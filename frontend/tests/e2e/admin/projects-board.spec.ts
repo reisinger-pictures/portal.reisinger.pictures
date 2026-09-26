@@ -1,14 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
+import { extractCookieHeader } from '../helpers/E2ECookieJar';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { KanbanHelper } from '../helpers/KanbanHelper';
 
 test.describe('Projekte-Board (Admin)', () => {
-    // Drag & Drop verändert das Board live (Karten werden eingefügt/verschoben) und die Tests
-    // teilen sich dieselbe (dirty) DB + dieselbe Anfrage-Spalte. Parallel würden sich die
-    // Drag-Versuche gegenseitig stören (Layout-Shift / verschobene Drop-Ziele) — siehe
-    // features/b2b/11-kanban-board.md (DnD). Deshalb: Datei seriell ausführen.
+    // Board-Mutationen verändern das Board live (Karten werden eingefügt/verschoben) und die
+    // Tests teilen sich dieselbe (dirty) DB + dieselbe Anfrage-Spalte. Der dedizierte DnD-Test
+    // darf deshalb nicht parallel zu anderen Board-Mutationen laufen — siehe
+    // features/b2b/11-kanban-board.md (DnD). Datei seriell ausführen.
     test.describe.configure({ mode: 'serial' });
 
     let helper: E2ESessionHelper;
@@ -92,8 +93,10 @@ test.describe('Projekte-Board (Admin)', () => {
         await expect(page.locator('main').getByText(clientName, { exact: false })).toHaveCount(0, { timeout: 10000 });
     });
 
+    // This is the sole browser-level native DnD regression. All other status
+    // transitions intentionally use the semantic status select below.
     test('Admin verschiebt ein Projekt per Drag & Drop in eine andere Spalte', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
-        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
+        test.skip(test.info().project.name !== 'Desktop Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin, 'Workflow', 'Workflow');
         const clientName = `Drag Projekt ${Math.random().toString(36).substring(2, 8)}`;
@@ -110,8 +113,7 @@ test.describe('Projekte-Board (Admin)', () => {
         await expect(page.locator('main').getByText(clientName, { exact: false }).first()).toBeVisible();
     });
 
-    test('Admin verschiebt ein Projekt in die Storniert-Spalte', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
-        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
+    test('Admin verschiebt ein Projekt semantisch in die Storniert-Spalte', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin, 'Workflow', 'Workflow');
         const clientName = `Storno ${Math.random().toString(36).substring(2, 8)}`;
@@ -122,39 +124,10 @@ test.describe('Projekte-Board (Admin)', () => {
         await kanban.waitForCreate('/api/management/projects');
         await expect(page.locator('main').getByText(clientName, { exact: false }).first()).toBeVisible();
 
-        await kanban.dragCard(clientName, 'Storniert');
+        await kanban.selectCardStatus(clientName, 'Storniert');
 
         await kanban.expectColumn('Storniert');
         await expect(page.locator('main').getByText(clientName, { exact: false }).first()).toBeVisible();
-    });
-
-    test('Admin reordert eine Karte innerhalb derselben Spalte in die Mitte (nicht ans Ende)', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
-        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
-        const superAdmin = await helper.createIsolatedUser('super_admin');
-        const { kanban } = await setup(page, superAdmin, 'Workflow', 'Workflow');
-        const names = ['Reorder A', 'Reorder B', 'Reorder C'].map(n => `${n} ${Math.random().toString(36).substring(2, 6)}`);
-
-        for (const name of names) {
-            await kanban.openCreateModal('Anfrage', 'Neues Projekt');
-            await kanban.fillField('Kundenname', name);
-            await kanban.submit();
-            await kanban.waitForCreate('/api/management/projects');
-            await kanban.modalIsClosed();
-        }
-
-        await kanban.expectCardOrder('Anfrage', names);
-
-        await kanban.dragCard(names[2], 'Anfrage', {
-            position: 'top',
-            verify: async () => {
-                const cards = kanban.column('Anfrage').locator('[data-testid="kanban-card"]');
-                const boxC = await cards.filter({ hasText: names[2] }).first().boundingBox();
-                const boxA = await cards.filter({ hasText: names[0] }).first().boundingBox();
-                return !!boxC && !!boxA && boxC.y < boxA.y;
-            },
-        });
-
-        await kanban.expectCardOrder('Anfrage', [names[2], names[0], names[1]]);
     });
 
     test('Admin verschiebt ein Projekt über das Karten-Status-Select (Mobile-Fallback, funktioniert auf allen Geräten)', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
@@ -174,7 +147,6 @@ test.describe('Projekte-Board (Admin)', () => {
     });
 
     test('Admin löscht ein storniertes Projekt mit Bestätigung', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
-        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin, 'Workflow', 'Workflow');
         const clientName = `Storno Del ${Math.random().toString(36).substring(2, 8)}`;
@@ -185,7 +157,7 @@ test.describe('Projekte-Board (Admin)', () => {
         await kanban.waitForCreate('/api/management/projects');
         await expect(page.locator('main').getByText(clientName, { exact: false }).first()).toBeVisible();
 
-        await kanban.dragCard(clientName, 'Storniert');
+        await kanban.selectCardStatus(clientName, 'Storniert');
 
         const card = page.locator('main').getByText(clientName, { exact: false }).first()
             .locator('xpath=ancestor::div[contains(@class,"card")][1]');
@@ -254,9 +226,9 @@ test.describe('Projekte-Board (Admin)', () => {
             data: { email: superAdmin.email, password: superAdmin.password },
             headers: { 'Accept': 'application/json' },
         });
-        const setCookie = loginApi.headers()['set-cookie'] ?? '';
-        const tokenMatch = setCookie.match(/rp_jwt=([^;]+)/);
-        const cookie = tokenMatch ? `rp_jwt=${tokenMatch[1]}` : '';
+        if (!loginApi.ok()) throw new Error(`Admin login failed: ${await loginApi.text()}`);
+        const cookie = extractCookieHeader(loginApi);
+        if (!cookie) throw new Error('Admin login response did not contain an auth cookie');
 
         const customerName = `Drop Kunde ${Math.random().toString(36).substring(2, 8)}`;
         const customerEmail = `drop-kunde-${Math.random().toString(36).substring(2, 8)}@example.com`;

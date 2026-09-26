@@ -122,21 +122,18 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
 
             if (aiData.detected_city) {
                 try {
-                    const locRes = await fetch(`/api/search/locations?type=city&q=${encodeURIComponent(aiData.detected_city)}`, { credentials: 'include', signal });
-                    if (locRes.ok) {
-                        const locs: LocationResult[] = await locRes.json();
-                        if (locs.length > 0) {
-                            locData = {
-                                ...locData,
-                                city: locs[0].name,
-                                state: locs[0].state || '',
-                                country: locs[0].country || '',
-                                iso_country: locs[0].iso_country || ''
-                            };
-                        } else {
-                            const detectedCity = aiData.detected_city;
-                            showToast('info', t`Stadt "${detectedCity}" wurde nicht in der Datenbank gefunden.`);
-                        }
+                    const locs = await fetcher<LocationResult[]>(`/api/search/locations?type=city&q=${encodeURIComponent(aiData.detected_city)}`, { signal });
+                    if (locs.length > 0) {
+                        locData = {
+                            ...locData,
+                            city: locs[0].name,
+                            state: locs[0].state || '',
+                            country: locs[0].country || '',
+                            iso_country: locs[0].iso_country || ''
+                        };
+                    } else {
+                        const detectedCity = aiData.detected_city;
+                        showToast('info', t`Stadt "${detectedCity}" wurde nicht in der Datenbank gefunden.`);
                     }
                 } catch (e: unknown) {
                     const isAbort = e instanceof Error && e.name === 'AbortError';

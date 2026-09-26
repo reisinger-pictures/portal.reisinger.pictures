@@ -1,9 +1,11 @@
 import useSWR, {mutate as globalMutate} from 'swr';
 import {t} from "@lingui/core/macro";
-import {fetcher, User} from '../api';
+import {fetcher, refreshAuthSession, type AuthMeUser, type User} from '../api';
+import {clearCheckoutSession} from './checkoutSession';
 
-// Re-export the canonical `User` type so existing imports from this module keep working.
-export type {User};
+// `useAuth` returns the /api/auth/me contract. Keep the broader `User`
+// re-export for non-auth consumers that still import it from this module.
+export type {AuthMeUser, User};
 
 interface AuthMessagePayload {
     message?: string;
@@ -23,8 +25,10 @@ async function readAuthMessage(response: Response): Promise<AuthMessagePayload> 
     }
 }
 
+const fetchAuthMe = (key: string): Promise<AuthMeUser> => fetcher<AuthMeUser>(key);
+
 export function useAuth() {
-    const {data: user, error, isLoading, mutate} = useSWR<User>('/api/auth/me', fetcher, {
+    const {data: user, error, isLoading, mutate} = useSWR<AuthMeUser>('/api/auth/me', fetchAuthMe, {
         shouldRetryOnError: false,
         dedupingInterval: 60_000,
     });
@@ -36,8 +40,10 @@ export function useAuth() {
             credentials: 'include',
             body: JSON.stringify({email, password})
         });
-        const data = await readAuthMessage(response);
-        if (!response.ok) throw new Error(data.message || data.error || t`Login fehlgeschlagen.`);
+        if (!response.ok) {
+            const data = await readAuthMessage(response);
+            throw new Error(data.message || data.error || t`Login fehlgeschlagen.`);
+        }
         await globalMutate(() => true, undefined, {revalidate: true});
     };
 
@@ -48,23 +54,45 @@ export function useAuth() {
             credentials: 'include',
             body: JSON.stringify({name, email})
         });
+        if (!response.ok) {
+            const data = await readAuthMessage(response);
+            throw new Error(data.message || data.error || t`Registrierung fehlgeschlagen`);
+        }
         const data = await readAuthMessage(response);
-        if (!response.ok) throw new Error(data.message || data.error || t`Registrierung fehlgeschlagen`);
         return data.message || t`Erfolgreich registriert`;
     };
 
     const logout = async (): Promise<void> => {
+        const requestLogout = (): Promise<Response> => fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: {'Accept': 'application/json'},
+            credentials: 'include'
+        });
+
+        let response: Response;
         try {
-            await fetch('/api/auth/logout', {
-                method: 'POST',
-                headers: {'Accept': 'application/json'},
-                credentials: 'include'
-            });
+            response = await requestLogout();
+            // An expired access cookie must not turn logout into a dead end.
+            // The refresh endpoint owns the HttpOnly refresh credential; after
+            // one successful rotation, retry the logout at most once.
+            if (response.status === 401 && await refreshAuthSession()) {
+                response = await requestLogout();
+            }
         } catch (e) {
             throw new Error(e instanceof Error ? e.message : t`Logout fehlgeschlagen`, {cause: e});
         }
-        await globalMutate(() => true, undefined, {revalidate: true});
+
+        if (!response.ok) {
+            const data = await readAuthMessage(response);
+            throw new Error(data.message || data.error || t`Logout fehlgeschlagen`);
+        }
+
+        if (user?.id) clearCheckoutSession(user.id);
+        // Do not revalidate protected keys after logout: a stale 401 would
+        // immediately start another refresh cycle even though the session is
+        // intentionally being cleared.
+        await globalMutate(() => true, undefined, {revalidate: false});
     };
 
-    return {user, isLoading: isLoading || (!user && !error), isError: error, login, register, logout, mutate};
+    return {user, isLoading, isError: error, login, register, logout, mutate};
 }

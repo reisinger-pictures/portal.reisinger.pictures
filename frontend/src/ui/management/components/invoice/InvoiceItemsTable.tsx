@@ -2,9 +2,12 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import {InvoiceItem, Product} from '../../../../api';
 import AutocompleteInput from '../../../components/AutocompleteInput';
+import {calculateEditorItemTotal, fixedPointToMajorUnits} from '../../../../logic/contractPricing';
 
 interface InvoiceItemsTableProps {
     items: InvoiceItem[];
+    /** Manual invoices use hundredths; contract snapshots keep whole units. */
+    quantityMode?: 'manual' | 'contract';
     onItemChange: (index: number, field: string, value: string | number) => void;
     onAddItem: () => void;
     onRemoveItem: (index: number) => void;
@@ -14,6 +17,7 @@ interface InvoiceItemsTableProps {
 
 export default function InvoiceItemsTable({
     items,
+    quantityMode = 'manual',
     onItemChange,
     onAddItem,
     onRemoveItem,
@@ -96,8 +100,8 @@ export default function InvoiceItemsTable({
                                 <input
                                     required
                                     type="number"
-                                    step="0.25"
-                                    min="0.25"
+                                    step={quantityMode === 'contract' ? '1' : '0.25'}
+                                    min={quantityMode === 'contract' ? '1' : '0.25'}
                                     value={item.qty}
                                     onChange={(e) => onItemChange(idx, 'qty', parseFloat(e.target.value) || 0)}
                                     className="input input-sm input-bordered w-full font-mono text-center"
@@ -127,7 +131,7 @@ export default function InvoiceItemsTable({
                                 <span className="label-text text-sm font-bold"><Trans>Gesamt</Trans></span>
                             </label>
                             <div className="text-right font-mono font-bold mt-1 text-base-content">
-                                {(item.price * item.qty).toFixed(2)} €
+                                {fixedPointToMajorUnits(calculateEditorItemTotal(item, quantityMode)).toFixed(2)} €
                             </div>
                         </div>
 

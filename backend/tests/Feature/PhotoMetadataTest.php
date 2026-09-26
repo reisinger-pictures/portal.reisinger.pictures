@@ -1,40 +1,45 @@
 <?php
+
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Role;
+use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\Photo;
+use App\Models\PhotoMetadataVersion;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
-class PhotoMetadataTest extends TestCase {
+class PhotoMetadataTest extends TestCase
+{
     use RefreshDatabase;
 
-    public function test_client_with_rights_can_update_metadata_and_creates_version() {
+    public function test_client_with_rights_can_update_metadata_and_creates_version()
+    {
         $client = User::factory()->create(['can_edit_metadata' => true]);
-        $client->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
-        
+        $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
+
         $gallery = Gallery::factory()->create([
             'allow_client_metadata_edit' => true,
-            'type' => 'delivery'
+            'type' => 'delivery',
         ]);
         $client->galleries()->attach($gallery);
 
         $photo = Photo::factory()->create([
             'gallery_id' => $gallery->id,
             'title' => 'Original Title',
-            'description' => 'Original Description'
+            'description' => 'Original Description',
         ]);
 
         $token = auth('api')->login($client);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-                         ->putJson("/api/photos/{$photo->id}/meta", [
-                             'title' => 'New Title by Client',
-                             'headline' => 'Awesome Headline',
-                             'description' => 'New Description by Client'
-                         ]);
+            ->putJson("/api/photos/{$photo->id}/meta", [
+                'title' => 'New Title by Client',
+                'headline' => 'Awesome Headline',
+                'description' => 'New Description by Client',
+            ]);
 
         $response->assertStatus(200);
 
@@ -42,7 +47,7 @@ class PhotoMetadataTest extends TestCase {
         $this->assertDatabaseHas('photos', [
             'id' => $photo->id,
             'title' => 'New Title by Client',
-            'headline' => 'Awesome Headline'
+            'headline' => 'Awesome Headline',
         ]);
 
         // Es muss eine Versionierung des ORIGINAL-Zustands existieren
@@ -50,14 +55,15 @@ class PhotoMetadataTest extends TestCase {
             'photo_id' => $photo->id,
             'user_id' => $client->id,
             'title' => 'Original Title',
-            'description' => 'Original Description'
+            'description' => 'Original Description',
         ]);
     }
 
-    public function test_client_without_rights_cannot_update_metadata() {
+    public function test_client_without_rights_cannot_update_metadata()
+    {
         $client = User::factory()->create(['can_edit_metadata' => false]); // Recht fehlt
-        $client->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
-        
+        $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
+
         $gallery = Gallery::factory()->create([
             'allow_client_metadata_edit' => true,
         ]);
@@ -68,55 +74,57 @@ class PhotoMetadataTest extends TestCase {
         $token = auth('api')->login($client);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-                         ->putJson("/api/photos/{$photo->id}/meta", [
-                             'title' => 'Hacked Title'
-                         ]);
+            ->putJson("/api/photos/{$photo->id}/meta", [
+                'title' => 'Hacked Title',
+            ]);
 
         $response->assertStatus(403);
     }
 
-    public function test_client_cannot_change_artist_metadata() {
+    public function test_client_cannot_change_artist_metadata()
+    {
         $client = clone User::factory()->create(['can_edit_metadata' => true]);
-        $client->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
-        
+        $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
+
         // Neu: Echten Fotografen anlegen, aus dem sich das 'artist' Attribut ableitet
         $photographer = clone User::factory()->create(['name' => 'Original Photographer']);
 
         $gallery = Gallery::factory()->create([
             'allow_client_metadata_edit' => true,
-            'type' => 'delivery'
+            'type' => 'delivery',
         ]);
         $client->galleries()->attach($gallery);
 
         $photo = Photo::factory()->create([
             'gallery_id' => $gallery->id,
             'user_id' => $photographer->id, // Neu: Referenz statt Fake-Spalte
-            'title' => 'Old Title'
+            'title' => 'Old Title',
         ]);
 
         $token = auth('api')->login($client);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-                         ->putJson("/api/photos/{$photo->id}/meta", [
-                             'title' => 'Allowed Title Change',
-                             'artist' => 'Hacker Artist Name' 
-                         ]);
+            ->putJson("/api/photos/{$photo->id}/meta", [
+                'title' => 'Allowed Title Change',
+                'artist' => 'Hacker Artist Name',
+            ]);
 
         $response->assertStatus(200);
 
         $this->assertDatabaseHas('photos', [
             'id' => $photo->id,
             'title' => 'Allowed Title Change',
-            'user_id' => $photographer->id // Sicherstellen, dass die ID intakt bleibt
+            'user_id' => $photographer->id, // Sicherstellen, dass die ID intakt bleibt
         ]);
 
         // Prüfen, ob der Accessor weiterhin den Namen des Original-Fotografen ausspuckt
         $this->assertEquals('Original Photographer', $photo->fresh()->artist);
     }
 
-    public function test_photographer_update_metadata_creates_version() {
+    public function test_photographer_update_metadata_creates_version()
+    {
         $photographer = User::factory()->create();
-        $photographer->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $photographer->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
         $gallery = Gallery::factory()->create(['type' => 'delivery']);
         $photographer->photographerGalleries()->attach($gallery);
@@ -132,11 +140,11 @@ class PhotoMetadataTest extends TestCase {
         $token = auth('api')->login($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-                         ->putJson("/api/photos/{$photo->id}/meta", [
-                             'title' => 'Updated by Photographer',
-                             'headline' => 'Updated Headline',
-                             'description' => 'Updated by Photographer',
-                         ]);
+            ->putJson("/api/photos/{$photo->id}/meta", [
+                'title' => 'Updated by Photographer',
+                'headline' => 'Updated Headline',
+                'description' => 'Updated by Photographer',
+            ]);
 
         $response->assertStatus(200);
 
@@ -154,35 +162,36 @@ class PhotoMetadataTest extends TestCase {
         ]);
     }
 
-    public function test_photographer_cannot_update_or_delete_other_photographers_photo() {
+    public function test_photographer_cannot_update_or_delete_other_photographers_photo()
+    {
         $photog1 = User::factory()->create();
-        $photog1->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $photog1->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
         $photog2 = User::factory()->create();
-        $photog2->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $photog2->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
         $gallery1 = Gallery::factory()->create(['restricted_photographers' => true]);
         $photog1->galleries()->attach($gallery1);
-        
+
         $photo1 = Photo::factory()->create(['gallery_id' => $gallery1->id]);
 
         $token2 = auth('api')->login($photog2);
 
         // Update Meta
         $this->withHeaders(['Authorization' => "Bearer $token2"])
-             ->putJson("/api/photos/{$photo1->id}/meta", ['title' => 'Hacked by P2'])
-             ->assertStatus(403);
+            ->putJson("/api/photos/{$photo1->id}/meta", ['title' => 'Hacked by P2'])
+            ->assertStatus(403);
 
         // Delete
         $this->withHeaders(['Authorization' => "Bearer $token2"])
-             ->deleteJson("/api/photos/{$photo1->id}")
-             ->assertStatus(403);
+            ->deleteJson("/api/photos/{$photo1->id}")
+            ->assertStatus(403);
     }
 
-
-    public function test_photographer_can_update_editorial_flag_and_it_is_returned() {
+    public function test_photographer_can_update_editorial_flag_and_it_is_returned()
+    {
         $photog = User::factory()->create();
-        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
         $gallery = Gallery::factory()->create(['type' => 'delivery']);
         $photog->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photog->id]);
@@ -190,27 +199,28 @@ class PhotoMetadataTest extends TestCase {
         $token = auth('api')->login($photog);
 
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
-             ->putJson("/api/photos/{$photo->id}/meta", [
-                 'is_editorial_only' => true
-             ]);
+            ->putJson("/api/photos/{$photo->id}/meta", [
+                'is_editorial_only' => true,
+            ]);
 
         $res->assertStatus(200);
         $this->assertDatabaseHas('photos', [
             'id' => $photo->id,
-            'is_editorial_only' => 1
+            'is_editorial_only' => 1,
         ]);
 
         $resContext = $this->withHeaders(['Authorization' => "Bearer $token"])
-             ->getJson("/api/photos/{$photo->id}/context");
-        
+            ->getJson("/api/photos/{$photo->id}/context");
+
         $resContext->assertStatus(200);
         $this->assertTrue($resContext->json('photo.is_editorial_only'));
         $this->assertTrue($resContext->json('photo.effective_is_editorial_only'));
     }
 
-    public function test_can_save_stress_keywords_longer_than_255_chars() {
+    public function test_can_save_stress_keywords_longer_than_255_chars()
+    {
         $photog = User::factory()->create();
-        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
         $gallery = Gallery::factory()->create();
         $photog->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photog->id]);
@@ -220,48 +230,91 @@ class PhotoMetadataTest extends TestCase {
 
         $token = auth('api')->login($photog);
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
-             ->putJson("/api/photos/{$photo->id}/meta", [
-                 'keywords' => $longKeywords
-             ]);
+            ->putJson("/api/photos/{$photo->id}/meta", [
+                'keywords' => $longKeywords,
+            ]);
 
         $res->assertStatus(200);
         $this->assertDatabaseHas('photos', [
             'id' => $photo->id,
-            'keywords' => rtrim($longKeywords)
+            'keywords' => rtrim($longKeywords),
         ]);
     }
-    public function test_captured_at_is_readonly_and_returned_in_context() {
+
+    public function test_revert_preserves_pre_revert_metadata_and_revert_actor_in_history()
+    {
+        $photographer = User::factory()->create();
+        $photographer->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
+
+        $gallery = Gallery::factory()->create(['type' => 'delivery']);
+        $photographer->photographerGalleries()->attach($gallery);
+
+        $photo = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'user_id' => $photographer->id,
+            'title' => 'Version B',
+            'headline' => 'Headline B',
+            'description' => 'Description B',
+        ]);
+        $versionA = PhotoMetadataVersion::create([
+            'photo_id' => $photo->id,
+            'user_id' => $photographer->id,
+            'title' => 'Version A',
+            'headline' => 'Headline A',
+            'description' => 'Description A',
+        ]);
+
+        $admin = User::factory()->create();
+        $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
+
+        $this->actingAs($admin, 'api')
+            ->postJson("/api/photos/{$photo->id}/revert/{$versionA->id}")
+            ->assertStatus(200);
+
+        $this->assertSame('Version A', $photo->fresh()->title);
+        $this->assertDatabaseCount('photo_metadata_versions', 2);
+        $this->assertDatabaseHas('photo_metadata_versions', [
+            'photo_id' => $photo->id,
+            'user_id' => $admin->id,
+            'title' => 'Version B',
+            'headline' => 'Headline B',
+            'description' => 'Description B',
+        ]);
+    }
+
+    public function test_captured_at_is_readonly_and_returned_in_context()
+    {
         $photog = User::factory()->create();
-        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
         $gallery = Gallery::factory()->create(['type' => 'delivery']);
         $photog->galleries()->attach($gallery);
         $photo = Photo::factory()->create([
-            'gallery_id' => $gallery->id, 
+            'gallery_id' => $gallery->id,
             'user_id' => $photog->id,
-            'captured_at' => '2025-01-01 12:00:00'
+            'captured_at' => '2025-01-01 12:00:00',
         ]);
 
         $token = auth('api')->login($photog);
 
         // 1. Context API prüft, ob Datum ausgeliefert wird
         $resContext = $this->withHeaders(['Authorization' => "Bearer $token"])
-             ->getJson("/api/photos/{$photo->id}/context");
-             
+            ->getJson("/api/photos/{$photo->id}/context");
+
         $resContext->assertStatus(200);
         $this->assertEquals('2025-01-01T12:00:00.000000Z', $resContext->json('photo.captured_at'));
 
         // 2. Security: User darf das EXIF-Datum nicht manipulieren
         $resUpdate = $this->withHeaders(['Authorization' => "Bearer $token"])
-             ->putJson("/api/photos/{$photo->id}/meta", [
-                 'title' => 'Updated Title',
-                 'captured_at' => '2099-01-01 00:00:00'
-             ]);
+            ->putJson("/api/photos/{$photo->id}/meta", [
+                'title' => 'Updated Title',
+                'captured_at' => '2099-01-01 00:00:00',
+            ]);
 
         $resUpdate->assertStatus(200);
         $this->assertDatabaseHas('photos', [
             'id' => $photo->id,
             'title' => 'Updated Title',
-            'captured_at' => '2025-01-01 12:00:00' // Datum muss exakt bleiben
+            'captured_at' => '2025-01-01 12:00:00', // Datum muss exakt bleiben
         ]);
     }
 }

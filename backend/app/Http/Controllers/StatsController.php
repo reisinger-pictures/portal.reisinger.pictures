@@ -19,6 +19,10 @@ class StatsController extends Controller
     public function index(StatsIndexRequest $request)
     {
         $user = auth('api')->user();
+        $authorization = app(AuthorizationService::class);
+        if ($user && $authorization->isReservedNullBrandActor($user)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
         $tier = $request->query('tier');
 
         $stats = $this->statsCalculationService->getStatsForUser($user, $tier);
@@ -30,6 +34,9 @@ class StatsController extends Controller
     {
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
+        if ($user && $svc->isReservedNullBrandActor($user)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
         $tier = $request->query('tier');
         $query = DownloadLog::with('gallery.latestPhoto')->orderBy('id', 'desc');
 

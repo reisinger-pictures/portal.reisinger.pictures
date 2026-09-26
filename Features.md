@@ -1,5 +1,11 @@
 # Reisinger Foto Portal – Feature Übersicht
 
+> **Legacy overview:** Diese Übersichtsseite bleibt für historische und
+> nutzerorientierte Einstiege erhalten. Die kanonischen technischen Indizes sind
+> [features/README.md](features/README.md) und
+> [features/tech/README.md](features/tech/README.md); neue Verträge und
+> Links werden dort gepflegt.
+
 Das Reisinger Foto Portal ist eine moderne SaaS-Lösung für Fotografen und Bildagenturen. Es vereinfacht den gesamten Prozess von der Bildauswahl über die sichere Auslieferung bis hin zum Verkauf von Lizenzen an B2B- und B2C-Kunden.
 
 ---
@@ -106,6 +112,7 @@ Detaillierte Spezifikationen nach Kategorie:
 - [18-jwt-offer-tokens.md](./features/infrastructure/18-jwt-offer-tokens.md)
 - [19-ftp-upload-pipeline.md](./features/infrastructure/19-ftp-upload-pipeline.md)
 - [20-setting-resolver.md](./features/infrastructure/20-setting-resolver.md)
+- [29-production-operations-runbook.md](./features/infrastructure/29-production-operations-runbook.md)
 
 ### Photos
 - [01-upload-and-processing.md](./features/photos/01-upload-and-processing.md)

@@ -5,16 +5,23 @@ import { Gallery, GalleryGroup, useProtectedGalleries } from '../../logic/useGal
 import GalleryModals from './GalleryModals';
 import { DashboardContext, type DashboardContextValue } from './DashboardContext';
 
+export interface DashboardLayoutHeaderProps {
+    onMenuClick: () => void;
+    isSidebarOpen: boolean;
+    sidebarId: string;
+}
+
 export interface DashboardLayoutProps {
     children: ReactNode;
     currentView?: string;
-    header?: (props: { onMenuClick: () => void }) => ReactNode;
+    header?: (props: DashboardLayoutHeaderProps) => ReactNode;
     mainClassName?: string;
     sidebarWrapper?: (children: ReactNode) => ReactNode;
 }
 
 export default function DashboardLayout({ children, currentView, header, mainClassName = '', sidebarWrapper }: DashboardLayoutProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const sidebarId = 'dashboard-sidebar';
 
     const galleryData = useProtectedGalleries();
     const { tree, isLoading, isError, mutate, createGroup, createGallery, updateGroup, updateGallery, deleteGroup, deleteGallery } = galleryData;
@@ -70,12 +77,18 @@ export default function DashboardLayout({ children, currentView, header, mainCla
                              onClick={() => setIsSidebarOpen(false)} />
                     )}
 
-                    <div className={`fixed inset-y-0 left-0 z-50 w-full md:w-72 2xl:w-80 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                    <div
+                        id={sidebarId}
+                        className={`fixed inset-y-0 left-0 z-50 w-full md:w-72 2xl:w-80 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                         {sidebarWrapper ? sidebarWrapper(sidebar) : sidebar}
                     </div>
 
                     <main className={`flex-1 overflow-y-auto flex flex-col w-full relative ${mainClassName}`}>
-                        {header && header({ onMenuClick: () => setIsSidebarOpen(true) })}
+                        {header && header({
+                            onMenuClick: () => setIsSidebarOpen(true),
+                            isSidebarOpen,
+                            sidebarId,
+                        })}
                         {children}
                     </main>
 

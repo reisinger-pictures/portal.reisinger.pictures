@@ -103,8 +103,14 @@ class FtpController extends Controller
             $targetRelativePath = $targetDir.'/'.$filename;
             $thumbsDir = $targetDir.'/_thumbs';
 
-            Storage::disk('photos')->put($targetRelativePath, file_get_contents($file));
-            unlink($file);
+            $contents = file_get_contents($file);
+            if ($contents === false) {
+                throw new \RuntimeException('FTP-Quelldatei konnte nicht gelesen werden.');
+            }
+
+            if (! Storage::disk('photos')->put($targetRelativePath, $contents)) {
+                throw new \RuntimeException('Foto konnte nicht in den Photo-Speicher geschrieben werden.');
+            }
 
             $targetPath = Storage::disk('photos')->path($targetRelativePath);
             $thumbPath = Storage::disk('photos')->path($thumbsDir.'/'.md5($filename.'1024').'.webp');
@@ -119,16 +125,22 @@ class FtpController extends Controller
             }
 
             DB::transaction(function () use ($gallery, $meta, $photoId, $user) {
-                $photo = new Photo;
-                $photo->forceFill(
+                // `id` is not fillable (it is the stored file name), and
+                // `captured_at` is EXIF-derived rather than client input — both
+                // are written deliberately by the explicit creation API.
+                Photo::createWithId(
                     array_merge([
-                        'id' => $photoId,
                         'gallery_id' => $gallery->id,
                         'lr_uuid' => 'ftp-'.uniqid(),
                         'user_id' => $user->id,
-                    ], $meta)
-                )->save();
+                    ], $meta),
+                    $photoId,
+                );
             });
+
+            if (file_exists($file) && ! unlink($file)) {
+                throw new \RuntimeException('FTP-Quelldatei konnte nicht gelöscht werden.');
+            }
 
             $processedCount++;
         }

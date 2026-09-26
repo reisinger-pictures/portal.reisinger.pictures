@@ -1,8 +1,11 @@
-# Brand Separation Matrix — RP vs SRP
+# Brand Separation Matrix — Historical RP/SRP Analysis
 
-> **Status:** active (analysis)
-> **Last updated:** 2026-07-06
-> **See also:** `features/infrastructure/12-brand-registry-and-settings-fixes.md`
+> **Status:** Historical analysis (2026-07-06); superseded for current
+> configuration by [`21-brand-config-driven.md`](21-brand-config-driven.md),
+> [`22-brand-settings-overlay.md`](22-brand-settings-overlay.md), and
+> [`17-pricing-strategy-pattern.md`](17-pricing-strategy-pattern.md).
+> The live application currently has the single configured `rp` brand; the
+> two-brand matrix below is retained for decision history only.
 
 ## Introduction
 

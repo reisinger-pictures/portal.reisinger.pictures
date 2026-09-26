@@ -30,7 +30,7 @@ class PayoutCalculationServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new PayoutCalculationService();
+        $this->service = new PayoutCalculationService;
     }
 
     /**
@@ -47,8 +47,10 @@ class PayoutCalculationServiceTest extends TestCase
         $log = DownloadLog::factory()->create($attributes);
         if ($createdAt !== null) {
             DownloadLog::where('id', $log->id)->update(['created_at' => $createdAt]);
+
             return DownloadLog::find($log->id);
         }
+
         return $log;
     }
 
@@ -216,6 +218,54 @@ class PayoutCalculationServiceTest extends TestCase
         $this->assertSame('20.0000', $pool->total_shares); // 5 * 4 = 20
         $this->assertSame(5, $pool->total_unique_downloads);
         $this->assertSame(1000, $pool->value_per_share_cents); // 20000 / 20
+    }
+
+    public function test_calculate_pool_shares_attributes_zip_to_actual_multi_photographer_ownership(): void
+    {
+        $pool = PayoutPool::factory()
+            ->forMonth(7, 2026)
+            ->withNetPool(1600)
+            ->create(['photographer_share_percent' => 100]);
+        $gallery = Gallery::factory()->create();
+        $photographerA = User::factory()->create();
+        $photographerB = User::factory()->create();
+
+        foreach (range(1, 3) as $index) {
+            Photo::factory()->create([
+                'gallery_id' => $gallery->id,
+                'user_id' => $photographerA->id,
+                'title' => 'Photographer A '.$index,
+            ]);
+        }
+        Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'user_id' => $photographerB->id,
+            'title' => 'Photographer B',
+        ]);
+
+        $this->logDownload([
+            'user_id' => User::factory()->create()->id,
+            'gallery_id' => $gallery->id,
+            'item_type' => 'full_zip',
+            'resolution_tier' => 'original',
+            'photo_count' => 4,
+            'payload' => null,
+            'created_at' => '2026-07-10 12:00:00',
+        ]);
+
+        $this->service->calculatePoolShares($pool->fresh());
+
+        $pool->refresh();
+        $this->assertSame('16.0000', $pool->total_shares);
+        $this->assertSame(4, $pool->total_unique_downloads);
+        $this->assertSame(100, $pool->value_per_share_cents);
+
+        $statementA = PhotographerStatement::where('user_id', $photographerA->id)->sole();
+        $statementB = PhotographerStatement::where('user_id', $photographerB->id)->sole();
+        $this->assertSame('12.0000', $statementA->total_shares_earned);
+        $this->assertSame(1200, $statementA->pool_earnings_cents);
+        $this->assertSame('4.0000', $statementB->total_shares_earned);
+        $this->assertSame(400, $statementB->pool_earnings_cents);
     }
 
     public function test_calculate_pool_shares_zip_takes_max_when_multiple_zips(): void
@@ -414,9 +464,10 @@ class PayoutCalculationServiceTest extends TestCase
         $this->assertNotEmpty($stmt->sequence_number); // auto-generated
     }
 
-    public function test_calculate_pool_shares_accumulates_into_existing_statement(): void
+    public function test_calculate_pool_shares_replaces_existing_pool_contribution(): void
     {
-        // REVIEW: firstOrNew lädt bestehendes Statement und addiert Shares/Earnings.
+        // The pool calculation is authoritative for (year, month): it replaces
+        // pool-derived fields instead of adding to a previous run.
         $pool = PayoutPool::factory()
             ->forMonth(6, 2026)->withNetPool(10000)
             ->create(['photographer_share_percent' => 100]);
@@ -425,6 +476,7 @@ class PayoutCalculationServiceTest extends TestCase
         PhotographerStatement::create([
             'user_id' => $photographer->id, 'month' => 6, 'year' => 2026,
             'total_shares_earned' => '5.0000', 'pool_earnings_cents' => 3000,
+            'delta_surcharge_earnings_cents' => 250,
         ]);
 
         $gallery = Gallery::factory()->create();
@@ -438,8 +490,9 @@ class PayoutCalculationServiceTest extends TestCase
         $this->service->calculatePoolShares($pool->fresh());
 
         $stmt = PhotographerStatement::where('user_id', $photographer->id)->sole();
-        $this->assertSame('6.0000', $stmt->total_shares_earned); // 5 + 1
-        $this->assertSame(13000, $stmt->pool_earnings_cents); // 3000 + (1*10000*100%)
+        $this->assertSame('1.0000', $stmt->total_shares_earned);
+        $this->assertSame(10000, $stmt->pool_earnings_cents); // 1 * 10000 * 100%
+        $this->assertSame(250, $stmt->delta_surcharge_earnings_cents);
     }
 
     // ============================================================

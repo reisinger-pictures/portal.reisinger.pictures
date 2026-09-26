@@ -7,6 +7,7 @@ use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
 use Stripe\ApiRequestor;
@@ -39,14 +40,16 @@ class WebhookReplayMailTest extends TestCase
         return [$payload, "t={$timestamp},v1={$signature}"];
     }
 
-    public function test_duplicate_payment_intent_succeeded_sends_only_one_invoice_mail(): void
+    public function test_duplicate_payment_intent_succeeded_enqueues_only_one_invoice_job(): void
     {
         $user = User::factory()->create();
         $order = Order::factory()->create([
             'user_id' => $user->id,
-            'status' => 'pending',
+            'status' => 'pending_payment',
             'total_amount' => 5000,
             'stripe_payment_intent_id' => 'pi_replay_123',
+            'checkout_idempotency_key' => 'checkout-pi-replay-123',
+            'checkout_fingerprint' => hash('sha256', 'pi_replay_123'),
         ]);
         InvoiceSnapshot::create([
             'order_id' => $order->id,
@@ -70,8 +73,19 @@ class WebhookReplayMailTest extends TestCase
             'data' => [
                 'object' => [
                     'id' => 'pi_replay_123',
+                    'amount' => 5000,
+                    'currency' => 'eur',
                     'amount_received' => 5000,
-                    'metadata' => ['order_id' => $order->id],
+                    'metadata' => [
+                        'order_id' => (string) $order->id,
+                        'checkout_idempotency_key' => (string) $order->checkout_idempotency_key,
+                        'checkout_fingerprint' => (string) $order->checkout_fingerprint,
+                        'generation' => (string) $order->payment_intent_generation,
+                        'portal_user_id' => (string) $order->user_id,
+                        'account_created_at' => (string) $order->user->created_at->getTimestamp(),
+                        'amount_cents' => (string) $order->total_amount,
+                        'currency' => 'eur',
+                    ],
                 ],
             ],
         ];
@@ -92,14 +106,17 @@ class WebhookReplayMailTest extends TestCase
             ]);
         ApiRequestor::setHttpClient($clientMock);
 
-        // First delivery — order becomes paid, invoice mail is queued
+        // First delivery — order becomes paid and one invoice job is enqueued
         $this->postJson('/api/webhooks/stripe', $payloadData, [
             'Stripe-Signature' => $sigHeader,
         ])->assertStatus(200);
 
         Mail::assertQueued(InvoiceMail::class, 1);
 
-        // Second delivery — exact same event, order already paid, no additional mail
+        // Losing the event-dedupe cache must not lose the durable mail claim.
+        Cache::flush();
+
+        // Second delivery — exact same event, order already paid, no additional enqueue
         $this->postJson('/api/webhooks/stripe', $payloadData, [
             'Stripe-Signature' => $sigHeader,
         ])->assertStatus(200);

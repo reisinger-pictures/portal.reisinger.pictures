@@ -1,11 +1,14 @@
-import { Page, expect } from '@playwright/test';
-import { Locator } from '@playwright/test';
+import { Locator, Page, expect } from '@playwright/test';
+
+const searchLabel = 'Suche';
 
 export class SearchHelper {
     private _input: Locator;
 
     constructor(private page: Page) {
-        this._input = this.page.locator('input[placeholder="Suche in allen Galerien..."]');
+        this._input = this.page
+            .getByRole('banner')
+            .getByRole('textbox', { name: searchLabel });
     }
 
     get input() {

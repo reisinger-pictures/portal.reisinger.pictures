@@ -2,20 +2,25 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
 use App\Models\Gallery;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
-use Carbon\Carbon;
+use Tests\TestCase;
 
 class CleanupGalleriesTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->useTemporaryStorageDisk('photos');
+        config(['scout.driver' => 'null']);
+    }
+
     public function test_cleanup_removes_expired_galleries_and_files()
     {
-        Storage::fake('photos');
-
         // Setze ein festes Datum für deterministische Tests
         Carbon::setTestNow(Carbon::create(2026, 3, 24, 12, 0, 0));
 
@@ -30,24 +35,24 @@ class CleanupGalleriesTest extends TestCase
         ]);
 
         // Fake Storage befüllen
-        Storage::disk('photos')->makeDirectory((string)$expiredGallery->id);
-        Storage::disk('photos')->put($expiredGallery->id . '/test.jpg', 'dummy content');
+        Storage::disk('photos')->makeDirectory((string) $expiredGallery->id);
+        Storage::disk('photos')->put($expiredGallery->id.'/test.jpg', 'dummy content');
 
-        Storage::disk('photos')->makeDirectory((string)$validGallery->id);
-        Storage::disk('photos')->put($validGallery->id . '/test.jpg', 'dummy content');
+        Storage::disk('photos')->makeDirectory((string) $validGallery->id);
+        Storage::disk('photos')->put($validGallery->id.'/test.jpg', 'dummy content');
 
         // Command ausführen
         $this->artisan('app:cleanup-galleries')
-             ->assertExitCode(0);
+            ->assertExitCode(0);
 
         // Assertions: Datenbank
         $this->assertDatabaseMissing('galleries', ['id' => $expiredGallery->id]);
         $this->assertDatabaseHas('galleries', ['id' => $validGallery->id]);
 
         // Assertions: Dateisystem
-        $this->assertFalse(Storage::disk('photos')->exists((string)$expiredGallery->id));
-        $this->assertTrue(Storage::disk('photos')->exists((string)$validGallery->id));
-        
+        $this->assertFalse(Storage::disk('photos')->exists((string) $expiredGallery->id));
+        $this->assertTrue(Storage::disk('photos')->exists((string) $validGallery->id));
+
         // Carbon Mock wieder aufheben
         Carbon::setTestNow();
     }

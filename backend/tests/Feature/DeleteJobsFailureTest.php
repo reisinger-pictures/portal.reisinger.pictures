@@ -33,7 +33,7 @@ class DeleteJobsFailureTest extends TestCase
     {
         $disk = Mockery::mock(Filesystem::class);
         $disk->shouldReceive('deleteDirectory')->once()->andReturn(false);
-        $disk->shouldReceive('exists')->andReturn(true);
+        $disk->shouldReceive('exists')->once()->andReturn(true);
 
         Storage::shouldReceive('disk')->with('photos')->andReturn($disk);
 

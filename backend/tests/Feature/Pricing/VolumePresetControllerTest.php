@@ -87,6 +87,42 @@ class VolumePresetControllerTest extends TestCase
         $this->assertTrue($res->json('presets.0.tiers.0.min_quantity') === 0);
     }
 
+    /**
+     * Wire contract for the management presets UI: `id` is the numeric
+     * `volume_presets.id` primary key. The frontend types it as a number and
+     * only stringifies it for URL segments and `data-testid`s, so a string here
+     * would silently desynchronise the preset dropdown and the effective preset
+     * shown on the photo page.
+     */
+    public function test_preset_id_and_tiers_are_serialised_as_json_numbers(): void
+    {
+        $token = $this->superAdminToken();
+
+        $created = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/settings/volume-presets', [
+                'name' => 'Typkontrakt',
+                'tiers' => [['min_quantity' => 0, 'price_cents' => 4200]],
+            ])
+            ->assertStatus(200);
+        $this->assertIsInt($created->json('id'));
+
+        $default = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson("/api/management/settings/volume-presets/{$created->json('id')}/default", [])
+            ->assertStatus(200);
+        $this->assertIsInt($default->json('id'));
+        $this->assertIsInt($default->json('tiers.0.min_quantity'));
+        $this->assertIsInt($default->json('tiers.0.price_cents'));
+
+        $listed = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->getJson('/api/management/settings/volume-presets')
+            ->assertStatus(200);
+        $preset = collect($listed->json('presets'))->firstWhere('name', 'Typkontrakt');
+        $this->assertIsArray($preset);
+        $this->assertIsInt($preset['id']);
+        $this->assertSame($created->json('id'), $preset['id']);
+        $this->assertIsInt($preset['tiers'][0]['position']);
+    }
+
     public function test_validation_requires_tiers_and_rejects_empty(): void
     {
         $token = $this->superAdminToken();

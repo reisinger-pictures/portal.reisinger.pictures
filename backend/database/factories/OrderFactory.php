@@ -21,6 +21,22 @@ class OrderFactory extends Factory
         ];
     }
 
+    public function forGuest(string $guestId): static
+    {
+        return $this->state([
+            'user_id' => null,
+            'guest_id' => $guestId,
+        ]);
+    }
+
+    public function ownerless(): static
+    {
+        return $this->state([
+            'user_id' => null,
+            'guest_id' => null,
+        ]);
+    }
+
     public function quoteRequest(): static
     {
         return $this->state(fn (array $attributes) => [

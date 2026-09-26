@@ -6,12 +6,15 @@ use App\Enums\Brand;
 use App\Http\Middleware\BrandContextMiddleware;
 use App\Models\Coupon;
 use App\Models\Gallery;
+use App\Models\Order;
 use App\Models\Photo;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Stripe\ApiRequestor;
+use Stripe\HttpClient\ClientInterface;
 use Tests\TestCase;
 use Tests\Support\MocksStripeClient;
 
@@ -175,6 +178,97 @@ class CheckoutCouponRevalidationTest extends TestCase
         $this->assertDatabaseHas('coupons', ['id' => $coupon->id, 'used_count' => 1]);
     }
 
+    public function test_exact_retry_replays_after_a_finite_use_coupon_is_exhausted(): void
+    {
+        $coupon = Coupon::factory()->percentage(10)->create([
+            'brand' => 'rp',
+            'code' => 'FINITE10',
+            'active' => true,
+            'max_uses_global' => 1,
+            'used_count' => 0,
+        ]);
+        $data = $this->createCheckoutData();
+        $user = User::factory()->create();
+        $token = auth('api')->login($user);
+        $createdPiId = 'pi_finite_coupon';
+        $createdAmount = 0;
+        $createdMetadata = [];
+        $createCalls = 0;
+        $clientMock = $this->createMock(ClientInterface::class);
+        $clientMock->method('request')->willReturnCallback(
+            function (string $method, string $url, array $headers, array $parameters) use (
+                &$createdPiId,
+                &$createdAmount,
+                &$createdMetadata,
+                &$createCalls,
+            ): array {
+                if ($method === 'post') {
+                    $createCalls++;
+                    $createdAmount = (int) ($parameters['amount'] ?? 0);
+                    $createdMetadata = $parameters['metadata'] ?? [];
+                }
+
+                return [json_encode([
+                    'id' => $createdPiId,
+                    'status' => 'requires_payment_method',
+                    'client_secret' => $createdPiId.'_secret',
+                    'amount' => $createdAmount,
+                    'currency' => 'eur',
+                    'created' => time(),
+                    'customer' => $parameters['customer'] ?? null,
+                    'metadata' => $createdMetadata,
+                ]), 200, []];
+            }
+        );
+        ApiRequestor::setHttpClient($clientMock);
+
+        $payload = [
+            'items' => $data['items'],
+            'coupon_code' => 'FINITE10',
+            'billing_name' => 'Test',
+            'billing_street' => 'Str 1',
+            'billing_zip' => '1010',
+            'billing_city' => 'Wien',
+            'withdrawal_waived' => true,
+        ];
+        $headers = [
+            'Authorization' => 'Bearer '.$token,
+            'Idempotency-Key' => 'finite-coupon-checkout-0001',
+        ];
+        $first = $this->withHeaders($headers)->postJson('/api/orders/checkout', $payload);
+        $first->assertOk();
+        $order = Order::query()->firstOrFail();
+        $this->assertSame(1, $coupon->fresh()->used_count);
+
+        $second = $this->withHeaders($headers)->postJson('/api/orders/checkout', $payload);
+        $second->assertOk();
+
+        $this->assertSame(1, $createCalls);
+        $this->assertSame(1, $coupon->fresh()->used_count);
+        $this->assertSame(1, Order::query()->count());
+        $this->assertSame($createdPiId, $order->fresh()->stripe_payment_intent_id);
+
+        $coupon->update(['active' => false, 'used_count' => 1]);
+        $lostKeyHeaders = [
+            'Authorization' => 'Bearer '.$token,
+            'Idempotency-Key' => 'finite-coupon-checkout-0002',
+        ];
+        $lostKeyRetry = $this->withHeaders($lostKeyHeaders)
+            ->postJson('/api/orders/checkout', $payload);
+        $lostKeyRetry->assertOk();
+        $this->assertSame(1, $createCalls);
+        $this->assertSame(1, $coupon->fresh()->used_count);
+        $this->assertSame(1, Order::query()->count());
+
+        $changedPayload = $payload;
+        $changedPayload['billing_street'] = 'Str 2';
+        $this->withHeaders($headers)
+            ->postJson('/api/orders/checkout', $changedPayload)
+            ->assertStatus(409)
+            ->assertJson(['idempotency_conflict' => true]);
+        $this->assertSame(1, $coupon->fresh()->used_count);
+    }
+
     public function test_checkout_increments_coupon_usage_per_account(): void
     {
         $coupon = Coupon::factory()->percentage(10)->create([
@@ -221,7 +315,6 @@ class CheckoutCouponRevalidationTest extends TestCase
         $user1 = User::factory()->create();
         $user2 = User::factory()->create();
         $token1 = auth('api')->login($user1);
-        $token2 = auth('api')->login($user2);
 
         $r1 = $this->withHeaders(['Authorization' => 'Bearer ' . $token1])
             ->postJson('/api/orders/checkout', [
@@ -234,6 +327,7 @@ class CheckoutCouponRevalidationTest extends TestCase
                 'withdrawal_waived' => true,
             ]);
         $r1->assertStatus(200);
+        $token2 = auth('api')->login($user2);
 
         $r2 = $this->withHeaders(['Authorization' => 'Bearer ' . $token2])
             ->postJson('/api/orders/checkout', [

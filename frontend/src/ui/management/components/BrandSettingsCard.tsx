@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useSWRConfig } from 'swr';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -36,11 +37,13 @@ function effectiveToFormValues(effective: BrandSetting['effective']): BrandSetti
 function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
     "use no memo";
     const { updateBrandSettings } = useBrandSettings();
+    const { mutate: revalidateBrandConfig } = useSWRConfig();
     const { showToast } = useUI();
     const { isSuperAdmin } = usePermissions();
     const canEdit = isSuperAdmin;
 
     const schema = createBrandSettingsSchema();
+    const accountingEmailId = `brand-settings-${brand.id}-accounting-email`;
 
     const {
         register,
@@ -74,6 +77,13 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
 
         try {
             await updateBrandSettings(brand.id, payload);
+            // The public config is consumed by every branded surface. Revalidate
+            // it after the management write so CSS variables update immediately.
+            try {
+                await revalidateBrandConfig('/api/settings/brand-config');
+            } catch {
+                // The write succeeded; a later mount/reload can retry this cache.
+            }
             showToast('success', 'Markeneinstellungen gespeichert.');
         } catch {
             showToast('error', 'Fehler beim Speichern der Markeneinstellungen.');
@@ -95,6 +105,11 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
         };
         try {
             await updateBrandSettings(brand.id, payload);
+            try {
+                await revalidateBrandConfig('/api/settings/brand-config');
+            } catch {
+                // The reset succeeded; the public cache can retry on the next load.
+            }
             showToast('success', 'Markeneinstellungen auf Standard zurückgesetzt.');
         } catch {
             showToast('error', 'Fehler beim Zurücksetzen der Markeneinstellungen.');
@@ -135,8 +150,8 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 </div>
 
                 <div className="form-control md:col-span-2">
-                    <label className="label"><span className="label-text font-bold">Buchhaltungs-E-Mail</span></label>
-                    <input type="email" className="input input-bordered" placeholder="buchhaltung@reisinger.pictures"
+                    <label className="label" htmlFor={accountingEmailId}><span className="label-text font-bold">Buchhaltungs-E-Mail</span></label>
+                    <input id={accountingEmailId} type="email" className="input input-bordered" placeholder="buchhaltung@reisinger.pictures"
                            disabled={!canEdit} {...register('accounting_email')} />
                     {errors.accounting_email &&
                         <span className="text-error text-xs mt-1">{errors.accounting_email.message}</span>}
@@ -161,6 +176,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">Primärfarbe (Hex)</span></label>
                     <input type="text" className="input input-bordered font-mono" placeholder="#1E5631"
+                           aria-label="Primärfarbe (Hex)" required
                            disabled={!canEdit} {...register('primary_color')} />
                     {errors.primary_color &&
                         <span className="text-error text-xs mt-1">{errors.primary_color.message}</span>}
@@ -169,6 +185,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">Sekundärfarbe (Hex)</span></label>
                     <input type="text" className="input input-bordered font-mono" placeholder="#A4B494"
+                           aria-label="Sekundärfarbe (Hex)" required
                            disabled={!canEdit} {...register('secondary_color')} />
                     {errors.secondary_color &&
                         <span className="text-error text-xs mt-1">{errors.secondary_color.message}</span>}

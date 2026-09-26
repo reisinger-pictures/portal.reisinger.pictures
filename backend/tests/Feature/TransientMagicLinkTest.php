@@ -2,14 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Brand;
+use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\GalleryInvite;
 use App\Models\Photo;
-use App\Models\DownloadLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
+use PHPOpenSourceSaver\JWTAuth\Factory;
 use Tests\TestCase;
 
 class TransientMagicLinkTest extends TestCase
@@ -25,7 +27,7 @@ class TransientMagicLinkTest extends TestCase
             'token' => 'anon-token',
             'name' => 'Anna Nom',
             'email' => 'anna@example.com',
-            'accept_privacy' => true
+            'accept_privacy' => true,
         ]);
 
         $res->assertStatus(200)->assertCookie('rp_jwt');
@@ -36,14 +38,19 @@ class TransientMagicLinkTest extends TestCase
     {
         $gallery = Gallery::factory()->create(['is_public' => false]);
         Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $gallery->id,
+            'token' => 'guest-access-invite',
+        ]);
 
         $guestId = (string) Str::uuid();
-        $factory = app(\PHPOpenSourceSaver\JWTAuth\Factory::class);
+        $factory = app(Factory::class);
         $payload = $factory->customClaims([
-            'sub' => 'guest_' . $guestId,
+            'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Guest',
-            'transient_galleries' => [$gallery->id]
+            'guest_invite_id' => $invite->id,
+            'transient_galleries' => [$gallery->id],
         ])->make();
         $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
 
@@ -58,14 +65,19 @@ class TransientMagicLinkTest extends TestCase
         $allowed = Gallery::factory()->create(['is_public' => false]);
         $blocked = Gallery::factory()->create(['is_public' => false]);
         Photo::factory()->create(['gallery_id' => $blocked->id]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $allowed->id,
+            'token' => 'guest-blocked-invite',
+        ]);
 
         $guestId = (string) Str::uuid();
-        $factory = app(\PHPOpenSourceSaver\JWTAuth\Factory::class);
+        $factory = app(Factory::class);
         $payload = $factory->customClaims([
-            'sub' => 'guest_' . $guestId,
+            'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Guest',
-            'transient_galleries' => [$allowed->id]
+            'guest_invite_id' => $invite->id,
+            'transient_galleries' => [$allowed->id],
         ])->make();
         $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
 
@@ -79,14 +91,19 @@ class TransientMagicLinkTest extends TestCase
     {
         $gallery = Gallery::factory()->create(['type' => 'selection', 'is_public' => false]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $gallery->id,
+            'token' => 'guest-rating-invite',
+        ]);
 
         $guestId = (string) Str::uuid();
-        $factory = app(\PHPOpenSourceSaver\JWTAuth\Factory::class);
+        $factory = app(Factory::class);
         $payload = $factory->customClaims([
-            'sub' => 'guest_' . $guestId,
+            'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Rating Guest',
-            'transient_galleries' => [$gallery->id]
+            'guest_invite_id' => $invite->id,
+            'transient_galleries' => [$gallery->id],
         ])->make();
         $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
 
@@ -100,7 +117,7 @@ class TransientMagicLinkTest extends TestCase
             'user_id' => null,
             'guest_id' => $guestId,
             'guest_name' => 'Rating Guest',
-            'rating' => 4
+            'rating' => 4,
         ]);
     }
 
@@ -111,7 +128,7 @@ class TransientMagicLinkTest extends TestCase
 
         $guestId = (string) Str::uuid();
 
-        \App\Models\DownloadLog::create([
+        DownloadLog::create([
             'user_id' => null,
             'guest_id' => $guestId,
             'user_name_snapshot' => 'DL Guest',
@@ -130,14 +147,19 @@ class TransientMagicLinkTest extends TestCase
     public function test_me_returns_guest_data()
     {
         $gallery = Gallery::factory()->create(['type' => 'selection', 'is_public' => false]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $gallery->id,
+            'token' => 'guest-me-invite',
+        ]);
 
         $guestId = (string) Str::uuid();
-        $factory = app(\PHPOpenSourceSaver\JWTAuth\Factory::class);
+        $factory = app(Factory::class);
         $payload = $factory->customClaims([
-            'sub' => 'guest_' . $guestId,
+            'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Me Guest',
-            'transient_galleries' => [$gallery->id]
+            'guest_invite_id' => $invite->id,
+            'transient_galleries' => [$gallery->id],
         ])->make();
         $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
 
@@ -156,7 +178,7 @@ class TransientMagicLinkTest extends TestCase
 
     public function test_authenticated_user_keeps_existing_galleries_after_invite_redeem()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $existing = Gallery::factory()->create(['is_public' => false]);
         $invited = Gallery::factory()->create(['is_public' => false]);
         $user->galleries()->attach($existing->id);
@@ -168,19 +190,19 @@ class TransientMagicLinkTest extends TestCase
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/invites/redeem', [
                 'token' => 'merge-token',
-                'accept_privacy' => true
+                'accept_privacy' => true,
             ]);
 
         $res->assertStatus(200)->assertCookie('rp_jwt');
 
         $this->assertDatabaseHas('user_galleries', [
             'user_id' => $user->id,
-            'gallery_id' => $existing->id
+            'gallery_id' => $existing->id,
         ]);
 
         $this->assertDatabaseMissing('user_galleries', [
             'user_id' => $user->id,
-            'gallery_id' => $invited->id
+            'gallery_id' => $invited->id,
         ]);
     }
 
@@ -191,11 +213,11 @@ class TransientMagicLinkTest extends TestCase
         GalleryInvite::create(['gallery_id' => $gallery->id, 'token' => 'multi-2']);
 
         $this->postJson('/api/invites/redeem', [
-            'token' => 'multi-1', 'name' => 'A', 'accept_privacy' => true
+            'token' => 'multi-1', 'name' => 'A', 'accept_privacy' => true,
         ])->assertStatus(200);
 
         $this->postJson('/api/invites/redeem', [
-            'token' => 'multi-2', 'name' => 'B', 'accept_privacy' => true
+            'token' => 'multi-2', 'name' => 'B', 'accept_privacy' => true,
         ])->assertStatus(200);
 
         $this->assertEquals(0, User::count());

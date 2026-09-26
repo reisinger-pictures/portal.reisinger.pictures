@@ -10,6 +10,7 @@ use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\User;
 use App\Support\BrandRegistry;
+use App\Support\GalleryGroupSubtree;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -22,6 +23,9 @@ class MailController extends Controller
     {
         $request->validate(['subject' => 'required|string', 'body' => 'required|string']);
         $gallery = Gallery::with('galleryGroup')->findOrFail($galleryId);
+        if (! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
+            return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
+        }
 
         // Authorization: only users who may manage this gallery can send a custom email for it.
         if (Gate::denies('manage', $gallery)) {
@@ -31,7 +35,16 @@ class MailController extends Controller
         $userIds = DB::table('user_galleries')->where('gallery_id', $gallery->id)->where('wants_notifications', true)->pluck('user_id')->toArray();
         $groupIds = [];
         $currentGroup = $gallery->galleryGroup;
+        // AUTH-5: cycle-safe and depth-bounded ancestor walk.
+        $visitedGroupIds = [];
+        $depth = 0;
         while ($currentGroup) {
+            $groupKey = (string) $currentGroup->getKey();
+            if ($groupKey === '' || isset($visitedGroupIds[$groupKey]) || $depth++ > GalleryGroupSubtree::MAX_DEPTH) {
+                break;
+            }
+            $visitedGroupIds[$groupKey] = true;
+
             $groupIds[] = $currentGroup->id;
             $currentGroup = GalleryGroup::find($currentGroup->parent_id);
         }
@@ -82,6 +95,9 @@ class MailController extends Controller
         $user = auth('api')->user();
         if (! $user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+        if (! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
+            return response()->json(['error' => 'Galerie nicht gefunden.'], 404);
         }
 
         // IDOR guard: only users who can access the gallery may trigger the rating-finished notification.

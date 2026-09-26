@@ -50,12 +50,12 @@ core.*
 ai_test_report.txt
 ses_*.json+
 
-# Env-Dateien: Default ignorieren, einzelne bewusst getrackte explizit erlauben
+# Env-Dateien: Default ignorieren, einzelne bewusst getrackte Fixtures explizit erlauben.
 .env*
 !.env.ci
 !.env.example
 !.env.local.example
-!.env.encrypted
+# Verschlüsselte .env-Backups bleiben bewusst lokal und werden nie committed.
 
 # History-rewrite artifacts (contains real secrets — never commit)
 .history-replacements.txt

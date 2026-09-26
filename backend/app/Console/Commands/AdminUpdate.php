@@ -2,39 +2,47 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\User;
-use App\Models\Role;
-use Illuminate\Support\Facades\Hash;
 use App\Enums\UserRole;
+use App\Models\Role;
+use App\Models\User;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Hash;
 
 class AdminUpdate extends Command
 {
     protected $signature = 'admin:update';
-    protected $description = 'Updates or creates the admin user based on .env credentials';
 
-    public function handle()
+    protected $description = 'Creates or rotates the bootstrap admin from configured credentials';
+
+    public function handle(): int
     {
-        $email = env('ADMIN_EMAIL');
-        $password = env('ADMIN_PASSWORD');
+        $email = config('admin.email');
+        $password = config('admin.password');
 
-        if (!$email || !$password) {
-            $this->error('ADMIN_EMAIL or ADMIN_PASSWORD not set in .env');
-            return 1;
+        if (! is_string($email) || trim($email) === '' || ! is_string($password) || trim($password) === '') {
+            $this->error('ADMIN_EMAIL and ADMIN_PASSWORD must both be configured.');
+
+            return self::FAILURE;
         }
 
         $admin = User::firstOrNew(['email' => $email]);
-        $admin->name = 'Admin';
-        if (!$admin->exists || empty($admin->password)) {
-            $admin->password = Hash::make($password);
+        if (! $admin->exists) {
+            $admin->name = 'Admin';
         }
+
+        // Always rotate the configured bootstrap password, including for an
+        // existing account. This makes changing ADMIN_PASSWORD an explicit,
+        // reliable credential-rotation operation on the next deployment.
+        $admin->password = Hash::make($password);
         $admin->save();
 
-        // Weise grundlegende Rollen zu
-        $roles = Role::whereIn('name', [UserRole::ADMIN->value, UserRole::PHOTOGRAPHER->value, UserRole::CLIENT->value])->pluck('id');
-        $admin->roles()->syncWithoutDetaching($roles);
+        $roles = collect(UserRole::cases())
+            ->map(static fn (UserRole $role): string => $role->value)
+            ->all();
+        $admin->roles()->syncWithoutDetaching(Role::whereIn('name', $roles)->pluck('id'));
 
-        $this->info('Admin user updated successfully.');
-        return 0;
+        $this->info('Admin user created or password rotated successfully.');
+
+        return self::SUCCESS;
     }
 }

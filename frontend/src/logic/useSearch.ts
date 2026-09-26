@@ -17,9 +17,8 @@ export function useSearch(query: string, personal: boolean = false, skipEmpty: b
         fetcher,
         {
             revalidateOnFocus: false,
-            keepPreviousData: true
         }
     );
 
-    return { results: data, isLoading, isError: error };
+    return {results: shouldFetch ? data : undefined, isLoading: shouldFetch && isLoading, isError: shouldFetch ? error : undefined};
 }

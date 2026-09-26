@@ -14,9 +14,10 @@ class DeleteGalleryFolderJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 3;
+    public int $tries = 5;
 
-    public $backoff = [30, 60, 120];
+    /** @var array<int, int> */
+    public array $backoff = [30, 60, 120, 300, 600];
 
     protected $galleryId;
 
@@ -25,22 +26,35 @@ class DeleteGalleryFolderJob implements ShouldQueue
         $this->galleryId = $galleryId;
     }
 
+    public function galleryId(): string
+    {
+        return $this->galleryId;
+    }
+
     public function handle(): void
     {
         $disk = Storage::disk('photos');
 
+        // A retry can legitimately arrive after a previous attempt already
+        // removed the directory. Delete first, then treat an absent directory
+        // as success; only a directory that still exists after the attempt is
+        // a real failure.
+        //
         // `deleteDirectory()` returns false when the underlying driver fails
-        // (the `photos` disk uses `throw => false`). Treat that as a real
-        // failure so the job is retried instead of reporting silent success.
+        // (the `photos` disk uses `throw => false`). The postcondition check
+        // distinguishes that failure from an already-completed retry.
         $deleted = $disk->deleteDirectory($this->galleryId);
 
-        if (! $deleted || $disk->exists($this->galleryId)) {
-            Log::error('DeleteGalleryFolderJob: gallery folder still exists after deletion', [
-                'galleryId' => $this->galleryId,
-            ]);
-
-            throw new \RuntimeException("Failed to delete gallery folder {$this->galleryId}");
+        $stillExists = $disk->exists($this->galleryId);
+        if (! $stillExists) {
+            return;
         }
+
+        Log::error('DeleteGalleryFolderJob: gallery folder still exists after deletion', [
+            'galleryId' => $this->galleryId,
+        ]);
+
+        throw new \RuntimeException("Failed to delete gallery folder {$this->galleryId}");
     }
 
     public function failed(\Throwable $exception): void

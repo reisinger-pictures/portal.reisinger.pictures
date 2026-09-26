@@ -7,7 +7,7 @@
 >
 > Ursprünglich: `active` — beschreibt den verbindlichen, entschiedenen Endzustand.
 > Verknüpft: `AGENTS.todo.md` A-01 (aufgelöst), T-03 (ehem. R-15b), T-09,
-> `features/infrastructure/08-Org-brand-concept.md`,
+> `features/infrastructure/08-org-brand-concept.md`,
 > `features/auth/01-roles-and-access.md`.
 > Erstellt 2026-06-29; Policy-Entscheidung (A-01) 2026-06-29.
 
@@ -93,7 +93,7 @@ Ein neuer pure-Logic-Hook (z. B. `frontend/src/logic/useBrandAccess.ts`) kapselt
   filtern nach Brand/Org) — das ist ein separates Thema und aus dem Frontend nicht allein
   lösbar.
 - Der UI-Begriff „Mandant" wird ggf. im Rahmen von T-01 angepasst (siehe
-  `08-Org-brand-concept.md` §3).
+  `08-org-brand-concept.md` §3).
 
 ## 6. Verifikation (später)
 

@@ -1,216 +1,165 @@
-# Pricing Strategy Pattern — Architektur (Soll-Zustand)
+# Pricing Strategy Pattern — Current Architecture
 
-> **Status:** Current (2026-07-14). Beschreibt die Architektur des Strategy-Patterns zur
-> Entkopplung der Preislogik. Das SRP-Portal wurde entfernt (Commit `1831116`); der
-> VolumeLicensingStrategy-Name bleibt als generische Volumen-Preislogik erhalten.
-> Verknüpft: `AGENTS.todo.md` F5, `features/infrastructure/16-srp-volume-pricing.md` (historical),
-> `features/infrastructure/21-brand-config-driven.md`.
-> Erstellt 2026-07-01, Update 2026-07-14.
+> **Status:** Current SOLL (reviewed 2026-09-24). The former SRP portal and
+> `Brand::SRP` were removed; the volume strategy is now a generic pricing mode.
+> The historical origin is retained in
+> [`16-srp-volume-pricing.md`](16-srp-volume-pricing.md). The canonical preset
+> details are in [`27-volume-licensing-presets.md`](27-volume-licensing-presets.md).
 
-## 1. Kontext
+## 1. Scope and current terms
 
-Bisher gibt es eine einzige Preislogik in `PricingService::calculateItemPriceCents()`, die auf
-`license_use_cases` und `license_modifiers` basiert (B2B-Modell). Für ein B2C-Portal wird ein
-vollständig anderes Preismodell benötigt (mengenbasiertes Volumen-Pricing). Das ehemalige SRP-Portal
-wurde entfernt (Commit `1831116`), aber die generische Volume-Logik bleibt als alternative Strategie
-erhalten.
+The application has two pricing strategies:
 
-Um die Modelle sauber zu trennen und zukünftige Preismodelle zu ermöglichen, wird das
-**Strategy-Pattern** eingeführt.
+- **Scope licensing** — item-by-item B2B pricing through
+  `LicenseUseCase` and `LicenseModifier` records.
+- **Volume licensing** — quantity-based pricing using a configurable
+  `VolumePreset`.
 
-## 2. Architektur
+The runtime brand is currently `rp` only. Names such as `srp_*` in settings,
+request payloads, comments, or older documents are compatibility/history labels;
+they do not describe a second live brand or a second current pricing model.
 
-### 2.1 Klassen-Diagramm
+The brand-level default is the `pricing_strategy` setting. A gallery can
+override that mode with `galleries.licensing_mode`, and a volume gallery can
+select a concrete `galleries.volume_preset_id` (or `null` for the brand default).
+These columns and the preset tables are part of V025/V029 and are live contracts,
+not a planned F2 design.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      PricingStrategy (Interface)                │
-│  + calculateCart(array $items, User $user): array              │
-└─────────────────────────────────────────────────────────────────┘
-                                  ▲
-                                  │ implements
-                  ┌───────────────┴───────────────┐
-                  │                               │
-    ┌─────────────────────────────┐  ┌─────────────────────────────┐
-    │   ScopeLicensingStrategy    │  │    VolumeLicensingStrategy  │
-     │   (B2B / RP)                │  │   (generic volume)          │
-    │                             │  │                             │
-    │   Einzelitem-Preis via      │  │   Mengenbasiert, retroaktiv  │
-    │   LicenseUseCase +          │  │   über gesamten Warenkorb   │
-    │   LicenseModifier           │  │                              │
-    └─────────────────────────────┘  └─────────────────────────────┘
-                  ▲                               ▲
-                  │                               │
-    ┌─────────────┴───────────────────────────────┴─────────────┐
-    │                   AppServiceProvider                       │
-    │     bindet PricingStrategy brand-gesteuert via             │
-    │     BrandRegistry::current()                               │
-    └───────────────────────────────────────────────────────────┘
-```
+## 2. Strategy contract
 
-### 2.2 Schnittstelle
+`App\Contracts\PricingStrategy` currently exposes:
 
 ```php
-namespace App\Contracts;
-
-use App\Models\User;
-
-interface PricingStrategy
-{
-    /**
-     * @param array $items Jedes Item hat:
-     *   - 'id' (int|string): Eindeutige ID (z.B. photoId)
-     *   - 'license_use_case_id' (string): Lizenz-Use-Case-ID (nur RP)
-     *   - 'license_modifier_ids' (array): Modifier-IDs (nur RP)
-     *   - 'is_quote' (bool): Ist ein Angebots-Item
-     * @param User $user Der bestellende Benutzer
-     * @return array
-     *   - 'items' (array): [
-     *       'itemId' => int|string,
-     *       'priceCents' => int,
-     *       'tier' => string,
-     *       'useCaseName' => string,
-     *       'modifierNames' => array,
-     *     ]
-     *   - 'totalCents' (int): Summe aller items
-     */
-    public function calculateCart(array $items, User $user): array;
-}
+public function calculateCart(array $items, User $user, ?string $couponCode = null): array;
+public function supportsCoupons(): bool;
 ```
 
-### 2.3 Strategien
+`PricingService::calculateItemPriceCents()` remains a compatibility wrapper
+that delegates to the injected strategy for a single item. Checkout itself uses
+`calculateCart()` so it can calculate a complete server-authoritative cart.
 
-#### ScopeLicensingStrategy (RP/B2B)
-- Kapselt die bestehende Logik aus `PricingService::calculateItemPriceCents()`
-- Berechnet jedes Item einzeln über `LicenseUseCase::findOrFail()`, Flatrate-Tier-Prüfung,
-  Modifier-Surcharges
-- Summiert die Einzelpreise auf
-- Enthält die `guardBrand()`-Logik (Defense-in-Depth)
+### 2.1 `ScopeLicensingStrategy`
 
-#### VolumeLicensingStrategy (generic volume)
-- Zählt alle Nicht-Quote-Items
-- Ermittelt den Volumen-Tier anhand der Gesamtmenge
-- Wendet den Tier-Preis retroaktiv auf **alle** Nicht-Quote-Items an
-- Quote-Items → 0 Cent
-- Preise via `SettingResolver` konfigurierbar
-- Fallback auf Hardcoded-Defaults (3000/2500/2000 Cents, Thresholds 10/20)
+- Looks up the selected use case and modifiers for each non-quote item.
+- Applies the user's flat-rate/tier and modifier surcharges.
+- Preserves the `guardBrand()` defense against cross-brand catalog injection.
+- Quote items are zero-priced.
+- `supportsCoupons()` is `false`; scope pricing does not apply a coupon.
 
-### 2.4 Dependency Injection
+### 2.2 `VolumeLicensingStrategy`
 
-Die Bindung erfolgt im `AppServiceProvider::register()`:
+- Receives a `VolumePreset` with any number of ordered tiers
+  (`min_quantity`, `price_cents`).
+- Counts non-quote items, selects the highest qualifying tier, and charges the
+  base-tier amount less an itemized retroactive tier discount.
+- Quote items are zero-priced and do not count toward the tier.
+- Coupon calculations for `max_items` and `photo_package` use a separate
+  effective-price item representation based on the qualifying tier. The
+  invoice item lines remain at the base price and show the volume discount as
+  separate `tier_breakdown` lines.
+- The implementation also handles non-monotonic/duplicate tier data without
+  allowing a volume step to increase the total; the invoice breakdown remains
+  consistent with `totalCents`.
+- `supportsCoupons()` is `true`; `CouponService` is applied after volume
+  pricing.
+- Volume-priced items are persisted with the supported `original` entitlement
+  tier. `volume` is a pricing-mode label, not a downloadable resolution tier.
 
-```php
-$this->app->bind(PricingStrategy::class, function ($app) {
-    $strategy = Setting::where('key', 'pricing_strategy')
-        ->where('brand', BrandRegistry::currentOrDefault())
-        ->value('value') ?? 'scope_licensing';
+## 3. Resolution and mixed carts
 
-    return match ($strategy) {
-        'volume_licensing' => new VolumeLicensingStrategy($app->make(SettingResolver::class)),
-        default => new ScopeLicensingStrategy(),
-    };
-});
-```
+### 3.1 Brand default
 
-### 2.5 Integration in bestehende Services
+`AppServiceProvider::register()` binds the default `PricingStrategy` by reading
+the brand-scoped `pricing_strategy` setting. The default fallback is
+`scope_licensing`; the value `volume_licensing` selects the volume strategy.
+The config feature flag is descriptive only; the database setting controls the
+runtime resolution.
 
-#### PricingService
-- Erhält `PricingStrategy` per Constructor Injection
-- `calculateItemPriceCents()` delegiert an `$this->strategy->calculateCart()` für Einzel-Item-Kompatibilität
-- `guardBrand()` bleibt erhalten (wird von ScopeLicensingStrategy intern genutzt)
+### 3.2 Gallery overrides
 
-#### CheckoutService
-- Erhält `PricingStrategy` per Constructor Injection (ersetzt `PricingService`)
-- `processCheckout()` ruft **einmalig** `$strategy->calculateCart($items, $user)` auf
-- Ergebnis liefert `items`-Array mit Preisen und `totalCents` für `orders.total_amount`
+`Gallery::effective_licensing_mode` is resolved in this order:
 
-## 3. Vorteile
+1. `galleries.licensing_mode`, when set (`scope_licensing` or `volume_licensing`).
+2. The gallery-brand `pricing_strategy` setting.
+3. `scope_licensing` when no setting exists.
 
-- **Trennung der Preismodelle**: B2B (scope-based) und B2C (volume-based) haben unabhängige Implementierungen
-- **Erweiterbarkeit**: Neue Preismodelle können durch Hinzufügen weiterer Strategien integriert werden
-- **Testbarkeit**: Jede Strategie kann isoliert getestet werden
-- **Keine Brand-If-Abfragen**: Die Strategie-Auswahl erfolgt zentral im ServiceProvider
+For volume mode, `VolumePresetService::resolveForGallery()` chooses the
+gallery's `volume_preset_id` when valid, otherwise the brand default preset.
+The public license-terms endpoint returns the effective tiers for a supplied
+`gallery_id`.
 
-## 4. Resolution — Wie die Strategie ausgewählt wird
+### 3.3 Checkout grouping
 
-Die Strategy-Resolution erfolgt im `AppServiceProvider::register()` zur Laufzeit:
+`CheckoutService` does not force every cart item through the brand-level binding.
+It groups items by `(effective licensing mode, volume preset)` and calculates
+each group with the matching strategy. This permits a mixed cart containing
+scope and volume galleries, including different volume presets. The resulting
+line items, tier breakdowns, and totals are merged before the order is created.
 
-1. Die `pricing_strategy`-Einstellung wird aus der `settings`-Tabelle gelesen (brand-scoped via `BrandRegistry::currentOrDefault()`).
-2. Der Wert steuert den `match`-Ausdruck, der die entsprechende Strategy-Instanz erzeugt.
-3. Strategie-Hardcoding: `'volume_licensing'` → `VolumeLicensingStrategy`, alles andere → `ScopeLicensingStrategy`.
+A signed quote token bypasses the normal strategy calculation after its
+signature, expiry, and positive server-authoritative amount have been verified.
 
-Interaktion mit der Brand-Architektur (`config/brands.php`):
-- `config/brands.php` enthält ein `features.volume_licensing`-Flag, das dokumentiert, ob eine Brand die Volume-Logik nutzen *kann*.
-- Die tatsächliche Runtime-Entscheidung liegt in der `settings`-Tabelle (brand-scoped), nicht in der Config-Datei. Das erlaubt Runtime-Umschaltung ohne Code-Deployment und ist die Grundlage für den geplanten Per-Gallery-Override (F2).
+## 4. Coupons and pricing modes
 
-```
-features/brands.php (doc flag)
-      │
-      ▼ (documentation only)
-settings.pricing_strategy → AppServiceProvider → PricingStrategy binding
-      │
-      ▼ (brand-scoped)
-VolumeLicensingStrategy or ScopeLicensingStrategy
-```
+The 2026-08-04 decision decoupled coupon **UI and management availability**
+from the brand's pricing mode: the navigation and coupon forms are not hidden
+because a gallery uses volume or scope pricing. That does not mean both
+strategies currently calculate the same discount:
 
-## 5. Planned: Per-Gallery Override (F2)
+- `VolumeLicensingStrategy::supportsCoupons()` is `true`; fixed, percentage,
+  and `photo_package` coupons are applied after volume pricing.
+- `ScopeLicensingStrategy::supportsCoupons()` is `false`; checkout does not
+  resolve or increment a coupon for a scope-only group. A coupon must not be
+  silently consumed without a discount.
+- Mixed carts apply the coupon only to the combined volume subtotal. Checkout
+  validates the scoped coupon against all non-quote volume items and applies
+  it once at order level; scope-only groups remain outside the discount. A
+  checkout that requests a coupon for a volume group revalidates it and fails
+  closed if it is invalid.
+- A valid discount that reduces a positive cart to exactly zero follows the
+  settled-free order path; it is not sent through PaymentIntent creation.
 
-> **Status:** Geplant, siehe `AGENTS.todo.md` F2. Nicht implementiert.
+The current coupon data model and API details are maintained in
+[`../ecommerce/08-srp-coupon-system.md`](../ecommerce/08-srp-coupon-system.md).
+The old document's SRP host/brand assumptions are historical; the live
+contract is brand-scoped coupon management on the configured `rp` brand.
 
-### Ziel
-Galleries sollen einen eigenen `licensing_mode` erhalten, der das Brand-weite `pricing_strategy`-Setting überschreibt.
+## 5. Presets and legacy settings
 
-### Ist-Zustand
-- `pricing_strategy` ist ein globales Brand-Setting → alle Galleries einer Brand teilen denselben Modus.
-- `Gallery`-Model hat keine Licensing-Spalte.
-- Frontend-Hook `useLicensingMode()` liest den Modus ohne Gallery-Kontext.
+`VolumePresetService` creates one default preset per brand and seeds it from
+legacy `srp_price_per_image_tier*`/`srp_tier_threshold*` values when present.
+The legacy rows are left in place for compatibility and are not the preferred
+configuration path. New writes use the V029 `volume_presets` and
+`volume_preset_tiers` tables, with gallery assignment through
+`galleries.volume_preset_id`.
 
-### Geplante Änderung
+A per-brand `pricing_strategy` editor is not part of the current brand-settings
+overlay whitelist. Exposing that setting in the admin UI remains a future task;
+until then, the DB setting and gallery fields are the authoritative controls.
 
-**a) Migration:** `licensing_mode VARCHAR(20) NULL` auf `galleries` (null = Brand-Setting gilt, Werte: `'scope_licensing'`, `'volume_licensing'`).
+## 6. Decision history
 
-**b) Resolution refactorn:** Die aktuelle DI-Bindung im `AppServiceProvider` ist request-scoped und kann nicht pro Cart-Item entscheiden. Ansätze:
-- `CheckoutService` gruppiert Items nach `licensing_mode` der zugehörigen Gallery und ruft `calculateCart()` pro Gruppe auf.
-- Oder: `PricingStrategy` um eine `calculateItem()`-Methode erweitern.
+1. **2026-07-01:** The strategy pattern was introduced with scope licensing and
+   the then-SRP volume model.
+2. **2026-07-14 (historical implementation step; its commit reference is not
+   present in this checkout):** The SRP portal and `Brand::SRP` were removed. The
+   volume implementation remained as a generic mode; the brand setting became
+   the runtime selector.
+3. **2026-07-14:** Gallery-level licensing mode and volume-preset assignment were
+   implemented. The old “planned F2” description in earlier revisions is
+   historical, not current.
+4. **2026-08-04 (`2394999`):** Coupon UI/management was decoupled from pricing
+   mode. The backend strategy capability remains explicit as described in §4.
+5. **2026-08-13:** V029 introduced configurable, arbitrary-tier volume presets;
+   see [`27-volume-licensing-presets.md`](27-volume-licensing-presets.md).
 
-**c) Mixed-Cart-Problem:** Ein Cart kann Items aus Galleries mit unterschiedlichen Modes enthalten. Lösung s.o. — Gruppierung im `CheckoutService`.
+## 7. Related documents
 
-**d) Frontend:** `useLicensingMode(galleryId?)` erweitern, `GET /api/settings/license-terms?gallery_id=X` Endpoint.
-
-## 6. Strategy History (for traceability)
-
-1. **2026-07-01:** Dokument erstellt — zwei Strategien: `ScopeLicensingStrategy` (RP/B2B) und `VolumeLicensingStrategy` (SRP/B2C).
-2. **2026-07-14 (Commit `1831116`):** SRP-Portal und `Brand::SRP` entfernt. VolumeLicensingStrategy bleibt als generische Volume-Logik. Strategy-Auswahl läuft über `pricing_strategy`-DB-Setting (brand-scoped).
-3. **Geplant (F2):** Per-Gallery `licensing_mode`-Override.
-
-## 7. Coupons unabhängig vom Lizenzmodus (2026-08-04)
-
-> **Entscheidung:** Das Coupon-Feature wird **nicht mehr** vom Brand-weiten `pricing_strategy`-Setting
-> (`scope_licensing` vs. `volume_licensing`) abhängig gemacht. Beide Lizenzmodelle werden **immer**
-> mit Coupons angeboten („offer both"). Keine globale Umstellung des `pricing_strategy`-Defaults.
-
-### Ist-Zustand (nach Entkopplung)
-
-- **Backend:** Coupon-Routen/Controller (`CouponAdminController`, `CouponCheckoutController`) hatten nie ein
-  `pricing_strategy`-Gate — nur das Frontend war gekoppelt.
-- **Frontend:** `useLicensingMode()`-Gates in `Sidebar.tsx` (Admin-Nav „Marketing" → „Gutscheincode"),
-  `ManagementCouponsView.tsx` (Placeholder „Gutscheincodes erfordern Volume-Licensing …") und
-  `CouponInput.tsx` (Client-Cart, Rendern nur bei `volume_licensing`) wurden **entfernt**.
-  Coupon-UI wird nun unabhängig vom Lizenzmodus angezeigt.
-- `useLicensingMode()` bleibt erhalten und wird weiterhin genutzt für **Preis-Logik/-Anzeige**
-  (`PhotoDetailView.tsx`, `ManagementGalleryView.tsx`, `ManagementMetaGalleryView.tsx`).
-
-### Long-term Roadmap: Brand-Setting in der UI konfigurierbar
-
-> **Status: Future-TODO — dokumentiert 2026-08-04, nicht implementiert.**
-
-Langfristig soll das **Brand-weite `pricing_strategy`** (inkl. der Coupon-Verfügbarkeit) als
-**Brand-Einstellung über die Admin-UI konfigurierbar** sein (analog F3 / `features/infrastructure/21-brand-config-driven.md`
-und `22-brand-settings-overlay.md`).
-
-- Umsetzung erfolgt über das **DB-Overlay**-Muster (Option B): `settings`-Tabelle (PK `(key, brand)`, V019),
-  `config/brands.php` bleibt Default/Fallback; Whitelist über `BrandRegistry::buildFromArray()`-Choke-Point.
-- Neues/geplantes Setting: `pricing_strategy` je Brand in der UI editierbar.
-- Dabei bleibt der Per-Gallery-Override (F2, `galleries.licensing_mode`) erhalten und hat Vorrang vor dem
-  Brand-Setting.
-
+- [`16-srp-volume-pricing.md`](16-srp-volume-pricing.md) — historical SRP
+  origin and migration context.
+- [`27-volume-licensing-presets.md`](27-volume-licensing-presets.md) — current
+  preset data model, API, and frontend contract.
+- [`21-brand-config-driven.md`](21-brand-config-driven.md) — current single-brand
+  configuration and the boundary between config and DB settings.
+- [`../ecommerce/09-stripe-checkout-flow.md`](../ecommerce/09-stripe-checkout-flow.md)
+  — checkout/order state machine.

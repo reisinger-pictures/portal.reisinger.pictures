@@ -2,12 +2,22 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
+use App\Enums\UserRole;
+use App\Jobs\InvalidateWatermarkCacheJob;
+use App\Models\Gallery;
 use App\Models\Role;
 use App\Models\Setting;
-use Illuminate\Support\Facades\Cache;
+use App\Models\User;
+use App\Models\VolumePreset;
+use App\Services\VolumePresetService;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
+use Mockery;
+use Tests\TestCase;
 
 class SettingsControllerTest extends TestCase
 {
@@ -16,21 +26,24 @@ class SettingsControllerTest extends TestCase
     private function adminToken(): string
     {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
+
         return auth('api')->login($user);
     }
 
     private function superAdminToken(): string
     {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+
         return auth('api')->login($user);
     }
 
     private function clientToken(): string
     {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
+
         return auth('api')->login($user);
     }
 
@@ -65,20 +78,71 @@ class SettingsControllerTest extends TestCase
     {
         Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
 
-        $presetService = app(\App\Services\VolumePresetService::class);
+        $presetService = app(VolumePresetService::class);
         $custom = $presetService->create('Custom', [
             ['min_quantity' => 0, 'price_cents' => 7000],
         ]);
-        $gallery = \App\Models\Gallery::factory()->create([
+        $gallery = Gallery::factory()->create([
             'is_public' => true,
             'licensing_mode' => 'volume_licensing',
             'volume_preset_id' => $custom->id,
         ]);
 
-        $this->getJson('/api/settings/license-terms?gallery_id=' . $gallery->id)
+        $this->getJson('/api/settings/license-terms?gallery_id='.$gallery->id)
             ->assertStatus(200)
-            ->assertJsonPath('volume_pricing.preset_id', $custom->id)
+            // Strict: `preset_id` is the numeric `volume_presets.id` primary key,
+            // never a string. The frontend's opaque preset key relies on it.
+            ->assertJsonPath('volume_pricing.preset_id', $custom->id, true)
             ->assertJsonPath('volume_pricing.tiers.0.price_cents', 7000);
+    }
+
+    /**
+     * Regression: the frontend called `.trim()` on `volume_pricing.preset_id`,
+     * which crashed the photo page ("preset_id?.trim is not a function") as soon
+     * as the endpoint returned the bigint primary key as a JSON number. Pin the
+     * wire *type* of that member, not just its value.
+     */
+    public function test_get_license_terms_serialises_preset_id_and_tiers_as_json_numbers(): void
+    {
+        Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
+
+        $response = $this->getJson('/api/settings/license-terms')->assertStatus(200);
+        $volumePricing = $response->json('volume_pricing');
+
+        $this->assertIsArray($volumePricing);
+        $this->assertIsInt($volumePricing['preset_id']);
+        $this->assertSame(VolumePreset::forBrand('rp')?->id, $volumePricing['preset_id']);
+        $this->assertIsString($volumePricing['preset_name']);
+        $this->assertNotSame('', $volumePricing['preset_name']);
+        $this->assertNotEmpty($volumePricing['tiers']);
+        foreach ($volumePricing['tiers'] as $tier) {
+            $this->assertIsInt($tier['min_quantity']);
+            $this->assertIsInt($tier['price_cents']);
+        }
+    }
+
+    public function test_get_license_terms_serialises_gallery_preset_id_as_json_number(): void
+    {
+        Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
+
+        $custom = app(VolumePresetService::class)->create('Custom Type', [
+            ['min_quantity' => 0, 'price_cents' => 7000],
+            ['min_quantity' => 5, 'price_cents' => 6000],
+        ]);
+        $gallery = Gallery::factory()->create([
+            'is_public' => true,
+            'licensing_mode' => 'volume_licensing',
+            'volume_preset_id' => $custom->id,
+        ]);
+
+        $volumePricing = $this->getJson('/api/settings/license-terms?gallery_id='.$gallery->id)
+            ->assertStatus(200)
+            ->assertJsonPath('volume_pricing.preset_name', 'Custom Type')
+            ->json('volume_pricing');
+
+        $this->assertIsInt($volumePricing['preset_id']);
+        $this->assertSame((int) $custom->id, $volumePricing['preset_id']);
+        $this->assertNotSame((string) $custom->id, $volumePricing['preset_id']);
     }
 
     public function test_get_license_terms_volume_pricing_null_for_scope(): void
@@ -199,6 +263,62 @@ class SettingsControllerTest extends TestCase
                 'base_price' => 1000,
             ])
             ->assertStatus(422);
+    }
+
+    public function test_watermark_update_dispatches_retryable_cache_invalidation_job(): void
+    {
+        Queue::fake();
+        $this->useTemporaryStorageDisk('photos');
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer {$token}"])
+            ->postJson('/api/management/settings/watermark', [
+                'opacity' => 0.5,
+            ])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        Queue::assertPushed(InvalidateWatermarkCacheJob::class, function (InvalidateWatermarkCacheJob $job): bool {
+            return $job->tries === 3
+                && $job->backoff === [30, 60, 120];
+        });
+    }
+
+    public function test_watermark_cache_cleanup_throws_and_records_terminal_failure(): void
+    {
+        $disk = Mockery::mock(Filesystem::class);
+        $disk->shouldReceive('directories')
+            ->once()
+            ->andReturn(['550e8400-e29b-41d4-a716-446655440000']);
+        $disk->shouldReceive('deleteDirectory')
+            ->twice()
+            ->andReturn(false);
+        Storage::set('photos', $disk);
+        Log::spy();
+
+        $job = new InvalidateWatermarkCacheJob;
+
+        try {
+            $job->handle();
+            $this->fail('Expected watermark cache deletion to fail.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame(
+                'Failed to delete 2 watermark cache directories',
+                $exception->getMessage(),
+            );
+            $job->failed($exception);
+        }
+
+        Log::shouldHaveReceived('error')
+            ->twice()
+            ->withArgs(function (string $message, array $context): bool {
+                return in_array($message, [
+                    'Automated cleanup: watermark cache deletion failures',
+                    'Queue job failed',
+                ], true)
+                    && ($context['failed_count'] ?? null) === 2
+                    && count($context['failures'] ?? []) === 2;
+            });
     }
 
     public function test_get_watermark_requires_management_role(): void

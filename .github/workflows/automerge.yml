@@ -13,7 +13,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: read
+  checks: read
 
 concurrency:
   group: dependabot-automerge-${{ github.event.pull_request.number }}
@@ -23,16 +23,21 @@ jobs:
   automerge:
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
+    # Hard total bound: 25 minutes for CI + 35 minutes for check discovery
+    # + 5 minutes for checkout/merge headroom = 65 minutes. The action's
+    # checks-discovery-timeout is not a total completion timeout, so the job
+    # itself must fail closed if the aggregate never completes.
+    timeout-minutes: 65
     steps:
       - name: Fetch Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v3
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Determine whether to merge
         id: should-merge
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
           # SECURITY: step outputs are untrusted data and must NEVER be
           # interpolated into the JavaScript source (script injection). Pass
@@ -69,25 +74,40 @@ jobs:
       # unbeaufsichtigten Auto-Merge nicht freischalten. Sollte je ein
       # legitim übersprungener Pflicht-Check auftauchen, wird der JOB gefixt
       # (nicht das Merge-Gate aufgeweicht).
-      # ACHTUNG: v1.9.1 kennt KEINEN "timeout"-Input (würde ignoriert -> potenziell
-      # 6h-Hängen). Warte-Zeit nur über wait-interval (Sekunden zwischen Polls) +
-      # das absichtlich kurze CI-Fenster im Repo begrenzt.
+      # v1.9.1 kennt KEINEN generischen "timeout"-Input. Der
+      # checks-discovery-timeout begrenzt nur die Check-Entdeckung; der
+      # job-level timeout oben begrenzt die gesamte Warte-/Merge-Kette.
+      # Der Push-Aggregatname ist absichtlich exakt: Dependabot-PRs haben
+      # zusätzlich einen pull_request-Lauf, dessen secret-dependent E2E und
+      # Aggregate-Gate absichtlich übersprungen werden. Nur der Push-Check auf
+      # demselben Head-SHA ist autoritativ.
       - name: Wait for CI checks
         if: steps.should-merge.outputs.result == 'true'
-        uses: lewagon/wait-on-check-action@v1.9.1
+        uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           running-workflow-name: automerge
           wait-interval: 60
+          # The aggregate may spend up to the 25-minute CI budget before it
+          # completes; allow 35 minutes for check discovery before failing closed.
+          checks-discovery-timeout: 2100
+          # Wait only for the exact push aggregate. Its dynamic event suffix
+          # keeps the normal pull_request aggregate distinct; an absent or
+          # non-success push dependency still fails closed.
+          check-name: 'CI gate (push)'
           allowed-conclusions: success
+          # fail-on-no-checks is effective with the exact check-name filter; an
+          # absent aggregate check must never authorize an auto-merge.
+          fail-on-no-checks: true
+          wait-for-duplicates: true
 
       # pull_request_target checkt per Default KEIN Repo aus -> "gh pr merge"
       # scheitert mit "not a git repository". Daher main auschecken (nur Metadaten/
       # API-Merge, KEIN PR-Code -> weiterhin sicher).
       - name: Checkout main (for gh pr merge)
         if: steps.should-merge.outputs.result == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: main
           sparse-checkout: .github
@@ -96,4 +116,9 @@ jobs:
         if: steps.should-merge.outputs.result == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr merge "${{ github.event.pull_request.number }}" --squash --delete-branch
+          # INFRA-9: GitHub-defined integers are not currently exploitable, but
+          # the repo policy (tests/infrastructure/ci-security-contract.sh) is to
+          # pass untrusted event metadata through env, never inline into a
+          # `run:` block. Keep this indirection even though the value is numeric.
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr merge "$PR_NUMBER" --squash --delete-branch

@@ -116,9 +116,21 @@ class AnthropicProvider implements AIProvider
         return '/messages';
     }
 
-    public function parseResponse(array $responseData): string
+    public function parseResponse(\stdClass $responseData): string
     {
-        return $responseData['content'][0]['text'] ?? '{}';
+        $contentBlocks = $responseData->content ?? null;
+        if (! is_array($contentBlocks) || ! array_is_list($contentBlocks)) {
+            return '';
+        }
+
+        $block = $contentBlocks[0] ?? null;
+        if (! $block instanceof \stdClass) {
+            return '';
+        }
+
+        $content = $block->text ?? null;
+
+        return is_string($content) ? $content : '';
     }
 
     public function supportsJsonMode(): bool

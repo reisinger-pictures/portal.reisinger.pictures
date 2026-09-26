@@ -21,7 +21,7 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
 
 **2. Codequalität ist gut**
 
-- Frontend: `pnpm lint:fix && pnpm build` (oder `tsc -b`) läuft fehlerfrei
+- Frontend: `pnpm lint:fix && pnpm build` läuft fehlerfrei; `pnpm build` enthält bereits TypeScript- und i18n-Prüfungen. `tsc -b` ist nur eine optionale Zusatzdiagnose und kein Ersatz.
 - Backend: `php artisan test` (alle bestehenden Tests grün)
 - Keine `eslint-disable`, `@ts-ignore` oder `any`
 - Keine blinden `.replace()`-Patches (Safe-Patching-Policy, §4)
@@ -36,7 +36,7 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
 
 ## 4. AI Operating Rules (STRICT)
 
-- **ESLint Auto-Fix Policy (STRICT):** Always use `npm run lint:fix` (= `eslint . --fix`) instead of plain `npm run lint`. Auto-fix handles formatting and trivial rules — never fix those by hand. The plain `lint` script (without `--fix`) is reserved for CI/PR checks only.
+- **ESLint Auto-Fix Policy (STRICT):** Always use `pnpm lint:fix` (= `eslint . --fix --max-warnings 0`) instead of plain `pnpm lint`. Auto-fix handles formatting and trivial rules — never fix those by hand. The plain `lint` script (without `--fix`) is reserved for CI/PR checks only.
 - **Test Debugging Transparency:** When analyzing test failure reports, you must explicitly document your debugging progress and thought process before proposing a fix. Explain what failed, why it failed based on the logs/DOM snapshots, and how the fix addresses the root cause.
 - **Patching & File Modification (CRITICAL):**
   - Multi-line Regex for search-and-replace in code is STRICTLY FORBIDDEN. It is too brittle.
@@ -59,20 +59,20 @@ The system and workflow are managed via a Main/Secondary Model architecture to p
 
 ## 6. Testing & E2E (STRICT)
 
-**Tag Policy — E2E tests MUST be tagged** using Playwright's `{tag: [...]}` syntax (`tag` accepts `string | string[]`). Every test gets one of these tiers:
+**Tag Policy — E2E tests MUST use Playwright's singular `{ tag: [...] }` option** (`tag` accepts `string | string[]`). Every new test must carry at least one **functional** tag:
 
 - `@smoke` — Critical path (login, guest, auth, basic CRUD). Run after every code change.
 - `@regression` — Full functional coverage. Run before deployment.
-- `@feature:<name>` — Optional, for feature-specific selection (e.g., `@feature:checkout`, `@feature:brand`).
-- **Device-specific tests** (mobile-only gestures, responsive layout) use `@mobile` tag.
-- **New E2E tests MUST include at least one tag.** If the test is critical path, use `@smoke`. If it's feature-specific, use `@feature:<name>`. Deep edge cases can remain untagged but will only run in the full pre-deployment suite.
+- `@feature:<name>` — Feature-specific selection (e.g., `@feature:checkout`, `@feature:brand`).
+
+**Device scope:** `@mobile` is an additional device-scope tag for mobile-only gestures or responsive coverage; it does not replace a functional tag. Legacy untagged tests remain part of the full suite until they are tagged, but new tests must not be untagged.
 
 **Execution:**
 
 - Bei jedem Code-Change: `test:e2e:smoke` (`npx playwright test --grep @smoke`)
 - Feature-spezifisch: `npx playwright test --grep @feature:<name>`
 - Vor Deployment: `test:e2e` (full suite, `npx playwright test`)
-- Wiederholung fehlgeschlagener Tests: `npx playwright test --last-failed`
+- Wiederholung fehlgeschlagener Tests: `npx playwright test --last-failed`; für die Fehleranalyse gelten maximal drei Fix-Versuche (siehe §6).
 
 **Workflow-Reihenfolge für Test-Fixes:**
 
@@ -88,7 +88,7 @@ The system and workflow are managed via a Main/Secondary Model architecture to p
 Module-specific instructions live in per-module `AGENTS.md` files:
 
 - **`frontend/AGENTS.md`** — React Vite SPA: React Compiler policy (`reactCompilerPreset`; `useMemo`/`useCallback`/`React.memo`/`forwardRef` are antipatterns), frontend test/lint/build + Playwright E2E commands, frontend STRICT rules (Tailwind JIT/Only, Zod validation, ESLint & TypeScript, semantic locator scoping, no `page.goto` SPA navigation, localStorage injection, field labels, useEffect & derived state).
-- **`backend/AGENTS.md`** — Laravel PHP: backend test command, Database Setup + Migration policy (seed after every migration; V029 is the latest deploy-ready migration), backend parallel testing/paratest rules and worker-DB concurrency.
+- **`backend/AGENTS.md`** — Laravel PHP: backend test command, Database Setup + Migration policy (seed after every migration; V035 is the last recorded deployed migration; V036–V038 are the current non-production repository frontier and may be consolidated when technically appropriate; a new V039+ migration is only for an unavoidable schema requirement), backend parallel testing/paratest rules and worker-DB concurrency.
 - **`admin.lrplugin/AGENTS.md`** — Lightroom Classic Lua plugin: scope, key files, and Lua conventions. This is a separate module with its own doc.
 
 The Security Risk Register (accepted risks, resolved C1–C7) is in §8 below and is repo-global.
@@ -97,7 +97,7 @@ The Security Risk Register (accepted risks, resolved C1–C7) is in §8 below an
 
 Bewusst akzeptierte Risiken aus dem Security-Audit (2026-07-11). **Nicht regredieren** — falls der jeweilige Guard entfernt wird, sofort fixen:
 
-- **[C1] ✅ RESOLVED (2026-07-21)** — `JWT_SECRET`-Fallback in `backend/config/jwt.php:18` rotiert. Deployment-Guard in `docker-compose.yml` auf generische Leerwert-Prüfung umgestellt (keine hartcodierten Secrets mehr).
+- **[C1] ✅ RESOLVED (2026-07-21)** — `JWT_SECRET`-Fallback in `backend/config/jwt.php:18` rotiert. Deployment-Guard in `deployment/docker-compose.yml` auf generische Leerwert-Prüfung umgestellt (keine hartcodierten Secrets mehr).
 - **[C2] ✅ RESOLVED (2026-07-21)** — `APP_KEY`-Fallback in `backend/config/app.php:110` rotiert. Gleiche Maßnahme wie C1.
 - **[C3] ✅ RESOLVED (2026-07-21)** — `backend/.env.testing` gelöscht; redundante Test-Credentials werden nur in `phpunit.xml` (localhost Fixtures) gehalten. Siehe auch C3b.
 - **[C3b] ✅ RESOLVED (2026-07-21)** — Hardcoded `sk_test`/`pk_test`-Fallback in `backend/config/services.php` entfernt. `STRIPE_*`-Env ist nun verpflichtend (Tests verwenden `Config::set()`-Mocks).
@@ -105,7 +105,7 @@ Bewusst akzeptierte Risiken aus dem Security-Audit (2026-07-11). **Nicht regredi
 - **[C5-history] ✅ RESOLVED (2026-07-21)** — Git-History mit `git-filter-repo` bereinigt (1. Durchlauf): alle 3 Stripe-Secrets (`pk_live`, `pk_test`, `sk_test`) in allen 133 Commits durch `*_REDACTED`-Platzhalter ersetzt. Force-Push zu GitHub, Reflog expired, GC mit `--prune=now`. Backup: `portal-backup-20260721-133753.bundle`.
 - **[C5b-history] ✅ RESOLVED (2026-07-21)** — 2. `git-filter-repo`-Durchlauf: `backend/.env.local` aus History entfernt, APP_KEY-JWT_SECRET-Fallbacks und `SuperSecret123!` durch `*_REDACTED` ersetzt. Force-Push erforderlich. Backup: `portal-backup-20260721-155854.bundle`. Siehe `features/security/env-hardening.md`.
 
-Offene Security-TODOs (M6, L2) siehe `AGENTS.todo.md`. M1–M5, M7–M9, L1, L3–L5 sind erledigt (Commit `0f10091` + Session 2026-07-14).
+Offene Security-/Infra-TODOs (P1-I1–P1-I8) siehe `AGENTS.todo.md`; P2-T5 ist als reine Dokumentationskorrektur abgeschlossen. Die früheren M-/L-Kennungen sind keine aktuellen Task-IDs mehr.
 
 ### Abgeschlossene Security-Hardening (2026-07-11, Historie)
 
@@ -126,7 +126,7 @@ Offene Security-TODOs (M6, L2) siehe `AGENTS.todo.md`. M1–M5, M7–M9, L1, L3�
 - `$fillable`-Disziplin (kein `$guarded=[]`, kein `Model::create($request->all())`)
 - Bildupload mehrstufig validiert (`image`-Rule + `mimes` + `exiftool`-MIME-Check)
 - File-Delivery auth-gated (`FileDeliveryController`)
-- Frontend-Disziplin (0× `any`/`@ts-ignore`/`eslint-disable`, Zod-Resolver auf allen Forms, `lint --max-warnings 0`)
+- Frontend-Disziplin (0× `any`/`@ts-ignore`/`eslint-disable`, Zod-Resolver auf allen Forms, ESLint mit `--max-warnings 0` über `pnpm lint:fix`)
 - Preisberechnung server-autoritativ (signiertes Offer-Token)
 - HTML-Sanitize beim Persistieren (Symfony `HtmlSanitizer`) + beim Render (DOMPurify)
 - Vertragssigning mit optimistischer Concurrency (`content_version` in UPDATE-WHERE)
@@ -157,14 +157,14 @@ Alle Run-Configs in `.run/*.run.xml` folgen einem einheitlichen Schema (etablier
 - **Konsistenz:** Dateiname und internes `name` müssen synchron sein (Name ohne `.run.xml`-Endung). Neue Configs MÜSSEN diesem Schema folgen.
 - **Sprache:** gemischt erlaubt (deutsche Kategorien `[Wartung]`, `[Gefahr]` und Task-Namen wie „generieren" bleiben).
 
-## 11. CodeGraph — Index & Git Sync Hook
+## 11. CodeGraph — Optionaler Index & Git-Sync-Hook
 
-- **Init/Index:** `.codegraph/` ist versioniert-ausgenommen via `.codegraph/.gitignore` (zeigt nur dieses eine File). The index (`codegraph.db`, daemon logs) bleibt lokal. Status: `codegraph status`, Rebuild: `codegraph index`, Manueller Sync: `codegraph sync`.
-- **Auto-Sync:** Der CodeGraph-Daemon (MCP) watchet die Working Tree und synct laufend (`daemon.log`). Der index ist damit fast immer fresh.
-- **Git Sync Hook (etabliert 2026-08-18):** `.githooks/pre-commit` (versioniert) läuft `codegraph sync -q` vor jedem Commit → Index ist zum Commit-Zeitpunkt garantiert aktuell, auch wenn der Daemon nicht läuft. Aktiviert via `git config core.hooksPath .githooks` (lokal, pro Clone einmal setzen). **Kanonische Kopie + Template:** `agents-skills/.agents/skills/codegraph-project-setup/templates/pre-commit.sh` (GitHub `reisi007/agents-skills`).
-  - **Fails open:** Fehlender `codegraph` auf PATH oder Sync-Fehler → Warnung, aber exit 0. Index-Freshness ist kein Commit-Gate (Design-Intent von codegraph selbst: Hooks „never block git"). Repos ohne `.codegraph/`-Index skippen still (Guard `[ -d .codegraph ]`).
-  - Test: `git hook run pre-commit` (git ≥ 2.36) oder direkt `.githooks/pre-commit` ausführen.
-  - codegraph bietet zusätzlich optionale **post**-Hooks (`post-commit`/`post-merge`/`post-checkout`, API `installGitSyncHook()` — für WSL2-Szenarien ohne File-Watcher). Bei uns nicht nötig (Daemon läuft); falls je gebraucht: als versionierte Files nach `.githooks/` legen (nicht den built-in Installer nutzen, er schreibt nach `.git/hooks/` — das wird bei gesetztem `core.hooksPath` ignoriert).
+- **Optionaler lokaler Index:** `.codegraph/.gitignore` ist die einzige versionierte Datei in diesem Verzeichnis. Ein vorhandenes `.codegraph/`-Verzeichnis bedeutet **nicht**, dass ein Index initialisiert ist; `codegraph status` kann in einem frischen Checkout `Not initialized` melden. Index und Daemon-Dateien (`codegraph.db`, Logs) bleiben maschinenlokal. Status: `codegraph status`; Initialisierung: `codegraph init`; Rebuild/Sync: `codegraph index`/`codegraph sync`.
+- **Auto-Sync:** Der CodeGraph-Daemon (MCP) watchet die Working Tree und synct laufend (`daemon.log`). Auto-Sync ist ein Best-Effort-Mechanismus, keine Freshness-Garantie.
+- **Git-Sync-Hook (optional, versioniert):** `.githooks/pre-commit` ist **fails open** und garantiert keine Index-Frische. Sein Guard prüft nur, ob `.codegraph/` als Verzeichnis existiert (`[ -d .codegraph ]`); er prüft weder `codegraph.db` noch den Initialisierungsstatus. Fehlt das Verzeichnis, wird still übersprungen. Ist das Verzeichnis vorhanden, aber `codegraph` fehlt, ist der Index nicht initialisiert oder `codegraph sync` schlägt fehl, erscheint eine Warnung und der Hook beendet mit Exit 0. Aktiviert wird er lokal mit `git config core.hooksPath .githooks`. **Kanonische Kopie + Template:** `agents-skills/.agents/skills/codegraph-project-setup/templates/pre-commit.sh` (GitHub `reisi007/agents-skills`).
+  - **Fails open:** Fehlender `codegraph` auf PATH, ein nicht initialisierter Index oder ein Sync-Fehler führen nur zu einer Warnung; der Hook beendet mit Exit 0. Index-Freshness ist kein Commit-Gate. Repos ohne `.codegraph/`-Verzeichnis werden durch den Guard still übersprungen.
+  - Test: `git hook run pre-commit` (git ≥ 2.36) oder direkt `.githooks/pre-commit` ausführen. Ein erfolgreicher Lauf bedeutet nur, dass der Best-Effort-Sync nicht fehlgeschlagen ist, nicht dass ein Index initialisiert wurde.
+  - CodeGraph bietet zusätzlich optionale **post**-Hooks (`post-commit`/`post-merge`/`post-checkout`, API `installGitSyncHook()` — für WSL2-Szenarien ohne File-Watcher). Wenn sie benötigt werden, als versionierte Dateien nach `.githooks/` legen (nicht den built-in Installer nutzen, er schreibt nach `.git/hooks/` — das wird bei gesetztem `core.hooksPath` ignoriert).
 
 ## 12. Zentrale Skills-Repo (agents-skills) — etabliert 2026-08-18
 

@@ -8,11 +8,15 @@ vi.mock('../../ui/components/UIContext', () => ({
     })),
 }));
 
+function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
 function mockFetch(response: unknown, ok = true) {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok,
-        json: () => Promise.resolve(response),
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(response, ok ? 200 : 500)));
 }
 
 function mockFetchNetworkError() {
@@ -110,6 +114,35 @@ describe('usePdfExtraction', () => {
         });
     });
 
+    it('restores fixed-point manual quantities as editor decimals', async () => {
+        const onDataExtracted = vi.fn();
+        mockFetch({
+            items: [{
+                type: 'item',
+                description: 'Teilstunde',
+                notes: '',
+                qty: 25,
+                quantity_scale: 100,
+                price: 1000,
+            }],
+        });
+
+        const {result} = renderHook(() => usePdfExtraction(onDataExtracted));
+        await act(async () => {
+            await result.current.processPdfFile(createMockFile());
+        });
+
+        expect(onDataExtracted).toHaveBeenCalledWith(expect.objectContaining({
+            items: [{
+                type: 'item',
+                description: 'Teilstunde',
+                notes: '',
+                qty: 0.25,
+                price: 10,
+            }],
+        }));
+    });
+
     it('sets isExtracting true during request and false after', async () => {
         const onDataExtracted = vi.fn();
 
@@ -128,10 +161,7 @@ describe('usePdfExtraction', () => {
         expect(result.current.isExtracting).toBe(true);
 
         await act(async () => {
-            resolveFetch!({
-                ok: true,
-                json: () => Promise.resolve({ items: [] }),
-            });
+            resolveFetch!(jsonResponse({ items: [] }));
             await promise!;
         });
 

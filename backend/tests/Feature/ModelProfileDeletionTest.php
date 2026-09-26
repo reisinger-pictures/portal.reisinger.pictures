@@ -10,9 +10,11 @@ use App\Models\Customer;
 use App\Models\ModelAccessToken;
 use App\Models\ModelPhoto;
 use App\Models\ModelProfile;
+use App\Models\ModelRegistrationInvite;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ModelFileStore;
+use App\Services\ModelProfileEraser;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
@@ -22,8 +24,8 @@ use Tests\TestCase;
 
 /**
  * DSGVO-Löschung von Model-Profilen: restlose Entfernung von Zeilen + Storage-
- * Dateien, Super-Admin-Gate, Brand-Scope und der Customer-Observer als
- * Generalschutz.
+ * Dateien, verknüpften Registrierungs-Einladungen, Super-Admin-Gate, Brand-Scope
+ * und der Customer-Observer als Generalschutz.
  */
 class ModelProfileDeletionTest extends TestCase
 {
@@ -162,6 +164,171 @@ class ModelProfileDeletionTest extends TestCase
                     && ! array_key_exists('email', $context);
             }))
             ->once();
+    }
+
+    public function test_super_admin_erasure_removes_linked_registration_invites_atomically(): void
+    {
+        $superAdmin = $this->userWithRole(UserRole::SUPER_ADMIN, 'rp');
+        $model = $this->modelWithFiles('rp');
+        $customer = $model['customer'];
+
+        $act = Act::create([
+            'brand' => 'rp',
+            'manager_customer_id' => $customer->id,
+            'act_type' => 'single',
+            'catalog_version' => 'v1',
+            'answers' => [],
+            'person_count' => 1,
+            'submitted_at' => now(),
+        ]);
+        ActMember::create([
+            'act_id' => $act->id,
+            'customer_id' => $customer->id,
+            'role' => 'manager',
+            'position' => 0,
+        ]);
+
+        $inviter = User::factory()->create(['brand' => 'rp']);
+        $linkedInvite = ModelRegistrationInvite::create([
+            'token' => bin2hex(random_bytes(32)),
+            'email' => 'private-invite@example.com',
+            'label' => 'Private invitation label',
+            'brand' => 'rp',
+            'invited_by' => $inviter->id,
+            'expires_at' => now()->addDays(7),
+            'used_at' => now(),
+            'act_id' => $act->id,
+            'customer_id' => $customer->id,
+        ]);
+
+        $unrelatedInvite = ModelRegistrationInvite::create([
+            'token' => bin2hex(random_bytes(32)),
+            'email' => 'other-invite@example.com',
+            'brand' => 'rp',
+            'invited_by' => $inviter->id,
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $this->actingAs($superAdmin, 'api')
+            ->deleteJson("/api/management/models/{$customer->id}")
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseMissing('model_registration_invites', ['id' => $linkedInvite->id]);
+        $this->assertDatabaseHas('model_registration_invites', [
+            'id' => $unrelatedInvite->id,
+            'customer_id' => null,
+        ]);
+    }
+
+    public function test_erasure_rolls_back_customer_and_invite_cleanup_together(): void
+    {
+        $model = $this->modelWithFiles('rp');
+        $customer = $model['customer'];
+        $inviter = User::factory()->create(['brand' => 'rp']);
+        $invite = ModelRegistrationInvite::create([
+            'token' => bin2hex(random_bytes(32)),
+            'email' => 'rollback-invite@example.com',
+            'brand' => 'rp',
+            'invited_by' => $inviter->id,
+            'expires_at' => now()->addDays(7),
+            'customer_id' => $customer->id,
+        ]);
+
+        $failureTriggered = false;
+        Customer::deleted(function () use (&$failureTriggered): void {
+            $failureTriggered = true;
+            throw new \RuntimeException('Simulated failure after customer delete');
+        });
+
+        $caught = null;
+        try {
+            app(ModelProfileEraser::class)->erase($customer, 'dsgvo');
+        } catch (\Throwable $exception) {
+            $caught = $exception;
+        }
+
+        $this->assertTrue($failureTriggered);
+        $this->assertInstanceOf(\RuntimeException::class, $caught);
+        $this->assertSame('Simulated failure after customer delete', $caught->getMessage());
+        $this->assertDatabaseHas('customers', ['id' => $customer->id]);
+        $this->assertDatabaseHas('model_registration_invites', ['id' => $invite->id]);
+        Storage::disk('local')->assertExists($model['age_proof']);
+        foreach ($model['photos'] as $path) {
+            Storage::disk('local')->assertExists($path);
+        }
+    }
+
+    public function test_deleting_manager_promotes_first_remaining_member(): void
+    {
+        $superAdmin = $this->userWithRole(UserRole::SUPER_ADMIN, 'rp');
+        $model = $this->modelWithFiles('rp');
+        $manager = $model['customer'];
+
+        $act = Act::create([
+            'brand' => 'rp',
+            'manager_customer_id' => $manager->id,
+            'act_type' => 'group',
+            'catalog_version' => 'v1',
+            'answers' => [],
+            'person_count' => 3,
+            'submitted_at' => now(),
+        ]);
+        ActMember::create(['act_id' => $act->id, 'customer_id' => $manager->id, 'role' => 'manager', 'position' => 0]);
+
+        $second = Customer::factory()->create(['brand' => 'rp', 'name' => 'Zweite Person']);
+        $third = Customer::factory()->create(['brand' => 'rp', 'name' => 'Dritte Person']);
+        // Deliberately not in position order, to prove the lowest position wins.
+        ActMember::create(['act_id' => $act->id, 'customer_id' => $third->id, 'role' => 'member', 'position' => 2]);
+        ActMember::create(['act_id' => $act->id, 'customer_id' => $second->id, 'role' => 'member', 'position' => 1]);
+
+        $this->actingAs($superAdmin, 'api')
+            ->deleteJson("/api/management/models/{$manager->id}")
+            ->assertOk();
+
+        // The act survives with the first remaining member as its new manager.
+        $this->assertDatabaseHas('acts', [
+            'id' => $act->id,
+            'manager_customer_id' => $second->id,
+        ]);
+        $this->assertDatabaseHas('act_members', [
+            'act_id' => $act->id,
+            'customer_id' => $second->id,
+            'role' => 'manager',
+        ]);
+        $this->assertDatabaseHas('act_members', [
+            'act_id' => $act->id,
+            'customer_id' => $third->id,
+            'role' => 'member',
+        ]);
+        $this->assertDatabaseMissing('act_members', ['act_id' => $act->id, 'customer_id' => $manager->id]);
+        $this->assertDatabaseMissing('customers', ['id' => $manager->id]);
+    }
+
+    public function test_direct_customer_delete_nulls_manager_but_keeps_act_and_members(): void
+    {
+        $model = $this->modelWithFiles('rp');
+        $manager = $model['customer'];
+
+        $act = Act::create([
+            'brand' => 'rp',
+            'manager_customer_id' => $manager->id,
+            'act_type' => 'group',
+            'catalog_version' => 'v1',
+            'answers' => [],
+            'person_count' => 2,
+            'submitted_at' => now(),
+        ]);
+        ActMember::create(['act_id' => $act->id, 'customer_id' => $manager->id, 'role' => 'manager', 'position' => 0]);
+
+        $member = Customer::factory()->create(['brand' => 'rp', 'name' => 'Restmitglied']);
+        ActMember::create(['act_id' => $act->id, 'customer_id' => $member->id, 'role' => 'member', 'position' => 1]);
+
+        // Bypasses the eraser on purpose: the relaxed FK must not cascade the act.
+        $manager->delete();
+
+        $this->assertDatabaseHas('acts', ['id' => $act->id, 'manager_customer_id' => null]);
+        $this->assertDatabaseHas('act_members', ['act_id' => $act->id, 'customer_id' => $member->id]);
     }
 
     public function test_admin_cannot_erase_model_profile(): void

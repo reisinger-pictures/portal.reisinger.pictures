@@ -1,6 +1,7 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
+﻿import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useAuth } from '../useAuth';
+import { useAuth, type AuthMeUser } from '../useAuth';
+import {checkoutSessionStorageKey, loadOrCreateCheckoutSession} from '../checkoutSession';
 
 vi.mock('swr', () => {
     const mutate = vi.fn();
@@ -10,11 +11,42 @@ vi.mock('swr', () => {
     };
 });
 
-import useSWR from 'swr';
+import useSWR, {mutate as globalMutate} from 'swr';
+
+const authMeUserFixture: AuthMeUser = {
+    id: 'u1',
+    guest_id: null,
+    name: 'Test User',
+    email: 'test@test.com',
+    billing_name: 'Test User',
+    billing_company: null,
+    billing_street: null,
+    billing_zip: null,
+    billing_city: null,
+    brand: 'rp',
+    is_cross_brand: false,
+    is_super_admin: false,
+    is_admin: false,
+    is_photographer: false,
+    is_org_admin: false,
+    is_power_user: false,
+    is_pending: false,
+    can_edit_metadata: false,
+    can_purchase_upgrades: false,
+    roles: [],
+    transient_galleries: [],
+    transient_meta_galleries: [],
+    photographer_gallery_groups: [],
+};
 
 describe('useAuth', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        sessionStorage.clear();
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
     it('returns loading state initially when no data', () => {
@@ -31,19 +63,18 @@ describe('useAuth', () => {
         expect(result.current.isError).toBeUndefined();
     });
 
-    it('returns user data when available', () => {
-        const mockUser = { id: 'u1', name: 'Test User', email: 'test@test.com', is_super_admin: false, is_admin: false, is_photographer: false, is_pending: false, can_edit_metadata: false, roles: [] };
-
+    it('returns the complete AuthMeUser contract when available', () => {
         vi.mocked(useSWR).mockReturnValue({
-            data: mockUser,
+            data: authMeUserFixture,
             error: undefined,
             isLoading: false,
             mutate: vi.fn(),
         } as never);
 
         const { result } = renderHook(() => useAuth());
+        const typedUser: AuthMeUser | undefined = result.current.user;
         expect(result.current.isLoading).toBe(false);
-        expect(result.current.user).toEqual(mockUser);
+        expect(typedUser).toEqual(authMeUserFixture);
         expect(result.current.isError).toBeUndefined();
     });
 
@@ -168,24 +199,131 @@ describe('useAuth', () => {
         vi.unstubAllGlobals();
     });
 
-    it('logout calls fetch and revalidates', async () => {
+    it('logout calls fetch and clears the cached session without revalidating', async () => {
         const mockMutate = vi.fn();
         vi.mocked(useSWR).mockReturnValue({
-            data: { id: 'u1', name: 'T', email: 't@t.com', is_super_admin: false, is_admin: false, is_photographer: false, is_pending: false, can_edit_metadata: false, roles: [] },
+            data: authMeUserFixture,
             error: undefined,
             isLoading: false,
             mutate: mockMutate,
         } as never);
 
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+        loadOrCreateCheckoutSession(
+            'u1',
+            'cart-v1-1111111111111111',
+            () => '11111111-1111-4111-8111-111111111111',
+            sessionStorage
+        );
 
         const { result } = renderHook(() => useAuth());
         await result.current.logout();
 
         expect(fetch).toHaveBeenCalledWith('/api/auth/logout', expect.objectContaining({
             method: 'POST',
+            credentials: 'include',
         }));
+        expect(globalMutate).toHaveBeenCalledWith(expect.any(Function), undefined, {revalidate: false});
+        expect(sessionStorage.getItem(checkoutSessionStorageKey('u1'))).toBeNull();
 
         vi.unstubAllGlobals();
+    });
+
+    it('settles into an unauthenticated state after logout without perpetual loading', async () => {
+        let swrData: AuthMeUser | undefined = authMeUserFixture;
+        let swrError: Error | undefined;
+        const mockMutate = vi.fn();
+        vi.mocked(useSWR).mockImplementation(() => ({
+            data: swrData,
+            error: swrError,
+            isLoading: false,
+            mutate: mockMutate,
+        }) as never);
+
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ok: true}));
+        const {result, rerender} = renderHook(() => useAuth());
+
+        vi.mocked(globalMutate).mockImplementationOnce(async () => {
+            // Simulate SWR applying the logout cache mutation: auth data and
+            // errors are cleared, while revalidation remains disabled.
+            swrData = undefined;
+            swrError = undefined;
+        });
+        await result.current.logout();
+        rerender();
+
+        expect(result.current.user).toBeUndefined();
+        expect(result.current.isError).toBeUndefined();
+        expect(result.current.isLoading).toBe(false);
+        expect(globalMutate).toHaveBeenCalledWith(expect.any(Function), undefined, {revalidate: false});
+    });
+
+    it('refreshes an expired access session once before retrying logout', async () => {
+        vi.mocked(useSWR).mockReturnValue({
+            data: authMeUserFixture,
+            error: undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        } as never);
+
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(new Response(JSON.stringify({error: 'Unauthenticated.'}), {
+                status: 401,
+                headers: {'Content-Type': 'application/json'}
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({success: true}), {
+                status: 200,
+                headers: {'Content-Type': 'application/json'}
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({message: 'Successfully logged out'}), {
+                status: 200,
+                headers: {'Content-Type': 'application/json'}
+            }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const { result } = renderHook(() => useAuth());
+        await result.current.logout();
+
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+        expect(fetchMock.mock.calls.map(([input]) => input)).toEqual([
+            '/api/auth/logout',
+            '/api/auth/refresh',
+            '/api/auth/logout',
+        ]);
+        expect(fetchMock.mock.calls[1][1]).toEqual(expect.objectContaining({
+            method: 'POST',
+            credentials: 'include',
+        }));
+        expect(globalMutate).toHaveBeenCalledWith(expect.any(Function), undefined, {revalidate: false});
+    });
+
+    it('does not issue a recursive logout when the refresh credential is invalid', async () => {
+        vi.mocked(useSWR).mockReturnValue({
+            data: authMeUserFixture,
+            error: undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        } as never);
+
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(new Response(JSON.stringify({error: 'Unauthenticated.'}), {
+                status: 401,
+                headers: {'Content-Type': 'application/json'}
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({error: 'Token konnte nicht aktualisiert werden.'}), {
+                status: 401,
+                headers: {'Content-Type': 'application/json'}
+            }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const { result } = renderHook(() => useAuth());
+
+        await expect(result.current.logout()).rejects.toThrow('Unauthenticated.');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock.mock.calls.map(([input]) => input)).toEqual([
+            '/api/auth/logout',
+            '/api/auth/refresh',
+        ]);
+        expect(globalMutate).not.toHaveBeenCalled();
     });
 });

@@ -1,5 +1,19 @@
 import {describe, it, expect} from 'vitest';
-import {calculateVolumeTier, calculateVolumeTotal, DEFAULT_VOLUME_PRICING, tiersFromApi} from '../useVolumeLicensing';
+import {
+    calculateVolumeTier,
+    calculateVolumeTotal,
+    DEFAULT_PRESET_KEY,
+    DEFAULT_VOLUME_PRICING,
+    descriptorFromTerms,
+    groupCartItemsByPricing,
+    groupGallerySourcesByPricing,
+    parseEffectiveLicenseTerms,
+    parseVolumePricing,
+    presetKeyFromId,
+    sumGalleryPricingGroupTotals,
+    sumPricingGroupTotals,
+    tiersFromApi,
+} from '../useVolumeLicensing';
 
 describe('calculateVolumeTier', () => {
     it('tier 0 for 0 items (edge: empty cart)', () => {
@@ -64,6 +78,44 @@ describe('calculateVolumeTier', () => {
         expect(calculateVolumeTier(100, config).priceCents).toBe(5000);
         expect(calculateVolumeTier(100, config).tierIndex).toBe(0);
         expect(calculateVolumeTier(100, config).isMaxTier).toBe(true);
+    });
+
+    it('clamps legacy non-monotonic tiers to the base price like checkout', () => {
+        const config = {
+            tiers: [
+                {minQuantity: 0, priceCents: 5000},
+                {minQuantity: 10, priceCents: 7000},
+            ],
+        };
+
+        expect(calculateVolumeTier(20, config)).toMatchObject({
+            priceCents: 5000,
+            tierIndex: 1,
+            isMaxTier: true,
+        });
+        expect(calculateVolumeTotal(Array.from({length: 20}, () => ({price: 0})), config)).toBe(100000);
+    });
+
+    it('clamps negative legacy prices to zero', () => {
+        const config = {
+            tiers: [
+                {minQuantity: 0, priceCents: -100},
+                {minQuantity: 5, priceCents: 4000},
+            ],
+        };
+
+        expect(calculateVolumeTier(8, config)).toMatchObject({
+            priceCents: 0,
+            tierIndex: 1,
+        });
+        expect(calculateVolumeTotal(Array.from({length: 8}, () => ({price: 0})), config)).toBe(0);
+    });
+
+    it('falls back safely when a legacy caller supplies an empty tier list', () => {
+        expect(calculateVolumeTier(1, {tiers: []})).toMatchObject({
+            priceCents: 3000,
+            tierIndex: 0,
+        });
     });
 });
 
@@ -154,5 +206,263 @@ describe('tiersFromApi', () => {
     it('falls back to DEFAULT_VOLUME_PRICING when payload is empty', () => {
         expect(tiersFromApi(undefined)).toEqual(DEFAULT_VOLUME_PRICING.tiers);
         expect(tiersFromApi([])).toEqual(DEFAULT_VOLUME_PRICING.tiers);
+    });
+
+    it('clamps negative legacy prices to zero', () => {
+        expect(tiersFromApi([
+            {min_quantity: 0, price_cents: -100},
+            {min_quantity: 5, price_cents: 4000},
+        ])).toEqual([
+            {minQuantity: 0, priceCents: 0},
+            {minQuantity: 5, priceCents: 0},
+        ]);
+    });
+
+    it('clamps malformed legacy price increases to the server base price', () => {
+        expect(tiersFromApi([
+            {min_quantity: 0, price_cents: 5000},
+            {min_quantity: 10, price_cents: 7000},
+        ])).toEqual([
+            {minQuantity: 0, priceCents: 5000},
+            {minQuantity: 10, priceCents: 5000},
+        ]);
+    });
+});
+
+describe('preset_id wire contract', () => {
+    it('keeps a numeric primary key as the opaque decimal group key', () => {
+        const descriptor = descriptorFromTerms(parseEffectiveLicenseTerms({
+            pricing_strategy: 'volume_licensing',
+            volume_pricing: {
+                preset_id: 42,
+                preset_name: 'Werbung',
+                tiers: [{min_quantity: 0, price_cents: 4000}],
+            },
+        }));
+
+        expect(descriptor).toMatchObject({
+            licensingMode: 'volume_licensing',
+            presetId: '42',
+            presetName: 'Werbung',
+        });
+        expect(presetKeyFromId(42)).toBe('42');
+    });
+
+    it('tolerates a stringified primary key from a stringifying intermediary', () => {
+        expect(parseVolumePricing({preset_id: ' 7 ', preset_name: 'Preset', tiers: []})).toEqual({
+            preset_id: 7,
+            preset_name: 'Preset',
+            tiers: null,
+        });
+        expect(parseVolumePricing({preset_id: '12abc'})).toMatchObject({preset_id: null});
+    });
+
+    it('rejects malformed identifiers without throwing and falls back to the default key', () => {
+        for (const presetId of [null, undefined, 0, -1, 1.5, Number.NaN, true, {}, [], '']) {
+            expect(parseVolumePricing({preset_id: presetId, tiers: [{min_quantity: 0, price_cents: 4000}]}))
+                .toMatchObject({preset_id: null});
+        }
+
+        const descriptor = descriptorFromTerms(parseEffectiveLicenseTerms({
+            pricing_strategy: 'volume_licensing',
+            volume_pricing: {preset_id: {id: 3}, tiers: [{min_quantity: 0, price_cents: 4000}]},
+        }));
+        expect(descriptor).toMatchObject({
+            licensingMode: 'volume_licensing',
+            presetId: DEFAULT_PRESET_KEY,
+        });
+        expect(descriptor.config.tiers).toEqual([{minQuantity: 0, priceCents: 4000}]);
+    });
+
+    it('drops malformed tiers instead of propagating NaN prices', () => {
+        expect(parseVolumePricing({
+            preset_id: 5,
+            preset_name: 7,
+            tiers: [null, {min_quantity: 0, price_cents: 4000}, {min_quantity: 'x', price_cents: 1}, {min_quantity: 5}],
+        })).toEqual({
+            preset_id: 5,
+            preset_name: null,
+            tiers: [{min_quantity: 0, price_cents: 4000}],
+        });
+    });
+
+    it('normalises a non-object terms payload to null', () => {
+        for (const value of [undefined, null, 'volume_licensing', 3, []]) {
+            expect(parseEffectiveLicenseTerms(value)).toBeNull();
+        }
+        expect(parseEffectiveLicenseTerms({
+            pricing_strategy: 42,
+            volume_pricing: 'not-an-object',
+        })).toEqual({pricing_strategy: null, volume_pricing: null});
+    });
+
+    it('trims the preset name and keeps scope groups on the default key', () => {
+        expect(parseVolumePricing({preset_id: 3, preset_name: '  Werbung  '}))
+            .toMatchObject({preset_name: 'Werbung'});
+        expect(descriptorFromTerms(parseEffectiveLicenseTerms({
+            pricing_strategy: 'scope_licensing',
+            volume_pricing: {preset_id: 3, preset_name: 'Werbung'},
+        }))).toMatchObject({
+            licensingMode: 'scope_licensing',
+            presetId: DEFAULT_PRESET_KEY,
+            presetName: null,
+        });
+    });
+});
+
+describe('mixed cart pricing groups', () => {
+    const scope = descriptorFromTerms({pricing_strategy: 'scope_licensing', volume_pricing: null});
+    const presetA = descriptorFromTerms({
+        pricing_strategy: 'volume_licensing',
+        volume_pricing: {
+            preset_id: 1,
+            preset_name: 'Preset A',
+            tiers: [{min_quantity: 0, price_cents: 5000}, {min_quantity: 2, price_cents: 4000}],
+        },
+    });
+    const presetB = descriptorFromTerms({
+        pricing_strategy: 'volume_licensing',
+        volume_pricing: {
+            preset_id: 2,
+            preset_name: 'Preset B',
+            tiers: [{min_quantity: 0, price_cents: 7000}],
+        },
+    });
+
+    it('groups scope, custom preset, and another preset independently', () => {
+        const items = [
+            {photoId: 'scope-1', tier: 'web' as const, galleryId: 'scope-gallery', price: 500},
+            {photoId: 'a-1', tier: 'original' as const, galleryId: 'gallery-a', price: 0},
+            {photoId: 'a-2', tier: 'original' as const, galleryId: 'gallery-a', price: 0},
+            {photoId: 'b-1', tier: 'original' as const, galleryId: 'gallery-b', price: 0},
+        ];
+        const groups = groupCartItemsByPricing(items, item => {
+            if (item.galleryId === 'scope-gallery') return scope;
+            if (item.galleryId === 'gallery-b') return presetB;
+            return presetA;
+        });
+
+        expect(groups).toHaveLength(3);
+        expect(groups.map(group => [group.licensingMode, group.presetId, group.totalCents])).toEqual([
+            ['scope_licensing', 'default', 500],
+            ['volume_licensing', '1', 8000],
+            ['volume_licensing', '2', 7000],
+        ]);
+        expect(sumPricingGroupTotals(groups)).toBe(15500);
+    });
+
+    it('combines galleries that resolve to the same effective preset', () => {
+        const items = [
+            {photoId: 'a-1', tier: 'original' as const, galleryId: 'gallery-a', price: 0},
+            {photoId: 'b-1', tier: 'original' as const, galleryId: 'gallery-b', price: 0},
+        ];
+        const groups = groupCartItemsByPricing(items, () => presetA);
+
+        expect(groups).toHaveLength(1);
+        expect(groups[0].itemIds).toEqual(['a-1', 'b-1']);
+        expect(groups[0].totalCents).toBe(8000);
+    });
+
+    it('does not count quote items in a volume group', () => {
+        const items = [
+            {photoId: 'volume-1', tier: 'original' as const, galleryId: 'gallery-a', price: 0},
+            {photoId: 'quote-1', tier: 'original' as const, galleryId: 'gallery-a', price: 0, isQuote: true},
+        ];
+        const [group] = groupCartItemsByPricing(items, () => presetA);
+
+        expect(group.totalCents).toBe(5000);
+        expect(group.itemPriceCents).toEqual({'volume-1': 5000});
+    });
+});
+
+describe('mixed child gallery pricing groups', () => {
+    const scope = descriptorFromTerms({pricing_strategy: 'scope_licensing', volume_pricing: null});
+    const presetA = descriptorFromTerms({
+        pricing_strategy: 'volume_licensing',
+        volume_pricing: {
+            preset_id: 11,
+            preset_name: 'Child Preset A',
+            tiers: [{min_quantity: 0, price_cents: 5000}, {min_quantity: 2, price_cents: 4000}],
+        },
+    });
+    const presetB = descriptorFromTerms({
+        pricing_strategy: 'volume_licensing',
+        volume_pricing: {
+            preset_id: 12,
+            preset_name: 'Child Preset B',
+            tiers: [{min_quantity: 0, price_cents: 7000}],
+        },
+    });
+
+    it('prices each child group with its own preset and tier before summing volume groups', () => {
+        const groups = groupGallerySourcesByPricing([
+            {galleryId: 'child-a', galleryGroupId: 'group-a', photoCount: 2},
+            {galleryId: 'child-b', galleryGroupId: 'group-b', photoCount: 1},
+            {galleryId: 'child-scope', galleryGroupId: 'group-scope', photoCount: 1},
+        ], source => {
+            if (source.galleryId === 'child-a') return presetA;
+            if (source.galleryId === 'child-b') return presetB;
+            return scope;
+        });
+
+        expect(groups).toHaveLength(3);
+        expect(groups.map(group => ({
+            key: group.key,
+            galleries: group.galleryIds,
+            parentGroups: group.galleryGroupIds,
+            price: group.pricePerItemCents,
+            total: group.totalCents,
+        }))).toEqual([
+            {
+                key: 'volume_licensing|11',
+                galleries: ['child-a'],
+                parentGroups: ['group-a'],
+                price: 4000,
+                total: 8000,
+            },
+            {
+                key: 'volume_licensing|12',
+                galleries: ['child-b'],
+                parentGroups: ['group-b'],
+                price: 7000,
+                total: 7000,
+            },
+            {
+                key: 'scope_licensing|default',
+                galleries: ['child-scope'],
+                parentGroups: ['group-scope'],
+                price: null,
+                total: null,
+            },
+        ]);
+        expect(sumGalleryPricingGroupTotals(groups)).toBe(15000);
+    });
+
+    it('ignores malformed negative-count child sources', () => {
+        const groups = groupGallerySourcesByPricing([
+            {galleryId: 'valid-child', galleryGroupId: 'group-a', photoCount: 1},
+            {galleryId: 'negative-child', galleryGroupId: 'group-b', photoCount: -1},
+            {galleryId: 'fractional-child', galleryGroupId: 'group-c', photoCount: 1.5},
+            {galleryId: 'nan-child', galleryGroupId: 'group-d', photoCount: Number.NaN},
+            {galleryId: 'valid-child', galleryGroupId: 'group-a', photoCount: 1},
+        ], () => presetA);
+
+        expect(groups).toHaveLength(1);
+        expect(groups[0].galleryIds).toEqual(['valid-child']);
+        expect(groups[0].totalCents).toBe(5000);
+    });
+
+    it('combines different child groups only when their effective server preset is equal', () => {
+        const groups = groupGallerySourcesByPricing([
+            {galleryId: 'child-a', galleryGroupId: 'group-a', photoCount: 1},
+            {galleryId: 'child-b', galleryGroupId: 'group-b', photoCount: 1},
+        ], () => presetA);
+
+        expect(groups).toHaveLength(1);
+        expect(groups[0].galleryIds).toEqual(['child-a', 'child-b']);
+        expect(groups[0].galleryGroupIds).toEqual(['group-a', 'group-b']);
+        expect(groups[0].photoCount).toBe(2);
+        expect(groups[0].pricePerItemCents).toBe(4000);
+        expect(groups[0].totalCents).toBe(8000);
     });
 });

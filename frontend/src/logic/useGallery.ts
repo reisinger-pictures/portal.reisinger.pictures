@@ -1,5 +1,5 @@
 import useSWRInfinite from 'swr/infinite';
-import {fetcher} from '../api';
+import {apiMutate, fetcher} from '../api';
 import {Gallery} from './useGalleries';
 import {IptcData} from './usePhoto';
 
@@ -32,6 +32,10 @@ export interface PaginatedGalleryResponse {
     notified_count: number;
     wants_notifications: boolean;
     breadcrumbs: {name: string, full_path: string, type: string}[];
+}
+
+function hasErrorStatus(error: unknown, status: number): boolean {
+    return typeof error === 'object' && error !== null && 'status' in error && error.status === status;
 }
 
 export function useGallery(slug: string | undefined) {
@@ -67,33 +71,32 @@ export function useGallery(slug: string | undefined) {
     const ratePhoto = async (photoId: string, rating: number, comment: string = '') => {
         const oldData = data;
 
-        if (data) {
-            const newData = data.map(page => ({
-                ...page,
-                photos: page.photos.map(p => p.id === photoId ? {...p, rating, comment} : p)
-            }));
-            mutate(newData, { revalidate: false });
-        }
-
         try {
-            const res = await fetch("/api/photos/" + photoId + "/rate", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({rating, comment}),
-                credentials: 'include'
-            });
+            if (data) {
+                const newData = data.map(page => ({
+                    ...page,
+                    photos: page.photos.map(p => p.id === photoId ? {...p, rating, comment} : p)
+                }));
+                await mutate(newData, {revalidate: false});
+            }
 
-            if (res.status === 401) {
-                window.location.href = '/login';
+            await apiMutate('/api/photos/' + photoId + '/rate', 'POST', {rating, comment});
+        } catch (error) {
+            if (oldData) {
+                try {
+                    await mutate(oldData, {revalidate: false});
+                } catch {
+                    // The API error below is the actionable failure. A local
+                    // cache rollback failure must not replace it for callers.
+                }
+            }
+
+            if (hasErrorStatus(error, 401)) {
+                window.location.replace('/');
                 return;
             }
-        } catch {
-            if (oldData) {
-                mutate(oldData, { revalidate: false });
-            }
+
+            throw error;
         }
     };
 
@@ -102,13 +105,8 @@ export function useGallery(slug: string | undefined) {
         gallery, canManage, photos, downloadsCount, notified_count: notifiedCount, totalPhotos, isLoading, isError: error,
         ratePhoto, size, setSize, isReachingEnd, wantsNotifications, breadcrumbs,
         toggleOptIn: async (id: string, val: boolean) => {
-            await fetch('/api/galleries/'+id+'/opt-in', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({wants_notifications: val}),
-                credentials: 'include'
-            });
-           await mutate()
+            await apiMutate(`/api/galleries/${id}/opt-in`, 'POST', {wants_notifications: val});
+            await mutate();
         },
         mutate
     };

@@ -11,6 +11,7 @@ use App\Models\Customer;
 use App\Models\ModelAccessToken;
 use App\Models\ModelPhoto;
 use App\Models\ModelProfile;
+use App\Models\ModelRegistrationInvite;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ModelFileStore;
@@ -25,7 +26,7 @@ use Tests\TestCase;
 
 /**
  * Lifecycle-Expiry (Hard-Delete nach 15 Monaten) und lifecycle-basierte
- * Admin-Liste (Default nur aktiv; inactive/all explizit).
+ * Admin-Liste (Default nur aktiv; inactive/all nur fuer Super-Admins, sonst 403).
  */
 class ModelProfileLifecycleExpiryTest extends TestCase
 {
@@ -138,6 +139,27 @@ class ModelProfileLifecycleExpiryTest extends TestCase
             ->once();
     }
 
+    public function test_expiry_run_removes_linked_registration_invites(): void
+    {
+        $model = $this->modelWithFiles(15);
+        $customer = $model['customer'];
+        $inviter = User::factory()->create(['brand' => 'rp']);
+        $invite = ModelRegistrationInvite::create([
+            'token' => bin2hex(random_bytes(32)),
+            'email' => 'expired-invite@example.com',
+            'label' => 'Expired model invitation',
+            'brand' => 'rp',
+            'invited_by' => $inviter->id,
+            'expires_at' => now()->addDays(7),
+            'used_at' => now(),
+            'customer_id' => $customer->id,
+        ]);
+
+        $this->artisan('app:process-model-lifecycle')->assertSuccessful();
+
+        $this->assertDatabaseMissing('model_registration_invites', ['id' => $invite->id]);
+    }
+
     public function test_active_profile_is_not_deleted_by_expiry_run(): void
     {
         $model = $this->modelWithFiles(14);
@@ -183,26 +205,69 @@ class ModelProfileLifecycleExpiryTest extends TestCase
         $this->assertSame($active['profile']->id, $response->json('0.id'));
     }
 
-    public function test_lifecycle_status_inactive_and_all_include_inactive(): void
+    public function test_super_admin_lifecycle_status_inactive_and_all_include_inactive(): void
     {
-        $admin = $this->userWithRole(UserRole::ADMIN, 'rp');
+        $superAdmin = $this->userWithRole(UserRole::SUPER_ADMIN, 'rp');
         $active = $this->modelWithFiles(0);
         $inactive = $this->modelWithFiles(13);
 
-        $inactiveOnly = $this->actingAs($admin, 'api')
+        $inactiveOnly = $this->actingAs($superAdmin, 'api')
             ->getJson('/api/management/models?lifecycle_status=inactive');
         $inactiveOnly->assertOk()->assertJsonCount(1);
         $this->assertSame($inactive['profile']->id, $inactiveOnly->json('0.id'));
 
-        $all = $this->actingAs($admin, 'api')
+        $all = $this->actingAs($superAdmin, 'api')
             ->getJson('/api/management/models?lifecycle_status=all');
         $all->assertOk()->assertJsonCount(2);
 
         // Search combines with the lifecycle filter for inactive profiles.
-        $found = $this->actingAs($admin, 'api')
+        $found = $this->actingAs($superAdmin, 'api')
             ->getJson('/api/management/models?lifecycle_status=inactive&q=model-');
         $found->assertOk()->assertJsonCount(1);
         $this->assertSame($inactive['profile']->id, $found->json('0.id'));
+
+        // The default (no param) stays active-only for super-admins too.
+        $default = $this->actingAs($superAdmin, 'api')
+            ->getJson('/api/management/models');
+        $default->assertOk()->assertJsonCount(1);
+        $this->assertSame($active['profile']->id, $default->json('0.id'));
+    }
+
+    public function test_regular_admin_cannot_filter_inactive_or_all(): void
+    {
+        $admin = $this->userWithRole(UserRole::ADMIN, 'rp');
+        $this->modelWithFiles(0);
+        $this->modelWithFiles(13);
+
+        // Fail-closed: explicit inactive/all are super-admin only, consistent
+        // with the DSGVO destroy gate.
+        $this->actingAs($admin, 'api')
+            ->getJson('/api/management/models?lifecycle_status=inactive')
+            ->assertForbidden();
+        $this->actingAs($admin, 'api')
+            ->getJson('/api/management/models?lifecycle_status=all')
+            ->assertForbidden();
+
+        // The default (no param) stays active-only for regular admins.
+        $this->actingAs($admin, 'api')
+            ->getJson('/api/management/models')
+            ->assertOk()
+            ->assertJsonCount(1);
+    }
+
+    public function test_invalid_lifecycle_status_falls_back_to_active(): void
+    {
+        $admin = $this->userWithRole(UserRole::ADMIN, 'rp');
+        $active = $this->modelWithFiles(0);
+        $this->modelWithFiles(13);
+
+        // Unknown values are not a privilege escalation vector: they reset to
+        // the active default instead of 403 (only inactive/all are gated).
+        $response = $this->actingAs($admin, 'api')
+            ->getJson('/api/management/models?lifecycle_status=bogus');
+
+        $response->assertOk()->assertJsonCount(1);
+        $this->assertSame($active['profile']->id, $response->json('0.id'));
     }
 
     public function test_super_admin_can_delete_inactive_profile(): void

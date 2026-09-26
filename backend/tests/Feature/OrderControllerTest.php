@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Brand;
 use App\Enums\UserRole;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
@@ -41,6 +42,52 @@ class OrderControllerTest extends TestCase
         $response->assertJsonFragment(['id' => $order->id]);
     }
 
+    public function test_user_can_read_own_order_status_without_exposing_payment_secrets(): void
+    {
+        $user = User::factory()->create();
+        $token = auth('api')->login($user);
+        $order = Order::factory()->create([
+            'user_id' => $user->id,
+            'status' => 'pending_payment',
+            'total_amount' => 5000,
+            'stripe_payment_intent_id' => 'pi_private_status',
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'customer_details' => ['name' => 'Owner'],
+            'total_net' => 5000,
+            'total_gross' => 5000,
+            'tax_rate' => 0,
+        ]);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer {$token}"])
+            ->getJson("/api/orders/{$order->id}");
+
+        $response->assertOk();
+        $response->assertJson([
+            'id' => $order->id,
+            'order_id' => $order->id,
+            'status' => 'pending_payment',
+            'invoice_number' => $order->invoiceSnapshot()->value('invoice_number'),
+            'total_amount' => 5000,
+            'currency' => 'eur',
+        ]);
+        $response->assertJsonMissingPath('client_secret');
+        $response->assertJsonMissingPath('stripe_payment_intent_id');
+    }
+
+    public function test_user_cannot_read_another_users_order_status(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $order = Order::factory()->create(['user_id' => $owner->id]);
+        $token = auth('api')->login($otherUser);
+
+        $this->withHeaders(['Authorization' => "Bearer {$token}"])
+            ->getJson("/api/orders/{$order->id}")
+            ->assertNotFound();
+    }
+
     public function test_user_order_list_includes_invoice_snapshot(): void
     {
         $user = User::factory()->create();
@@ -67,7 +114,7 @@ class OrderControllerTest extends TestCase
         $admin = $this->createUserWithRole(UserRole::ADMIN->value);
         $token = auth('api')->login($admin);
 
-        Order::factory()->count(3)->create();
+        Order::factory()->count(3)->create(['brand' => Brand::B2B]);
 
         $response = $this->withHeaders(['Authorization' => "Bearer {$token}"])
             ->getJson('/api/management/orders');
@@ -103,7 +150,10 @@ class OrderControllerTest extends TestCase
         $admin = $this->createUserWithRole(UserRole::ADMIN->value);
         $token = auth('api')->login($admin);
 
-        $order = Order::factory()->create(['status' => 'pending']);
+        $order = Order::factory()->create([
+            'brand' => Brand::B2B,
+            'status' => 'pending',
+        ]);
 
         $response = $this->withHeaders(['Authorization' => "Bearer {$token}"])
             ->putJson("/api/management/orders/{$order->id}/status", [

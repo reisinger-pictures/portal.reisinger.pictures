@@ -22,6 +22,37 @@ status: active
 - **Direct Invoice:** Standard users immediately receive an invoice with a generated number upon checkout.
 - **Collective Invoice (Future Scope):** Purchases by specific B2B tenants initially generate a "Delivery Note" (Lieferschein) as an order line item without a fiscal invoice number. The actual invoice number is only assigned when the collective invoice is generated at the end of the billing period (month/quarter).
 
+### 2.1 Purchase-time organization attribution
+
+- A checkout for a user assigned to an organization writes the organization
+  UUID to `invoice_snapshots.customer_details.org_id` in the same transaction as the
+  order and snapshot. The existing JSON column is the snapshot contract; no
+  `orders` or `invoice_snapshots` schema migration is required.
+- Collective invoice generation treats a present `org_id` value as immutable
+  purchase-time attribution. A later `users.org_id` reassignment cannot move
+  that order to the new organization.
+- Legacy snapshots without the `org_id` key retain the compatibility fallback
+  to the user's current organization membership. A present but null or invalid
+  key fails closed and is never treated as a legacy row.
+- A delivery note without an `InvoiceSnapshot` is malformed accounting data and
+  fails closed; it is not a legacy fallback row.
+- The organization summary count and the generation path use the same
+  attribution predicate, so a historical order remains visible to its
+  purchase-time organization even after all of its users have moved.
+- `InvoiceSnapshot::updating` is the application-level immutability boundary:
+  once `customer_details.org_id` is present, Eloquent `save()`/`update()` may
+  neither replace nor remove it (including a null/invalid value). A legacy
+  snapshot without the key may receive a one-time backfill.
+- This is **not** a claim of database-level immutability. Raw Query Builder/DB
+  facade writes, bulk Eloquent updates, and event-disabled maintenance writes
+  bypass model events; they are trusted maintenance escape hatches and are not
+  supported business-logic paths. Standard application writes that change
+  `customer_details` use per-model Eloquent `save()`/`update()` so the model
+  guard is effective.
+- Candidate selection deliberately avoids JSON extraction in SQL. It loads
+  snapshot-bearing delivery notes and evaluates the attribution predicate in
+  PHP, so malformed JSON is filtered closed instead of aborting a SQLite query.
+
 ## 3. Email Automation
 - Asynchronous dispatch of documents using Laravel Queues to handle Google Mail API rate limits (max 500-2000/day).
 - **Mandatory BCC:** Every system-generated accounting email MUST include a blind copy routing to the internal accounting mailbox.

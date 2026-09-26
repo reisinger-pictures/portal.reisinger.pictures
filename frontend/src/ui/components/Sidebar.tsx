@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 import { useBrand } from '../../logic/useBrand';
@@ -51,8 +52,13 @@ export default function Sidebar(props: SidebarProps) {
                     </Link>
                 </div>
                 {/* Mobile Close Button */}
-                <button className="btn btn-sm btn-square btn-ghost md:hidden absolute top-4 right-4" onClick={props.onCloseMobile}>
-                    <span className="mdi--close text-xl"></span>
+                <button
+                    type="button"
+                    className="btn btn-sm btn-square btn-ghost md:hidden absolute top-4 right-4"
+                    aria-label={t`Menü schließen`}
+                    onClick={props.onCloseMobile}
+                >
+                    <span className="mdi--close text-xl" aria-hidden="true"></span>
                 </button>
             </div>
 
@@ -126,7 +132,8 @@ export default function Sidebar(props: SidebarProps) {
                     <>
                         {isStaff && <div className="divider my-1 text-sm opacity-50"><Trans>Dein Account</Trans></div>}
                         <li><Link to="/search" className={props.currentView === 'search' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--magnify text-lg"></span> <Trans>Suche & Entdecken</Trans></Link></li>
-                        <li><Link to="/profile" className={props.currentView === 'profile' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-circle text-lg"></span> <Trans>Mein Profil</Trans></Link></li>
+                        <li><Link to="/profile" className={props.currentView === 'profile' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-circle text-lg" aria-hidden="true"></span> <Trans>Mein Profil</Trans></Link></li>
+                        <li><Link to="/notifications" className={props.currentView === 'notifications' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--bell-ring text-lg" aria-hidden="true"></span> <Trans>Benachrichtigungen</Trans></Link></li>
                         {hasModels && (
                             <li><Link to="/my-models" className={props.currentView === 'my-models' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--account-cog text-lg"></span> <Trans>Meine Profile</Trans></Link></li>
                         )}
@@ -136,10 +143,15 @@ export default function Sidebar(props: SidebarProps) {
                 )}
                 
                 <li>
-                    <a onClick={() => { props.onCloseMobile?.(); navigate('/cart'); }} className="flex justify-between items-center">
-                        <div className="flex items-center gap-2"><span className="mdi--cart text-lg"></span> <Trans>Warenkorb</Trans></div>
+                    <Link
+                        to="/cart"
+                        className={`flex justify-between items-center ${props.currentView === 'cart' ? 'active' : ''}`}
+                        onClick={props.onCloseMobile}
+                        aria-current={props.currentView === 'cart' ? 'page' : undefined}
+                    >
+                        <div className="flex items-center gap-2"><span className="mdi--cart text-lg" aria-hidden="true"></span> <Trans>Warenkorb</Trans></div>
                         {itemCount > 0 && <span className="badge badge-primary badge-sm">{itemCount}</span>}
-                    </a>
+                    </Link>
                 </li>
             </ul>
             </div>

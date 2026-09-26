@@ -2,14 +2,14 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { UserDetailed, UserRole } from '../../../logic/useUsers';
 
-const roleLabels: Record<UserRole, string> = {
+const createRoleLabels = (): Record<UserRole, string> => ({
     [UserRole.SUPER_ADMIN]: t`Super-Admin`,
     [UserRole.ADMIN]: t`Administrator`,
     [UserRole.PHOTOGRAPHER]: t`Fotograf`,
     [UserRole.CUSTOMER_MANAGER]: t`Kundenbetreuer`,
     [UserRole.POWER_USER]: t`Power-User`,
     [UserRole.CLIENT]: t`Kunde`,
-};
+});
 
 interface UserTableProps {
     users?: UserDetailed[];
@@ -18,6 +18,7 @@ interface UserTableProps {
 }
 
 export default function UserTable({ users, searchTerm, onEdit }: UserTableProps) {
+    const roleLabels = createRoleLabels();
     const filteredUsers = users?.filter(u =>
         u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.email.toLowerCase().includes(searchTerm.toLowerCase())

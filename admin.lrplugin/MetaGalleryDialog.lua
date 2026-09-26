@@ -6,10 +6,14 @@ local LrTasks = import 'LrTasks'
 local Api = require "Api"
 local Utils = require "Utils"
 
-return function(editingGroup, treeData, jwt, onSuccess)
+return function(editingGroup, treeData, jwt, onSuccess, requestApi)
     LrFunctionContext.callWithContext("MetaGalleryDialogContext", function(context)
         local f = LrView.osFactory()
         local props = LrBinding.makePropertyTable(context)
+        local function apiRequest(endpoint, method, payload)
+            if requestApi then return requestApi(endpoint, method, payload) end
+            return Api.call(endpoint, method, payload, jwt)
+        end
 
         props.gName = editingGroup and editingGroup.name or ""
         props.gSlug = editingGroup and editingGroup.slug or ""
@@ -33,10 +37,10 @@ return function(editingGroup, treeData, jwt, onSuccess)
         end)
 
         local parentItems = { {title="-- Keine (Root Ebene) --", value=""} }
-        for _, g in ipairs(Utils.flattenGroups(treeData.groups)) do 
-            if not editingGroup or g.value ~= editingGroup.id then
-                table.insert(parentItems, g) 
-            end
+        -- A group cannot be its own parent, nor can any descendant be chosen:
+        -- the latter would create a cycle when the server persists parent_id.
+        for _, g in ipairs(Utils.flattenGroupChoices(treeData.groups, editingGroup)) do
+            table.insert(parentItems, g)
         end
 
         local rows = { spacing = f:control_spacing() }
@@ -81,6 +85,16 @@ return function(editingGroup, treeData, jwt, onSuccess)
         }
 
         if res == "ok" and props.gName ~= "" then
+            local parentId = props.gParent or ""
+            if not Utils.isGroupParentSelectionValid(treeData.groups, editingGroup, parentId) then
+                LrDialogs.message(
+                    Api.getTitle("Ungültiger Unterordner"),
+                    "Eine Meta-Galerie kann nicht als eigener Unterordner oder als Elternteil eines ihrer Unterordner ausgewählt werden.",
+                    "warning"
+                )
+                return
+            end
+
             LrTasks.startAsyncTask(function()
                 local isPub = nil
                 if props.gPublic == "true" then isPub = true elseif props.gPublic == "false" then isPub = false end
@@ -88,7 +102,7 @@ return function(editingGroup, treeData, jwt, onSuccess)
                     name = props.gName,
                     slug = props.gSlug,
                     is_public = isPub,
-                    parent_id = props.gParent == "" and nil or props.gParent,
+                    parent_id = parentId == "" and nil or parentId,
                     is_free_download = props.gFreeDownload,
                     is_editorial_only = props.gEditorialOnly,
                     is_hidden = props.gHidden
@@ -97,7 +111,7 @@ return function(editingGroup, treeData, jwt, onSuccess)
                 local endpoint = editingGroup and ("/api/management/gallery-groups/" .. editingGroup.id) or "/api/management/gallery-groups"
                 local apiMethod = editingGroup and "PUT" or "POST"
                 
-                local data, status = Api.call(endpoint, apiMethod, payload, jwt)
+                local data, status = apiRequest(endpoint, apiMethod, payload)
                 if status == 200 then
                     if onSuccess then onSuccess() end
                 else

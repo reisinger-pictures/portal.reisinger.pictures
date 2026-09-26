@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Gallery;
+use App\Models\GalleryInvite;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use PHPOpenSourceSaver\JWTAuth\Factory;
 use PHPOpenSourceSaver\JWTAuth\JWTAuth;
 use Tests\TestCase;
 
@@ -19,12 +21,17 @@ class BrandScopingGuestOptInTest extends TestCase
 
     private function guestTokenWithGallery(string $galleryId): string
     {
+        $invite = GalleryInvite::create([
+            'gallery_id' => $galleryId,
+            'token' => 'opt-in-guest-invite-'.Str::uuid(),
+        ]);
         $guestId = (string) Str::uuid();
-        $factory = app(\PHPOpenSourceSaver\JWTAuth\Factory::class);
+        $factory = app(Factory::class);
         $payload = $factory->customClaims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Opt-In Guest',
+            'guest_invite_id' => $invite->id,
             'transient_galleries' => [$galleryId],
         ])->make();
 

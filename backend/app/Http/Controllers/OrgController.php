@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\UserRole;
 use App\Http\Controllers\Concerns\EnforcesBrandIsolation;
 use App\Models\GalleryGroup;
-use App\Models\Order;
 use App\Models\Org;
 use App\Models\User;
 use App\Services\AuthorizationService;
@@ -23,7 +22,9 @@ class OrgController extends Controller
         $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
 
-        $query = Org::withCount(['users', 'galleryGroups'])->orderBy('name');
+        $query = Org::withCount(['users', 'galleryGroups'])
+            ->whereNotNull('brand')
+            ->orderBy('name');
 
         if ($svc->isOrgAdmin($user)) {
             $query->where('id', $user->org_id);
@@ -48,17 +49,20 @@ class OrgController extends Controller
         $user = auth('api')->user();
         $org = Org::with(['users:id,name,email,org_id', 'galleryGroups:id,name,parent_id'])->findOrFail($id);
 
+        if ($this->brandValue($org) === null) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
+
         if (! $svc->isAdmin($user) && $user->org_id !== $id) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
-        if ($user->brand !== null && $org->brand !== null && $user->brand !== $org->brand) {
+        if ($this->isBrandMismatch($user, $org)) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
-        $openDeliveryNotesCount = Order::whereIn('user_id', $org->users()->pluck('id'))
-            ->where('status', 'delivery_note')
-            ->count();
+        $openDeliveryNotesCount = app(InvoiceService::class)
+            ->countOpenDeliveryNotesForOrg($org);
         $org->setAttribute('open_delivery_notes_count', $openDeliveryNotesCount);
 
         return response()->json($org);
@@ -98,7 +102,7 @@ class OrgController extends Controller
 
         $org = Org::findOrFail($id);
 
-        if ($this->isBrandMismatch($user, $org)) {
+        if ($this->brandValue($org) === null || $this->isBrandMismatch($user, $org)) {
             return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
         }
 
@@ -126,7 +130,7 @@ class OrgController extends Controller
 
         $org = Org::findOrFail($id);
 
-        if ($this->isBrandMismatch(auth('api')->user(), $org)) {
+        if ($this->brandValue($org) === null || $this->isBrandMismatch(auth('api')->user(), $org)) {
             return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
         }
 
@@ -169,7 +173,7 @@ class OrgController extends Controller
 
         $org = Org::findOrFail($id);
 
-        if ($this->isBrandMismatch($user, $org)) {
+        if ($this->brandValue($org) === null || $this->isBrandMismatch($user, $org)) {
             return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
         }
 
@@ -183,10 +187,18 @@ class OrgController extends Controller
             return response()->json(['error' => 'Super-Admins können keiner Organisation zugewiesen werden.'], 422);
         }
 
-        // Brand consistency: assigned users must share the org's brand. This also
-        // covers brand-less orgs (brand = null), which may only absorb brand-less
-        // users — previously they could absorb users of any brand.
+        // Brand consistency: assigned users must share the org's brand. A legacy
+        // null-brand account is invalid unless it is a trusted Super-Admin;
+        // Super-Admins were rejected above, so reject the remaining null rows
+        // instead of linking them into a concrete organization.
         $orgBrand = $this->brandValue($org);
+        $legacyNullUsers = User::whereIn('id', $request->user_ids ?? [])
+            ->whereNull('brand')
+            ->exists();
+        if ($legacyNullUsers) {
+            return response()->json(['error' => 'Benutzer ohne Brand-Zuweisung können keiner Organisation zugewiesen werden.'], 422);
+        }
+
         $conflictingUsers = User::whereIn('id', $request->user_ids ?? [])
             ->whereNotNull('brand')
             ->when($orgBrand !== null, fn ($query) => $query->where('brand', '!=', $orgBrand))
@@ -241,7 +253,7 @@ class OrgController extends Controller
         ]);
         $org = Org::findOrFail($id);
 
-        if ($this->isBrandMismatch($user, $org)) {
+        if ($this->brandValue($org) === null || $this->isBrandMismatch($user, $org)) {
             return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
         }
 
@@ -279,14 +291,14 @@ class OrgController extends Controller
 
         $org = Org::findOrFail($id);
 
-        if ($this->isBrandMismatch($user, $org)) {
+        if ($this->brandValue($org) === null || $this->isBrandMismatch($user, $org)) {
             return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
         }
 
         $result = $invoiceService->generateForOrg($org, $user);
 
         if (! $result['success']) {
-            return response()->json(['error' => $result['error']], 400);
+            return response()->json(['error' => $result['error']], (int) ($result['status'] ?? 400));
         }
 
         return response()->json($result);

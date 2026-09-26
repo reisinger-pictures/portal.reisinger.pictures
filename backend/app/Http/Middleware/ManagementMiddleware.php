@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\AuthorizationService;
+use App\Support\BrandRegistry;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -20,6 +21,17 @@ class ManagementMiddleware
         }
 
         $svc = app(AuthorizationService::class);
+        if ($svc->isReservedNullBrandActor($user)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
+
+        $actorBrand = BrandRegistry::normalizeId($user->brand);
+        if ($svc->isSuperAdmin($user)
+            && $actorBrand !== null
+            && $actorBrand !== BrandRegistry::currentIdOrNull()) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
+
         if ($svc->isAdmin($user)) {
             return $next($request);
         }

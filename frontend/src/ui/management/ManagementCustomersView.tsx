@@ -29,6 +29,7 @@ export default function ManagementCustomersView() {
             mutate();
         } catch (e: unknown) {
             showToast('error', e instanceof Error ? e.message : t`Fehler beim Speichern`);
+            throw e;
         }
     };
 

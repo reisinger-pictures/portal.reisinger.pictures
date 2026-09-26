@@ -8,7 +8,10 @@ use App\Models\ModelAccessToken;
 use App\Models\ModelPhoto;
 use App\Models\ModelProfile;
 use App\Services\AuthorizationService;
+use App\Services\ModelContactSheetService;
+use App\Services\ModelFileCleanupService;
 use App\Services\ModelFileStore;
+use App\Services\ModelPhotoPrimaryService;
 use App\Services\ModelProfileEraser;
 use App\Services\ModelQuestionnaire;
 use Illuminate\Database\Eloquent\Builder;
@@ -43,7 +46,10 @@ class ModelManagementController extends Controller
 
     public function __construct(
         private readonly ModelFileStore $fileStore,
+        private readonly ModelFileCleanupService $fileCleanup,
         private readonly ModelQuestionnaire $questionnaire,
+        private readonly ModelContactSheetService $contactSheetService,
+        private readonly ModelPhotoPrimaryService $photoPrimary,
     ) {}
 
     public function index(Request $request)
@@ -71,6 +77,15 @@ class ModelManagementController extends Controller
         if (! in_array($status, [ModelProfile::LIFECYCLE_ACTIVE, ModelProfile::LIFECYCLE_INACTIVE, 'all'], true)) {
             $status = ModelProfile::LIFECYCLE_ACTIVE;
         }
+
+        // Inactive/expired profiles are hidden from regular admins: the only
+        // super-admin action they enable is the DSGVO deletion. Fail closed
+        // with 403 (consistent with the destroy gate) instead of silently
+        // falling back, so URL tampering cannot enumerate hidden profiles.
+        if ($status !== ModelProfile::LIFECYCLE_ACTIVE && ! $this->isSuperAdmin()) {
+            abort(response()->json(['error' => 'Keine Berechtigung.'], 403));
+        }
+
         if ($status !== 'all') {
             $profiles = $profiles
                 ->filter(fn (ModelProfile $profile) => $profile->lifecycleStatus() === $status)
@@ -191,6 +206,44 @@ class ModelManagementController extends Controller
         );
     }
 
+    /**
+     * Druckfähiges Contact Sheet als PDF (`variant=internal|external`).
+     *
+     * Intern: alle Fotos + PII; extern: nur `public`-Fotos, kein PII, mit
+     * Wasserzeichen. Jeder Export wird PII-frei audit-geloggt.
+     */
+    public function contactSheet(Request $request, string $id)
+    {
+        $this->authorizeAdmin();
+        $brand = $this->adminBrand();
+
+        $variant = $request->query('variant');
+        if (! is_string($variant) || ! in_array($variant, ModelContactSheetService::VARIANTS, true)) {
+            throw ValidationException::withMessages([
+                'variant' => 'Ungültige Variante. Erlaubt sind „internal" und „external".',
+            ]);
+        }
+
+        $profile = ModelProfile::query()
+            ->forBrand($brand)
+            ->findOrFail($id);
+
+        $pdf = $this->contactSheetService->render($profile, $variant);
+
+        Log::info('model.contact_sheet.export', [
+            'model_profile_id' => $profile->id,
+            'customer_id' => $profile->customer_id,
+            'variant' => $variant,
+            'user_id' => auth('api')->id(),
+        ]);
+
+        $filename = sprintf('model-%s-%s-%s.pdf', $profile->id, $variant, now()->format('Ymd'));
+
+        return response()->streamDownload(function () use ($pdf): void {
+            echo $pdf;
+        }, $filename, ['Content-Type' => 'application/pdf']);
+    }
+
     public function photo(string $id, string $photoId)
     {
         $this->authorizeAdmin();
@@ -216,16 +269,17 @@ class ModelManagementController extends Controller
         $profile = ModelProfile::query()->forBrand($brand)->findOrFail($id);
         $photo = $this->resolvePhoto($profile, $photoId, requireFile: false);
 
-        // Delete the row first, then the file: a failed file delete leaves an
-        // orphan (recoverable) rather than a DB row without a file.
-        $path = $photo->path;
-        $photo->delete();
-        $this->fileStore->delete($path);
-
-        // Deleting the primary photo clears the flag (no auto-promotion, §2.4).
-        if ($photo->is_primary) {
-            ModelPhoto::where('model_profile_id', $profile->id)->update(['is_primary' => false]);
-        }
+        // Delete the row and clear its primary flag under the same profile
+        // lock. The service aborts before this point when a model event
+        // cancels/fails deletion, so the encrypted file is never removed for a
+        // row that was not deleted. File cleanup is queued only after commit and
+        // is retryable when the private disk is temporarily unavailable.
+        $deletedPhoto = $this->photoPrimary->deletePhoto($profile, $photo->id);
+        $this->fileCleanup->afterCommit(
+            $deletedPhoto->path,
+            'model_photo_delete',
+            $profile->customer_id,
+        );
 
         return response()->json(['success' => true]);
     }
@@ -245,10 +299,9 @@ class ModelManagementController extends Controller
             ]);
         }
 
-        ModelPhoto::where('model_profile_id', $profile->id)->update(['is_primary' => false]);
-        $photo->forceFill(['is_primary' => true])->save();
+        $primaryPhoto = $this->photoPrimary->promote($profile, $photo->id);
 
-        return response()->json(['success' => true, 'primary_photo_id' => $photo->id]);
+        return response()->json(['success' => true, 'primary_photo_id' => $primaryPhoto->id]);
     }
 
     /**
@@ -295,7 +348,7 @@ class ModelManagementController extends Controller
         // Defense-in-depth: the route is additionally gated by the
         // `super_admin` middleware (isSuperAdmin).
         $user = auth('api')->user();
-        if (! $user || ! app(AuthorizationService::class)->isSuperAdmin($user)) {
+        if (! $this->isSuperAdmin()) {
             abort(response()->json(['error' => 'Keine Berechtigung.'], 403));
         }
 
@@ -308,6 +361,16 @@ class ModelManagementController extends Controller
         app(ModelProfileEraser::class)->erase($model, 'dsgvo', $user->id);
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Shared super-admin check for the lifecycle listing and DSGVO deletion.
+     */
+    private function isSuperAdmin(): bool
+    {
+        $user = auth('api')->user();
+
+        return $user !== null && app(AuthorizationService::class)->isSuperAdmin($user);
     }
 
     private function resolvePhoto(ModelProfile $profile, string $photoId, bool $requireFile = true): ModelPhoto

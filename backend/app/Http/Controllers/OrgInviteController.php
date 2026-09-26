@@ -28,6 +28,10 @@ class OrgInviteController extends Controller
         $user = auth('api')->user();
         $org = Org::findOrFail($orgId);
 
+        if ($this->brandValue($org) === null) {
+            return response()->json(['error' => 'Keine Berechtigung, Nutzer in diese Organisation einzuladen.'], 403);
+        }
+
         // Scoped Policy: Nur Admins oder Org-Admin DES Org dürfen einladen
         $svc = app(AuthorizationService::class);
         if (! $svc->isAdmin($user) && ! ($svc->isOrgAdmin($user) && $user->org_id === $orgId)) {
@@ -66,6 +70,12 @@ class OrgInviteController extends Controller
             ->with('org')
             ->firstOrFail();
 
+        // Org invite links are host-bound. A legacy null/foreign org must not
+        // be redeemed merely because its token is still present in the table.
+        if (! $invite->org || ! BrandRegistry::resourceMatchesCurrent($invite->org->brand)) {
+            return response()->json(['error' => 'Einladung nicht gefunden.'], 404);
+        }
+
         return response()->json([
             'org_name' => $invite->org->name,
             'email' => $invite->email,
@@ -95,16 +105,24 @@ class OrgInviteController extends Controller
             ->with('org')
             ->firstOrFail();
 
+        // A legacy org without a concrete brand is not a valid invite target.
+        // Resolve the brand before any user row is created; never copy NULL
+        // into a new non-Super-Admin account.
+        $inviteBrand = $this->brandValue($invite->org);
+        if (! $invite->org || $inviteBrand === null || ! BrandRegistry::resourceMatchesCurrent($inviteBrand)) {
+            return response()->json(['error' => 'Keine Berechtigung für diese Einladung.'], 403);
+        }
+
         // Brand isolation: the invite belongs to the org of a specific brand. A
         // brand-bound actor may only redeem an invite of their own brand — this
         // also blocks a brand-bound actor from being flipped to cross-brand via a
-        // brand-less org invite. Cross-brand actors (brand = null) may act across
+        // brand-less org invite. A trusted null-brand Super-Admin may act across
         // brands (magic-link trust: holding the token is the credential).
         if ($user && $this->isBrandMismatch($user, $invite->org)) {
             return response()->json(['error' => 'Keine Berechtigung für diese Einladung.'], 403);
         }
 
-        return DB::transaction(function () use ($request, $invite, $user) {
+        return DB::transaction(function () use ($request, $invite, $inviteBrand, $user) {
             if (! $user) {
                 // Neuen User erstellen
                 $existing = User::where('email', $invite->email)->first();
@@ -120,6 +138,7 @@ class OrgInviteController extends Controller
                     'name' => $request->name,
                     'email' => $invite->email,
                     'password' => Hash::make($request->password),
+                    'brand' => $inviteBrand,
                 ]);
 
                 if (empty($user->password)) {
@@ -130,7 +149,7 @@ class OrgInviteController extends Controller
 
             // Org-Zuweisung sicherstellen
             $user->org_id = $invite->org_id;
-            $user->brand = $invite->org->brand;
+            $user->brand = $inviteBrand;
             $user->save();
 
             // Client-Rolle vergeben falls noch keine
@@ -150,10 +169,8 @@ class OrgInviteController extends Controller
             // Neuen User einloggen
             Auth::guard('api')->logout();
             $token = Auth::guard('api')->login($user);
-            $ttl = Auth::guard('api')->factory()->getTTL();
-            $cookie = cookie('rp_jwt', $token, $ttl, '/', null, ! app()->environment('local'), true, false, 'Lax');
 
-            return response()->json(['success' => true])->withCookie($cookie);
+            return $this->respondWithToken($token);
         });
     }
 }

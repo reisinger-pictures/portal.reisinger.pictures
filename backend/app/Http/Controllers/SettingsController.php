@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\Brand;
 use App\Http\Requests\StoreBrandSettingsRequest;
+use App\Jobs\InvalidateWatermarkCacheJob;
 use App\Models\Gallery;
 use App\Services\BrandSettingsService;
 use App\Services\SettingResolver;
@@ -15,7 +15,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Symfony\Component\Finder\Finder;
 
 class SettingsController extends Controller
@@ -140,18 +139,11 @@ class SettingsController extends Controller
             $disk->putFileAs($dir, $request->file('bucket_2000_sel'), $pfx.'master_selection_2000.png');
         }
 
-        // Cache-Busting: Lösche alle generierten Wasserzeichen-Bilder asynchron im Hintergrund
-        dispatch(function () {
-            $disk = Storage::disk('photos');
-            $directories = $disk->directories();
-            foreach ($directories as $dir) {
-                // Nur Galerie-Ordner (UUIDs) durchsuchen
-                if (Str::isUuid($dir)) {
-                    $disk->deleteDirectory($dir.'/_watermarked');
-                    $disk->deleteDirectory($dir.'/_thumbs/_watermarked');
-                }
-            }
-        });
+        // Cache-Busting: Lösche alle generierten Wasserzeichen-Bilder asynchron
+        // im Hintergrund. Der Job prüft beide Löschvorgänge und wird bei einem
+        // verbleibenden Verzeichnis erneut versucht; ein terminaler Fehler wird
+        // über den Queue-Failure-Handler protokolliert.
+        InvalidateWatermarkCacheJob::dispatch();
 
         return response()->json(['success' => true]);
     }
@@ -192,11 +184,15 @@ class SettingsController extends Controller
         if ($galleryId !== null) {
             $gallery = Gallery::find($galleryId);
             if ($gallery !== null) {
-                // Cross-brand leak guard: a gallery of another brand must never
-                // influence this brand's licensing mode / volume pricing.
-                // Legacy null-brand galleries are still accepted.
-                $galleryBrand = $gallery->brand instanceof Brand ? $gallery->brand->value : $gallery->brand;
-                if ($galleryBrand !== null && $galleryBrand !== BrandRegistry::currentId()) {
+                $galleryBrand = BrandRegistry::normalizeId($gallery->brand);
+                $parentTreeMatches = $gallery->gallery_group_id === null
+                    || BrandRegistry::galleryGroupTreeMatchesCurrent($gallery->galleryGroup()->first());
+
+                // Keep the established legacy-null gallery fallback for the
+                // gallery's own brand, but never let a foreign/null parent
+                // influence this host's licensing terms or volume preset.
+                if (($galleryBrand !== null && ! BrandRegistry::resourceMatchesCurrent($galleryBrand))
+                    || ! $parentTreeMatches) {
                     $gallery = null;
                 } else {
                     $pricingStrategy = $gallery->effective_licensing_mode;
@@ -233,12 +229,17 @@ class SettingsController extends Controller
             'srp_privacy_fee' => $resolver->get('privacy_fee'),
             'srp_extra_image_fee' => $resolver->get('extra_image_fee'),
             'pricing_strategy' => $pricingStrategy,
+            // Wire contract: `preset_id` is the `volume_presets.id` primary key
+            // and is serialised as a JSON *number*. The frontend treats it as an
+            // opaque identifier and only stringifies it for the `mode|preset`
+            // group key; stringifying it here would break the numeric contract
+            // documented in features/infrastructure/27-volume-licensing-presets.md.
             'volume_pricing' => $preset !== null ? [
-                'preset_id' => $preset->id,
+                'preset_id' => (int) $preset->id,
                 'preset_name' => $preset->name,
                 'tiers' => $preset->tiers->map(fn ($tier) => [
-                    'min_quantity' => $tier->min_quantity,
-                    'price_cents' => $tier->price_cents,
+                    'min_quantity' => (int) $tier->min_quantity,
+                    'price_cents' => (int) $tier->price_cents,
                 ])->values(),
             ] : null,
         ]);

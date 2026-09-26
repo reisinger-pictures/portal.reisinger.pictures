@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Models\Gallery;
+use App\Models\Photo;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -203,5 +204,47 @@ class ImageUploadTest extends TestCase
             ]);
 
         $response->assertStatus(403);
+    }
+
+    public function test_replacement_matches_the_original_filename_instead_of_a_null_title(): void
+    {
+        $photographer = $this->createPhotographerUser();
+        $gallery = $this->createDeliveryGallery();
+        $photographer->galleries()->attach($gallery);
+
+        $matchingPhoto = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'title' => 'replacement-source',
+            'lr_uuid' => 'existing-lr-uuid',
+        ]);
+        $nullTitlePhoto = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'title' => null,
+            'lr_uuid' => 'null-title-uuid',
+        ]);
+
+        $file = UploadedFile::fake()->createWithContent('replacement-source.jpg', $this->fixtureContent);
+
+        $response = $this->actingAs($photographer, 'api')
+            ->postJson('/api/management/upload', [
+                'gallery_id' => $gallery->id,
+                'lr_uuid' => 'web-replacement',
+                'replace' => true,
+                'file' => $file,
+            ]);
+
+        $response->assertStatus(200)->assertJson([
+            'success' => true,
+            'photo_id' => $matchingPhoto->id,
+        ]);
+
+        $matchingPhoto->refresh();
+        $nullTitlePhoto->refresh();
+
+        $this->assertSame('replacement-source', $matchingPhoto->title);
+        $this->assertSame('web-replacement', $matchingPhoto->lr_uuid);
+        $this->assertNull($nullTitlePhoto->title);
+        $this->assertSame('null-title-uuid', $nullTitlePhoto->lr_uuid);
+        $this->assertDatabaseCount('photos', 2);
     }
 }

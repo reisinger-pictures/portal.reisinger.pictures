@@ -2,6 +2,7 @@ import {describe, it, expect, vi, afterEach} from 'vitest';
 import {
     getBrandFromHostname,
     getBrandTheme,
+    applyBrandColors,
     applyTheme,
 } from '../brandRegistry';
 
@@ -76,6 +77,37 @@ describe('brandRegistry', () => {
 
             expect(addEventListener).toHaveBeenCalledTimes(2);
             expect(removeEventListener).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('applyBrandColors', () => {
+        afterEach(() => {
+            document.documentElement.style.removeProperty('--color-primary');
+            document.documentElement.style.removeProperty('--color-secondary');
+        });
+
+        it('applies validated persisted colors to the document theme variables', () => {
+            applyBrandColors({
+                primary_color: '#123456',
+                secondary_color: '#ABCDEF',
+            });
+
+            expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('#123456');
+            expect(document.documentElement.style.getPropertyValue('--color-secondary')).toBe('#ABCDEF');
+        });
+
+        it('removes stale variables for missing or unsafe values', () => {
+            applyBrandColors({
+                primary_color: '#123456',
+                secondary_color: '#ABCDEF',
+            });
+            applyBrandColors({ primary_color: 'red; background: url(unsafe)' });
+
+            expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('');
+            expect(document.documentElement.style.getPropertyValue('--color-secondary')).toBe('');
+
+            applyBrandColors(null);
+            expect(document.documentElement.style.getPropertyValue('--color-secondary')).toBe('');
         });
     });
 });

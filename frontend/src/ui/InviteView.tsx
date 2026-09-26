@@ -9,15 +9,30 @@ import { useAuth } from '../logic/useAuth';
 import { apiMutate } from '../api';
 import { RedeemInviteResponse } from '../api';
 
+interface InviteLookupResponse {
+    gallery_name: string;
+    requires_password: boolean;
+    invite_name?: string;
+}
+
 export default function InviteView() {
-    const {token} = useParams<{ token: string }>();
+    const {token: routeToken} = useParams<{ token: string }>();
+    const token = routeToken ?? null;
     const navigate = useNavigate();
     const { mutate } = useSWRConfig();
     const { user, isLoading: authLoading } = useAuth();
+    // A transient guest is authenticated for gallery access, but must not be
+    // treated as a registered user by the automatic redemption path. Keeping
+    // the identity as a primitive also prevents a harmless auth-cache refresh
+    // from cancelling an in-flight redemption.
+    const isRegisteredUser = user?.guest_id === null;
+    const userId = user?.id ?? null;
     const autoRedeemStartedRef = useRef(false);
+    const autoRedeemAbortRef = useRef<AbortController | null>(null);
     const [autoRedeeming, setAutoRedeeming] = useState(false);
 
     const [loading, setLoading] = useState(true);
+    const [resolvedToken, setResolvedToken] = useState<string | null>(null);
     const [error, setError] = useState('');
     const [galleryName, setGalleryName] = useState('');
     const [requiresPassword, setRequiresPassword] = useState(false);
@@ -30,21 +45,55 @@ export default function InviteView() {
     const [acceptPrivacy, setAcceptPrivacy] = useState(false);
 
     useEffect(() => {
-        fetch('/api/invites/' + token, {headers: {'Accept': 'application/json'}})
-            .then(res => {
+        if (!token) return;
+
+        // The invite lookup is a public token endpoint, not an authenticated
+        // portal request; the redeem mutation below uses apiMutate.
+        const requestToken = token;
+        const controller = new AbortController();
+        let cancelled = false;
+        autoRedeemStartedRef.current = false;
+
+        const loadInvite = async () => {
+            try {
+                const res = await fetch('/api/invites/' + requestToken, {
+                    headers: {'Accept': 'application/json'},
+                    signal: controller.signal
+                });
+                if (cancelled || controller.signal.aborted) return;
                 if (!res.ok) throw new Error(t`Dieser Einladungslink ist ungültig oder abgelaufen.`);
-                return res.json();
-            })
-            .then(data => {
+                const data = await res.json() as InviteLookupResponse;
+                if (cancelled || controller.signal.aborted) return;
                 setGalleryName(data.gallery_name);
                 setRequiresPassword(data.requires_password);
                 setInviteName(data.invite_name || '');
+                setRegSuccess('');
+                setAutoRedeeming(false);
+                setResolvedToken(requestToken);
+                setError('');
                 setLoading(false);
-            })
-            .catch(err => {
-                setError(err instanceof Error ? (err as Error).message : String(err));
+            } catch (err: unknown) {
+                if (cancelled || controller.signal.aborted) return;
+                setGalleryName('');
+                setRequiresPassword(false);
+                setInviteName('');
+                setRegSuccess('');
+                setAutoRedeeming(false);
+                setResolvedToken(requestToken);
+                setError(err instanceof Error ? err.message : String(err));
                 setLoading(false);
-            });
+            }
+        };
+
+        void loadInvite();
+        return () => {
+            cancelled = true;
+            controller.abort();
+            if (autoRedeemAbortRef.current) {
+                autoRedeemAbortRef.current.abort();
+                autoRedeemAbortRef.current = null;
+            }
+        };
     }, [token]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -52,22 +101,20 @@ export default function InviteView() {
         setError('');
 
         try {
-            const res = await fetch('/api/invites/redeem', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-                credentials: 'include', // CRITICAL FIX: Damit das JWT-Cookie nicht verworfen wird
-                body: JSON.stringify({token, name: name || null, email: email || null, password: password || null, accept_privacy: acceptPrivacy})
+            const data = await apiMutate<RedeemInviteResponse>('/api/invites/redeem', 'POST', {
+                token,
+                name: name || null,
+                email: email || null,
+                password: password || null,
+                accept_privacy: acceptPrivacy
             });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.message || JSON.stringify(data) || t`Fehler beim Beitritt.`);
             if (data.requires_mail_verification) {
-                setRegSuccess(data.message);
+                setRegSuccess(data.message || t`Registrierung erfolgreich. Bitte bestätige deine E-Mail.`);
                 return;
             }
 
             // SWR anweisen, die User-Session frisch zu laden
-            await mutate(() => true, undefined, { revalidate: true });
+            await mutate('/api/auth/me', undefined, { revalidate: true });
             
             navigate('/' + data.full_path, {replace: true});
         } catch (err: unknown) {
@@ -77,34 +124,69 @@ export default function InviteView() {
 
     
     useEffect(() => {
-        // Auto-Redeem nur wenn: Nicht am Laden, User eingeloggt, Galerie bekannt, kein PW nötig
-        if (!loading && !authLoading && user && galleryName && !requiresPassword && !error && !autoRedeemStartedRef.current) {
-            autoRedeemStartedRef.current = true;
-            // Nur senden, wenn der User existiert (und somit Datenschutzerklärung bei Registrierung akzeptiert hat)
-            // setAutoRedeeming wird bewusst NICHT synchron im Effect-Body aufgerufen (react-hooks/set-state-in-effect),
-            // sondern erst asynchron, sobald der Request unterwegs ist.
-            Promise.resolve()
-                .then(() => setAutoRedeeming(true))
-                .then(() => apiMutate<RedeemInviteResponse>('/api/invites/redeem', 'POST', { token, accept_privacy: !!user }))
-                .then(resData => {
-                    if (resData.full_path) {
-                        mutate(() => true, undefined, { revalidate: true });
-                        navigate('/' + resData.full_path, {replace: true});
-                    } else {
-                        setAutoRedeeming(false);
-                        autoRedeemStartedRef.current = false;
-                    }
-                })
-                .catch((err) => {
-                    console.error("Auto-redeem failed", err);
-                    setError(t`Automatischer Beitritt fehlgeschlagen. Bitte manuell versuchen.`);
+        // Auto-redeem only for a registered user after the public invite lookup;
+        // transient guests must explicitly submit the privacy form themselves.
+        if (loading || authLoading || !token || resolvedToken !== token || userId === null || !isRegisteredUser || !galleryName || requiresPassword || error || autoRedeemStartedRef.current) {
+            return;
+        }
+
+        autoRedeemStartedRef.current = true;
+        const controller = new AbortController();
+        autoRedeemAbortRef.current = controller;
+        let cancelled = false;
+
+        const autoRedeem = async () => {
+            // Keep the state transition asynchronous, as required by the
+            // effect rules, and do not start a request after cleanup.
+            await Promise.resolve();
+            if (cancelled || controller.signal.aborted) return;
+
+            setAutoRedeeming(true);
+            try {
+                const resData = await apiMutate<RedeemInviteResponse>('/api/invites/redeem', 'POST', {
+                    token,
+                    accept_privacy: true
+                }, {signal: controller.signal});
+                if (cancelled || controller.signal.aborted) return;
+
+                if (resData.full_path) {
+                    // The redeem response already installed the new auth cookies.
+                    // Navigate first so an unrelated, slow SWR revalidation cannot
+                    // leave the invite route mounted after a successful redemption.
+                    navigate('/' + resData.full_path, {replace: true});
+                    await mutate('/api/auth/me', undefined, {revalidate: true});
+                } else {
                     setAutoRedeeming(false);
                     autoRedeemStartedRef.current = false;
-                });
-        }
-    }, [loading, authLoading, user, galleryName, requiresPassword, error, token, navigate, mutate]);
+                }
+            } catch (err: unknown) {
+                if (cancelled || controller.signal.aborted) return;
+                console.error("Auto-redeem failed", err);
+                setError(t`Automatischer Beitritt fehlgeschlagen. Bitte manuell versuchen.`);
+                setAutoRedeeming(false);
+                autoRedeemStartedRef.current = false;
+            }
+        };
 
-    if (loading || authLoading || autoRedeeming) return <PageLayout>
+        void autoRedeem();
+        return () => {
+            cancelled = true;
+            controller.abort();
+            if (autoRedeemAbortRef.current === controller) {
+                autoRedeemAbortRef.current = null;
+            }
+        };
+    }, [loading, authLoading, resolvedToken, userId, isRegisteredUser, galleryName, requiresPassword, error, token, navigate, mutate]);
+
+    if (!token) {
+        return <PageLayout>
+            <div className="flex h-full items-center justify-center p-4">
+                <ErrorMessage message={t`Dieser Einladungslink ist ungültig oder abgelaufen.`} className="max-w-md shadow-lg mx-auto"/>
+            </div>
+        </PageLayout>;
+    }
+
+    if (loading || authLoading || resolvedToken !== token || (autoRedeeming && user && galleryName && !requiresPassword && !error)) return <PageLayout>
         <div className="flex h-full items-center justify-center"><span
             className="loading loading-spinner loading-lg text-primary"></span></div>
     </PageLayout>;

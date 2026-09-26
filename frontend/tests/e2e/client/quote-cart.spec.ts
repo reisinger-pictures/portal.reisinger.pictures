@@ -43,24 +43,26 @@ test.describe('Custom Quotes Full Workflow', () => {
 
         const validAdminToken = helper.getAdminToken();
         const rolesRes = await page.request.get('/api/management/roles', { headers: { 'Cookie': validAdminToken } });
+        expect(rolesRes.ok()).toBeTruthy();
         const rolesData = await rolesRes.json();
         const roles = Array.isArray(rolesData) ? rolesData : (rolesData.data || []);
         const powerUserRoleId = roles.find((r: Role) => r.name === 'power_user')?.id;
+        expect(powerUserRoleId).toBeTruthy();
 
         const galleryUrl = page.url();
         const gallerySlug = galleryUrl.split('/').pop();
         const galRes = await page.request.get(`/api/galleries/${gallerySlug}`, { headers: { 'Cookie': validAdminToken } });
+        expect(galRes.ok()).toBeTruthy();
         const galData = await galRes.json();
         const galId = galData.gallery?.id;
+        expect(galId).toBeTruthy();
 
         // Wir weisen dem Client die Galerie zu
-        if (powerUserRoleId && galId) {
-            const assignRes = await page.request.put(`/api/management/users/${clientUser.id}`, {
-                data: { role_ids: [powerUserRoleId], gallery_ids: [galId], gallery_group_ids: [], can_edit_metadata: false, brand: 'rp' },
-                headers: { 'Cookie': validAdminToken, 'Accept': 'application/json', 'Content-Type': 'application/json' }
-            });
-            expect(assignRes.ok()).toBeTruthy();
-        }
+        const assignRes = await page.request.put(`/api/management/users/${clientUser.id}`, {
+            data: { role_ids: [powerUserRoleId], gallery_ids: [galId], gallery_group_ids: [], can_edit_metadata: false, brand: 'rp' },
+            headers: { 'Cookie': validAdminToken, 'Accept': 'application/json', 'Content-Type': 'application/json' }
+        });
+        expect(assignRes.ok()).toBeTruthy();
         await auth.logout();
 
         // --- 2. CLIENT: Fragt Angebot an ---

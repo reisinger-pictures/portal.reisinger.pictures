@@ -1,6 +1,8 @@
-# SRP Coupon / Discount Code System
+# Coupon / Discount Code System (legacy filename: SRP)
 
-**Status:** Draft  
+**Status:** Current SOLL / implemented (reviewed 2026-09-24). The filename and
+some `SRP` tags retain historical naming; the live system has one configured
+`rp` brand and brand-scoped coupons.
 **Epic:** SRP-01 / SRP-01-ext  
 **Tags:** `coupon`, `discount`, `pricing`, `srp`, `photographer`, `scope`, `Org`, `organisation`, `max-items`
 
@@ -26,7 +28,7 @@ Coupons can be restricted by scope:
 | `gallery` | Valid only when the cart contains items from the specified `scope_id` (galleries.id) |
 | `meta_gallery` | Valid only when the cart contains items from the specified `scope_id` (gallery_groups.id) |
 | `photographer` | Valid only when the cart contains items from **any** gallery owned by the coupon creator (via `photographer_gallery_groups`). `scope_id` is ignored. |
-| `organisation` | Valid only when the authenticated user belongs to the B2B Org specified by `scope_id` (tenants.id). Primarily for mandantenweite Rabattcodes in B2B contexts. `scope_id` contains the Org UUID. |
+| `organisation` | Valid only when the authenticated user's current `org` matches `scope_id`. Primarily for organisation-wide discount codes in B2B contexts. |
 
 If a cart contains items from multiple galleries, a gallery-scoped coupon applies when *any* item belongs to the matching gallery.
 
@@ -50,34 +52,28 @@ When `type = 'percentage'`, an optional `max_items` (unsigned integer) limits th
 
 - `scope_type=organisation`, `scope_id=<Org-UUID>`, `type=fixed`, `value=10`
 - Nur Benutzer, die dem Org `scope_id` angehören, können diesen Code einlösen.
-- Org-Zugehörigkeit wird via `user->tenants()->first()` geprüft (Standard-B2B-Org des Users).
+- Org-Zugehörigkeit wird über `User::find($userId)->org` geprüft.
 
 ### 3. Business Rules
 
 - Only **one** coupon can be active at a time (user enters a single code).
-- The volume tier discount (built-in) and a coupon stack: coupon is applied **after** the volume price is calculated.
-- Coupons are brand-isolated (SRP vs B2B). A coupon created for SRP cannot be used in a B2B cart.
-- **Coupon REDEMPTION is SRP-exclusive (Klärung 2026-07-06):** Coupons are designed for the SRP
-  volume-pricing model and are applied exclusively by `VolumeLicensingStrategy`. The
-  `ScopeLicensingStrategy` (RP/B2B) does NOT apply coupons. Consequently `CheckoutService` MUST
-  skip coupon resolution (`resolveCoupon`) and usage increment (`incrementUsage`) entirely when
-  the active strategy is `ScopeLicensingStrategy`. Reason: a coupon carries no discount in the
-  scope-licensing price path, so validating + consuming it would silently burn usage limits
-  without granting any discount.
-  - **IST-Divergence (Bug B-02, AGENTS.todo.md 2026-07-06):** Today `CheckoutService::resolveCoupon()`
-    runs for both strategies — it validates the coupon, and `createOrder()` increments
-    `used_count`/`coupon_user_usage` and stores `coupon_id`/`coupon_discount_cents` on the order,
-    while `ScopeLicensingStrategy` always returns `discountCents: 0`. Net effect for RP: coupon
-    usage is consumed, no discount applied, order records a mismatched `coupon_discount_cents`.
-    SOLL: gate `resolveCoupon`/`incrementUsage` on `VolumeLicensingStrategy`.
-  - Coupon **management** (CRUD) remains available for both brands via API/CLI (see §9); only the
-    UI is SRP-only. The SRP-exclusivity above concerns the *redemption at checkout*, not management.
+- The volume tier discount (built-in) and a coupon stack: coupon is applied **after** the volume price is calculated. For `max_items` and `photo_package`, the coupon calculation receives each item's effective qualifying-tier price; invoice item lines remain at the base price and retain the separate volume-tier breakdown.
+- Coupons are brand-isolated. The current configured brand is `rp`; a coupon
+  created in another brand context cannot be used in this cart. The old
+  `SRP`/`B2B` host distinction is historical.
+- **Coupon redemption follows strategy capability (current):**
+  `VolumeLicensingStrategy` supports coupons; `ScopeLicensingStrategy` does not.
+  `CheckoutService` therefore resolves, applies, and increments coupons only for
+  the combined volume subtotal. Validation considers every non-quote volume
+  item (including items in later volume galleries), and the discount is applied
+  once at order level. A scope-only cart must not consume a coupon or record a
+  discount without applying one. Coupon management/UI availability is separate
+  and is not hidden solely because a gallery uses scope pricing.
 - `max_uses_global` limits total redemptions across all users (NULL = unlimited).
 - `max_uses_per_account` limits redemptions **per user account** (NULL = unlimited). Tracked via `coupon_user_usage` table.
 - `expires_at` defines an expiry datetime.
 - `used_count` increments atomically on each successful application; `coupon_user_usage.used_count` increments per user.
-- **Coupon invalidation (active toggle):** Admins and photographers can deactivate coupons via `active = false`. A deactivated coupon is permanently invalid until reactivated.
-- **Coupon invalidation (active toggle):** Admins and photographers can deactivate coupons via `active = false`. A deactivated coupon is permanently invalid until reactivated.
+- **Coupon invalidation (active toggle):** Admins and photographers can deactivate coupons via `active = false`. A deactivated coupon is invalid until reactivated.
 - **Coupon deletion:** Super Admin and Admin (brand-bound) can delete any coupon unconditionally. Photographers may only delete their own coupons where `used_count = 0` (invoice integrity). The `used_count > 0` guard is skipped for any user with `is_admin` or `is_super_admin`.
 
 ### 3a. Photo Package Type (`photo_package`) — Foto-Paket-Gutschein
@@ -110,19 +106,24 @@ Parameter: **N** = `package_quantity` (Anzahl Fotos im Paket), **Y** = `package_
 ```
 M             = count(items where priceCents > 0)                 // zahlbare Items
 covered       = min(M, coupon.package_quantity)
-prices        = sort(items.priceCents where priceCents > 0 ascending)
-normalCovered = sum(prices[0 .. covered-1])                       // regulärer Preis der abgedeckten Fotos
+prices        = sort(effective qualifying-tier item prices where priceCents > 0 ascending)
+normalCovered = sum(prices[0 .. covered-1])                       // effektiver Preis der abgedeckten Fotos
 effPackage    = min(coupon.package_price_cents, normalCovered)    // Übercharge-Guard
 discountCents = normalCovered - effPackage
 totalCents    = currentTotalCents - discountCents                 // Rest-Items (M - covered) unverändert
 ```
 
 Integriert sich nahtlos in `VolumeLicensingStrategy::calculateCart()`, das `applyCoupon` bereits aufruft
-(Konsistenz mit `fixed`/`percentage`). Coupon wird **nach** der Volume-Preisberechnung angewendet.
+(Konsistenz mit `fixed`/`percentage`). Für `max_items`/`photo_package` wird eine separate
+Coupon-Item-Liste mit effektiven Qualifying-Tier-Preisen übergeben; die Rechnungspositionen
+bleiben auf dem Basispreis und zeigen den Mengenrabatt separat. Coupon wird **nach** der
+Volume-Preisberechnung angewendet.
 
-**Data Model (Migration V030):** neue, **separate** Migration (`V030__add_photo_package_to_coupons.php`; V027 war die letzte deploy-bereite — V028/V029 kamen danach hinzu).
-Tabelle `coupons` erweitern um `package_quantity INT UNSIGNED NOT NULL` (N) und
-`package_price_cents INT NOT NULL` (Y, Stripe-konform). `Coupon::$fillable` + `$casts` ergänzen.
+**Data Model (Migration V030):** eigene, separate Migration
+(`V030__add_photo_package_to_coupons.php`). V038 ist die aktuelle
+Repository-Migrations-Frontier; V030 beschreibt nur die Coupon-Erweiterung.
+Tabelle `coupons` erweitern um `package_quantity INT UNSIGNED NULL` (N) und
+`package_price_cents INT NULL` (Y, Stripe-konform). `Coupon::$fillable` + `$casts` ergänzen.
 Für `photo_package` sind `value` und `max_items` **ungenutzt** (bleiben NULL/0). `down()` darf leer bleiben.
 
 **Validation (`CouponStoreRequest` / `CouponUpdateRequest`):** `type → in:fixed,percentage,photo_package`;
@@ -144,7 +145,8 @@ vor `Coupon::create()`/`update()` (Cent-Konvention wie `value`→`*_cents` ander
 **Security / Brand Isolation:** Coupon ist bereits brand-isoliert (`forCurrentBrand`/`byBrand`;
 `CouponAdminController` setzt `brand`). `photo_package` erbt Scope/Limits/Expiry/Usage-Count automatisch —
 **kein neuer Guard nötig**; bestehende IDOR-Guards (H2/H3) greifen weiter. Wie alle Coupons ist
-`photo_package` **SRP/Volume-exklusiv** (siehe §3 oben: nur `VolumeLicensingStrategy` wendet Coupons an).
+`photo_package` wird im aktuellen Contract von `VolumeLicensingStrategy` angewendet;
+der Begriff „SRP" im Dateinamen ist historisch.
 
 **Annahme „zahlbar" = `priceCents > 0`:** Quote-Items sind 0 und werden nicht gezählt. Edge-Case: ein
 reguläres Item mit `priceCents = 0` würde fälschlich nicht gezählt — im Volume-Pfad unrealistisch; bei
@@ -167,7 +169,7 @@ Bedarf `is_quote`-Flag in `pricedItems` durchreichen statt der `> 0`-Heuristik.
    - Global usage limit (`max_uses_global`)
    - Per-account usage limit (`max_uses_per_account` via `coupon_user_usage` table)
     - Scope match (gallery / meta_gallery / photographer / organisation)
-4. Backend returns `{valid: true, coupon: {code, type, value}, discount_cents: int}` or `{valid: false, error: "..."}`. The response includes `type` and `value` (needed for frontend display) but omits internal fields `id` and `scope_type` (least-information principle).
+4. Backend returns `{valid: true, coupon: {code, type, value, package_quantity?, package_price_cents?}, discount_cents: int}` or `{valid: false, error: "..."}`. The response includes the public display fields but omits internal `id` and `scope_type`.
 5. On checkout-submit (`POST /api/orders/checkout`), the coupon code is passed in the request body.
 6. **Checkout re-validation (critical):** Before applying the coupon, the backend re-validates it atomically. If the coupon is no longer valid (expired, limit reached, scope mismatch), the checkout is **rejected** with HTTP 422 and a user-facing error message. Silent fallback (ignoring the coupon) is **forbidden** — the user must be informed that their coupon became invalid between preview and checkout.
 7. `CheckoutService` → `VolumeLicensingStrategy` applies the coupon after volume pricing.
@@ -218,7 +220,7 @@ Die Pricing-Strategie (`VolumeLicensingStrategy`) darf niemals lautlos auf den C
 | Column | Type | Notes |
 |---|---|---|
 | `id` | BIGINT UNSIGNED AUTO_INCREMENT | Primary key |
-| `brand` | ENUM('rp','srp') NOT NULL | Brand isolation |
+| `brand` | string(20) NOT NULL | Brand-Isolation; aktuell wird die konfigurierte `rp`-Brand verwendet |
 | `code` | VARCHAR(50) NOT NULL | Human-readable code |
 | `type` | ENUM('fixed','percentage','photo_package') NOT NULL | Discount type (see §1 / §3a) |
 | `value` | DECIMAL(10,2) NOT NULL | Amount / percent (unused for `photo_package`) |
@@ -259,7 +261,7 @@ Unique: `(coupon_id, user_id)`
 
 | Feld | Super Admin | Admin (brand-bound) | Photographer |
 |---|---|---|---|
-| `brand` | `'rp'` / `'srp'` wählbar | aus User-Brand (forced) | aus User-Brand (forced) |
+| `brand` | aus User-/Brand-Kontext | aus User-Brand (forced) | aus User-Brand (forced) |
 | `code` | ✓ | ✓ | ✓ |
 | `type` / `value` | ✓ | ✓ | ✓ |
 | `scope_type` | alle (inkl. `organisation`) | alle (inkl. `organisation`) | `gallery`, `meta_gallery`, `photographer` (nur eigene) |
@@ -282,23 +284,27 @@ Unique: `(coupon_id, user_id)`
 - `scope_id` muss eine gültige Org-UUID der aktuellen Brand sein
 - Validierung: `Org::byBrand(...)->where('id', scope_id)->exists()`
 
-### 9. Coupon Management UI — SRP-only
+### 9. Coupon Management UI — current brand-scoped contract
 
-Die Coupon-Verwaltung via UI wird **ausschließlich auf SRP** (`buy.reisinger.pictures`) angeboten. Bei Aufruf auf RP (`portal.reisinger.pictures`) erscheint ein Hinweis: "Gutscheincodes sind nur auf buy.reisinger.pictures verfügbar."
+Coupon management is available in the configured portal regardless of whether
+an individual gallery uses scope or volume pricing. There is no live `SRP`
+host/brand branch in this contract.
 
-| Aktion | URL | Sichtbar |
+| Aktion | Endpoint/UI | Sichtbar |
 |---|---|---|
-| SRP-Coupons verwalten | `buy.reisinger.pictures` | UI + API |
-| RP-Coupons verwalten | `portal.reisinger.pictures` | **Nicht im UI** — nur API (Super Admin / Admin) |
-| SRP-Gallerie-Coupons | `buy.reisinger.pictures` | Nur Gallerien mit brand='srp' |
-| RP-Gallerie-Coupons | `portal.reisinger.pictures` | **Nicht im UI** — nur API |
+| Coupons verwalten | `portal.reisinger.pictures` + `/api/management/coupons` | Management-Rollen; Liste/Schreiben brand-scoped |
+| Gallery-Coupons | `/api/management/galleries/{id}/coupons` | Management-/Zugriffsrechte der Gallery |
+| Group-Coupons | `/api/management/gallery-groups/{id}/coupons` | Management-/Zugriffsrechte der Gallery-Group |
 
 **Implementierung:**
-- Alle Management-Endpoints nutzen `BrandRegistry::currentOrDefault()` zur Filterung
-- Die Backend-API unterstützt beide Brands (`rp` und `srp`) gleichermaßen — Super Admin und Admin können RP-Coupons über API-Requests oder CLI erstellen/verwalten
-- Die UI-Komponente (`ManagementCouponsView`) blendet sich auf RP aus (`brand === 'srp'` Guard)
-- Der Login bleibt cross-brand (Super Admin kann sich an beiden Portalen anmelden), aber nach dem Login gilt der Host-Kontext
-- **RP-seitige Coupons** werden (falls zukünftig benötigt) via Backend/CLI erstellt — UI-Support ist nicht geplant
+- Alle Management-Endpoints filtern über `BrandRegistry::currentOrDefault()`
+  und erzielen Ownership-/Brand-Guards.
+- `CouponAdminController` setzt `brand` aus dem aktuellen Host-Kontext; ein
+  Super-Admin kann nicht durch einen alten UI-Guard zwischen Hosts schalten.
+- Frontend-Navigation und Formulare werden nicht mehr an `pricing_strategy`
+  oder einen historischen `isSrp`-Guard gekoppelt.
+- Historische `buy.reisinger.pictures`-/SRP-Zeilen in älteren Revisionen
+  beschreiben einen entfernten Produktnamen, nicht den aktuellen Vertrag.
 
 ### 10. Error Messages (User-facing)
 

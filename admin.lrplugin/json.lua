@@ -24,6 +24,11 @@
 
 local json = { _version = "0.1.2" }
 
+-- A table sentinel is used for an explicit JSON null.  Lua removes table
+-- fields whose value is nil, so callers that need to send `null` (for
+-- example, when clearing a gallery expiry) must use this sentinel instead.
+json.null = {}
+
 -------------------------------------------------------------------------------
 -- Encode
 -------------------------------------------------------------------------------
@@ -121,6 +126,8 @@ local type_func_map = {
 
 
 encode = function(val, stack)
+    if val == json.null then return "null" end
+
     local t = type(val)
     local f = type_func_map[t]
     if f then

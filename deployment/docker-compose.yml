@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: mariadb:11.4
+    image: mariadb:11.4@sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b
     container_name: portal_db
     restart: unless-stopped
     logging:
@@ -25,7 +25,7 @@ services:
       - portal_internal
 
   search:
-    image: getmeili/meilisearch:v1.48.3
+    image: getmeili/meilisearch:v1.48.3@sha256:c1a52f17c759c2cd6349eede3d5108b8dac07b97e10665b1d64a2d4961c2fd29
     container_name: portal_search
     restart: unless-stopped
     logging:
@@ -46,14 +46,16 @@ services:
       - portal_internal
 
   composer_init:
-    image: composer:latest
+    image: composer:2.10.3@sha256:a5f59b9fd2faf31218632be4809dc6491761085e8064c31dc3b84378c48c248b
+    user: "1000:1000"
     container_name: portal_composer
     volumes:
       - /home/webadmin/websites/api-portal.reisinger.pictures:/app:Z
     command: install --ignore-platform-reqs --no-interaction --optimize-autoloader
 
   backend:
-    image: ghcr.io/reisi007/portal-base:8.5
+    image: ghcr.io/reisinger-pictures/portal-base:8.5@sha256:d762d47c3434434ea5b0dd1ef213e0fa8f12c80b9c3eed314f6f859500a08736
+    user: "1000:1000"
     container_name: portal_backend
     restart: unless-stopped
     depends_on:
@@ -72,11 +74,18 @@ services:
       - /home/webadmin/portal/images:/var/www/photos:Z
       - /home/webadmin/websites/ftp:/var/www/ftp:Z
     environment:
+      - DB_CONNECTION=${DB_CONNECTION:-mariadb}
       - DB_HOST=db
       - DB_DATABASE=portal_db
       - DB_USERNAME=portal_user
       - DB_PASSWORD=${DB_PASSWORD}
-      - APP_ENV=${APP_ENV}
+      - DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-mariadb}
+      - DB_QUEUE_RETRY_AFTER=${DB_QUEUE_RETRY_AFTER:-90}
+      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
+      - QUEUE_FAILED_DRIVER=${QUEUE_FAILED_DRIVER:-database-uuids}
+      - QUEUE_WORKER_TIMEOUT=${QUEUE_WORKER_TIMEOUT:-60}
+      - QUEUE_WORKER_RESTART_DELAY=${QUEUE_WORKER_RESTART_DELAY:-5}
+      - APP_ENV=${APP_ENV:-production}
       # Default false: never enable debug by accident in production.
       - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL}
@@ -91,13 +100,15 @@ services:
       - LOG_CHANNEL=stderr
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ACCOUNTING_EMAIL=${ACCOUNTING_EMAIL}
       # ---
       # E-Mail-Versand (SMTP via ZeptoMail, Migration vom Gmail-REST-OAuth am 2026-08-24)
       # Konfiguration liegt in .env.production:
       #   MAIL_MAILER=smtp
+      #   MAIL_SCHEME=smtp
+      #   MAIL_REQUIRE_TLS=true
       #   MAIL_HOST=smtp.zeptomail.eu
       #   MAIL_PORT=587
-      #   MAIL_ENCRYPTION=tls
       #   MAIL_USERNAME=emailapikey
       #   MAIL_PASSWORD=<ZeptoMail-API-Key>
       #   MAIL_FROM_ADDRESS=noreply@reisinger.pictures
@@ -105,13 +116,19 @@ services:
       # im Code erhalten; OAUTH_*-Secrets sind aus dem PROD-Setup entfernt.
       # ---
       - MAIL_MAILER=${MAIL_MAILER}
+      - MAIL_SCHEME=${MAIL_SCHEME}
+      - MAIL_REQUIRE_TLS=${MAIL_REQUIRE_TLS:-true}
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=${MAIL_PORT}
-      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
       - MAIL_USERNAME=${MAIL_USERNAME}
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
       - MAIL_FROM_NAME=${MAIL_FROM_NAME}
+      # Scheduler mutexes must use a store shared by every backend replica.
+      # The provisioned MariaDB store is the current production default.
+      - CACHE_STORE=${CACHE_STORE:-database}
+      - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-mariadb}
+      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-mariadb}
       - MAKE_WEBHOOK_URL=${MAKE_WEBHOOK_URL}
       - MAKE_API_KEY=${MAKE_API_KEY}
       - MEILISEARCH_HOST=http://search:7700
@@ -120,10 +137,26 @@ services:
       - AUTH_THROTTLE_LIMIT=10
       - DOWNLOAD_THROTTLE=120
       - ZIP_DOWNLOAD_THROTTLE=10
+      - CHECKOUT_THROTTLE_USER_PER_HOUR=${CHECKOUT_THROTTLE_USER_PER_HOUR:-5}
+      - CHECKOUT_THROTTLE_IP_PER_HOUR=${CHECKOUT_THROTTLE_IP_PER_HOUR:-10}
+      - CHECKOUT_THROTTLE_IP_PER_DAY=${CHECKOUT_THROTTLE_IP_PER_DAY:-30}
+      - CHECKOUT_IDEMPOTENCY_TTL_MINUTES=${CHECKOUT_IDEMPOTENCY_TTL_MINUTES:-30}
+      - TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
+      - TURNSTILE_SECRET=${TURNSTILE_SECRET:-}
+      - TURNSTILE_ALLOWED_HOSTNAMES=${TURNSTILE_ALLOWED_HOSTNAMES:-}
+      - TURNSTILE_USER_THRESHOLD_PER_HOUR=${TURNSTILE_USER_THRESHOLD_PER_HOUR:-3}
+      - TURNSTILE_IP_THRESHOLD_PER_HOUR=${TURNSTILE_IP_THRESHOLD_PER_HOUR:-5}
+      - TURNSTILE_FAILURE_USER_THRESHOLD_PER_HOUR=${TURNSTILE_FAILURE_USER_THRESHOLD_PER_HOUR:-3}
+      - TURNSTILE_FAILURE_IP_THRESHOLD_PER_HOUR=${TURNSTILE_FAILURE_IP_THRESHOLD_PER_HOUR:-5}
+      - TURNSTILE_FAILURE_WINDOW_SECONDS=${TURNSTILE_FAILURE_WINDOW_SECONDS:-3600}
       - FTP_STORAGE_PATH=/var/www/ftp
       - STRIPE_KEY=${STRIPE_KEY}
       - STRIPE_SECRET=${STRIPE_SECRET}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS=${STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS:-24}
+      - STRIPE_CHECKOUT_ENABLED=${STRIPE_CHECKOUT_ENABLED:-true}
+      - STRIPE_STALE_PAYMENT_INTENT_HOURS=${STRIPE_STALE_PAYMENT_INTENT_HOURS:-2}
+      - STRIPE_CUSTOMERS_ENABLED=${STRIPE_CUSTOMERS_ENABLED:-true}
       - PROXY_DELIVERY_HEADER=${PROXY_DELIVERY_HEADER}
       - PHOTO_STORAGE_PATH=${PHOTO_STORAGE_PATH}
       - AI_ENABLED=${AI_ENABLED}
@@ -131,32 +164,75 @@ services:
       - AI_BASE_URL=${AI_BASE_URL}
       - AI_API_KEY=${AI_API_KEY}
       - AI_MODEL=${AI_MODEL}
-      - AI_SESSION_HEADER=${AI_SESSION_HEADER}
-      - AI_SESSION_PREFIX=${AI_SESSION_PREFIX}
+      # Unset-only defaults keep an explicit empty header as the opt-out.
+      - AI_SESSION_HEADER=${AI_SESSION_HEADER-x-opencode-session}
+      - AI_SESSION_PREFIX=${AI_SESSION_PREFIX-portal-}
     healthcheck:
-      test: ["CMD-SHELL", "kill -0 1 2>/dev/null && grep -q php-fpm /proc/1/cmdline"]
+      test:
+        - CMD-SHELL
+        - >-
+          kill -0 1 2>/dev/null &&
+          grep -q php-fpm /proc/1/cmdline &&
+          test -s /tmp/portal-queue-supervisor.pid &&
+          test -s /tmp/portal-queue-worker.pid &&
+          test -s /tmp/portal-scheduler.pid &&
+          kill -0 "$$(cat /tmp/portal-queue-supervisor.pid)" 2>/dev/null &&
+          kill -0 "$$(cat /tmp/portal-queue-worker.pid)" 2>/dev/null &&
+          kill -0 "$$(cat /tmp/portal-scheduler.pid)" 2>/dev/null
       interval: "30s"
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 90s
     command: >
       sh -c "
-      if [ -z \"$${APP_KEY}\" ] || [ -z \"$${JWT_SECRET}\" ] || [ -z \"$${FILE_ENCRYPTION_KEY}\" ]; then
-        echo 'FATAL: APP_KEY, JWT_SECRET oder FILE_ENCRYPTION_KEY ist nicht gesetzt. Start verweigert (fail-closed)!';
+      if [ \"$$(id -u)\" -ne 1000 ] || [ \"$$(id -g)\" -ne 1000 ]; then
+        echo 'FATAL: Backend muss als UID:GID 1000:1000 laufen. Start verweigert (fail-closed)!';
         exit 1;
       fi;
-      php artisan cache:clear;
-      php artisan optimize;
-      php artisan migrate --force;
-      php artisan scout:sync-index-settings;
-      php artisan queue:restart;
-      php artisan admin:update;
-      echo 'Starte Hintergrund-Prozesse...';
-      php artisan app:import-locations &
-      php artisan queue:work --tries=3 &
-      (while true; do php artisan schedule:run >> /dev/null 2>&1; sleep 60; done) &
-      echo 'Starte PHP-FPM...';
-      exec php-fpm
+      if [ \"$${APP_ENV}\" != 'production' ]; then
+        echo 'FATAL: APP_ENV muss im Produktions-Stack production sein. Start verweigert (fail-closed)!';
+        exit 1;
+      fi;
+      if [ -z \"$${APP_KEY}\" ] || [ -z \"$${JWT_SECRET}\" ] || [ -z \"$${FILE_ENCRYPTION_KEY}\" ] || [ -z \"$${ADMIN_EMAIL}\" ] || [ -z \"$${ADMIN_PASSWORD}\" ] || [ -z \"$${PHOTO_STORAGE_PATH}\" ]; then
+        echo 'FATAL: APP_KEY, JWT_SECRET, FILE_ENCRYPTION_KEY, ADMIN_EMAIL, ADMIN_PASSWORD oder PHOTO_STORAGE_PATH ist nicht gesetzt. Start verweigert (fail-closed)!';
+        exit 1;
+      fi;
+      case \"$${PHOTO_STORAGE_PATH}\" in
+        /*) ;;
+        *) echo 'FATAL: PHOTO_STORAGE_PATH muss ein absoluter Mount-Pfad sein. Start verweigert!'; exit 1;;
+      esac;
+      case \"$${AI_SESSION_HEADER}\" in
+        '') ;;
+        *[!A-Za-z0-9-]*) echo 'FATAL: AI_SESSION_HEADER darf nur Buchstaben, Ziffern und Bindestriche enthalten. Start verweigert (fail-closed)!'; exit 1;;
+      esac;
+      case \"$${AI_SESSION_PREFIX}\" in
+        '') ;;
+        *[!A-Za-z0-9._-]*) echo 'FATAL: AI_SESSION_PREFIX darf nur Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich enthalten. Start verweigert (fail-closed)!'; exit 1;;
+      esac;
+      for path in /var/www/html \"$${PHOTO_STORAGE_PATH}\" /var/www/ftp; do
+        if [ ! -d \"$${path}\" ] || [ ! -w \"$${path}\" ] || [ \"$$(stat -c '%u:%g' \"$${path}\")\" != '1000:1000' ]; then
+          echo \"FATAL: Runtime-Pfad $$path fehlt, ist nicht schreibbar oder gehört nicht UID:GID 1000:1000. Start verweigert!\";
+          exit 1;
+        fi;
+      done;
+      # Rebuild-Pfad: portal-base wird von .github/workflows/base-image.yml
+      # unter OWNER: ${{ github.repository_owner }} publiziert, also in den
+      # Org-Namespace ghcr.io/reisinger-pictures/ (nicht in einen persönlichen
+      # Namespace). Nach dem GHCR-Push den gepinnten Digest weiter unten in
+      # dieser Datei und in ci.yml/Dockerfile.e2e nachziehen.
+      if [ ! -x /usr/local/bin/validate-production-env ] || [ ! -x /usr/local/bin/portal-backend-supervisor ]; then
+        echo 'FATAL: Production preflight/supervisor is missing. Rebuild portal-base:8.5, push GHCR, update the pinned compose digest, then redeploy. No migration or seed was run.';
+        exit 1;
+      fi;
+      /usr/local/bin/validate-production-env || exit 1;
+      php artisan cache:clear || exit 1;
+      php artisan optimize || exit 1;
+      php artisan ops:validate-production || exit 1;
+      php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1;
+      php artisan scout:sync-index-settings || exit 1;
+      php artisan queue:restart || exit 1;
+      echo 'Starte Supervisor...';
+      exec /usr/local/bin/portal-backend-supervisor
       "
     networks:
       portal_internal:

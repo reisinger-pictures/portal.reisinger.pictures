@@ -1,19 +1,20 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { TextSnippet } from '../../../api';
 import WysiwygEditor from '../../components/WysiwygEditor';
+import { useFocusTrap } from '../../../logic/useFocusTrap';
 
-const snippetSchema = z.object({
+const createSnippetSchema = () => z.object({
     title: z.string().min(1, t`Titel ist erforderlich`),
     shortcut: z.string().min(1, t`Kürzel ist erforderlich`).regex(/^[a-z0-9_-]+$/, t`Nur Kleinbuchstaben, Zahlen, - und _`),
     content_html: z.string().min(1, t`Inhalt ist erforderlich`)
 });
 
-type SnippetFormValues = z.infer<typeof snippetSchema>;
+type SnippetFormValues = z.infer<ReturnType<typeof createSnippetSchema>>;
 
 interface Props {
     isOpen: boolean;
@@ -24,6 +25,7 @@ interface Props {
 
 export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSave }: Props) {
     "use no memo";
+    const snippetSchema = createSnippetSchema();
     const { register, handleSubmit, reset, setValue, control, formState: { errors, isSubmitting } } = useForm<SnippetFormValues>({
         resolver: zodResolver(snippetSchema)
     });
@@ -41,17 +43,31 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet, onSa
     const watchContentHtml = useWatch({ control, name: 'content_html' });
 
     const onSubmit = async (data: SnippetFormValues) => {
-        await onSave(data);
-        onClose();
+        try {
+            await onSave(data);
+            onClose();
+        } catch {
+            // The parent reports the API error; keep the entered values and modal open.
+            return;
+        }
     };
+
+    const titleId = useId();
+    const dialogRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: onClose });
 
     if (!isOpen) return null;
 
     return (
-        <div className="modal modal-open">
+        <div
+            className="modal modal-open"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+        >
             <div className="modal-box max-w-4xl relative flex flex-col h-80vh">
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-6 flex items-center gap-2 shrink-0">
+                <h3 id={titleId} className="font-bold text-xl mb-6 flex items-center gap-2 shrink-0">
                     <span className="iconify mdi--text-box-multiple text-primary"></span>
                     {editingSnippet ? <Trans>Textbaustein bearbeiten</Trans> : <Trans>Neuen Textbaustein anlegen</Trans>}
                 </h3>

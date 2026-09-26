@@ -3,8 +3,11 @@
 namespace App\Models;
 
 use App\Casts\AsBrand;
+use App\Enums\Brand;
 use App\Enums\PaymentStatus;
 use App\Enums\ProjectStatus;
+use App\Support\ModelStatusGuard;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +15,26 @@ use Illuminate\Database\Eloquent\Model;
 class Project extends Model
 {
     use HasFactory, HasUuids;
+
+    /**
+     * Current workflow states, derived from the board enums.
+     *
+     * Persisted rows may still carry a legacy value outside these lists; such a
+     * row must stay savable through unrelated board operations (see
+     * {@see ModelStatusGuard::assertTransitionAllowed()}).
+     *
+     * @return array<int, string>
+     */
+    public static function allowedStatuses(): array
+    {
+        return array_column(ProjectStatus::cases(), 'value');
+    }
+
+    /** @return array<int, string> */
+    public static function allowedPaymentStatuses(): array
+    {
+        return array_column(PaymentStatus::cases(), 'value');
+    }
 
     protected $fillable = [
         'brand',
@@ -37,6 +60,15 @@ class Project extends Model
         'position' => 'integer',
     ];
 
+    public function scopeForBrand(Builder $query, string|Brand|null $brand): Builder
+    {
+        if ($brand === null) {
+            return $query->whereNull('brand');
+        }
+
+        return $query->where('brand', $brand instanceof Brand ? $brand->value : $brand);
+    }
+
     public function owner()
     {
         return $this->belongsTo(User::class, 'owner_id');
@@ -54,16 +86,22 @@ class Project extends Model
 
     protected static function booted()
     {
-        static::saving(function ($project) {
-            $allowedStatuses = ['anfrage', 'angebot', 'beauftragt', 'rechnung', 'bezahlt', 'storniert'];
-            if (!in_array($project->status, $allowedStatuses)) {
-                throw new \InvalidArgumentException("Ungültiger Projektstatus: {$project->status}");
-            }
+        static::saving(function (Project $project) {
+            // Transition guard: only an actually written status is validated so
+            // a legacy row stays savable through unrelated board operations.
+            ModelStatusGuard::assertTransitionAllowed(
+                $project,
+                'status',
+                self::allowedStatuses(),
+                'Projektstatus',
+            );
 
-            $allowedPaymentStatuses = ['open', 'partly_paid', 'paid'];
-            if (!in_array($project->payment_status, $allowedPaymentStatuses)) {
-                throw new \InvalidArgumentException("Ungültiger Zahlungsstatus: {$project->payment_status}");
-            }
+            ModelStatusGuard::assertTransitionAllowed(
+                $project,
+                'payment_status',
+                self::allowedPaymentStatuses(),
+                'Zahlungsstatus',
+            );
         });
     }
 }

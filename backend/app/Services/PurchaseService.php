@@ -5,10 +5,15 @@ namespace App\Services;
 use App\Constants\TierRanks;
 use App\Models\Order;
 use App\Models\User;
+use App\Support\ActorIdentity;
 use Illuminate\Support\Facades\Cache;
 
 class PurchaseService
 {
+    public function __construct(
+        private readonly MediaVisibilityService $mediaVisibility,
+    ) {}
+
     /**
      * Order statuses that legitimately grant download access.
      *
@@ -50,13 +55,22 @@ class PurchaseService
      */
     public function hasPurchasedPhoto(User $user, string $photoId, string $requestedTier): bool
     {
-        $cacheKey = "user.{$user->id}.purchased.{$photoId}.{$requestedTier}";
-        $cached = Cache::get($cacheKey);
-        if ($cached !== null) {
-            return $cached;
+        $cacheKey = ActorIdentity::purchaseCacheKeyForActor($user, $photoId, $requestedTier);
+        if ($cacheKey === null) {
+            return false;
         }
 
-        $orders = Order::where('user_id', $user->id)
+        // Purchase entitlement is mutable (refund, dispute, ownership/brand
+        // changes), so a positive cache entry can never stand in for the final
+        // authorization check immediately before bytes are emitted.
+        if (! $this->mediaVisibility->photoIsVisible($photoId)) {
+            Cache::forget($cacheKey);
+
+            return false;
+        }
+
+        $orders = Order::query()
+            ->ownedBy($user)
             ->whereIn('status', self::DOWNLOAD_ELIGIBLE_STATUSES)
             ->with('invoiceSnapshot')->get();
         $reqRank = TierRanks::RANKS[$requestedTier] ?? 3;
@@ -79,6 +93,8 @@ class PurchaseService
                 }
             }
         }
+
+        Cache::forget($cacheKey);
 
         return false;
     }

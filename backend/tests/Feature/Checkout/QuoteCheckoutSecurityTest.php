@@ -17,6 +17,7 @@ use App\Services\OfferTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -59,10 +60,12 @@ class QuoteCheckoutSecurityTest extends TestCase
         $gallery = Gallery::factory()->create(['is_public' => true]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
-        return app(OfferTokenService::class)->issue([
-            'photos' => [$photo->id],
-            'price' => $price,
-        ], now()->addDays(7));
+        return app(OfferTokenService::class)->issueQuote(
+            [$photo->id],
+            $price,
+            brand: 'rp',
+            expiresAt: now()->addDays(7),
+        );
     }
 
     private function checkoutWithToken(string $token)
@@ -103,14 +106,20 @@ class QuoteCheckoutSecurityTest extends TestCase
 
     public function test_generate_quote_link_rejects_zero_and_negative_prices(): void
     {
-        $photographer = User::factory()->create();
+        $gallery = Gallery::factory()->create([
+            'is_public' => true,
+            'restricted_photographers' => false,
+        ]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $photographer = User::factory()->create(['brand' => 'rp']);
         $photographer->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
+        $photographer->photographerGalleries()->attach($gallery);
         $token = auth('api')->login($photographer);
 
         foreach ([0, -500] as $price) {
             $this->withHeaders(['Authorization' => "Bearer $token"])
                 ->postJson('/api/management/orders/quote-link', [
-                    'photo_ids' => ['uuid-1'],
+                    'photo_ids' => [$photo->id],
                     'custom_price' => $price,
                 ])
                 ->assertStatus(422);
@@ -141,5 +150,114 @@ class QuoteCheckoutSecurityTest extends TestCase
         $this->assertSame(422, $response->status());
         $this->assertSame('Ungültige Lizenz-Auswahl.', $response->getData(true)['error']);
         $this->assertSame(0, Order::count());
+    }
+
+    public function test_quote_checkout_rejects_private_foreign_target_with_public_placeholder(): void
+    {
+        $privateGallery = Gallery::factory()->create([
+            'is_public' => false,
+            'restricted_photographers' => true,
+        ]);
+        $privatePhoto = Photo::factory()->create(['gallery_id' => $privateGallery->id]);
+        $publicGallery = Gallery::factory()->create(['is_public' => true]);
+        $publicPhoto = Photo::factory()->create(['gallery_id' => $publicGallery->id]);
+
+        Storage::fake('photos');
+        $fixture = file_get_contents(base_path('tests/Fixtures/sample.jpg'));
+        Storage::disk('photos')->put($privateGallery->id.'/'.$privatePhoto->filename, $fixture);
+        Storage::disk('photos')->put($publicGallery->id.'/'.$publicPhoto->filename, $fixture);
+
+        // Simulate a signed but improperly assembled offer. Checkout must bind
+        // the token to its real targets instead of trusting the public item
+        // supplied by the browser.
+        $token = app(OfferTokenService::class)->issueQuote(
+            [$privatePhoto->id, $publicPhoto->id],
+            5000,
+            brand: 'rp',
+            expiresAt: now()->addDays(7),
+        );
+
+        Mail::fake();
+        $response = $this->service->processCheckout(
+            $this->makeRequest(
+                [['photoId' => $publicPhoto->id, 'isQuote' => false, 'tier' => 'original']],
+                ['quote_token' => $token],
+            ),
+            User::factory()->create(),
+            'invoice',
+        );
+
+        $this->assertSame(422, $response->status());
+        $this->assertSame('Angebot und Warenkorb stimmen nicht überein.', $response->getData(true)['error']);
+        $this->assertSame(0, Order::count());
+    }
+
+    public function test_quote_checkout_reauthorizes_private_target_before_creating_order(): void
+    {
+        $gallery = Gallery::factory()->create([
+            'is_public' => false,
+            'restricted_photographers' => true,
+        ]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        Storage::fake('photos');
+        Storage::disk('photos')->put(
+            $gallery->id.'/'.$photo->filename,
+            file_get_contents(base_path('tests/Fixtures/sample.jpg')),
+        );
+        $buyer = User::factory()->create();
+        $buyer->galleries()->attach($gallery);
+
+        $token = app(OfferTokenService::class)->issueQuote(
+            [$photo->id],
+            5000,
+            brand: 'rp',
+            expiresAt: now()->addDays(7),
+        );
+
+        // Access was valid when the offer was issued, but is revoked before
+        // checkout. The signed token must not bypass the current grant.
+        $buyer->galleries()->detach($gallery);
+        Mail::fake();
+
+        $response = $this->service->processCheckout(
+            $this->makeRequest(
+                [['photoId' => $photo->id, 'isQuote' => false, 'tier' => 'original']],
+                ['quote_token' => $token],
+            ),
+            $buyer,
+            'invoice',
+        );
+
+        $this->assertSame(403, $response->status());
+        $this->assertSame('Zugriff verweigert', $response->getData(true)['error']);
+        $this->assertSame(0, Order::count());
+    }
+
+    public function test_quote_link_generation_rejects_unmanaged_private_target(): void
+    {
+        $privateGallery = Gallery::factory()->create([
+            'is_public' => false,
+            'restricted_photographers' => true,
+        ]);
+        $privatePhoto = Photo::factory()->create(['gallery_id' => $privateGallery->id]);
+        $publicGallery = Gallery::factory()->create([
+            'is_public' => true,
+            'restricted_photographers' => false,
+        ]);
+        $publicPhoto = Photo::factory()->create(['gallery_id' => $publicGallery->id]);
+
+        $photographer = User::factory()->create(['brand' => 'rp']);
+        $photographer->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
+        $photographer->photographerGalleries()->attach($publicGallery);
+        $authToken = auth('api')->login($photographer);
+
+        $this->withHeaders(['Authorization' => "Bearer $authToken"])
+            ->postJson('/api/management/orders/quote-link', [
+                'photo_ids' => [$privatePhoto->id, $publicPhoto->id],
+                'custom_price' => 5000,
+            ])
+            ->assertStatus(403);
+
+        $this->assertDatabaseCount('orders', 0);
     }
 }

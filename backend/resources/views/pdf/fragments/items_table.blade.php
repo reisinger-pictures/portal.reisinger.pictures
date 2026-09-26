@@ -5,9 +5,40 @@
     $separateTotals = $separateTotals ?? false;
     $subtotal = 0;
     $hasDiscounts = false;
+    $normalizedItems = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            throw new \InvalidArgumentException('The invoice contains an invalid row.');
+        }
+        if ((!isset($item['type']) || $item['type'] === 'item')
+            && !array_key_exists('row_total', $item)
+        ) {
+            // Ordinary checkout snapshots historically omit row_total. Fill
+            // that compatibility case with checked integer arithmetic; a
+            // fractional legacy quantity fails closed instead of being
+            // truncated so the rendered subtotal cannot disagree with the
+            // authoritative total. Manual fractional rows always arrive from
+            // ManualInvoiceService with an authoritative row_total and never
+            // take this fallback.
+            $item['row_total'] = \App\Services\ContractPricingService::legacyRowTotal(
+                $item['price'] ?? 0,
+                $item['qty'] ?? 1,
+            );
+        }
+        $normalizedItems[] = $item;
+    }
+    $items = $normalizedItems;
+
     foreach ($items as $item) {
         if (!isset($item['type']) || $item['type'] === 'item') {
-            $subtotal += $item['row_total'] ?? ($item['price'] * ($item['qty'] ?? 1));
+            // Service-produced rows always carry the checked, authoritative
+            // integer row total. Never re-multiply a potentially fractional
+            // legacy quantity in the PDF layer.
+            $rowTotal = (int) ($item['row_total'] ?? 0);
+            if ($rowTotal < 0 || $rowTotal > \App\Services\ContractPricingService::MAX_SAFE_INTEGER - $subtotal) {
+                throw new \InvalidArgumentException('The invoice subtotal exceeds the safe integer range.');
+            }
+            $subtotal += $rowTotal;
         } else {
             $hasDiscounts = true;
         }
@@ -42,8 +73,8 @@
                         @endif
                     </td>
                     <td class="text-right" style="white-space: nowrap;">{{ fmod($item['qty'] ?? 1, 1) !== 0.0 ? number_format($item['qty'] ?? 1, 2, ',', '.') : number_format($item['qty'] ?? 1, 0, ',', '.') }}</td>
-                    <td class="text-right" style="white-space: nowrap;">{{ number_format($item['price'] / 100, 2, ',', '.') }} €</td>
-                    <td class="text-right" style="white-space: nowrap;">{{ number_format(($item['row_total'] ?? ($item['price'] * ($item['qty'] ?? 1))) / 100, 2, ',', '.') }} €</td>
+                    <td class="text-right" style="white-space: nowrap;">{{ \App\Support\PersistedMoney::formatCents((int) ($item['price'] ?? 0)) }} €</td>
+                    <td class="text-right" style="white-space: nowrap;">{{ \App\Support\PersistedMoney::formatCents((int) ($item['row_total'] ?? 0)) }} €</td>
                 </tr>
             @endif
         @endforeach
@@ -57,13 +88,13 @@
         @if($showSubtotal)
             <tr>
                 <td colspan="3" class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>Zwischensumme</strong></td>
-                <td class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>{{ number_format($subtotal / 100, 2, ',', '.') }} €</strong></td>
+                <td class="text-right" style="padding-top: 15px; padding-bottom: 15px;"><strong>{{ \App\Support\PersistedMoney::formatCents($subtotal) }} €</strong></td>
             </tr>
             @include('pdf.fragments.discount_rows', ['items' => $items])
         @endif
         <tr class="total-row">
             <td colspan="3" class="text-right">{{ $totalLabel }}</td>
-            <td class="text-right">{{ number_format($totalGross / 100, 2, ',', '.') }} €</td>
+            <td class="text-right">{{ \App\Support\PersistedMoney::formatCents((int) $totalGross) }} €</td>
         </tr>
     </tbody>
 @if($separateTotals)

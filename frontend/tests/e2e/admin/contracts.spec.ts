@@ -182,6 +182,159 @@ test.describe('Digital Contracts Workflow', () => {
         expect(closeData.contract.status).toBe('closed');
     });
 
+    test('signing view displays the authoritative total for percentage and fixed discounts', { tag: ['@regression', '@feature:contracts'] }, async ({ page, request }) => {
+        const headers = {
+            'Cookie': helper.getAdminToken(),
+            'Accept': 'application/json',
+        };
+
+        const createRes = await request.post('/api/management/contracts', {
+            data: {
+                available_roles: ['Model'],
+                allow_multiple_roles_per_signer: false,
+                terms_html: `<p>Discount contract ${uniqueSuffix}</p>`,
+                items: [
+                    { type: 'item', description: 'Fotoshooting', qty: 1, price: 10000, notes: '' },
+                ],
+                discounts: [
+                    { type: 'discount_percent', description: '10% Rabatt', qty: 1, price: 1000, notes: '' },
+                    { type: 'discount_fixed', description: 'Bonus', qty: 1, price: 500, notes: '' },
+                ],
+            },
+            headers,
+        });
+        expect(createRes.ok()).toBeTruthy();
+        const contractId = (await createRes.json()).contract.id as string;
+        helper.trackContract(contractId);
+
+        const openRes = await request.post(`/api/management/contracts/${contractId}/open`, { headers });
+        expect(openRes.ok()).toBeTruthy();
+        const joinToken = ((await openRes.json()).join_link as string).split('/contracts/join/')[1];
+        expect(joinToken).toBeTruthy();
+
+        const joinRes = await request.post(`/api/contracts/join/${joinToken}`, {
+            data: {
+                name: 'Discount Signer',
+                email: `discount-${uniqueSuffix}@example.com`,
+                roles: ['Model'],
+            },
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(joinRes.ok()).toBeTruthy();
+        const personalToken = (await joinRes.json()).personal_token as string;
+
+        const contentRes = await request.get(`/api/contracts/sign/${personalToken}`, {
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(contentRes.ok()).toBeTruthy();
+        const contentData = await contentRes.json();
+        expect(contentData.contract.discounts[0].price).toBe(1000);
+        expect(contentData.contract.total).toBe(8500);
+
+        await page.goto(`/contracts/sign/${personalToken}`);
+        const main = page.getByRole('main');
+        const shootingRow = main.getByRole('row').filter({ hasText: 'Fotoshooting' });
+        await expect(shootingRow.getByRole('cell').nth(2)).toHaveText('100,00 €', { timeout: 10000 });
+        await expect(shootingRow.getByRole('cell').nth(3)).toHaveText('100,00 €', { timeout: 10000 });
+        await expect(main.getByText('10%', { exact: true })).toBeVisible();
+        await expect(main.getByText('5,00 €', { exact: true })).toBeVisible();
+        await expect(main.getByText('85,00 €', { exact: true })).toBeVisible();
+
+        await main.getByRole('checkbox').check();
+        await main.getByRole('button', { name: 'Zahlungspflichtig abschließen' }).click();
+        await expect(main.getByRole('heading', { name: 'Vertrag unterschrieben!' })).toBeVisible({ timeout: 10000 });
+    });
+
+    test('CR-FE-016: changing a contract token clears identity, consent and signed state while retaining reusable roles', { tag: ['@regression', '@feature:contracts'] }, async ({ page, request }) => {
+        const headers = {
+            'Cookie': helper.getAdminToken(),
+            'Accept': 'application/json',
+        };
+        const joinTokens: string[] = [];
+
+        for (const label of ['First', 'Second']) {
+            const createRes = await request.post('/api/management/contracts', {
+                data: {
+                    available_roles: ['Model', 'Fotograf'],
+                    allow_multiple_roles_per_signer: false,
+                    terms_html: `<p>${label} token contract ${uniqueSuffix}</p>`,
+                    items: [],
+                    discounts: [],
+                },
+                headers,
+            });
+            expect(createRes.ok()).toBeTruthy();
+            const createData = await createRes.json();
+            const contractId = createData.contract.id;
+            helper.trackContract(contractId);
+
+            const openRes = await request.post(`/api/management/contracts/${contractId}/open`, { headers });
+            expect(openRes.ok()).toBeTruthy();
+            const openData = await openRes.json();
+            joinTokens.push(openData.join_link.split('/contracts/join/')[1]);
+        }
+
+        const firstJoinRes = await request.post(`/api/contracts/join/${joinTokens[0]}`, {
+            data: { name: 'First Signer', email: `first-${uniqueSuffix}@example.com`, roles: ['Model'] },
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(firstJoinRes.ok()).toBeTruthy();
+        const firstJoinData = await firstJoinRes.json();
+
+        const secondJoinRes = await request.post(`/api/contracts/join/${joinTokens[1]}`, {
+            data: { name: 'Second Signer', email: `second-${uniqueSuffix}@example.com`, roles: ['Fotograf'] },
+            headers: { 'Accept': 'application/json' },
+        });
+        expect(secondJoinRes.ok()).toBeTruthy();
+        const secondJoinData = await secondJoinRes.json();
+
+        await page.goto(`/contracts/join/${joinTokens[0]}`);
+        const main = page.getByRole('main');
+        await expect(main.getByRole('heading', { name: 'Vertrag beitreten' })).toBeVisible({ timeout: 10000 });
+        await main.getByPlaceholder('z.B. Maria Muster').fill('Old Identity');
+        await main.getByPlaceholder('maria@beispiel.de').fill(`old-${uniqueSuffix}@example.com`);
+        await main.getByRole('button', { name: 'Model' }).click();
+        await expect(main.getByRole('button', { name: 'Model' })).toHaveAttribute('aria-pressed', 'true');
+        await main.getByRole('checkbox').check();
+
+        // Keep one mounted React Router instance so the next transition exercises
+        // token-scoped component state rather than a full-page reload.
+        await page.evaluate((path) => {
+            window.history.pushState(window.history.state, '', path);
+            window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+        }, `/contracts/join/${joinTokens[1]}`);
+
+        await expect(page).toHaveURL(new RegExp(`/contracts/join/${joinTokens[1]}$`));
+        await expect(main.getByRole('button', { name: 'Fotograf' })).toBeVisible({ timeout: 10000 });
+        await expect(main.getByPlaceholder('z.B. Maria Muster')).toHaveValue('');
+        await expect(main.getByPlaceholder('maria@beispiel.de')).toHaveValue('');
+        await expect(main.getByRole('checkbox')).not.toBeChecked();
+        // Both contracts intentionally expose the same role catalog. The role
+        // selection, identity, and consent must still reset for the new token.
+        await expect(main.getByRole('button', { name: 'Model' })).toHaveAttribute('aria-pressed', 'false');
+        await expect(main.getByRole('button', { name: 'Fotograf' })).toHaveAttribute('aria-pressed', 'false');
+        await expect(main.getByRole('button', { name: 'Vertraulich ansehen & unterschreiben' })).toBeDisabled();
+
+        await page.goto(`/contracts/sign/${firstJoinData.personal_token}`);
+        await expect(main.getByRole('heading', { name: 'Vertrag', exact: true })).toBeVisible({ timeout: 10000 });
+        await expect(main.getByText(`First token contract ${uniqueSuffix}`)).toBeVisible();
+        await main.getByRole('checkbox').check();
+        await main.getByRole('button', { name: 'Vertrag verbindlich abschließen' }).click();
+        await expect(main.getByRole('heading', { name: 'Vertrag unterschrieben!' })).toBeVisible({ timeout: 10000 });
+
+        await page.evaluate((path) => {
+            window.history.pushState(window.history.state, '', path);
+            window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+        }, `/contracts/sign/${secondJoinData.personal_token}`);
+
+        await expect(page).toHaveURL(new RegExp(`/contracts/sign/${secondJoinData.personal_token}$`));
+        await expect(main.getByText('Second Signer')).toBeVisible({ timeout: 10000 });
+        await expect(main.getByText(`Second token contract ${uniqueSuffix}`)).toBeVisible();
+        await expect(main.getByRole('heading', { name: 'Vertrag unterschrieben!' })).toHaveCount(0);
+        await expect(main.getByRole('checkbox')).not.toBeChecked();
+        await expect(main.getByRole('button', { name: 'Vertrag verbindlich abschließen' })).toBeDisabled();
+    });
+
     test('Admin edits active contract, signer is blocked from signing stale version', { tag: ['@feature:admin:contracts'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
         await auth.login(testUser.email, testUser.password);

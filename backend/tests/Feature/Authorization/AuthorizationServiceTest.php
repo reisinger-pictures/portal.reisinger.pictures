@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\Authorization;
 
+use App\Enums\Brand;
 use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
-use App\Models\Role;
+use App\Models\GalleryInvite;
 use App\Models\Org;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\AuthorizationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,27 +24,50 @@ class AuthorizationServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new AuthorizationService();
+        $this->service = new AuthorizationService;
     }
 
     // ──────────────────────────────────────────────
     //  Guest User
     // ──────────────────────────────────────────────
 
-    public function test_guest_user_gets_transient_galleries(): void
+    public function test_guest_without_invite_provenance_returns_no_galleries(): void
     {
-        $user = User::factory()->create();
-        $user->guest_id = 'guest-1';
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->guest_id = 'guest-without-invite';
         $user->transient_galleries = ['g1', 'g2'];
 
         $ids = $this->service->getAllowedGalleryIds($user);
 
-        $this->assertSame(['g1', 'g2'], $ids);
+        $this->assertSame([], $ids);
+    }
+
+    public function test_guest_gets_only_active_current_host_invite_gallery(): void
+    {
+        $gallery = Gallery::factory()->create();
+        $invite = GalleryInvite::create([
+            'gallery_id' => $gallery->id,
+            'token' => 'authorization-guest-invite',
+        ]);
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->guest_id = 'guest-with-invite';
+        $user->transient_galleries = [$gallery->id];
+        $user->transient_invites = [
+            (string) $invite->id => [
+                'gallery_ids' => [(string) $gallery->id],
+                'meta_gallery_ids' => [],
+            ],
+        ];
+        $user->transient_invite_ids = [(string) $invite->id];
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertSame([(string) $gallery->id], $ids);
     }
 
     public function test_guest_user_with_empty_transient_returns_empty(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->guest_id = 'guest-2';
         $user->transient_galleries = [];
 
@@ -52,13 +77,118 @@ class AuthorizationServiceTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
+    //  Registered user — invite claims are clamped to live state (AUTH-2)
+    // ──────────────────────────────────────────────
+
+    /**
+     * AUTH-2: a registered-user token carries `gallery_ids` in its invite
+     * record, but that is self-contained claim data. It must be clamped to the
+     * live invite's real gallery, exactly like the guest branch, and
+     * `can_edit_metadata` must be derived from the invite rather than the claim.
+     */
+    public function test_registered_invite_claim_is_clamped_to_the_live_invite_gallery(): void
+    {
+        $inviteGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $foreignGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $inviteGallery->id,
+            'token' => 'registered-clamp-'.uniqid(),
+            'can_edit_metadata' => false,
+        ]);
+
+        $sanitized = $this->service->sanitizeTransientClaims([
+            'transient_galleries' => [$inviteGallery->id, $foreignGallery->id],
+            'transient_meta_galleries' => [$inviteGallery->id, $foreignGallery->id],
+            'transient_invites' => [
+                (string) $invite->id => [
+                    'gallery_ids' => [$inviteGallery->id, $foreignGallery->id],
+                    'meta_gallery_ids' => [$inviteGallery->id, $foreignGallery->id],
+                    'can_edit_metadata' => true,
+                ],
+            ],
+            'transient_invite_ids' => [(string) $invite->id],
+        ]);
+
+        $this->assertSame([$inviteGallery->id], $sanitized['transient_galleries']);
+        // The claim escalated metadata, but the live invite is read-only.
+        $this->assertSame([], $sanitized['transient_meta_galleries']);
+        $this->assertSame(
+            [$inviteGallery->id],
+            $sanitized['transient_invites'][(string) $invite->id]['gallery_ids']
+        );
+        $this->assertSame(
+            [],
+            $sanitized['transient_invites'][(string) $invite->id]['meta_gallery_ids']
+        );
+    }
+
+    public function test_registered_user_cannot_gain_a_foreign_gallery_from_a_claimed_invite_record(): void
+    {
+        $inviteGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $foreignGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $inviteGallery->id,
+            'token' => 'registered-foreign-'.uniqid(),
+            'can_edit_metadata' => true,
+        ]);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->transient_galleries = [$inviteGallery->id, $foreignGallery->id];
+        $user->transient_meta_galleries = [$inviteGallery->id, $foreignGallery->id];
+        $user->transient_invites = [
+            (string) $invite->id => [
+                'gallery_ids' => [$inviteGallery->id, $foreignGallery->id],
+                'meta_gallery_ids' => [$inviteGallery->id, $foreignGallery->id],
+            ],
+        ];
+        $user->transient_invite_ids = [(string) $invite->id];
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertContains($inviteGallery->id, $ids);
+        $this->assertNotContains($foreignGallery->id, $ids);
+        $this->assertFalse($this->service->canAccessGallery($user, $foreignGallery->id));
+        $this->assertTrue($this->service->canAccessGallery($user, $inviteGallery->id));
+    }
+
+    /**
+     * Control: a registered-user invite record naming the invite's real gallery
+     * still grants it, and metadata follows the live invite flag.
+     */
+    public function test_registered_invite_claim_for_the_real_gallery_survives_clamping(): void
+    {
+        $inviteGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $inviteGallery->id,
+            'token' => 'registered-valid-'.uniqid(),
+            'can_edit_metadata' => true,
+        ]);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->transient_galleries = [$inviteGallery->id];
+        $user->transient_meta_galleries = [$inviteGallery->id];
+        $user->transient_invites = [
+            (string) $invite->id => [
+                'gallery_ids' => [$inviteGallery->id],
+                'meta_gallery_ids' => [$inviteGallery->id],
+            ],
+        ];
+        $user->transient_invite_ids = [(string) $invite->id];
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertContains($inviteGallery->id, $ids);
+        $this->assertContains($inviteGallery->id, $this->service->getActiveTransientMetaGalleryIds($user));
+    }
+
+    // ──────────────────────────────────────────────
     //  Direct Gallery Assignments
     // ──────────────────────────────────────────────
 
     public function test_direct_gallery_assignment(): void
     {
         $gallery = Gallery::factory()->create();
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->galleries()->attach($gallery);
 
         $ids = $this->service->getAllowedGalleryIds($user);
@@ -74,7 +204,7 @@ class AuthorizationServiceTest extends TestCase
     {
         $group = GalleryGroup::factory()->create();
         $gallery = Gallery::factory()->create(['gallery_group_id' => $group->id]);
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->galleryGroups()->attach($group);
 
         $ids = $this->service->getAllowedGalleryIds($user);
@@ -87,7 +217,7 @@ class AuthorizationServiceTest extends TestCase
         $parent = GalleryGroup::factory()->create();
         $child = GalleryGroup::factory()->create(['parent_id' => $parent->id]);
         $gallery = Gallery::factory()->create(['gallery_group_id' => $child->id]);
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->galleryGroups()->attach($parent);
 
         $ids = $this->service->getAllowedGalleryIds($user);
@@ -104,7 +234,7 @@ class AuthorizationServiceTest extends TestCase
         $org = Org::factory()->create();
         $gallery = Gallery::factory()->create(['type' => 'delivery']);
         $gallery->orgs()->attach($org->id);
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->org_id = $org->id;
         $user->save();
 
@@ -119,7 +249,7 @@ class AuthorizationServiceTest extends TestCase
         $group = GalleryGroup::factory()->create();
         $group->orgs()->attach($org->id);
         $gallery = Gallery::factory()->create(['gallery_group_id' => $group->id, 'type' => 'delivery']);
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->org_id = $org->id;
         $user->save();
 
@@ -134,9 +264,10 @@ class AuthorizationServiceTest extends TestCase
 
     private function createPhotographer(): User
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $role = Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]);
         $user->roles()->attach($role);
+
         return $user;
     }
 
@@ -289,12 +420,16 @@ class AuthorizationServiceTest extends TestCase
     {
         $roleModel = Role::firstOrCreate(['name' => $role->value]);
         $user->roles()->syncWithoutDetaching([$roleModel->id]);
+        if ($role === UserRole::SUPER_ADMIN) {
+            $user->forceFill(['brand' => null])->save();
+        }
+
         return $roleModel;
     }
 
     public function test_has_role_returns_true_when_user_holds_role(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::ADMIN);
 
         $this->assertTrue($this->service->hasRole($user, 'admin'));
@@ -302,7 +437,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_has_role_returns_false_when_user_does_not_hold_role(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::ADMIN);
 
         $this->assertFalse($this->service->hasRole($user, 'photographer'));
@@ -310,7 +445,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_has_role_matches_any_of_multiple_roles(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
 
         $this->assertTrue($this->service->hasRole($user, 'admin', 'photographer'));
@@ -319,7 +454,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_role_names_returns_assigned_role_names(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::ADMIN);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
 
@@ -328,14 +463,14 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_role_names_returns_empty_for_user_without_roles(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
 
         $this->assertSame([], $this->service->roleNames($user));
     }
 
     public function test_is_super_admin_true_when_role_assigned(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::SUPER_ADMIN);
 
         $this->assertTrue($this->service->isSuperAdmin($user));
@@ -343,17 +478,17 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_is_super_admin_false_without_role(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
 
         $this->assertFalse($this->service->isSuperAdmin($user));
     }
 
     public function test_is_admin_true_for_admin_and_super_admin(): void
     {
-        $admin = User::factory()->create();
+        $admin = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($admin, UserRole::ADMIN);
 
-        $superAdmin = User::factory()->create();
+        $superAdmin = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($superAdmin, UserRole::SUPER_ADMIN);
 
         $this->assertTrue($this->service->isAdmin($admin));
@@ -362,7 +497,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_is_admin_false_without_admin_role(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
 
         $this->assertFalse($this->service->isAdmin($user));
@@ -370,7 +505,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_is_photographer_true_when_role_assigned(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
 
         $this->assertTrue($this->service->isPhotographer($user));
@@ -378,7 +513,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_is_photographer_false_without_role(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::ADMIN);
 
         $this->assertFalse($this->service->isPhotographer($user));
@@ -386,7 +521,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_is_power_user_true_when_role_assigned(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::POWER_USER);
 
         $this->assertTrue($this->service->isPowerUser($user));
@@ -394,7 +529,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_is_power_user_false_without_role(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
 
         $this->assertFalse($this->service->isPowerUser($user));
     }
@@ -402,7 +537,7 @@ class AuthorizationServiceTest extends TestCase
     public function test_is_org_admin_true_with_role_and_org(): void
     {
         $org = Org::factory()->create();
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::ORG_ADMIN);
         $user->org_id = $org->id;
         $user->save();
@@ -412,7 +547,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_is_org_admin_false_with_role_but_without_org(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::ORG_ADMIN);
 
         $this->assertFalse($this->service->isOrgAdmin($user));
@@ -421,7 +556,7 @@ class AuthorizationServiceTest extends TestCase
     public function test_is_org_admin_false_with_org_but_without_role(): void
     {
         $org = Org::factory()->create();
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->org_id = $org->id;
         $user->save();
 
@@ -430,14 +565,14 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_is_pending_true_for_plain_user(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
 
         $this->assertTrue($this->service->isPending($user));
     }
 
     public function test_is_pending_false_for_guest(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->guest_id = 'guest-pending';
         $user->transient_galleries = [];
 
@@ -446,7 +581,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_is_pending_false_when_role_assigned(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::CLIENT);
 
         $this->assertFalse($this->service->isPending($user));
@@ -455,7 +590,7 @@ class AuthorizationServiceTest extends TestCase
     public function test_is_pending_false_when_gallery_group_assigned(): void
     {
         $group = GalleryGroup::factory()->create();
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->galleryGroups()->attach($group);
 
         $this->assertFalse($this->service->isPending($user));
@@ -464,7 +599,7 @@ class AuthorizationServiceTest extends TestCase
     public function test_is_pending_false_when_gallery_assigned(): void
     {
         $gallery = Gallery::factory()->create();
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->galleries()->attach($gallery);
 
         $this->assertFalse($this->service->isPending($user));
@@ -476,7 +611,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_access_gallery_super_admin_true_for_any_gallery(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::SUPER_ADMIN);
         $gallery = Gallery::factory()->create();
 
@@ -485,7 +620,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_access_gallery_super_admin_true_for_nonexistent_gallery(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::SUPER_ADMIN);
 
         $this->assertTrue($this->service->canAccessGallery($user, 'nonexistent-gallery-id'));
@@ -493,7 +628,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_access_gallery_photographer_with_unrestricted_gallery_true(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
         $gallery = Gallery::factory()->create();
 
@@ -502,7 +637,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_access_gallery_photographer_restricted_without_right_false(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
         $gallery = Gallery::factory()->create(['restricted_photographers' => true]);
 
@@ -511,7 +646,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_access_gallery_user_with_direct_right_true(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $gallery = Gallery::factory()->create();
         $user->galleries()->attach($gallery->id);
 
@@ -520,7 +655,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_access_gallery_user_without_right_false(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $gallery = Gallery::factory()->create();
 
         $this->assertFalse($this->service->canAccessGallery($user, $gallery->id));
@@ -532,7 +667,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_photographer_access_gallery_super_admin_true(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::SUPER_ADMIN);
         $gallery = Gallery::factory()->create(['restricted_photographers' => true]);
 
@@ -541,7 +676,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_photographer_access_gallery_non_photographer_false(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::ADMIN);
         $gallery = Gallery::factory()->create();
 
@@ -550,7 +685,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_photographer_access_gallery_unrestricted_true(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
         $gallery = Gallery::factory()->create(['restricted_photographers' => false]);
 
@@ -559,7 +694,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_photographer_access_gallery_restricted_without_assignment_false(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
         $gallery = Gallery::factory()->create(['restricted_photographers' => true]);
 
@@ -568,7 +703,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_photographer_access_gallery_restricted_with_direct_assignment_true(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
         $gallery = Gallery::factory()->create(['restricted_photographers' => true]);
         $user->photographerGalleries()->attach($gallery->id);
@@ -578,7 +713,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_photographer_access_gallery_restricted_via_group_true(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
         $group = GalleryGroup::factory()->create();
         $gallery = Gallery::factory()->create([
@@ -596,7 +731,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_manage_gallery_super_admin_true(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::SUPER_ADMIN);
         $gallery = Gallery::factory()->create();
 
@@ -605,7 +740,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_manage_gallery_admin_true(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::ADMIN);
         $gallery = Gallery::factory()->create();
 
@@ -614,7 +749,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_manage_gallery_photographer_unrestricted_true(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
         $gallery = Gallery::factory()->create();
 
@@ -623,7 +758,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_manage_gallery_photographer_restricted_without_right_false(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $this->assignRole($user, UserRole::PHOTOGRAPHER);
         $gallery = Gallery::factory()->create(['restricted_photographers' => true]);
 
@@ -632,7 +767,7 @@ class AuthorizationServiceTest extends TestCase
 
     public function test_can_manage_gallery_plain_user_false(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $gallery = Gallery::factory()->create();
 
         $this->assertFalse($this->service->canManageGallery($user, $gallery->id));

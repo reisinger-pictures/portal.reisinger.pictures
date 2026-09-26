@@ -13,7 +13,7 @@ import {
     safeParseFloat, safeParseInt
 } from '../../../logic/shootingCalculator';
 
-const calculatorSettingsSchema = z.object({
+const createCalculatorSettingsSchema = () => z.object({
     calc_base_price: z.number().min(0, t`Muss positiv sein`),
     calc_hourly_rate: z.number().min(0, t`Muss positiv sein`),
     calc_images_per_hour: z.number().int(t`Muss eine ganze Zahl sein`).min(1, t`Mindestens 1 Bild`),
@@ -25,7 +25,7 @@ const calculatorSettingsSchema = z.object({
     srp_extra_image_fee: z.number().min(0, t`Muss positiv sein`)
 });
 
-type CalculatorSettingsFormValues = z.infer<typeof calculatorSettingsSchema>;
+type CalculatorSettingsFormValues = z.infer<ReturnType<typeof createCalculatorSettingsSchema>>;
 
 function mapApiToForm(terms: { [key: string]: string | undefined }): CalculatorSettingsFormValues {
     const flatrateMultiplier = safeParseFloat(terms.calc_flatrate_multiplier, parseFloat(DEFAULT_FLATRATE_MULTIPLIER));
@@ -60,6 +60,7 @@ export default function CalculatorSettingsCard() {
     "use no memo";
     const {terms, updateTerms} = useLicenseTerms();
     const {showToast} = useUI();
+    const calculatorSettingsSchema = createCalculatorSettingsSchema();
 
     const {register, handleSubmit, reset, formState: {isSubmitting}} = useForm<CalculatorSettingsFormValues>({
         resolver: zodResolver(calculatorSettingsSchema),

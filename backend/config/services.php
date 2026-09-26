@@ -42,6 +42,15 @@ return [
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
     ],
 
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY'),
+        'secret' => env('TURNSTILE_SECRET'),
+        'allowed_hostnames' => env('TURNSTILE_ALLOWED_HOSTNAMES', ''),
+        // Only the CI fixture may opt into the exact official Cloudflare
+        // dummy-key response. Production keeps this false.
+        'allow_dummy_test_keys' => filter_var(env('TURNSTILE_ALLOW_DUMMY_TEST_KEYS', false), FILTER_VALIDATE_BOOL),
+    ],
+
     'ai' => [
         'enabled' => env('AI_ENABLED', false),
         'type' => env('AI_TYPE', 'openai'),

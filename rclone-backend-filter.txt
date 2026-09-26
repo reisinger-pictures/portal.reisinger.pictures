@@ -1,14 +1,11 @@
-# 🛑 Lokale Caches, Logs, Tests und Vendor nicht synchronisieren
+# 🛑 Lokale Caches, Logs, Tests, Vendor und Env-Dateien nicht synchronisieren
+# Runtime-Konfiguration kommt vom Host; .env.ci/.env.e2e/.env.testing dürfen
+# niemals durch einen destruktiven Backend-Sync auf Produktion landen.
 - .env
-- .env.testing
-- .env.backup
-- .env.local
+- .env.*
 - vendor/**
 - node_modules/**
 - tests/**
-- .env
-- .env.local
-- .env.testing
 - .phpunit.cache/**
 - storage/logs/**
 - storage/framework/cache/data/**
@@ -16,12 +13,18 @@
 - storage/framework/testing/**
 - storage/framework/views/**
 - storage/app/public/**
-- storage/app/private/temp/**
-- storage/app/private/watermark*
+# Runtime-private storage is deployment-owned, not code-owned. Exclude the
+# complete tree so source-only secrets are not uploaded and destination-only
+# private files (including model age proofs) are not deleted.
+- /storage/app/private/stripe_secret.txt
+- /storage/app/private/
+- /storage/app/private/**
 - out/**
 - bootstrap/cache/**
 - core
 - core/**
 # 🛑 Lokale SQLite-Datenbanken (Dev/E2E) nicht synchronisieren
+# The rooted rule is required because **/ does not match top-level files.
+- /*.sqlite*
 - **/*.sqlite*
 + **

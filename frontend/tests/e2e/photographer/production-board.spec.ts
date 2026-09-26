@@ -5,14 +5,14 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
 import { KanbanHelper } from '../helpers/KanbanHelper';
 
 test.describe('Bildbearbeitungs-Board (Photographer)', () => {
-    // Drag & Drop / Status-Select verändern das Board live; die Tests teilen sich
+    // Status-Select-Transitions verändern das Board live; die Tests teilen sich
     // dieselbe Spalte. `fullyParallel: true` (playwright.config) würde die Tests
-    // dieser Datei parallel ausführen -> Layout-Shift / verschobene Drop-Ziele.
+    // dieser Datei parallel ausführen -> konkurrierende Board-Mutationen.
     // Datei seriell ausführen (analog projects-board.spec.ts).
     test.describe.configure({ mode: 'serial' });
 
     let helper: E2ESessionHelper;
-    let photographer = { email: '', password: '' };
+    let photographer = { email: '', password: '', id: '' };
 
     test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);
@@ -107,11 +107,65 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
     });
 
-    test('Admin verschiebt einen Auftrag per Drag & Drop', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
-        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
+    test('Photographer kann Bildzahlen und Zuweisung im Auftrag explizit leeren', { tag: ['@regression', '@feature:kanban'] }, async ({ page, request }) => {
+        const title = `Clear Auftrag ${Math.random().toString(36).substring(2, 8)}`;
+        const cookie = await helper.loginAs(photographer.email, photographer.password);
+        const createResponse = await request.post('/api/management/photo-jobs', {
+            data: {
+                title,
+                assignee_id: photographer.id,
+                total_count: 24,
+                selected_count: 12,
+            },
+            headers: { Accept: 'application/json', Cookie: cookie },
+        });
+        expect(createResponse.ok()).toBeTruthy();
+        const { photo_job: photoJob } = await createResponse.json() as { photo_job: { id: string } };
+
+        const { kanban } = await setup(page, photographer);
+        const card = page.locator('main').getByText(title, { exact: false }).first()
+            .locator('xpath=ancestor::div[contains(@class,"card")][1]');
+        await card.getByRole('button', { name: 'Details' }).click();
+
+        const modal = page.locator('main .modal-open');
+        const totalInput = modal.locator('.form-control').filter({ hasText: 'Bilder gesamt' }).locator('input');
+        const selectedInput = modal.locator('.form-control').filter({ hasText: 'Bilder selektiert' }).locator('input');
+        const assigneeSelect = modal.locator('.form-control').filter({ hasText: 'Zuständig' }).locator('select');
+        await expect(totalInput).toHaveValue('24');
+        await expect(selectedInput).toHaveValue('12');
+        await expect(assigneeSelect.locator(`option[value="${photographer.id}"]`)).toHaveCount(1);
+        await expect(assigneeSelect).toHaveValue(photographer.id);
+        await totalInput.fill('');
+        await selectedInput.fill('');
+        await assigneeSelect.selectOption('');
+
+        const responsePromise = page.waitForResponse(response =>
+            response.url().includes(`/api/management/photo-jobs/${photoJob.id}`)
+            && response.request().method() === 'PUT',
+        );
+        await modal.getByRole('button', { name: 'Speichern' }).click();
+        const response = await responsePromise;
+        expect(response.ok()).toBeTruthy();
+        const payload = response.request().postDataJSON() as { total_count: unknown; selected_count: unknown; assignee_id: unknown };
+        expect(payload.total_count).toBe(0);
+        expect(payload.selected_count).toBe(0);
+        expect(payload.assignee_id).toBeNull();
+        await kanban.modalIsClosed();
+
+        await page.reload();
+        const reloadedCard = page.locator('main').getByText(title, { exact: false }).first()
+            .locator('xpath=ancestor::div[contains(@class,"card")][1]');
+        await reloadedCard.getByRole('button', { name: 'Details' }).click();
+        const reloadedModal = page.locator('main .modal-open');
+        await expect(reloadedModal.locator('.form-control').filter({ hasText: 'Bilder gesamt' }).locator('input')).toHaveValue('0');
+        await expect(reloadedModal.locator('.form-control').filter({ hasText: 'Bilder selektiert' }).locator('input')).toHaveValue('0');
+        await expect(reloadedModal.locator('.form-control').filter({ hasText: 'Zuständig' }).locator('select')).toHaveValue('');
+    });
+
+    test('Admin verschiebt einen Auftrag semantisch in die Bearbeitung-Spalte', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin);
-        const title = `Drag Auftrag ${Math.random().toString(36).substring(2, 8)}`;
+        const title = `Status Auftrag ${Math.random().toString(36).substring(2, 8)}`;
 
         await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
@@ -119,13 +173,13 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await kanban.waitForCreate('/api/management/photo-jobs');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
 
-        await kanban.dragCard(title, 'Bearbeitung');
+        await kanban.selectCardStatus(title, 'Bearbeitung');
 
+        await kanban.expectColumn('Bearbeitung');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
     });
 
-    test('Admin verschiebt einen Auftrag in die Abgebrochen-Spalte', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
-        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
+    test('Admin verschiebt einen Auftrag semantisch in die Abgebrochen-Spalte', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin);
         const title = `Abbruch ${Math.random().toString(36).substring(2, 8)}`;
@@ -136,14 +190,13 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await kanban.waitForCreate('/api/management/photo-jobs');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
 
-        await kanban.dragCard(title, 'Abgebrochen');
+        await kanban.selectCardStatus(title, 'Abgebrochen');
 
         await kanban.expectColumn('Abgebrochen');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
     });
 
     test('Admin löscht einen abgebrochenen Auftrag', { tag: ['@regression', '@feature:kanban'] }, async ({ page }) => {
-        test.skip(test.info().project.name === 'Mobile Chrome', 'Drag & Drop ist nur am Desktop verfügbar');
         const superAdmin = await helper.createIsolatedUser('super_admin');
         const { kanban } = await setup(page, superAdmin);
         const title = `Abbruch Del ${Math.random().toString(36).substring(2, 8)}`;
@@ -154,7 +207,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await kanban.waitForCreate('/api/management/photo-jobs');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
 
-        await kanban.dragCard(title, 'Abgebrochen');
+        await kanban.selectCardStatus(title, 'Abgebrochen');
 
         const card = page.locator('main').getByText(title, { exact: false }).first()
             .locator('xpath=ancestor::div[contains(@class,"card")][1]');
@@ -184,6 +237,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
 
         await kanban.selectCardStatus(title, 'Culling');
 
+        await kanban.expectColumn('Culling');
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
     });
 });

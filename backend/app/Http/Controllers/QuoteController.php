@@ -7,12 +7,15 @@ use App\Mail\CustomMail;
 use App\Models\Gallery;
 use App\Models\Order;
 use App\Models\Photo;
+use App\Models\User;
 use App\Services\AuthorizationService;
 use App\Services\ManualInvoiceService;
 use App\Services\QuoteLinkService;
 use App\Support\BrandRegistry;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class QuoteController extends Controller
@@ -25,13 +28,21 @@ class QuoteController extends Controller
     public function sendQuote(SendQuoteRequest $request, $id)
     {
         $user = auth('api')->user();
-        $svc = app(AuthorizationService::class);
+        if (! $user) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
 
-        // Brand isolation (defense in depth): never touch orders of another brand.
+        $currentBrand = BrandRegistry::currentIdOrNull();
+        if ($currentBrand === null) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        }
+
+        // Brand isolation (defense in depth): a quote mutation is only ever
+        // considered for a complete, current-host order.  The relationship
+        // check below is deliberately separate from this lookup: a same-brand
+        // order is not automatically related to the acting photographer.
         $order = Order::with(['user', 'invoiceSnapshot'])
-            ->where(function ($query) {
-                $query->where('brand', BrandRegistry::currentId())->orWhereNull('brand');
-            })
+            ->where('brand', $currentBrand)
             ->findOrFail($id);
 
         // Only an open quote request may be answered. A paid/invoiced order must
@@ -40,73 +51,204 @@ class QuoteController extends Controller
             return response()->json(['error' => 'Nur offene Angebotsanfragen können beantwortet werden.'], 422);
         }
 
-        // Ownership: non-admins may only answer quote requests for galleries they manage.
-        if (! $svc->isAdmin($user)) {
-            $galleryIds = $this->orderGalleryIds($order);
-
-            if ($galleryIds === []) {
-                return response()->json(['error' => 'Keine Berechtigung'], 403);
-            }
-
-            foreach ($galleryIds as $galleryId) {
-                $gallery = Gallery::find($galleryId);
-                if ($gallery === null || Gate::denies('manage', $gallery)) {
-                    return response()->json(['error' => 'Keine Berechtigung'], 403);
-                }
-            }
-        }
-
         // A quote link must always carry a positive amount (see checkout guard).
         if ((int) $request->custom_price < 1) {
             return response()->json(['error' => 'Der Angebotspreis muss größer als 0 sein.'], 422);
         }
 
-        $order->update(['status' => 'cancelled']);
+        // Validate the persisted relationship and the complete item set before
+        // changing the order.  The old implementation generated the link and
+        // cancelled the order without proving that the actor could manage every
+        // referenced gallery, allowing a same-brand but unrelated order to be
+        // superseded.
+        try {
+            $photoIds = $this->authorizeSendQuoteTarget($order, $user);
+            $link = $this->quoteLinkService->generateQuoteLink(
+                $photoIds,
+                (int) $request->custom_price,
+                rightsText: $request->rights_text,
+                issuer: $user,
+            );
+        } catch (AuthorizationException) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        } catch (\InvalidArgumentException) {
+            return response()->json(['error' => 'Die Fotoauswahl ist ungültig oder nicht lieferbar.'], 422);
+        }
 
-        $items = $order->invoiceSnapshot?->customer_details['items'] ?? [];
-        $photoIds = array_column($items, 'photoId');
-
-        $link = $this->quoteLinkService->generateQuoteLink($photoIds, $request->custom_price, rightsText: $request->rights_text);
-
+        $order->refresh();
         $subject = 'Individuelles Angebot';
         $body = '<p>'.nl2br(htmlspecialchars($request->message))."</p><br><p><a href=\"{$link}\">Hier geht es zum Angebot und Checkout</a></p>";
+        $recipient = (string) $order->user->email;
+        $mailable = new CustomMail($subject, $body);
 
-        Mail::to($order->user->email)->send(new CustomMail($subject, $body));
+        try {
+            $claimed = $this->claimPendingQuote($order, $recipient, $mailable);
+        } catch (\Throwable $exception) {
+            Log::warning('quote.mail_dispatch_failed', [
+                'order_id' => (string) $order->getKey(),
+                'exception_class' => $exception::class,
+            ]);
+
+            return response()->json([
+                'error' => 'Das Angebot konnte nicht versendet werden. Bitte versuche es erneut.',
+            ], 503);
+        }
+
+        if (! $claimed) {
+            return response()->json([
+                'error' => 'Das Angebot wurde zwischenzeitlich anderweitig aktualisiert.',
+            ], 409);
+        }
 
         return response()->json(['success' => true]);
     }
 
     /**
-     * Distinct gallery IDs referenced by an order's invoice snapshot.
+     * Atomically claim the pending quote and durably enqueue its mailable.
      *
-     * @return array<string>
+     * The queue insert is part of the same database transaction as the
+     * conditional pending -> cancelled update. A transport or enqueue failure
+     * therefore rolls the claim back, so the request can be retried instead of
+     * leaving a permanently cancelled quote with no delivery intent. The
+     * conditional update remains the correctness boundary on SQLite and other
+     * engines. The order row is the quote intent claim; no invoice-snapshot
+     * marker or second mail dispatcher is needed.
+     *
+     * This is an at-most-one durable enqueue guarantee, not an exactly-once
+     * SMTP guarantee. Queue-worker retries and terminal SMTP recovery remain
+     * separate concerns, consistent with invoice mail dispatch.
      */
-    private function orderGalleryIds(Order $order): array
+    private function claimPendingQuote(Order $order, string $recipient, CustomMail $mailable): bool
     {
-        $items = $order->invoiceSnapshot?->customer_details['items'] ?? [];
-        $photoIds = array_filter(array_column($items, 'photoId'));
+        return DB::transaction(function () use ($order, $recipient, $mailable): bool {
+            $locked = Order::query()
+                ->whereKey($order->getKey())
+                ->lockForUpdate()
+                ->first();
+            if (! $locked instanceof Order
+                || ! $locked->is_quote_request
+                || $locked->status !== 'pending') {
+                return false;
+            }
 
-        if ($photoIds === []) {
-            return [];
+            $claimed = Order::query()
+                ->whereKey($locked->getKey())
+                ->where('is_quote_request', true)
+                ->where('status', 'pending')
+                ->update(['status' => 'cancelled']) === 1;
+            if (! $claimed) {
+                return false;
+            }
+
+            Mail::to($recipient)->queue($mailable);
+
+            return true;
+        });
+    }
+
+    /**
+     * Prove that the quote request is a valid current-host target and that the
+     * acting management user is authorized to manage every gallery in its
+     * persisted snapshot.  This is intentionally stricter than a brand check:
+     * a photographer must not be able to cancel another photographer's quote
+     * merely because both orders carry the same brand.
+     *
+     * @return array<int, string>
+     */
+    private function authorizeSendQuoteTarget(Order $order, User $user): array
+    {
+        $currentBrand = BrandRegistry::currentIdOrNull();
+        if ($currentBrand === null
+            || ! BrandRegistry::resourceMatchesCurrent($order->brand)
+            || ! BrandRegistry::resourceMatchesCurrent($order->invoiceSnapshot?->brand)) {
+            throw new AuthorizationException('Keine Berechtigung');
         }
 
-        return Photo::whereIn('id', $photoIds)
-            ->pluck('gallery_id')
-            ->unique()
-            ->values()
-            ->all();
+        if (! $order->user) {
+            throw new \InvalidArgumentException('Die Bestellung hat keinen gültigen Kunden.');
+        }
+
+        $customerDetails = $order->invoiceSnapshot?->customer_details;
+        $items = is_array($customerDetails) && is_array($customerDetails['items'] ?? null)
+            ? $customerDetails['items']
+            : [];
+        if (! is_array($items) || $items === [] || count($items) > QuoteLinkService::MAX_PHOTOS) {
+            throw new \InvalidArgumentException('Die Fotoauswahl ist ungültig.');
+        }
+
+        $photoIds = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                throw new \InvalidArgumentException('Die Fotoauswahl ist ungültig.');
+            }
+
+            $photoId = $item['photoId'] ?? null;
+            if (! is_string($photoId) || trim($photoId) === '' || strlen(trim($photoId)) > 255) {
+                throw new \InvalidArgumentException('Die Fotoauswahl ist ungültig.');
+            }
+
+            $photoIds[] = trim($photoId);
+        }
+
+        if (count(array_unique($photoIds)) !== count($photoIds)) {
+            throw new \InvalidArgumentException('Die Fotoauswahl ist ungültig.');
+        }
+
+        $photos = Photo::with('gallery')
+            ->whereIn('id', $photoIds)
+            ->get()
+            ->keyBy(fn (Photo $photo): string => (string) $photo->getKey());
+        if ($photos->count() !== count($photoIds)) {
+            throw new \InvalidArgumentException('Die Fotoauswahl ist ungültig.');
+        }
+
+        $authorization = app(AuthorizationService::class);
+        foreach ($photoIds as $photoId) {
+            $photo = $photos->get($photoId);
+            $gallery = $photo?->gallery;
+            if (! $photo instanceof Photo || ! $gallery instanceof Gallery) {
+                throw new \InvalidArgumentException('Die Fotoauswahl ist ungültig.');
+            }
+            if (! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
+                throw new AuthorizationException('Keine Berechtigung');
+            }
+            if ($gallery->type !== 'delivery') {
+                throw new \InvalidArgumentException('Auswahl-Galerien können nicht angeboten werden.');
+            }
+            if (! $authorization->canManageGallery($user, (string) $gallery->getKey())) {
+                throw new AuthorizationException('Keine Berechtigung');
+            }
+        }
+
+        return $photoIds;
     }
 
     public function generateQuoteLink(Request $request)
     {
-        $svc = app(AuthorizationService::class);
         $user = auth('api')->user();
-        if (! $svc->isAdmin($user) && ! $svc->isPhotographer($user)) {
+        if (! $user) {
             return response()->json(['error' => 'Keine Berechtigung'], 403);
         }
-        $request->validate(['photo_ids' => 'required|array', 'custom_price' => 'required|integer|min:1', 'rights_text' => 'nullable|string|max:2000']);
 
-        $link = $this->quoteLinkService->generateQuoteLink($request->photo_ids, $request->custom_price, rightsText: $request->rights_text);
+        $request->validate([
+            'photo_ids' => ['required', 'array', 'min:1', 'max:'.QuoteLinkService::MAX_PHOTOS],
+            'photo_ids.*' => ['string', 'distinct'],
+            'custom_price' => ['required', 'integer', 'min:1'],
+            'rights_text' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $link = $this->quoteLinkService->generateQuoteLink(
+                $request->input('photo_ids', []),
+                (int) $request->input('custom_price'),
+                rightsText: $request->input('rights_text'),
+                issuer: $user,
+            );
+        } catch (AuthorizationException) {
+            return response()->json(['error' => 'Keine Berechtigung'], 403);
+        } catch (\InvalidArgumentException) {
+            return response()->json(['error' => 'Die Fotoauswahl ist ungültig oder nicht lieferbar.'], 422);
+        }
 
         return response()->json(['success' => true, 'link' => $link]);
     }

@@ -1,5 +1,5 @@
 import { Trans } from "@lingui/react/macro";
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { BreadcrumbItem } from '../../api';
 
 export interface GalleryHeaderInfo {
@@ -29,7 +29,7 @@ export default function GalleryHeader({ gallery, breadcrumbs, canManage }: Galle
                     {canManage && <li><a onClick={() => navigate('/galleries')}><Trans>Galerien</Trans></a></li>}
                     {breadcrumbs?.map((bc, idx) => (
                         <li key={idx}>
-                            {canManage ? <a onClick={() => navigate('/' + bc.full_path)} className="opacity-80 hover:opacity-100">{bc.name}</a> : <span>{bc.name}</span>}
+                            {canManage ? <Link to={'/' + bc.full_path} className="opacity-80 hover:opacity-100">{bc.name}</Link> : <span>{bc.name}</span>}
                         </li>
                     ))}
                     {/* Das <span> kapselt die Limitierung, damit das <li> sein Slash-Trennzeichen von DaisyUI behält */}

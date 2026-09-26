@@ -37,8 +37,8 @@ export default function WatermarkSettingsCard() {
         if (watermark) reset({ opacity: watermark.opacity || 0.15 });
     }, [watermark, reset]);
 
-    // Initial data load: fetch the brand SVG blob once and render the initial preview.
-    // Preview updates on opacity-change are driven by the slider's onChange handler below.
+    // This is a public static brand asset, not a portal API request; it has no
+    // session to refresh. Preview updates are driven by the slider handler.
     useEffect(() => {
         let isActive = true;
         fetch(svgUrl)
