@@ -41,6 +41,142 @@
 
 > Ziel: alle **actionable** TODOs in Abhängigkeitsreihenfolge abarbeiten. Historische `[x]`-Einträge werden nicht automatisch neu geprüft; stale/duplicate Findings werden durch einen aktuellen Reproduktionstest geschlossen oder als offen markiert. Der aktuelle Working Tree ist dirty; kein Checkbox-Status und kein Diff allein gilt als Verifikationsnachweis.
 
+### 🆕 Validierung der Remediations-Welle `e5d20f0..2bfaed8` — 7 DeepSeek-v4.1-Reviewer
+
+> **Methode:** 7 unabhängige read-only DeepSeek-v4.1-Reviewer über die gesamte Welle (664 Dateien, ~76k Zeilen). Ergebnis: **65 Befunde, 0× P0, 9× P1, 56× P2.** Authorization/Brand/Gallery-Tree/Media-Delivery als **READY** beurteilt (0 P0/P1; 6 Verdachtsmomente aktiv verworfen). Umsetzung in 5 nicht-überlappenden Workstreams, je mit separatem Verifier.
+
+#### E2E — lokal gefunden, behoben und verifiziert
+
+- [x] **E2E-1 (P1, 19 Fehlschläge):** `SidebarHelper.navigateTo()` wartete unbedingt auf den `Menü öffnen`-Trigger, der `md:hidden` und damit ab dem `md`-Breakpoint **nicht im Accessibility-Tree** ist → auf Desktop 0 Treffer, jeder Aufrufer verbrannte sein 10s-Budget. **Upstream-Fix `551bf31`** (Warte auf das `<aside>`-Landmark, das auf jedem Viewport montiert ist und mobil nur aus dem Viewport verschoben wird). Mein lokal gleichzeitiger Fix (Sentinel `data-testid="app-loader" aus `ProtectedRoute`) wurde zugunsten der Upstream-Variante **verworfen** — sie begründet die Landmark-Wahl vollständiger und recycelt den Shell-Locator. Messung mit meiner Variante: `@smoke` **20 failed/38 passed → 62/62 passed**, Model-Suites **28/28**. Für die Upstream-Variante ist dieser Nachweis **noch zu erbringen** (Commit `551bf31` sagt ausdrücklich „E2E run NOT executed").
+- [x] **E2E-2 (P1, 7 Stellen / 3 Dateien):** `getByLabel('Suche')` war Strict-Mode-Violation über 3 Elemente (Header-Suche, deren Submit-Button, Models-Filter `#model-filter-q`). `main` löst es **nicht** auf, weil `main` den Sticky-Header mit einschließt. Fix: `#model-filter-q` (der `id`, auf den `<label htmlFor>` zeigt). Betroffen: `model-contact-sheet.spec.ts`, `model-access.spec.ts`, `model-delete.spec.ts` (4×).
+- [x] **E2E-3 (P1, 2 Stellen):** `getByRole('button', {name: 'Schließen'})` matchte auf Mobile zusätzlich `Menü schließen` (Sidebar, `md:hidden`) als Teilstring → Strict-Mode-Violation nur auf Mobile. Fix: etabliertes Repo-Muster `.modal-box` + `exact: true` (wie `model-delete.spec.ts:80`, `model-filters.spec.ts:82`).
+- [x] **E2E-4 (P1, Vacuous-Test):** `SidebarHelper.test.ts` mockte `toBeAttached` auf `appReady = true` — der Unit-Test konnte den Bug prinzipiell nicht sehen. Upstream `551bf31` ersetzt den Test durch 4 Assertions, davon 3 gegen den Pre-Fix-Helper rot.
+- [x] **CI-Ursache isoliert (in `1b3448d` dokumentiert):** GHCR-Pakete waren `private`, CI zieht bewusst anonym (`ci.yml:17-25`, Least Privilege) — **kein E2E-Test war defekt**, alle 6 E2E-Jobs starben in `Initialize containers`. Sichtbarkeit am 2026-09-25 vom Owner auf `public` gesetzt; anonymer Pull liefert für beide Pins **HTTP 200** bei unveränderten Digests.
+
+#### P1
+
+- [x] **CTR-1 — KEIN Befund (User-Entscheid 2026-09-25):** Super-Admin darf cross-brand arbeiten; gewollt. Nicht umsetzen.
+- [x] **AIS-1 — KEIN Befund (User-Entscheid 2026-09-25):** „Alles mit Abzug der Payment-Gebühren wird verteilt" ist das gewollte Verteilungsmodell. Nicht umsetzen.
+- [ ] **INFRA-2:** `ci.yml` E2E-`container:` ohne `options: --user root`, `Dockerfile.e2e` endet auf `USER www-data` (uid 1000) → Checkout/`pnpm install` schreiben in einen uid-1000-fremden Host-Mount → EACCES. Nie gelaufen, weil CI am Pull starb. **CI-blockierend.**
+- [x] **CTR-2 — umgesetzt + verifiziert (2026-09-25):** `ContractController::normalizeWriteSnapshot()` (`:279-285`) prüft den Reorder-Guard jetzt für **alle** Vertragstypen, nicht nur Templates, und schließt fail-closed mit 422 („Die Reihenfolge der Legacy-Preispositionen kann nicht verlustfrei erhalten werden"). Zusätzlich: ein Partial-Update ohne `items`/`discounts` schreibt den Legacy-Snapshot nicht mehr blind um (`:261-271`), preflightet aber weiterhin das bestehende Total.
+- [x] **CTR-3 — umgesetzt + verifiziert (2026-09-25):** `ContractCloseService.php:146-148` — die Bedingung `&& $billingDetails !== []` ist **entfernt**. Ein `total_gross > 0` erzeugt jetzt immer Order + Invoice; fehlender Empfänger führt laut Kommentar zu einer Rechnung ohne Kunden-Mail statt zu *gar keiner* Rechnung. Entspricht dem SOLL-Trigger `features/ecommerce/10-digital-contracts.md:103`.
+- [x] **PAY-1 — umgesetzt + verifiziert (2026-09-25):** Neuer `app/Services/DisputeMailDispatcher.php` mit `queueOnce($order)`. `WebhookController:145-151` nutzt ihn; der Status-Übergang ist **nicht** mehr der Mail-Idempotency-Key, der durable Snapshot-Claim übernimmt at-most-once nach erfolgreicher Enqueue.
+- [ ] **FE-1:** `useVolumeLicensing.ts:467-471,544-551` fällt auf Brand-Terms zurück, wenn Galerie-Terms nicht im Cache sind; `PhotoDetailView` gatet nur auf `useLicensingMode` (kein `isLoading`) → falsche License-Map wird angezeigt **und** `VolumeLicensingCard` erlaubt Add-to-Cart mit `pricePerItemCents === 0` bzw. zu niedrigem Total (Server schlägt später, Anzeige weicht ab). `isLoading` exponieren, Add-Button+Preis sperren, kein Fallback auf globale Terms.
+- [ ] **DOC-1:** `AGENTS.md:91` + `backend/AGENTS.md:26` sind **inhaltlich falsch und zu restriktiv**. Korrekt laut User: **Produktion hat V035; alles darüber (V036–V040) ist konsolidierbar.** Die Doku behauptet „V036–V038 Frontier, V039+ nur bei unvermeidbarem Bedarf" und erfindet ein Verbot. Fix: V035 = last deployed, V036–V040 = nicht-produktive Frontier, konsolidierbar (V039-Signer-Identität und V040-Payout-Natural-Keys inhaltlich erhalten), neue Migration nur wenn Konsolidation technisch nicht geht. **Keine** nicht-vom-User-stammende Restriktion erfinden.
+- [ ] **INFRA-Bash (neu):** `verify-image-nonroot.sh:152` und `ci-security-contract.sh` nutzen `mapfile` (Bash 4+). Unter macOS-Bash 3.2 brechen sie mit `mapfile: command not found` ab, **statt zu prüfen** — das Security-Gate läuft lokal nicht. Versions-Guard oder `while read`.
+
+#### P2 (Details je Workstream)
+
+<details><summary>INFRA (10)</summary>
+
+- [ ] **INFRA-3:** `verify-image-nonroot.sh` prüft nur `portal-base`; `portal-e2e`-Digest ohne Gate/Existenzprüfung, obwohl das Image CI-Secrets bekommt. Beide Pins prüfen.
+- [ ] **INFRA-4:** `V036:9-31` ohne `hasColumn`/`hasIndex`-Guards, obwohl MariaDB-DDL auto-committet → Teilfehler unrecoverbar. V037–V040 sind guarded.
+- [ ] **INFRA-5:** `APP_DEBUG` nirgends validiert; `APP_DEBUG=true` passiert das komplette Production-Preflight → Stacktraces/Env-Leaks.
+- [ ] **INFRA-6:** `admin.lrplugin/tests/run.sh:6-23` fail-open: ohne `python3` **und** `lua` exit 0 bei **null** Checks. `checks_run`-Zähler.
+- [ ] **INFRA-7:** `Api.lua:341-363` setzt `session.expired = true` auch bei transientem Refresh-Fehler → ein Netzwackler killt die Session dauerhaft. Nur bei 401/403.
+- [ ] **INFRA-8:** `V038:108-110` **löscht** Duplicate-Ratings (V039/V040 fail-closed) → irreversibel, `down()` leer. Fail-closed + Report.
+- [ ] **INFRA-9:** `automerge.yml:119` interpoliert `${{ github.event.pull_request.number }}` direkt in `run:` (heute Integer, also nicht ausnutzbar) → über `env:` leiten.
+- [ ] **INFRA-10:** Image-Workflows publizieren mutable Tags, kein Job aktualisiert die Consumer-Digests, kein Freshness-Gate → Security-Fixes erreichen CI/Prod nicht. `verify-image-nonroot` prüft den alten Pin. Pin-Bump-PR/Freshness-Assertion + `provenance`/`sbom`.
+- [ ] **INFRA-11:** `ci-security-contract.sh:97-99,348-359` Vakuum-Lücken (`permissions: write-all` nicht erkannt, `contents: read` nur als Substring, Artifact-Guard nur exakt-ein-Space unquoted).
+- [ ] **INFRA-12:** `Api.lua:102-113` / `ManagerCore.lua:55-64` — bei Keychain-Fehler bleibt das Klartext-Passwort dauerhaft in `LrPrefs` und wird nie mehr nachgeräumt.
+
+</details>
+
+<details><summary>AI/Media/Storage/Payouts (8)</summary>
+
+- [ ] **AIS-2:** `DeletePhotoFilesJob.php:55-71` + `CleanupDerivatives.php:36-39` löschen die neuen `.watermark.json`-Marker nicht mit → 2+ Marker pro Foto-Delete dauerhaft.
+- [ ] **AIS-3:** Beide AI-POST-Routen nur `throttle:api` (120/min) → 120 kostenpflichtige Analysen/min + ~160 MB GD. `throttle:ai-generate`.
+- [ ] **AIS-4:** `ImageProcessor.php:146-177` `generateThumbnail()` ohne `removeFailedOutput`/`isValidImageFile`/`imagecreatetruecolor`-Check → uncaught `TypeError`, Teil-`.webp` bleibt.
+- [ ] **AIS-5:** `DurableDispatchService.php:85-121` — Model-Files und Customer-Search nutzen `afterCommit` statt `afterCommitDurably` → Crash zwischen COMMIT und Callback lässt DSGVO-Dateien/Meilisearch-Dokument zurück.
+- [ ] **AIS-6:** `UuidDatabaseFailedJobProvider.php:28-32` wirft bei Payload ohne UUID → Job nie in `failed_jobs`, blockiert endlos. `Str::uuid7()`-Fallback.
+- [ ] **AIS-7:** `ImageProcessor.php:539-545,613-619` unterdrückt `@unlink` ohne Verifikation/Log.
+- [ ] **AIS-8:** `AIService.php:300,318,422-424` AI-Tempfiles in `sys_get_temp_dir()`; `app:cleanup-temp` fegt nur `storage/app/private/temp`.
+- [ ] **AIS-9:** `ImportLocations.php:202` kompletter Body im Memory, `:329-345` Extraction vor Größen-Check. Streamen mit Byte-Cap.
+
+</details>
+
+<details><summary>Contracts/Pricing (6)</summary>
+
+- [x] **CTR-4:** `ContractSigner::$hidden = ['personal_token']` (`:37-39`) — die Management-API liefert keine Signier-Credentials mehr, während der Join-Flow sie weiterhin nie herausgibt.
+- [x] **CTR-5:** `ContractController.php:113` kapselt Content-Update **und** `content_version`-Increment in `DB::transaction` — ein `sign()` kann nicht mehr neuen Content mit alter Version sehen.
+- [x] **CTR-6:** `config/queue.php` auf `after_commit => true` für die transaktionale Datenbank-Queue; Close-Mail wird erst nach Commit dispatcht.
+- [x] **CTR-7:** Join-Flow gibt den `personal_token` nicht mehr ungeprüft zurück; Verhalten ist entschieden und dokumentiert.
+- [x] **CTR-8:** `pdf/fragments/items_table.blade.php` castet Legacy-`qty` nicht mehr blind mit `(int)`; der Fallback nutzt den geprüften Service-Pfad bzw. schließt fail-closed.
+- [x] **CTR-9:** `PersistedMoney::assertNonNegativeCents()` neu (`:87`); `Order::saving` (`:104-110`) prüft jetzt `total_amount` **sowie** `coupon_discount_cents` und `stripe_fee_cents`.
+
+</details>
+
+<details><summary>Frontend (7)</summary>
+
+- [ ] **FE-2:** `ClientCartView.tsx:570,631` + `StripeCheckoutForm.tsx:130` — neue Strings ohne Lingui (`check-i18n` prüft nur bereits extrahierte msgids, Build bleibt grün).
+- [ ] **FE-3:** `UploadDropzone.tsx:29-41` verschluckt HTTP-Fehler still; bei allen Fehlschlägen weder Toast noch `onUploadComplete()`. `failureCount`.
+- [ ] **FE-4:** `cartLogic.ts:36-44,118-156` persistiert den signierten `quoteToken` in `localStorage` statt `sessionStorage` — verbreitertes XSS-Fenster.
+- [ ] **FE-5:** `ImageHelper.ts:1-12` + `api.ts:341` — `apiDownload` setzt fest `Accept: application/pdf`, wird für JPEG/PNG (KI-Analyse) genutzt.
+- [ ] **FE-6:** `ClientNotificationsView.tsx:30-38` mutiert den SWR-Cache flach.
+- [ ] **FE-7:** `ModelDetailModal.tsx:350,385` `target="_blank"` ohne `rel="noopener noreferrer"`.
+- [ ] **FE-8:** 6 Modals ohne Focus-Trap/ARIA/Escape (nutzen `ModalDialogShell` nicht).
+
+</details>
+
+<details><summary>Checkout/Payments (5)</summary>
+
+- [x] **PAY-2:** `WebhookController.php:73-76` — der Datei-Fallback auf `storage/app/private/stripe_secret.txt` ist auf `local`/`testing` begrenzt; in Production bleibt ein leeres Secret ein harter 400.
+- [x] **PAY-3:** `StripePaymentService::createPaymentIntent()` bricht ab, wenn `$amountCents !== (int) $order->total_amount`, **vor** dem Stripe-Call. Regression `amount mismatch fails closed before calling stripe` grün.
+- [x] **PAY-4:** `InvoiceMailDispatcher` erzwingt die transaktionale Datenbank-Queue auch außerhalb von `production`, statt den at-most-once-Vertrag stillschweigend zu schwächen.
+- [x] **PAY-5:** `WebhookController` — Dispute- **und** Refund-Handler sind jetzt in `withWebhookEventClaim(...)` gewrappt (6 Aufrufe statt 2).
+- [x] **PAY-6:** Die geteilte-Cache-Anforderung ist in der Production-Operations-Policy als Invariante verankert.
+
+</details>
+
+<details><summary>Authorization/Brand (5, alle P2 — Bereich READY)</summary>
+
+- [ ] **AUTH-1:** `GalleryService.php:106-119,197-200` — `resolveAuthoritativeGroupBrand()` prüft **nicht** Manage-Recht auf der Zielgruppe → jeder same-brand Photographer kann in die Gruppe eines anderen hängen und deren `is_public`-Policy erben (`:253-258`).
+- [ ] **AUTH-2:** `AuthorizationService.php:413-475` — registrierte User vertrauen `transient_invites.gallery_ids` aus dem JWT ohne Abgleich mit dem Live-Invite (Gast-Pfad `:357-405` ist strikt). Latent fail-open.
+- [ ] **AUTH-3:** `FileDeliveryController.php:33,50,66` — `size` nur `^_thumbs/(\d+)/`, `Photo::DERIVATIVE_SIZES` nie angewandt → beliebige Verzeichnisse/unwatermarked Full-Size-Intermediate.
+- [ ] **AUTH-4:** `User.php:55` `stripe_customer_id` in `$fillable` ohne Notwendigkeit (alle Writer nutzen `forceFill`).
+- [ ] **AUTH-5:** Breadcrumb-`while`-Loops (`GalleryFrontendController.php:93-102`, `SearchController.php:245-254`, `MailController.php:35-40`) ohne Visited-Set; `MediaVisibilityService.php:109-124`/`BrandRegistry.php:158-176` ohne Depth-Cap.
+
+</details>
+
+<details><summary>Tests/Dokumentation (15)</summary>
+
+- [ ] **DOC-2:** `features/tech/01-database-schema.md:11` nennt V038 als Frontier; V039/V040 fehlen.
+- [ ] **DOC-3:** 6 weitere `features/**` behaupten „V038 = Frontier, neu ab V039": `features/README.md:62`, `b2b/11-kanban-board.md:58-59`, `infrastructure/21-brand-config-driven.md:18-20`, `tech/07-architectural-decisions.md:8`, `security/card-testing-protection.md:14-15,60` (sogar „no V039 migration" bei :106/:627), `ecommerce/08-srp-coupon-system.md:123`.
+- [ ] **DOC-4:** `CR-DATA-018`/`CR-BE-018` gleichzeitig „verified/done" (`:71`,`:128`) und „offen" (`:330-334`); `:332` behauptet, es gebe keine Migration, obwohl V039 existiert.
+- [ ] **DOC-5:** `CR-CRM-008` „verifier abgeschlossen" (`:69`,`:125`) vs. „implementation in progress" (`:405`).
+- [ ] **DOC-6:** `P2-T2` „waitForTimeout + Drag-Retries = flaky" (`:594`), obwohl `grep` in `KanbanHelper.ts` nichts findet.
+- [ ] **DOC-7:** „Gesamt-Build bleibt wegen `ManagementMetaGalleryView.test.tsx:372` blockiert" widerspricht dem korrigierten/grünen Status.
+- [ ] **DOC-8:** P0-A13/P0-B7 unter „bereits gefixt/stale" gruppiert, während andere Einträge sie explizit als **nicht** gefixt führen → Security-Findings könnten verschwinden.
+- [ ] **DOC-9:** `features/e2e-test-strategy.md:135` pinnte `ghcr.io/reisi007/portal-e2e`; in `551bf31` mitgeändert — prüfen.
+- [ ] **DOC-10:** `features/ecommerce/10-digital-contracts.md:193` referenziert `src/logic/__tests__/useContractManagement.test.ts` — existiert nicht.
+- [ ] **DOC-11:** `CR-DOC-001` behauptet, die Modul-Doku sei „auf V038" korrigiert — selbst der stale Claim.
+- [ ] **DOC-12:** `P1-M15` (Brand-Invariante) steht auf offen, obwohl `2bfaed8` es mit 894-Zeilen-Test umsetzt.
+- [ ] **TST-1:** `useContractManagement.ts:71` `normalizeManagementContract()` (Server-Total/Legacy-Fallback, money-facing) hat **keinen** Vitest.
+- [ ] **TST-2:** `tests/infrastructure/rclone-sync-regression.sh` (413 Zeilen) wird nirgends ausgeführt, wird aber als `[x]` geführt. In den `security-contract`-Job hängen.
+- [ ] **TST-3:** `ContractSignerIdentityRaceTest.php:26,30` + `ContractSignerIdentityTest.php:217,223` sind driver-gated und laufen auf CI-SQLite `:memory:` immer skipped → V039-Uniqueness-Invariante ohne automatisierten Nachweis.
+- [ ] **TST-4:** `PhotoDownloadControllerTest.php:288-293,145-150` — `photo_count`-Tests haben ordered == prepared und laufen mit **alter und neuer** Logik; nur der Null-Fall diskriminiert. Fall `0 < prepared < ordered` fehlt.
+
+</details>
+
+### ✅ Finaler unabhängiger Review (DeepSeek-v4.1, 2026-09-26) — Blocker behoben
+
+> Review von `git diff 1b3448d` (gesamtes Changeset, 120 Dateien). Urteil: **NOT_READY** wegen 1× P1. Nach Behebung: **READY_TO_COMMIT**. Der Reviewer verifizierte 15 Fixes als korrekt (PAY-1-Kernlogik, CTR-2/3/5/9, PAY-3, AUTH-1, AIS-2, AIS-5, INFRA-2, FE-4, V036-Idempotenz, AUTH-3/5, APP_DEBUG-Policy, `ContractSigner::$hidden`, `stripe_customer_id`).
+
+- [x] **FINAL-1 (P1, BLOCKER — behoben):** `backend/config/queue.php:54` war von `after_commit => false` auf `true` umgestellt worden, mit einem Kommentar, der die falsche Richtung begründete. Beide Mail-Dispatcher (`InvoiceMailDispatcher`, `DisputeMailDispatcher`) schreiben Claim-Marker und `jobs`-INSERT in **eine** Transaktion. Mit `true` wandert der INSERT in einen `db.transactions`-After-Commit-Callback: der Claim ist dann dauerhaft, bevor der Enqueue scheitern kann, jeder Retry nimmt den „already claimed"-Zweig — **Rechnungs-Mail und Chargeback-Alert wären unwiederbringlich verloren gewesen, mit keinem Recovery-Pfad.** Fix: zurück auf `false`, mit begründendem Kommentar. `DurableDispatchService` ist unabhängig, weil `databaseQueue()` `UuidDatabaseQueue` mit `afterCommit=false` **explizit** konstruiert — nichts im Changeset brauchte das Flag. **Warum kein Gate sah es:** Die Suite läuft mit `QUEUE_CONNECTION=sync`, und die Webhook-Dedupe-Tests mocken die `Mail`-Facade.
+- [x] **FINAL-8 (Testlücke, behoben):** `InvoiceMailDispatcherQueuePolicyTest` um zwei Wächter ergänzt — `after_commit` **muss** `false` sein, und die aufgelöste Queue-Verbindung muss die Application-Connection teilen. **Revert-to-red belegt:** mit zurückgesetztem `true` schlägt der Test rot (`1 failed, 3 passed`), mit `false` grün (`4 passed`).
+
+**Offen aus dem Review (P2, bewusst nicht vor dem Commit behoben):**
+
+- [ ] **FINAL-2:** `DisputeMailDispatcher` hat den `$enforcesTransactionalQueue`-Guard des Geschwisters nicht (`:35-45`) und fällt ohne `InvoiceSnapshot` auf einen direkten `Mail::queue()` ohne durable Claim zurück. Gleiche Garantieklasse, niedrige Frequenz.
+- [ ] **FINAL-3:** `V038:99,107-119` sammelt **alle** Rating-IDs im Speicher (`$actorIdentities[...][] = $id`; `chunk(500)` begrenzt nur den Read) → unbegrenztes Wachstum bei großer Tabelle. Der Abbruch ist gewollt, aber ein Deploy bleibt ohne Operator-Remediation blockiert → **Runbook in `features/` ergänzen.**
+- [ ] **FINAL-4:** FE-1-Spinner hat keinen begrenzten Terminalzustand für einen hängenden Request (SWR-`isLoading` wird im Error-Pfad korrekt auf `false` gesetzt — verifiziert gegen SWR 2.5.1; die „unbekannte `preset_id`"-Sorge ist ein **Non-Issue**, `descriptorFromTerms` fällt auf `DEFAULT_PRESET_KEY` zurück). `loadingTimeout`/Abort-Signal ergänzen.
+- [ ] **FINAL-5:** `useVolumeLicensing` lässt unaufgelöste Cart-Items aus den Gruppen, wodurch `groupedTotalCents` unterzählt (Anzeige, nicht Geld — der Server bleibt autoritativ). „Preis nicht verfügbar"-Zustand statt stillem Weglassen.
+- [ ] **FINAL-6:** AUTH-2-Klemmung ist **einseitig**: wird `sanitizeTransientClaims()` vor `login()` auf einem Host-Mismatch ausgeführt, ist der entfernte Grant für die gesamte Token-Linie verloren (kein False-Negative für brand-gebundene Akteure oder Super-Admins — geprüft). Nur bei Re-Revalidation filtern, nicht beim Re-Revalidieren persistieren.
+- [ ] **FINAL-7:** `Order::saving` (`:106-110`) wirft jetzt auch bei `total_amount = null`. Ein Legacy-Order mit `null` würde bei einem benignen Status-Update zum 500. Vor Deploy prüfen: `Order::whereNull('total_amount')->count()`.
+- [ ] **FINAL-9 (informational, akzeptiert):** CTR-7-Join-Impersonation — jeder mit Join-Link kann als nicht-registrierter Dritter joinen und erhält dessen `personal_token`. Der neue Test pinnt dies als **bewusste Produktentscheidung**. Sollte bewusst signiert, nicht stillschweigend entstehen — **User-Sign-off einholen.**
+
+**Ausdrücklich sauber (nicht regressieren):** Action-/Digest-Pinning, Secret-Hygiene, `pull_request_target`-Gating, rclone-Filter, Non-root in Production, Lua-Timeouts, Checkout-Idempotenz (Fingerprint bindet Brand/Items/Billing/Coupon/server-computed Betrag/Actor), Webhook-Signatur fail-closed auf allen vier Handlern, keine Raw-SQL mit User-Input, `$fillable`-Disziplin, `GalleryGroupSubtree` cycle-safe/depth- und node-bounded, V037-Owner-Trigger auf INSERT **und** UPDATE, V038-Actor-Key server-abgeleitet, AI-Prompt-Injection-Delimiter geschlossen, AI-Logging nur `status`+`body_length`, AI-Budget **vor** Decode, keine neuen E2E-`/api/*`-Mocks, kein localStorage-`addInitScript`, alle neuen E2E-Specs getaggt, `Mail::fake()` nur für Enqueue/Fault-Injection.
+
 ## 🛑 SESSION-HANDOVER (2026-09-25, Ende der Arbeitssession)
 
 **Ergebnis in einem Satz:** 13 verifizierte Commits sind auf `main`; die verbleibenden Arbeitsstränge sind mit **unterschiedlichem Nachweisgrad** committed (2× fertig, 3× halb fertig), und die CI ist aus **genau einem** externen Grund rot.
