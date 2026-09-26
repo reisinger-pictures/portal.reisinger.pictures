@@ -928,7 +928,52 @@ SFTPGo-Account findet, den das Portal nicht kennt — etwa nach einem manuellen
 Eingriff in SFTPGo. `reconcileAccount()` (P1-M30) ist der vorgesehene Weg und
 bleibt offen.
 
-**Reihenfolge im Frontend:** `FtpAccountStatus` ist eine abschließende Union mit
-dem ausdrücklichen Zweck, einen UI-Switch zur Compile-Zeit prüfbar zu halten. Der
-Compiler benennt daher jede Stelle, die `revoked` noch nicht behandelt. Das ist
-beabsichtigt und kein Aufwand.
+**Provisionierung ist der Übergang nach `active`.** Die Invariante hält nur,
+wenn der Pfad, der den Account anlegt, den Zustand auch schreibt. Bis V043 tat er
+das nicht — sein Kommentar stammte aus der Zeit vor V041 —, also meldete das
+Portal `pending`, während SFTPGo einen lebenden Account hielt. Nach dem Entzug
+wurde daraus ein echter Widerspruch: ein entzogener Fotograf, der die Rolle
+zurückbekam, wäre neu provisioniert worden, während der Status `revoked` blieb.
+`provisionAndShow()` schreibt jetzt `active` und `ftp_provisioned_at`.
+**Wiedereintritt ist kein Sonderfall**, sondern derselbe Übergang:
+`revoked → active`, und `ftp_revoked_at` bleibt als Beleg des vergangenen Entzugs
+stehen. Geschrieben wird dabei kein Geheimnis, nur die zwei Buchungsspalten.
+
+**Reihenfolge im Frontend:** `FtpAccountStatus` ist eine abschließende Union, und
+die Statusanzeige ist ein `Record<FtpAccountStatus, …>` statt einer if-Kette mit
+Fallback. Der Unterschied ist nicht kosmetisch: die frühere Form endete in „alles
+andere ist aktiv" und hätte `revoked` als **Konto aktiv** angezeigt — die eine
+Auskunft, die ein Fotograf über ein nicht funktionierendes Konto nie bekommen
+darf. Als Record ist ein neuer Status ein Compile-Fehler statt einer stillen
+Lüge.
+
+### 7.17 Zielordner der Kamera
+
+Stand 2026-09-26. Canons Assistent bietet im Schritt *Zielordner* neben
+`Stammverzeichnis` ein eigenes `Ordner wählen`. Der Wert kommt deshalb aus der
+Konfiguration und nicht aus einem festen Text: `FTP_UPLOAD_PATH`, Default `/`.
+
+**Kein Schema.** Der Zielordner ist Deployment-Konfiguration, keine Eigenschaft
+des Fotografen — es gibt genau ein Konto je Marke und höchstens eine
+Zielgalerie, also braucht der Pfad keine eigene Spalte. `/` bleibt der korrekte
+Wert, solange eine Zielgalerie alles nimmt, was ankommt.
+
+**Zwei Richtungen, zwei Härten.** Das ist der Kern:
+
+- **Anzeige streng:** Das Value Object validiert den Pfad (`/` oder
+  `/segment/segment`, kein `..`) und meldet bei einem malformierten Wert
+  `path: null`. `isConfigured()` zählt den Zielordner mit, sonst zeigte die
+  Oberfläche eine vollständige Verbindung ohne Zielordner — und der Fotograf
+  würde das Feld in der Kamera raten.
+- **Import permissiv:** `resolvedUploadPath()` fällt bei einem malformierten Wert
+  auf die Konto-Wurzel zurück, und `getInboxPath()` hängt den Ordner an. Ein
+  Import, der zu viel liest, kann Dateien retten; einer, der zu wenig liest,
+  verliert sie still.
+
+**Der Fehlermodus, der die ganze Sorgfalt erklärt:** Weicht der Zielordner in der
+Kamera vom konfigurierten Wert ab, landet der Upload in einem Verzeichnis, das
+der Import nie liest. Das Verzeichnis ist der einzige Fehler, der wie ein
+**leerer Posteingang** aussieht und nicht wie ein Fehler — deshalb steht der
+Hinweis sowohl im Deployment-Runbook als auch auf der Einrichtungsseite im UI.
+Der Import ist nicht rekursiv (`glob(...)`), also bleibt auch Canons
+„Verzeichnisstruktur" der zweite Weg in denselben stillen Fehlermodus.
