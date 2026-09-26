@@ -45,69 +45,133 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   gefixt, aber `check-i18n.mjs` erkennt einen **ungewrappten** String nicht: er
   wird nie extrahiert, also nie gesehen. Es braucht eine AST-Regel für
   benutzersichtbare Strings außerhalb der Lingui-Makros.
-- [ ] **P1-M17 (P0) — `users.ftp_slug` ist noch kein FTP-Username und hat
-  keinerlei Zeichen-Validierung.** `AuthController.php:230` erlaubt
-  `string|max:255|unique` mit vorheriger `Str::slug()`-Normalisierung
-  (`:221-225`). FTP-Usernamen dürfen aber weder Punkt noch `@` noch Slash
-  enthalten, und pure-ftpd hat harte Längengrenzen. Sobald `ftp_slug` als
-  FTP-Accountname verwendet wird (P1-M18), muss ein Muster wie
-  `^[a-z0-9][a-z0-9_-]{2,31}$` erzwungen werden — inkl. Fehlerpfad für
-  bestehende Slugs, die das verletzen. **Tests:** PHPUnit für die
-  Validierungsregel (Slug-Äquivalente bleiben gültig, `a.b`/`a@b`/`a/b`/
-  zu lang werden abgelehnt, Uniqueness greift weiterhin) + Playwright-E2E
-  für den Fehlerhinweis in `ProfileSettingsCard.tsx:82-92`.
-- [ ] **P1-M18 (P1) — pro Fotograf ein FTP-User, Passwörter von der
-  Applikation verwaltet.** Heute existiert genau **ein** pauschaler
-  Server-User (`webadmin`) mit einem fest auf dem Server hinterlegten
-  Passwort, der auf den **gesamten** Website-Baum zeigt. Das ist zu breit:
-  jeder mit dem Passwort kann in jede Site schreiben.
-  Das Datenmodell ist bereits da, es fehlt nur die Server-Anbindung:
-  `users.ftp_slug` (unique, selbst wählbar, `V001:62`) ist der natürliche
-  FTP-Username, und `FtpController::getInboxPath()`
-  (`app/Http/Controllers/FtpController.php:151-156`) liest bereits pro
-  Fotograf aus `Storage::disk('ftp_inbox')->path($user->ftp_slug)` — der
-  Ordnername auf dem Server muss also nur dem Slug entsprechen.
-  **Umsetzung:**
-  1. Tabelle `ftp_credentials` (**V041+**, siehe `backend/AGENTS.md`: vorab
-     Schema-/Backfill-/Rollback-Entscheidung dokumentieren): `user_id` FK,
-     `password` als **`text`** mit `'encrypted'`-Cast — Muster
-     `ModelProfile.php:55-62`; dort ist in `V034:11-16` ausdrücklich
-     vermerkt, dass `json`/`varchar` mit Ciphertext **nicht** funktioniert.
-  2. `$hidden` für jede Serialisierung + Show-once beim Rotieren — Muster
-     `ContractSigner.php:29-39` (`personal_token`).
-  3. Key aus `FILE_ENCRYPTION_KEY` (nicht `APP_KEY`), Rotation über
-     `FILE_ENCRYPTION_PREVIOUS_KEYS` — Muster `ModelFileStore.php:11-26`.
-  4. Serverseitig `pure-pw useradd` pro Slug, Home = `ftp/<slug>`, danach
-     Container-Restart. **pure-ftpd liest die puredb nur beim Start**
-     (verifiziert 2026-09-26) — das ist der Grund, warum die puredb in
-     `/config` persistiert liegt.
-  5. **Kein Eigenbau:** `AGENTS.md` §9 verbietet Eigenbau-Kryptografie für
-     Security-Critical.
-  **Tests:** PHPUnit für Verschlüsselung at rest (DB-Dump enthält das
-  Klartext-Passwort nicht), Show-once-Semantik, Rotation mit
-  `FILE_ENCRYPTION_PREVIOUS_KEYS`, und die Gleichheit
-  `FtpController::getInboxPath()` == FTP-Home. Playwright-E2E für
-  Anzeige/Rotation im `ProfileSettingsCard`.
-- [ ] **P1-M19 (P1) — `FtpController::process()` hat keinen Concurrency-Guard.**
+<!-- FTP-Konten: Ansatz am 2026-09-26 von pure-pw/pure-ftpd auf SFTPGo
+     umgestellt. P1-M17..P1-M20 sind durch P1-M21..P1-M29 abgeloest.
+     Begruendung: (a) pure-ftpd kann AES128-SHA nicht anbieten, damit
+     erreicht die Kamera den Server nicht; (b) pure-ftpd liest die puredb
+     nur beim Start, PHP-verwaltete Passwoerter erfordern also Neustarts.
+     Der wichtigste Gewinn ist aber P1-M23: mit SFTPGo erzeugt PHP das
+     Passwort, zeigt es einmal an und speichert es gar nicht. Damit
+     entfaellt die urspruenglich geplante verschluesselte
+     ftp_credentials-Tabelle samt FILE_ENCRYPTION_KEY vollstaendig. -->
+
+- [ ] **P1-M21 (P0) — `users.ftp_slug` als FTP-/SFTP-Username braucht
+  Zeichen- und Längenvalidierung.** `AuthController.php:230` erlaubt
+  `string|max:255|unique` mit `Str::slug()`-Normalisierung (`:221-225`).
+  Das ist als Anzeigename in Ordnung, als **Login-Name** nicht: SFTPGo und
+  pure-ftpd haben harte Grenzen, und Punkt/`@`/Slash sind in Freigabepfaden
+  nicht erlaubt. Wird relevant, sobald `ftp_slug` als Accountname verwendet
+  wird (P1-M18/P1-M22).
+  **Zielregel:** `^[a-z0-9][a-z0-9_-]{2,31}$` — kleingeschrieben, keine
+  Sonderzeichen, max. 32 Zeichen.
+  **Zu klären:** was mit den aus `@`-Localparts erzeugten Slugs passiert
+  (`Str::slug` lässt Punkte zu, z. B. `j.doe`), und wie ein bereits
+  vergebenes, aber regelwidriges Slug migriert wird — Slug umbenennen ist
+  eine Fremdschlüssel-Änderung an `storage/app/private`.
+  **Tests:** PHPUnit für die Regel (Slug-Äquivalente gültig, `a.b`/`a@b`/`a/b`/
+  zu lang/führender Unterstrich abgelehnt, Uniqueness greift weiterhin) +
+  Playwright-E2E für den Fehlerhinweis in `ProfileSettingsCard.tsx:82-92`.
+- [ ] **P1-M22 (P0) — SFTPGo-Admin-API-Client im Portal.** Ersetzt die
+  geplante `pure-pw`-Anbindung aus P1-M18. Nachweislich existiert
+  `drakkan/sftpgo` mit Admin-API v2 (`POST /api/v2/users`, Auth über
+  `POST /api/v2/token` mit JWT oder Header `X-SFTPGO-API-KEY`).
+  **Neu:** `app/Services/SftpGoClient.php` mit `provisionUser()`,
+  `resetPassword()`, `deleteUser()`, `listFolders()`. **Kein** eigener
+  FTP-Client-Talk im Portal — nur HTTP gegen den Dienst.
+  **Zeitfenster:** Jetzt, solange es nur einen Fotografen gibt. Später
+  müssten bestehende lokal gepflegte Ordner durch provisioniert ersetzt
+  werden, und der Pfad geht in die Fremdschlüssel-Änderung aus P1-M21.
+  **Tests:** PHPUnit mit gemocktem HTTP-Client für jede Methode inkl.
+  Fehlerpfade (SFTPGo nicht erreichbar, Benutzer existiert bereits,
+  4xx/5xx); ein Test muss sicherstellen, dass **kein** Passwort im Log oder
+  in einer Exception landet.
+- [ ] **P1-M23 (P0) — Passwort-Erzeugung und Show-once, statt Verschlüsselung
+  at rest.** Das ist die **entscheidende Entlastung gegenüber P1-M18** und
+  der eigentliche Grund für den Wechsel: SFTPGo hält das Passwort, das
+  Portal muss es **nicht** speichern. Damit entfallen `ftp_credentials` als
+  verschlüsselte Tabelle, `FILE_ENCRYPTION_KEY` und der
+  `FILE_ENCRYPTION_PREVIOUS_KEYS`-Rotationspfad vollständig.
+  **Ablauf:** PHP erzeugt ein kamerataugliches Passwort
+  (`^[a-z0-9]{16,24}$`, keine Sonderzeichen — Kameras können sie nicht
+  eingeben), übergibt es per HTTPS an SFTPGo, **zeigt es einmal** an und
+  verwirft es. Verloren → `resetPassword()`, nicht wiederherstellbar.
+  **Zu entscheiden:** ob die Fotografen ihr Passwort selbst ändern dürfen
+  (dann Confirm-Flow mit dem aktuellen Passwort) oder nur der Admin.
+  **Tests:** PHPUnit für Erzeugung (Länge, Charset, keine Kollision nach
+  `Str::random` + Prüfschleife) und dafür, dass im Request-Log/Response
+  nach dem Show-once **kein** Klartext mehr auftaucht; Playwright-E2E für
+  Anzeige und Reset.
+- [ ] **P1-M24 (P1) — Ordner-Anlage und UID-Modell klären.** Aus der
+  SFTPGo-Doku: *"Virtual folder auto creation on user add/update … you have
+  to create the folder on disk yourself"* — SFTPGo legt nichts an. Der Ordner
+  `ftp/<ftp_slug>` muss auf dem Host existieren, mit `1002:webgroup` und
+  `2777`, **bevor** oder im selben Schritt wie der User.
+  **Zu entscheiden:** Wer macht das? Ein kleines Script auf dem Host, das die
+  Applikation aufruft, oder ein Admin-Schritt. **Wichtig:** Das ist exakt
+  die Stelle, an der der Ownership-Vorfall vom 2026-09-26 wieder passieren
+  kann (38.969 Dateien umgeschrieben, weil ein Entrypoint `chown -R` auf den
+  gemappten Website-Baum lief). **Verboten:** `chown -R` durch
+  Container-Entrypoints auf `/home/webadmin/websites`, und `adduser -h` auf
+  bestehende Pfade.
+  **Tests:** Shell-Test für das Script (existierender Ordner, falscher Owner,
+  setgid-Bit) plus PHPUnit, dass ein nicht zugänglicher Ordner zu einem
+  verständlichen Fehler führt und der User-Status im Portal als
+  „wartet auf Ordner" geführt wird.
+- [ ] **P1-M25 (P1) — `FtpController` bleibt unverändert; das ist Absicht und
+  muss getestet bleiben.** Weil SFTPGo auf **denselben** Host-Pfad
+  `/home/webadmin/websites/ftp` schreibt und der Bind-Mount
+  `-> /var/www/ftp` erhalten bleibt, funktionieren die Disk `ftp_inbox`
+  (`config/filesystems.php:49-53`) und `getInboxPath()`
+  (`app/Http/Controllers/FtpController.php:151-156`) unverändert weiter.
+  **Kein** Umbau auf den `sftp`-Flysystem-Treiber — das wäre ein Netzwerk-
+  Roundtrip nach localhost pro Datei plus Credentials im Portal für den
+  eigenen Host.
+  **Bewachung:** `FtpImportTest` (9 Tests) deckt das ab und muss nach dem
+  Stack-Wechsel grün bleiben. Zusätzlich sollte ein Test die Annahme
+  festhalten, dass `ftp_inbox` ein **lokales** Verzeichnis ist — sonst
+  „refaktoriert" jemand den Import auf `Storage::disk('sftp')` und es wird
+  langsamer und geheimnisvoller.
+- [ ] **P1-M26 (P2) — Zustand und Fehlerbehandlung im Portal sichtbar.** Der
+  Import darf nicht daran hängen, dass SFTPGo erreichbar ist: Dateien, die
+  schon auf der Platte liegen, müssen auch dann importierbar sein, wenn der
+  Dienst ausfällt. Umgekehrt braucht `FtpController::status()`
+  (`:21-39`) eine Credential-/Konto-Anzeige, damit der Fotograf sieht „Konto
+  nicht provisioniert" statt eines leeren Inbox-Ordners. Aktuell liefert
+  `status()` nur `ftp_folder`, `file_count` und `current_target_gallery`.
+  **Tests:** PHPUnit für `status()` mit und ohne provisioniertes Konto, und
+  ein Test, dass `process()` ohne SFTPGo-Kontakt weiterläuft.
+- [ ] **P1-M27 (P2) — Kamera-Protokoll ist ungeklärt und blockiert die
+  Abnahme.** Es ist **nicht verifiziert**, ob die konkrete Kamera FTPS mit
+  GCM oder CBC/SHA1 braucht. Mit pure-ftpd war `AES128-SHA` nachweislich
+  nicht aktivierbar (verifiziert 2026-09-26); SFTPGo ist Go/`crypto/tls` und
+  **müsste** es können, aber das ist ungetestet. Solange offen, gilt der
+  Kamera-User `florian` als **UZugangsersatzweg für den Betrieb**, nicht als
+  Beweis, dass die Kamera funktioniert.
+  **Testmethode:** Cipher-Liste des laufenden SFTPGo gegen
+  `openssl s_client -cipher …` prüfen, dann mit echter Kamera testen. Bei
+  SFTP-Unterstützung der Kamera ist SFTP vorzuziehen — moderne Ciphers, und
+  SFTPGo bietet FTPS und SFTP auf demselben Port.
+- [ ] **P1-M28 (P2) — `FtpController::process()` hat keinen Concurrency-Guard.**
   `features/infrastructure/19-ftp-upload-pipeline.md:129` hält fest: kein
   Lock, doppelte Verarbeitung derselben Datei möglich, Annahme
-  "single-user access". Sobald mehrere Fotografen parallel importieren
-  (P1-M18), ist das keine Annahme mehr, sondern ein Fehler. **Tests:**
-  PHPUnit mit zwei konkurrierenden `process()`-Aufrufen auf dieselbe Datei
-  muss genau eine `Photo`-Zeile und eine `unlink()`-Aktion ergeben.
-- [ ] **P1-M20 (P2) — Brand-Scope der FTP-Credentials.** `ftp_slug` ist
+  „single-user access". Sobald mehrere Fotografen parallel importieren
+  (P1-M22), ist das keine Annahme mehr, sondern ein Fehler.
+  **Tests:** PHPUnit mit zwei konkurrierenden `process()`-Aufrufen auf
+  dieselbe Datei muss genau eine `Photo`-Zeile und eine `unlink()`-Aktion
+  ergeben.
+- [ ] **P1-M29 (P2) — Brand-Scope der FTP-Konten.** `ftp_slug` ist
   user-level, nicht brand-level
   (`features/infrastructure/25-brand-separation-matrix.md:33`). Der
   `Brand`-Enum hat aktuell nur einen Fall (`app/Enums/Brand.php:12-15`), das
-  Schema ist also faktisch Single-Tenant. Sobald ein zweiter Brand dazukommt,
-  braucht `ftp_credentials` eine `brand`-Spalte analog
-  `ModelRegistrationInvite.php:28`. **Bewusst offen gelassen** — eine Spalte
-  für einen einzigen Brand ist YAGNI, das Risiko aber dokumentiert, damit es
-  nicht übersehen wird.
+  Schema ist also faktisch Single-Tenant. Bei einem zweiten Brand braucht
+  die SFTPGo-Anbindung eine Trennung (eigener Folder-Namespace je Brand),
+  sonst sieht ein Fotograf die Ordner einer anderen Marke. **Bewusst offen
+  gelassen** — für einen Brand YAGNI, aber dokumentiert, damit es nicht
+  übersehen wird.
 - [ ] **DOC — `features/infrastructure/13-ftp-brand-isolation.md:6`
   referenziert `FT-01` in `AGENTS.todo.md`; dieses Task existiert nicht mehr**
   (`grep FT-01` → 0 Treffer im Board). Das `FT-NN`-Schema ist historisch und
-  sollte durch einen Verweis auf P1-M17/P1-M18 ersetzt werden, sonst sucht
+  sollte durch einen Verweis auf P1-M21/P1-M22 ersetzt werden, sonst sucht
   niemand die Fortsetzung.
 
 ### Offene Dokumentations-Wahrheit (kein Code, aber irreführend)
