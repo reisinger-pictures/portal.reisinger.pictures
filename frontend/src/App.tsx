@@ -28,6 +28,7 @@ const SearchView = lazy(() => import('./ui/SearchView'));
 const ManagementOrgsView = lazy(() => import('./ui/management/ManagementOrgsView'));
 const ManagementOrgDetailView = lazy(() => import('./ui/management/ManagementOrgDetailView'));
 const UserProfileView = lazy(() => import('./ui/UserProfileView'));
+const KameraEinrichtung = lazy(() => import('./ui/KameraEinrichtung'));
 const Privacy = lazy(() => import('./ui/Privacy'));
 const Impressum = lazy(() => import('./ui/Impressum'));
 const LicenseTerms = lazy(() => import('./ui/LicenseTerms'));
@@ -123,6 +124,7 @@ export default function App() {
                             <Route path="/users"
                                 element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/profile" element={<ProtectedRoute><ErrorBoundary><UserProfileView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/kamera-einrichtung" element={<ProtectedRoute><ErrorBoundary><KameraEinrichtung/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/settings"
                                 element={<ProtectedRoute><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/stats"

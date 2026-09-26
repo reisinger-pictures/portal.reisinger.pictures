@@ -17,6 +17,15 @@ export interface FtpConnection {
     ftps_port: number | null;
     pasv_port_start: number | null;
     pasv_port_end: number | null;
+    /**
+     * `explicit` (AUTH TLS), `implicit`, or `null` when the deployment declares
+     * no usable value.
+     *
+     * `null` must never be rendered as a mode: this is the single value that
+     * decides whether a camera can complete an FTPS handshake at all, and a
+     * guess that is wrong looks exactly like a firewall problem.
+     */
+    ftps_tls_mode: string | null;
 }
 
 /**
@@ -29,7 +38,7 @@ export interface FtpConnection {
  * decision logic stays testable without a catalogue and the strings stay
  * translatable.
  */
-export type FtpConnectionField = 'host' | 'username' | 'sftp' | 'ftps' | 'passive_ports' | 'path';
+export type FtpConnectionField = 'host' | 'username' | 'sftp' | 'ftps' | 'ftps_tls_mode' | 'passive_ports' | 'path';
 
 export interface FtpConnectionRow {
     field: FtpConnectionField;
@@ -66,6 +75,9 @@ export function describeFtpConnection(connection: FtpConnection): FtpConnectionR
     }
     if (connection.ftps_port !== null) {
         rows.push({ field: 'ftps', value: String(connection.ftps_port) });
+    }
+    if (connection.ftps_tls_mode !== null) {
+        rows.push({ field: 'ftps_tls_mode', value: connection.ftps_tls_mode });
     }
     if (connection.pasv_port_start !== null && connection.pasv_port_end !== null) {
         rows.push({ field: 'passive_ports', value: `${connection.pasv_port_start}\u2013${connection.pasv_port_end}` });
