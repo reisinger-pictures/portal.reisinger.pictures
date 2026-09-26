@@ -1732,7 +1732,7 @@ alle mit Regressionstest:
   `[ "$$(id -u)" -ne 1000 ]` effektiv `[ "1(id -u)" -ne 1000 ]` → `Illegal
   number` → FATAL. Betroffen waren **alle 16** Escapes des Guards: der
   Identitäts-Guard verweigerte gültige Starts, und `test -z "$${APP_KEY}"`
-  prüfte由于 `$$` zur PID **nie** leer, schützte also nichts. Nachgewiesen mit
+  prüfte wegen `$$` zur PID **nie** leer, schützte also nichts. Nachgewiesen mit
   einem Dreiformen-Test (folded / list / plain scalar) auf dem Server.
   **Fix:** Guard ohne jede Shell-Expansion, über `printenv | grep` und
   `xargs -I{}`. Kein `${VAR}`, weil Compose Secrets zur Interpolationszeit in
