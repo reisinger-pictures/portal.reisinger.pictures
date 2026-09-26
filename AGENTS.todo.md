@@ -1925,15 +1925,31 @@ alle mit Regressionstest:
   (P1-M32) und ist damit genau das Ziel dieser Runde.** Entweder braucht es einen
   eigenen Provisionierungs-Endpunkt, oder der Reset-Pfad muss ein fehlendes Konto
   bewusst anlegen (mit derselben Fail-closed- und Quota-Disziplin). Das ist eine
-  Designentscheidung mit Auth-Bezug und wurde deshalb **nicht** unter Zeitdruck
-  implementiert.
+  Designentscheidung mit Auth-Bezug. **Erledigt (c020422).** Zwei Ursache,
+  ein Guard: Der Reset-Endpunkt provisioniert bei `pending` und lehnt `revoked`
+  und `error` ab — `revoked` darf sich nicht durch einen Klick wiederbeleben,
+  sonst waere der Entzug wertlos. Und der Slug-Wechsel-Zweig in `AuthController`
+  loeschte **bedingungslos**, also gegen einen nie existierenden Account → 404 →
+  Fail-closed → 500: ein Fotograf konnte seinen ersten Slug-Wechsel nie
+  durchfuehren. Der Delete ist jetzt an `STATUS_ACTIVE` gekoppelt, derselbe
+  Guard wie `revoke()`. Der Guard ist eine **Allowlist** (nur `active`), damit
+  ein kuenftiger Enum-Wert per Default abgelehnt wird. Bestands-Fixtures
+  pinnen jetzt explizit `active` — sie rotierten bisher implizit gegen einen
+  nie provisionierten Account und prueften damit den Falschen.
 - [ ] **P1-M59 — `features/` nennt an mehreren Stellen noch `@sha256`-Digests
   als Pin-Mechanik.** Gemeldet vom Gate-Agenten, bewusst nicht geaendert (Spec-
   Entscheidung): `features/infrastructure/01-deployment.md:27,135-136,139,141`,
   `29-production-operations-runnbook.md:96`, `28-ci-test-image.md:4,20,23,34,44,46,47,51,139`,
   `features/e2e-test-strategy.md:135`, `features/ai/02-testing-strategy.md:20`
   (letzteres betrifft ein anderes Image, Kontext pruefen). `PORTAL_E2E_IMAGE` ist
-  reine Doku, kein Code — geprueft.
+  reine Doku, kein Code — geprueft. **Erledigt (a5820fa).** `features/ai/
+  02-testing-strategy.md:20` traf doch dasselbe `portal-base:8.5` (Beleg:
+  `AIServiceImageBudgetTest.php:126`), wurde praezisiert. Der Composer-Digest
+  `a5f59b9f…` in `28-ci-test-image.md` war reiner Pin-Wert ohne Belegfunktion
+  und ist entfernt; `d762…` blieb, weil er die Build-Log-Evidenz traegt.
+  **Nachzuholen:** `deployment/validate-production-env.sh:118` sagte noch
+  „update the compose digest" — gefixt in `95ac30a`, inklusive der
+  Policy-Test-Assertion.
 - [x] **Kein Reset-Guard noetig (geprueft, bewusst nicht gebaut).**
   `resetAndShow()` auf `pending`/`revoked` kann den Account **nicht**
   wiederbeleben: `SftpGoClient::resetPassword()` ruft zuerst `findUser()` und
