@@ -1844,8 +1844,16 @@ alle mit Regressionstest:
   (`/var/lib/sftpgo/ftps/cert.pem` im Container) muss als `.CER`/`.CRT`/`.PEM`
   auf die Speicherkarte, und in der Kamera „Zielserver vertrauen → Aktivieren"
   (sonst Error 48, cam.start.canon UG-06_Network_0230).
-- [ ] **Zertifikat aus der GUI herunterladbar machen.** Der Fotograf braucht die
-  Datei für die Speicherkarte; heute liegt sie nur im Container.
+- [ ] **Zertifikat auf die Speicherkarte der Kamera — operativer Testschritt,
+  kein Produktziel.** Canon verlangt die Datei plus „Zielserver vertrauen →
+  Aktivieren", sonst Error 48. Sie liegt im Container unter
+  `/var/lib/sftpgo/ftps/cert.pem` und wird für den Test auf die Karte kopiert
+  (`docker cp` oder Portainer-Dateiverwaltung). **Kein GUI-Download nötig:** der
+  Import in eine Galerie ist das Ziel und existiert — `FtpController::process()`
+  → `runImport()`, abgesichert durch `FtpImportTest` (10 Tests) mit der
+  Reihenfolgegarantie „Inbox-Datei wird erst nach Storage- **und** DB-Erfolg
+  gelöscht" plus `FtpProcessConcurrencyTest` (9 Tests). Ein Download wäre
+  Bequemlichkeit, keine Lücke.
 - [ ] **`useBrandSettings.test.ts`** nutzt `reisinger.pictures` als Fixture ohne
   semantischen Grund (anders als `useBrand.test.ts`, wo es zwingend ist) — auf
   `.invalid` umstellen. Von einem Subagenten gemeldet, außerhalb des Auftrags.
