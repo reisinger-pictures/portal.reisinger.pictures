@@ -20,7 +20,10 @@ import {describeFtpConnection, type FtpConnection} from '../ftpConnection';
 
 const configured: FtpConnection = {
     configured: true,
-    host: 'reisinger.pictures',
+    // Reserved per RFC 2606, so it can never resolve to a real server. The host
+    // carries no meaning for this logic, and a production hostname here would be
+    // one copy-paste away from an actual request.
+    host: 'sftp.example.invalid',
     username: 'florian',
     path: '/',
     sftp_port: 2222,
@@ -49,7 +52,7 @@ describe('describeFtpConnection', () => {
 
     it('describes a fully configured connection in camera order', () => {
         expect(describeFtpConnection(configured)).toEqual([
-            {field: 'host', value: 'reisinger.pictures'},
+            {field: 'host', value: 'sftp.example.invalid'},
             {field: 'username', value: 'florian'},
             {field: 'sftp', value: '2222'},
             {field: 'ftps', value: '989'},

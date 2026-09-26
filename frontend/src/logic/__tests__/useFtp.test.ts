@@ -32,7 +32,10 @@ const BASE_STATUS: FtpStatus = {
     // unconfigured case.
     connection: {
         configured: true,
-        host: 'reisinger.pictures',
+        // Reserved per RFC 2606, so it can never resolve to a real server. Every
+        // test here stubs `fetch` globally, but a fixture that points at the
+        // production host would survive a forgotten stub.
+        host: 'sftp.example.invalid',
         username: 'florian',
         path: '/',
         sftp_port: 2222,
@@ -85,7 +88,7 @@ describe('useFtp', () => {
         // The camera settings ride along with the inbox fields; a UI that only
         // renders them when the connection is present needs the hook to hand
         // them through unchanged.
-        expect(result.current.status?.connection.host).toBe('reisinger.pictures');
+        expect(result.current.status?.connection.host).toBe('sftp.example.invalid');
         expect(result.current.status?.connection.sftp_port).toBe(2222);
     });
 
