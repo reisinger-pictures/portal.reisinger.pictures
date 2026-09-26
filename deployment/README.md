@@ -163,6 +163,27 @@ Restore nie geprüft wurde, ist eine Vermutung.
 
 ## 4. Deploy
 
+### Sync und der Container-Neustart (Pflicht)
+
+`sync.sh` kopiert Code, nichts mehr. **Nach jedem Sync mit PHP-Änderungen
+muss `portal_backend` neu gestartet werden:**
+
+```bash
+./sync.sh
+ssh root@reisinger.pictures 'docker restart portal_backend'
+```
+
+Grund: PHP kompiliert Klassen und hält das Ergebnis im Prozess. Ein rsync
+aktualisiert die Dateien, der laufende Prozess behält aber die alten Klassen
+im Speicher — das Backend führt dann teils den neuen, teils den alten Code
+aus, und das sieht aus wie ein inkonsistenter Zustand, nicht wie ein
+Caching-Problem. Steht als STRICT-Regel in `AGENTS.md` §13.
+
+Der Frontend-Sync braucht keinen Neustart (`dist/` ist statisch), und
+Migrationen laufen nicht mit — die gehören bewusst und getrennt dazu.
+
+
+
 ```bash
 cd /data/compose/15/       # Portainer-Stack-Verzeichnis
 docker compose up -d

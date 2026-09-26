@@ -174,6 +174,29 @@ Alle Run-Configs in `.run/*.run.xml` folgen einem einheitlichen Schema (etablier
 - **Ownership:** Offizielle/Third-Party-Packs (daisyui, find-skills, stripe-*, …) bleiben dort, wo der Installer sie ablegt (`~/.agents/skills/`, Projekt-`.agents/skills/`, …); projekt-spezifische Skills (nx-*, blog-beitrag, testimonial) bleiben im Projekt.
 - **Erweitern:** neuer Skill als `.agents/skills/<id>/SKILL.md` (Frontmatter `name`+`description`, kebab-case-ID = Ordnername) → Commit+Push; keine Config-Änderung nötig. Details: Skill `agent-config`.
 
+## 13. Deployment & Sync (STRICT)
+
+`sync.sh` kopiert Code, nichts mehr. Er startet keinen Container neu und
+führt keine Migration aus. Deshalb gilt:
+
+- **Nach jedem Sync mit PHP-Änderungen: `portal_backend` neu starten.**
+  Auf dem Host: `docker restart portal_backend`. Grund: PHP kompiliert
+  Klassen und hält das Ergebnis im Prozess (Compiler-/OPcache). Ein rsync
+  aktualisiert die Dateien auf der Platte, der laufende Prozess behaelt
+  aber die alten Klassen im Speicher. Das Ergebnis ist ein Backend, das
+  teils den neuen und teils den alten Code ausfuehrt — und das sieht aus
+  wie ein inkonsistenter Zustand, nicht wie ein Caching-Problem. Wer den
+  Neustart weglaesst, debuggt einen Fehler, den es nicht gibt.
+- **Frontend-Sync braucht keinen Neustart.** `dist/` ist statisch, der
+  Webserver liest pro Request neu.
+- **Migrationen laufen nicht mit.** `sync.sh` ist kein Deploy im Sinne von
+  `migrate --force && db:seed --force`. Wer eine Migration braucht, macht
+  sie bewusst und getrennt — und seedet danach, wie `backend/AGENTS.md`
+  verlangt.
+- **Reihenfolge:** Sync → Neustart → Gegenprobe. Die Gegenprobe ist der
+  Health-Check plus ein Request, der den neuen Code zwingt (kein
+  `cache:clear`-Verhalten, das der Neustart ohnehin erledigt).
+
 ## TODO (UI-Review)
 
 UI-Review-Screenshot-Skill noch nicht angewendet (Playwright-Harness + Vision-Analyse). Referenz: ocg-price-tracker/tests/screenshots (ui-screenshots.spec.ts mit Section-Captures).
