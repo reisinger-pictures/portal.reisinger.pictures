@@ -7,6 +7,7 @@ use App\Models\Gallery;
 use App\Models\Photo;
 use App\Services\AuthorizationService;
 use App\Services\PhotoProcessingService;
+use App\Values\FtpConnectionDetails;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -89,6 +90,11 @@ class FtpController extends Controller
             'ftp_account_status' => $user->ftp_account_status,
             'ftp_provisioned_at' => $user->ftp_provisioned_at,
             'ftp_account_error' => $user->ftp_account_error,
+            // What a camera has to be configured with. Read from the same
+            // variables the compose publishes, so the UI cannot show a port
+            // the container does not listen on, and it carries no secret — the
+            // password stays behind the show-once endpoint.
+            'connection' => FtpConnectionDetails::forUser($user)->toArray(),
         ]);
     }
 

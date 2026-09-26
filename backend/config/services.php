@@ -79,4 +79,26 @@ return [
     'accounting_email' => env('ACCOUNTING_EMAIL'),
 
     'proxy_delivery_header' => env('PROXY_DELIVERY_HEADER'),
+
+    /*
+     * What a camera needs to be configured with, as shown in the management UI
+     * (feature doc 7.13). Deliberately NO defaults: these are the host-facing
+     * values, and a default would be a guess about this deployment's network
+     * that nobody can see. The ports have to match what the compose publishes,
+     * so both read the same variables — `${SFTPGO_SFTP_PORT:-2222}` in the
+     * compose and `SFTPGO_SFTP_PORT` here. That is why `.env.production` sets
+     * them explicitly instead of leaning on the compose default: one source,
+     * and the UI can never show a port the container does not listen on.
+     *
+     * The passive range belongs here too, because it is the port range a
+     * firewall has to open (feature doc 7.13) and a camera cannot be told
+     * anything useful without it.
+     */
+    'ftp_transport' => [
+        'public_host' => env('FTP_PUBLIC_HOST'),
+        'sftp_port' => env('SFTPGO_SFTP_PORT'),
+        'ftps_port' => env('SFTPGO_FTPS_PORT'),
+        'pasv_port_start' => env('SFTPGO_PASV_PORT_START'),
+        'pasv_port_end' => env('SFTPGO_PASV_PORT_END'),
+    ],
 ];

@@ -1,5 +1,6 @@
 import useSWR from 'swr';
 import {apiMutate, fetcher} from '../api';
+import {FtpConnection} from './ftpConnection';
 
 export interface FtpTargetGallery {
     id: string;
@@ -31,6 +32,12 @@ export interface FtpStatus {
     ftp_provisioned_at: string | null;
     /** Provider text for `error`, `null` in every other state. */
     ftp_account_error: string | null;
+    /**
+     * What a camera has to be configured with. Absent values mean the server
+     * has not declared them, which is reported rather than guessed — see
+     * `FtpConnection`.
+     */
+    connection: FtpConnection;
 }
 
 export interface ProcessInboxResponse {
