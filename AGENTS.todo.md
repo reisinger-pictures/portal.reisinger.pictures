@@ -2026,6 +2026,19 @@ Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
 - [x] **Zusatz, gleicher Bereich:** Der Guide nannte noch „Neues Kamera-Passwort",
   waehrend der pending-Button „Kamera-Zugang einrichten" heisst → Guide nennt jetzt
   den zustandskorrekten Button.
+
+**Offener Folge-Task (Harness-Luecke):**
+- [ ] **Dialog-Zustaende sind vom Screenshot-Harness nicht erfassbar.** Das
+  Manifest (`tests/screenshots/ui-review.config.ts`) kennt als Nav-Schritt nur
+  `goto` und `fill`; es gibt kein `click`. Damit ist der Kamera-Anleitungs-Dialog
+  — die neue, vom Owner ausdruecklich gewuenschte Oberflaeche — screenshot-seitig
+  **strukturell ungeprueft**; abgesichert ist er bisher nur funktional (E2E
+  `kamera-einrichtung.spec.ts`: Werte, Abschnitte, Schliessen) und per
+  Sichtpruefung des Implementierers. Fix: kleinen `click`-Nav-Schritt (Locator +
+  optionales `waitFor`) im Manifest-Typ und im Spec ergaenzen, dann einen
+  Manifest-Eintrag „FTP Inbox mit offener Anleitung" aufnehmen und nach
+  `ui-review-checklist.md` bewerten (Dialoghoehe, Scroll-Verhalten,
+  Tabellen-Ueberlauf auf Mobile).
 - [x] **Zusatz:** literale `\u2014` in JSX-Text der Fehlertabelle des Guides
   entsprachen keinem Escape und rendeten als `\u2014` → durch echte Em-Dashes
   ersetzt.
