@@ -77,15 +77,29 @@ bash tests/infrastructure/compose-entrypoint-contract.sh                       #
 
 ## 2. Firewall — die einzige Handarbeit
 
-Drei Regeln öffnen, eine bleibt **geschlossen**:
+Drei Regeln öffnen, eine bleibt **geschlossen**.
+
+**Auf diesem Host ist `ufw` nicht installiert** — die Firewall ist **firewalld**
+(`inet firewalld`, Zone `public` auf `eth0`). Die früheren `ufw allow`-Zeilen
+dieser Datei sind daher falsch und werden hiermit ersetzt:
 
 ```bash
-ufw allow 2222:2222/tcp      comment 'SFTPGo SFTP'
-ufw allow 989:989/tcp        comment 'SFTPGo FTPS'
-ufw allow 50000:50100/tcp    comment 'SFTPGo passive FTPS'
+# dauerhaft (--permanent) und dann erst aktivieren, sonst wirkt es erst beim
+# nächsten Reload und der Port ist bis dahin weiter zu
+firewall-cmd --permanent --zone=public --add-port=2222/tcp
+firewall-cmd --permanent --zone=public --add-port=989/tcp
+firewall-cmd --permanent --zone=public --add-port=50000-50100/tcp
+firewall-cmd --reload
+
+# Gegenprobe — 2222 und 989 müssen auftauchen, 8080 darf nicht
+firewall-cmd --zone=public --list-ports
 
 # 8080/tcp BLEIBT ZU. Nicht öffnen.
 ```
+
+**Stand 2026-09-26:** in der Zone `public` steht bislang nur
+`2222/tcp 10000-10600/tcp`. **989 und die passive Range fehlen**, FTPS ist also
+von außen noch nicht erreichbar. 2222 ist bereits offen.
 
 | Port | Warum | Wenn fehlt |
 |---|---|---|
