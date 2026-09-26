@@ -103,6 +103,11 @@ class Order extends Model
     {
         static::saving(function ($order) {
             ActorIdentity::assertOrderOwnerInvariant($order->user_id, $order->guest_id);
+            // Strict on every save, insert or update. orders.total_amount is
+            // declared NOT NULL with default 0 (V004), so a persisted row can
+            // never carry NULL and there is no legacy shape to tolerate here;
+            // assertNonNegativeCentsIfPresent() would only weaken this guard
+            // for a state the schema cannot produce.
             PersistedMoney::assertNonNegativeCents($order->total_amount, 'orders.total_amount');
             // Nullable legacy columns may stay null, but a present value must
             // never be negative or exceed the persisted money ceiling.

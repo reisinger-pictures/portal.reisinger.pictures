@@ -180,7 +180,16 @@ class InviteController extends Controller
 
             // Sanitize before issuing a replacement token as well. This drops
             // grants whose invite was revoked while the current JWT was alive.
-            $transientClaims = app(AuthorizationService::class)->sanitizeTransientClaims($transientClaims);
+            //
+            // FINAL-6: a grant that is only invisible from this host is carried
+            // through rather than burned, because the replacement token outlives
+            // this request and a host mismatch is a viewing-context problem, not
+            // a revocation. The server still has to be on the invite's host for
+            // the grant to become usable.
+            $transientClaims = app(AuthorizationService::class)->sanitizeTransientClaims(
+                $transientClaims,
+                true,
+            );
             $token = $guard->claims($transientClaims)->login($currentUser);
 
             return $this->respondWithToken($token, ['full_path' => $gallery->full_path]);

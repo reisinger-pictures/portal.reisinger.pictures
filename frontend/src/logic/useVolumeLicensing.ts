@@ -667,10 +667,9 @@ export function useVolumeLicensing(items: CartItem[], galleryId?: string): Volum
     // supplies each child descriptor; an unresolved gallery is omitted until
     // its own terms arrive. Never apply the displayed gallery's descriptor to
     // unrelated cart galleries.
-    const groups = groupCartItemsByPricing(
-        items,
-        item => resolvedTerms.descriptorForGallery(item.galleryId),
-    );
+    const resolveItemDescriptor = (item: CartItem): EffectivePricingDescriptor | null =>
+        resolvedTerms.descriptorForGallery(item.galleryId);
+    const groups = groupCartItemsByPricing(items, resolveItemDescriptor);
     const volumeGroups = groups.filter(group => group.isVolumePricing);
 
     // A photo-price card may show a prospective price for a gallery that is
@@ -699,6 +698,13 @@ export function useVolumeLicensing(items: CartItem[], galleryId?: string): Volum
     );
     const volumeSubtotalCents = volumeGroups.reduce((sum, group) => sum + group.totalCents, 0);
     const groupedTotalCents = sumPricingGroupTotals(groups);
+    // Items whose gallery terms never resolved are grouped nowhere, so the
+    // grouped total is knowingly incomplete. Expose the count instead of
+    // letting a consumer present that sum as final.
+    const unresolvedItemCount = items.reduce(
+        (count, item) => (resolveItemDescriptor(item) === null ? count + 1 : count),
+        0,
+    );
     const selectedTiers = selectedGroup?.tiers
         ?? displayedDescriptor?.config.tiers
         ?? DEFAULT_VOLUME_PRICING.tiers;
@@ -721,5 +727,6 @@ export function useVolumeLicensing(items: CartItem[], galleryId?: string): Volum
         groupedTotalCents,
         volumeSubtotalCents,
         volumeItemPrices,
+        unresolvedItemCount,
     };
 }

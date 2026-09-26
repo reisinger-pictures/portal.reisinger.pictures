@@ -181,6 +181,79 @@ class AuthorizationServiceTest extends TestCase
         $this->assertContains($inviteGallery->id, $this->service->getActiveTransientMetaGalleryIds($user));
     }
 
+    /**
+     * FINAL-6: a revocation and a host mismatch must not be conflated.
+     *
+     * Sanitizing for a re-issued token dropped any grant that was invisible
+     * from the current host. Because the sanitized claims are then written into
+     * a NEW token that outlives the request, redeeming an invite from the
+     * wrong host destroyed the grant for the whole token lineage — a permanent
+     * loss caused by a transient viewing-context mismatch. A revocation is a
+     * real access loss and must still drop the grant.
+     *
+     * Coverage note: the revocation half is asserted here. The host-mismatch
+     * half is currently LATENT and therefore not reproducible in a test — the
+     * Brand enum holds only `B2B` (SRP was removed), so
+     * `galleryTreeMatchesCurrent()` cannot disagree with the resource brand
+     * yet. That branch is forward protection for when a second brand is added;
+     * it must be re-verified at that point rather than assumed to work.
+     */
+    public function test_reissue_still_drops_a_revoked_invite_grant(): void
+    {
+        $activeGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $activeInvite = GalleryInvite::create([
+            'gallery_id' => $activeGallery->id,
+            'token' => 'reissue-active-'.uniqid(),
+        ]);
+        $revokedGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $revokedInvite = GalleryInvite::create([
+            'gallery_id' => $revokedGallery->id,
+            'token' => 'reissue-revoked-'.uniqid(),
+        ]);
+        // Revocation in this schema is the invite blacklist, not a column.
+        Cache::put('blacklisted_invite_'.$revokedInvite->id, true, now()->addMinutes(60));
+
+        $claims = [
+            'transient_galleries' => [$activeGallery->id, $revokedGallery->id],
+            'transient_meta_galleries' => [],
+            'transient_invites' => [
+                (string) $activeInvite->id => [
+                    'gallery_ids' => [$activeGallery->id],
+                    'meta_gallery_ids' => [],
+                ],
+                (string) $revokedInvite->id => [
+                    'gallery_ids' => [$revokedGallery->id],
+                    'meta_gallery_ids' => [],
+                ],
+            ],
+            'transient_invite_ids' => [
+                (string) $activeInvite->id,
+                (string) $revokedInvite->id,
+            ],
+        ];
+
+        $preserved = $this->service->sanitizeTransientClaims($claims, true);
+
+        $this->assertContains(
+            (string) $activeInvite->id,
+            $preserved['transient_invite_ids'],
+            'A live invite grant must survive the re-issue.',
+        );
+        $this->assertNotContains(
+            (string) $revokedInvite->id,
+            $preserved['transient_invite_ids'],
+            'A revoked invite is a real access loss and must still be dropped.',
+        );
+        $this->assertArrayNotHasKey(
+            (string) $revokedInvite->id,
+            $preserved['transient_invites'],
+        );
+        $this->assertNotContains(
+            $revokedGallery->id,
+            $preserved['transient_galleries'],
+        );
+    }
+
     // ──────────────────────────────────────────────
     //  Direct Gallery Assignments
     // ──────────────────────────────────────────────

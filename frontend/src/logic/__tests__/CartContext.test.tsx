@@ -14,6 +14,7 @@ const mockContextValue = {
     clearCart: vi.fn(),
     totalAmount: 5000,
     itemCount: 1,
+    unresolvedItemCount: 0,
 };
 
 function createWrapper(value = mockContextValue) {

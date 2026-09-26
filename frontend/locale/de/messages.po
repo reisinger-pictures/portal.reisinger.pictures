@@ -2488,6 +2488,10 @@ msgstr "Freitext..."
 msgid "FTP Inbox"
 msgstr "FTP Inbox"
 
+#: src/ui/client/ClientCartView.tsx
+msgid "Für {unresolvedItemCount} Artikel ist der Preis noch nicht verfügbar. Die Summe wird beim Bezahlen verbindlich berechnet."
+msgstr "Für {unresolvedItemCount} Artikel ist der Preis noch nicht verfügbar. Die Summe wird beim Bezahlen verbindlich berechnet."
+
 #: src/ui/Privacy.tsx
 #~ msgid "Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete IP-Risikoschlüssel zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten."
 #~ msgstr "Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete IP-Risikoschlüssel zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten."
