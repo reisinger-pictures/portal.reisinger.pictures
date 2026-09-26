@@ -4938,7 +4938,7 @@ msgstr "Schlagwörter"
 msgid "Schliessen"
 msgstr "Schliessen"
 
-#: src/ui/components/ModalDialogShell.tsx
+#: src/ui/components/ModalShell.tsx
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/InviteModal.tsx
 #: src/ui/management/components/ModelDetailModal.tsx

@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { type KeyboardEvent, type ReactNode, type RefObject, useId } from 'react';
-import { useFocusTrap } from '../../logic/useFocusTrap';
+import { type ReactNode, type RefObject } from 'react';
+import ModalShell from './ModalShell';
 
 interface ModalDialogShellProps {
     title: ReactNode;
@@ -22,6 +22,14 @@ interface ModalDialogShellProps {
     children: ReactNode;
 }
 
+/**
+ * A form-shaped dialog: header, body, and a submit/cancel footer.
+ *
+ * The accessibility contract is not here, it lives in ModalShell. This
+ * component only adds the form and its footer, which is why the two are split:
+ * eleven of the modals fixed for FE-8 have no form at all and could not
+ * sensibly use this one.
+ */
 export default function ModalDialogShell({
     title,
     icon,
@@ -40,67 +48,34 @@ export default function ModalDialogShell({
     className = '',
     children,
 }: ModalDialogShellProps) {
-    const widthClass = maxWidth === '2xl' ? 'max-w-2xl' : '';
-    const titleId = useId();
-    const internalRef = useFocusTrap<HTMLDialogElement>(true, { containerRef: modalRef });
-    const resolvedRef = modalRef ?? internalRef;
-
-    const handleKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
-        if (event.key !== 'Escape') return;
-        event.preventDefault();
-        onClose();
-    };
+    const footer = (
+        <div className="modal-action col-span-full flex justify-between mt-8">
+            {editing ? (
+                <button type="button" className="btn btn-outline btn-error" onClick={onDelete}><Trans>Löschen</Trans></button>
+            ) : <div></div>}
+            <div>
+                <button type="button" className="btn btn-ghost mr-2" onClick={onClose}>{cancelText}</button>
+                <button type="submit" className={`btn ${submitClassName}`} disabled={isSubmitting}>
+                    {isSubmitting ? <span className="loading loading-spinner"></span> : submitText}
+                </button>
+            </div>
+        </div>
+    );
 
     return (
-        <dialog
-            ref={resolvedRef}
-            open
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            aria-describedby={descriptionId}
-            className={`modal modal-open ${className}`.trim()}
-            onKeyDown={handleKeyDown}
-            onCancel={(event) => {
-                event.preventDefault();
-                onClose();
-            }}
+        <ModalShell
+            title={title}
+            icon={icon}
+            onClose={onClose}
+            modalRef={modalRef}
+            maxWidth={maxWidth}
+            secondaryAction={secondaryAction}
+            descriptionId={descriptionId}
+            className={className}
+            onFormSubmit={onSubmit}
+            footer={footer}
         >
-            <div className={`modal-box relative ${widthClass}`}>
-                <button
-                    type="button"
-                    className="btn btn-circle btn-ghost absolute right-2 top-2"
-                    onClick={onClose}
-                    aria-label={t`Schließen`}
-                >
-                    <span aria-hidden="true">✕</span>
-                </button>
-
-                <div className="flex justify-between items-center mb-6 mr-8">
-                    <h3 id={titleId} className="font-bold text-xl flex items-center gap-2">
-                        {icon && <span className={`iconify ${icon} text-primary`} aria-hidden="true"></span>}
-                        {title}
-                    </h3>
-                    {secondaryAction}
-                </div>
-
-                <form onSubmit={onSubmit}>
-                    {children}
-
-                    <div className="modal-action col-span-full flex justify-between mt-8">
-                        {editing ? (
-                            <button type="button" className="btn btn-outline btn-error" onClick={onDelete}><Trans>Löschen</Trans></button>
-                        ) : <div></div>}
-                        <div>
-                            <button type="button" className="btn btn-ghost mr-2" onClick={onClose}>{cancelText}</button>
-                            <button type="submit" className={`btn ${submitClassName}`} disabled={isSubmitting}>
-                                {isSubmitting ? <span className="loading loading-spinner"></span> : submitText}
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div className="modal-backdrop" aria-hidden="true" onClick={onClose}></div>
-        </dialog>
+            {children}
+        </ModalShell>
     );
 }
