@@ -6,38 +6,46 @@ application pipelines and published as **mutable tags**:
 | Image | Published tags | Built by | Consumed by |
 |-------|----------------|----------|-------------|
 | `portal-base` | `8.5`, `latest` | `.github/workflows/base-image.yml` (push to `main`, nightly cron, manual) | `deployment/docker-compose.yml` (production) and `.github/workflows/ci.yml` (backend job) |
-| `portal-e2e` | `latest`, `<playwright-version>` | `.github/workflows/e2e-image.yml` (push to `main`, weekly cron, manual) | `.github/workflows/ci.yml` (e2e job `container:`) |
+| `portal-e2e` | `<playwright-version>`, `latest` | `.github/workflows/e2e-image.yml` (push to `main`, weekly cron, manual) | `.github/workflows/ci.yml` (e2e job `container:`) |
 
-Only the **sha256 digest** is an immutable consumer pin. A mutable tag is
-useful for publishing, not for consuming. Every consumer therefore pins the
-digest (`reference@sha256:...`), and the only place that may change is the
-repository pin itself.
+Since the owner decision of 2026-09-26 the consumers pin a **concrete tag**
+(`portal-base:8.5`, `portal-e2e:<playwright-version>`) and never `latest`. The
+earlier `@sha256` digest pin was dropped: a digest froze an image to one build
+and required a manual update for every patch release, so a base-image security
+fix stayed on the tag while the repository kept booting the older digest.
 
 ## The gap this policy closes
 
-Because nothing updated the consumer digests, a rebuild reached GHCR but never
-CI or production: security fixes in the base image (PHP, extensions, exiftool)
-stayed on the tag while the repository kept booting the older digest. The
-non-root artifact gate (`verify-image-nonroot.sh`) happily passed on the stale
-pin, because it inspects the pinned digest — a correct artifact, just an old
-one.
+Pinning a tag has one honest downside: a **mutable tag is not an immutable
+pin**. The digest guarantee — the consumer boots exactly the bytes that were
+reviewed — is intentionally gone, and a tag can move under the consumer. That
+trade was accepted because the tag delivers rebuilds automatically.
+
+What the tag does *not* fix is a workflow that silently stopped running (cron
+disabled, build broken, a secret expired): the tag still resolves, but it now
+points at an **old artifact**. Nothing changes at the consumer, and the non-root
+artifact gate (`verify-image-nonroot.sh`) happily inspects that old artifact —
+a correct image, just a stale one. The remaining, and only, barrier is the
+artifact's age, which this policy enforces.
 
 ## The gate
 
-`tests/infrastructure/verify-image-freshness.sh` resolves, for each consumed
-tag, the digest the tag currently points at (anonymous registry inspect) and
-compares it with the repository pin:
+`tests/infrastructure/verify-image-freshness.sh`:
 
-- **pin == tag digest** → fresh.
-- **pin != tag digest and pinned artifact age ≤ `MAX_IMAGE_PIN_AGE_DAYS`** →
-  the consumer is behind, but inside the documented grace window; the gate
-  prints a `behind:` line and passes.
-- **pin != tag digest and pinned artifact age > `MAX_IMAGE_PIN_AGE_DAYS`**, or
-  the pinned artifact itself is older than the maximum → **FAIL**. The pin must
-  be bumped to the current digest.
+1. resolves the consumed tag from the repository's own pins
+   (`deployment/docker-compose.yml` for `portal-base`, `.github/workflows/ci.yml`
+   for `portal-base` and `portal-e2e`) and rejects `latest`;
+2. resolves the digest the tag currently points at, anonymously;
+3. reads the artifact's own `created` timestamp from the published image config;
+4. **age ≤ `MAX_IMAGE_PIN_AGE_DAYS`** → pass; the gate prints which artifact
+   (`image:tag -> digest`) is how old and confirms it is inside the window.
+5. **age > `MAX_IMAGE_PIN_AGE_DAYS`** → **FAIL**; the tag must be rebuilt and
+   republished.
 
-The pinned artifact's age is read from the published image config `created`
-field, so a workflow that silently stopped rebuilding also trips the gate.
+The artifact's age is read from the published image config `created` field, so a
+workflow that silently stopped rebuilding trips the gate even though the tag
+still resolves. The registry inspect is anonymous: a package that is not
+anonymously readable fails the gate instead of being skipped.
 
 **Documented maximum pin age: 14 days** (`DEFAULT_MAX_PIN_AGE_DAYS` in the
 script; overridable with `MAX_IMAGE_PIN_AGE_DAYS`). 14 days bounds exposure to
@@ -48,18 +56,21 @@ The gate runs in the `security-contract` CI job, next to
 `verify-image-nonroot.sh`. Both inspect the registry anonymously; a private
 package fails the job instead of silently skipping it.
 
-## Bumping a pin
+## Publishing a new artifact
 
-1. Read the current tag digest, for example with
-   `docker buildx imagetools inspect <reference>:<tag>`, or from the
-   `verify-image-freshness.sh` `behind:` line.
-2. Update **every** consumer of that image:
-   - `portal-base`: `deployment/docker-compose.yml`,
-     `.github/workflows/ci.yml`, and `deployment/Dockerfile.e2e` (`FROM`).
-   - `portal-e2e`: `.github/workflows/ci.yml` only.
-3. Run `bash tests/infrastructure/verify-image-nonroot.sh` and
-   `bash tests/infrastructure/verify-image-freshness.sh` locally (both need
-   network access).
+There is no digest pin to bump any more; a rebuild under the consumed tag
+refreshes the artifact every consumer follows:
+
+- `portal-base`: `base-image.yml` republishes `8.5` (and `latest`). Production
+  and the backend CI job pick the new build up on the next pull.
+- `portal-e2e`: `e2e-image.yml` republishes `portal-e2e:<playwright-version>`
+  (and `latest`). `ci.yml` pins that version tag (`1.62.1` today, from
+  `frontend/package.json`). When Playwright moves to a new minor and the old
+  version tag stops being rebuilt, the age gate fails and the consumer must move
+  to the new version tag in `ci.yml`.
+- Verify locally after a change (both need network access):
+  `bash tests/infrastructure/verify-image-nonroot.sh` and
+  `bash tests/infrastructure/verify-image-freshness.sh`.
 
 `provenance: true` and `sbom: true` are set on both build-push steps so each
-published digest carries a signed provenance attestation and an SBOM.
+published artifact carries a signed provenance attestation and an SBOM.

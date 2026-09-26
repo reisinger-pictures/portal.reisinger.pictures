@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Regression for the INFRA-10 pinned-digest freshness gate.
+# Regression for the INFRA-10 tag-pinned freshness gate.
 #
 # A real registry is not required: a tiny fixture registry plus a synthetic
-# repository pin proves both outcomes of verify-image-freshness.sh.
-#   * stale: the consumed tag moved on while the pin aged past the documented
-#     maximum -> the gate MUST fail.
-#   * fresh: the consumed tag resolves to the pinned digest -> the gate MUST
-#     pass.
+# repository proves both outcomes of verify-image-freshness.sh.
+#   * stale: the artifact the consumed tag resolves to was built long ago ->
+#     the gate MUST fail, because the age barrier is the only protection left
+#     after the digest pin was dropped.
+#   * fresh: the consumed tag resolves to a recently built artifact -> the gate
+#     MUST pass.
 # It also asserts the documented policy constants and the provenance/sbom
 # attestations, so the policy cannot be silently removed.
 set -euo pipefail
@@ -27,7 +28,7 @@ fail() {
 grep -Fq -- 'readonly DEFAULT_MAX_PIN_AGE_DAYS=14' "$FRESHNESS_GATE" \
     || fail 'the documented maximum pin age must stay at 14 days'
 if grep -Eq 'sha256:[0-9a-f]{64}' "$FRESHNESS_GATE"; then
-    fail 'the freshness gate must resolve pins from the repository, not carry its own digest'
+    fail 'the freshness gate must resolve tags from the repository, not carry its own digest'
 fi
 if grep -Eq '\|\|[[:space:]]*true' "$FRESHNESS_GATE"; then
     fail 'the freshness gate must fail closed, not degrade to a no-op'
@@ -40,17 +41,14 @@ for workflow in base-image e2e-image; do
 done
 
 # --- synthetic repository -----------------------------------------------------
-readonly BASE_PIN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-readonly E2E_PIN="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-
 FIXTURE_REPO="$TMP_ROOT/repo"
 mkdir -p "$FIXTURE_REPO/tests/infrastructure" "$FIXTURE_REPO/deployment" "$FIXTURE_REPO/.github/workflows"
 cp "$FRESHNESS_GATE" "$FIXTURE_REPO/tests/infrastructure/verify-image-freshness.sh"
 
-cat > "$FIXTURE_REPO/deployment/docker-compose.yml" <<YAML
+cat > "$FIXTURE_REPO/deployment/docker-compose.yml" <<'YAML'
 services:
   backend:
-    image: ghcr.io/reisinger-pictures/portal-base:8.5@sha256:${BASE_PIN}
+    image: ghcr.io/reisinger-pictures/portal-base:8.5
 YAML
 cat > "$FIXTURE_REPO/deployment/Dockerfile" <<'DOCKERFILE'
 FROM scratch
@@ -61,18 +59,19 @@ FROM scratch
 USER root
 USER www-data
 DOCKERFILE
-cat > "$FIXTURE_REPO/.github/workflows/ci.yml" <<YAML
+cat > "$FIXTURE_REPO/.github/workflows/ci.yml" <<'YAML'
 jobs:
   backend:
     steps:
-      - run: docker run ghcr.io/reisinger-pictures/portal-base:8.5@sha256:${BASE_PIN}
+      - run: docker run ghcr.io/reisinger-pictures/portal-base:8.5
   e2e:
     container:
-      image: ghcr.io/reisinger-pictures/portal-e2e@sha256:${E2E_PIN}
+      image: ghcr.io/reisinger-pictures/portal-e2e:1.62.1
 YAML
 
 # --- fixture registry ---------------------------------------------------------
 cat > "$TMP_ROOT/fixture-registry.py" <<'PYTHON'
+import datetime
 import json
 import os
 import re
@@ -81,17 +80,16 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 MODE = os.environ["FIXTURE_MODE"]
 PORT_FILE = os.environ["FIXTURE_PORT_FILE"]
-BASE_PIN = "a" * 64
-E2E_PIN = "b" * 64
-BASE_TAG_STALE = "c" * 64
-E2E_TAG_STALE = "e" * 64
+BASE_DIGEST = "a" * 64
+E2E_DIGEST = "b" * 64
 CONFIG_DIGEST = "d" * 64
+# "fresh" is a build from right now; "stale" is far past the 14-day window.
+NOW = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+STALE = "2000-01-01T00:00:00Z"
 
 
 def tag_digest(repo):
-    if repo.endswith("portal-base"):
-        return BASE_PIN if MODE == "fresh" else BASE_TAG_STALE
-    return E2E_PIN if MODE == "fresh" else E2E_TAG_STALE
+    return BASE_DIGEST if repo.endswith("portal-base") else E2E_DIGEST
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -135,7 +133,8 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if re.match(r"^/v2/(.+)/blobs/sha256:[0-9a-f]+$", path):
-            self._send(200, json.dumps({"created": "2000-01-01T00:00:00Z"}).encode(), {"Content-Type": "application/json"})
+            created = NOW if MODE == "fresh" else STALE
+            self._send(200, json.dumps({"created": created}).encode(), {"Content-Type": "application/json"})
             return
 
         self._send(404, b"not found")
@@ -194,7 +193,8 @@ run_case() {
         || fail "freshness gate output for mode=$mode did not contain '$expected_text': $(cat "$output_file")"
 }
 
-run_case stale 1 'stale portal-base pin'
+# Old artifact behind the tag -> hard failure. Fresh artifact -> pass.
+run_case stale 1 'stale portal-base artifact'
 run_case fresh 0 'fresh: portal-base'
 
-printf 'PASS: image pin freshness gate regression (stale pin fails, fresh pin passes)\n'
+printf 'PASS: image pin freshness gate regression (stale artifact fails, fresh artifact passes)\n'

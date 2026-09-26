@@ -1,23 +1,25 @@
 #!/usr/bin/env bash
-# Pinned-digest freshness gate (INFRA-10).
+# Tag-pinned freshness gate (INFRA-10).
 #
 # Policy (documented here and in deployment/image-pin-freshness.md):
-#   `base-image.yml` and `e2e-image.yml` push mutable tags (portal-base:8.5,
-#   portal-e2e:latest). Only the sha256 digest is an immutable consumer pin, so
-#   a rebuild reaches GHCR but never CI or production until the pin is bumped.
-#   This gate resolves the digest the consumed tag currently points at and
-#   compares it with the repository pin:
-#     * pin == tag digest              -> fresh.
-#     * pin != tag digest, pin age     -> the consumer is behind; allowed only
-#       <= MAX_IMAGE_PIN_AGE_DAYS        while the pinned artifact is younger
-#                                        than the documented maximum age. Older
-#                                        than that is a hard failure.
-#   The pinned artifact's age is read from the published image config `created`
-#   field, so a workflow that silently stopped rebuilding also trips the gate.
+#   `base-image.yml` and `e2e-image.yml` publish mutable tags (portal-base:8.5,
+#   portal-e2e:<playwright-version>). Since the owner decision of 2026-09-26 the
+#   consumers pin a concrete tag (no `latest`) and follow it, so a rebuild
+#   reaches CI and production without a manual pin bump. A mutable tag is
+#   deliberately NOT an immutable digest pin: the earlier `@sha256` guarantee is
+#   traded for automatic bugfix delivery. The remaining barrier is the artifact's
+#   age. This gate resolves the digest the consumed tag currently points at,
+#   reads that artifact's own `created` timestamp from the published image
+#   config, and fails when the artifact is older than MAX_IMAGE_PIN_AGE_DAYS:
+#     * age <= MAX_IMAGE_PIN_AGE_DAYS -> pass.
+#     * age >  MAX_IMAGE_PIN_AGE_DAYS -> hard failure; rebuild and republish.
+#   A workflow that silently stopped rebuilding therefore trips the gate even
+#   though the tag still resolves.
 #
 # The registry inspect is anonymous on purpose (the packages are public); a
 # 401/403 fails closed instead of degrading to a skip, exactly like
-# verify-image-nonroot.sh.
+# verify-image-nonroot.sh. `latest` is rejected: the pin must name a concrete
+# tag (P1-M45).
 #
 # Bash 3.2 compatible: no mapfile/readarray.
 set -euo pipefail
@@ -31,8 +33,8 @@ E2E_DOCKERFILE="$ROOT_DIR/deployment/Dockerfile.e2e"
 readonly DEFAULT_REGISTRY_BASE_URL='https://ghcr.io'
 readonly HTTP_TIMEOUT_SECONDS=30
 readonly MANIFEST_ACCEPT='application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json'
-# Documented maximum freshness window for a consumer pin. Overridable for the
-# fixture regression; the default is the production policy.
+# Documented maximum freshness window for a consumed tag's artifact. Overridable
+# for the fixture regression; the default is the production policy.
 readonly DEFAULT_MAX_PIN_AGE_DAYS=14
 
 REGISTRY_BASE_URL="${IMAGE_REGISTRY_BASE_URL:-$DEFAULT_REGISTRY_BASE_URL}"
@@ -117,35 +119,37 @@ if not token:
 print(token)' <"$BODY_FILE")" || fail "the token response carried no pull token"
         http_get "$manifest_url" -H "Accept: $MANIFEST_ACCEPT" -H "Authorization: Bearer $anonymous_token"
         if [[ "$HTTP_STATUS" == '401' || "$HTTP_STATUS" == '403' ]]; then
-            fail "the pinned ${current_image} artifact is not anonymously inspectable: the registry answered HTTP ${HTTP_STATUS}; the registry packages must be public"
+            fail "the consumed ${current_image} artifact is not anonymously inspectable: the registry answered HTTP ${HTTP_STATUS}; the registry packages must be public"
         fi
         return 0
     fi
-    fail "the pinned ${current_image} artifact is not anonymously inspectable: ${REGISTRY_BASE_URL} answered HTTP ${HTTP_STATUS}; the registry packages must be public"
+    fail "the consumed ${current_image} artifact is not anonymously inspectable: ${REGISTRY_BASE_URL} answered HTTP ${HTTP_STATUS}; the registry packages must be public"
 }
 
-# Resolves the single pinned digest for $1 from the remaining files (same
-# resolver as verify-image-nonroot.sh: the repository pin is the source of
-# truth, never a second hardcoded copy).
+# Resolves the single consumed tag for $1 from the remaining files (same
+# resolver shape as verify-image-nonroot.sh: the repository pin is the source of
+# truth, never a second hardcoded copy). Emits the tag (e.g. "8.5") on stdout;
+# fails closed on zero or on a disagreement.
 resolve_pin() {
     local image_name="$1"
     shift
-    local digests=()
-    local digest
-    while IFS= read -r digest; do
-        [[ -n "$digest" ]] || continue
-        digests+=("$digest")
+    local tags=()
+    local tag
+    while IFS= read -r tag; do
+        [[ -n "$tag" ]] || continue
+        tags+=("$tag")
     done < <(
-        grep -ohE "ghcr\.io/[A-Za-z0-9._-]+/${image_name}(:[^[:space:]\"']+)?@sha256:[0-9a-f]{64}" "$@" \
-            | sed -E 's/.*@(sha256:[0-9a-f]{64})$/\1/' \
+        grep -ohE "ghcr\.io/[A-Za-z0-9._-]+/${image_name}:[^[:space:]\"'@]+" "$@" \
+            | sed -E 's/.*:([^[:space:]@]+)$/\1/' \
             | sort -u
     )
-    ((${#digests[@]} > 0)) || fail "no digest-pinned ${image_name} reference found in: $*"
-    ((${#digests[@]} == 1)) || fail "the pinned ${image_name} digests disagree: ${digests[*]}"
-    printf '%s' "${digests[0]}"
+    ((${#tags[@]} > 0)) || fail "no tag-pinned ${image_name} reference found in: $*"
+    ((${#tags[@]} == 1)) || fail "the consumed ${image_name} tags disagree: ${tags[*]}"
+    printf '%s' "${tags[0]}"
 }
 
-# Digest age in whole days from a published image `created` timestamp.
+# Age in whole days from a published image `created` timestamp. Prints -1 when
+# the timestamp cannot be parsed, so the caller can fail closed.
 created_age_days() {
     python3 - "$1" <<'PY'
 import datetime
@@ -168,30 +172,30 @@ print((now - base).days)
 PY
 }
 
-# Fetches the image config `created` timestamp for a pinned digest. Expects the
-# image config blob to be readable anonymously.
+# Fetches the image config `created` timestamp for a resolved digest. Expects
+# the image config blob to be readable anonymously.
 created_for_digest() {
     local image_repository="$1"
-    local pinned_digest="$2"
+    local artifact_digest="$2"
     local manifest_url config_digest resolved manifest_kind
-    manifest_url="$REGISTRY_BASE_URL/v2/$image_repository/manifests/$pinned_digest"
+    manifest_url="$REGISTRY_BASE_URL/v2/$image_repository/manifests/$artifact_digest"
     ensure_anonymous_token "$manifest_url"
     [[ "$HTTP_STATUS" == '200' ]] \
-        || fail "unexpected HTTP $HTTP_STATUS while fetching the manifest of ${pinned_digest}"
+        || fail "unexpected HTTP $HTTP_STATUS while fetching the manifest of ${artifact_digest}"
 
     resolved="$(resolve_manifest_config)" \
-        || fail "could not resolve the config digest of ${pinned_digest}"
+        || fail "could not resolve the config digest of ${artifact_digest}"
     read -r manifest_kind config_digest <<<"$resolved"
     if [[ "$manifest_kind" == 'index' ]]; then
         http_get_with_token "$REGISTRY_BASE_URL/v2/$image_repository/manifests/$config_digest" -H "Accept: $MANIFEST_ACCEPT"
         [[ "$HTTP_STATUS" == '200' ]] \
-            || fail "unexpected HTTP $HTTP_STATUS while resolving the platform manifest of ${pinned_digest}"
-        resolved="$(resolve_manifest_config)" || fail "could not resolve the platform config of ${pinned_digest}"
+            || fail "unexpected HTTP $HTTP_STATUS while resolving the platform manifest of ${artifact_digest}"
+        resolved="$(resolve_manifest_config)" || fail "could not resolve the platform config of ${artifact_digest}"
         read -r manifest_kind config_digest <<<"$resolved"
     fi
 
     http_get_with_token "$REGISTRY_BASE_URL/v2/$image_repository/blobs/$config_digest"
-    [[ "$HTTP_STATUS" == '200' ]] || fail "unexpected HTTP $HTTP_STATUS while fetching the config of ${pinned_digest}"
+    [[ "$HTTP_STATUS" == '200' ]] || fail "unexpected HTTP $HTTP_STATUS while fetching the config of ${artifact_digest}"
     python3 -c \
         'import json, sys; print(json.load(sys.stdin).get("created", ""))' <"$BODY_FILE"
 }
@@ -213,58 +217,61 @@ else:
     print("manifest", manifest["config"]["digest"])' <"$BODY_FILE"
 }
 
-# Verifies one consumed image against the digest its consumed tag points at.
-# $1 image, $2 consumed tag, $3.. consumer files.
+# Verifies one consumed image: the tag is resolved from the repository's own
+# pins, then the artifact that tag currently points at must be younger than the
+# documented maximum age. $1 image, $2.. consumer files.
 verify_freshness() {
     local image_name="$1"
-    local consumed_tag="$2"
-    shift 2
+    shift
     local sources=("$@")
 
     current_image="$image_name"
     anonymous_token=''
 
-    local pinned_digest
-    pinned_digest="$(resolve_pin "$image_name" "${sources[@]}")"
+    local pinned_tag
+    pinned_tag="$(resolve_pin "$image_name" "${sources[@]}")"
+    [[ "$pinned_tag" != 'latest' ]] \
+        || fail "${image_name} is consumed through the mutable 'latest' tag; \
+pin a concrete tag instead (P1-M45)."
 
     local pinned_reference image_repository
-    pinned_reference="$(grep -ohE "ghcr\.io/[A-Za-z0-9._-]+/${image_name}(:[^[:space:]\"']+)?@${pinned_digest}" \
+    pinned_reference="$(grep -ohE "ghcr\.io/[A-Za-z0-9._-]+/${image_name}:${pinned_tag}" \
         "${sources[@]}" | sort -u | head -n 1)"
-    [[ -n "$pinned_reference" ]] || fail "could not reconstruct the pinned ${image_name} reference"
+    [[ -n "$pinned_reference" ]] || fail "could not reconstruct the consumed ${image_name} reference"
     local pinned_path="${pinned_reference#*/}"
-    pinned_path="${pinned_path%@*}"
+    pinned_path="${pinned_path%:*}"
     image_repository="${pinned_path%:*}"
+    printf 'pin: %s (resolved from %d consumer reference(s))\n' "$pinned_reference" "${#sources[@]}"
 
-    # Current digest the consumed tag points at.
-    local tag_url
-    tag_url="$REGISTRY_BASE_URL/v2/$image_repository/manifests/$consumed_tag"
+    # The digest the consumed tag currently points at.
+    local tag_url tag_digest
+    tag_url="$REGISTRY_BASE_URL/v2/$image_repository/manifests/$pinned_tag"
     ensure_anonymous_token "$tag_url"
     [[ "$HTTP_STATUS" == '200' ]] \
-        || fail "unexpected HTTP $HTTP_STATUS while resolving the ${image_name}:${consumed_tag} tag"
-    local tag_digest
+        || fail "unexpected HTTP $HTTP_STATUS while resolving the ${image_name}:${pinned_tag} tag"
     tag_digest="$(sed -nE 's/^[Dd]ocker-[Cc]ontent-[Dd]igest:[[:space:]]*(sha256:[0-9a-f]{64}).*$/\1/p' \
         "$HEADER_FILE" | tr -d '\r' | tail -n 1)"
     [[ -n "$tag_digest" ]] \
-        || fail "the registry did not return a Docker-Content-Digest for ${image_name}:${consumed_tag}"
+        || fail "the registry did not return a Docker-Content-Digest for ${image_name}:${pinned_tag}"
 
-    if [[ "$tag_digest" == "$pinned_digest" ]]; then
-        printf 'fresh: %s:%s pin %s matches the published tag\n' "$image_name" "$consumed_tag" "$pinned_digest"
-        return 0
-    fi
-
+    # The artifact's own build timestamp, read from its published image config.
     local created age
-    created="$(created_for_digest "$image_repository" "$pinned_digest")"
+    created="$(created_for_digest "$image_repository" "$tag_digest")"
     [[ -n "$created" ]] || fail "the ${image_name} config carried no 'created' timestamp"
     age="$(created_age_days "$created")"
-    [[ "$age" =~ ^-?[0-9]+$ ]] || fail "could not compute the age of the pinned ${image_name} artifact"
+    [[ "$age" =~ ^-?[0-9]+$ ]] || fail "could not compute the age of the ${image_name} artifact"
+    (( age >= 0 )) \
+        || fail "the ${image_name} artifact ${tag_digest} reports an unusable 'created' timestamp (${created}); \
+the ${MAX_PIN_AGE_DAYS}-day freshness window cannot be proven."
 
     if (( age > MAX_PIN_AGE_DAYS )); then
-        fail "stale ${image_name} pin: the consumer pins ${pinned_digest} (built ${created}, ${age} days old) while ${image_name}:${consumed_tag} already points at ${tag_digest}. \
-Bump the pin in ${sources[*]} to the current digest; the documented maximum pin age is ${MAX_PIN_AGE_DAYS} days."
+        fail "stale ${image_name} artifact: ${image_name}:${pinned_tag} points at ${tag_digest} \
+(built ${created}, ${age} day(s) old), which is older than the documented maximum age of ${MAX_PIN_AGE_DAYS} days. \
+Rebuild ${image_name} and republish the tag so every consumer picks up a fresh artifact."
     fi
 
-    printf 'behind: %s pin is %d day(s) old and %s:%s already moved to %s (within the documented %d-day grace)\n' \
-        "$image_name" "$age" "$image_name" "$consumed_tag" "$tag_digest" "$MAX_PIN_AGE_DAYS"
+    printf 'fresh: %s:%s -> %s built %s (%d day(s) old, within the documented %d-day window)\n' \
+        "$image_name" "$pinned_tag" "$tag_digest" "$created" "$age" "$MAX_PIN_AGE_DAYS"
 }
 
 require_command curl
@@ -279,5 +286,5 @@ if [[ "$REGISTRY_BASE_URL" != "$DEFAULT_REGISTRY_BASE_URL" ]]; then
         "$REGISTRY_BASE_URL" >&2
 fi
 
-verify_freshness 'portal-base' '8.5' "$COMPOSE_FILE" "$CI_WORKFLOW"
-verify_freshness 'portal-e2e' 'latest' "$CI_WORKFLOW"
+verify_freshness 'portal-base' "$COMPOSE_FILE" "$CI_WORKFLOW"
+verify_freshness 'portal-e2e' "$CI_WORKFLOW"
