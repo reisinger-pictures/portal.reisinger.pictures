@@ -107,18 +107,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [ ] **FE-8 — 12 von 13 Modals abgeschlossen; `InviteModal` ist der Rest.**
-  Verifiziert 2026-09-26 gegen den Code: `PhotoHistoryModal`, `AIBatchEditModal`,
-  `AIGalleryDefaultsModal`, `EmailComposerModal`, `GalleryAccessModal`,
-  `GalleryMetadataDefaultsModal`, `InviteModal`, `ModelDetailModal`,
-  `PhotographerTeamModal`, `RatingStatusModal`, `ShootingCalculatorModal`,
-  `PhotoJobModal` und `LicenseSelectorModal` nutzen bereits `ModalShell` inklusive
-  Fokus-Trap, `aria-modal` und Escape. `InviteModal` ist die **einzige Ausnahme**:
-  es baut die Dialog-Struktur aus rohen daisyUI-Klassen selbst
-  (`modal modal-open`, `modal-box`, `modal-backdrop`), ohne `role="dialog"`,
-  ohne Fokus-Trap, ohne Escape-Handling. Es hat ein Formular (Radio-Buttons,
-  Inputs, Checkbox, Tabelle) → `ModalDialogShell`. **Bereich:**
-  `frontend/src/ui/management/components/InviteModal.tsx:65-201`.
+- [x] **FE-8 (abgeschlossen 2026-09-26) — 13 Modals ohne Focus-Trap/ARIA/Escape.** Verifiziert gegen den Code: alle 13 nutzen `ModalShell` inklusive Fokus-Trap, `aria-modal` und Escape. `InviteModal` war die letzte Ausnahme (rohe daisyUI-Klassen, kein `role="dialog"`), wurde auf `ModalShell` migriert. Lint + Build grün. Der Board-Satz "13 offene Modals" war veraltet — 12 davon waren bereits in `af0c661` erledigt. **Erledigt, kein Handlungsbedarf.**
 - [ ] **FE-2 (halb) — i18n-Wächter fehlt.** Die drei zitierten Strings sind
   gefixt, aber `check-i18n.mjs` erkennt einen **ungewrappten** String nicht: er
   wird nie extrahiert, also nie gesehen. Es braucht eine AST-Regel für

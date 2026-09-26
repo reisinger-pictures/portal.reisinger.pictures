@@ -4,6 +4,7 @@ import {useState} from 'react';
 import useSWR from 'swr';
 import {apiMutate, fetcher, GenerateInviteResponse, InviteData} from '../../../api';
 import {useUI} from '../../components/UIContext';
+import ModalShell from '../../components/ModalShell';
 
 export interface InviteModalProps {
     galleryId: string;
@@ -63,12 +64,17 @@ export default function InviteModal({galleryId, galleryType, onClose}: InviteMod
     };
 
     return (
-        <div className="modal modal-open">
-            <div className="modal-box relative max-w-2xl">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
-                    <span className="iconify mdi--link-variant text-info"></span> <Trans>Einladungen verwalten</Trans>
-                </h3>
+        <ModalShell
+            title={<Trans>Einladungen verwalten</Trans>}
+            icon="mdi--link-variant"
+            onClose={onClose}
+            maxWidth="2xl"
+            footer={
+                <div className="mt-6 flex justify-end">
+                    <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Schließen</Trans></button>
+                </div>
+            }
+        >
 
                 <div className="flex flex-col gap-8">
                     {/* Linke Spalte: Neu generieren */}
@@ -191,12 +197,6 @@ export default function InviteModal({galleryId, galleryType, onClose}: InviteMod
                         </div>
                     </div>
                 </div>
-
-                <div className="modal-action col-span-full mt-6">
-                    <button className="btn" onClick={onClose}><Trans>Schließen</Trans></button>
-                </div>
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+        </ModalShell>
     );
 }
