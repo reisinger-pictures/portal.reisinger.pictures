@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Exceptions\SftpGoException;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\FtpCredentialService;
 use App\Support\FtpSlug;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -55,7 +56,17 @@ class FtpSlugValidationTest extends TestCase
         $user = User::factory()->create(['email' => $email, 'name' => 'Max Mustermann']);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
-        return $user;
+        // `active` on purpose for the account assertions in this file: they
+        // describe the replacement of an account that *exists*, which is the
+        // `DELETE`-then-`POST` order. A photographer who never had an account is
+        // `pending`, has nothing to delete and provisions without a `DELETE` —
+        // that case lives in `FtpFirstSlugChangeTest`, because a shared helper
+        // that silently picked one of the two states would let both regress.
+        // The column is not mass-assignable and is written the way the service
+        // writes it.
+        $user->forceFill(['ftp_account_status' => FtpCredentialService::STATUS_ACTIVE])->save();
+
+        return $user->fresh();
     }
 
     /**

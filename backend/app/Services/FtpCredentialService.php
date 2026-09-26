@@ -54,6 +54,22 @@ class FtpCredentialService
     public const STATUS_REVOKED = 'revoked';
 
     /**
+     * The two states that are *not* a usable account and are not a deliberate
+     * revocation, named for the reset path (P1-M58). They sit here rather than
+     * as literals in `resetAndShow()` because the branch that reads them decides
+     * whether a photographer gets a credential at all, and a literal would let a
+     * typo degrade into "always reset" without any type to catch it.
+     *
+     * `pending` is the column default and means "never provisioned" — which is
+     * the state every photographer who never changed their slug is in. `error`
+     * means the last provisioning attempt failed, so the real outcome is unknown
+     * and overwriting it would be a guess.
+     */
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_ERROR = 'error';
+
+    /**
      * Resets allowed per account and per hour (P1-M33).
      *
      * Three is a deliberate number and deliberately a constant rather than an
@@ -219,27 +235,71 @@ class FtpCredentialService
     }
 
     /**
-     * Rotates the camera password and returns the new one **once** (P1-M33).
+     * Issues the calling photographer a camera password, **once** (P1-M33,
+     * extended for first-time provisioning in P1-M58).
      *
-     * Same show-once contract as `provisionAndShow()`: the password goes to
-     * SFTPGo, comes back to the caller, and is nowhere else — not in a column,
-     * not in a cache entry, not in the log, not in the audit row.
+     * The one action the inbox offers is "Neues Kamera-Passwort", and it has to
+     * work for all three account states the photographer can be in. Which one it
+     * is decides what this method does, and the table is closed — a state that
+     * is not named here cannot get a credential:
      *
-     * Two guards, in this order:
+     * | `ftp_account_status` | what happens |
+     * |---|---|
+     * | `pending` | **provision** (`provisionAndShow()`), password shown once |
+     * | `active`  | **rotate** the password of the existing account |
+     * | `revoked` | refuse, nothing reaches SFTPGo |
+     * | `error`   | refuse, nothing reaches SFTPGo |
+     *
+     * `pending` has to provision, not rotate: `SftpGoClient::resetPassword()` is
+     * a read-modify-write that starts with `findUser()`, so it answers 404 for an
+     * account that was never created. Before this branch existed, a photographer
+     * who never changed their slug had no way to get an account *at all* — the
+     * status said `pending`, the UI said "request your credentials first", and
+     * the only endpoint 404'd.
+     *
+     * `revoked` must not be revocable again by a click, and that is the reason
+     * the reset is not simply "provision whatever is not active". The revocation
+     * was a deliberate decision (a lost role, §7.16); re-creating the account
+     * would hand a withdrawn photographer a working SFTPGo access again with one
+     * click, and the whole guard would be worthless. `error` is refused for the
+     * same reason in the other direction: the last provisioning attempt failed, so
+     * the real state is unknown, and a reset must not overwrite it with a guess.
+     *
+     * Same show-once contract as `provisionAndShow()` for both successful paths:
+     * the password goes to SFTPGo, comes back to the caller, and is nowhere else
+     * — not in a column, not in a cache entry, not in the log, not in the audit
+     * row.
+     *
+     * Three guards, in this order:
      *
      * 1. **Quota, before anything happens.** The check runs first so a rejected
      *    call generates no password, contacts no service and writes no audit
      *    row: it is not a reset attempt, it is the refusal of one. Note that a
      *    rejected call still increments the counter, so hammering the button
      *    cannot push the window forward indefinitely — the same deliberate
-     *    choice `CheckoutRiskService` makes.
-     * 2. **Audit row, for every attempt that got past the quota** — successful or
+     *    choice `CheckoutRiskService` makes. It also covers the `pending` branch,
+     *    which is why first-time provisioning cannot be used to mint credentials
+     *    around the quota.
+     * 2. **State, inside the `try` and before anything is sent.** Placement is
+     *    the point, not a detail: the `catch` below audits every refusal that
+     *    comes from there as a *failed attempt*, and a click on "new password" for
+     *    a `revoked` account is exactly such an attempt. Checking before the
+     *    `try` would refuse the same states and leave the interesting click
+     *    unaudited — the hole this trail exists to close.
+     * 3. **Audit row, for every attempt that got past the quota** — successful or
      *    not. A failed reset is the more interesting row: it is what a repeated
      *    failure against a live service looks like from the outside. The row is
      *    written from a method that never receives the password, so there is no
      *    path by which the secret could reach the table.
      *
-     * A failure of the audit write itself is *not* swallowed. On the success
+     * The `pending` branch is the one path that writes no audit row, and that is
+     * deliberate rather than an oversight: an account *creation* is not a reset,
+     * and this table is the reset trail. `provisionAndShow()` is also
+     * fail-closed on its own — it writes `active` + `ftp_provisioned_at` only
+     * after SFTPGo has accepted the account, so an unreachable service leaves the
+     * status at `pending` and the photographer can try again.
+     *
+     * A failure of the audit write itself is *not* swallowed. On the rotation
      * path that means a broken database can answer 500 after the password was
      * already rotated, so the photographer never sees the new password and has
      * to reset again — deliberately. The alternative, logging and carrying on,
@@ -253,15 +313,21 @@ class FtpCredentialService
     {
         $this->assertResetQuotaAvailable($user);
 
+        if ($user->ftp_account_status === self::STATUS_PENDING) {
+            return $this->provisionAndShow($user);
+        }
+
         try {
+            $this->assertPasswordMayBeReissued($user);
             $username = $this->accountNameFor($user);
             $password = $this->generateCameraPassword();
             $this->sftpGo->resetPassword($username, $password);
         } catch (Throwable $exception) {
             // Every refusal from here on is a failed reset, including the
-            // portal-side preconditions (no account name, a name that cannot be
-            // an account). Those never reach SFTPGo, but the attempt is exactly
-            // what an audit trail has to show.
+            // portal-side preconditions (an account state that may not be
+            // re-issued, no account name, a name that cannot be an account).
+            // Those never reach SFTPGo, but the attempt is exactly what an audit
+            // trail has to show.
             $this->recordResetAttempt($user, $ip, false);
 
             throw $exception;
@@ -270,6 +336,25 @@ class FtpCredentialService
         $this->recordResetAttempt($user, $ip, true);
 
         return $password;
+    }
+
+    /**
+     * Only an `active` account has a password that may be replaced.
+     *
+     * Written as a positive allow rather than as a list of refusals on purpose:
+     * a state that is added to the enum by a later migration is then refused by
+     * default instead of silently inheriting the rotation. The column is
+     * `NOT NULL` with default `pending` since V041, so there is no "unknown"
+     * value to accommodate — and if there ever were, refusing is the right answer
+     * anyway.
+     */
+    private function assertPasswordMayBeReissued(User $user): void
+    {
+        if ($user->ftp_account_status === self::STATUS_ACTIVE) {
+            return;
+        }
+
+        throw FtpCredentialException::notResettable((string) $user->ftp_account_status);
     }
 
     /**

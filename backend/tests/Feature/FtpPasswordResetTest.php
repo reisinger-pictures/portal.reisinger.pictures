@@ -370,7 +370,13 @@ class FtpPasswordResetTest extends TestCase
     {
         Http::fake();
         $user = User::factory()->create();
-        $user->forceFill(['ftp_slug' => null])->saveQuietly();
+        // `active` on purpose: this is a *reset* that the portal refuses. A
+        // `pending` account is provisioned instead (P1-M58), and that path writes
+        // no audit row at all — a creation is not a reset.
+        $user->forceFill([
+            'ftp_account_status' => FtpCredentialService::STATUS_ACTIVE,
+            'ftp_slug' => null,
+        ])->saveQuietly();
 
         try {
             app(FtpCredentialService::class)->resetAndShow($user, '203.0.113.7');
@@ -567,6 +573,14 @@ class FtpPasswordResetTest extends TestCase
         if (! is_string($user->ftp_slug) || ! FtpSlug::isValid($user->ftp_slug)) {
             $user->forceFill(['ftp_slug' => 'florian'])->save();
         }
+
+        // Everything in this file rotates a *live* account, so the state is named
+        // instead of left to the column default. Since P1-M58 a `pending` account
+        // is provisioned instead of rotated — a different transition with a
+        // different audit contract, covered in `FtpFirstCameraAccountTest`. A
+        // test about the rotation path has to say so; the column is not
+        // mass-assignable and is written the way the service writes it.
+        $user->forceFill(['ftp_account_status' => FtpCredentialService::STATUS_ACTIVE])->save();
 
         return $user->fresh();
     }

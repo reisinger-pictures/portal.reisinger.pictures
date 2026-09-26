@@ -275,7 +275,21 @@ class AuthController extends Controller
                 //    nicht erreichbar ist, abbrechen — der User soll nicht
                 //    aktualisiert werden, wenn der Account nicht gelöscht
                 //    wurde.
-                if ($oldSlug) {
+                //
+                //    Nur wenn laut Status ein Account *existiert* (19-ftp 7.16).
+                //    `User::booted()` vergibt bei jedem Anlegen einen Slug, aber
+                //    kein Konto: Ein Fotograf, der seinen ersten Slug wechselt,
+                //    ist `pending` und hat in SFTPGo nichts, was man löschen
+                //    könnte. `SftpGoClient::deleteUser()` meldet ein 404 aber
+                //    als `not_found` statt es zu schlucken — mit dem
+                //    Fail-closed-Verhalten brach damit *jeder* erste
+                //    Slug-Wechsel mit HTTP 500 ab. Der Guard ist derselbe wie
+                //    in `FtpCredentialService::revoke()`: kein Delete ohne
+                //    Status `active`, sonst hielte SFTPGo einen Account, den das
+                //    Portal nicht als existierend führt. Fail-closed bleibt
+                //    unberührt — ist der Status `active` und SFTPGo nicht
+                //    erreichbar, bricht der Wechsel weiterhin ab.
+                if ($oldSlug && $user->ftp_account_status === FtpCredentialService::STATUS_ACTIVE) {
                     $credentialSvc->deleteUser($oldSlug);
                 }
 

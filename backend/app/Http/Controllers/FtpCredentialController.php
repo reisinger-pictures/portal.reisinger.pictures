@@ -26,7 +26,16 @@ class FtpCredentialController extends Controller
     ) {}
 
     /**
-     * Rotates the calling user's camera password and shows the new one once.
+     * Issues the calling user's camera password and shows it once.
+     *
+     * One endpoint for the whole lifecycle (P1-M58): a `pending` account is
+     * provisioned here, an `active` one has its password rotated. Both are the
+     * same act from the photographer's side — "give me a working camera
+     * password" — and this route already carries everything that act needs: the
+     * `management/ftp*` permission, the hourly quota, the audit trail and the
+     * show-once contract. A separate provisioning route would have to duplicate
+     * all four, and two doors with one discipline behind them are more places to
+     * get it wrong than one door that serves two cases.
      *
      * There is no request input beyond the authenticated user: the account is
      * always `auth('api')->user()`. A `user_id` in the payload would be an IDOR
@@ -70,19 +79,33 @@ class FtpCredentialController extends Controller
     }
 
     /**
-     * 429 for the quota, 422 for every other portal-side precondition. The reason
-     * is not exposed in the payload: the message is the whole contract, and a
-     * client cannot act on a machine-readable variant of it.
+     * 429 for the quota, 409 for an account state that may not be re-issued, 422
+     * for every other portal-side precondition. The reason is not exposed in the
+     * payload: the message is the whole contract, and a client cannot act on a
+     * machine-readable variant of it.
+     *
+     * `not_resettable` is a conflict and not an unprocessable request: nothing
+     * about the request is wrong, the account simply is not in a state that
+     * allows a credential — retrying the same call can never succeed, which is
+     * exactly what 409 says and what the retry semantics of a client need. 422
+     * would promise that a corrected input fixes it, and there is no input to
+     * correct. The reset handler in the inbox already distinguishes 409, so the
+     * status also reaches a client that can act on it.
      */
     private function fromCredentialException(FtpCredentialException $exception): JsonResponse
     {
-        if ($exception->reason !== FtpCredentialException::REASON_RATE_LIMITED) {
-            return response()->json(['error' => $exception->getMessage()], 422);
-        }
-
-        return response()->json(['error' => $exception->getMessage()], 429, [
-            'Retry-After' => (string) ($exception->retryAfterSeconds ?? 1),
-        ]);
+        return match ($exception->reason) {
+            FtpCredentialException::REASON_NOT_RESETTABLE => response()->json(
+                ['error' => $exception->getMessage()],
+                409,
+            ),
+            FtpCredentialException::REASON_RATE_LIMITED => response()->json(
+                ['error' => $exception->getMessage()],
+                429,
+                ['Retry-After' => (string) ($exception->retryAfterSeconds ?? 1)],
+            ),
+            default => response()->json(['error' => $exception->getMessage()], 422),
+        };
     }
 
     /**
