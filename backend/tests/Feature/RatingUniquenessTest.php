@@ -220,6 +220,76 @@ class RatingUniquenessTest extends TestCase
         $this->assertFalse(Schema::hasIndex('ratings', 'ratings_photo_actor_key_unique', 'unique'));
     }
 
+    /**
+     * FINAL-3: the preflight used to accumulate every rating id for the whole
+     * table, so memory grew with table size even when nothing was duplicated.
+     * It now keeps a running count plus a bounded sample. This pins that the
+     * reported count stays exact while the id list stays capped, so an
+     * operator can still size the reconciliation work from the abort message.
+     */
+    public function test_v038_duplicate_report_counts_every_row_but_samples_a_bounded_id_list(): void
+    {
+        $gallery = Gallery::factory()->create();
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $user = User::factory()->create();
+
+        // The report caps ids per group at 20; use clearly more than that.
+        $duplicateCount = 25;
+
+        Schema::table('ratings', function ($table): void {
+            $table->dropUnique('ratings_photo_id_user_id_guest_id_unique');
+            $table->dropUnique('ratings_photo_actor_key_unique');
+        });
+
+        $rows = [];
+        for ($i = 0; $i < $duplicateCount; $i++) {
+            $rows[] = [
+                'id' => sprintf('10000000-0000-4fff-8fff-%012d', $i),
+                'photo_id' => $photo->id,
+                'user_id' => $user->id,
+                'guest_id' => null,
+                'rating' => 3,
+                'comment' => 'duplicate '.$i,
+                'actor_key' => null,
+            ];
+        }
+        DB::table('ratings')->insert($rows);
+
+        $migration = require database_path('migrations/V038__add_rating_actor_key.php');
+
+        try {
+            $migration->up();
+            $this->fail('V038 must abort when duplicate actor ratings exist');
+        } catch (\RuntimeException $exception) {
+            $message = $exception->getMessage();
+
+            // The exact row count is reported even though only a sample of ids
+            // is retained, so the operator can size the work from the message.
+            $this->assertStringContainsString('duplicate_groups=1', $message);
+            $this->assertStringContainsString('duplicate_rows='.$duplicateCount, $message);
+            $this->assertStringContainsString('count='.$duplicateCount, $message);
+            $this->assertStringContainsString('at most 20 ids per group', $message);
+
+            preg_match('/^ratings identity=.* count=\d+ ids=(.*)$/m', $message, $matches);
+            $this->assertNotEmpty($matches, 'The report must list the duplicate group with its ids.');
+
+            $listedIds = array_filter(explode(',', trim($matches[1])), static fn (string $id): bool => $id !== '');
+            $this->assertCount(20, $listedIds, 'The id sample must stay capped at the documented limit.');
+            $this->assertCount(
+                count($listedIds),
+                array_unique($listedIds),
+                'The sampled ids must be distinct, so the operator can act on each one.',
+            );
+            $this->assertLessThan(
+                $duplicateCount,
+                count($listedIds),
+                'The sample must be strictly smaller than the group, otherwise this proves nothing.',
+            );
+        }
+
+        $this->assertDatabaseCount('ratings', $duplicateCount);
+    }
+
     public function test_repeated_guest_rating_requests_update_one_database_row(): void
     {
         $gallery = Gallery::factory()->create([

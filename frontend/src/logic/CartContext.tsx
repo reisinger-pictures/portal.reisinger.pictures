@@ -133,6 +133,17 @@ export interface VolumeLicensingResult {
     volumeSubtotalCents?: number;
     /** Actual volume prices keyed by photo id, used for coupon/package math. */
     volumeItemPrices?: Record<string, number>;
+    /**
+     * Cart items whose gallery terms could not be resolved and are therefore
+     * absent from `groups` and `groupedTotalCents`.
+     *
+     * The grouping deliberately never prices an unresolved gallery with the
+     * brand default, because that would invent a volume price. The consequence
+     * is that `groupedTotalCents` undercounts while this is non-zero, so a
+     * consumer presenting a total must say so instead of showing a confidently
+     * wrong sum. The server remains authoritative at checkout.
+     */
+    unresolvedItemCount?: number;
 }
 
 export interface CartContextType {
@@ -147,6 +158,13 @@ export interface CartContextType {
     itemCount: number;
     /** Volume licensing pricing summary (undefined for non-volume-licensing brands). */
     volumeLicensing?: VolumeLicensingResult;
+    /**
+     * Number of cart items whose gallery terms did not resolve. While this is
+     * non-zero, `totalAmount` excludes those items and must not be presented as
+     * the final price. The server recomputes the authoritative total at
+     * checkout, so this is a display-integrity signal, not a money path.
+     */
+    unresolvedItemCount: number;
 }
 
 export const CartContext = createContext<CartContextType | undefined>(undefined);

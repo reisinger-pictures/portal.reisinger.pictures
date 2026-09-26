@@ -145,6 +145,7 @@ describe('Sidebar', () => {
             clearCart: vi.fn(),
             totalAmount: 0,
             itemCount: 0,
+            unresolvedItemCount: 0,
         });
     });
 
@@ -189,6 +190,7 @@ describe('Sidebar', () => {
             clearCart: vi.fn(),
             totalAmount: 0,
             itemCount: 3,
+            unresolvedItemCount: 0,
         });
         renderSidebar();
 

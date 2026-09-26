@@ -416,6 +416,35 @@ export class E2ESessionHelper {
         if (response) this.rememberAdminCookies(response);
     }
 
+    /**
+     * Grant a user access to whole gallery groups.
+     *
+     * The gallery tree only shows a photographer the groups that are either
+     * unrestricted or assigned to them, and a group survives pruning only if it
+     * contains galleries inside getAllowedGalleryIds(). Group membership feeds
+     * that list recursively, so assigning the meta-gallery groups is what makes
+     * admin-created fixtures visible to a photographer in the tree.
+     *
+     * The fixtures must be created by the admin first (volume presets are
+     * admin-only), so this cannot be folded into createIsolatedUser.
+     */
+    async assignUserToGalleryGroups(userId: string, groupIds: string[]): Promise<void> {
+        await this.ensureAdminLogin();
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+
+        // No read-back: there is no GET for a single management user, and a
+        // freshly created isolated user has no group assignments yet, so
+        // replacing the set is equivalent to extending it.
+        const updateRes = await this.request.put(`/api/management/users/${userId}`, {
+            data: { gallery_group_ids: [...new Set(groupIds)] },
+            headers,
+        });
+        this.rememberAdminCookies(updateRes);
+        if (!updateRes.ok()) {
+            throw new Error(`Failed to assign groups to user ${userId}. Status: ${updateRes.status()} Body: ${await updateRes.text()}`);
+        }
+    }
+
     async createVolumePreset(data: { name: string; tiers: Array<{ min_quantity: number; price_cents: number }> }): Promise<VolumePresetResponse> {
         await this.ensureAdminLogin();
         const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };

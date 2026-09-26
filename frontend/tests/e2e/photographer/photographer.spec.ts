@@ -122,7 +122,12 @@ test.describe('Photographer Core Workflow', () => {
         await expect(page.locator('h1:has-text("Mein Profil")')).toBeVisible();
 
         const main = page.getByRole('main');
-        const nameInput = main.getByRole('textbox', { name: 'Dein Name', exact: true });
+        // Anchored regex, not `exact`: the required-field marker is injected via
+        // CSS `.label-text::after`, and generated content counts towards the
+        // accessible name, so this field is exposed as "Dein Name *" while the
+        // helper labels are not. The `required` attribute is asserted below
+        // separately, so nothing is lost by not matching the marker here.
+        const nameInput = main.getByRole('textbox', { name: /^Dein Name/ });
         const ftpSlugInput = main.getByRole('textbox', { name: /^FTP Upload Ordner \(Slug\)/ });
         const copyrightInput = main.getByRole('textbox', { name: /^Standard-Urheber \(IPTC Copyright\)/ });
         const profileFields = [nameInput, ftpSlugInput, copyrightInput];
