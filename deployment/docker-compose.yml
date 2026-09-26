@@ -239,6 +239,68 @@ services:
       webnet:
         ipv4_address: 172.18.0.31
 
+  # Ersetzt pure-ftpd als Datei-Transport fuer Kameras (P1-M22 ff.).
+  # Drei Portklassen mit unterschiedlicher Erreichbarkeit — das ist der
+  # entscheidende Punkt, siehe features/infrastructure/19-ftp-upload-pipeline.md
+  # 7.13 (Port-Erreichbarkeit) und 7.12 (Cutover-Runbook).
+  sftpgo:
+    # Gepinnt auf die Minor-Reihe 2.7. Bewusst NICHT `latest` und NICHT `v2`:
+    # `latest` zeigt auf den Build vom 2026-09-18, `2.7.x` wird dagegen laufend
+    # neu gebaut und bekommt damit Bugfixes automatisch — springt aber nie
+    # auf 2.8, was das Config-Format mitbringt. Stand 2026-09-26 ist v2.7.6
+    # die neueste Release (2026-09-19). Begründung: 19-ftp 7.13.
+    image: drakkan/sftpgo:2.7.x
+    container_name: portal_sftpgo
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+    volumes:
+      # Schreibzugriff auf denselben Host-Baum, den der Backend-Container als
+      # ftp_inbox liest. Ownership-Regeln: features/... 19-ftp 7.9.
+      - /home/webadmin/websites/ftp:/var/www/ftp:Z
+      # Persistenter Datenprovider (SQLite) + Config. OHNE dieses Volume ist die
+      # Instanz nach jedem Neustart ohne Admin-User und ohne Konten — dann gibt
+      # /api/v2/token 401 und die Provisionierung aus P1-M22 laeuft nicht.
+      - sftpgo_data:/var/lib/sftpgo
+    environment:
+      # `:?` erzwingt den Abbruch, wenn die Variable leer ist — ohne
+      # Default. Grund: ohne Admin-User gibt es kein /api/v2/token (401) und
+      # damit keine Provisionierung aus P1-M22. Lieber der Stack startet
+      # gar nicht, als dass er mit einem unbenutzbaren Dienst laeuft.
+      - SFTPGO_DEFAULT_ADMIN_USERNAME=${SFTPGO_DEFAULT_ADMIN_USERNAME:?SFTPGO_DEFAULT_ADMIN_USERNAME fehlt}
+      - SFTPGO_DEFAULT_ADMIN_PASSWORD=${SFTPGO_DEFAULT_ADMIN_PASSWORD:?SFTPGO_DEFAULT_ADMIN_PASSWORD fehlt}
+      - SFTPGO_DEFAULT_ADMIN_PERMISSIONS=${SFTPGO_DEFAULT_ADMIN_PERMISSIONS:-*}
+    ports:
+      # --- Oeffentlich erreichbar: der Kamera-Zugang ---
+      # FTPS (explizites TLS) und SFTP (SSH). Beide muessen von aussen
+      # erreichbar sein, sonst erreicht die Kamera den Server nicht. SFTPGo
+      # bietet FTPS und SFTP auf demselben Port; getrennte Ports hier, weil
+      # die Kamera genau eines der beiden spricht und der jeweils andere
+      # geschlossen bleiben kann.
+      - "${SFTPGO_SFTP_PORT:-2222}:2222"
+      - "${SFTPGO_FTPS_PORT:-989}:989"
+      # Passive-Ports fuer FTPS. Ohne diese Range bricht der Datenkanal:
+      # der Client verbindet sich auf 989, der Server antwortet aus diesem
+      # Bereich. Bei Kameras ist das der haeufigste Stillschweizgrund.
+      - "${SFTPGO_PASV_PORT_START:-50000}-${SFTPGO_PASV_PORT_END:-50100}:50000-50100"
+    networks:
+      # NUR portal_internal. Der HTTP-/Admin-API-Port wird bewusst NICHT
+      # per `ports:` veroeffentlicht: auf `expose` fehlt, er ist damit nur
+      # ueber das Docker-Netz erreichbar. Das Portal spricht ihn als
+      # http://sftpgo:8080 an. Wer den Port im Stack publicly machen will,
+      # muss das als eigenen Change begruenden — er ist die Schnittstelle, ueber
+      # die Konten angelegt und Passwoerter gesetzt werden.
+      portal_internal:
+        ipv4_address: 172.18.0.32
+    # Non-root wie der Backend (verify-image-nonroot.sh ist CI-Gate). SFTPGo
+    # laeuft im Image als uid 1000, der Host-Pfad gehoert 1002:webgroup.
+    user: "1000:1000"
+
 networks:
   webnet:
     external: true
@@ -247,3 +309,4 @@ networks:
 volumes:
   db_data:
   search_data:
+  sftpgo_data:
