@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useEffect, useState } from 'react';
 import ErrorMessage from '../../components/ErrorMessage';
+import ModalShell from '../../components/ModalShell';
 import { fetcher, RatingData } from '../../../api';
 
 interface Props {
@@ -60,10 +61,11 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
     if (!isOpen) return null;
 
     return (
-        <div className="modal modal-open">
-            <div className="modal-box max-w-5xl relative flex flex-col max-h-90vh">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-2xl mb-6 shrink-0"><Trans>Bewertungen & Status</Trans></h3>
+        <ModalShell
+            title={<span className="text-2xl"><Trans>Bewertungen & Status</Trans></span>}
+            onClose={onClose}
+            boxClassName="max-w-5xl flex flex-col max-h-90vh"
+        >
                 
                 {isLoading ? (
                     <div className="flex-1 flex items-center justify-center p-10"><span className="loading loading-spinner loading-lg text-primary"></span></div>
@@ -139,8 +141,6 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
                         </div>
                     </div>
                 )}
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+        </ModalShell>
     );
 }

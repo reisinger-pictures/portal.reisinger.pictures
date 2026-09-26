@@ -301,7 +301,6 @@ msgstr "Ab {minQuantity} Bildern {price}€ pro Bild"
 #: src/ui/management/ManagementOrdersView.tsx
 #: src/ui/management/ManagementOrgDetailView.tsx
 #: src/ui/management/ManagementOrgsView.tsx
-#: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Abbrechen"
 msgstr "Abbrechen"
 
@@ -5094,7 +5093,6 @@ msgstr "Spalte löschen"
 #: src/ui/management/ManagementOrgDetailView.tsx
 #: src/ui/management/ManagementOrgsView.tsx
 #: src/ui/PhotoDetailView.tsx
-#: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Speichern"
 msgstr "Speichern"
 

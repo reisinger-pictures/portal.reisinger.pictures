@@ -79,7 +79,9 @@ test.describe('Model-Filter & Deeplink', () => {
         await expect(page.getByTestId('model-facts')).toBeVisible({ timeout: 15000 });
         await expect(page.locator('.modal-box').getByRole('heading', { level: 3 })).toContainText(model.firstName);
 
-        await page.locator('.modal-box').getByRole('button', { name: 'Schließen', exact: true }).click();
+        // The shell renders a labelled header close button and the footer has its
+        // own, so an unscoped 'Schließen' matches two. Scope to the footer.
+        await page.getByRole('dialog').locator('.modal-action').getByRole('button', { name: 'Schließen', exact: true }).click();
         await expect(page).not.toHaveURL(/[?&]model=/);
         await expect(page.getByTestId('model-facts')).toHaveCount(0);
     });

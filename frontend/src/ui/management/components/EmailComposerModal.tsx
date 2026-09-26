@@ -3,6 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import { apiMutate } from '../../../api';
 import { useUI } from '../../components/UIContext';
+import ModalShell from '../../components/ModalShell';
 import WysiwygEditor from '../../components/WysiwygEditor';
 import { SendMailResponse } from '../../../api';
 
@@ -39,11 +40,20 @@ export default function EmailComposerModal({ isOpen, onClose, galleryId }: Email
     };
 
     return (
-        <div className="modal modal-open z-50">
-            <div className="modal-box max-w-3xl relative">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-4"><Trans>Nachricht an Kunden senden</Trans></h3>
-
+        <ModalShell
+            title={<Trans>Nachricht an Kunden senden</Trans>}
+            onClose={onClose}
+            className="z-50"
+            boxClassName="max-w-3xl"
+            footer={
+                <div className="modal-action col-span-full">
+                    <button className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
+                    <button className="btn btn-primary" disabled={sendingMail || !mailSubject || !mailBody} onClick={handleSendCustomMail}>
+                        {sendingMail ? <span className="loading loading-spinner"></span> : <Trans>Nachricht Senden</Trans>}
+                    </button>
+                </div>
+            }
+        >
                 <div className="form-control mb-4">
                     <label className="label"><span className="label-text font-bold"><Trans>Betreff</Trans></span></label>
                     <input type="text" value={mailSubject} onChange={e => setMailSubject(e.target.value)} className="input input-bordered w-full"/>
@@ -57,15 +67,6 @@ export default function EmailComposerModal({ isOpen, onClose, galleryId }: Email
                     
                     <WysiwygEditor value={mailBody} onChange={setMailBody} />
                 </div>
-
-                <div className="modal-action col-span-full">
-                    <button className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
-                    <button className="btn btn-primary" disabled={sendingMail || !mailSubject || !mailBody} onClick={handleSendCustomMail}>
-                        {sendingMail ? <span className="loading loading-spinner"></span> : <Trans>Nachricht Senden</Trans>}
-                    </button>
-                </div>
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+        </ModalShell>
     );
 }

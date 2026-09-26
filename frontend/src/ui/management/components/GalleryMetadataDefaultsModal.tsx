@@ -5,6 +5,7 @@ import { Gallery, GalleryMetadataOpts } from '../../../logic/useGalleries';
 import IptcMetadataEditor from '../../components/IptcMetadataEditor';
 import { IptcData } from '../../../logic/usePhoto';
 import { useUI } from '../../components/UIContext';
+import ModalShell from '../../components/ModalShell';
 import { useForm, useWatch } from 'react-hook-form';
 import AIGalleryDefaultsModal from './AIGalleryDefaultsModal';
 
@@ -101,56 +102,56 @@ export default function GalleryMetadataDefaultsModal({ isOpen, onClose, gallery,
     if (!isOpen) return null;
 
     return (
-        <dialog className="modal modal-open">
-            <div className="modal-box max-w-2xl relative">
-                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                
-                <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
-                    <span className="iconify mdi--tag-multiple text-primary"></span> <Trans>Metadaten-Vorgaben</Trans>
-                </h3>
-                <p className="opacity-70 mb-6 text-sm"><Trans>Für Galerie:</Trans> <strong>{gallery.name}</strong></p>
+        <ModalShell
+            title={<Trans>Metadaten-Vorgaben</Trans>}
+            icon="mdi--tag-multiple"
+            onClose={onClose}
+            maxWidth="2xl"
+            onFormSubmit={handleSubmit(onSubmit)}
+            footer={
+                // Three actions, so the two-button ModalDialogShell footer does
+                // not fit here: "KI generieren" opens a nested dialog and is not
+                // a submit. The footer markup is therefore kept verbatim.
+                <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 w-full">
+                    <button type="button" className="btn btn-ghost w-full sm:w-auto" onClick={onClose}><Trans>Abbrechen</Trans></button>
+                    <button type="button" className="btn btn-outline btn-primary w-full sm:w-auto" onClick={() => setIsAiModalOpen(true)}>
+                        <span className="iconify mdi--auto-fix"></span> <Trans>KI generieren</Trans>
+                    </button>
+                    <button type="submit" className="btn btn-primary w-full sm:w-auto" disabled={isSubmitting}>
+                        {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
+                    </button>
+                </div>
+            }
+        >
+            <p className="opacity-70 mb-6 text-sm"><Trans>Für Galerie:</Trans> <strong>{gallery.name}</strong></p>
 
-                <form onSubmit={handleSubmit(onSubmit)}>
-                    <div className="form-control mb-4">
-                        <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full hover:bg-base-300/50 transition-colors">
-                            <input type="checkbox" {...register('allow_client_metadata_edit')} className="checkbox checkbox-primary shrink-0"/>
-                            <div>
-                                <span className="label-text font-bold block"><Trans>Kunden dürfen Metadaten bearbeiten</Trans></span>
-                                <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1"><Trans>Erlaubt Kunden mit der Rolle "Metadaten bearbeiten" das Ändern von IPTC-Daten in dieser Galerie.</Trans></span>
-                            </div>
-                        </label>
+            <div className="form-control mb-4">
+                <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full hover:bg-base-300/50 transition-colors">
+                    <input type="checkbox" {...register('allow_client_metadata_edit')} className="checkbox checkbox-primary shrink-0"/>
+                    <div>
+                        <span className="label-text font-bold block"><Trans>Kunden dürfen Metadaten bearbeiten</Trans></span>
+                        <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1"><Trans>Erlaubt Kunden mit der Rolle "Metadaten bearbeiten" das Ändern von IPTC-Daten in dieser Galerie.</Trans></span>
                     </div>
-
-                    <div className="form-control mb-4">
-                        <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full hover:bg-base-300/50 transition-colors">
-                            <input type="checkbox" {...register('apply_metadata_to_photos')} className="checkbox checkbox-primary shrink-0"/>
-                            <div>
-                                <span className="label-text font-bold block"><Trans>Standard-Metadaten beim Upload anwenden</Trans></span>
-                                <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1"><Trans>Überschreibt leere Felder bei neu hochgeladenen Bildern mit den untenstehenden Werten.</Trans></span>
-                            </div>
-                        </label>
-                    </div>
-
-                    {watchApplyMeta && (
-                        <div className="mb-6 pt-4 border-t border-base-300">
-                            <IptcMetadataEditor data={currentIptc} onChange={handleIptcChange} showArtist={false} />
-                        </div>
-                    )}
-                    
-                    <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 w-full">
-                        <button type="button" className="btn btn-ghost w-full sm:w-auto" onClick={onClose}><Trans>Abbrechen</Trans></button>
-                        <button type="button" className="btn btn-outline btn-primary w-full sm:w-auto" onClick={() => setIsAiModalOpen(true)}>
-                            <span className="iconify mdi--auto-fix"></span> <Trans>KI generieren</Trans>
-                        </button>
-                        <button type="submit" className="btn btn-primary w-full sm:w-auto" disabled={isSubmitting}>
-                            {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
-                        </button>
-                    </div>
-                </form>
-
-                <AIGalleryDefaultsModal isOpen={isAiModalOpen} onClose={() => setIsAiModalOpen(false)} onApply={handleAiApply} />
+                </label>
             </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </dialog>
+
+            <div className="form-control mb-4">
+                <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full hover:bg-base-300/50 transition-colors">
+                    <input type="checkbox" {...register('apply_metadata_to_photos')} className="checkbox checkbox-primary shrink-0"/>
+                    <div>
+                        <span className="label-text font-bold block"><Trans>Standard-Metadaten beim Upload anwenden</Trans></span>
+                        <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mt-1"><Trans>Überschreibt leere Felder bei neu hochgeladenen Bildern mit den untenstehenden Werten.</Trans></span>
+                    </div>
+                </label>
+            </div>
+
+            {watchApplyMeta && (
+                <div className="mb-6 pt-4 border-t border-base-300">
+                    <IptcMetadataEditor data={currentIptc} onChange={handleIptcChange} showArtist={false} />
+                </div>
+            )}
+
+            <AIGalleryDefaultsModal isOpen={isAiModalOpen} onClose={() => setIsAiModalOpen(false)} onApply={handleAiApply} />
+        </ModalShell>
     );
 }

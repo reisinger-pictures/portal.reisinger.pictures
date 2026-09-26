@@ -35,7 +35,9 @@ test.describe('Model löschen (DSGVO)', () => {
         // close button is labelled "Menü schließen" and is only rendered on
         // narrow viewports, so an unscoped substring match becomes a strict-mode
         // violation on mobile.
-        await page.locator('.modal-box').getByRole('button', { name: 'Schließen', exact: true }).click();
+        // The shell renders a labelled header close button and the footer has its
+        // own, so an unscoped 'Schließen' matches two. Scope to the footer.
+        await page.getByRole('dialog').locator('.modal-action').getByRole('button', { name: 'Schließen', exact: true }).click();
         await auth.logout();
 
         // Super-admin: delete the model for good.
@@ -81,7 +83,9 @@ test.describe('Model löschen (DSGVO)', () => {
 
         // Detail stays open (nothing was deleted), then close it.
         await expect(page.getByTestId('model-delete-zone')).toBeVisible();
-        await page.locator('.modal-box').getByRole('button', { name: 'Schließen', exact: true }).click();
+        // The shell renders a labelled header close button and the footer has its
+        // own, so an unscoped 'Schließen' matches two. Scope to the footer.
+        await page.getByRole('dialog').locator('.modal-action').getByRole('button', { name: 'Schließen', exact: true }).click();
 
         // Server-side persistence: reload the filtered list — the model is still there.
         await page.reload();

@@ -4,6 +4,7 @@ import {useState} from 'react';
 import useSWR from 'swr';
 import {apiMutate, fetcher} from '../../../api';
 import {useUI} from '../../components/UIContext';
+import ModalShell from '../../components/ModalShell';
 
 interface GalleryBase {
     id: string;
@@ -57,12 +58,12 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
     };
 
     return (
-        <div className="modal modal-open">
-            <div className="modal-box max-w-2xl relative flex flex-col max-h-80vh">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-2 flex items-center gap-2">
-                    <span className="iconify mdi--account-key text-primary"></span> <Trans>Nutzer-Zugriff verwalten</Trans>
-                </h3>
+        <ModalShell
+            title={<Trans>Nutzer-Zugriff verwalten</Trans>}
+            icon="mdi--account-key"
+            onClose={onClose}
+            boxClassName="max-w-2xl flex flex-col max-h-80vh"
+        >
                 <p className="text-sm opacity-70 mb-4"><Trans>Galerie:</Trans> <strong>{galleryName}</strong></p>
 
                 <input
@@ -101,8 +102,6 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
                         </div>
                     )}
                 </div>
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+        </ModalShell>
     );
 }

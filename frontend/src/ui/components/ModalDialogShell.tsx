@@ -11,6 +11,13 @@ interface ModalDialogShellProps {
     editing: boolean;
     isSubmitting: boolean;
     onSubmit: (e: React.FormEvent) => void;
+    /**
+     * Disables native browser constraint validation on the form. PhotoJobModal
+     * depends on this: it validates through Zod and asserts rendered field
+     * errors, so native validation would block submit with a browser tooltip
+     * the test never sees.
+     */
+    noValidate?: boolean;
     modalRef?: RefObject<HTMLDialogElement | null>;
     maxWidth?: 'default' | 'lg' | 'xl' | '2xl';
     secondaryAction?: ReactNode;
@@ -38,6 +45,7 @@ export default function ModalDialogShell({
     editing,
     isSubmitting,
     onSubmit,
+    noValidate = false,
     modalRef,
     maxWidth = 'default',
     secondaryAction,
@@ -73,6 +81,7 @@ export default function ModalDialogShell({
             descriptionId={descriptionId}
             className={className}
             onFormSubmit={onSubmit}
+            noValidate={noValidate}
             footer={footer}
         >
             {children}
