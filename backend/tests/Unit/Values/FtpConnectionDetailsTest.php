@@ -38,7 +38,7 @@ class FtpConnectionDetailsTest extends TestCase
     {
         parent::setUp();
 
-        // A developer's local `.env` may well fill these five variables in, so
+        // A developer's local `.env` may well fill these variables in, so
         // the baseline is pinned to "nothing set" before every test. Without
         // this an omitted configuration would silently pass on ambient values.
         $this->configureTransport([
@@ -47,6 +47,7 @@ class FtpConnectionDetailsTest extends TestCase
             'ftps_port' => null,
             'pasv_port_start' => null,
             'pasv_port_end' => null,
+            'ftps_tls_mode' => null,
         ]);
     }
 
@@ -71,6 +72,7 @@ class FtpConnectionDetailsTest extends TestCase
             'ftps_port' => 989,
             'pasv_port_start' => 50000,
             'pasv_port_end' => 50100,
+            'ftps_tls_mode' => 'explicit',
         ], $details->toArray());
     }
 
@@ -95,6 +97,7 @@ class FtpConnectionDetailsTest extends TestCase
             'ftps_port',
             'pasv_port_start',
             'pasv_port_end',
+            'ftps_tls_mode',
         ], array_keys($payload));
 
         $this->assertStringNotContainsString(
@@ -353,8 +356,66 @@ class FtpConnectionDetailsTest extends TestCase
         $this->assertNull($payload['pasv_port_end'], 'A half-open range must not be completed by guesswork.');
     }
 
-    // ── UPLOAD_PATH ──────────────────────────────────────────────────────────
+    // ── ftpsTlsMode ──────────────────────────────────────────────────────────
 
+    /**
+     * The TLS mode is translated, not passed through: SFTPGo speaks 1 and 2,
+     * a camera's configuration screen says "explicit" or "implicit", and a
+     * literal in the frontend would be a second source of truth for the setting
+     * that decides whether the camera can connect at all.
+     *
+     * @return array<string, array{0: mixed, 1: ?string}>
+     */
+    public static function tlsModeValues(): array
+    {
+        return [
+            'one as string is explicit' => ['1', 'explicit'],
+            'one as int is explicit' => [1, 'explicit'],
+            'two as string is implicit' => ['2', 'implicit'],
+            'two as int is implicit' => [2, 'implicit'],
+            'zero is not a mode' => ['0', null],
+            'three is not a mode' => ['3', null],
+            'out of range' => ['99', null],
+            'named value is not the wire format' => ['explicit', null],
+            'padded value' => [' 1 ', null],
+            'leading zero is a different number' => ['01', null],
+            'not a number' => ['abc', null],
+            'empty string' => ['', null],
+            'null' => [null, null],
+            'true' => [true, null],
+            'false' => [false, null],
+        ];
+    }
+
+    #[DataProvider('tlsModeValues')]
+    public function test_the_tls_mode_is_translated_and_anything_unknown_is_absent(mixed $configured, ?string $expected): void
+    {
+        $this->configureTransport(['ftps_tls_mode' => $configured]);
+
+        $details = FtpConnectionDetails::forUser($this->user('florian'));
+
+        $this->assertSame($expected, $details->ftpsTlsMode);
+        $this->assertSame($expected, $details->toArray()['ftps_tls_mode']);
+    }
+
+    /**
+     * The mode is reported, not required. It is a property of the published
+     * binding, so a deployment that has not set it still has a working SFTP port
+     * — gating the configuration on it would tell a photographer with a reachable
+     * FTPS port that their camera setup is broken.
+     */
+    public function test_an_unset_tls_mode_does_not_break_the_configuration(): void
+    {
+        $this->configureTransport(['ftps_tls_mode' => null]);
+
+        $details = FtpConnectionDetails::forUser($this->user('florian'));
+
+        $this->assertTrue($details->isConfigured());
+        $this->assertTrue($details->toArray()['configured']);
+        $this->assertNull($details->toArray()['ftps_tls_mode']);
+    }
+
+    // ── UPLOAD_PATH ──────────────────────────────────────────────────────────
     /**
      * The account root is the upload target (feature doc 7.9), so `path` is a
      * constant rather than something a deployment configures. It has to be in
@@ -408,6 +469,9 @@ class FtpConnectionDetailsTest extends TestCase
                 'ftps_port' => 989,
                 'pasv_port_start' => 50000,
                 'pasv_port_end' => 50100,
+                // `SFTPGO_FTPD_TLS_MODE`, so 1 = AUTH TLS on 989. A string,
+                // because that is what `env()` produces.
+                'ftps_tls_mode' => '1',
             ], $overrides),
         ]);
     }
