@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\Photo;
+use App\Support\GalleryGroupSubtree;
 
 /**
  * Single current-state visibility boundary for downloadable media.
@@ -106,7 +107,15 @@ class MediaVisibilityService
         }
 
         $visited = [];
+        $depth = 0;
         while ($group instanceof GalleryGroup) {
+            // AUTH-5: bound one lookup per ancestor level so an over-deep or
+            // corrupt hierarchy cannot pin the request. Cycles and over-deep
+            // chains fail closed (the media is treated as not visible).
+            if ($depth++ > GalleryGroupSubtree::MAX_DEPTH) {
+                return false;
+            }
+
             $id = (string) $group->getKey();
             if ($id === '' || isset($visited[$id]) || (bool) $group->is_hidden) {
                 return false;

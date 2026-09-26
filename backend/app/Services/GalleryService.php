@@ -382,7 +382,13 @@ class GalleryService
      *   Super-Admin included, since it is not a trusted cross-brand actor,
      * - a group whose complete parent chain is not coherent in that brand, which
      *   would produce a gallery that is invisible in every brand-scoped listing
-     *   (`BrandRegistry::galleryGroupTreeMatchesBrand`).
+     *   (`BrandRegistry::galleryGroupTreeMatchesBrand`),
+     * - a same-brand group the actor may not manage (AUTH-1): brand coherence
+     *   alone must not let a photographer attach their own gallery to another
+     *   user's subtree and inherit its `is_public`/visibility policy. The same
+     *   `canManageGalleryGroup()` capability the group endpoints enforce is
+     *   required; Super-Admins keep their reach because the check passes for
+     *   them.
      *
      * A trusted cross-brand Super-Admin (`brand === null`) keeps its documented
      * all-brand access: the gallery adopts the group's brand instead of being
@@ -410,6 +416,19 @@ class GalleryService
         }
 
         $this->assertGroupTreeMatchesBrand($group, $groupBrand);
+
+        // AUTH-1: brand coherence is necessary but not sufficient. Without this
+        // check any same-brand photographer could attach their own gallery to a
+        // same-brand group they have no assignment to and inherit that group's
+        // visibility policy, polluting another user's subtree. Reuse the same
+        // capability the group mutation endpoints require. Admins and
+        // Super-Admins pass inside canManageGalleryGroup(); the actorless create
+        // path is deliberately routed through resolveGroupBrandForActorlessCreate().
+        if (! $authorization->canManageGalleryGroup($actor, $group)) {
+            throw ValidationException::withMessages([
+                'gallery_group_id' => 'Keine Berechtigung für die gewählte Galerie-Gruppe.',
+            ]);
+        }
 
         return $groupBrand;
     }

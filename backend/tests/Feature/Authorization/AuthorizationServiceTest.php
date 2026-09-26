@@ -77,6 +77,111 @@ class AuthorizationServiceTest extends TestCase
     }
 
     // ──────────────────────────────────────────────
+    //  Registered user — invite claims are clamped to live state (AUTH-2)
+    // ──────────────────────────────────────────────
+
+    /**
+     * AUTH-2: a registered-user token carries `gallery_ids` in its invite
+     * record, but that is self-contained claim data. It must be clamped to the
+     * live invite's real gallery, exactly like the guest branch, and
+     * `can_edit_metadata` must be derived from the invite rather than the claim.
+     */
+    public function test_registered_invite_claim_is_clamped_to_the_live_invite_gallery(): void
+    {
+        $inviteGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $foreignGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $inviteGallery->id,
+            'token' => 'registered-clamp-'.uniqid(),
+            'can_edit_metadata' => false,
+        ]);
+
+        $sanitized = $this->service->sanitizeTransientClaims([
+            'transient_galleries' => [$inviteGallery->id, $foreignGallery->id],
+            'transient_meta_galleries' => [$inviteGallery->id, $foreignGallery->id],
+            'transient_invites' => [
+                (string) $invite->id => [
+                    'gallery_ids' => [$inviteGallery->id, $foreignGallery->id],
+                    'meta_gallery_ids' => [$inviteGallery->id, $foreignGallery->id],
+                    'can_edit_metadata' => true,
+                ],
+            ],
+            'transient_invite_ids' => [(string) $invite->id],
+        ]);
+
+        $this->assertSame([$inviteGallery->id], $sanitized['transient_galleries']);
+        // The claim escalated metadata, but the live invite is read-only.
+        $this->assertSame([], $sanitized['transient_meta_galleries']);
+        $this->assertSame(
+            [$inviteGallery->id],
+            $sanitized['transient_invites'][(string) $invite->id]['gallery_ids']
+        );
+        $this->assertSame(
+            [],
+            $sanitized['transient_invites'][(string) $invite->id]['meta_gallery_ids']
+        );
+    }
+
+    public function test_registered_user_cannot_gain_a_foreign_gallery_from_a_claimed_invite_record(): void
+    {
+        $inviteGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $foreignGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $inviteGallery->id,
+            'token' => 'registered-foreign-'.uniqid(),
+            'can_edit_metadata' => true,
+        ]);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->transient_galleries = [$inviteGallery->id, $foreignGallery->id];
+        $user->transient_meta_galleries = [$inviteGallery->id, $foreignGallery->id];
+        $user->transient_invites = [
+            (string) $invite->id => [
+                'gallery_ids' => [$inviteGallery->id, $foreignGallery->id],
+                'meta_gallery_ids' => [$inviteGallery->id, $foreignGallery->id],
+            ],
+        ];
+        $user->transient_invite_ids = [(string) $invite->id];
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertContains($inviteGallery->id, $ids);
+        $this->assertNotContains($foreignGallery->id, $ids);
+        $this->assertFalse($this->service->canAccessGallery($user, $foreignGallery->id));
+        $this->assertTrue($this->service->canAccessGallery($user, $inviteGallery->id));
+    }
+
+    /**
+     * Control: a registered-user invite record naming the invite's real gallery
+     * still grants it, and metadata follows the live invite flag.
+     */
+    public function test_registered_invite_claim_for_the_real_gallery_survives_clamping(): void
+    {
+        $inviteGallery = Gallery::factory()->create(['brand' => Brand::B2B]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $inviteGallery->id,
+            'token' => 'registered-valid-'.uniqid(),
+            'can_edit_metadata' => true,
+        ]);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->transient_galleries = [$inviteGallery->id];
+        $user->transient_meta_galleries = [$inviteGallery->id];
+        $user->transient_invites = [
+            (string) $invite->id => [
+                'gallery_ids' => [$inviteGallery->id],
+                'meta_gallery_ids' => [$inviteGallery->id],
+            ],
+        ];
+        $user->transient_invite_ids = [(string) $invite->id];
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertContains($inviteGallery->id, $ids);
+        $this->assertContains($inviteGallery->id, $this->service->getActiveTransientMetaGalleryIds($user));
+    }
+
+    // ──────────────────────────────────────────────
     //  Direct Gallery Assignments
     // ──────────────────────────────────────────────
 

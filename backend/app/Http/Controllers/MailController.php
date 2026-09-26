@@ -10,6 +10,7 @@ use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\User;
 use App\Support\BrandRegistry;
+use App\Support\GalleryGroupSubtree;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -34,7 +35,16 @@ class MailController extends Controller
         $userIds = DB::table('user_galleries')->where('gallery_id', $gallery->id)->where('wants_notifications', true)->pluck('user_id')->toArray();
         $groupIds = [];
         $currentGroup = $gallery->galleryGroup;
+        // AUTH-5: cycle-safe and depth-bounded ancestor walk.
+        $visitedGroupIds = [];
+        $depth = 0;
         while ($currentGroup) {
+            $groupKey = (string) $currentGroup->getKey();
+            if ($groupKey === '' || isset($visitedGroupIds[$groupKey]) || $depth++ > GalleryGroupSubtree::MAX_DEPTH) {
+                break;
+            }
+            $visitedGroupIds[$groupKey] = true;
+
             $groupIds[] = $currentGroup->id;
             $currentGroup = GalleryGroup::find($currentGroup->parent_id);
         }

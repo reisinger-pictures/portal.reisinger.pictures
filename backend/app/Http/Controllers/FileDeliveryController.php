@@ -55,6 +55,18 @@ class FileDeliveryController extends Controller
         }
         [$gallery, $photo] = $mediaAuthorization;
         $baseStoragePath = rtrim(Storage::disk('photos')->path(''), '/\\');
+
+        // AUTH-3: only the model's whitelisted derivative sizes may ever be
+        // materialized. Without this, any digit sequence became a
+        // `_thumbs/{size}` directory and full-resolution unwatermarked
+        // intermediate, enabling unbounded disk/cache exhaustion for any
+        // readable gallery. Reject unknown sizes before any filesystem or image
+        // work (and after authorization, to preserve the established gate
+        // ordering). `0` (original delivery) is never a thumbnail request.
+        if ($isThumbnail && ! in_array($size, Photo::DERIVATIVE_SIZES, true)) {
+            return response()->json(['error' => 'Ungültige Thumbnail-Größe'], 400);
+        }
+
         $path = null;
 
         if ($isThumbnail) {

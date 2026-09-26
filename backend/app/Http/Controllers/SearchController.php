@@ -10,6 +10,7 @@ use App\Models\Location;
 use App\Models\Photo;
 use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
+use App\Support\GalleryGroupSubtree;
 use Illuminate\Http\Request;
 
 class SearchController extends Controller
@@ -243,7 +244,16 @@ class SearchController extends Controller
 
         $breadcrumbs = [];
         $groupId = $photo->gallery->gallery_group_id;
+        // AUTH-5: cycle-safe and depth-bounded breadcrumb walk.
+        $visitedGroupIds = [];
+        $depth = 0;
         while ($groupId) {
+            $groupKey = (string) $groupId;
+            if (isset($visitedGroupIds[$groupKey]) || $depth++ > GalleryGroupSubtree::MAX_DEPTH) {
+                break;
+            }
+            $visitedGroupIds[$groupKey] = true;
+
             $group = GalleryGroup::find($groupId);
             if ($group) {
                 if (! BrandRegistry::resourceMatchesCurrent($group->brand)) {
