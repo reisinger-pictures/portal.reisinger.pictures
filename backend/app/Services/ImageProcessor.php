@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\BrandRegistry;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 
@@ -17,7 +18,7 @@ class ImageProcessor
      */
     private const WATERMARK_MARKER_VERSION = 1;
 
-    private const WATERMARK_MARKER_SUFFIX = '.watermark.json';
+    public const WATERMARK_MARKER_SUFFIX = '.watermark.json';
 
     /**
      * Validate an image before it is used as a delivery or watermark source.
@@ -145,13 +146,22 @@ class ImageProcessor
 
     public function generateThumbnail($sourcePath, $destPath, $size, $quality = 80)
     {
+        if (! $this->isValidImageFile($sourcePath)) {
+            $this->removeFailedOutput($destPath, $sourcePath);
+
+            return false;
+        }
+
         $img = $this->loadGdImage($sourcePath);
         if (! $img) {
+            $this->removeFailedOutput($destPath, $sourcePath);
+
             return false;
         }
 
         if (! $this->ensureOutputDirectory($destPath)) {
             imagedestroy($img);
+            $this->removeFailedOutput($destPath, $sourcePath);
 
             return false;
         }
@@ -162,18 +172,38 @@ class ImageProcessor
         if ($width > $size) {
             // Extreme landscape ratios would floor to 0; GD requires >= 1px.
             $newHeight = max(1, (int) ($height * ($size / $width)));
-            $newImg = imagecreatetruecolor($size, $newHeight);
-            imagealphablending($newImg, false);
-            imagesavealpha($newImg, true);
-            imagecopyresampled($newImg, $img, 0, 0, 0, 0, $size, $newHeight, $width, $height);
+            $newImg = $this->createTrueColorImage($size, $newHeight);
+            // imagecreatetruecolor() returns false under memory pressure. Feed
+            // that value to imagecopyresampled() and the TypeError escapes as an
+            // uncaught 500, so the failure is handled explicitly here.
+            if (! $newImg
+                || ! imagecopyresampled($newImg, $img, 0, 0, 0, 0, $size, $newHeight, $width, $height)) {
+                if ($newImg) {
+                    imagedestroy($newImg);
+                }
+                imagedestroy($img);
+                $this->removeFailedOutput($destPath, $sourcePath);
+
+                return false;
+            }
             imagedestroy($img);
             $img = $newImg;
         }
 
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
         $success = imagewebp($img, $destPath, $quality);
         imagedestroy($img);
 
-        return $success;
+        // A partially written .webp would later 500 the delivery controller.
+        // Treat an invalid output like any other failed generation and remove it.
+        if (! $success || ! $this->isValidImageFile($destPath)) {
+            $this->removeFailedOutput($destPath, $sourcePath);
+
+            return false;
+        }
+
+        return true;
     }
 
     public function scaleImage($sourcePath, $destPath, $maxWidth)
@@ -539,8 +569,12 @@ class ImageProcessor
     private function removeWatermarkMarker(string $destPath): void
     {
         $markerPath = $this->watermarkMarkerPath($destPath);
-        if (is_file($markerPath)) {
-            @unlink($markerPath);
+        if (! $this->unlinkPath($markerPath)) {
+            // `photos` uses throw => false, so a failed unlink is silent
+            // otherwise. Surface a residual marker so the leak is observable.
+            Log::warning('image_processor.watermark_marker_unlink_failed', [
+                'path' => $markerPath,
+            ]);
         }
     }
 
@@ -612,10 +646,41 @@ class ImageProcessor
 
     private function removeFailedOutput(string $path, string $sourcePath): void
     {
-        if ($path !== $sourcePath && is_file($path)) {
-            @unlink($path);
+        if ($path !== $sourcePath && ! $this->unlinkPath($path)) {
+            // A silent failed unlink leaves a partially written derivative that
+            // FileDeliveryController would later reject with a 500.
+            Log::warning('image_processor.failed_output_unlink_failed', [
+                'path' => $path,
+                'source' => $sourcePath,
+            ]);
         }
         $this->removeWatermarkMarker($path);
+    }
+
+    /**
+     * Remove a path and report whether it is actually gone.
+     *
+     * `@unlink` on the `throw => false` photos disk fails silently. The
+     * postcondition is the observable truth used by callers and logs.
+     */
+    protected function unlinkPath(string $path): bool
+    {
+        if (! is_file($path) && ! is_link($path)) {
+            return true;
+        }
+
+        @unlink($path);
+
+        return ! is_file($path) && ! is_link($path);
+    }
+
+    /**
+     * GD allocation seam. Kept separate so the false-return path can be
+     * exercised without exhausting the process memory limit in tests.
+     */
+    protected function createTrueColorImage(int $width, int $height): \GdImage|false
+    {
+        return imagecreatetruecolor($width, $height);
     }
 
     private function loadGdImage($path)

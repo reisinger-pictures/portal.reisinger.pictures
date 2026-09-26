@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Psr\Http\Message\StreamInterface;
 use Throwable;
 
 class ImportLocations extends Command
@@ -18,7 +19,28 @@ class ImportLocations extends Command
 
     protected $description = 'Lädt GeoNames Daten (AT PLZ & Länder) herunter und pusht sie nach Meilisearch';
 
+    /**
+     * Resource caps for untrusted upstream data. The hard limits are not
+     * environment-configurable: a deployment override must not be able to turn
+     * an upstream-controlled body into an unbounded memory or temp-disk write.
+     */
+    private const MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024;
+
+    private const MAX_EXTRACTED_ENTRY_BYTES = 256 * 1024 * 1024;
+
+    private const DOWNLOAD_CHUNK_BYTES = 8192;
+
     private int $cleanupFailureCount = 0;
+
+    protected function maxDownloadBytes(): int
+    {
+        return self::MAX_DOWNLOAD_BYTES;
+    }
+
+    protected function maxExtractedEntryBytes(): int
+    {
+        return self::MAX_EXTRACTED_ENTRY_BYTES;
+    }
 
     public function handle(): int
     {
@@ -182,7 +204,11 @@ class ImportLocations extends Command
             }
 
             try {
-                $response = Http::timeout($timeout)->get($url);
+                // Stream the response body instead of buffering it in memory.
+                // The bounded writer below enforces the byte cap.
+                $response = Http::timeout($timeout)
+                    ->withOptions(['stream' => true])
+                    ->get($url);
             } catch (Throwable $exception) {
                 $this->logDownloadFailure($url, 'request_failed', [
                     'exception' => $exception::class,
@@ -199,15 +225,22 @@ class ImportLocations extends Command
                 return false;
             }
 
-            $body = (string) $response->body();
-            if ($body === '') {
-                $this->logDownloadFailure($url, 'empty_body');
+            $declaredLength = $response->header('Content-Length');
+            if (is_string($declaredLength) && ctype_digit($declaredLength)
+                && (int) $declaredLength > $this->maxDownloadBytes()) {
+                $this->logDownloadFailure($url, 'too_large', [
+                    'content_length' => (int) $declaredLength,
+                    'max_bytes' => $this->maxDownloadBytes(),
+                ]);
 
                 return false;
             }
 
             try {
-                $writtenBytes = $this->writeDownloadBody($tempFile, $body);
+                $result = $this->writeDownloadStream(
+                    $response->toPsrResponse()->getBody(),
+                    $tempFile,
+                );
             } catch (Throwable $exception) {
                 $this->logDownloadFailure($url, 'write_failed', [
                     'exception' => $exception::class,
@@ -216,11 +249,30 @@ class ImportLocations extends Command
                 return false;
             }
 
-            $expectedBytes = strlen($body);
-            if ($writtenBytes !== $expectedBytes) {
+            if ($result === null) {
+                $this->logDownloadFailure($url, 'too_large', [
+                    'max_bytes' => $this->maxDownloadBytes(),
+                ]);
+
+                return false;
+            }
+
+            if ($result === false) {
+                $this->logDownloadFailure($url, 'write_failed');
+
+                return false;
+            }
+
+            if ($result['expected'] === 0) {
+                $this->logDownloadFailure($url, 'empty_body');
+
+                return false;
+            }
+
+            if ($result['written'] !== $result['expected']) {
                 $this->logDownloadFailure($url, 'short_write', [
-                    'expected_bytes' => $expectedBytes,
-                    'actual_bytes' => $writtenBytes,
+                    'expected_bytes' => $result['expected'],
+                    'actual_bytes' => $result['written'],
                 ]);
 
                 return false;
@@ -251,11 +303,84 @@ class ImportLocations extends Command
     }
 
     /**
+     * Stream a response body to disk while enforcing the configured byte cap.
+     *
+     * Aborting at the cap protects both memory (the body is never buffered
+     * whole) and the temp disk (an oversized upstream body is never completed).
+     *
+     * @return array{written: int, expected: int}|null|false Bytes written and
+     *                                                       bytes observed; null when the cap was exceeded; false on error.
+     */
+    protected function writeDownloadStream(StreamInterface $stream, string $path): array|null|false
+    {
+        $handle = @fopen($path, 'wb');
+        if ($handle === false) {
+            return false;
+        }
+
+        $cap = $this->maxDownloadBytes();
+        $written = 0;
+        $expected = 0;
+        $shortWrite = false;
+
+        try {
+            while (! $stream->eof()) {
+                $chunk = $stream->read(self::DOWNLOAD_CHUNK_BYTES);
+                if ($chunk === '') {
+                    if ($stream->eof()) {
+                        break;
+                    }
+
+                    return false;
+                }
+
+                $length = strlen($chunk);
+                $expected += $length;
+                if ($expected > $cap) {
+                    return null;
+                }
+
+                if ($shortWrite) {
+                    // Keep counting bytes so the short-write log can report the
+                    // full upstream length without writing past the failure.
+                    continue;
+                }
+
+                $bytesWritten = $this->writeDownloadChunk($handle, $chunk);
+                if ($bytesWritten === false || $bytesWritten > $length) {
+                    return false;
+                }
+                $written += $bytesWritten;
+                if ($bytesWritten < $length) {
+                    $shortWrite = true;
+                }
+            }
+        } finally {
+            @fclose($handle);
+        }
+
+        return ['written' => $written, 'expected' => $expected];
+    }
+
+    /**
+     * Write one bounded chunk to the download staging file.
+     *
      * Override seam for deterministic short-write regression tests.
      */
-    protected function writeDownloadBody(string $path, string $contents): int|false
+    protected function writeDownloadChunk(mixed $handle, string $chunk): int|false
     {
-        return file_put_contents($path, $contents, LOCK_EX);
+        $written = 0;
+        $length = strlen($chunk);
+
+        while ($written < $length) {
+            $bytesWritten = @fwrite($handle, substr($chunk, $written));
+            if ($bytesWritten === false || $bytesWritten === 0) {
+                return false;
+            }
+            $written += $bytesWritten;
+        }
+
+        return $written;
     }
 
     /**
@@ -302,6 +427,32 @@ class ImportLocations extends Command
             }
             $zipIsOpen = true;
 
+            // Read the declared uncompressed size from the archive index and
+            // reject an oversized entry before it is ever written to disk.
+            $entryIndex = $zip->locateName($entry);
+            if ($entryIndex === false) {
+                $this->logDownloadFailure($url, 'zip_entry_missing_or_empty');
+
+                return false;
+            }
+
+            $entryStat = $zip->statIndex($entryIndex);
+            $declaredEntrySize = is_array($entryStat) ? (int) ($entryStat['size'] ?? 0) : 0;
+            if ($declaredEntrySize <= 0) {
+                $this->logDownloadFailure($url, 'zip_entry_missing_or_empty');
+
+                return false;
+            }
+
+            if ($declaredEntrySize > $this->maxExtractedEntryBytes()) {
+                $this->logDownloadFailure($url, 'zip_entry_too_large', [
+                    'entry_bytes' => $declaredEntrySize,
+                    'max_bytes' => $this->maxExtractedEntryBytes(),
+                ]);
+
+                return false;
+            }
+
             try {
                 $token = bin2hex(random_bytes(6));
             } catch (Throwable $exception) {
@@ -340,6 +491,17 @@ class ImportLocations extends Command
             $extractedSize = is_file($extractedPath) ? filesize($extractedPath) : false;
             if (! $extracted || $extractedSize === false || $extractedSize === 0) {
                 $this->logDownloadFailure($url, 'zip_entry_missing_or_empty');
+
+                return false;
+            }
+
+            // Defense in depth against a forged central-directory size: reject
+            // the real extraction result before it is committed to $target.
+            if ($extractedSize > $this->maxExtractedEntryBytes()) {
+                $this->logDownloadFailure($url, 'zip_entry_too_large', [
+                    'entry_bytes' => $extractedSize,
+                    'max_bytes' => $this->maxExtractedEntryBytes(),
+                ]);
 
                 return false;
             }

@@ -17,10 +17,12 @@ class ModelFileCleanupService
     /**
      * Queue deletion after the current transaction commits.
      *
-     * The database queue is the durable retry path in the normal deployment. If
-     * dispatch itself fails, a UUID-keyed CRM cleanup outbox row is written to
-     * the existing jobs table so the worker can retry it. A sync-queue
-     * development/test run still gets deterministic deletion.
+     * The dispatch is durable: a transaction-bound outbox intent is written
+     * before commit and released only after the primary dispatch succeeds. A
+     * process death between COMMIT and the post-commit callback therefore
+     * leaves a retryable cleanup row instead of orphaning DSGVO age-proof or
+     * person-photo files. A sync-queue development/test run still gets
+     * deterministic deletion.
      *
      * @param  string|array<int, string>  $paths
      */
@@ -31,7 +33,7 @@ class ModelFileCleanupService
             return;
         }
 
-        $this->dispatch->afterCommit(
+        $this->dispatch->afterCommitDurably(
             new DeleteModelFilesJob($paths, $reason, $customerId),
             CrmCleanupOutboxJob::forFileCleanup($paths, $reason, $customerId),
             'model.file_cleanup',
