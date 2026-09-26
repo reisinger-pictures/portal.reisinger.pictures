@@ -78,9 +78,32 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
   `APP_KEY`, `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, `ADMIN_EMAIL`,
   `ADMIN_PASSWORD` oder `PHOTO_STORAGE_PATH`. `PHOTO_STORAGE_PATH` muss ein
   absoluter Pfad sein. `/var/www/html`, der konfigurierte Storage-Pfad und
-  `/var/www/ftp` müssen existieren, schreibbar sein und `stat` muss für sie
-  `1000:1000` liefern. Die Prüfung erfolgt generisch ohne hartcodierte
+  `/var/www/ftp` müssen als Verzeichnis existieren und für die laufende UID
+  schreibbar sein. Die Prüfung erfolgt generisch ohne hartcodierte
   Schlüsselwerte.
+- **Ownership wird bewusst *nicht* geprüft:** `/home/webadmin/websites` gehört
+  `1002:webgroup` mit setgid und darf laut `19-ftp-upload-pipeline.md` 7.9
+  **nicht** per `chown -R` auf `1000:1000` umgeschrieben werden (Vorfall
+  2026-09-26: 38.969 Dateien). Ein `stat`-Vergleich auf `1000:1000` wäre damit
+  unerfüllbar, ohne die bindende Regel zu brechen. Maßgeblich ist die
+  Schreibbarkeit der laufenden UID; die Identität selbst bleibt über den
+  Identitäts-Guard und `user: "1000:1000"` erzwungen. Der Fotospeicher
+  `/home/webadmin/portal/images` liegt außerhalb des `websites`-Baums und ist
+  auf `1000:1000` mit `2775` gesetzt.
+- **Keine Shell-Expansion im Compose-`command:`:** Docker Compose v5.0.2 gibt
+  jede Command-Substitution als `$$(...)` aus und reduziert `$$` in keiner
+  YAML-Form auf `$`. Die Shell im Container expandiert `$$` zur PID, womit
+  `[ "$$(id -u)" -ne 1000 ]` zu `[ "1(id -u)" ...` wird. Aus demselben Grund darf
+  der Block keine `#`-Kommentare enthalten (`command: >` faltet alle Zeilen zu
+  einer, und `sh` beginnt ab einem mitten liegenden `#` den Kommentar) und kein
+  `${VAR}` verwenden (Compose würde Secrets zur Interpolationszeit in
+  `docker inspect Cmd` schreiben). Der Guard liest daher über
+  `printenv | grep` und `xargs -I{}`. Gate:
+  `tests/infrastructure/compose-entrypoint-contract.sh`.
+- **Keine `ipv4_address` auf `portal_internal`:** Das Netz existiert bereits aus
+  dem Stack und hat `172.21.0.0/16`; eine dort gepinnte Adresse bricht den Deploy
+  mit `no configured subnet contains IP address`. Gepinnt wird nur `webnet`, weil
+  Caddy auf die Backend-Adresse routet.
 - **AI-Session-Config-Guard:** Nichtleere `AI_SESSION_HEADER` dürfen nur
   Buchstaben, Ziffern und Bindestriche enthalten; `AI_SESSION_PREFIX` darf leer
   sein oder nur Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich
