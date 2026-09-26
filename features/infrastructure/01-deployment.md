@@ -148,11 +148,12 @@ Das `app:search-rebuild`-Command flushed alle 5 Indizes (Photo, Gallery, Locatio
 
 **Normale Code-Deploys (kein Meilisearch-Upgrade):** `scout:sync-index-settings` + `queue:restart` laufen bei jedem Container-Start automatisch. Kein manuelles Eingreifen nötig.
 
-## 11. OPcache & Live-Updates (Rclone Sync)
-- **Die Falle:** Wenn PHP-Dateien im laufenden Betrieb über `rclone` (z.B. durch die `sync.bat`) auf den Produktionsserver synchronisiert werden, greifen Backend-Änderungen unter Umständen nicht sofort.
+## 11. OPcache & Live-Updates (rsync-Sync)
+- **Die Falle:** Wenn PHP-Dateien im laufenden Betrieb über `rsync` (durch `sync.sh`) auf den Produktionsserver synchronisiert werden, greifen Backend-Änderungen unter Umständen nicht sofort.
 - **Der Grund:** In Produktionsumgebungen ist der PHP OPcache aus Performancegründen scharf geschaltet (meist `opcache.validate_timestamps=0`). PHP liest geänderte Dateien nicht neu von der Festplatte ein, sondern nutzt den alten Bytecode aus dem RAM.
-- **Die Lösung:** Nach einem Rclone-Sync von Backend-Dateien muss der PHP-Container (PHP-FPM) zwingend neu gestartet werden, um den Cache zu leeren:
+- **Die Lösung:** Nach einem rsync-Sync von Backend-Dateien muss der PHP-Container (PHP-FPM) zwingend neu gestartet werden, um den Cache zu leeren:
   `docker restart portal_backend`
+- **Offene Lücke (Stand 2026-09-26):** `sync.sh` führt diesen Restart **nicht** aus. Das Verhalten ist seit dem Wechsel von rclone auf rsync unverändert, der Schritt bleibt aber manuell. Nach jedem Backend-Deploy ist `docker restart portal_backend` erforderlich, sonst liefert die Live-Instanz veralteten Bytecode.
 - **App-Cache (2026-08-17):** Das `command`-Block des Backend-Containers führt bei jedem Start `php artisan cache:clear` aus. Damit werden forever-gecachte Werte wie `laravel_build_time` (System-Info-Seite) bei jedem Deploy/Neustart frisch berechnet — der Timestamp ist die neueste mtime **aller** PHP-Dateien (exkl. `vendor/`, `storage/`, `bootstrap/cache/`), nicht nur einzelner Verzeichnisse.
 
 ## 12. Frontend E2E-Artefakte (Playwright, CI)
