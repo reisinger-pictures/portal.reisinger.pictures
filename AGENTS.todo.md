@@ -249,11 +249,11 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   liest nur?
   **Tests:** PHPUnit, der einen umbenannten Slug gegen SFTPGo abgleicht und einen
   Dienstneustart mit abweichendem Store prüft.
-- [ ] **DOC — `features/infrastructure/13-ftp-brand-isolation.md:6`
-  referenziert `FT-01` in `AGENTS.todo.md`; dieses Task existiert nicht mehr**
-  (`grep FT-01` → 0 Treffer im Board). Das `FT-NN`-Schema ist historisch und
-  sollte durch einen Verweis auf P1-M21/P1-M22 ersetzt werden, sonst sucht
-  niemand die Fortsetzung.
+- [x] **DOC (2026-09-26, erledigt) — der verwaiste `FT-01`-Verweis ist
+  aufgelöst.** `13-ftp-brand-isolation.md:6` referenzierte ein Task, das im
+  Board nicht mehr existiert. Titel und Verweis zeigen jetzt auf Abschnitt 7
+  in `19-ftp-upload-pipeline.md` und auf P1-M21 bis P1-M32. Das `FT-NN`-Schema
+  bleibt nur noch im Changelog von 13 als Historie stehen.
 
 ### Offene Dokumentations-Wahrheit (kein Code, aber irreführend)
 
