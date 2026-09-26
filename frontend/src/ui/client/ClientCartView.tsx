@@ -122,7 +122,7 @@ const couponScopeContextForCart = (
 
 export default function ClientCartView() {
     "use no memo";
-    const {items, quoteToken, setQuoteToken, removeFromCart, totalAmount, clearCart, addToCart, volumeLicensing} = useCart();
+    const {items, quoteToken, setQuoteToken, removeFromCart, totalAmount, clearCart, addToCart, volumeLicensing, unresolvedItemCount} = useCart();
     const hasQuotes = items.some(i => i.isQuote);
     const hasVolumePricing = volumeLicensing?.isVolumePricing ?? true;
     const volumeSubtotalCents = volumeLicensing?.volumeSubtotalCents;
@@ -426,6 +426,14 @@ export default function ClientCartView() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+
+                        {unresolvedItemCount > 0 && (
+                            <div role="status" data-testid="cart-price-pending"
+                                 className="lg:col-span-5 alert alert-warning">
+                                <span className="iconify mdi--alert-circle text-xl" aria-hidden="true"></span>
+                                <Trans>Für {unresolvedItemCount} Artikel ist der Preis noch nicht verfügbar. Die Summe wird beim Bezahlen verbindlich berechnet.</Trans>
+                            </div>
+                        )}
 
                         <div className="lg:col-span-3 space-y-6">
                             <CartItemList items={items} handleUpdateItem={handleUpdateItem} removeFromCart={removeFromCart}

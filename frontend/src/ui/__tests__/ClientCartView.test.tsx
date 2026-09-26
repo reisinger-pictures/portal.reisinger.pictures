@@ -213,6 +213,7 @@ function setupDefaultMocks() {
         clearCart: vi.fn(),
         addToCart: vi.fn(),
         itemCount: 0,
+        unresolvedItemCount: 0,
     });
 }
 
@@ -226,6 +227,7 @@ function setCartWithItems() {
         clearCart: vi.fn(),
         addToCart: vi.fn(),
         itemCount: 2,
+        unresolvedItemCount: 0,
     };
     vi.mocked(useCart).mockReturnValue(cart);
     return cart;
@@ -317,6 +319,7 @@ function setMixedScopeCart(): CartContextType {
         clearCart: vi.fn(),
         addToCart: vi.fn(),
         itemCount: mixedScopeItems.length,
+        unresolvedItemCount: 0,
         volumeLicensing: mixedVolumeLicensing,
     };
     vi.mocked(useCart).mockReturnValue(cart);
@@ -396,6 +399,7 @@ describe('ClientCartView', () => {
             clearCart: vi.fn(),
             addToCart: vi.fn(),
             itemCount: 2,
+            unresolvedItemCount: 0,
         });
         renderCartView();
 
@@ -532,6 +536,7 @@ describe('ClientCartView', () => {
             clearCart: vi.fn(),
             addToCart: vi.fn(),
             itemCount: 2,
+            unresolvedItemCount: 0,
         });
 
         // Checkout endpoint returns requires_action → triggers clientSecret
@@ -666,6 +671,7 @@ describe('ClientCartView', () => {
             clearCart: vi.fn(),
             addToCart: vi.fn(),
             itemCount: 2,
+            unresolvedItemCount: 0,
         });
         renderCartView();
 
@@ -694,6 +700,7 @@ describe('ClientCartView', () => {
             clearCart: vi.fn(),
             addToCart: vi.fn(),
             itemCount: 2,
+            unresolvedItemCount: 0,
         });
 
         vi.mocked(apiMutate)
@@ -789,6 +796,7 @@ describe('ClientCartView', () => {
             ...cart,
             items: [...cart.items, scopeOnlyItem],
             itemCount: cart.itemCount + 1,
+            unresolvedItemCount: 0,
             totalAmount: 4500,
             volumeLicensing: {
                 ...mixedVolumeLicensing,
@@ -895,6 +903,7 @@ describe('ClientCartView', () => {
             clearCart: vi.fn(),
             addToCart: vi.fn(),
             itemCount: 2,
+            unresolvedItemCount: 0,
             volumeLicensing: {
                 isVolumePricing: false,
                 tierIndex: 0,
@@ -924,6 +933,7 @@ describe('ClientCartView', () => {
             clearCart: vi.fn(),
             addToCart: vi.fn(),
             itemCount: 2,
+            unresolvedItemCount: 0,
             volumeLicensing: {
                 isVolumePricing: true,
                 isLoading: false,
@@ -1081,6 +1091,7 @@ describe('ClientCartView', () => {
             clearCart: vi.fn(),
             addToCart: vi.fn(),
             itemCount: 1,
+            unresolvedItemCount: 0,
         });
         vi.mocked(apiMutate)
             .mockRejectedValueOnce(createApiError(503, {}))
@@ -1310,6 +1321,7 @@ describe('ClientCartView', () => {
             clearCart: vi.fn(),
             addToCart: vi.fn(),
             itemCount: 1,
+            unresolvedItemCount: 0,
         });
         vi.mocked(apiMutate).mockRejectedValueOnce(createApiError(403, {turnstile_required: true}));
 
