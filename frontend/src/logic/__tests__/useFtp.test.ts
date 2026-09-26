@@ -2,7 +2,7 @@ import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
 import {renderHook, act, waitFor} from '@testing-library/react';
 import {SWRConfig} from 'swr';
 import {createElement, type ReactNode} from 'react';
-import {useFtp, type FtpStatus} from '../useFtp';
+import {useFtp, type FtpStatus, type ResetCredentialsResponse} from '../useFtp';
 
 /**
  * The FTP status contract (P1-M26).
@@ -42,6 +42,7 @@ const BASE_STATUS: FtpStatus = {
         ftps_port: 989,
         pasv_port_start: 50000,
         pasv_port_end: 50100,
+        ftps_tls_mode: 'explicit',
     },
 };
 
@@ -144,5 +145,152 @@ describe('useFtp', () => {
         // The refetch is what keeps the provisioning fields in step too: a reset
         // or a provisioning done elsewhere has to appear without a page reload.
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    });
+});
+
+/**
+ * `resetCredentials` (P1-M33) is the only way a photographer can obtain a camera
+ * password, and its failure modes are not interchangeable: 429 means the quota
+ * (three per hour) is spent, 503 means SFTPGo is not configured or unreachable,
+ * 404 means the cached account does not exist. A hook that folded those into one
+ * rejected promise without a status would leave the UI unable to say anything
+ * true, and the 429 in particular must not invite a retry.
+ */
+describe('useFtp.resetCredentials', () => {
+    const CREDENTIALS = {
+        success: true,
+        password: 'Kamera-P4sswort-4711',
+        password_notice: 'Dieses Passwort wird genau einmal angezeigt.',
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('posts to the credential endpoint and hands the password back', async () => {
+        const fetchMock = vi.fn().mockImplementation((url: string) => {
+            if (url.endsWith('/reset-password')) {
+                return Promise.resolve(jsonResponse(CREDENTIALS));
+            }
+
+            return Promise.resolve(jsonResponse({...BASE_STATUS, ftp_account_status: 'active'}));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp();
+        await waitFor(() => expect(result.current.status).toBeDefined());
+
+        let response: ResetCredentialsResponse | null = null;
+        await act(async () => {
+            response = await result.current.resetCredentials();
+        });
+
+        expect(response).toEqual(CREDENTIALS);
+
+        const postCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/reset-password'));
+        expect(postCall).toBeDefined();
+        expect(postCall?.[1]).toMatchObject({method: 'POST'});
+    });
+
+    it('refetches the status so the account state leaves pending after a reset', async () => {
+        // The status has to *change* across the reset, otherwise the assertion
+        // below would pass even without the refetch. The mock therefore starts at
+        // `pending` and only reports `active` once the reset has been called —
+        // which is the sequence the backend actually produces.
+        let provisioned = false;
+        const fetchMock = vi.fn().mockImplementation((url: string) => {
+            if (url.endsWith('/reset-password')) {
+                provisioned = true;
+                return Promise.resolve(jsonResponse(CREDENTIALS));
+            }
+
+            return Promise.resolve(jsonResponse({...BASE_STATUS, ftp_account_status: provisioned ? 'active' : 'pending'}));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp();
+        await waitFor(() => expect(result.current.status?.ftp_account_status).toBe('pending'));
+
+        await act(async () => {
+            await result.current.resetCredentials();
+        });
+
+        // A reset that did not move the status would leave the page telling the
+        // photographer the camera still cannot log in, after it can.
+        await waitFor(() => expect(result.current.status?.ftp_account_status).toBe('active'));
+    });
+
+    it('surfaces a rate limit as a 429 instead of swallowing it', async () => {
+        const message = 'Zu viele Passwort-Änderungen. Bitte später erneut versuchen.';
+        const fetchMock = vi.fn().mockImplementation((url: string) => {
+            if (url.endsWith('/reset-password')) {
+                return Promise.resolve(jsonResponse({error: message}, 429));
+            }
+
+            return Promise.resolve(jsonResponse(BASE_STATUS));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp();
+        await waitFor(() => expect(result.current.status).toBeDefined());
+
+        // The quota is three per hour, so a caller that cannot see 429 will keep
+        // pressing a button that cannot succeed.
+        await expect(result.current.resetCredentials()).rejects.toMatchObject({
+            status: 429,
+            message,
+        });
+    });
+
+    it('surfaces an unreachable SFTPGo as a 503 instead of swallowing it', async () => {
+        const message = 'Der FTP-Dienst ist nicht erreichbar.';
+        const fetchMock = vi.fn().mockImplementation((url: string) => {
+            if (url.endsWith('/reset-password')) {
+                return Promise.resolve(jsonResponse({error: message}, 503));
+            }
+
+            return Promise.resolve(jsonResponse(BASE_STATUS));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp();
+        await waitFor(() => expect(result.current.status).toBeDefined());
+
+        // 503 is the retryable one, and it means something different from 429:
+        // the photographer's password did not change either way, but only here is
+        // waiting the right answer.
+        await expect(result.current.resetCredentials()).rejects.toMatchObject({
+            status: 503,
+            message,
+        });
+    });
+
+    it('does not swallow a failed reset, so the status is not refetched as if it had worked', async () => {
+        const fetchMock = vi.fn().mockImplementation((url: string) => {
+            if (url.endsWith('/reset-password')) {
+                return Promise.resolve(jsonResponse({error: 'Konto existiert laut Cache nicht.'}, 404));
+            }
+
+            return Promise.resolve(jsonResponse(BASE_STATUS));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp();
+        await waitFor(() => expect(result.current.status).toBeDefined());
+
+        // Count only the status reads: the POST under test is a fetch call too,
+        // and counting it would hide the very thing being asserted.
+        const statusReads = () => fetchMock.mock.calls.filter(([url]) => !String(url).endsWith('/reset-password')).length;
+        const readsBefore = statusReads();
+
+        await expect(result.current.resetCredentials()).rejects.toMatchObject({status: 404});
+
+        // No refetch: the refetch is the "it worked" signal, and firing it after a
+        // failure would show an account state that never happened.
+        expect(statusReads()).toBe(readsBefore);
     });
 });

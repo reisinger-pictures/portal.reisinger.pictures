@@ -45,6 +45,19 @@ export interface ProcessInboxResponse {
     processed: number;
 }
 
+/**
+ * The show-once credential response.
+ *
+ * `password_notice` is the server's own wording, not decoration: it states that
+ * the value is not stored and cannot be recovered, which is the only warning the
+ * photographer gets before the value leaves this response and is gone.
+ */
+export interface ResetCredentialsResponse {
+    success: boolean;
+    password: string;
+    password_notice: string;
+}
+
 export function useFtp() {
     const {data: status, isLoading, mutate} = useSWR<FtpStatus>('/api/management/ftp/status', fetcher);
 
@@ -59,5 +72,27 @@ export function useFtp() {
         return data;
     };
 
-    return {status, isLoading, setTargetGallery, processInbox};
+    /**
+     * Provisions the camera account (or rotates its password) and returns the new
+     * password exactly once.
+     *
+     * The error is deliberately not caught: `apiMutate` rejects with an `ApiError`
+     * carrying `status` and the server's `error` string, and the status is what
+     * separates "you hit the quota" (429) from "SFTPGo is not configured or
+     * unreachable" (503) from "the cached account does not exist" (404). Swallowing
+     * that into one generic failure would leave the photographer guessing which of
+     * those three they are looking at — and retrying blindly is exactly what the
+     * 3-per-hour quota punishes. The caller shows the message and does not retry.
+     *
+     * The status is refetched because a successful reset is what moves
+     * `ftp_account_status` from `pending` to `active`, and that transition is the
+     * signal that the camera can authenticate at all.
+     */
+    const resetCredentials = async () => {
+        const data = await apiMutate<ResetCredentialsResponse>('/api/management/ftp/reset-password', 'POST');
+        await mutate();
+        return data;
+    };
+
+    return {status, isLoading, setTargetGallery, processInbox, resetCredentials};
 }

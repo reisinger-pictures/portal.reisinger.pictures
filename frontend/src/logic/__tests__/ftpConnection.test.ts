@@ -30,6 +30,9 @@ const configured: FtpConnection = {
     ftps_port: 989,
     pasv_port_start: 50000,
     pasv_port_end: 50100,
+    // The deployment's real value, so the row-order expectation below pins where
+    // the mode belongs. `null` and the two modes each get their own case below.
+    ftps_tls_mode: 'explicit',
 };
 
 const connection = (overrides: Partial<FtpConnection> = {}): FtpConnection => ({
@@ -56,6 +59,7 @@ describe('describeFtpConnection', () => {
             {field: 'username', value: 'florian'},
             {field: 'sftp', value: '2222'},
             {field: 'ftps', value: '989'},
+            {field: 'ftps_tls_mode', value: 'explicit'},
             {field: 'passive_ports', value: '50000\u201350100'},
             {field: 'path', value: '/'},
         ]);
@@ -65,11 +69,12 @@ describe('describeFtpConnection', () => {
         const rows = describeFtpConnection(connection({sftp_port: null}));
 
         expect(rows.map(row => row.field)).not.toContain('sftp');
-        expect(rows).toHaveLength(5);
+        expect(rows).toHaveLength(6);
         expect(rows.map(row => row.field)).toEqual([
             'host',
             'username',
             'ftps',
+            'ftps_tls_mode',
             'passive_ports',
             'path',
         ]);
@@ -79,7 +84,7 @@ describe('describeFtpConnection', () => {
         const rows = describeFtpConnection(connection({ftps_port: null}));
 
         expect(rows.map(row => row.field)).not.toContain('ftps');
-        expect(rows).toHaveLength(5);
+        expect(rows).toHaveLength(6);
     });
 
     it('drops the passive range when only its start is known', () => {
@@ -89,28 +94,28 @@ describe('describeFtpConnection', () => {
         const rows = describeFtpConnection(connection({pasv_port_end: null}));
 
         expect(rows.map(row => row.field)).not.toContain('passive_ports');
-        expect(rows).toHaveLength(5);
+        expect(rows).toHaveLength(6);
     });
 
     it('drops the passive range when only its end is known', () => {
         const rows = describeFtpConnection(connection({pasv_port_start: null}));
 
         expect(rows.map(row => row.field)).not.toContain('passive_ports');
-        expect(rows).toHaveLength(5);
+        expect(rows).toHaveLength(6);
     });
 
     it('drops the host row when the host is unknown and keeps the rest', () => {
         const rows = describeFtpConnection(connection({host: null}));
 
         expect(rows.map(row => row.field)).not.toContain('host');
-        expect(rows).toHaveLength(5);
+        expect(rows).toHaveLength(6);
     });
 
     it('drops the username row when the username is unknown and keeps the rest', () => {
         const rows = describeFtpConnection(connection({username: null}));
 
         expect(rows.map(row => row.field)).not.toContain('username');
-        expect(rows).toHaveLength(5);
+        expect(rows).toHaveLength(6);
     });
 
     it('drops the path row when the path is empty', () => {
@@ -118,7 +123,58 @@ describe('describeFtpConnection', () => {
         const rows = describeFtpConnection(connection({path: ''}));
 
         expect(rows.map(row => row.field)).not.toContain('path');
-        expect(rows).toHaveLength(5);
+        expect(rows).toHaveLength(6);
+    });
+
+    it('drops the TLS mode row when the deployment declares no mode', () => {
+        // The mode decides whether an FTPS handshake can complete at all. An
+        // unknown mode must vanish rather than fall back to a default: a wrong
+        // guess surfaces in the camera as Error 48, which sends the photographer
+        // to the certificate menu instead of to the truth.
+        const rows = describeFtpConnection(connection({ftps_tls_mode: null}));
+
+        expect(rows.map(row => row.field)).not.toContain('ftps_tls_mode');
+        expect(rows).toHaveLength(6);
+        expect(rows.map(row => row.field)).toEqual([
+            'host',
+            'username',
+            'sftp',
+            'ftps',
+            'passive_ports',
+            'path',
+        ]);
+    });
+
+    it('reports the explicit TLS mode verbatim', () => {
+        const rows = describeFtpConnection(connection({ftps_tls_mode: 'explicit'}));
+
+        expect(rows).toContainEqual({field: 'ftps_tls_mode', value: 'explicit'});
+        // Directly after the FTPS port: the mode qualifies that port, and reading
+        // order follows the camera's own dialog.
+        expect(rows.map(row => row.field)).toEqual([
+            'host',
+            'username',
+            'sftp',
+            'ftps',
+            'ftps_tls_mode',
+            'passive_ports',
+            'path',
+        ]);
+    });
+
+    it('reports the implicit TLS mode verbatim', () => {
+        const rows = describeFtpConnection(connection({ftps_tls_mode: 'implicit'}));
+
+        expect(rows).toContainEqual({field: 'ftps_tls_mode', value: 'implicit'});
+    });
+
+    it('does not rewrite a mode it does not recognise', () => {
+        // The backend is the authority on the allowed values. Normalising an
+        // unknown mode into `explicit` here would hide exactly the configuration
+        // drift the field was added to expose.
+        const rows = describeFtpConnection(connection({ftps_tls_mode: 'implicit-stapling'}));
+
+        expect(rows).toContainEqual({field: 'ftps_tls_mode', value: 'implicit-stapling'});
     });
 
     it('keeps a path that only looks empty-ish, because it is a real root', () => {
@@ -147,6 +203,7 @@ describe('describeFtpConnection', () => {
             ftps_port: null,
             pasv_port_start: null,
             pasv_port_end: null,
+            ftps_tls_mode: null,
         })).toEqual([]);
     });
 });

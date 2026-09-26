@@ -1,31 +1,15 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useState, type ReactElement } from 'react';
-import {describeFtpConnection, type FtpConnectionField} from '../../logic/ftpConnection';
+import { useState } from 'react';
+import {Link} from 'react-router-dom';
+import {describeFtpConnection} from '../../logic/ftpConnection';
 import {useFtp} from '../../logic/useFtp';
 import {useProtectedGalleries} from '../../logic/useGalleries';
 import { useUI } from '../components/UIContext';
+import {FtpConnectionRows, FtpConnectionUnconfigured} from './FtpConnectionRows';
 
 const brandLabels: Record<string, string> = {
     rp: 'Reisinger Pictures',
-};
-
-/**
- * The wording for the camera rows, kept here and not in `ftpConnection`.
- *
- * The logic module returns stable field names instead of labels on purpose: it
- * has to stay testable without a Lingui catalogue, and a `t` at module scope is
- * forbidden anyway (the shell chunks are evaluated before the locale is
- * activated). The map is static, so a missing field is a TypeScript error rather
- * than an empty table cell.
- */
-const connectionLabels: Record<FtpConnectionField, ReactElement> = {
-    host: <Trans>Server</Trans>,
-    username: <Trans>Benutzername</Trans>,
-    sftp: <Trans>SFTP-Port</Trans>,
-    ftps: <Trans>FTPS-Port</Trans>,
-    passive_ports: <Trans>Passiver Bereich (Firewall)</Trans>,
-    path: <Trans>Zielordner</Trans>,
 };
 
 function BrandBadge({brand}: {brand?: string | null}) {
@@ -33,11 +17,120 @@ function BrandBadge({brand}: {brand?: string | null}) {
     return <span className="badge badge-sm badge-outline ml-1">{brandLabels[brand] ?? brand}</span>;
 }
 
+/**
+ * The one sentence about FTPS, built from the deployment instead of asserted.
+ *
+ * Ports and TLS mode were literals here once, and they were wrong once: the UI
+ * said "explicit" while the SFTPGo binding could be configured differently, and
+ * the resulting handshake failure surfaces in the camera as Error 48, which sends
+ * the photographer to the wrong menu. Each mode therefore gets its own message
+ * naming the concrete Canon choice, and an unknown mode says so instead of
+ * picking one.
+ */
+function FtpsHint({sftpPort, ftpsPort, tlsMode}: {sftpPort: number | null; ftpsPort: number | null; tlsMode: string | null}) {
+    const missing = t`nicht konfiguriert`;
+    // Resolved to plain variables first: the Lingui rule requires identifiers in
+    // the placeholder, and a `??` inside `${}` would make the message untranslatable
+    // in any real editor.
+    const sftp = sftpPort !== null ? String(sftpPort) : missing;
+    const ftps = ftpsPort !== null ? String(ftpsPort) : missing;
+
+    if (tlsMode === 'explicit') {
+        return (
+            <p className="text-sm opacity-70 mt-2">
+                {t`SFTP läuft über Port ${sftp}, FTPS über Port ${ftps}. FTPS verwendet explizites TLS (AUTH TLS) — in der Kamera dafür „Explizites FTP über TLS" wählen. Der passive Bereich muss in der Firewall freigeschaltet sein.`}
+            </p>
+        );
+    }
+
+    if (tlsMode === 'implicit') {
+        return (
+            <p className="text-sm opacity-70 mt-2">
+                {t`SFTP läuft über Port ${sftp}, FTPS über Port ${ftps}. FTPS verwendet implizites TLS — in der Kamera dafür „Implizites FTP über TLS" wählen. Der passive Bereich muss in der Firewall freigeschaltet sein.`}
+            </p>
+        );
+    }
+
+    return (
+        <p className="text-sm opacity-70 mt-2">
+            {t`SFTP läuft über Port ${sftp}, FTPS über Port ${ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt — bitte den Support kontaktieren, bevor du FTPS in der Kamera einrichtest.`}
+        </p>
+    );
+}
+
+/**
+ * The provisioning state, and what it means for the camera.
+ *
+ * `pending` is called out separately from `error` because they fail differently
+ * and the difference is invisible from the outside: a `pending` account makes
+ * every camera login fail no matter which password is typed, which is the silent
+ * failure that looks like a wrong slug.
+ */
+function AccountStatus({status, error}: {status: string; error: string | null}) {
+    if (status === 'pending') {
+        return (
+            <div className="alert alert-warning shadow-sm mt-2" role="status">
+                <span className="iconify mdi--account-clock-outline text-xl"></span>
+                <div>
+                    <h3 className="font-bold"><Trans>Kamera-Konto noch nicht angelegt</Trans></h3>
+                    <p className="text-sm"><Trans>Die Kamera kann sich noch nicht anmelden — unabhängig vom Passwort. Fordere
+                        zuerst die Zugangsdaten an.</Trans></p>
+                </div>
+            </div>
+        );
+    }
+
+    if (status === 'error') {
+        return (
+            <div className="alert alert-error shadow-sm mt-2" role="status">
+                <span className="iconify mdi--alert-circle-outline text-xl"></span>
+                <div>
+                    <h3 className="font-bold"><Trans>Kamera-Konto fehlerhaft</Trans></h3>
+                    <p className="text-sm">{error ?? <Trans>Der Server nennt keinen Grund.</Trans>}</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-center gap-2 mt-1">
+            <span className="badge badge-success badge-sm"><Trans>Konto aktiv</Trans></span>
+        </div>
+    );
+}
+
+/**
+ * The show-once password.
+ *
+ * Held in component state and nowhere else: no SWR cache, no storage, no
+ * navigation state. Unmounting the card — closing the view or navigating away —
+ * drops the value and its DOM node with it, so there is nothing to clean up by
+ * hand and nothing that can survive into the next mount. The dismiss button
+ * removes it while the card stays open, which is the only way a password could
+ * otherwise linger on a shared screen.
+ */
+function ShowOncePassword({password, notice, onDismiss}: {password: string; notice: string; onDismiss: () => void}) {
+    return (
+        <div className="alert alert-warning shadow-sm mt-3" role="status">
+            <span className="iconify mdi--key-outline text-xl"></span>
+            <div className="flex-1">
+                <h3 className="font-bold"><Trans>Neues Kamera-Passwort</Trans></h3>
+                <code className="font-mono text-lg font-bold select-all break-all">{password}</code>
+                <p className="text-sm mt-1">{notice}</p>
+                <button className="btn btn-xs btn-outline mt-2" onClick={onDismiss}><Trans>Verstanden, ausblenden</Trans></button>
+            </div>
+        </div>
+    );
+}
+
 export default function ManagementFtpInbox() {
-    const {status, isLoading, setTargetGallery, processInbox} = useFtp();
+    const {status, isLoading, setTargetGallery, processInbox, resetCredentials} = useFtp();
     const {tree} = useProtectedGalleries();
     const [selectedId, setSelectedId] = useState<string>('');
     const [processing, setProcessing] = useState(false);
+    const [resetting, setResetting] = useState(false);
+    const [newPassword, setNewPassword] = useState<string | null>(null);
+    const [passwordNotice, setPasswordNotice] = useState<string | null>(null);
     const { showToast } = useUI();
 
     if (isLoading || !status) return <div className="p-4"><span className="loading loading-spinner"></span></div>;
@@ -68,6 +161,31 @@ export default function ManagementFtpInbox() {
         setProcessing(false);
     };
 
+    /**
+     * One reset per click, never a retry loop.
+     *
+     * The backend allows three resets per hour and account. Retrying on a 429, or
+     * re-enabling the button on a timer, would spend the photographer's remaining
+     * quota on guesses; the honest behaviour is to surface the server's message
+     * and let them come back later. A failed reset also drops any password still
+     * on screen: the server cannot promise the old one is unchanged, and a stale
+     * password in the DOM is what produces Error 41 in the camera.
+     */
+    const handleResetCredentials = async () => {
+        setResetting(true);
+        try {
+            const result = await resetCredentials();
+            setNewPassword(result.password);
+            setPasswordNotice(result.password_notice);
+        } catch (error) {
+            setNewPassword(null);
+            setPasswordNotice(null);
+            showToast('error', error instanceof Error ? error.message : t`Die Zugangsdaten konnten nicht erneuert werden.`);
+        } finally {
+            setResetting(false);
+        }
+    };
+
     return (
         <div className="card bg-base-200 border border-base-300 mb-8">
             <div className="card-body">
@@ -91,40 +209,48 @@ export default function ManagementFtpInbox() {
                 <div className="divider my-2"><Trans>Kamera-Verbindung</Trans></div>
 
                 {connectionRows.length === 0 ? (
-                    <div className="alert alert-warning shadow-sm" role="status">
-                        <span className="iconify mdi--alert-circle-outline text-xl"></span>
-                        <div>
-                            <h3 className="font-bold"><Trans>Verbindungsdaten der Kamera nicht verfügbar</Trans></h3>
-                            <p className="text-sm"><Trans>Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine
-                                Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera
-                                eingerichtet werden kann.</Trans></p>
-                        </div>
-                    </div>
+                    <FtpConnectionUnconfigured />
                 ) : (
                     <>
-                        <div className="overflow-x-auto bg-base-100 rounded-box border border-base-300 shadow-sm">
-                            <table className="table table-zebra w-full">
-                                <thead>
-                                    <tr>
-                                        <th><Trans>Einstellung</Trans></th>
-                                        <th><Trans>Wert</Trans></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {connectionRows.map(row => (
-                                        <tr key={row.field}>
-                                            <td className="whitespace-nowrap text-sm">{connectionLabels[row.field]}</td>
-                                            <td><code className="font-mono text-sm">{row.value}</code></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        <p className="text-sm opacity-70 mt-2"><Trans>SFTP läuft über Port 2222, FTPS über Port 989.
-                            FTPS verwendet explizites TLS (AUTH TLS) — in der Kamera muss dafür
-                            „Explizites FTP über TLS" gewählt werden. Der passive Bereich muss in der
-                            Firewall freigeschaltet sein.</Trans></p>
+                        <FtpConnectionRows rows={connectionRows} />
+                        <FtpsHint
+                            sftpPort={status.connection.sftp_port}
+                            ftpsPort={status.connection.ftps_port}
+                            tlsMode={status.connection.ftps_tls_mode}
+                        />
                     </>
+                )}
+
+                <div className="mt-3">
+                    <Link to="/kamera-einrichtung" className="btn btn-sm btn-outline">
+                        <span className="iconify mdi--book-open-variant text-lg"></span> <Trans>Anleitung öffnen</Trans>
+                    </Link>
+                </div>
+
+                <div className="divider my-2"><Trans>Kamera-Konto</Trans></div>
+
+                <div className="flex flex-wrap gap-3 items-center justify-between">
+                    <div className="flex-1 min-w-56">
+                        <p className="text-sm opacity-70"><Trans>Zugangsdaten für die Kamera</Trans></p>
+                        <AccountStatus status={status.ftp_account_status} error={status.ftp_account_error} />
+                    </div>
+                    <button onClick={handleResetCredentials} disabled={resetting} className="btn btn-primary">
+                        {resetting
+                            ? <span className="loading loading-spinner loading-sm"></span>
+                            : <span className="iconify mdi--key-outline text-lg"></span>}
+                        <Trans>Neues Kamera-Passwort</Trans>
+                    </button>
+                </div>
+
+                {newPassword !== null && passwordNotice !== null && (
+                    <ShowOncePassword
+                        password={newPassword}
+                        notice={passwordNotice}
+                        onDismiss={() => {
+                            setNewPassword(null);
+                            setPasswordNotice(null);
+                        }}
+                    />
                 )}
 
                 <div className="divider my-2"><Trans>Zuordnung</Trans></div>
