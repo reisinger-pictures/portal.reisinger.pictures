@@ -1879,7 +1879,14 @@ alle mit Regressionstest:
   Fotograf zu sein, behaelt heute ein funktionierendes SFTPGo-Credential auf ein
   Verzeichnis, das seine Fotos enthaelt. `deleteUser()` haengt ausschliesslich am
   Slug-Wechsel. Migration V043 (Enum `+revoked`, `ftp_revoked_at`), fail-closed
-  wie beim Slug-Wechsel. Schema-Entscheidung steht in 19-ftp 7.16. *In Arbeit.*
+  wie beim Slug-Wechsel. Schema-Entscheidung steht in 19-ftp 7.16. **Erledigt
+  (b2c9bde).** Der Wiedereintritt (entzogen → wieder Fotograf) ist bewusst
+  derselbe Uebergang und keine Sonderfall-Verzweigung.
+  **Nachgezogen (f3aa0d3):** `provisionAndShow()` schrieb bis dahin **keine**
+  Spalte — sein Kommentar stammte aus der Zeit vor V041. Damit meldete das Portal
+  `pending`, waehrend SFTPGo einen lebenden Account hielt, und mit `revoked` wurde
+  daraus ein echter Widerspruch. Jetzt schreibt die Provisionierung `active` +
+  `ftp_provisioned_at`.
 - [ ] **P1-M55 — Der Image-Freshness-Gate fordert noch `@sha256`-Digests
   (CI-Blocker beim naechsten Push).** `7b80c2a` hat den Digest aus dem Compose
   entfernt und den PHP-Vertrag auf Tags umgestellt, aber
@@ -1889,7 +1896,14 @@ alle mit Regressionstest:
   Substanz behalten (Alter des Artefakts aus dem `created`-Feld, 14-Tage-Rahmen,
   anonyme Erreichbarkeit) — ein mutabler Tag ist kein immutabler Pin, diese
   Einschraenkung gehoert ehrlich in `deployment/image-pin-freshness.md`.
-  *In Arbeit.*
+  **Erledigt (bf7a431).** Zwei Blocker mehr als erwartet, beide real:
+  `portal-e2e:v2026.09.24` **existierte nicht** in GHCR (der Tag war in `7b80c2a`
+  erfunden; publiziert sind nur `latest` und `1.62.1`) — der E2E-Job haette das
+  Image nicht pullen koennen. Und `verify-image-nonroot.sh` verglich seit der
+  Tag-Migration einen Digest mit einem Tag-Namen und war dadurch **immer** rot,
+  nicht umgebungsbedingt. Beides gefixt. Der Gate prueft jetzt das Alter des
+  Artefakts hinter dem Tag (14-Tage-Fenster) statt einen Repository-Pin gegen den
+  Tag — die frueher zugesicherte Immutabilitaet entfaellt damit bewusst.
 - [ ] **P1-M56 — Das Profilformular verschluckt das Einmal-Passwort.** Der
   Backend-Fix aus P1-M50 liefert `ftp_password`, aber die Profilansicht ignoriert
   es. Ein Fotograf, der seinen Slug im Profil aendert, verliert das Passwort also
@@ -1900,6 +1914,33 @@ alle mit Regressionstest:
   wenn der Dienst fehlt. Die Absicherung darf **nicht** aufgeweicht werden; der
   E2E-Stack braucht einen erreichbaren SFTPGo oder einen Fake. Harness-Referenz:
   `tests/scripts/ftp-transport-test/`. *In Arbeit.*
+- [ ] **P1-M58 (P0) — Es gibt keinen Pfad, der ein Konto zum ERSTEN Mal anlegt.**
+  `provisionAndShow()` wird an **genau einer** Stelle aufgerufen:
+  `AuthController` im Slug-**Wechsel**-Zweig. Ein Fotograf, der seinen Slug nie
+  aendert, bekommt also nie ein Konto, und die Oberflaeche bietet als einzige
+  Aktion „Neues Kamera-Passwort" an — was `resetPassword()` aufruft, das ueber
+  `findUser()` einen existierenden Account voraussetzt und sonst 404 liefert. Der
+  Text im `pending`-Zustand sagt „Fordere zuerst die Zugangsdaten an", aber es
+  gibt keinen Weg dafuer. **Das blockiert den Kamera-Test aus der Oberflaeche
+  (P1-M32) und ist damit genau das Ziel dieser Runde.** Entweder braucht es einen
+  eigenen Provisionierungs-Endpunkt, oder der Reset-Pfad muss ein fehlendes Konto
+  bewusst anlegen (mit derselben Fail-closed- und Quota-Disziplin). Das ist eine
+  Designentscheidung mit Auth-Bezug und wurde deshalb **nicht** unter Zeitdruck
+  implementiert.
+- [ ] **P1-M59 — `features/` nennt an mehreren Stellen noch `@sha256`-Digests
+  als Pin-Mechanik.** Gemeldet vom Gate-Agenten, bewusst nicht geaendert (Spec-
+  Entscheidung): `features/infrastructure/01-deployment.md:27,135-136,139,141`,
+  `29-production-operations-runnbook.md:96`, `28-ci-test-image.md:4,20,23,34,44,46,47,51,139`,
+  `features/e2e-test-strategy.md:135`, `features/ai/02-testing-strategy.md:20`
+  (letzteres betrifft ein anderes Image, Kontext pruefen). `PORTAL_E2E_IMAGE` ist
+  reine Doku, kein Code — geprueft.
+- [x] **Kein Reset-Guard noetig (geprueft, bewusst nicht gebaut).**
+  `resetAndShow()` auf `pending`/`revoked` kann den Account **nicht**
+  wiederbeleben: `SftpGoClient::resetPassword()` ruft zuerst `findUser()` und
+  scheitert sonst mit 404, der Controller mappt das bereits. Ein zusaetzlicher
+  Portal-Guard waere klarere Fehlermeldung, aber keine Korrektheitsfrage — und
+  eine ungetestete Absicherung unter Zeitdruck ist schlechter als die
+  dokumentierte Entscheidung, sie nicht zu bauen.
 
 **Offen:**
 
