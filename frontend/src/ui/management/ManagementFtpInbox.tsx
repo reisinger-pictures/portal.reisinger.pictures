@@ -1,12 +1,13 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useState, type ReactElement } from 'react';
-import {Link} from 'react-router-dom';
 import {describeFtpConnection} from '../../logic/ftpConnection';
 import {useFtp, type FtpAccountStatus} from '../../logic/useFtp';
 import {useProtectedGalleries} from '../../logic/useGalleries';
+import ModalShell from '../components/ModalShell';
 import { useUI } from '../components/UIContext';
 import {FtpConnectionRows, FtpConnectionUnconfigured} from './FtpConnectionRows';
+import KameraEinrichtungContent from './KameraEinrichtungContent';
 import ShowOncePassword from './components/ShowOncePassword';
 
 const brandLabels: Record<string, string> = {
@@ -122,6 +123,7 @@ export default function ManagementFtpInbox() {
     const [resetting, setResetting] = useState(false);
     const [newPassword, setNewPassword] = useState<string | null>(null);
     const [passwordNotice, setPasswordNotice] = useState<string | null>(null);
+    const [showGuide, setShowGuide] = useState(false);
     const { showToast } = useUI();
 
     if (isLoading || !status) return <div className="p-4"><span className="loading loading-spinner"></span></div>;
@@ -213,10 +215,31 @@ export default function ManagementFtpInbox() {
                 )}
 
                 <div className="mt-3">
-                    <Link to="/kamera-einrichtung" className="btn btn-sm btn-outline">
+                    <button
+                        type="button"
+                        onClick={() => setShowGuide(true)}
+                        className="btn btn-sm btn-outline"
+                    >
                         <span className="iconify mdi--book-open-variant text-lg"></span> <Trans>Anleitung öffnen</Trans>
-                    </Link>
+                    </button>
                 </div>
+
+                {showGuide && (
+                    // Largest available dialog with a scrollable body: the guide is
+                    // long (six sections plus tables) and must not push its close
+                    // button off screen. The content is rendered from the status the
+                    // inbox already holds, so the hook stays in this one component.
+                    <ModalShell
+                        title={<Trans>Kamera einrichten</Trans>}
+                        icon="mdi--camera"
+                        onClose={() => setShowGuide(false)}
+                        boxClassName="w-11/12 max-w-5xl max-h-90vh flex flex-col"
+                    >
+                        <div className="flex-1 overflow-y-auto pr-2">
+                            <KameraEinrichtungContent connection={status.connection} />
+                        </div>
+                    </ModalShell>
+                )}
 
                 <div className="divider my-2"><Trans>Kamera-Konto</Trans></div>
 

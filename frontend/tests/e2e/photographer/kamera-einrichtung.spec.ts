@@ -4,25 +4,24 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 
 /**
- * Camera setup: the guide page and the credential reset (P1-M33, P1-M32).
+ * Camera setup: the guide dialog and the credential reset (P1-M33, P1-M32).
  *
- * Both responses are stubbed with `page.route` on purpose. The guide is
- * specified to render host, ports and the TLS mode from
- * `GET /api/management/ftp/status`, so a test that asserted the real deployment
- * would only ever verify whatever the CI environment happens to be configured
- * with — and would be green while the page showed a port nothing listens on. The
- * same is true of the reset: it mints a fresh random password, so the value and
- * the server's notice are stubbed here to keep the assertions deterministic. The
- * real provisioning path, including the one-time password, is covered by
- * profile-ftp-slug.spec.ts against the E2E stack's SFTPGo.
+ * Both responses are stubbed with `page.route` on purpose. The guide renders host,
+ * ports and the TLS mode from `GET /api/management/ftp/status`, so a test that
+ * asserted the real deployment would only ever verify whatever the CI environment
+ * happens to be configured with — and would be green while the dialog showed a port
+ * nothing listens on. The same is true of the reset: it mints a fresh random
+ * password, so the value and the server's notice are stubbed here to keep the
+ * assertions deterministic. The real provisioning path, including the one-time
+ * password, is covered by profile-ftp-slug.spec.ts against the E2E stack's SFTPGo.
  *
  * The stub therefore serves a deliberately distinctive payload (`.invalid` host,
  * non-default ports) and the assertions check that those exact values reach the
- * DOM. A hardcoded copy of the same values in the page would fail this test, which
- * is the point.
+ * DOM. A hardcoded copy of the same values in the dialog would fail this test,
+ * which is the point.
  *
- * No `page.goto` for navigation: the guide is reached by clicking the link in the
- * inbox card, which is also the user path the link exists for.
+ * No `page.goto` for navigation: the guide is reached by clicking the button in the
+ * inbox card, which is also the user path that button exists for.
  *
  * @feature:ftp
  */
@@ -69,7 +68,7 @@ test.describe('Kamera einrichten: Anleitung und Zugangsdaten', () => {
         if (helper) await helper.teardown();
     });
 
-    test('renders the camera values from the status response, not from a literal', { tag: ['@feature:ftp'] }, async ({ page, request }) => {
+    test('renders the camera values from the status response in the guide dialog', { tag: ['@feature:ftp'] }, async ({ page, request }) => {
         helper = new E2ESessionHelper(request);
         const testUser = await helper.createIsolatedUser('photographer');
         const auth = new AuthHelper(page);
@@ -81,32 +80,37 @@ test.describe('Kamera einrichten: Anleitung und Zugangsdaten', () => {
 
         const main = page.getByRole('main');
         const cameraSection = main.locator('.card').filter({ hasText: 'Kamera-Verbindung' });
-        await expect(cameraSection.getByRole('link', { name: 'Anleitung öffnen' })).toBeVisible();
+        await expect(cameraSection.getByRole('button', { name: 'Anleitung öffnen' })).toBeVisible();
 
         // The inbox card is the same data source; if it shows the stub, the
         // response is really being used.
         await expect(cameraSection.locator('td', { hasText: 'sftp.example.invalid' })).toBeVisible();
 
-        await cameraSection.getByRole('link', { name: 'Anleitung öffnen' }).click();
+        await cameraSection.getByRole('button', { name: 'Anleitung öffnen' }).click();
 
-        await expect(page).toHaveURL(/\/kamera-einrichtung$/);
-        const guide = page.getByRole('main');
+        // The guide is a dialog in the same page, not a route. Its accessible name
+        // comes from ModalShell's title heading.
+        const dialog = page.getByRole('dialog', { name: 'Kamera einrichten' });
+        await expect(dialog).toBeVisible();
 
-        // Every stubbed value has to appear on the page, in both places the guide
+        // Every stubbed value has to appear in the guide, in both places it
         // mentions it: the value table and the menu table.
-        await expect(guide.getByRole('heading', { level: 1, name: 'Kamera einrichten' })).toBeVisible();
-        await expect(guide.getByText('sftp.example.invalid').first()).toBeVisible();
-        await expect(guide.getByText('2222').first()).toBeVisible();
-        await expect(guide.getByText('989').first()).toBeVisible();
-        await expect(guide.getByText('50000–50100').first()).toBeVisible();
-        await expect(guide.getByText('e2e-camera').first()).toBeVisible();
+        await expect(dialog.getByText('sftp.example.invalid').first()).toBeVisible();
+        await expect(dialog.getByText('2222').first()).toBeVisible();
+        await expect(dialog.getByText('989').first()).toBeVisible();
+        await expect(dialog.getByText('50000–50100').first()).toBeVisible();
+        await expect(dialog.getByText('e2e-camera').first()).toBeVisible();
 
         // The TLS mode is the value that must never be asserted instead of read.
         // Row-scoped on purpose: a bare `hasText: 'explicit'` would also match the
         // error table's "explizites", which contains it as a substring.
-        const tlsRow = guide.locator('tr').filter({ hasText: 'FTPS-Verschlüsselung' });
+        const tlsRow = dialog.locator('tr').filter({ hasText: 'FTPS-Verschlüsselung' });
         await expect(tlsRow.locator('td').nth(1)).toHaveText('explicit');
-        await expect(guide.getByText('explizites TLS konfiguriert (AUTH TLS)').first()).toBeVisible();
+        await expect(dialog.getByText('explizites TLS konfiguriert (AUTH TLS)').first()).toBeVisible();
+
+        // Closing the dialog returns to the inbox and removes it from the DOM.
+        await dialog.getByRole('button', { name: 'Schließen' }).click();
+        await expect(dialog).toHaveCount(0);
     });
 
     test('warns instead of showing a value table when the server is not configured', { tag: ['@feature:ftp'] }, async ({ page, request }) => {

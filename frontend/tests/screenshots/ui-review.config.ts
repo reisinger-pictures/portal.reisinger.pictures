@@ -109,13 +109,6 @@ export const uiReviewConfig: UiReviewConfig = {
         // (`goto`/`fill`) cannot trigger — covered by the E2E dialog test instead.
         // ---- Kamera / FTP (neue Oberflaechen) --------------------------------
         {
-            name: 'kamera-einrichtung',
-            path: '/kamera-einrichtung',
-            states: ['filled'],
-            auth: 'admin',
-            note: 'Camera setup guide, built from the Canon manual. Protected route; the content is the deployment/kamera-einrichtung.md rendered as a page.',
-        },
-        {
             name: 'photographer-dashboard',
             path: '/',
             states: ['filled'],
@@ -123,7 +116,7 @@ export const uiReviewConfig: UiReviewConfig = {
             seeds: {
                 filled: context => seedPhotographer(context.request),
             },
-            note: 'Photographer landing: the FTP inbox with the camera connection table, the credentials button, the account status and the link to the setup guide. Photographer-only, so the admin login cannot reach it.',
+            note: 'Photographer landing: the FTP inbox with the camera connection table, the credentials button, the account status and the button that opens the setup guide dialog. Photographer-only, so the admin login cannot reach it.',
         },
         {
             name: 'admin-models',

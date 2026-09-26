@@ -21,11 +21,11 @@ msgstr "--- €"
 msgid "„Beste Übereinstimmung\" gewichtet Lust stärker als Erfahrung."
 msgstr "„Beste Übereinstimmung\" gewichtet Lust stärker als Erfahrung."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "„Verzeichnisstruktur: Standard\" ist zwingend"
 msgstr "„Verzeichnisstruktur: Standard\" ist zwingend"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "„Verzeichnisstruktur\" steht auf Kamera statt Standard"
 msgstr "„Verzeichnisstruktur\" steht auf Kamera statt Standard"
 
@@ -196,7 +196,7 @@ msgstr "1 Jahr:"
 #~ msgid "1. Automatische Datenerfassung und IP-Adressen"
 #~ msgstr "1. Automatische Datenerfassung und IP-Adressen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "1. Das Konto anlegen — es gibt noch keins"
 msgstr "1. Das Konto anlegen — es gibt noch keins"
 
@@ -236,7 +236,7 @@ msgstr "2. Nutzungsdauer"
 msgid "2. Optionale Zuschläge"
 msgstr "2. Optionale Zuschläge"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "2. Verbindung in der Kamera einrichten"
 msgstr "2. Verbindung in der Kamera einrichten"
 
@@ -248,7 +248,7 @@ msgstr "2. Vertragsgegenstand"
 msgid "3. Download-Tracking und Urheberrechtsschutz"
 msgstr "3. Download-Tracking und Urheberrechtsschutz"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "3. Übertragen und importieren"
 msgstr "3. Übertragen und importieren"
 
@@ -256,7 +256,7 @@ msgstr "3. Übertragen und importieren"
 msgid "3. Zustandekommen des Vertrages"
 msgstr "3. Zustandekommen des Vertrages"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "4. Drei stille Fehler"
 msgstr "4. Drei stille Fehler"
 
@@ -280,7 +280,7 @@ msgstr "5. Cloudflare Turnstile"
 msgid "5. Lieferung digitaler Inhalte"
 msgstr "5. Lieferung digitaler Inhalte"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "5. Wenn es nicht klappt"
 msgstr "5. Wenn es nicht klappt"
 
@@ -292,7 +292,7 @@ msgstr "6. Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
 msgid "6. Ihre Rechte"
 msgstr "6. Ihre Rechte"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "6. SFTP zuerst probieren"
 msgstr "6. SFTP zuerst probieren"
 
@@ -439,8 +439,8 @@ msgid "Akt & Boudoir"
 msgstr "Akt & Boudoir"
 
 #: src/ui/components/PhotoHistoryModal.tsx
-#: src/ui/KameraEinrichtung.tsx
 #: src/ui/management/components/InviteModal.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Aktion"
 msgstr "Aktion"
 
@@ -467,7 +467,7 @@ msgstr "Aktionen"
 msgid "Aktiv"
 msgstr "Aktiv"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Aktivieren"
 msgstr "Aktivieren"
@@ -858,7 +858,7 @@ msgstr "Bearbeitung"
 msgid "Beauftragt"
 msgstr "Beauftragt"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Bedeutung"
 msgstr "Bedeutung"
 
@@ -870,11 +870,11 @@ msgstr "Bei fehlgeschlagenen Zahlungen verarbeiten wir begrenzte PaymentIntent-F
 msgid "Bei Verträgen über die Lieferung digitaler Inhalte im Sinne des § 18 Abs. 1 Z 11 des österreichischen Fern- und Auswärtsgeschäfte-Gesetzes (FAGG) erlischt das Rücktrittsrecht vorzeitig, wenn der Kunde bei der Bestellung ausdrücklich zugestimmt hat, dass die Ausführung des Vertrages – nämlich der sofortige Download der Fotos – vor Ablauf der Widerrufsfrist beginnt, und wenn der Kunde zur Kenntnis genommen hat, dass er durch diese Zustimmung sein Rücktrittsrecht verliert."
 msgstr "Bei Verträgen über die Lieferung digitaler Inhalte im Sinne des § 18 Abs. 1 Z 11 des österreichischen Fern- und Auswärtsgeschäfte-Gesetzes (FAGG) erlischt das Rücktrittsrecht vorzeitig, wenn der Kunde bei der Bestellung ausdrücklich zugestimmt hat, dass die Ausführung des Vertrages – nämlich der sofortige Download der Fotos – vor Ablauf der Widerrufsfrist beginnt, und wenn der Kunde zur Kenntnis genommen hat, dass er durch diese Zustimmung sein Rücktrittsrecht verliert."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Beide Ports bleiben offen. Es kostet nichts, und ein nicht vorhersehbarer Kameratyp soll den Umstieg nicht blockieren."
 msgstr "Beide Ports bleiben offen. Es kostet nichts, und ein nicht vorhersehbarer Kameratyp soll den Umstieg nicht blockieren."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Beide Protokolle sind eingerichtet. SFTP ist der einfachere Weg: ein Port, kein Zertifikat, keine passive Port-Range. FTPS ist der Rückweg für Kameras, die SFTP nicht sprechen — und der braucht „Vertrauenswürdige Zielserver\" und den Passiven Modus."
 msgstr "Beide Protokolle sind eingerichtet. SFTP ist der einfachere Weg: ein Port, kein Zertifikat, keine passive Port-Range. FTPS ist der Rückweg für Kameras, die SFTP nicht sprechen — und der braucht „Vertrauenswürdige Zielserver\" und den Passiven Modus."
 
@@ -1104,7 +1104,7 @@ msgstr "Bild"
 msgid "Bild {photoIdShort}"
 msgstr "Bild {photoIdShort}"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Bild auswählen: Bildauswahl/übertr. → Bild markieren → MENU → Übertrag. → OK. Oder FTP-Übertragungseinstellungen → Autom. Übertragung → Aktivieren, dann geht jedes Bild direkt nach der Aufnahme raus."
 msgstr "Bild auswählen: Bildauswahl/übertr. → Bild markieren → MENU → Übertrag. → OK. Oder FTP-Übertragungseinstellungen → Autom. Übertragung → Aktivieren, dann geht jedes Bild direkt nach der Aufnahme raus."
 
@@ -1328,7 +1328,7 @@ msgstr "Büro & Dokumente"
 msgid "Business / Corporate"
 msgstr "Business / Corporate"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Canon EOS R1 / R6 Mark II → Portal. Menüpfade und Nummerierung aus dem Canon-Handbuch, Abschnitt „Übertragen von Bildern auf einen FTP-Server\"."
 msgstr "Canon EOS R1 / R6 Mark II → Portal. Menüpfade und Nummerierung aus dem Canon-Handbuch, Abschnitt „Übertragen von Bildern auf einen FTP-Server\"."
 
@@ -1396,7 +1396,7 @@ msgstr "Culling"
 msgid "Damit wird die letzte Bestätigung auf jetzt gesetzt. Der Fragenkatalog wird dabei nicht verändert."
 msgstr "Damit wird die letzte Bestätigung auf jetzt gesetzt. Der Fragenkatalog wird dabei nicht verändert."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Dann scheitert jede Anmeldung der Kamera, unabhängig vom Passwort. Warte, bis unter FTP Inbox → Kamera-Konto „Konto aktiv\" steht."
 msgstr "Dann scheitert jede Anmeldung der Kamera, unabhängig vom Passwort. Warte, bis unter FTP Inbox → Kamera-Konto „Konto aktiv\" steht."
 
@@ -1412,7 +1412,7 @@ msgstr "Darf nicht negativ sein"
 msgid "dargestellt."
 msgstr "dargestellt."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "das einmal angezeigte Passwort"
 msgstr "das einmal angezeigte Passwort"
 
@@ -1432,11 +1432,11 @@ msgstr "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prü
 msgid "Das Foto wird von der privaten Ablage entfernt."
 msgstr "Das Foto wird von der privaten Ablage entfernt."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Das ist der erste Weg. Das Stammzertifikat ist der Fallback, falls die Kamera mit dieser Einstellung keine Verbindung aufnimmt."
 msgstr "Das ist der erste Weg. Das Stammzertifikat ist der Fallback, falls die Kamera mit dieser Einstellung keine Verbindung aufnimmt."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Das Konto steht noch auf „pending\""
 msgstr "Das Konto steht noch auf „pending\""
 
@@ -1460,7 +1460,7 @@ msgstr "Das unterschriebene Vertragsdokument wird dir nach Vertragsschluss per E
 msgid "Das Widerrufsrecht erlischt bei Verträgen über die Lieferung digitaler Inhalte, wenn die Ausführung des Vertrages mit Ihrer ausdrücklichen Zustimmung begonnen hat, bevor die Widerrufsfrist abgelaufen ist, und wenn Sie zur Kenntnis genommen haben, dass Sie durch die Zustimmung Ihr Widerrufsrecht verlieren."
 msgstr "Das Widerrufsrecht erlischt bei Verträgen über die Lieferung digitaler Inhalte, wenn die Ausführung des Vertrages mit Ihrer ausdrücklichen Zustimmung begonnen hat, bevor die Widerrufsfrist abgelaufen ist, und wenn Sie zur Kenntnis genommen haben, dass Sie durch die Zustimmung Ihr Widerrufsrecht verlieren."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Das Zertifikat des Servers ist selbstsigniert, die Kamera kann seine Vertrauenswürdigkeit deshalb nicht prüfen. Der dafür vorgesehene Schalter liegt nicht im FTP-Konfigurationsfluss, sondern eine Ebene tiefer: Gerät für Verbindung bearbeiten → Gerät wählen → FTP-Server → Vertrauenswürdige Zielserver → Aktivieren."
 msgstr "Das Zertifikat des Servers ist selbstsigniert, die Kamera kann seine Vertrauenswürdigkeit deshalb nicht prüfen. Der dafür vorgesehene Schalter liegt nicht im FTP-Konfigurationsfluss, sondern eine Ebene tiefer: Gerät für Verbindung bearbeiten → Gerät wählen → FTP-Server → Vertrauenswürdige Zielserver → Aktivieren."
 
@@ -1561,7 +1561,7 @@ msgstr "Dein Warenkorb"
 msgid "Dein Warenkorb ist leer."
 msgstr "Dein Warenkorb ist leer."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Dein WLAN; bei einem Fehlschlag „Offline konfigurieren\" wählen"
 msgstr "Dein WLAN; bei einem Fehlschlag „Offline konfigurieren\" wählen"
 
@@ -1612,7 +1612,7 @@ msgstr "Delivery (Downloads)"
 msgid "Delta (Aufpreis):"
 msgstr "Delta (Aufpreis):"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Der Client erwartet implizites TLS"
 msgstr "Der Client erwartet implizites TLS"
 
@@ -1633,7 +1633,7 @@ msgstr "Der Fotograf hat noch keine Bilder für diese Galerie freigegeben."
 msgid "Der Fotograf wurde erfolgreich benachrichtigt!"
 msgstr "Der Fotograf wurde erfolgreich benachrichtigt!"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Der FTPS-Verschlüsselungsmodus"
 msgstr "Der FTPS-Verschlüsselungsmodus"
 
@@ -1665,7 +1665,7 @@ msgstr "Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzule
 msgid "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular bereit (Anhang I B zum Fern- und Auswärtsgeschäfte-Gesetz, FAGG). Sie können den Widerruf formlos erklären – etwa per E-Mail an den auf dem Portal angegebenen Kontakt. Das Muster-Widerrufsformular verlangt lediglich die Angabe des Vertrags, die Mitteilung über Ihren Entschluss zum Widerruf sowie Ihren Namen und Ihre Anschrift. Zur Wahrung der Widerrufsfrist genügt die rechtzeitige Absendung der Erklärung."
 msgstr "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular bereit (Anhang I B zum Fern- und Auswärtsgeschäfte-Gesetz, FAGG). Sie können den Widerruf formlos erklären – etwa per E-Mail an den auf dem Portal angegebenen Kontakt. Das Muster-Widerrufsformular verlangt lediglich die Angabe des Vertrags, die Mitteilung über Ihren Entschluss zum Widerruf sowie Ihren Namen und Ihre Anschrift. Zur Wahrung der Widerrufsfrist genügt die rechtzeitige Absendung der Erklärung."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Der passive Bereich <0>{pasvValue}</0> muss in der Firewall freigeschaltet sein — er wird nur von FTPS benötigt, SFTP kommt mit einem einzigen Port aus."
 msgstr "Der passive Bereich <0>{pasvValue}</0> muss in der Firewall freigeschaltet sein — er wird nur von FTPS benötigt, SFTP kommt mit einem einzigen Port aus."
 
@@ -1681,19 +1681,19 @@ msgstr "Der Rabatt wird auf den serverberechneten Warenkorb angewendet."
 msgid "Der Schutz Ihrer Daten ist uns wichtig. Nachfolgend informieren wir Sie über die Verarbeitung personenbezogener Daten bei der Nutzung dieses Foto-Portals."
 msgstr "Der Schutz Ihrer Daten ist uns wichtig. Nachfolgend informieren wir Sie über die Verarbeitung personenbezogener Daten bei der Nutzung dieses Foto-Portals."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Der Server ist auf explizites TLS konfiguriert — in der Kamera SFTP wählen oder einen Client mit AUTH TLS benutzen"
 msgstr "Der Server ist auf explizites TLS konfiguriert — in der Kamera SFTP wählen oder einen Client mit AUTH TLS benutzen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Der Server ist auf explizites TLS konfiguriert (AUTH TLS). In der Kamera ist dafür nichts extra einzustellen — der Modus FTPS der Kamera macht genau das. Ein Klartext-Greeting beim Testen des Servers ist dieses Verfahren und kein Fehler."
 msgstr "Der Server ist auf explizites TLS konfiguriert (AUTH TLS). In der Kamera ist dafür nichts extra einzustellen — der Modus FTPS der Kamera macht genau das. Ein Klartext-Greeting beim Testen des Servers ist dieses Verfahren und kein Fehler."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Der Server ist auf implizites TLS konfiguriert — in der Kamera FTPS wählen"
 msgstr "Der Server ist auf implizites TLS konfiguriert — in der Kamera FTPS wählen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Der Server ist auf implizites TLS konfiguriert. Wähle in der Kamera FTPS; ein Klartext-Greeting beim Testen des Servers ist in diesem Modus ein Fehlerzeichen."
 msgstr "Der Server ist auf implizites TLS konfiguriert. Wähle in der Kamera FTPS; ein Klartext-Greeting beim Testen des Servers ist in diesem Modus ein Fehlerzeichen."
 
@@ -1701,7 +1701,7 @@ msgstr "Der Server ist auf implizites TLS konfiguriert. Wähle in der Kamera FTP
 msgid "Der Server nennt keinen Grund."
 msgstr "Der Server nennt keinen Grund."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "der SFTP-Login schlägt still fehl: das Konto steht noch auf pending"
 msgstr "der SFTP-Login schlägt still fehl: das Konto steht noch auf pending"
 
@@ -1709,11 +1709,11 @@ msgstr "der SFTP-Login schlägt still fehl: das Konto steht noch auf pending"
 msgid "Der Text ist zu lang."
 msgstr "Der Text ist zu lang."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Der Upload funktioniert, aber der Import findet nichts, weil die Datei in einem Unterordner liegt. Siehe Schritt 14."
 msgstr "Der Upload funktioniert, aber der Import findet nichts, weil die Datei in einem Unterordner liegt. Siehe Schritt 14."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Der Upload kam nicht an"
 msgstr "Der Upload kam nicht an"
 
@@ -1738,7 +1738,7 @@ msgstr "Die Aufbewahrung der IP-bezogenen Bestell- und Sicherheitsdaten richtet 
 msgid "Die Darstellung der Produkte im Portal stellt kein bindendes Angebot dar. Mit dem Klicken auf „Zahlungspflichtig bestellen“ gibt der Kunde ein bindendes Angebot zum Abschluss des Vertrages ab. Der Vertrag kommt mit der Bestätigung der Bestellung durch den Fotografen bzw. mit der Aussendung der Bestellbestätigung zustande."
 msgstr "Die Darstellung der Produkte im Portal stellt kein bindendes Angebot dar. Mit dem Klicken auf „Zahlungspflichtig bestellen“ gibt der Kunde ein bindendes Angebot zum Abschluss des Vertrages ab. Der Vertrag kommt mit der Bestätigung der Bestellung durch den Fotografen bzw. mit der Aussendung der Bestellbestätigung zustande."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Die Datei liegt in einem Unterordner"
 msgstr "Die Datei liegt in einem Unterordner"
 
@@ -1754,7 +1754,7 @@ msgstr "Die Europäische Kommission stellt eine Plattform zur Online-Streitbeile
 msgid "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen."
 msgstr "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Die Kamera importiert ausschließlich eine Stammzertifikatsdatei mit genau diesen Dateinamen. Ein beliebig benanntes cert.pem wird übersprungen, ohne jede Fehlermeldung. Es kann nur ein Zertifikat importiert werden, und die Karte muss vorher eingesteckt sein."
 msgstr "Die Kamera importiert ausschließlich eine Stammzertifikatsdatei mit genau diesen Dateinamen. Ein beliebig benanntes cert.pem wird übersprungen, ohne jede Fehlermeldung. Es kann nur ein Zertifikat importiert werden, und die Karte muss vorher eingesteckt sein."
 
@@ -1762,7 +1762,7 @@ msgstr "Die Kamera importiert ausschließlich eine Stammzertifikatsdatei mit gen
 msgid "Die Kamera kann sich noch nicht anmelden — unabhängig vom Passwort. Fordere zuerst die Zugangsdaten an."
 msgstr "Die Kamera kann sich noch nicht anmelden — unabhängig vom Passwort. Fordere zuerst die Zugangsdaten an."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "die Kamera verlangt ein Stammzertifikat"
 msgstr "die Kamera verlangt ein Stammzertifikat"
 
@@ -1798,7 +1798,7 @@ msgstr "Die Sicherheitsprüfung konnte nicht geladen werden. Bitte versuche es e
 msgid "Die Telefonnummer ist zu lang."
 msgstr "Die Telefonnummer ist zu lang."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Die Werte für die Kamera"
 msgstr "Die Werte für die Kamera"
 
@@ -1838,7 +1838,7 @@ msgstr "Diese Allgemeinen Geschäftsbedingungen (AGB) und Lizenzbedingungen gelt
 msgid "Diese Bedingungen regeln das Vertragsverhältnis zwischen dem Betreiber dieses Portals (im Folgenden „Fotograf“) und dem Kunden bei der Bestellung von Bildern, Lizenzpaketen und sonstigen digitalen Inhalten. Entgegenstehende oder abweichende Bedingungen des Kunden werden nicht anerkannt, sofern der Fotograf ihrer Geltung nicht ausdrücklich schriftlich zugestimmt hat."
 msgstr "Diese Bedingungen regeln das Vertragsverhältnis zwischen dem Betreiber dieses Portals (im Folgenden „Fotograf“) und dem Kunden bei der Bestellung von Bildern, Lizenzpaketen und sonstigen digitalen Inhalten. Entgegenstehende oder abweichende Bedingungen des Kunden werden nicht anerkannt, sofern der Fotograf ihrer Geltung nicht ausdrücklich schriftlich zugestimmt hat."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Diese drei Fälle erzeugen keine Fehlermeldung in der Kamera. Sie sehen nur nach Erfolg aus und kosten trotzdem den ganzen Test."
 msgstr "Diese drei Fälle erzeugen keine Fehlermeldung in der Kamera. Sie sehen nur nach Erfolg aus und kosten trotzdem den ganzen Test."
 
@@ -1986,7 +1986,7 @@ msgstr "E-Mail:"
 msgid "E-Mail: [E-Mail-Adresse]"
 msgstr "E-Mail: [E-Mail-Adresse]"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Ebenfalls unter Gerät für Verbindung bearbeiten → FTP-Server. Nimm Standard. Der Import im Portal liest die Inbox nicht rekursiv; die Kamera legt auf dem Server A/DCIM/100EOSR1/… an, und diese Dateien landen in einem Unterordner, den der Import nicht sieht. Das Ergebnis ist: Upload erfolgreich, Import 0 Bilder."
 msgstr "Ebenfalls unter Gerät für Verbindung bearbeiten → FTP-Server. Nimm Standard. Der Import im Portal liest die Inbox nicht rekursiv; die Kamera legt auf dem Server A/DCIM/100EOSR1/… an, und diese Dateien landen in einem Unterordner, den der Import nicht sieht. Das Ergebnis ist: Upload erfolgreich, Import 0 Bilder."
 
@@ -2110,7 +2110,7 @@ msgstr "Einstellung"
 msgid "Einstellungen"
 msgstr "Einstellungen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Einstellungen speichern"
 msgstr "Einstellungen speichern"
 
@@ -2218,7 +2218,7 @@ msgstr "Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
 msgid "Erneut versuchen"
 msgstr "Erneut versuchen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Erste Verdachtsstelle"
 msgstr "Erste Verdachtsstelle"
 
@@ -2260,8 +2260,12 @@ msgid "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen P
 msgstr "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Kreditkarte (über den Zahlungsdienstleister Stripe) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
 
 #: src/ui/KameraEinrichtung.tsx
-msgid "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt — frag den Support danach."
-msgstr "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt — frag den Support danach."
+#~ msgid "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt — frag den Support danach."
+#~ msgstr "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt — frag den Support danach."
+
+#: src/ui/management/KameraEinrichtungContent.tsx
+msgid "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt."
+msgstr "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt."
 
 #: src/ui/LicenseTerms.tsx
 msgid "Es gilt österreichisches Recht unter Ausschluss des UN-Kaufrechts. Sollte eine Bestimmung dieser Bedingungen unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt. Gerichtsstand ist, soweit gesetzlich zulässig, der Sitz des Fotografen."
@@ -2559,7 +2563,7 @@ msgstr "Filter zurücksetzen"
 msgid "finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen."
 msgstr "finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Firewall für {ftpsValue} bzw. {sftpValue}; Passiver Modus auf Aktivieren"
 msgstr "Firewall für {ftpsValue} bzw. {sftpValue}; Passiver Modus auf Aktivieren"
 
@@ -2589,9 +2593,13 @@ msgstr "Flex Tarif Rechner"
 msgid "Folgen des Widerrufs"
 msgstr "Folgen des Widerrufs"
 
+#: src/ui/management/KameraEinrichtungContent.tsx
+msgid "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
+msgstr "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
+
 #: src/ui/KameraEinrichtung.tsx
-msgid "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Neues Kamera-Passwort\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
-msgstr "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Neues Kamera-Passwort\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
+#~ msgid "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Neues Kamera-Passwort\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
+#~ msgstr "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Neues Kamera-Passwort\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
 
 #: src/ui/client/DeliveryView.tsx
 msgid "Format"
@@ -2689,7 +2697,7 @@ msgstr "FTPS-Port"
 msgid "FTPS-Verschlüsselung"
 msgstr "FTPS-Verschlüsselung"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "FTPS: „Vertrauenswürdige Zielserver\" aktivieren"
 msgstr "FTPS: „Vertrauenswürdige Zielserver\" aktivieren"
 
@@ -2713,9 +2721,13 @@ msgstr "Für den gewählten Kontaktweg fehlt die hinterlegte Angabe."
 msgid "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht."
 msgstr "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht."
 
+#: src/ui/management/KameraEinrichtungContent.tsx
+msgid "Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Die Kamera kann FTPS damit nicht aushandeln — nutze stattdessen SFTP."
+msgstr "Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Die Kamera kann FTPS damit nicht aushandeln — nutze stattdessen SFTP."
+
 #: src/ui/KameraEinrichtung.tsx
-msgid "Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Frage den Support nach der Einrichtung, bevor du FTPS verwendest."
-msgstr "Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Frage den Support nach der Einrichtung, bevor du FTPS verwendest."
+#~ msgid "Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Frage den Support nach der Einrichtung, bevor du FTPS verwendest."
+#~ msgstr "Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Frage den Support nach der Einrichtung, bevor du FTPS verwendest."
 
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 msgid "Für Galerie:"
@@ -3176,7 +3188,7 @@ msgstr "Kalkulieren & Antworten"
 msgid "Kalkulieren & E-Mail senden"
 msgstr "Kalkulieren & E-Mail senden"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/ManagementFtpInbox.tsx
 msgid "Kamera einrichten"
 msgstr "Kamera einrichten"
 
@@ -3940,7 +3952,7 @@ msgstr "Meine Fotos"
 msgid "Meine Profile"
 msgstr "Meine Profile"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Meldung"
 msgstr "Meldung"
 
@@ -4264,7 +4276,7 @@ msgstr "name@beispiel.de"
 msgid "Nein"
 msgstr "Nein"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Netzwerk ggf. erst aktivieren"
 msgstr "Netzwerk ggf. erst aktivieren"
 
@@ -4284,7 +4296,7 @@ msgstr "Neu"
 msgid "Neue Einladung"
 msgstr "Neue Einladung"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Neue Einstellungen"
 msgstr "Neue Einstellungen"
 
@@ -4410,7 +4422,7 @@ msgstr "Neueste zuerst"
 msgid "Nicht erforderlich"
 msgstr "Nicht erforderlich"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "nicht konfiguriert"
 msgstr "nicht konfiguriert"
@@ -4468,7 +4480,7 @@ msgstr "Noch keine Profile verknüpft."
 msgid "Noch keine Verträge vorhanden."
 msgstr "Noch keine Verträge vorhanden."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Notiere das Passwort sofort. Es wird genau einmal angezeigt, nicht gespeichert und nicht wiederherstellbar. Bei Verlust gibt es nur ein neues, und das alte entfällt."
 msgstr "Notiere das Passwort sofort. Es wird genau einmal angezeigt, nicht gespeichert und nicht wiederherstellbar. Bei Verlust gibt es nur ein neues, und das alte entfällt."
 
@@ -4635,7 +4647,7 @@ msgstr "Ordner erfolgreich gelöscht."
 msgid "Ordner ist leer."
 msgstr "Ordner ist leer."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Ordner wählen"
 msgstr "Ordner wählen"
 
@@ -5051,11 +5063,11 @@ msgstr "Projekte"
 msgid "Prozent"
 msgstr "Prozent"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Prüfe deinen FTP-Ordner-Slug im Profil — er ist der Benutzername der Kamera. Eine Änderung ist per Definition ein Reset: alter Account weg, neuer Account, neues Passwort."
 msgstr "Prüfe deinen FTP-Ordner-Slug im Profil — er ist der Benutzername der Kamera. Eine Änderung ist per Definition ein Reset: alter Account weg, neuer Account, neues Passwort."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Prüfe, dass die Datei angekommen ist: die Anzahl unter „Bilder in der Warteschlange\" muss hochgehen. Sonst ist der Upload gescheitert — nicht der Import."
 msgstr "Prüfe, dass die Datei angekommen ist: die Anzahl unter „Bilder in der Warteschlange\" muss hochgehen. Sonst ist der Upload gescheitert — nicht der Import."
 
@@ -5171,7 +5183,7 @@ msgstr "Registrierung erfolgreich. Bitte bestätige deine E-Mail."
 msgid "Registrierung fehlgeschlagen"
 msgstr "Registrierung fehlgeschlagen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Reihenfolge nicht umstellen: erst Konto und Passwort, dann Kamera. Wer zuerst die Kamera konfiguriert, hat noch kein gültiges Passwort und wundert sich über Error 41."
 msgstr "Reihenfolge nicht umstellen: erst Konto und Passwort, dann Kamera. Wer zuerst die Kamera konfiguriert, hat noch kein gültiges Passwort und wundert sich über Error 41."
 
@@ -5238,7 +5250,7 @@ msgstr "Schliessen"
 msgid "Schließen"
 msgstr "Schließen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Schritt"
 msgstr "Schritt"
 
@@ -5294,7 +5306,7 @@ msgstr "Setze ein neues Passwort für den Account <0>{email}</0>."
 msgid "Setzen"
 msgstr "Setzen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "SFTP (empfohlen) oder FTPS"
 msgstr "SFTP (empfohlen) oder FTPS"
 
@@ -5307,8 +5319,12 @@ msgid "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. FTPS verwendet imp
 msgstr "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. FTPS verwendet implizites TLS — in der Kamera dafür „Implizites FTP über TLS\" wählen. Der passive Bereich muss in der Firewall freigeschaltet sein."
 
 #: src/ui/management/ManagementFtpInbox.tsx
-msgid "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt — bitte den Support kontaktieren, bevor du FTPS in der Kamera einrichtest."
-msgstr "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt — bitte den Support kontaktieren, bevor du FTPS in der Kamera einrichtest."
+#~ msgid "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt — bitte den Support kontaktieren, bevor du FTPS in der Kamera einrichtest."
+#~ msgstr "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt — bitte den Support kontaktieren, bevor du FTPS in der Kamera einrichtest."
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Ohne diesen Modus kann die Kamera FTPS nicht aushandeln — nutze daher SFTP."
+msgstr "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Ohne diesen Modus kann die Kamera FTPS nicht aushandeln — nutze daher SFTP."
 
 #: src/ui/management/ManagementFtpInbox.tsx
 #~ msgid "SFTP läuft über Port 2222, FTPS über Port 989. FTPS verwendet explizites TLS (AUTH TLS) — in der Kamera muss dafür „Explizites FTP über TLS\" gewählt werden. Der passive Bereich muss in der Firewall freigeschaltet sein."
@@ -5368,7 +5384,7 @@ msgstr "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschrä
 msgid "Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses."
 msgstr "Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses."
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "siehe den Hinweis zum Stammzertifikat unten"
 msgstr "siehe den Hinweis zum Stammzertifikat unten"
 
@@ -5429,7 +5445,7 @@ msgstr "Speichern"
 msgid "Speichern fehlgeschlagen"
 msgstr "Speichern fehlgeschlagen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "speichern; bei Rückfrage OK → Zielserver vertrauen"
 msgstr "speichern; bei Rückfrage OK → Zielserver vertrauen"
 
@@ -5476,11 +5492,11 @@ msgstr "Staffel entfernen"
 msgid "Staffel hinzufügen"
 msgstr "Staffel hinzufügen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Stammverzeichnis"
 msgstr "Stammverzeichnis"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Stammzertifikat: Dateiname muss ROOT.CER, ROOT.CRT oder ROOT.PEM sein"
 msgstr "Stammzertifikat: Dateiname muss ROOT.CER, ROOT.CRT oder ROOT.PEM sein"
 
@@ -5655,7 +5671,7 @@ msgstr "Tabelle einfügen"
 msgid "Tabelle löschen"
 msgstr "Tabelle löschen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "TCP kommt nicht durch"
 msgstr "TCP kommt nicht durch"
 
@@ -5726,11 +5742,11 @@ msgstr "Titel ist erforderlich"
 msgid "Titel:"
 msgstr "Titel:"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "TLS-Handshake bricht mit „wrong version number\" ab"
 msgstr "TLS-Handshake bricht mit „wrong version number\" ab"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "TLS-Vertrauen"
 msgstr "TLS-Vertrauen"
 
@@ -5975,7 +5991,7 @@ msgstr "Upgrades"
 msgid "Upgrades kaufen erlaubt"
 msgstr "Upgrades kaufen erlaubt"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Upload läuft, aber Import 0 Bilder"
 msgstr "Upload läuft, aber Import 0 Bilder"
 
@@ -6000,7 +6016,7 @@ msgstr "URL Slug"
 msgid "Verbindliche Unterzeichnung"
 msgstr "Verbindliche Unterzeichnung"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Verbindung ok, aber 0 Bilder in der Warteschlange"
 msgstr "Verbindung ok, aber 0 Bilder in der Warteschlange"
 
@@ -6181,7 +6197,7 @@ msgstr "Verwendung"
 msgid "Verwerfen"
 msgstr "Verwerfen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Verzeichnisstruktur steht auf „Kamera\" statt „Standard\""
 msgstr "Verzeichnisstruktur steht auf „Kamera\" statt „Standard\""
 
@@ -6222,7 +6238,7 @@ msgstr "Volumenpreis (Tier {tierNum})"
 #~ msgid "Volumenpreis (Tier {volumeTierIndex})"
 #~ msgstr "Volumenpreis (Tier {volumeTierIndex})"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Vor dem Test existiert bewusst kein FTP-Konto. Dein FTP-Ordner-Slug ist nur der Name; in SFTPGo wird nichts angelegt, bis die Zugangsdaten angefordert werden. Ein Konto vorab zu provisionieren hieße, Zugangsdaten zu erzeugen, die niemand kennt."
 msgstr "Vor dem Test existiert bewusst kein FTP-Konto. Dein FTP-Ordner-Slug ist nur der Name; in SFTPGo wird nichts angelegt, bis die Zugangsdaten angefordert werden. Ein Konto vorab zu provisionieren hieße, Zugangsdaten zu erzeugen, die niemand kennt."
 
@@ -6339,12 +6355,12 @@ msgstr "Wenn Sie Bilder aus unseren Galerien herunterladen, dokumentieren wir di
 msgid "Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, einschließlich der Lieferkosten, unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung über Ihren Widerruf bei uns eingegangen ist. Für die Rückzahlung verwenden wir dasselbe Zahlungsmittel, das Sie bei der ursprünglichen Transaktion eingesetzt haben, es sei denn, mit Ihnen wurde ausdrücklich etwas anderes vereinbart."
 msgstr "Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, einschließlich der Lieferkosten, unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung über Ihren Widerruf bei uns eingegangen ist. Für die Rückzahlung verwenden wir dasselbe Zahlungsmittel, das Sie bei der ursprünglichen Transaktion eingesetzt haben, es sei denn, mit Ihnen wurde ausdrücklich etwas anderes vereinbart."
 
-#: src/ui/KameraEinrichtung.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
 #: src/ui/management/FtpConnectionRows.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Wert"
 msgstr "Wert"
@@ -6596,7 +6612,7 @@ msgstr "Ziel-Galerie"
 msgid "Ziel-Galerie auswählen"
 msgstr "Ziel-Galerie auswählen"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Ziel-Galerie setzen, dann „Bilder Importieren\". Die Datei wird erst nach erfolgreicher Verarbeitung und erst nach dem Datenbankeintrag gelöscht. Bricht der Import ab, bleibt sie liegen und der nächste Versuch sieht sie wieder."
 msgstr "Ziel-Galerie setzen, dann „Bilder Importieren\". Die Datei wird erst nach erfolgreicher Verarbeitung und erst nach dem Datenbankeintrag gelöscht. Bricht der Import ab, bleibt sie liegen und der nächste Versuch sieht sie wieder."
 
@@ -6608,7 +6624,7 @@ msgstr "Ziel-ID"
 msgid "Zielordner"
 msgstr "Zielordner"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "zuerst „Vertrauenswürdige Zielserver\" auf Aktivieren"
 msgstr "zuerst „Vertrauenswürdige Zielserver\" auf Aktivieren"
 
@@ -6661,7 +6677,7 @@ msgstr "Zugriff..."
 msgid "Zugriffs-Status (Fotografen)"
 msgstr "Zugriffs-Status (Fotografen)"
 
-#: src/ui/KameraEinrichtung.tsx
+#: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Zum Stammzertifikat"
 msgstr "Zum Stammzertifikat"
 
@@ -6678,8 +6694,8 @@ msgid "Zur eindeutigen Zuordnung speichern wir die Stripe Customer-ID des Portal
 msgstr "Zur eindeutigen Zuordnung speichern wir die Stripe Customer-ID des Portalkontos und die PaymentIntent-ID des Zahlungsvorgangs. Diese Kennungen sind Zahlungs- und Kontrollinformationen, keine Kartendaten. Für die technische Absicherung wird außerdem der Checkout-Fingerprint-Hash aus dem serverseitig kanonisierten Checkout-Kontext verwendet; er ist kein Browser-Fingerprint und wird nicht für seitenübergreifendes Tracking verwendet."
 
 #: src/ui/KameraEinrichtung.tsx
-msgid "Zurück zum FTP Inbox"
-msgstr "Zurück zum FTP Inbox"
+#~ msgid "Zurück zum FTP Inbox"
+#~ msgstr "Zurück zum FTP Inbox"
 
 #: src/ui/client/ClientCartView.tsx
 #: src/ui/ContractSignView.tsx
