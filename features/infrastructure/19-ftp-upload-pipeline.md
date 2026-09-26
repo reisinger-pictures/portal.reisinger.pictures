@@ -256,6 +256,10 @@ Ablösung als Parallelsystem plant, plant den Ausfall für den Fotografen.
   Kein gemeinsamer User, kein `r1`-User. Die Kamera konfiguriert `/` als
   Subpath und lädt direkt in das Home-Verzeichnis. **Die GUI-Auswahl des
   Subfolders entfällt** — der User wählt keinen Unterordner mehr aus.
+- **Physischer Ordner pro User:** Jeder User bekommt einen eigenen physischen
+  Ordner auf dem Host (`ftp/<slug>`), auf den er eingeschränkt ist. SFTPGo
+  konfiguriert das als `home_dir` — der User sieht nur sein eigenes
+  Verzeichnis, nicht die anderer User. Das ist die Isolationsgrenze.
 
 ### 7.3 Passwort-Fluss: erzeugen, anzeigen, verwerfen
 
