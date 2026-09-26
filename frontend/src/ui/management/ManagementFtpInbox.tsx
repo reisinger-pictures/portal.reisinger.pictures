@@ -220,24 +220,29 @@ export default function ManagementFtpInbox() {
 
                 <div className="divider my-2"><Trans>Kamera-Konto</Trans></div>
 
-                <div className="flex flex-wrap gap-3 items-center justify-between">
-                    <div className="flex-1 min-w-56">
+                <div>
+                    {/* Label and action share one line: the label reads as the row's
+                        title, so the button belongs on that line. `items-center`
+                        keeps them aligned, and only the status block sits below —
+                        rendering the action against the tall warning instead is what
+                        floated it vertically in the UI review. */}
+                    <div className="flex flex-wrap gap-3 items-center justify-between">
                         <p className="text-sm opacity-70"><Trans>Zugangsdaten für die Kamera</Trans></p>
-                        <AccountStatus status={status.ftp_account_status} error={status.ftp_account_error} />
+                        <button onClick={handleResetCredentials} disabled={resetting} data-testid="ftp-credentials-button" className="btn btn-primary">
+                            {resetting
+                                ? <span className="loading loading-spinner loading-sm"></span>
+                                : <span className="iconify mdi--key-outline text-lg"></span>}
+                            {/* Bei `pending` existiert noch kein Konto — dort ist die
+                                Aktion eine Anlage, keine Rotation. Der Text muss das
+                                sagen, sonst suggeriert er einen Reset, den es nicht
+                                gibt, und der Fotograf sucht vergeblich nach dem
+                                Passwort, das noch nie erzeugt wurde. */}
+                            {status.ftp_account_status === 'pending'
+                                ? <Trans>Kamera-Zugang einrichten</Trans>
+                                : <Trans>Neues Kamera-Passwort</Trans>}
+                        </button>
                     </div>
-                    <button onClick={handleResetCredentials} disabled={resetting} data-testid="ftp-credentials-button" className="btn btn-primary">
-                        {resetting
-                            ? <span className="loading loading-spinner loading-sm"></span>
-                            : <span className="iconify mdi--key-outline text-lg"></span>}
-                        {/* Bei `pending` existiert noch kein Konto — dort ist die
-                            Aktion eine Anlage, keine Rotation. Der Text muss das
-                            sagen, sonst suggeriert er einen Reset, den es nicht
-                            gibt, und der Fotograf sucht vergeblich nach dem
-                            Passwort, das noch nie erzeugt wurde. */}
-                        {status.ftp_account_status === 'pending'
-                            ? <Trans>Kamera-Zugang einrichten</Trans>
-                            : <Trans>Neues Kamera-Passwort</Trans>}
-                    </button>
+                    <AccountStatus status={status.ftp_account_status} error={status.ftp_account_error} />
                 </div>
 
                 {newPassword !== null && passwordNotice !== null && (
