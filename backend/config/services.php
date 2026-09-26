@@ -100,5 +100,9 @@ return [
         'ftps_port' => env('SFTPGO_FTPS_PORT'),
         'pasv_port_start' => env('SFTPGO_PASV_PORT_START'),
         'pasv_port_end' => env('SFTPGO_PASV_PORT_END'),
+        // 1 = explicit (AUTH TLS), 2 = implicit. Read with no default so the UI
+        // reports an unset mode instead of claiming one; the compose default of
+        // 1 applies to the binding itself, and .env.production sets it.
+        'ftps_tls_mode' => env('SFTPGO_FTPD_TLS_MODE'),
     ],
 ];

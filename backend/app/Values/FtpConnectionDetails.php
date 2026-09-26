@@ -45,6 +45,7 @@ final class FtpConnectionDetails
         public readonly ?int $ftpsPort,
         public readonly ?int $pasvPortStart,
         public readonly ?int $pasvPortEnd,
+        public readonly ?string $ftpsTlsMode,
     ) {}
 
     public static function forUser(User $user): self
@@ -56,6 +57,7 @@ final class FtpConnectionDetails
             self::port(Config::get('services.ftp_transport.ftps_port')),
             self::port(Config::get('services.ftp_transport.pasv_port_start')),
             self::port(Config::get('services.ftp_transport.pasv_port_end')),
+            self::tlsMode(Config::get('services.ftp_transport.ftps_tls_mode')),
         );
     }
 
@@ -79,7 +81,8 @@ final class FtpConnectionDetails
      *     sftp_port: ?int,
      *     ftps_port: ?int,
      *     pasv_port_start: ?int,
-     *     pasv_port_end: ?int
+     *     pasv_port_end: ?int,
+     *     ftps_tls_mode: ?string
      * }
      */
     public function toArray(): array
@@ -93,6 +96,7 @@ final class FtpConnectionDetails
             'ftps_port' => $this->ftpsPort,
             'pasv_port_start' => $this->pasvPortStart,
             'pasv_port_end' => $this->pasvPortEnd,
+            'ftps_tls_mode' => $this->ftpsTlsMode,
         ];
     }
 
@@ -110,6 +114,24 @@ final class FtpConnectionDetails
         $value = trim($value);
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * `explicit` for 1, `implicit` for 2, `null` for anything else.
+     *
+     * Reported rather than hardcoded in the UI, because it is the value the
+     * sftpgo binding is actually started with: the same `SFTPGO_FTPD_TLS_MODE`
+     * feeds `SFTPGO_FTPD__BINDINGS__0__TLS_MODE` and this read. A literal in
+     * the frontend would be a second source of truth for a setting that decides
+     * whether a camera can connect at all.
+     */
+    private static function tlsMode(mixed $value): ?string
+    {
+        return match (is_string($value) || is_int($value) ? (string) $value : null) {
+            '1' => 'explicit',
+            '2' => 'implicit',
+            default => null,
+        };
     }
 
     /**

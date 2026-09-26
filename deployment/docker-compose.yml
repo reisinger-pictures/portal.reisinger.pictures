@@ -97,6 +97,7 @@ services:
       - SFTPGO_FTPS_PORT=${SFTPGO_FTPS_PORT}
       - SFTPGO_PASV_PORT_START=${SFTPGO_PASV_PORT_START}
       - SFTPGO_PASV_PORT_END=${SFTPGO_PASV_PORT_END}
+      - SFTPGO_FTPD_TLS_MODE=${SFTPGO_FTPD_TLS_MODE}
       - DB_DATABASE=portal_db
       - DB_USERNAME=portal_user
       - DB_PASSWORD=${DB_PASSWORD}
@@ -332,7 +333,11 @@ services:
       # auf 989 ohne 21.
       - SFTPGO_FTPD__BINDINGS__0__ADDRESS=0.0.0.0
       - SFTPGO_FTPD__BINDINGS__0__PORT=989
-      - SFTPGO_FTPD__BINDINGS__0__TLS_MODE=1
+      # Aus der Stack-Env, damit die Anzeige im Management-UI nicht etwas
+      # behauptet, was der Dienst nicht tut. Default 1 = explizit, weil eine
+      # Canon-Kamera direkt nach dem Verbindungsaufbau AUTH TLS sendet
+      # (cam.start.canon UG-06_Network_0060).
+      - SFTPGO_FTPD__BINDINGS__0__TLS_MODE=${SFTPGO_FTPD_TLS_MODE:-1}
       # KEINE Max-TLS-Version gesetzt, und das ist Absicht. Go bietet TLS 1.3
       # an und handelt mit einem aelteren Client von selbst auf dessen hoechste
       # Version herunter — eine Kamera, die nur 1.2 kann, bekommt 1.2. Eine
