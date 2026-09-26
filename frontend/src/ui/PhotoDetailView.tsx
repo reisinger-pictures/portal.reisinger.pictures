@@ -18,7 +18,7 @@ import { useUI } from './components/UIContext';
 import { useAI } from '../logic/useAI';
 import LicenseSelectorCard from './client/components/LicenseSelectorCard';
 import VolumeLicensingCard from './client/components/VolumeLicensingCard';
-import {useLicensingMode} from '../logic/useLicensingMode';
+import {useLicensingModeStatus} from '../logic/useLicensingMode';
 import { BreadcrumbItem } from '../api';
 
 interface PhotoContextData {
@@ -43,7 +43,7 @@ export default function PhotoDetailView() {
     const [prevPhotoId, setPrevPhotoId] = useState<string | undefined>(undefined);
     const [aiContext, setAiContext] = useState('');
     const [isAiGenerating, setIsAiGenerating] = useState(false);
-    const licensingMode = useLicensingMode(data?.photo.gallery_id);
+    const licensingMode = useLicensingModeStatus(data?.photo.gallery_id);
 
     const photoId = data?.photo?.id;
     if (photoId && photoId !== prevPhotoId) {
@@ -146,7 +146,14 @@ export default function PhotoDetailView() {
 
                     <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
                         {data.photo.gallery?.type === 'delivery' && (
-                            licensingMode === 'volume_licensing' ? (
+                            licensingMode.isLoading ? (
+                                <div
+                                    data-testid="licensing-loading"
+                                    className="bg-base-100 rounded-box border border-base-300 shadow-sm p-5 md:p-6 flex items-center justify-center min-h-40"
+                                >
+                                    <span className="loading loading-spinner loading-lg"></span>
+                                </div>
+                            ) : licensingMode.mode === 'volume_licensing' ? (
                                 <VolumeLicensingCard photo={data.photo} onAddToCart={() => {}} />
                             ) : (
                                 <LicenseSelectorCard photo={data.photo} />

@@ -90,6 +90,11 @@ export default function AutocompleteInput<T>({
         }
         if (e.key === 'Escape') {
             e.preventDefault();
+            if (hasOpenListbox) {
+                // Consume Escape while the suggestion list is open so an
+                // enclosing dialog's focus trap does not close it as well.
+                e.stopPropagation();
+            }
             closeSuggestions();
             return;
         }

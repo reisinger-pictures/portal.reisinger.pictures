@@ -68,6 +68,10 @@ msgstr "{couponsLength} Coupon{couponsPlural} für diese Galerie"
 msgid "{couponsLength} Coupon{couponsPlural} für diese Galerie-Gruppe"
 msgstr "{couponsLength} Coupon{couponsPlural} für diese Galerie-Gruppe"
 
+#: src/ui/management/components/UploadDropzone.tsx
+msgid "{failureCount} Bild(er) konnten nicht hochgeladen werden."
+msgstr "{failureCount} Bild(er) konnten nicht hochgeladen werden."
+
 #: src/ui/management/ManagementStatsView.tsx
 msgid "{galleryCount} Downloads"
 msgstr "{galleryCount} Downloads"
@@ -1563,6 +1567,10 @@ msgstr "Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzule
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular bereit (Anhang I B zum Fern- und Auswärtsgeschäfte-Gesetz, FAGG). Sie können den Widerruf formlos erklären – etwa per E-Mail an den auf dem Portal angegebenen Kontakt. Das Muster-Widerrufsformular verlangt lediglich die Angabe des Vertrags, die Mitteilung über Ihren Entschluss zum Widerruf sowie Ihren Namen und Ihre Anschrift. Zur Wahrung der Widerrufsfrist genügt die rechtzeitige Absendung der Erklärung."
 msgstr "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular bereit (Anhang I B zum Fern- und Auswärtsgeschäfte-Gesetz, FAGG). Sie können den Widerruf formlos erklären – etwa per E-Mail an den auf dem Portal angegebenen Kontakt. Das Muster-Widerrufsformular verlangt lediglich die Angabe des Vertrags, die Mitteilung über Ihren Entschluss zum Widerruf sowie Ihren Namen und Ihre Anschrift. Zur Wahrung der Widerrufsfrist genügt die rechtzeitige Absendung der Erklärung."
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Der Rabatt macht diese Bestellung kostenlos. Eine Stripe-Zahlung ist nicht erforderlich."
+msgstr "Der Rabatt macht diese Bestellung kostenlos. Eine Stripe-Zahlung ist nicht erforderlich."
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "Der Rabatt wird auf den serverberechneten Warenkorb angewendet."
@@ -3266,6 +3274,10 @@ msgstr "Kopiert!"
 msgid "Kostenfrei (Flatrate)"
 msgstr "Kostenfrei (Flatrate)"
 
+#: src/ui/client/ClientCartView.tsx
+msgid "Kostenlos bestellen"
+msgstr "Kostenlos bestellen"
+
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/GalleryModal.tsx
 msgid "Kostenlosen Download erlauben"
@@ -4569,6 +4581,10 @@ msgstr "Preis (€)"
 #: src/ui/management/components/invoice/InvoiceItemsTable.tsx
 msgid "Preis / Stück"
 msgstr "Preis / Stück"
+
+#: src/ui/client/components/VolumeLicensingCard.tsx
+msgid "Preis wird geladen…"
+msgstr "Preis wird geladen…"
 
 #: src/ui/management/components/PricingSettingsTabs.tsx
 msgid "Preise & Lizenzen"
@@ -6142,6 +6158,10 @@ msgstr "Zahlung fehlgeschlagen — bitte versuche es erneut."
 #: src/ui/client/components/StripeCheckoutForm.tsx
 msgid "Zahlung fehlgeschlagen."
 msgstr "Zahlung fehlgeschlagen."
+
+#: src/ui/client/components/StripeCheckoutForm.tsx
+msgid "Zahlung unvollständig — bitte erneut versuchen."
+msgstr "Zahlung unvollständig — bitte erneut versuchen."
 
 #: src/ui/client/components/StripeCheckoutForm.tsx
 msgid "Zahlung wird verifiziert..."

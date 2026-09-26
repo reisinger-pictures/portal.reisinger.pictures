@@ -8,6 +8,7 @@ import {
     loadCartItems,
     loadCartState,
     persistCartItems,
+    quoteTokenStorageKey,
     splitTotalEvenly,
 } from '../cartLogic';
 import {CartItem} from '../CartContext';
@@ -194,20 +195,27 @@ describe('loadCartItems', () => {
 
 describe('quote-aware cart persistence', () => {
     const key = 'cart-logic-test-key';
+    const tokenKey = quoteTokenStorageKey(key);
 
     afterEach(() => {
         vi.restoreAllMocks();
         localStorage.removeItem(key);
+        sessionStorage.removeItem(tokenKey);
     });
 
-    it('round-trips a validated quote token together with the exact offer prices', () => {
+    it('keeps the signed quote token out of localStorage and in sessionStorage', () => {
         const storedItems = [item({price: 75000}), item({photoId: 'p2', price: 75000})];
         const quoteToken = 'header.payload.signature';
 
         expect(persistCartItems(key, storedItems, quoteToken)).toBe(true);
+
         const raw = localStorage.getItem(key);
         expect(raw).not.toBeNull();
-        expect(loadCartState(raw)).toEqual({
+        // The bearer-like token must not be persisted with the cart.
+        expect(raw).not.toContain('quoteToken');
+        expect(raw).not.toContain(quoteToken);
+        expect(sessionStorage.getItem(tokenKey)).toBe(quoteToken);
+        expect(loadCartState(key)).toEqual({
             items: storedItems,
             quoteToken,
             error: 'none',
@@ -222,8 +230,9 @@ describe('quote-aware cart persistence', () => {
             quoteToken: 'header.payload.signature',
             client_secret: 'cs_must_not_persist',
         });
+        localStorage.setItem(key, unsafe);
 
-        expect(loadCartState(unsafe)).toEqual({items: [], quoteToken: null, error: 'schema'});
+        expect(loadCartState(key)).toEqual({items: [], quoteToken: null, error: 'schema'});
         expect(warnSpy).toHaveBeenCalled();
     });
 
@@ -234,20 +243,23 @@ describe('quote-aware cart persistence', () => {
         const raw = localStorage.getItem(key);
         expect(raw).not.toContain('client_secret');
         expect(raw).not.toContain('cs_must_not_persist');
-        expect(loadCartState(raw).items[0]).toEqual(item());
+        expect(loadCartState(key).items[0]).toEqual(item());
     });
 
     it('does not resurrect a quote token for an empty persisted cart', () => {
-        const stored = JSON.stringify({version: 1, items: [], quoteToken: 'header.payload.signature'});
+        localStorage.setItem(key, JSON.stringify({version: 1, items: [], quoteToken: 'header.payload.signature'}));
+        sessionStorage.setItem(tokenKey, 'header.payload.signature');
 
-        expect(loadCartState(stored)).toEqual({items: [], quoteToken: null, error: 'none'});
+        expect(loadCartState(key)).toEqual({items: [], quoteToken: null, error: 'none'});
     });
 
     it('clears quote metadata when persisting an empty cart', () => {
-        localStorage.setItem(key, JSON.stringify({version: 1, items: [item()], quoteToken: 'header.payload.signature'}));
+        localStorage.setItem(key, JSON.stringify([item()]));
+        sessionStorage.setItem(tokenKey, 'header.payload.signature');
 
         expect(persistCartItems(key, [], 'header.payload.signature')).toBe(true);
-        expect(loadCartState(localStorage.getItem(key))).toEqual({items: [], quoteToken: null, error: 'none'});
+        expect(sessionStorage.getItem(tokenKey)).toBeNull();
+        expect(loadCartState(key)).toEqual({items: [], quoteToken: null, error: 'none'});
     });
 });
 

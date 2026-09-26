@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { Customer } from '../../../api';
 import AutocompleteInput from '../../components/AutocompleteInput';
 import { LocationResult } from '../../../logic/useLocations';
+import { useFocusTrap } from '../../../logic/useFocusTrap';
 
 const createCustomerSchema = () => z.object({
     name: z.string().min(1, t`Name oder Ansprechpartner ist erforderlich`),
@@ -31,6 +32,7 @@ interface Props {
 export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave }: Props) {
     "use no memo";
     const formId = useId();
+    const titleId = `${formId}-title`;
     const nameInputId = `${formId}-name`;
     const companyInputId = `${formId}-company`;
     const emailInputId = `${formId}-email`;
@@ -76,13 +78,21 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
         }
     };
 
+    const dialogRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: onClose });
+
     if (!isOpen) return null;
 
     return (
-        <div className="modal modal-open z-50">
+        <div
+            className="modal modal-open z-50"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+        >
             <div className="modal-box max-w-2xl relative">
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
+                <h3 id={titleId} className="font-bold text-xl mb-6 flex items-center gap-2">
                     <span className="iconify mdi--account-details text-primary"></span>
                     {editingCustomer ? 'Kunde bearbeiten' : 'Neuen Kunden anlegen'}
                 </h3>

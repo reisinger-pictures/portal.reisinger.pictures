@@ -365,12 +365,15 @@ const createPricingGroup = (
  */
 export function groupCartItemsByPricing(
     items: CartItem[],
-    resolveDescriptor: (item: CartItem) => EffectivePricingDescriptor,
+    resolveDescriptor: (item: CartItem) => EffectivePricingDescriptor | null,
 ): CartPricingGroup[] {
     const groups = new Map<string, {descriptor: EffectivePricingDescriptor; items: CartItem[]}>();
 
     for (const item of items) {
         const descriptor = resolveDescriptor(item);
+        // An unresolved gallery is skipped, not silently priced with the brand
+        // default: it joins its group on the render after its terms arrive.
+        if (descriptor === null) continue;
         const key = groupKeyForDescriptor(descriptor);
         const current = groups.get(key);
         if (current) {
@@ -404,7 +407,7 @@ const isValidGalleryPricingSource = (source: GalleryPricingSource): boolean => (
  */
 export function groupGallerySourcesByPricing(
     sources: GalleryPricingSource[],
-    resolveDescriptor: (source: GalleryPricingSource) => EffectivePricingDescriptor,
+    resolveDescriptor: (source: GalleryPricingSource) => EffectivePricingDescriptor | null,
 ): GalleryPricingGroup[] {
     const groups = new Map<string, {descriptor: EffectivePricingDescriptor; sources: GalleryPricingSource[]}>();
     const seenGalleryIds = new Set<string>();
@@ -421,6 +424,9 @@ export function groupGallerySourcesByPricing(
         seenGalleryIds.add(source.galleryId);
 
         const descriptor = resolveDescriptor(source);
+        // A child gallery whose own terms are still unresolved is omitted until
+        // its response arrives instead of being priced with the brand default.
+        if (descriptor === null) continue;
         const key = groupKeyForDescriptor(descriptor);
         const current = groups.get(key);
         if (current) {
@@ -556,7 +562,14 @@ interface ResolvedGalleryLicenseTerms {
     galleryTermsMap: Record<string, EffectiveLicenseTerms> | null;
     singleTerms: EffectiveLicenseTerms | null;
     isLoading: boolean;
-    descriptorForGallery: (galleryId?: string) => EffectivePricingDescriptor;
+    /**
+     * Resolve a gallery's descriptor, or `null` while that gallery's own terms
+     * are unresolved. A gallery-specific lookup must never fall back to the
+     * brand terms: the gallery override is only known once its own response
+     * arrived, and presenting the brand default instead can show the wrong
+     * licensing map (and price) for the gallery.
+     */
+    descriptorForGallery: (galleryId?: string) => EffectivePricingDescriptor | null;
 }
 
 /**
@@ -592,11 +605,13 @@ function useResolvedGalleryLicenseTerms(galleryIds: string[]): ResolvedGalleryLi
         galleryTermsMap,
         singleTerms,
         isLoading: Boolean(globalTermsLoading || isLoading),
-        descriptorForGallery: (galleryId?: string) => descriptorFromTerms(
-            (galleryId ? galleryTermsMap?.[galleryId] : undefined)
-            ?? singleTerms
-            ?? globalTerms,
-        ),
+        descriptorForGallery: (galleryId?: string): EffectivePricingDescriptor | null => {
+            if (galleryId) {
+                const galleryTerms = galleryTermsMap?.[galleryId] ?? singleTerms;
+                return galleryTerms ? descriptorFromTerms(galleryTerms) : null;
+            }
+            return globalTerms ? descriptorFromTerms(globalTerms) : null;
+        },
     };
 }
 
@@ -649,9 +664,9 @@ export function useVolumeLicensing(items: CartItem[], galleryId?: string): Volum
     const displayedDescriptor = resolvedTerms.descriptorForGallery(galleryId);
 
     // Resolve every cart item independently. A complete composite response
-    // supplies each child descriptor; a missing/legacy composite response falls
-    // back to the brand terms. Never apply the displayed gallery's descriptor
-    // to unrelated cart galleries.
+    // supplies each child descriptor; an unresolved gallery is omitted until
+    // its own terms arrive. Never apply the displayed gallery's descriptor to
+    // unrelated cart galleries.
     const groups = groupCartItemsByPricing(
         items,
         item => resolvedTerms.descriptorForGallery(item.galleryId),
@@ -662,14 +677,15 @@ export function useVolumeLicensing(items: CartItem[], galleryId?: string): Volum
     // not in the cart yet. Count only cart items from the same effective
     // server group; items from another gallery/preset must not advance this
     // gallery's retroactive tier.
-    const displayedGroupKey = galleryId ? groupKeyForDescriptor(displayedDescriptor) : null;
+    const displayedGroupKey = displayedDescriptor ? groupKeyForDescriptor(displayedDescriptor) : null;
     const displayedPricingItems = displayedGroupKey === null
         ? []
-        : items.filter(item => (
-            item.galleryId
-            && groupKeyForDescriptor(resolvedTerms.descriptorForGallery(item.galleryId)) === displayedGroupKey
-        ));
-    const displayedGroup = galleryId && displayedDescriptor.licensingMode === 'volume_licensing'
+        : items.filter(item => {
+            const itemDescriptor = resolvedTerms.descriptorForGallery(item.galleryId);
+            return itemDescriptor !== null
+                && groupKeyForDescriptor(itemDescriptor) === displayedGroupKey;
+        });
+    const displayedGroup = galleryId && displayedDescriptor?.licensingMode === 'volume_licensing'
         ? createPricingGroup(
             `displayed|${displayedGroupKey}`,
             displayedDescriptor,
@@ -683,7 +699,9 @@ export function useVolumeLicensing(items: CartItem[], galleryId?: string): Volum
     );
     const volumeSubtotalCents = volumeGroups.reduce((sum, group) => sum + group.totalCents, 0);
     const groupedTotalCents = sumPricingGroupTotals(groups);
-    const selectedTiers = selectedGroup?.tiers ?? displayedDescriptor.config.tiers;
+    const selectedTiers = selectedGroup?.tiers
+        ?? displayedDescriptor?.config.tiers
+        ?? DEFAULT_VOLUME_PRICING.tiers;
 
     return {
         tierIndex: selectedGroup?.tierIndex ?? 0,
@@ -694,8 +712,11 @@ export function useVolumeLicensing(items: CartItem[], galleryId?: string): Volum
         nextTierLabel: selectedGroup?.nextTierLabel ?? '',
         tiers: selectedTiers,
         isVolumePricing: galleryId
-            ? displayedDescriptor.licensingMode === 'volume_licensing'
+            ? displayedDescriptor?.licensingMode === 'volume_licensing'
             : selectedGroup !== undefined,
+        // The card must not present a price or enable add-to-cart until the
+        // descriptor is resolved (see VolumeLicensingCard / PhotoDetailView).
+        isLoading: resolvedTerms.isLoading,
         groups,
         groupedTotalCents,
         volumeSubtotalCents,

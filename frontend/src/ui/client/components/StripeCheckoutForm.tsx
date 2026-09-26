@@ -127,7 +127,7 @@ export function StripeCheckoutForm({orderId, defaultEmail, defaultName, billingA
             } else {
                 paymentConfirmationRef.current = false;
                 setIsProcessing(false);
-                showToast('info', 'Zahlung unvollständig — bitte erneut versuchen.');
+                showToast('info', t`Zahlung unvollständig — bitte erneut versuchen.`);
             }
         } catch {
             paymentConfirmationRef.current = false;

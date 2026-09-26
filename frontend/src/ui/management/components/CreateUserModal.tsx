@@ -1,10 +1,11 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useUI } from '../../components/UIContext';
+import { useFocusTrap } from '../../../logic/useFocusTrap';
 
 const createUserSchema = () => z.object({
     name: z.string().min(1, t`Name ist erforderlich`),
@@ -40,6 +41,9 @@ export default function CreateUserModal({ isOpen, onClose, onCreate }: Props) {
         onClose();
     };
 
+    const titleId = useId();
+    const dialogRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: handleClose });
+
     if (!isOpen) return null;
 
     const onSubmit = async (data: UserFormValues) => {
@@ -55,10 +59,16 @@ export default function CreateUserModal({ isOpen, onClose, onCreate }: Props) {
     };
 
     return (
-        <div className="modal modal-open">
+        <div
+            className="modal modal-open"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+        >
             <div className="modal-box relative">
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={handleClose}>✕</button>
-                <h3 className="font-bold text-lg mb-4"><Trans>Neuen Nutzer einladen</Trans></h3>
+                <h3 id={titleId} className="font-bold text-lg mb-4"><Trans>Neuen Nutzer einladen</Trans></h3>
                 <p className="text-sm opacity-70 mb-4"><Trans>Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzulegen.</Trans></p>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
                     <div className="form-control">

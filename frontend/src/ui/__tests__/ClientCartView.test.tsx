@@ -262,6 +262,7 @@ const mixedVolumeLicensing: VolumeLicensingResult = {
     nextTierLabel: '',
     tiers: mixedScopeTiers,
     isVolumePricing: true,
+    isLoading: false,
     groups: [
         {
             key: 'preset-a',
@@ -903,6 +904,7 @@ describe('ClientCartView', () => {
                 nextTierCount: 0,
                 nextTierLabel: '',
                 tiers: [],
+                isLoading: false,
             },
         });
 
@@ -924,6 +926,7 @@ describe('ClientCartView', () => {
             itemCount: 2,
             volumeLicensing: {
                 isVolumePricing: true,
+                isLoading: false,
                 tierIndex: 0,
                 isMaxTier: true,
                 pricePerItemCents: 2000,
@@ -962,6 +965,7 @@ describe('ClientCartView', () => {
             quoteToken: 'header.payload.signature',
             volumeLicensing: {
                 isVolumePricing: true,
+                isLoading: false,
                 tierIndex: 0,
                 isMaxTier: true,
                 pricePerItemCents: 2000,
@@ -1032,6 +1036,7 @@ describe('ClientCartView', () => {
             ...cart,
             volumeLicensing: {
                 isVolumePricing: true,
+                isLoading: false,
                 tierIndex: 0,
                 isMaxTier: true,
                 pricePerItemCents: 2000,

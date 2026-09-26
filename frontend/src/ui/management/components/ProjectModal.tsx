@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import AutocompleteInput from '../../components/AutocompleteInput';
 import { Customer } from '../../../api';
 import { Project, ProjectInput } from '../../../logic/useProjectsBoard';
 import { useUsers } from '../../../logic/useUsers';
+import { useFocusTrap } from '../../../logic/useFocusTrap';
 
 export interface BoardStatusOption { value: string; label: string; }
 
@@ -82,6 +83,9 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
         }
     }, [isOpen, editing, initial, defaultStatus, reset]);
 
+    const titleId = useId();
+    const dialogRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: onClose });
+
     if (!isOpen) return null;
 
     const onSubmit = async (data: ProjectFormValues) => {
@@ -106,10 +110,16 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
     };
 
     return (
-        <div className="modal modal-open">
+        <div
+            className="modal modal-open"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+        >
             <div className="modal-box max-w-2xl">
                 <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-6">
+                <h3 id={titleId} className="font-bold text-xl mb-6">
                     {editing ? <Trans>Projekt bearbeiten</Trans> : <Trans>Neues Projekt anlegen</Trans>}
                 </h3>
                 <form onSubmit={handleSubmit(onSubmit)} noValidate>

@@ -26,7 +26,12 @@ test.describe('Model Contact Sheet Export', () => {
         await auth.login(adminUser.email, adminUser.password);
         await sidebar.navigateTo('Models');
         await expect(page.locator('main').getByRole('heading', { name: 'Models', exact: true })).toBeVisible({ timeout: 15000 });
-        await page.getByLabel('Suche').fill(model.firstName);
+        // The Models filter shares its accessible name "Suche" with the header
+        // gallery search and that search's submit button, so getByLabel('Suche')
+        // is a strict-mode violation. The `main` landmark cannot disambiguate
+        // either: it wraps the sticky header as well. Target the filter via the
+        // id its <label htmlFor> points at.
+        await page.locator('#model-filter-q').fill(model.firstName);
 
         const card = page.locator('[data-testid^="model-card-"]').first();
         await expect(card).toBeVisible({ timeout: 15000 });

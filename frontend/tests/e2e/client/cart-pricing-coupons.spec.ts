@@ -152,6 +152,64 @@ test.describe('Cart pricing and coupon integration', () => {
         await expect(main.getByTestId('cart-total')).toHaveText(money(4000 + 6000 + scopeUseCase.priceCents));
     });
 
+    // FE-1 regression: with a non-empty cart from another gallery, the volume
+    // photo detail must not expose an enabled add-to-cart while the license
+    // terms (the displayed gallery's own terms and the mixed-cart composite)
+    // are still unresolved.
+    test('shows no enabled add-to-cart before the volume license terms resolve', {tag: ['@feature:client:checkout', '@feature:client:volume', '@regression']}, async ({page}) => {
+        test.setTimeout(120000);
+        const suffix = Math.random().toString(36).substring(2, 8);
+        const preset = await helper.createVolumePreset({
+            name: `E2E Delay Preset ${suffix}`,
+            tiers: [{min_quantity: 0, price_cents: 4000}],
+        });
+        helper.trackPreset(String(preset.id));
+
+        const fixtures = await createGalleryFixtures(page, helper, photographer, [
+            {name: `Delay Cart ${suffix}`, licensingMode: 'volume_licensing', volumePresetId: preset.id},
+            {name: `Delay Open ${suffix}`, licensingMode: 'volume_licensing', volumePresetId: preset.id},
+        ]);
+        const [cartGallery, openedGallery] = fixtures;
+
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+        await auth.login(buyer.email, buyer.password);
+        await sidebar.navigateToClientGalleries();
+
+        // Fill the cart from the other volume gallery first.
+        await addFirstPhotoToCart(page, cartGallery.name);
+        await sidebar.navigateToClientGalleries();
+
+        // Gate every license-terms response until the test releases it.
+        let releaseTerms: (() => void) | undefined;
+        const termsGate = new Promise<void>(resolve => {
+            releaseTerms = resolve;
+        });
+        let termsRequested = false;
+        await page.route('**/api/settings/license-terms**', async route => {
+            termsRequested = true;
+            await termsGate;
+            await route.continue();
+        });
+
+        const main = page.getByRole('main');
+        await main.getByText(openedGallery.name).first().click();
+        await expect(main.locator('a.pswp-item img').first()).toBeVisible({timeout: 15000});
+        await main.getByRole('button', {name: 'Bild öffnen'}).first().click();
+        await expect(page).toHaveURL(/\/photos\//, {timeout: 15000});
+
+        // While the terms request is gated, neither the licensing map nor an
+        // enabled add-to-cart may be presented.
+        await expect.poll(() => termsRequested).toBe(true);
+        await expect(page.getByTestId('licensing-loading')).toBeVisible();
+        await expect(main.getByRole('button', {name: 'In den Warenkorb'})).toHaveCount(0);
+
+        releaseTerms?.();
+
+        await expect(page.getByTestId('volume-pricing-card')).toBeVisible({timeout: 15000});
+        await expect(main.getByRole('button', {name: 'In den Warenkorb'})).toBeEnabled();
+    });
+
     test('fixed, percentage, and 100% coupons show server-priced net totals; 100% skips Stripe', {tag: ['@feature:client:coupon', '@feature:client:checkout', '@regression']}, async ({page}) => {
         test.setTimeout(120000);
         const suffix = Math.random().toString(36).substring(2, 8).toUpperCase();

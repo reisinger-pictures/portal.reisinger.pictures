@@ -1,5 +1,6 @@
 import {describe, it, expect, vi} from 'vitest';
 import {fireEvent, screen, waitFor} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {renderWithProviders} from '../../test-setup';
 import CreateUserModal from '../management/components/CreateUserModal';
 
@@ -39,5 +40,21 @@ describe('CreateUserModal', () => {
             expect(reopenedNameInput).toHaveValue('');
             expect(reopenedEmailInput).toHaveValue('');
         });
+    });
+
+    // FE-8 regression: the modal must expose the dialog contract and handle Escape.
+    it('exposes an aria-modal dialog and closes on Escape', async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+        renderWithProviders(
+            <CreateUserModal isOpen onClose={onClose} onCreate={vi.fn()} />,
+        );
+
+        const dialog = screen.getByRole('dialog', {name: 'Neuen Nutzer einladen'});
+        expect(dialog).toHaveAttribute('aria-modal', 'true');
+
+        await user.keyboard('{Escape}');
+
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 });

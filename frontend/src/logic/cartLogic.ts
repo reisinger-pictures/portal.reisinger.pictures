@@ -44,6 +44,27 @@ const persistedCartSchema = z.object({
     quoteToken: quoteTokenSchema.nullable(),
 }).strict();
 
+/**
+ * Session-scoped storage key for the signed quote token derived from the cart
+ * key. The token is bearer-like (it re-materialises the offer price), so it is
+ * kept out of the persistent localStorage cart and lives in sessionStorage,
+ * which dies with the tab and is not shared with other tabs.
+ */
+export function quoteTokenStorageKey(cartKey: string): string {
+    return `${cartKey}__quote`;
+}
+
+const readSessionQuoteToken = (cartKey: string): string | null => {
+    try {
+        if (typeof sessionStorage === 'undefined') return null;
+        const raw = sessionStorage.getItem(quoteTokenStorageKey(cartKey));
+        if (raw === null) return null;
+        return quoteTokenSchema.safeParse(raw).success ? raw : null;
+    } catch {
+        return null;
+    }
+};
+
 /** Ersetzt ein Item mit gleicher photoId, hängt sonst an (verhaltensgleich zu CartProvider.addToCart). */
 export function addToCartPure(prev: CartItem[], item: CartItem): CartItem[] {
     const existing = prev.find(i => i.photoId === item.photoId);
@@ -154,9 +175,23 @@ function parseCartState(saved: string | null): CartStateLoadResult {
 /**
  * Loads and validates both the cart items and the optional signed quote token.
  * The strict envelope rejects unknown fields, including payment client secrets.
+ *
+ * Items come from localStorage; the token is read from sessionStorage first
+ * (the only place it is written now) and falls back to a legacy localStorage
+ * envelope for carts persisted before the session-scoped move.
  */
-export function loadCartState(saved: string | null): CartStateLoadResult {
-    return parseCartState(saved);
+export function loadCartState(cartKey: string): CartStateLoadResult {
+    const result = parseCartState(localStorage.getItem(cartKey));
+    if (result.items.length === 0) {
+        // A token without its bound photo set is stale.
+        return {items: [], quoteToken: null, error: result.error};
+    }
+
+    return {
+        items: result.items,
+        quoteToken: readSessionQuoteToken(cartKey) ?? result.quoteToken,
+        error: result.error,
+    };
 }
 
 /**
@@ -169,9 +204,10 @@ export function loadCartItems(saved: string | null): CartLoadResult {
 }
 
 /**
- * Persists only the validated cart shape. Normal carts retain the legacy array
- * format; quote carts use a versioned envelope containing the signed offer
- * token. Payment client secrets are neither part of the input nor serialized.
+ * Persists only the validated cart shape. Items live in localStorage; the
+ * signed quote token is written to sessionStorage instead, so the bearer-like
+ * offer credential is not persisted beyond the tab. Payment client secrets are
+ * neither part of the input nor serialized.
  */
 export function persistCartItems(key: string, items: CartItem[], quoteToken: string | null = null): boolean {
     const validatedItems = cartSchema.safeParse(items);
@@ -181,14 +217,16 @@ export function persistCartItems(key: string, items: CartItem[], quoteToken: str
     try {
         const effectiveQuoteToken = validatedItems.data.length > 0 ? quoteToken : null;
         if (validatedItems.data.length > 0 || localStorage.getItem(key)) {
-            const serialized = effectiveQuoteToken === null
-                ? JSON.stringify(validatedItems.data)
-                : JSON.stringify({
-                    version: 1,
-                    items: validatedItems.data,
-                    quoteToken: effectiveQuoteToken,
-                });
-            localStorage.setItem(key, serialized);
+            // Always the bare item array: any legacy token previously embedded
+            // in the localStorage envelope is dropped on the next write.
+            localStorage.setItem(key, JSON.stringify(validatedItems.data));
+        }
+
+        const tokenKey = quoteTokenStorageKey(key);
+        if (effectiveQuoteToken === null) {
+            sessionStorage.removeItem(tokenKey);
+        } else {
+            sessionStorage.setItem(tokenKey, effectiveQuoteToken);
         }
         return true;
     } catch {

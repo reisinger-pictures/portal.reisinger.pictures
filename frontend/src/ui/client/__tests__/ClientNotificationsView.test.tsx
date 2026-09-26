@@ -29,13 +29,16 @@ const preferences = {
 };
 
 describe('ClientNotificationsView', () => {
+    const mutateMock = vi.fn();
+
     beforeEach(() => {
         vi.clearAllMocks();
+        mutateMock.mockReset();
         vi.mocked(useSWR).mockReturnValue({
             data: preferences,
             error: undefined,
             isLoading: false,
-            mutate: vi.fn(),
+            mutate: mutateMock,
         } as never);
     });
 
@@ -59,5 +62,24 @@ describe('ClientNotificationsView', () => {
             'POST',
             { wants_notifications: false },
         );
+    });
+
+    // FE-6 regression: the optimistic update must build fresh nested objects,
+    // never mutate the object still referenced by the SWR cache.
+    it('updates the cache immutably for the optimistic toggle', async () => {
+        const user = userEvent.setup();
+        renderWithProviders(<ClientNotificationsView />);
+
+        const galleryToggle = screen.getByRole('checkbox', { name: 'Benachrichtigungen für Galerie Portraits' });
+        await user.click(galleryToggle);
+
+        expect(mutateMock).toHaveBeenCalled();
+        const [optimistic] = mutateMock.mock.calls[0];
+        expect(optimistic).not.toBe(preferences);
+        expect(optimistic.galleries).not.toBe(preferences.galleries);
+        expect(optimistic.galleries[0]).not.toBe(preferences.galleries[0]);
+        expect(optimistic.galleries[0].wants_notifications).toBe(true);
+        // The original cache value stays untouched.
+        expect(preferences.galleries[0].wants_notifications).toBe(false);
     });
 });

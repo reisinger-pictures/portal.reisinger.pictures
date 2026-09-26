@@ -24,11 +24,11 @@ const cartItems: CartItem[] = [
     {photoId: 'quote-photo', tier: 'original', galleryId: 'cart-gallery', price: 0, isQuote: true},
 ];
 
-function mockGalleryTerms(data: unknown) {
+function mockGalleryTerms(data: unknown, isLoading = false) {
     vi.mocked(useSWR).mockReturnValue({
         data,
         error: undefined,
-        isLoading: false,
+        isLoading,
         isValidating: false,
         mutate: vi.fn(),
     } as never);
@@ -264,7 +264,7 @@ describe('useVolumeLicensing gallery context', () => {
         expect(result.current.isMaxTier).toBe(false);
     });
 
-    it('does not leak a partial child response when the composite terms map is incomplete', () => {
+    it('does not use the brand default for a child gallery whose terms are missing', () => {
         vi.mocked(useLicenseTerms).mockReturnValue({
             terms: {pricing_strategy: 'volume_licensing'},
             isLoading: false,
@@ -282,17 +282,32 @@ describe('useVolumeLicensing gallery context', () => {
             {galleryId: 'gallery-b', galleryGroupId: 'group-b', photoCount: 1},
         ]));
 
-        expect(result.current.groups).toHaveLength(1);
-        expect(result.current.groups[0]).toMatchObject({
-            licensingMode: 'volume_licensing',
-            presetId: 'default',
-            galleryIds: ['gallery-a', 'gallery-b'],
-            photoCount: 2,
-            totalCents: 6000,
-        });
+        // The incomplete composite response is never reinterpreted as brand
+        // terms: no group is fabricated with the brand's volume default.
+        expect(result.current.groups).toEqual([]);
     });
 
-    it('ignores a partial descriptor instead of applying it to displayed or cart groups', () => {
+    // FE-1 regression: while a gallery's own terms are unresolved, the brand
+    // default must not be presented as the gallery's price or licensing map.
+    it('flags loading and fabricates no price while the displayed gallery is unresolved', () => {
+        vi.mocked(useLicenseTerms).mockReturnValue({
+            terms: {pricing_strategy: 'volume_licensing'},
+            isLoading: false,
+            updateTerms: vi.fn(),
+        });
+        mockGalleryTerms(undefined, true);
+
+        const {result} = renderHook(() => useVolumeLicensing(cartItems, 'displayed-gallery'));
+
+        expect(result.current.isLoading).toBe(true);
+        expect(result.current.isVolumePricing).toBe(false);
+        expect(result.current.groups).toEqual([]);
+        // The caller is expected to hide this via `isLoading`; it is never a
+        // legitimate final price.
+        expect(result.current.pricePerItemCents).toBe(0);
+    });
+
+    it('never reinterprets a settled partial map as brand terms', () => {
         vi.mocked(useLicenseTerms).mockReturnValue({
             terms: {pricing_strategy: 'volume_licensing'},
             isLoading: false,
@@ -307,12 +322,11 @@ describe('useVolumeLicensing gallery context', () => {
 
         const {result} = renderHook(() => useVolumeLicensing(cartItems, 'displayed-gallery'));
 
-        expect(result.current.isVolumePricing).toBe(true);
-        expect(result.current.pricePerItemCents).toBe(3000);
-        expect(result.current.groups?.map(group => [
-            group.licensingMode,
-            group.presetId,
-        ])).toEqual([['volume_licensing', 'default']]);
+        // The composite response is incomplete, so no gallery resolves to the
+        // brand volume default; no group is fabricated from it.
+        expect(result.current.groups).toEqual([]);
+        expect(result.current.isVolumePricing).toBe(false);
+        expect(result.current.pricePerItemCents).toBe(0);
     });
 
     it('resolves meta-gallery child groups independently and totals each preset', () => {
