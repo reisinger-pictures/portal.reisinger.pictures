@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -67,6 +68,42 @@ class CardTestingSchemaTest extends TestCase
                 'unique' => false,
             ],
         ], $paymentIndexes->all());
+    }
+
+    public function test_v036_rerun_is_a_noop_and_recovers_a_partial_index_commit(): void
+    {
+        $migration = require database_path('migrations/V036__card_testing_defenses.php');
+
+        // RefreshDatabase already applied V036 once. Model the MariaDB
+        // auto-commit boundary where all columns are committed but a later
+        // index statement failed: a retry must tolerate the columns and only
+        // recreate what is missing.
+        Schema::table('users', function (Blueprint $table): void {
+            $table->dropUnique('users_stripe_customer_id_unique');
+        });
+        Schema::table('orders', function (Blueprint $table): void {
+            $table->dropIndex('orders_stripe_payment_intent_idx');
+            $table->dropUnique('orders_user_id_checkout_idempotency_key_unique');
+        });
+
+        $migration->up();
+        // A second, fully satisfied retry must be a pure no-op.
+        $migration->up();
+
+        $this->assertTrue(Schema::hasColumn('users', 'stripe_customer_id'));
+        $this->assertTrue(Schema::hasIndex('users', 'users_stripe_customer_id_unique', 'unique'));
+        $this->assertTrue(Schema::hasColumns('orders', [
+            'checkout_idempotency_key',
+            'checkout_fingerprint',
+            'payment_intent_generation',
+            'payment_failure_count',
+            'last_payment_failure_at',
+            'last_payment_decline_code',
+        ]));
+        $this->assertTrue(Schema::hasIndex('orders', 'orders_user_id_checkout_idempotency_key_unique', 'unique'));
+        $this->assertTrue(Schema::hasIndex('orders', 'orders_stripe_payment_intent_idx'));
+        $this->assertTrue(Schema::hasIndex('orders', 'orders_user_fingerprint_lookup_idx'));
+        $this->assertTrue(Schema::hasIndex('orders', 'orders_pending_stale_idx'));
     }
 
     public function test_schema_defaults_and_user_factory_account_age_states(): void

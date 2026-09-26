@@ -18,6 +18,7 @@ EXPECTED_LUA_TESTS = [
     "tests/regression.lua",
     "tests/api_session_regression.lua",
     "tests/manager_upload_regression.lua",
+    "tests/legacy_password_migration_regression.lua",
 ]
 
 
@@ -68,10 +69,37 @@ def main() -> int:
             f"expected {EXPECTED_LUA_TESTS!r}, got {actual!r}"
         )
 
+        # INFRA-6: with neither python3 nor lua reachable, the harness must fail
+        # closed instead of printing a disclosure and exiting 0 with zero checks.
+        no_runtime_bin = Path(temp_dir) / "no-runtime-bin"
+        no_runtime_bin.mkdir()
+        dirname = shutil.which("dirname")
+        assert dirname, "dirname is required to launch the fail-closed probe"
+        os.symlink(dirname, no_runtime_bin / "dirname")
+
+        no_runtime_env = os.environ.copy()
+        no_runtime_env["PATH"] = str(no_runtime_bin)
+        no_runtime_result = subprocess.run(
+            [bash, str(RUN_SCRIPT)],
+            cwd=PLUGIN_DIR,
+            env=no_runtime_env,
+            capture_output=True,
+            text=True,
+        )
+        assert no_runtime_result.returncode != 0, (
+            "run.sh must exit non-zero when no test runtime is available\n"
+            f"stdout:\n{no_runtime_result.stdout}\n"
+            f"stderr:\n{no_runtime_result.stderr}"
+        )
+        assert "no test runtime available" in no_runtime_result.stderr, (
+            "run.sh must explain the missing runtime on stderr\n"
+            f"stderr:\n{no_runtime_result.stderr}"
+        )
+
     print(
         "Canonical harness registration regression passed "
         "(manager upload test invocation verified with a mock Lua executable; "
-        "no live Lightroom runtime)"
+        "fail-closed no-runtime guard verified; no live Lightroom runtime)"
     )
     return 0
 

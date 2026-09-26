@@ -67,6 +67,9 @@ jobs:
             PNPM_VERSION=${{ steps.versions.outputs.pnpm_version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # INFRA-10: signed provenance + SBOM for the published e2e digest.
+          provenance: true
+          sbom: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.OWNER }}/portal-e2e:latest
             ${{ env.REGISTRY }}/${{ env.OWNER }}/portal-e2e:${{ steps.versions.outputs.playwright_version }}

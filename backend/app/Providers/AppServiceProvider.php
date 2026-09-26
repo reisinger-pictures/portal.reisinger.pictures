@@ -189,6 +189,21 @@ class AppServiceProvider extends ServiceProvider
             (int) config('app.throttle_model_registration', 10)
         )->by($request->ip()));
 
+        // AIS-3: both AI POST endpoints bill a provider on every call and may
+        // decode a ~40M-pixel image (~160 MB) through GD. The generic
+        // `throttle:api` (120/min) is far too permissive for that. This limiter
+        // is registered here, not in routes/api.php: `php artisan optimize` runs
+        // `route:cache` in production, which skips loading the route files, so a
+        // routes-file registration would leave the named limiter undefined at
+        // runtime and turn the endpoint into a 500.
+        RateLimiter::for('ai-generate', fn (Request $request) => Limit::perMinute(
+            max(1, (int) config('app.throttle_ai_generate', 5))
+        )->by(
+            $request->user('api')
+                ? ActorIdentity::cacheIdentifier($request->user('api'))
+                : $request->ip()
+        ));
+
         // Reset brand state before each queue job to prevent stale config carrying over
         // between jobs in long-running queue workers (php artisan queue:work).
         // Consumers like InvoiceMail::build() call BrandRegistry::set() explicitly, so they

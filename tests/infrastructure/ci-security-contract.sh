@@ -56,6 +56,79 @@ assert_contains_text() {
     grep -Fq -- "$expected" <<<"$text" || fail "$description"
 }
 
+# --- policy probes -----------------------------------------------------------
+# Reusable so the real workflows and the synthetic fixtures below exercise
+# exactly the same logic. Each *_violation function prints a message and returns
+# 0 when the input violates the rule, and returns 1 with no output when clean.
+
+# Prints every `permissions:` block (header plus its more-indented body). Scopes
+# are detected structurally via indentation, so a later job-level escalation
+# cannot hide behind an earlier top-level `read`.
+permissions_blocks() {
+    awk '
+        function indent_count(line) { match(line, /^[[:space:]]*/); return RLENGTH }
+        /^[[:space:]]*permissions:[[:space:]]*[^[:space:]]/ { print; next }
+        /^[[:space:]]*permissions:[[:space:]]*$/ { in_block = 1; base = indent_count($0); print; next }
+        in_block {
+            if ($0 ~ /^[[:space:]]*$/) { next }
+            if (indent_count($0) > base) { print; next }
+            in_block = 0
+        }
+    ' "$1"
+}
+
+# Prints the write scopes granted by every permissions block in $1.
+write_scopes() {
+    permissions_blocks "$1" \
+        | sed -nE 's/^[[:space:]]*([[:alnum:]_-]+):[[:space:]]*write[[:space:]]*$/\1/p' \
+        | sort -u
+}
+
+write_all_violation() {
+    if permissions_blocks "$1" | grep -Eq '^[[:space:]]*permissions:[[:space:]]*write-all[[:space:]]*$'; then
+        printf '%s\n' "workflow grants write-all permissions: $1"
+        return 0
+    fi
+    return 1
+}
+
+# Prints every `run:` block body (inline values and block scalars) in $1.
+run_blocks() {
+    awk '
+        function indent_count(line) { match(line, /^[[:space:]]*/); return RLENGTH }
+        /^[[:space:]]*(-[[:space:]]*)?run:[[:space:]]*[^[:space:]]/ { in_block = 1; base = indent_count($0); print; next }
+        in_block {
+            if ($0 ~ /^[[:space:]]*$/) { next }
+            if (indent_count($0) > base) { print; next }
+            in_block = 0
+        }
+    ' "$1"
+}
+
+run_block_violation() {
+    if run_blocks "$1" | grep -Eq '\$\{\{[^}]*github\.event[^_[:alnum:]]'; then
+        printf '%s\n' "workflow interpolates github.event directly into a run: block: $1"
+        return 0
+    fi
+    return 1
+}
+
+artifact_upload_violation() {
+    if grep -Eq '^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*[^[:space:]]*upload(-pages)?-artifact@' "$1"; then
+        printf '%s\n' "workflow declares an artifact upload: $1"
+        return 0
+    fi
+    return 1
+}
+
+artifact_path_violation() {
+    if grep -Eq "^[[:space:]]*(-[[:space:]]*)?path:[[:space:]]*['\"]?[^'\"]*(playwright-report|test-results|trace|screenshot|video)" "$1"; then
+        printf '%s\n' "workflow declares a Playwright artifact path: $1"
+        return 0
+    fi
+    return 1
+}
+
 require_file "$AUTOMERGE_WORKFLOW"
 require_file "$CI_WORKFLOW"
 require_file "$PLAYWRIGHT_CONFIG"
@@ -66,7 +139,11 @@ require_file "$PACKAGE_JSON"
 require_file "$WAIT_FOR_MEILISEARCH"
 require_file "$E2E_UP_SCRIPT"
 
-mapfile -t workflow_files < <(
+workflow_files=()
+while IFS= read -r workflow_file; do
+    [[ -n "$workflow_file" ]] || continue
+    workflow_files+=("$workflow_file")
+done < <(
     find "$WORKFLOW_DIR" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print | sort
 )
 ((${#workflow_files[@]} > 0)) || fail 'no GitHub Actions workflows found'
@@ -86,32 +163,54 @@ for workflow in "${workflow_files[@]}"; do
     done < <(sed -nE 's/^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*([^[:space:]#]+).*/\2/p' "$workflow")
 done
 
-# 2. Least-privilege permissions are explicit. The CI workflow is read-only;
-# image publishing has the narrowly scoped packages write it needs; automerge
-# has only merge, PR, and check-read access.
+# 2. Least-privilege permissions are explicit and scoped. Every permissions
+# block is walked structurally, so a later job-level escalation cannot hide
+# behind an earlier top-level `read`; `write-all` is rejected outright.
 for workflow in "${workflow_files[@]}"; do
     grep -Eq '^[[:space:]]*permissions:' "$workflow" \
         || fail "workflow has no explicit permissions block: $workflow"
-done
 
-if grep -Eq '^[[:space:]]+(contents|packages|pull-requests|actions|id-token|deployments|repository-projects|security-events):[[:space:]]*write' "$CI_WORKFLOW"; then
-    fail 'CI must not request a write scope'
-fi
-assert_contains "$CI_WORKFLOW" '  contents: read' 'CI must be contents: read only'
-
-for image_workflow in "$WORKFLOW_DIR/base-image.yml" "$WORKFLOW_DIR/e2e-image.yml"; do
-    require_file "$image_workflow"
-    assert_contains "$image_workflow" '      contents: read' 'image workflow must read repository contents'
-    assert_contains "$image_workflow" '      packages: write' 'image workflow must be able to publish its image'
-    if grep -Eq '^[[:space:]]+(actions|id-token|deployments|security-events):[[:space:]]*write' "$image_workflow"; then
-        fail "image workflow requests an unnecessary write scope: $image_workflow"
+    if message="$(write_all_violation "$workflow")"; then
+        fail "$message"
     fi
 done
 
-assert_contains "$AUTOMERGE_WORKFLOW" '  contents: write' 'automerge needs contents write for the merge'
-assert_contains "$AUTOMERGE_WORKFLOW" '  pull-requests: write' 'automerge needs pull-request write for the merge'
+# CI is read-only: no block may grant any write scope.
+ci_write_scopes="$(write_scopes "$CI_WORKFLOW")"
+ci_write_scopes_oneline="$(printf '%s' "$ci_write_scopes" | tr '\n' ',')"
+[[ -z "$ci_write_scopes" ]] \
+    || fail "CI must not request a write scope (found: ${ci_write_scopes_oneline%,})"
+# The top-level block must itself be the read-only one; a substring search would
+# stay true even if a later job escalated above it.
+ci_top_permissions="$(permissions_blocks "$CI_WORKFLOW" | head -n 2)"
+[[ "$ci_top_permissions" == $'permissions:\n  contents: read' ]] \
+    || fail 'CI must declare top-level permissions: contents: read'
+
+for image_workflow in "$WORKFLOW_DIR/base-image.yml" "$WORKFLOW_DIR/e2e-image.yml"; do
+    require_file "$image_workflow"
+    image_write_scopes="$(write_scopes "$image_workflow")"
+    while IFS= read -r scope; do
+        [[ -z "$scope" ]] && continue
+        [[ "$scope" == 'packages' ]] \
+            || fail "image workflow requests an unnecessary write scope (${scope}): $image_workflow"
+    done <<<"$image_write_scopes"
+    assert_contains "$image_workflow" '      contents: read' 'image workflow must read repository contents'
+    [[ "$image_write_scopes" == 'packages' ]] \
+        || fail "image workflow must grant exactly the packages: write scope: $image_workflow"
+done
+
+automerge_write_scopes="$(write_scopes "$AUTOMERGE_WORKFLOW")"
+for required_scope in contents pull-requests; do
+    grep -Fxq -- "$required_scope" <<<"$automerge_write_scopes" \
+        || fail "automerge must grant ${required_scope}: write"
+done
+while IFS= read -r scope; do
+    [[ -z "$scope" ]] && continue
+    [[ "$scope" == 'contents' || "$scope" == 'pull-requests' ]] \
+        || fail "automerge requests an unnecessary write scope (${scope})"
+done <<<"$automerge_write_scopes"
 assert_contains "$AUTOMERGE_WORKFLOW" '  checks: read' 'automerge needs checks read for the CI gate'
-if grep -Eq '^[[:space:]]+(actions|id-token|packages|deployments|security-events):[[:space:]]+(read|write)' "$AUTOMERGE_WORKFLOW"; then
+if permissions_blocks "$AUTOMERGE_WORKFLOW" | grep -Eq '^[[:space:]]*(actions|id-token|packages|deployments|security-events):'; then
     fail 'automerge requests an unnecessary actions/id-token/packages scope'
 fi
 
@@ -199,6 +298,25 @@ e2e_ci_job="$(
     ' "$CI_WORKFLOW"
 )"
 [[ -n "$e2e_ci_job" ]] || fail 'CI must define the E2E job'
+# The rclone regression is a real gate only while the security-contract job
+# executes it; an unwired script is dead coverage (TST-2).
+security_contract_job="$(
+    awk '
+        /^  security-contract:[[:space:]]*$/ { in_job = 1 }
+        in_job && /^  [[:alnum:]_-]+:[[:space:]]*$/ && $0 !~ /^  security-contract:/ { exit }
+        in_job { print }
+    ' "$CI_WORKFLOW"
+)"
+[[ -n "$security_contract_job" ]] || fail 'CI must define the security-contract job'
+for contract_step in \
+    'bash tests/infrastructure/ci-security-contract.sh' \
+    'bash tests/infrastructure/rclone-sync-regression.sh' \
+    'bash tests/infrastructure/verify-image-nonroot.sh' \
+    'bash tests/infrastructure/verify-image-freshness.sh' \
+    'bash tests/infrastructure/image-pin-freshness-regression.sh'; do
+    assert_contains_text "$security_contract_job" "        run: $contract_step" \
+        "the security-contract job must run $contract_step"
+done
 assert_contains_text "$e2e_ci_job" \
     "    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork == false)" \
     'E2E must run on push and normal same-repository PRs, but skip Dependabot PR-side secret-dependent runs'
@@ -343,19 +461,115 @@ if grep -Eq 'ref:[[:space:]]+\$\{\{[[:space:]]*github\.event\.pull_request\.head
 fi
 assert_contains "$AUTOMERGE_WORKFLOW" '          ref: main' 'automerge checkout must stay on main'
 
-# 4. No Playwright artifact upload path or secret diagnostic is permitted in
-# CI. The config is checked separately below for the fail-closed artifact mode.
-if grep -R -Eq -- '^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]+actions/upload-artifact@' "$WORKFLOW_DIR"; then
-    fail 'a GitHub Actions workflow uploads Playwright artifacts'
-fi
-if grep -R -Eq -- '^[[:space:]]*path:[[:space:]].*(playwright-report|test-results|trace|screenshot|video)' "$WORKFLOW_DIR"; then
-    fail 'a GitHub Actions workflow declares a Playwright artifact path'
-fi
+# 4. No workflow may declare an artifact upload or a Playwright artifact path,
+# and no `run:` block may interpolate github.event directly (untrusted metadata
+# must go through env). Detection is structural: any indentation, any artifact
+# action, quoted or unquoted paths.
+for workflow in "${workflow_files[@]}"; do
+    if message="$(artifact_upload_violation "$workflow")"; then
+        fail "$message"
+    fi
+    if message="$(artifact_path_violation "$workflow")"; then
+        fail "$message"
+    fi
+    if message="$(run_block_violation "$workflow")"; then
+        fail "$message"
+    fi
+done
 if grep -R -Eq -- '--reporter[=[:space:]]+[^[:space:]]*html|--reporter[=[:space:]]+list,html' "$WORKFLOW_DIR"; then
     fail 'CI enables the Playwright HTML reporter'
 fi
 if grep -R -Eq -- 'PW_TRACE[[:space:]]*=[[:space:]]*1' "$WORKFLOW_DIR"; then
     fail 'CI enables Playwright tracing'
+fi
+
+# 4b. Synthetic fixtures prove the probes above actually fail closed: a vacuum
+# guard looks green while enforcing nothing. Each bad fixture MUST be rejected,
+# and the clean fixture MUST pass so a probe is not trivially always-failing.
+fixture_dir="$TMP_ROOT/fixtures"
+mkdir -p "$fixture_dir"
+
+cat > "$fixture_dir/write-all.yml" <<'YAML'
+name: fixture
+on: push
+permissions: write-all
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+YAML
+if ! write_all_violation "$fixture_dir/write-all.yml" >/dev/null; then
+    fail 'the write-all fixture was not rejected by the permission probe'
+fi
+
+cat > "$fixture_dir/job-escalation.yml" <<'YAML'
+name: fixture
+on: push
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - run: echo ok
+YAML
+if [[ -z "$(write_scopes "$fixture_dir/job-escalation.yml")" ]]; then
+    fail 'the per-job write escalation fixture was not rejected by the permission probe'
+fi
+
+cat > "$fixture_dir/artifact-upload.yml" <<'YAML'
+name: fixture
+on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/upload-artifact@0123456789012345678901234567890123456789
+        with:
+          path: "test-results/"
+YAML
+if ! artifact_upload_violation "$fixture_dir/artifact-upload.yml" >/dev/null; then
+    fail 'the artifact-upload fixture was not rejected'
+fi
+if ! artifact_path_violation "$fixture_dir/artifact-upload.yml" >/dev/null; then
+    fail 'the quoted artifact-path fixture was not rejected'
+fi
+
+cat > "$fixture_dir/run-event.yml" <<'YAML'
+name: fixture
+on: pull_request
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "${{ github.event.pull_request.number }}"'
+YAML
+if ! run_block_violation "$fixture_dir/run-event.yml" >/dev/null; then
+    fail 'the github.event run-block fixture was not rejected'
+fi
+
+cat > "$fixture_dir/clean.yml" <<'YAML'
+name: fixture
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: 'echo "${{ github.event_name }}"'
+YAML
+if write_all_violation "$fixture_dir/clean.yml" >/dev/null \
+    || [[ -n "$(write_scopes "$fixture_dir/clean.yml")" ]] \
+    || artifact_upload_violation "$fixture_dir/clean.yml" >/dev/null \
+    || artifact_path_violation "$fixture_dir/clean.yml" >/dev/null \
+    || run_block_violation "$fixture_dir/clean.yml" >/dev/null; then
+    fail 'the clean fixture was rejected by a contract probe'
 fi
 
 workflow_code="$TMP_ROOT/workflow-code"

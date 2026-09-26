@@ -1,0 +1,41 @@
+name: Verify pinned image digests are fresh
+
+# INFRA-10: base-image.yml and e2e-image.yml push mutable tags, but CI and
+# production consume immutable digests. Nothing bumps those consumer pins, so
+# a published security fix silently never reaches CI or production and
+# verify-image-nonroot.sh keeps passing on the stale pin. This gate resolves
+# the digest each consumed tag currently points at, compares it with the
+# repository pin, and fails when the pin is stale beyond the documented
+# maximum age.
+#
+# Policy and exit contract: tests/infrastructure/verify-image-freshness.sh
+# and deployment/image-pin-freshness.md.
+on:
+  schedule:
+    # Daily, just after the base/e2e image rebuild schedules (01:00/02:00 UTC).
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'deployment/docker-compose.yml'
+      - '.github/workflows/ci.yml'
+      - 'tests/infrastructure/verify-image-freshness.sh'
+      - '.github/workflows/image-freshness.yml'
+
+# Least privilege: the gate only reads the repository and the public registry.
+permissions:
+  contents: read
+
+concurrency:
+  group: image-freshness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  freshness:
+    name: Pinned digest freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Verify consumer pins match the published tags
+        run: bash tests/infrastructure/verify-image-freshness.sh
