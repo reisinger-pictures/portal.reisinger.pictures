@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\VolumePreset;
@@ -54,6 +55,7 @@ class VolumePresetController extends Controller
         $this->validateTierMonotonicity($data['tiers']);
 
         $preset = $this->presetService->create($data['name'], $data['tiers']);
+
         return response()->json($this->serialize($preset));
     }
 
@@ -73,6 +75,7 @@ class VolumePresetController extends Controller
         $this->validateTierMonotonicity($data['tiers']);
 
         $preset = $this->presetService->update($preset, $data['name'], $data['tiers']);
+
         return response()->json($this->serialize($preset));
     }
 
@@ -140,6 +143,7 @@ class VolumePresetController extends Controller
     private function serialize(VolumePreset $preset): array
     {
         $preset->load('tiers');
+
         return [
             // Numeric wire contract: see index().
             'id' => (int) $preset->id,

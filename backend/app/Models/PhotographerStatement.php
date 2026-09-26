@@ -2,18 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class PhotographerStatement extends Model
 {
     use HasFactory, HasUuids;
 
     protected $fillable = [
-        'user_id', 'sequence_number', 'month', 'year', 
-        'total_shares_earned', 'pool_earnings_cents', 'delta_surcharge_earnings_cents', 
-        'earned_amount_cents', 'rolled_over_amount_cents', 'total_payable_cents', 'status'
+        'user_id', 'sequence_number', 'month', 'year',
+        'total_shares_earned', 'pool_earnings_cents', 'delta_surcharge_earnings_cents',
+        'earned_amount_cents', 'rolled_over_amount_cents', 'total_payable_cents', 'status',
     ];
 
     protected $casts = [
@@ -37,7 +38,7 @@ class PhotographerStatement extends Model
     {
         static::creating(function ($model) {
             if (empty($model->sequence_number)) {
-                $model->sequence_number = 'ST-' . $model->year . '-' . str_pad($model->month, 2, '0', STR_PAD_LEFT) . '-' . strtoupper(\Illuminate\Support\Str::random(6));
+                $model->sequence_number = 'ST-'.$model->year.'-'.str_pad($model->month, 2, '0', STR_PAD_LEFT).'-'.strtoupper(Str::random(6));
             }
         });
     }

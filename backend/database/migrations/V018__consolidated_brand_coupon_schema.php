@@ -22,7 +22,8 @@ use Illuminate\Support\Str;
  *  7. Create coupon_user_usage table
  *  8. Backfill photo_metadata_versions for photos without audit snapshots (was V019)
  */
-return new class extends Migration {
+return new class extends Migration
+{
     private const BRAND_TABLES = [
         'orders', 'invoice_snapshots', 'users', 'galleries', 'gallery_groups', 'tenants',
         'products', 'license_use_cases', 'license_modifiers', 'settings', 'customers', 'text_snippets',
@@ -40,16 +41,16 @@ return new class extends Migration {
         if (DB::connection()->getDriverName() === 'sqlite') {
             Schema::table('settings', fn (Blueprint $t) => $t->dropPrimary(['key']));
         } else {
-            $hasSettingsPrimary = collect(DB::select("SHOW INDEX FROM `settings`"))
+            $hasSettingsPrimary = collect(DB::select('SHOW INDEX FROM `settings`'))
                 ->contains(fn ($i) => $i->Key_name === 'PRIMARY');
             if ($hasSettingsPrimary) {
-                DB::statement("ALTER TABLE `settings` DROP PRIMARY KEY");
+                DB::statement('ALTER TABLE `settings` DROP PRIMARY KEY');
             }
         }
 
         // 1b. Add brand column to all 12 tables
         foreach (self::BRAND_TABLES as $table) {
-            if (!Schema::hasColumn($table, 'brand')) {
+            if (! Schema::hasColumn($table, 'brand')) {
                 if (DB::connection()->getDriverName() === 'sqlite') {
                     Schema::table($table, fn (Blueprint $t) => $t->enum('brand', ['rp', 'srp'])->nullable());
                 } else {
@@ -103,7 +104,7 @@ return new class extends Migration {
             if (DB::connection()->getDriverName() === 'sqlite') {
                 Schema::table($table, fn (Blueprint $t) => $t->index('brand', $indexName));
             } else {
-                if (!collect(DB::select("SHOW INDEX FROM `{$table}`"))->contains(fn ($i) => $i->Key_name === $indexName)) {
+                if (! collect(DB::select("SHOW INDEX FROM `{$table}`"))->contains(fn ($i) => $i->Key_name === $indexName)) {
                     DB::statement("ALTER TABLE `{$table}` ADD INDEX `{$indexName}` (`brand`)");
                 }
             }
@@ -114,11 +115,11 @@ return new class extends Migration {
             Schema::table('settings', fn (Blueprint $t) => $t->index('key', 'settings_key_index'));
             Schema::table('settings', fn (Blueprint $t) => $t->unique(['key', 'brand'], 'settings_key_brand_unique'));
         } else {
-            if (!collect(DB::select("SHOW INDEX FROM `settings`"))->contains(fn ($i) => $i->Key_name === 'settings_key_index')) {
-                DB::statement("ALTER TABLE `settings` ADD INDEX `settings_key_index` (`key`)");
+            if (! collect(DB::select('SHOW INDEX FROM `settings`'))->contains(fn ($i) => $i->Key_name === 'settings_key_index')) {
+                DB::statement('ALTER TABLE `settings` ADD INDEX `settings_key_index` (`key`)');
             }
-            if (!collect(DB::select("SHOW INDEX FROM `settings`"))->contains(fn ($i) => $i->Key_name === 'settings_key_brand_unique')) {
-                DB::statement("ALTER TABLE `settings` ADD UNIQUE INDEX `settings_key_brand_unique` (`key`, `brand`)");
+            if (! collect(DB::select('SHOW INDEX FROM `settings`'))->contains(fn ($i) => $i->Key_name === 'settings_key_brand_unique')) {
+                DB::statement('ALTER TABLE `settings` ADD UNIQUE INDEX `settings_key_brand_unique` (`key`, `brand`)');
             }
         }
 
@@ -170,7 +171,7 @@ return new class extends Migration {
         //  Part 4: Add coupon fields to orders (was V021)
         // ══════════════════════════════════════════════
 
-        if (!Schema::hasColumn('orders', 'coupon_id')) {
+        if (! Schema::hasColumn('orders', 'coupon_id')) {
             Schema::table('orders', function (Blueprint $table) {
                 $table->unsignedBigInteger('coupon_id')->nullable()->after('stripe_fee_cents');
                 $table->integer('coupon_discount_cents')->default(0)->after('coupon_id');
@@ -206,7 +207,7 @@ return new class extends Migration {
         // ══════════════════════════════════════════════
 
         foreach (['users', 'photos', 'galleries'] as $table) {
-            if (!Schema::hasColumn($table, 'updated_at')) {
+            if (! Schema::hasColumn($table, 'updated_at')) {
                 Schema::table($table, function (Blueprint $t) {
                     $t->timestamp('updated_at')->nullable();
                 });
@@ -246,7 +247,7 @@ return new class extends Migration {
                 ]);
             }
         } else {
-            DB::statement("
+            DB::statement('
                 INSERT INTO photo_metadata_versions (id, photo_id, user_id, title, headline, description, keywords, location, city, state, country, iso_country, created_at)
                 SELECT
                     UUID() AS id,
@@ -265,7 +266,7 @@ return new class extends Migration {
                 FROM photos p
                 LEFT JOIN photo_metadata_versions v ON v.photo_id = p.id
                 WHERE v.id IS NULL
-            ");
+            ');
         }
     }
 
@@ -299,13 +300,13 @@ return new class extends Migration {
             ->update(['brand' => 'rp']);
 
         // Remove brand from all 12 tables + restore settings PK
-        $hasComposite = collect(DB::select("SHOW INDEX FROM `settings`"))
+        $hasComposite = collect(DB::select('SHOW INDEX FROM `settings`'))
             ->contains(fn ($i) => $i->Key_name === 'settings_key_brand_unique');
         if ($hasComposite) {
-            DB::statement("ALTER TABLE `settings` DROP INDEX `settings_key_brand_unique`");
+            DB::statement('ALTER TABLE `settings` DROP INDEX `settings_key_brand_unique`');
         }
-        if (collect(DB::select("SHOW INDEX FROM `settings`"))->contains(fn ($i) => $i->Key_name === 'settings_key_index')) {
-            DB::statement("ALTER TABLE `settings` DROP INDEX `settings_key_index`");
+        if (collect(DB::select('SHOW INDEX FROM `settings`'))->contains(fn ($i) => $i->Key_name === 'settings_key_index')) {
+            DB::statement('ALTER TABLE `settings` DROP INDEX `settings_key_index`');
         }
 
         foreach (self::BRAND_TABLES as $table) {
@@ -319,7 +320,7 @@ return new class extends Migration {
         }
 
         // Part 6 rollback: remove backfilled versions
-        DB::statement("
+        DB::statement('
             DELETE v
             FROM photo_metadata_versions v
             INNER JOIN (
@@ -330,6 +331,6 @@ return new class extends Migration {
             ) singles ON singles.photo_id = v.photo_id
             INNER JOIN photos p ON p.id = v.photo_id
             WHERE v.created_at = p.created_at
-        ");
+        ');
     }
 };

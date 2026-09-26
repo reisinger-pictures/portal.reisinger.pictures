@@ -2,15 +2,18 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Gallery;
-use App\Models\Photo;
 use App\Models\DownloadLog;
+use App\Models\Gallery;
+use App\Models\InvoiceSnapshot;
+use App\Models\Order;
 use App\Models\PayoutPool;
+use App\Models\Photo;
+use App\Models\PhotographerStatement;
+use App\Models\User;
 use App\Services\PayoutCalculationService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class PayoutSystemTest extends TestCase
 {
@@ -63,8 +66,8 @@ class PayoutSystemTest extends TestCase
         // 10000 cents / 22 shares = 454 cents per share
         $this->assertEquals(454, $pool->value_per_share_cents);
 
-        $stmt1 = \App\Models\PhotographerStatement::where('user_id', $photog1->id)->first();
-        $stmt2 = \App\Models\PhotographerStatement::where('user_id', $photog2->id)->first();
+        $stmt1 = PhotographerStatement::where('user_id', $photog1->id)->first();
+        $stmt2 = PhotographerStatement::where('user_id', $photog2->id)->first();
 
         // Photog1: 2 shares * 454 = 908 cents * 50% = 454 cents
         $this->assertEquals(2, $stmt1->total_shares_earned);
@@ -79,40 +82,40 @@ class PayoutSystemTest extends TestCase
     {
         $photog = User::factory()->create();
         $client = User::factory()->create(['flatrate_level' => 'web']);
-        
+
         $gallery = Gallery::factory()->create(['type' => 'delivery']);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photog->id]);
 
         $now = Carbon::now();
 
         // Bezahlte Bestellung (10€ Aufpreis / 1000 Cents)
-        $order = \App\Models\Order::create([
+        $order = Order::create([
             'user_id' => $client->id,
             'status' => 'paid',
             'is_quote_request' => false,
             'total_amount' => 1000,
-            'created_at' => $now
+            'created_at' => $now,
         ]);
 
-        \App\Models\InvoiceSnapshot::create([
+        InvoiceSnapshot::create([
             'order_id' => $order->id,
             'invoice_number' => 'RE-TEST',
             'customer_details' => [
                 'items' => [
-                    ['photoId' => $photo->id, 'tier' => 'original', 'price' => 1000]
-                ]
+                    ['photoId' => $photo->id, 'tier' => 'original', 'price' => 1000],
+                ],
             ],
             'total_net' => 1000,
             'total_gross' => 1000,
             'tax_rate' => 0,
-            'created_at' => $now
+            'created_at' => $now,
         ]);
 
         $service = app(PayoutCalculationService::class);
         $service->calculatePowerUserDelta($now->month, $now->year);
 
-        $stmt = \App\Models\PhotographerStatement::where('user_id', $photog->id)->first();
-        
+        $stmt = PhotographerStatement::where('user_id', $photog->id)->first();
+
         // Assert: 1000 Cents - 40 Cents Fee = 960 Netto -> 50% Share = 480 Cents (4,80€)
         $this->assertEquals(480, $stmt->delta_surcharge_earnings_cents);
     }
@@ -120,27 +123,27 @@ class PayoutSystemTest extends TestCase
     public function test_rollover_and_payout_threshold()
     {
         $photog = User::factory()->create();
-        
+
         $now = Carbon::now();
         $prev = $now->copy()->subMonth();
 
         // Rollover Statement aus dem Vormonat (30€)
-        \App\Models\PhotographerStatement::create([
+        PhotographerStatement::create([
             'user_id' => $photog->id,
             'month' => $prev->month,
             'year' => $prev->year,
             'total_payable_cents' => 3000,
-            'status' => 'rollover'
+            'status' => 'rollover',
         ]);
 
         // Aktuelles Statement (25€ Pool Earnings)
-        $stmt = \App\Models\PhotographerStatement::create([
+        $stmt = PhotographerStatement::create([
             'user_id' => $photog->id,
             'month' => $now->month,
             'year' => $now->year,
             'pool_earnings_cents' => 2500,
             'delta_surcharge_earnings_cents' => 0,
-            'status' => 'pending' // Temp state
+            'status' => 'pending', // Temp state
         ]);
 
         $service = app(PayoutCalculationService::class);
@@ -155,19 +158,18 @@ class PayoutSystemTest extends TestCase
         $this->assertEquals('pending', $stmt->status);
 
         // Assert: Unter Auszahlungsschwelle
-        $stmt2 = \App\Models\PhotographerStatement::create([
+        $stmt2 = PhotographerStatement::create([
             'user_id' => User::factory()->create()->id,
             'month' => $now->month,
             'year' => $now->year,
             'pool_earnings_cents' => 1000, // 10€
             'delta_surcharge_earnings_cents' => 0,
-            'status' => 'pending'
+            'status' => 'pending',
         ]);
-        
+
         $service->finalizeStatements($now->month, $now->year);
         $stmt2->refresh();
         $this->assertEquals(1000, $stmt2->total_payable_cents);
         $this->assertEquals('rollover', $stmt2->status); // Da < 50€
     }
 }
-

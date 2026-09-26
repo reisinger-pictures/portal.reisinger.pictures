@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Authorization;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Role;
 use App\Enums\UserRole;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class RoleAbortTest extends TestCase
 {
@@ -17,6 +17,7 @@ class RoleAbortTest extends TestCase
         $user = User::factory()->create();
         $role = Role::firstOrCreate(['name' => $roleName]);
         $user->roles()->attach($role);
+
         return $user;
     }
 

@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\TextSnippet;
 use App\Http\Resources\TextSnippetResource;
+use App\Models\TextSnippet;
 use App\Support\BrandRegistry;
+use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 
@@ -22,17 +22,19 @@ class TextSnippetController extends Controller
         $q = $request->query('q');
         if ($q && strlen($q) >= 2) {
             $snippets = TextSnippet::search($q)
-                ->query(fn($query) => $query->where('brand', $brand))
+                ->query(fn ($query) => $query->where('brand', $brand))
                 ->orderBy('created_at', 'desc')
                 ->take(20)
                 ->get();
+
             return response()->json(
-                $snippets->map(fn($s) => new TextSnippetResource($s))->values()
+                $snippets->map(fn ($s) => new TextSnippetResource($s))->values()
             );
         }
 
         $snippets = TextSnippet::where('brand', $brand)->orderBy('created_at', 'desc')->get();
-        return response()->json($snippets->map(fn($s) => new TextSnippetResource($s))->values());
+
+        return response()->json($snippets->map(fn ($s) => new TextSnippetResource($s))->values());
     }
 
     public function store(Request $request)
@@ -41,13 +43,14 @@ class TextSnippetController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'shortcut' => ['nullable', 'string', 'min:1', 'max:100', Rule::unique('text_snippets', 'shortcut')->where(fn($query) => $query->where('brand', $brand))],
+            'shortcut' => ['nullable', 'string', 'min:1', 'max:100', Rule::unique('text_snippets', 'shortcut')->where(fn ($query) => $query->where('brand', $brand))],
             'content_html' => 'nullable|string',
         ]);
 
         $validated['content_html'] = $this->htmlSanitizer->sanitize($validated['content_html'] ?? '');
         $validated['brand'] = $brand;
         $snippet = TextSnippet::create($validated);
+
         return response()->json(['success' => true, 'snippet' => new TextSnippetResource($snippet)]);
     }
 
@@ -58,7 +61,7 @@ class TextSnippetController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'shortcut' => ['nullable', 'string', 'min:1', 'max:100', Rule::unique('text_snippets', 'shortcut')->where(fn($query) => $query->where('brand', $brand))->ignore($id)],
+            'shortcut' => ['nullable', 'string', 'min:1', 'max:100', Rule::unique('text_snippets', 'shortcut')->where(fn ($query) => $query->where('brand', $brand))->ignore($id)],
             'content_html' => 'nullable|string',
         ]);
 
@@ -66,12 +69,14 @@ class TextSnippetController extends Controller
             $validated['content_html'] = $this->htmlSanitizer->sanitize($validated['content_html']);
         }
         $snippet->update($validated);
+
         return response()->json(['success' => true, 'snippet' => new TextSnippetResource($snippet)]);
     }
 
     public function destroy($id)
     {
         TextSnippet::forCurrentBrand()->findOrFail($id)->delete();
+
         return response()->json(['success' => true]);
     }
 }

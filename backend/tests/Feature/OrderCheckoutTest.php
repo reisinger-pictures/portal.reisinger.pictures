@@ -1,55 +1,65 @@
 <?php
+
 namespace Tests\Feature;
-use Tests\TestCase;
-use Tests\Support\MocksStripeClient;
-use App\Models\User;
-use App\Models\Role;
+
+use App\Enums\UserRole;
 use App\Models\Gallery;
+use App\Models\LicenseModifier;
+use App\Models\LicenseUseCase;
 use App\Models\Photo;
+use App\Models\Role;
+use App\Models\Setting;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\MocksStripeClient;
+use Tests\TestCase;
 
-class OrderCheckoutTest extends TestCase {
-    use RefreshDatabase;
+class OrderCheckoutTest extends TestCase
+{
     use MocksStripeClient;
+    use RefreshDatabase;
 
-    protected function setUp(): void {
+    protected function setUp(): void
+    {
         parent::setUp();
         $this->mockStripePaymentIntentSuccess();
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
-        \App\Models\Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'rp'], ['value' => 'Teststreet 1']);
-        
-        \App\Models\LicenseUseCase::forceCreate(['id' => '11111111-1111-1111-1111-111111111111', 'name' => 'Tageszeitung', 'base_price' => 8000, 'flatrate_tier' => 'print', 'brand' => 'rp']);
-        \App\Models\LicenseModifier::forceCreate(['id' => '22222222-2222-2222-2222-222222222222', 'name' => 'Titelseite', 'percent_surcharge' => 100.00, 'is_included_in_flatrate' => true, 'brand' => 'rp']);
-        \App\Models\LicenseModifier::forceCreate(['id' => '33333333-3333-3333-3333-333333333333', 'name' => 'Weltweit', 'percent_surcharge' => 50.00, 'is_included_in_flatrate' => false, 'brand' => 'rp']);
+        Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'rp'], ['value' => 'Teststreet 1']);
+
+        LicenseUseCase::forceCreate(['id' => '11111111-1111-1111-1111-111111111111', 'name' => 'Tageszeitung', 'base_price' => 8000, 'flatrate_tier' => 'print', 'brand' => 'rp']);
+        LicenseModifier::forceCreate(['id' => '22222222-2222-2222-2222-222222222222', 'name' => 'Titelseite', 'percent_surcharge' => 100.00, 'is_included_in_flatrate' => true, 'brand' => 'rp']);
+        LicenseModifier::forceCreate(['id' => '33333333-3333-3333-3333-333333333333', 'name' => 'Weltweit', 'percent_surcharge' => 50.00, 'is_included_in_flatrate' => false, 'brand' => 'rp']);
     }
 
-    protected function tearDown(): void {
+    protected function tearDown(): void
+    {
         $this->resetStripeHttpClient();
         parent::tearDown();
     }
 
-    public function test_checkout_calculates_delta_pricing_with_flatrate_and_modifiers() {
+    public function test_checkout_calculates_delta_pricing_with_flatrate_and_modifiers()
+    {
         $user = User::factory()->create(['flatrate_level' => 'print']);
-        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::POWER_USER->value]));
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::POWER_USER->value]));
         $token = auth('api')->login($user);
 
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
-        $response = $this->withHeaders(['Authorization' => "Bearer " . $token])
-                         ->postJson("/api/orders/checkout", [
-                             'items' => [
-                                 [
-                                     'photoId' => $photo->id, 
-                                     'tier' => 'print',
-                                     'useCaseId' => '11111111-1111-1111-1111-111111111111', 
-                                     'modifierIds' => ['22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333']
-                                 ]
-                             ],
-                             'billing_name' => 'Test', 'billing_street' => 'Str 1', 'billing_zip' => '1234', 'billing_city' => 'City', 'withdrawal_waived' => true
-                         ]);
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/orders/checkout', [
+                'items' => [
+                    [
+                        'photoId' => $photo->id,
+                        'tier' => 'print',
+                        'useCaseId' => '11111111-1111-1111-1111-111111111111',
+                        'modifierIds' => ['22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333'],
+                    ],
+                ],
+                'billing_name' => 'Test', 'billing_street' => 'Str 1', 'billing_zip' => '1234', 'billing_city' => 'City', 'withdrawal_waived' => true,
+            ]);
 
         $response->assertStatus(200);
         $orderId = $response->json('order_id');
@@ -61,65 +71,67 @@ class OrderCheckoutTest extends TestCase {
         $this->assertDatabaseHas('orders', ['id' => $orderId, 'total_amount' => 4000]);
     }
 
-    public function test_checkout_blocks_commercial_license_for_editorial_photo() {
+    public function test_checkout_blocks_commercial_license_for_editorial_photo()
+    {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
         $user->roles()->attach(Role::firstOrCreate(['name' => 'power_user']));
         $token = auth('api')->login($user);
 
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'is_editorial_only' => true]);
-        
-        $useCase = \App\Models\LicenseUseCase::create([
-            'name' => 'Commercial License', 
-            'base_price' => 45000, 
-            'flatrate_tier' => 'original', 
-            'is_commercial' => true
+
+        $useCase = LicenseUseCase::create([
+            'name' => 'Commercial License',
+            'base_price' => 45000,
+            'flatrate_tier' => 'original',
+            'is_commercial' => true,
         ]);
 
-        $response = $this->withHeaders(['Authorization' => "Bearer " . $token])
-                         ->postJson("/api/orders/checkout", [
-                             'items' => [
-                                 [
-                                     'photoId' => $photo->id, 
-                                     'tier' => 'original',
-                                     'useCaseId' => $useCase->id, 
-                                     'modifierIds' => []
-                                 ]
-                             ],
-                             'billing_name' => 'Test', 'billing_street' => 'Str 1', 'billing_zip' => '1234', 'billing_city' => 'City', 'withdrawal_waived' => true
-                         ]);
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/orders/checkout', [
+                'items' => [
+                    [
+                        'photoId' => $photo->id,
+                        'tier' => 'original',
+                        'useCaseId' => $useCase->id,
+                        'modifierIds' => [],
+                    ],
+                ],
+                'billing_name' => 'Test', 'billing_street' => 'Str 1', 'billing_zip' => '1234', 'billing_city' => 'City', 'withdrawal_waived' => true,
+            ]);
 
         $response->assertStatus(403);
         $response->assertJson(['error' => "Das Bild '{$photo->filename}' ist nur für redaktionelle Nutzung freigegeben."]);
     }
 
-    public function test_admin_without_flatrate_pays_full_price() {
+    public function test_admin_without_flatrate_pays_full_price()
+    {
         $user = User::factory()->create(['flatrate_level' => 'none']);
-        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
         $token = auth('api')->login($user);
 
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
-        $response = $this->withHeaders(['Authorization' => "Bearer " . $token])
-                         ->postJson("/api/orders/checkout", [
-                             'items' => [
-                                 [
-                                     'photoId' => $photo->id, 
-                                     'tier' => 'original',
-                                     'useCaseId' => '11111111-1111-1111-1111-111111111111', 
-                                     'modifierIds' => []
-                                 ]
-                             ],
-                             'billing_name' => 'Test', 'billing_street' => 'Str 1', 'billing_zip' => '1234', 'billing_city' => 'City', 'withdrawal_waived' => true
-                         ]);
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/orders/checkout', [
+                'items' => [
+                    [
+                        'photoId' => $photo->id,
+                        'tier' => 'original',
+                        'useCaseId' => '11111111-1111-1111-1111-111111111111',
+                        'modifierIds' => [],
+                    ],
+                ],
+                'billing_name' => 'Test', 'billing_street' => 'Str 1', 'billing_zip' => '1234', 'billing_city' => 'City', 'withdrawal_waived' => true,
+            ]);
 
         $response->assertStatus(200);
         $orderId = $response->json('order_id');
-        
+
         // Use Case (Original) = 80€ Base * 4.0 (Keine Flatrate -> voller Preis)
         // Preis = 80€ (Base) * (Keine Modifikatoren) -> Backend Price Service gibt einfach Base zurück.
         $this->assertDatabaseHas('orders', ['id' => $orderId, 'total_amount' => 8000]);

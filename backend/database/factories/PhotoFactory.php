@@ -2,8 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\Photo;
 use App\Models\Gallery;
+use App\Models\Photo;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class PhotoFactory extends Factory
@@ -19,7 +20,7 @@ class PhotoFactory extends Factory
             'height' => 1333,
             'title' => $this->faker->sentence(),
             'description' => $this->faker->paragraph(),
-            'user_id' => \App\Models\User::factory(),
+            'user_id' => User::factory(),
             'captured_at' => $this->faker->optional()->dateTimeThisYear(),
         ];
     }

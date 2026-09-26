@@ -41,7 +41,7 @@ class EffectiveAttributesTest extends TestCase
             ]);
         }
 
-        $effectiveAttribute = 'effective_' . $attribute;
+        $effectiveAttribute = 'effective_'.$attribute;
         $this->assertSame($expected, $entityModel->$effectiveAttribute);
     }
 

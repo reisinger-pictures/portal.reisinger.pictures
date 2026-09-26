@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\DisputeMailDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Mail\MailManager;
 use Illuminate\Mail\PendingMail;
@@ -128,9 +129,9 @@ class DisputeMailRetryTest extends TestCase
         Config::set('services.stripe.webhook_secret', $secret);
         [$payload, $signature] = $this->signedPayload($secret);
 
-        $dispatcher = Mockery::mock(\App\Services\DisputeMailDispatcher::class);
+        $dispatcher = Mockery::mock(DisputeMailDispatcher::class);
         $dispatcher->shouldReceive('queueOnce')->once()->andReturnTrue();
-        $this->app->instance(\App\Services\DisputeMailDispatcher::class, $dispatcher);
+        $this->app->instance(DisputeMailDispatcher::class, $dispatcher);
 
         $this->postJson('/api/webhooks/stripe', $payload, ['Stripe-Signature' => $signature])
             ->assertOk();

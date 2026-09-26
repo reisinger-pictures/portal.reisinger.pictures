@@ -15,7 +15,7 @@ class TextSnippetFactory extends Factory
         return [
             'title' => fake()->sentence(3),
             'shortcut' => fake()->unique()->regexify('[a-z0-9_]{5,15}'),
-            'content_html' => '<p>' . fake()->paragraph() . '</p>',
+            'content_html' => '<p>'.fake()->paragraph().'</p>',
             'brand' => Brand::B2B,
         ];
     }

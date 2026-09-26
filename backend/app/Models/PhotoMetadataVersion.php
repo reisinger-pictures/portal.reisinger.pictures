@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 
 class PhotoMetadataVersion extends Model
 {
@@ -22,7 +22,7 @@ class PhotoMetadataVersion extends Model
         'city',
         'state',
         'country',
-        'iso_country'
+        'iso_country',
     ];
 
     public function photo()

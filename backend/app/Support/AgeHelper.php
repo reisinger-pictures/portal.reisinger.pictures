@@ -39,6 +39,7 @@ class AgeHelper
         }
 
         $formatted = Carbon::parse($birthdate)->format('d.m.Y');
+
         return "Alter: {$age} Jahre (geb. {$formatted})";
     }
 }

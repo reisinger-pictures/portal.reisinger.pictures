@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 class CustomMail extends AbstractBrandAwareMailable
 {
     public $subject;
+
     public $customBody;
 
     public function __construct($subject, $customBody)
@@ -21,11 +22,11 @@ class CustomMail extends AbstractBrandAwareMailable
         $this->applyBrandFrom();
 
         return $this->subject($this->subject)
-                    ->bcc($this->brandBcc())
-                    ->view('emails.custom')
-                    ->with([
-                        'logoUrl' => $this->brandLogoUrl(),
-                    ]);
+            ->bcc($this->brandBcc())
+            ->view('emails.custom')
+            ->with([
+                'logoUrl' => $this->brandLogoUrl(),
+            ]);
     }
 
     public function failed(\Throwable $exception): void

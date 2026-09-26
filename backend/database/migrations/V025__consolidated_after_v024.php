@@ -461,7 +461,7 @@ return new class extends Migration
             $table->dropColumn('template_id');
             $table->dropColumn('expires_at');
         });
-        DB::statement("ALTER TABLE contracts DROP COLUMN type");
+        DB::statement('ALTER TABLE contracts DROP COLUMN type');
 
         // Reverse V025 Step C: drop status indexes
         Schema::table('orders', function (Blueprint $table) {

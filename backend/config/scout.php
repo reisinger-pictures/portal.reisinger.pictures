@@ -1,5 +1,11 @@
 <?php
 
+use App\Models\Customer;
+use App\Models\Gallery;
+use App\Models\Location;
+use App\Models\Photo;
+use App\Models\TextSnippet;
+
 return [
     'driver' => env('SCOUT_DRIVER', 'meilisearch'),
     'prefix' => env('SCOUT_PREFIX', ''),
@@ -18,7 +24,7 @@ return [
         'key' => env('MEILISEARCH_KEY'),
 
         'index-settings' => [
-            \App\Models\Photo::class => [
+            Photo::class => [
                 // Explizite searchableAttributes: verhindert, dass Meilisearch die Reihenfolge
                 // nicht-deterministisch ableitet (IDs/UUIDs dominieren sonst). Textfelder zuerst.
                 'searchableAttributes' => [
@@ -33,7 +39,7 @@ return [
                     'minWordSizeForTypos' => ['oneTypo' => 4, 'twoTypos' => 8],
                 ],
             ],
-            \App\Models\Gallery::class => [
+            Gallery::class => [
                 'searchableAttributes' => ['name'],
                 'filterableAttributes' => ['id', 'is_hidden'],
                 'typoTolerance' => [
@@ -41,18 +47,18 @@ return [
                     'minWordSizeForTypos' => ['oneTypo' => 4, 'twoTypos' => 8],
                 ],
             ],
-            \App\Models\Location::class => [
+            Location::class => [
                 // Die Suchreihenfolge (WICHTIG! PLZ und Name zuerst, ID wird ignoriert)
                 'searchableAttributes' => ['postal_code', 'name', 'state', 'country'],
                 'filterableAttributes' => ['type'],
                 'sortableAttributes' => ['population', 'postal_code'],
             ],
-            \App\Models\Customer::class => [
+            Customer::class => [
                 'searchableAttributes' => ['name', 'company', 'email', 'zip', 'city', 'street', 'country', 'uid'],
                 'filterableAttributes' => ['id'],
                 'sortableAttributes' => ['created_at'],
             ],
-            \App\Models\TextSnippet::class => [
+            TextSnippet::class => [
                 'searchableAttributes' => ['title', 'shortcut', 'content_html'],
                 'filterableAttributes' => ['id'],
                 'sortableAttributes' => ['created_at'],

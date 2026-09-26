@@ -31,7 +31,7 @@ class OfferTokenServiceTest extends TestCase
         // Flip the last character of the signature segment.
         $last = substr($token, -1);
         $replacement = $last === 'A' ? 'B' : 'A';
-        $tampered = substr($token, 0, -1) . $replacement;
+        $tampered = substr($token, 0, -1).$replacement;
 
         $this->assertNull($this->service->verify($tampered));
     }

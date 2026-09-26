@@ -13,7 +13,7 @@ class PhotoProcessingServiceTest extends TestCase
 
     public function test_process_handles_non_existent_file_gracefully()
     {
-        $service = new PhotoProcessingService();
+        $service = new PhotoProcessingService;
         $gallery = Gallery::factory()->create([
             'type' => 'delivery',
             'apply_metadata_to_photos' => false,
@@ -28,7 +28,8 @@ class PhotoProcessingServiceTest extends TestCase
 
     public function test_process_returns_gallery_defaults_when_apply_metadata_is_true()
     {
-        $service = new class extends PhotoProcessingService {
+        $service = new class extends PhotoProcessingService
+        {
             protected function runExifTool(string $targetPath): ?array
             {
                 return null;
@@ -62,7 +63,7 @@ class PhotoProcessingServiceTest extends TestCase
 
     public function test_process_does_not_set_captured_at_for_selection_galleries()
     {
-        $service = new PhotoProcessingService();
+        $service = new PhotoProcessingService;
         $gallery = Gallery::factory()->create([
             'type' => 'selection',
             'apply_metadata_to_photos' => true,

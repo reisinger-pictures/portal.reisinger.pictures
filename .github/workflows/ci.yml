@@ -139,6 +139,14 @@ jobs:
             composer:2.10.3@sha256:a5f59b9fd2faf31218632be4809dc6491761085e8064c31dc3b84378c48c248b install --ignore-platform-reqs --no-interaction --optimize-autoloader
       - name: Generate app key
         run: docker exec php php artisan key:generate
+      - name: Check PHP formatting (Pint)
+        # Pint runs in --test mode, so it reports and never rewrites. This is a
+        # gate, not a formatter: it fails the build on style, so formatting
+        # cannot silently drift back in across a large changeset. The codebase
+        # was normalised once (165 files) when the gate was added, so this
+        # starts from a clean baseline. Locally: cd backend && ./vendor/bin/pint,
+        # then commit the result.
+        run: docker exec php ./vendor/bin/pint --test
       - name: Run PHPUnit
         # Parallele Worker via paratest (portal-base:8.5 enthaelt seit dem
         # Rebuild ext-pcntl + posix). pipefail laesst den Step fehlschlagen,

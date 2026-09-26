@@ -6,7 +6,6 @@ use App\Enums\Brand;
 use App\Models\Gallery;
 use App\Models\Setting;
 use App\Models\VolumePreset;
-use App\Models\VolumePresetTier;
 use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;

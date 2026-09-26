@@ -2,14 +2,15 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\Order;
-use App\Models\InvoiceSnapshot;
 use App\Enums\Brand;
+use App\Models\InvoiceSnapshot;
+use App\Models\Order;
+use Illuminate\Console\Command;
 
 class BackfillBrand extends Command
 {
     protected $signature = 'app:backfill-brand';
+
     protected $description = 'Backfill brand column for existing orders and invoice_snapshots (CLI-safe B2B default).';
 
     public function handle()

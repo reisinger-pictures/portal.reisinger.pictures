@@ -6,22 +6,23 @@ use App\Enums\Brand;
 use App\Http\Middleware\BrandContextMiddleware;
 use App\Models\Coupon;
 use App\Models\Gallery;
+use App\Models\LicenseUseCase;
 use App\Models\Order;
 use App\Models\Photo;
+use App\Models\Setting;
 use App\Models\User;
 use App\Support\BrandRegistry;
-use App\Values\BrandConfig;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\ClientInterface;
-use Tests\TestCase;
 use Tests\Support\MocksStripeClient;
+use Tests\TestCase;
 
 class CheckoutCouponRevalidationTest extends TestCase
 {
-    use RefreshDatabase;
     use MocksStripeClient;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -30,13 +31,13 @@ class CheckoutCouponRevalidationTest extends TestCase
         $this->withoutMiddleware(BrandContextMiddleware::class);
         BrandRegistry::set(Brand::B2B);
 
-        \App\Models\Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
-        \App\Models\Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
-        \App\Models\Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'rp'], ['value' => 'Teststreet 1']);
+        Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
+        Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
+        Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
+        Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'rp'], ['value' => 'Teststreet 1']);
 
-        \App\Models\LicenseUseCase::forceCreate(['id' => '11111111-1111-1111-1111-111111111111', 'name' => 'Tageszeitung', 'base_price' => 8000, 'flatrate_tier' => 'print', 'brand' => 'rp']);
-        \App\Models\LicenseUseCase::forceCreate(['id' => '00000000-0000-0000-0000-000000000000', 'name' => 'Web', 'base_price' => 3000, 'flatrate_tier' => 'web', 'brand' => 'rp']);
+        LicenseUseCase::forceCreate(['id' => '11111111-1111-1111-1111-111111111111', 'name' => 'Tageszeitung', 'base_price' => 8000, 'flatrate_tier' => 'print', 'brand' => 'rp']);
+        LicenseUseCase::forceCreate(['id' => '00000000-0000-0000-0000-000000000000', 'name' => 'Web', 'base_price' => 3000, 'flatrate_tier' => 'web', 'brand' => 'rp']);
     }
 
     protected function tearDown(): void
@@ -66,7 +67,7 @@ class CheckoutCouponRevalidationTest extends TestCase
         $user = User::factory()->create();
         $token = auth('api')->login($user);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', [
                 'items' => $data['items'],
                 'coupon_code' => 'INVALID',
@@ -96,7 +97,7 @@ class CheckoutCouponRevalidationTest extends TestCase
         $user = User::factory()->create();
         $token = auth('api')->login($user);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', [
                 'items' => $data['items'],
                 'coupon_code' => 'EXPCHECK',
@@ -127,7 +128,7 @@ class CheckoutCouponRevalidationTest extends TestCase
         $user = User::factory()->create();
         $token = auth('api')->login($user);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', [
                 'items' => $data['items'],
                 'coupon_code' => 'MAXCHECK',
@@ -158,7 +159,7 @@ class CheckoutCouponRevalidationTest extends TestCase
         $user = User::factory()->create();
         $token = auth('api')->login($user);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', [
                 'items' => $data['items'],
                 'coupon_code' => 'VALID10',
@@ -283,7 +284,7 @@ class CheckoutCouponRevalidationTest extends TestCase
         $user = User::factory()->create();
         $token = auth('api')->login($user);
 
-        $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', [
                 'items' => $data['items'],
                 'coupon_code' => 'INCR',
@@ -316,7 +317,7 @@ class CheckoutCouponRevalidationTest extends TestCase
         $user2 = User::factory()->create();
         $token1 = auth('api')->login($user1);
 
-        $r1 = $this->withHeaders(['Authorization' => 'Bearer ' . $token1])
+        $r1 = $this->withHeaders(['Authorization' => 'Bearer '.$token1])
             ->postJson('/api/orders/checkout', [
                 'items' => $data['items'],
                 'coupon_code' => 'RACE',
@@ -329,7 +330,7 @@ class CheckoutCouponRevalidationTest extends TestCase
         $r1->assertStatus(200);
         $token2 = auth('api')->login($user2);
 
-        $r2 = $this->withHeaders(['Authorization' => 'Bearer ' . $token2])
+        $r2 = $this->withHeaders(['Authorization' => 'Bearer '.$token2])
             ->postJson('/api/orders/checkout', [
                 'items' => $data['items'],
                 'coupon_code' => 'RACE',

@@ -2,11 +2,12 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Role;
+use App\Enums\UserRole;
 use App\Models\Org;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class OrgControllerTest extends TestCase
 {
@@ -15,14 +16,16 @@ class OrgControllerTest extends TestCase
     private function adminToken(): string
     {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
+
         return auth('api')->login($user);
     }
 
     private function clientToken(): string
     {
         $user = User::factory()->create();
-        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
+
         return auth('api')->login($user);
     }
 

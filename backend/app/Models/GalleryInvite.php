@@ -2,17 +2,17 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 
 class GalleryInvite extends Model
 {
     use HasUuids;
 
     public const UPDATED_AT = null;
-    
-        protected $casts = [
-        'can_edit_metadata' => 'boolean'
+
+    protected $casts = [
+        'can_edit_metadata' => 'boolean',
     ];
 
     protected $fillable = [
@@ -20,7 +20,7 @@ class GalleryInvite extends Model
         'token',
         'name',
         'can_edit_metadata',
-        'created_at'
+        'created_at',
     ];
 
     public function gallery()

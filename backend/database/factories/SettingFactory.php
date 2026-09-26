@@ -16,7 +16,7 @@ class SettingFactory extends Factory
     {
         return [
             'brand' => Brand::B2B,
-            'key' => 'test_' . Str::lower(Str::random(12)),
+            'key' => 'test_'.Str::lower(Str::random(12)),
             'value' => $this->faker->word(),
         ];
     }

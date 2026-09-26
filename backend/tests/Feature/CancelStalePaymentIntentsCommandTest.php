@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\InvoiceMail;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
+use App\Models\User;
 use App\Services\StripePaymentService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -62,7 +63,7 @@ class CancelStalePaymentIntentsCommandTest extends TestCase
     public function test_remote_succeeded_candidate_is_reconciled_and_paid_with_fee_and_mail(): void
     {
         Mail::fake();
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $order = Order::factory()->create([
             'user_id' => $user->id,
             'status' => 'pending_payment',
@@ -242,7 +243,7 @@ class CancelStalePaymentIntentsCommandTest extends TestCase
 
     public function test_v036_remote_customer_mismatch_is_skipped_without_cancel(): void
     {
-        $user = \App\Models\User::factory()->create(['stripe_customer_id' => 'cus_command_expected']);
+        $user = User::factory()->create(['stripe_customer_id' => 'cus_command_expected']);
         $order = Order::factory()->create([
             'user_id' => $user->id,
             'status' => 'pending_payment',

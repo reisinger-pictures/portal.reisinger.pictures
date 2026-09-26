@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\Mail;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Role;
-use App\Models\Gallery;
 use App\Enums\UserRole;
+use App\Models\Gallery;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Tests\TestCase;
 
 class FinishRatingTest extends TestCase
 {
@@ -27,7 +27,7 @@ class FinishRatingTest extends TestCase
 
         $token = auth('api')->login($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-                         ->postJson("/api/galleries/{$gallery->id}/finish-rating");
+            ->postJson("/api/galleries/{$gallery->id}/finish-rating");
 
         $response->assertStatus(403);
         Mail::assertNothingSent();
@@ -45,7 +45,7 @@ class FinishRatingTest extends TestCase
 
         $token = auth('api')->login($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-                         ->postJson("/api/galleries/{$gallery->id}/finish-rating");
+            ->postJson("/api/galleries/{$gallery->id}/finish-rating");
 
         $response->assertStatus(200);
         // No photographers/admins with wants_notifications → 0 mails is correct.

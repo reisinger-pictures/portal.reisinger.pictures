@@ -421,13 +421,11 @@ PHP;
      * Raw YAML of a single top-level CI job. Job keys sit at two-space
      * indentation under `jobs:`, so the next key on that level closes the
      * block without needing a YAML parser.
-     *
-     * @return string
      */
     private function ciJob(string $name): string
     {
         $contents = $this->read('.github/workflows/ci.yml');
-        $pattern = '/^  ' . preg_quote($name, '/') . ':[ \t]*$(.*?)(?=^  [\w-]+:[ \t]*$|\z)/ms';
+        $pattern = '/^  '.preg_quote($name, '/').':[ \t]*$(.*?)(?=^  [\w-]+:[ \t]*$|\z)/ms';
         $matched = preg_match($pattern, $contents, $matches);
 
         $this->assertSame(1, $matched, "ci.yml must define the {$name} job");

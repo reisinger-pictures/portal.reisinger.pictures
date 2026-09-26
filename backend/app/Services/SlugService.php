@@ -14,11 +14,10 @@ class SlugService
      * in the specified table/column. If a collision is found, a numeric
      * suffix is appended (e.g. "my-slug-1").
      *
-     * @param string      $value   Raw value to slugify.
-     * @param string      $table   Database table to check for collisions.
-     * @param string      $column  Column name (default: 'slug').
-     * @param string|null $ignoreId Optional model ID to exclude (for updates).
-     * @return string
+     * @param  string  $value  Raw value to slugify.
+     * @param  string  $table  Database table to check for collisions.
+     * @param  string  $column  Column name (default: 'slug').
+     * @param  string|null  $ignoreId  Optional model ID to exclude (for updates).
      */
     public function makeUnique(string $value, string $table, string $column = 'slug', ?string $ignoreId = null): string
     {
@@ -31,17 +30,19 @@ class SlugService
             if ($ignoreId !== null) {
                 $q->where('id', '!=', $ignoreId);
             }
+
             return $q->exists();
         };
 
-        if (!$isTaken($baseSlug)) {
+        if (! $isTaken($baseSlug)) {
             return $baseSlug;
         }
 
         $counter = 1;
-        while ($isTaken($baseSlug . '-' . $counter)) {
+        while ($isTaken($baseSlug.'-'.$counter)) {
             $counter++;
         }
-        return $baseSlug . '-' . $counter;
+
+        return $baseSlug.'-'.$counter;
     }
 }

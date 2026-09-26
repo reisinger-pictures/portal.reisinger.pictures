@@ -2,15 +2,16 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Role;
+use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\Photo;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Cache;
+use App\Models\Role;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
 
 class StorageLifecycleTest extends TestCase
 {
@@ -26,26 +27,26 @@ class StorageLifecycleTest extends TestCase
     {
         // Require flatrate_level to bypass watermark generation (which would 404 without ImageMagick)
         $user = User::factory()->create(['flatrate_level' => 'original']);
-        $user->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::CLIENT->value]));
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true]);
         $user->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
         // Create dummy file
         $fixturePath = base_path('tests/Fixtures/sample.jpg');
-        Storage::disk('photos')->put($gallery->id . '/' . $photo->filename, file_get_contents($fixturePath));
+        Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, file_get_contents($fixturePath));
 
         // Ensure initially null
         $this->assertNull($photo->last_accessed_at);
 
-        // Wir loggen uns ein, um die ImageMagick-Wasserzeichengenerierung zu umgehen, 
+        // Wir loggen uns ein, um die ImageMagick-Wasserzeichengenerierung zu umgehen,
         // welche an der Dummy-Textdatei des Tests scheitern und 404 auslösen würde.
         $token = auth('api')->login($user);
 
         // First Request
         $this->withHeaders(['Authorization' => "Bearer $token"])
-             ->get('/api/media/' . $gallery->slug . '/' . $photo->id . '.jpg')
-             ->assertStatus(200);
+            ->get('/api/media/'.$gallery->slug.'/'.$photo->id.'.jpg')
+            ->assertStatus(200);
 
         // Verify DB was updated
         $photo->refresh();
@@ -53,7 +54,7 @@ class StorageLifecycleTest extends TestCase
         $firstTimestamp = $photo->last_accessed_at;
 
         // Verify Cache is set
-        $this->assertTrue(Cache::has('photo_hit_' . $photo->id));
+        $this->assertTrue(Cache::has('photo_hit_'.$photo->id));
 
         // Advance the clock deterministically instead of a real sleep(1): a second
         // request "one second later" must still hit the 24h cache and therefore must
@@ -64,8 +65,8 @@ class StorageLifecycleTest extends TestCase
 
         try {
             $this->withHeaders(['Authorization' => "Bearer $token"])
-                 ->get('/api/media/' . $gallery->slug . '/' . $photo->id . '.jpg')
-                 ->assertStatus(200);
+                ->get('/api/media/'.$gallery->slug.'/'.$photo->id.'.jpg')
+                ->assertStatus(200);
 
             // Verify DB was NOT updated again due to cache throttling
             $photo->refresh();

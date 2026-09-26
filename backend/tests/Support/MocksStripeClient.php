@@ -13,7 +13,7 @@ trait MocksStripeClient
         $clientMock->method('request')
             ->willReturnCallback(function (string $method, string $absUrl, array $headers, array $params, bool $hasFile) {
                 $body = json_encode([
-                    'id' => 'pi_test_' . md5($absUrl . json_encode($params)),
+                    'id' => 'pi_test_'.md5($absUrl.json_encode($params)),
                     'object' => 'payment_intent',
                     'status' => 'requires_payment_method',
                     'client_secret' => 'pi_test_secret',

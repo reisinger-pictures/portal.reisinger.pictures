@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 
 class OrgInvite extends Model
 {
@@ -15,11 +15,11 @@ class OrgInvite extends Model
         'email',
         'org_id',
         'token',
-        'expires_at'
+        'expires_at',
     ];
 
     protected $casts = [
-        'expires_at' => 'datetime'
+        'expires_at' => 'datetime',
     ];
 
     public function org()

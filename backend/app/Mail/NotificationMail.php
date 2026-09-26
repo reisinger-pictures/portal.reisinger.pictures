@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\Log;
 class NotificationMail extends AbstractBrandAwareMailable
 {
     public $userName;
+
     public $messageBody;
+
     public $mailSubject;
 
     public function __construct($userName, $messageBody, $mailSubject)
@@ -23,11 +25,11 @@ class NotificationMail extends AbstractBrandAwareMailable
         $this->applyBrandFrom();
 
         return $this->subject($this->mailSubject)
-                    ->bcc($this->brandBcc())
-                    ->view('emails.notification')
-                    ->with([
-                        'logoUrl' => $this->brandLogoUrl(),
-                    ]);
+            ->bcc($this->brandBcc())
+            ->view('emails.notification')
+            ->with([
+                'logoUrl' => $this->brandLogoUrl(),
+            ]);
     }
 
     public function failed(\Throwable $exception): void

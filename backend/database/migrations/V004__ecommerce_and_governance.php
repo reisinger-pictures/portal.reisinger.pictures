@@ -2,10 +2,14 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
-return new class extends Migration {
-    public function up(): void {
+return new class extends Migration
+{
+    public function up(): void
+    {
         // --- 1. User Flatrate & Billing ---
         Schema::table('users', function (Blueprint $table) {
             $table->string('flatrate_level', 20)->default('none')->after('can_edit_metadata');
@@ -123,7 +127,7 @@ return new class extends Migration {
         });
 
         // --- 7. Default Settings ---
-        \Illuminate\Support\Facades\DB::table('settings')->insert([
+        DB::table('settings')->insert([
             ['key' => 'base_price', 'value' => '35.00'],
             ['key' => 'term_editorial', 'value' => 'Nur für redaktionelle Berichterstattung zugelassen. Jegliche kommerzielle Nutzung (Werbung, Advertorials, Social Media Ads) ist untersagt.'],
             ['key' => 'term_commercial', 'value' => 'Uneingeschränkte kommerzielle Nutzung (Werbung, Flyer, Social Media Kampagnen) ist gestattet. Weiterverkauf der Rohdaten ist untersagt.'],
@@ -131,27 +135,28 @@ return new class extends Migration {
             ['key' => 'term_unlimited', 'value' => 'Zeitlich und räumlich unbegrenztes Nutzungsrecht.'],
             ['key' => 'term_web', 'value' => 'Auflösung optimiert für Web & Social Media (max. 2560px Kantenlänge, 72dpi).'],
             ['key' => 'term_print', 'value' => 'Hohe Auflösung für den Druck (bis A4, max. 4000px).'],
-            ['key' => 'term_original', 'value' => 'Maximale Originalauflösung (RAW entwickelt).']
+            ['key' => 'term_original', 'value' => 'Maximale Originalauflösung (RAW entwickelt).'],
         ]);
 
         // --- 8. Super Admin Role ---
-        $roleId = \Illuminate\Support\Str::uuid()->toString();
-        \Illuminate\Support\Facades\DB::table('roles')->insert([
+        $roleId = Str::uuid()->toString();
+        DB::table('roles')->insert([
             'id' => $roleId,
-            'name' => 'super_admin'
+            'name' => 'super_admin',
         ]);
 
         // God Mode an unseren initialen Admin vergeben
-        $adminUser = \Illuminate\Support\Facades\DB::table('users')->where('email', env('ADMIN_EMAIL', 'admin@example.com'))->first();
+        $adminUser = DB::table('users')->where('email', env('ADMIN_EMAIL', 'admin@example.com'))->first();
         if ($adminUser) {
-            \Illuminate\Support\Facades\DB::table('user_roles')->insert([
+            DB::table('user_roles')->insert([
                 'user_id' => $adminUser->id,
-                'role_id' => $roleId
+                'role_id' => $roleId,
             ]);
         }
     }
 
-    public function down(): void {
+    public function down(): void
+    {
         Schema::dropIfExists('tenant_invites');
         Schema::dropIfExists('gallery_group_tenant');
         Schema::dropIfExists('tenant_user');
@@ -191,10 +196,10 @@ return new class extends Migration {
             $table->dropColumn(['is_editorial_only', 'is_free_download', 'is_hidden']);
         });
 
-        $roleId = \Illuminate\Support\Facades\DB::table('roles')->where('name', 'super_admin')->value('id');
+        $roleId = DB::table('roles')->where('name', 'super_admin')->value('id');
         if ($roleId) {
-            \Illuminate\Support\Facades\DB::table('user_roles')->where('role_id', $roleId)->delete();
-            \Illuminate\Support\Facades\DB::table('roles')->where('id', $roleId)->delete();
+            DB::table('user_roles')->where('role_id', $roleId)->delete();
+            DB::table('roles')->where('id', $roleId)->delete();
         }
     }
 };

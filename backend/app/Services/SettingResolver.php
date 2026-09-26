@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Services;
 
 use App\Enums\Brand;
@@ -51,5 +52,4 @@ class SettingResolver
             ['value' => $value]
         );
     }
-
 }

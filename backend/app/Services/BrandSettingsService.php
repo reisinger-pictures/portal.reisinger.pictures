@@ -107,7 +107,7 @@ class BrandSettingsService
     {
         // Tolerate a missing table (fresh :memory: test DBs without
         // RefreshDatabase, pre-migration states): no overrides then.
-        if (!Schema::hasTable('settings')) {
+        if (! Schema::hasTable('settings')) {
             return [];
         }
 

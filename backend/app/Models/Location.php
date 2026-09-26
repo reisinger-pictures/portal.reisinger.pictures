@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 use Laravel\Scout\Searchable;
 
 class Location extends Model
@@ -19,7 +19,7 @@ class Location extends Model
         'country',
         'iso_country',
         'postal_code',
-        'population'
+        'population',
     ];
 
     public function toSearchableArray()

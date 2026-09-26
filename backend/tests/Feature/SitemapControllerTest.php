@@ -168,8 +168,8 @@ class SitemapControllerTest extends TestCase
 
         $response->assertStatus(200);
         $content = $response->getContent();
-        $this->assertStringContainsString('/api/media/' . $testBrandGallery->id . '/' . $testBrandPhoto->filename, $content);
-        $this->assertStringNotContainsString('/api/media/' . $b2bGallery->id, $content);
+        $this->assertStringContainsString('/api/media/'.$testBrandGallery->id.'/'.$testBrandPhoto->filename, $content);
+        $this->assertStringNotContainsString('/api/media/'.$b2bGallery->id, $content);
     }
 
     public function test_sitemap_images_excludes_private_gallery_photos()

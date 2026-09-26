@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Middleware;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Role;
 use App\Enums\UserRole;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class ManagementMiddlewareTest extends TestCase
 {
@@ -29,7 +29,7 @@ class ManagementMiddlewareTest extends TestCase
 
         $token = auth('api')->login($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-                         ->getJson('/api/management/galleries');
+            ->getJson('/api/management/galleries');
 
         $response->assertStatus(403);
     }
@@ -41,7 +41,7 @@ class ManagementMiddlewareTest extends TestCase
 
         $token = auth('api')->login($admin);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-                         ->getJson('/api/management/galleries');
+            ->getJson('/api/management/galleries');
 
         $response->assertStatus(200);
     }

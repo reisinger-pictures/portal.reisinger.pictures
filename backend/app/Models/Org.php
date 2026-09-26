@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
-use App\Enums\Brand;
-use Illuminate\Database\Eloquent\Model;
+use App\Casts\AsBrand;
+use App\Enums\AutoJoinPolicy;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Org extends Model
 {
@@ -24,9 +25,9 @@ class Org extends Model
     ];
 
     protected $casts = [
-        'brand' => \App\Casts\AsBrand::class,
+        'brand' => AsBrand::class,
         'can_purchase_upgrades' => 'boolean',
-        'auto_join_policy' => \App\Enums\AutoJoinPolicy::class,
+        'auto_join_policy' => AutoJoinPolicy::class,
     ];
 
     public function users()

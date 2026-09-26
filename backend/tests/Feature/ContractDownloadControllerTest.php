@@ -2,14 +2,14 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\Contract;
-use App\Models\User;
-use App\Models\Role;
 use App\Enums\UserRole;
+use App\Models\Contract;
+use App\Models\Role;
+use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class ContractDownloadControllerTest extends TestCase
 {
@@ -57,8 +57,8 @@ class ContractDownloadControllerTest extends TestCase
             'available_roles' => ['buyer'],
         ]);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->getJson('/api/management/contracts/' . $contract->id . '/download');
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->getJson('/api/management/contracts/'.$contract->id.'/download');
 
         $response->assertStatus(200);
         $response->assertHeader('Content-Type', 'application/pdf');
@@ -83,8 +83,8 @@ class ContractDownloadControllerTest extends TestCase
             'available_roles' => ['buyer'],
         ]);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->getJson('/api/management/contracts/' . $contract->id . '/download');
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->getJson('/api/management/contracts/'.$contract->id.'/download');
 
         $response->assertStatus(403);
     }

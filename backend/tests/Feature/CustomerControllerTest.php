@@ -9,6 +9,8 @@ use App\Models\Role;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Meilisearch\Client;
 use Meilisearch\Contracts\TasksQuery;
 use Tests\TestCase;
 
@@ -17,7 +19,9 @@ class CustomerControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $superAdmin;
+
     private User $admin;
+
     private User $photographer;
 
     protected function setUp(): void
@@ -28,8 +32,8 @@ class CustomerControllerTest extends TestCase
         // Flush + re-sync Meilisearch index settings so sortableAttributes
         // (e.g. created_at on the customers index) are applied and stale
         // documents from previous runs (without created_at) are removed.
-        \Illuminate\Support\Facades\Artisan::call('scout:flush', ['model' => Customer::class]);
-        \Illuminate\Support\Facades\Artisan::call('scout:sync-index-settings');
+        Artisan::call('scout:flush', ['model' => Customer::class]);
+        Artisan::call('scout:sync-index-settings');
         $this->waitForMeilisearchTasks();
 
         $this->superAdmin = User::factory()->create(['brand' => Brand::B2B]);
@@ -48,8 +52,8 @@ class CustomerControllerTest extends TestCase
      */
     private function waitForMeilisearchTasks(): void
     {
-        $client = app(\Meilisearch\Client::class);
-        $query = (new TasksQuery())->setStatuses(['enqueued', 'processing']);
+        $client = app(Client::class);
+        $query = (new TasksQuery)->setStatuses(['enqueued', 'processing']);
         foreach ($client->getTasks($query) as $task) {
             $uid = is_array($task) ? $task['uid'] : $task->getUid();
             $client->waitForTask($uid, 5000, 50);
@@ -140,7 +144,7 @@ class CustomerControllerTest extends TestCase
         $customer = Customer::factory()->create(['brand' => Brand::B2B]);
 
         $response = $this->actingAs($this->superAdmin, 'api')
-            ->putJson('/api/management/customers/' . $customer->id, [
+            ->putJson('/api/management/customers/'.$customer->id, [
                 'name' => 'Updated Name',
                 'birthdate' => '1995-03-20',
             ]);
@@ -157,7 +161,7 @@ class CustomerControllerTest extends TestCase
         $customer = Customer::factory()->create(['brand' => Brand::B2B]);
 
         $response = $this->actingAs($this->superAdmin, 'api')
-            ->deleteJson('/api/management/customers/' . $customer->id);
+            ->deleteJson('/api/management/customers/'.$customer->id);
 
         $response->assertStatus(200);
         $response->assertJsonPath('success', true);
@@ -169,7 +173,7 @@ class CustomerControllerTest extends TestCase
         $customer = Customer::factory()->create(['brand' => Brand::B2B]);
 
         $response = $this->actingAs($this->superAdmin, 'api')
-            ->putJson('/api/management/customers/' . $customer->id, [
+            ->putJson('/api/management/customers/'.$customer->id, [
                 'email' => 'not-an-email',
             ]);
 

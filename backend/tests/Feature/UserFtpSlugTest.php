@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -31,7 +32,7 @@ class UserFtpSlugTest extends TestCase
     {
         // Boot the model first so the built-in slug generator is registered
         // before the collision listener (listeners run in registration order).
-        new User();
+        new User;
 
         $injected = false;
 
@@ -69,7 +70,7 @@ class UserFtpSlugTest extends TestCase
 
         $user = User::factory()->make(['ftp_slug' => 'taken']);
 
-        $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
+        $this->expectException(UniqueConstraintViolationException::class);
         $user->save();
     }
 }

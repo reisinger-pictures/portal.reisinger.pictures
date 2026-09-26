@@ -15,7 +15,7 @@ class GenerateInviteRequest extends FormRequest
     {
         return [
             'name' => 'nullable|string|max:255',
-            'can_edit_metadata' => 'boolean'
+            'can_edit_metadata' => 'boolean',
         ];
     }
 }

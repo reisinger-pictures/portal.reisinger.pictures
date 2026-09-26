@@ -2,14 +2,13 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Role;
+use App\Enums\UserRole;
 use App\Models\Org;
 use App\Models\OrgInvite;
-use App\Enums\UserRole;
-use App\Support\BrandRegistry;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class OrgOrganizationCoreTest extends TestCase
 {
@@ -20,6 +19,7 @@ class OrgOrganizationCoreTest extends TestCase
         $org = Org::factory()->create(['invoice_frequency' => 'immediate']);
         $user = User::factory()->create(['org_id' => $org->id]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ORG_ADMIN->value]));
+
         return ['token' => auth('api')->login($user), 'org' => $org, 'user' => $user];
     }
 
@@ -27,6 +27,7 @@ class OrgOrganizationCoreTest extends TestCase
     {
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
+
         return auth('api')->login($user);
     }
 
@@ -34,6 +35,7 @@ class OrgOrganizationCoreTest extends TestCase
     {
         $user = User::factory()->create(['org_id' => null]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ORG_ADMIN->value]));
+
         return auth('api')->login($user);
     }
 
@@ -45,8 +47,8 @@ class OrgOrganizationCoreTest extends TestCase
     {
         $ctx = $this->orgAdminContext();
 
-        $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
-            ->putJson('/api/management/orgs/' . $ctx['org']->id, [
+        $this->withHeaders(['Authorization' => 'Bearer '.$ctx['token']])
+            ->putJson('/api/management/orgs/'.$ctx['org']->id, [
                 'name' => 'Updated Org',
                 'invoice_frequency' => 'monthly',
             ])
@@ -68,8 +70,8 @@ class OrgOrganizationCoreTest extends TestCase
         $ctx = $this->orgAdminContext();
         $otherOrg = Org::factory()->create(['invoice_frequency' => 'immediate']);
 
-        $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
-            ->putJson('/api/management/orgs/' . $otherOrg->id, [
+        $this->withHeaders(['Authorization' => 'Bearer '.$ctx['token']])
+            ->putJson('/api/management/orgs/'.$otherOrg->id, [
                 'name' => 'Hacked',
                 'invoice_frequency' => 'monthly',
             ])
@@ -84,7 +86,7 @@ class OrgOrganizationCoreTest extends TestCase
     {
         $ctx = $this->orgAdminContext();
 
-        $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
+        $this->withHeaders(['Authorization' => 'Bearer '.$ctx['token']])
             ->postJson('/api/management/orgs', [
                 'name' => 'New Org',
                 'invoice_frequency' => 'immediate',
@@ -100,8 +102,8 @@ class OrgOrganizationCoreTest extends TestCase
     {
         $ctx = $this->orgAdminContext();
 
-        $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
-            ->deleteJson('/api/management/orgs/' . $ctx['org']->id)
+        $this->withHeaders(['Authorization' => 'Bearer '.$ctx['token']])
+            ->deleteJson('/api/management/orgs/'.$ctx['org']->id)
             ->assertStatus(403);
     }
 
@@ -113,7 +115,7 @@ class OrgOrganizationCoreTest extends TestCase
     {
         $ctx = $this->orgAdminContext();
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$ctx['token']])
             ->postJson('/api/management/users', [
                 'name' => 'New User',
                 'email' => 'newuser@example.com',
@@ -136,8 +138,8 @@ class OrgOrganizationCoreTest extends TestCase
         $ctx = $this->orgAdminContext();
         $targetUser = User::factory()->create(['org_id' => $ctx['org']->id]);
 
-        $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
-            ->deleteJson('/api/management/users/' . $targetUser->id)
+        $this->withHeaders(['Authorization' => 'Bearer '.$ctx['token']])
+            ->deleteJson('/api/management/users/'.$targetUser->id)
             ->assertStatus(200)
             ->assertJsonPath('success', true);
 
@@ -153,16 +155,14 @@ class OrgOrganizationCoreTest extends TestCase
         $token = $this->orgAdminWithoutOrgToken();
         $someOrg = Org::factory()->create(['invoice_frequency' => 'immediate']);
 
-        $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->getJson('/api/management/orgs')
             ->assertStatus(403);
 
-        $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->getJson('/api/management/orgs/' . $someOrg->id)
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->getJson('/api/management/orgs/'.$someOrg->id)
             ->assertStatus(403);
     }
-
-
 
     // ──────────────────────────────────────────────
     // N12: StatsController scoped per org_id
@@ -172,7 +172,7 @@ class OrgOrganizationCoreTest extends TestCase
     {
         $ctx = $this->orgAdminContext();
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$ctx['token']])
             ->getJson('/api/management/stats');
 
         $response->assertStatus(200);
@@ -218,7 +218,7 @@ class OrgOrganizationCoreTest extends TestCase
         $user = User::factory()->create(['org_id' => null]);
         $token = auth('api')->login($user);
 
-        $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/org-invites/redeem', [
                 'token' => 'n14-redeem-token',
                 'accept_privacy' => true,

@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\DownloadLog;
 use App\Models\Gallery;
+use App\Models\PayoutPool;
 use App\Models\Photo;
 use App\Models\PhotographerStatement;
-use App\Models\PayoutPool;
 use App\Models\User;
 use App\Services\PayoutCalculationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -21,7 +21,7 @@ class PayoutIdempotencyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new PayoutCalculationService();
+        $this->service = new PayoutCalculationService;
     }
 
     private function logDownload(array $attributes): DownloadLog
@@ -30,8 +30,10 @@ class PayoutIdempotencyTest extends TestCase
         $log = DownloadLog::factory()->create($attributes);
         if ($createdAt !== null) {
             DownloadLog::where('id', $log->id)->update(['created_at' => $createdAt]);
+
             return DownloadLog::find($log->id);
         }
+
         return $log;
     }
 
@@ -57,7 +59,7 @@ class PayoutIdempotencyTest extends TestCase
         $this->service->calculatePoolShares($pool->fresh());
 
         $pool->refresh();
-        $this->assertGreaterThan(0, (float)$pool->total_shares);
+        $this->assertGreaterThan(0, (float) $pool->total_shares);
         $this->assertSame(1, $pool->total_unique_downloads);
 
         $statements = PhotographerStatement::all();

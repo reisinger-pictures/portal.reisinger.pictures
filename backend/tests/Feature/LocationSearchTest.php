@@ -2,15 +2,16 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
 use App\Models\Location;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class LocationSearchTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void {
+    protected function setUp(): void
+    {
         parent::setUp();
         config(['scout.driver' => 'database']);
     }
@@ -32,7 +33,7 @@ class LocationSearchTest extends TestCase
             'postal_code' => '4020',
             'state' => 'Oberösterreich',
             'country' => 'Österreich',
-            'iso_country' => 'AT'
+            'iso_country' => 'AT',
         ]);
 
         $resCity = $this->getJson('/api/search/locations?q=Linz&type=city');
@@ -51,7 +52,7 @@ class LocationSearchTest extends TestCase
 
         $res = $this->getJson('/api/search/locations?q=Wien&type=city');
         $res->assertStatus(200);
-        
+
         // Sollte nur 1 Ergebnis zurückgeben wegen unique('name') im Controller
         $this->assertCount(1, $res->json());
         // Das Ergebnis mit der höchsten Population (1010) muss das verbleibende sein

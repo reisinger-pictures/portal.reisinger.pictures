@@ -1,6 +1,8 @@
 <?php
+
 namespace App\Models;
 
+use App\Casts\AsBrand;
 use App\Enums\Brand;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,7 +23,7 @@ class VolumePreset extends Model
 
     protected $casts = [
         'is_default' => 'boolean',
-        'brand' => \App\Casts\AsBrand::class,
+        'brand' => AsBrand::class,
     ];
 
     public function tiers(): HasMany
@@ -31,7 +33,7 @@ class VolumePreset extends Model
 
     public function scopeForCurrentBrand(Builder $query): Builder
     {
-        return $query->where($query->getQuery()->from . '.brand', BrandRegistry::currentId());
+        return $query->where($query->getQuery()->from.'.brand', BrandRegistry::currentId());
     }
 
     public function scopeDefault(Builder $query): Builder

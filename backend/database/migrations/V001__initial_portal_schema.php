@@ -2,12 +2,14 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
-return new class extends Migration {
-    public function up(): void {
+return new class extends Migration
+{
+    public function up(): void
+    {
         // --- Cache Tables ---
         Schema::create('cache', function (Blueprint $table) {
             $table->string('key')->primary();
@@ -76,7 +78,7 @@ return new class extends Migration {
         });
 
         DB::table('roles')->insert([
-            ['id' => Str::uuid()->toString(), 'name' => 'admin'], ['id' => Str::uuid()->toString(), 'name' => 'photographer'], ['id' => Str::uuid()->toString(), 'name' => 'client']
+            ['id' => Str::uuid()->toString(), 'name' => 'admin'], ['id' => Str::uuid()->toString(), 'name' => 'photographer'], ['id' => Str::uuid()->toString(), 'name' => 'client'],
         ]);
 
         Schema::create('user_roles', function (Blueprint $table) {
@@ -112,7 +114,7 @@ return new class extends Migration {
             $table->boolean('is_live')->default(false);
             $table->boolean('is_public')->default(false);
             $table->string('password_hash')->nullable();
-            
+
             // Metadaten-Berechtigungen & Defaults
             $table->boolean('allow_client_metadata_edit')->default(false);
             $table->boolean('apply_metadata_to_photos')->default(false);
@@ -140,7 +142,7 @@ return new class extends Migration {
             $table->string('lr_uuid', 64);
             $table->integer('width')->default(0);
             $table->integer('height')->default(0);
-            
+
             // IPTC Metadaten
             $table->string('title')->nullable();
             $table->text('description')->nullable();
@@ -151,7 +153,7 @@ return new class extends Migration {
             $table->string('state')->nullable();
             $table->string('country')->nullable();
             $table->string('iso_country', 2)->nullable();
-            
+
             $table->timestamp('created_at')->useCurrent();
             $table->unique(['gallery_id', 'lr_uuid']);
         });
@@ -221,19 +223,16 @@ return new class extends Migration {
             $table->text('value')->nullable();
         });
 
-        
-
-        
     }
 
-    public function down(): void {
+    public function down(): void
+    {
         Schema::dropIfExists('jobs');
         Schema::dropIfExists('job_batches');
         Schema::dropIfExists('failed_jobs');
         Schema::dropIfExists('cache');
         Schema::dropIfExists('cache_locks');
 
-        
         Schema::dropIfExists('settings');
         Schema::dropIfExists('gallery_invites');
         Schema::dropIfExists('download_logs');
@@ -242,7 +241,9 @@ return new class extends Migration {
         Schema::dropIfExists('ratings');
         Schema::dropIfExists('photo_metadata_versions');
         Schema::dropIfExists('photos');
-        Schema::table('users', function (Blueprint $table) { $table->dropForeign(['current_ftp_gallery_id']); });
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropForeign(['current_ftp_gallery_id']);
+        });
         Schema::dropIfExists('galleries');
         Schema::dropIfExists('domain_mappings');
         Schema::dropIfExists('gallery_groups');

@@ -1,10 +1,13 @@
 <?php
+
 namespace Tests\Feature\Pricing;
 
 use App\Enums\Brand;
+use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\VolumePreset;
+use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -16,7 +19,8 @@ class VolumePresetControllerTest extends TestCase
     private function superAdminToken(): string
     {
         $superAdmin = User::factory()->create();
-        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value]));
+        $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+
         return auth('api')->login($superAdmin);
     }
 
@@ -204,7 +208,7 @@ class VolumePresetControllerTest extends TestCase
     public function test_normal_admin_cannot_manage_presets(): void
     {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
         $token = auth('api')->login($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -215,7 +219,7 @@ class VolumePresetControllerTest extends TestCase
     public function test_admin_can_read_presets_but_not_write(): void
     {
         $admin = User::factory()->create();
-        $admin->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value]));
+        $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
         $token = auth('api')->login($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -236,7 +240,7 @@ class VolumePresetControllerTest extends TestCase
     public function test_default_preset_cannot_be_deleted(): void
     {
         BrandRegistry::set(Brand::B2B);
-        $default = app(\App\Services\VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B);
+        $default = app(VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B);
 
         $token = $this->superAdminToken();
         $this->withHeaders(['Authorization' => "Bearer $token"])

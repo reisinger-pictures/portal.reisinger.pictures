@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\GalleryGroup;
 use App\Models\Gallery;
+use App\Models\GalleryGroup;
 use App\Models\Photo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class HierarchicalGovernanceTest extends TestCase
 {
@@ -16,20 +16,20 @@ class HierarchicalGovernanceTest extends TestCase
     {
         // Top-Level Group (Force True)
         $parentGroup = GalleryGroup::factory()->create(['is_editorial_only' => true]);
-        
+
         // Child Group (Inherit / default false)
         $childGroup = GalleryGroup::factory()->create([
-            'parent_id' => $parentGroup->id
+            'parent_id' => $parentGroup->id,
         ]);
 
         // Gallery (Inherit / default false)
         $gallery = Gallery::factory()->create([
-            'gallery_group_id' => $childGroup->id
+            'gallery_group_id' => $childGroup->id,
         ]);
 
         // Photo (Inherit / default false)
         $photo = Photo::factory()->create([
-            'gallery_id' => $gallery->id
+            'gallery_id' => $gallery->id,
         ]);
 
         // Assert Inheritance

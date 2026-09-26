@@ -10,11 +10,11 @@ use App\Models\InvoiceSnapshot;
 use App\Models\LicenseModifier;
 use App\Models\LicenseUseCase;
 use App\Models\Order;
+use App\Models\Org;
 use App\Models\PayoutPool;
 use App\Models\PhotographerStatement;
 use App\Models\Product;
 use App\Models\Setting;
-use App\Models\Org;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -44,19 +44,19 @@ class FactoryIntegrationTest extends TestCase
     public static function factoryProvider(): array
     {
         return [
-            'Product'               => [Product::class, 'id'],
-            'Setting'               => [Setting::class, 'key'],
-            'LicenseUseCase'        => [LicenseUseCase::class, 'id'],
-            'LicenseModifier'       => [LicenseModifier::class, 'id'],
-            'Org'                   => [Org::class, 'id'],
-            'Order'                 => [Order::class, 'id'],
-            'InvoiceSnapshot'       => [InvoiceSnapshot::class, 'invoice_number'],
-            'DownloadLog'           => [DownloadLog::class, 'id'],
-            'PayoutPool'            => [PayoutPool::class, 'id'],
+            'Product' => [Product::class, 'id'],
+            'Setting' => [Setting::class, 'key'],
+            'LicenseUseCase' => [LicenseUseCase::class, 'id'],
+            'LicenseModifier' => [LicenseModifier::class, 'id'],
+            'Org' => [Org::class, 'id'],
+            'Order' => [Order::class, 'id'],
+            'InvoiceSnapshot' => [InvoiceSnapshot::class, 'invoice_number'],
+            'DownloadLog' => [DownloadLog::class, 'id'],
+            'PayoutPool' => [PayoutPool::class, 'id'],
             'PhotographerStatement' => [PhotographerStatement::class, 'id'],
-            'Contract'              => [Contract::class, 'id'],
-            'ContractSigner'        => [ContractSigner::class, 'id'],
-            'ContractAuditLog'      => [ContractAuditLog::class, 'id'],
+            'Contract' => [Contract::class, 'id'],
+            'ContractSigner' => [ContractSigner::class, 'id'],
+            'ContractAuditLog' => [ContractAuditLog::class, 'id'],
         ];
     }
 }

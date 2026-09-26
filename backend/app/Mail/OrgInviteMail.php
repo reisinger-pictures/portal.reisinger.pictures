@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 class OrgInviteMail extends AbstractBrandAwareMailable
 {
     public $orgName;
+
     public $inviteLink;
 
     public function __construct($orgName, $inviteLink)
@@ -21,11 +22,11 @@ class OrgInviteMail extends AbstractBrandAwareMailable
         $this->applyBrandFrom();
 
         return $this->subject("Einladung zur Organisation: {$this->orgName}")
-                    ->view('emails.org_invite')
-                    ->with([
-                        'logoUrl' => $this->brandLogoUrl(),
-                        'orgName' => $this->orgName,
-                    ]);
+            ->view('emails.org_invite')
+            ->with([
+                'logoUrl' => $this->brandLogoUrl(),
+                'orgName' => $this->orgName,
+            ]);
     }
 
     public function failed(\Throwable $exception): void

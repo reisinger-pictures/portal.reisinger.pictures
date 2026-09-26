@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Product;
 use App\Http\Resources\ProductResource;
+use App\Models\Product;
 use App\Support\BrandRegistry;
+use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
@@ -19,13 +19,15 @@ class ProductController extends Controller
 
         $q = $request->query('q');
         if ($q && strlen($q) >= 2) {
-            $query->where('name', 'like', '%' . $q . '%');
+            $query->where('name', 'like', '%'.$q.'%');
             $products = $query->take(20)->get();
-            return response()->json($products->map(fn($p) => new ProductResource($p))->values());
+
+            return response()->json($products->map(fn ($p) => new ProductResource($p))->values());
         }
 
         $products = $query->orderBy('name', 'asc')->get();
-        return response()->json($products->map(fn($p) => new ProductResource($p))->values());
+
+        return response()->json($products->map(fn ($p) => new ProductResource($p))->values());
     }
 
     public function store(Request $request)
@@ -39,6 +41,7 @@ class ProductController extends Controller
 
         $validated['brand'] = BrandRegistry::currentOrDefault()->value;
         $product = Product::create($validated);
+
         return response()->json(['success' => true, 'product' => new ProductResource($product)]);
     }
 
@@ -54,12 +57,14 @@ class ProductController extends Controller
         ]);
 
         $product->update($validated);
+
         return response()->json(['success' => true, 'product' => new ProductResource($product)]);
     }
 
     public function destroy($id)
     {
         Product::forCurrentBrand()->findOrFail($id)->delete();
+
         return response()->json(['success' => true]);
     }
 }

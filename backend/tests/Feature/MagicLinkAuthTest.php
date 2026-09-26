@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 use PHPOpenSourceSaver\JWTAuth\Factory;
+use PHPOpenSourceSaver\JWTAuth\JWT;
 use Tests\TestCase;
 
 class MagicLinkAuthTest extends TestCase
@@ -121,7 +122,7 @@ class MagicLinkAuthTest extends TestCase
             ->assertJsonPath('full_path', $gallery->full_path);
 
         $accessToken = (string) $registered->getCookie('rp_jwt', false)->getValue();
-        $payload = app(\PHPOpenSourceSaver\JWTAuth\JWT::class)
+        $payload = app(JWT::class)
             ->setToken($accessToken)
             ->getPayload();
         $this->assertSame((string) $user->id, (string) $payload->get('sub'));

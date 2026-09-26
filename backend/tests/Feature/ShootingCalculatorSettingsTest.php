@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
@@ -20,8 +21,9 @@ class ShootingCalculatorSettingsTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(
-            Role::firstOrCreate(['name' => \App\Enums\UserRole::ADMIN->value])
+            Role::firstOrCreate(['name' => UserRole::ADMIN->value])
         );
+
         return auth('api')->login($admin);
     }
 
@@ -33,8 +35,9 @@ class ShootingCalculatorSettingsTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(
-            Role::firstOrCreate(['name' => \App\Enums\UserRole::SUPER_ADMIN->value])
+            Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value])
         );
+
         return auth('api')->login($superAdmin);
     }
 

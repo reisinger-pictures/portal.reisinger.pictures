@@ -4,11 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\Brand;
 use App\Models\Gallery;
-use App\Models\Photo;
 use App\Models\Setting;
-use App\Models\User;
-use App\Services\CheckoutService;
-use App\Pricing\ScopeLicensingStrategy;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;

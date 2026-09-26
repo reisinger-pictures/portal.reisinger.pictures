@@ -18,6 +18,7 @@ class ExtractOfferValidationTest extends TestCase
         $role = Role::firstOrCreate(['name' => 'super_admin']);
         $user->roles()->attach($role);
         $token = auth('api')->login($user);
+
         return ['user' => $user, 'token' => $token];
     }
 
@@ -27,7 +28,7 @@ class ExtractOfferValidationTest extends TestCase
 
         $fakePdf = UploadedFile::fake()->create('document.pdf', 100, 'text/plain');
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$ctx['token']])
             ->postJson('/api/management/invoices/extract-offer', [
                 'pdf' => $fakePdf,
             ]);
@@ -42,7 +43,7 @@ class ExtractOfferValidationTest extends TestCase
 
         $pdf = UploadedFile::fake()->create('offer.pdf', 500, 'application/pdf');
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$ctx['token']])
             ->postJson('/api/management/invoices/extract-offer', [
                 'pdf' => $pdf,
             ]);
@@ -57,7 +58,7 @@ class ExtractOfferValidationTest extends TestCase
         $user = User::factory()->create();
         $token = auth('api')->login($user);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/management/invoices/extract-offer', [
                 'pdf' => UploadedFile::fake()->create('offer.pdf', 100, 'application/pdf'),
             ]);
@@ -71,7 +72,7 @@ class ExtractOfferValidationTest extends TestCase
 
         $largeFile = UploadedFile::fake()->create('large.pdf', 15000, 'application/pdf');
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$ctx['token']])
             ->postJson('/api/management/invoices/extract-offer', [
                 'pdf' => $largeFile,
             ]);
@@ -84,7 +85,7 @@ class ExtractOfferValidationTest extends TestCase
     {
         $ctx = $this->superAdminContext();
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $ctx['token']])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$ctx['token']])
             ->postJson('/api/management/invoices/extract-offer', []);
 
         $response->assertStatus(422);
