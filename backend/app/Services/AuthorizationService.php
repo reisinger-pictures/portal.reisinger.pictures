@@ -172,6 +172,13 @@ class AuthorizationService
      * this map makes each grant independently revocable.
      *
      * @param  array<string, mixed>  $claims
+     * @param  bool  $preserveHostScopedGrants  FINAL-6: when the sanitized
+     *                                          claims are about to be written into a re-issued token, a grant that is
+     *                                          merely invisible from the current host must be carried through instead
+     *                                          of dropped, otherwise redeeming from the wrong host would destroy the
+     *                                          grant for the whole token lineage. It is still excluded from the
+     *                                          effective gallery lists, so it grants nothing in this context. Leave
+     *                                          this at its default for authorization-time filtering.
      * @return array{
      *     transient_galleries: array<int, string>,
      *     transient_meta_galleries: array<int, string>,
@@ -179,7 +186,7 @@ class AuthorizationService
      *     transient_invite_ids: array<int, string>
      * }
      */
-    public function sanitizeTransientClaims(array $claims): array
+    public function sanitizeTransientClaims(array $claims, bool $preserveHostScopedGrants = false): array
     {
         $galleries = $this->normalizeGalleryIds($claims['transient_galleries'] ?? []);
         $metaGalleries = $this->normalizeGalleryIds($claims['transient_meta_galleries'] ?? []);
@@ -203,6 +210,8 @@ class AuthorizationService
         $activeGalleries = [];
         $activeMetaGalleries = [];
         $activeInvites = [];
+        $keptRecords = [];
+        $keptInvites = [];
 
         foreach ($records as $inviteId => $record) {
             $inviteKey = (string) $inviteId;
@@ -214,8 +223,25 @@ class AuthorizationService
             // every claimed gallery to the invite's real gallery, so a foreign
             // id in a server-signed (or replayed) token can never become a
             // grant.
+            //
+            // FINAL-6: a revocation and a host mismatch must not be treated
+            // alike. A revoked invite is a real loss of access and is dropped
+            // permanently. A host mismatch is only a *viewing-context* problem:
+            // persisting the stripped claim would burn the grant for the whole
+            // token lineage, so a user who merely redeems from the wrong host
+            // would lose it for good. In that case the record is kept as issued
+            // and stays filtered at authorization time instead.
+            if (! $this->isInviteActive($inviteKey)) {
+                continue;
+            }
+
             $invite = $this->activeCurrentHostInvite($inviteKey);
             if (! $invite instanceof GalleryInvite) {
+                if ($preserveHostScopedGrants) {
+                    $keptRecords[$inviteKey] = $record;
+                    $keptInvites[] = $inviteKey;
+                }
+
                 continue;
             }
 
@@ -253,11 +279,30 @@ class AuthorizationService
             $activeMetaGalleries,
         )));
 
+        // FINAL-6: a host-scoped grant is carried through untouched so that
+        // re-issuing the token on another host does not destroy it. It is
+        // deliberately NOT added to the effective gallery lists above, so it
+        // still grants nothing in the current viewing context.
+        foreach ($keptRecords as $inviteKey => $record) {
+            $keptGalleries = $this->normalizeGalleryIds($record['gallery_ids'] ?? []);
+            if ($keptGalleries === []) {
+                continue;
+            }
+
+            $activeInvites[$inviteKey] = [
+                'gallery_ids' => $keptGalleries,
+                'meta_gallery_ids' => [],
+            ];
+        }
+
         return [
             'transient_galleries' => $galleries,
             'transient_meta_galleries' => $metaGalleries,
             'transient_invites' => $activeInvites,
-            'transient_invite_ids' => array_keys($activeInvites),
+            'transient_invite_ids' => array_values(array_unique(array_merge(
+                array_keys($activeInvites),
+                $keptInvites,
+            ))),
         ];
     }
 

@@ -96,7 +96,19 @@ return new class extends Migration
                     continue;
                 }
 
-                $actorIdentities[$rating->photo_id."\0".$actorKey][] = (string) $rating->id;
+                // Keep a running count plus a bounded sample of ids instead of
+                // every id. Retaining all of them made memory grow with the
+                // whole ratings table during `migrate`, even when the table
+                // held no duplicate at all — the sample is only ever used to
+                // make the abort report actionable.
+                $identity = $rating->photo_id."\0".$actorKey;
+                if (! isset($actorIdentities[$identity])) {
+                    $actorIdentities[$identity] = ['count' => 0, 'ids' => []];
+                }
+                $actorIdentities[$identity]['count']++;
+                if (count($actorIdentities[$identity]['ids']) < self::MAX_REPORT_IDS) {
+                    $actorIdentities[$identity]['ids'][] = (string) $rating->id;
+                }
 
                 if ($rating->actor_key !== $actorKey) {
                     $actorKeyUpdates[$rating->id] = $actorKey;
@@ -106,7 +118,7 @@ return new class extends Migration
 
         $duplicateGroups = array_filter(
             $actorIdentities,
-            static fn (array $ids): bool => count($ids) > 1,
+            static fn (array $group): bool => $group['count'] > 1,
         );
 
         if ($duplicateGroups !== []) {
@@ -155,23 +167,36 @@ return new class extends Migration
 
         $totalGroups = count($groups);
         $totalRows = array_sum(array_map(
-            static fn (array $ids): int => count($ids),
+            static fn (array $group): int => $group['count'],
             $groups,
         ));
         $lines[] = sprintf('ratings duplicate_groups=%d duplicate_rows=%d', $totalGroups, $totalRows);
+        if ($totalGroups > self::MAX_REPORT_GROUPS) {
+            $lines[] = sprintf(
+                'NOTE: only the first %d duplicate groups are listed; reconcile the remainder by '
+                .'the same (photo_id, actor) rule before retrying.',
+                self::MAX_REPORT_GROUPS,
+            );
+        }
+        if ($totalRows > $totalGroups * self::MAX_REPORT_IDS) {
+            $lines[] = sprintf(
+                'NOTE: at most %d ids per group are listed; use count= to size the remaining work.',
+                self::MAX_REPORT_IDS,
+            );
+        }
 
         $groupIndex = 0;
-        foreach ($groups as $identity => $ids) {
+        foreach ($groups as $identity => $group) {
             if ($groupIndex >= self::MAX_REPORT_GROUPS) {
                 break;
             }
 
-            $ids = array_values(array_unique(array_map('strval', $ids)));
+            $ids = array_values(array_unique(array_map('strval', $group['ids'])));
             sort($ids, SORT_STRING);
             $lines[] = sprintf(
                 'ratings identity=%s count=%d ids=%s',
                 str_replace("\0", ' actor=', $identity),
-                count($ids),
+                $group['count'],
                 implode(',', array_slice($ids, 0, self::MAX_REPORT_IDS)),
             );
             $groupIndex++;

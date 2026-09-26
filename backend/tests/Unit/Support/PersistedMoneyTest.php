@@ -6,6 +6,8 @@ use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Support\PersistedMoney;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Tests\TestCase;
 
@@ -54,13 +56,34 @@ class PersistedMoneyTest extends TestCase
                     'status' => 'pending',
                     'total_amount' => $value,
                 ]);
-                $this->fail('Expected the non-negative order total guard to reject the write.');
+                $this->fail('Expected the non-negative order total guard to reject the insert.');
             } catch (InvalidArgumentException) {
                 // expected
             }
         }
 
         $this->assertDatabaseCount('orders', 0);
+    }
+
+    /**
+     * FINAL-7 was investigated and does not apply: orders.total_amount is
+     * declared NOT NULL with default 0 (V004), so a persisted order can never
+     * carry NULL and the saving guard has no legacy shape to tolerate. This
+     * test pins that schema contract so a future "make it nullable" change
+     * cannot silently weaken the money guard without noticing.
+     */
+    public function test_order_total_is_not_nullable_in_the_schema(): void
+    {
+        $this->assertTrue(Schema::hasColumn('orders', 'total_amount'));
+
+        $column = collect(DB::getSchemaBuilder()->getColumns('orders'))
+            ->firstWhere('name', 'total_amount');
+
+        $this->assertNotNull($column, 'orders.total_amount column metadata is missing.');
+        $this->assertFalse(
+            (bool) $column['nullable'],
+            'orders.total_amount must stay NOT NULL; the Order::saving guard relies on it.',
+        );
     }
 
     public function test_negative_coupon_discount_and_negative_stripe_fee_are_rejected_before_insert(): void

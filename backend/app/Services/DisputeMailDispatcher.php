@@ -7,6 +7,7 @@ use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Support\BrandRegistry;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
 
@@ -31,15 +32,24 @@ class DisputeMailDispatcher
      */
     public function queueOnce(Order $order): bool
     {
+        $this->assertTransactionalQueueIsUsable();
+
         $snapshot = InvoiceSnapshot::query()
             ->where('order_id', $order->getKey())
             ->first();
 
         if (! $snapshot instanceof InvoiceSnapshot) {
-            // Legacy/quote orders may not have an invoice snapshot. There is no
-            // durable claim surface, but the alert is time-critical, so it is
-            // sent directly. The webhook event claim still deduplicates an
+            // Legacy/quote orders may not have an invoice snapshot, so there is
+            // no durable claim surface for the marker below. The alert is
+            // time-critical, so it is sent directly rather than dropped, and
+            // the missing durability is recorded explicitly instead of being
+            // invisible. The webhook event claim still deduplicates an
             // identical replay at the ingress layer.
+            Log::warning('dispute_mail.snapshot_missing_dispatch_not_durable', [
+                'order_id' => $order->getKey(),
+                'stripe_payment_intent_id' => $order->stripe_payment_intent_id,
+            ]);
+
             Mail::to($this->recipient())->queue($this->mailable($order));
 
             return true;
@@ -65,6 +75,43 @@ class DisputeMailDispatcher
 
             return true;
         });
+    }
+
+    /**
+     * The claim marker and the jobs INSERT only share a commit boundary when
+     * the queue writes to the application database inside the same
+     * transaction. An inline `sync` driver or a separate queue connection would
+     * let a rolled-back attempt still deliver the mail and a retry deliver a
+     * second one. This mirrors InvoiceMailDispatcher: enforced in every
+     * non-local environment, not only in production. Local/test keep the
+     * inline driver for developer ergonomics.
+     */
+    private function assertTransactionalQueueIsUsable(): void
+    {
+        if (app()->environment(['local', 'testing'])) {
+            return;
+        }
+
+        $queueConnection = config('queue.connections.database.connection');
+        $databaseConnection = config('database.default');
+
+        $usable = config('queue.default') === 'database'
+            && config('queue.connections.database.driver') === 'database'
+            && is_string($queueConnection)
+            && $queueConnection !== ''
+            && $queueConnection === $databaseConnection
+            // The dispatcher relies on transaction membership, which
+            // after_commit would move the INSERT out of the transaction and
+            // leave a committed claim with no job.
+            && ! config('queue.connections.database.after_commit');
+
+        if (! $usable) {
+            throw new RuntimeException(
+                app()->environment('production')
+                    ? 'Dispute mail requires the transactional database queue in production.'
+                    : 'Dispute mail requires the transactional database queue outside local test environments.',
+            );
+        }
     }
 
     /**
