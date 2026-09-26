@@ -104,5 +104,12 @@ return [
         // reports an unset mode instead of claiming one; the compose default of
         // 1 applies to the binding itself, and .env.production sets it.
         'ftps_tls_mode' => env('SFTPGO_FTPD_TLS_MODE'),
+        // The subfolder the camera is told to upload into, relative to the
+        // account root. '/' means the account root itself, which is correct as
+        // long as one target gallery takes everything that arrives. A
+        // subfolder is what makes Canon's 'Ordner wählen' usable, and it needs
+        // no schema change: the path is deployment configuration, not a
+        // property of the photographer.
+        'upload_path' => env('FTP_UPLOAD_PATH'),
     ],
 ];
