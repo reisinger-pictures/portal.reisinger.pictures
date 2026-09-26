@@ -1,8 +1,82 @@
 # Task Board — Portal Reisinger Pictures
 
-> Stand: 2026-09-26. **Nur offene TODOs + erledigte Referenz-Blöcke.** Architekturentscheidungen in `features/`.
+> Stand: 2026-09-26. Architekturentscheidungen in `features/`.
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
+>
+> **Struktur-Hinweis (2026-09-26):** Dieses Board ist historisch gewachsen und
+> enthält 322 Positionen über 1.725 Zeilen, davon 247 erledigt. Die offenen
+> Positionen liegen in **elf verstreuten Clustern** (siehe unten), vermischt mit
+> abgeschlossenen Audit- und Session-Blöcken. Wer hier eine Position sucht, muss
+> springen. Die drei häufigsten Irrtümer: (1) eine Position abhaken, die längst
+> erledigt ist, (2) eine Audit-Feststellung als offene Arbeit lesen, (3) eine
+> Position aus einem alten Abschnitt als aktuell behandeln. **Nutze die
+> Übersicht unten als Einstieg, nicht die Reihenfolge im Dokument.**
+
+---
+
+## 📌 OFFENE ARBEIT — Einstieg (Stand 2026-09-26)
+
+75 offene Positionen, sortiert nach dem, was sie **für den Start** brauchen.
+Nicht nach Schwere oder Familie — nach Abhängigkeit.
+
+### A. Jetzt umsetzbar (keine Entscheidung, kein Dienst nötig)
+
+| Position | Was | Quelle |
+|---|---|---|
+| FE-8 | 13 Modals ohne Focus-Trap/ARIA/Escape → `ModalShell` | unten, „Offene Code-Arbeit" |
+| FE-2 (halb) | i18n-Wächter braucht AST-Regel für ungewrapte Strings | unten |
+| P1-M21 | `ftp_slug`-Formatregel `^[a-z0-9][a-z0-9_-]{2,31}$` + Validierung | FTP-Block |
+| P1-M23 | Passwort erzeugen, einmal anzeigen, verwerfen | FTP-Block |
+| P1-M22 | `SftpGoClient` (HTTP gegen Admin-API, gemockt testbar) | FTP-Block |
+| P1-M25 | Test, der festschreibt, dass `ftp_inbox` lokal bleibt | FTP-Block |
+| P1-M28 | Concurrency-Guard für `FtpController::process()` | FTP-Block |
+| P1-M30 | Migration `ftp_account_status` (V041+) | FTP-Block |
+| P1-M33 | `resetPassword()` mit Rate-Limit und Audit-Trail | FTP-Block |
+| TST-* (4) | Testqualitäts-Lücken, siehe Test-Audit | Test-Audit |
+
+### B. Braucht eine Entscheidung oder Betriebs-Evidenz
+
+| Position | Blockiert durch | Wer entscheidet |
+|---|---|---|
+| P1-M27 / M35 | Kamera-Protokoll ungeklärt; Messung steht aus | Fotograf + laufende Instanz |
+| P1-M31 | `ftp_slug` vs. SFTPGo-Store: wer führt? | Owner |
+| P1-M29 | Brand-Scope des Folder-Namespaces (bewusst YAGNI) | Owner, bei 2. Brand |
+| P1-M36 | Cutover gegen **laufenden** `pure-ftpd` | Owner + Runbook 7.12 |
+| P1-I9 | `portal_backend` läuft als root, Repo fordert `1000:1000` | Owner, vor Cutover |
+| Auth-* (5) | Auth-Befunde, Verifikation ausstehend | Owner |
+| P1-M24 | Ordner-Anlage und UID-Modell auf dem Host | Owner, Host-Zugriff |
+
+### C. Ungeprüft — nicht als offen oder erledigt lesen
+
+Diese Familien sind **weder** verifiziert **noch** abgehakt. Sie stehen in
+alten Abschnitten und sehen je nach Abschnitt erledigt oder offen aus. Erst
+prüfen, dann anfassen:
+
+| Familie | Anzahl | Wo |
+|---|---|---|
+| `AIS-*` | 8 | verstreut, Abschnitt „P1 — AI / Mail / Jobs" |
+| `AUTH-*` | 5 | dito |
+| `TST-*` | 4 | Test-Audit, dort als Lücken geführt |
+| P1-M32 | 1 | Kameraneukonfiguration — operativer Schritt, kein Code |
+
+### Reihenfolge, die sich daraus ergibt
+
+1. **Kamera prüfen** (P1-M32, ~20 Min, nur beim Fotograf). Klärt, ob SFTP oder
+   FTPS überhaupt der Weg ist. Danach ist die Grundsatzentscheidung belegt.
+2. **Harness bauen** (P1-M35) — beantwortet die Cipher-Frage und ist die
+   Grundlage für den Integrationstest (P1-M38).
+3. **A-Gruppe abarbeiten**, beginnend mit FE-8 (größter bekannter Brocken) und
+   den M-Positionen in der Reihenfolge M21 → M22 → M23 → M30.
+4. **Cutover** (P1-M36) erst, wenn 1–3 stehen und M27 beantwortet ist.
+
+> **Bekannte Störung:** fünf `P1-M`-IDs (`M9`, `M11`, `M14`, `M15`, `M16`), fünf
+> `DOC`-IDs (`3`, `4`, `6`, `7`, `8`) und **zwei `FE`-IDs (`FE-2`, `FE-8`)** sind
+> doppelt vergeben — Position **DOC-13**. Bei `FE-2` und `FE-8` ist die Folge
+> unmittelbar sichtbar: es gibt je eine offene und eine erledigte Definition,
+> und nur die **obere** zählt als offen. Ein Verweis auf „P1-M15" ist dagegen
+> nicht auflösbar, weil dort zwei verschiedene Befunde stehen. Nicht stumm
+> umnummeriert, das ist eine eigene Entscheidung.
 
 ---
 
@@ -33,14 +107,18 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [ ] **FE-8 — 13 Modals ohne Focus-Trap/ARIA/Escape.** Das Board nannte 6, es
-  sind **13** (12 vollständig + `LicenseSelectorModal` halb). Das Board
-  unterschätzt den Umfang. Betroffen: `PhotoHistoryModal`, `AIBatchEditModal`,
+- [ ] **FE-8 — 12 von 13 Modals abgeschlossen; `InviteModal` ist der Rest.**
+  Verifiziert 2026-09-26 gegen den Code: `PhotoHistoryModal`, `AIBatchEditModal`,
   `AIGalleryDefaultsModal`, `EmailComposerModal`, `GalleryAccessModal`,
   `GalleryMetadataDefaultsModal`, `InviteModal`, `ModelDetailModal`,
   `PhotographerTeamModal`, `RatingStatusModal`, `ShootingCalculatorModal`,
-  `PhotoJobModal`, `LicenseSelectorModal`. Muster: `ModalDialogShell` oder
-  `useFocusTrap(isOpen, { onEscape })` + `role="dialog"` + `aria-modal="true"`.
+  `PhotoJobModal` und `LicenseSelectorModal` nutzen bereits `ModalShell` inklusive
+  Fokus-Trap, `aria-modal` und Escape. `InviteModal` ist die **einzige Ausnahme**:
+  es baut die Dialog-Struktur aus rohen daisyUI-Klassen selbst
+  (`modal modal-open`, `modal-box`, `modal-backdrop`), ohne `role="dialog"`,
+  ohne Fokus-Trap, ohne Escape-Handling. Es hat ein Formular (Radio-Buttons,
+  Inputs, Checkbox, Tabelle) → `ModalDialogShell`. **Bereich:**
+  `frontend/src/ui/management/components/InviteModal.tsx:65-201`.
 - [ ] **FE-2 (halb) — i18n-Wächter fehlt.** Die drei zitierten Strings sind
   gefixt, aber `check-i18n.mjs` erkennt einen **ungewrappten** String nicht: er
   wird nie extrahiert, also nie gesehen. Es braucht eine AST-Regel für
@@ -189,37 +267,95 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   Fehlermeldungstext darf **keinen** Doppelpunkt enthalten.
   **Offen:** die Bindings auf die Container-Ports 2222/989/8080 und der passive
   Bereich `50000-50100` müssen in der Instanz gesetzt werden — hängt an M35.
-  Doku: `19-ftp-upload-pipeline.md` 7.13 (Port-Erreichbarkeit) und 7.14.
-  **Stand der Verifikation (2026-09-26):** Die Cipher-Messung ist **nicht**
-  durchgeführt — **nicht** weil sie unmöglich ist, sondern weil die Sonde
-  dreimal an der Konfiguration scheiterte. Belegte Zwischenbefunde:
-  SFTPGo 2.7.6-62ae9ba3; `--config-dir` defaultet auf `.` (= `/var/lib/sftpgo`),
-  das Image meldet aber `config file used: "/etc/sftpgo/sftpgo.json"`. FTPS-Bindings
-  liegen unter `ftpserver.bindings[].port`, nicht `ftpserver.port`. Solange die
-  Bindung nicht steht, liefert `openssl s_client` **0 gelesene Bytes** und ein
-  leeres Ergebnis. **Ein leeres Ergebnis als „Cipher nicht angeboten" zu protokollieren
-  wäre ein Fehlschluss** — genau dieser Fehler ist in drei Sondenversuchen
-  entstanden. Vor der nächsten Messung Config-Weg klären (siehe P1-M35).
-- [ ] **P1-M35 (P0, neu 2026-09-26) — Konfigurationsweg der SFTPGo-Instanz
-  klären, bevor weiter gemessen oder deployed wird.** Ohne funktionierende
-  Konfiguration ist **jede** Aussage über die Ciphers wertlos — das ist in
-  drei Sondenversuchen praktisch bestätigt worden. Zu klären:
-  (a) **Config-Verzeichnis**: das Image meldet `/etc/sftpgo/sftpgo.json`,
-  `--config-dir` defaultet aber auf `.`; was gewinnt in der Portainer-Stack?
-  (b) **Datenprovider**: der Default ist `sqlite` mit `Name:sftpgo.db` **relativ
-  zum Config-Verzeichnis**; ein nicht persistiertes oder falsch gemountetes
-  Verzeichnis ergibt `no such table: schema_version` und **keinen** Admin-User
-  (`CreateDefaultAdmin:false`), damit 401 auf `/api/v2/token` — die
+  Doku: `19-ftp-upload-pipeline.md` 7.13 (Port-Erreichbarkeit) und 7.15
+  (bewusst nicht im Compose-Stack).
+  **Hinweis:** die Cipher-Messergebnisse und die Config-Fehlersymptome stehen
+  unter **P1-M35**, weil sie dieselbe Ursache haben — nicht unter dieser
+  Position, die nur den Image-Pin und die Port-Trennung betrifft.
+- [ ] **P1-M35 (P0, neu 2026-09-26) — Testinfrastruktur für den
+  Datei-Transport aufbauen; Config-Weg und Cipher-Frage fallen dabei ab.**
+  **Neu gefasst 2026-09-26:** Das ist **kein Messskript-Problem**, sondern ein
+  Testinfrastruktur-Problem. Messung und Integrationstest (M38) haben
+  ** dieselbe** Voraussetzung: eine gesund konfigurierte SFTPGo-Instanz. Wer
+  das Harness baut, beantwortet die Cipher-Frage nebenbei — sie zu messen,
+  ohne das Harness zu bauen, war in drei Versuchen gescheitert.
+  **Konfigurationsfragen, die das Harness beantworten muss:**
+  (a) **Config-Verzeichnis**: das Image meldet `config file used:
+  "/etc/sftpgo/sftpgo.json"`, `--config-dir` defaultet aber auf `.`; was gewinnt
+  in der Portainer-Stack-Umgebung?
+  (b) **Datenprovider**: der Default ist `sqlite` mit `Name:sftpgo.db`
+  **relativ zum Config-Verzeichnis**; ein nicht persistiertes oder falsch
+  gemountetes Verzeichnis ergibt `no such table: schema_version` und **keinen**
+  Admin-User (`CreateDefaultAdmin:false`), damit 401 auf `/api/v2/token` — die
   Provisionierung aus M22 kann dann nicht laufen.
   (c) **Admin-Bootstrap**: `SFTPGO_DEFAULT_ADMIN_USERNAME`/`_PASSWORD` müssen
   greifen, sonst gibt es keinen API-Zugang.
   **Konsequenz für M22:** die Client-Implementierung darf **keine** Annahme
   über Erreichbarkeit oder Seed-Zustand treffen; ein nicht erreichbarer Dienst
   muss ein sauberer Fehlerpfad sein, kein 500er (vgl. 7.5 im Feature-Doc).
-  **Tests:** PHPUnit mit gemocktem HTTP deckt den 401-Fall bereits ab; zusätzlich
-  ein Smoke-Test gegen die reale Instanz, der die Cipher-Liste als Fixture
-  festschreibt, damit M27 später nicht erneut von einer defekten Sonde
+  **Tests:** PHPUnit mit gemocktem HTTP deckt den 401-Fall ab; den Rest macht
+  das Harness aus M38.
+  **Messbefunde aus drei gescheiterten Sondenversuchen (2026-09-26)** — die
+  Ursache war jedes Mal die Konfiguration, nie SFTPGo selbst:
+  SFTPGo 2.7.6-62ae9ba3. (1) Der erste Versand brachte das falsche Ergebnis
+  „Cipher nicht angeboten", weil FTPS nie gestartet war: konfiguriert war Port
+  9021, gelauscht wurde auf 2022 (Default), also wurde die Config gar nicht
+  gelesen. (2) Der Mount nach `/var/lib/sftpgo` blieb ebenfalls wirkungslos,
+  weil das Image intern `/etc/sftpgo` meldet. (3) FTPS-Bindings liegen unter
+  `ftpserver.bindings[].port` und **nicht** unter `ftpserver.port`;
+  `ftpserver.port` wird stillschweigend ignoriert, ohne Fehlermeldung.
+  **Die eigentliche Lehre:** Solange die Bindung nicht steht, liefert
+  `openssl s_client` **0 gelesene Bytes** und eine leere Cipher-Liste.
+  **Ein leeres Ergebnis als „Cipher nicht angeboten" zu protokollieren ist ein
+  Fehlschluss** — genau dieser Fehler ist entstanden, und er hätte die
+  Grundsatzentscheidung aus einem falschen Grund gekippt. Jede künftige Messung
+  muss deshalb **vor** dem Auslesen der Cipher-Liste prüfen, dass der
+  TLS-Handshake überhaupt abgeschlossen wurde (gelesene Bytes > 0, Protokoll
+  und Cipher gesetzt), und das Ergebnis als Fixture wegschreiben.
+- [ ] **P1-M38 (P0, neu 2026-09-26) — Integrationstest des Datei-Transports
+  über **beide** Protokolle, mit echtem Client gegen echten Dienst.** Ergänzt
+  M35 und M27: das Harness, auf das sich beide stützen.
+  **Was dieser Test beweist — und was nicht.** Ein Client-Protokolltest prüft
+  die **Server-Seite**: Erreichbarkeit, TLS-Handshake, Login, Upload,
+  Ownership-Kette, Passwort-Durchreichung. Er beweist **nicht**, dass die
+  Kamera es kann — die Kamera ist kein `curl`, sie hat eine eigene
+  TLS-Bibliothek, eine eigene Cipher-Liste und ein Passwortfeld, das
+  ausschließlich alphanumerisch akzeptiert. Diese Grenze ist der Grund, warum
+  P1-M32 (Kamera bestätigt) ein **operativer** Schritt bleibt und durch keinen
+  Test ersetzt wird. Wer diesen Test als Kamera-Nachweis zitiert, hat ihn
+  falsch gelesen.
+  **Abgedeckte Lücken** (das ist der eigentliche Wert, alles andere wäre
+  getestete Fremdsoftware):
+  (a) **Passive Port-Range.** Ein FTPS-Client, der 50000–50100 nicht erreicht,
+  baut den TLS-Handshake erfolgreich auf und bricht erst beim Transfer ab. Ein
+  `curl` gegen Port 989 allein findet diesen Fehler **nicht** — der passive
+  Kanal ist ein zweiter TCP-Verbindungspfad. Das ist der häufigste
+  Stillschweizgrund (7.13).
+  (b) **Ownership-Kette.** Datei hochladen und prüfen, dass sie mit
+  `1002:webgroup` ankommt und der `setgid`-Bit auf `ftp/<slug>` gehalten hat.
+  Sonst scheitert der Import nach dem ersten echten Foto, beim Fotografen.
+  (c) **Show-once-Passwort** (M23): ein alphanumerisches 16–24-Zeichen-Passwort
+  muss ohne Sonderzeichen durch Provisionierung und Login kommen. Bisher ist das
+  eine Behauptung, kein Beleg.
+  (d) **Cipher-Fixture**: `openssl s_client` gegen die laufende Instanz, mit
+  **Handshake-Vollständigkeitsprüfung** vor dem Auslesen (siehe M35). Ergebnis
+  als Fixture wegschreiben, damit M27 nicht erneut von einer defekten Sonde
   ausgeht.
+  **Struktur — drei strikt getrennte Ebenen:**
+  1. *Unit/Feature* (bestehend, `Storage::fake()`): `FtpImportTest` prüft die
+     Pipeline ohne jeden Dienst und bleibt grün. Für `SftpGoClient` (M22) kommt
+     ein gemockter HTTP-Client dazu: jeder Fehlerpfad (Dienst nicht erreichbar,
+     Benutzer existiert, 4xx/5xx) und ein Test, der sicherstellt, dass **kein**
+     Passwort in Log oder Exception landet.
+  2. *Integration*: eigener Job, eigener Compose-Stack mit echtem SFTPGo,
+     provisioniertem Test-User und echtem Client (`curl` für FTPS, `sftp`/`ssh`
+     für SFTP). **Nicht** Teil von `php artisan test` — sonst wird der Test
+     bei der ersten Timing-Abweichung zum Flake und wird abgeschaltet.
+  3. *Manuell*: echte Kamera, echtes Foto. P1-M32, nicht automatisierbar.
+  **Tests:** PHPUnit für `SftpGoClient` (Ebene 1, gemockt). Der Integrationstest
+  ist der Test — er ist **kein** PHPUnit-Fall, sondern ein Skript mit
+  Playwright-Tag `@feature:ftp-transport`, damit er getrennt ausführbar ist und
+  nicht den Smoke-Lauf blockiert.
 - [ ] **P1-M36 (P0, neu 2026-09-26) — Ablösung eines **laufenden** FTP-Servers,
   nicht Parallelbetrieb.** `pure-ftpd` läuft heute und bedient einen Fotografen;
   SFTPGo **ersetzt** ihn. Damit ist der Plan kein Greenfield-Aufbau, sondern ein
@@ -359,10 +495,19 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   Abschlussnotiz. Folge: „DOC-8 ist offen" und „DOC-8 ist erledigt" sind beide
   im Board gleichzeitig belegbar.
 
-  **Gemeinsame Ursache:** zwei unabhängige Erfassungswellen haben beide bei 1
-  begonnen, ohne dass ein ID-Schema vergeben wurde. Deshalb ist die Korrektur
-  eine **sprechende Säule** (Konvention: `DOC-<n>` für offene Positionen,
-  `DOC-<n>#close` für Abschlussnotizen) und nicht bloß ein Umnummerieren.
+  **(c) Zwei FE-IDs, zusätzlich gefunden 2026-09-26:** `FE-2` und `FE-8` sind je
+  zweimal definiert — offen in „Offene Code-Arbeit" (Z. 106/114), erledigt in der
+  Verifikationsliste (Z. 828/834). Anders als bei (b) ist das **nicht** harmlos:
+  bei beiden ist die **obere** Definition die richtige, die untere erledigte
+  beschreibt einen kleineren Umfang („6 Modals" statt der tatsächlichen 13).
+  Wer nach unten scrollt und die untere liest, hält FE-8 für erledigt und
+  übersieht 13 Modals. **Deshalb** steht in der Einstiegs-Übersicht ausdrücklich,
+  dass nur die obere zählt.
+
+  **Gemeinsame Ursache:** mehrere unabhängige Erfassungswellen haben jeweils bei
+  1 begonnen, ohne dass ein ID-Schema vergeben wurde. Deshalb ist die Korrektur
+  eine **sprechende Säule** (Konvention: `FE-<n>`/`P1-<fam>-<n>` für offene
+  Positionen, `<id>#close` für Abschlussnotizen) und nicht bloß ein Umnummerieren.
 
 ### Offene Dokumentations-Wahrheit (kein Code, aber irreführend)
 
