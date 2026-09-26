@@ -162,6 +162,12 @@ Ein dritter Grund kam bei der Prüfung hinzu: `pure-ftpd` kann `AES128-SHA`
 `-C`-Bits sind *Verbote*, `OPENSSL_CONF` wird ignoriert). Kameras, die CBC/SHA1
 brauchen, erreichen den Server damit nicht, und das ist nicht konfigurierbar.
 
+**Der laufende Betrieb ist Teil des Problems.** `pure-ftpd` ist kein Altbestand,
+sondern derzeit der einzige Weg, auf dem die Fotos hereinkommen. SFTPGo ersetzt
+ihn; der Wechsel ist ein Schnitt mit laufendem Betrieb, kein Greenfield-Aufbau.
+Die Reihenfolge in 7.10 und das Runbook in 7.12 sind daraus abgeleitet. Wer die
+Ablösung als Parallelsystem plant, plant den Ausfall für den Fotografen.
+
 ### 7.2 Ein Account pro Fotograf, Username = `ftp_slug`
 
 - Der FTP-/SFTP-Username ist **`users.ftp_slug`** — bereits vorhanden
@@ -291,18 +297,41 @@ Aus dem Vorfall vom 2026-09-26, verbindlich für jeden Prozess, der auf
 
 ### 7.10 Reihenfolge
 
-1. Formatregel für `ftp_slug` (P1-M21) — vor jedem Provisioning.
-2. `ftp_account_status`-Spalten (P1-M30).
-3. `SftpGoClient` + Passwort-Fluss (P1-M22, P1-M23, P1-M31).
-4. Ordner-Anlage auf dem Host (P1-M24).
-5. Host-Umgebung: SFTPGo-Stack, Cipher, Firewall (`strato-vps` 6e).
-6. **Kameraneukonfiguration** (P1-M32) — operativer Schritt, mit Owner.
-7. Erst dann `pure-ftpd` stilllegen.
+Die Reihenfolge ist **verifikationszuerst** und nicht implementierungszuerst.
+Anlass ist P1-M27: die Cipher-Frage ist die einzige Unbekannte, die die
+Grundentscheidung kippen kann. Ein Stapel, der auf einem Protokoll beruht, das
+die Kamera nicht spricht, ist nach dem Umschalten funktional tot — egal wie
+viel Code darauf liegt.
 
-Schritt 6 darf nicht übersprungen werden: Wird SFTPGo eingerichtet und niemand
-stellt die Kamera um, ist nach dem Umschalten alles gleichzeitig still — und
-der Import läuft weiter, weil die Dateien noch auf der Platte liegen. Der
-Ausfall ist damit leicht zu übersehen.
+1. **SFTPGo-Instanz mit gesunder Konfiguration hochfahren** (P1-M35) — Config-
+   Verzeichnis, persistenter Datenprovider, Admin-Bootstrap. Ohne das ist jede
+   Messung wertlos: ein nicht erreichbarer Dienst liefert eine leere
+   Cipher-Liste, die wie ein Befund aussieht.
+2. **Cipher-Liste messen** (P1-M27): `openssl s_client -cipher …` gegen die
+   laufende Instanz. **Ergebnis schriftlich festhalten**, bevor weitergearbeitet
+   wird. Braucht die Kamera einen Cipher, den SFTPGo nicht anbietet, endet der
+   Pfad hier — und zwar vor dem Schreiben von Anwendungscode.
+3. **Kameraneukonfiguration verifizieren** (P1-M32) — mit echter Kamera, nicht
+   mit einem Desktop-Client. Solange die Kamera nicht bestätigt hat, wird
+   `pure-ftpd` **nicht** angefasst.
+4. Formatregel für `ftp_slug` (P1-M21).
+5. `ftp_account_status`-Spalten (P1-M30).
+6. `SftpGoClient` + Passwort-Fluss (P1-M22, P1-M23, P1-M31).
+7. Ordner-Anlage auf dem Host (P1-M24).
+8. Firewall, Berechtigungen, Host-Umgebung (`strato-vps` 6e).
+9. **Cutover** nach §7.12 — inklusive Sicherung und Rollback-Fenster.
+10. Erst dann `pure-ftpd` stilllegen.
+
+Schritt 3 darf nicht übersprungen und nicht nach hinten verschoben werden: Wird
+SFTPGo eingerichtet und niemand stellt die Kamera um, ist nach dem Umschalten
+alles gleichzeitig still — und der Import läuft scheinbar weiter, weil die
+Dateien noch auf der Platte liegen. Der Ausfall ist damit leicht zu übersehen.
+Deshalb ist der Reihenfolgewechsel gegenüber dem Stand vom 2026-09-26 (der
+Kameraschritt stand dort an Position 6 von 7) **eine bewusste Korrektur**, kein
+Versehen.
+
+Schritt 9 ersetzt die frühere Formulierung „Umschalten“ als einzelner Schritt:
+siehe §7.12, denn der Betrieb läuft während des Wechsels weiter.
 
 ### 7.11 Offene Punkte
 
@@ -312,6 +341,21 @@ laufenden SFTPGo mit `openssl s_client -cipher …` prüfen, dann mit echter
 Kamera. Unterstützt die Kamera SFTP, ist SFTP vorzuziehen — moderne Ciphers,
 und SFTPGo bietet FTPS und SFTP auf demselben Port. Der User `florian` unter
 `pure-ftpd` gilt bis dahin als **Betriebs-Workaround, kein Beweis**.
+
+**Stand 2026-09-26: die Messung steht noch aus.** Sie ist nicht gescheitert,
+sondern dreimal an der Konfiguration der Messinstanz (P1-M35). Belegt ist:
+SFTPGo 2.7.6-62ae9ba3; das Image meldet `config file used:
+"/etc/sftpgo/sftpgo.json"`, während `--config-dir` auf `.` defaultet; FTPS
+Bindings liegen unter `ftpserver.bindings[].port`. **Warnung für die
+Messung:** ein nicht erreichbarer Dienst liefert `SSL handshake has read 0
+bytes` und eine leere Cipher-Liste. Das ist **kein** Befund über die
+verfügbaren Ciphers und darf nicht als „Cipher nicht angeboten" protokolliert
+werden. Vor der Messung Config-Weg und Datenprovider-Persistenz klären.
+
+Über die TLS-Seite hinaus ist offen, ob die Kamera überhaupt Authentifizierung
+über die SFTPGo-User-Datenbank akzeptiert — der Benutzer existiert dort erst ab
+Provisionierung (M22), während die Kamera ihn vorher konfigurieren muss. Der
+Cutover (7.12) behandelt das als Reihenfolgeproblem, nicht als Detail.
 
 **Bestehende `ftp_slug`-Werte.** `Str::slug()` lässt Punkte zu, ein Localpart
 wie `j.doe` wird zu `j.doe`; die neue Regel verbietet das. Eine Umbenennung ist
@@ -329,3 +373,38 @@ dokumentiert (P1-M29).
 **Concurrency im Import.** Siehe Abschnitt 6: `process()` hat keinen Lock. Mit
 mehreren Fotografen ist die Annahme "single-user access" eine Fehlerquelle
 (P1-M28).
+
+### 7.12 Cutover-Runbook
+
+`pure-ftpd` läuft heute und bedient einen Fotografen. SFTPGo **ersetzt** diesen
+Server; es gibt keinen Parallelbetrieb als dauerhafte Lösung. Der Datenbestand
+auf `/home/webadmin/websites/ftp` ist dabei der einzige Ort, an dem die
+ungesicherten Originalfotos liegen — ein Fehler im Schnitt ist durch einen
+zweiten Stack **nicht** reversibel, solange die Dateien nur einmal existieren.
+
+**Reihenfolge, bindend:**
+
+1. **Sicherung vor allem anderen.** Kompletter `ftp`-Baum inkl. Eigentümer und
+   Rechten (`1002:webgroup`, `2775`/setgid). Nachweis, dass ein **Restore
+   geprüft** wurde, nicht nur, dass ein Backup existiert.
+2. **Konfiguration verifiziert** (P1-M35), **Cipher-Liste gemessen und
+   schriftlich festgehalten** (P1-M27).
+3. **Kamera bestätigt den neuen Zugang** (P1-M32) — mit der echten Kamera und
+   einem echten Upload. Ein erfolgreicher Desktop-Client beweist nichts.
+4. **Erst jetzt** Konto in SFTPGo provisionieren und den alten Zugang am
+   Fotografen widerrufen. `pure-ftpd` läuft bis hierher **unverändert weiter**.
+5. **Rollback-Fenster:** beide Zugänge bleiben parallel bestehen, bis mit der
+   Kamera **mindestens ein** Import vollständig durchgelaufen ist. Erst danach
+   `pure-ftpd` stilllegen.
+6. **Nach dem ersten echten Import:** prüfen, dass Dateien mit korrekter
+   Ownership und Gruppenrechten ankommen, und dass der `setgid`-Bit auf
+   `ftp/<slug>` gehalten hat (neue Dateien müssen die Gruppe erben, sonst
+   scheitert der Import nach dem ersten Upload).
+
+**Ausdrücklich verboten:**
+
+- `pure-ftpd` vor Schritt 3 oder 4 stillzulegen.
+- Backup und Restore in einem Schritt zu erledigen.
+- Den Cutover mit einem Windows- oder macOS-Client zu testen.
+- Nach dem Schnitt Ownership-Fixes per `chown -R` auf `/home/webadmin/websites`
+  (siehe 7.9).
