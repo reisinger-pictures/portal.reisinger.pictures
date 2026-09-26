@@ -221,11 +221,6 @@ services:
           exit 1;
         fi;
       done;
-      # Rebuild-Pfad: portal-base wird von .github/workflows/base-image.yml
-      # unter OWNER: ${{ github.repository_owner }} publiziert, also in den
-      # Org-Namespace ghcr.io/reisinger-pictures/ (nicht in einen persönlichen
-      # Namespace). Nach dem GHCR-Push den gepinnten Digest weiter unten in
-      # dieser Datei und in ci.yml/Dockerfile.e2e nachziehen.
       if [ ! -x /usr/local/bin/validate-production-env ] || [ ! -x /usr/local/bin/portal-backend-supervisor ]; then
         echo 'FATAL: Production preflight/supervisor is missing. Rebuild portal-base:8.5, push GHCR, update the pinned compose digest, then redeploy. No migration or seed was run.';
         exit 1;
@@ -235,11 +230,6 @@ services:
       php artisan optimize || exit 1;
       php artisan ops:validate-production || exit 1;
       php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1;
-      # P1-M24: die Inbox-Ordner pro Fotograf anlegen. SFTPGo legt sie nicht
-      # selbst an ("you have to create the folder on disk yourself"), ohne sie
-      # kann die Kamera nicht hochladen. Idempotent, also bei jedem Deploy
-      # gefahrlos laufend. --fix-permissions setzt das setgid-Bit, ohne das
-      # ein Upload in der falschen Gruppe landet und der Import ihn nicht liest.
       php artisan ftp:provision-folders --fix-permissions || exit 1;
       php artisan scout:sync-index-settings || exit 1;
       php artisan queue:restart || exit 1;
@@ -285,8 +275,12 @@ services:
       # laeuft dann ins Leere. `SFTPGO_DEFAULT_ADMIN_PERMISSIONS` existiert in
       # 2.7.x nicht mehr und wird stillschweigend ignoriert.
       - SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true
-      - SFTPGO_DEFAULT_ADMIN_USERNAME=${SFTPGO_DEFAULT_ADMIN_USERNAME:?SFTPGO_DEFAULT_ADMIN_USERNAME fehlt}
-      - SFTPGO_DEFAULT_ADMIN_PASSWORD=${SFTPGO_DEFAULT_ADMIN_PASSWORD:?SFTPGO_DEFAULT_ADMIN_PASSWORD fehlt}
+    env_file:
+      # Ausserhalb des Portainer-Volumes, mit 600 und root:root. Portainer
+      # ueberschreibt stack.env bei jedem Stack-Save; eine Datei ausserhalb
+      # seines Volumes kann es nicht. Ohne CREATE_DEFAULT_ADMIN bliebe die
+      # admins-Tabelle leer und /api/v2-token antwortete 401 (P1-M35).
+      - /root/sftpgo-admin.env
     ports:
       # --- Oeffentlich erreichbar: der Kamera-Zugang ---
       # FTPS (explizites TLS) und SFTP (SSH). Beide muessen von aussen
