@@ -251,7 +251,13 @@ class AuthController extends Controller
             ]
         );
 
-        DB::transaction(function () use ($user, $validated) {
+        // Das Rueckgabewert wird absichtlich weitergegeben. `DB::transaction()`
+        // liefert den Wert der Closure zurueck; ohne ihn zu benutzen,
+        // antwortete der Slug-Wechsel mit `{"success": true}` und das soeben
+        // erzeugte Passwort wurde niemandem angezeigt — ein working account,
+        // dessen Passwort niemand kennt, mit dem Reset-Endpunkt (3x/Stunde)
+        // als einzigem Ausweg. Die Nicht-Slug-Aenderungen liefern null.
+        $credentialResponse = DB::transaction(function () use ($user, $validated) {
             // P1-M34: Ein Slug-Wechsel ist ein Reset. Der alte SFTPGo-Account
             // wird gelöscht, der neue Account mit einem neuen Passwort
             // angelegt. Das Passwort wird einmal zurückgegeben, nicht
@@ -289,9 +295,11 @@ class AuthController extends Controller
 
             $user->update($validated);
             $user->photos()->searchable();
+
+            return null;
         });
 
-        return response()->json(['success' => true]);
+        return $credentialResponse ?? response()->json(['success' => true]);
     }
 
     public function me()
