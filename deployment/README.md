@@ -188,25 +188,14 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://api-portal.reisinger.pictures/
 
 ## 5. Kamera testen
 
-Erst **hier** darf `pure-ftpd` abgeschaltet werden. Wer vorher abschaltet,
-schaltet den einzigen funktionierenden Uploadweg ab, bevor jemand geprüft hat,
-dass der neue funktioniert.
+→ **Anleitung: [`kamera-einrichtung.md`](kamera-einrichtung.md)** — Canon EOS R1 /
+R6 Mark II, Menüpfade aus dem Herstellerhandbuch, alle einzutragenden Werte, und die
+drei stillen Fehlerquellen (Dateiname `ROOT.PEM`, `Verzeichnisstruktur: Standard`,
+Konto-Zustand `pending`).
 
-| Protokoll | Einstellungen in der Kamera |
-|---|---|
-| **SFTP** | `ftp_slug`@`reisinger.pictures`, Port 2222, Passwort aus dem Portal |
-| **FTPS** | `ftp_slug`@`reisinger.pictures`, Port 989, **explizites TLS**, TLS 1.2 |
-
-Das Passwort steht **einmal** im Portal, wenn das Konto provisioniert wird. Es
-wird nirgends gespeichert — verloren bedeutet Reset (P1-M33).
-
-**Passwort-Constraint:** nur Kleinbuchstaben und Ziffern, 16–24 Zeichen. Kameras
-nehmen auf dem Konfigurationsbildschirm keine Sonderzeichen an.
-
-Beide Uploads müssen funktionieren. Danach im Portal: Galerie wählen →
-`process()` → Foto prüfen.
-
----
+Kurzfassung: der Test ist der einzige offene Cutover-Schritt (P1-M32). Zuerst SFTP
+probieren — ein Port, kein Zertifikat, keine passive Range. Nur wenn die Kamera SFTP
+nicht spricht, FTPS mit dem importierten Stammzertifikat.
 
 ## 6. `pure-ftpd` abschalten
 
