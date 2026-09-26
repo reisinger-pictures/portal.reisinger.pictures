@@ -115,8 +115,16 @@ assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__PORT=989' \
 # A Canon camera sends AUTH TLS right after connecting and does not reliably
 # support implicit FTPS (cam.start.canon, UG-06_Network_0060), so the binding
 # must be explicit. The cleartext 220 greeting is that mode working, not a fault.
-assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__TLS_MODE=1' \
-    'the FTP binding must use explicit TLS (mode 1); a Canon camera upgrades with AUTH TLS'
+# Mode 1 is the default here, and the value is deliberately not spelled twice:
+# the same variable feeds the sftpgo binding and the management API, so the UI
+# cannot tell the photographer "explicit" while the daemon runs implicit
+# (P1-M44). The default keeps the binding explicit even when the Portainer GUI
+# env omits the variable, and the second assertion is what holds the two
+# consumers together.
+assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__TLS_MODE=${SFTPGO_FTPD_TLS_MODE:-1}' \
+    'the FTP binding must default to explicit TLS (mode 1); a Canon camera upgrades with AUTH TLS'
+assert_contains "$COMPOSE" '      - SFTPGO_FTPD_TLS_MODE=${SFTPGO_FTPD_TLS_MODE}' \
+    'the backend must receive the same TLS mode the binding uses, or the UI can disagree with the daemon'
 assert_contains "$COMPOSE" '      - "${SFTPGO_SFTP_PORT:-2222}:2022"' \
     'the SFTP publish must target the port SFTPGo 2.7 binds (2022), not 2222'
 
