@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useAuth } from '../../../logic/useAuth';
 import { usePermissions } from '../../../logic/usePermissions';
 import { apiMutate } from '../../../api';
@@ -8,6 +8,7 @@ import { useUI } from '../../components/UIContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import ShowOncePassword from './ShowOncePassword';
 
 /**
  * `ftp_slug` becomes the SFTPGo account name, so the persisted value has to match
@@ -35,12 +36,31 @@ const createProfileSchema = () => z.object({
 });
 type ProfileFormValues = z.infer<ReturnType<typeof createProfileSchema>>;
 
+/**
+ * The profile update response (`PUT /api/auth/profile`).
+ *
+ * `ftp_password` is present exactly once, and only when the submitted
+ * `ftp_slug` replaced an existing account: the backend treats that rename as a
+ * password reset (`AuthController::updateProfile`), deletes the old SFTPGo
+ * account, provisions a new one and returns the fresh password a single time.
+ * It is genuinely optional — an unchanged slug, the field left empty, or a
+ * request that never reached SFTPGo (which fails closed) all answer without it,
+ * so the success path must not assume the field exists.
+ */
+interface ProfileUpdateResponse {
+    success: boolean;
+    ftp_password?: string;
+    ftp_password_note?: string;
+}
+
 export default function ProfileSettingsCard() {
     "use no memo";
     const { user, mutate: mutateUser } = useAuth();
     const { isPhotographer } = usePermissions();
     const { showToast } = useUI();
     const profileFormId = useId();
+    const [newPassword, setNewPassword] = useState<string | null>(null);
+    const [passwordNotice, setPasswordNotice] = useState<string | null>(null);
     const nameInputId = `${profileFormId}-name`;
     const ftpSlugInputId = `${profileFormId}-ftp-slug`;
     const copyrightInputId = `${profileFormId}-metadata-copyright`;
@@ -71,9 +91,22 @@ export default function ProfileSettingsCard() {
         try {
             const payload: Record<string, string | undefined> = { name: data.name, metadata_copyright: data.metadata_copyright };
             if (isPhotographer) payload.ftp_slug = data.ftp_slug;
-            
-            await apiMutate('/api/auth/profile', 'PUT', payload);
+
+            const response = await apiMutate<ProfileUpdateResponse>('/api/auth/profile', 'PUT', payload);
             await mutateUser();
+
+            // A slug change is a password reset: the backend hands the new camera
+            // password over exactly once. Dropping it here is the bug this branch
+            // closes — the account would keep working while nobody knows the
+            // password, and the rate-limited reset endpoint would be the only way
+            // back. Both halves are required: a response without the note is not
+            // something this form can render, and a half-shown secret is worse
+            // than none, so the panel only appears for a complete receipt.
+            if (typeof response.ftp_password === 'string' && response.ftp_password !== '') {
+                setNewPassword(response.ftp_password);
+                setPasswordNotice(response.ftp_password_note ?? null);
+            }
+
             showToast('success', t`Profil aktualisiert`);
         } catch {
             showToast('error', t`Fehler beim Speichern`);
@@ -136,6 +169,17 @@ export default function ProfileSettingsCard() {
                         </button>
                     </div>
                 </form>
+
+                {newPassword !== null && passwordNotice !== null && (
+                    <ShowOncePassword
+                        password={newPassword}
+                        notice={passwordNotice}
+                        onDismiss={() => {
+                            setNewPassword(null);
+                            setPasswordNotice(null);
+                        }}
+                    />
+                )}
             </div>
         </div>
     );

@@ -128,6 +128,53 @@ describe('ProfileSettingsCard', () => {
         expect(screen.queryByText(FORMAT_HINT)).not.toBeInTheDocument();
     });
 
+    it('shows the one-time camera password when a slug change resets it', async () => {
+        const password = 'abc123def456ghi7';
+        const notice = 'Dieses Passwort wird nur einmal angezeigt. Speichere es sofort.';
+        vi.mocked(apiMutate).mockResolvedValue({
+            success: true,
+            ftp_password: password,
+            ftp_password_note: notice,
+        } as never);
+
+        const user = userEvent.setup();
+        renderWithProviders(<ProfileSettingsCard />);
+
+        const ftpSlugInput = screen.getByRole('textbox', {name: /^FTP Upload Ordner \(Slug\)/});
+        await user.clear(ftpSlugInput);
+        await user.type(ftpSlugInput, 'j-doe');
+        await user.click(screen.getByRole('button', {name: /Profil speichern/}));
+
+        // The success toast stays exactly as before; the password is an addition,
+        // not a replacement for the normal confirmation.
+        expect(await screen.findByText('Neues Kamera-Passwort')).toBeInTheDocument();
+        expect(screen.getByText(password)).toBeInTheDocument();
+        expect(screen.getByText(notice)).toBeInTheDocument();
+        expect(mutateUser).toHaveBeenCalled();
+        expect(showToast).toHaveBeenCalledWith('success', 'Profil aktualisiert');
+
+        await user.click(screen.getByRole('button', {name: 'Verstanden, ausblenden'}));
+        expect(screen.queryByText('Neues Kamera-Passwort')).not.toBeInTheDocument();
+        expect(screen.queryByText(password)).not.toBeInTheDocument();
+    });
+
+    it('does not show the password panel when the response carries no new password', async () => {
+        vi.mocked(apiMutate).mockResolvedValue({success: true} as never);
+
+        const user = userEvent.setup();
+        renderWithProviders(<ProfileSettingsCard />);
+
+        const ftpSlugInput = screen.getByRole('textbox', {name: /^FTP Upload Ordner \(Slug\)/});
+        await user.clear(ftpSlugInput);
+        await user.type(ftpSlugInput, 'j-doe');
+        await user.click(screen.getByRole('button', {name: /Profil speichern/}));
+
+        await waitFor(() => expect(showToast).toHaveBeenCalledWith('success', 'Profil aktualisiert'));
+        // An unchanged slug (or a request that failed closed before provisioning)
+        // answers without a password; the form must not invent one.
+        expect(screen.queryByText('Neues Kamera-Passwort')).not.toBeInTheDocument();
+    });
+
     it('does not offer the ftp login field to non-photographers', () => {
         vi.mocked(usePermissions).mockReturnValue({isPhotographer: false} as never);
         renderWithProviders(<ProfileSettingsCard />);
