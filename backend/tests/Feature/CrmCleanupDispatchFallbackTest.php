@@ -15,6 +15,7 @@ use App\Services\ModelProfileEraser;
 use Illuminate\Contracts\Bus\Dispatcher as DispatcherContract;
 use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionResolverInterface;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Console\WorkCommand;
 use Illuminate\Support\Facades\Artisan;
@@ -29,6 +30,7 @@ use Mockery;
 use ReflectionProperty;
 use RuntimeException;
 use Tests\TestCase;
+use Throwable;
 
 class CrmCleanupDispatchFallbackTest extends TestCase
 {
@@ -105,24 +107,33 @@ class CrmCleanupDispatchFallbackTest extends TestCase
             ->once();
     }
 
-    public function test_outbox_row_is_registered_after_commit_and_not_before(): void
+    public function test_durable_intent_is_registered_before_commit_and_rolls_back_with_the_transaction(): void
     {
         $this->failQueuePush();
 
-        DB::transaction(function (): void {
-            app(ModelFileCleanupService::class)->afterCommit(
-                'model-age-proofs/customer-1/proof.jpg',
-                'after_commit',
-                'customer-1',
-            );
+        try {
+            DB::transaction(function (): void {
+                app(ModelFileCleanupService::class)->afterCommit(
+                    'model-age-proofs/customer-1/proof.jpg',
+                    'after_commit',
+                    'customer-1',
+                );
 
-            $this->assertDatabaseCount('jobs', 0);
-        });
+                // The durable intent exists before COMMIT so a process death in
+                // the post-commit window cannot lose the cleanup.
+                $this->assertDatabaseCount('jobs', 1);
 
-        $this->assertDatabaseCount('jobs', 1);
+                throw new RuntimeException('force rollback');
+            });
+        } catch (RuntimeException $exception) {
+            $this->assertSame('force rollback', $exception->getMessage());
+        }
+
+        // A rollback discards the intent together with the business write.
+        $this->assertDatabaseCount('jobs', 0);
     }
 
-    public function test_real_erasure_persists_file_and_search_fallbacks_only_after_commit(): void
+    public function test_real_erasure_persists_durable_file_and_search_intents_that_survive_a_missing_dispatch(): void
     {
         $this->failQueuePush(2);
         Log::spy();
@@ -153,8 +164,10 @@ class CrmCleanupDispatchFallbackTest extends TestCase
         $stats = app(ModelProfileEraser::class)->erase($customer, 'dispatch_failure_regression');
 
         $this->assertTrue($stats['had_age_proof']);
+        // The durable intents are written before COMMIT: the deletion event
+        // already sees both the file-cleanup and the search-removal intent.
         $this->assertNotNull($jobsAtDeleteBoundary);
-        $this->assertSame(0, $jobsAtDeleteBoundary);
+        $this->assertSame(2, $jobsAtDeleteBoundary);
         $this->assertDatabaseMissing('customers', ['id' => $customerId]);
         $this->assertDatabaseMissing('model_profiles', ['id' => $profile->id]);
         Storage::disk('local')->assertExists($proof);
@@ -331,19 +344,28 @@ class CrmCleanupDispatchFallbackTest extends TestCase
             ->once();
     }
 
-    public function test_fallback_failure_is_audited_without_turning_committed_request_into_an_exception(): void
+    public function test_search_sync_intent_write_failure_is_critical_and_aborts_the_business_transaction(): void
     {
         $this->failQueuePush();
         config(['queue.connections.database.table' => 'missing_jobs_table']);
         Log::spy();
 
-        app(CustomerSearchSyncService::class)->defer('customer-1');
+        $thrown = null;
+        try {
+            app(CustomerSearchSyncService::class)->defer('customer-1');
+        } catch (Throwable $exception) {
+            $thrown = $exception;
+        }
 
+        // A durable cleanup/de-index intent is mandatory. When it cannot be
+        // written the operation aborts instead of committing without a retry
+        // path, and the failure is audited as critical.
+        $this->assertInstanceOf(QueryException::class, $thrown);
         $this->assertDatabaseCount('jobs', 0);
         Log::shouldHaveReceived('critical')
             ->with('customer.search_sync.fallback_failed', Mockery::on(
                 static fn (array $context): bool => $context['customer_id'] === 'customer-1'
-                    && isset($context['fallback_exception'])
+                    && isset($context['exception'])
             ))
             ->once();
     }
@@ -574,6 +596,70 @@ class CrmCleanupDispatchFallbackTest extends TestCase
         $this->assertTrue(Str::isUuid($row->id));
         $this->assertSame('default', $row->queue);
         $this->assertInstanceOf(CrmCleanupOutboxJob::class, $this->payloadCommand($row->payload));
+    }
+
+    public function test_file_cleanup_is_durable_when_the_pending_post_commit_callback_is_lost(): void
+    {
+        $durable = $this->durableServiceWithLostCallback($captured);
+        $service = new ModelFileCleanupService(app(ModelFileStore::class), $durable);
+
+        $service->afterCommit(
+            'model-age-proofs/customer-1/lost-callback.jpg',
+            'lost_callback',
+            'customer-1',
+        );
+
+        // Without the durable variant no row would exist: the only registration
+        // was an after-commit callback that was never executed.
+        $this->assertNotNull($captured);
+        $row = $this->fallbackRow();
+        $this->assertTrue(Str::isUuid($row->id));
+        $command = $this->payloadCommand($row->payload);
+        $this->assertInstanceOf(CrmCleanupOutboxJob::class, $command);
+        $this->assertSame(CrmCleanupOutboxJob::FILE_CLEANUP, $command->operation());
+    }
+
+    public function test_customer_search_sync_is_durable_when_the_pending_post_commit_callback_is_lost(): void
+    {
+        $durable = $this->durableServiceWithLostCallback($captured);
+        $service = new CustomerSearchSyncService($durable);
+
+        $service->defer('customer-1', SyncCustomerSearchJob::REMOVE);
+
+        $this->assertNotNull($captured);
+        $row = $this->fallbackRow();
+        $command = $this->payloadCommand($row->payload);
+        $this->assertInstanceOf(CrmCleanupOutboxJob::class, $command);
+        $this->assertSame(CrmCleanupOutboxJob::CUSTOMER_SEARCH, $command->operation());
+        $this->assertSame('customer-1', $command->customerId());
+        $this->assertSame(SyncCustomerSearchJob::REMOVE, $command->searchOperation());
+    }
+
+    /**
+     * Build a DurableDispatchService whose connection reports an open
+     * transaction and captures the after-commit callback without running it.
+     * That models a process death in the COMMIT-to-callback window.
+     */
+    private function durableServiceWithLostCallback(?callable &$captured): DurableDispatchService
+    {
+        $captured = null;
+        $realConnection = DB::connection();
+        $deferredConnection = Mockery::mock(Connection::class);
+        $deferredConnection->shouldReceive('transactionLevel')->andReturn(1);
+        $deferredConnection->shouldReceive('afterCommit')->andReturnUsing(
+            static function (callable $callback) use (&$captured): void {
+                $captured = $callback;
+            },
+        );
+
+        $resolver = Mockery::mock(ConnectionResolverInterface::class);
+        $resolver->shouldReceive('connection')->andReturnUsing(
+            static function (...$arguments) use ($deferredConnection, $realConnection): Connection {
+                return $arguments === [] ? $deferredConnection : $realConnection;
+            },
+        );
+
+        return new DurableDispatchService(app(DispatcherContract::class), $resolver, app());
     }
 
     private function resetQueueWorkerFailureListener(): void

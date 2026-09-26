@@ -269,19 +269,15 @@ class ImportLocationsTest extends TestCase
                 return $this->downloadZipEntry($url, $zipPath, $entry, $target);
             }
 
-            protected function writeDownloadBody(string $path, string $contents): int|false
+            protected function writeDownloadChunk(mixed $handle, string $chunk): int|false
             {
                 if ($this->shortWriteBytes === null) {
-                    return parent::writeDownloadBody($path, $contents);
+                    return parent::writeDownloadChunk($handle, $chunk);
                 }
 
-                $written = file_put_contents(
-                    $path,
-                    substr($contents, 0, $this->shortWriteBytes),
-                    LOCK_EX
-                );
+                $written = @fwrite($handle, substr($chunk, 0, $this->shortWriteBytes));
 
-                return $written === false ? false : $this->shortWriteBytes;
+                return $written === false ? false : $written;
             }
         };
     }

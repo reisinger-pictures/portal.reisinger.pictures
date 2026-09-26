@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Photo;
+use App\Services\ImageProcessor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -69,6 +70,15 @@ class DeletePhotoFilesJob implements ShouldQueue
             $paths[] = "{$this->galleryId}/_thumbs/{$size}/{$newThumbName}";
             $paths[] = "{$this->galleryId}/_thumbs/_watermarked/{$size}/{$newThumbName}";
         }
+
+        // Every watermarked derivative has a provenance marker sibling. Delete
+        // it with the image; leaving it behind is a permanent disk leak and a
+        // stale marker could be matched against a recreated file.
+        $markerPaths = array_map(
+            static fn (string $path): string => $path.ImageProcessor::WATERMARK_MARKER_SUFFIX,
+            $paths,
+        );
+        $paths = array_merge($paths, $markerPaths);
 
         $paths = array_values(array_unique($paths));
 

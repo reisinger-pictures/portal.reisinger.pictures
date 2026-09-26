@@ -224,8 +224,15 @@ class AIServiceImageBudgetTest extends TestCase
             // ...while a global glob over the shared temp directory would have
             // reported it. This is the assertion that regressed to red when the
             // observation window was widened to the whole system temp dir.
+            // tempnam() returns a canonicalized path (macOS: /private/var/...)
+            // while glob() preserves the sys_get_temp_dir() spelling
+            // (/var/...), so compare resolved paths.
             $global = glob(sys_get_temp_dir().DIRECTORY_SEPARATOR.AIService::DEFAULT_TEMPORARY_PREFIX.'*');
-            $this->assertContains($foreign, $global === false ? [] : $global);
+            $global = array_values(array_filter(array_map(
+                static fn (string $path): string|false => realpath($path),
+                $global === false ? [] : $global,
+            )));
+            $this->assertContains(realpath($foreign), $global);
         } finally {
             if (is_string($foreign) && is_file($foreign)) {
                 @unlink($foreign);

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Photo;
+use App\Services\ImageProcessor;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -33,10 +34,17 @@ class CleanupDerivatives extends Command
             $failedForPhoto = false;
 
             foreach (Photo::DERIVATIVE_SIZES as $size) {
-                $paths = [
+                $imagePaths = [
                     $photo->gallery_id.'/_thumbs/'.$size.'/'.$photo->id.'.webp',
                     $photo->gallery_id.'/_thumbs/_watermarked/'.$size.'/'.$photo->id.'.webp',
                 ];
+
+                // Each derivative can have a provenance marker sibling. Both
+                // are part of the derivative and must be removed together.
+                $paths = array_merge($imagePaths, array_map(
+                    static fn (string $path): string => $path.ImageProcessor::WATERMARK_MARKER_SUFFIX,
+                    $imagePaths,
+                ));
 
                 foreach ($paths as $path) {
                     if (! $disk->exists($path)) {

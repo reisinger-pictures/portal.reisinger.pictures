@@ -309,10 +309,7 @@ class AIService
                 );
             }
 
-            $tmpPath = tempnam(sys_get_temp_dir(), $this->temporaryPrefix());
-            if ($tmpPath === false) {
-                throw new \RuntimeException('Failed to create temp file for AI image processing');
-            }
+            $tmpPath = $this->createTemporaryFile();
 
             $tmpHandle = @fopen($tmpPath, 'wb');
             if ($tmpHandle === false) {
@@ -433,6 +430,12 @@ class AIService
             }
             if (is_string($tmpPath) && (is_file($tmpPath) || is_link($tmpPath))) {
                 @unlink($tmpPath);
+                if (is_file($tmpPath) || is_link($tmpPath)) {
+                    // The finally cleanup is the primary guarantee; make a
+                    // residual file (e.g. a locked/hard-killed writer) visible
+                    // instead of assuming the unlink succeeded.
+                    Log::warning('ai.temporary_file_cleanup_failed', ['path' => $tmpPath]);
+                }
             }
         }
 
@@ -454,6 +457,36 @@ class AIService
         return is_string($prefix) && preg_match('/\A[A-Za-z0-9_]{1,60}\z/', $prefix) === 1
             ? $prefix
             : self::DEFAULT_TEMPORARY_PREFIX;
+    }
+
+    /**
+     * Create the bounded temporary copy inside the swept application temp
+     * directory, so a hard kill/OOM orphan is removed by `app:cleanup-temp`
+     * instead of surviving forever in the shared system temp directory.
+     *
+     * The system temp directory remains the fallback when the application temp
+     * directory cannot be prepared, and the normal `finally` cleanup still
+     * removes the file on every non-crash path.
+     */
+    protected function createTemporaryFile(): string
+    {
+        $directory = storage_path('app/private/temp');
+        if (! is_dir($directory) && ! @mkdir($directory, 0755, true) && ! is_dir($directory)) {
+            $directory = sys_get_temp_dir();
+        }
+
+        $tmpPath = @tempnam($directory, $this->temporaryPrefix());
+        if ($tmpPath === false) {
+            // A rejected prefix or unwritable directory must not disable the
+            // cleanup guarantee; retry with the documented default namespace.
+            $tmpPath = @tempnam($directory, self::DEFAULT_TEMPORARY_PREFIX);
+        }
+
+        if ($tmpPath === false) {
+            throw new \RuntimeException('Failed to create temp file for AI image processing');
+        }
+
+        return $tmpPath;
     }
 
     /**

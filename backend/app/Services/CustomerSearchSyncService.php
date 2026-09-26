@@ -31,10 +31,12 @@ class CustomerSearchSyncService
     /**
      * Queue an index or remove operation after the current commit.
      *
-     * Dispatch failures are persisted as a retryable CRM cleanup outbox job
-     * instead of being allowed to turn a committed CRM request into a false
-     * 500. The existing jobs table is the durable fallback; terminal worker
-     * failures remain visible through failed_jobs.
+     * The dispatch is durable: a transaction-bound outbox intent is written
+     * before commit and released only after the primary dispatch succeeds. A
+     * process death between COMMIT and the post-commit callback cannot lose the
+     * Meilisearch document (name/e-mail) that the deletion was meant to remove.
+     * The existing jobs table is the durable fallback; terminal worker failures
+     * remain visible through failed_jobs.
      */
     public function defer(Customer|string $customer, string $operation = SyncCustomerSearchJob::INDEX): void
     {
@@ -50,7 +52,7 @@ class CustomerSearchSyncService
             return;
         }
 
-        $this->dispatch->afterCommit(
+        $this->dispatch->afterCommitDurably(
             new SyncCustomerSearchJob($customerId, $operation),
             CrmCleanupOutboxJob::forCustomerSearch($customerId, $operation),
             'customer.search_sync',

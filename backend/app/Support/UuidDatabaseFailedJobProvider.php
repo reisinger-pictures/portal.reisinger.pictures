@@ -5,7 +5,6 @@ namespace App\Support;
 use Illuminate\Queue\Failed\DatabaseUuidFailedJobProvider;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
-use RuntimeException;
 
 /**
  * Failed-job provider for the repository's UUID-keyed failed_jobs table.
@@ -28,7 +27,11 @@ final class UuidDatabaseFailedJobProvider extends DatabaseUuidFailedJobProvider
         $decoded = json_decode($payload, true);
         $uuid = is_array($decoded) ? ($decoded['uuid'] ?? null) : null;
         if (! is_string($uuid) || $uuid === '') {
-            throw new RuntimeException('The failed job payload does not contain a valid UUID.');
+            // This runs in the worker's failure path. Throwing here would keep
+            // the job in `jobs` forever (past `tries`) because the failed_jobs
+            // insert never happens. Synthesize a UUID instead so the record is
+            // always written and the job can be removed from the queue.
+            $uuid = (string) Str::uuid7();
         }
 
         $this->getTable()->insert([
