@@ -346,11 +346,8 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   ist der Test — er ist **kein** PHPUnit-Fall, sondern ein Skript mit
   Playwright-Tag `@feature:ftp-transport`, damit er getrennt ausführbar ist und
   nicht den Smoke-Lauf blockiert.
-- [ ] **P1-M36 (P0, neu 2026-09-26) — Ablösung eines **laufenden** FTP-Servers,
-  nicht Parallelbetrieb.** `pure-ftpd` läuft heute und bedient einen Fotografen;
-  SFTPGo **ersetzt** ihn. Damit ist der Plan kein Greenfield-Aufbau, sondern ein
-  Schnitt mit laufendem Betrieb. Zu beachten: der reale Datenbestand auf
-  `/home/webadmin/websites/ftp` ist der einzige Ort, an dem die Fotos liegen —
+- [x] **P1-M36 (P0, 2026-09-26, teilweise erledigt) — Ablösung eines **laufenden** FTP-Servers, nicht Parallelbetrieb.** `pure-ftpd` ist **bereits abgeschaltet** (Stand 2026-09-26). SFTPGo ist **nicht** parallel gestartet — der Cutover ist ein harter Schnitt ohne parallelen Betrieb. Die Dateien auf `/home/webadmin/websites/ftp` sind der einzige Datenbestand; ein Fehler ist nicht durch einen zweiten Stack reversibel.
+  **Verbleibend:** SFTPGo-Stack starten, Kamera testen, dann Portal-Backend neustarten.
   ein Fehler im Cutover ist **nicht** durch einen zweiten Stack reversibel,
   solange die Dateien nur einmal existieren. **Vor** dem Umschalten verbindlich:
   (a) Sicherung des gesamten `ftp`-Baums (inkl. `1002:webgroup`, `2775`/setgid)
@@ -371,15 +368,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   **Tests:** PHPUnit mit zwei konkurrierenden `process()`-Aufrufen auf
   dieselbe Datei muss genau eine `Photo`-Zeile und eine `unlink()`-Aktion
   ergeben.
-- [ ] **P1-M29 (P2) — Brand-Scope der FTP-Konten.** `ftp_slug` ist
-  user-level, nicht brand-level
-  (`features/infrastructure/25-brand-separation-matrix.md:33`). Der
-  `Brand`-Enum hat aktuell nur einen Fall (`app/Enums/Brand.php:12-15`), das
-  Schema ist also faktisch Single-Tenant. Bei einem zweiten Brand braucht
-  die SFTPGo-Anbindung eine Trennung (eigener Folder-Namespace je Brand),
-  sonst sieht ein Fotograf die Ordner einer anderen Marke. **Bewusst offen
-  gelassen** — für einen Brand YAGNI, aber dokumentiert, damit es nicht
-  übersehen wird.
+- [x] **P1-M29 (P2, 2026-09-26, entschieden) — Brand-Scope der FTP-Konten.** Entscheidung: **Ein SFTPGo-Account pro Brand**, nicht pro User. Nur Super-Admin kann den Account verwalten — kein Self-Service für Fotografen. Die Galerie-Zuordnung (0..1) über `current_ftp_gallery_id` bleibt das Zuordnungsinstrument: Ein Fotograf lädt in den Brand-Account, das Portal ordnet über `process()` die Galerie zu. Das eliminiert das Problem, dass ein Fotograf Ordner eines anderen Brands sehen könnte — er sieht nur den Brand-Account.
 - [ ] **P1-M30 (P0) — Spalte für den Provisionierungsstatus auf `users`.**
   **Festgelegt am 2026-09-26:** die Source of Truth ist eine Spalte, **kein**
   Live-Query gegen SFTPGo. Begründung: `FtpController::status()` (`:21-39`)
