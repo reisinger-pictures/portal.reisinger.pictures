@@ -43,6 +43,17 @@ class FtpCredentialService
     public const PASSWORD_MAX_LENGTH = 24;
 
     /**
+     * The `ftp_account_status` values the revocation path has to tell apart
+     * (§7.16). The column is a string with a closed set; only the two states
+     * that decide whether an account exists are named here. `active` is the
+     * value the invariant is built on ("an account exists iff the status is
+     * active"), `revoked` the state written when it stops existing.
+     */
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_REVOKED = 'revoked';
+
+    /**
      * Resets allowed per account and per hour (P1-M33).
      *
      * Three is a deliberate number and deliberately a constant rather than an
@@ -100,6 +111,51 @@ class FtpCredentialService
     public function deleteUser(string $slug): void
     {
         $this->sftpGo->deleteUser($slug);
+    }
+
+    /**
+     * Ends the camera account when the photographer role goes away (§7.16).
+     *
+     * The invariant this restores: an SFTPGo account exists **iff**
+     * `users.ftp_account_status` is `active`. Losing the role therefore means
+     * the account has to go and the status has to stop claiming it is there.
+     * `ftp_provisioned_at` deliberately stays — it records that provisioning
+     * happened; `ftp_revoked_at` records when it ended.
+     *
+     * Failure and order, same as the slug change (P1-M34): the external delete
+     * comes first, so if SFTPGo is unreachable the exception propagates and
+     * **nothing** is written. The caller aborts the role change or the delete.
+     * A workforce without the photographer role that cannot reach SFTPGo is a
+     * worse state than a refused role change, because the credential would stay
+     * live on a directory that still holds photographs.
+     *
+     * Idempotent by construction:
+     * - an already-revoked account returns without touching the service or the
+     *   timestamp, so a repeated call cannot move `ftp_revoked_at`;
+     * - a never-provisioned account (`pending`/`error`) has no account to
+     *   delete — there is no external call and no failure — and is marked
+     *   revoked directly. Nothing else would be truthful: the role that could
+     *   request credentials is gone.
+     *
+     * Deliberately not swallowed: a `not_found` from SFTPGo. Only `active`
+     * triggers the delete, and by the invariant that state means the account
+     * exists; a 404 is a real divergence (P1-M34) and must surface rather than
+     * be hidden behind an idempotent-looking revoke.
+     */
+    public function revoke(User $user): void
+    {
+        if ($user->ftp_account_status === self::STATUS_REVOKED) {
+            return;
+        }
+
+        if ($user->ftp_account_status === self::STATUS_ACTIVE) {
+            $this->deleteUser($this->accountNameFor($user));
+        }
+
+        $user->forceFill([
+            'ftp_account_status' => self::STATUS_REVOKED,
+            'ftp_revoked_at' => now(),
+        ])->save();
     }
 
     /**

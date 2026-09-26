@@ -128,6 +128,7 @@ class User extends Authenticatable implements JWTSubject
         'can_edit_metadata' => 'boolean',
         'brand' => AsBrand::class,
         'ftp_provisioned_at' => 'datetime',
+        'ftp_revoked_at' => 'datetime',
     ];
 
     public function getJWTIdentifier()

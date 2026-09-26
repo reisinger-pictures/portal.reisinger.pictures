@@ -897,10 +897,16 @@ anzufordern.
 
 `down()` wird laut Repo-Regel nie ausgeführt und bleibt leer.
 
-**Die Invariante, die ein Umbau sonst zerstört:** `users.ftp_slug` benennt einen
-tatsächlich existierenden SFTPGo-Account — oder ist leer. Es gibt keinen Zustand,
-in dem der Portal-Stand und der Dienst auseinanderlaufen, ohne dass das System
-es bemerkt. Daraus folgt fail-closed an beiden Stellen:
+**Die Invariante, die ein Umbau sonst zerstört:** Ein SFTPGo-Account existiert
+**genau dann**, wenn `users.ftp_account_status === 'active'` ist. Der Slug bleibt
+beim Entzug stehen — er benennt den Account, den es einmal gab —, aber er ist
+kein Beleg dafür, dass der Account noch lebt; die frühere Formulierung „der Slug
+benennt einen existierenden Account — oder ist leer" gilt seit `revoked` nicht
+mehr. `ftp_provisioned_at` bleibt ebenfalls stehen: es beschreibt die
+*vergangene* Provisionierung, `ftp_revoked_at` sagt, wann sie endete; beide
+zusammen lesen sich korrekt. Es gibt keinen Zustand, in dem der Portal-Stand und
+der Dienst auseinanderlaufen, ohne dass das System es bemerkt. Daraus folgt
+fail-closed an beiden Stellen:
 
 - **Slug-Wechsel** (P1-M34): Der alte Account wird gelöscht, bevor der neue
   User-Datensatz geschrieben wird. Ist SFTPGo nicht erreichbar, bricht der

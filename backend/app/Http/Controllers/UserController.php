@@ -12,6 +12,7 @@ use App\Models\Org;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuthorizationService;
+use App\Services\FtpCredentialService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -188,6 +189,13 @@ class UserController extends Controller
             : $user->roles()->pluck('name')->all();
         $isSuperAdminSelection = in_array(UserRole::SUPER_ADMIN->value, $selectedRoleNames, true);
 
+        // §7.16: losing the photographer role ends the camera account. The two
+        // facts are read before the transaction because the decision is the
+        // *transition*, not the new state — `revoke()` then runs before the role
+        // rows change.
+        $hadPhotographerRole = $user->roles()->where('name', UserRole::PHOTOGRAPHER->value)->exists();
+        $keepsPhotographerRole = in_array(UserRole::PHOTOGRAPHER->value, $selectedRoleNames, true);
+
         $updates = [];
         foreach ([
             'can_edit_metadata',
@@ -206,7 +214,15 @@ class UserController extends Controller
             $updates['brand'] = $isSuperAdminSelection ? null : $request->input('brand');
         }
 
-        DB::transaction(function () use ($request, $user, $roleIds, $updates) {
+        DB::transaction(function () use ($request, $user, $roleIds, $updates, $hadPhotographerRole, $keepsPhotographerRole) {
+            // The account goes before the role does, inside the same
+            // transaction: a raise from SFTPGo (unreachable) rolls the whole
+            // update back, so a live credential never outlives the role that
+            // justified it and the sync cannot run without the revocation.
+            if ($hadPhotographerRole && ! $keepsPhotographerRole) {
+                app(FtpCredentialService::class)->revoke($user);
+            }
+
             if ($request->has('role_ids')) {
                 $user->roles()->sync($roleIds ?? []);
             }
@@ -273,7 +289,17 @@ class UserController extends Controller
             return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
         }
 
-        $user->delete();
+        // §7.16: an account exists iff the status is `active`. Same order and
+        // fail-closed rule as the role change — revoke first, delete second, in
+        // one transaction, so an SFTPGo outage leaves the account in place
+        // instead of deleting the row and orphaning a live credential.
+        DB::transaction(function () use ($user): void {
+            if ($user->ftp_account_status === FtpCredentialService::STATUS_ACTIVE) {
+                app(FtpCredentialService::class)->revoke($user);
+            }
+
+            $user->delete();
+        });
 
         return response()->json(['success' => true]);
     }
