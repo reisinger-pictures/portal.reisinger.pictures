@@ -82,6 +82,11 @@ services:
       # Admin-Credentials braucht.
       - SFTPGO_BASE_URL=${SFTPGO_BASE_URL:-http://sftpgo:8080}
       - SFTPGO_API_KEY=${SFTPGO_API_KEY:-}
+      # JWT-Fallback, wenn kein API-Key gesetzt ist. config/services.php
+      # liest genau diese zwei Namen; ohne sie bleibt der Admin-Token leer
+      # und die Provisionierung laeuft ins Leere.
+      - SFTPGO_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME:-}
+      - SFTPGO_ADMIN_PASSWORD=${SFTPGO_ADMIN_PASSWORD:-}
       - DB_DATABASE=portal_db
       - DB_USERNAME=portal_user
       - DB_PASSWORD=${DB_PASSWORD}
@@ -276,11 +281,12 @@ services:
       # 2.7.x nicht mehr und wird stillschweigend ignoriert.
       - SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true
     env_file:
-      # Ausserhalb des Portainer-Volumes, mit 600 und root:root. Portainer
-      # ueberschreibt stack.env bei jedem Stack-Save; eine Datei ausserhalb
-      # seines Volumes kann es nicht. Ohne CREATE_DEFAULT_ADMIN bliebe die
-      # admins-Tabelle leer und /api/v2-token antwortete 401 (P1-M35).
-      - /root/sftpgo-admin.env
+      # SFTPGo-Admin-Bootstrap, aus der bestehenden machine-local Env-Datei
+      # (AGENTS: Produktions-Secrets liegen untracked auf dem Host, nicht im
+      # Repo). Portainer ueberschreibt stack.env bei jedem Stack-Save; eine
+      # Datei ausserhalb seines Volumes kann es nicht. Ohne diese beiden Werte
+      # bleibt die admins-Tabelle leer und /api/v2/token antwortet 401 (P1-M35).
+      - /root/webadmin/.env.production.sftpgo
     ports:
       # --- Oeffentlich erreichbar: der Kamera-Zugang ---
       # FTPS (explizites TLS) und SFTP (SSH). Beide muessen von aussen
