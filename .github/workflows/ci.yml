@@ -40,6 +40,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Verify workflow and artifact security invariants
         run: bash tests/infrastructure/ci-security-contract.sh
+      # Both Compose-v5 traps that took production down on 2026-09-26 are
+      # invisible to `docker compose config` and to a container that happens to
+      # boot: a `#` inside the folded `command:` comments out the rest of the
+      # joined line, and Compose v5 emits every `$(...)` as `$$(...)` so the
+      # shell expands `$$` to its PID. Neither shows up in a log. The gate reads
+      # the command block statically and fails closed on the whole guard, the
+      # migration sequence, the internal-network pin and the SFTPGo bootstrap
+      # mapping. See tests/infrastructure/compose-entrypoint-contract.sh.
+      - name: Verify the compose entrypoint contract
+        run: bash tests/infrastructure/compose-entrypoint-contract.sh
       # CR-INF-001/CR-INF-014: the sync regression was never executed by
       # anything. It is self-contained (mktemp) and fails closed on
       # private-storage exclusions, root SQLite exclusion and partial-sync

@@ -639,11 +639,26 @@ for file in "${config_files[@]}"; do
         [[ "$stripped" == \#* ]] && continue
 
         if [[ "$line" =~ ^[[:space:]]*(image:[[:space:]]|FROM[[:space:]]|COPY[[:space:]]+--from=) ]]; then
-            [[ "$line" =~ @sha256:[0-9a-f]{64}([[:space:]]|$) ]] \
-                || fail "image reference is not digest-pinned in $file: $line"
+            # P1-M37 (Owner-Entscheidung 2026-09-26): Image werden auf Minor-Tags
+            # gepinnt, nicht auf @sha256-Digests. Ein Digest gefror den Stand und
+            # liess jeden Bugfix im Release-Zweig aus; ein expliziter Tag holt
+            # Bugfixes automatisch und springt nie auf eine neue Minor-Version.
+            # Der unvermeidbare Nachteil — ein Tag kann sich unter den Fussen
+            # verschieben — wird von verify-image-freshness.sh (INFRA-10) und
+            # verify-image-nonroot.sh aufgefangen, die genau diesen Tag
+            # aufloesen. Dieser Gate prueft deshalb die Tag-Form, nicht Digest.
+            reference="${line#*FROM }"
+            reference="${reference#*--from=}"
+            reference="${reference#*image: }"
+            reference="${reference%%[[:space:]]*}"
+            [[ "$reference" == *:* || "$reference" == *@* ]] \
+                || fail "image reference carries no explicit tag in $file: $line"
+            if [[ "$reference" == *:latest ]] || [[ "$reference" == *:latest@* ]]; then
+                fail "image reference uses the mutable 'latest' tag in $file: $line"
+            fi
         elif [[ "$line" =~ (ghcr\.io/|getmeili/|axllent/|mariadb:|composer:|php:) ]] \
-            && [[ "$line" != *"@sha256:"* ]]; then
-            fail "workflow/container image reference is not digest-pinned in $file: $line"
+            && [[ "$line" != *"@sha256:"* ]] && [[ "$line" != *:* ]]; then
+            fail "workflow/container image reference carries no explicit tag in $file: $line"
         fi
     done <"$file"
 done

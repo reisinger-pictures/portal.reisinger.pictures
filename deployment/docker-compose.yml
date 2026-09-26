@@ -194,42 +194,56 @@ services:
       timeout: 10s
       retries: 3
       start_period: 90s
+    # WICHTIG: Kommentare duerfen NIEMALS innerhalb des `command:`-Blocks
+    # stehen. `command: >` ist ein gefalteter Skalar, alle Zeilen werden zu
+    # EINER Zeile verbunden, und `sh` faengt an einem `#` mitten in der Zeile
+    # den Kommentar an — der frisst dann den Rest der Zeile, also
+    # for-Schleife, migrate und exec. Genau das war die Restart-Schleife vom
+    # 2026-09-26. Siehe features/infrastructure/01-deployment.md 9.
+    #
+    # Bewusst NUR Existenz + Schreibbarkeit fuer die laufende UID, kein
+    # Ownership-Vergleich: 19-ftp 7.9 verbietet das Umstellen von
+    # /home/webadmin/websites auf 1000:1000, der Host haelt 1002:webgroup
+    # mit 2775+setgid. Ein stat-Vergleich auf 1000:1000 waere damit
+    # unerfuellbar, ohne die bindende Regel zu brechen. Die Identitaet
+    # selbst ist weiterhin ueber `user: 1000:1000` erzwungen.
+    # ACHTUNG — zwei Compose-v5-Fallen in diesem Block, beide schon produktiv
+    # aufgefallen. 1) KEIN `#` innerhalb von `command:`, auch nicht als
+    # Kommentar: `command: >` ist ein gefalteter Skalar, alle Zeilen werden zu
+    # EINER Zeile, und `sh` beginnt ab einem `#` mitten in der Zeile den
+    # Kommentar — der frisst for-Schleife, migrate und exec (Restart-Schleife
+    # vom 2026-09-26). 2) KEIN `$` ausser in `$(...)`, und auch dort ist es
+    # kaputt: Compose v5.0.2 gibt JEDE Command-Substitution als `$$(...)` aus,
+    # auch wenn in der Datei schon `$$` steht. Der Container-Shell expandiert
+    # `$$` dann zur PID — aus `[ "$$(id -u)" -ne 1000 ]` wird
+    # `[ "1(id -u)" -ne 1000 ]`, also `Illegal number` und FATAL. Ebenso
+    # werden `$${APP_ENV}` zu `1234{APP_ENV}`. Nachgewiesen mit
+    # Docker Compose v5.0.2; `$$` wirkt in KEINER YAML-Form. Deshalb liest
+    # dieser Guard ueber `printenv | grep` und `xargs -I{}` statt ueber
+    # Variablen-Expansion, und verzichtet auf `${VAR}` komplett: das wuerde
+    # Secrets zur Compose-Interpolationszeit in `docker inspect Cmd` schreiben.
+    #
+    # Gegenprobe vor jedem Deploy (siehe deployment/README.md):
+    #   docker compose config --format json | grep -c '\$\$'   -> muss 0 sein
     command: >
       sh -c "
-      if [ \"$$(id -u)\" -ne 1000 ] || [ \"$$(id -g)\" -ne 1000 ]; then
-        echo 'FATAL: Backend muss als UID:GID 1000:1000 laufen. Start verweigert (fail-closed)!';
-        exit 1;
-      fi;
-      if [ \"$${APP_ENV}\" != 'production' ]; then
-        echo 'FATAL: APP_ENV muss im Produktions-Stack production sein. Start verweigert (fail-closed)!';
-        exit 1;
-      fi;
-      if [ -z \"$${APP_KEY}\" ] || [ -z \"$${JWT_SECRET}\" ] || [ -z \"$${FILE_ENCRYPTION_KEY}\" ] || [ -z \"$${ADMIN_EMAIL}\" ] || [ -z \"$${ADMIN_PASSWORD}\" ] || [ -z \"$${PHOTO_STORAGE_PATH}\" ]; then
-        echo 'FATAL: APP_KEY, JWT_SECRET, FILE_ENCRYPTION_KEY, ADMIN_EMAIL, ADMIN_PASSWORD oder PHOTO_STORAGE_PATH ist nicht gesetzt. Start verweigert (fail-closed)!';
-        exit 1;
-      fi;
-      case \"$${PHOTO_STORAGE_PATH}\" in
-        /*) ;;
-        *) echo 'FATAL: PHOTO_STORAGE_PATH muss ein absoluter Mount-Pfad sein. Start verweigert!'; exit 1;;
-      esac;
-      case \"$${AI_SESSION_HEADER}\" in
-        '') ;;
-        *[!A-Za-z0-9-]*) echo 'FATAL: AI_SESSION_HEADER darf nur Buchstaben, Ziffern und Bindestriche enthalten. Start verweigert (fail-closed)!'; exit 1;;
-      esac;
-      case \"$${AI_SESSION_PREFIX}\" in
-        '') ;;
-        *[!A-Za-z0-9._-]*) echo 'FATAL: AI_SESSION_PREFIX darf nur Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich enthalten. Start verweigert (fail-closed)!'; exit 1;;
-      esac;
-      for path in /var/www/html \"$${PHOTO_STORAGE_PATH}\" /var/www/ftp; do
-        if [ ! -d \"$${path}\" ] || [ ! -w \"$${path}\" ] || [ \"$$(stat -c '%u:%g' \"$${path}\")\" != '1000:1000' ]; then
-          echo \"FATAL: Runtime-Pfad $$path fehlt, ist nicht schreibbar oder gehört nicht UID:GID 1000:1000. Start verweigert!\";
-          exit 1;
-        fi;
-      done;
-      if [ ! -x /usr/local/bin/validate-production-env ] || [ ! -x /usr/local/bin/portal-backend-supervisor ]; then
-        echo 'FATAL: Production preflight/supervisor is missing. Rebuild portal-base:8.5, push GHCR, update the pinned compose digest, then redeploy. No migration or seed was run.';
-        exit 1;
-      fi;
+      id -u | grep -qx 1000 || { echo 'FATAL: Backend muss als UID 1000 laufen. Start verweigert (fail-closed)!'; exit 1; };
+      id -g | grep -qx 1000 || { echo 'FATAL: Backend muss als GID 1000 laufen. Start verweigert (fail-closed)!'; exit 1; };
+      printenv APP_ENV | grep -qx production || { echo 'FATAL: APP_ENV muss im Produktions-Stack production sein. Start verweigert (fail-closed)!'; exit 1; };
+      printenv APP_KEY | grep -q . || { echo 'FATAL: APP_KEY ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
+      printenv JWT_SECRET | grep -q . || { echo 'FATAL: JWT_SECRET ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
+      printenv FILE_ENCRYPTION_KEY | grep -q . || { echo 'FATAL: FILE_ENCRYPTION_KEY ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
+      printenv ADMIN_EMAIL | grep -q . || { echo 'FATAL: ADMIN_EMAIL ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
+      printenv ADMIN_PASSWORD | grep -q . || { echo 'FATAL: ADMIN_PASSWORD ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
+      printenv PHOTO_STORAGE_PATH | grep -q . || { echo 'FATAL: PHOTO_STORAGE_PATH ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
+      printenv PHOTO_STORAGE_PATH | grep -q '^/' || { echo 'FATAL: PHOTO_STORAGE_PATH muss ein absoluter Mount-Pfad sein. Start verweigert!'; exit 1; };
+      printenv AI_SESSION_HEADER | grep -qE '^[A-Za-z0-9-]*$' || { echo 'FATAL: AI_SESSION_HEADER darf nur Buchstaben, Ziffern und Bindestriche enthalten. Start verweigert (fail-closed)!'; exit 1; };
+      printenv AI_SESSION_PREFIX | grep -qE '^[A-Za-z0-9._-]*$' || { echo 'FATAL: AI_SESSION_PREFIX darf nur Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich enthalten. Start verweigert (fail-closed)!'; exit 1; };
+      [ -d /var/www/html ] && [ -w /var/www/html ] || { echo 'FATAL: /var/www/html fehlt oder ist fuer UID 1000 nicht schreibbar. Start verweigert!'; exit 1; };
+      [ -d /var/www/ftp ] && [ -w /var/www/ftp ] || { echo 'FATAL: /var/www/ftp fehlt oder ist fuer UID 1000 nicht schreibbar. Start verweigert!'; exit 1; };
+      printenv PHOTO_STORAGE_PATH | xargs -r -I{} test -d {} || { echo 'FATAL: PHOTO_STORAGE_PATH ist kein Verzeichnis. Start verweigert!'; exit 1; };
+      printenv PHOTO_STORAGE_PATH | xargs -r -I{} test -w {} || { echo 'FATAL: PHOTO_STORAGE_PATH ist fuer UID 1000 nicht schreibbar. Start verweigert!'; exit 1; };
+      [ -x /usr/local/bin/validate-production-env ] && [ -x /usr/local/bin/portal-backend-supervisor ] || { echo 'FATAL: Production preflight/supervisor is missing. Rebuild portal-base:8.5, push GHCR, update the pinned compose tag, then redeploy. No migration or seed was run.'; exit 1; };
       /usr/local/bin/validate-production-env || exit 1;
       php artisan cache:clear || exit 1;
       php artisan optimize || exit 1;
@@ -280,13 +294,16 @@ services:
       # laeuft dann ins Leere. `SFTPGO_DEFAULT_ADMIN_PERMISSIONS` existiert in
       # 2.7.x nicht mehr und wird stillschweigend ignoriert.
       - SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true
-    env_file:
-      # SFTPGo-Admin-Bootstrap, aus der bestehenden machine-local Env-Datei
-      # (AGENTS: Produktions-Secrets liegen untracked auf dem Host, nicht im
-      # Repo). Portainer ueberschreibt stack.env bei jedem Stack-Save; eine
-      # Datei ausserhalb seines Volumes kann es nicht. Ohne diese beiden Werte
-      # bleibt die admins-Tabelle leer und /api/v2/token antwortet 401 (P1-M35).
-      - /root/webadmin/.env.production.sftpgo
+      # SFTPGo liest eigene Bootstrap-Namen, die nicht in .env.production
+      # stehen. Sie sind dasselbe Geheimnis wie SFTPGO_ADMIN_* (backend-Block
+      # weiter oben), das backend/config/services.php fuer den JWT-Fallback
+      # liest — deshalb hier gemappt statt ein zweites Wertepaar in der
+      # Portainer-GUI zu pflegen. Deklariert wie die 31 anderen
+      # Pflicht-Secrets als bare ${VAR}: fehlt der Wert, bricht Compose mit
+      # Namensnennung ab, statt SFTPGo mit leerem Admin in eine
+      # Restart-Schleife laufen zu lassen ("no admins found" im Log).
+      - SFTPGO_DEFAULT_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME}
+      - SFTPGO_DEFAULT_ADMIN_PASSWORD=${SFTPGO_ADMIN_PASSWORD}
     ports:
       # --- Oeffentlich erreichbar: der Kamera-Zugang ---
       # FTPS (explizites TLS) und SFTP (SSH). Beide muessen von aussen
@@ -307,10 +324,21 @@ services:
       # http://sftpgo:8080 an. Wer den Port im Stack publicly machen will,
       # muss das als eigenen Change begruenden — er ist die Schnittstelle, ueber
       # die Konten angelegt und Passwoerter gesetzt werden.
-      portal_internal:
-        ipv4_address: 172.18.0.32
-    # Non-root wie der Backend (verify-image-nonroot.sh ist CI-Gate). SFTPGo
-    # laeuft im Image als uid 1000, der Host-Pfad gehoert 1002:webgroup.
+      # Bewusst KEIN ipv4_address. Das Netz `portal_internal` existiert bereits
+      # aus dem Stack und sein Subnetz ist nicht 172.18.0.0/16; eine dort
+      # gepinnte Adresse bricht den Deploy mit "no configured subnet contains IP
+      # address". Auf portal_internal wird nichts gepinnt — der Dienstname
+      # `sftpgo` loest per Docker-DNS auf, eine feste IP wird nicht gebraucht.
+      # Der Backend pinnt seine IP nur auf webret, weil Caddy darauf routet.
+      - portal_internal
+    # Non-root wie der Backend (verify-image-nonroot.sh ist CI-Gate).
+    # Der Host-Pfad gehoert 1002:webgroup mit setgid, NICHT 1000:1000:
+    # features/infrastructure/19-ftp-upload-pipeline.md 7.9 verbietet
+    # ausdruecklich, /home/webadmin/websites per chown -R auf 1000
+    # umzuschreiben (Vorfall 2026-09-26: 38.969 Dateien). uid 1000 schreibt
+    # in 2775+setgid trotzdem, und neue Dateien erben die Gruppe webgroup —
+    # genau das soll 7.9. Deshalb wird hier nichts gechownt, weder von hier
+    # noch aus dem Backend-Entrypoint.
     user: "1000:1000"
 
 networks:

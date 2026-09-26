@@ -28,16 +28,50 @@ der Stack selbst (Schritt 4).
 
 Nicht ins Repo — dieselbe Fehlerklasse wie die Security-Historie C1–C4.
 
-```bash
-SFTPGO_DEFAULT_ADMIN_USERNAME=<admin-user>
-SFTPGO_DEFAULT_ADMIN_PASSWORD=<admin-passwort>
-SFTPGO_BASE_URL=http://sftpgo:8080
-SFTPGO_API_KEY=<api-key>
+Beim Deploy über den **Web-Editor** schreibt Portainer `stack.env` selbst aus dem
+GUI-Environment. Deshalb steht im Compose **kein `env_file`** und **kein
+`${VAR:?}`-Guard**: Portainer löst die Interpolation ab, bevor die GUI-Umgebung
+angewendet ist, ein Guard bricht jeden Deploy ab.
+
+**Ein Wertepaar, nicht zwei.** SFTPGo liest eigene Bootstrap-Namen
+(`SFTPGO_DEFAULT_ADMIN_*`); gepflegt wird nur das Paar aus `.env.production`,
+das `backend/config/services.php` ohnehin liest. Das Compose mapt es:
+
+```yaml
+- SFTPGO_DEFAULT_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME}   # sftpgo-Service
+- SFTPGO_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME:-}        # backend, JWT-Fallback
 ```
 
-`SFTPGO_DEFAULT_ADMIN_USERNAME` und `_PASSWORD` sind im Compose **Pflicht**
-(`${VAR:?...}`) — fehlen sie, startet der Stack absichtlich nicht, statt mit
-einem unbenutzbaren Dienst zu laufen.
+In die GUI gehören also nur die beiden neuen Zeilen aus `.env.production`:
+
+```bash
+SFTPGO_ADMIN_USERNAME=sftpgo-admin
+SFTPGO_ADMIN_PASSWORD=<generiertes Passwort>
+```
+
+Fehlen sie, startet SFTPGo nicht und schreibt `no admins found, try to create
+the default one` ins Log — sichtbar, nicht still.
+
+### Einmalige Host-Voraussetzung: Fotospeicher
+
+Der Backend läuft als `1000:1000`, der Fotospeicher gehörte `33:33` mit `755`.
+Ohne diesen Schritt verweigert der fail-closed Guard den Start mit
+`PHOTO_STORAGE_PATH ist fuer UID 1000 nicht schreibbar`:
+
+```bash
+chown -R 1000:1000 /home/webadmin/portal/images
+find /home/webadmin/portal/images -type d -exec chmod 2775 {} +
+```
+
+**Nicht** `/home/webadmin/websites` anfassen: das gehört `1002:webgroup` und
+wird absichtlich nicht umgeschrieben (`19-ftp-upload-pipeline.md` 7.9).
+
+### Gegenprobe vor jedem Deploy
+
+```bash
+docker compose -f docker-compose.yml config --format json | grep -c '\$\$('   # muss 0 sein
+bash tests/infrastructure/compose-entrypoint-contract.sh                       # muss PASS sein
+```
 
 ---
 

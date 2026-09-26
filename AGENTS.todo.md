@@ -1720,6 +1720,78 @@ Commit-Stand ist synchron):
 - [x] **Historischer Playwright-Datensatz (nicht aktueller Working-Tree-Nachweis):** Der getaggte `@feature:card-testing`-Turnstile-Retry-Flow, die Stripe-Decline-/Success-Suite inklusive server-autoritativem Paid-Status, Quote-Checkout und Legal-/Privacy-Flows sind im finalen CI-Lauf grün. Die vollständige Abdeckung von Kontoalter-/Limit-Block, Idempotenz-Reuse ohne doppelte PI, 3DS-Return/Expiry und stale/recovery bleibt als follow-up offen.
 - [x] **Historischer Gesamtverifikationsdatensatz (nicht aktueller Working-Tree-Nachweis):** Nach Code-Änderungen `php artisan test` (gesamte Suite) und die getaggten Playwright-Smoke-/Feature-Läufe durch einen separaten Verifikations-Subagenten grün ausführen; der finale CI-Lauf `35917265654` auf Commit `e73d5cf` bestätigt **1.725 PHPUnit-Tests / 4.936 Assertions**, **759/759 Vitest-Tests** und alle Playwright-Matrix-Jobs als grün. `pnpm lint:fix`, Lingui-Compile, `pnpm build`, PHP-Syntax und Diff-Check sind ebenfalls grün; kein Deployment wurde ausgeführt.
 
+## Produktionsdeploy SFTPGo — Vorfall vom 2026-09-26 (abgeschlossen)
+
+Der Cutover auf SFTPGo hat die Produktion am 2026-09-26 mehrfach lahmgelegt.
+Ursache war nicht SFTPGo, sondern Compose v5.0.2. Drei davon gefundene Fehler,
+alle mit Regressionstest:
+
+- [x] **P1-M39 (P0) — Compose v5.0.2 gibt jede Command-Substitution als
+  `$$(...)` aus** und reduziert `$$` in keiner YAML-Form auf `$`. Der
+  Container-Shell expandiert `$$` zur PID, also wurde aus
+  `[ "$$(id -u)" -ne 1000 ]` effektiv `[ "1(id -u)" -ne 1000 ]` → `Illegal
+  number` → FATAL. Betroffen waren **alle 16** Escapes des Guards: der
+  Identitäts-Guard verweigerte gültige Starts, und `test -z "$${APP_KEY}"`
+  prüfte由于 `$$` zur PID **nie** leer, schützte also nichts. Nachgewiesen mit
+  einem Dreiformen-Test (folded / list / plain scalar) auf dem Server.
+  **Fix:** Guard ohne jede Shell-Expansion, über `printenv | grep` und
+  `xargs -I{}`. Kein `${VAR}`, weil Compose Secrets zur Interpolationszeit in
+  `docker inspect Cmd` schreiben würde.
+- [x] **P1-M40 (P0) — `#` im gefalteten `command: >` frisst den Rest der
+  Zeile.** Alle Zeilen werden zu EINER verbunden, `sh` beginnt ab einem
+  mitten liegenden `#` den Kommentar — und frisst damit `for`-Schleife,
+  `migrate`, `db:seed` und `exec`. Diese Falle war die dokumentierte Ursache der
+  Restart-Schleife; sie wurde beim erneuten Schreiben des Guards **reimportiert**
+  und nur vom `sh -n`-Check auf dem aufgelösten Script gefunden.
+- [x] **P1-M41 (P0) — `stat`-Vergleich auf `1000:1000` im Pfad-Guard war
+  unerfüllbar.** `19-ftp` 7.9 verbietet `chown -R` auf
+  `/home/webadmin/websites` (Vorfall: 38.969 Dateien), der Host hält
+  `1002:webgroup` mit `2775`+setgid. Der Guard prüft jetzt Existenz und
+  Schreibbarkeit der laufenden UID; die Identität bleibt über
+  `user: "1000:1000"` erzwungen.
+- [x] **P1-M42 (P1) — Fotospeicher gehörte `33:33`/`755`.** uid 1000 konnte
+  nicht schreiben, der Guard verweigerte den Start mit `PHOTO_STORAGE_PATH ist
+  fuer UID 1000 nicht schreibbar`. Der Baum liegt außerhalb des verbotenen
+  `websites`-Pfads (66 Dateien, 24 MB) und ist jetzt `1000:1000`/`2775`+setgid.
+  uid 33 hat auf dem Host nicht einmal einen Passwd-Eintrag, war also ein
+  Container-Artefakt.
+- [x] **P1-M43 (P1) — `ipv4_address` auf `portal_internal`.** Das Netz
+  existiert bereits und hat `172.21.0.0/16`; die Pin auf `172.18.0.32` brach
+  jeden Deploy mit `no configured subnet contains IP address`. Gepinnt wird nur
+  `webnet`, weil Caddy auf die Backend-Adresse routet.
+- [x] **P1-M44 (P1) — Zwei Namenspaare für dasselbe SFTPGo-Secret.** Compose
+  las `SFTPGO_DEFAULT_ADMIN_*`, `config/services.php` liest
+  `SFTPGO_ADMIN_*`, und der Backend-Service deklarierte keines von beiden — mit
+  leerem `SFTPGO_API_KEY` wäre die Provisionierung mit 401 gescheitert, während
+  die Konfiguration korrekt aussah. Das Compose mappt jetzt vom
+  `.env.production`-Paar auf SFTPGOs Bootstrap-Namen. Damit braucht die
+  Portainer-GUI **ein** Wertepaar statt zwei.
+- [x] **P1-M45 (P1) — `ci-security-contract.sh` war rot** (Pre-Existing
+  Failure aus P1-M37): der Gate verlangte `@sha256`-Digests, während
+  `verify-image-nonroot.sh` bereits Tags auflöste. Zwei Gates widersprachen
+  sich. Gate prüft jetzt die Tag-Form ohne `latest`.
+- [x] **Regressionstest:** `tests/infrastructure/compose-entrypoint-contract.sh`
+  (in CI verdrahtet) prüft alle sechs Punkte statisch: kein `$$`/`$(`/`${` und
+  kein `#` im `command:`-Block, alle 17 Guard-Prüfungen und die
+  Startsequenz vorhanden, kein `stat -c`, keine Pin auf `portal_internal`, die
+  SFTPGo-Abbildung, kein `${VAR:?}`, kein `env_file`, kein `:latest`.
+
+**Weiterhin offen (bewusst):**
+
+- [ ] **P1-M32 — echter Kamera-Test.** Heute ausdrücklich offengelassen. Der
+  Integrationstest P1-M38 beweist die Server-Seite, nicht die Kamera.
+- [ ] **Firewall 2222/989/50000-50100** ist weiterhin Handarbeit und noch
+  nicht gesetzt. Ohne diese Ports erreicht die Kamera SFTPGo nicht; 8080
+  bleibt zu.
+- [ ] **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen
+  der aufgelösten Compose-Datei im Klartext durch das Terminal gelaufen.
+- [ ] **`POST /api/management/ftp/status` ohne Auth liefert 500** (vorbestehend,
+  nicht durch den Deploy verursacht): Laravel sucht eine nicht existierende
+  `login`-Route.
+- [ ] **dev-vm-Container aus `volume-backup.sh` ausschließen** (angefordert,
+  nicht umgesetzt).
+
+
 **Verifikation / Übergabe**
 - [x] Operations/Docs-Pass hat die vorhandenen Migrations-, Backend-, Frontend- und Testdateien inventarisiert und die Deployment-Migrations-/Seed-Reihenfolge dokumentarisch korrigiert; dies ersetzt weder Code-Review noch Testläufe und behauptet keine neuen Application-Tests.
 - [ ] Diff-Review gegen `features/security/card-testing-protection.md` (V036 separat, keine Secrets/PII, keine ungeprüften Stripe-/Turnstile-Bypässe) durch separaten Reviewer.
