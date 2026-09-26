@@ -53,7 +53,14 @@ CHOWN="--chown=1002:webgroup"
 CHMOD="--chmod=D2777,F666"
 
 # Argumente durchreichen, damit ./sync.sh --dry-run funktioniert.
-RSYNC_EXTRA=("$@")
+# Bash 3.2 (macOS) behandelt ein leeres Array unter `set -u` als ungebundene
+# Variable — "RSYNC_EXTRA[@]: unbound variable". Die ${x[@]+...}-Form ist das
+# portable Idiom: sie expandiert zu nichts, wenn das Array leer ist.
+if [[ $# -gt 0 ]]; then
+    RSYNC_EXTRA=("$@")
+else
+    RSYNC_EXTRA=()
+fi
 
 echo "==================================================="
 echo "🔄 Starte rsync/ssh Sync zum Server..."
@@ -73,7 +80,7 @@ echo "📦 Sync: API-Ordner..."
   --exclude-from=rsync-backend-exclude.txt \
   --info=progress2 \
   --rsh="ssh $SSH_OPTS" \
-  "${RSYNC_EXTRA[@]}"
+  ${RSYNC_EXTRA[@]+"${RSYNC_EXTRA[@]}"}
 
 # --- 2. Web Bereich (Frontend Dist) ----------------------------------------
 # Reines Build-Artefakt: keine Excludes noetig, der Ordner enthaelt nur
@@ -86,7 +93,7 @@ echo "🎨 Sync: Frontend (dist)..."
   "$CHMOD" \
   --info=progress2 \
   --rsh="ssh $SSH_OPTS" \
-  "${RSYNC_EXTRA[@]}"
+  ${RSYNC_EXTRA[@]+"${RSYNC_EXTRA[@]}"}
 
 echo ""
 echo "✅ Sync abgeschlossen!"
