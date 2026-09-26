@@ -895,6 +895,10 @@ msgstr "Benutzer / Gast"
 msgid "Benutzer & Rechte"
 msgstr "Benutzer & Rechte"
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Benutzername"
+msgstr "Benutzername"
+
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Berechnen"
 msgstr "Berechnen"
@@ -1632,6 +1636,10 @@ msgstr "Die Lieferung der bestellten digitalen Inhalte erfolgt ausschließlich i
 msgid "Die Passwörter stimmen nicht überein."
 msgstr "Die Passwörter stimmen nicht überein."
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera eingerichtet werden kann."
+msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera eingerichtet werden kann."
+
 #: src/ui/client/ClientCartView.tsx
 msgid "Die Sicherheitsprüfung ist nicht konfiguriert. Bitte wende dich an den Support."
 msgstr "Die Sicherheitsprüfung ist nicht konfiguriert. Bitte wende dich an den Support."
@@ -1929,6 +1937,10 @@ msgstr "Einladungslink (zum Kopieren)"
 #: src/ui/management/components/ManagementGalleryActions.tsx
 msgid "Einladungslink..."
 msgstr "Einladungslink..."
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Einstellung"
+msgstr "Einstellung"
 
 #: src/ui/components/Sidebar.tsx
 #: src/ui/management/ManagementDashboard.tsx
@@ -2487,6 +2499,10 @@ msgstr "Freitext..."
 msgid "FTP Inbox"
 msgstr "FTP Inbox"
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "FTPS-Port"
+msgstr "FTPS-Port"
+
 #: src/ui/client/ClientCartView.tsx
 msgid "Für {unresolvedItemCount} Artikel ist der Preis noch nicht verfügbar. Die Summe wird beim Bezahlen verbindlich berechnet."
 msgstr "Für {unresolvedItemCount} Artikel ist der Preis noch nicht verfügbar. Die Summe wird beim Bezahlen verbindlich berechnet."
@@ -2965,6 +2981,10 @@ msgstr "Kalkulieren & Antworten"
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Kalkulieren & E-Mail senden"
 msgstr "Kalkulieren & E-Mail senden"
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Kamera-Verbindung"
+msgstr "Kamera-Verbindung"
 
 #: src/ui/components/LightroomCatalogsProfileCard.tsx
 msgid "Katalog aktualisiert"
@@ -4470,6 +4490,10 @@ msgstr "Paket-Kalkulator"
 msgid "Pärchen"
 msgstr "Pärchen"
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Passiver Bereich (Firewall)"
+msgstr "Passiver Bereich (Firewall)"
+
 #: src/ui/components/GalleryModal.tsx
 #: src/ui/components/SidebarLoginForm.tsx
 msgid "Passwort"
@@ -4978,6 +5002,10 @@ msgstr "Seite neu laden"
 msgid "Sendet eine Test-E-Mail über den konfigurierten Mailer an deine eigene (Administrator-)Adresse."
 msgstr "Sendet eine Test-E-Mail über den konfigurierten Mailer an deine eigene (Administrator-)Adresse."
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Server"
+msgstr "Server"
+
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Server:"
 msgstr "Server:"
@@ -4997,6 +5025,14 @@ msgstr "Setze ein neues Passwort für den Account <0>{email}</0>."
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Setzen"
 msgstr "Setzen"
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "SFTP läuft über Port 2222, FTPS über Port 989. FTPS verwendet explizites TLS (AUTH TLS) — in der Kamera muss dafür „Explizites FTP über TLS\" gewählt werden. Der passive Bereich muss in der Firewall freigeschaltet sein."
+msgstr "SFTP läuft über Port 2222, FTPS über Port 989. FTPS verwendet explizites TLS (AUTH TLS) — in der Kamera muss dafür „Explizites FTP über TLS\" gewählt werden. Der passive Bereich muss in der Firewall freigeschaltet sein."
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "SFTP-Port"
+msgstr "SFTP-Port"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Shares / Info"
@@ -5648,6 +5684,10 @@ msgstr "URL Slug"
 msgid "Verbindliche Unterzeichnung"
 msgstr "Verbindliche Unterzeichnung"
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Verbindungsdaten der Kamera nicht verfügbar"
+msgstr "Verbindungsdaten der Kamera nicht verfügbar"
+
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Verbraucher haben bei Verträgen über digitale Inhalte und Fotoprodukte das folgende gesetzliche Widerrufsrecht."
 msgstr "Verbraucher haben bei Verträgen über digitale Inhalte und Fotoprodukte das folgende gesetzliche Widerrufsrecht."
@@ -5972,6 +6012,7 @@ msgstr "Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die 
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
 #: src/ui/management/ManagementCouponsView.tsx
+#: src/ui/management/ManagementFtpInbox.tsx
 msgid "Wert"
 msgstr "Wert"
 
@@ -6225,6 +6266,10 @@ msgstr "Ziel-Galerie auswählen"
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Ziel-ID"
 msgstr "Ziel-ID"
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Zielordner"
+msgstr "Zielordner"
 
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Zugeordnete Galerien"
