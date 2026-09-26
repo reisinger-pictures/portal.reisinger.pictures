@@ -185,10 +185,23 @@ class FtpCredentialService
     }
 
     /**
-     * Provisions the account and returns the password **once**. Nothing is
-     * written: no password column, no cache entry, no file. The provisioning
-     * status column on `users` is P1-M30 — until it exists this service touches
-     * no column at all, which is exactly the "no secret at rest" property.
+     * Provisions the account, records that it exists, and returns the password
+     * **once**.
+     *
+     * Nothing *secret* is written: no password column, no cache entry, no file.
+     * The two columns that are written are the opposite of a secret — they are
+     * what makes `ftp_account_status` true. A SFTPGo account exists exactly when
+     * the column says `active` (19-ftp 7.16), so provisioning that left the
+     * column alone would let the portal report `pending` or `revoked` while the
+     * service holds a live credential, and the inbox would offer the wrong next
+     * step. V041 created the column; this is the write that keeps it honest.
+     *
+     * Re-entry is the same transition, not a special case: a photographer who
+     * was revoked and gets the role back provisions again, the column returns to
+     * `active`, and `ftp_revoked_at` stays as the record of the past revocation.
+     *
+     * `forceFill()` because neither column is mass-assignable — they are set by
+     * this service and by `revoke()`, never from request input.
      */
     public function provisionAndShow(User $user): string
     {
@@ -196,6 +209,11 @@ class FtpCredentialService
         $password = $this->generateCameraPassword();
 
         $this->sftpGo->provisionUser($username, $password, $this->homeDirectoryFor($username));
+
+        $user->forceFill([
+            'ftp_account_status' => self::STATUS_ACTIVE,
+            'ftp_provisioned_at' => now(),
+        ])->save();
 
         return $password;
     }

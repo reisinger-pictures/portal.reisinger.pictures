@@ -129,7 +129,7 @@ class FtpCredentialServiceTest extends TestCase
         });
     }
 
-    public function test_provision_and_show_stores_nothing(): void
+    public function test_provision_and_show_stores_no_secret(): void
     {
         Http::fake([
             'sftpgo.test:8080/api/v2/users' => Http::response(['id' => 7, 'username' => 'florian'], 201),
@@ -142,7 +142,25 @@ class FtpCredentialServiceTest extends TestCase
 
         $after = $user->fresh()?->getAttributes();
 
-        $this->assertSame($before, $after, 'The show-once flow must not write to the user record.');
+        // The property is "no secret at rest", not "nothing is written". The
+        // account now records that it exists — `ftp_account_status` is `active`
+        // exactly while SFTPGo holds the account (19-ftp 7.16), so writing it is
+        // what keeps the column from lying. Naming the three permitted columns
+        // instead is the stricter assertion: a fourth would have to be justified
+        // here, and the two that could ever hold a secret are ruled out below.
+        // `updated_at` is permitted rather than required: the factory and this
+        // call land in the same second, so the timestamp may or may not move.
+        $permitted = ['ftp_account_status', 'ftp_provisioned_at', 'updated_at'];
+        $changed = array_keys(array_diff_assoc($after, $before));
+        sort($changed);
+        $this->assertEmpty(
+            array_diff($changed, $permitted),
+            'Provisioning may write the account bookkeeping, and nothing else; it wrote: '
+                .implode(', ', $changed),
+        );
+        $this->assertContains('ftp_account_status', $changed);
+        $this->assertContains('ftp_provisioned_at', $changed);
+        $this->assertSame('active', $after['ftp_account_status']);
         $this->assertStringNotContainsString(
             $password,
             (string) json_encode($after, JSON_THROW_ON_ERROR),

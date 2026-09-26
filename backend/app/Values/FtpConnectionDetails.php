@@ -81,8 +81,16 @@ final class FtpConnectionDetails
      */
     public function isConfigured(): bool
     {
+        // Der Zielordner gehoert dazu. Ein malformierter Wert liest sich als
+        // `path: null`, und ohne ihn in dieser Pruefung saehe die Oberflaeche
+        // eine vollstaendige Verbindung ohne Zielordner — der Fotograf wuerde
+        // das Feld in der Kamera raten, und ein abweichender Ordner sieht wie
+        // ein leerer Posteingang aus, nicht wie ein Fehler. Der Import bleibt
+        // davon unberuehrt: `resolvedUploadPath()` faellt auf die Konto-Wurzel
+        // zurueck und kann dadurch nur mehr finden, nie weniger.
         return $this->host !== null && $this->username !== null
-            && $this->sftpPort !== null && $this->ftpsPort !== null;
+            && $this->sftpPort !== null && $this->ftpsPort !== null
+            && $this->uploadPath !== null;
     }
 
     /**
