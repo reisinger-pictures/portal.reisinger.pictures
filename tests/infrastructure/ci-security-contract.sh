@@ -399,6 +399,18 @@ assert_contains_text "$ci_gate_job" '    needs:' \
     'CI gate must retain its dependency aggregate'
 assert_contains "$CI_WORKFLOW" '  push:' 'CI must retain the push aggregate used by Dependabot automerge'
 assert_contains "$CI_WORKFLOW" '  pull_request:' 'CI must retain the normal pull-request aggregate'
+
+# The pinned prod image runs as `USER www-data` (uid 1000) and both test jobs
+# bind-mount the runner-owned workspace. Without an explicit root override the
+# jobs cannot write .env, storage/logs or vendor/, and they die before any test
+# runs — which is exactly how the backend job failed after the image went
+# public. This only relaxes the throwaway CI test container; the non-root
+# guarantee for the deployed artifact stays in deployment/Dockerfile, the
+# compose `user:` directive and verify-image-nonroot.sh.
+assert_contains "$CI_WORKFLOW" '      options: --user root' \
+    'The e2e container job must override the non-root image user, or checkout and pnpm install fail on the mounted workspace'
+assert_contains "$CI_WORKFLOW" '            --user root \' \
+    'The backend php container must override the non-root image user, or composer install and artisan key:generate fail on the mounted workspace'
 ci_gate_needs="$(
     awk '
         /^[[:space:]]+needs:[[:space:]]*$/ { in_needs = 1; next }

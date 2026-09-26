@@ -111,7 +111,16 @@ jobs:
       # unter 127.0.0.1:7701/1025 erreichbar (phpunit.xml + .env unveraendert).
       - name: Start PHP container (prod image)
         run: |
+          # The pinned prod image runs as `USER www-data` (uid 1000), but the
+          # workspace is a bind mount owned by the runner user, so composer,
+          # `artisan key:generate`, storage/logs and .env are not writable and
+          # the job dies before PHPUnit starts. Run the test container as root;
+          # the non-root guarantee that matters is enforced for the deployed
+          # artifact via deployment/Dockerfile, compose `user:` and
+          # tests/infrastructure/verify-image-nonroot.sh, none of which this
+          # overrides. Same rationale as the e2e job's `options: --user root`.
           docker run -d --name php \
+            --user root \
             --network host \
             -v "${{ github.workspace }}:/app" \
             -w /app/backend \
