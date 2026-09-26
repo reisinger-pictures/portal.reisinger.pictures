@@ -164,6 +164,32 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   `openssl s_client -cipher …` prüfen, dann mit echter Kamera testen. Bei
   SFTP-Unterstützung der Kamera ist SFTP vorzuziehen — moderne Ciphers, und
   SFTPGo bietet FTPS und SFTP auf demselben Port.
+- [x] **P1-M37 (2026-09-26, erledigt) — Image auf `2.7.x` gepinnt, Port-Trennung
+  im Stack hinterlegt.** Recherchiert über die GitHub-API (neueste Release
+  `v2.7.6`, 2026-09-19) und die Docker-Hub-Tag-Liste. **Befund:** `latest` und
+  `v2.7` wurden am **2026-09-18** gebaut, `2.7.x` am **2026-09-26** — `latest`
+  ist damit bereits **acht Tage veraltet**, während `2.7.x` beweglich die
+  Minor-Reihe 2.7 mit Bugfixes versorgt, ohne auf 2.8 zu springen. Gewählt:
+  `2.7.x`.
+  **Verworfen:** `latest` (folgt einem alten Build, kein Minor-Bezug),
+  `v2.7.6` exakt (Bugfixes nur manuell — für einen Stack mit laufendem Betrieb
+  zu riskant), Digest-Pinning (`sha256:1edd28d8…` für v2.7.6, verhindert
+  Security-Patches ohne Review).
+  Im selben Commit an `deployment/docker-compose.yml`: Service `sftpgo`, nur an
+  `portal_internal`; SFTP 2222 und FTPS 989 öffentlich; passive Range
+  50000–50100 öffentlich; **API-Port 8080 bewusst ohne `ports:`**; persistentes
+  Volume `sftpgo_data` (ohne das ist die Instanz nach jedem Neustart ohne
+  Admin-User → 401 auf `/api/v2/token`); `user: "1000:1000"` wie der Backend,
+  damit `verify-image-nonroot.sh` als CI-Gate gültig bleibt;
+  `SFTPGO_DEFAULT_ADMIN_USERNAME`/`_PASSWORD` als Pflichtvariablen via `:?`.
+  **Verifiziert:** YAML parst; `8080` in **keinem** `ports:`; `:?` bricht ohne
+  die Variable mit exit=1 ab; Passwort mit Sonderzeichen (`p@ss:w#rd$1`) wird
+  korrekt durchgereicht; Port-Override greift. Vorsicht bei der Syntax:
+  `${VAR:?Text mit Doppelpunkt}` zerlegt der YAML-Parser als Hash — der
+  Fehlermeldungstext darf **keinen** Doppelpunkt enthalten.
+  **Offen:** die Bindings auf die Container-Ports 2222/989/8080 und der passive
+  Bereich `50000-50100` müssen in der Instanz gesetzt werden — hängt an M35.
+  Doku: `19-ftp-upload-pipeline.md` 7.13 (Port-Erreichbarkeit) und 7.14.
   **Stand der Verifikation (2026-09-26):** Die Cipher-Messung ist **nicht**
   durchgeführt — **nicht** weil sie unmöglich ist, sondern weil die Sonde
   dreimal an der Konfiguration scheiterte. Belegte Zwischenbefunde:
@@ -171,8 +197,9 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   das Image meldet aber `config file used: "/etc/sftpgo/sftpgo.json"`. FTPS-Bindings
   liegen unter `ftpserver.bindings[].port`, nicht `ftpserver.port`. Solange die
   Bindung nicht steht, liefert `openssl s_client` **0 gelesene Bytes** und ein
-  leeres Ergebnis — **das ist als „Cipher nicht angeboten" zu lesen ist ein
-  Fehlschluss.** Vor der nächsten Messung Config-Weg klären (siehe P1-M35).
+  leeres Ergebnis. **Ein leeres Ergebnis als „Cipher nicht angeboten" zu protokollieren
+  wäre ein Fehlschluss** — genau dieser Fehler ist in drei Sondenversuchen
+  entstanden. Vor der nächsten Messung Config-Weg klären (siehe P1-M35).
 - [ ] **P1-M35 (P0, neu 2026-09-26) — Konfigurationsweg der SFTPGo-Instanz
   klären, bevor weiter gemessen oder deployed wird.** Ohne funktionierende
   Konfiguration ist **jede** Aussage über die Ciphers wertlos — das ist in
@@ -362,6 +389,45 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   `2bfaed8` mit 894-Zeilen-Test umgesetzt wurde).
 
 ### Braucht eine Entscheidung oder Betriebs-Evidenz (kein Code)
+
+- [ ] **P1-I9 (P0) — Deployment-Drift: `portal_backend` läuft als root, das
+  versionierte Compose fordert `user: "1000:1000"`.** Verifiziert 2026-09-26.
+  **Befund:** `deployment/docker-compose.yml:58` deklariert
+  `user: "1000:1000"` für `backend`. Der laufende Container hat
+  `Config.User` = **leer**, `docker exec portal_backend id` →
+  `uid=0(root)`. Der Stack ist seit der `user:`-Zeile nie neu erstellt worden.
+  **Warum das dringend ist, nicht nur unsauber:** beim nächsten
+  `docker compose up -d` fällt der Backend **und** der neue `sftpgo`-Service
+  (`:299`, ebenfalls `user: "1000:1000"`) auf UID 1000. Alles, was heute
+  implizit über root funktioniert, bricht dann. Konkret verifiziert: mit
+  `2755` auf `ftp/<slug>` konnte UID 1000 **weder anlegen noch `unlink`en** —
+  und `FtpController::process()` macht genau das (`unlink($file)` nach dem
+  Import). Ein solcher Ordner ist mit `2777` entschärft (passiert am
+  2026-09-26), die Fehlerklasse bleibt aber: **jeder neue Pfad mit `2755` unter
+  `/home/webadmin/websites` bricht beim UID-Wechsel.**
+  **Zweite, verwandte Diskrepanz:** `sftpgo` läuft als `1000:1000`, der
+  Host-Pfad gehört `1002:webgroup`. Dateien, die der Dienst anlegt, werden
+  dadurch `1000`-owned statt `1002`. Funktional auffällig wird es nicht
+  (2777 + setgid ⇒ Gruppe erbt sich, Lesen/Löschen gelingt), aber es
+  mischt die Ownership-Modelle im Website-Baum — dieselbe Art Unordnung wie
+  der `r1`-Vorfall vom 2026-09-26, nur leiser. **Zu entscheiden:** läuft
+  SFTPGo als `1002:82`, oder bleibt `1000` und die Site-Konvention wird für
+  dieses eine Verzeichnis offiziell ausgenommen?
+  **Warum das CI-Gate nicht greift:** `tests/infrastructure/verify-image-nonroot.sh`
+  prüft `Config.User` des **Image-Artefakts** (abgefangen in der früheren
+  C-Historie), nicht den **effektiven Benutzer des laufenden Containers**. Ein
+  korrektes Image mit überschriebenem `user:` im Compose ist für dieses Gate
+  unsichtbar.
+  **Tests:** (a) PHPUnit/Shell-Test, der `Config.User` des laufenden Containers
+  gegen die `user:`-Deklaration im Compose stellt und bei Abweichung
+  fehlschlägt — als eigener Vertrag, nicht im Image-Test; (b) Test, dass jede
+  unter `/home/webadmin/websites` angelegte Inbox `2777` und `1002:webgroup`
+  **oder** die dokumentierte Ausnahme ist; (c) `verify-image-nonroot.sh` um
+  einen Hinweis ergänzen, dass es `user:`-Overrides im Compose **nicht**
+  abdeckt.
+  **Nicht im Scope:** die Reparatur selbst ist ein Deployment (Stack
+  recreated), kein Code. Vorher die UID-Fragen oben entscheiden, sonst wird der
+  Restart zum Ausfalltag.
 
 - [ ] **Branch-Protection für `main` fehlt** — `GET /branches/main/protection`
   antwortet `404 Branch not protected`. Der `CI gate (push)` existiert und läuft

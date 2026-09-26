@@ -381,16 +381,30 @@ siehe §7.12, denn der Betrieb läuft während des Wechsels weiter.
 
 ### 7.11 Offene Punkte
 
-**Kamera-Protokoll (blockiert die Abnahme).** Ob die konkrete Kamera FTPS mit
-GCM oder CBC/SHA1 braucht, ist **ungeklärt**. Testmethode: Cipher-Liste des
-laufenden SFTPGo mit `openssl s_client -cipher …` prüfen, dann mit echter
-Kamera. Unterstützt die Kamera SFTP, ist SFTP vorzuziehen — moderne Ciphers.
+**Kamera-Protokoll — Protokoll geklärt, Cipher offen.** Die Kameras können
+**sowohl FTPS als auch SFTP** (Auskunft 2026-09-26). Die Grundsatzentscheidung
+ist damit **nicht mehr gefährdet**; der Punkt war als stack-abbruchendes P0
+geführt und ist es nicht mehr.
+
+Die **Cipher**-Frage ist damit aber nicht erledigt, nur von „unmöglich" auf
+„konfigurierbar" gesenkt: Protokollfähigkeit sagt nichts über die Cipher aus,
+und eine ältere Kamera kann SFTP sprechen und trotzdem nur `AES128-CTR` oder
+`3DES` können. Der entscheidende Unterschied: auf der SSH-Seite ist die
+Cipher-Liste über `Ciphers`/`tls_config` **einstellbar**, während pure-ftpd sie
+fest selbst baute — `AES128-SHA` war dort nachweislich nicht erreichbar.
+
+**Empfehlung: SFTP statt FTPS.** (a) Die Cipher-Frage ist auf der SSH-Seite
+lösbar, auf der FTP-Seite nicht. (b) SFTP braucht **keine passive Port-Range** —
+damit entfallen 501 Firewall-Ports und der Docker-`DOCKER`-Chain-Sonderfall, der
+in `strato-vps` 6e dokumentiert ist. (c) SFTP ist ein einziger TCP-Kanal, FTPS
+braucht Control- plus Datenkanal. FTPS bleibt als Rückweg, weil die Kameras es
+können und der User `florian` unter pure-ftpd heute schon funktioniert.
+
 **Achtung:** SFTPGo lauscht für SFTP und FTPS auf **getrennten Ports**
 (`sshd`/`ftpd` mit eigener `address`), sie teilen sich keinen. Für FTPS wird
 `AUTH TLS` auf dem normalen FTP-Port unterstützt, also explizites FTPS ohne
 zusätzlichen Port. Die Portwahl ist Teil des Portal-Stacks — die Firewall
-dokumentiert `~/dev/strato-vps/ANALYSIS.md` Abschnitt 6e. Der User `florian` unter
-`pure-ftpd` gilt bis dahin als **Betriebs-Workaround, kein Beweis**.
+dokumentiert `~/dev/strato-vps/ANALYSIS.md` Abschnitt 6e.
 
 **Stand 2026-09-26: die Messung steht noch aus.** Sie ist nicht gescheitert,
 sondern dreimal an der Konfiguration der Messinstanz (P1-M35). Belegt ist:
@@ -458,3 +472,58 @@ zweiten Stack **nicht** reversibel, solange die Dateien nur einmal existieren.
 - Den Cutover mit einem Windows- oder macOS-Client zu testen.
 - Nach dem Schnitt Ownership-Fixes per `chown -R` auf `/home/webadmin/websites`
   (siehe 7.9).
+
+### 7.13 Port-Erreichbarkeit
+
+Drei Portklassen, drei unterschiedliche Erreichbarkeiten. Die Trennung ist
+Absicht und der eigentliche Sicherheitsgewinn des Wechsels: die Kamera
+kommt an den Dateitransport, aber die **Kontenverwaltung** ist nur von
+innen erreichbar.
+
+| Port | Zweck | Erreichbar | Compose |
+|---|---|---|---|
+| 2222 (Host) → 2222 | SFTP (SSH) | **öffentlich** | `ports:` |
+| 989 (Host) → 989 | FTPS (explizites TLS) | **öffentlich** | `ports:` |
+| 50000–50100 | Passive FTPS-Datenkanal | **öffentlich** | `ports:` als Range |
+| 8080 | HTTP- und Admin-API | **nur `portal_internal`** | *kein* `ports:` |
+
+- **Warum zwei öffentliche Protokolle:** SFTPGo bietet FTPS und SFTP auf
+  demselben Port an. Getrennt publiziert werden sie, weil die Kamera genau
+  eines der beiden spricht — der jeweils andere Pfad bleibt unbenutzt und kann
+  in der Firewall geschlossen werden. Welcher der beiden benötigt wird, ist
+  offen (7.11, P1-M27).
+- **Warum die passive Range zwingend ist:** bei FTPS verbindet sich der Client
+  auf 989, aber der **Datenkanal** kommt aus 50000–50100. Wird die Range nicht
+  mitpubliziert, baut der TLS-Handshake erfolgreich auf und der Upload bricht
+  danach lautlos ab. Das ist der häufigste Stillschweizgrund bei FTPS und der
+  Grund, warum sie hier ausdrücklich steht.
+- **Warum 8080 nicht `ports:` bekommt:** über diesen Port werden Konten
+  angelegt und Passwörter gesetzt (P1-M22). Öffentlich wäre das eine
+  Verwaltungsfläche im Internet. Der Portal-Backend erreicht ihn als
+  `http://sftpgo:8080` über `portal_internal`; der Service hängt **nicht** an
+  `webnet`. Eine Veröffentlichung wäre ein eigener Change mit eigener
+  Begründung, nicht eine Zeile in dieser Datei.
+- **Image-Pin:** `drakkan/sftpgo:2.7.x`, bewusst **nicht** `latest`. Stand
+  2026-09-26 ist `v2.7.6` die neueste Release (2026-09-19). Der Tag `latest`
+  zeigt auf den Build vom **2026-09-18** und ist damit bereits veraltet,
+  während `2.7.x` am 2026-09-26 neu gebaut wurde und beweglich die Minor-Reihe
+  2.7 mit Bugfixes versorgt. Damit bleiben Security-Patches automatisch drin,
+  ein Minor-Sprung (2.7 → 2.8, der das Config-Format mitbringt) aber nicht.
+  Exakt auf `v2.7.6` zu pinnen würde bedeuten, Security-Patches manuell
+  einzuspielen — auf einem Server mit laufendem Betrieb die schlechtere Wahl.
+
+**Noch offen für den echten Stack:** SFTPGo muss seine Bindings auf die
+**Container**-Ports 2222/989/8080 bekommen, und der passive Bereich muss auf
+`50000-50100` stehen. Seit 2.6 liegt die Konfiguration in der Datenbank
+statt in einer JSON-Datei, der Seeding-Weg ist deshalb Teil von P1-M35 und
+nicht als Kleinigkeit zu behandeln.
+
+### 7.14 Bewusst nicht im Compose-Stack
+
+- **Der Fotograf-Upload läuft nicht über den Portal-Container.** Die Dateien
+  landen direkt auf dem Host-Pfad, den der Backend-Container liest. Ein
+  Einbruch ins Portal-Core liefert deshalb **keinen** Dateizugriff.
+- **`SFTPGO_DEFAULT_ADMIN_*` sind Pflichtvariablen** (Compose `:?` ohne
+  Default). Fehlen sie, startet der Stack nicht absichtlich: ohne Admin-User
+  gibt es kein `/api/v2/token`, also keine Provisionierung. Ein Stack, der
+  läuft, aber nicht provisionieren kann, wäre der schlechtere Zustand.
