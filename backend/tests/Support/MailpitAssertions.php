@@ -20,14 +20,16 @@ trait MailpitAssertions
 
     protected function getMailpitMessageByEmail(string $email): ?array
     {
-        $messages = $this->getMailpitMessages();
-
-        foreach ($messages as $msg) {
-            foreach ($msg['To'] ?? [] as $recipient) {
-                if (($recipient['Address'] ?? '') === $email) {
-                    return Http::get($this->mailpitApiUrl()."/message/{$msg['ID']}")->json();
-                }
-            }
+        // Recipient-scoped search, not the global message list. GET /messages
+        // applies a default limit (50) and returns only the most recent
+        // messages, so in a full parallel run — or against a long-lived local
+        // Mailpit that has accumulated hundreds of messages — the message under
+        // test falls outside the window and the lookup reports it as missing.
+        // Measured locally with 569 messages stored: /messages returned 50,
+        // /search?query=to:<recipient> returned the 7 that actually matched.
+        // CI did not catch this because its Mailpit starts empty every run.
+        foreach ($this->getMailpitMessagesByRecipient($email) as $message) {
+            return Http::get($this->mailpitApiUrl()."/message/{$message['ID']}")->json();
         }
 
         return null;
