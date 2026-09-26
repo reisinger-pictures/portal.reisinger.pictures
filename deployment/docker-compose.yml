@@ -76,6 +76,12 @@ services:
     environment:
       - DB_CONNECTION=${DB_CONNECTION:-mariadb}
       - DB_HOST=db
+      # SFTPGo Admin-API (P1-M22). Der Backend provisioniert FTP-Konten ueber
+      # diese URL. Der API-Key kommt aus der Portainer-Stack-Env; ohne ihn
+      # faellt der Client auf den JWT-Pfad zurueck, der ebenfalls die
+      # Admin-Credentials braucht.
+      - SFTPGO_BASE_URL=${SFTPGO_BASE_URL:-http://sftpgo:8080}
+      - SFTPGO_API_KEY=${SFTPGO_API_KEY:-}
       - DB_DATABASE=portal_db
       - DB_USERNAME=portal_user
       - DB_PASSWORD=${DB_PASSWORD}
@@ -268,13 +274,13 @@ services:
       # /api/v2/token 401 und die Provisionierung aus P1-M22 laeuft nicht.
       - sftpgo_data:/var/lib/sftpgo
     environment:
-      # `:?` erzwingt den Abbruch, wenn die Variable leer ist — ohne
-      # Default. Grund: ohne Admin-User gibt es kein /api/v2/token (401) und
-      # damit keine Provisionierung aus P1-M22. Lieber der Stack startet
-      # gar nicht, als dass er mit einem unbenutzbaren Dienst laeuft.
+      # Admin-Bootstrap. Ohne `CREATE_DEFAULT_ADMIN=true` bleibt die admins-Tabelle
+      # leer und /api/v2/token antwortet 401 — die Provisionierung aus P1-M22
+      # laeuft dann ins Leere. `SFTPGO_DEFAULT_ADMIN_PERMISSIONS` existiert in
+      # 2.7.x nicht mehr und wird stillschweigend ignoriert.
+      - SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true
       - SFTPGO_DEFAULT_ADMIN_USERNAME=${SFTPGO_DEFAULT_ADMIN_USERNAME:?SFTPGO_DEFAULT_ADMIN_USERNAME fehlt}
       - SFTPGO_DEFAULT_ADMIN_PASSWORD=${SFTPGO_DEFAULT_ADMIN_PASSWORD:?SFTPGO_DEFAULT_ADMIN_PASSWORD fehlt}
-      - SFTPGO_DEFAULT_ADMIN_PERMISSIONS=${SFTPGO_DEFAULT_ADMIN_PERMISSIONS:-*}
     ports:
       # --- Oeffentlich erreichbar: der Kamera-Zugang ---
       # FTPS (explizites TLS) und SFTP (SSH). Beide muessen von aussen
