@@ -11,11 +11,11 @@
 
 import type { APIRequestContext } from '@playwright/test';
 import { SCREENSHOT_OUTPUT_DIR } from './harness';
-import { seedOpenModelInvite, seedRegisteredModel } from './seeds';
+import { seedOpenModelInvite, seedPhotographer, seedRegisteredModel } from './seeds';
 
 export type UiReviewState = 'filled' | 'empty';
 export type UiReviewViewport = 'desktop' | 'mobile';
-export type UiReviewAuth = 'guest' | 'admin';
+export type UiReviewAuth = 'guest' | 'admin' | 'photographer';
 
 export interface UiReviewSeedContext {
     request: APIRequestContext;
@@ -107,6 +107,24 @@ export const uiReviewConfig: UiReviewConfig = {
         // `/admin-model-invites` redirects to `/admin-models`; the invite form is
         // a modal opened by a button click, which the manifest's nav steps
         // (`goto`/`fill`) cannot trigger — covered by the E2E dialog test instead.
+        // ---- Kamera / FTP (neue Oberflaechen) --------------------------------
+        {
+            name: 'kamera-einrichtung',
+            path: '/kamera-einrichtung',
+            states: ['filled'],
+            auth: 'admin',
+            note: 'Camera setup guide, built from the Canon manual. Protected route; the content is the deployment/kamera-einrichtung.md rendered as a page.',
+        },
+        {
+            name: 'photographer-dashboard',
+            path: '/',
+            states: ['filled'],
+            auth: 'photographer',
+            seeds: {
+                filled: context => seedPhotographer(context.request),
+            },
+            note: 'Photographer landing: the FTP inbox with the camera connection table, the credentials button, the account status and the link to the setup guide. Photographer-only, so the admin login cannot reach it.',
+        },
         {
             name: 'admin-models',
             path: '/admin-models',
