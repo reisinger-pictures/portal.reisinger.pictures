@@ -54,7 +54,7 @@ function FtpsHint({sftpPort, ftpsPort, tlsMode}: {sftpPort: number | null; ftpsP
 
     return (
         <p className="text-sm opacity-70 mt-2">
-            {t`SFTP läuft über Port ${sftp}, FTPS über Port ${ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt — bitte den Support kontaktieren, bevor du FTPS in der Kamera einrichtest.`}
+            {t`SFTP läuft über Port ${sftp}, FTPS über Port ${ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Ohne diesen Modus kann die Kamera FTPS nicht aushandeln — nutze daher SFTP.`}
         </p>
     );
 }
