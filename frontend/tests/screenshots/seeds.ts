@@ -31,10 +31,17 @@ interface RegisteredModel {
     query: string;
 }
 
-interface PhotographerCredentials {
+/**
+ * A type alias, not an `interface`, on purpose: `UiReviewSeed` returns
+ * `Record<string, unknown>`, and only object literal *types* get an implicit
+ * index signature. An `interface` with the same members is not assignable to
+ * `Record<string, unknown>` and fails `tsc -b` (the seed's return type would
+ * otherwise never satisfy its manifest slot).
+ */
+type PhotographerCredentials = {
     email: string;
     password: string;
-}
+};
 
 let openInviteCache: OpenInvite | null = null;
 let inviteListCache: Record<string, unknown> | null = null;
