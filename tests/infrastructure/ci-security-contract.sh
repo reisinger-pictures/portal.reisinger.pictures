@@ -298,7 +298,7 @@ e2e_ci_job="$(
     ' "$CI_WORKFLOW"
 )"
 [[ -n "$e2e_ci_job" ]] || fail 'CI must define the E2E job'
-# The rclone regression is a real gate only while the security-contract job
+# The rsync regression is a real gate only while the security-contract job
 # executes it; an unwired script is dead coverage (TST-2).
 security_contract_job="$(
     awk '
@@ -310,7 +310,7 @@ security_contract_job="$(
 [[ -n "$security_contract_job" ]] || fail 'CI must define the security-contract job'
 for contract_step in \
     'bash tests/infrastructure/ci-security-contract.sh' \
-    'bash tests/infrastructure/rclone-sync-regression.sh' \
+    'bash tests/infrastructure/rsync-sync-regression.sh' \
     'bash tests/infrastructure/verify-image-nonroot.sh' \
     'bash tests/infrastructure/verify-image-freshness.sh' \
     'bash tests/infrastructure/image-pin-freshness-regression.sh'; do

@@ -76,9 +76,14 @@ mehr Teil des aktuellen Brand-Setups.)*
 
 Der Run-Config **`🚀 [Deploy] Sync Only`** führt `sync.sh` aus. Das Script
 verwendet `set -euo pipefail`: Der Backend-Sync (inklusive
-`rclone-backend-filter.txt`) und der Frontend-`dist`-Sync müssen beide
+`rsync-backend-exclude.txt`) und der Frontend-`dist`-Sync müssen beide
 erfolgreich abgeschlossen sein, bevor der Erfolg ausgegeben wird. Ein
-fehlgeschlagener `rclone`-Aufruf beendet den Vorgang mit einem Fehlerstatus.
+fehlgeschlagener `rsync`-Aufruf beendet den Vorgang mit einem Fehlerstatus.
+Der Transport ist `rsync` über `ssh root@reisinger.pictures` (seit 2026-09-26;
+zuvor `rclone` über ein SFTP-Remote). `./sync.sh --dry-run` zeigt den
+Änderungsumfang ohne Schreibzugriff. Nach einem Backend-Deploy ist zusätzlich
+`docker restart portal_backend` nötig (OPcache, siehe
+`features/infrastructure/01-deployment.md` §11).
 Der Sync ersetzt weder Migration noch Seed und ist kein Ersatz für den
 fail-closed Deployment-Start.
 

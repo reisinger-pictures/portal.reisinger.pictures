@@ -1,0 +1,66 @@
+# =============================================================================
+# rsync-backend-exclude.txt — rsync-Excludes fuer den Backend-Sync
+# =============================================================================
+# Ersetzt rclone-backend-filter.txt (rclone-Filter-Syntax) nach der
+# Migration von rclone auf rsync/ssh. Reihenfolge ist hier nicht relevant
+# (nur Excludes, keine Includes) — die Liste folgt trotzdem der urspruenglichen
+# rclone-Reihenfolge, damit der Review-Diff lesbar bleibt.
+#
+# GRUNDREGEL: Alles was mit "storage/", "vendor/", ".env" zu tun hat, gehoert
+# NICHT in den Deploy. Diese Datei ist der einzige Schutz davor, dass
+# --delete runtime-eigene oder geheime Dateien auf dem Server loescht.
+#
+# SYNTAX-UEBERSETZUNG rclone -> rsync:
+#   rclone '- /pfad/**'  ->  rsync '/pfad/'    (rsync steigt in ausgeschlossene
+#                                                 Verzeichnisse nicht hinab)
+#   rclone '- /pfad'     ->  rsync '/pfad'    (Datei ODER Verzeichnis)
+#   rclone '+ **'        ->  entfaellt         (rsync schliesst alles ein,
+#                                                 was nicht ausgeschlossen ist)
+#   Anker '/' am Anfang bleibt erhalten und bedeutet "nur auf Root-Ebene".
+# =============================================================================
+
+# --- ENV / Secrets ----------------------------------------------------------
+# .env und .env.* duerfen NIE in den Webroot. Eine .htaccess hilft unter
+# PHP-FPM/Caddy nicht, weil der_reverse_proxy sie nicht auswertet.
+.env
+.env.*
+
+# --- Abhaengigkeiten --------------------------------------------------------
+vendor/
+node_modules/
+
+# --- Tests / Dev ------------------------------------------------------------
+# .phpunit.result.cache ist ein PHPUnit-Cache und gehoert ebenfalls nicht
+# deployed. Im rclone-Filter fehlte diese Regel (nur .phpunit.cache/** war
+# gesetzt) — hier ergaenzt, weil es beim Umstellen als Lint-Ausgabe auffiel.
+tests/
+.phpunit.cache/
+.phpunit.result.cache
+
+# --- Laufzeit-Storage -------------------------------------------------------
+# Wird zur Laufzeit vom Container beschrieben, nicht aus dem Repo.
+storage/logs/
+storage/framework/cache/data/
+storage/framework/sessions/
+storage/framework/testing/
+storage/framework/views/
+storage/app/public/
+
+# --- Private Storage: KRITISK ----------------------------------------------
+# Runtime-private storage ist deployment-owned, nicht code-owned:
+#   - darf nicht hochgeladen werden (stripe_secret.txt!)
+#   - und darf vor allem NICHT geloescht werden, weil die Dateien nur auf dem
+#     Server existieren (Modell-Altersnachweise, Watermark, hochgeladene
+#     Dateien). Ohne diese Excludes wuerde --delete Produktivdaten vernichten.
+# Beide Regeln bleiben bewusst bestehen: die Verzeichnisregel schuetzt den
+# Inhalt, die Dateiregel dokumentiert explizit das Stripe-Secret.
+# Reihenfolge wie in der rclone-Fassung: Datei zuerst, dann Verzeichnis.
+/storage/app/private/stripe_secret.txt
+/storage/app/private/
+
+# --- Build-Artefakte --------------------------------------------------------
+out/
+bootstrap/cache/
+core
+/*.sqlite*
+*.sqlite*

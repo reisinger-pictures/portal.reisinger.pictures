@@ -40,12 +40,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Verify workflow and artifact security invariants
         run: bash tests/infrastructure/ci-security-contract.sh
-      # CR-INF-001/CR-INF-014: the 413-line rclone sync regression was never
-      # executed by anything. It is self-contained (mktemp) and fails closed on
+      # CR-INF-001/CR-INF-014: the sync regression was never executed by
+      # anything. It is self-contained (mktemp) and fails closed on
       # private-storage exclusions, root SQLite exclusion and partial-sync
       # propagation, so it belongs next to the other infrastructure contracts.
-      - name: Verify rclone sync exclusions and failure propagation
-        run: bash tests/infrastructure/rclone-sync-regression.sh
+      # Migrated 2026-09-26 from rclone to rsync: the test now drives the real
+      # sync.sh with a real rsync --dry-run against a local fixture instead of
+      # simulating rclone's filter engine in Python.
+      - name: Verify rsync sync exclusions and failure propagation
+        run: bash tests/infrastructure/rsync-sync-regression.sh
       # P1-I5: the pinned base image must not run as root. This inspects the
       # published artifact anonymously - a source-only 'USER www-data' check is
       # not evidence, because the digest production pinned until d7f3596 was
