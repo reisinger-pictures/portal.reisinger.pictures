@@ -56,39 +56,4 @@ test.describe('Coupon photo_package (Foto-Paket)', () => {
         await expect(row).toBeVisible({ timeout: 10000 });
         await expect(row).toContainText(PHOTO_PACKAGE_DISPLAY);
     });
-
-    test('photo_package coupon displays "N Fotos / Y €" in the management list', { tag: ['@feature:coupon'] }, async ({ page, request }) => {
-        const auth = new AuthHelper(page);
-        await auth.login(superAdmin.email, superAdmin.password, 'http://localhost:4321/');
-        const cookie = await helper.loginAs(superAdmin.email, superAdmin.password, { brand: 'rp' });
-
-        const couponCode = `FOTO-${Math.random().toString(36).substring(2, 8)}`.toUpperCase();
-        const headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Cookie': cookie,
-            'Referer': 'http://localhost:4321/',
-        };
-        const createRes = await request.post('/api/management/coupons', {
-            data: {
-                code: couponCode,
-                type: 'photo_package',
-                package_quantity: 10,
-                package_price_cents: 40, // Euro → 4000 cents via controller mapping
-                scope_type: 'global',
-                active: true,
-            },
-            headers,
-        });
-        const createResJson = await createRes.json();
-        if (createResJson?.coupon?.id) helper.trackCoupon(createResJson.coupon.id);
-
-        const sidebar = new SidebarHelper(page);
-        await sidebar.navigateTo('Gutscheincode');
-        await expect(page.locator('h1')).toContainText('Gutscheincode', { timeout: 15000 });
-
-        const row = page.locator('main tr').filter({ hasText: couponCode }).first();
-        await expect(row).toBeVisible({ timeout: 10000 });
-        await expect(row).toContainText(PHOTO_PACKAGE_DISPLAY);
-    });
 });

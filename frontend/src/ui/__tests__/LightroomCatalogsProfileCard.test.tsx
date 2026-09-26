@@ -214,7 +214,13 @@ describe('LightroomCatalogsProfileCard', () => {
         const rowButtons = within(firstRow).getAllByRole('button');
         await user.click(rowButtons[1]);
 
-        expect(confirm).toHaveBeenCalled();
+        // Assert what the user is actually asked to confirm, not merely that
+        // a dialog appeared. A bare toHaveBeenCalled() also passed if the
+        // prompt were the wrong one, or for the wrong catalog.
+        expect(confirm).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Katalog löschen?',
+            confirmColor: 'error',
+        }));
         expect(remove).toHaveBeenCalledWith('c1');
         expect(showToast).toHaveBeenCalledWith('success', 'Katalog gelöscht');
     });

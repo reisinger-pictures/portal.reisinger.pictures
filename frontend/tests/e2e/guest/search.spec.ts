@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Global Search Workflow', () => {
-    test('Guest can use global sidebar search to find content', { tag: ['@feature:guest'] }, async ({ page }) => {
+    // Carries @smoke since 2026-09-26: guest.spec.ts was deleted as a duplicate
+    // of this test, and deleting it would otherwise have removed the only
+    // @smoke coverage of the guest search path.
+    test('Guest can use global sidebar search to find content', { tag: ['@smoke', '@feature:guest'] }, async ({ page }) => {
         await page.goto('/');
 
         // Auf Mobile das Menü öffnen, damit die Sidebar sichtbar wird

@@ -187,9 +187,17 @@ describe('AIBatchEditModal', () => {
         const saveButtons = screen.getAllByText('Speichern');
         await user.click(saveButtons[0]);
 
+        // handleSave writes one row at a time and the test clicks the first
+        // row's button, so exactly one call is correct. What the bare
+        // toHaveBeenCalled() never checked is WHICH row and with what payload —
+        // saving p2 or p3, or saving p1 with another row's fields, both passed.
         await vi.waitFor(() => {
-            expect(mockUpdateMetadata).toHaveBeenCalled();
+            expect(mockUpdateMetadata).toHaveBeenCalledTimes(1);
         });
+        expect(mockUpdateMetadata).toHaveBeenCalledWith('p1', expect.objectContaining({
+            title: '',
+            description: '',
+        }));
 
         expect(showToast).toHaveBeenCalledWith('success', 'Gespeichert!');
     });

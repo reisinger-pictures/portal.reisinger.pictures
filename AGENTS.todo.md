@@ -175,7 +175,7 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 ### Überflüssige Tests — belegt löschbar
 
-- [ ] **E2E-Redundanz (4 Tests):** `admin/coupon-photo-package.spec.ts:60` ist
+- [x] **E2E-Redundanz (4 Tests) — umgesetzt 2026-09-26:** `admin/coupon-photo-package.spec.ts:60` ist
   ein exaktes Duplikat von `:26` und beweist nur, was die API schon erzeugt hat.
   `guest/guest.spec.ts:4` ist eine Zugabe zu `search.spec.ts:4` und fügt nichts
   hinzu — der Kommentar räumt sogar ein, er suche etwas, das „probably isn't
@@ -186,7 +186,7 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   **Nicht** zu löschen, obwohl überlappend: die drei Search-Specs
   (`search.spec.ts:4`, `guest-search-header.spec.ts:18`, `search-url-sync.spec.ts:5`)
   prüfen drei verschiedene Verträge (URL, a11y-Namen, Back/Forward-Mount).
-- [ ] **Zwei vollständig vakuose Unit-Dateien:** `PhotoDetailView.test.tsx`
+- [x] **Zwei vollständig vakuose Unit-Dateien — umgesetzt 2026-09-26:** `PhotoDetailView.test.tsx`
   (16 Mocks, 4 Tests) und `ManagementGalleryView.licensing.test.tsx`
   (22 Mocks, 2 Tests, 161 Zeilen, 13 Kinder zu `() => null`).
   **Die Vakuums-Behauptung wurde nachgeprüft, nicht geglaubt:** `grep` findet
@@ -195,7 +195,7 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   **Ersatz statt Löschung:** die beabsichtigte Abdeckung (Licensing-Modus)
   gehört in einen Logik-Test für `useLicensingMode`, nicht in einen
   Komponententest mit 16 Mocks.
-- [ ] **5 blanke `toHaveBeenCalled()` ohne Argumente** — bestehen auch, wenn der
+- [x] **4 blanke `toHaveBeenCalled()` ohne Argumente — umgesetzt 2026-09-26:** — bestehen auch, wenn der
   Aufruf mit falschen Daten erfolgt: `AIBatchEditModal.test.tsx:191`,
   `CouponInput.test.tsx:148`, `useBrandSettings.test.ts:109,130`,
   `ManagementOrdersView.test.tsx:189`, `LightroomCatalogsProfileCard.test.tsx:217`.
@@ -204,17 +204,17 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 ### Lücken, die Geld betreffen — höchste Priorität
 
-- [ ] **`utils.ts` `moveArrayItemUp/Down` ist ungetestet** und verschiebt
+- [x] **`utils.ts` `moveArrayItemUp/Down` ist ungetestet** und verschiebt
   Vertragspositionen und Rabattstaffeln (`ManagementContractView.tsx:241,245,265,269`,
   `logic/useInvoiceDraft.ts`). Ein Off-by-one dort ist ein **Geldfehler, kein
   Testfehler** — genau die Klasse, die ein Test nicht-fehlschlagen-lassen soll.
-- [ ] **Fixed-Point-Skalierung in `contractPricing.ts` ungetestet:**
+- [x] **Fixed-Point-Skalierung in `contractPricing.ts` ungetestet — umgesetzt 2026-09-26:**
   `CONTRACT_SNAPSHOT_SCALE`, `CONTRACT_PERCENT_SCALE`, `calculateEditorSubtotal`.
   Betrifft Rundung im Vertrags-Snapshot.
-- [ ] **`toSlug` ungetestet** (`utils.ts:138`) — speist Galerie-URLs
+- [x] **`toSlug` ungetestet — umgesetzt 2026-09-26:** (`utils.ts:138`) — speist Galerie-URLs
   (`GalleryModal.tsx:193,200`, `GalleryGroupModal.tsx:145`); keiner der beiden
   Komponententests importiert es.
-- [ ] **`useModels.ts` `modelPhotoDownloadUrl` ungetestet** (`:227-229`) — baut
+- [x] **`useModels.ts` `modelPhotoDownloadUrl` ungetestet — umgesetzt 2026-09-26:** (`:227-229`) — baut
   die File-Delivery-URL. Bricht unbemerkt, ist das ein kaputter Download, kein
   Testfehler.
 - [ ] **`usePayouts.ts` ungetestet** (`useAdminPayouts`, `useMyPayouts`) —
@@ -244,9 +244,38 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   und `model-delete.spec.ts` tragen alle `@feature:model-registration`, obwohl
   sie Filter, rollengebundenen Lifecycle und DSGVO-Löschung prüfen — Abdeckung
   vorhanden, aber per Tag nicht selektierbar.
-- [ ] **`useBrandSettings.test.ts` liegt falsch** (`ui/__tests__/` statt
+- [x] **`useBrandSettings.test.ts` liegt falsch — behoben 2026-09-26:** (`ui/__tests__/` statt
   `logic/__tests__/`), wodurch das Modul in einem Verzeichnisscan als ungetestet
   *aussieht*, obwohl es getestet ist. Misfiled, nicht ungetestet.
+
+
+### Abweichungen bei der Umsetzung (2026-09-26) — zwei Audits, nicht blind übernommen
+
+- **`CouponInput.test.tsx:148` war ein Fehlalarm.** `removeCoupon()` wird mit
+  **keinen Argumenten** aufgerufen (`CouponInput.tsx:38`), die blanke Assertion
+  ist dort also korrekt. Argumente zu ergänzen wäre falsch gewesen. Von fünf
+  gemeldeten Stellen sind damit **vier** echte.
+- **Zwei der vier E2E-Löschungen wurden zu Verschiebungen.** `guest.spec.ts` und
+  `public-gallery.spec.ts` tragen `@smoke`; ein blindes Löschen hätte
+  Smoke-Abdeckung entfernt, was die Bewertung des Audits nicht abwog. Deshalb:
+  `@smoke` auf `search.spec.ts:4` gehoben (das den Test bereits duplizierte) und
+  `guest.spec.ts` gelöscht; `public-gallery.spec.ts` **umbenannt** statt gelöscht,
+  weil der Testkörper die Login-Formular-Eindeutigkeit prüft und nur der Name
+  log. Der Test hieß „can view public galleries", öffnete aber keine Galerie.
+- **Die verschachtelte-Dialog-Reparatur war zunächst falsch.** Der erste
+  Fix prüfte „zuletzt registriert gewinnt" — aber React führt Effects
+  **kind-zuerst** aus, ein verschachtelter Dialog registriert sich also *vor*
+  seinem Elternteil und der äußere Dialog konsumierte das Escape. Die
+  Korrektur nutzt DOM-Reihenfolge, die die Verschachtelung tatsächlich
+  ausdrückt.
+- **Eine von mir verschärfte Assertion schlug fehl und erwies meine eigene
+  Annahme als falsch:** `handleSave(index)` speichert **eine** Zeile, ich hatte
+  drei erwartet. Der Code war richtig, die Assertion wurde korrigiert — und
+  bleibt schärfer, weil sie jetzt Foto-ID und Payload-Form prüft.
+- **Einheitenregel im Vertrags-Pricing:** Editor-Positionen sind in **Euro**,
+  Snapshot-Positionen in **Cent** (`toSnapshotValue` multipliziert mit
+  `CONTRACT_SNAPSHOT_SCALE`). Ein um Faktor 100 falscher Testwert wäre ein
+  Geldfehler im Test gewesen; der Kommentar pinnt die Regel jetzt explizit.
 
 ### Sauber, kein Handlungsbedarf
 

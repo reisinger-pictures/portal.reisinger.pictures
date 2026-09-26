@@ -1,11 +1,6 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Guest Search & Header (G9)', () => {
-    test('Guest can see search input on landing page', { tag: ['@feature:guest'] }, async ({ page }) => {
-        await page.goto('/');
-        const searchInput = page.getByRole('main').locator('input[placeholder="Suche in allen Galerien..."]');
-        await expect(searchInput).toBeVisible();
-    });
 
     test('Guest sees header with brand elements', { tag: ['@feature:guest'] }, async ({ page }) => {
         await page.goto('/');

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useBrandSettings } from '../../logic/useBrandSettings';
+import { useBrandSettings } from '../useBrandSettings';
 
 vi.mock('swr', () => ({
     default: vi.fn(),
@@ -106,7 +106,9 @@ describe('useBrandSettings', () => {
             'PUT',
             { primary_color: '#123456' }
         );
-        expect(mutate).toHaveBeenCalled();
+        // Proves the hook revalidates after a successful write. A bare
+        // toHaveBeenCalled() would also pass on a second spurious revalidation.
+        expect(mutate).toHaveBeenCalledTimes(1);
     });
 
     it('updateBrandSettings can reset a field with null', async () => {
@@ -127,6 +129,8 @@ describe('useBrandSettings', () => {
             'PUT',
             { primary_color: null }
         );
-        expect(mutate).toHaveBeenCalled();
+        // Proves the hook revalidates after a successful write. A bare
+        // toHaveBeenCalled() would also pass on a second spurious revalidation.
+        expect(mutate).toHaveBeenCalledTimes(1);
     });
 });
