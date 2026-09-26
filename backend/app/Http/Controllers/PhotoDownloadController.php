@@ -15,6 +15,7 @@ use App\Services\MediaVisibilityService;
 use App\Services\PurchaseService;
 use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
+use App\Support\TempDirectory;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -137,7 +138,7 @@ class PhotoDownloadController extends Controller
 
     protected function injectMetadata($sourcePath, $photo, $userName, ?string $customConditions = null)
     {
-        $tempDir = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
+        $tempDir = TempDirectory::path('photo_download');
         if (! is_dir($tempDir)) {
             mkdir($tempDir, 0755, true);
         }
@@ -307,7 +308,7 @@ class PhotoDownloadController extends Controller
             abort(404, 'Datei nicht gefunden oder noch nicht verarbeitet.');
         }
 
-        $tempDir = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
+        $tempDir = TempDirectory::path('photo_download');
         if (! is_dir($tempDir) && ! @mkdir($tempDir, 0755, true) && ! is_dir($tempDir)) {
             abort(500, 'Bildverarbeitung fehlgeschlagen.');
         }
@@ -537,7 +538,7 @@ class PhotoDownloadController extends Controller
         string $baseStoragePath,
         string $userName,
     ): array {
-        $tempDir = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
+        $tempDir = TempDirectory::path('photo_download');
         if (! is_dir($tempDir) && ! @mkdir($tempDir, 0755, true) && ! is_dir($tempDir)) {
             abort(500, 'ZIP-Vorbereitung fehlgeschlagen.');
         }
@@ -935,7 +936,7 @@ class PhotoDownloadController extends Controller
         string $userName,
         ?string $customConditions,
     ): array {
-        $tempDir = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
+        $tempDir = TempDirectory::path('photo_download');
         if (! is_dir($tempDir) && ! @mkdir($tempDir, 0755, true) && ! is_dir($tempDir)) {
             abort(500, 'ZIP-Vorbereitung fehlgeschlagen.');
         }

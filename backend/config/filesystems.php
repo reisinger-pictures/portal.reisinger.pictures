@@ -90,15 +90,25 @@ return [
     |--------------------------------------------------------------------------
     |
     | Scratch directory for downloads, archives and in-flight processing.
-    | It is deliberately configurable so tests can point a test class at its
-    | own directory. The default is a single absolute path, and paratest runs
-    | different test classes in separate worker processes at the same time,
-    | so any class that sweeps this directory — app:cleanup-temp empties it
-    | wholesale — deletes the fixtures of a concurrently running class.
+    | It is deliberately configurable so a test can point a single consumer
+    | at its own directory: the default is a single absolute path, and
+    | paratest runs separate test classes in separate worker processes, so a
+    | flat namespace lets concurrently running classes overwrite each
+    | other's files.
+    |
+    | Each consumer additionally gets its own subdirectory, resolved through
+    | App\Support\TempDirectory. The keys here are the consumer identifiers
+    | that class passes in; the values are the on-disk folder names.
     |
     */
 
     'temp_dir' => storage_path('app/private/temp'),
+
+    'temp_subdirs' => [
+        'import_locations' => 'import-locations',
+        'photo_download' => 'photo-download',
+        'ai' => 'ai',
+    ],
 
     /*
     |--------------------------------------------------------------------------
