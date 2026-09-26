@@ -400,6 +400,22 @@ jobs:
         ports:
           - 8025:8025
           - 1025:1025
+      # Real SFTPGo Admin API for the camera-account provisioning path that the
+      # profile slug-change specs exercise. A slug change is fail-closed without
+      # it, so a reachable service is the honest environment for those specs —
+      # not a relaxed assertion. Only the admin API is needed; the portal never
+      # speaks FTP itself, so no FTPS/SFTP bindings are configured here.
+      sftpgo:
+        image: drakkan/sftpgo:2.7.x
+        env:
+          # Both halves are required: the *_DEFAULT_ADMIN_* pair is ignored
+          # while `data_provider.create_default_admin` stays at its false
+          # default, and /api/v2/token would answer 401.
+          SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN: "true"
+          SFTPGO_DEFAULT_ADMIN_USERNAME: e2e
+          SFTPGO_DEFAULT_ADMIN_PASSWORD: e2e-sftpgo-admin-2026
+          SFTPGO_HTTPD__BINDINGS__0__PORT: "8080"
+          SFTPGO_HTTPD__BINDINGS__0__ADDRESS: "0.0.0.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Wait for Meilisearch
@@ -412,6 +428,12 @@ jobs:
           MEILISEARCH_REQUEST_TIMEOUT_SECONDS: "2"
           MEILISEARCH_READY_POLL_SECONDS: "1"
         run: bash scripts/wait-for-meilisearch.sh
+      - name: Wait for SFTPGo
+        # Service containers start before the job but are not guaranteed ready.
+        # The patience is bounded so a broken service fails here with a clear
+        # name instead of surfacing as a provisioning 503 much later.
+        run: |
+          timeout 60s bash -c 'until curl -sf http://sftpgo:8080/healthz > /dev/null; do sleep 1; done'
       - name: Ensure Stripe test keys are configured
         env:
           STRIPE_SECRET_SET: ${{ secrets.STRIPE_SECRET != '' }}
@@ -466,11 +488,25 @@ jobs:
             -e 's|^DB_PORT=.*|DB_PORT=3306|' \
             -e 's|^MEILISEARCH_HOST=.*|MEILISEARCH_HOST=http://meilisearch:7700|' \
             -e 's|^MAIL_HOST=.*|MAIL_HOST=mailpit|' \
+            -e 's|^FTP_STORAGE_PATH=.*|FTP_STORAGE_PATH=/tmp/portal-e2e-ftp|' \
             .env && rm -f .env.bak
+          # SFTPGo Admin API for the camera-account provisioning path. Appended
+          # because .env.ci does not carry these keys; the service hostname is
+          # the GitHub Service label above. No API key: the JWT fallback is the
+          # path under test, matching the local e2e-up.sh setup.
+          {
+            echo 'SFTPGO_BASE_URL=http://sftpgo:8080'
+            echo 'SFTPGO_API_KEY='
+            echo 'SFTPGO_ADMIN_USERNAME=e2e'
+            echo 'SFTPGO_ADMIN_PASSWORD=e2e-sftpgo-admin-2026'
+          } >> .env
           grep -q '^DB_HOST=mariadb$' .env
           grep -q '^DB_PORT=3306$' .env
           grep -q '^MEILISEARCH_HOST=http://meilisearch:7700$' .env
           grep -q '^MAIL_HOST=mailpit$' .env
+          grep -q '^FTP_STORAGE_PATH=/tmp/portal-e2e-ftp$' .env
+          grep -q '^SFTPGO_BASE_URL=http://sftpgo:8080$' .env
+          grep -q '^SFTPGO_ADMIN_USERNAME=e2e$' .env
       - name: Install backend dependencies
         working-directory: backend
         # Composer ist im Image (tag-gepinntes COPY --from); kein separater

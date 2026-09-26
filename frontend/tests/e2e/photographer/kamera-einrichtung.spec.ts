@@ -11,8 +11,10 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
  * `GET /api/management/ftp/status`, so a test that asserted the real deployment
  * would only ever verify whatever the CI environment happens to be configured
  * with — and would be green while the page showed a port nothing listens on. The
- * same is true of the reset: SFTPGo is a deployment dependency that is not
- * running in CI, so the real endpoint can only ever answer 503.
+ * same is true of the reset: it mints a fresh random password, so the value and
+ * the server's notice are stubbed here to keep the assertions deterministic. The
+ * real provisioning path, including the one-time password, is covered by
+ * profile-ftp-slug.spec.ts against the E2E stack's SFTPGo.
  *
  * The stub therefore serves a deliberately distinctive payload (`.invalid` host,
  * non-default ports) and the assertions check that those exact values reach the
