@@ -31,9 +31,15 @@ interface RegisteredModel {
     query: string;
 }
 
+interface PhotographerCredentials {
+    email: string;
+    password: string;
+}
+
 let openInviteCache: OpenInvite | null = null;
 let inviteListCache: Record<string, unknown> | null = null;
 let registeredModelCache: RegisteredModel | null = null;
+let photographerCache: PhotographerCredentials | null = null;
 
 /**
  * Create one admin invite and resolve its magic-link token from Mailpit. The
@@ -145,4 +151,19 @@ export async function seedRegisteredModel(request: APIRequestContext): Promise<R
     }
 
     return { q: registeredModelCache.query };
+}
+
+/**
+ * Filled state of the photographer dashboard: a photographer who owns a camera
+ * account. The FTP inbox is photographer-only, so the admin login cannot reach
+ * it — this seed creates the role the inbox renders for. The credentials are
+ * returned so the spec can log in through the real sidebar form.
+ */
+export async function seedPhotographer(request: APIRequestContext): Promise<PhotographerCredentials> {
+    if (photographerCache) return photographerCache;
+
+    const helper = new E2ESessionHelper(request);
+    photographerCache = await helper.createIsolatedUser('photographer');
+
+    return photographerCache;
 }

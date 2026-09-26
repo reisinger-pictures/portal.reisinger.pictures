@@ -120,6 +120,15 @@ async function captureSections(
  * E-Mail/Passwort inputs → Enter). A plain admin lands on "/".
  */
 async function loginAdminViaUi(page: Page): Promise<void> {
+    await loginViaUi(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+}
+
+/**
+ * UI login through the sidebar login form, with explicit credentials. The
+ * photographer dashboard needs a photographer, and the admin account has no
+ * camera account — so the harness cannot reuse the admin login for it.
+ */
+async function loginViaUi(page: Page, email: string, password: string): Promise<void> {
     await page.goto('/');
 
     await expect(page.getByTestId('app-loader').first()).toBeHidden({ timeout: 10000 });
@@ -139,8 +148,8 @@ async function loginAdminViaUi(page: Page): Promise<void> {
     }
 
     if (await emailInput.isVisible()) {
-        await emailInput.fill(ADMIN_EMAIL);
-        await page.fill('input[placeholder="Passwort"]', ADMIN_PASSWORD);
+        await emailInput.fill(email);
+        await page.fill('input[placeholder="Passwort"]', password);
         await page.getByRole('button', { name: 'Login' }).first().scrollIntoViewIfNeeded();
         await page.keyboard.press('Enter');
         await expect(emailInput).toBeHidden({ timeout: 15000 });
@@ -197,6 +206,8 @@ for (const route of routes) {
 
                 if (route.auth === 'admin') {
                     await loginAdminViaUi(page);
+                } else if (route.auth === 'photographer') {
+                    await loginViaUi(page, String(seed.email ?? ''), String(seed.password ?? ''));
                 }
 
                 // Initial load: the guest initial-load / deep-link exception.
