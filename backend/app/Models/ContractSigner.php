@@ -26,6 +26,18 @@ class ContractSigner extends Model
         'signed_at' => 'datetime',
     ];
 
+    /**
+     * The personal token is the credential for the unauthenticated
+     * `POST /api/contracts/sign/{token}` endpoint. Management list/detail
+     * serialization must never leak a foreign signer's credential; the join
+     * response returns the freshly created signer's token explicitly instead.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'personal_token',
+    ];
+
     protected static function booted(): void
     {
         static::creating(function (self $signer): void {

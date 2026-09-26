@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\ContractCloseConflictException;
+use App\Http\Controllers\Concerns\EnforcesBrandIsolation;
 use App\Http\Requests\StoreContractRequest;
 use App\Http\Requests\UpdateContractRequest;
 use App\Models\Contract;
@@ -11,12 +12,15 @@ use App\Services\ContractCloseService;
 use App\Services\ContractPricingService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 class ContractController extends Controller
 {
+    use EnforcesBrandIsolation;
+
     private ContractAuditService $contractAuditService;
 
     private ContractCloseService $contractCloseService;
@@ -72,12 +76,20 @@ class ContractController extends Controller
     {
         $contract = Contract::with(['signers.auditLogs'])->findOrFail($id);
 
+        if ($this->isBrandMismatch(auth('api')->user(), $contract)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
+
         return response()->json(['contract' => $this->serializeContract($contract)]);
     }
 
     public function update(UpdateContractRequest $request, $id)
     {
         $contract = Contract::findOrFail($id);
+
+        if ($this->isBrandMismatch($request->user(), $contract)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
 
         if ($contract->status !== 'draft' && $contract->status !== 'active') {
             return response()->json(['error' => 'Nur Entwürfe oder aktive Verträge ohne Unterschriften können bearbeitet werden'], 403);
@@ -91,17 +103,26 @@ class ContractController extends Controller
             return response()->json(['error' => 'Der Vertragstyp kann nach der Erstellung nicht mehr geändert werden'], 422);
         }
 
-        $contract->update($this->normalizeWriteSnapshot($request->validated(), $contract));
+        $data = $this->normalizeWriteSnapshot($request->validated(), $contract);
 
-        if ($contract->wasChanged() && $contract->status === 'active') {
-            $contract->increment('content_version');
-            $this->contractAuditService->log(
-                $contract->id,
-                null,
-                'modified',
-                $request
-            );
-        }
+        // Content and content_version must move together. In autocommit mode a
+        // concurrent sign() could otherwise take the row lock between the
+        // content UPDATE and the version increment, observe new content with
+        // the old version, pass the staleness check, and bind to terms the
+        // signer never saw.
+        DB::transaction(function () use ($contract, $data, $request): void {
+            $contract->update($data);
+
+            if ($contract->wasChanged() && $contract->status === 'active') {
+                $contract->increment('content_version');
+                $this->contractAuditService->log(
+                    $contract->id,
+                    null,
+                    'modified',
+                    $request
+                );
+            }
+        });
 
         return response()->json([
             'success' => true,
@@ -112,6 +133,10 @@ class ContractController extends Controller
     public function open($id)
     {
         $contract = Contract::findOrFail($id);
+
+        if ($this->isBrandMismatch(auth('api')->user(), $contract)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
 
         if ($contract->status !== 'draft') {
             return response()->json(['error' => 'Nur Entwürfe können geöffnet werden'], 400);
@@ -154,6 +179,10 @@ class ContractController extends Controller
     {
         $template = Contract::findOrFail($id);
 
+        if ($this->isBrandMismatch(auth('api')->user(), $template)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
+
         if ($template->type !== 'template') {
             return response()->json(['error' => 'Nicht gefunden'], 404);
         }
@@ -163,6 +192,12 @@ class ContractController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Defend against an anomalous instance row whose brand drifted from
+        // its template: never serialize an instance the actor may not see.
+        $instances = $instances->reject(
+            fn (Contract $contract): bool => $this->isBrandMismatch(auth('api')->user(), $contract),
+        );
+
         return response()->json($instances->map(
             fn (Contract $contract): array => $this->serializeContract($contract),
         )->values());
@@ -171,6 +206,10 @@ class ContractController extends Controller
     public function close($id)
     {
         $contract = Contract::with('signers')->findOrFail($id);
+
+        if ($this->isBrandMismatch(auth('api')->user(), $contract)) {
+            return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
+        }
 
         try {
             $result = $this->contractCloseService->close($contract);
@@ -232,11 +271,16 @@ class ContractController extends Controller
         }
 
         try {
-            if ($contract?->type === 'template'
+            // A rewrite of an existing snapshot must never silently change the
+            // authoritative total. A legacy mixed placement that cannot be
+            // copied into the canonical items/discounts partitions without
+            // reordering fails closed for every contract type, not only for
+            // templates.
+            if ($contract !== null
                 && ! $this->contractPricingService->canCopySnapshotWithoutReordering($contract->items, $contract->discounts)
             ) {
                 throw ValidationException::withMessages([
-                    'items' => 'Die Reihenfolge der Legacy-Preispositionen dieser Vorlage kann nicht verlustfrei erhalten werden.',
+                    'items' => 'Die Reihenfolge der Legacy-Preispositionen kann nicht verlustfrei erhalten werden.',
                 ]);
             }
 

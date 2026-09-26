@@ -14,6 +14,8 @@ use App\Models\User;
 use App\Services\ContractCloseService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\MailpitAssertions;
@@ -120,6 +122,101 @@ class ContractCloseTest extends TestCase
             'brand' => 'rp',
             'total_gross' => 10000,
         ]);
+    }
+
+    public function test_close_with_priced_items_and_missing_billing_recipient_still_creates_accounting(): void
+    {
+        Mail::fake();
+
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Leistung',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 10000,
+            ]],
+            'discounts' => [],
+            'billing_details' => null,
+        ]);
+
+        $result = app(ContractCloseService::class)->close($contract);
+
+        $this->assertSame(ContractCloseService::RESULT_CLOSED, $result['status']);
+        // The documented auto-invoicing trigger is `total_gross > 0` alone: a
+        // priced contract must never close without a receivable.
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertDatabaseCount('invoice_snapshots', 1);
+        $this->assertDatabaseHas('orders', [
+            'status' => 'invoice_created',
+            'total_amount' => 10000,
+            'user_id' => null,
+        ]);
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'status' => 'closed',
+        ]);
+    }
+
+    public function test_rolled_back_close_leaves_no_queued_closure_mail_and_retry_queues_once(): void
+    {
+        Mail::fake();
+
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Leistung',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 10000,
+            ]],
+            'discounts' => [],
+            'billing_details' => null,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'email' => 'rollback-signer@example.com',
+            'status' => 'signed',
+        ]);
+
+        $triggered = false;
+        ContractSigner::retrieved(function () use (&$triggered): void {
+            if ($triggered || DB::transactionLevel() < 1) {
+                return;
+            }
+
+            $triggered = true;
+            throw new \RuntimeException('simulated rollback after queueClosedMail');
+        });
+
+        try {
+            app(ContractCloseService::class)->close($contract);
+            $this->fail('Expected the simulated failure to abort the close transaction.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('simulated rollback after queueClosedMail', $exception->getMessage());
+        } finally {
+            Event::forget('eloquent.retrieved: '.ContractSigner::class);
+        }
+
+        $this->assertTrue($triggered);
+        // The mail is dispatched after commit, so a rolled-back attempt must
+        // leave no queued job behind.
+        Mail::assertNothingQueued();
+        $this->assertDatabaseHas('contracts', [
+            'id' => $contract->id,
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('invoice_snapshots', 0);
+
+        // The successful retry dispatches exactly once.
+        $result = app(ContractCloseService::class)->close($contract);
+        $this->assertSame(ContractCloseService::RESULT_CLOSED, $result['status']);
+        Mail::assertQueued(ContractClosedMail::class, 1);
     }
 
     public function test_repeated_and_stale_close_callers_create_one_accounting_and_mail_path(): void

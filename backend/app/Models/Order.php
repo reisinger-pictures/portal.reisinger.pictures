@@ -103,7 +103,11 @@ class Order extends Model
     {
         static::saving(function ($order) {
             ActorIdentity::assertOrderOwnerInvariant($order->user_id, $order->guest_id);
-            PersistedMoney::assertFitsCents($order->total_amount, 'orders.total_amount');
+            PersistedMoney::assertNonNegativeCents($order->total_amount, 'orders.total_amount');
+            // Nullable legacy columns may stay null, but a present value must
+            // never be negative or exceed the persisted money ceiling.
+            PersistedMoney::assertFitsCents($order->coupon_discount_cents, 'orders.coupon_discount_cents');
+            PersistedMoney::assertFitsCents($order->stripe_fee_cents, 'orders.stripe_fee_cents');
 
             // Transition guard: a persisted legacy status must not break saves
             // that do not touch the status column (e.g. payment-failure

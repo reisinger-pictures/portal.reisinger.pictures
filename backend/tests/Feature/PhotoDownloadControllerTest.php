@@ -349,6 +349,53 @@ class PhotoDownloadControllerTest extends TestCase
         $this->assertDatabaseCount('download_logs', 0);
     }
 
+    public function test_paid_order_zip_counts_only_prepared_files_when_one_source_is_missing(): void
+    {
+        $user = User::factory()->create();
+        $gallery = Gallery::factory()->create([
+            'type' => 'delivery',
+            'is_public' => true,
+        ]);
+        $present = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $missing = Photo::factory()->create(['gallery_id' => $gallery->id]);
+
+        // Only the first ordered item has a source file. The derivation must
+        // report one prepared file, not the two ordered items.
+        Storage::disk('photos')->put(
+            $gallery->id.'/'.$present->filename,
+            (string) file_get_contents(base_path('tests/Fixtures/sample.jpg')),
+        );
+
+        $order = Order::factory()->paid()->create([
+            'user_id' => $user->id,
+            'brand' => 'rp',
+        ]);
+
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'invoice_number' => 'P-PARTIAL-ZIP-COUNT',
+            'brand' => 'rp',
+            'customer_details' => [
+                'items' => [
+                    ['photoId' => $present->id, 'tier' => 'original', 'price' => 1750],
+                    ['photoId' => $missing->id, 'tier' => 'original', 'price' => 1750],
+                ],
+            ],
+            'total_net' => 3500,
+            'total_gross' => 3500,
+            'tax_rate' => 0,
+        ]);
+
+        $this->actingAs($user, 'api')
+            ->get("/api/orders/{$order->id}/download-zip")
+            ->assertStatus(200);
+
+        $log = DownloadLog::sole();
+        $this->assertSame(1, $log->photo_count);
+        $this->assertSame(1, $log->payload['photo_count']);
+        $this->assertSame([(string) $present->id], $log->payload['photo_ids']);
+    }
+
     public function test_gallery_zip_fails_closed_when_watermark_bucket_is_missing(): void
     {
         $user = User::factory()->create(['flatrate_level' => 'web', 'brand' => 'rp']);

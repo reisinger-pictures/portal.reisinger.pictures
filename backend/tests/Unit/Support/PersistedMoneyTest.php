@@ -46,6 +46,64 @@ class PersistedMoneyTest extends TestCase
         }
     }
 
+    public function test_negative_and_null_order_totals_are_rejected_before_insert(): void
+    {
+        foreach ([-1, null] as $value) {
+            try {
+                Order::create([
+                    'status' => 'pending',
+                    'total_amount' => $value,
+                ]);
+                $this->fail('Expected the non-negative order total guard to reject the write.');
+            } catch (InvalidArgumentException) {
+                // expected
+            }
+        }
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_negative_coupon_discount_and_negative_stripe_fee_are_rejected_before_insert(): void
+    {
+        try {
+            Order::create([
+                'status' => 'pending',
+                'total_amount' => 100,
+                'coupon_discount_cents' => -1,
+            ]);
+            $this->fail('Expected the coupon discount guard to reject a negative value.');
+        } catch (InvalidArgumentException) {
+            // expected
+        }
+
+        try {
+            Order::create([
+                'status' => 'pending',
+                'total_amount' => 100,
+                'stripe_fee_cents' => -1,
+            ]);
+            $this->fail('Expected the stripe fee guard to reject a negative value.');
+        } catch (InvalidArgumentException) {
+            // expected
+        }
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_over_ceiling_coupon_discount_is_rejected_before_insert(): void
+    {
+        try {
+            Order::create([
+                'status' => 'pending',
+                'total_amount' => 100,
+                'coupon_discount_cents' => PersistedMoney::MAX_CENTS + 1,
+            ]);
+            $this->fail('Expected the coupon discount ceiling guard to reject the write.');
+        } catch (InvalidArgumentException) {
+            $this->assertDatabaseCount('orders', 0);
+        }
+    }
+
     public function test_invoice_snapshot_overflow_is_rejected_before_insert(): void
     {
         $order = Order::create([
@@ -65,6 +123,27 @@ class PersistedMoneyTest extends TestCase
         } catch (InvalidArgumentException) {
             $this->assertDatabaseCount('invoice_snapshots', 0);
             $this->assertDatabaseHas('orders', ['id' => $order->id]);
+        }
+    }
+
+    public function test_negative_invoice_snapshot_totals_are_rejected_before_insert(): void
+    {
+        $order = Order::create([
+            'status' => 'pending',
+            'total_amount' => 1,
+        ]);
+
+        try {
+            InvoiceSnapshot::create([
+                'order_id' => $order->id,
+                'invoice_number' => 'NEGATIVE-1',
+                'customer_details' => [],
+                'total_net' => -1,
+                'total_gross' => 1,
+            ]);
+            $this->fail('Expected the persisted snapshot guard to reject a negative total.');
+        } catch (InvalidArgumentException) {
+            $this->assertDatabaseCount('invoice_snapshots', 0);
         }
     }
 }

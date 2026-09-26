@@ -2,22 +2,33 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\CustomMail;
 use App\Models\Order;
 use App\Services\CheckoutRiskService;
+use App\Services\DisputeMailDispatcher;
 use App\Services\PaymentIntentReconciliationService;
 use App\Services\StripePaymentService;
 use App\Support\ActorIdentity;
-use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Webhook;
 
+/**
+ * Stripe webhook ingress.
+ *
+ * Replay tolerance is layered: the durable database compare-and-swap on the
+ * order status (and the invoice-snapshot mail claim) is the real money/access
+ * guard. The app-cache event claim is a defense-in-depth short-circuit that
+ * requires a shared cache store (database/redis/memcached/dynamodb) to
+ * deduplicate concurrent duplicates across containers; a per-container cache
+ * degrades it to at-least-once processing, which the durable guards absorb.
+ * The shared-cache requirement for webhook containers is currently enforced
+ * only indirectly (see ProductionOperationsPolicy scheduler rule) and should
+ * be promoted to an explicit production invariant.
+ */
 class WebhookController extends Controller
 {
     private const WEBHOOK_EVENT_CLAIM_TTL_SECONDS = 120;
@@ -32,15 +43,20 @@ class WebhookController extends Controller
 
     private PaymentIntentReconciliationService $paymentReconciliation;
 
+    private DisputeMailDispatcher $disputeMailDispatcher;
+
     public function __construct(
         ?StripePaymentService $stripePayment = null,
         ?CheckoutRiskService $checkoutRisk = null,
         ?PaymentIntentReconciliationService $paymentReconciliation = null,
+        ?DisputeMailDispatcher $disputeMailDispatcher = null,
     ) {
         $this->stripePayment = $stripePayment ?? app(StripePaymentService::class);
         $this->checkoutRisk = $checkoutRisk ?? app(CheckoutRiskService::class);
         $this->paymentReconciliation = $paymentReconciliation
             ?? app(PaymentIntentReconciliationService::class);
+        $this->disputeMailDispatcher = $disputeMailDispatcher
+            ?? app(DisputeMailDispatcher::class);
     }
 
     public function handleStripe(Request $request)
@@ -51,8 +67,14 @@ class WebhookController extends Controller
 
         // Local development fallback: read the live secret from the
         // auto-tunneler's private file without ever logging its contents.
+        // This artifact only exists for local/tunnel workflows; it must never
+        // become an accepted signing secret on a production-like host with an
+        // unset env var.
         $secretFile = storage_path('app/private/stripe_secret.txt');
-        if (empty($endpointSecret) && file_exists($secretFile)) {
+        if (empty($endpointSecret)
+            && app()->environment(['local', 'testing'])
+            && file_exists($secretFile)
+        ) {
             $endpointSecret = trim(file_get_contents($secretFile));
         }
 
@@ -95,62 +117,84 @@ class WebhookController extends Controller
             return $this->recordPaymentFailure($event);
         } elseif ($eventType === 'charge.dispute.created') {
             $dispute = $this->eventObject($event);
-            $piId = $this->customerOrPaymentIntentId($dispute, 'payment_intent');
-            if ($piId === null) {
-                Log::warning('Webhook: dispute with null payment_intent, skipping', [
-                    'dispute_id' => $this->valueString($this->objectValue($dispute, 'id')),
-                ]);
 
-                return response()->json(['status' => 'success']);
-            }
+            return $this->withWebhookEventClaim(
+                $this->webhookEventKey($this->eventId($event), $dispute, 'charge.dispute.created'),
+                function () use ($dispute): JsonResponse {
+                    $piId = $this->customerOrPaymentIntentId($dispute, 'payment_intent');
+                    if ($piId === null) {
+                        Log::warning('Webhook: dispute with null payment_intent, skipping', [
+                            'dispute_id' => $this->valueString($this->objectValue($dispute, 'id')),
+                        ]);
 
-            $order = Order::where('stripe_payment_intent_id', $piId)->first();
-            $disputedOrder = $order === null
-                ? null
-                : $this->transitionTerminalPaymentStatus($order, 'disputed');
-            if ($order !== null) {
-                // A late event may be ignored, but any stale positive cache is
-                // still unsafe to retain for a negative payment signal.
-                $this->clearPurchasedCache($order);
-            }
-            if ($disputedOrder !== null) {
-                Mail::to(BrandRegistry::configOrDefault()->accountingEmail ?? 'accounting@reisinger.pictures')
-                    ->send(new CustomMail('Stripe Dispute eröffnet', "Für die Bestellung {$disputedOrder->id} wurde ein Dispute (Rückbuchung) eröffnet. Der Download-Zugriff für den Kunden wurde automatisch gesperrt."));
-            }
+                        return response()->json(['status' => 'success']);
+                    }
+
+                    $order = Order::where('stripe_payment_intent_id', $piId)->first();
+                    if ($order === null) {
+                        return response()->json(['status' => 'success']);
+                    }
+
+                    $disputedOrder = $this->transitionTerminalPaymentStatus($order, 'disputed');
+
+                    // A late event may be ignored, but any stale positive cache
+                    // is still unsafe to retain for a negative payment signal.
+                    $this->clearPurchasedCache($order);
+
+                    // The status transition is a lifecycle guard, not the mail
+                    // idempotency key. If the first enqueue fails after the
+                    // order is already `disputed`, a retry still sees the
+                    // terminal status; the durable snapshot claim keeps the
+                    // alert at-most-once after a successful enqueue.
+                    $currentStatus = $disputedOrder?->status ?? $order->fresh()?->status;
+                    if ($currentStatus === 'disputed') {
+                        $this->disputeMailDispatcher->queueOnce($order);
+                    }
+
+                    return response()->json(['status' => 'success']);
+                },
+            );
         } elseif ($eventType === 'charge.refunded') {
             $charge = $this->eventObject($event);
-            $piId = $this->customerOrPaymentIntentId($charge, 'payment_intent');
-            if ($piId === null) {
-                Log::warning('Webhook: refund with null payment_intent, skipping', [
-                    'charge_id' => $this->valueString($this->objectValue($charge, 'id')),
-                ]);
 
-                return response()->json(['status' => 'success']);
-            }
+            return $this->withWebhookEventClaim(
+                $this->webhookEventKey($this->eventId($event), $charge, 'charge.refunded'),
+                function () use ($charge): JsonResponse {
+                    $piId = $this->customerOrPaymentIntentId($charge, 'payment_intent');
+                    if ($piId === null) {
+                        Log::warning('Webhook: refund with null payment_intent, skipping', [
+                            'charge_id' => $this->valueString($this->objectValue($charge, 'id')),
+                        ]);
 
-            // `charge.refunded` fires for partial refunds too. In this domain the
-            // `refunded` order state means a FULL refund (see
-            // features/ecommerce/09-stripe-checkout-flow.md), so partial refunds
-            // must not revoke the customer's download access.
-            if (! $this->isFullRefund($charge)) {
-                Log::warning('Webhook: partial refund received, order access preserved', [
-                    'charge_id' => $this->valueString($this->objectValue($charge, 'id')),
-                    'amount' => $this->valueInt($this->objectValue($charge, 'amount')),
-                    'amount_refunded' => $this->valueInt($this->objectValue($charge, 'amount_refunded')),
-                ]);
+                        return response()->json(['status' => 'success']);
+                    }
 
-                return response()->json(['status' => 'success']);
-            }
+                    // `charge.refunded` fires for partial refunds too. In this
+                    // domain the `refunded` order state means a FULL refund (see
+                    // features/ecommerce/09-stripe-checkout-flow.md), so partial
+                    // refunds must not revoke the customer's download access.
+                    if (! $this->isFullRefund($charge)) {
+                        Log::warning('Webhook: partial refund received, order access preserved', [
+                            'charge_id' => $this->valueString($this->objectValue($charge, 'id')),
+                            'amount' => $this->valueInt($this->objectValue($charge, 'amount')),
+                            'amount_refunded' => $this->valueInt($this->objectValue($charge, 'amount_refunded')),
+                        ]);
 
-            $order = Order::where('stripe_payment_intent_id', $piId)->first();
-            $refundedOrder = $order === null
-                ? null
-                : $this->transitionTerminalPaymentStatus($order, 'refunded');
-            if ($order !== null) {
-                // Keep the cache fail-closed even when the terminal-state guard
-                // intentionally leaves a pending/cancelled/refunded row unchanged.
-                $this->clearPurchasedCache($order);
-            }
+                        return response()->json(['status' => 'success']);
+                    }
+
+                    $order = Order::where('stripe_payment_intent_id', $piId)->first();
+                    if ($order !== null) {
+                        $this->transitionTerminalPaymentStatus($order, 'refunded');
+                        // Keep the cache fail-closed even when the terminal-state
+                        // guard intentionally leaves a pending/cancelled/refunded
+                        // row unchanged.
+                        $this->clearPurchasedCache($order);
+                    }
+
+                    return response()->json(['status' => 'success']);
+                },
+            );
         }
 
         return response()->json(['status' => 'success']);

@@ -137,7 +137,13 @@ class ContractCloseService
                 $lockedContract->status = 'closed';
                 $lockedContract->updated_at = $closedAt;
 
-                if ($totalGross > 0 && $billingDetails !== []) {
+                // The documented auto-invoicing trigger is `total_gross > 0`
+                // alone. A priced contract must never close without a
+                // receivable, so the billing-recipient preconditions are not
+                // allowed to silently skip the accounting rows: a missing
+                // recipient yields an order/invoice without a customer e-mail
+                // rather than no order at all.
+                if ($totalGross > 0) {
                     $this->createInvoice($lockedContract, $billingDetails, $processed, $totalGross);
                 }
 
@@ -236,9 +242,15 @@ class ContractCloseService
 
         $recipients = array_values(array_unique(array_filter($recipients)));
 
-        foreach ($recipients as $recipient) {
-            Mail::to($recipient)->queue(new ContractClosedMail($contract));
-        }
+        // Dispatch only after the close transaction commits. The database queue
+        // connection also sets after_commit, but the sync/local driver would
+        // otherwise send inline and survive a rolled-back attempt (then send a
+        // second time on the retry).
+        DB::afterCommit(function () use ($recipients, $contract): void {
+            foreach ($recipients as $recipient) {
+                Mail::to($recipient)->queue(new ContractClosedMail($contract));
+            }
+        });
     }
 
     private function isRetryableDatabaseConflict(Throwable $exception): bool

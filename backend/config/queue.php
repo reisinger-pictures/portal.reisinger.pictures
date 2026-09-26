@@ -48,6 +48,16 @@ return [
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
             'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // MUST stay false. InvoiceMailDispatcher and DisputeMailDispatcher
+            // persist their claim marker and enqueue inside ONE transaction, and
+            // they rely on transaction membership for at-most-once enqueue that
+            // is still retryable. With after_commit=true the jobs INSERT moves
+            // into a db.transactions callback that runs after commit(), so a
+            // failed enqueue would leave a committed claim with no queued job:
+            // every retry then takes the "already claimed" branch and the mail
+            // (invoice receipt, chargeback alert) is lost permanently.
+            // DurableDispatchService does not depend on this flag: it constructs
+            // UuidDatabaseQueue with afterCommit=false explicitly.
             'after_commit' => false,
         ],
 

@@ -118,6 +118,42 @@ class ContractJoinTest extends TestCase
         ]);
     }
 
+    public function test_join_accepts_an_unverified_third_party_email_and_returns_its_token(): void
+    {
+        // ACCEPTED PRODUCT DECISION (CTR-7): anyone holding a valid join link
+        // may join under a not-yet-joined e-mail address and receives the
+        // personal signing token inline. V039 guarantees uniqueness of
+        // (join_scope_key, normalized_email), not proof of address ownership.
+        // This test pins the behaviour so a future change cannot drift
+        // silently; the secure alternative requires a frontend + mail flow
+        // owned by other implementers.
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'join_token' => 'third-party-join',
+            'available_roles' => ['Model'],
+            'allow_multiple_roles_per_signer' => false,
+            'brand' => Brand::B2B,
+        ]);
+
+        $response = $this->postJson('/api/contracts/join/third-party-join', [
+            'name' => 'Not The Counterparty',
+            'email' => 'counterparty@example.com',
+            'roles' => ['Model'],
+        ]);
+
+        $response->assertStatus(201);
+        $token = $response->json('personal_token');
+        $this->assertIsString($token);
+        $this->assertDatabaseHas('contract_signers', [
+            'contract_id' => $contract->id,
+            'email' => 'counterparty@example.com',
+            'status' => 'joined',
+        ]);
+
+        // The returned token grants access to the public signature endpoints.
+        $this->getJson('/api/contracts/sign/'.$token)->assertOk();
+    }
+
     public function test_multiple_roles_rejected(): void
     {
         $contract = Contract::factory()->create([

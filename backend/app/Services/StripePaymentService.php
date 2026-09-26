@@ -67,6 +67,15 @@ class StripePaymentService
         if (is_string($order->guest_id) && trim($order->guest_id) !== '') {
             throw new \RuntimeException('Stripe checkout for transient guests is not supported.');
         }
+
+        // This is the single choke point that creates a charge. The amount is
+        // server-authoritative: it must always equal the persisted order total.
+        // A mismatch (for example a future caller passing a cart subtotal) must
+        // fail closed before any Stripe request instead of creating a
+        // "validated" PaymentIntent for the wrong amount.
+        if ($amountCents !== (int) $order->total_amount) {
+            throw new \RuntimeException('Stripe PaymentIntent amount does not match the persisted order total.');
+        }
         $context = $this->resolveIntentContext(
             $orderId,
             $generation,
