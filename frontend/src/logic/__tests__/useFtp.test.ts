@@ -26,6 +26,20 @@ const BASE_STATUS: FtpStatus = {
     ftp_account_status: 'pending',
     ftp_provisioned_at: null,
     ftp_account_error: null,
+    // A fully configured connection, because the camera settings the management UI
+    // renders are only as good as this payload: a fixture with `configured: false`
+    // would let a dropped field pass unnoticed. `ftpConnection.test.ts` covers the
+    // unconfigured case.
+    connection: {
+        configured: true,
+        host: 'reisinger.pictures',
+        username: 'florian',
+        path: '/',
+        sftp_port: 2222,
+        ftps_port: 989,
+        pasv_port_start: 50000,
+        pasv_port_end: 50100,
+    },
 };
 
 /**
@@ -68,6 +82,11 @@ describe('useFtp', () => {
         expect(result.current.status?.ftp_account_status).toBe('pending');
         expect(result.current.status?.ftp_provisioned_at).toBeNull();
         expect(result.current.status?.ftp_account_error).toBeNull();
+        // The camera settings ride along with the inbox fields; a UI that only
+        // renders them when the connection is present needs the hook to hand
+        // them through unchanged.
+        expect(result.current.status?.connection.host).toBe('reisinger.pictures');
+        expect(result.current.status?.connection.sftp_port).toBe(2222);
     });
 
     it('distinguishes a failed provisioning from an unprovisioned one', async () => {
