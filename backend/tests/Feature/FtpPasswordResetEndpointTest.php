@@ -304,6 +304,14 @@ class FtpPasswordResetEndpointTest extends TestCase
         $user = User::factory()->create($attributes);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
+        // This file describes the rotation of a *live* account, so the state is
+        // named instead of left to the column default. Since P1-M58 a `pending`
+        // account is provisioned by the same endpoint instead of rotated, which
+        // is covered in `FtpFirstCameraAccountTest`; without this line these
+        // tests would silently have changed what they assert. The column is not
+        // mass-assignable and is written the way the service writes it.
+        $user->forceFill(['ftp_account_status' => FtpCredentialService::STATUS_ACTIVE])->save();
+
         return $user->fresh();
     }
 }

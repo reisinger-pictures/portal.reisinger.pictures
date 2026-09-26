@@ -939,6 +939,57 @@ zurückbekam, wäre neu provisioniert worden, während der Status `revoked` blie
 `revoked → active`, und `ftp_revoked_at` bleibt als Beleg des vergangenen Entzugs
 stehen. Geschrieben wird dabei kein Geheimnis, nur die zwei Buchungsspalten.
 
+**Der Reset ist die Beschaffung, nicht nur die Rotation (P1-M58).**
+`POST /management/ftp/reset-password` war die einzige Aktion der Oberfläche und
+rief `resetPassword()`, das als Read-Modify-Write mit `findUser()` beginnt — ein
+nie provisioniertes Konto antwortet also 404. Damit konnte ein Fotograf, der
+seinen `ftp_slug` nie ändert, **gar kein** Konto bekommen: Status `pending`, und
+die Oberfläche sagte „Fordere zuerst die Zugangsdaten an", wofür es keine Tür
+gab. Derselbe Fehler stand eine Zeile früher: der Slug-Wechsel in
+`AuthController::updateProfile()` rief `deleteUser()` **unbedingt**, sobald ein
+Slug gesetzt war. `User::booted()` vergibt aber bei jedem Anlegen einen Slug und
+niemals ein Konto — der Delete lief also gegen einen Account, den es nie gab,
+und der Fail-closed brach **jeden ersten Slug-Wechsel mit HTTP 500** ab.
+
+Der Endpunkt bekommt deshalb die Zustandstabelle. Keine neue Tür: er trägt
+bereits Auth, die `management/ftp*`-Berechtigung, die Quota (3/Stunde), den
+Audit-Trail und das Show-once-Kontrakt — eine zweite Tür mit derselben Disziplin
+wäre mehr Fläche für Fehler als eine Tür mit zwei Fällen.
+
+| `ftp_account_status` | Verhalten | HTTP |
+|---|---|---|
+| `pending` | **Provisionieren** (`provisionAndShow()`), Passwort einmal zeigen | 200 |
+| `active` | **Rotieren** (unverändert) | 200 |
+| `revoked` | **Ablehnen**, gar kein SFTPGo-Aufruf | 409 |
+| `error` | **Ablehnen**, gar kein SFTPGo-Aufruf | 409 |
+
+Zwei Punkte sind Last:
+
+- **`revoked` ist per Klick nicht wiederzubeleben.** Der Entzug war eine
+  bewusste Entscheidung (Rollenverlust). Ein Reset, der das Konto anlegt, gäbe
+  einem entzogenen Fotografen mit einem Klick wieder funktionierenden
+  SFTPGo-Zugang — die Absicherung wäre wertlos. Die Prüfung steht deshalb
+  **innerhalb des `try`**, vor dem SFTPGo-Aufruf: der `catch` auditiert jede
+  von dort kommende Ablehnung als **fehlgeschlagenen Versuch**, und genau das ist
+  der interessante Eintrag. Vor dem `try` würde derselbe Klick unauditiert
+  bleiben — die Lücke, die der Trail schließen soll.
+- **`error` bleibt `error`.** Der letzte Provisionierungsversuch schlug fehl,
+  der Zustand ist unbekannt. Ein Reset, der ihn überschreibt, rät und meldet
+  danach ein Passwort für einen Account, dessen Existenz niemand belegen kann.
+
+Nur `pending` provisioniert, und dabei **ohne** Audit-Zeile: eine Anlage ist kein
+Reset, `ftp_password_resets` ist der Reset-Trail. Die Quota gilt auch für diesen
+Zweig — sonst wäre die Erstanlage ein Weg um sie herum. **409 statt 422**, weil
+nichts an der Anfrage falsch ist: der Account ist in einem Zustand, der keinen
+Zugang erlaubt, und es gibt keinen zu korrigierenden Input. Fail-closed bleibt
+beidseits: ist SFTPGo nicht erreichbar, bleibt der Status `pending`, weil
+`provisionAndShow()` `active` erst nach einer erfolgreichen Annage schreibt.
+
+Denselben Guard trägt der Slug-Wechsel jetzt auch: `deleteUser()` nur bei
+`STATUS_ACTIVE`, wie in `revoke()`. Er schränkt ein, *ob* gelöscht wird, nicht
+ob ein Fehler toleriert wird — `active` plus nicht erreichbares SFTPGo bricht
+den Wechsel weiterhin ab.
+
 **Reihenfolge im Frontend:** `FtpAccountStatus` ist eine abschließende Union, und
 die Statusanzeige ist ein `Record<FtpAccountStatus, …>` statt einer if-Kette mit
 Fallback. Der Unterschied ist nicht kosmetisch: die frühere Form endete in „alles

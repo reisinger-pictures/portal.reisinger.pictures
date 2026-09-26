@@ -20,6 +20,13 @@ use RuntimeException;
  * an unlimited mint for valid credentials unless the portal caps it. That cap
  * is enforced before any request leaves the process, so it belongs with the
  * other "the portal stopped this" reasons and not with `SftpGoException`.
+ *
+ * The fourth portal-side precondition is `not_resettable` (P1-M58): the account
+ * state says the access may not be re-issued at all — `revoked` after a role
+ * loss, or `error` from a provisioning attempt whose outcome is unknown. It is
+ * not a failure of the input and not a failure of the service, it is a state the
+ * portal refuses to touch, so it cannot be an `SftpGoException` and it never
+ * reaches SFTPGo either.
  */
 class FtpCredentialException extends RuntimeException
 {
@@ -32,6 +39,8 @@ class FtpCredentialException extends RuntimeException
     public const REASON_UNUSABLE_INBOX_PATH = 'unusable_inbox_path';
 
     public const REASON_RATE_LIMITED = 'rate_limited';
+
+    public const REASON_NOT_RESETTABLE = 'not_resettable';
 
     public function __construct(
         public readonly string $reason,
@@ -96,5 +105,31 @@ class FtpCredentialException extends RuntimeException
             "Zu viele FTP-Passwort-Zurücksetzungen für dieses Konto (maximal {$limit} pro Stunde). Bitte später erneut versuchen.",
             max(1, $retryAfterSeconds),
         );
+    }
+
+    /**
+     * The account state forbids re-issuing a credential (P1-M58), and the reason
+     * is passed in so the photographer is told *why* instead of only that it did
+     * not work.
+     *
+     * Both texts have to make one thing unmistakable: retrying changes nothing.
+     * They name the administration as the way out, because neither state can be
+     * cleared from the photographer's own screen — a `revoked` account was taken
+     * away deliberately, and an `error` one has an unknown outcome that only a
+     * look at the service can resolve.
+     *
+     * The two known states are spelled out as cases rather than as constants:
+     * this class reports on the service from the outside and does not depend on
+     * `FtpCredentialService`, so the default arm covers `error` and every state a
+     * future migration may add.
+     */
+    public static function notResettable(string $status): self
+    {
+        $message = match ($status) {
+            'revoked' => 'Der FTP-Kamera-Zugang dieses Kontos wurde entzogen und kann nicht zurückgesetzt werden. Bitte wende dich an die Administration, wenn du den Zugang wieder benötigst.',
+            default => 'Der FTP-Kamera-Zugang dieses Kontos ist in einem fehlerhaften Zustand und kann nicht zurückgesetzt werden. Bitte wende dich an die Administration.',
+        };
+
+        return new self(self::REASON_NOT_RESETTABLE, $message);
     }
 }
