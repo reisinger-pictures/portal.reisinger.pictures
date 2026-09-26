@@ -229,7 +229,14 @@ export default function ManagementFtpInbox() {
                         {resetting
                             ? <span className="loading loading-spinner loading-sm"></span>
                             : <span className="iconify mdi--key-outline text-lg"></span>}
-                        <Trans>Neues Kamera-Passwort</Trans>
+                        {/* Bei `pending` existiert noch kein Konto — dort ist die
+                            Aktion eine Anlage, keine Rotation. Der Text muss das
+                            sagen, sonst suggeriert er einen Reset, den es nicht
+                            gibt, und der Fotograf sucht vergeblich nach dem
+                            Passwort, das noch nie erzeugt wurde. */}
+                        {status.ftp_account_status === 'pending'
+                            ? <Trans>Kamera-Zugang einrichten</Trans>
+                            : <Trans>Neues Kamera-Passwort</Trans>}
                     </button>
                 </div>
 
