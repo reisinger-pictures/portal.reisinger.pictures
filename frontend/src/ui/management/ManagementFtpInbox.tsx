@@ -7,6 +7,7 @@ import {useFtp} from '../../logic/useFtp';
 import {useProtectedGalleries} from '../../logic/useGalleries';
 import { useUI } from '../components/UIContext';
 import {FtpConnectionRows, FtpConnectionUnconfigured} from './FtpConnectionRows';
+import ShowOncePassword from './components/ShowOncePassword';
 
 const brandLabels: Record<string, string> = {
     rp: 'Reisinger Pictures',
@@ -95,30 +96,6 @@ function AccountStatus({status, error}: {status: string; error: string | null}) 
     return (
         <div className="flex items-center gap-2 mt-1">
             <span className="badge badge-success badge-sm"><Trans>Konto aktiv</Trans></span>
-        </div>
-    );
-}
-
-/**
- * The show-once password.
- *
- * Held in component state and nowhere else: no SWR cache, no storage, no
- * navigation state. Unmounting the card — closing the view or navigating away —
- * drops the value and its DOM node with it, so there is nothing to clean up by
- * hand and nothing that can survive into the next mount. The dismiss button
- * removes it while the card stays open, which is the only way a password could
- * otherwise linger on a shared screen.
- */
-function ShowOncePassword({password, notice, onDismiss}: {password: string; notice: string; onDismiss: () => void}) {
-    return (
-        <div className="alert alert-warning shadow-sm mt-3" role="status">
-            <span className="iconify mdi--key-outline text-xl"></span>
-            <div className="flex-1">
-                <h3 className="font-bold"><Trans>Neues Kamera-Passwort</Trans></h3>
-                <code className="font-mono text-lg font-bold select-all break-all">{password}</code>
-                <p className="text-sm mt-1">{notice}</p>
-                <button className="btn btn-xs btn-outline mt-2" onClick={onDismiss}><Trans>Verstanden, ausblenden</Trans></button>
-            </div>
         </div>
     );
 }
