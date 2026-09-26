@@ -88,7 +88,7 @@ The system and workflow are managed via a Main/Secondary Model architecture to p
 Module-specific instructions live in per-module `AGENTS.md` files:
 
 - **`frontend/AGENTS.md`** — React Vite SPA: React Compiler policy (`reactCompilerPreset`; `useMemo`/`useCallback`/`React.memo`/`forwardRef` are antipatterns), frontend test/lint/build + Playwright E2E commands, frontend STRICT rules (Tailwind JIT/Only, Zod validation, ESLint & TypeScript, semantic locator scoping, no `page.goto` SPA navigation, localStorage injection, field labels, useEffect & derived state).
-- **`backend/AGENTS.md`** — Laravel PHP: backend test command, Database Setup + Migration policy (seed after every migration; V035 is the last recorded deployed migration; V036–V038 are the current non-production repository frontier and may be consolidated when technically appropriate; a new V039+ migration is only for an unavoidable schema requirement), backend parallel testing/paratest rules and worker-DB concurrency.
+- **`backend/AGENTS.md`** — Laravel PHP: backend test command, Database Setup + Migration policy (seed after every migration; V035 is the last recorded deployed migration; V036–V040 are the current non-production repository frontier and may be consolidated when technically appropriate; a new V041+ migration is only for an unavoidable schema requirement), backend parallel testing/paratest rules and worker-DB concurrency.
 - **`admin.lrplugin/AGENTS.md`** — Lightroom Classic Lua plugin: scope, key files, and Lua conventions. This is a separate module with its own doc.
 
 The Security Risk Register (accepted risks, resolved C1–C7) is in §8 below and is repo-global.

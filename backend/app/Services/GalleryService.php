@@ -29,6 +29,21 @@ class GalleryService
             'gallery_groups'
         );
 
+        $brand = BrandRegistry::currentOrDefault()->value;
+
+        // A new group takes the actor's brand, so a parent from another brand
+        // would immediately violate the one-brand-per-tree invariant. No cycle
+        // check is needed yet: a group that does not exist cannot be an
+        // ancestor of anything.
+        if (($data['parent_id'] ?? null) !== null) {
+            $parent = $this->findGroupOrFail($data['parent_id']);
+            if (BrandRegistry::normalizeId($parent->brand) !== BrandRegistry::normalizeId($brand)) {
+                throw ValidationException::withMessages([
+                    'parent_id' => 'Die übergeordnete Galerie-Gruppe gehört nicht zur Brand dieser Galerie-Gruppe.',
+                ]);
+            }
+        }
+
         $group = GalleryGroup::create([
             'name' => $data['name'],
             'slug' => $slug,
@@ -38,7 +53,7 @@ class GalleryService
             'is_editorial_only' => $data['is_editorial_only'] ?? false,
             'is_hidden' => $data['is_hidden'] ?? false,
             'restricted_photographers' => $data['restricted_photographers'] ?? null,
-            'brand' => BrandRegistry::currentOrDefault()->value,
+            'brand' => $brand,
         ]);
 
         if (! empty($data['org_id'])) {
@@ -57,6 +72,8 @@ class GalleryService
         if ($slug !== $group->slug) {
             $slug = $this->slugService->makeUnique($slug, 'gallery_groups');
         }
+
+        $this->assertParentAssignmentIsSound($group, $data['parent_id'] ?? null);
 
         DB::transaction(function () use ($group, $data, $slug) {
             $group->update([
@@ -454,6 +471,62 @@ class GalleryService
     /**
      * @throws ValidationException
      */
+    /**
+     * Refuse a parent assignment that would break the group hierarchy.
+     *
+     * The brand chain is already validated in GroupRequest via
+     * Rule::exists(...)->where('brand', $brand), but that rule is skipped
+     * whenever the group has no normalizable brand, and a request class is the
+     * wrong place for a structural invariant: anything that reaches the service
+     * can bypass it. The check lives here as well so the invariant holds for
+     * every caller.
+     *
+     * The cycle guard matters even though the subtree traversal is already
+     * cycle-safe (GalleryGroupSubtree tracks visited ids, so it terminates).
+     * A cycle is not a hang, it is a corrupted hierarchy: the recursive group
+     * tree in the frontend has no meaningful rendering for it, and the
+     * structure stops being a tree at all.
+     */
+    private function assertParentAssignmentIsSound(GalleryGroup $group, mixed $parentId): void
+    {
+        if ($parentId === null) {
+            return;
+        }
+
+        $parent = $this->findGroupOrFail($parentId);
+        $groupBrand = $this->requireGroupBrand($group);
+
+        if (BrandRegistry::normalizeId($parent->brand) !== $groupBrand) {
+            throw ValidationException::withMessages([
+                'parent_id' => 'Die übergeordnete Galerie-Gruppe gehört nicht zur Brand dieser Galerie-Gruppe.',
+            ]);
+        }
+
+        // Walk up from the candidate parent. Reaching the group being moved
+        // means the new parent is one of its own descendants, so the move
+        // would close a loop.
+        $seen = [];
+        $cursor = $parent;
+        while ($cursor instanceof GalleryGroup) {
+            $cursorId = (string) $cursor->id;
+
+            if ($cursorId === (string) $group->id) {
+                throw ValidationException::withMessages([
+                    'parent_id' => 'Eine Galerie-Gruppe kann nicht unter ihre eigene Untergruppe verschoben werden.',
+                ]);
+            }
+
+            if (isset($seen[$cursorId])) {
+                // A cycle already exists further up. Refuse rather than extend
+                // it, and stop so this walk cannot spin either.
+                break;
+            }
+            $seen[$cursorId] = true;
+
+            $cursor = $cursor->parent_id !== null ? GalleryGroup::find($cursor->parent_id) : null;
+        }
+    }
+
     private function requireGroupBrand(GalleryGroup $group): string
     {
         $groupBrand = BrandRegistry::normalizeId($group->brand);
