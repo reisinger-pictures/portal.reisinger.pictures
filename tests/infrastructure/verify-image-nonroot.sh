@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Artifact-level gate for P1-I5: the digest-pinned portal-base image that
-# production boots - and the digest-pinned portal-e2e image that receives the
+# Artifact-level gate for P1-I5: the tag-pinned portal-base image that
+# production boots - and the tag-pinned portal-e2e image that receives the
 # CI secrets - must not run as root.
 #
 # The static half of this policy lives in
 # backend/tests/Feature/InfrastructureSupplyChainPolicyTest.php: the Dockerfiles
-# declare a non-root USER and every consumer pins one identical digest. That
+# declare a non-root USER and every consumer pins one identical concrete tag. That
 # half is not sufficient on its own, because it only describes the *source*.
 # `USER www-data` entered deployment/Dockerfile on 2026-09-24, while the digest
 # production pinned until commit d7f3596 had been built on 2026-08-20 from an
@@ -17,9 +17,10 @@
 # was previously unpinned by any gate; a typo or a stale digest was undetectable.
 # It is consumed only by .github/workflows/ci.yml (the e2e job `container:`).
 #
-# The manifest is requested *by the pinned digest*, so the config blob it points
-# at is content-addressed: this inspects exactly the image the consumer boots,
-# not whatever the tag happens to point at today.
+# The manifest is requested *by the consumed tag*, so the config blob the
+# registry resolves it to is the artifact the consumer boots today; the digest
+# the registry reports is kept for the failure messages, not compared against a
+# repository pin (this gate no longer requires a digest pin).
 #
 # The inspect is deliberately anonymous - no docker login, no credential from
 # ~/.docker/config.json, no Authorization header on the first request. A
@@ -145,7 +146,7 @@ resolve_pin() {
         [[ -n "$tag" ]] || continue
         tags+=("$tag")
     done < <(
-        grep -ohE "ghcr\.io/[A-Za-z0-9._-]+/${image_name}(:[^[:space:]\"']+)?" "$@" \
+        grep -ohE "ghcr\.io/[A-Za-z0-9._-]+/${image_name}:[^[:space:]\"'@]+" "$@" \
             | sed -E 's/.*:([^[:space:]@]+)$/\1/' \
             | sort -u
     )
@@ -158,9 +159,9 @@ resolve_pin() {
     printf '%s' "${tags[0]}"
 }
 
-# Verifies one consumed image: expected runtime user (from source), pinned
-# digest (from the consumer files), anonymous inspectability, and the published
-# Config.User.
+# Verifies one consumed image: expected runtime user (from source), the
+# consumed tag (from the consumer files), anonymous inspectability, and the
+# published Config.User.
 verify_image() {
     local image_name="$1"
     shift
@@ -255,13 +256,15 @@ rebuild and push ${image_name} or correct the pin before this gate can prove any
     fi
     [[ "$HTTP_STATUS" == '200' ]] || fail "unexpected HTTP $HTTP_STATUS while fetching ${manifest_url}"
 
-    # Defensive: the registry must answer with the exact digest that was requested.
+    # Defensive: a tag manifest must still be content-addressed by the registry.
+    # There is no requested digest to compare against any more (the consumer
+    # pins a tag, not a digest), so this only fails closed when the registry
+    # answers without a usable Docker-Content-Digest.
     local served_digest
     served_digest="$(sed -nE 's/^[Dd]ocker-[Cc]ontent-[Dd]igest:[[:space:]]*(sha256:[0-9a-f]{64}).*$/\1/p' \
         "$HEADER_FILE" | tr -d '\r' | tail -n 1)"
-    if [[ -n "$served_digest" && "$served_digest" != "$pinned_tag" ]]; then
-        fail "the registry served $served_digest while tag ${pinned_tag} was requested"
-    fi
+    [[ -n "$served_digest" ]] \
+        || fail "the registry did not return a Docker-Content-Digest while tag ${pinned_tag} was requested"
 
     # 4. A multi-platform image is published as an index; follow it to the
     # linux/amd64 manifest so the inspected config is the one the runners use.

@@ -1,12 +1,12 @@
-name: Verify pinned image digests are fresh
+name: Verify consumed image tags are fresh
 
-# INFRA-10: base-image.yml and e2e-image.yml push mutable tags, but CI and
-# production consume immutable digests. Nothing bumps those consumer pins, so
-# a published security fix silently never reaches CI or production and
-# verify-image-nonroot.sh keeps passing on the stale pin. This gate resolves
-# the digest each consumed tag currently points at, compares it with the
-# repository pin, and fails when the pin is stale beyond the documented
-# maximum age.
+# INFRA-10: base-image.yml and e2e-image.yml push mutable tags, and since the
+# owner decision of 2026-09-26 the CI/production consumers pin a concrete tag
+# (no `latest`) instead of an immutable digest. A mutable tag delivers rebuilds
+# automatically, but a workflow that silently stops rebuilding leaves an old
+# artifact behind the tag with no consumer-visible change. This gate resolves the
+# artifact each consumed tag currently points at, reads its published `created`
+# timestamp and fails when the artifact is older than the documented maximum age.
 #
 # Policy and exit contract: tests/infrastructure/verify-image-freshness.sh
 # and deployment/image-pin-freshness.md.
@@ -33,9 +33,9 @@ concurrency:
 
 jobs:
   freshness:
-    name: Pinned digest freshness
+    name: Consumed image tag freshness
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Verify consumer pins match the published tags
+      - name: Verify the consumed tags point at fresh artifacts
         run: bash tests/infrastructure/verify-image-freshness.sh
