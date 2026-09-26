@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useEffect, useReducer, useRef } from 'react';
 import { usePhoto, PhotoVersion } from '../../logic/usePhoto';
+import ModalShell from './ModalShell';
 import { useUI } from './UIContext';
 
 interface Props {
@@ -56,13 +57,13 @@ export default function PhotoHistoryModal({ photoId, isOpen, onClose, onReverted
     if (!isOpen) return null;
 
     return (
-        <div className="modal modal-open">
-            <div className="modal-box max-w-4xl relative">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
-                    <span className="iconify mdi--history text-primary"></span> <Trans>Änderungshistorie (Vor-Zustände)</Trans>
-                </h3>
-                <p className="text-sm opacity-70 mb-4"><Trans>Hier werden die ursprünglichen Metadaten gespeichert, <strong>bevor</strong> ein Kunde eine Änderung vorgenommen hat.</Trans></p>
+        <ModalShell
+            title={<Trans>Änderungshistorie (Vor-Zustände)</Trans>}
+            icon="mdi--history"
+            onClose={onClose}
+            boxClassName="max-w-4xl"
+        >
+            <p className="text-sm opacity-70 mb-4"><Trans>Hier werden die ursprünglichen Metadaten gespeichert, <strong>bevor</strong> ein Kunde eine Änderung vorgenommen hat.</Trans></p>
 
                 {state.status === 'loading' ? (
                     <div className="flex justify-center p-8"><span className="loading loading-spinner"></span></div>
@@ -101,9 +102,7 @@ export default function PhotoHistoryModal({ photoId, isOpen, onClose, onReverted
                             </tbody>
                         </table>
                     </div>
-                )}
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+            )}
+        </ModalShell>
     );
 }
