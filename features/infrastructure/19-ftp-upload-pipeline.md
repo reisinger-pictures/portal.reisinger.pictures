@@ -3,6 +3,7 @@
 > **Status:** Soll-Zustand.
 > Describes the complete FTP upload pipeline: watch → parse → import → cleanup.
 > References: `features/infrastructure/13-ftp-brand-isolation.md`.
+> Account-Provisioning und Transport (SFTPGo): Abschnitt 7.
 
 ## 1. Pipeline Overview
 
@@ -34,20 +35,11 @@ Two storage disks are involved:
   ```
 - Each authenticated photographer has a dedicated directory named by their `ftp_slug` (falls back to `user.id`).
 - The FTP server (external) is configured to write incoming files into the correct user directory.
-- **Transport wird ersetzt (2026-09-26, in Arbeit).** Der externe Server ist
-  aktuell `pure-ftpd` und wird durch **SFTPGo** abgelöst. Zwei Gründe:
-  `pure-ftpd` kann `AES128-SHA` nicht anbieten (verifiziert — die Cipher-Liste
-  wird intern gebaut und ignoriert `OPENSSL_CONF`), damit erreicht die Kamera
-  den Server nicht; und `pure-ftpd` liest seine User-DB nur beim Start, was
-  PHP-verwaltete Passwörter ohne Neustart unmöglich macht. Tasks:
-  **P1-M21 bis P1-M29** in `AGENTS.todo.md`, Infrastruktur-Anforderung in
-  `~/dev/strato-vps/ANALYSIS.md` Abschnitt 6e.
-- **Für diesen Abschnitt bleibt entscheidend, dass sich nichts ändert:**
-  SFTPGo schreibt auf denselben Host-Pfad `/home/webadmin/websites/ftp`, der
-  Bind-Mount auf `/var/www/ftp` bleibt, und `ftp_inbox` bleibt `driver=local`.
-  `FtpController` und `FtpImportTest` werden **nicht** angefasst. Ein Wechsel
-  auf den `sftp`-Flysystem-Treiber wäre ein Netzwerk-Roundtrip nach localhost
-  pro Datei — bewusst nicht gewollt (P1-M25).
+- **Transport:** externer Dienst, bis 2026-09-26 `pure-ftpd`, Ziel ist
+  **SFTPGo** (Abschnitt 7.1). Auf diesem Pfad ändert sich für die Disks
+  nichts.
+- Details zu Transport und Provisioning: **Abschnitt 7**. Dort ist auch
+  festgehalten, dass `FtpController` und `FtpImportTest` unverändert bleiben.
 
 ### 2.2 Photo Storage (`photos` disk)
 
@@ -143,3 +135,197 @@ Gallery assignment is purely explicit via `setTarget()`:
 | Concurrent process calls | No locking — duplicate processing of same files is possible. Design assumes single-user access. |
 | Gallery deleted between setTarget and process | `Gallery::find()` returns null in process() loop — error may occur. Current code uses `Gallery::find()` after the check. |
 | Brand isolation violation | 403 response — the user is informed before any import occurs. |
+
+## 7. Account Provisioning & Transport (SFTPGo)
+
+> Erweitert 2026-09-26. Kameras laden per FTPS/SFTP in `ftp_inbox/{ftp_slug}/`;
+> der Dateitransport ist ein **externer Dienst** und nicht Teil des Portals.
+> Verbindlicher Soll-Zustand, in Umsetzung.
+>
+> **Verknüpfte Tasks:** P1-M21 bis P1-M32 in `AGENTS.todo.md`.
+> Infrastruktur-Seite: `~/dev/strato-vps/ANALYSIS.md` Abschnitt 6e.
+
+### 7.1 Ausgangslage und Bewegungsgründe
+
+Bis 2026-09-26 war der externe Dienst `pure-ftpd` mit **einem** pauschalen
+User (`webadmin`), dessen Passwort fest in einer Stack-ENV-Datei lag und dessen
+Home auf den **gesamten** Website-Baum zeigte. Nicht haltbar aus zwei Gründen:
+
+1. **Blast Radius.** Wer das Passwort hat, kann in jede Site schreiben —
+   inklusive `api-portal.reisinger.pictures` und des Portal-Codes.
+2. **Keine Verwaltung durch die Applikation.** `pure-ftpd` liest seine
+   User-Datenbank **einmal beim Start**. Jedes neue Konto und jede Rotation
+   erfordert einen Container-Neustart.
+
+Ein dritter Grund kam bei der Prüfung hinzu: `pure-ftpd` kann `AES128-SHA`
+**nicht anbieten** (verifiziert — die Cipher-Liste wird intern gebaut, die
+`-C`-Bits sind *Verbote*, `OPENSSL_CONF` wird ignoriert). Kameras, die CBC/SHA1
+brauchen, erreichen den Server damit nicht, und das ist nicht konfigurierbar.
+
+### 7.2 Ein Account pro Fotograf, Username = `ftp_slug`
+
+- Der FTP-/SFTP-Username ist **`users.ftp_slug`** — bereits vorhanden
+  (`V001__initial_portal_schema.php:62`), `unique()` und selbst wählbar
+  (`AuthController.php:220-230`).
+- **Verbindliche Formatregel** (P1-M21): `^[a-z0-9][a-z0-9_-]{2,31}$`.
+  Keine Punkte, kein `@`, kein Slash, max. 32 Zeichen, kleingeschrieben.
+  Offene Frage zur Migration bestehender Werte: 7.6.
+- Der FTP-Ordner ist `ftp/<ftp_slug>`, konsistent mit `getInboxPath()`
+  (`:151-156`).
+
+### 7.3 Passwort-Fluss: erzeugen, anzeigen, verwerfen
+
+**Das Portal speichert kein FTP-Passwort.** Das ist der Kern des Wechsels.
+
+1. PHP erzeugt ein kamerataugliches Passwort `^[a-z0-9]{16,24}$` —
+   **keine Sonderzeichen**, da Kameras sie am Konfigurationsbildschirm nicht
+   eingeben können; keine gemischte Groß-/Kleinschreibung, um
+   Tastatur-Layout-Fehler zu vermeiden.
+2. Übergabe per **HTTPS** an die SFTPGo-Admin-API.
+3. Anzeige **einmal**, danach verwerfen.
+4. Verloren → `resetPassword()`. Es gibt **keine** Wiederherstellung.
+
+Daraus folgt: **keine** `ftp_credentials`-Tabelle, **kein**
+`FILE_ENCRYPTION_KEY`/`FILE_ENCRYPTION_PREVIOUS_KEYS` für FTP, **keine**
+verschlüsselten Secrets at rest. Der zwischenzeitlich erwogene Entwurf mit
+`encrypted`-Cast auf einer `text`-Spalte (Muster `ModelProfile.php:55-62`) ist
+**hinfällig**.
+
+*Offen (Produktentscheidung):* dürfen Fotografen ihr Passwort selbst ändern
+oder nur der Admin? Ein Selbständerungs-Flow bräuchte einen Confirm-Schritt
+mit dem aktuellen Passwort.
+
+### 7.4 Provisionierungsstatus auf `users`
+
+`status()` braucht eine Kontoanzeige, obwohl kein Passwort gespeichert wird.
+
+**Festgelegt: eine Spalte, kein Live-Query gegen SFTPGo.** Ein Live-Query im
+Lesepfad würde die UI vom Dienst abhängig machen und widerspricht 7.5; er
+bräuchte außerdem ein Credential auch für Read-Operationen und nähme der
+Reduktion der Secret-Fläche den Kern.
+
+Migration **V041+** (Reihe endet bei V040; `backend/AGENTS.md` verlangt die
+vorab dokumentierte Schema-/Backfill-/Rollback-Entscheidung):
+
+| Spalte | Typ | Bedeutung |
+|---|---|---|
+| `ftp_account_status` | enum `pending`/`active`/`error` | Kontozustand |
+| `ftp_provisioned_at` | timestamp nullable | letzter erfolgreicher Provision |
+| `ftp_account_error` | text nullable | Fehlertext für `error` |
+
+- **Backfill:** bestehende Fotografen auf `pending` — der Zustand ist
+  unbekannt, sie wurden nie über SFTPGo provisioniert.
+- **Rollback:** reines Spalten-Drop, kein Datenverlust.
+- Die Spalte ist ein **Cache**, nicht die Wahrheit: wird der User in SFTPGo von
+  Hand gelöscht, ist sie veraltet. Deshalb ein expliziter
+  `reconcileAccount()`-Pfad statt eines stillen Live-Query.
+
+### 7.5 Der Import darf nicht am Dienst hängen
+
+Dateien, die bereits in `ftp/<slug>` liegen, müssen auch dann importierbar
+sein, wenn SFTPGo ausfällt. **`process()` hat keinen SFTPGo-Kontakt.**
+
+- `status()` liefert bei Timeout **keinen** 500er, sondern den zuletzt
+  bekannten Stand aus 7.4. Der Fotograf soll sehen, was das System weiß, nicht
+  einen Fehler, der nach Datenverlust aussieht.
+- Der HTTP-Client bekommt feste Timeouts (`Http::timeout(5)` connect,
+  `Http::timeout(15)` total), kein Default-Timeout.
+
+### 7.6 Admin-API-Client
+
+`SftpGoClient` (`app/Services/`) kapselt ausschließlich HTTP gegen die
+Admin-API. **Kein** FTP-/SFTP-Protokoll-Speak im Portal.
+
+- Endpunkte `/api/v2/users` (POST anlegen, PUT ändern), Auth über
+  `X-SFTPGO-API-KEY` oder JWT aus `POST /api/v2/token`.
+- **Schema nicht raten.** Quelle: `GET /openapi` an der laufenden Instanz
+  (Swagger UI, im Community-Build aktiv), dann `openapi.yaml` im Repository
+  `drakkan/sftpgo`.
+
+### 7.7 Credential-Haltung
+
+- `deployment/docker-compose.yml` ist **versioniert** und enthält
+  ausschließlich `${SFTPGO_BASE_URL}` und `${SFTPGO_API_KEY}`. Der Wert gehört
+  in die **Portainer-Stack-Env**. Commit nur Platzhalter — dieselbe
+  Fehlerklasse wie C1–C4.
+- **Lizenz:** SFTPGo ist AGPL-3.0. Betrieben wird das **offizielle,
+  unveränderte** Image; damit haften keine Offenlegungspflichten für das
+  Portal. Ein selbstgebautes oder gepatchtes Image wäre eine andere
+  Rechtslage und ist **untersagt**. (Keine Anwaltsberatung, nur die
+  technische Konsequenz aus der Lizenz.)
+
+### 7.8 Was sich bewusst NICHT ändert
+
+SFTPGo schreibt auf **denselben** Host-Pfad `/home/webadmin/websites/ftp`.
+Bind-Mount `-> /var/www/ftp` und Disk `ftp_inbox` als `driver=local` bleiben.
+
+- **`FtpController` wird nicht angefasst** — `getInboxPath()`, `setTarget()`,
+  die `status()`-Struktur und `process()` bleiben.
+- **Kein** `Storage::disk('sftp')` für den Import: Netzwerk-Roundtrip nach
+  localhost pro Datei **plus** ein Credential im Portal für den eigenen Host.
+- `FtpImportTest` muss nach dem Wechsel unverändert grün bleiben. P1-M25
+  ergänzt einen Test, der festschreibt, dass `ftp_inbox` lokal bleibt.
+
+### 7.9 Ownership-Regeln auf dem Host
+
+Aus dem Vorfall vom 2026-09-26, verbindlich für jeden Prozess, der auf
+`/home/webadmin/websites` schreibt.
+
+**Verboten:**
+
+- `chown -R` durch Container-Entrypoints auf `/home/webadmin/websites`. Ein
+  FTP-Stack-Start hat damit die Ownership von **38.969 Dateien** von
+  `1002:webgroup` auf `1000` umgeschrieben (Container-UID 1000 → Host-UID 1000
+  = `r1`).
+- `adduser -h DIR` auf bestehende Pfade. BusyBox `adduser -h` chownt das Home
+  **selbst**, auch ohne `-R`.
+
+**Soll:**
+
+- SFTPGo läuft als eigener System-User, der auf `1002:webgroup` gemappt wird.
+- `ftp/<slug>` ist `1002:webgroup` mit `2777` (setgid), damit neue Dateien die
+  Gruppe erben.
+- SFTPGo legt virtuelle Ordner **nicht** an (Doku: *"you have to create the
+  folder on disk yourself"*). Anlegen und Ownership-setzen ist ein
+  Host-seitiger Schritt, getrennt vom User-Provisioning (P1-M24).
+
+### 7.10 Reihenfolge
+
+1. Formatregel für `ftp_slug` (P1-M21) — vor jedem Provisioning.
+2. `ftp_account_status`-Spalten (P1-M30).
+3. `SftpGoClient` + Passwort-Fluss (P1-M22, P1-M23, P1-M31).
+4. Ordner-Anlage auf dem Host (P1-M24).
+5. Host-Umgebung: SFTPGo-Stack, Cipher, Firewall (`strato-vps` 6e).
+6. **Kameraneukonfiguration** (P1-M32) — operativer Schritt, mit Owner.
+7. Erst dann `pure-ftpd` stilllegen.
+
+Schritt 6 darf nicht übersprungen werden: Wird SFTPGo eingerichtet und niemand
+stellt die Kamera um, ist nach dem Umschalten alles gleichzeitig still — und
+der Import läuft weiter, weil die Dateien noch auf der Platte liegen. Der
+Ausfall ist damit leicht zu übersehen.
+
+### 7.11 Offene Punkte
+
+**Kamera-Protokoll (blockiert die Abnahme).** Ob die konkrete Kamera FTPS mit
+GCM oder CBC/SHA1 braucht, ist **ungeklärt**. Testmethode: Cipher-Liste des
+laufenden SFTPGo mit `openssl s_client -cipher …` prüfen, dann mit echter
+Kamera. Unterstützt die Kamera SFTP, ist SFTP vorzuziehen — moderne Ciphers,
+und SFTPGo bietet FTPS und SFTP auf demselben Port. Der User `florian` unter
+`pure-ftpd` gilt bis dahin als **Betriebs-Workaround, kein Beweis**.
+
+**Bestehende `ftp_slug`-Werte.** `Str::slug()` lässt Punkte zu, ein Localpart
+wie `j.doe` wird zu `j.doe`; die neue Regel verbietet das. Eine Umbenennung ist
+keine Kosmetik, weil `ftp_slug` Fremdschlüssel für `storage/app/private`-Pfade
+ist. Zu entscheiden: Altslugs automatisch normalisieren (mit Folge für die
+Ordnerstruktur) oder den Fotografen wählen lassen, mit Fehlerpfad bis dahin.
+
+**Brand-Scope.** `ftp_slug` ist user-level, nicht brand-level
+(`25-brand-separation-matrix.md:33`). Der `Brand`-Enum hat aktuell genau einen
+Fall (`app/Enums/Brand.php:12-15`), das Schema ist faktisch Single-Tenant. Für
+einen zweiten Brand braucht es eine Trennung des Folder-Namespaces, sonst sieht
+ein Fotograf die Ordner einer anderen Marke. Bewusst nicht vorgebaut, aber
+dokumentiert (P1-M29).
+
+**Concurrency im Import.** Siehe Abschnitt 6: `process()` hat keinen Lock. Mit
+mehreren Fotografen ist die Annahme "single-user access" eine Fehlerquelle
+(P1-M28).
