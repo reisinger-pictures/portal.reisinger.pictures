@@ -872,3 +872,57 @@ Board: P1-M38 (Integrationstest), P1-M35 (Harness und Config-Weg), P1-M27
   `SFTPGO_DEFAULT_ADMIN_*`, der Backend-Service deklarierte keines der beiden
   Paare, und mit leerem `SFTPGO_API_KEY` wäre die Provisionierung mit 401
   gescheitert, während die Konfiguration korrekt aussah.
+
+### 7.16 Lebenszyklus des Kamera-Kontos
+
+Stand 2026-09-26, entschieden vor der Umsetzung (Schema-Entscheidung nach
+`backend/AGENTS.md`, Migration Policy).
+
+**Der Zustand ist eine Liste, kein Flag.** `users.ftp_account_status` ist ein
+Enum mit `pending | active | error`. Ein Entzug braucht einen vierten Wert, weil
+„hat nie gehabt" und „hatte es und wurde entzogen" für die Oberfläche und das
+Audit zwei verschiedene Dinge sind. Ohne vierten Wert müsste der Entzug auf
+`pending` oder `error` landen — beides wäre eine Lüge: `pending` behauptet
+„noch nie provisioniert" und lädt former Fotografen ein, Zugangsdaten
+anzufordern.
+
+**Migration V043:**
+
+| Änderung | Typ | Begründung |
+|---|---|---|
+| `ftp_account_status` Enum um `revoked` erweitern | Schema | vierter Zustand, siehe oben |
+| `ftp_revoked_at` | timestamp, null | Audit-Spur, spiegelbildlich zu `ftp_provisioned_at` |
+| Backfill | **keiner** | es wurde noch nie entzogen; alle bestehenden Werte bleiben gültig |
+| Rollback | Enum auf drei Werte, `ftp_revoked_at` droppen | nur sinnvoll, wenn keine Zeile `revoked` existiert; die Spalte ist genau für den Fall da, also wird sie im Normalbetrieb nicht zurückgerollt |
+
+`down()` wird laut Repo-Regel nie ausgeführt und bleibt leer.
+
+**Die Invariante, die ein Umbau sonst zerstört:** `users.ftp_slug` benennt einen
+tatsächlich existierenden SFTPGo-Account — oder ist leer. Es gibt keinen Zustand,
+in dem der Portal-Stand und der Dienst auseinanderlaufen, ohne dass das System
+es bemerkt. Daraus folgt fail-closed an beiden Stellen:
+
+- **Slug-Wechsel** (P1-M34): Der alte Account wird gelöscht, bevor der neue
+  User-Datensatz geschrieben wird. Ist SFTPGo nicht erreichbar, bricht der
+  Vorgang ab und der User bleibt unverändert. Grund: ohne Abbruch bekäme der
+  Fotograf einen Slug, für den es weder Verzeichnis noch Account gibt — das sieht
+  in der Oberfläche wie ein leerer Posteingang aus und nicht wie ein Fehler.
+- **Entzug bei Rollenverlust** (neu): Verlässt jemand die Rolle Fotograf, wird
+  der SFTPGo-Account gelöscht und `revoked` + `ftp_revoked_at` geschrieben. Auch
+  hier fail-closed: ist SFTPGo nicht erreichbar, wird der Rollenwechsel
+  abgelehnt. Eine Belegschaft ohne Fotograf-Rolle, die SFTPGo nicht erreichen
+  kann, ist ein schlechterer Zustand als ein abgelehnter Rollenwechsel.
+
+**Verdrahtung:** `UserController::update()` (Rollenwechsel über `role_ids`) und
+`UserController::destroy()` (Kontolöschung). Beide rufen
+`FtpCredentialService::revoke()` auf, **bevor** sie schreiben.
+
+**Was das nicht löst:** Es gibt weiterhin keine Reconciliation, die einen
+SFTPGo-Account findet, den das Portal nicht kennt — etwa nach einem manuellen
+Eingriff in SFTPGo. `reconcileAccount()` (P1-M30) ist der vorgesehene Weg und
+bleibt offen.
+
+**Reihenfolge im Frontend:** `FtpAccountStatus` ist eine abschließende Union mit
+dem ausdrücklichen Zweck, einen UI-Switch zur Compile-Zeit prüfbar zu halten. Der
+Compiler benennt daher jede Stelle, die `revoked` noch nicht behandelt. Das ist
+beabsichtigt und kein Aufwand.
