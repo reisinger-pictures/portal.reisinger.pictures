@@ -11,6 +11,7 @@ use App\Http\Controllers\CouponCheckoutController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\FileDeliveryController;
 use App\Http\Controllers\FtpController;
+use App\Http\Controllers\FtpCredentialController;
 use App\Http\Controllers\GalleryController;
 use App\Http\Controllers\GalleryFrontendController;
 use App\Http\Controllers\ImageController;
@@ -258,6 +259,11 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/ftp/status', [FtpController::class, 'status'])->name('api.management.ftp.status');
     Route::post('/management/ftp/target', [FtpController::class, 'setTarget'])->name('api.management.ftp.target');
     Route::post('/management/ftp/process', [FtpController::class, 'process'])->name('api.management.ftp.process');
+    // P1-M33: Passwort-Reset — der einzige Recovery-Weg (SFTPGo kennt das alte
+    // Passwort nicht wiederherstellbar). Eigener Controller, damit der
+    // Import-Pfad in FtpController unangetastet bleibt (§7.8). `api/management/ftp*`
+    // ist für Fotografen in der ManagementMiddleware bereits freigegeben.
+    Route::post('/management/ftp/reset-password', [FtpCredentialController::class, 'resetPassword'])->name('api.management.ftp.reset-password');
 
     Route::get('/management/orgs', [OrgController::class, 'index'])->name('api.management.orgs.index');
     Route::post('/management/orgs', [OrgController::class, 'store'])->name('api.management.orgs.store');

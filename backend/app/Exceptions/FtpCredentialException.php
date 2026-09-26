@@ -14,6 +14,12 @@ use RuntimeException;
  * The caller can therefore tell "the photographer has to fix their profile"
  * apart from "the service is unavailable" — and neither carries a password,
  * because no factory here takes one.
+ *
+ * One more portal-side precondition lives here as of P1-M33: `rate_limited`.
+ * The reset is the only recovery path for a lost camera password, which makes it
+ * an unlimited mint for valid credentials unless the portal caps it. That cap
+ * is enforced before any request leaves the process, so it belongs with the
+ * other "the portal stopped this" reasons and not with `SftpGoException`.
  */
 class FtpCredentialException extends RuntimeException
 {
@@ -25,9 +31,18 @@ class FtpCredentialException extends RuntimeException
 
     public const REASON_UNUSABLE_INBOX_PATH = 'unusable_inbox_path';
 
+    public const REASON_RATE_LIMITED = 'rate_limited';
+
     public function __construct(
         public readonly string $reason,
         string $message,
+        /**
+         * Seconds until the quota frees up, for `rate_limited` only. It is
+         * data the client needs to back off correctly, so it is part of the
+         * exception instead of something the controller has to recompute from a
+         * limiter key it no longer has. Null for every other reason.
+         */
+        public readonly ?int $retryAfterSeconds = null,
     ) {
         parent::__construct($message);
     }
@@ -66,6 +81,20 @@ class FtpCredentialException extends RuntimeException
         return new self(
             self::REASON_UNUSABLE_INBOX_PATH,
             'Das FTP-Inbox-Verzeichnis (FTP_STORAGE_PATH) ist nicht als absoluter Pfad konfiguriert.',
+        );
+    }
+
+    /**
+     * The per-account reset quota is exhausted (P1-M33). The limit is named in
+     * the message instead of being hardcoded into a string, so the text cannot
+     * drift away from the constant that enforces it.
+     */
+    public static function rateLimited(int $limit, int $retryAfterSeconds): self
+    {
+        return new self(
+            self::REASON_RATE_LIMITED,
+            "Zu viele FTP-Passwort-Zurücksetzungen für dieses Konto (maximal {$limit} pro Stunde). Bitte später erneut versuchen.",
+            max(1, $retryAfterSeconds),
         );
     }
 }
