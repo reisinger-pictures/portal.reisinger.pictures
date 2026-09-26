@@ -1837,6 +1837,70 @@ alle mit Regressionstest:
   erreicht. Ausnahme mit Grund: `useBrand.test.ts` braucht den echten Host, weil
   die Markenerkennung domain-abhängig ist.
 
+### Nachtrag 2026-09-26, Kamera-Setup aus der Oberfläche bedienbar machen
+
+- [x] **P1-M50 (P0) — Der Slug-Wechsel erzeugte ein Passwort, das niemand sah.**
+  `DB::transaction()` gibt den Wert der Closure zurueck; der Controller verwarf
+  ihn. Der Slug-Zweig baute eine Antwort mit `ftp_password` und
+  `ftp_password_note` und wurde weggeworfen — die Methode antwortete immer mit
+  `{"success": true}`. Das Passwort war gesetzt, der Account funktionierte, und
+  der einzige Ausweg blieb der Reset-Endpunkt (3x/Stunde). Regressionstest
+  `FtpSlugChangePasswordTest` vergleicht das **an SFTPGo gesendete** Passwort mit
+  dem angezeigten; eine schwaechere Zusicherung („nicht leer") haette auch gegen
+  ein zweites, frisch erzeugtes Passwort bestanden.
+- [x] **P1-M51 (P1) — Der Zielordner war hartkodiert `/`.** Canons Assistent
+  bietet „Ordner waehlen" neben dem Stammverzeichnis an, das Feld war also eine
+  Sackgasse. `FTP_UPLOAD_PATH` (Default `/`) macht den Pfad konfigurierbar —
+  Deployment-Konfiguration, keine Nutzereigenschaft, deshalb ohne Migration. Zwei
+  Regeln halten es ehrlich: das Value Object validiert den Pfad und laesst bei
+  einem malformierten Wert die Zeile weg (`path: null`), und `getInboxPath()`
+  haengt den Ordner an — sonst laedt die Kamera in ein Verzeichnis, das der
+  Import nie liest, und das sieht wie ein leerer Posteingang aus.
+- [x] **P1-M52 (P1) — Drei Deployment-Policy-Tests pinnten Formulierungen statt
+  Invarianten.** Sie blieben an Command-Sprachformen haengen, die der
+  SFTPGo-Cutover aendern musste, und waren damit rot gegen eine korrekte
+  Compose-Datei. Besonders lehrreich: der AI-Header-Guard liest jetzt ueber
+  `printenv | grep` statt `case`, weil Compose v5.0.2 jede Substitution als
+  `$$(...)` ausgibt und `$$` nie reduziert — der Guard prueft dieselbe
+  Zeichenklasse, aber ein neuer Test **fuehrt beide Guard-Zeilen wirklich aus**
+  und belegt, dass CRLF, Semikolon und `$(id)` abgelehnt werden. Der
+  Photo-Storage-Check prueft Schreibbarkeit und **verbietet** den
+  Eigentumsvergleich explizit (19-ftp 7.9 untersagt `chown -R`, er waere nicht
+  erfuellbar).
+- [x] **P1-M53 (P1) — Der Compose-Contract-Test pinnte `TLS_MODE=1` hart.**
+  Seit der Umstellung auf **ein** Wertepaar (P1-M44) bindet die Bindung ueber
+  `${SFTPGO_FTPD_TLS_MODE:-1}`. Der Test prueft jetzt den Default **und** dass
+  dieselbe Variable beide Verbraucher speist — sonst koennte die Oberflaeche
+  „explizit" behaupten, waehrend der Daemon implizit laeuft.
+
+**Offen (aus dieser Runde):**
+
+- [ ] **P1-M54 — Entzug des Kamera-Kontos bei Rollenverlust.** Wer aufhoert
+  Fotograf zu sein, behaelt heute ein funktionierendes SFTPGo-Credential auf ein
+  Verzeichnis, das seine Fotos enthaelt. `deleteUser()` haengt ausschliesslich am
+  Slug-Wechsel. Migration V043 (Enum `+revoked`, `ftp_revoked_at`), fail-closed
+  wie beim Slug-Wechsel. Schema-Entscheidung steht in 19-ftp 7.16. *In Arbeit.*
+- [ ] **P1-M55 — Der Image-Freshness-Gate fordert noch `@sha256`-Digests
+  (CI-Blocker beim naechsten Push).** `7b80c2a` hat den Digest aus dem Compose
+  entfernt und den PHP-Vertrag auf Tags umgestellt, aber
+  `tests/infrastructure/verify-image-freshness.sh` verlangt in `resolve_pin()`
+  weiterhin einen Digest. Lokal rot; CI ist nur gruen, weil die betroffenen
+  Commits **noch nicht gepusht** sind. Achtung Beweislast: der Gate muss seine
+  Substanz behalten (Alter des Artefakts aus dem `created`-Feld, 14-Tage-Rahmen,
+  anonyme Erreichbarkeit) — ein mutabler Tag ist kein immutabler Pin, diese
+  Einschraenkung gehoert ehrlich in `deployment/image-pin-freshness.md`.
+  *In Arbeit.*
+- [ ] **P1-M56 — Das Profilformular verschluckt das Einmal-Passwort.** Der
+  Backend-Fix aus P1-M50 liefert `ftp_password`, aber die Profilansicht ignoriert
+  es. Ein Fotograf, der seinen Slug im Profil aendert, verliert das Passwort also
+  weiterhin unbemerkt — die Luecke ist nur eine Schicht hoeher gewandert.
+  *In Arbeit.*
+- [ ] **P1-M57 — `profile-ftp-slug.spec.ts` ist rot, weil der E2E-Stack keinen
+  SFTPGo hat.** Der Slug-Wechsel provisioniert jetzt und bricht fail-closed ab,
+  wenn der Dienst fehlt. Die Absicherung darf **nicht** aufgeweicht werden; der
+  E2E-Stack braucht einen erreichbaren SFTPGo oder einen Fake. Harness-Referenz:
+  `tests/scripts/ftp-transport-test/`. *In Arbeit.*
+
 **Offen:**
 
 - [ ] **P1-M32 — echter Kamera-Test.** Weiterhin der einzige offene
