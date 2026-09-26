@@ -42,20 +42,14 @@ test.describe('WYSIWYG-Editor', () => {
         await editor.pressSequentially('Punkt zwei');
         await expect(editor.locator('ol li')).toHaveCount(2);
 
-        // Select "Punkt zwei" via a mouse drag. Keyboard caret navigation
+        // Select "Punkt zwei" for the link. Keyboard caret navigation
         // (Home/End/Shift+Arrow) is unreliable here: Tiptap v3 restores the
         // caret after toolbar blurs asynchronously and maps Home/End to the
-        // document edges. The click below re-focuses the editor first — a drag
-        // right after a toolbar interaction (blur) does not reliably register
-        // its selection with ProseMirror.
-        await editor.locator('li').last().click();
-        const lastItem = editor.locator('li').last();
-        const itemBox = await lastItem.locator('p').boundingBox();
-        if (!itemBox) throw new Error('list item paragraph has no bounding box');
-        await page.mouse.move(itemBox.x + 2, itemBox.y + itemBox.height / 2);
-        await page.mouse.down();
-        await page.mouse.move(itemBox.x + itemBox.width - 2, itemBox.y + itemBox.height / 2, { steps: 5 });
-        await page.mouse.up();
+        // document edges. A pixel drag was the previous approach and it was
+        // flaky under parallel load, because the selection only registers once
+        // the editor has settled. A triple click selects the whole list-item
+        // paragraph deterministically and needs no coordinates.
+        await editor.locator('li').last().locator('p').click({ clickCount: 3 });
         await page.getByRole('button', { name: 'Link einfügen' }).click();
         await page.getByRole('textbox', { name: 'Link-Adresse' }).fill('https://example.com');
         await page.getByRole('button', { name: 'Anwenden' }).click();
