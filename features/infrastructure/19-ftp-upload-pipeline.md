@@ -521,7 +521,44 @@ werden genutzt), der Verwaltungsport bleibt drinnen. Alles andere ist Detail.
 statt in einer JSON-Datei, der Seeding-Weg ist deshalb Teil von P1-M35 und
 nicht als Kleinigkeit zu behandeln.
 
-### 7.14 Bewusst nicht im Compose-Stack
+### 7.14 Teststrategie für den Transport
+
+Drei Ebenen, strikt getrennt. Der Grund für die Trennung ist eine Grenze, die
+man leicht falsch liest: **ein Client-Protokolltest prüft die Server-Seite, nicht
+die Kamera.**
+
+| Ebene | Was | Wie | Beweist die Kamera? |
+|---|---|---|---|
+| Unit/Feature | Pipeline, `SftpGoClient` | `Storage::fake()`, gemocktes HTTP | nein |
+| Integration | Transport über beide Protokolle | echter Dienst, echter Client | **nein** |
+| Manuell | Kameraupload | echte Kamera, echtes Foto | **ja** |
+
+Die Kamera ist kein `curl`. Sie hat eine eigene TLS-Bibliothek, eine eigene
+Cipher-Liste und ein Passwortfeld, das ausschließlich alphanumerisch akzeptiert.
+Ein grüner Integrationstest sagt daher **nicht**, dass die Kamera den Server
+erreicht — das bleibt P1-M32 und ist ein operativer Schritt, den kein CI-Job
+ersetzen kann.
+
+Trotzdem ist die Integrationsebene die wertvollste, weil sie die Lücke zwischen
+Kamera-Verhalten und Server-Konfiguration prüft — also genau das, was sonst
+niemand prüft:
+
+- **Die passive Port-Range.** Ein FTPS-Client, der 50000–50100 nicht erreicht,
+  baut den TLS-Handshake erfolgreich auf und bricht erst beim Transfer ab. Ein
+  Test gegen Port 989 allein findet das **nicht**, weil der passive Kanal ein
+  zweiter TCP-Verbindungspfad ist. Für SFTP irrelevant — dort ist es ein
+  einzelner Kanal.
+- **Die Ownership-Kette:** Datei ankommt mit `1002:webgroup`, `setgid` auf
+  `ftp/<slug>` gehalten.
+- **Das Show-once-Passwort:** ein alphanumerisches 16–24-Zeichen-Passwort ohne
+  Sonderzeichen muss durch Provisionierung und Login kommen (7.3).
+- **Die Cipher-Liste als Fixture** — mit Handshake-Vollständigkeitsprüfung vor
+  dem Auslesen. Siehe die Messfalle in 7.11.
+
+Board: P1-M38 (Integrationstest), P1-M35 (Harness und Config-Weg), P1-M27
+(Cipher-Frage selbst).
+
+### 7.15 Bewusst nicht im Compose-Stack
 
 - **Der Fotograf-Upload läuft nicht über den Portal-Container.** Die Dateien
   landen direkt auf dem Host-Pfad, den der Backend-Container liest. Ein
