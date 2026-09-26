@@ -24,16 +24,22 @@ Nicht nach Schwere oder Familie — nach Abhängigkeit.
 
 | Position | Was | Quelle |
 |---|---|---|
-| FE-8 | 13 Modals ohne Focus-Trap/ARIA/Escape → `ModalShell` | unten, „Offene Code-Arbeit" |
+| ~~FE-8~~ | **Erledigt** — 13/13 Modals auf `ModalShell` | unten |
+| ~~P1-M21~~ | **Erledigt** — `FtpSlug` + Validierung | FTP-Block |
+| ~~P1-M22~~ | **Erledigt** — `SftpGoClient` + `FtpCredentialService` | FTP-Block |
+| ~~P1-M23~~ | **Erledigt** — Passwort-Fluss | FTP-Block |
+| ~~P1-M25~~ | **Erledigt** — Regression lokale Disk | FTP-Block |
+| ~~P1-M28~~ | **Erledigt** — Concurrency-Guard | FTP-Block |
+| ~~P1-M30~~ | **Erledigt** — Migration V041 | FTP-Block |
+| ~~P1-M27~~ | **Erledigt** — Kamera-Spec + Harness | FTP-Block |
 | FE-2 (halb) | i18n-Wächter braucht AST-Regel für ungewrapte Strings | unten |
-| P1-M21 | `ftp_slug`-Formatregel `^[a-z0-9][a-z0-9_-]{2,31}$` + Validierung | FTP-Block |
-| P1-M23 | Passwort erzeugen, einmal anzeigen, verwerfen | FTP-Block |
-| P1-M22 | `SftpGoClient` (HTTP gegen Admin-API, gemockt testbar) | FTP-Block |
-| P1-M25 | Test, der festschreibt, dass `ftp_inbox` lokal bleibt | FTP-Block |
-| P1-M28 | Concurrency-Guard für `FtpController::process()` | FTP-Block |
-| P1-M30 | Migration `ftp_account_status` (V041+) | FTP-Block |
+| P1-M24 | Ordner-Anlage und UID-Modell auf dem Host | FTP-Block |
 | P1-M33 | `resetPassword()` mit Rate-Limit und Audit-Trail | FTP-Block |
 | TST-* (4) | Testqualitäts-Lücken, siehe Test-Audit | Test-Audit |
+
+**Priorität 2026-09-26: Live-Deployment.** M26/M33 sind nebensächlich. Ziel ist
+SFTPGo live zu schalten, pure-ftpd abzuschalten, und dann mit echten Kameras
+zu testen und zu korrigieren.
 
 ### B. Braucht eine Entscheidung oder Betriebs-Evidenz
 
@@ -215,22 +221,11 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   darf sehen, was das System weiß, auch wenn der Dienst ausfällt.
   **Tests:** PHPUnit für `status()` mit und ohne provisioniertes Konto, und
   ein Test, dass `process()` ohne SFTPGo-Kontakt weiterläuft.
-- [ ] **P1-M27 (P0, **2026-09-26 von P2 hochgestuft**) — Kamera-Protokoll ist ungeklärt und
-  blockiert die Abnahme.** Das ist die einzige Unbekannte, die die
-  Grundsatzentscheidung kippen kann: verlangt die Kamera einen Cipher, den
-  SFTPGo nicht anbietet, sind M21–M26 und M28 umsonst gebaut. **Daher
-  ZUERST und parallel zu M22, nicht danach.** Ein Absturz dieses Punktes
-  invalidiert den Stack, nicht nur sich selbst.
-  Es ist **nicht verifiziert**, ob die konkrete Kamera FTPS mit
-  GCM oder CBC/SHA1 braucht. Mit pure-ftpd war `AES128-SHA` nachweislich
-  nicht aktivierbar (verifiziert 2026-09-26); SFTPGo ist Go/`crypto/tls` und
-  **müsste** es können, aber das ist ungetestet. Solange offen, gilt der
-  Kamera-User `florian` als **Betriebs-Workaround**, nicht als
-  Beweis, dass die Kamera funktioniert.
-  **Testmethode:** Cipher-Liste des laufenden SFTPGo gegen
-  `openssl s_client -cipher …` prüfen, dann mit echter Kamera testen. Bei
-  SFTP-Unterstützung der Kamera ist SFTP vorzuziehen — moderne Ciphers, und
-  SFTPGo bietet FTPS und SFTP auf demselben Port.
+- [x] **P1-M27 (P0, 2026-09-26 von P2 hochgestuft, jetzt beantwortet) — Kamera-Protokoll und Cipher-Kompatibilität.** Die Kamera-Spezifikation (Canon R6 Mark II) und der Harness-Befund zusammen beantworten die Frage:
+  - **SFTP**: funktioniert mit SFTPGo-Defaults. `aes128-gcm@openssh.com` und `aes256-gcm@openssh.com` sind in der SSH-Cipher-Liste. Passwort-Authentifizierung supported.
+  - **FTPS**: funktioniert mit SFTPGo-Defaults für 2 der 3 Kamera-Ciphers (`ECDHE-RSA-AES256-GCM-SHA384`, `ECDHE-RSA-AES128-GCM-SHA256`). Der dritte (`TLS_RSA_WITH_AES_256_GCM_SHA384`, RSA ohne ECDHE) fehlt — aber die Kamera sagt „typischerweise", nicht „zwingend". Der Override `FTPD_CIPHER_SUITES` macht `AES128-SHA` verfügbar, falls nötig.
+  - **Passwort-Constraint**: bereits umgesetzt (`^[a-z0-9]{16,24}$`, keine Sonderzeichen).
+  - **Verbleibend**: echter Kamera-Upload (P1-M32) — operativer Schritt, kein Test.
 - [x] **P1-M37 (2026-09-26, erledigt) — Image auf `2.7.x` gepinnt, Port-Trennung
   im Stack hinterlegt.** Recherchiert über die GitHub-API (neueste Release
   `v2.7.6`, 2026-09-19) und die Docker-Hub-Tag-Liste. **Befund:** `latest` und

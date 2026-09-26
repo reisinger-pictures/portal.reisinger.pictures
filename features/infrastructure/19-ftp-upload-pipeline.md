@@ -420,6 +420,11 @@ Bind-Mount `-> /var/www/ftp` und Disk `ftp_inbox` als `driver=local` bleiben.
 
 ### 7.9 Ownership-Regeln auf dem Host
 
+**FTPS-Zertifikat (Host-Setup, P1-M24).** SFTPGo kann ein Self-Signed-Zertifikat
+nutzen — die Kamera akzeptiert es (verifiziert mit pure-ftpd). Das Zertifikat wird
+beim ersten Start erstellt und liegt dann unter `/etc/sftpgo/`. Kein gültiges
+Zertifikat einer öffentlichen CA nötig.
+
 Aus dem Vorfall vom 2026-09-26, verbindlich für jeden Prozess, der auf
 `/home/webadmin/websites` schreibt.
 
