@@ -13,12 +13,14 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
+use Tests\Support\UsesIsolatedTempDirectory;
 use Tests\TestCase;
 use ZipArchive;
 
 class PhotoDownloadControllerTest extends TestCase
 {
     use RefreshDatabase;
+    use UsesIsolatedTempDirectory;
 
     /**
      * Wall-clock budget for the exiftool read-back that verifies a download.
@@ -45,7 +47,15 @@ class PhotoDownloadControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->setUpIsolatedTempDirectory();
         $this->useTemporaryStorageDisk('photos');
+    }
+
+    protected function tearDown(): void
+    {
+        $this->tearDownIsolatedTempDirectory();
+
+        parent::tearDown();
     }
 
     public function test_authorized_user_can_download_single_image_and_metadata_is_injected()
@@ -139,7 +149,7 @@ class PhotoDownloadControllerTest extends TestCase
         $response = $this->get('/api/galleries/'.$gallery->id.'/download-zip');
         $response->assertStatus(200);
 
-        $tempZipPath = storage_path('app/private/temp/test_dl_'.uniqid().'.zip');
+        $tempZipPath = $this->isolatedTempPath('test_dl_'.uniqid().'.zip');
         if (! is_dir(dirname($tempZipPath))) {
             mkdir(dirname($tempZipPath), 0755, true);
         }
