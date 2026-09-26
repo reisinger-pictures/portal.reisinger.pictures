@@ -52,6 +52,13 @@ SFTPGO_ADMIN_PASSWORD=<generiertes Passwort>
 Fehlen sie, startet SFTPGo nicht und schreibt `no admins found, try to create
 the default one` ins Log — sichtbar, nicht still.
 
+`FTP_UPLOAD_PATH` ist die einzige **optionale** Variable in diesem Block: sie bestimmt
+den Zielordner, den die Kamera beschreibt. `/` (Konto-Wurzel) ist der richtige Wert,
+solange eine Zielgalerie alles nimmt, deshalb steht sie im Compose mit Default
+(`- FTP_UPLOAD_PATH=${FTP_UPLOAD_PATH:-/}`) — fehlt sie in der GUI, bleibt der Upload
+importierbar. Ein Unterordner wie `/shoots/2026-09` muss **identisch** im UI und in der
+Kamera stehen, sonst schreibt die Kamera in einen Ordner, den der Import nie liest.
+
 ### Einmalige Host-Voraussetzung: Fotospeicher
 
 Der Backend läuft als `1000:1000`, der Fotospeicher gehörte `33:33` mit `755`.

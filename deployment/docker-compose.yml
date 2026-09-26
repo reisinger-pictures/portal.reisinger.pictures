@@ -98,6 +98,11 @@ services:
       - SFTPGO_PASV_PORT_START=${SFTPGO_PASV_PORT_START}
       - SFTPGO_PASV_PORT_END=${SFTPGO_PASV_PORT_END}
       - SFTPGO_FTPD_TLS_MODE=${SFTPGO_FTPD_TLS_MODE}
+      # Der Unterordner, den die Kamera beschreibt. '/' ist das Konto-
+      # Wurzelverzeichnis und der korrekte Wert, solange eine Zielgalerie
+      # alles nimmt, was ankommt. Anders als Host und Ports ist ein Default
+      # hier ehrlich: '/' ist nicht geraten, sondern richtig.
+      - FTP_UPLOAD_PATH=${FTP_UPLOAD_PATH:-/}
       - DB_DATABASE=portal_db
       - DB_USERNAME=portal_user
       - DB_PASSWORD=${DB_PASSWORD}

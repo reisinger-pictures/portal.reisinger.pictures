@@ -54,7 +54,7 @@ Abrufbar im Management-UI unter **FTP Inbox → Kamera-Verbindung**:
 | SFTP-Port | `2222` |
 | FTPS-Port | `989` |
 | Passiver Bereich (Firewall) | `50000–50100` |
-| Zielordner | `/` (Stammverzeichnis) |
+| Zielordner | der Wert aus dem Feld *Zielordner* im UI; Standard `/` = Stammverzeichnis |
 | Passwort | nur einmal, aus Schritt 2 |
 
 Reihenfolge nicht umstellen: erst Konto und Passwort, dann Kamera. Wer zuerst die
@@ -79,8 +79,18 @@ FTP-Server-Verbindungseinstellungen*:
 | 10 | *nur SFTP:* `Benutzername`, `Kennwort` | slug + einmal-Passwort |
 | **11** | *nur FTP/FTPS:* **Passiver Modus** | **`Aktivieren`** |
 | 13 | *nur FTP/FTPS:* `Anmeldekennwort` | das einmal angezeigte Passwort |
-| **14** | **Zielordner** | **`Stammverzeichnis`** |
+| **14** | **Zielordner** | bei `/` → **`Stammverzeichnis`**; sonst `Ordner wählen` und genau den Wert aus dem UI eintragen |
 | 15 | `SET` | speichern; bei Rückfrage `OK` → Zielserver vertrauen |
+
+Der Zielordner ist der einzige Wert, bei dem die Kamera eine Auswahl anbietet statt eines
+Textfelds: `Stammverzeichnis` ist der Konto-Wurzelordner und entspricht dem UI-Wert `/`.
+Wurde dort ein Unterordner eingetragen (etwa `/shoots/2026-09`), wählt man `Ordner wählen`
+und gibt ihn buchstabengenau ein. Weicht er ab, landet der Upload in einem Verzeichnis, das
+das Portal nicht importiert — das sieht dann wie ein leerer Posteingang aus, nicht wie ein
+Fehler.
+
+**Nicht** die Option für Verzeichnisstruktur wählen: der Import liest den Zielordner
+nicht-rekursiv. Unterordner pro Aufnahmetag bleiben damit unentdeckt.
 
 ### FTPS: `Vertrauenswürdige Zielserver` auf `Aktivieren`
 
