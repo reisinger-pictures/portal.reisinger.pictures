@@ -100,8 +100,15 @@ return function(galleryId, galleryName, jwt, onSyncComplete, requestApi)
                 return
             end
 
+            -- P1-L6: the write lock is held only for the metadata writes. A
+            -- modal dialog and the sync callback both used to run inside
+            -- withWriteAccessDo; LrDialogs.message blocks Lightroom until the
+            -- user dismisses it, and onSyncComplete reaches reloadTree, which
+            -- performs blocking LrHttp. Holding the catalog write lock across
+            -- either one stalls the whole application. onSyncComplete may still
+            -- do its work asynchronously on its own; it must not do it here.
+            local matchCount = 0
             catalog:withWriteAccessDo("Bewertungen synchronisieren", function()
-                local matchCount = 0
                 for _, item in ipairs(resData) do
                     if item.lr_uuid then
                         local photo = catalog:findPhotoByUuid(item.lr_uuid)
@@ -124,9 +131,10 @@ return function(galleryId, galleryName, jwt, onSyncComplete, requestApi)
                         end
                     end
                 end
-                LrDialogs.message(Api.getTitle("Synchronisation abgeschlossen"), matchCount .. " Bilder wurden aktualisiert.", "info")
-                if onSyncComplete then onSyncComplete() end
             end)
+
+            LrDialogs.message(Api.getTitle("Synchronisation abgeschlossen"), matchCount .. " Bilder wurden aktualisiert.", "info")
+            if onSyncComplete then onSyncComplete() end
         end
 
         local rows = { spacing = f:control_spacing(), width = 700 }

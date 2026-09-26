@@ -145,6 +145,41 @@ def main() -> int:
     )
     assert "Render durch LR übersprungen" not in manager, "stale-rendition fallback returned"
 
+    # P1-L6: the sync write lock must cover only the metadata writes. A modal
+    # dialog and the sync callback used to run inside withWriteAccessDo:
+    # LrDialogs.message blocks Lightroom until dismissed, and onSyncComplete
+    # reaches reloadTree, which performs blocking LrHttp. Locating the end of
+    # the block by paren balance is reliable here because strip_lua already
+    # removed every string and comment, so no parenthesis can hide in either.
+    rating = (PLUGIN_DIR / "RatingStatusDialog.lua").read_text(encoding="utf-8")
+    rating_code = " ".join(strip_lua(rating).split())
+    lock_open = rating_code.index("withWriteAccessDo(")
+    depth = 0
+    lock_close = None
+    for offset in range(lock_open, len(rating_code)):
+        char = rating_code[offset]
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                lock_close = offset
+                break
+    assert lock_close is not None, "P1-L6: could not locate the end of the write-lock block"
+    inside_lock = rating_code[lock_open:lock_close]
+    assert "LrDialogs.message" not in inside_lock, (
+        "P1-L6: a modal dialog must not be shown while the catalog write lock is held"
+    )
+    assert "onSyncComplete" not in inside_lock, (
+        "P1-L6: onSyncComplete must not run inside withWriteAccessDo, it reaches blocking LrHttp"
+    )
+    assert "setRawMetadata" in inside_lock, (
+        "P1-L6: the write lock must still cover the metadata writes it exists for"
+    )
+    after_lock = rating_code[lock_close:]
+    assert "onSyncComplete" in after_lock, "P1-L6: onSyncComplete must still run after the write lock is released"
+    assert "LrDialogs.message" in after_lock, "P1-L6: the completion dialog must still be shown after the write lock is released"
+
     api = (PLUGIN_DIR / "Api.lua").read_text(encoding="utf-8")
     require(api, "MAX_AUTH_RETRIES = 1", "bounded session renewal")
     require(api, "pcall(Api.login, session.email)", "protected credential fallback")

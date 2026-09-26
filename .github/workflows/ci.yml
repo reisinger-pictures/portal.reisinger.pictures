@@ -59,6 +59,23 @@ jobs:
       # checks.
       - name: Verify the Lightroom plugin harness fails closed
         run: bash tests/infrastructure/plugin-harness-fail-closed.sh
+      # P2-T4: the harness above only proves the runner fails closed when no
+      # runtime is present. Nothing actually executed the suites, so a real Lua
+      # defect could ship green. This runs them for real. The source-level
+      # static checks need only python3; lua is installed so the four Lua
+      # suites execute too. Ubuntu's package ships the interpreter as lua5.x
+      # rather than lua, so the symlink is explicit instead of left to chance.
+      # No Lightroom runtime is involved either way — these are pure-Lua unit
+      # checks plus source invariants.
+      - name: Run the Lightroom plugin regression suites
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.4
+          if ! command -v lua >/dev/null 2>&1; then
+            sudo ln -sf "$(command -v lua5.4)" /usr/local/bin/lua
+          fi
+          bash admin.lrplugin/tests/run.sh
       # INFRA-10: the consumer pins must stay within the documented maximum age
       # of the digest the mutable tag currently points at, otherwise security
       # fixes published to GHCR never reach CI/production.
