@@ -12,6 +12,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\AIService;
 use App\Services\AuthorizationService;
+use App\Services\FtpCredentialService;
 use App\Support\BrandRegistry;
 use App\Support\FtpSlug;
 use Illuminate\Http\Exceptions\HttpResponseException;
