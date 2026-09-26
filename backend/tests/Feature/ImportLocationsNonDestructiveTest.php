@@ -44,9 +44,28 @@ class ImportLocationsNonDestructiveTest extends TestCase
         'countryInfo.txt.part',
     ];
 
+    /**
+     * Per-test scratch directory.
+     *
+     * The importer writes into filesystems.temp_dir, which defaults to one
+     * absolute path shared by the whole application. Paratest runs different
+     * test classes in separate worker processes at the same time, and
+     * StorageCommandsTest invokes app:cleanup-temp, which empties that
+     * directory wholesale. So a shared directory lets a concurrent class
+     * delete this class's fixtures mid-run. That surfaced as two different
+     * intermittent failures in this class: a FileNotFoundException on a cache
+     * file the test had just written, and an import exiting non-zero because
+     * the fixture it depended on had been swept away. The database is already
+     * isolated per worker via SQLite :memory:, the filesystem was not.
+     */
+    private string $tempDir;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->tempDir = storage_path('app/private/testing/temp-'.Str::uuid());
+        config(['filesystems.temp_dir' => $this->tempDir]);
 
         $this->clearLocalCache();
     }
@@ -54,6 +73,7 @@ class ImportLocationsNonDestructiveTest extends TestCase
     protected function tearDown(): void
     {
         $this->clearLocalCache();
+        File::deleteDirectory($this->tempDir);
 
         parent::tearDown();
     }
@@ -101,7 +121,7 @@ class ImportLocationsNonDestructiveTest extends TestCase
     public function test_empty_successful_responses_are_fail_closed_and_clean_staging_artifacts(): void
     {
         $id = $this->insertLocation('country', 'Existing Country', null);
-        $tempDir = storage_path('app/private/temp');
+        $tempDir = $this->tempDir;
         File::put($tempDir.'/AT_postal.txt', 'unparseable cached postal data');
         File::put($tempDir.'/countryInfo.txt', 'unparseable cached country data');
         File::put($tempDir.'/AT_postal.zip', 'stale archive');
@@ -142,7 +162,7 @@ class ImportLocationsNonDestructiveTest extends TestCase
         config(['scout.driver' => 'null']);
         $countryId = $this->insertLocation('country', 'Existing Country', null);
         File::put(
-            storage_path('app/private/temp/AT_postal.txt'),
+            $this->tempDir.'/AT_postal.txt',
             "AT\t1020\tWien\tWien"
         );
 
@@ -165,7 +185,7 @@ class ImportLocationsNonDestructiveTest extends TestCase
 
     private function clearLocalCache(): void
     {
-        $tempDir = storage_path('app/private/temp');
+        $tempDir = $this->tempDir;
         if (! is_dir($tempDir)) {
             File::makeDirectory($tempDir, 0755, true);
         }
