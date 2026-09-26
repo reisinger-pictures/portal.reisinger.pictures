@@ -182,6 +182,12 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   to create the folder on disk yourself"* — SFTPGo legt nichts an. Der Ordner
   `ftp/<ftp_slug>` muss auf dem Host existieren, mit `1002:webgroup` und
   `2777`, **bevor** oder im selben Schritt wie der User.
+  **Designprinzip (2026-09-26):** Jeder User bekommt einen eigenen physischen
+  Ordner auf dem Host, auf den er eingeschränkt ist. SFTPGo konfiguriert das
+  als `home_dir` — der User sieht nur sein eigenes Verzeichnis, nicht die
+  anderer User. Kein gemeinsamer `r1`-User mehr. Die Kamera konfiguriert `/`
+  als Subpath und lädt direkt in das Home-Verzeichnis. **Die GUI-Auswahl des
+  Subfolders entfällt.**
   **Zu entscheiden:** Wer macht das? Ein kleines Script auf dem Host, das die
   Applikation aufruft, oder ein Admin-Schritt. **Wichtig:** Das ist exakt
   die Stelle, an der der Ownership-Vorfall vom 2026-09-26 wieder passieren
