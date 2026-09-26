@@ -153,6 +153,15 @@ set_env SFTPGO_ADMIN_PASSWORD "$E2E_SFTPGO_ADMIN_PASSWORD"
 # fail after a successful SFTPGo call — a 500 that looks like a service problem.
 set_env FTP_STORAGE_PATH "/tmp/portal-e2e-ftp"
 
+# Kamera-Verbindungsdaten. Ohne Host und Ports ist
+# `FtpConnectionDetails::isConfigured()` false, und das Inbox rendert statt der
+# Tabelle den Hinweis „nicht verfügbar" — der Slug-Wechsel, den die Specs
+# pruefen, waere dann unsichtbar. `.invalid` ist nach RFC 2606 reserviert, damit
+# nichts aus einem vergessenen Stub heraus erreicht werden kann.
+set_env FTP_PUBLIC_HOST "camera.e2e.invalid"
+set_env SFTPGO_SFTP_PORT "2222"
+set_env SFTPGO_FTPS_PORT "989"
+
 # Checkout defense overrides for the isolated E2E backend. The account-age
 # gate and dedicated checkout limiters stay test-only; the risk thresholds
 # still allow the Turnstile checkout spec to exercise its third-attempt path.
