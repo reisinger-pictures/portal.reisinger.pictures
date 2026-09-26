@@ -30,13 +30,24 @@ use Illuminate\Support\Facades\Config;
 final class FtpConnectionDetails
 {
     /**
-     * The subpath a camera is configured with.
+     * The subpath a camera is configured with when the deployment declares none.
      *
-     * Each account has its own physical directory, so the account root *is* the
-     * target and the camera is told to upload to `/`. There is no subfolder to
-     * pick in the UI by design (feature doc 7.9).
+     * The account root is the correct default: each account has its own physical
+     * directory, and one target gallery takes everything that arrives. A
+     * subfolder is configured with `FTP_UPLOAD_PATH` and is what makes Canon's
+     * *Ordner wählen* field usable.
      */
     public const UPLOAD_PATH = '/';
+
+    /**
+     * Rejects anything that could escape the account directory.
+     *
+     * The value is deployment configuration, but it reaches a filesystem path,
+     * so `..` and absolute paths are refused rather than normalised away. An
+     * invalid value reads as `null`, which drops the row, instead of silently
+     * becoming something the photographer would configure in the camera.
+     */
+    private const PATH_PATTERN = '#^(/[A-Za-z0-9_-]+)+$|^/$#';
 
     private function __construct(
         public readonly ?string $host,
@@ -46,6 +57,7 @@ final class FtpConnectionDetails
         public readonly ?int $pasvPortStart,
         public readonly ?int $pasvPortEnd,
         public readonly ?string $ftpsTlsMode,
+        public readonly ?string $uploadPath,
     ) {}
 
     public static function forUser(User $user): self
@@ -58,6 +70,7 @@ final class FtpConnectionDetails
             self::port(Config::get('services.ftp_transport.pasv_port_start')),
             self::port(Config::get('services.ftp_transport.pasv_port_end')),
             self::tlsMode(Config::get('services.ftp_transport.ftps_tls_mode')),
+            self::uploadPath(Config::get('services.ftp_transport.upload_path')),
         );
     }
 
@@ -77,7 +90,7 @@ final class FtpConnectionDetails
      *     configured: bool,
      *     host: ?string,
      *     username: ?string,
-     *     path: string,
+     *     path: ?string,
      *     sftp_port: ?int,
      *     ftps_port: ?int,
      *     pasv_port_start: ?int,
@@ -91,7 +104,7 @@ final class FtpConnectionDetails
             'configured' => $this->isConfigured(),
             'host' => $this->host,
             'username' => $this->username,
-            'path' => self::UPLOAD_PATH,
+            'path' => $this->uploadPath,
             'sftp_port' => $this->sftpPort,
             'ftps_port' => $this->ftpsPort,
             'pasv_port_start' => $this->pasvPortStart,
@@ -114,6 +127,42 @@ final class FtpConnectionDetails
         $value = trim($value);
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * Der Zielordner als aufgeloester Pfad, nie `null`.
+     *
+     * Fuer den Import: ein malformierter Wert liest sich wie "nicht
+     * konfiguriert" und faellt auf das Konto-Wurzelverzeichnis zurueck. Das ist
+     * die permissive Richtung — der Import kann dadurch nur mehr finden, nie
+     * weniger. Die Verbindungsdaten bleiben streng und lassen die Zeile bei
+     * einem malformierten Wert weg (`path: null`), damit die Kamera nicht auf
+     * einen Pfad zeigt, den der Server nicht bestaetigt.
+     */
+    public static function resolvedUploadPath(): string
+    {
+        return self::uploadPath(Config::get('services.ftp_transport.upload_path')) ?? self::UPLOAD_PATH;
+    }
+
+    /**
+     * The configured subfolder, or `/` when nothing is declared.
+     *
+     * Empty means *not declared*, which is not the same as *root*, so it falls
+     * back to the documented default. A value that is present but malformed is
+     * `null`: quietly rewriting it to `/` would tell the photographer to
+     * configure something the server does not agree with.
+     */
+    private static function uploadPath(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return self::UPLOAD_PATH;
+        }
+
+        if (! is_string($value) || preg_match(self::PATH_PATTERN, $value) !== 1) {
+            return null;
+        }
+
+        return $value;
     }
 
     /**

@@ -279,7 +279,20 @@ class FtpController extends Controller
     private function getInboxPath($user)
     {
         $folder = $user->ftp_slug ?? $user->id;
+        $root = Storage::disk('ftp_inbox')->path((string) $folder);
 
-        return Storage::disk('ftp_inbox')->path((string) $folder);
+        // Der Zielordner aus den Verbindungsdaten ist der Unterordner, den die
+        // Kamera beschreibt. '/' bedeutet das Konto-Wurzelverzeichnis selbst.
+        // Ohne diesen Zusatz importierte das Portal nichts mehr, sobald ein
+        // Zielordner konfiguriert ist: die Kamera laedt dann in einen Ordner,
+        // den der Import nie liest — und das saehe wie ein leerer Posteingang
+        // aus, nicht wie ein Fehler.
+        $uploadPath = FtpConnectionDetails::resolvedUploadPath();
+
+        if ($uploadPath === FtpConnectionDetails::UPLOAD_PATH) {
+            return $root;
+        }
+
+        return $root.$uploadPath;
     }
 }
