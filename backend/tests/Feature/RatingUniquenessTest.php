@@ -66,6 +66,76 @@ class RatingUniquenessTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $user = User::factory()->create();
         $guestId = (string) Str::uuid();
+        $guestRowId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+        $userRowId = '00000000-0000-4fff-8fff-000000000043';
+        $legacyId = '00000000-0000-4fff-8fff-000000000042';
+
+        DB::table('ratings')->insert([
+            [
+                'id' => $guestRowId,
+                'photo_id' => $photo->id,
+                'user_id' => null,
+                'guest_id' => $guestId,
+                'rating' => 1,
+                'comment' => 'guest row',
+                'actor_key' => null,
+            ],
+            [
+                'id' => $userRowId,
+                'photo_id' => $photo->id,
+                'user_id' => $user->id,
+                'guest_id' => null,
+                'rating' => 2,
+                'comment' => 'user row',
+                'actor_key' => null,
+            ],
+            [
+                'id' => $legacyId,
+                'photo_id' => $photo->id,
+                'user_id' => null,
+                'guest_id' => null,
+                'rating' => 3,
+                'comment' => 'ownerless legacy row',
+                'actor_key' => null,
+            ],
+        ]);
+
+        $migration = require database_path('migrations/V038__add_rating_actor_key.php');
+        $migration->up();
+
+        $this->assertDatabaseCount('ratings', 3);
+        $this->assertTrue(Schema::hasIndex('ratings', 'ratings_photo_actor_key_unique', 'unique'));
+        $this->assertDatabaseHas('ratings', [
+            'id' => $guestRowId,
+            'guest_id' => $guestId,
+            'actor_key' => 'guest:'.$guestId,
+            'comment' => 'guest row',
+        ]);
+        $this->assertDatabaseHas('ratings', [
+            'id' => $userRowId,
+            'user_id' => $user->id,
+            'actor_key' => 'user:'.$user->id,
+            'comment' => 'user row',
+        ]);
+        $this->assertDatabaseHas('ratings', [
+            'id' => $legacyId,
+            'user_id' => null,
+            'guest_id' => null,
+            'actor_key' => null,
+            'comment' => 'ownerless legacy row',
+        ]);
+    }
+
+    /**
+     * INFRA-8: duplicates for one identifiable actor are no longer deleted.
+     * The migration must abort and leave every row untouched.
+     */
+    public function test_v038_aborts_on_duplicate_actor_ratings_without_deleting_them(): void
+    {
+        $gallery = Gallery::factory()->create();
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $user = User::factory()->create();
+        $guestId = (string) Str::uuid();
         $guestIds = [
             'ffffffff-ffff-4fff-8fff-ffffffffffff',
             '00000000-0000-4fff-8fff-000000000041',
@@ -130,29 +200,24 @@ class RatingUniquenessTest extends TestCase
         ]);
 
         $migration = require database_path('migrations/V038__add_rating_actor_key.php');
-        $migration->up();
 
-        $this->assertDatabaseCount('ratings', 3);
-        $this->assertTrue(Schema::hasIndex('ratings', 'ratings_photo_actor_key_unique', 'unique'));
-        $this->assertDatabaseHas('ratings', [
-            'id' => $guestIds[1],
-            'guest_id' => $guestId,
-            'actor_key' => 'guest:'.$guestId,
-            'comment' => 'guest canonical',
-        ]);
-        $this->assertDatabaseHas('ratings', [
-            'id' => $userIds[1],
-            'user_id' => $user->id,
-            'actor_key' => 'user:'.$user->id,
-            'comment' => 'user canonical',
-        ]);
-        $this->assertDatabaseHas('ratings', [
-            'id' => $legacyId,
-            'user_id' => null,
-            'guest_id' => null,
-            'actor_key' => null,
-            'comment' => 'ownerless legacy row',
-        ]);
+        try {
+            $migration->up();
+            $this->fail('V038 must abort when duplicate actor ratings exist');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('V038 rating actor-key preflight failed', $exception->getMessage());
+            $this->assertStringContainsString('duplicate_groups=2', $exception->getMessage());
+        }
+
+        // Nothing was deleted, merged, or normalized.
+        $this->assertDatabaseCount('ratings', 5);
+        foreach ([...$guestIds, ...$userIds, $legacyId] as $id) {
+            $this->assertDatabaseHas('ratings', [
+                'id' => $id,
+                'actor_key' => null,
+            ]);
+        }
+        $this->assertFalse(Schema::hasIndex('ratings', 'ratings_photo_actor_key_unique', 'unique'));
     }
 
     public function test_repeated_guest_rating_requests_update_one_database_row(): void

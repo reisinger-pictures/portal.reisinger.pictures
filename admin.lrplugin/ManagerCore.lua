@@ -52,13 +52,21 @@ return function(mode, baseUrl)
         -- OS-protected credential store, then try a silent login with the
         -- saved credentials. If the keychain is unavailable, keep the legacy
         -- value until it can be migrated rather than silently deleting it.
-        local legacyMigrationOk = Api.migrateLegacyPassword()
-        if legacyMigrationOk == false then
+        -- INFRA-12: the migration is retried after every successful login, but
+        -- the warning is surfaced at most once per manager run.
+        local legacyMigrationWarningShown = false
+        local function warnLegacyMigrationFailure()
+            if legacyMigrationWarningShown then return end
+            legacyMigrationWarningShown = true
             LrDialogs.message(
                 Api.getTitle("Passwortmigration"),
                 "Das gespeicherte Passwort konnte nicht in den Betriebssystem-Schlüsselbund übernommen werden. Bitte melde dich erneut an.",
                 "warning"
             )
+        end
+
+        if Api.migrateLegacyPassword() == false then
+            warnLegacyMigrationFailure()
         end
         local credEmail = prefs.apiUser or ""
         local credPassword = Api.getStoredPassword()
@@ -141,6 +149,12 @@ return function(mode, baseUrl)
                         "Die Anmeldung war erfolgreich, das Passwort konnte aber nicht im Betriebssystem-Schlüsselbund gespeichert werden. Beim nächsten Start muss es erneut eingegeben werden.",
                         "warning"
                     )
+                end
+                -- INFRA-12: a keychain that was unavailable at startup may have
+                -- recovered. Retry the legacy plaintext migration now that the
+                -- login succeeded; the warning is shown at most once per run.
+                if Api.migrateLegacyPassword() == false then
+                    warnLegacyMigrationFailure()
                 end
                 if not session then
                     session = Api.createSession(jwt, credEmail, function()

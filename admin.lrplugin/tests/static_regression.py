@@ -150,6 +150,8 @@ def main() -> int:
     require(api, "pcall(Api.login, session.email)", "protected credential fallback")
     require(api, "function Api.createSession", "session holder")
     require(api, "function Api.refreshSession", "session renewal")
+    require(api, "authRejected", "refresh terminal classification")
+    require(api, "if refreshTerminal then session.expired = true end", "transport-safe refresh outcome")
     require(api, "function Api.callWithSession", "non-upload session wrapper")
     require(api, "function Api.uploadWithSession", "upload session wrapper")
     require(api, 'string.gmatch(cookieValue .. ";"', "Lua 5.1 cookie fallback")
@@ -208,7 +210,9 @@ def main() -> int:
     require(runner, "python3 -B tests/harness_regression.py", "harness contract-test registration")
     require(runner, "python3 -B tests/static_regression.py", "static fallback registration")
     require(runner, "lua tests/manager_upload_regression.lua", "ManagerCore Lua-suite registration")
+    require(runner, "lua tests/legacy_password_migration_regression.lua", "legacy password migration Lua-suite registration")
     require(runner, "no live Lightroom execution", "no-runtime disclosure")
+    require(runner, "no test runtime available", "fail-closed no-runtime guard")
 
     print(
         "Static Lightroom source regression checks passed "

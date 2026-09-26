@@ -40,6 +40,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Verify workflow and artifact security invariants
         run: bash tests/infrastructure/ci-security-contract.sh
+      # CR-INF-001/CR-INF-014: the 413-line rclone sync regression was never
+      # executed by anything. It is self-contained (mktemp) and fails closed on
+      # private-storage exclusions, root SQLite exclusion and partial-sync
+      # propagation, so it belongs next to the other infrastructure contracts.
+      - name: Verify rclone sync exclusions and failure propagation
+        run: bash tests/infrastructure/rclone-sync-regression.sh
       # P1-I5: the pinned base image must not run as root. This inspects the
       # published artifact anonymously - a source-only 'USER www-data' check is
       # not evidence, because the digest production pinned until d7f3596 was
@@ -48,6 +54,20 @@ jobs:
       # skip. See tests/infrastructure/verify-image-nonroot.sh.
       - name: Verify the pinned base image is not a root image
         run: bash tests/infrastructure/verify-image-nonroot.sh
+      # INFRA-6: the plugin harness must fail closed (non-zero) when neither
+      # python3 nor lua is available instead of reporting success after zero
+      # checks.
+      - name: Verify the Lightroom plugin harness fails closed
+        run: bash tests/infrastructure/plugin-harness-fail-closed.sh
+      # INFRA-10: the consumer pins must stay within the documented maximum age
+      # of the digest the mutable tag currently points at, otherwise security
+      # fixes published to GHCR never reach CI/production.
+      - name: Verify the pinned images are fresh
+        run: bash tests/infrastructure/verify-image-freshness.sh
+      # The freshness policy itself is regression-tested against a fixture
+      # registry (stale pin must fail, fresh pin must pass).
+      - name: Verify the image pin freshness gate
+        run: bash tests/infrastructure/image-pin-freshness-regression.sh
 
   backend:
     name: Backend (PHPUnit)
@@ -240,6 +260,18 @@ jobs:
     # infrastructure/28-ci-test-image.md.
     container:
       image: ghcr.io/reisinger-pictures/portal-e2e@sha256:c09b2f8e2cb93be6d84f9917c33072cc171b941ce8c0933c9390570b48295aaf
+      # INFRA-2: the runner mounts the host workspace at $GITHUB_WORKSPACE and
+      # runs steps inside this container. Dockerfile.e2e ends in
+      # `USER www-data` (uid 1000), so without this override actions/checkout,
+      # pnpm install, composer install and `artisan key:generate` would write as
+      # uid 1000 into a workspace owned by the host runner user -> EACCES and a
+      # red job. CI is ephemeral, so running the job as root here is safe and
+      # intentional. The non-root runtime guarantee belongs to the *production*
+      # artifacts: deployment/Dockerfile's `USER www-data` plus the compose
+      # `user: "1000:1000"` (asserted by InfrastructureSupplyChainPolicyTest and
+      # tests/infrastructure/verify-image-nonroot.sh). Never drop this option
+      # without also making the mounted workspace writable by uid 1000.
+      options: --user root
     strategy:
       fail-fast: false
       matrix:

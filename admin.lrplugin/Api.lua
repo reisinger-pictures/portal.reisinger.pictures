@@ -252,7 +252,7 @@ function Api.login(email, password)
         password = Api.getStoredPassword()
     end
     if type(email) ~= "string" or email == "" or type(password) ~= "string" or password == "" then
-        return nil, "Keine Zugangsdaten eingegeben.", ""
+        return nil, "Keine Zugangsdaten eingegeben.", "", nil
     end
     Api.setBaseUrl(prefs.useLocal and "http://localhost:4321" or "https://portal.reisinger.pictures")
     local payload = { email = email, password = password }
@@ -264,11 +264,11 @@ function Api.login(email, password)
         -- httpOnly `rp_jwt` cookie. Deliberately do not accept a body token:
         -- accepting a legacy/foreign field would bypass the cookie contract.
         local token = extractCookieToken(resHeaders, "rp_jwt")
-        if token then return token, nil, nil end
+        if token then return token, nil, nil, 200 end
 
         local detail = "Status: 200\nURL: " .. Api.baseUrl .. "/api/auth/login\n"
             .. "Der Server hat kein rp_jwt-Cookie gesetzt."
-        return nil, "Sitzung konnte nicht gelesen werden.", detail
+        return nil, "Sitzung konnte nicht gelesen werden.", detail, 200
     end
 
     local err = (type(data) == "table" and data.error) or "Unbekannter API-Fehler"
@@ -278,7 +278,10 @@ function Api.login(email, password)
         detail = detail .. "\nBody: " .. string.sub(resBody, 1, 300)
     end
 
-    return nil, err, detail
+    -- The fourth return value is the HTTP status (0 for a transport failure).
+    -- refreshSession uses it to distinguish a definitive auth rejection
+    -- (401/403) from a timeout/5xx/network error that must stay retryable.
+    return nil, err, detail, status
 end
 
 -- Returns resBody, status on success; nil, status, errDetail on failure.
@@ -333,33 +336,52 @@ end
 -- uploadWithSession) owns the one-retry bound; this function never loops.
 -- LrTasks.pcall is required because Api.login yields while LrHttp is running;
 -- the standard Lua pcall cannot safely cross that yield in Lua 5.1.
+--
+-- Returns newJwt, errorMessage, terminal. `terminal` is true only for a
+-- definitive authentication rejection (HTTP 401/403) or a session that is
+-- already expired. A transport failure (timeout, 5xx, network, status 0) is
+-- deliberately NOT terminal: the session must stay retryable so a later
+-- request can renew once the connection recovers. The per-request retry bound
+-- in the callers is unchanged.
 function Api.refreshSession(session)
-    if not isAuthSession(session) then return nil, "Keine aktive Sitzung." end
-    if session.expired then return nil, "Sitzung ist abgelaufen." end
-    if session.refreshing then return nil, "Sitzung wird bereits erneuert." end
+    if not isAuthSession(session) then return nil, "Keine aktive Sitzung.", true end
+    if session.expired then return nil, "Sitzung ist abgelaufen.", true end
+    if session.refreshing then return nil, "Sitzung wird bereits erneuert.", false end
 
     session.refreshing = true
-    local ok, newJwt, err
+    local ok, newJwt, err, detail, status
     if type(session.refresh) == "function" then
-        ok, newJwt, err = LrTasks.pcall(session.refresh)
+        ok, newJwt, err, detail, status = LrTasks.pcall(session.refresh)
     else
-        ok, newJwt, err = LrTasks.pcall(Api.login, session.email)
+        ok, newJwt, err, detail, status = LrTasks.pcall(Api.login, session.email)
     end
     session.refreshing = false
 
+    -- The refresh callback may return the login status as its fourth value
+    -- (Api.login does). Only an explicit 401/403 marks the session terminal.
+    local authRejected = tonumber(status) == 401 or tonumber(status) == 403
+
+    local function failure(message, terminal)
+        if terminal then session.expired = true end
+        return nil, message, terminal
+    end
+
     if not ok then
-        session.expired = true
-        return nil, tostring(newJwt)
+        -- A thrown error is a runtime/programming failure, not proof that the
+        -- credentials are invalid. Keep the session retryable.
+        return failure(tostring(newJwt), false)
     end
 
     if type(newJwt) == "string" and newJwt ~= "" then
         session.jwt = newJwt
         session.expired = false
-        return newJwt, nil
+        return newJwt, nil, false
     end
 
-    session.expired = true
-    return nil, err or "Sitzung konnte nicht erneuert werden."
+    return failure(
+        err or detail or "Sitzung konnte nicht erneuert werden.",
+        authRejected
+    )
 end
 
 -- Calls an authenticated endpoint and retries exactly once after a bounded
@@ -377,9 +399,12 @@ function Api.callWithSession(session, endpoint, method, payload)
         data, status, resBody, resHeaders, errorDetail = Api.call(endpoint, method, payload, session.jwt)
         if status ~= 401 or retry >= MAX_AUTH_RETRIES or not allowAuthRetry then break end
 
-        local newJwt, refreshError = Api.refreshSession(session)
+        local newJwt, refreshError, refreshTerminal = Api.refreshSession(session)
         if not newJwt then
-            session.expired = true
+            -- A transport-only refresh failure must not kill the session; only
+            -- a definitive auth rejection is terminal (refreshSession already
+            -- set session.expired in that case).
+            if refreshTerminal then session.expired = true end
             return data, status, resBody, resHeaders, refreshError or errorDetail
         end
     end
@@ -400,9 +425,9 @@ function Api.uploadWithSession(session, endpoint, formFields)
         resBody, status, errDetail = Api.uploadMultipart(endpoint, formFields, session.jwt)
         if status ~= 401 or retry >= MAX_AUTH_RETRIES or not allowAuthRetry then break end
 
-        local newJwt, refreshError = Api.refreshSession(session)
+        local newJwt, refreshError, refreshTerminal = Api.refreshSession(session)
         if not newJwt then
-            session.expired = true
+            if refreshTerminal then session.expired = true end
             return nil, status, refreshError or errDetail
         end
     end

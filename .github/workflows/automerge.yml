@@ -116,4 +116,9 @@ jobs:
         if: steps.should-merge.outputs.result == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr merge "${{ github.event.pull_request.number }}" --squash --delete-branch
+          # INFRA-9: GitHub-defined integers are not currently exploitable, but
+          # the repo policy (tests/infrastructure/ci-security-contract.sh) is to
+          # pass untrusted event metadata through env, never inline into a
+          # `run:` block. Keep this indirection even though the value is numeric.
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr merge "$PR_NUMBER" --squash --delete-branch

@@ -42,6 +42,7 @@ final class ProductionOperationsPolicy
         $this->validateWorkerRestartDelay($workerRestartDelay, $violations);
         $this->validateScheduler($config, $usesOnOneServerScheduler, $violations);
         $this->validateMail($config, $violations);
+        $this->validateDebug($config, $violations);
 
         return array_values(array_unique($violations));
     }
@@ -364,6 +365,27 @@ final class ProductionOperationsPolicy
             $fromName !== null && preg_match('/[\x00-\x1F\x7F]/', $fromName) === 1,
             $violations,
             'MAIL_FROM_NAME must not contain control characters.',
+        );
+    }
+
+    /**
+     * Applies the same fail-closed APP_DEBUG rule as
+     * deployment/validate-production-env.sh. The compose file defaults the
+     * value to false, but an explicit APP_DEBUG=true in an env file wins and
+     * would expose stack traces, configuration, and SQL in production.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  list<string>  $violations
+     */
+    private function validateDebug(array $config, array &$violations): void
+    {
+        $app = $config['app'] ?? null;
+        $debug = is_array($app) ? $this->booleanValue($app['debug'] ?? null) : null;
+
+        $this->addViolation(
+            $debug === true,
+            $violations,
+            'APP_DEBUG must not be true in production.',
         );
     }
 

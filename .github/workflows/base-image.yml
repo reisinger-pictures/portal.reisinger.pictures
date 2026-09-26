@@ -42,6 +42,12 @@ jobs:
           context: deployment
           push: true
           platforms: linux/amd64
+          # INFRA-10: attach signed build provenance and an SBOM so the
+          # published digest is auditable and not just a mutable tag. The
+          # consumer pin freshness is enforced separately by
+          # tests/infrastructure/verify-image-freshness.sh.
+          provenance: true
+          sbom: true
           build-args: |
             PHP_VERSION=8.5
             DB_EXT=mysql

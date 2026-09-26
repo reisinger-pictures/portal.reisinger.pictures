@@ -213,9 +213,46 @@ class ProductionOperationsPolicyTest extends TestCase
         }
     }
 
+    public function test_app_debug_true_is_a_fail_closed_violation(): void
+    {
+        $config = $this->validConfig();
+        $config['app']['debug'] = true;
+
+        $this->assertContains(
+            'APP_DEBUG must not be true in production.',
+            $this->policy()->violations($config, 60, 5, true),
+        );
+    }
+
+    public function test_app_debug_normalization_matches_the_shell_preflight(): void
+    {
+        foreach (['true', '1', 'on', 'yes'] as $truthy) {
+            $config = $this->validConfig();
+            $config['app']['debug'] = $truthy;
+
+            $this->assertContains(
+                'APP_DEBUG must not be true in production.',
+                $this->policy()->violations($config, 60, 5, true),
+                "APP_DEBUG={$truthy} must be rejected",
+            );
+        }
+
+        foreach (['false', '0', 'off', 'no', ''] as $falsy) {
+            $config = $this->validConfig();
+            $config['app']['debug'] = $falsy;
+
+            $this->assertNotContains(
+                'APP_DEBUG must not be true in production.',
+                $this->policy()->violations($config, 60, 5, true),
+                "APP_DEBUG={$falsy} must be accepted",
+            );
+        }
+    }
+
     public function test_raw_preflight_rejects_whitespace_fractional_and_invalid_topology(): void
     {
         foreach ([
+            ['APP_DEBUG', 'true'],
             ['DB_QUEUE_RETRY_AFTER', ' 90 '],
             ['DB_QUEUE_RETRY_AFTER', '90.5'],
             ['QUEUE_WORKER_TIMEOUT', '60.5'],
@@ -333,6 +370,8 @@ class ProductionOperationsPolicyTest extends TestCase
         $this->assertStringContainsString('is_positive_integer()', $preflight);
         $this->assertStringContainsString('DB_QUEUE_RETRY_AFTER must be a raw positive integer.', $preflight);
         $this->assertStringContainsString('MAIL_REQUIRE_TLS must be true.', $preflight);
+        $this->assertStringContainsString('APP_DEBUG must not be true in production.', $preflight);
+        $this->assertStringContainsString('APP_DEBUG must not be true in production.', $policySource);
         $this->assertStringContainsString('strcasecmp', $policySource);
         $this->assertStringContainsString('/tmp/portal-queue-supervisor.pid', $compose);
         $this->assertStringContainsString('/tmp/portal-queue-worker.pid', $compose);
@@ -416,6 +455,9 @@ class ProductionOperationsPolicyTest extends TestCase
     private function validConfig(): array
     {
         return [
+            'app' => [
+                'debug' => false,
+            ],
             'database' => [
                 'default' => 'mariadb',
             ],
@@ -475,6 +517,7 @@ class ProductionOperationsPolicyTest extends TestCase
         $config ??= $this->validConfig();
 
         config([
+            'app.debug' => $config['app']['debug'],
             'queue' => $config['queue'],
             'database.default' => $config['database']['default'],
             'cache.default' => $config['cache']['default'],
@@ -494,6 +537,7 @@ class ProductionOperationsPolicyTest extends TestCase
     {
         return [
             'APP_ENV' => 'production',
+            'APP_DEBUG' => 'false',
             'DB_CONNECTION' => 'mariadb',
             'DB_QUEUE_CONNECTION' => 'mariadb',
             'QUEUE_CONNECTION' => 'database',

@@ -51,6 +51,10 @@ use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
+// AIS-3: the `ai-generate` limiter is registered in AppServiceProvider, not
+// here: `php artisan optimize` caches routes in production and would skip this
+// file, leaving the named limiter undefined at runtime. The two AI POST routes
+// below reference `throttle:ai-generate`.
 $throttleLimit = config('app.throttle_auth', 5);
 Route::middleware("throttle:$throttleLimit,1")->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
@@ -165,8 +169,8 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
 
     // AI Metadata Generation
     Route::get('/ai/status', [AIController::class, 'status'])->name('api.ai.status');
-    Route::post('/ai/generate-metadata', [AIController::class, 'generateMetadata'])->name('api.ai.generate-metadata');
-    Route::post('/ai/generate-metadata-text', [AIController::class, 'generateMetadataText'])->name('api.ai.generate-metadata-text');
+    Route::post('/ai/generate-metadata', [AIController::class, 'generateMetadata'])->middleware('throttle:ai-generate')->name('api.ai.generate-metadata');
+    Route::post('/ai/generate-metadata-text', [AIController::class, 'generateMetadataText'])->middleware('throttle:ai-generate')->name('api.ai.generate-metadata-text');
 
     // Coupon validation (public, auth-required)
     Route::post('/coupons/validate', [CouponCheckoutController::class, 'validateCoupon'])->name('api.coupons.validate')->middleware('throttle:coupon-validate');

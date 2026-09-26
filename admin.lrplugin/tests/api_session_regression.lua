@@ -194,4 +194,57 @@ assert(unsafeUploadStatus == 401 and unsafeUploadRefreshes == 0,
     "upload without UUID identity was replayed")
 assert(#calls == unsafeCallCount + 2, "unsafe upload made more than one request")
 
+-- INFRA-7: a refresh that fails for a transport reason (timeout, 5xx,
+-- network, status 0) must NOT mark the session terminal. A later request
+-- retries the refresh and can recover.
+responses = {
+    { headers = { status = 401 } }, -- first protected request
+    { headers = { status = 401 } }, -- second protected request
+    { body = '{"ok":true}', headers = { status = 200 } }, -- retry after re-login
+}
+local transientRefreshAttempts = 0
+local transient = Api.createSession("transient-old", "photographer@example.test", function()
+    transientRefreshAttempts = transientRefreshAttempts + 1
+    if transientRefreshAttempts == 1 then
+        return nil, "Netzwerkfehler", "Status: 0", 0
+    end
+    return "transient-new"
+end)
+local _, transientStatus = Api.callWithSession(transient, "/first", "GET", nil)
+assert(transientStatus == 401, "a transport refresh failure must surface the original 401")
+assert(not transient.expired, "a transport refresh failure must NOT expire the session")
+assert(transientRefreshAttempts == 1, "refresh must be attempted once per request")
+
+local _, recoveredStatus = Api.callWithSession(transient, "/second", "GET", nil)
+assert(recoveredStatus == 200, "a later request did not recover after a transport-only refresh failure")
+assert(transientRefreshAttempts == 2, "a later request must retry the refresh")
+assert(not transient.expired, "a recovered session must stay usable")
+
+-- A definitive auth rejection from the refresh callback is terminal and no
+-- later request may reach the network.
+responses = { { headers = { status = 401 } } }
+local rejectedRefreshAttempts = 0
+local rejected = Api.createSession("rejected-old", "photographer@example.test", function()
+    rejectedRefreshAttempts = rejectedRefreshAttempts + 1
+    return nil, "Ungueltige Sitzung", "Status: 401", 401
+end)
+local _, rejectedStatus = Api.callWithSession(rejected, "/first", "GET", nil)
+assert(rejectedStatus == 401 and rejected.expired, "a 401 refresh rejection must be terminal")
+local rejectedCallCount = #calls
+local _, rejectedAgain = Api.callWithSession(rejected, "/second", "GET", nil)
+assert(rejectedAgain == 401 and #calls == rejectedCallCount,
+    "an expired session must not make another request")
+assert(rejectedRefreshAttempts == 1, "a terminal session must not refresh again")
+
+-- The default Api.login refresh path carries the HTTP status as its fourth
+-- value, so a 401 login rejection is terminal there too.
+responses = {
+    { headers = { status = 401 } },
+    { body = '{"error":"invalid"}', headers = { status = 401 } },
+}
+local defaultRejected = Api.createSession("default-rejected", "photographer@example.test")
+local _, defaultRejectedStatus = Api.callWithSession(defaultRejected, "/protected", "GET", nil)
+assert(defaultRejectedStatus == 401 and defaultRejected.expired,
+    "a 401 login refresh failure must be terminal on the default path")
+
 print("Lua API session regression checks passed")

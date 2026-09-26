@@ -48,6 +48,7 @@ is_shared_cache_store() {
 }
 
 app_env=${APP_ENV:-}
+app_debug=${APP_DEBUG:-}
 db_connection=${DB_CONNECTION:-}
 db_queue_connection=${DB_QUEUE_CONNECTION:-}
 queue_connection=${QUEUE_CONNECTION:-}
@@ -69,6 +70,10 @@ mail_from_address=${MAIL_FROM_ADDRESS:-}
 mail_from_name=${MAIL_FROM_NAME:-}
 
 [ "$app_env" = 'production' ] || fail 'APP_ENV must be production.'
+# INFRA-5: an explicit APP_DEBUG=true in .env.production wins over the compose
+# default, leaking stack traces, config, and SQL to the public internet. Fail
+# closed on any truthy value; unset/empty/false are safe.
+is_true "$app_debug" && fail 'APP_DEBUG must not be true in production.'
 [ -n "$db_connection" ] || fail 'DB_CONNECTION must be non-empty.'
 has_whitespace "$db_connection" && fail 'DB_CONNECTION must not contain whitespace.'
 [ -n "$db_queue_connection" ] || fail 'DB_QUEUE_CONNECTION must be non-empty.'
