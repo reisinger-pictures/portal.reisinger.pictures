@@ -20,7 +20,7 @@ class PricingServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new PricingService(new ScopeLicensingStrategy());
+        $this->service = new PricingService(new ScopeLicensingStrategy);
     }
 
     public function test_calculate_item_price_throws_when_use_case_missing(): void

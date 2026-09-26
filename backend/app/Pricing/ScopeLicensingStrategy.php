@@ -26,7 +26,7 @@ class ScopeLicensingStrategy implements PricingStrategy
         foreach ($items as $item) {
             $itemId = $item['id'] ?? 0;
 
-            if (!empty($item['is_quote'])) {
+            if (! empty($item['is_quote'])) {
                 $pricedItems[] = [
                     'itemId' => $itemId,
                     'priceCents' => 0,
@@ -34,6 +34,7 @@ class ScopeLicensingStrategy implements PricingStrategy
                     'useCaseName' => 'Anfrage',
                     'modifierNames' => [],
                 ];
+
                 continue;
             }
 
@@ -68,9 +69,6 @@ class ScopeLicensingStrategy implements PricingStrategy
     /**
      * Replicate the original PricingService::calculateItemPriceCents() logic.
      *
-     * @param  string  $useCaseId
-     * @param  array   $modifierIds
-     * @param  string  $userFlatrateLevel
      * @return array{total_cents: int, tier: string, use_case_name: string, modifier_names: array}
      */
     private function calculateSingleItem(string $useCaseId, array $modifierIds, string $userFlatrateLevel): array
@@ -90,7 +88,7 @@ class ScopeLicensingStrategy implements PricingStrategy
         $surchargeAmountCents = 0;
         $modifierNames = [];
 
-        if (!empty($modifierIds)) {
+        if (! empty($modifierIds)) {
             $modifiers = LicenseModifier::whereIn('id', $modifierIds)->get();
             foreach ($modifiers as $mod) {
                 $this->guardBrand($mod->brand);
@@ -113,7 +111,8 @@ class ScopeLicensingStrategy implements PricingStrategy
     /**
      * Defense-in-depth: reject cross-brand price injection.
      *
-     * @param  \App\Enums\Brand|string|null  $rowBrand
+     * @param  Brand|string|null  $rowBrand
+     *
      * @throws \RuntimeException when the row's brand does not match the current brand.
      */
     protected function guardBrand(mixed $rowBrand): void
@@ -128,7 +127,7 @@ class ScopeLicensingStrategy implements PricingStrategy
         $rowValue = $rowBrand instanceof Brand ? $rowBrand->value : (string) $rowBrand;
         if ($rowValue !== $current->value) {
             throw new \RuntimeException(
-                'Cross-brand access denied: row brand [' . $rowValue . '] does not match current brand [' . $current->value . '].'
+                'Cross-brand access denied: row brand ['.$rowValue.'] does not match current brand ['.$current->value.'].'
             );
         }
     }

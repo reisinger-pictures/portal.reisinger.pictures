@@ -14,7 +14,6 @@ enum PhotoJobStatus: string
     case EXPORTIERT = 'exportiert';
     case ABGEBROCHEN = 'abgebrochen';
 
-    /** @return self */
     public static function initial(): self
     {
         return self::IMPORTIERT;

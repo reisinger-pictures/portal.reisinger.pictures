@@ -15,7 +15,7 @@ class SendInviteEmailRequest extends FormRequest
     {
         return [
             'email' => 'required|email',
-            'name' => 'nullable|string|max:255'
+            'name' => 'nullable|string|max:255',
         ];
     }
 }

@@ -12,6 +12,7 @@ class AsBrand implements CastsAttributes
         if ($value === null) {
             return null;
         }
+
         return Brand::tryFrom($value) ?? $value;
     }
 
@@ -23,6 +24,7 @@ class AsBrand implements CastsAttributes
         if ($value instanceof Brand) {
             return $value->value;
         }
+
         return (string) $value;
     }
 }

@@ -1,8 +1,10 @@
 <?php
+
 namespace App\Services;
 
 use App\Enums\Brand;
 use App\Models\Gallery;
+use App\Models\Setting;
 use App\Models\VolumePreset;
 use App\Models\VolumePresetTier;
 use App\Support\BrandRegistry;
@@ -45,6 +47,7 @@ class VolumePresetService
         $fallback = VolumePreset::where('brand', $brandValue)->first();
         if ($fallback !== null) {
             $fallback->update(['is_default' => true]);
+
             return $fallback;
         }
 
@@ -84,6 +87,7 @@ class VolumePresetService
         }
 
         $brand = $gallery?->brand ?? BrandRegistry::currentOrDefault();
+
         return $this->ensureDefaultPresetForBrand($brand);
     }
 
@@ -104,11 +108,11 @@ class VolumePresetService
     {
         $values = [];
         foreach (['srp_price_per_image_tier1', 'srp_price_per_image_tier2', 'srp_price_per_image_tier3'] as $key) {
-            $value = \App\Models\Setting::where('key', $key)->where('brand', $brandValue)->value('value');
+            $value = Setting::where('key', $key)->where('brand', $brandValue)->value('value');
             $values[] = $value !== null ? (int) $value : null;
         }
-        $threshold1 = \App\Models\Setting::where('key', 'srp_tier_threshold1')->where('brand', $brandValue)->value('value');
-        $threshold2 = \App\Models\Setting::where('key', 'srp_tier_threshold2')->where('brand', $brandValue)->value('value');
+        $threshold1 = Setting::where('key', 'srp_tier_threshold1')->where('brand', $brandValue)->value('value');
+        $threshold2 = Setting::where('key', 'srp_tier_threshold2')->where('brand', $brandValue)->value('value');
 
         // Only migrate when at least one tier price exists; otherwise use defaults.
         if ($values[0] === null && $values[1] === null && $values[2] === null) {
@@ -138,6 +142,7 @@ class VolumePresetService
                 'is_default' => $isFirst,
             ]);
             $this->replaceTiers($preset, $tiers);
+
             return $preset;
         });
     }
@@ -149,6 +154,7 @@ class VolumePresetService
     {
         $preset->update(['name' => $name]);
         $this->replaceTiers($preset, $tiers);
+
         return $preset;
     }
 
@@ -163,6 +169,7 @@ class VolumePresetService
 
         VolumePreset::where('brand', $preset->brand)->where('is_default', true)->update(['is_default' => false]);
         $preset->update(['is_default' => true]);
+
         return $preset;
     }
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Mail\CustomMail;
+use App\Mail\InvoiceMail;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
@@ -105,7 +106,7 @@ class StripeWebhookTest extends TestCase
             'payment_intent_generation' => 1,
             'stripe_fee_cents' => 44,
         ]);
-        Mail::assertQueued(\App\Mail\InvoiceMail::class, 1);
+        Mail::assertQueued(InvoiceMail::class, 1);
     }
 
     public function test_missing_local_link_does_not_bypass_v036_identity_validation(): void

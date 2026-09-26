@@ -18,7 +18,7 @@ class RedeemInviteRequest extends FormRequest
             'name' => 'nullable|string',
             'email' => 'nullable|email',
             'password' => 'nullable|string',
-            'accept_privacy' => 'required|accepted'
+            'accept_privacy' => 'required|accepted',
         ];
     }
 }

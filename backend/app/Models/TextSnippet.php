@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Casts\AsBrand;
 use App\Enums\Brand;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Laravel\Scout\Searchable;
 
 class TextSnippet extends Model
@@ -20,17 +21,17 @@ class TextSnippet extends Model
         'title',
         'shortcut',
         'content_html',
-        'brand'
+        'brand',
     ];
 
-    protected $casts = ['brand' => \App\Casts\AsBrand::class];
+    protected $casts = ['brand' => AsBrand::class];
 
     /**
      * Scope to the current brand (host-derived). See spec §3.3 / §3.4.
      */
     public function scopeForCurrentBrand(Builder $query): Builder
     {
-        return $query->where($query->getQuery()->from . '.brand', BrandRegistry::currentId());
+        return $query->where($query->getQuery()->from.'.brand', BrandRegistry::currentId());
     }
 
     public function toSearchableArray()

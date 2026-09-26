@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Pricing\ScopeLicensingStrategy;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ScopeLicensingStrategyTest extends TestCase
@@ -16,12 +15,13 @@ class ScopeLicensingStrategyTest extends TestCase
     use RefreshDatabase;
 
     private ScopeLicensingStrategy $strategy;
+
     private User $user;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->strategy = new ScopeLicensingStrategy();
+        $this->strategy = new ScopeLicensingStrategy;
         $this->user = User::factory()->create(['flatrate_level' => 'web']);
     }
 

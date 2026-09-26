@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
-use App\Enums\Brand;
+use App\Casts\AsBrand;
+use App\Services\GalleryTreeService;
 use App\Support\GalleryGroupSubtree;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class GalleryGroup extends Model
@@ -14,7 +15,7 @@ class GalleryGroup extends Model
     use HasFactory, HasUuids;
 
     public const UPDATED_AT = null;
-    
+
     protected $fillable = [
         'parent_id',
         'name',
@@ -24,7 +25,7 @@ class GalleryGroup extends Model
         'is_editorial_only',
         'is_hidden',
         'restricted_photographers',
-        'brand'
+        'brand',
     ];
 
     protected $casts = [
@@ -33,7 +34,7 @@ class GalleryGroup extends Model
         'is_editorial_only' => 'boolean',
         'is_hidden' => 'boolean',
         'restricted_photographers' => 'boolean',
-        'brand' => \App\Casts\AsBrand::class,
+        'brand' => AsBrand::class,
     ];
 
     protected static function booted()
@@ -66,8 +67,8 @@ class GalleryGroup extends Model
         });
 
         static::saved(function (GalleryGroup $group) {
-            DB::afterCommit(function () use ($group) {
-                app(\App\Services\GalleryTreeService::class)->clearCache();
+            DB::afterCommit(function () {
+                app(GalleryTreeService::class)->clearCache();
             });
 
             if ($group->wasChanged('brand') && $group->brand !== null) {
@@ -96,14 +97,14 @@ class GalleryGroup extends Model
                 Gallery::where('gallery_group_id', $group->id)
                     ->where(function ($q) use ($brand) {
                         $q->where('brand', '!=', $brand)
-                          ->orWhereNull('brand');
+                            ->orWhereNull('brand');
                     })
                     ->update(['brand' => $brand]);
             }
         });
         static::deleted(function () {
             DB::afterCommit(function () {
-                app(\App\Services\GalleryTreeService::class)->clearCache();
+                app(GalleryTreeService::class)->clearCache();
             });
         });
     }

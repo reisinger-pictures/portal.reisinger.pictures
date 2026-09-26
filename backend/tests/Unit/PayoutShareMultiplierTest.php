@@ -19,7 +19,7 @@ class PayoutShareMultiplierTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new PayoutCalculationService();
+        $this->service = new PayoutCalculationService;
     }
 
     public function test_original_tier_returns_multiplier_4(): void

@@ -29,7 +29,7 @@ class ContractClosedMail extends AbstractBrandAwareMailable
 
             $pdf = app(ContractPdfService::class)->generate($this->contract);
 
-            $filename = 'Vertrag_' . now()->format('Y-m-d') . '.pdf';
+            $filename = 'Vertrag_'.now()->format('Y-m-d').'.pdf';
 
             return $this->subject('Ihr unterschriebener Vertrag')
                 ->bcc($this->brandBcc())

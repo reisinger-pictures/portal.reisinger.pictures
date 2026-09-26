@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Gallery;
+use Carbon\Carbon;
 use Symfony\Component\Process\Process;
 
 class PhotoProcessingService
@@ -15,8 +16,8 @@ class PhotoProcessingService
     public function processImage(string $targetPath, string $thumbPath, Gallery $gallery): array
     {
         $size = @getimagesize($targetPath);
-        $width = $size ? (int)$size[0] : 0;
-        $height = $size ? (int)$size[1] : 0;
+        $width = $size ? (int) $size[0] : 0;
+        $height = $size ? (int) $size[1] : 0;
 
         $applyDefaults = $gallery->type !== 'selection' && $gallery->apply_metadata_to_photos;
 
@@ -35,7 +36,7 @@ class PhotoProcessingService
         ];
 
         // Selection Galerien überspringen die Exif-Extraktion aus Performance-Gründen
-        if ($gallery->type === 'selection' || !$gallery->apply_metadata_to_photos) {
+        if ($gallery->type === 'selection' || ! $gallery->apply_metadata_to_photos) {
             return $meta;
         }
 
@@ -58,7 +59,7 @@ class PhotoProcessingService
             $dateStr = $m['DateTimeOriginal'] ?? $m['CreateDate'] ?? null;
             if ($dateStr) {
                 try {
-                    $meta['captured_at'] = \Carbon\Carbon::createFromFormat('Y:m:d H:i:s', substr($dateStr, 0, 19))->toDateTimeString();
+                    $meta['captured_at'] = Carbon::createFromFormat('Y:m:d H:i:s', substr($dateStr, 0, 19))->toDateTimeString();
                 } catch (\Exception $e) {
                 }
             }
@@ -80,9 +81,10 @@ class PhotoProcessingService
             'exiftool', '-json', '-Title', '-ObjectName', '-XPTitle',
             '-ImageDescription', '-Caption-Abstract', '-Keywords', '-Sub-location', '-City', '-Province-State',
             '-Country-PrimaryLocationName', '-Country-PrimaryLocationCode', '-DateTimeOriginal', '-CreateDate',
-            $targetPath
+            $targetPath,
         ]);
         $process->run();
+
         return json_decode($process->getOutput(), true);
     }
 }

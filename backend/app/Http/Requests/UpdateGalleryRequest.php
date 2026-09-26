@@ -2,13 +2,16 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Gallery;
+use Illuminate\Support\Facades\Gate;
+
 class UpdateGalleryRequest extends GalleryRequest
 {
     public function authorize(): bool
     {
-        $gallery = \App\Models\Gallery::find($this->route('id'));
+        $gallery = Gallery::find($this->route('id'));
 
-        return $gallery !== null && \Illuminate\Support\Facades\Gate::allows('manage', $gallery);
+        return $gallery !== null && Gate::allows('manage', $gallery);
     }
 
     // Rules inherited from GalleryRequest

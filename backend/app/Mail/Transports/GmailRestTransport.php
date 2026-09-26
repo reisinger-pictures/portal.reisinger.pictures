@@ -2,16 +2,18 @@
 
 namespace App\Mail\Transports;
 
-use Symfony\Component\Mailer\Transport\AbstractTransport;
-use Symfony\Component\Mailer\SentMessage;
+use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Exception;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mailer\Transport\AbstractTransport;
 
 class GmailRestTransport extends AbstractTransport
 {
     protected $clientId;
+
     protected $clientSecret;
+
     protected $refreshToken;
 
     public function __construct($clientId, $clientSecret, $refreshToken)
@@ -25,10 +27,10 @@ class GmailRestTransport extends AbstractTransport
     protected function doSend(SentMessage $message): void
     {
         $email = $message->getOriginalMessage();
-        
+
         // Symfony Email in einen RFC 2822 String umwandeln
         $rawMessage = $email->toString();
-        
+
         // Gmail REST API erwartet Base64Url Encoding (ohne padding)
         $base64Url = str_replace(['+', '/'], ['-', '_'], rtrim(base64_encode($rawMessage), '='));
 
@@ -41,8 +43,8 @@ class GmailRestTransport extends AbstractTransport
                 'grant_type' => 'refresh_token',
             ]);
 
-            if (!$tokenResponse->successful()) {
-                throw new Exception('Google OAuth2 Token Refresh failed: ' . $tokenResponse->body());
+            if (! $tokenResponse->successful()) {
+                throw new Exception('Google OAuth2 Token Refresh failed: '.$tokenResponse->body());
             }
 
             $accessToken = $tokenResponse->json('access_token');
@@ -52,35 +54,35 @@ class GmailRestTransport extends AbstractTransport
             // message/rfc822 für den Raw-Teil) — ein reiner JSON-Body mit 'raw'
             // wird mit "Media type 'application/json' is not supported" (400)
             // abgelehnt. Wir bauen den Multipart-Body manuell auf.
-            $boundary = 'boundary_' . bin2hex(random_bytes(16));
+            $boundary = 'boundary_'.bin2hex(random_bytes(16));
             $rawRfc822 = $email->toString();
 
             $multipartBody = implode("\r\n", [
-                '--' . $boundary,
+                '--'.$boundary,
                 'Content-Type: application/json; charset=UTF-8',
                 '',
                 json_encode(['raw' => $base64Url]),
-                '--' . $boundary,
+                '--'.$boundary,
                 'Content-Type: message/rfc822',
                 '',
                 $rawRfc822,
-                '--' . $boundary . '--',
+                '--'.$boundary.'--',
                 '',
             ]);
 
             $sendResponse = Http::withToken($accessToken)
                 ->withHeaders([
-                    'Content-Type' => 'multipart/related; boundary="' . $boundary . '"',
+                    'Content-Type' => 'multipart/related; boundary="'.$boundary.'"',
                 ])
-                ->withBody($multipartBody, 'multipart/related; boundary="' . $boundary . '"')
+                ->withBody($multipartBody, 'multipart/related; boundary="'.$boundary.'"')
                 ->post('https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=multipart');
 
-            if (!$sendResponse->successful()) {
-                throw new Exception('Gmail REST API rejected the message: ' . $sendResponse->body());
+            if (! $sendResponse->successful()) {
+                throw new Exception('Gmail REST API rejected the message: '.$sendResponse->body());
             }
 
         } catch (Exception $e) {
-            Log::error('GmailRestTransport Error: ' . $e->getMessage());
+            Log::error('GmailRestTransport Error: '.$e->getMessage());
             $this->triggerMakeWebhook($e->getMessage());
             throw $e;
         }
@@ -99,7 +101,7 @@ class GmailRestTransport extends AbstractTransport
                 ->post($webhookUrl, [
                     'error' => 'Laravel Portal: Failed to send Email via Gmail REST API',
                     'details' => $errorMsg,
-                    'info' => 'Mail system down. See Laravel logs for details.' // SECURITY FIX: Keine Raw-E-Mail Dumps mehr an externe Webhooks.
+                    'info' => 'Mail system down. See Laravel logs for details.', // SECURITY FIX: Keine Raw-E-Mail Dumps mehr an externe Webhooks.
                 ]);
         }
     }

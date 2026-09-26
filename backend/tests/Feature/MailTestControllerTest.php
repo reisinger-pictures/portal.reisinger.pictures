@@ -2,14 +2,14 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\User;
-use App\Models\Role;
 use App\Enums\Brand;
-use App\Support\BrandRegistry;
-use Illuminate\Support\Facades\Mail;
 use App\Mail\TestMail;
+use App\Models\Role;
+use App\Models\User;
+use App\Support\BrandRegistry;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
+use Tests\TestCase;
 
 class MailTestControllerTest extends TestCase
 {
@@ -20,6 +20,7 @@ class MailTestControllerTest extends TestCase
         $user = User::factory()->create(['email' => 'superadmin@reisinger.pictures']);
         $role = Role::firstOrCreate(['name' => 'super_admin']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
@@ -28,12 +29,14 @@ class MailTestControllerTest extends TestCase
         $user = User::factory()->create();
         $role = Role::firstOrCreate(['name' => 'admin']);
         $user->roles()->attach($role);
+
         return $user;
     }
 
     private function authHeaders(User $user): array
     {
         $token = auth('api')->login($user);
+
         return ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
     }
 

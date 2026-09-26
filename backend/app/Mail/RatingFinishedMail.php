@@ -7,8 +7,11 @@ use Illuminate\Support\Facades\Log;
 class RatingFinishedMail extends AbstractBrandAwareMailable
 {
     public $notifiedUserName;
+
     public $clientName;
+
     public $clientEmail;
+
     public $galleryName;
 
     public function __construct($notifiedUserName, $clientName, $clientEmail, $galleryName)
@@ -25,10 +28,10 @@ class RatingFinishedMail extends AbstractBrandAwareMailable
         $this->applyBrandFrom();
 
         return $this->subject("Auswahl abgeschlossen: {$this->galleryName}")
-                    ->view('emails.rating_finished')
-                    ->with([
-                        'logoUrl' => $this->brandLogoUrl(),
-                    ]);
+            ->view('emails.rating_finished')
+            ->with([
+                'logoUrl' => $this->brandLogoUrl(),
+            ]);
     }
 
     public function failed(\Throwable $exception): void

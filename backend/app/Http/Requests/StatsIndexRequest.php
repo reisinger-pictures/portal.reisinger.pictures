@@ -14,7 +14,7 @@ class StatsIndexRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tier' => 'nullable|string|in:web,print,original'
+            'tier' => 'nullable|string|in:web,print,original',
         ];
     }
 }

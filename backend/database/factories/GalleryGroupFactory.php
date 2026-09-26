@@ -14,10 +14,11 @@ class GalleryGroupFactory extends Factory
     public function definition(): array
     {
         $name = $this->faker->words(2, true);
+
         return [
             'brand' => Brand::B2B,
             'name' => ucfirst($name),
-            'slug' => Str::slug($name) . '-' . $this->faker->unique()->numberBetween(1, 1000),
+            'slug' => Str::slug($name).'-'.$this->faker->unique()->numberBetween(1, 1000),
             'is_public' => $this->faker->boolean(),
             'parent_id' => null,
         ];

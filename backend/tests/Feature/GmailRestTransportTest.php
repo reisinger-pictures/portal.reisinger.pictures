@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use Illuminate\Support\Facades\Http;
 use App\Mail\Transports\GmailRestTransport;
+use Illuminate\Support\Facades\Http;
 use Symfony\Component\Mailer\Transport\TransportInterface;
 use Symfony\Component\Mime\Email;
+use Tests\TestCase;
 
 class GmailRestTransportTest extends TestCase
 {
@@ -20,7 +20,7 @@ class GmailRestTransportTest extends TestCase
         $transport = new GmailRestTransport('client-id', 'client-secret', 'refresh-token');
         $this->assertInstanceOf(TransportInterface::class, $transport);
 
-        $email = (new Email())
+        $email = (new Email)
             ->from('florian@reisinger.pictures')
             ->to('test@example.com')
             ->subject('SMTP Test')
@@ -30,7 +30,7 @@ class GmailRestTransportTest extends TestCase
 
         // Verify the Gmail send request used multipart/related (not raw JSON).
         Http::assertSent(function ($request) {
-            if (!str_contains($request->url(), 'gmail.googleapis.com')) {
+            if (! str_contains($request->url(), 'gmail.googleapis.com')) {
                 return false;
             }
 
@@ -55,7 +55,7 @@ class GmailRestTransportTest extends TestCase
 
         $transport = new GmailRestTransport('client-id', 'client-secret', 'refresh-token');
 
-        $email = (new Email())
+        $email = (new Email)
             ->from('florian@reisinger.pictures')
             ->to('test@example.com')
             ->subject('SMTP Test')

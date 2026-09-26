@@ -13,6 +13,20 @@ export PATH="/c/Users/flori/.config/herd/bin/php85:$PATH"
 cd backend && php artisan test
 ```
 
+Backend Formatting — Pint (STRICT, CI-Gate seit 2026-09-26):
+
+```bash
+cd backend && ./vendor/bin/pint          # formatiert um
+cd backend && ./vendor/bin/pint --test   # prüft nur, schreibt nichts (CI-Modus)
+```
+
+`pint --test` läuft als eigener Step im `Backend (PHPUnit)`-Job und lässt den
+Build bei Formatverstößen fehlschlagen. Im Gegensatz zum Frontend gibt es hier
+kein `--fix` als Auto-Fix-Policy für den Agenten: Pint **ist**
+der Auto-Fix. Verstöße werden **nicht** von Hand korrigiert, sondern mit
+`./vendor/bin/pint` behoben und committet. Beim Anlegen des Gates wurde die
+gesamte Codebasis einmal normalisiert (165 Dateien), das ist die Baseline.
+
 ## Database Setup Policy (STRICT)
 
 Nach `php artisan migrate:fresh` MUSS `php artisan db:seed` (oder `--seed` Flag) ausgeführt werden. Ohne Seed existiert kein Admin-User — Login und Auth sind tot. Der `DatabaseSeeder` legt den Admin via `firstOrCreate` mit `ADMIN_EMAIL`/`ADMIN_PASSWORD` an. `composer setup` ist kein Config-Wizard: Es kopiert eine fehlende `.env` nur ungefragt und ruft am Ende `migrate --force --seed` auf; `ADMIN_EMAIL` und ein nicht leeres `ADMIN_PASSWORD` müssen deshalb vor dem Setup gesetzt sein.

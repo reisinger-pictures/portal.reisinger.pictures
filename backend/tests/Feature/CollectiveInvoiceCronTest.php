@@ -2,20 +2,21 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
+use App\Models\InvoiceSnapshot;
+use App\Models\Order;
 use App\Models\Org;
 use App\Models\User;
-use App\Models\Order;
-use App\Models\InvoiceSnapshot;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\MailpitAssertions;
+use Tests\TestCase;
 
-#[\PHPUnit\Framework\Attributes\Group('mailpit')]
+#[Group('mailpit')]
 class CollectiveInvoiceCronTest extends TestCase
 {
-    use RefreshDatabase, MailpitAssertions;
+    use MailpitAssertions, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -30,18 +31,18 @@ class CollectiveInvoiceCronTest extends TestCase
         $user->save();
 
         $order = Order::create([
-            'user_id' => $user->id, 
-            'status' => 'delivery_note', 
-            'total_amount' => 100
+            'user_id' => $user->id,
+            'status' => 'delivery_note',
+            'total_amount' => 100,
         ]);
-        
+
         InvoiceSnapshot::create([
             'order_id' => $order->id,
             'invoice_number' => 'L-2026-0001',
             'customer_details' => ['name' => 'Kunde', 'items' => []],
             'total_net' => 100,
             'total_gross' => 100,
-            'tax_rate' => 0
+            'tax_rate' => 0,
         ]);
 
         // Sprung zum Monatsende
@@ -53,10 +54,10 @@ class CollectiveInvoiceCronTest extends TestCase
         $order->refresh();
         $this->assertEquals('archived_in_collective', $order->status);
         $this->assertDatabaseHas('orders', [
-            'status' => 'invoice_created', 
-            'total_amount' => 100
+            'status' => 'invoice_created',
+            'total_amount' => 100,
         ]);
-        
+
         // Warteschlange abarbeiten, damit die InvoiceMail verschickt wird
         Artisan::call('queue:work', ['--stop-when-empty' => true]);
 

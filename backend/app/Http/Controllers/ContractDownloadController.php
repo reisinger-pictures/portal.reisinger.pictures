@@ -23,7 +23,7 @@ class ContractDownloadController extends Controller
 
         return response()->streamDownload(function () use ($pdfOutput) {
             echo $pdfOutput;
-        }, 'Vertrag_' . $contract->id . '.pdf', [
+        }, 'Vertrag_'.$contract->id.'.pdf', [
             'Content-Type' => 'application/pdf',
         ]);
     }

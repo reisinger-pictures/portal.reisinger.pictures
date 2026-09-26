@@ -2,11 +2,13 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
-    public function up(): void {
+return new class extends Migration
+{
+    public function up(): void
+    {
         // 1. pricing_factors & license_options zu UUID
         Schema::dropIfExists('pricing_factors');
         Schema::create('pricing_factors', function (Blueprint $table) {
@@ -89,7 +91,7 @@ return new class extends Migration {
             $table->dropForeign(['gallery_group_id']);
             $table->dropPrimary();
         });
-        
+
         Schema::table('photographer_gallery_groups', function (Blueprint $table) {
             $table->uuid('gallery_group_id')->nullable()->change();
         });
@@ -102,7 +104,8 @@ return new class extends Migration {
         });
     }
 
-    public function down(): void {
+    public function down(): void
+    {
         // Rollback logik
     }
 };

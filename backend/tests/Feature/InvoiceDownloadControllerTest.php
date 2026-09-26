@@ -2,13 +2,11 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Gallery;
-use App\Models\Photo;
-use App\Models\Order;
 use App\Models\InvoiceSnapshot;
+use App\Models\Order;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class InvoiceDownloadControllerTest extends TestCase
 {
@@ -34,8 +32,8 @@ class InvoiceDownloadControllerTest extends TestCase
             'tax_rate' => 0,
         ]);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->get('/api/orders/' . $order->id . '/invoice');
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->get('/api/orders/'.$order->id.'/invoice');
 
         $response->assertStatus(200);
         $response->assertHeader('Content-Type', 'application/pdf');
@@ -53,8 +51,8 @@ class InvoiceDownloadControllerTest extends TestCase
             'total_amount' => 5000,
         ]);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->get('/api/orders/' . $order->id . '/invoice');
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->get('/api/orders/'.$order->id.'/invoice');
 
         $response->assertStatus(404);
     }
@@ -71,8 +69,8 @@ class InvoiceDownloadControllerTest extends TestCase
             'is_quote_request' => true,
         ]);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
-            ->get('/api/orders/' . $order->id . '/invoice');
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->get('/api/orders/'.$order->id.'/invoice');
 
         $response->assertStatus(403);
     }

@@ -8,9 +8,13 @@ use Illuminate\Support\Facades\Log;
 class ActivateAccountMail extends AbstractBrandAwareMailable
 {
     public $userName;
+
     public $introText;
+
     public $actionUrl;
+
     public $actionText;
+
     public $mailSubject;
 
     public function __construct($userName, $introText, $actionUrl, $actionText, $mailSubject, ?Brand $brand = null)
@@ -28,10 +32,10 @@ class ActivateAccountMail extends AbstractBrandAwareMailable
         $this->applyBrandFrom();
 
         return $this->subject($this->mailSubject)
-                    ->view('emails.activate')
-                    ->with([
-                        'logoUrl' => $this->brandLogoUrl(),
-                    ]);
+            ->view('emails.activate')
+            ->with([
+                'logoUrl' => $this->brandLogoUrl(),
+            ]);
     }
 
     public function failed(\Throwable $exception): void

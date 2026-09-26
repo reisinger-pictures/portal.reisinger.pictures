@@ -19,12 +19,12 @@ class TestMail extends AbstractBrandAwareMailable
         $this->applyBrandFrom();
 
         return $this->subject('Reisinger Portal — SMTP Test')
-                    ->view('emails.test')
-                    ->with([
-                        'logoUrl' => $this->brandLogoUrl(),
-                        'recipient' => $this->recipient,
-                        'mailer' => config('mail.default'),
-                    ]);
+            ->view('emails.test')
+            ->with([
+                'logoUrl' => $this->brandLogoUrl(),
+                'recipient' => $this->recipient,
+                'mailer' => config('mail.default'),
+            ]);
     }
 
     public function failed(\Throwable $exception): void

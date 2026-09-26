@@ -5,8 +5,6 @@ namespace Tests\Feature;
 use App\Enums\Brand;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
 class BrandQueueResetTest extends TestCase

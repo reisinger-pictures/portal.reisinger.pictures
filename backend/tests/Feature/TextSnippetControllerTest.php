@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\TextSnippet;
 use App\Models\User;
 use App\Support\BrandRegistry;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,6 +17,7 @@ class TextSnippetControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $superAdmin;
+
     private User $admin;
 
     protected function setUp(): void
@@ -146,7 +148,7 @@ class TextSnippetControllerTest extends TestCase
         $snippet = TextSnippet::factory()->create(['brand' => Brand::B2B]);
 
         $response = $this->actingAs($this->superAdmin, 'api')
-            ->putJson('/api/management/text-snippets/' . $snippet->id, [
+            ->putJson('/api/management/text-snippets/'.$snippet->id, [
                 'title' => 'Updated Title',
                 'content_html' => '<p>Updated</p>',
             ]);
@@ -162,7 +164,7 @@ class TextSnippetControllerTest extends TestCase
         $snippet = TextSnippet::factory()->create(['brand' => Brand::B2B]);
 
         $response = $this->actingAs($this->superAdmin, 'api')
-            ->deleteJson('/api/management/text-snippets/' . $snippet->id);
+            ->deleteJson('/api/management/text-snippets/'.$snippet->id);
 
         $response->assertStatus(200);
         $response->assertJsonPath('success', true);
@@ -172,7 +174,7 @@ class TextSnippetControllerTest extends TestCase
     public function test_snippet_shortcut_is_globally_unique()
     {
         TextSnippet::factory()->create(['shortcut' => 'global-unique', 'brand' => Brand::B2B]);
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
         TextSnippet::factory()->create(['shortcut' => 'global-unique', 'brand' => 'test-brand']);
     }
 }

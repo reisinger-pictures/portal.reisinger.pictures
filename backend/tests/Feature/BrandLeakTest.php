@@ -4,20 +4,16 @@ namespace Tests\Feature;
 
 use App\Enums\Brand;
 use App\Enums\UserRole;
+use App\Mail\InvoiceMail;
 use App\Models\Coupon;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
-use App\Models\Role;
-use App\Models\Setting;
 use App\Models\Org;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\InvoiceService;
-use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
-use App\Mail\InvoiceMail;
-use App\Http\Middleware\BrandContextMiddleware;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class BrandLeakTest extends TestCase
@@ -148,7 +144,7 @@ class BrandLeakTest extends TestCase
             'tax_rate' => 0,
         ]);
 
-        $service = new InvoiceService();
+        $service = new InvoiceService;
         $result = $service->generateForOrg($org);
         $this->assertTrue($result['success']);
 

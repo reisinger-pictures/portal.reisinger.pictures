@@ -2,11 +2,11 @@
 
 namespace App\Mail;
 
+use App\Enums\Brand;
+use App\Support\BrandRegistry;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
-use App\Enums\Brand;
-use App\Support\BrandRegistry;
 use Illuminate\Queue\SerializesModels;
 
 abstract class AbstractBrandAwareMailable extends Mailable implements ShouldQueue
@@ -40,7 +40,7 @@ abstract class AbstractBrandAwareMailable extends Mailable implements ShouldQueu
         $config = $this->brand ? BrandRegistry::configForBrand($this->brand->value) : null;
         $logoPath = $config?->logoEmailPath ?? '/brands/rp/logo-email-64.png';
 
-        return $this->brandFrontendUrl() . $logoPath;
+        return $this->brandFrontendUrl().$logoPath;
     }
 
     protected function brandBcc(): string

@@ -212,7 +212,7 @@ class PhotoLogicTest extends TestCase
         $photo = Photo::factory()->for($gallery)->create();
 
         // No gallery access (unauth) → watermark required
-        $expected = '/api/media/' . $photo->gallery_id . '/watermarked/_thumbs/2000/' . $photo->id . '.webp';
+        $expected = '/api/media/'.$photo->gallery_id.'/watermarked/_thumbs/2000/'.$photo->id.'.webp';
 
         $this->assertStringStartsWith($expected, $photo->url);
         $this->assertStringContainsString('?v=', $photo->url);
@@ -224,8 +224,8 @@ class PhotoLogicTest extends TestCase
         $photo = Photo::factory()->for($gallery)->create();
         $photo->refresh(); // ensure created_at is hydrated
 
-        $expectedV = (string)$photo->created_at->timestamp;
-        $this->assertStringContainsString('?v=' . $expectedV . '_', $photo->url);
+        $expectedV = (string) $photo->created_at->timestamp;
+        $this->assertStringContainsString('?v='.$expectedV.'_', $photo->url);
     }
 
     public function test_url_attribute_uses_v1_when_created_at_null(): void
@@ -245,7 +245,7 @@ class PhotoLogicTest extends TestCase
         $gallery = Gallery::factory()->create(['is_free_download' => true]);
         $photo = Photo::factory()->for($gallery)->create();
 
-        $expected = '/api/media/' . $photo->gallery_id . '/_thumbs/2000/' . $photo->id . '.webp';
+        $expected = '/api/media/'.$photo->gallery_id.'/_thumbs/2000/'.$photo->id.'.webp';
 
         $this->assertStringStartsWith($expected, $photo->url);
         $this->assertStringNotContainsString('watermarked/', $photo->url);
@@ -363,35 +363,35 @@ class PhotoLogicTest extends TestCase
     {
         $photo = Photo::factory()->create(['mime_type' => 'image/png']);
 
-        $this->assertSame($photo->id . '.png', $photo->filename);
+        $this->assertSame($photo->id.'.png', $photo->filename);
     }
 
     public function test_filename_attribute_for_webp_mime(): void
     {
         $photo = Photo::factory()->create(['mime_type' => 'image/webp']);
 
-        $this->assertSame($photo->id . '.webp', $photo->filename);
+        $this->assertSame($photo->id.'.webp', $photo->filename);
     }
 
     public function test_filename_attribute_for_jpeg_mime_defaults_to_jpg(): void
     {
         $photo = Photo::factory()->create(['mime_type' => 'image/jpeg']);
 
-        $this->assertSame($photo->id . '.jpg', $photo->filename);
+        $this->assertSame($photo->id.'.jpg', $photo->filename);
     }
 
     public function test_filename_attribute_for_null_mime_defaults_to_jpg(): void
     {
         $photo = Photo::factory()->create(['mime_type' => null]);
 
-        $this->assertSame($photo->id . '.jpg', $photo->filename);
+        $this->assertSame($photo->id.'.jpg', $photo->filename);
     }
 
     public function test_filename_attribute_for_gif_mime_defaults_to_jpg(): void
     {
         $photo = Photo::factory()->create(['mime_type' => 'image/gif']);
 
-        $this->assertSame($photo->id . '.jpg', $photo->filename);
+        $this->assertSame($photo->id.'.jpg', $photo->filename);
     }
 
     // ------------------------------------------------------------------

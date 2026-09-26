@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services;
 
+use App\AI\Contracts\AIProvider;
 use App\AI\Providers\AnthropicProvider;
 use App\AI\Providers\LMStudioProvider;
 use App\AI\Providers\OpenAIProvider;
@@ -67,19 +68,19 @@ class AIProviderFactoryTest extends TestCase
     {
         config(['services.ai.type' => 'anthropic']);
         $this->assertInstanceOf(
-            \App\AI\Contracts\AIProvider::class,
+            AIProvider::class,
             $this->factory->make()
         );
 
         config(['services.ai.type' => 'lmstudio']);
         $this->assertInstanceOf(
-            \App\AI\Contracts\AIProvider::class,
+            AIProvider::class,
             $this->factory->make()
         );
 
         config(['services.ai.type' => 'openai']);
         $this->assertInstanceOf(
-            \App\AI\Contracts\AIProvider::class,
+            AIProvider::class,
             $this->factory->make()
         );
     }

@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Casts\AsBrand;
 use App\Enums\Brand;
 use App\Support\BrandRegistry;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -24,8 +25,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $type fixed|percentage|photo_package
  * @property float $value
  * @property int|null $max_items
- * @property int|null $package_quantity  Photo-package: number of photos (N)
- * @property int|null $package_price_cents  Photo-package: flat price Y in cents
+ * @property int|null $package_quantity Photo-package: number of photos (N)
+ * @property int|null $package_price_cents Photo-package: flat price Y in cents
  * @property string $scope_type global|gallery|meta_gallery|photographer|organisation
  * @property int|null $scope_id
  * @property int|null $max_uses_global
@@ -34,8 +35,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $created_by
  * @property string|null $expires_at
  * @property bool $active
- * @property \Carbon\Carbon|null $created_at
- * @property \Carbon\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class Coupon extends Model
 {
@@ -73,7 +74,7 @@ class Coupon extends Model
         'created_by' => 'string',
         'active' => 'boolean',
         'expires_at' => 'datetime',
-        'brand' => \App\Casts\AsBrand::class,
+        'brand' => AsBrand::class,
     ];
 
     // ──────────────────────────────────────────────
@@ -96,12 +97,12 @@ class Coupon extends Model
 
     public function scopeForCurrentBrand(Builder $query): Builder
     {
-        return $query->where($query->getQuery()->from . '.brand', BrandRegistry::currentId());
+        return $query->where($query->getQuery()->from.'.brand', BrandRegistry::currentId());
     }
 
     public function scopeByBrand(Builder $query, Brand|string $brand): Builder
     {
-        return $query->where($query->getQuery()->from . '.brand', $brand instanceof Brand ? $brand->value : $brand);
+        return $query->where($query->getQuery()->from.'.brand', $brand instanceof Brand ? $brand->value : $brand);
     }
 
     public function scopeForCreator(Builder $query, User $user): Builder
@@ -150,7 +151,7 @@ class Coupon extends Model
 
     public function isValid(): bool
     {
-        if (!$this->active) {
+        if (! $this->active) {
             return false;
         }
 

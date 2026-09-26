@@ -2,14 +2,15 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Role;
+use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\Photo;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
+use Tests\TestCase;
 
 class RetroactiveGalleryDefaultsTest extends TestCase
 {
@@ -24,7 +25,7 @@ class RetroactiveGalleryDefaultsTest extends TestCase
     public function test_downloaded_images_contain_retroactively_applied_metadata()
     {
         $photog = User::factory()->create(['name' => 'Test Fotograf']);
-        $photog->roles()->attach(Role::firstOrCreate(['name' => \App\Enums\UserRole::PHOTOGRAPHER->value]));
+        $photog->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
         $gallery = Gallery::factory()->create([
             'type' => 'delivery',
@@ -40,7 +41,7 @@ class RetroactiveGalleryDefaultsTest extends TestCase
         ]);
 
         $fixturePath = base_path('tests/Fixtures/sample.jpg');
-        Storage::disk('photos')->put($gallery->id . '/' . $photo->filename, file_get_contents($fixturePath));
+        Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, file_get_contents($fixturePath));
 
         $token = auth('api')->login($photog);
 
@@ -49,7 +50,7 @@ class RetroactiveGalleryDefaultsTest extends TestCase
             ->putJson("/api/management/galleries/{$gallery->id}", [
                 'apply_metadata_to_photos' => true,
                 'default_title' => 'Retro Title',
-                'default_city' => 'Retro City'
+                'default_city' => 'Retro City',
             ])->assertStatus(200);
 
         // 2. ✨ WICHTIG: Model refreshen, damit die neuen Werte für den Download-Controller bereitstehen
@@ -57,7 +58,7 @@ class RetroactiveGalleryDefaultsTest extends TestCase
 
         // 3. Download via DownloadController
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->get('/api/photos/' . $photo->id . '/download');
+            ->get('/api/photos/'.$photo->id.'/download');
 
         $response->assertStatus(200);
         $downloadedFilePath = $response->getFile()->getPathname();

@@ -21,7 +21,8 @@ use Illuminate\Support\Facades\Schema;
  *
  * down() is intentionally empty — we never roll back migrations.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         // ══════════════════════════════════════════════
@@ -39,29 +40,29 @@ return new class extends Migration {
 
         // 0b. Rename max_uses → max_uses_global (skip if already done by V018)
         if (Schema::hasColumn('coupons', 'max_uses')) {
-            DB::statement("ALTER TABLE `coupons` CHANGE `max_uses` `max_uses_global` INT UNSIGNED NULL");
+            DB::statement('ALTER TABLE `coupons` CHANGE `max_uses` `max_uses_global` INT UNSIGNED NULL');
         }
 
         // 0c. Add max_uses_per_account
-        if (!Schema::hasColumn('coupons', 'max_uses_per_account')) {
+        if (! Schema::hasColumn('coupons', 'max_uses_per_account')) {
             if (DB::connection()->getDriverName() === 'sqlite') {
                 Schema::table('coupons', fn (Blueprint $t) => $t->unsignedInteger('max_uses_per_account')->nullable());
             } else {
-                DB::statement("ALTER TABLE `coupons` ADD COLUMN `max_uses_per_account` INT UNSIGNED NULL AFTER `max_uses_global`");
+                DB::statement('ALTER TABLE `coupons` ADD COLUMN `max_uses_per_account` INT UNSIGNED NULL AFTER `max_uses_global`');
             }
         }
 
         // 0d. Add created_by (nullable FK to users — uuid, no DB constraint)
-        if (!Schema::hasColumn('coupons', 'created_by')) {
+        if (! Schema::hasColumn('coupons', 'created_by')) {
             if (DB::connection()->getDriverName() === 'sqlite') {
                 Schema::table('coupons', fn (Blueprint $t) => $t->char('created_by', 36)->nullable());
             } else {
-                DB::statement("ALTER TABLE `coupons` ADD COLUMN `created_by` CHAR(36) NULL AFTER `active`");
+                DB::statement('ALTER TABLE `coupons` ADD COLUMN `created_by` CHAR(36) NULL AFTER `active`');
             }
         }
 
         // 0e. Create coupon_user_usage table
-        if (!Schema::hasTable('coupon_user_usage')) {
+        if (! Schema::hasTable('coupon_user_usage')) {
             Schema::create('coupon_user_usage', function (Blueprint $table) {
                 $table->bigIncrements('id');
                 $table->unsignedBigInteger('coupon_id');
@@ -83,14 +84,14 @@ return new class extends Migration {
                 $t->primary(['key', 'brand']);
             });
         } else {
-            $hasCompositeUnique = collect(DB::select("SHOW INDEX FROM `settings`"))
+            $hasCompositeUnique = collect(DB::select('SHOW INDEX FROM `settings`'))
                 ->contains(fn ($i) => $i->Key_name === 'settings_key_brand_unique');
-            $hasPrimary = collect(DB::select("SHOW INDEX FROM `settings`"))
+            $hasPrimary = collect(DB::select('SHOW INDEX FROM `settings`'))
                 ->contains(fn ($i) => $i->Key_name === 'PRIMARY');
 
-            if ($hasCompositeUnique && !$hasPrimary) {
-                DB::statement("ALTER TABLE `settings` DROP INDEX `settings_key_brand_unique`");
-                DB::statement("ALTER TABLE `settings` ADD PRIMARY KEY (`key`, `brand`)");
+            if ($hasCompositeUnique && ! $hasPrimary) {
+                DB::statement('ALTER TABLE `settings` DROP INDEX `settings_key_brand_unique`');
+                DB::statement('ALTER TABLE `settings` ADD PRIMARY KEY (`key`, `brand`)');
             }
         }
 
@@ -112,20 +113,20 @@ return new class extends Migration {
         // ══════════════════════════════════════════════
 
         Schema::table('tenants', function (Blueprint $table) {
-            if (!Schema::hasColumn('tenants', 'default_role_id')) {
+            if (! Schema::hasColumn('tenants', 'default_role_id')) {
                 $table->foreignUuid('default_role_id')->nullable()->after('domain')
-                      ->constrained('roles')->onDelete('set null');
+                    ->constrained('roles')->onDelete('set null');
             }
-            if (!Schema::hasColumn('tenants', 'default_flatrate_level')) {
+            if (! Schema::hasColumn('tenants', 'default_flatrate_level')) {
                 $table->enum('default_flatrate_level', ['none', 'web', 'print', 'original'])
-                      ->nullable()->default('none')->after('default_role_id');
+                    ->nullable()->default('none')->after('default_role_id');
             }
-            if (!Schema::hasColumn('tenants', 'can_purchase_upgrades')) {
+            if (! Schema::hasColumn('tenants', 'can_purchase_upgrades')) {
                 $table->boolean('can_purchase_upgrades')->default(false)->after('default_flatrate_level');
             }
-            if (!Schema::hasColumn('tenants', 'auto_join_policy')) {
+            if (! Schema::hasColumn('tenants', 'auto_join_policy')) {
                 $table->enum('auto_join_policy', ['immediate', 'requires_invite', 'disabled'])
-                      ->default('immediate')->after('can_purchase_upgrades');
+                    ->default('immediate')->after('can_purchase_upgrades');
             }
         });
 
@@ -134,9 +135,9 @@ return new class extends Migration {
         // ══════════════════════════════════════════════
 
         Schema::table('users', function (Blueprint $table) {
-            if (!Schema::hasColumn('users', 'tenant_id')) {
+            if (! Schema::hasColumn('users', 'tenant_id')) {
                 $table->foreignUuid('tenant_id')->nullable()->after('brand')
-                      ->constrained('tenants')->nullOnDelete();
+                    ->constrained('tenants')->nullOnDelete();
                 $table->index('tenant_id');
             }
         });
@@ -154,7 +155,7 @@ return new class extends Migration {
         // ══════════════════════════════════════════════
 
         // 7a. Add max_items column (nullable unsigned integer)
-        if (!Schema::hasColumn('coupons', 'max_items')) {
+        if (! Schema::hasColumn('coupons', 'max_items')) {
             Schema::table('coupons', function (Blueprint $table) {
                 $table->unsignedInteger('max_items')->nullable()->after('value');
             });
@@ -184,7 +185,7 @@ return new class extends Migration {
         // ══════════════════════════════════════════════
 
         Schema::table('users', function (Blueprint $table) {
-            if (!Schema::hasColumn('users', 'can_purchase_upgrades')) {
+            if (! Schema::hasColumn('users', 'can_purchase_upgrades')) {
                 $table->boolean('can_purchase_upgrades')->default(false)->after('flatrate_level');
             }
         });
@@ -194,7 +195,7 @@ return new class extends Migration {
         // ══════════════════════════════════════════════
 
         Schema::table('tenants', function (Blueprint $table) {
-            if (!Schema::hasColumn('tenants', 'shared_flatrate_cents')) {
+            if (! Schema::hasColumn('tenants', 'shared_flatrate_cents')) {
                 $table->unsignedInteger('shared_flatrate_cents')->nullable()->after('default_flatrate_level');
             }
         });
@@ -215,7 +216,7 @@ return new class extends Migration {
             });
         } else {
             $galleriesFk = DB::select("SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'galleries' AND CONSTRAINT_NAME = 'galleries_tenant_id_foreign'");
-            if (!empty($galleriesFk) && $galleriesFk[0]->DELETE_RULE === 'SET NULL') {
+            if (! empty($galleriesFk) && $galleriesFk[0]->DELETE_RULE === 'SET NULL') {
                 Schema::table('galleries', function (Blueprint $table) {
                     $table->dropForeign('galleries_tenant_id_foreign');
                     $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade');
@@ -223,7 +224,7 @@ return new class extends Migration {
             }
 
             $groupsFk = DB::select("SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'gallery_groups' AND CONSTRAINT_NAME = 'gallery_groups_tenant_id_foreign'");
-            if (!empty($groupsFk) && $groupsFk[0]->DELETE_RULE === 'SET NULL') {
+            if (! empty($groupsFk) && $groupsFk[0]->DELETE_RULE === 'SET NULL') {
                 Schema::table('gallery_groups', function (Blueprint $table) {
                     $table->dropForeign('gallery_groups_tenant_id_foreign');
                     $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade');

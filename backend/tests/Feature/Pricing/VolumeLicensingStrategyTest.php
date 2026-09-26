@@ -139,7 +139,7 @@ class VolumeLicensingStrategyTest extends TestCase
 
         $strategy = new VolumeLicensingStrategy(
             VolumePreset::first(),
-            new CouponService()
+            new CouponService
         );
         $user = User::factory()->create();
         $items = $this->buildItems(5, false);
@@ -207,7 +207,7 @@ class VolumeLicensingStrategyTest extends TestCase
     }
 
     /**
-     * @param array<array{0: int, 1: int}> $tiers [min_quantity, price_cents]
+     * @param  array<array{0: int, 1: int}>  $tiers  [min_quantity, price_cents]
      */
     private function makeStrategy(array $tiers): VolumeLicensingStrategy
     {
@@ -220,6 +220,7 @@ class VolumeLicensingStrategyTest extends TestCase
                 'price_cents' => $priceCents,
             ]);
         }
+
         return new VolumeLicensingStrategy($preset);
     }
 
@@ -228,12 +229,13 @@ class VolumeLicensingStrategyTest extends TestCase
         $items = [];
         for ($i = 0; $i < $count; $i++) {
             $items[] = [
-                'id' => 'item-' . ($i + 1),
+                'id' => 'item-'.($i + 1),
                 'license_use_case_id' => '',
                 'license_modifier_ids' => [],
                 'is_quote' => $isQuote,
             ];
         }
+
         return $items;
     }
 }

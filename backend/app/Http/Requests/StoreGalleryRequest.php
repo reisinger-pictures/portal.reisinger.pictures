@@ -2,11 +2,15 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Gallery;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Gate;
+
 class StoreGalleryRequest extends GalleryRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null && \Illuminate\Support\Facades\Gate::allows('create', \App\Models\Gallery::class);
+        return $this->user() !== null && Gate::allows('create', Gallery::class);
     }
 
     public function rules(): array
@@ -43,6 +47,6 @@ class StoreGalleryRequest extends GalleryRequest
 
     protected function failedAuthorization()
     {
-        throw new \Illuminate\Auth\Access\AuthorizationException('Nur Fotografen dürfen Galerien erstellen.');
+        throw new AuthorizationException('Nur Fotografen dürfen Galerien erstellen.');
     }
 }

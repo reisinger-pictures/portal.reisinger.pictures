@@ -2,17 +2,17 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
 use App\Enums\Brand;
-use App\Support\BrandRegistry;
-use App\Mail\TestMail;
 use App\Mail\ActivateAccountMail;
+use App\Mail\CustomMail;
 use App\Mail\GalleryInviteMail;
 use App\Mail\NotificationMail;
-use App\Mail\CustomMail;
 use App\Mail\OrgInviteMail;
 use App\Mail\RatingFinishedMail;
+use App\Mail\TestMail;
+use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class EmailCompatibilityTest extends TestCase
 {

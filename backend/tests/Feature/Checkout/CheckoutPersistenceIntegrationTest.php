@@ -10,7 +10,7 @@ use App\Models\Order;
 use App\Models\Photo;
 use App\Models\User;
 use App\Pricing\ScopeLicensingStrategy;
-use App\Services\CheckoutRiskService;
+use App\Services\CheckoutIdempotencyService;
 use App\Services\CheckoutService;
 use App\Services\StripePaymentService;
 use App\Support\BrandRegistry;
@@ -108,7 +108,7 @@ class CheckoutPersistenceIntegrationTest extends TestCase
     {
         [$user, $photo, $useCase] = $this->checkoutData();
         $stripe = new StripePaymentService(new StripeClient('test-server-side-placeholder'));
-        $identityService = new \App\Services\CheckoutIdempotencyService($stripe);
+        $identityService = new CheckoutIdempotencyService($stripe);
         $recoveryRequest = $this->checkoutRequest($photo, $useCase, 'new-client-key-0001');
         $identity = $identityService->identify($recoveryRequest, $user, 4000, 'stripe');
         $persistedKey = 'persisted-checkout-key-0001';

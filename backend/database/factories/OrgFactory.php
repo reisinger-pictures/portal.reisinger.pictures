@@ -25,6 +25,4 @@ class OrgFactory extends Factory
     {
         return $this->state(fn (array $attributes) => ['invoice_frequency' => 'immediate']);
     }
-
-
 }

@@ -2,18 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class PayoutPool extends Model
 {
     use HasFactory, HasUuids;
 
     protected $fillable = [
-        'month', 'year', 'product_id', 'gross_amount_cents', 
-        'stripe_fee_cents', 'net_pool_cents', 'photographer_share_percent', 
-        'total_unique_downloads', 'total_shares', 'value_per_share_cents'
+        'month', 'year', 'product_id', 'gross_amount_cents',
+        'stripe_fee_cents', 'net_pool_cents', 'photographer_share_percent',
+        'total_unique_downloads', 'total_shares', 'value_per_share_cents',
     ];
 
     protected $casts = [

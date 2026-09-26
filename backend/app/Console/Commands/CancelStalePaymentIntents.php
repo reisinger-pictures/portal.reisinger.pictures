@@ -27,8 +27,7 @@ class CancelStalePaymentIntents extends Command
     public function handle(
         StripePaymentService $stripePayment,
         PaymentIntentReconciliationService $paymentReconciliation,
-    ): int
-    {
+    ): int {
         $hoursOption = $this->option('hours');
         $hours = $hoursOption === null
             ? (int) config('app.stripe.stale_payment_intent_hours', 2)
@@ -91,8 +90,7 @@ class CancelStalePaymentIntents extends Command
         PaymentIntentReconciliationService $paymentReconciliation,
         array &$counters,
         int $cutoffTimestamp,
-    ): void
-    {
+    ): void {
         $paymentIntentId = $candidate->stripe_payment_intent_id;
         $generation = (int) $candidate->payment_intent_generation;
 
@@ -293,6 +291,7 @@ class CancelStalePaymentIntents extends Command
                 if ($actualValue !== null && $actualValue !== (string) $expectedValue) {
                     return false;
                 }
+
                 continue;
             }
             if ($actualValue === null || $actualValue !== (string) $expectedValue) {

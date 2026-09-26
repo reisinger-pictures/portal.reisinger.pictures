@@ -1,23 +1,26 @@
 <?php
+
 namespace Tests\Feature;
 
-use Tests\TestCase;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
+use Tests\TestCase;
 
 class DisputeAccessTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_webhook_dispute_locks_order_status() {
-        \Illuminate\Support\Facades\Mail::fake();
+    public function test_webhook_dispute_locks_order_status()
+    {
+        Mail::fake();
         $user = User::factory()->create();
         $order = Order::create([
             'user_id' => $user->id,
             'status' => 'paid',
             'total_amount' => 10000,
-            'stripe_payment_intent_id' => 'pi_dispute_test_123'
+            'stripe_payment_intent_id' => 'pi_dispute_test_123',
         ]);
 
         $secret = 'whsec_test_secret';
@@ -27,9 +30,9 @@ class DisputeAccessTest extends TestCase
             'type' => 'charge.dispute.created',
             'data' => [
                 'object' => [
-                    'payment_intent' => 'pi_dispute_test_123'
-                ]
-            ]
+                    'payment_intent' => 'pi_dispute_test_123',
+                ],
+            ],
         ]);
 
         // Konstruktion eines kryptografisch korrekten Stripe Webhook Signatur-Headers
@@ -39,7 +42,7 @@ class DisputeAccessTest extends TestCase
         $header = "t={$timestamp},v1={$signature}";
 
         $response = $this->withHeaders([
-            'Stripe-Signature' => $header
+            'Stripe-Signature' => $header,
         ])->postJson('/api/webhooks/stripe', json_decode($payload, true));
 
         $response->assertStatus(200);
@@ -59,7 +62,7 @@ class DisputeAccessTest extends TestCase
         ]);
 
         $response = $this->actingAs($user, 'api')
-            ->getJson('/api/orders/' . $order->id . '/download-zip');
+            ->getJson('/api/orders/'.$order->id.'/download-zip');
 
         $response->assertStatus(403);
         $response->assertJsonPath('message', 'Zugriff aufgrund des Bestellstatus gesperrt.');
@@ -75,7 +78,7 @@ class DisputeAccessTest extends TestCase
         ]);
 
         $response = $this->actingAs($user, 'api')
-            ->getJson('/api/orders/' . $order->id . '/download-zip');
+            ->getJson('/api/orders/'.$order->id.'/download-zip');
 
         $response->assertStatus(403);
         $response->assertJsonPath('message', 'Zugriff aufgrund des Bestellstatus gesperrt.');
@@ -91,7 +94,7 @@ class DisputeAccessTest extends TestCase
         ]);
 
         $response = $this->actingAs($user, 'api')
-            ->getJson('/api/orders/' . $order->id . '/download-zip');
+            ->getJson('/api/orders/'.$order->id.'/download-zip');
 
         $response->assertStatus(403);
         $response->assertJsonPath('message', 'Zugriff aufgrund des Bestellstatus gesperrt.');
@@ -109,7 +112,7 @@ class DisputeAccessTest extends TestCase
         // A paid order without invoiceSnapshot returns 404 (no items),
         // proving the status check did NOT block the request.
         $response = $this->actingAs($user, 'api')
-            ->getJson('/api/orders/' . $order->id . '/download-zip');
+            ->getJson('/api/orders/'.$order->id.'/download-zip');
 
         $response->assertStatus(404);
     }
