@@ -87,6 +87,16 @@ services:
       # und die Provisionierung laeuft ins Leere.
       - SFTPGO_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME:-}
       - SFTPGO_ADMIN_PASSWORD=${SFTPGO_ADMIN_PASSWORD:-}
+      # Kameraseitige Verbindungsdaten fuer die Anzeige im Management-UI.
+      # Gleiche Variablen, die der sftpgo-Service als Host-Ports benutzt, damit
+      # die Anzeige nicht von der Wirklichkeit abweichen kann. Pflicht ohne
+      # Default: ein fehlender Wert wird als `configured: false` gemeldet, nicht
+      # still ersetzt (AGENTS 8, Security-Review C1/C2).
+      - FTP_PUBLIC_HOST=${FTP_PUBLIC_HOST}
+      - SFTPGO_SFTP_PORT=${SFTPGO_SFTP_PORT}
+      - SFTPGO_FTPS_PORT=${SFTPGO_FTPS_PORT}
+      - SFTPGO_PASV_PORT_START=${SFTPGO_PASV_PORT_START}
+      - SFTPGO_PASV_PORT_END=${SFTPGO_PASV_PORT_END}
       - DB_DATABASE=portal_db
       - DB_USERNAME=portal_user
       - DB_PASSWORD=${DB_PASSWORD}
@@ -294,6 +304,64 @@ services:
       # laeuft dann ins Leere. `SFTPGO_DEFAULT_ADMIN_PERMISSIONS` existiert in
       # 2.7.x nicht mehr und wird stillschweigend ignoriert.
       - SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true
+      # SFTPGo 2.7 startet den FTP-Daemon mit `Bindings:[{Port:0}]`, also
+      # voellig aus. Ohne diese drei Zeilen lauscht auf 989 nichts, der
+      # Host-Port liefert nur ein TCP-RST, und die Kamera sieht einen
+      # Verbindungsfehler ohne erkennbare Ursache. Nachgewiesen am 2026-09-26:
+      # im Container lauschten nur 2022 und 8080.
+      # Der Praefix lautet `FTPD__`, nicht `FTP__`: seit 2.6 heisst der
+      # Config-Abschnitt `ftpd` (Default-Datei /etc/sftpgo/sftpgo.json:
+      # `"ftpd": {...}`). Mit `FTP__` wird die Variable kommentarlos
+      # ignoriert — die Konfiguration sah dann korrekt aus und der Port
+      # blieb trotzdem tot.
+      #
+      # TLS_MODE=1 ist **explizites** TLS: der Server begruesst mit
+      # `220 SFTPGo_2.7.6` im Klartext und schaltet auf `AUTH TLS` um. Das ist
+      # genau der Ablauf, den eine Canon-Kamera erwartet (cam.start.canon,
+      # UG-06_Network_0060: die Kamera sendet direkt nach dem Verbindungsaufbau
+      # `AUTH TLS`; implizites FTPS wird nicht zuverlaessig unterstuetzt).
+      # Werte laut SFTPGo-Doku und `ftpd`-Paket: 0 = aus, 1 = explizit,
+      # 2 = implizit. Implizit zu waehlen war der naheliegende Fehlschluss: der
+      # Klartext-Greeting sah nach einem Fehler aus und war es nicht.
+      #
+      # Fuer einen zweiten, explizit unverschluesselten Zugriffsweg gibt es
+      # keine Abschaltung: `AUTH` ist optional, ein Client kann die TLS-Stufe
+      # auch auslassen. Das entspricht dem FTP-Standard und dem Verhalten der
+      # Kamera, ist aber eine bewusste Entscheidung und keine Konfigurations-
+      # nachlaessigkeit — wer FTPS erzwingen will, braegt eine Firewall-Regel
+      # auf 989 ohne 21.
+      - SFTPGO_FTPD__BINDINGS__0__ADDRESS=0.0.0.0
+      - SFTPGO_FTPD__BINDINGS__0__PORT=989
+      - SFTPGO_FTPD__BINDINGS__0__TLS_MODE=1
+      # KEINE Max-TLS-Version gesetzt, und das ist Absicht. Go bietet TLS 1.3
+      # an und handelt mit einem aelteren Client von selbst auf dessen hoechste
+      # Version herunter — eine Kamera, die nur 1.2 kann, bekommt 1.2. Eine
+      # Obergrenze wuerde hier nur Faehigkeit wegnehmen und nichts hinzufuegen;
+      # sie war ein Kurzschluss aus der Beobachtung, dass der Kontrolltest
+      # TLS 1.3 negotiated. Nachgewiesen ist beides: `openssl s_client -tls1_2`
+      # und ein 1.3-Client handshake beide gegen dieselbe Bindung.
+      # SFTPGo 2.7 erzeugt im Gegensatz zu 19-ftp 7.9 KEIN Zertifikat
+      # selbst. Ohne diese beiden Pfade bricht der Start ab mit
+      # "could not start FTP server: to enable TLS you need to provide a
+      # certificate" und der Container restartet in einer Schleife. Das
+      # Zertifikat wird deshalb beim ersten Start selbstsigniert erzeugt und
+      # im persistenten Dataprovider-Volume abgelegt, damit es einen Neustart
+      # und einen Stack-Redeploy ueberlebt. Die Kamera akzeptiert
+      # selbstsignierte Zertifikate (19-ftp 7.9), der CN ist rein kosmetisch
+      # und wird deshalb nicht als Konfiguration hierher geschrieben.
+      - SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_FILE=/var/lib/sftpgo/ftps/cert.pem
+      - SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_KEY_FILE=/var/lib/sftpgo/ftps/key.pem
+      # Passive Range explizit, aus denselben Variablen wie der Publish unten.
+      # Bisher hing sie an SFTPGOs Default, der zufaellig genau 50000-50100 ist —
+      # ein Default, der sich mit einem SFTPGo-Update ohne Vorwarnung mitbewegt
+      # und dann genau den stillen Fehler erzeugt, den diese Range verursacht
+      # (Handshake ok, Upload bricht ab). Die Harness
+      # tests/scripts/ftp-transport-test/docker-compose.yml macht es genauso.
+      - SFTPGO_FTPD__PASSIVE_PORT_RANGE__START=${SFTPGO_PASV_PORT_START:-50000}
+      - SFTPGO_FTPD__PASSIVE_PORT_RANGE__END=${SFTPGO_PASV_PORT_END:-50100}
+      # SSH-Bindung: SFTPGo 2.7 lauscht auf 2022 (Publish weiter unten als 2222).
+      # Die Adresse explizit, damit der Wildcard nicht vom Default abhaengt.
+      - SFTPGO_SFTPD__BINDINGS__0__ADDRESS=0.0.0.0
       # SFTPGo liest eigene Bootstrap-Namen, die nicht in .env.production
       # stehen. Sie sind dasselbe Geheimnis wie SFTPGO_ADMIN_* (backend-Block
       # weiter oben), das backend/config/services.php fuer den JWT-Fallback
@@ -304,6 +372,31 @@ services:
       # Restart-Schleife laufen zu lassen ("no admins found" im Log).
       - SFTPGO_DEFAULT_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME}
       - SFTPGO_DEFAULT_ADMIN_PASSWORD=${SFTPGO_ADMIN_PASSWORD}
+    # Erzeugt das FTPS-Zertifikat einmalig und startet dann SFTPGo.
+    #
+    # `sftpgo serve` ist zwingend: das Image-Default ist `["sftpgo","serve"]`, und
+    # blankes `sftpgo` druckt nur die Hilfe und beendet sich mit Exit 0 — der
+    # Container restartet dann scheinbar grundlos ohne einen Listener.
+    #
+    # Listenform statt `command: >`, und darin ein Literal-Block `|` statt eines
+    # gefalteten `>-`: bei `>-` behalten staerker eingerueckte Folgezeilen ihren
+    # Zeilenumbruch, das Kommando zerfiel in `sh: -keyout: not found` und
+    # SFTPGo wurde nie gestartet. Jede Zeile des Skripts steht deshalb hier
+    # buendig und der openssl-Aufruf bleibt einzeilig.
+    #
+    # Weiterhin gilt: kein `#` und kein `$` im Command. Compose v5.0.2 ersetzt
+    # jedes `$(` durch `$$(`, und die Shell im Container expandiert `$$` zur PID
+    # (ausfuehrlich am backend-command). Das Zertifikat liegt im
+    # Dataprovider-Volume, nicht im websites-Baum, es beruehrt also nichts, was
+    # 19-ftp 7.9 verbietet.
+    command:
+      - sh
+      - -c
+      - |
+        if [ ! -f /var/lib/sftpgo/ftps/cert.pem ]; then
+          mkdir -p /var/lib/sftpgo/ftps && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=sftpgo -keyout /var/lib/sftpgo/ftps/key.pem -out /var/lib/sftpgo/ftps/cert.pem;
+        fi;
+        exec sftpgo serve
     ports:
       # --- Oeffentlich erreichbar: der Kamera-Zugang ---
       # FTPS (explizites TLS) und SFTP (SSH). Beide muessen von aussen
@@ -311,7 +404,12 @@ services:
       # bietet FTPS und SFTP auf demselben Port; getrennte Ports hier, weil
       # die Kamera genau eines der beiden spricht und der jeweils andere
       # geschlossen bleiben kann.
-      - "${SFTPGO_SFTP_PORT:-2222}:2222"
+      # Links der kameraseitige Port, rechts der Container-Port. SFTPGo 2.7
+      # lauscht mit SSH auf 2022; `2222:2222` hat auf dem Host einen
+      # docker-proxy gebunden, im Container aber niemand — das Ergebnis war
+      # ein RST auf dem Host-Port. FTPS laeuft nach der Aktivierung oben auf
+      # 989, dort passt die Zahl zufaellig auf beiden Seiten.
+      - "${SFTPGO_SFTP_PORT:-2222}:2022"
       - "${SFTPGO_FTPS_PORT:-989}:989"
       # Passive-Ports fuer FTPS. Ohne diese Range bricht der Datenkanal:
       # der Client verbindet sich auf 989, der Server antwortet aus diesem

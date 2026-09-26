@@ -43,6 +43,10 @@ fail() {
 
 [[ -f "$COMPOSE" ]] || fail "required file is missing: $COMPOSE"
 
+assert_contains() {
+    grep -Fq -- "$2" "$COMPOSE" || fail "$3"
+}
+
 # The backend `command:` block: from the folded scalar to the next service-level
 # key. Everything in between is one shell string once Compose is done with it.
 backend_command() {
@@ -92,7 +96,77 @@ for step in 'validate-production-env || exit 1' 'ops:validate-production || exit
         || fail "the start sequence lost a step: $step"
 done
 
-# --- 3. no pinned address on the internal network ---------------------------
+# --- 3. a published port must have a listener behind it ----------------------
+# The camera-facing port is the left half of `ports:`, the container port the
+# right one. They are not the same number, and SFTPGo 2.7 does not use the
+# conventional defaults: its SSH daemon listens on 2022 and its FTP daemon is
+# disabled entirely (`Bindings:[{Port:0}]`). Publishing `2222:2222` therefore
+# bound a host port that nothing answered on — the host sent a RST, the network
+# was never at fault, and a scanner SYN in the tcpdump capture looked like a
+# blocked port. Likewise `989:989` published a dead port until the FTP bindings
+# were switched on.
+#
+# Rule: the container half of each publish must equal the port SFTPGo is told
+# to bind. When the compose sets no binding env, the SFTPGo 2.7 defaults apply
+# (SSH 2022, HTTP 8080, FTP disabled).
+assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__PORT=989' \
+    'FTPS must actually be enabled; SFTPGo 2.7 ships the FTP daemon disabled'
+# 0 = off, 1 = explicit (AUTH TLS), 2 = implicit (SFTPGo docs, ftpd package).
+# A Canon camera sends AUTH TLS right after connecting and does not reliably
+# support implicit FTPS (cam.start.canon, UG-06_Network_0060), so the binding
+# must be explicit. The cleartext 220 greeting is that mode working, not a fault.
+assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__TLS_MODE=1' \
+    'the FTP binding must use explicit TLS (mode 1); a Canon camera upgrades with AUTH TLS'
+assert_contains "$COMPOSE" '      - "${SFTPGO_SFTP_PORT:-2222}:2022"' \
+    'the SFTP publish must target the port SFTPGo 2.7 binds (2022), not 2222'
+
+# SFTPGo 2.7 refuses to start the FTP server with TLS and no certificate
+# ("to enable TLS you need to provide a certificate"), and unlike 19-ftp 7.9 it
+# does not generate one. Without the certificate paths the container restart-loops
+# with the FTP service silently absent, so both paths and the generating command
+# are part of the contract.
+# No TLS ceiling may be pinned. Go downgrades to whatever the client supports,
+# so a TLS 1.2-only camera and a TLS 1.3 client both work against the same
+# binding. A ceiling would only remove capability.
+if grep -qE 'SFTPGO_FTPD__BINDINGS__0__(MAX|MIN)_TLS_VERSION=' "$COMPOSE"; then
+    fail 'the FTPS binding pins a TLS version; Go already downgrades per client, a ceiling only removes capability'
+fi
+assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_FILE=/var/lib/sftpgo/ftps/cert.pem' \
+    'FTPS needs a certificate path; SFTPGo 2.7 will not generate one'
+assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_KEY_FILE=/var/lib/sftpgo/ftps/key.pem' \
+    'the FTPS certificate needs its key path'
+assert_contains "$COMPOSE" \
+    '          mkdir -p /var/lib/sftpgo/ftps && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=sftpgo -keyout /var/lib/sftpgo/ftps/key.pem -out /var/lib/sftpgo/ftps/cert.pem;' \
+    'the sftpgo command must generate the self-signed certificate on first start, on one line'
+# A folded scalar (>- or >) keeps the line break of any MORE INDENTED continuation
+# line, which split the openssl call into `sh: -keyout: not found` and left
+# SFTPGo unstarted. The script must therefore be a literal block.
+assert_contains "$COMPOSE" '      - |' \
+    'the sftpgo command must use a literal block; a folded scalar breaks the multi-line script'
+assert_contains "$COMPOSE" '        exec sftpgo serve' \
+    'the sftpgo command must hand over via `exec sftpgo serve`; bare `sftpgo` only prints help and exits 0'
+
+# The sftpgo command carries the same two traps as the backend command, so it is
+# held to the same rule: no shell expansion, no comment.
+sftpgo_command="$(awk '
+    /^    command:$/ { in_cmd = 1; next }
+    in_cmd && /^    [a-z_]+:/ { in_cmd = 0 }
+    in_cmd { print }
+' "$COMPOSE")"
+for token in '$$' '$(' '${' '#'; do
+    if grep -qF -- "$token" <<<"$sftpgo_command"; then
+        fail "the sftpgo command block uses $token, which Compose v5 corrupts or comments out the rest of the line"
+    fi
+done
+
+sftp_binding="$(grep -oE 'SFTPGO_SFTPD__BINDINGS__0__PORT=[0-9]+' "$COMPOSE" | cut -d= -f2 || true)"
+if [ -n "$sftp_binding" ]; then
+    sftp_publish="$(grep -E '^[[:space:]]+- "\$\{SFTPGO_SFTP_PORT' "$COMPOSE" || true)"
+    grep -qF ":$sftp_binding\"" <<<"$sftp_publish" \
+        || fail "the SFTP publish does not target the declared SFTPD binding port $sftp_binding"
+fi
+
+# --- 4. no pinned address on the internal network ---------------------------
 # The backend may pin on webret (Caddy routes there). Anything else is a
 # subnet assumption that aborts the deploy as soon as Docker has already
 # created the network with a different pool.
@@ -107,9 +181,6 @@ if awk '
 fi
 
 # --- 4. SFTPGo bootstrap comes from the .env.production names ---------------
-assert_contains() {
-    grep -Fq -- "$2" "$COMPOSE" || fail "$3"
-}
 assert_contains "$COMPOSE" '      - SFTPGO_DEFAULT_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME}' \
     'the sftpgo admin username must be mapped from the .env.production name'
 assert_contains "$COMPOSE" '      - SFTPGO_DEFAULT_ADMIN_PASSWORD=${SFTPGO_ADMIN_PASSWORD}' \

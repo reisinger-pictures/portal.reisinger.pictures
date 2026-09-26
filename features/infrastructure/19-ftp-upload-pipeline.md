@@ -537,10 +537,23 @@ Bind-Mount `-> /var/www/ftp` und Disk `ftp_inbox` als `driver=local` bleiben.
 
 ### 7.9 Ownership-Regeln auf dem Host
 
-**FTPS-Zertifikat (Host-Setup, P1-M24).** SFTPGo kann ein Self-Signed-Zertifikat
-nutzen — die Kamera akzeptiert es (verifiziert mit pure-ftpd). Das Zertifikat wird
-beim ersten Start erstellt und liegt dann unter `/etc/sftpgo/`. Kein gültiges
+**FTPS-Zertifikat (Host-Setup, P1-M24).** Die Kamera akzeptiert ein
+selbstsigniertes Zertifikat (verifiziert mit pure-ftpd). Kein gültiges
 Zertifikat einer öffentlichen CA nötig.
+
+**Korrigiert am 2026-09-26:** SFTPGo 2.7 erzeugt **kein** Zertifikat selbst. Die
+frühere Fassung behauptete das und war falsch — sie ist der Grund, warum der
+erste Start mit `could not start FTP server: to enable TLS you need to provide a
+certificate` in einer Restart-Schleife endete. Das Zertifikat wird jetzt beim
+ersten Start per `openssl` selbstsigniert erzeugt und liegt unter
+`/var/lib/sftpgo/ftps/` im Dataprovider-Volume, damit es Neustart und Redeploy
+überlebt.
+
+**Für die Kamera exportieren:** Canon verlangt die Datei auf der Speicherkarte
+(`.CER`/`.CRT`/`.PEM`) plus „Zielserver vertrauen → Aktivieren", sonst bricht die
+Übertragung mit Error 48 ab (cam.start.canon UG-06_Network_0230). Die Datei liegt
+im Container unter `/var/lib/sftpgo/ftps/cert.pem`; ein Download aus der GUI ist
+noch nicht gebaut (offen, `AGENTS.todo.md`).
 
 Aus dem Vorfall vom 2026-09-26, verbindlich für jeden Prozess, der auf
 `/home/webadmin/websites` schreibt.
@@ -631,8 +644,28 @@ User `florian` unter pure-ftpd heute schon darüber funktioniert.
 zusätzlichen Port. Die Portwahl ist Teil des Portal-Stacks — die Firewall
 dokumentiert `~/dev/strato-vps/ANALYSIS.md` Abschnitt 6e.
 
-**Stand 2026-09-26: die Messung steht noch aus.** Sie ist nicht gescheitert,
-sondern dreimal an der Konfiguration der Messinstanz (P1-M35). Belegt ist:
+**Stand 2026-09-26: die Messung ist nachgeholt, gegen die laufende
+Produktionsinstanz, per `openssl s_client -starttls ftp`.** Ergebnis:
+
+- **SFTP (2222):** `aes128-gcm@openssh.com`, `aes128-ctr`, `aes256-gcm@openssh.com`
+  und `chacha20-poly1305@openssh.com` werden alle akzeptiert. Die Cipher-Frage ist
+  auf der SSH-Seite **erledigt** — das war die offene Begründung dafür, SFTP zum
+  bevorzugten Weg zu machen.
+- **FTPS (989), explizit:** TLS 1.2 **und** 1.3 werden bedient; Go handelt mit
+  einem älteren Client selbst herunter. `ECDHE-RSA-AES128-GCM-SHA256` und
+  `ECDHE-RSA-AES256-GCM-SHA384` — die Cipher, die Canons Dokumentation nennt —
+  werden angeboten.
+- **Nicht** angeboten: `AES128-SHA`, `AES256-SHA`, DHE-Suites, TLS 1.0/1.1. Nach
+  der Canon-Doku ist das **kein** Mangel: sie verlangt gerade die
+  RSA-GCM-Suites. Der frühere Befund "AES128-SHA fehlt" stammt aus dem
+  pure-ftpd-Vergleich und ist für die fraglichen Kameramodelle gegenstandslos.
+  Ein Legacy-Cipher-Override (`TLS_CIPHER_SUITES`) ist damit **nicht** nötig und
+  wird bewusst nicht gesetzt — er würde die Transportverschlüsselung schwächen,
+  ohne einen bekannten Nutzen.
+
+Die frühere Fassung dieses Abschnitts (Messung stehe aus, wiederholt gescheitert)
+ist damit überholt. Nachfolgend die ursprüngliche Begründung, unverändert
+erhalten. Belegt ist:
 SFTPGo 2.7.6-62ae9ba3; das Image meldet `config file used:
 "/etc/sftpgo/sftpgo.json"`, während `--config-dir` auf `.` defaultet; FTPS
 Bindings liegen unter `ftpserver.bindings[].port`. **Warnung für die
@@ -732,7 +765,7 @@ werden genutzt), der Verwaltungsport bleibt drinnen. Alles andere ist Detail.
 
 | Port | Zweck | Erreichbar | Compose |
 |---|---|---|---|
-| 2222 (Host) → 2222 | SFTP (SSH) | **öffentlich** | `ports:` |
+| 2222 (Host) → **2022** (Container) | SFTP (SSH) | **öffentlich** | `ports:` |
 | 989 (Host) → 989 | FTPS (explizites TLS) | **öffentlich** | `ports:` |
 | 50000–50100 | Passive FTPS-Datenkanal | **öffentlich** | `ports:` als Range |
 | 8080 | HTTP- und Admin-API | **nur `portal_internal`** | *kein* `ports:` |
@@ -764,11 +797,26 @@ werden genutzt), der Verwaltungsport bleibt drinnen. Alles andere ist Detail.
   Exakt auf `v2.7.6` zu pinnen würde bedeuten, Security-Patches manuell
   einzuspielen — auf einem Server mit laufendem Betrieb die schlechtere Wahl.
 
-**Noch offen für den echten Stack:** SFTPGo muss seine Bindings auf die
-**Container**-Ports 2222/989/8080 bekommen, und der passive Bereich muss auf
-`50000-50100` stehen. Seit 2.6 liegt die Konfiguration in der Datenbank
-statt in einer JSON-Datei, der Seeding-Weg ist deshalb Teil von P1-M35 und
-nicht als Kleinigkeit zu behandeln.
+**Erledigt am 2026-09-26, gegen den laufenden Stack gemessen.** Die Annahme in der
+früheren Fassung war an drei Stellen falsch und ist die Ursache der
+Nicht-Erreichbarkeit gewesen:
+
+1. **SFTPGo 2.7 lauscht mit SSH auf 2022, nicht auf 2222.** `2222:2222` band
+   einen Host-Port, im Container aber nichts — der Host antwortete mit RST. Die
+   Korrektur ist `2222:2022`; kameraseitig bleibt 2222.
+2. **Der FTP-Daemon ist standardmäßig aus** (`ftpd.bindings[].port = 0`). Port
+   989 war ebenfalls tot, bis die Bindung aktiviert wurde.
+3. **Die Konfiguration liegt nicht in der Datenbank**, sondern in
+   `/etc/sftpgo/sftpgo.json`; `SFTPGO_*`-Variablen überschreiben sie. Der
+   Präfix lautet `SFTPGO_FTPD__…`, **nicht** `SFTPGO_FTP__…` (der Abschnitt
+   heißt seit 2.6 `ftpd`). Mit `FTP__` wird die Variable kommentarlos ignoriert —
+   die Konfiguration sah korrekt aus und der Port blieb tot.
+
+Zusätzlich: `exec sftpgo serve` ist zwingend, blankes `sftpgo` druckt nur die
+Hilfe und beendet sich mit 0. Und `TLS_MODE=1` ist **explizites** TLS (`AUTH
+TLS`), weil eine Canon-Kamera direkt nach dem Verbindungsaufbau `AUTH TLS`
+sendet und implizites FTPS nicht zuverlässig unterstützt
+(cam.start.canon UG-06_Network_0060).
 
 ### 7.14 Teststrategie für den Transport
 
@@ -812,7 +860,15 @@ Board: P1-M38 (Integrationstest), P1-M35 (Harness und Config-Weg), P1-M27
 - **Der Fotograf-Upload läuft nicht über den Portal-Container.** Die Dateien
   landen direkt auf dem Host-Pfad, den der Backend-Container liest. Ein
   Einbruch ins Portal-Core liefert deshalb **keinen** Dateizugriff.
-- **`SFTPGO_DEFAULT_ADMIN_*` sind Pflichtvariablen** (Compose `:?` ohne
-  Default). Fehlen sie, startet der Stack nicht absichtlich: ohne Admin-User
-  gibt es kein `/api/v2/token`, also keine Provisionierung. Ein Stack, der
-  läuft, aber nicht provisionieren kann, wäre der schlechtere Zustand.
+- **Kein `${VAR:?}`-Guard im Compose, trotz allem.** Portainer löst die
+  Interpolation ab, **bevor** es die GUI-Umgebung anwendet; ein Guard bricht
+  jeden Deploy ab. SFTPGo ist deshalb fail-*sichtbar* statt fail-closed: ohne
+  Admin-Credentials startet es nicht und schreibt `no admins found, try to create
+  the default one` ins Log, und der Container restartet.
+- **Ein Wertepaar, nicht zwei.** Gepflegt wird `SFTPGO_ADMIN_USERNAME` /
+  `SFTPGO_ADMIN_PASSWORD` aus `.env.production` — dieselben Namen, die
+  `config/services.php` für den JWT-Fallback liest. Das Compose mappt sie auf
+  SFTPGOs Bootstrap-Namen `SFTPGO_DEFAULT_ADMIN_*`. Vorher las das Compose
+  `SFTPGO_DEFAULT_ADMIN_*`, der Backend-Service deklarierte keines der beiden
+  Paare, und mit leerem `SFTPGO_API_KEY` wäre die Provisionierung mit 401
+  gescheitert, während die Konfiguration korrekt aussah.
