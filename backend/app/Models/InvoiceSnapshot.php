@@ -61,6 +61,13 @@ class InvoiceSnapshot extends Model
     public const MAIL_DISPATCH_KEY = '_invoice_mail_dispatch';
 
     /**
+     * Durable, per-order enqueue claim for the time-critical chargeback /
+     * dispute notification. Kept separate from the invoice-mail claim so the
+     * two independent messages have independent at-most-once enqueue slots.
+     */
+    public const DISPUTE_MAIL_DISPATCH_KEY = '_dispute_mail_dispatch';
+
+    /**
      * Source identity for an invoice created while closing a contract. The
      * existing JSON snapshot column is sufficient; no order or invoice schema
      * extension is required for contract-close idempotency.
@@ -85,6 +92,24 @@ class InvoiceSnapshot extends Model
         $this->forceFill(['customer_details' => $details])->save();
     }
 
+    public function disputeMailDispatchClaimed(): bool
+    {
+        $details = $this->customer_details;
+
+        return is_array($details) && array_key_exists(self::DISPUTE_MAIL_DISPATCH_KEY, $details);
+    }
+
+    public function claimDisputeMailDispatch(): void
+    {
+        $details = is_array($this->customer_details) ? $this->customer_details : [];
+        $details[self::DISPUTE_MAIL_DISPATCH_KEY] = [
+            'state' => 'claimed',
+            'claimed_at' => now()->toISOString(),
+        ];
+
+        $this->forceFill(['customer_details' => $details])->save();
+    }
+
     /**
      * Return the customer-facing/evidence payload without internal dispatch
      * metadata.
@@ -94,7 +119,7 @@ class InvoiceSnapshot extends Model
     public function customerDetailsForPresentation(): array
     {
         $details = is_array($this->customer_details) ? $this->customer_details : [];
-        unset($details[self::MAIL_DISPATCH_KEY]);
+        unset($details[self::MAIL_DISPATCH_KEY], $details[self::DISPUTE_MAIL_DISPATCH_KEY]);
 
         return $details;
     }
@@ -146,8 +171,8 @@ class InvoiceSnapshot extends Model
     protected static function booted()
     {
         static::saving(function (self $snapshot): void {
-            PersistedMoney::assertFitsCents($snapshot->total_net, 'invoice_snapshots.total_net');
-            PersistedMoney::assertFitsCents($snapshot->total_gross, 'invoice_snapshots.total_gross');
+            PersistedMoney::assertNonNegativeCents($snapshot->total_net, 'invoice_snapshots.total_net');
+            PersistedMoney::assertNonNegativeCents($snapshot->total_gross, 'invoice_snapshots.total_gross');
         });
 
         static::creating(function ($snapshot) {

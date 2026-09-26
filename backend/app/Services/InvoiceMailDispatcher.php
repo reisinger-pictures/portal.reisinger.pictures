@@ -43,13 +43,24 @@ class InvoiceMailDispatcher
     {
         $queueConnection = config('queue.connections.database.connection');
         $databaseConnection = config('database.default');
-        if (app()->environment('production')
+        // The durable claim + enqueue pair is only atomic when the queue writes
+        // to the application database in the same transaction. This invariant
+        // must hold in every non-local environment (staging included), not only
+        // in production: an inline `sync` or a separate queue connection would
+        // let a rolled-back attempt still deliver a mail and retry a second
+        // one. Local/test keep the inline driver for developer ergonomics.
+        $enforcesTransactionalQueue = ! app()->environment(['local', 'testing']);
+        if ($enforcesTransactionalQueue
             && (config('queue.default') !== 'database'
                 || config('queue.connections.database.driver') !== 'database'
                 || ! is_string($queueConnection)
                 || $queueConnection === ''
                 || $queueConnection !== $databaseConnection)) {
-            throw new RuntimeException('Invoice mail requires the transactional database queue in production.');
+            throw new RuntimeException(
+                app()->environment('production')
+                    ? 'Invoice mail requires the transactional database queue in production.'
+                    : 'Invoice mail requires the transactional database queue outside local test environments.',
+            );
         }
 
         $snapshot = InvoiceSnapshot::query()

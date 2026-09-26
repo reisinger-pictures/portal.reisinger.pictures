@@ -206,6 +206,76 @@ class ContractPricingService
     }
 
     /**
+     * Compute the authoritative row total for a legacy invoice row that does
+     * not carry a persisted `row_total`.
+     *
+     * This mirrors the read-path integer normalization: both operands must be
+     * integral and non-negative. A fractional legacy quantity fails closed
+     * instead of being silently truncated, so the rendered PDF subtotal can
+     * never disagree with the authoritative total.
+     */
+    public static function legacyRowTotal(mixed $price, mixed $quantity): int
+    {
+        $normalizedPrice = self::legacyIntegralValue($price ?? 0, 'price');
+        $normalizedQuantity = self::legacyIntegralValue($quantity ?? 1, 'qty');
+
+        if ($normalizedPrice < 0 || $normalizedQuantity < 0) {
+            throw new InvalidArgumentException('The invoice row values must not be negative.');
+        }
+
+        if ($normalizedPrice !== 0
+            && $normalizedQuantity > intdiv(self::MAX_SAFE_INTEGER, $normalizedPrice)
+        ) {
+            throw new InvalidArgumentException('The invoice row exceeds the safe integer range.');
+        }
+
+        return $normalizedPrice * $normalizedQuantity;
+    }
+
+    private static function legacyIntegralValue(mixed $value, string $field): int
+    {
+        if (is_int($value)) {
+            $integer = $value;
+        } elseif (is_float($value)) {
+            if (! is_finite($value)
+                || floor($value) !== $value
+                || $value > (float) self::MAX_SAFE_INTEGER
+                || $value < (float) -self::MAX_SAFE_INTEGER
+            ) {
+                throw new InvalidArgumentException("The invoice {$field} must be an exactly representable integer.");
+            }
+
+            $integer = (int) $value;
+        } elseif (is_string($value) && preg_match('/^-?[0-9]+$/D', $value) === 1) {
+            $integer = self::legacyIntegerFromString($value, $field);
+        } else {
+            throw new InvalidArgumentException("The invoice {$field} must be an integer.");
+        }
+
+        if ($integer < -self::MAX_SAFE_INTEGER || $integer > self::MAX_SAFE_INTEGER) {
+            throw new InvalidArgumentException('The invoice row exceeds the safe integer range.');
+        }
+
+        return $integer;
+    }
+
+    private static function legacyIntegerFromString(string $value, string $field): int
+    {
+        $negative = str_starts_with($value, '-');
+        $digits = ltrim($negative ? substr($value, 1) : $value, '0');
+        $digits = $digits === '' ? '0' : $digits;
+        $maximum = (string) self::MAX_SAFE_INTEGER;
+
+        if (strlen($digits) > strlen($maximum)
+            || (strlen($digits) === strlen($maximum) && strcmp($digits, $maximum) > 0)
+        ) {
+            throw new InvalidArgumentException("The invoice {$field} exceeds the safe integer range.");
+        }
+
+        return $negative ? -(int) $digits : (int) $digits;
+    }
+
+    /**
      * Process manual-invoice lines whose quantities use hundredths on the wire.
      * Legacy lines without `quantity_scale` retain their exact decimal quantity
      * and are normalized to the same integer representation before arithmetic.

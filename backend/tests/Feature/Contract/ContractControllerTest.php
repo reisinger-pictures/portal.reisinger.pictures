@@ -14,6 +14,7 @@ use App\Support\BrandRegistry;
 use App\Support\PersistedMoney;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -383,6 +384,112 @@ class ContractControllerTest extends TestCase
         ]);
     }
 
+    public function test_update_fails_closed_when_a_legacy_mixed_snapshot_would_be_reordered(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'draft',
+            'brand' => Brand::B2B,
+            'items' => [
+                ['type' => 'discount_percent', 'description' => 'Rabatt', 'price' => 1000],
+                ['type' => 'item', 'description' => 'Leistung', 'qty' => 1, 'price' => 10000],
+            ],
+            'discounts' => [],
+        ]);
+
+        // The legacy read path preserves source order, so the percentage is
+        // applied to a zero base and the authoritative total is 10000.
+        $show = $this->withHeaders($headers)->getJson("/api/management/contracts/{$contract->id}");
+        $show->assertOk();
+        $show->assertJsonPath('contract.total', 10000);
+
+        $beforeItems = $contract->items;
+        $beforeDiscounts = $contract->discounts;
+        $beforeVersion = $contract->content_version;
+
+        // A full editor save always sends the canonical partitions. Moving the
+        // discount after the item would silently change the total to 9000.
+        $response = $this->withHeaders($headers)->putJson("/api/management/contracts/{$contract->id}", [
+            'items' => [
+                ['type' => 'item', 'description' => 'Leistung', 'qty' => 1, 'price' => 10000],
+            ],
+            'discounts' => [
+                ['type' => 'discount_percent', 'description' => 'Rabatt', 'price' => 1000],
+            ],
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('items');
+        $contract->refresh();
+        $this->assertSame($beforeItems, $contract->items);
+        $this->assertSame($beforeDiscounts, $contract->discounts);
+        $this->assertSame($beforeVersion, $contract->content_version);
+    }
+
+    public function test_management_contract_never_exposes_a_signer_personal_token(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create(['status' => 'draft', 'brand' => Brand::B2B]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'must-not-leak-token',
+            'status' => 'joined',
+        ]);
+
+        $show = $this->withHeaders($headers)->getJson("/api/management/contracts/{$contract->id}");
+        $show->assertOk();
+        $this->assertArrayNotHasKey('personal_token', $show->json('contract.signers.0'));
+
+        $index = $this->withHeaders($headers)->getJson('/api/management/contracts');
+        $index->assertOk();
+
+        $this->assertStringNotContainsString('must-not-leak-token', $show->getContent());
+        $this->assertStringNotContainsString('must-not-leak-token', $index->getContent());
+    }
+
+    public function test_active_contract_content_and_version_are_persisted_atomically(): void
+    {
+        $user = $this->createSuperAdmin();
+        $headers = $this->authHeaders($user);
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'terms_html' => '<p>Original</p>',
+            'content_version' => 0,
+        ]);
+
+        // Fail exactly between the content UPDATE and the version increment.
+        // Without a single transaction the content write would already be
+        // committed and only the version would be lost.
+        $thrown = false;
+        Contract::updated(function (Contract $updatedContract) use ($contract, &$thrown): void {
+            if ($thrown || $updatedContract->getKey() !== $contract->getKey()) {
+                return;
+            }
+
+            $thrown = true;
+            throw new \RuntimeException('simulated failure between content and version');
+        });
+
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->withHeaders($headers)->putJson("/api/management/contracts/{$contract->id}", [
+                'terms_html' => '<p>Changed</p>',
+            ]);
+            $this->fail('Expected the simulated failure to propagate.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('simulated failure between content and version', $exception->getMessage());
+        } finally {
+            Event::forget('eloquent.updated: '.Contract::class);
+        }
+
+        $contract->refresh();
+        $this->assertSame('<p>Original</p>', $contract->terms_html);
+        $this->assertSame(0, $contract->content_version);
+    }
+
     public function test_non_super_admin_cannot_create(): void
     {
         $user = $this->createAdmin();
@@ -428,9 +535,11 @@ class ContractControllerTest extends TestCase
         $user = $this->createSuperAdmin();
         $headers = $this->authHeaders($user);
         $contract = Contract::factory()->create(['status' => 'active', 'brand' => Brand::B2B]);
-        $contract->signers()->create(
-            ContractSigner::factory()->make(['status' => 'signed', 'signed_at' => now()])->toArray()
-        );
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'status' => 'signed',
+            'signed_at' => now(),
+        ]);
 
         $response = $this->withHeaders($headers)->putJson("/api/management/contracts/{$contract->id}", [
             'available_roles' => ['Model'],

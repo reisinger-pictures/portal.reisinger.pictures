@@ -19,8 +19,10 @@ final class PersistedMoney
 
     /**
      * Validate a value before it is written to a persisted money column.
-     * Non-negative business totals are expected by the callers; the guard is
-     * specifically responsible for the shared upper bound and integral shape.
+     *
+     * Nullable legacy columns (for example `orders.stripe_fee_cents`) may
+     * still be null, but a present value must be a non-negative integral
+     * number of cents within the shared signed-INT ceiling.
      */
     public static function assertFitsCents(mixed $value, string $field): void
     {
@@ -29,6 +31,9 @@ final class PersistedMoney
         }
 
         if (is_int($value)) {
+            if ($value < 0) {
+                self::throwNegative($field);
+            }
             if ($value > self::MAX_CENTS) {
                 self::throwCeilingExceeded($field);
             }
@@ -37,8 +42,14 @@ final class PersistedMoney
         }
 
         if (is_float($value)) {
-            if (! is_finite($value) || floor($value) !== $value || $value > (float) self::MAX_CENTS) {
+            if (! is_finite($value) || floor($value) !== $value) {
                 self::throwInvalid($field);
+            }
+            if ($value < 0) {
+                self::throwNegative($field);
+            }
+            if ($value > (float) self::MAX_CENTS) {
+                self::throwCeilingExceeded($field);
             }
 
             return;
@@ -50,8 +61,12 @@ final class PersistedMoney
             $digits = $digits === '' ? '0' : $digits;
             $maximum = (string) self::MAX_CENTS;
 
-            if (! $negative && (strlen($digits) > strlen($maximum)
-                || (strlen($digits) === strlen($maximum) && strcmp($digits, $maximum) > 0))
+            if ($negative) {
+                self::throwNegative($field);
+            }
+
+            if (strlen($digits) > strlen($maximum)
+                || (strlen($digits) === strlen($maximum) && strcmp($digits, $maximum) > 0)
             ) {
                 self::throwCeilingExceeded($field);
             }
@@ -60,6 +75,22 @@ final class PersistedMoney
         }
 
         self::throwInvalid($field);
+    }
+
+    /**
+     * Validate a value for a non-nullable, non-negative-facing money column.
+     *
+     * Unlike {@see assertFitsCents()} a missing (null) value is rejected here:
+     * `orders.total_amount`, `orders.coupon_discount_cents`, and the invoice
+     * snapshot totals must always be an explicit non-negative integer.
+     */
+    public static function assertNonNegativeCents(mixed $value, string $field): void
+    {
+        if ($value === null) {
+            self::throwInvalid($field);
+        }
+
+        self::assertFitsCents($value, $field);
     }
 
     /**
@@ -94,6 +125,11 @@ final class PersistedMoney
     private static function throwCeilingExceeded(string $field): never
     {
         throw new InvalidArgumentException("{$field} exceeds the persisted money ceiling.");
+    }
+
+    private static function throwNegative(string $field): never
+    {
+        throw new InvalidArgumentException("{$field} must not be negative.");
     }
 
     private static function throwInvalid(string $field): never

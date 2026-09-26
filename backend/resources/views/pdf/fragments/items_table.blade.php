@@ -14,17 +14,16 @@
             && !array_key_exists('row_total', $item)
         ) {
             // Ordinary checkout snapshots historically omit row_total. Fill
-            // that compatibility case with checked integer arithmetic; manual
-            // fractional rows always arrive from ManualInvoiceService with an
-            // authoritative row_total and never take this fallback.
-            $price = (int) ($item['price'] ?? 0);
-            $quantity = (int) ($item['qty'] ?? 1);
-            if ($price < 0 || $quantity < 0
-                || ($price !== 0 && $quantity > intdiv(\App\Services\ContractPricingService::MAX_SAFE_INTEGER, $price))
-            ) {
-                throw new \InvalidArgumentException('The invoice row exceeds the safe integer range.');
-            }
-            $item['row_total'] = $price * $quantity;
+            // that compatibility case with checked integer arithmetic; a
+            // fractional legacy quantity fails closed instead of being
+            // truncated so the rendered subtotal cannot disagree with the
+            // authoritative total. Manual fractional rows always arrive from
+            // ManualInvoiceService with an authoritative row_total and never
+            // take this fallback.
+            $item['row_total'] = \App\Services\ContractPricingService::legacyRowTotal(
+                $item['price'] ?? 0,
+                $item['qty'] ?? 1,
+            );
         }
         $normalizedItems[] = $item;
     }

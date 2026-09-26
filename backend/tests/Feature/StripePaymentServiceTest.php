@@ -30,6 +30,7 @@ class StripePaymentServiceTest extends TestCase
             'payment_intent_generation' => 7,
             'checkout_idempotency_key' => 'checkout-key-payment-service',
             'checkout_fingerprint' => str_repeat('f', 64),
+            'total_amount' => 3456,
         ]);
         $accountCreatedAt = $user->created_at->getTimestamp();
 
@@ -132,6 +133,7 @@ class StripePaymentServiceTest extends TestCase
         $order = Order::factory()->create([
             'user_id' => $user->id,
             'payment_intent_generation' => 3,
+            'total_amount' => 1000,
         ]);
 
         $httpClient = $this->createMock(ClientInterface::class);
@@ -178,6 +180,31 @@ class StripePaymentServiceTest extends TestCase
         $service = new StripePaymentService(new StripeClient('test-server-side-placeholder'));
         $this->expectException(\RuntimeException::class);
         $service->createPaymentIntent(1000, 'missing-order', 'legacy@example.test');
+    }
+
+    public function test_amount_mismatch_fails_closed_before_calling_stripe(): void
+    {
+        $user = User::factory()->create();
+        $order = Order::factory()->create([
+            'user_id' => $user->id,
+            'total_amount' => 5000,
+        ]);
+
+        $httpClient = $this->createMock(ClientInterface::class);
+        $httpClient->expects($this->never())->method('request');
+        ApiRequestor::setHttpClient($httpClient);
+
+        $service = new StripePaymentService(new StripeClient('test-server-side-placeholder'));
+
+        try {
+            $service->createPaymentIntent(4999, (string) $order->getKey(), (string) $user->email);
+            $this->fail('Expected the amount mismatch to be rejected before any Stripe call.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame(
+                'Stripe PaymentIntent amount does not match the persisted order total.',
+                $exception->getMessage(),
+            );
+        }
     }
 
     public function test_fee_retrieval_distinguishes_unavailable_from_genuine_zero(): void

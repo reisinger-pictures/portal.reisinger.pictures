@@ -247,6 +247,30 @@ class ContractPricingServiceTest extends TestCase
         ]);
     }
 
+    public function test_legacy_row_total_matches_integer_arithmetic(): void
+    {
+        $this->assertSame(10000, ContractPricingService::legacyRowTotal(5000, 2));
+        $this->assertSame(10000, ContractPricingService::legacyRowTotal('5000', '2'));
+        $this->assertSame(10000, ContractPricingService::legacyRowTotal(5000.0, 2.0));
+        $this->assertSame(0, ContractPricingService::legacyRowTotal(0, 5));
+    }
+
+    public function test_legacy_row_total_fails_closed_on_a_fractional_quantity(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        // 1.5 must never be silently truncated to 1: the rendered subtotal
+        // would then disagree with the authoritative total.
+        ContractPricingService::legacyRowTotal(5000, 1.5);
+    }
+
+    public function test_legacy_row_total_fails_closed_on_a_fractional_price(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        ContractPricingService::legacyRowTotal(10.5, 2);
+    }
+
     /**
      * @return array<string, mixed>
      */
