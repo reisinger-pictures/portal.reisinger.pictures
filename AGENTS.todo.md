@@ -95,6 +95,108 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ---
 
+## 🧪 TEST-QUALITÄTS-AUDIT (2026-09-26) — zwei unabhängige Audits
+
+Scope: 84 E2E-Specs (191 `test()`, 278 Testinstanzen, 9.769 Zeilen) und 129
+Vitest-Dateien (1.051 Tests) plus 2.440 PHPUnit-Tests. Zwei read-only Audits
+auf getrennten Ebenen, beide mit der Auflage, Testnamen nicht für bare Münze zu
+nehmen.
+
+**Ergebnis vorweg: die Suite ist gesünder, als die Fragestellung nahelegte.**
+77 % der E2E-Specs testen echte Use-Cases, 19 % Frontend-Features, 4 % gemischt.
+Die Tag-Policy wird **ohne eine einzige Verletzung** eingehalten (190 von 191
+`test()`-Aufrufen explizit getaggt; die eine Ausnahme nutzt eine berechnete
+Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
+**Tiefe und Redundanz**.
+
+### Überflüssige Tests — belegt löschbar
+
+- [ ] **E2E-Redundanz (4 Tests):** `admin/coupon-photo-package.spec.ts:60` ist
+  ein exaktes Duplikat von `:26` und beweist nur, was die API schon erzeugt hat.
+  `guest/guest.spec.ts:4` ist eine Zugabe zu `search.spec.ts:4` und fügt nichts
+  hinzu — der Kommentar räumt sogar ein, er suche etwas, das „probably isn't
+  there" ist. `guest/public-gallery.spec.ts:4` heißt „kann öffentliche Galerien
+  ohne Auth ansehen", **öffnet aber keine Galerie**, sondern prüft `main` auf
+  Sichtbarkeit und zählt Login-Felder. `guest/guest-search-header.spec.ts:4` ist
+  eine strikte Teilmenge von `:10`.
+  **Nicht** zu löschen, obwohl überlappend: die drei Search-Specs
+  (`search.spec.ts:4`, `guest-search-header.spec.ts:18`, `search-url-sync.spec.ts:5`)
+  prüfen drei verschiedene Verträge (URL, a11y-Namen, Back/Forward-Mount).
+- [ ] **Zwei vollständig vakuose Unit-Dateien:** `PhotoDetailView.test.tsx`
+  (16 Mocks, 4 Tests) und `ManagementGalleryView.licensing.test.tsx`
+  (22 Mocks, 2 Tests, 161 Zeilen, 13 Kinder zu `() => null`).
+  **Die Vakuums-Behauptung wurde nachgeprüft, nicht geglaubt:** `grep` findet
+  `scope-selector` in `src/` **nirgends** — es existiert nur im Mock, also
+  prüft `getByTestId('scope-selector')`, dass ein bedingungsloser Stub rendert.
+  **Ersatz statt Löschung:** die beabsichtigte Abdeckung (Licensing-Modus)
+  gehört in einen Logik-Test für `useLicensingMode`, nicht in einen
+  Komponententest mit 16 Mocks.
+- [ ] **5 blanke `toHaveBeenCalled()` ohne Argumente** — bestehen auch, wenn der
+  Aufruf mit falschen Daten erfolgt: `AIBatchEditModal.test.tsx:191`,
+  `CouponInput.test.tsx:148`, `useBrandSettings.test.ts:109,130`,
+  `ManagementOrdersView.test.tsx:189`, `LightroomCatalogsProfileCard.test.tsx:217`.
+  **Nicht** zu ändern: 96 blanke `not.toHaveBeenCalled()` sind legitime
+  Negativ-Guards.
+
+### Lücken, die Geld betreffen — höchste Priorität
+
+- [ ] **`utils.ts` `moveArrayItemUp/Down` ist ungetestet** und verschiebt
+  Vertragspositionen und Rabattstaffeln (`ManagementContractView.tsx:241,245,265,269`,
+  `logic/useInvoiceDraft.ts`). Ein Off-by-one dort ist ein **Geldfehler, kein
+  Testfehler** — genau die Klasse, die ein Test nicht-fehlschlagen-lassen soll.
+- [ ] **Fixed-Point-Skalierung in `contractPricing.ts` ungetestet:**
+  `CONTRACT_SNAPSHOT_SCALE`, `CONTRACT_PERCENT_SCALE`, `calculateEditorSubtotal`.
+  Betrifft Rundung im Vertrags-Snapshot.
+- [ ] **`toSlug` ungetestet** (`utils.ts:138`) — speist Galerie-URLs
+  (`GalleryModal.tsx:193,200`, `GalleryGroupModal.tsx:145`); keiner der beiden
+  Komponententests importiert es.
+- [ ] **`useModels.ts` `modelPhotoDownloadUrl` ungetestet** (`:227-229`) — baut
+  die File-Delivery-URL. Bricht unbemerkt, ist das ein kaputter Download, kein
+  Testfehler.
+- [ ] **`usePayouts.ts` ungetestet** (`useAdminPayouts`, `useMyPayouts`) —
+  Admin-Auszahlungen; E2E deckt die UI, nicht die Zustandsübergänge des Hooks.
+- [ ] **E2E-Lücken bei Use-Cases:** `GalleryAccessModal` (Button „Zugriff…",
+  admin-only), `RatingStatusModal` (Button „Bewertungen…", nur bei
+  `type === 'selection'`), `AIGalleryDefaultsModal` (Button „KI generieren",
+  **innerhalb** von `GalleryMetadataDefaultsModal`) — `grep` findet keinen Spec,
+  der sie öffnet. `photographer/ai-gallery-defaults.spec.ts:26` **sieht** aus wie
+  Abdeckung, öffnet aber nur das Eltern-Modal und klickt „KI generieren" nie;
+  der Kopfkommentar behauptet, AT-03-E4 sei entfernt, der Test existiert aber.
+  Außerdem `TextSnippetModal` („Neuer Baustein") ohne Spec.
+
+### Strukturbefunde, nicht jetzt umgesetzt
+
+- [ ] **`admin/` ist ein Sammelbecken:** 31 von 84 Specs (37 %) in einem flachen
+  Verzeichnis, das Pricing, CRM-Dokumente, Tenant-Administration,
+  Galerie-Konfiguration und Projekt-Boards mischt, während `client/`,
+  `photographer/`, `crm/`, `delivery/` und `selection/` sauber actor- bzw.
+  domänenskaliert sind. Zusätzlich drei fast identische 80–107-Zeilen-Specs für
+  Negativ-Berechtigungen mit identischem 85-Zeilen-Setup. **Eigene Aufgabe, keine
+  Nebenwirkung eines Cleanup.**
+- [ ] **`contracts.spec.ts` ist mit 617 Zeilen / 8 Tests die schwerste Datei** und
+  mischt Vertrags-Lifecycle, Rabatt-Summen, Token-Rotation und einen
+  Tiptap-Reload-Regress.
+- [ ] **Tag-Kollisionen:** `crm/model-filters.spec.ts`, `model-lifecycle-filter.spec.ts`
+  und `model-delete.spec.ts` tragen alle `@feature:model-registration`, obwohl
+  sie Filter, rollengebundenen Lifecycle und DSGVO-Löschung prüfen — Abdeckung
+  vorhanden, aber per Tag nicht selektierbar.
+- [ ] **`useBrandSettings.test.ts` liegt falsch** (`ui/__tests__/` statt
+  `logic/__tests__/`), wodurch das Modul in einem Verzeichnisscan als ungetestet
+  *aussieht*, obwohl es getestet ist. Misfiled, nicht ungetestet.
+
+### Sauber, kein Handlungsbedarf
+
+- Kein `expect(true)` in der gesamten Suite, **keine Snapshot-Tests** (0 Dateien).
+- `tests/Unit/Models/GalleryOrgIdsTest.php:27` sieht wie ein reiner
+  Getter-Test aus, ist aber gerechtfertigt: dokumentierter Regressionstext,
+  prüft die Precondition im *ungeladenen* Zustand.
+- `shootingCalculator.ts calculateCustomStudioPrice` wirkt ungetestet, ist es
+  aber nicht — der Test greift über den Alias `calculateShootingPrice`, eine
+  Einzeiler-Delegation. **Korrekt als Fehlalarm abgetan.**
+- In der gesamten E2E-Suite nur zwei `page.route`-Mocks, beide legitim (einer
+  verzögert und `continue()`t, einer mockt Stripe). **Kein Test mockt weg, was er
+  zu prüfen vorgibt.**
+
 ## 🔍 VOLLSTÄNDIGER HEAD-AUDIT (2026-09-24)
 
 > Scope: vollständiger tracked Codebestand bei `HEAD=72f55da` (1.127 Dateien; 531 PHP, 376 TS/TSX, 78 E2E-Specs), nicht nur der letzte Diff. Der Working Tree war zu Auditbeginn sauber. Die Prüfung läuft als unabhängiger Full-Repository-Audit; Befunde werden erst nach Verifikation gegen Implementierung, Call-Path und bestehende Tests als Probleme dokumentiert.
