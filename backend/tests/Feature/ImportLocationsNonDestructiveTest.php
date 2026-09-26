@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Support\TempDirectory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,27 +46,35 @@ class ImportLocationsNonDestructiveTest extends TestCase
     ];
 
     /**
-     * Per-test scratch directory.
+     * Per-test base directory, and the consumer subdirectory inside it.
      *
-     * The importer writes into filesystems.temp_dir, which defaults to one
-     * absolute path shared by the whole application. Paratest runs different
-     * test classes in separate worker processes at the same time, and
-     * StorageCommandsTest invokes app:cleanup-temp, which empties that
-     * directory wholesale. So a shared directory lets a concurrent class
-     * delete this class's fixtures mid-run. That surfaced as two different
-     * intermittent failures in this class: a FileNotFoundException on a cache
-     * file the test had just written, and an import exiting non-zero because
-     * the fixture it depended on had been swept away. The database is already
-     * isolated per worker via SQLite :memory:, the filesystem was not.
+     * The importer writes into App\Support\TempDirectory::path('import_locations'),
+     * which resolves filesystems.temp_dir plus a per-consumer subdirectory.
+     * The base is unique per test and the subdirectory scopes the importer
+     * away from every other consumer, so this class can neither see nor be
+     * seen by a concurrently running worker.
+     *
+     * Both halves are needed. The subdirectory alone would not help, because
+     * ImportLocationsTest exercises the same consumer and would land in the
+     * same subdirectory. ParaTest runs the two classes in separate worker
+     * processes, and both use AT_postal.zip, AT_postal.txt, AT_places.*,
+     * countryInfo.txt and the .part staging files. Sharing one flat absolute
+     * namespace produced intermittent failures whose symptom followed the
+     * interleaving — a missing cache file in one run, a non-zero import exit
+     * in the next. The database is already isolated per worker via SQLite
+     * :memory:, the filesystem was not.
      */
+    private string $baseDir;
+
     private string $tempDir;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->tempDir = storage_path('app/private/testing/temp-'.Str::uuid());
-        config(['filesystems.temp_dir' => $this->tempDir]);
+        $this->baseDir = storage_path('app/private/testing/temp-'.Str::uuid());
+        config(['filesystems.temp_dir' => $this->baseDir]);
+        $this->tempDir = TempDirectory::path('import_locations');
 
         $this->clearLocalCache();
     }
@@ -73,7 +82,7 @@ class ImportLocationsNonDestructiveTest extends TestCase
     protected function tearDown(): void
     {
         $this->clearLocalCache();
-        File::deleteDirectory($this->tempDir);
+        File::deleteDirectory($this->baseDir);
 
         parent::tearDown();
     }

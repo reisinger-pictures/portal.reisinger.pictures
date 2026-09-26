@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\AIImageProcessingException;
 use App\Models\Photo;
+use App\Support\TempDirectory;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -470,7 +471,7 @@ class AIService
      */
     protected function createTemporaryFile(): string
     {
-        $directory = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
+        $directory = TempDirectory::path('ai');
         if (! is_dir($directory) && ! @mkdir($directory, 0755, true) && ! is_dir($directory)) {
             $directory = sys_get_temp_dir();
         }

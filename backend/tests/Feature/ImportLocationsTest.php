@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Console\Commands\ImportLocations;
+use App\Support\TempDirectory;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -33,9 +35,26 @@ class ImportLocationsTest extends TestCase
         'countryInfo.txt.part',
     ];
 
+    /**
+     * Per-test base directory, and the consumer subdirectory inside it.
+     *
+     * See ImportLocationsNonDestructiveTest for why both halves are needed:
+     * this class and that one drive the same consumer, run in separate
+     * ParaTest worker processes, and use the same cache file names. The
+     * subdirectory keeps the importer away from other consumers; the unique
+     * base keeps it away from the other import test class.
+     */
+    private string $baseDir;
+
+    private string $tempDir;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->baseDir = storage_path('app/private/testing/temp-'.Str::uuid());
+        config(['filesystems.temp_dir' => $this->baseDir]);
+        $this->tempDir = TempDirectory::path('import_locations');
 
         $this->clearLocalCache();
     }
@@ -43,13 +62,14 @@ class ImportLocationsTest extends TestCase
     protected function tearDown(): void
     {
         $this->clearLocalCache();
+        File::deleteDirectory($this->baseDir);
 
         parent::tearDown();
     }
 
     private function clearLocalCache(): void
     {
-        $tempDir = storage_path('app/private/temp');
+        $tempDir = $this->tempDir;
         foreach (self::CACHE_FILES as $file) {
             File::delete($tempDir.'/'.$file);
         }

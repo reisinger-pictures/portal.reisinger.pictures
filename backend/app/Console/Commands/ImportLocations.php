@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Location;
+use App\Support\TempDirectory;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -71,7 +72,7 @@ class ImportLocations extends Command
         $this->cleanupFailureCount = 0;
         $this->info('Starte Import der Location-Daten für Smart Assistance...');
 
-        $tempDir = (string) config('filesystems.temp_dir', storage_path('app/private/temp'));
+        $tempDir = TempDirectory::path('import_locations');
         if (! $this->ensureDirectory($tempDir, 'temp_directory')) {
             $this->error('Temporäres Importverzeichnis konnte nicht vorbereitet werden.');
 
