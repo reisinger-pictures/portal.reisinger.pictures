@@ -26,7 +26,7 @@ describe('calculateVolumeTier', () => {
         const result = calculateVolumeTier(1);
         expect(result.tierIndex).toBe(0);
         expect(result.priceCents).toBe(3000);
-        expect(result.label).toContain('30€');
+        expect(result.label).toBe('30 € pro Bild');
     });
 
     it('tier 0 for 9 items (upper boundary of tier 0)', () => {
@@ -39,15 +39,28 @@ describe('calculateVolumeTier', () => {
         const result = calculateVolumeTier(10);
         expect(result.tierIndex).toBe(1);
         expect(result.priceCents).toBe(2500);
-        expect(result.label).toContain('25€');
+        expect(result.label).toBe('Ab 10 Bildern 25 € pro Bild');
     });
 
     it('tier 2 for 20 items (lower boundary of last tier)', () => {
         const result = calculateVolumeTier(20);
         expect(result.tierIndex).toBe(2);
         expect(result.priceCents).toBe(2000);
-        expect(result.label).toContain('20€');
+        expect(result.label).toBe('Ab 20 Bildern 20 € pro Bild');
         expect(result.isMaxTier).toBe(true);
+    });
+
+    it('groups thousands in the label amount and keeps the symbol in the message', () => {
+        // The label used to interpolate `(priceCents / 100).toFixed(0)`, which
+        // rendered "1200€ pro Bild": no grouping, and the symbol welded to the
+        // number inside the placeholder value.
+        const config = {tiers: [{minQuantity: 0, priceCents: 120_000}]};
+        expect(calculateVolumeTier(1, config).label).toBe('1.200 € pro Bild');
+    });
+
+    it('shows a placeholder instead of NaN when a tier price is broken', () => {
+        const config = {tiers: [{minQuantity: 0, priceCents: Number.NaN}]};
+        expect(calculateVolumeTier(1, config).label).toBe('--- € pro Bild');
     });
 
     it('isMaxTier is false for intermediate tiers', () => {

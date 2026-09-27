@@ -11,6 +11,7 @@ import {t} from "@lingui/core/macro";
 import {Trans} from "@lingui/react/macro";
 import type {UseCouponResult} from '../../../logic/useCoupon';
 import {formatMoney} from '../../../logic/utils';
+import {formatEuroDecimal} from '../../../logic/formatCurrency';
 
 interface CouponInputProps {
     /** Shared coupon state owned by the checkout view (single source of truth). */
@@ -26,7 +27,14 @@ export default function CouponInput({state, disabled = false, displayedDiscount:
     const [inputValue, setInputValue] = useState<string>('');
 
     const packageQuantity = coupon?.package_quantity ?? null;
-    const packagePriceText = coupon != null ? formatMoney(coupon.package_price_cents ?? 0) : null;
+    // The amount is a *placeable value*: the symbol (and the non-breaking space
+    // that keeps it from wrapping to the next line) belongs to the message, not
+    // to the value. A `formatMoney` string here would arrive as one opaque
+    // placeholder with the "€" welded to it, so no translator could ever
+    // reorder or localise number and symbol. `formatEuroDecimal` keeps the cents
+    // — a package price is a cent amount, so rounding it to whole euros would
+    // silently rewrite the price — and drops only the symbol.
+    const packagePriceText = coupon != null ? formatEuroDecimal((coupon.package_price_cents ?? 0) / 100) : null;
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -62,7 +70,7 @@ export default function CouponInput({state, disabled = false, displayedDiscount:
                         )}
                         {coupon?.type === 'photo_package' && packageQuantity != null && packagePriceText != null && (
                             <span className="text-sm opacity-80 whitespace-nowrap">
-                                <Trans>{packageQuantity} Fotos für {packagePriceText}</Trans>
+                                <Trans>{packageQuantity} Fotos für {packagePriceText}{'\u00A0'}€</Trans>
                             </span>
                         )}
                     </div>

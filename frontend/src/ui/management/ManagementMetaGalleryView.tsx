@@ -6,6 +6,7 @@ import {useRef, useState} from 'react';
 import { usePhotoSwipe } from '../../logic/usePhotoSwipe';
 import {useNavigate, useParams, useSearchParams} from 'react-router-dom';
 import {flattenGroups, formatMoney} from '../../logic/utils';
+import {formatEuroDecimal} from '../../logic/formatCurrency';
 import {useProtectedGalleries} from '../../logic/useGalleries';
 import {usePermissions} from '../../logic/usePermissions';
 import {useMetaGallery} from '../../logic/useMetaGallery';
@@ -110,10 +111,10 @@ export default function ManagementMetaGalleryView() {
                                 const galleryNames = group.galleryIds
                                     .map(galleryId => galleryNamesById.get(galleryId) ?? galleryId)
                                     .join(', ');
-                                const pricePerItem = formatMoney(group.pricePerItemCents ?? 0);
+                                const pricePerItem = formatEuroDecimal((group.pricePerItemCents ?? 0) / 100);
                                 const photoCount = group.photoCount;
                                 const tierIndex = group.tierIndex;
-                                const priceLabel = t`${pricePerItem} pro Bild (Tier ${tierIndex})`;
+                                const priceLabel = t`${pricePerItem}\u00A0€ pro Bild (Tier ${tierIndex})`;
                                 return (
                                     <article
                                         key={group.key}

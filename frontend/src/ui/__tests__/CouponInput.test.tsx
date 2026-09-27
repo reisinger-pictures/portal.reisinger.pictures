@@ -51,6 +51,24 @@ function renderCouponInput(state: UseCouponResult) {
     return renderWithProviders(<CouponInput state={state} />);
 }
 
+/** `Intl` separates amount and symbol with U+00A0 so the pair cannot wrap. */
+const NBSP = String.fromCharCode(0xa0);
+
+function photoPackageState(packageQuantity: number | null, packagePriceCents: number | null) {
+    return makeState({
+        couponCode: 'PAKET10',
+        isValid: true,
+        discount: 0,
+        coupon: {
+            code: 'PAKET10',
+            type: 'photo_package',
+            value: 0,
+            package_quantity: packageQuantity ?? undefined,
+            package_price_cents: packagePriceCents ?? undefined,
+        },
+    });
+}
+
 describe('CouponInput', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -156,6 +174,80 @@ describe('CouponInput', () => {
 
         expect(screen.queryByLabelText('Rabattcode')).not.toBeInTheDocument();
         expect(screen.getByText('SAVE10')).toBeInTheDocument();
+    });
+});
+
+/**
+ * The photo-package line used to interpolate a `formatMoney` string — which
+ * already carried the "€" and the non-breaking space — as a single placeholder
+ * value. Number and symbol were welded into one opaque token, so no translator
+ * could reorder or localise them. The amount now goes in as a symbol-free value
+ * (`formatEuroDecimal`) and the message owns the `NBSP` + "€".
+ */
+/**
+ * The package line has to be located by regex and then compared on raw
+ * `textContent`: Testing Library's text matcher normalises the *element* string
+ * with `/\s+/g` — which in JavaScript also swallows U+00A0 — but compares the
+ * *matcher* string verbatim, so a `getByText` call containing a NBSP can never
+ * match. Comparing `textContent` directly is what actually pins the code points,
+ * which is the whole point of this refactor.
+ */
+function packageLine(): string {
+    return screen.getByText(/Fotos für/).textContent ?? '';
+}
+
+describe('CouponInput photo package line', () => {
+    /**
+     * The acceptance criterion for moving the symbol out of the value: the
+     * rendered text is *identical* to the pre-refactor output. German grouping
+     * (period), decimal comma and the U+00A0 before the symbol must all survive.
+     */
+    it('renders grouping, decimal comma and the non-breaking space before the symbol', () => {
+        renderCouponInput(photoPackageState(10, 123450));
+
+        expect(packageLine()).toBe(`10 Fotos für 1.234,50${NBSP}€`);
+    });
+
+    /**
+     * Guards the weld itself: a plain formatted amount would already satisfy the
+     * assertion above, so the space is pinned as its own code point. A regular
+     * space would let "1.234,50 €" break across a line end.
+     */
+    it('keeps the space before the symbol non-breaking', () => {
+        renderCouponInput(photoPackageState(10, 123450));
+
+        const line = packageLine();
+        expect(line).toContain(NBSP);
+        expect(line).not.toContain(' €');
+    });
+
+    /**
+     * The symbol must not travel inside the value, and a package price is a cent
+     * amount, so `formatEuroDecimal` (not `formatEuroWhole`) is the formatter
+     * that keeps the cents: 1.234,50 must not be rounded to "1.235".
+     */
+    it('does not round the cents away', () => {
+        renderCouponInput(photoPackageState(10, 123450));
+
+        expect(packageLine()).toBe(`10 Fotos für 1.234,50${NBSP}€`);
+    });
+
+    it('renders a whole-euro price with two decimals', () => {
+        renderCouponInput(photoPackageState(5, 7500));
+
+        expect(packageLine()).toBe(`5 Fotos für 75,00${NBSP}€`);
+    });
+
+    it('keeps the placeholder for a non-finite package price', () => {
+        renderCouponInput(photoPackageState(10, Number.NaN));
+
+        expect(packageLine()).toBe(`10 Fotos für ---${NBSP}€`);
+    });
+
+    it('renders no package line without a quantity', () => {
+        renderCouponInput(photoPackageState(null, 123450));
+
+        expect(screen.queryByText(/Fotos für/)).not.toBeInTheDocument();
     });
 });
 

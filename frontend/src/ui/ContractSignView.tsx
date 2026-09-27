@@ -7,12 +7,11 @@ import ErrorMessage from './components/ErrorMessage';
 import { fetchSignContract, sendPageExit, submitSign, SignContractResponse } from '../logic/useContractJoin';
 import { useContractHeartbeat } from '../logic/useContractHeartbeat';
 import { calcAge } from '../logic/utils';
-import { formatEuro } from '../logic/formatCurrency';
+import { formatEuro, formatPercent } from '../logic/formatCurrency';
 import { sanitizeHtml } from '../logic/sanitizeHtml';
 import {
     calculateContractTotal,
     calculateWireLineTotal,
-    formatBasisPointsAsPercent,
     normalizeContractSnapshot,
 } from '../logic/contractPricing';
 
@@ -208,7 +207,7 @@ function ContractSignTokenView({ token }: { token: string }) {
                                             <tr key={`d-${i}`}>
                                                 <td colSpan={2}>{d.description}</td>
                                                 <td className="text-right text-error">
-                                                    {d.type === 'discount_percent' ? formatBasisPointsAsPercent(d.price) : formatEuro(d.price / 100)}
+                                                    {d.type === 'discount_percent' ? formatPercent(d.price) : formatEuro(d.price / 100)}
                                                 </td>
                                                 <td className="text-right text-error">-</td>
                                             </tr>
