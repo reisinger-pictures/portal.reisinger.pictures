@@ -2066,6 +2066,16 @@ Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
   (`grep` nach der Klasse/Komponente) — sonst fixt man eine Kopie und die
   Anzeige bleibt defekt. **Skill-Konsequenz:** die `ui-review`-Checkliste ist um
   den Punkt ergaenzt, dass ein Befund vor dem Fix auf Duplikate zu pruefen ist.
+- [ ] **Latentes Risiko, bewusst nicht angefasst (kein Regressionsfall):**
+  `Sidebar.tsx:51` rendert den Portalnamen mit `whitespace-nowrap` **ohne**
+  Truncation. Bei der aktuellen Breite passt der Name (Desktop-Screenshot
+  bestaetigt), aber eine schmalere Sidebar oder ein laengerer Portalanme liesse
+  ihn ungebremst ueberlaufen — genau die Klasse Fehler, die am Mobile-Header
+  gerade behoben wurde. Entscheidung offen: `truncate` waere hier *korrekt*
+  (einzeilige Navigationsleiste), aber mit sichtbarem Effekt statt stiller Kuerzung
+  besser ein `title`-Attribut oder ein Layout, das den Namen umbrechen laesst.
+  Aufgenommen, damit die Asymmetrie Mobile (bricht um) vs. Desktop (nowrap)
+  bewusst bleibt und nicht als Versehen durchgeht.
 - [x] **Zusatz:** literale `\u2014` in JSX-Text der Fehlertabelle des Guides
   entsprachen keinem Escape und rendeten als `\u2014` → durch echte Em-Dashes
   ersetzt.
