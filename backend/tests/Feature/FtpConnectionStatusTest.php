@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\FtpCredentialService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
@@ -302,6 +303,29 @@ class FtpConnectionStatusTest extends TestCase
         $response->assertOk();
         $this->assertSame(2, $response->json('file_count'));
         $response->assertJsonPath('connection.configured', true);
+    }
+
+    /**
+     * The reset quota is a security rule, and the camera setup guide tells the
+     * photographer what it is ("Es sind n Anforderungen pro Stunde möglich").
+     * That sentence went stale the moment the quota was raised from three to ten on
+     * 2026-09-27, because the number lived in the German copy instead of in the
+     * response. The field exists so the guide is a reader of the rule, not a second
+     * copy of it.
+     *
+     * The assertion is against the constant, never against a number, and that is
+     * the whole point: the test cannot tell anyone what the quota is, it can only
+     * tell them that the response and the guard agree. A test pinning `10` would
+     * have kept passing through the raise that produced this defect — it would have
+     * failed on the *guide* instead, which is the side that has no constant to
+     * assert against.
+     */
+    public function test_the_status_reports_the_reset_quota_the_credential_service_enforces(): void
+    {
+        $response = $this->statusFor($this->photographer(['ftp_slug' => 'florian']));
+
+        $response->assertOk();
+        $response->assertJsonPath('ftp_reset_limit_per_hour', FtpCredentialService::RESET_LIMIT_PER_HOUR);
     }
 
     private function statusFor(User $user)

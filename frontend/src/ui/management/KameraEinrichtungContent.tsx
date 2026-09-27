@@ -20,11 +20,18 @@ import {FtpConnectionBlock} from './FtpConnectionRows';
  * call `useFtp()` itself — the dialog container already holds the status and
  * passes the connection down, so the content stays a pure function of its props.
  *
+ * The same rule decides the hourly reset quota. It used to be spelled out here
+ * ("Es sind drei Anforderungen pro Stunde möglich") while the server enforced
+ * ten, so the guide was stating a security rule that did not exist; the number
+ * now arrives as `resetLimitPerHour` and is interpolated. A required prop is the
+ * point: a caller that forgets it is a TypeScript error, not a guide that quietly
+ * falls back to a number nobody checked.
+ *
  * The root-certificate procedure is deliberately absent. It is a fallback for
  * when `Vertrauenswürdige Zielserver` does not work, and it is only worth
  * freezing into a procedure once that has actually happened.
  */
-export default function KameraEinrichtungContent({connection}: {connection: FtpConnection}) {
+export default function KameraEinrichtungContent({connection, resetLimitPerHour}: {connection: FtpConnection; resetLimitPerHour: number}) {
     const {host, username, sftp_port, ftps_port, pasv_port_start, pasv_port_end, ftps_tls_mode, path} = connection;
     const missing = t`nicht konfiguriert`;
     const serverValue = host ?? missing;
@@ -115,8 +122,8 @@ export default function KameraEinrichtungContent({connection}: {connection: FtpC
                             Passwort.</Trans></li>
                         <li><Trans>Fordere die Zugangsdaten an: im Dashboard unter
                             <strong> FTP Inbox → Kamera-Konto</strong> auf
-                            <strong> „Kamera-Zugang einrichten"</strong> klicken. Es sind drei Anforderungen pro Stunde
-                            möglich.</Trans></li>
+                            <strong> „Kamera-Zugang einrichten"</strong> klicken. Es sind {resetLimitPerHour} Anforderungen pro
+                            Stunde möglich.</Trans></li>
                         <li><Trans>Notiere das Passwort sofort. Es wird genau einmal angezeigt, nicht gespeichert
                             und nicht wiederherstellbar. Bei Verlust gibt es nur ein neues, und das alte entfällt.</Trans></li>
                     </ol>

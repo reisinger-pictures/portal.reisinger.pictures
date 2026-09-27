@@ -157,7 +157,8 @@ export default function ManagementFtpInbox() {
     /**
      * One reset per click, never a retry loop.
      *
-     * The backend allows three resets per hour and account. Retrying on a 429, or
+     * The backend allows a fixed number of resets per hour and account
+     * (`status.ftp_reset_limit_per_hour`, P1-M33). Retrying on a 429, or
      * re-enabling the button on a timer, would spend the photographer's remaining
      * quota on guesses; the honest behaviour is to surface the server's message
      * and let them come back later. A failed reset also drops any password still
@@ -244,7 +245,7 @@ export default function ManagementFtpInbox() {
                             closing alert. This dialog has no footer, so the band can
                             sit directly at the end without hiding anything below. */}
                         <div className="flex-1 overflow-y-auto pr-2 scroll-fade-bottom pb-8">
-                            <KameraEinrichtungContent connection={status.connection} />
+                            <KameraEinrichtungContent connection={status.connection} resetLimitPerHour={status.ftp_reset_limit_per_hour} />
                         </div>
                     </ModalShell>
                 )}

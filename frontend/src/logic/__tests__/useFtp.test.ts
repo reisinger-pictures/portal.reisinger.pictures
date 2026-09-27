@@ -26,6 +26,10 @@ const BASE_STATUS: FtpStatus = {
     ftp_account_status: 'pending',
     ftp_provisioned_at: null,
     ftp_account_error: null,
+    // The quota the guide quotes. The value is the current production one, so a
+    // fixture that drifts from the server does not read as a deliberate change;
+    // nothing in the hook branches on it.
+    ftp_reset_limit_per_hour: 10,
     // A fully configured connection, because the camera settings the management UI
     // renders are only as good as this payload: a fixture with `configured: false`
     // would let a dropped field pass unnoticed. `ftpConnection.test.ts` covers the
@@ -238,8 +242,8 @@ describe('useFtp.resetCredentials', () => {
         const {result} = renderFtp();
         await waitFor(() => expect(result.current.status).toBeDefined());
 
-        // The quota is three per hour, so a caller that cannot see 429 will keep
-        // pressing a button that cannot succeed.
+        // The quota is a fixed number per hour, so a caller that cannot see 429
+        // will keep pressing a button that cannot succeed.
         await expect(result.current.resetCredentials()).rejects.toMatchObject({
             status: 429,
             message,
