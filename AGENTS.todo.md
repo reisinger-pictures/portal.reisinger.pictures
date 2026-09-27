@@ -2190,6 +2190,60 @@ hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
   Aufnahmen zeigen ihn deshalb zunaechst so, wie er ist, statt ihn zu
   beschönigen. Sichtpruefung des Dialogs selbst: **sauber** (Titel
   „Fotografen-Team", Galerie, `Zugriffs-Status (Fotografen)`, Info-Alert).
+
+### Dialog-UI-Review 2026-09-27 — Auswertung aller 13 Dialog-Aufnahmen
+
+Vollauf `pnpm test:screenshots`: **44 passed / 0 failed (1,6 min)**, 13 Dialoge ×
+Desktop/Mobile. Auswertung in zwei Hälften (5 + 8 Dialoge) gegen
+`ui-review-checklist.md`, danach **jeder high- und medium-Befund von mir am Bild
+nachgeprueft**. Protokoll: 26 Bilder, 38 Befunde, davon **6 bestaetigt, 1
+widerlegt**, Rest low. Widerlegt heisst: ein plausibler Scheinbefund, der als
+Produktionsfehler verkauft worden waere.
+
+| Befund | Schwere | Von mir geprueft |
+|---|---|---|
+| `gallery-edit-dialog`: Dialog hoeher als der Viewport, Footer mit „Speichern" abgeschnitten (Desktop + Mobile) | **high** | **bestaetigt** — Desktop zeigt nur einen ~10 px-Streifen der Footer-Buttons, der Primaer-Button ist ohne Scrollen unerreichbar |
+| `gallery-invite-dialog` (Mobile): zwei Optionsbeschreibungen verlieren Text am Kartenrand, „durchgewun" endet mitten im Wort — kein Umbruch, kein Ellipsis | **high** | **bestaetigt** — Textverlust; die dritte Karte daneben bricht korrekt um |
+| `gallery-access-dialog`: letzte Listenzeile mitten durch die Glyphen abgeschnitten, keine Scroll-/`Fade`-Affordanz | **medium** | **bestaetigt** |
+| **Waehrung mit Punkt-Dezimaltrennzeichen** (`369.00 €`, `30.00`) in durchgehend deutscher Oberflaeche | **medium** | **bestaetigt als echter Produktionsfehler** |
+| `gallery-metadata-defaults` (Mobile): Fusszeile stapelt vollbreit | — | **bestaetigt korrekt** — das ist das richtige Mobile-Muster |
+| `Hinzufügen`-Button zentriert gegen den Name/E-Mail-Block statt auf der Namenslinie | low | **bestaetigt** |
+| `model-detail` (Mobile): „Altersnachweis"-Karte 48 % breit neben 100 % breiter „Datenstand"-Karte | low | gemeldet |
+| `model-detail`: „Profil-Angaben" / „Basisdaten" typografisch identisch, Hierarchie geht verloren | low | gemeldet |
+| `volume-preset`: `€` ist Flex-Geschwister statt Feld-Suffix, Input dadurch schief | low | gemeldet |
+| `mm/dd/yyyy` im nativen Datumsfeld | medium | **WIDERLEGT — Harness-Artefakt**, siehe unten |
+
+- [ ] **Harness setzt keine Locale — `locale: 'de-DE'` fehlt.**
+  `playwright.screenshots.config.ts` und die Specs setzen nirgends eine Locale,
+  auch die Geraeteprofil nicht (`devices['Galaxy A55'].locale === undefined`).
+  Chromium faellt damit auf die Host-Sprache des Entwicklers zurueck. Deshalb
+  rendert das native `<input type="date">` **US-Format**, obwohl die UI deutsch
+  ist. **Das ist kein Produktionsfehler** — ein deutscher Fotograf sieht
+  `TT.MM.JJJJ`. Solange das fehlt, sind **alle** kuenftigen Aufnahmen bei
+  Datums- und Zahlenformaten irrefuehrend. Fix: `locale: 'de-DE'` in `use` der
+  Screenshot-Config, danach ein Lauf.
+- [ ] **Echter Bug daneben: `toFixed()` statt Locale-Format.** Die Waehrung
+  nutzt `toFixed(2)` (`ShootingCalculatorModal.tsx:228-229`,
+  `VolumePresetSettingsCard.tsx:31,46,72`). `toFixed` ist **sprachunabhaengig**
+  und liefert immer einen Punkt — `369.00 €` bleibt also auch bei korrekter
+  Browser-Locale falsch. Das ist derselbe Bericht wie beim Datumsfeld, aber eine
+  andere Ursache und ein echter Fehler in einem Abrechnungswerkzeug. Fix:
+  `toLocaleString('de-DE', { minimumFractionDigits: 2 })` bzw. eine
+  zentrale Format-Hilfe.
+- [ ] **Ausrichtung: dritte Instanz desselben Musters.** „Hinzufügen" in
+  `gallery-access-dialog` zentriert gegen den Name/E-Mail-Block statt auf der
+  Namenszeile — exakt die Form, die als erster Befund dieser Runde gemeldet und
+  daraufhin in der `ui-review`-Checkliste verankert wurde. Sie greift zum
+  wiederholten Mal; der Fix gehoert in die Komponente, nicht in die Checkliste.
+- [ ] **Ungeprueft geblieben** (ausdruecklich als `unsicher` gemeldet, nicht
+  uebernommen): ob die Dialoge ueberhaupt scrollen (macOS ueberlagert
+  Scrollbars, im Snapshot nicht sichtbar) — davon haengt ab, ob die harten
+  Schnitte UX-Bruch oder Snapshot-Artefakt sind; ob `€` als Suffix gemeint ist;
+  Tap-Target-Groessen der Kalkulator-Checkboxen (Zeilenhoehe vs. 17-px-Kasten);
+  die ISO-Darstellung `1995-05-05` neben `27.09.2026` im selben Dialog — im
+  Dialog-Component nicht auffindbar, `Geburtsdatum` liegt in
+  `CustomerModal.tsx:117` und `ManagementContractView.tsx:494` als natives
+  Date-Input, die Quelle des gerenderten Werts blieb offen.
 - [x] **Zusatz:** literale `\u2014` in JSX-Text der Fehlertabelle des Guides
   entsprachen keinem Escape und rendeten als `\u2014` → durch echte Em-Dashes
   ersetzt.
