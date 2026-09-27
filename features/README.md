@@ -91,6 +91,7 @@ This directory serves as the single source of truth for all technical concepts, 
 * [05-security-and-perf-refinement.md](tech/05-security-and-perf-refinement.md) - Security and performance hardening.
 * [06-i18n-internationalization.md](tech/06-i18n-internationalization.md) - Internationalization policy and Lingui integration.
 * [07-architectural-decisions.md](tech/07-architectural-decisions.md) - Historical and current architecture decisions.
+* [08-dialog-height-contract.md](tech/08-dialog-height-contract.md) - **Dialog-Höhenvertrag:** `ModalShell`/`ModalDialogShell`, opt-in `scrollableBody` gegen `.modal-box` als Scrollregion, plus offene Migrationswellen.
 
 ### 🧪 E2E Test Strategy
 * [e2e-test-strategy.md](e2e-test-strategy.md) - Playwright topology, functional-tag policy, isolation rules, and CI shard selection.

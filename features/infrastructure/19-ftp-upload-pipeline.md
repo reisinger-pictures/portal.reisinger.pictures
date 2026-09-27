@@ -278,13 +278,60 @@ Ablösung als Parallelsystem plant, plant den Ausfall für den Fotografen.
 
 **Das Portal speichert kein FTP-Passwort.** Das ist der Kern des Wechsels.
 
-1. PHP erzeugt ein kamerataugliches Passwort `^[a-z0-9]{16,24}$` —
-   **keine Sonderzeichen**, da Kameras sie am Konfigurationsbildschirm nicht
-   eingeben können; keine gemischte Groß-/Kleinschreibung, um
-   Tastatur-Layout-Fehler zu vermeiden.
+1. PHP erzeugt ein kamerataugliches Passwort
+   `/^[a-km-zA-HJ-NP-Z2-9]{10,12}$/` — **keine Sonderzeichen** und **keine der
+   fünf mehrdeutigen Zeichen**. Details und Begründung unten.
 2. Übergabe per **HTTPS** an die SFTPGo-Admin-API.
 3. Anzeige **einmal**, danach verwerfen.
 4. Verloren → `resetPassword()`. Es gibt **keine** Wiederherstellung.
+
+**Passwortform, Präzisierung 2026-09-27 (Owner-Entscheidung).** Verbindlich ist
+`FtpCredentialService::PASSWORD_PATTERN` =
+`/^[a-km-zA-HJ-NP-Z2-9]{10,12}$/`, mit `PASSWORD_MIN_LENGTH = 10` und
+`PASSWORD_MAX_LENGTH = 12`. Die Länge wird **pro Aufruf gezogen**, damit ein
+geleaktes Passwort nicht über die Länge eingegrenzt werden kann. Drei
+Entscheidungen stecken in dieser einen Zeile:
+
+- **Keine Sonderzeichen.** Unverändert gegenüber der Ursprungsregel: eine Kamera
+  kann `-`, `&` oder `!` am Konfigurationsbildschirm nicht eingeben, das
+  Alphabet ist streng alphanumerisch.
+- **Die fünf mehrdeutigen Zeichen fallen weg — sie werden nicht bloß lesbar
+  gemacht.** Ausgeschlossen sind `0`, `O`, `1`, `l` und `I`; es bleiben **57
+  Zeichen**. Sie lesbar zu rendern reicht nicht: ein auf dem Kameradisplay
+  verwechseltes `0`/`O` oder `1`/`l` ist kein Fehler, den der Fotograf bemerkt,
+  sondern eine fehlgeschlagene Anmeldung und eine Neugenerierung.
+- **Gemischte Groß-/Kleinschreibung ist erlaubt, und das hebt die frühere
+  Regel auf.** Die alte Begründung — gemischte Schreibweise würde ein
+  Tastatur-Layout in einen Support-Fall verwandeln — war eine abgewogene
+  Abwägung und wird hier **überstimmt**, nicht vergessen; deshalb ist sie
+  festgehalten. Sie unterstellt, dass ein Mensch das Passwort abtippt. Angezeigt
+  wird es in `ShowOncePassword` in einer Monospace-Schrift (`font-mono`), also
+  Zeichen für Zeichen lesbar, und niemand tippt es aus dem Gedächtnis nach.
+  **Das kleingeschriebene Alphabet nicht wiederherstellen** — die gemischte
+  Form war die Anforderung, und die Entropiekosten unten sind der dafür
+  akzeptierte Preis.
+
+**Die Entropie ist gesunken, das ist keine Rundungsdifferenz.** Die Entropie ist
+`Länge × log2(57)`, `log2(57) ≈ 5.833` Bit je Zeichen: **10 Zeichen ≈ 58,3 Bit,
+12 Zeichen ≈ 70,0 Bit.** Die frühere Form waren 36 Zeichen bei 16–24 Zeichen,
+`log2(36) ≈ 5.170`, also **~82,7 bis ~124,1 Bit.**
+
+Die neue Spanne liegt damit **nicht innerhalb** der alten, sondern vollständig
+**darunter**: unten um ~24 Bit, oben um ~54 Bit. Klar gesagt, weil ein
+Absatz, der das verschweigt, schlechter ist als keiner: **die Mindeststärke eines
+Kamerapassworts ist gesunken.** Das ist eine echte Reduktion des
+Brute-Force-Raums. Bewusst in Kauf genommen (Owner-Entscheidung, 2026-09-27)
+aus zwei Gründen. Ein Online-Angreifer gewinnt vom Alphabet nichts: die
+Stundenquota (7.6a) begrenzt, wie schnell ein Konto sein **eigenes**
+Zugangsdatenpaar rotiert, und diese Klasse speichert das Passwort nie — ein
+Offline-Ziel gibt es hier nicht, ein Offline-Angriff müsste den Credential-Store
+von SFTPGo selbst treffen, ein fremdes System mit eigenem Schutz, das diese
+Klasse weder schreibt noch liest. Was die Reduktion kauft, ist der Punkt der
+Änderung: 16–24 Zeichen sind „extrem schwer auf der Kamera einzugeben", und ein
+Passwort, das nicht eingegeben werden kann, ist eine Kamera, die nie hochlädt.
+Die Kürzung um 37 % an der Untergrenze (16 → 10) und 50 % an der Obergrenze
+(24 → 12) ist die **Kompensation** für die gemischte Schreibweise, kein
+Nebeneffekt des Alphabets.
 
 Daraus folgt: **keine** `ftp_credentials`-Tabelle, **kein**
 `FILE_ENCRYPTION_KEY`/`FILE_ENCRYPTION_PREVIOUS_KEYS` für FTP, **keine**
@@ -311,6 +358,15 @@ einmal zurück**. Festgeschrieben ist:
 - **Die Regel aus 7.2 wird durchgesetzt**, nicht nur dokumentiert. Ein
   regelwidriger Alt-Slug (`j.doe`) führt zu einem benannten Fehler mit
   Verweis auf die Profilseite, statt still ein unbrauchbares Konto anzulegen.
+- **Erzeugung und Prüfung sind zwei Hälften einer Form.** `Str::random()` liefert
+  Base64 ohne `/`, `+` und `=`, also 62 alphanumerische Zeichen; die Klasse
+  filtert daraus die fünf mehrdeutigen weg und behält 57.
+  `NON_CAMERA_CHARACTERS` ist bewusst das **exakte Komplement** zu
+  `PASSWORD_PATTERN` — eine in zwei Formen geschriebene Zeichenklasse muss
+  zweimal gelesen werden, um geprüft zu werden. **Die gemischte Schreibweise
+  bleibt erhalten**: ein `Str::lower()` im Erzeugungspfad würde die
+  Owner-Entscheidung oben stillschweigend zurücknehmen, und genau deshalb steht
+  dort keines mehr.
 - **Das Home-Verzeichnis** ist `filesystems.disks.ftp_inbox.root` + Slug, nicht
   eine zweite Konstante: beide Container mounten denselben Host-Pfad auf
   denselben Container-Pfad, also stimmen Portal und Dienst mit einem String
@@ -358,14 +414,15 @@ Schema-/Backfill-/Rollback-Entscheidung):
   Hand gelöscht, ist sie veraltet. Deshalb ein expliziter
   `reconcileAccount()`-Pfad statt eines stillen Live-Query.
 
-**Umsetzung (P1-M26).** `FtpController::status()` gibt die drei Felder
-zusammen mit dem Bestand zurück:
+**Umsetzung (P1-M26, ergänzt 2026-09-27).** `FtpController::status()` gibt die
+drei Kontofelder zusammen mit dem Bestand und der Reset-Quota zurück:
 
 | Feld | Quelle | Bedeutung |
 |---|---|---|
 | `ftp_account_status` | `users.ftp_account_status` | `pending` / `active` / `error` |
 | `ftp_provisioned_at` | `users.ftp_provisioned_at` | letzter erfolgreicher Provision, ISO-8601 oder `null` |
 | `ftp_account_error` | `users.ftp_account_error` | Fehlertext zu `error`, sonst `null` |
+| `ftp_reset_limit_per_hour` | `FtpCredentialService::RESET_LIMIT_PER_HOUR` | Stundenkontingent des Passwort-Resets (7.6a) |
 
 - **Kein SFTPGo-Kontakt.** Der Lesepfad ruft den Dienst nicht auf; der Wert
   kommt aus der Spalte. Ein 500er aus dem Dienst kann hier prinzipiell nicht
@@ -373,6 +430,21 @@ zusammen mit dem Bestand zurück:
   7.5 geforderte Verhalten: der Fotograf sieht, was das System weiß.
 - **Additiv.** `ftp_folder`, `file_count` und `current_target_gallery` bleiben
   unverändert im Response; der Inbox-UI baut darauf auf.
+- **`ftp_reset_limit_per_hour` ist Teil des Vertrags, damit die
+  Kamera-Anleitung keine veraltete Quota nennen kann.** Quelle ist die
+  Konstante, die der Guard selbst benutzt, nicht ein Literal. Der Anlass war
+  eine Lücke, die 2026-09-27 aufgefallen ist: die Quota wurde von 3 auf 10
+  angehoben, während der Schritt *Kennwort anfordern* in
+  `KameraEinrichtungContent` im deutschen Copy noch „drei Anforderungen pro
+  Stunde" sagte — und **nichts ist fehlgeschlagen**, weil eine Zahl im deutschen
+  Copy keinen Test hat, der sie widerlegt. Der Fotograf hätte eine falsche
+  Auskunft bekommen. Die Anleitung ist damit **Leserin** der Regel statt einer
+  zweiten Kopie davon, und die beiden können nicht auseinanderlaufen. Eine
+  Konstante ist aus demselben Grund die richtige Quelle und kein Config-Wert:
+  das ist eine Sicherheitsregel, die UI darf sie beschreiben, aber nicht
+  definieren. `KameraEinrichtungContent` bekommt den Wert als Prop
+  `resetLimitPerHour`; `KameraEinrichtungContent.test.tsx` prüft in beide
+  Richtungen, damit ein Literal nicht zurückkehren kann.
 - **Frontend-Typ:** `FtpAccountStatus` in `frontend/src/logic/useFtp.ts` ist die
   geschlossene Menge der drei Werte. `null` gehört nicht zum Vertrag (die Spalte
   ist NOT NULL mit Default), deshalb ist der Union-Typ erschöpfend und ein
@@ -426,9 +498,12 @@ Admin-API. **Kein** FTP-/SFTP-Protokoll-Speak im Portal.
 
 Die Show-once-Semantik aus 7.3 macht den Reset zum **einzigen**
 Recovery-Weg: das alte Passwort ist unwiederbringlich. Genau das macht ihn
-gefährlich — ein unbeschränkter Reset-Endpoint ist eine unbegrenzte Erzeugung
-gültiger Kamera-Zugangsdaten. 7.6 (M22) und 7.3 (M23) sichern ab, dass ein
-Passwort nicht ins Log gerät; **wie oft** zurückgesetzt wird, regeln sie nicht.
+gefährlich — ein unbeschränkter Reset-Endpoint lässt ein Konto die
+Zugangsdaten einer **funktionierenden** Kamera so oft tauschen, wie es klickt.
+(Nicht: unbegrenzt gültige Zugangsdaten. Ein Reset ersetzt; was die Quota
+tatsächlich begrenzt, steht unten.) 7.6 (M22) und 7.3 (M23) sichern ab, dass
+ein Passwort nicht ins Log gerät; **wie oft** zurückgesetzt wird, regeln sie
+nicht.
 
 **Endpoint.** `POST /api/management/ftp/reset-password` →
 `FtpCredentialController::resetPassword()`.
@@ -448,7 +523,7 @@ Passwort nicht ins Log gerät; **wie oft** zurückgesetzt wird, regeln sie nicht
   der Fotograf muss wissen, ob sein Passwort sich geändert hat, denn es wird
   **nicht** zurückgerollt.
 
-**Rate-Limit.** `FtpCredentialService::RESET_LIMIT_PER_HOUR = 3`, Fenster 3600 s,
+**Rate-Limit.** `FtpCredentialService::RESET_LIMIT_PER_HOUR = 10`, Fenster 3600 s,
 über `RateLimiter`, Schlüssel `ftp-password-reset:{userId}`.
 
 - **Pro Konto, nicht global.** Sonst könnte ein Fotograf den Recovery-Weg allen
@@ -456,14 +531,43 @@ Passwort nicht ins Log gerät; **wie oft** zurückgesetzt wird, regeln sie nicht
 - **Schlüssel ist die User-ID, nicht der Slug.** P1-M34 lässt offen, ob
   `users.ftp_slug` oder der SFTPGo-Store führend ist; ein Slug-Schlüssel würde
   bei einem Rename still ein frisches Kontingent gutschreiben.
-- **Konstante, kein Config-Wert.** Drei ist eine Sicherheitsregel aus dem Board,
+- **Konstante, kein Config-Wert.** Zehn ist eine Sicherheitsregel aus dem Board,
   keine Kapazitätseinstellung — und ein Wert in `config/app.php` könnte als `0`
   ausgeliefert werden, was den Recovery-Weg still abschaltet.
+- **Von 3 auf 10 angehoben — das schwächt den Guard, und das ist die ehrliche
+  Schlagzeile** (Owner-Entscheidung, 2026-09-27). Drei war gegen jemanden
+  gemessen, der bereits weiß, was er tut, und scheitert an genau dem Fall, der
+  tatsächlich eintrifft: jemand an der Kamera, der an einer Scheibe dreht und
+  ein Passwort falsch abtippt, das er nicht nachlesen kann. Jeder Versuch gibt
+  das Zugangsdatenpaar neu aus, also verwandelt eine niedrige Quota ein
+  Transkriptionsproblem in eine stundenlange Sperre ohne Ausweg. Die
+  Kompensation ist die Audit-Zeile, und beides ist **zusammen** zu lesen: eine
+  weitere Quota bedeutet eine **längere** Spur, nicht eine leisere. Ein Schwall von
+  zehn Resets sind zehn zuordenbare Zeilen, nicht eine verschüttete.
 - **Abgelehnte Aufrufe zählen mit.** Ein gehämmerter Button verlängert das
   Fenster dadurch nicht endlos — dieselbe bewusste Entscheidung wie in
   `CheckoutRiskService`.
-- **Die Quota läuft ab.** Drei echte Versuche in einer Stunde sind ein
+- **Die Quota läuft ab.** Zehn echte Versuche in einer Stunde sind ein
   Support-Fall; ein Limiter, der nie vergisst, wäre ein Lockout.
+
+**Was die Quota tatsächlich begrenzt**, gehört präzise gesagt, denn die
+naheliegende Formulierung ist falsch. Ein Reset **ersetzt** das Passwort, es
+gibt also je Konto zu jedem Zeitpunkt genau **ein** gültiges Zugangsdatenpaar,
+und kein Reset erzeugt je ein zweites. Die Grenze ist deshalb **keine**
+Obergrenze für die Anzahl existierender Zugangsdaten — das Portal verwaltet zu
+jedem Zeitpunkt nie mehr als eines. Begrenzt werden zwei reelle Dinge:
+
+1. **Die Störung einer funktionierenden Kamera.** Jede Rotation macht das
+   Passwort ungültig, das die Kamera hält. Ohne Drossel ließe ein Konto den
+   Uploader so oft offline nehmen, wie es klickt.
+2. **Die Last auf die SFTPGo-API.** Jede Rotation ist ein Read-Modify-Write
+   (`findUser()`, dann das Update) gegen einen laufenden Dienst; der Endpoint
+   wäre sonst ein Verstärker für Request-Volumen.
+
+Der Audit-Trail ist die ausgleichende Kontrolle, und er skaliert **nicht** mit
+der Zahl: `recordResetAttempt()` schreibt eine Zeile für jeden Versuch, der die
+Quota passiert hat, erfolgreich oder nicht. Das Anheben von 3 auf 10 verlängert
+die Spur und schwächt **nichts** an der Zurechenbarkeit.
 
 **Audit-Trail.** Migration **V042**, Tabelle `ftp_password_resets`
 (`FtpPasswordReset`):
@@ -476,7 +580,7 @@ Passwort nicht ins Log gerät; **wie oft** zurückgesetzt wird, regeln sie nicht
 | `reset_at` | timestamp NOT NULL | Zeitpunkt |
 
 - **Jeder Versuch schreibt eine Zeile, nicht nur der Erfolg.** Ein fehlgeschlagener
-  Reset ist die *interessantere* Zeile: ein Dienst, der dreimal 500 liefert, ist
+  Reset ist die *interessantere* Zeile: ein Dienst, der zehnmal 500 liefert, ist
   ein Support-Fall, und ohne diese Zeilen bleibt die Beschwerde „Reset tut
   nichts" spurlos. Erfasst sind auch Portal-Vorbedingungen, die den Dienst nie
   erreichen.
@@ -847,8 +951,9 @@ niemand prüft:
   einzelner Kanal.
 - **Die Ownership-Kette:** Datei ankommt mit `1002:webgroup`, `setgid` auf
   `ftp/<slug>` gehalten.
-- **Das Show-once-Passwort:** ein alphanumerisches 16–24-Zeichen-Passwort ohne
-  Sonderzeichen muss durch Provisionierung und Login kommen (7.3).
+- **Das Show-once-Passwort:** ein Passwort aus den 57 alphanumerischen
+  Kamerazeichen mit 10–12 Zeichen, gemischter Groß-/Kleinschreibung und ohne
+  `0 O 1 l I`, muss durch Provisionierung und Login kommen (7.3).
 - **Die Cipher-Liste als Fixture** — mit Handshake-Vollständigkeitsprüfung vor
   dem Auslesen. Siehe die Messfalle in 7.11.
 
@@ -952,7 +1057,7 @@ niemals ein Konto — der Delete lief also gegen einen Account, den es nie gab,
 und der Fail-closed brach **jeden ersten Slug-Wechsel mit HTTP 500** ab.
 
 Der Endpunkt bekommt deshalb die Zustandstabelle. Keine neue Tür: er trägt
-bereits Auth, die `management/ftp*`-Berechtigung, die Quota (3/Stunde), den
+bereits Auth, die `management/ftp*`-Berechtigung, die Quota (10/Stunde), den
 Audit-Trail und das Show-once-Kontrakt — eine zweite Tür mit derselben Disziplin
 wäre mehr Fläche für Fehler als eine Tür mit zwei Fällen.
 
