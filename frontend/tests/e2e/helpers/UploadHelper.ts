@@ -19,21 +19,26 @@ export class UploadHelper {
 
         await fileInput.evaluate(el => { (el as HTMLInputElement).value = ''; });
         await fileInput.setInputFiles(sampleImagePath);
+
+        // `waitForUpload` throws when the request is never answered, so `res` is
+        // always a real Response by the time it is read: "never answered" and
+        // "answered with an error" cannot both arrive here. The previous version
+        // still asked `if (res)` and kept an else arm that fabricated a timeout
+        // message for a response that never existed — unreachable, and a claim
+        // this code can no longer make. On a timeout the enriched `TimeoutError`
+        // from NetworkHelper propagates out of this method untouched instead,
+        // naming the endpoint, the method and the budget.
         const res = await uploadPromise;
-        
+
         let errorBody = '';
-        if (!res || !res.ok()) {
-            if (res) {
-                errorBody = await res.text();
-                console.error('\n--- UPLOAD ERROR RESPONSE BODY ---');
-                console.error(errorBody);
-                console.error('----------------------------------\n');
-            } else {
-                errorBody = 'Upload request timed out (no response received)';
-            }
+        if (!res.ok()) {
+            errorBody = await res.text();
+            console.error('\n--- UPLOAD ERROR RESPONSE BODY ---');
+            console.error(errorBody);
+            console.error('----------------------------------\n');
         }
 
-        expect(res && res.ok(), `Upload API request failed${res ? ' with status ' + res.status() : ' (timed out)'}. Details: ${errorBody}`).toBeTruthy();
+        expect(res.ok(), `Upload API request failed with status ${res.status()}. Details: ${errorBody}`).toBeTruthy();
 
         // Warten, bis das Frontend den Upload-Prozess registriert hat
         const toast = this.page.locator('.toast').filter({ hasText: /hochgeladen/i }).first();
