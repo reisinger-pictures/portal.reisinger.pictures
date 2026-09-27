@@ -6,8 +6,11 @@ import { ToastHelper } from '../helpers/ToastHelper';
 
 // E2E coverage for the `photo_package` (Foto-Paket) coupon type.
 // The coupon form has no separate "name" field — the unique identifier is `code`.
-// The list renders photo_package value as "<N> Fotos / <Y> €" (formatMoney → "40.00 €").
-const PHOTO_PACKAGE_DISPLAY = /10 Fotos \/ 40[.,]00\s*€/;
+// The list renders photo_package value as "<N> Fotos / <Y> €" (formatMoney →
+// "40,00 €" in de-DE, NBSP before the symbol). The separator is pinned to the
+// comma: a `[.,]` tolerance here is what let the display drift to "40.00 €"
+// unnoticed while this test kept passing.
+const PHOTO_PACKAGE_DISPLAY = /10 Fotos \/ 40,00\s*€/;
 
 test.describe('Coupon photo_package (Foto-Paket)', () => {
     let helper: E2ESessionHelper;

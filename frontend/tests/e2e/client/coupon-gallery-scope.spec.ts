@@ -79,7 +79,7 @@ test.describe('Gallery-Scoped Coupons', () => {
         // box render a minus, so an unscoped getByText(/−/) is a strict-mode
         // violation. Asserting the amount also pins the value, not just its
         // presence.
-        await expect(page.getByTestId('cart-discount')).toContainText('−10.00 €');
+        await expect(page.getByTestId('cart-discount')).toContainText('−10,00 €');
         await auth.logout('http://localhost:4321/');
     });
 

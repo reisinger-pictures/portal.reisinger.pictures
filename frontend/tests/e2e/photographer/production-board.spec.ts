@@ -34,6 +34,26 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         return { kanban };
     }
 
+    /**
+     * Speichert das Create-Modal und wartet auf die POST-Response.
+     *
+     * Der Listener wird hier VOR dem Klick registriert: `waitForCreate` hängt
+     * den `page`-Listener synchron beim Aufruf an, und `Promise.all` wertet
+     * seine Argumente links nach rechts aus. Das ist zwingend — der Board-POST
+     * ist schnell genug, dass die Response häufig schon da ist, bevor
+     * `kanban.submit()` zurückkehrt. Ein `await submit(); await waitForCreate()`
+     * kann die Response dann prinzipiell nicht mehr beobachten und verbrennt
+     * sein komplettes Budget, obwohl die Mutation erfolgreich war. Auf einer
+     * unbelasteten Box lagen 12 von 20 gemessenen Läufen in einem Fenster von
+     * 6–12 ms — es ist ein Registrierungsproblem, kein Timing-Problem.
+     */
+    function submitAndAwaitCreate(kanban: KanbanHelper) {
+        return Promise.all([
+            kanban.waitForCreate('/api/management/photo-jobs'),
+            kanban.submit(),
+        ]);
+    }
+
     test('Photographer wird das Bildbearbeitungs-Board mit allen Spalten angezeigt', { tag: ['@smoke'] }, async ({ page }) => {
         const { kanban } = await setup(page, photographer);
         await kanban.expectColumn('Importiert');
@@ -99,9 +119,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
         await kanban.fillField('Bilder gesamt', '24');
-        await kanban.submit();
-
-        await kanban.waitForCreate('/api/management/photo-jobs');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('.toast')).toContainText('Auftrag angelegt');
         await kanban.modalIsClosed();
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
@@ -169,8 +187,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
 
         await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
-        await kanban.submit();
-        await kanban.waitForCreate('/api/management/photo-jobs');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
 
         await kanban.selectCardStatus(title, 'Bearbeitung');
@@ -186,8 +203,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
 
         await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
-        await kanban.submit();
-        await kanban.waitForCreate('/api/management/photo-jobs');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
 
         await kanban.selectCardStatus(title, 'Abgebrochen');
@@ -203,8 +219,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
 
         await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
-        await kanban.submit();
-        await kanban.waitForCreate('/api/management/photo-jobs');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
 
         await kanban.selectCardStatus(title, 'Abgebrochen');
@@ -231,8 +246,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
 
         await kanban.openCreateModal('Importiert', 'Neuer Auftrag');
         await kanban.fillField('Titel', title);
-        await kanban.submit();
-        await kanban.waitForCreate('/api/management/photo-jobs');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('main').getByText(title, { exact: false }).first()).toBeVisible();
 
         await kanban.selectCardStatus(title, 'Culling');

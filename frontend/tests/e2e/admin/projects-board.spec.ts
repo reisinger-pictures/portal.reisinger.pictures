@@ -34,6 +34,27 @@ test.describe('Projekte-Board (Admin)', () => {
         return { kanban };
     }
 
+    /**
+     * Speichert das Create-Modal und wartet auf die POST-Response.
+     *
+     * Der Listener wird hier VOR dem Klick registriert: `waitForCreate` hängt
+     * den `page`-Listener synchron beim Aufruf an, und `Promise.all` wertet
+     * seine Argumente links nach rechts aus. Das ist zwingend — der Board-POST
+     * ist schnell genug, dass die Response häufig schon da ist, bevor
+     * `kanban.submit()` zurückkehrt. Ein `await submit(); await waitForCreate()`
+     * kann die Response dann prinzipiell nicht mehr beobachten und verbrennt
+     * sein komplettes Budget, obwohl die Mutation erfolgreich war (der
+     * Zeitpunkt-Snapshot zeigte die neue Karte bereits auf dem Board und das
+     * Modal geschlossen). Das ist kein Timing-Problem, sondern ein
+     * Registrierungsproblem — ein größerer Timeout hätte es nur kaschiert.
+     */
+    function submitAndAwaitCreate(kanban: KanbanHelper) {
+        return Promise.all([
+            kanban.waitForCreate('/api/management/projects'),
+            kanban.submit(),
+        ]);
+    }
+
     test('Admin wird das Projekte-Board mit allen Spalten angezeigt', { tag: ['@smoke'] }, async ({ page }) => {
         const { kanban } = await setup(page, admin);
         await kanban.expectColumn('Anfrage');
@@ -58,9 +79,7 @@ test.describe('Projekte-Board (Admin)', () => {
         await kanban.openCreateModal('Anfrage', 'Neues Projekt');
         await kanban.fillField('Kundenname', clientName);
         await kanban.fillField('Preis', '150.00');
-        await kanban.submit();
-
-        await kanban.waitForCreate('/api/management/projects');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('.toast')).toContainText('Projekt angelegt');
         await kanban.modalIsClosed();
         await kanban.expectColumn('Anfrage');
@@ -73,8 +92,7 @@ test.describe('Projekte-Board (Admin)', () => {
 
         await kanban.openCreateModal('Anfrage', 'Neues Projekt');
         await kanban.fillField('Kundenname', clientName);
-        await kanban.submit();
-        await kanban.waitForCreate('/api/management/projects');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('main').getByText(clientName, { exact: false }).first()).toBeVisible();
 
         const card = page.locator('main').getByText(clientName, { exact: false }).first()
@@ -103,8 +121,7 @@ test.describe('Projekte-Board (Admin)', () => {
 
         await kanban.openCreateModal('Anfrage', 'Neues Projekt');
         await kanban.fillField('Kundenname', clientName);
-        await kanban.submit();
-        await kanban.waitForCreate('/api/management/projects');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('main').getByText(clientName, { exact: false }).first()).toBeVisible();
 
         await kanban.dragCard(clientName, 'Beauftragt');
@@ -120,8 +137,7 @@ test.describe('Projekte-Board (Admin)', () => {
 
         await kanban.openCreateModal('Anfrage', 'Neues Projekt');
         await kanban.fillField('Kundenname', clientName);
-        await kanban.submit();
-        await kanban.waitForCreate('/api/management/projects');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('main').getByText(clientName, { exact: false }).first()).toBeVisible();
 
         await kanban.selectCardStatus(clientName, 'Storniert');
@@ -136,8 +152,7 @@ test.describe('Projekte-Board (Admin)', () => {
 
         await kanban.openCreateModal('Anfrage', 'Neues Projekt');
         await kanban.fillField('Kundenname', clientName);
-        await kanban.submit();
-        await kanban.waitForCreate('/api/management/projects');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('main').getByText(clientName, { exact: false }).first()).toBeVisible();
 
         await kanban.selectCardStatus(clientName, 'Beauftragt');
@@ -153,8 +168,7 @@ test.describe('Projekte-Board (Admin)', () => {
 
         await kanban.openCreateModal('Anfrage', 'Neues Projekt');
         await kanban.fillField('Kundenname', clientName);
-        await kanban.submit();
-        await kanban.waitForCreate('/api/management/projects');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('main').getByText(clientName, { exact: false }).first()).toBeVisible();
 
         await kanban.selectCardStatus(clientName, 'Storniert');
@@ -182,9 +196,7 @@ test.describe('Projekte-Board (Admin)', () => {
         await kanban.openCreateModal('Anfrage', 'Neues Projekt');
         await kanban.fillField('Kundenname', clientName);
         await kanban.fillField('Notiz', note);
-        await kanban.submit();
-
-        await kanban.waitForCreate('/api/management/projects');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('.toast')).toContainText('Projekt angelegt');
         await kanban.modalIsClosed();
 
@@ -202,9 +214,7 @@ test.describe('Projekte-Board (Admin)', () => {
 
         await kanban.openCreateModal('Anfrage', 'Neues Projekt');
         await kanban.fillField('Kundenname', clientName);
-        await kanban.submit();
-
-        await kanban.waitForCreate('/api/management/projects');
+        await submitAndAwaitCreate(kanban);
         await expect(page.locator('.toast')).toContainText('Projekt angelegt');
         await kanban.modalIsClosed();
 

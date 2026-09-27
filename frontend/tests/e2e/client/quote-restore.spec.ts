@@ -73,7 +73,7 @@ test.describe('Quote Cart Restore Workflow', () => {
         await expect(toast).toBeVisible();
         await expect(toast).toContainText('Angebot aus Link wiederhergestellt.');
         await expect(page.getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
-        await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('1500.00 €');
+        await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('1.500,00 €');
         await expect(page).toHaveURL(/.*\/cart$/);
     });
 });

@@ -80,14 +80,14 @@ test.describe('Cart Persistence', () => {
 
         await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.');
         await expect(page.getByRole('main').getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
-        await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1500.00 €');
+        await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1.500,00 €');
 
         // Provider-State bleibt beim SPA-Navigieren erhalten.
         await sidebar.navigateTo('Einkäufe & Anfragen');
         await expect(page).toHaveURL(/.*\/orders/);
         await sidebar.navigateTo('Warenkorb');
         await expect(page.getByRole('main').getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
-        await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1500.00 €');
+        await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1.500,00 €');
 
         // Vollständiger Reload: Der URL-Token ist bereinigt, der persistierte
         // Cart-Context muss Token und Originalpreise trotzdem wiederherstellen.
@@ -96,7 +96,7 @@ test.describe('Cart Persistence', () => {
         const main = page.getByRole('main');
         await expect(main.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible();
         await expect(main.getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
-        await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1500.00 €');
+        await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1.500,00 €');
 
         await expect(main.getByLabel('Vor- & Nachname')).toHaveAttribute('required');
         await expect(main.getByRole('checkbox', {name: /allgemeinen geschäftsbedingungen/i})).toHaveAttribute('required');

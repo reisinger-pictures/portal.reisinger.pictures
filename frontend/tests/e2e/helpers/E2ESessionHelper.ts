@@ -10,6 +10,45 @@ const e2eBrandSettings = {
     secondary_color: '#654321',
 } as const;
 
+/**
+ * The five pricing factors the shooting-calculator modal consumes, in the exact
+ * spelling of `/api/settings/license-terms`.
+ */
+const SHOOTING_CALCULATOR_SETTING_KEYS = [
+    'calc_base_price',
+    'calc_hourly_rate',
+    'calc_images_per_hour',
+    'calc_outdoor_images_per_hour',
+    'calc_flatrate_multiplier',
+] as const;
+
+type ShootingCalculatorSettingKey = typeof SHOOTING_CALCULATOR_SETTING_KEYS[number];
+
+export type ShootingCalculatorSettings = Record<ShootingCalculatorSettingKey, string>;
+
+/**
+ * `PUT /management/settings/license-terms` validates these three as `required`,
+ * so every save of the calculator factors has to carry them along — that is
+ * exactly what `CalculatorSettingsCard.onSubmit` does.
+ */
+const LICENSE_MULTIPLIER_KEYS = ['mult_commercial', 'mult_unlimited', 'mult_international'] as const;
+
+const pickShootingCalculatorSettings = (payload: Record<string, unknown>): ShootingCalculatorSettings => {
+    const settings: Partial<ShootingCalculatorSettings> = {};
+    for (const key of SHOOTING_CALCULATOR_SETTING_KEYS) {
+        const value = payload[key];
+        if (typeof value !== 'string' && typeof value !== 'number') {
+            throw new Error(
+                `Calculator setting "${key}" is missing from /api/settings/license-terms: ${JSON.stringify(payload)}`,
+            );
+        }
+        settings[key] = String(value);
+    }
+
+    // Every key of the record was validated above, so the partial is complete.
+    return settings as ShootingCalculatorSettings;
+};
+
 type VolumePresetResponse = {
     id: string | number;
     name: string;
@@ -108,6 +147,93 @@ export class E2ESessionHelper {
             primary_color: null,
             secondary_color: null,
         });
+    }
+
+    /**
+     * Raw `/api/settings/license-terms` payload, exactly as the settings form
+     * receives it.
+     */
+    private async getLicenseTermsPayload(): Promise<Record<string, unknown>> {
+        await this.ensureAdminLogin();
+        const response = await this.request.get('/api/settings/license-terms', {
+            headers: { 'Accept': 'application/json', 'Cookie': this.adminToken! },
+        });
+        this.rememberAdminCookies(response);
+        if (!response.ok()) {
+            throw new Error(`Reading the license terms failed: ${response.status()} ${await response.text()}`);
+        }
+        return await response.json() as Record<string, unknown>;
+    }
+
+    /**
+     * Read the shooting-calculator pricing factors as the calculator itself
+     * sees them — the same public endpoint `useLicenseTerms()` (and therefore
+     * `ShootingCalculatorModal`) fetches.
+     *
+     * These settings are a per-*brand* singleton, and the portal has exactly one
+     * brand, so this returns the values every worker in the run shares. Callers
+     * that depend on specific numbers must establish them with
+     * `setShootingCalculatorSettings()` while holding
+     * `SHOOTING_CALCULATOR_SETTINGS_LOCK`; see `GlobalSettingsLock.ts`.
+     */
+    async getShootingCalculatorSettings(): Promise<ShootingCalculatorSettings> {
+        return pickShootingCalculatorSettings(await this.getLicenseTermsPayload());
+    }
+
+    /**
+     * Write a partial set of shooting-calculator pricing factors and return the
+     * resulting effective values, so a caller can assert what the calculator
+     * will actually use instead of assuming the write landed.
+     *
+     * This is the endpoint the settings form submits
+     * (`useLicenseTerms().updateTerms`), used here as test *setup* by specs
+     * whose subject is the calculator's arithmetic rather than the settings form.
+     * The form also has to send the three licence multipliers on every save —
+     * the controller marks them `required` — so this mirrors that contract and
+     * echoes the currently effective values instead of inventing defaults.
+     *
+     * Writing is only safe while holding `SHOOTING_CALCULATOR_SETTINGS_LOCK`:
+     * the row is shared by every worker of the run.
+     */
+    async setShootingCalculatorSettings(
+        settings: Partial<Record<ShootingCalculatorSettingKey, string | number>>,
+    ): Promise<ShootingCalculatorSettings> {
+        await this.ensureAdminLogin();
+
+        const payload: Record<string, string> = {};
+        for (const key of SHOOTING_CALCULATOR_SETTING_KEYS) {
+            const value = settings[key];
+            if (value === undefined) continue;
+            payload[key] = String(value);
+        }
+        if (Object.keys(payload).length === 0) {
+            throw new Error('setShootingCalculatorSettings() needs at least one setting to write');
+        }
+
+        const current = await this.getLicenseTermsPayload();
+        for (const key of LICENSE_MULTIPLIER_KEYS) {
+            const value = current[key];
+            payload[key] = typeof value === 'string' || typeof value === 'number' ? String(value) : '1.5';
+        }
+
+        const response = await this.request.put('/api/management/settings/license-terms', {
+            data: payload,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Cookie': this.adminToken!,
+            },
+        });
+        this.rememberAdminCookies(response);
+        if (!response.ok()) {
+            throw new Error(`Writing the calculator settings failed: ${response.status()} ${await response.text()}`);
+        }
+        const body = await response.json() as { success?: boolean };
+        if (body?.success !== true) {
+            throw new Error(`Writing the calculator settings was not acknowledged: ${JSON.stringify(body)}`);
+        }
+
+        return this.getShootingCalculatorSettings();
     }
 
     async loginAs(email: string, password: string, _options?: { brand?: string }): Promise<string> {

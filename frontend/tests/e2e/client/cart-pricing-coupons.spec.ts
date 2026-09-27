@@ -6,6 +6,7 @@ import {GalleryHelper} from '../helpers/GalleryHelper';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {SidebarHelper} from '../helpers/SidebarHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
+import {formatMoney} from '../../../src/logic/utils';
 
 type User = {email: string; password: string; id: string};
 type GalleryFixture = {id: string; name: string; slug: string};
@@ -22,7 +23,13 @@ type LicenseCatalog = {
     }>;
 };
 
-const money = (cents: number) => `${(cents / 100).toFixed(2)} €`;
+// Every money assertion below goes through the app's own `formatMoney`
+// (cents in, German display string out) instead of a local `toFixed(2)`
+// helper. A second, independently written formatter is what let this suite keep
+// asserting "1500.00 €" while the UI had already moved to "1.500,00 €".
+//
+// The business arithmetic stays under test: the cent amounts are the spec's own
+// (4000 + 6000 + catalog price), only the presentation is shared.
 
 async function createGalleryFixtures(
     page: Page,
@@ -147,9 +154,9 @@ test.describe('Cart pricing and coupon integration', () => {
         const groupB = main.getByTestId(`volume-pricing-group-${presetB.id}`);
         await expect(groupA).toContainText(presetA.name);
         await expect(groupB).toContainText(presetB.name);
-        await expect(groupA).toContainText(money(4000));
-        await expect(groupB).toContainText(money(6000));
-        await expect(main.getByTestId('cart-total')).toHaveText(money(4000 + 6000 + scopeUseCase.priceCents));
+        await expect(groupA).toContainText(formatMoney(4000));
+        await expect(groupB).toContainText(formatMoney(6000));
+        await expect(main.getByTestId('cart-total')).toHaveText(formatMoney(4000 + 6000 + scopeUseCase.priceCents));
     });
 
     // FE-1 regression: with a non-empty cart from another gallery, the volume
@@ -262,17 +269,17 @@ test.describe('Cart pricing and coupon integration', () => {
         };
 
         await apply(fixedCode);
-        await expect(main.getByTestId('cart-discount')).toContainText(money(1000));
-        await expect(main.getByTestId('cart-total')).toHaveText(money(3000));
+        await expect(main.getByTestId('cart-discount')).toContainText(formatMoney(1000));
+        await expect(main.getByTestId('cart-total')).toHaveText(formatMoney(3000));
         await remove();
 
         await apply(percentageCode);
-        await expect(main.getByTestId('cart-discount')).toContainText(money(2000));
-        await expect(main.getByTestId('cart-total')).toHaveText(money(2000));
+        await expect(main.getByTestId('cart-discount')).toContainText(formatMoney(2000));
+        await expect(main.getByTestId('cart-total')).toHaveText(formatMoney(2000));
         await remove();
 
         await apply(freeCode);
-        await expect(main.getByTestId('cart-total')).toHaveText(money(0));
+        await expect(main.getByTestId('cart-total')).toHaveText(formatMoney(0));
         const form = new FormHelper(page, new ModalHelper(page));
         await form.fillCheckoutForm({
             name: 'Coupon Buyer',

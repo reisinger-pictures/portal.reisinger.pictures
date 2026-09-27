@@ -27,7 +27,27 @@ test.describe('E-Commerce & Checkout Workflow', () => {
     });
 
     test('Flow P, Q, AG, AJ: Flatrate Bypass, Upselling Cart, Checkout', { tag: ['@smoke', '@feature:client:checkout'] }, async ({ page }) => {
-        test.setTimeout(60000); // Erhöhtes Timeout, da dieser Test extrem viele Logins/Logouts durchführt
+        // Kein eigenes `test.setTimeout`: dieser Test erbt bewusst den kalibrierten
+        // Per-Test-Budget aus `playwright.config.ts` (120s). Das frühere, hier
+        // hart kodierte `test.setTimeout(60000)` stammt aus der Zeit, als 30s der
+        // Playwright-Default war, und war zum Zeitpunkt der Kalibrierung nicht
+        // mitgemessen worden — es ist die einzige Stelle im E2E-Set, die den
+        // dokumentierten Standard nach unten überschreibt.
+        //
+        // Gemessene Kosten dieser Journey (pro Phase, Playwright-Lauf, Desktop
+        // Chrome): beforeEach mit 4× `createIsolatedUser` 8.3–17.7s, Login +
+        // Galerie + Upload 3.8s, Flatrate-Durchlauf 4.6s, Warenkorb + Checkout
+        // 3.5s, ZIP-Download 0.45s, danach Admin- und Power-User-Prüfung. Bei
+        // Last 5–10 s gesamt 28.8–37.2s, also 48–62% von 60s — zu wenig Reserve,
+        // um das Budget als Synchronisationspunkt zu benutzen. Bei Last 157
+        // (fremder Last-Brenner auf der Box) lief es in 3 von 4 Läufen in den
+        // Abbruch bei 60s.
+        //
+        // Der Abbruch war als `API Error 401 {"message":"Unauthenticated."}`
+        // maskiert: Playwright verwirft den Browser-Kontext, während der
+        // Galerien-POST noch unterwegs ist, und der Request kommt ohne Session
+        // an. Das war kein Auth-Defekt — dieselbe Journey läuft mit dem
+        // konfigurierten Budget durch.
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const modal = new ModalHelper(page);
@@ -68,9 +88,6 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         
         // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
-        
-        // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
         await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
         
         // Da er "Print" als Flatrate hat, muss der "Jetzt herunterladen" Button für "Print" sichtbar sein, ohne Cart-Prozess!
@@ -81,9 +98,6 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         // 4. Flow Q, AG, AJ: Power User Cart, Upselling und Checkout
         await auth.login(powerUser.email, powerUser.password);
         await page.locator('main').getByText(galleryName).first().click();
-        
-        // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
         
         // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
         await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });

@@ -36,7 +36,10 @@ test.describe('Payout System UI Workflow', () => {
 
         await expect(page.locator('.toast')).toContainText('Abrechnung erfolgreich durchgeführt!');
 
-        await expect(page.locator('div.font-mono.text-right').filter({ hasText: '100.50 €' }).first()).toBeVisible();
+        // Rendered pool amount: formatMoney(10050) → "100,50 €" (de-DE, NBSP
+        // before the symbol). The input above stays "100.50" — a number input
+        // rejects a comma decimal separator.
+        await expect(page.locator('div.font-mono.text-right').filter({ hasText: '100,50 €' }).first()).toBeVisible();
 
         await auth.logout();
 

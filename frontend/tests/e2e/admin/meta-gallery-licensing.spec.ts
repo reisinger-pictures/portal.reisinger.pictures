@@ -156,14 +156,14 @@ test.describe('Meta-gallery child licensing', () => {
             .filter({hasText: definitions[0].name});
         await expect(presetAGroup).toContainText(definitions[2].name);
         await expect(presetAGroup).toContainText('2 Bilder');
-        await expect(presetAGroup).toContainText('35.00 €');
-        await expect(presetAGroup).toContainText('70.00 €');
+        await expect(presetAGroup).toContainText('35,00 €');
+        await expect(presetAGroup).toContainText('70,00 €');
         const presetAGalleryIds = await presetAGroup.getAttribute('data-gallery-ids');
         expect(presetAGalleryIds).toContain(galleries[1].id);
         expect(presetAGalleryIds).toContain(galleries[2].id);
-        await expect(presetBGroup).toContainText('62.00 €');
+        await expect(presetBGroup).toContainText('62,00 €');
         await expect(scopeGroup).toContainText('Scope-Lizenz');
-        await expect(pricingSection).toContainText('132.00 €');
+        await expect(pricingSection).toContainText('132,00 €');
         expect(termsRequests).toEqual(expect.arrayContaining(galleries.map(gallery => gallery.id)));
     });
 });

@@ -54,7 +54,14 @@ export function ProtectedRoute({children, requiredFeature}: ProtectedRouteProps)
     return <>{children}</>;
 }
 
-const SuspenseFallback = () => <div className="flex h-screen items-center justify-center"><span className="loading loading-spinner loading-lg text-primary"></span></div>;
+// The testid is the only addressable handle on this spinner. It is deliberately
+// separate from `app-loader`: that one is rendered *inside* the lazy route
+// (ProtectedRoute / ProtectedDashboard) and therefore does not exist while this
+// fallback is on screen — the exact window in which a bootstrap wait that only
+// looks at `app-loader` resolves against an element that is absent by
+// construction. See AuthHelper.login().
+const SuspenseFallback = () => <div className="flex h-screen items-center justify-center"><span
+    data-testid="app-loader-fallback" className="loading loading-spinner loading-lg text-primary"></span></div>;
 
 function TenantRedirect() {
     const { id } = useParams<{ id: string }>();
