@@ -34,8 +34,11 @@ unverändert gegenüber dem vorigen Deploy, Homepage **200**.
   (`/management/ftp`), den Kamera-Status prüfen: Konto-Status, Zielordner-Pfad und
   der Inhalt der Inbox-Tabelle müssen dem tatsächlichen SFTPGo-Account auf dem Host
   entsprechen. Worauf es ankommt: **kein** 500er auf `GET /api/management/ftp/status`
-  (vorbestehender Fehler, siehe gleichnamigen Board-Eintrag) und der angezeigte
-  `ftp_folder` muss der Name sein, den die Kamera als Ziel bekommt.
+  und der angezeigte `ftp_folder` muss der Name sein, den die Kamera als Ziel bekommt.
+  **Erst die Migration prüfen, dann den Browser:** `sync.sh` führt keine Migration aus
+  (§13), und `FtpController::status()` liest eine Spalte aus V041. Steht V041 auf dem
+  Host auf `pending`, ist der 500er erklärt und der Browser-Test gegenstandslos —
+  siehe den Eintrag „`GET /api/management/ftp/status` liefert 500, wenn die Spalte fehlt".
 - [ ] manuell prüfen: Lizenz-Dialog auf Escape und Backdrop-Klick — Coupon-Formular
   (`CouponFormDrawer`) im Warenkorb öffnen, ein Feld ändern, dann **Escape** drücken
   und danach über den **Backdrop** schließen. Beide Wege müssen jetzt die
@@ -1226,9 +1229,38 @@ alle mit Regressionstest:
   bleibt zu.
 - [ ] manuell prüfen: `AI_API_KEY` und `ADMIN_PASSWORD` im Portal-/Host-Secret-Store rotieren — beide sind beim Auslesen der aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen. **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen
   der aufgelösten Compose-Datei im Klartext durch das Terminal gelaufen.
-- [~] wartet auf die fehlende `login`-Route im Laravel-Router. Vorbestehend, nicht durch den Deploy verursacht. **`POST /api/management/ftp/status` ohne Auth liefert 500** (vorbestehend,
-  nicht durch den Deploy verursacht): Laravel sucht eine nicht existierende
-  `login`-Route.
+- [~] wartet auf den Schema-Abgleich auf dem Host. **`GET /api/management/ftp/status`
+  liefert 500, wenn die Spalte fehlt** — gemessen am 2026-09-27 gegen
+  `V041__add_ftp_account_status_to_users.php`: `FtpController::status()` liest
+  `$user->ftp_account_status` (Z. 91), und `sync.sh` enthält keinen
+  `artisan`-Aufruf (§13). Ist der Code synchronisiert, die Migration aber nie
+  gelaufen, liefert genau dieser Feldzugriff einen 500er.
+  **Gegenprobe auf dem Host:** `docker exec portal_backend php artisan migrate:status | grep -E 'V04[123]'` —
+  steht dort `pending`, ist die Migration der Fix und kein Code.
+  **Der vorige Eintrag war dreifach falsch und ist hiermit ersetzt:** es heißt `GET`,
+  nicht `POST` (`backend/routes/api.php:259` definiert ausschließlich `Route::get`);
+  ohne Auth liefert die Route **401**, keinen 500, weil sie in der Gruppe
+  `['auth:api', 'management']` (Z. 180) hängt und dieser Guard eine
+  `AuthenticationException` als JSON rendert; und die bisherige Begründung, Laravel
+  suche eine fehlende `login`-Route, trifft nicht zu — `auth:api` konsultiert nie eine
+  `login`-Route, und eine solche existiert in `backend/routes/` ohnehin nicht.
+- [~] wartet auf dieselbe Host-Messung wie der Eintrag darüber; die veraltete Angabe
+  selbst ist rein dokumentarisch. **Der Migrationszeiger in `AGENTS.md` (Zeile 100) und
+  `backend/AGENTS.md` (Zeile 40) ist veraltet** — beide behaupten, „V036–V040 sind die
+  aktuelle nicht-produktive Repository-Frontier" und „eine neue V041+-Migration ist nur
+  zulässig, wenn …". Im Repository liegen V041, V042 und V043 (Stand 2026-09-26), und
+  alle drei sind mit Schema-Entscheidung dokumentiert — V041 mit Schema/Backfill/Rollback
+  unter „Offene Code-Arbeit" (Schema-Block `ftp_account_status`), V042 und V043 in
+  `19-ftp-upload-pipeline.md` und `07-architectural-decisions.md`. Dort steht als
+  Reihenende noch „V040", was ebenfalls überholt ist.
+  **Die Zahlen nicht auffüllen, bevor sie gemessen sind:** Die *Frontier*-Angabe ist
+  eindeutig veraltet und steht unabhängig vom Host fest — im Repository liegen V036–V043,
+  also ist „V036–V040" durch „V036–V043" zu ersetzen. Die *deployte* Angabe („zuletzt
+  deployte Migration: V035") ist dagegen **nicht** aus dem Repository ableitbar, weil
+  `sync.sh` keine Migration ausführt (§13): dieselbe Messung
+  (`migrate:status` auf dem Host) entscheidet, ob V035 der Stand bleibt oder durch einen
+  späteren Wert ersetzt werden muss. Beide Werte einzeln geraten wären genau die
+  Fehlklassenzuordnung, die §3 (Aussage an eine Messung binden) verhindern soll.
 - [~] wartet auf die Anforderung des Owners. Bisher nicht umgesetzt. **dev-vm-Container aus `volume-backup.sh` ausschließen** (angefordert,
   nicht umgesetzt).
 
@@ -1828,10 +1860,6 @@ gerissen und zur Entscheidung gemacht.
   Opt-in eine Hoehe entgegennimmt oder der 90vh-Deckel ueberschreibbar wird).
   Damit wandern alle drei auf `bodyClassName` fuer Rahmen und Hintergrund der
   Liste.
-- [~] wartet auf Dublette zum gleichnamigen Eintrag im FTP-Block — einmal beheben und beide Einträge schließen. **`POST /api/management/ftp/status` ohne Auth liefert 500** (vorbestehend):
-  Laravel sucht eine nicht existierende `login`-Route.
-- [~] wartet auf Dublette zum gleichnamigen Eintrag im FTP-Block — einmal beheben und beide Einträge schließen. **dev-vm-Container aus `volume-backup.sh` ausschließen** (angefordert, nicht
-  umgesetzt).
 - [~] wartet auf ein späteres Aufräumen der Stack-Env — der Wert hat keinen Secret-Bezug, wird aber über die Ports-Liste geführt. **`SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN`** ist im Compose ein
   Container-Wert ohne Secret-Bezug, wird aber über die Ports-Liste geführt; bei
   einem späteren Aufräumen prüfen, ob es in die Stack-Env gehört.
