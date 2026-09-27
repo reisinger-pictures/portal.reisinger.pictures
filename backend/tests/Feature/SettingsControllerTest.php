@@ -233,7 +233,14 @@ class SettingsControllerTest extends TestCase
         // first request and survived rclone syncs and container restarts.
         // The reset now happens via `php artisan cache:clear` in the backend
         // command block (every container start).
-        Cache::put('laravel_build_time', now()->subDays(30)->getTimestamp());
+        //
+        // The stale timestamp is captured ONCE, before the request that serves it.
+        // Evaluating `now()` a second time after the round trip compared two
+        // different wall-clock readings: whenever the request straddled a second
+        // boundary the assertion saw a 1s difference and failed intermittently in
+        // the full suite. The product code is correct; the test was racy.
+        $stale = now()->subDays(30)->getTimestamp();
+        Cache::put('laravel_build_time', $stale);
         $token = $this->adminToken();
 
         // Cache hit: the stale value is served while the key exists.
@@ -241,7 +248,7 @@ class SettingsControllerTest extends TestCase
             ->getJson('/api/management/settings/system')
             ->assertStatus(200)
             ->json('laravel_build_time');
-        $this->assertSame(now()->subDays(30)->getTimestamp(), strtotime($cached));
+        $this->assertSame($stale, strtotime($cached));
 
         // Container start runs `php artisan cache:clear` — same effect here.
         Cache::forget('laravel_build_time');
@@ -251,7 +258,7 @@ class SettingsControllerTest extends TestCase
             ->getJson('/api/management/settings/system')
             ->assertStatus(200)
             ->json('laravel_build_time');
-        $this->assertGreaterThan(now()->subDays(30)->getTimestamp(), strtotime($fresh));
+        $this->assertGreaterThan($stale, strtotime($fresh));
     }
 
     public function test_update_license_terms_requires_mult_fields(): void
