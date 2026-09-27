@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../../test-setup';
 import ModalDialogShell from '../ModalDialogShell';
 
-function renderDialog(onClose = vi.fn()) {
+function renderDialog(onClose = vi.fn(), props: Partial<React.ComponentProps<typeof ModalDialogShell>> = {}) {
     const result = renderWithProviders(
         <>
             <ModalDialogShell
@@ -14,15 +14,29 @@ function renderDialog(onClose = vi.fn()) {
                 editing={false}
                 isSubmitting={false}
                 onSubmit={(event) => event.preventDefault()}
+                {...props}
             >
-                <button type="button">Erste Aktion</button>
-                <button type="button">Letzte Aktion</button>
+                <div data-testid="dialog-content">
+                    <button type="button">Erste Aktion</button>
+                    <button type="button">Letzte Aktion</button>
+                </div>
             </ModalDialogShell>
             <button type="button" data-testid="outside-control">Außerhalb</button>
         </>,
     );
 
     return { onClose, ...result };
+}
+
+/**
+ * The element that is a direct child of `ancestor` and wraps `node` — the
+ * region the shell put around that content. Resolved by walking the tree, so
+ * the assertions below pin structure instead of Tailwind class names.
+ */
+function wrapperUnder(ancestor: HTMLElement, node: HTMLElement): HTMLElement | null {
+    let current: HTMLElement | null = node;
+    while (current && current.parentElement !== ancestor) current = current.parentElement;
+    return current;
 }
 
 describe('ModalDialogShell', () => {
@@ -234,5 +248,52 @@ describe('ModalDialogShell', () => {
 
         fireEvent.click(within(outerDialog).getByRole('button', { name: 'Schließen' }));
         expect(trigger).toHaveFocus();
+    });
+
+    it('keeps the submit row out of the scrolling body when the bounded layout is on', () => {
+        // A form dialog with more content than a viewport has to offer: the box
+        // is daisyUI's scroll region, so an unbounded submit row is simply the
+        // last row of a long column and Speichern lands below the fold. The
+        // bounded layout gives the children their own region inside the form and
+        // leaves the submit row beside it.
+        const { container } = renderDialog(vi.fn(), { scrollableBody: true });
+
+        const form = container.querySelector('form') as HTMLFormElement;
+        const body = screen.getByTestId('dialog-content').parentElement as HTMLElement;
+        const submit = screen.getByRole('button', { name: 'Speichern' });
+
+        // The body is a region inside the form…
+        expect(body.parentElement).toBe(form);
+        // …and the submit row is its sibling, so scrolling the body cannot take
+        // it out of reach. Still inside the form: Enter-to-submit and
+        // `type="submit"` are untouched.
+        expect(wrapperUnder(form, submit)).not.toBe(body);
+        expect(body).not.toContainElement(submit);
+        expect(form).toContainElement(submit);
+    });
+
+    it('leaves the unbounded structure alone by default', () => {
+        // The default path is the load-bearing one: every dialog that does not
+        // opt in is rendered against it, and there the whole box scrolls as one
+        // column. The bounded layout must stay opt-in, so the unwrapped body
+        // and the submit row remain direct siblings of the form.
+        const { container } = renderDialog();
+
+        const form = container.querySelector('form') as HTMLFormElement;
+        const submit = screen.getByRole('button', { name: 'Speichern' });
+
+        expect(screen.getByTestId('dialog-content').parentElement).toBe(form);
+        expect(wrapperUnder(form, submit)?.parentElement).toBe(form);
+    });
+
+    it('forwards boxClassName to the modal-box', () => {
+        // It used to be dropped, which is why the bounded long-dialog layout was
+        // unreachable through this shell: GalleryModal abandoned the shared
+        // submit row and reimplemented it. A class-name pass-through is asserted
+        // on the class name — there is nothing structural left to check.
+        const { container } = renderDialog(vi.fn(), { boxClassName: 'max-w-4xl' });
+
+        const box = (container.querySelector('.modal-box') as HTMLElement).className;
+        expect(box).toContain('max-w-4xl');
     });
 });

@@ -26,6 +26,22 @@ interface ModalDialogShellProps {
     submitClassName?: string;
     descriptionId?: string;
     className?: string;
+    /**
+     * Forwarded to the modal-box, for dialogs that need to size it themselves.
+     * It was missing here, which is why the bounded long-dialog layout was
+     * unreachable through this shell: GalleryModal gave up on the shared form
+     * and submit row and reimplemented both, so the same submit markup existed
+     * twice and could drift.
+     */
+    boxClassName?: string;
+    /**
+     * Forwarded to ModalShell: bound the box, scroll the children in their own
+     * region and keep this shell's submit row below that region. A form dialog
+     * with more content than a viewport has to offer is the case this exists
+     * for — see the `scrollableBody` docblock in ModalShell for why it is not
+     * the default.
+     */
+    scrollableBody?: boolean;
     children: ReactNode;
 }
 
@@ -54,8 +70,14 @@ export default function ModalDialogShell({
     submitClassName = 'btn-primary',
     descriptionId,
     className = '',
+    boxClassName,
+    scrollableBody = false,
     children,
 }: ModalDialogShellProps) {
+    // No `shrink-0` on this row, on purpose: in the bounded layout ModalShell
+    // wraps the footer in its own `shrink-0` region, so pinning the row is the
+    // shell's job. That is what lets a bounded dialog use this footer verbatim
+    // instead of hand-rolling one — which is what GalleryModal had to do.
     const footer = (
         <div className="modal-action col-span-full flex justify-between mt-8">
             {editing ? (
@@ -80,6 +102,8 @@ export default function ModalDialogShell({
             secondaryAction={secondaryAction}
             descriptionId={descriptionId}
             className={className}
+            boxClassName={boxClassName}
+            scrollableBody={scrollableBody}
             onFormSubmit={onSubmit}
             noValidate={noValidate}
             footer={footer}

@@ -13,11 +13,10 @@ vi.mock('../UIContext', () => ({
     useUI: () => ({ showToast: vi.fn(), confirm: vi.fn().mockResolvedValue(true) }),
 }));
 
-// The dialog does not go through ModalDialogShell any more: it renders
-// ModalShell and owns its <form> and submit row, because the shell's unclassed
-// form blocks the bounded-height dialog with a scrolling body (see the comment
-// in GalleryModal). The assertions below therefore run against the real shell
-// instead of a stub that handed them a submit button.
+// The dialog renders through ModalDialogShell with `scrollableBody` on, against
+// the real shell: the bounded-height layout used to be unreachable here, so the
+// dialog owned its <form> and duplicated the submit row. The assertions below
+// run against the shared footer now.
 function setupSwr(presets: Array<{id: number; name: string; is_default: boolean}> = []) {
     vi.mocked(useSWR).mockImplementation(((key: unknown) => {
         if (key === '/api/management/orgs') {
@@ -28,6 +27,17 @@ function setupSwr(presets: Array<{id: number; name: string; is_default: boolean}
         }
         return {data: undefined, error: undefined, isLoading: false, mutate: vi.fn()};
     }) as never);
+}
+
+/**
+ * The element that is a direct child of `ancestor` and wraps `node` — the
+ * region the shell put around that content. Resolved by walking the tree, so
+ * the assertion pins structure instead of Tailwind class names.
+ */
+function wrapperUnder(ancestor: HTMLElement, node: HTMLElement): HTMLElement | null {
+    let current: HTMLElement | null = node;
+    while (current && current.parentElement !== ancestor) current = current.parentElement;
+    return current;
 }
 
 describe('GalleryModal forced visibility', () => {
@@ -267,6 +277,37 @@ describe('GalleryModal forced visibility', () => {
 
         expect(onUpdate).toHaveBeenCalledTimes(1);
         expect(onUpdate.mock.calls[0][9]).toMatchObject({volume_preset_id: '9'});
+    });
+
+    it('keeps the submit row reachable while the long form scrolls', () => {
+        // The reason this dialog opts into the bounded layout: ten fields plus
+        // four option cards do not fit a viewport, and the modal-box is the
+        // scroll region, so a submit row inside the form is only reachable by
+        // scrolling the form out from under the user. Structure, not class
+        // names: the body region is resolved by walking up from a form field.
+        const { container } = renderWithProviders(
+            <GalleryModal
+                isOpen
+                onClose={vi.fn()}
+                onOpenGroupModal={vi.fn()}
+                availableGroups={[]}
+                onCreate={vi.fn().mockResolvedValue(undefined)}
+                onUpdate={vi.fn().mockResolvedValue(undefined)}
+                onDelete={vi.fn().mockResolvedValue(undefined)}
+            />,
+        );
+
+        const saveButton = screen.getByRole('button', {name: 'Speichern'});
+        const form = screen.getByLabelText('Name der Galerie').closest('form') as HTMLFormElement;
+        const body = wrapperUnder(form, screen.getByLabelText('Name der Galerie'));
+        // The last field of the long form, to show the region holds all of the
+        // body rather than one of the field groups this file happens to render.
+        const lastField = container.querySelector('input[type="date"]') as HTMLInputElement;
+
+        expect(body).toContainElement(lastField);
+        expect(body).not.toContainElement(saveButton);
+        // Still one form around both, so submit keeps working.
+        expect(form).toContainElement(saveButton);
     });
 
     it('restores explicit private intent after a forcing parent is removed', async () => {
