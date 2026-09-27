@@ -323,19 +323,33 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
         // test. The three CRM specs that close this dialog are scoped to the
         // footer instead.
         //
-        // The modal-box is also the scroll region (`max-h-90vh overflow-y-auto`),
-        // so without an affordance the boundary slices whatever row it lands on —
-        // in the UI review it cut "Linz"/"Österreich" through the glyphs, which
-        // reads as broken rather than as scrollable. `scroll-fade-bottom` fades
-        // the last 2rem; `pb-10` (2.5rem) keeps that band clear of the content
-        // and of the footer, so nothing is faded once the box is scrolled to its
-        // end.
+        // The footer (`modal-action` with the two contact-sheet buttons and
+        // "Schließen") is long enough that a user who has scrolled to the bottom
+        // of this dialog has to scroll back up to reach it — so the dialog opts
+        // into the shell's bounded body: the box caps at 90vh, the body takes the
+        // height that is left and scrolls inside it, and the footer keeps its own
+        // height below the scroll port. The header stays put for the same reason
+        // the footer does: it is navigation, not content.
+        //
+        // Moving the scroll port from the box to the body moves what the
+        // boundary affordances have to sit on. Without one the boundary slices
+        // whatever row it lands on — in the UI review it cut "Linz"/"Österreich"
+        // through the glyphs, which reads as broken rather than as scrollable.
+        // `scroll-fade-bottom` fades the last 2rem and belongs on the element
+        // that scrolls, so it moves onto the body together with the `pb-10` that
+        // keeps the content clear of the faded band: the mask always covers the
+        // last 2rem of the padding box, and without the padding it would fade the
+        // content once the body is scrolled to its end. Left on the box it would
+        // now fade nothing at all, because the box no longer scrolls. The footer
+        // needs no such padding — it is outside the mask, which is the point.
         <ModalShell
             title={<span className="text-2xl min-w-0 break-words">{model.display_name ?? t`Unbenanntes Model`}</span>}
             icon="mdi--account-details"
             onClose={onClose}
             className="z-50"
-            boxClassName="max-w-4xl max-h-90vh overflow-y-auto pb-10 scroll-fade-bottom"
+            boxClassName="max-w-4xl"
+            bodyClassName="pb-10 scroll-fade-bottom"
+            scrollableBody
             secondaryAction={
                 <span className={`badge shrink-0 h-auto whitespace-normal ${modelLifecycleBadgeClass(model.lifecycle_status)}`}>
                     {modelLifecycleLabel(model.lifecycle_status)}
