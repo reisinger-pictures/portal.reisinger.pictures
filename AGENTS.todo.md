@@ -2222,14 +2222,42 @@ Produktionsfehler verkauft worden waere.
   `TT.MM.JJJJ`. Solange das fehlt, sind **alle** kuenftigen Aufnahmen bei
   Datums- und Zahlenformaten irrefuehrend. Fix: `locale: 'de-DE'` in `use` der
   Screenshot-Config, danach ein Lauf.
-- [ ] **Echter Bug daneben: `toFixed()` statt Locale-Format.** Die Waehrung
-  nutzt `toFixed(2)` (`ShootingCalculatorModal.tsx:228-229`,
-  `VolumePresetSettingsCard.tsx:31,46,72`). `toFixed` ist **sprachunabhaengig**
-  und liefert immer einen Punkt — `369.00 €` bleibt also auch bei korrekter
-  Browser-Locale falsch. Das ist derselbe Bericht wie beim Datumsfeld, aber eine
-  andere Ursache und ein echter Fehler in einem Abrechnungswerkzeug. Fix:
-  `toLocaleString('de-DE', { minimumFractionDigits: 2 })` bzw. eine
-  zentrale Format-Hilfe.
+- [ ] ~~**Echter Bug daneben: `toFixed()` statt Locale-Format.**~~ **TEILWEISE
+  ZURUECKGENOMMEN — Befund war teilweise falsch zugeordnet, dazu unten ein
+  Follow-up.** `ShootingCalculatorModal.tsx:228-229` war ein echter Fehler und
+  ist behoben. Die `toFixed(2)`-Stellen in `VolumePresetSettingsCard` waren
+  **kein** Fehler: sie liefern den `value` eines `<input type="number">`, und
+  `1.234,50` waere per HTML-Spec ein ungueltiger Float — das Feld rendert
+  **leer**. Schlimmer: `parsePriceCents` macht
+  `Number.parseFloat(raw.replace(',', '.'))`, und `parseFloat('1.234,50')`
+  stoppt am Komma und liefert `1.234` — es waere **falsch abgerechnet** worden.
+  Die Repo-Regressionstests pinnen das (`VolumePresetSettingsCard.test.tsx:56`
+  erwartet `basePrice.value === '1.0'`). Das im Screenshot sichtbare `30.00` ist
+  in diesem Feld also **korrekt** — Maschinenwert, nicht Anzeige. Lehre: bei
+  gemeldeten Formatbefunden zuerst fragen, **wo** der Wert steht, nicht nur wie
+  er aussieht.
+  **Umgesetzt:** `src/logic/formatCurrency.ts` mit `formatEuro` (Anzeige, Locale
+  hart auf `de-DE` gepinnt, nie von der Browser-Sprache geerbt) und
+  `formatEuroInputValue` (Maschinenwert, Punkt-Dezimal). `Intl` liefert das
+  schmale NBSP vor `€` mit, also `369,00 €`. Nicht-endliche Werte ergeben
+  `--- €` und **nicht** `NaN €`, nach der bestehenden App-Konvention aus
+  `formatMoney` — in einem Abrechnungswerkzeug darf ein kaputter Wert nicht als
+  `0,00 €` durchgehen. 12 Vitest-Tests, davon einer als benannte Regression,
+  der ausdruecklich pinnt, dass die Ausgabe **nicht** der `toFixed`-String ist;
+  alle Erwartungen mit explizitem ` `, damit ein normales Leerzeichen sie
+  nicht erfuellt.
+- [ ] **Offener Follow-up: `formatMoney` in `src/logic/utils.ts` hat denselben
+  Bug** — `(cents/100).toFixed(2) + ' €'`, also Punkt-Dezimal, und ist in
+  **13 weiteren Komponenten** im Einsatz; `utils.test.ts:20-34` pinnt die
+  en-US-Ausgabe sogar als Erwartung. In dieser Runde bewusst nicht angefasst,
+  weil es fremde Dateien und fremde Tests betrifft. Richtig waere,
+  `formatMoney` als duennen Wrapper ueber `formatEuro` zu legen und die drei
+  betroffenen Testdateien mitzuziehen — sonst bleibt der Fehler an 13 Stellen
+  stehen, waehrend die zwei grossen Dialoge schon richtig rechnen.
+- [ ] **Vorbestehender Policy-Verstoss, separat:** `VolumePresetSettingsCard.tsx:170`
+  nutzt `sm:grid-cols-[1fr_auto_auto]`. Klammer-Syntax ist laut `frontend/AGENTS.md`
+  verboten; vorbestehend und nicht Teil des Formatierungs-Fixes, deshalb nicht
+  mitgeschleust. Gehoert in einen eigenen Cleanup.
 - [ ] **Ausrichtung: dritte Instanz desselben Musters.** „Hinzufügen" in
   `gallery-access-dialog` zentriert gegen den Name/E-Mail-Block statt auf der
   Namenszeile — exakt die Form, die als erster Befund dieser Runde gemeldet und
@@ -2244,6 +2272,86 @@ Produktionsfehler verkauft worden waere.
   Dialog-Component nicht auffindbar, `Geburtsdatum` liegt in
   `CustomerModal.tsx:117` und `ManagementContractView.tsx:494` als natives
   Date-Input, die Quelle des gerenderten Werts blieb offen.
+- [ ] **Architektur-Follow-up: der Footer liegt in der Scroll-Region — Problem
+  ist `ModalShell`, nicht der Einzelfall.** Aus zwei unabhaengigen Befunden
+  bestaetigt: `gallery-edit-dialog` („Speichern" unterhalb der Falz) und
+  `ModelDetailModal` (Footer scrollt mit dem Inhalt weg). Ursache: `ModalShell`
+  legt die Scroll-Region auf `.modal-box`, und daisyUI setzt darauf
+  `max-height:100vh; overflow-y:auto`; der Footer wird **darin** gerendert. Ein
+  `flex-1 overflow-y-auto`-Body kann zudem durch das unklassierte `<form>`
+  nicht schrumpfen. Das betrifft **alle Formular-Dialoge**, nicht nur die zwei
+  gefundenen. Zusaetzlich nimmt `ModalDialogShell` **kein** `boxClassName` an und
+  reicht es nicht durch, obwohl `ModalShell` es kann — der bounded-height-Pfad
+  ist ueber die geteilte Shell also gar nicht erreichbar.
+  **Entschieden: jetzt nicht.** Die Aenderung beruehrt 18 Dialog-Oberflaechen
+  und gehoert in eine eigene, gepruefte Arbeit statt als Schlussstueck in eine
+  UI-Bug-Runde. `GalleryModal` traegt deshalb vorerst einen lokalen Fix (eigenes
+  `<form>` + Submit-Zeile, `boxClassName="max-h-90vh flex flex-col"`, an drei
+  Viewports gemessen verifiziert). Das ist **Duplikation mit Vorbehalt**, nicht
+  Absicht: sie entfaellt, sobald `ModalDialogShell` `boxClassName` durchreicht
+  und einen Klassen-Hook fuer das `<form>` anbietet. Dann wandert `GalleryModal`
+  zurueck auf die geteilte Shell.
+- [ ] **Vierte Gruppenueberschrift bewusst nicht vereinheitlicht:**
+  „DSGVO-Loeschung" (`ModelDetailModal.tsx:537`) traegt
+  `font-bold text-lg text-error mb-2` und ist eine vierte Instanz derselben
+  Ebene, benutzt `groupHeadingClass` aber nicht, weil sie die Fehlerfarbe
+  braucht. Das `mb-2` ist hier **gewollt**: sie steht in einem eigenen
+  `mt-6 border-t pt-4`-Block direkt vor dem destruktiven Bereich und soll mehr
+  Luft davor haben als die drei neutralen Gruppen. Festgehalten, damit die
+  Asymmetrie als Entscheidung gelesen wird und nicht als Versaeumnis.
+
+**Umsetzung 2026-09-27 (alle gegen frische Aufnahmen verifiziert):**
+- [x] **Dialog-Fixes durchgefuehrt, 7 von 8 Befunden behoben, keine Regression.**
+  Verifiziert per Volllauf (`44 passed / 0 failed`) und Nachbewertung. Die zwei
+  `high` wurden zusaetzlich von mir selbst am Bild bestaetigt: der Footer des
+  Galerie-Editors liegt wieder auf einer undurchsichtigen Leiste, und die
+  Einladungs-Optionen umbrechen sauber. Ursache des Textverlusts war **nicht**
+  die Textlaenge, sondern daisyUI 5: `.label { white-space: nowrap }` mit
+  `:has(input[type=checkbox])`-Ausnahme — genau die **Radio**-Karten brachen.
+- [ ] **Nicht behoben, ehrlich als offen gefuehrt: Mid-Token-Bruch in der
+  Verbindungstabelle.** Der Fade ist da, aber der Wert bricht auf Mobile
+  weiterhin mitten im Token (`e2e-photographer-uxt` / `hwxr`). `break-all`
+  aendert nur die Bruchstelle, nicht die Tatsache des Bruchs — das ist keine
+  Loesung. Braucht eine andere Spaltenlogik (z. B. `table-layout: fixed` mit
+  `word-break` auf dem Wert), nicht eine weitere Klasse.
+- [ ] **Vorbestehender flaky Test, bei diesem Lauf beobachtet und
+  charakterisiert:** `SettingsControllerTest > system info build time refreshes
+  after cache clear` — `Failed asserting that 1787903378 is identical to
+  1787903379`. Ursache: Zeile 236 cached `now()->subDays(30)->getTimestamp()`,
+  Zeile 244 rechnet denselben Ausdruck nach einem HTTP-Roundtrip neu; liegen
+  die beiden ueber einer Sekundenweiche, differieren sie um 1. Isoliert gruen,
+  im Vollauf rot. Nach der Zero-Pre-existing-Failures-Policy ein eigenes Fix
+  (eine Zeile: `$stale` vor dem Request erfassen oder `freezeTime()`).
+- [ ] **Veralteter Migration-Docblock:** `V042__add_ftp_password_resets_audit_table.php`
+  behauptet noch, die Endpoint waere „an unlimited, unobserved mint for valid
+  credentials". Das ist falsch (ein Reset **ersetzt**, es gibt immer genau ein
+  Credential) und wurde im Service-Docblock bereits korrigiert. Die Migration
+  dokumentiert eine Schemadescheidung und ihr zweiter Satz ist noch richtig —
+  deshalb nur geflaggt, nicht mitgeschleust.
+- [ ] **Meine eigene Rechnung war falsch — korrigiert.** Fuer das neue
+  Passwort hatte ich `57^10 ≈ 91,5 Bit` behauptet und daraus geschlossen, die
+  neue Spanne liege innerhalb der alten („kein Sicherheitsverlust"). Falsch:
+  `log2(57) ≈ 5,833`, also **58,3 Bit** bei 10 Zeichen und **70,0** bei 12,
+  gegenueber **82,7–124,1** vorher. Die neue Spanne liegt **unter** der alten.
+  Der Subagent hat die falschen Zahlen abgelehnt und die echten hineingeschrieben
+  statt sie zu uebernehmen. **Lehre:** Entropie nicht aus dem Gefuehl
+  herleiten — `length * log2(alphabet)` ist eine Einzeilung, und eine
+  Sicherheitsaussage gehoert nicht in einen Kommentar, der man selbst nicht
+  nachgerechnet hat. Die Reduktion ist bewusst in Kauf genommen (Online-Angriff
+  durch die Quote begrenzt, Offline-Angriff braucht den SFTPGo-Store, den diese
+  Klasse nie schreibt) — aber sie gehoerte **angesagt** zu werden, nicht als
+  Nebenwirkung verborgen.
+- [ ] **Support-Sackgasse im FTP-Inbox: Konflikt zwischen zwei Subagenten
+  aufgeloest.** Die eine Position: „hier gibt es keine Aktion". Die andere: „der
+  Fotograf kann einrichten". Geprueft: beide Buttons rendern **ausserhalb** des
+  `connectionRows.length === 0`-Zweigs, also bedingungslos — die erste Aussage
+  ist falsch. Aber ob `provisionAndShow` ohne deklarierte FTP-Env-Vars
+  **erfolgreich** ist, ist nicht verifizierbar, und der erste Text versprach es
+  („kannst du trotzdem einrichten") — eine ungepruefte Zusage ist derselbe
+  Fehler wie die Sackgasse, die sie ersetzen sollte. **Loesung:** Konsequenz
+  nennen und auf die Anleitung verweisen, die bedingungslos existiert, **ohne**
+  zu versprechen, dass das Anlegen klappt. Der Kommentar haelt fest, warum die
+  Zusage weg ist.
 - [x] **Zusatz:** literale `\u2014` in JSX-Text der Fehlertabelle des Guides
   entsprachen keinem Escape und rendeten als `\u2014` → durch echte Em-Dashes
   ersetzt.
