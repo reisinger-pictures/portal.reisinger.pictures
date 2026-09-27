@@ -6,13 +6,13 @@ import {Link, Navigate, useLocation} from 'react-router-dom';
 import {Gallery, GalleryGroup} from '../../logic/useGalleries';
 import {useAuth} from '../../logic/useAuth';
 import {useBillingDetails} from '../../logic/useLicenseTerms';
-import {useBrand} from '../../logic/useBrand';
 import {usePermissions} from '../../logic/usePermissions';
 import {useSearch} from '../../logic/useSearch';
 import DashboardLayout from '../components/DashboardLayout';
 import {useDashboard} from '../components/DashboardContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import SearchBarWithSuggestions from '../components/SearchBarWithSuggestions';
+import MobileBrandLink from '../components/MobileBrandLink';
 import ManagementUserView from './ManagementUserView';
 import ManagementSettingsView from './ManagementSettingsView';
 import ManagementStructureView from './ManagementStructureView';
@@ -89,7 +89,6 @@ export default function ManagementDashboard() {
 
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const {user} = useAuth();
-    const {logoSrc, portalName} = useBrand();
     const {billingDetails, isLoading: termsLoading} = useBillingDetails();
     const isImpressumMissing = isSuperAdmin && !termsLoading && (!billingDetails?.bank_holder || !billingDetails?.company_street || !billingDetails?.company_zip || !billingDetails?.company_city || !billingDetails?.bank_iban);
     const {results: personalFeed, isLoading: feedLoading} = useSearch('', true);
@@ -146,12 +145,7 @@ export default function ManagementDashboard() {
                                 onClick={onMenuClick}>
                             <span className="iconify mdi--menu text-2xl" aria-hidden="true"></span>
                         </button>
-                        <Link to="/"
-                              className={`md:hidden flex items-center gap-2 shrink-0 mr-1 ${isSearchFocused ? 'hidden' : ''}`}>
-                            <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100"/>
-                            <span
-                                className="font-bold text-sm truncate max-w-28 sm:max-w-48">{portalName}</span>
-                        </Link>
+                        <MobileBrandLink hidden={isSearchFocused}/>
 
                         <SearchBarWithSuggestions clearOnSubmit onFocusChange={setIsSearchFocused} />
                     </header>
