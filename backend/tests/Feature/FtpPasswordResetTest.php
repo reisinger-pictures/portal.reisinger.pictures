@@ -22,11 +22,12 @@ use Tests\TestCase;
  * `resetAndShow()`: the per-account quota and the audit trail (P1-M33).
  *
  * The show-once flow (P1-M23) makes the reset the *only* recovery path — SFTPGo
- * cannot restore the old password. That is precisely what makes it dangerous
- * unthrottled: an open reset endpoint is an unlimited mint for valid camera
- * credentials. M22 and M23 guarantee a password never reaches a log; neither
- * says anything about *how often* one may be rotated. These tests pin the two
- * answers: a hard quota per account, and one audit row per attempt.
+ * cannot restore the old password. That is precisely what makes it worth
+ * bounding: a reset *replaces* the password, so an unthrottled endpoint would
+ * let one account invalidate a working camera as often as it likes and load the
+ * SFTPGo API to match. M22 and M23 guarantee a password never reaches a log;
+ * neither says anything about *how often* one may be rotated. These tests pin
+ * the two answers: a hard quota per account, and one audit row per attempt.
  */
 class FtpPasswordResetTest extends TestCase
 {
@@ -129,12 +130,12 @@ class FtpPasswordResetTest extends TestCase
     // ── Rate limit ───────────────────────────────────────────────────────────
 
     /**
-     * The core of P1-M33: the fourth reset inside the window is refused. Three is
-     * the documented limit and the assertion is written against the constant, so a
-     * deliberate change to the number fails the test loudly instead of silently
-     * loosening the guard.
+     * The core of P1-M33: the reset past the hourly limit is refused. The number
+     * is `FtpCredentialService::RESET_LIMIT_PER_HOUR` and the assertion is
+     * written against the constant, so a deliberate change to the number fails
+     * the test loudly instead of silently loosening the guard.
      */
-    public function test_the_fourth_reset_within_the_hour_is_refused(): void
+    public function test_the_reset_past_the_hourly_limit_is_refused(): void
     {
         $this->fakeSuccessfulService();
         $user = $this->photographer();
@@ -150,6 +151,66 @@ class FtpPasswordResetTest extends TestCase
         } catch (FtpCredentialException $exception) {
             $this->assertSame(FtpCredentialException::REASON_RATE_LIMITED, $exception->reason);
         }
+    }
+
+    /**
+     * The number itself, not only its enforcement. Ten is a documented decision
+     * (raised from three on 2026-09-27), so a typo or a well-meant tweak has to
+     * fail here and force a comment update rather than pass unnoticed. Zero is
+     * called out separately: it is the one value that would disable the recovery
+     * path completely, and it is the value a careless config default produces.
+     */
+    public function test_the_quota_is_the_documented_number_over_a_documented_window(): void
+    {
+        $this->assertSame(10, FtpCredentialService::RESET_LIMIT_PER_HOUR);
+        $this->assertSame(3600, FtpCredentialService::RESET_WINDOW_SECONDS);
+        $this->assertGreaterThan(0, FtpCredentialService::RESET_LIMIT_PER_HOUR);
+    }
+
+    /**
+     * Why the quota is a disruption limit and not a cap on credentials: a reset
+     * *replaces* the password, so a full burst of them churns one slot instead of
+     * minting several. Every returned password is distinct, only the last one is
+     * the live credential, and every attempt is still in the trail. This is the
+     * invariant the service docblock rests on when it says the limit bounds
+     * disruption and SFTPGo load — so it belongs in a test, not only in prose.
+     */
+    public function test_a_burst_of_resets_replaces_the_credential_instead_of_adding_one(): void
+    {
+        $this->fakeSuccessfulService();
+        $user = $this->photographer();
+        $service = app(FtpCredentialService::class);
+
+        $passwords = [];
+        for ($attempt = 0; $attempt < FtpCredentialService::RESET_LIMIT_PER_HOUR; $attempt++) {
+            $passwords[] = $service->resetAndShow($user, '203.0.113.7');
+        }
+
+        $this->assertCount(
+            FtpCredentialService::RESET_LIMIT_PER_HOUR,
+            array_unique($passwords),
+            'Every reset must produce a different value; otherwise the old one stays valid.',
+        );
+
+        $written = [];
+        Http::assertSent(function (Request $request) use (&$written): bool {
+            if ($request->method() === 'PUT') {
+                $written[] = (string) $request->data()['password'];
+            }
+
+            return true;
+        });
+
+        $this->assertSame(
+            $passwords,
+            $written,
+            'The last value written to SFTPGo is the last one handed out — one slot, overwritten.',
+        );
+        $this->assertSame(
+            FtpCredentialService::RESET_LIMIT_PER_HOUR,
+            FtpPasswordReset::query()->count(),
+            'The compensating control is the trail, and it does not thin out with the limit.',
+        );
     }
 
     /**
@@ -245,9 +306,9 @@ class FtpPasswordResetTest extends TestCase
     }
 
     /**
-     * The quota expires. A photographer who really lost a password three times
-     * this morning must be able to try again tomorrow — a limiter that never
-     * forgets would be a lockout, not a rate limit.
+     * The quota expires. A photographer who really lost a password as often as
+     * the limit allows must be able to try again tomorrow — a limiter that
+     * never forgets would be a lockout, not a rate limit.
      */
     public function test_the_quota_frees_up_when_the_window_expires(): void
     {

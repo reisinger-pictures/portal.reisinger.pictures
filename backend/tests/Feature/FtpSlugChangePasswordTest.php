@@ -26,7 +26,8 @@ use Tests\TestCase;
  * while the account in SFTPGo had a password nobody had ever seen. Nothing was
  * broken in the database, the slug was correct, the account worked: the only
  * symptom was a photographer who could not log their camera in, and the only
- * way out was the reset endpoint (three per hour, P1-M33). A green suite and a
+ * way out was the reset endpoint (the hourly quota of
+ * `FtpCredentialService::RESET_LIMIT_PER_HOUR`, P1-M33). A green suite and a
  * working inbox, with an unreachable account.
  *
  * So the assertion that matters is not "the response has a password" but "the
@@ -81,8 +82,9 @@ class FtpSlugChangePasswordTest extends TestCase
 
         $this->assertIsString($shown);
         $this->assertNotEmpty($shown);
-        // Camera-typable by construction (P1-M23): no special characters, no
-        // mixed case, so a keyboard layout cannot turn this into a support case.
+        // Camera-typable by construction (P1-M23): no special characters, and a
+        // de-ambiguated alphanumeric alphabet, so a keyboard layout cannot turn
+        // this into a support case.
         $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $shown);
 
         // The password the account was actually created with, not a second one.

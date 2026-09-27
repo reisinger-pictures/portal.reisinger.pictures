@@ -56,7 +56,7 @@ class FtpSlugChangeResetTest extends TestCase
         $svc = new FtpCredentialService($client);
         $password = $svc->provisionAndShow($user);
 
-        $this->assertMatchesRegularExpression('/^[a-z0-9]{16,24}$/', $password);
+        $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $password);
     }
 
     public function test_password_is_never_persisted(): void
@@ -105,6 +105,6 @@ class FtpSlugChangeResetTest extends TestCase
 
         $this->assertSame(['delete', 'provision'], $order);
         $this->assertSame('new-slug', $user->fresh()->ftp_slug);
-        $this->assertMatchesRegularExpression('/^[a-z0-9]{16,24}$/', $password);
+        $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $password);
     }
 }

@@ -294,9 +294,9 @@ class FtpFirstCameraAccountTest extends TestCase
     }
 
     /**
-     * The hourly quota is the reason this endpoint is not an open mint for valid
-     * camera credentials, and it has to cover the provisioning branch too —
-     * otherwise the first-account path would be a way around it.
+     * The hourly quota bounds how often one account can invalidate a working
+     * camera, and it has to cover the provisioning branch too — otherwise the
+     * first-account path would be a way around it.
      */
     public function test_the_hourly_quota_also_covers_the_provisioning_branch(): void
     {

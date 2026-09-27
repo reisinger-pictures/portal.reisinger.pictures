@@ -45,6 +45,8 @@ class FtpCredentialServiceTest extends TestCase
     {
         $service = app(FtpCredentialService::class);
         $lengths = [];
+        $sawUppercase = false;
+        $sawLowercase = false;
 
         for ($i = 0; $i < 200; $i++) {
             $password = $service->generateCameraPassword();
@@ -52,10 +54,15 @@ class FtpCredentialServiceTest extends TestCase
             $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $password);
             $this->assertGreaterThanOrEqual(FtpCredentialService::PASSWORD_MIN_LENGTH, strlen($password));
             $this->assertLessThanOrEqual(FtpCredentialService::PASSWORD_MAX_LENGTH, strlen($password));
-            // A camera cannot type a special character, and mixed case would
-            // turn a keyboard layout into a support case.
-            $this->assertMatchesRegularExpression('/^[a-z0-9]+$/', $password);
-            $this->assertSame($password, Str::lower($password));
+            // A camera cannot type a special character, mixed case is deliberate
+            // (monospace display, owner decision 2026-09-27), and the five
+            // ambiguous symbols are gone — a misread 0/O or 1/l is a failed
+            // authentication and a regeneration on a camera screen.
+            $this->assertMatchesRegularExpression('/^[a-km-zA-HJ-NP-Z2-9]+$/', $password);
+            $this->assertDoesNotMatchRegularExpression('/[0O1lI]/', $password);
+
+            $sawUppercase = $sawUppercase || preg_match('/[A-Z]/', $password) === 1;
+            $sawLowercase = $sawLowercase || preg_match('/[a-z]/', $password) === 1;
 
             $lengths[] = strlen($password);
         }
@@ -66,6 +73,62 @@ class FtpCredentialServiceTest extends TestCase
             max($lengths),
             'At least one of 200 passwords must be longer than the minimum length.',
         );
+
+        // Guards the removed `Str::lower()`: mixed case is a decision, so a
+        // re-introduced lowercasing has to fail here rather than quietly change
+        // every password on every camera.
+        $this->assertTrue($sawUppercase, 'The alphabet includes A-Z; a lowercased generator would fail this.');
+        $this->assertTrue($sawLowercase, 'The alphabet includes a-z.');
+    }
+
+    /**
+     * The pattern is the contract a camera is configured with, so its two halves
+     * are pinned here, away from the generator: the length range must be exactly
+     * the one the constants name, and the alphabet must be exactly `a-z A-Z 0-9`
+     * minus `0`, `O`, `1`, `l`, `I` — 57 symbols, checked one at a time rather
+     * than by a sample, so a widened class (`0` crept back in for a nickname,
+     * say) fails here instead of on a camera.
+     */
+    public function test_the_pattern_encodes_the_documented_alphabet_and_length_range(): void
+    {
+        $minimum = 'aB2mZ9kQ3x';
+
+        $this->assertSame(
+            FtpCredentialService::PASSWORD_MIN_LENGTH,
+            strlen($minimum),
+            'The fixture the range assertions build on must be the minimum length.',
+        );
+        $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $minimum);
+        $this->assertDoesNotMatchRegularExpression(
+            FtpCredentialService::PASSWORD_PATTERN,
+            substr($minimum, 0, FtpCredentialService::PASSWORD_MIN_LENGTH - 1),
+            'Below the minimum length the pattern must refuse the string.',
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            FtpCredentialService::PASSWORD_PATTERN,
+            $minimum.str_repeat('a', FtpCredentialService::PASSWORD_MAX_LENGTH + 1 - FtpCredentialService::PASSWORD_MIN_LENGTH),
+            'Above the maximum length the pattern must refuse the string.',
+        );
+
+        $excluded = ['0', 'O', '1', 'l', 'I'];
+        $accepted = 0;
+
+        foreach (str_split('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') as $symbol) {
+            // One symbol appended to a valid minimum-length string: the length
+            // stays inside the range, so only the alphabet can decide.
+            $isAccepted = preg_match(FtpCredentialService::PASSWORD_PATTERN, 'aB2mZ9kQ3'.$symbol) === 1;
+            $isExpected = ! in_array($symbol, $excluded, true);
+
+            $this->assertSame(
+                $isExpected,
+                $isAccepted,
+                "'{$symbol}' must ".(($isExpected) ? 'be accepted' : 'be refused').' by the camera pattern.',
+            );
+
+            $accepted += (int) $isAccepted;
+        }
+
+        $this->assertSame(57, $accepted, 'a-z A-Z 0-9 is 62 symbols; minus the ambiguous five.');
     }
 
     public function test_generated_camera_passwords_do_not_repeat(): void
@@ -82,10 +145,12 @@ class FtpCredentialServiceTest extends TestCase
 
     public function test_generation_stays_inside_the_camera_alphabet_even_for_a_hostile_random_source(): void
     {
-        // Str::random() is a base64 alphabet with mixed case; the filter is what
+        // Str::random() hands over 62 alphanumeric symbols; the filter is what
         // turns it into a camera-safe string, and the pattern check is the
-        // guarantee. A hostile factory proves the filter does the work.
-        Str::createRandomStringsUsing(fn (int $length): string => str_repeat('ABCdef-123!', (int) ceil($length / 12)));
+        // guarantee. A hostile factory proves the filter does the work. The
+        // fixture carries a special character *and* all five ambiguous symbols,
+        // so one string exercises both halves of the filter.
+        Str::createRandomStringsUsing(fn (int $length): string => str_repeat('ABCdef-0123!lIO', (int) ceil($length / 14)));
 
         try {
             $password = app(FtpCredentialService::class)->generateCameraPassword();
@@ -93,10 +158,20 @@ class FtpCredentialServiceTest extends TestCase
 
             $this->assertStringContainsString('!', $raw, 'The hostile source really is hostile.');
             $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $password);
-            $this->assertSame(
-                substr((string) preg_replace('/[^a-z0-9]/', '', Str::lower($raw)), 0, strlen($password)),
-                $password,
-            );
+            // The filter of the service, mirrored: drop everything outside the
+            // camera alphabet, then cut to length. No `Str::lower()` here either —
+            // mixed case survives the generator, that is the whole point.
+            $filtered = (string) preg_replace('/[^a-km-zA-HJ-NP-Z2-9]/', '', $raw);
+
+            $this->assertSame(substr($filtered, 0, strlen($password)), $password);
+
+            foreach (['0', 'O', '1', 'l', 'I'] as $ambiguous) {
+                $this->assertStringNotContainsString(
+                    $ambiguous,
+                    $password,
+                    "The filter has to drop '{$ambiguous}' — the hostile source is full of them.",
+                );
+            }
         } finally {
             Str::createRandomStringsUsing(null);
         }
