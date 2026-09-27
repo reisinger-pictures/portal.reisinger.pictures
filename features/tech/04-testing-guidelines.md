@@ -95,6 +95,22 @@ status: active
 ## 6. Form Validation & HTML5
 - **Required Fields:** E2E Tests dürfen niemals blind auf Submit-Buttons klicken, wenn native HTML5 `required` Felder existieren. Der Browser blockiert die Navigation stumm, und Playwright läuft in Timeouts. Fülle Formulare immer vollständig aus.
 
+## 6a. Fallen, die 2026-09-27 gemessen wurden
+
+Diese Regeln sind aus Fehlschlägen entstanden, nicht aus Vermutungen. Jede nennt den Nachweis.
+
+- **Ein Wächter, der nicht scheitern kann, ist schlimmer als keiner.** `AuthHelper.login()` wartete auf `app-loader` mit `toBeHidden()`. Dieses Element wird *innerhalb* der lazy geladenen Route gerendert und existiert während des Chunk-Fetches **nicht** — gemessen: Anzahl 0. `toBeHidden()` passte in **4 ms** von 15 s, während `getByRole('main')` **0** Elemente hatte. **Regel:** Um zu beobachten, dass etwas *noch da* ist, `toBeVisible()`; um zu beobachten, dass der Boot *fertig* ist, auf **Abwesenheit** warten (`toHaveCount(0)`). Ein Timeout, der sofort passt, hat nichts geprüft.
+- **Kein Selektor auf eine globale CSS-Klasse.** `.loading-spinner.loading-lg` steht an **43 Stellen** in `src/`; ein `.first()` band in **10 von 10** Messungen an einen fremden Spinner. `data-testid="app-loader"` existiert genau zweimal.
+- **Ein verschlucktes Timeout verschiebt die Schuld.** `NetworkHelper` fing den 15-s-Timeout und gab `null` zurück; `ModalHelper` prüfte darauf und meldete danach „Modal nicht verborgen" — 30 s Fehlausgabe, während das echte Signal nach `stdout` verschwand. **Regel:** Ein Timeout **muss** an der Wartestelle scheitern und den Endpunkt nennen. `page.waitForResponse` wirft bereits; ein `.catch()` darauf ist der Defekt, nicht die Lösung.
+- **Ein Wächter gegen einen nicht scheiternden Wächter muss selbst beweisen, dass er lebt.** Sonst ist eine geschlossene Tür, die niemand auslöst, von einer zu unterscheiden, die nicht funktioniert. Sabotage **mit Negativkontrolle**: wenn die Sonde auch im Fehlerfall nicht feuert, misst sie nichts.
+- **Ein Test, der einen Defekt festschreibt, ist keine Beweislage.** `getByRole(..., {exact: true})` war ein **Typfehler** (`exact` ist kein `ByRoleOptions`-Mitglied) und wurde zur Laufzeit **stillschweigend ignoriert**; ein anderer Test pinnte, dass drei Felder als `"%"` antworten, und kommentierte das selbst als „the pre-refactor state of this file". **Regel:** Prüft ein Test einen Zustand und nennt ihn in einem Kommentar *vorher*, ist er eine Freigabe, ihn zu behalten.
+- **`tsc -b` ist inkrementell.** Ein veraltetes `tsbuildinfo` hat 50 echte Fehler in Testdateien verdeckt. **Nach parallelen Läufen immer `tsc -b --force`** — und: Testdateien, die in *keinem* TS-Projekt liegen, werden weder von `tsc` noch von `pnpm build` geprüft, laufen aber. Nach Inbetriebnahme von `tsconfig.tests.json` kam das um 50 sichtbare Fehler hoch.
+- **Ein `serial`-Describe braucht `--workers 1`.** `--repeat-each N` mit `workers > 1` lässt N *gleichzeitige* Kopien auf demselben geteilten Zustand laufen — das ist ein Messfehler, kein Defekt (Nachweis: isoliert 8/8, ganzes File 60/60 mit `--workers 1`).
+- **Loadzahlen ohne Kontext sind wertlos.** Ein grüner Lauf bei Load 264 sagt weniger als einer bei Load 5. Immer die Last mitschreiben; ein fremder Prozess auf der Box (hier 1678–1709 % CPU) kann jede Zahl eines anderen Projekts erzeugen.
+- **Harte Assertion-Formen brauchen die Form, die die Bedeutung trägt.** Ein Klick auf einen `type="submit"`-Button unterscheidet **nicht** ein formularweites `onSubmit` von einem Button-`onClick` — dafür `fireEvent.submit(form)` nutzen und den Typ separat prüfen. `getByDisplayValue('')` ist mehrdeutig, wenn zwei Felder leer starten; Felder über ihr Label adressieren, nicht per Index.
+- **Playwright löscht `test-results/` bei jedem Start.** In parallelen Sessions flüchtet damit jedes Bildartefakt.
+- **Markenweit geteilter Testzustand braucht eine Sperre, nicht getrennte Fixtures.** Die E2E-Test-Benutzer sind markenübergreifend, also teilen sich alle Specs dieselbe Einstellungszeile; zwei Specs, die dieselben Settings schreiben, kollidieren abhängig von der Shard-Zuteilung. Eine `mkdir`-Mutex über das Dateisystem schließt das Fenster, zwei beforeEach-Schreiber verengen es nur.
+
 ## 7. Brand Context in E2E Tests (Referer Header)
 
 * **Brand context via request origin (never via `data.brand`):** The current

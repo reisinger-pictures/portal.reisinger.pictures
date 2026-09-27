@@ -32,6 +32,15 @@ Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind
 - **`AGENTS.todo.md`** = **temporäre Task-Liste** + Code-Review-Notizen + Bug-Analysen + Session-Tracking. Alles, was nur für die aktuelle Session oder den nächsten PR relevant ist, gehört hierher, **nicht** in `features/`.
 - Code-Reviews, temporäre Analysen und Diskussionen → `AGENTS.todo.md`. Nur wenn ein neuer SOLL-Zustand definiert wird → `features/`.
 - **Task & Test Tracking:** Every feature requires actionable TODOs in `AGENTS.todo.md`. You MUST explicitly include TODOs for writing test cases (PHPUnit for backend, Playwright for E2E).
+- **Board-Hygiene (STRICT):** `AGENTS.todo.md` ist eine **Arbeitsliste, kein Archiv**. Es wird bei der Übergabe einer Session bzw. unmittelbar nach dem Abschluss eines Themenblocks bereinigt, nicht erst wenn es unlesbar wird.
+  - **1. Abgeschlossene Einträge werden entfernt, nicht abgehakt.** Ein `[x]`-Eintrag ist ein Signal, dass hier noch etwas zu tun ist — er bleibt nur für den Commit, der ihn geschlossen hat. Wer nach einem Befund sucht, findet sonst abgeschlossene Arbeit und hält sie für offen (in der Runde vom 2026-09-27 standen so vier Einträge, die Arbeit an einer inzwischen **gelöschten** Datei beschrieben).
+  - **2. Was über eine Sitzung hinaus trägt, wandert nach `features/` oder ins Git.** Eine Architekturentscheidung, ein gehäfteter Root-Cause oder eine Regel mit allgemeiner Geltung gehören dauerhaft dokumentiert — nicht in eine Liste, die bei der nächsten Bereinigung verschwindet. `git log` ist das Archiv für den Fortschritt.
+  - **3. Erkenntnisse ohne offene Aufgabe sind trotzdem wertvoll — aber kompakt.** Kein abgeschlossener Block, der länger ist als der Befund, den er begründet.
+  - **4. Drei Fälle, in denen ein Eintrag trotzdem bleibt:**
+    - **manuell zu prüfen** — vom Owner nach einem Deploy anzusehen; als `[ ] manuell prüfen: <was, wo, worauf>` führen, nicht als erledigt
+    - **wartet auf eine Entscheidung** — `[ ] Entscheidung offen: <Frage>`
+    - **wartet auf eine Bedingung** — `[~] wartet auf <Bedingung>`
+  - **5. Ein Eintrag, der eine Zahl oder einen Zustand beschreibt, wird mit dem Stand von heute eingetragen und mit der Quelle des Nachweises.** Keine Zahl ohne Herleitung, kein Zustand ohne Commit.
 - **Zero Pre-existing Failures Policy (STRICT):** Pre-existing Test-Failures (PHPUnit, Vitest, Playwright) MÜSSEN immer behoben werden, bevor neue Arbeit beginnt. Ein "pre-existing" Label oder Ausrede ist nicht erlaubt — jeder Fehlerblock wird analysiert und gefixt, oder als akzeptiertes Risiko in `features/` dokumentiert. Dies gilt auch für flaky Tests: Diese werden bis zur Stabilisierung debugged.
 
 ## 4. AI Operating Rules (STRICT)
