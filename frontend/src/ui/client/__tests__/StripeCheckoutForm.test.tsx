@@ -5,10 +5,10 @@ import userEvent from '@testing-library/user-event';
 import { StripeCheckoutForm } from '../components/StripeCheckoutForm';
 
 const mockConfirmPayment = vi.fn();
-const mockUseStripe = vi.fn(() => ({
+const mockUseStripe = vi.fn<() => { confirmPayment: typeof mockConfirmPayment } | null>(() => ({
     confirmPayment: mockConfirmPayment,
 }));
-const mockUseElements = vi.fn(() => ({}));
+const mockUseElements = vi.fn<() => object | null>(() => ({}));
 let mockShowToast = vi.fn();
 
 vi.mock('@stripe/react-stripe-js', () => ({

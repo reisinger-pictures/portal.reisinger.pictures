@@ -246,7 +246,10 @@ describe('ContractSignView stale detection', () => {
         renderWithProviders(<ContractSignView />);
 
         await waitFor(() => expect(screen.getByText('Gesamtbetrag')).toBeInTheDocument());
-        expect(screen.getByText('10%')).toBeInTheDocument();
+        // Percentage discounts share the one percent formatter: German decimal
+        // separator, two decimals, same as the product tables. It used to read
+        // "10%" here via the contract-side formatBasisPointsAsPercent.
+        expect(screen.getByText('10,00 %')).toBeInTheDocument();
         expect(screen.getByText('90,00 €')).toBeInTheDocument();
     });
 

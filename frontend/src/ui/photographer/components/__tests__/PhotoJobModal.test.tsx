@@ -57,9 +57,18 @@ const editingPhotoJob: PhotoJob = {
 
 function setupMocks(overrides: Record<string, unknown> = {}) {
     const showToast = vi.fn();
-    vi.mocked(useUsers).mockReturnValue({ users: [] });
+    vi.mocked(useUsers).mockReturnValue({ users: [], roles: [], createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn() });
     vi.mocked(useProtectedGalleries).mockReturnValue({
         tree: { root_galleries: [], groups: [] },
+        isLoading: false,
+        isError: undefined,
+        mutate: vi.fn(),
+        createGroup: vi.fn(),
+        createGallery: vi.fn(),
+        deleteGallery: vi.fn(),
+        updateGroup: vi.fn(),
+        deleteGroup: vi.fn(),
+        updateGallery: vi.fn(),
     });
     vi.mocked(useLightroomCatalogs).mockReturnValue({
         lightroomCatalogs: catalogs,
@@ -70,7 +79,7 @@ function setupMocks(overrides: Record<string, unknown> = {}) {
         remove: vi.fn(),
         ...overrides,
     });
-    vi.mocked(useUI).mockReturnValue({ showToast });
+    vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
     return { showToast };
 }
 

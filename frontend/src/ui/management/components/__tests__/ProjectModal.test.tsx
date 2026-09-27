@@ -61,8 +61,8 @@ const editingProject: Project = {
 
 function setupMocks() {
     const showToast = vi.fn();
-    vi.mocked(useUsers).mockReturnValue({ users: [] });
-    vi.mocked(useUI).mockReturnValue({ showToast });
+    vi.mocked(useUsers).mockReturnValue({ users: [], roles: [], createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn() });
+    vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
     return { showToast };
 }
 

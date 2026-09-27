@@ -35,11 +35,12 @@ function formatDiscountAmount(amount: number | undefined): string {
 /**
  * Product `price` is stored in hundredths of the row's own unit — cents for a
  * fixed discount, hundredths of a percent for a percentage one — so the type
- * decides the formatter.
+ * decides the formatter. `formatPercent` reads the stored hundredths itself;
+ * `formatEuro` works in euros and therefore gets the explicit division.
  */
 function formatProductValue(price: number, type: Product['type']): string {
     return type === 'discount_percent'
-        ? formatPercent(price / 100)
+        ? formatPercent(price)
         : formatEuro(price / 100);
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../../../test-setup';
 
@@ -78,10 +78,37 @@ function columnSpans(element: Element | null): { base: number; md: number } {
     return { base: base ? Number(base[1]) : 1, md: md ? Number(md[1]) : 1 };
 }
 
+/**
+ * The regions the shell puts inside the modal-box, located by structure rather
+ * than by a guessed index: the bounded body that scrolls, and the wrapper that
+ * holds the footer next to it. Both are direct children of the box, which is
+ * what makes the sibling relation between them the thing to assert — the
+ * affordance has to be on the region that scrolls, and the footer has to be
+ * outside it, and neither is visible from the other region's classes.
+ */
+function boundedRegions(container: HTMLElement): { box: HTMLElement; body: HTMLElement; footer: HTMLElement } {
+    const box = container.querySelector<HTMLElement>('.modal-box');
+    if (!box) throw new Error('ModelDetailModal renders no .modal-box');
+    const body = box.querySelector<HTMLElement>(':scope > .overflow-y-auto');
+    const footer = box.querySelector<HTMLElement>(':scope > .shrink-0');
+    // A named throw rather than a bare `expect(...).not.toBeNull()`: the only way
+    // to get here is that the shell built no bounded body, which means the dialog
+    // stopped opting into `scrollableBody` — so say that, and show what the box
+    // does contain, instead of leaving the next reader to re-derive it.
+    if (!body || !footer) {
+        throw new Error(
+            'ModalShell built no bounded body/footer wrapper — ModelDetailModal is '
+            + 'no longer opting into `scrollableBody`. Box children: '
+            + Array.from(box.children).map(child => child.className).join(' | '),
+        );
+    }
+    return { box, body, footer };
+}
+
 describe('ModelDetailModal contact sheet actions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn().mockResolvedValue(true) });
+        vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn().mockResolvedValue(true), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
         vi.mocked(usePermissions).mockReturnValue(basePermissions);
     });
 
@@ -126,28 +153,60 @@ describe('ModelDetailModal contact sheet actions', () => {
 });
 
 /**
- * The three layout invariants the UI review of 2026-09-27 found broken. They are
- * cheap to state and cheap to lose, so they are pinned here instead of being left
- * to the next screenshot pass; the visual confirmation stays an E2E concern.
+ * The three layout invariants the UI review of 2026-09-27 found broken, plus the
+ * boundary they hang on. They are cheap to state and cheap to lose, so they are
+ * pinned here instead of being left to the next screenshot pass; the visual
+ * confirmation stays an E2E concern.
  */
 describe('ModelDetailModal layout affordances', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn().mockResolvedValue(true) });
+        vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn().mockResolvedValue(true), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
         vi.mocked(usePermissions).mockReturnValue(basePermissions);
     });
 
-    it('fades the bottom edge of the scroll region it owns', () => {
+    it('fades the region that scrolls, not the box that bounds it', () => {
         const { container } = renderModal();
 
-        // The modal-box is the scroll region (`max-h-90vh overflow-y-auto`).
-        // Without the fade its boundary slices whatever row it lands on, which
-        // the review caught cutting "Linz"/"Österreich" through the glyphs.
-        const box = container.querySelector('.modal-box');
-        expect(box).toHaveClass('overflow-y-auto', 'scroll-fade-bottom');
-        // The fade band is 2rem (see the `@utility` in index.css), so the bottom
-        // padding has to hold the content and the footer clear of it.
-        expect(box).toHaveClass('pb-10');
+        const { box, body } = boundedRegions(container);
+
+        // The box only bounds the dialog (`max-h-90vh flex flex-col`); it is the
+        // body that has the height to spare and therefore the thing that scrolls.
+        expect(box).toHaveClass('max-h-90vh', 'flex', 'flex-col');
+        expect(body).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto');
+
+        // The fade and its padding live on that body. The mask only reads as
+        // "there is more below" on the element with a scroll port under it; on
+        // the box it would fade nothing, because the box no longer scrolls, and
+        // the boundary would slice the last row of text with nothing softening
+        // it — the defect the review caught cutting "Linz"/"Österreich" through
+        // the glyphs. The padding is half of the same invariant: the mask always
+        // covers the last 2rem of the padding box, so `pb-10` (2.5rem) is what
+        // keeps the content clear of the band once the body is scrolled to its end.
+        expect(body).toHaveClass('scroll-fade-bottom', 'pb-10');
+
+        // Pinned in the negative too: a fade "somewhere" is not the invariant, the
+        // fade being AT the scroll boundary is. Leaving the tuning on the box as
+        // well would leave two competing masks and the test green.
+        expect(box).not.toHaveClass('overflow-y-auto', 'scroll-fade-bottom', 'pb-10');
+    });
+
+    it('keeps the footer reachable outside the scrolling body', () => {
+        const { container } = renderModal();
+
+        const { body, footer } = boundedRegions(container);
+        const contactSheetActions = screen.getByTestId('model-contact-sheet-actions');
+
+        // The footer is the body's next sibling, not something inside it: with
+        // the footer inside the scroll port, scrolling to the end of a long
+        // profile would carry the contact-sheet actions and "Schließen" out of
+        // reach — the symptom that made this dialog worth migrating at all.
+        expect(body.nextElementSibling).toBe(footer);
+        expect(body).not.toContainElement(contactSheetActions);
+        expect(footer).toContainElement(contactSheetActions);
+        // The footer's own close button travels with it, not with the content.
+        const footerClose = within(footer).getByRole('button', { name: 'Schließen' });
+        expect(body).not.toContainElement(footerClose);
     });
 
     it('nests the answer sections one heading level below their group', () => {

@@ -19,11 +19,12 @@ interface BatchData {
  * The `price` column carries two units depending on the product type: cents for
  * items and fixed discounts, hundredths of a percent for percentage discounts.
  * The type therefore selects the formatter — a fixed discount is an amount,
- * a percentage discount is not.
+ * a percentage discount is not. `formatPercent` reads the stored hundredths
+ * itself; `formatEuro` works in euros and therefore gets the explicit division.
  */
 function formatProductValue(price: number, type: Product['type']): string {
     return type === 'discount_percent'
-        ? formatPercent(price / 100)
+        ? formatPercent(price)
         : formatEuro(price / 100);
 }
 

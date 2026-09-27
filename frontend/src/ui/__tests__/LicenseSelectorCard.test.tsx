@@ -56,8 +56,8 @@ const mockPhoto = {
 
 const mockCatalog = {
     use_cases: [
-        { id: 'uc1', name: 'Web-Nutzung', description: 'F�r Web & Social Media', base_price: 5000, flatrate_tier: 'web', sort_order: 0, is_commercial: false },
-        { id: 'uc2', name: 'Print', description: 'F�r Printmedien', base_price: 15000, flatrate_tier: 'print', sort_order: 1, is_commercial: false },
+        { id: 'uc1', name: 'Web-Nutzung', description: 'Für Web & Social Media', base_price: 5000, flatrate_tier: 'web', sort_order: 0, is_commercial: false },
+        { id: 'uc2', name: 'Print', description: 'Für Printmedien', base_price: 15000, flatrate_tier: 'print', sort_order: 1, is_commercial: false },
     ],
     modifiers: [
         { id: 'm1', name: 'Titelseite', description: 'Nutzung auf Titelseite', percent_surcharge: 100, is_included_in_flatrate: false, sort_order: 0 },
@@ -286,7 +286,7 @@ describe('LicenseSelectorCard', () => {
         vi.mocked(useLicenseCatalog).mockReturnValue({
             catalog: {
                 use_cases: [
-                    { id: 'uc1', name: 'Web-Nutzung', description: 'F�r Web & Social Media', base_price: 5000, flatrate_tier: 'web', sort_order: 0, is_commercial: false },
+                    { id: 'uc1', name: 'Web-Nutzung', description: 'Für Web & Social Media', base_price: 5000, flatrate_tier: 'web', sort_order: 0, is_commercial: false },
                     { id: 'uc2', name: 'Werbung', description: 'Kommerzielle Werbekampagne', base_price: 30000, flatrate_tier: 'print', sort_order: 1, is_commercial: true },
                 ],
                 modifiers: [],

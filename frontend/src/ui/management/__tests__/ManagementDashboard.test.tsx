@@ -147,6 +147,7 @@ describe('ManagementDashboard AI configuration notice', () => {
                 company_email: 'office@example.com',
             },
             isLoading: false,
+            updateBillingDetails: vi.fn(),
         });
         vi.mocked(usePermissions).mockReturnValue({
             isStaff: true,

@@ -22,7 +22,7 @@ vi.mock('../../../components/AutocompleteInput', () => ({
     ),
 }));
 
-import { useUsers } from '../../../../logic/useUsers';
+import { useUsers, type UserDetailed } from '../../../../logic/useUsers';
 import { useUI } from '../../../components/UIContext';
 
 const statusOptions = [
@@ -47,6 +47,22 @@ const editingProject: Project = {
     notes: null,
 };
 
+function detailedUser(overrides: Partial<UserDetailed> & Pick<UserDetailed, 'id' | 'name'>): UserDetailed {
+    return {
+        email: '',
+        is_super_admin: false,
+        is_admin: false,
+        is_photographer: false,
+        is_pending: false,
+        can_edit_metadata: false,
+        flatrate_level: 'none',
+        roles: [],
+        gallery_groups: [],
+        galleries: [],
+        ...overrides,
+    };
+}
+
 function getControl(label: string): HTMLElement {
     return screen.getByText(label).closest('.form-control') as HTMLElement;
 }
@@ -66,8 +82,8 @@ function getSelect(label: string): HTMLSelectElement {
 describe('ProjectModal board save regression', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(useUI).mockReturnValue({ showToast: vi.fn() });
-        vi.mocked(useUsers).mockReturnValue({ users: [{ id: 'u2', name: 'Max Mustermann' }] });
+        vi.mocked(useUI).mockReturnValue({ showToast: vi.fn(), confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
+        vi.mocked(useUsers).mockReturnValue({ users: [detailedUser({ id: 'u2', name: 'Max Mustermann' })], roles: [], createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn() });
     });
 
     it('keeps the project data open when saving rejects', async () => {
