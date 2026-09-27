@@ -185,8 +185,19 @@ async function applyNavStep(page: Page, step: UiReviewNavStep, seed: Record<stri
         return;
     }
 
-    if (!step.label || !step.valueKey) throw new Error('nav step "fill" requires label and valueKey');
-    await page.locator('main').getByLabel(step.label, { exact: true }).fill(String(seed[step.valueKey] ?? ''));
+    if (!step.valueKey) throw new Error('nav step "fill" requires valueKey');
+    if (step.target) {
+        // Explicit locator wins over `label`: several controls can share one
+        // accessible name (on /admin-models three are called "Suche"), which
+        // makes a label-only step a strict-mode violation.
+        await page.locator('main').locator(step.target).fill(String(seed[step.valueKey] ?? ''));
+    } else if (step.label) {
+        // Backwards compatible: a step that only sets `label` keeps resolving
+        // exactly as it did before.
+        await page.locator('main').getByLabel(step.label, { exact: true }).fill(String(seed[step.valueKey] ?? ''));
+    } else {
+        throw new Error('nav step "fill" requires label or target');
+    }
     await waitForAppSettled(page);
 }
 
