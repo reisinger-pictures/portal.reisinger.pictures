@@ -2352,6 +2352,81 @@ Produktionsfehler verkauft worden waere.
   nennen und auf die Anleitung verweisen, die bedingungslos existiert, **ohne**
   zu versprechen, dass das Anlegen klappt. Der Kommentar haelt fest, warum die
   Zusage weg ist.
+
+### CI-Befund 2026-09-27 (Push fa8e19d) — zwei Ursachen, beide belegt
+
+**1. `Frontend (Lint, Build, Vitest)` rot am Schritt „Build" (Lint war gruen).**
+`check-i18n.mjs` schlug auf einem **unberuehrten** Checkout fehl. Ursache: Ich
+habe `FtpConnectionRows.tsx` selbst geaendert (den Support-Text) und mit
+`git add frontend/` committet, **ohne den Lingui-Katalog neu zu erzeugen** — die
+Quelle hatte den neuen Text, das committete `messages.js` noch den alten.
+**Regel daraus: wer einen UI-String aendert, erzeugt den Katalog im selben
+Commit neu** (`pnpm lingui:extract && pnpm lingui:compile`). `pnpm build`
+allein genuegt nicht — es laeuft `extract`, aber nicht `compile`.
+
+**2. Sechs E2E-Tests rot, jeweils auf allen drei Retries** (kein Flake) — nicht
+drei, wie es zuerst aussah: `magic-link.spec.ts:22` und `:74`,
+`client.spec.ts:26`, `photographer/communication.spec.ts:93`,
+`selection/photoswipe.spec.ts:24`, `selection/rating-regressions.spec.ts:10`.
+Alle neun Fehlschlaege (6 Tests × 3 Retries, Desktop 2/3 + Desktop 3/3 + Mobile
+3/3) mit derselben Ursache:
+`strict mode violation: .modal-open >> getByRole('button', {name:'Schließen'})
+resolved to 2 elements`. Ursache: die Migration der `InviteModal` vom
+handgebauten `modal modal-open` (unbenannter `✕`) auf `ModalShell`
+(`aria-label="Schließen"`, `ModalShell.tsx:186`) hat den Schliessen-Button
+**benannt**, waehrend der Footer denselben Text traegt. **Alle sechs schliessen
+dieselbe `InviteModal`** — ich hatte aus dem Shard-2/3-Auszug geschlossen, die
+drei anderen Specs betroffen nicht.
+**Die UI wird NICHT geaendert:** `ModelDetailModal.tsx:316-324` dokumentiert die
+Doppelung ausdruecklich als Entscheidung — ein Kopf- und ein Fuss-Schliessen
+gehoeren zusammen, und den Fuss-Button zu entfernen, damit ein Locator
+eindeutig wird, waere eine Bedienmoeglichkeit fuer den Test geopfert. Die
+Migration hat schlicht ihre Specs nicht mitgezogen; die vier CRM-Specs scopen
+deshalb bereits auf `.modal-action`. **Regel daraus: eine Dialog-Migration
+zieht alle Specs mit, die auf den Dialog schliessen** — und wer eine
+Fehlermeldung sieht, muss den **ganzen** Lauf lesen, nicht den Shard, in dem
+sie gelandet ist.
+
+**3. Fast ein dritter Fehlschluss beim Diagnostizieren.** Ich schloss zuerst
+„ich habe die Regression eingeschleust" und stuetzte das auf zwei
+`cf066a5 success`-Eintraege von `gh run list`. Die waren die Image- und
+Tag-Workflows, **nicht** die CI; erst `--workflow=ci.yml` zeigte, dass CI auf
+`cf066a5` gruen war — und die Diagnose damit bestaetigte. **Regel daraus:** bei
+`gh run list` immer **nach Workflow filtern**, bevor ein alter Lauf als
+Referenz dient, sonst zieht man den falschen Lauf als Beweis heran. Das ist
+derselbe Fehler wie bei der Auth-Drosselung: eine Zahl aus dem Kontext
+gerissen und zur Entscheidung gemacht.
+
+**Folgepunkte aus der Waehrungs-Migration (2026-09-27):**
+- [ ] **`useVolumeLicensing.ts:137`** — `(priceCents/100).toFixed(0)` in einem
+  `t`-Template. Echter Restfehler (keine Tausendertrennung, normales Leerzeichen
+  vor `€`), aber **nicht** durch `formatEuro` loesbar: eine formatierte
+  Waehrungs-Zeichenkette laesst sich nicht in eine Message mit Placeholder
+  einbetten, ohne die Message zu spalten und das Placeable zu verlieren.
+  Braucht eine eigene Entscheidung (eigener Platzhalter, z. B. `{price}` plus
+  separate `€`-Position).
+- [ ] **Zwei Prozent-Formatter mit unterschiedlicher Ausgabe.**
+  `formatPercent` (neu, in `formatCurrency.ts`) und das bestehende
+  `formatBasisPointsAsPercent` (Vertrags-Preisgrenze) liefern `10,5 %` bzw.
+  `10.5%` und schneiden Nullen unterschiedlich. Gleiche Einheit, anderes
+  Ergebnis — das ist genau die Divergenz, die die Formatter-Extraktion eigentlich
+  verhindern soll. **Nicht** im Aufgabenumfang geaendert, weil
+  `ContractSignView.test.tsx:249` die bestehende Ausgabe pinnt.
+- [ ] **`LicenseSettingsCard`: Vorschau ist fabriziert.** Sie zeigt
+  `calculateUpgradePrice(previewTerms, …)` aus festen Defaults (75/145/450),
+  aber die Karte rendert **keine** `price_*`-Felder und `reset()` setzt sie nie —
+  die Vorschau zeigt also nie die gespeicherten Konditionen. Von der
+  Formatumstellung nicht verursacht, aber beim Nachlesen aufgefallen: eine Zahl,
+  die nicht stimmt, ist schlimmer als eine, die fehlt.
+- [ ] **Vorbestehender Mobile-Flake im geteilten Login-Helfer:** `AuthHelper.ts:48`,
+  `await expect(backdrop).toBeHidden({ timeout: 5000 })` beim Schliessen des
+  Sidebar-Drawers. Lastabhaengig, tritt **vor** dem Gallery-Aufbau auf und ist
+  damit unabhaengig von den FTP-/Dialog-Aenderungen. Nach §6 zu verfolgen.
+- [x] **`LicenseSelectorModal` bestaetigt toter Code:** **0 Importer** in
+  `src/`, nur noch als Extraktionsquelle in der `.po`. Die in dieser Runde
+  korrigierte Preis-Anzeige dort (`1500.00 €` -> `15,00 €`, weil
+  `calculateUpgradePrice` Cent zurueckgibt) ist damit gegenstandslos — die
+  Loesung ist Loeschung, nicht Anzeigefix. Entscheidung des Owners offen.
 - [x] **Zusatz:** literale `\u2014` in JSX-Text der Fehlertabelle des Guides
   entsprachen keinem Escape und rendeten als `\u2014` → durch echte Em-Dashes
   ersetzt.
