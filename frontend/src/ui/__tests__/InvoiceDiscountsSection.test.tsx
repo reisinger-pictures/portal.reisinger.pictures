@@ -20,6 +20,15 @@ const discounts: InvoiceDiscount[] = [
     { type: 'discount_percent', description: 'Zweiter Prozentsatz', notes: '', price: 20 },
 ];
 
+/**
+ * `Intl` separates the amount from the symbol with U+00A0, never with a plain
+ * space — spelled out so an expectation cannot be satisfied by a normal space.
+ * `getDisplayedAmounts` reads raw `textContent`, which testing-library does not
+ * normalise. `String.fromCharCode` keeps the character visible in the source
+ * instead of hiding it behind an escape that looks like a normal space.
+ */
+const NBSP = String.fromCharCode(0xa0);
+
 function getDisplayedAmounts(): string[] {
     return screen.getAllByText('Gesamt').map((label) => {
         const amountCell = label.closest('.form-control');
@@ -49,10 +58,14 @@ describe('InvoiceDiscountsSection', () => {
     it('renders ordered discount amounts for fixed and percentage discounts', () => {
         renderSection();
 
+        // German notation, produced by formatEuro: comma decimal separator plus a
+        // non-breaking space before the symbol. This used to read
+        // ['25.00 €', '17.50 €', '31.50 €'] because the component used
+        // `amount.toFixed(2)`, which is locale-independent and always emits a period.
         expect(getDisplayedAmounts()).toEqual([
-            '25.00 €',
-            '17.50 €',
-            '31.50 €',
+            `25,00${NBSP}€`,
+            `17,50${NBSP}€`,
+            `31,50${NBSP}€`,
         ]);
     });
 

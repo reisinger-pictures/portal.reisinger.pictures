@@ -7,6 +7,7 @@ import { fetcher, apiMutate } from '../../../api';
 import { useUI } from '../../components/UIContext';
 import { useAuth } from '../../../logic/useAuth';
 import { formatMoney } from '../../../logic/utils';
+import { formatEuro } from '../../../logic/formatCurrency';
 import ErrorMessage from '../../components/ErrorMessage';
 import CouponFormDrawer, { type Coupon } from './CouponFormDrawer';
 
@@ -36,7 +37,9 @@ const formatValue = (coupon: Coupon): string => {
     if (Number.isNaN(numeric)) return String(coupon.value);
     switch (coupon.type) {
         case 'fixed':
-            return `${numeric.toFixed(2).replace('.', ',')} €`;
+            // Matches ManagementCouponsView: the stored value is in euros, so
+            // formatEuro is the single place the German notation is defined.
+            return formatEuro(numeric);
         case 'percentage':
             return `${numeric} %`;
         case 'photo_package':

@@ -3,6 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import {InvoiceItem, Product} from '../../../../api';
 import AutocompleteInput from '../../../components/AutocompleteInput';
 import {calculateEditorItemTotal, fixedPointToMajorUnits} from '../../../../logic/contractPricing';
+import {formatEuro} from '../../../../logic/formatCurrency';
 
 interface InvoiceItemsTableProps {
     items: InvoiceItem[];
@@ -66,7 +67,7 @@ export default function InvoiceItemsTable({
                                 mapResponse={(data) => data.map(p => ({
                                     id: p.id,
                                     title: p.name,
-                                    subtitle: `${(p.price / 100).toFixed(2)} €`,
+                                    subtitle: formatEuro(p.price / 100),
                                     raw: p
                                 }))}
                                 onSelect={(p) => {
@@ -131,7 +132,7 @@ export default function InvoiceItemsTable({
                                 <span className="label-text text-sm font-bold"><Trans>Gesamt</Trans></span>
                             </label>
                             <div className="text-right font-mono font-bold mt-1 text-base-content">
-                                {fixedPointToMajorUnits(calculateEditorItemTotal(item, quantityMode)).toFixed(2)} €
+                                {formatEuro(fixedPointToMajorUnits(calculateEditorItemTotal(item, quantityMode)))}
                             </div>
                         </div>
 

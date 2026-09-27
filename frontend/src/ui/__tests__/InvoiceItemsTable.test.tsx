@@ -12,6 +12,20 @@ const item: InvoiceItem = {
     price: 10,
 };
 
+/**
+ * `Intl` separates the amount from the symbol with U+00A0, never with a plain
+ * space. `String.fromCharCode` keeps that character visible in the source.
+ */
+const NBSP = String.fromCharCode(0xa0);
+
+/** The read-only "Gesamt" total, i.e. the cell that a human reads. */
+function getRowTotal(): string {
+    const label = screen.getByText('Gesamt');
+    const cell = label.closest('.form-control')?.querySelector('div.text-right');
+    if (!cell) throw new Error('Item total cell not found.');
+    return cell.textContent?.trim() ?? '';
+}
+
 function renderTable(quantityMode?: 'manual' | 'contract') {
     return renderWithProviders(
         <InvoiceItemsTable
@@ -42,5 +56,13 @@ describe('InvoiceItemsTable quantity modes', () => {
         const quantity = screen.getAllByRole('spinbutton')[0];
         expect(quantity).toHaveAttribute('min', '1');
         expect(quantity).toHaveAttribute('step', '1');
+    });
+
+    it('renders the row total in German notation', () => {
+        renderTable();
+
+        // 0.25 qty × 10.00 = 2.50. This used to read "2.50 €", because the cell
+        // used `.toFixed(2)`, which is locale-independent and always emits a period.
+        expect(getRowTotal()).toBe(`2,50${NBSP}€`);
     });
 });

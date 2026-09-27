@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import useSWR from 'swr';
 import type {Photo} from '../../../logic/useGallery';
 import type {CartItem} from '../../../logic/CartContext';
-import {formatMoney} from '../../../logic/utils';
 import {useCart} from '../../../logic/CartContext';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import {useUI} from '../../components/UIContext';
@@ -37,6 +36,14 @@ const photo: Photo = {
 const items: CartItem[] = [
     {photoId: 'cart-photo', tier: 'original', galleryId: 'cart-gallery', price: 5000},
 ];
+
+/**
+ * The tier price is rendered by `formatMoney`, i.e. `Intl` de-DE: comma decimal
+ * separator plus a U+00A0 between amount and symbol. Testing Library collapses
+ * that non-breaking space to a normal one before matching, so the expectations
+ * below spell the amount out in German with a plain space — which also keeps
+ * them independent of the formatter under test.
+ */
 
 function mockTermsResponse(terms: unknown) {
     vi.mocked(useSWR).mockReturnValue({
@@ -98,7 +105,7 @@ describe('VolumeLicensingCard with a real volume-licensing payload', () => {
 
         const card = within(screen.getByTestId('volume-pricing-card'));
         // Headline price plus the single tier row both render the resolved price.
-        expect(card.getAllByText(formatMoney(4000)).length).toBeGreaterThanOrEqual(1);
+        expect(card.getAllByText('40,00 €').length).toBeGreaterThanOrEqual(1);
         expect(screen.queryByText('Ein unerwarteter Fehler ist aufgetreten')).not.toBeInTheDocument();
 
         const button = card.getByRole('button', {name: 'In den Warenkorb', exact: true});
@@ -130,7 +137,7 @@ describe('VolumeLicensingCard with a real volume-licensing payload', () => {
         renderWithProviders(<VolumeLicensingCard photo={photo} onAddToCart={onAddToCart} />);
 
         const card = within(screen.getByTestId('volume-pricing-card'));
-        expect(card.getAllByText(formatMoney(4000)).length).toBeGreaterThanOrEqual(1);
+        expect(card.getAllByText('40,00 €').length).toBeGreaterThanOrEqual(1);
     });
 
     it('survives a malformed volume-pricing payload without unmounting the page', () => {

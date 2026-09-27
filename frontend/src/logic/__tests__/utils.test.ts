@@ -14,30 +14,53 @@ import {
     moveArrayItemDown,
     toSlug,
 } from '../utils';
+import {formatEuro} from '../formatCurrency';
+
+/**
+ * `Intl` separates the amount from the symbol with U+00A0, never with a plain
+ * space — spelled out so an expectation cannot be satisfied by a normal space.
+ */
+const NBSP = '\u00A0';
 
 describe('formatMoney', () => {
-    it('formats cents to euro with 2 decimals', () => {
-        expect(formatMoney(0)).toBe('0.00 €');
-        expect(formatMoney(1)).toBe('0.01 €');
-        expect(formatMoney(100)).toBe('1.00 €');
-        expect(formatMoney(1234)).toBe('12.34 €');
+    it('formats cents to euro with 2 decimals and a comma as decimal separator', () => {
+        expect(formatMoney(0)).toBe(`0,00${NBSP}€`);
+        expect(formatMoney(1)).toBe(`0,01${NBSP}€`);
+        expect(formatMoney(100)).toBe(`1,00${NBSP}€`);
+        expect(formatMoney(1234)).toBe(`12,34${NBSP}€`);
     });
 
     it('handles negative amounts', () => {
-        expect(formatMoney(-500)).toBe('-5.00 €');
-        expect(formatMoney(-1)).toBe('-0.01 €');
+        expect(formatMoney(-500)).toBe(`-5,00${NBSP}€`);
+        expect(formatMoney(-1)).toBe(`-0,01${NBSP}€`);
     });
 
     it('formats large and half-cent values', () => {
-        expect(formatMoney(999999)).toBe('9999.99 €');
-        expect(formatMoney(155)).toBe('1.55 €');
-        expect(formatMoney(105)).toBe('1.05 €');
+        expect(formatMoney(999999)).toBe(`9.999,99${NBSP}€`);
+        expect(formatMoney(155)).toBe(`1,55${NBSP}€`);
+        expect(formatMoney(105)).toBe(`1,05${NBSP}€`);
     });
 
     it('returns --- € for NaN and non-finite values', () => {
-        expect(formatMoney(NaN)).toBe('--- €');
-        expect(formatMoney(Infinity)).toBe('--- €');
-        expect(formatMoney(-Infinity)).toBe('--- €');
+        expect(formatMoney(NaN)).toBe(`---${NBSP}€`);
+        expect(formatMoney(Infinity)).toBe(`---${NBSP}€`);
+        expect(formatMoney(-Infinity)).toBe(`---${NBSP}€`);
+    });
+
+    it('delegates to formatEuro with the amount converted from cents to euros', () => {
+        // The wrapper must not re-implement presentation: one formatter, one
+        // German output. If this ever diverges, formatMoney has started
+        // bypassing formatEuro again.
+        expect(formatMoney(12345)).toBe(formatEuro(123.45));
+        expect(formatMoney(12345)).toBe(`123,45${NBSP}€`);
+        expect(formatMoney(12345)).toContain(',');
+        expect(formatMoney(12345)).not.toContain('NaN');
+    });
+
+    it('regression: never emits the locale-independent toFixed(2) output', () => {
+        // Number.prototype.toFixed always uses a period, in every locale.
+        expect(formatMoney(12345)).not.toBe('123.45 €');
+        expect(formatMoney(12345)).not.toContain('123.45');
     });
 });
 

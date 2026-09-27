@@ -3,6 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import {InvoiceDiscount, Product} from '../../../../api';
 import AutocompleteInput from '../../../components/AutocompleteInput';
 import {calculateEditorDiscountAmounts} from '../../../../logic/contractPricing';
+import {formatEuro, formatPercent} from '../../../../logic/formatCurrency';
 
 interface InvoiceDiscountsSectionProps {
     discounts: InvoiceDiscount[];
@@ -23,9 +24,23 @@ function getOrderedDiscountAmounts(subtotal: number, discounts: InvoiceDiscount[
 }
 
 function formatDiscountAmount(amount: number | undefined): string {
+    // '—' stays distinct from formatEuro's '--- €' placeholder: here it means
+    // "this discount line has no computable amount yet" (the shared pricing
+    // input is still invalid), not "the amount is broken".
     return typeof amount === 'number' && Number.isFinite(amount)
-        ? `${amount.toFixed(2)} €`
+        ? formatEuro(amount)
         : '—';
+}
+
+/**
+ * Product `price` is stored in hundredths of the row's own unit — cents for a
+ * fixed discount, hundredths of a percent for a percentage one — so the type
+ * decides the formatter.
+ */
+function formatProductValue(price: number, type: Product['type']): string {
+    return type === 'discount_percent'
+        ? formatPercent(price / 100)
+        : formatEuro(price / 100);
 }
 
 export default function InvoiceDiscountsSection({
@@ -101,7 +116,7 @@ export default function InvoiceDiscountsSection({
                                 mapResponse={(data) => data.map(p => ({
                                     id: p.id,
                                     title: p.name,
-                                    subtitle: `${(p.price / 100).toFixed(2)} ${p.type === 'discount_percent' ? '%' : '€'}`,
+                                    subtitle: formatProductValue(p.price, p.type),
                                     raw: p
                                 }))}
                                 onSelect={(p) => {

@@ -4,6 +4,7 @@ import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import {useUI} from '../../components/UIContext';
 import {useForm, useWatch} from 'react-hook-form';
 import {calculateUpgradePrice} from '../../../logic/pricingLogic';
+import {formatEuro} from '../../../logic/formatCurrency';
 import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 
@@ -137,14 +138,17 @@ export default function LicenseSettingsCard() {
                         <div className="col-span-full font-bold border-b border-base-300 pb-2">Preisvorschau für Kunden
                             ohne Flatrate
                         </div>
+                        {/* The preview feeds its own euro-denominated watch values into
+                            calculateUpgradePrice, so the result is already in euros here —
+                            it must NOT be divided by 100 the way a stored `*_cents` value is. */}
                         <div className="text-sm">Web + Redaktionell + 1 Jahr: <strong
-                            className="font-mono text-primary">{calculateUpgradePrice(previewTerms, 'none', 'web', 'editorial', '1_year').toFixed(2)} €</strong>
+                            className="font-mono text-primary">{formatEuro(calculateUpgradePrice(previewTerms, 'none', 'web', 'editorial', '1_year'))}</strong>
                         </div>
                         <div className="text-sm">Print + Kommerziell + 1 Jahr: <strong
-                            className="font-mono text-primary">{calculateUpgradePrice(previewTerms, 'none', 'print', 'commercial', '1_year').toFixed(2)} €</strong>
+                            className="font-mono text-primary">{formatEuro(calculateUpgradePrice(previewTerms, 'none', 'print', 'commercial', '1_year'))}</strong>
                         </div>
                         <div className="text-sm">Original + Kommerziell + Unbegrenzt + Weltweit: <strong
-                            className="font-mono text-primary">{calculateUpgradePrice(previewTerms, 'none', 'original', 'commercial', 'unlimited', 'international').toFixed(2)} €</strong>
+                            className="font-mono text-primary">{formatEuro(calculateUpgradePrice(previewTerms, 'none', 'original', 'commercial', 'unlimited', 'international'))}</strong>
                         </div>
                     </div>
 
