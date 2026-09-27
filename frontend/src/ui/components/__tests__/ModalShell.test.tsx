@@ -202,6 +202,89 @@ describe('ModalShell', () => {
         expect(container.querySelector('form')).toBeNull();
     });
 
+    /**
+     * The opt-in pair (`scrollableBody`, `bodyClassName`) and the off-path they
+     * must leave alone.
+     *
+     * Two dialogs need a bounded body; the other sixteen render through this
+     * shell unchanged. Giving the bounded layout a working default would move
+     * the scroll boundary under all of them at once — which is why the props are
+     * opt-in, and why the two properties the opt-in design rests on are pinned
+     * here instead of being left to a throwaway harness: without the flag the
+     * new props do *nothing* (no class, no region, no new element), and with the
+     * flag the caller's class *tunes* the region the shell created rather than
+     * replacing it.
+     */
+    it('ignores bodyClassName without the opt-in', () => {
+        // The silent failure is the dangerous one, and it is the shape the prop
+        // invites: dropping an unusable class gets reported immediately, while
+        // folding it into `boxClassName` on the caller's behalf would land the
+        // tuning on the box — the wrong element, silently, under every dialog
+        // that never opted in. So the class has to reach no element at all…
+        const { container } = renderShell({ bodyClassName: 'scroll-fade-bottom pb-10' });
+
+        const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        const content = screen.getByTestId('shell-content');
+
+        // …neither token of it, anywhere in the rendered output. The search
+        // starts at the container rather than at the box, because a descendant
+        // query never matches the box itself — and the box is the element most
+        // likely to receive the class by mistake.
+        expect(container.querySelectorAll('.scroll-fade-bottom')).toHaveLength(0);
+        expect(container.querySelectorAll('.pb-10')).toHaveLength(0);
+        // …and the children are not put inside a region to receive it. The shell
+        // builds a body region on the opt-in branch and nowhere else, so here
+        // they sit straight in the box with nothing between.
+        expect(content.parentElement).toBe(box);
+        expect(container.querySelector('.overflow-y-auto')).toBeNull();
+    });
+
+    it('appends bodyClassName to the region it tunes instead of replacing the shell classes', () => {
+        // `bodyClassName` exists because a boundary the shell owns is a knob the
+        // caller otherwise cannot turn (ModelDetailModal's scroll fade and the
+        // padding that keeps its content clear of it). Tuning means adding to
+        // that region: a caller that *replaced* the class string would take
+        // `flex-1`/`min-h-0` with it, and the box would grow with its content
+        // again — the same defect the opt-in exists to fix, reached by the
+        // other door.
+        renderShell({
+            scrollableBody: true,
+            bodyClassName: 'scroll-fade-bottom pb-10',
+        });
+
+        const body = screen.getByTestId('shell-content').parentElement as HTMLElement;
+
+        // The shell's own region classes survive…
+        expect(body).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto', 'pr-2');
+        // …with the caller's alongside them, not in their place.
+        expect(body).toHaveClass('scroll-fade-bottom', 'pb-10');
+    });
+
+    it('renders the off-path structure it rendered before the props existed', () => {
+        // The default layout is one scrolling column: header, children and footer
+        // in the box, and the box scrolls. So neither region the opt-in creates
+        // may be present here — every dialog that did not opt in is rendered
+        // against exactly this DOM, and an element the shell started wrapping
+        // things in is an element they never had to account for. (The form
+        // variant of this is pinned in ModalDialogShell.test.tsx, which is the
+        // only way to reach it with a submit handler set.)
+        renderShell({ footer: <button type="button">Fußzeile</button> });
+
+        const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        const content = screen.getByTestId('shell-content');
+        const footerButton = screen.getByRole('button', { name: 'Fußzeile' });
+
+        // The children are a direct child of the box, not of a body region…
+        expect(content.parentElement).toBe(box);
+        // …and the footer is a direct child too, so the `shrink-0` wrapper the
+        // bounded layout puts around it is absent along with everything else.
+        expect(footerButton.parentElement).toBe(box);
+        // The box itself is untouched: its height cap and the flex chain that
+        // lets the body shrink are what the opt-in switches on, so the box
+        // carries its own two classes and nothing else.
+        expect(Array.from(box.classList)).toEqual(['modal-box', 'relative']);
+    });
+
     it('hands the bounded body to its own form instead of letting the form block it', () => {
         // A form between the box and the body is a plain block, and a flex
         // item's automatic minimum size is its content height — so an unclassed
@@ -224,5 +307,76 @@ describe('ModalShell', () => {
         expect(body.parentElement).toBe(form);
         expect(form).toContainElement(submit);
         expect(body).not.toContainElement(submit);
+    });
+
+    /**
+     * `boxTestId` — the hook that lets a caller address the box it cannot own.
+     *
+     * ModelInviteDialog carried `data-testid="model-invite-dialog"` on a wrapper
+     * element purely because the shell exposed no way to place one, and eight
+     * E2E assertions scope through that id. Both properties matter and they pull
+     * in opposite directions: the id has to end up on the box (otherwise the
+     * wrapper stays and the hole is only papered over), and the eighteen
+     * dialogs that ask for nothing must not grow an attribute they never had.
+     */
+    it('puts a caller-supplied testid on the modal-box itself', () => {
+        renderShell({ boxTestId: 'harness-dialog' });
+
+        const box = screen.getByTestId('harness-dialog');
+        // The box, not a stand-in for it: `boxClassName` cannot carry a testid,
+        // so an id landing anywhere else would mean the wrapper came back.
+        expect(box).toHaveClass('modal-box');
+        expect(box).toBe(screen.getByRole('dialog').firstElementChild);
+        // …and it encloses the caller's content, which is the whole reason a
+        // dialog testid is used: scoping to it must still reach every node an E2E
+        // spec targets through it.
+        expect(box).toContainElement(screen.getByTestId('shell-content'));
+        expect(box).toContainElement(screen.getByRole('button', { name: 'Erste Aktion' }));
+    });
+
+    it('renders no testid at all when none is asked for', () => {
+        // The off-path for the hook, and the reason it is safe to add: React
+        // omits an attribute whose value is `undefined`, so the other eighteen
+        // dialogs keep byte-identical markup. An always-present `data-testid`
+        // would hang a new test handle on every dialog in the app.
+        renderShell();
+
+        const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        expect(box).not.toHaveAttribute('data-testid');
+    });
+
+    /**
+     * `maxWidth` — the two states the type admits, and only those.
+     *
+     * The prop once accepted `'lg'` and `'xl'` and dropped both, so the type
+     * promised widths the shell never produced. A caller asking for `'lg'` got a
+     * dialog at daisyUI's default `max-width: 32rem` and no indication that the
+     * box had changed size. The type is now `'default' | '2xl'` — the other two
+     * are a compile error, which `tsc` in the build gate enforces and no test
+     * here can — so what remains has to actually reach the box.
+     */
+    it('renders the only two width states the type offers', () => {
+        const wide = renderShell({ maxWidth: '2xl' });
+        const wideBox = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        expect(wideBox).toHaveClass('modal-box', 'max-w-2xl');
+        wide.unmount();
+
+        renderShell();
+        const defaultBox = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        // `default` is daisyUI's own width, so it contributes nothing: not a
+        // second `max-w-*` class that could win the cascade in a different order.
+        expect(defaultBox).toHaveClass('modal-box');
+        expect(defaultBox).not.toHaveClass('max-w-2xl');
+    });
+
+    it('keeps a boxClassName width in force regardless of the maxWidth state', () => {
+        // The escape hatch the narrowed type pushes every other width onto: a
+        // caller that sizes the box itself must get its class even when
+        // `maxWidth` is at its default, and both classes have to coexist because
+        // the box reads the *last* `max-w-*` in the list.
+        renderShell({ boxClassName: 'max-w-4xl' });
+
+        const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        expect(Array.from(box.classList)).toEqual(['modal-box', 'relative', 'max-w-4xl']);
     });
 });

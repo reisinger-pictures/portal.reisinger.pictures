@@ -5,8 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Customer } from '../../../api';
 import AutocompleteInput from '../../components/AutocompleteInput';
+import ModalDialogShell from '../../components/ModalDialogShell';
 import { LocationResult } from '../../../logic/useLocations';
-import { useFocusTrap } from '../../../logic/useFocusTrap';
 
 const createCustomerSchema = () => z.object({
     name: z.string().min(1, t`Name oder Ansprechpartner ist erforderlich`),
@@ -29,10 +29,18 @@ interface Props {
     onSave: (data: Partial<Customer>) => Promise<void>;
 }
 
-export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave }: Props) {
+// Renamed on destructuring, see TextSnippetModal: the record is `customer`, and
+// `editing` in this file belongs to the shell's delete-action prop.
+export default function CustomerModal({ isOpen, onClose, editingCustomer: customer, onSave }: Props) {
     "use no memo";
+    // `useId` is still the source for every field id, for one concrete reason:
+    // the regression test asserts that all nine controls carry *distinct* ids
+    // and that the two adjacent location comboboxes resolve their listbox and
+    // active option through ids derived from their own input id. A single base
+    // id keeps those relationships in one namespace, instead of four unrelated
+    // ones. The dialog title used to be `${formId}-title` so the hand-rolled
+    // `aria-labelledby` could point at it; ModalShell owns that wiring now.
     const formId = useId();
-    const titleId = `${formId}-title`;
     const nameInputId = `${formId}-name`;
     const companyInputId = `${formId}-company`;
     const emailInputId = `${formId}-email`;
@@ -51,18 +59,18 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
     useEffect(() => {
         if (isOpen) {
             reset({
-                name: editingCustomer?.name || '',
-                company: editingCustomer?.company || '',
-                email: editingCustomer?.email || '',
-                birthdate: editingCustomer?.birthdate || '',
-                street: editingCustomer?.street || '',
-                zip: editingCustomer?.zip || '',
-                city: editingCustomer?.city || '',
-                country: editingCustomer?.country || '',
-                uid: editingCustomer?.uid || ''
+                name: customer?.name || '',
+                company: customer?.company || '',
+                email: customer?.email || '',
+                birthdate: customer?.birthdate || '',
+                street: customer?.street || '',
+                zip: customer?.zip || '',
+                city: customer?.city || '',
+                country: customer?.country || '',
+                uid: customer?.uid || ''
             });
         }
-    }, [isOpen, editingCustomer, reset]);
+    }, [isOpen, customer, reset]);
 
     const watchZip = useWatch({ control, name: 'zip' });
     const watchCity = useWatch({ control, name: 'city' });
@@ -78,26 +86,30 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
         }
     };
 
-    const dialogRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: onClose });
-
     if (!isOpen) return null;
 
     return (
-        <div
-            className="modal modal-open z-50"
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
+        <ModalDialogShell
+            title={customer ? 'Kunde bearbeiten' : 'Neuen Kunden anlegen'}
+            icon="mdi--account-details"
+            onClose={onClose}
+            // This dialog has no delete action for an existing customer, so the
+            // shared footer must not offer one — and the value that would mean
+            // "a customer is being edited" is `customer`, not `editing`. See the
+            // `editing` note in TextSnippetModal.
+            editing={false}
+            isSubmitting={isSubmitting}
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+            className="z-50"
+            // The dialog is `max-w-2xl` today, and it has to stay that width.
+            // `maxWidth="2xl"` would render the same class on the same element —
+            // both land in the box's class list — so this stays on `boxClassName`,
+            // where it has been since before the migration, and the rendered
+            // markup is unchanged by either spelling.
+            boxClassName="max-w-2xl"
         >
-            <div className="modal-box max-w-2xl relative">
-                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 id={titleId} className="font-bold text-xl mb-6 flex items-center gap-2">
-                    <span className="iconify mdi--account-details text-primary"></span>
-                    {editingCustomer ? 'Kunde bearbeiten' : 'Neuen Kunden anlegen'}
-                </h3>
-
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+                <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control">
                             <label className="label" htmlFor={nameInputId}><span className="label-text font-bold">Name / Ansprechpartner</span></label>
@@ -180,16 +192,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer, onSave
                             />
                         </div>
                     </div>
-
-                    <div className="modal-action col-span-full mt-6">
-                        <button type="button" className="btn btn-ghost" onClick={onClose}>Abbrechen</button>
-                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                            {isSubmitting ? <span className="loading loading-spinner"></span> : 'Speichern'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+                </div>
+        </ModalDialogShell>
     );
 }

@@ -227,6 +227,11 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
         // handler anywhere in this dialog — it saves per row, not on submit.
         // There is no `modal-action` footer either; the only header-right
         // control is the batch button, which goes to `secondaryAction`.
+        // The bounded layout stays hand-rolled for the same reason as the other
+        // list dialogs: `scrollableBody` would take the batch progress and the
+        // global-context card into the scroll region with the rows, and the
+        // context field is exactly the control that has to survive scrolling the
+        // photo list. The `h-90vh` bound itself would survive the opt-in.
         <ModalShell
             title={<span className="text-2xl"><Trans>KI Beschriftung</Trans></span>}
             icon="mdi--robot-outline"

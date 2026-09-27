@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import ErrorMessage from '../../components/ErrorMessage';
 import EmptyState from '../../components/EmptyState';
+import ModalShell from '../../components/ModalShell';
 import { useUI } from '../../components/UIContext';
 import { usePermissions } from '../../../logic/usePermissions';
 import {
@@ -134,15 +135,36 @@ export default function ModelInviteDialog({ onClose }: Props) {
         }
     };
 
+    // `ModalShell`, not `ModalDialogShell`: the create form is a region *inside*
+    // this dialog, not the dialog. The invite table below it has to render
+    // outside that form, so the dialog cannot itself be one. The shell's
+    // `onFormSubmit` would have had to wrap the table in a <form> too.
+    //
+    // `data-testid="model-invite-dialog"` used to sit on the hand-rolled
+    // `.modal-box`; the shell owns the box, so it arrives through `boxTestId`
+    // instead. The wrapper `<div>` that carried it while the shell had no such
+    // hook is gone: every assertion that scopes through the id (the create
+    // button, the invite table) targets content that is a descendant of the box
+    // anyway, so an enclosing scope resolves all of them unchanged.
     return (
-        <div className="modal modal-open z-50">
-            <div className="modal-box max-w-4xl max-h-90vh overflow-y-auto" data-testid="model-invite-dialog">
-                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose} aria-label={t`Schließen`}>✕</button>
-
-                <h3 className="font-bold text-2xl mb-1 flex items-center gap-2">
-                    <span className="iconify mdi--account-plus text-primary"></span>
-                    <Trans>Einladung erstellen</Trans>
-                </h3>
+        <ModalShell
+            title={<Trans>Einladung erstellen</Trans>}
+            icon="mdi--account-plus"
+            onClose={onClose}
+            className="z-50"
+            boxClassName="max-w-4xl"
+            boxTestId="model-invite-dialog"
+            // The invite list is unbounded in rows, so this dialog can outgrow
+            // a viewport. The bound is unchanged at 90vh; what changes is that
+            // the scroll region is the body, which keeps the footer close below
+            // the fold instead of inside it.
+            scrollableBody
+            footer={
+                <div className="modal-action">
+                    <button type="button" className="btn btn-ghost" data-testid="model-invite-close" onClick={onClose}><Trans>Schließen</Trans></button>
+                </div>
+            }
+        >
                 <p className="opacity-70 mb-6"><Trans>Erstelle einen kopierbaren Einladungslink und teile ihn z. B. per WhatsApp. Eine E-Mail ist optional.</Trans></p>
 
                 {error && <ErrorMessage message={t`Fehler beim Laden der Einladungen.`} />}
@@ -290,12 +312,6 @@ export default function ModelInviteDialog({ onClose }: Props) {
                         </div>
                     )}
                 </div>
-
-                <div className="modal-action">
-                    <button type="button" className="btn btn-ghost" data-testid="model-invite-close" onClick={onClose}><Trans>Schließen</Trans></button>
-                </div>
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+        </ModalShell>
     );
 }

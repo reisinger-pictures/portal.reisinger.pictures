@@ -19,7 +19,8 @@ interface ModalDialogShellProps {
      */
     noValidate?: boolean;
     modalRef?: RefObject<HTMLDialogElement | null>;
-    maxWidth?: 'default' | 'lg' | 'xl' | '2xl';
+    /** Forwarded to ModalShell; see its docblock for why it is two states, not a scale. */
+    maxWidth?: 'default' | '2xl';
     secondaryAction?: ReactNode;
     submitText?: string;
     cancelText?: string;

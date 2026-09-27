@@ -5,6 +5,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useUI } from '../../components/UIContext';
+import ModalDialogShell from '../../components/ModalDialogShell';
 
 export interface Coupon {
     id?: number;
@@ -125,7 +126,9 @@ function emptyToUndefined(value: string | undefined): string | undefined {
     return value && value.length > 0 ? value : undefined;
 }
 
-export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSave }: Props) {
+// Renamed on destructuring, see TextSnippetModal: the record is `coupon`, and
+// `editing` in this file belongs to the shell's delete-action prop.
+export default function CouponFormDrawer({ isOpen, onClose, editingCoupon: coupon, onSave }: Props) {
     "use no memo";
     const { confirm } = useUI();
     const {
@@ -140,9 +143,9 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
 
     useEffect(() => {
         if (isOpen) {
-            reset(toFormValues(editingCoupon));
+            reset(toFormValues(coupon));
         }
-    }, [isOpen, editingCoupon, reset]);
+    }, [isOpen, coupon, reset]);
 
     const handleClose = async () => {
         if (isDirty) {
@@ -184,22 +187,37 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
     if (!isOpen) return null;
 
     return (
-        <div className="modal modal-open z-50">
-            <div className="modal-box max-w-2xl relative">
-                <button
-                    type="button"
-                    className="btn btn-circle btn-ghost absolute right-2 top-2"
-                    onClick={handleClose}
-                    aria-label={t`Schließen`}
-                >
-                    ✕
-                </button>
-                <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
-                    <span className="iconify mdi--ticket-percent-outline text-primary"></span>
-                    {editingCoupon ? <Trans>Rabattcode bearbeiten</Trans> : <Trans>Neuen Rabattcode anlegen</Trans>}
-                </h3>
-
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <ModalDialogShell
+            title={coupon ? <Trans>Rabattcode bearbeiten</Trans> : <Trans>Neuen Rabattcode anlegen</Trans>}
+            icon="mdi--ticket-percent-outline"
+            // `handleClose`, not `onClose`: it asks for confirmation whenever
+            // the form is dirty. The shell routes its header button, its
+            // backdrop, Escape and the cancel button all through this one prop,
+            // so all four now raise that confirmation — Escape and the backdrop
+            // previously discarded a dirty form with no warning, which was the
+            // one place this dialog could lose typed input silently.
+            onClose={handleClose}
+            // This dialog has no delete action for an existing coupon — codes
+            // are deactivated through the `Aktiv` checkbox — so the shared
+            // footer must not offer one, and the value that would mean "a coupon
+            // is being edited" is `coupon`, not `editing`. See the `editing` note
+            // in TextSnippetModal.
+            editing={false}
+            isSubmitting={isSubmitting}
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+            className="z-50"
+            // See CustomerModal: `max-w-2xl` is also what `maxWidth="2xl"`
+            // renders, so this stays on `boxClassName` with the markup it has
+            // always had.
+            boxClassName="max-w-2xl"
+            // Eleven form-controls at the `photo_package` setting, so this
+            // dialog genuinely outgrows a viewport. Opting in keeps the submit
+            // row reachable instead of below the fold, which is what a long
+            // *form* needs from the bounded layout.
+            scrollableBody
+        >
+                <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control">
                             <label className="label">
@@ -402,18 +420,7 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon, onSav
                             </label>
                         </div>
                     </div>
-
-                    <div className="modal-action col-span-full mt-6">
-                        <button type="button" className="btn btn-ghost" onClick={handleClose}>
-                            <Trans>Abbrechen</Trans>
-                        </button>
-                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                            {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
-                        </button>
-                    </div>
-                </form>
-            </div>
-            <div className="modal-backdrop" onClick={handleClose}></div>
-        </div>
+                </div>
+        </ModalDialogShell>
     );
 }
