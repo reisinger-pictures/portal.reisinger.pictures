@@ -186,7 +186,7 @@ test.describe('Coupon Checkout Re-validation', () => {
         await couponInput.fill(code);
         await main.getByRole('button', {name: 'Anwenden'}).click();
 
-        await expect(main.getByTestId('cart-discount')).toContainText('10.00 €');
+        await expect(main.getByTestId('cart-discount')).toContainText('10,00 €');
         await expect(main.getByTestId('coupon-input')).toContainText(code);
     });
 });

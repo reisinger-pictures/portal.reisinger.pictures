@@ -128,7 +128,7 @@ test.describe('Custom Quotes Full Workflow', () => {
 
         await expect(async () => {
             await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.', { timeout: 1000 });
-            await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('1500.00 €', { timeout: 1000 });
+            await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('1.500,00 €', { timeout: 1000 });
             await expect(page.getByRole('button', { name: 'Zahlungspflichtig bestellen' })).toBeVisible({ timeout: 1000 });
         }).toPass({ timeout: 15000 });
     });

@@ -1,11 +1,12 @@
 import type { Page } from '@playwright/test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { playwrightExpect, toHaveCount, toBeAttached, toBeVisible, toPass } = vi.hoisted(() => ({
+const { playwrightExpect, toHaveCount, toBeAttached, toBeVisible, toHaveAttribute, toPass } = vi.hoisted(() => ({
     playwrightExpect: vi.fn(),
     toHaveCount: vi.fn(),
     toBeAttached: vi.fn(),
     toBeVisible: vi.fn(),
+    toHaveAttribute: vi.fn(),
     toPass: vi.fn(),
 }));
 
@@ -22,18 +23,22 @@ interface FakeLocator {
     first: MockOf<() => FakeLocator>;
     isVisible: MockOf<() => Promise<boolean>>;
     click: MockOf<() => Promise<void>>;
+    getAttribute: MockOf<(name: string) => Promise<string | null>>;
     // Kept only so the tests can prove the helper never uses the separate
     // scroll/attach steps that used to detach mid-click.
     scrollIntoViewIfNeeded: MockOf<() => Promise<void>>;
     waitFor: MockOf<() => Promise<void>>;
 }
 
-function fakeLocator(name: string, visible: boolean): FakeLocator {
+function fakeLocator(name: string, visible: boolean, expanded?: boolean): FakeLocator {
     const self: FakeLocator = {
         name,
         first: vi.fn<() => FakeLocator>(() => self),
         isVisible: vi.fn<() => Promise<boolean>>(async () => visible),
         click: vi.fn<() => Promise<void>>(async () => undefined),
+        getAttribute: vi.fn<(attr: string) => Promise<string | null>>(
+            async () => (expanded === undefined ? null : String(expanded)),
+        ),
         scrollIntoViewIfNeeded: vi.fn<() => Promise<void>>(async () => undefined),
         waitFor: vi.fn<() => Promise<void>>(async () => undefined),
     };
@@ -45,7 +50,6 @@ interface Harness {
     modal: { name: string };
     shell: { name: string; getByRole: MockOf<(role: string, options?: { name?: string }) => FakeLocator> };
     menuButton: FakeLocator;
-    backdrop: FakeLocator;
     link: FakeLocator;
 }
 
@@ -53,12 +57,12 @@ interface Harness {
  * Builds a page whose drawer trigger is either visible (below the `md`
  * breakpoint) or absent from the accessibility tree (from `md` upwards, because
  * the button carries `md:hidden`). The `<aside>` landmark is present in both
- * cases, exactly as in the product.
+ * cases, exactly as in the product. `drawerOpen` drives the trigger's
+ * `aria-expanded`, which is the only drawer-state signal the helper reads.
  */
-function createHarness(options: { triggerVisible: boolean; backdropVisible?: boolean }): Harness {
+function createHarness(options: { triggerVisible: boolean; drawerOpen?: boolean }): Harness {
     const modal = { name: 'modal-open' };
-    const backdrop = fakeLocator('backdrop', options.backdropVisible ?? false);
-    const menuButton = fakeLocator('menu-btn', options.triggerVisible);
+    const menuButton = fakeLocator('menu-btn', options.triggerVisible, options.drawerOpen ?? false);
     const link = fakeLocator('link', true);
     const shell = {
         name: 'shell',
@@ -76,12 +80,14 @@ function createHarness(options: { triggerVisible: boolean; backdropVisible?: boo
         }),
         locator: vi.fn((selector: string) => {
             if (selector === '.modal-open') return modal;
-            if (selector === 'div.fixed.inset-0') return backdrop;
+            // The removed `div.fixed.inset-0` drawer scrim is deliberately absent:
+            // resolving it here would throw and fail these tests, which is the
+            // regression guard against reintroducing it as a state signal.
             throw new Error(`Unexpected selector: ${selector}`);
         }),
     } as unknown as Page;
 
-    return { page, modal, shell, menuButton, backdrop, link };
+    return { page, modal, shell, menuButton, link };
 }
 
 /** Every locator handed to an `expect()` wait, in call order. */
@@ -104,13 +110,14 @@ describe('SidebarHelper.navigateTo', () => {
         toHaveCount.mockReset();
         toBeAttached.mockReset();
         toBeVisible.mockReset();
+        toHaveAttribute.mockReset();
         toPass.mockReset();
         toPass.mockImplementation(async () => {
             const actual = playwrightExpect.mock.calls.at(-1)?.[0];
             if (typeof actual !== 'function') throw new Error('toPass callback was not provided');
             return (actual as () => Promise<void>)();
         });
-        playwrightExpect.mockReturnValue({ toHaveCount, toBeAttached, toBeVisible, toPass });
+        playwrightExpect.mockReturnValue({ toHaveCount, toBeAttached, toBeVisible, toHaveAttribute, toPass });
     });
 
     /** The locator the most recent `expect()` was called with. */
@@ -134,16 +141,18 @@ describe('SidebarHelper.navigateTo', () => {
     }
 
     it('waits for the navigation shell, then opens the mobile drawer before clicking the link', async () => {
-        const { page, modal, shell, menuButton, backdrop, link } = createHarness({ triggerVisible: true });
+        const { page, modal, shell, menuButton, link } = createHarness({ triggerVisible: true });
         onlyShellIsAwaitable(shell);
 
         await new SidebarHelper(page).navigateTo('Mein Team');
 
-        expect(awaitedLocators()).toEqual([modal, shell, backdrop, link]);
+        expect(awaitedLocators()).toEqual([modal, shell, menuButton, link]);
         expect(toHaveCount).toHaveBeenCalledWith(0, { timeout: 5000 });
         expect(toBeAttached).toHaveBeenCalledTimes(1);
         expect(toBeAttached).toHaveBeenCalledWith({ timeout: 10000 });
         expect(toBeAttached.mock.invocationCallOrder[0]).toBeLessThan(menuButton.isVisible.mock.invocationCallOrder[0]);
+        expect(menuButton.getAttribute).toHaveBeenCalledWith('aria-expanded');
+        expect(toHaveAttribute).toHaveBeenCalledWith('aria-expanded', 'true', { timeout: 2000 });
         expect(menuButton.click).toHaveBeenCalledTimes(1);
         expect(shell.getByRole).toHaveBeenCalledWith('link', { name: 'Mein Team', exact: false });
         expect(link.first).toHaveBeenCalledTimes(1);
@@ -154,7 +163,7 @@ describe('SidebarHelper.navigateTo', () => {
     });
 
     it('does not re-click the trigger when the drawer is already open', async () => {
-        const { page, shell, menuButton, link } = createHarness({ triggerVisible: true, backdropVisible: true });
+        const { page, shell, menuButton, link } = createHarness({ triggerVisible: true, drawerOpen: true });
         onlyShellIsAwaitable(shell);
 
         await new SidebarHelper(page).navigateTo('Verträge');
@@ -198,10 +207,6 @@ describe('SidebarHelper.navigateTo', () => {
             first: vi.fn().mockReturnThis(),
             isVisible: vi.fn().mockResolvedValue(false),
         };
-        const backdrop = {
-            first: vi.fn().mockReturnThis(),
-            isVisible: vi.fn().mockResolvedValue(false),
-        };
         const page = {
             getByRole: vi.fn((role: string) => {
                 if (role === 'button') return menuButton;
@@ -210,7 +215,6 @@ describe('SidebarHelper.navigateTo', () => {
             }),
             locator: vi.fn((selector: string) => {
                 if (selector === '.modal-open') return {};
-                if (selector === 'div.fixed.inset-0') return backdrop;
                 throw new Error(`Unexpected selector: ${selector}`);
             }),
         } as unknown as Page;

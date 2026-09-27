@@ -104,7 +104,7 @@ test.describe('Quote Checkout Workflow', () => {
         // Warte auf Toast + korrekten Preis
         await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.', { timeout: 10000 });
         const totalAmount = page.locator('.text-3xl.font-mono.text-primary');
-        await expect(totalAmount).toHaveText('1500.00 €');
+        await expect(totalAmount).toHaveText('1.500,00 €');
 
         // --- 4. Checkout-Formular ausfüllen ---
         await form.fillCheckoutForm({

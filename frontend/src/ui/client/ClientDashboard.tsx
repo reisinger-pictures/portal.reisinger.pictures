@@ -21,11 +21,6 @@ export default function ClientDashboard() {
     const userName = user.name;
     return (
         <div className="flex h-screen bg-base-100 overflow-hidden relative">
-            {isSidebarOpen && (
-                <div className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
-                     onClick={() => setIsSidebarOpen(false)}></div>
-            )}
-
             <div
                 id="client-sidebar"
                 className={`fixed inset-y-0 left-0 z-50 w-full md:w-72 2xl:w-80 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>

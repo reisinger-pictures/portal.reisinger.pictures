@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
+import { withGlobalSettingsLock, SHOOTING_CALCULATOR_SETTINGS_LOCK } from '../helpers/GlobalSettingsLock';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 
 test.describe('Manual Documents & CRM Workflow', () => {
@@ -99,7 +100,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
         await discountOption.click();
 
         // Validierung der Gesamtsumme (150 * 2 - 20 = 280)
-        await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('280.00 €');
+        await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('280,00 €');
 
         // 5. PDF Generierung
         const [download] = await Promise.all([
@@ -137,7 +138,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
         await expect(page.locator('.form-control').filter({ hasText: 'Menge' }).locator('input').first()).toHaveValue('2');
         
         await expect(page.locator('.form-control').filter({ hasText: 'Titel / Beschreibung' }).locator('input').last()).toHaveValue(`E2E Discount ${uniqueSuffix}`);
-        await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('280.00 €');
+        await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('280,00 €');
         
         // Nutze den bereits oben deklarierten 'editor' Locator
         await expect(editor).toContainText(`Magic${uniqueSuffix}Content`);
@@ -148,31 +149,66 @@ test.describe('Manual Documents & CRM Workflow', () => {
         const sidebar = new SidebarHelper(page);
         await auth.login(testUser.email, testUser.password);
 
-        await sidebar.navigateTo('Manuelles Angebot');
-        
-        // Kalkulator Modal öffnen
-        await page.locator('button:has-text("Paket-Kalkulator")').click();
-        const calcModal = page.locator('.modal-open');
-        await expect(calcModal).toBeVisible();
+        // The calculator reads brand-global pricing factors, and the portal has a
+        // single brand — so every worker of the run shares one `settings` row.
+        // `package-calculator-config.spec.ts` saves its own values there, and
+        // under `fullyParallel` with several workers that save can land between
+        // this test reading the factors and asserting the total. It did: with
+        // its hourly rate of 95 the total is 119,00 € instead of 105,00 €.
+        //
+        // The lock closes that window instead of narrowing it — no other worker
+        // can touch these settings between establishing them and asserting — and
+        // the factors are established here, so the expected number no longer
+        // depends on whatever state the run happens to start from. Waiting for
+        // the lock is charged to the test timeout, so only the shared-state
+        // access is inside it: the write has to precede the navigation, because
+        // `ShootingCalculatorModal` fetches the terms when the page mounts.
+        await withGlobalSettingsLock(SHOOTING_CALCULATOR_SETTINGS_LOCK, async () => {
+            const effective = await helper.setShootingCalculatorSettings({
+                calc_base_price: 50,
+                calc_hourly_rate: 80,
+                calc_images_per_hour: 6,
+                calc_outdoor_images_per_hour: 8,
+                calc_flatrate_multiplier: 1.2,
+            });
+            // Guard the premise of the arithmetic asserted below: these are the
+            // factors the calculator modal will consume, not merely what was sent.
+            expect(effective).toEqual({
+                calc_base_price: '50',
+                calc_hourly_rate: '80',
+                calc_images_per_hour: '6',
+                calc_outdoor_images_per_hour: '8',
+                calc_flatrate_multiplier: '1.2',
+            });
 
-        // Werte über eindeutige Landmarken/Labels eintragen, um Verschiebungen im Mobil-Layout zu verhindern
-        await calcModal.locator('.form-control', { hasText: 'Dauer (Min.)' }).locator('input').fill('60');
-        await calcModal.locator('.form-control', { hasText: 'Inkl. Bilder' }).locator('input').fill('6');
-        
-        // 50% OG Rabatt auswählen
-        await calcModal.locator('.form-control', { hasText: 'Rabatt-Stufe' }).locator('select').selectOption('50');
-        
-        // Berechnen & Hinzufügen klicken
-        await calcModal.getByRole('button', { name: 'Berechnen & Hinzufügen' }).click();
-        await expect(calcModal).toBeHidden();
+            await sidebar.navigateTo('Manuelles Angebot');
 
-        // Validierung in der Haupt-Tabelle (jetzt div-basiert nach Refactoring)
-        // Leistungsposten prüfen (250.00 €)
-        // React setzt den Value als DOM-Property, nicht als HTML-Attribute → toHaveValue statt CSS-Selector
-        const itemTitleInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
-        await expect(itemTitleInput).toHaveValue('Individuelles Shooting-Paket', { timeout: 10000 });
-        
-        // Gesamtsumme prüfen (250€ - 50% = 125€)
-        await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('105.00 €');
+            // Kalkulator Modal öffnen
+            await page.locator('button:has-text("Paket-Kalkulator")').click();
+            const calcModal = page.locator('.modal-open');
+            await expect(calcModal).toBeVisible();
+
+            // Werte über eindeutige Landmarken/Labels eintragen, um Verschiebungen im Mobil-Layout zu verhindern
+            await calcModal.locator('.form-control', { hasText: 'Dauer (Min.)' }).locator('input').fill('60');
+            await calcModal.locator('.form-control', { hasText: 'Inkl. Bilder' }).locator('input').fill('6');
+
+            // 50% OG Rabatt auswählen
+            await calcModal.locator('.form-control', { hasText: 'Rabatt-Stufe' }).locator('select').selectOption('50');
+
+            // Berechnen & Hinzufügen klicken
+            await calcModal.getByRole('button', { name: 'Berechnen & Hinzufügen' }).click();
+            await expect(calcModal).toBeHidden();
+
+            // Validierung in der Haupt-Tabelle (jetzt div-basiert nach Refactoring)
+            // React setzt den Value als DOM-Property, nicht als HTML-Attribut → toHaveValue statt CSS-Selector
+            const itemTitleInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
+            await expect(itemTitleInput).toHaveValue('Individuelles Shooting-Paket', { timeout: 10000 });
+
+            // Gesamtsumme prüfen. Mit den oben gesetzten Faktoren:
+            // Basis 50 + Zeit (1 h × 80) + Bilder ((80/6) × 6) = 210 → psychologisch 209;
+            // davon 50 % Rabatt: 104,50 → psychologisch gerundet 105.
+            // Der Rabattposten im Beleg ist 209 − 105 = 104, die Summe also 105,00 €.
+            await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('105,00 €');
+        });
     });
 });

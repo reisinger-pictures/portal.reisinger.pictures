@@ -236,7 +236,9 @@ test.describe('Digital Contracts Workflow', () => {
         const shootingRow = main.getByRole('row').filter({ hasText: 'Fotoshooting' });
         await expect(shootingRow.getByRole('cell').nth(2)).toHaveText('100,00 €', { timeout: 10000 });
         await expect(shootingRow.getByRole('cell').nth(3)).toHaveText('100,00 €', { timeout: 10000 });
-        await expect(main.getByText('10%', { exact: true })).toBeVisible();
+        // Percent discounts use the one percent formatter (comma, two decimals).
+        // Playwright normalises the U+00A0 of `formatPercent` to a plain space.
+        await expect(main.getByText('10,00 %', { exact: true })).toBeVisible();
         await expect(main.getByText('5,00 €', { exact: true })).toBeVisible();
         await expect(main.getByText('85,00 €', { exact: true })).toBeVisible();
 

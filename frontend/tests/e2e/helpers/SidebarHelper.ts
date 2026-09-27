@@ -24,17 +24,24 @@ export class SidebarHelper {
         await expect(shell).toBeAttached({ timeout: 10000 });
 
         const menuBtn = this.page.getByRole('button', { name: 'Menü öffnen' }).first();
-        const backdrop = this.page.locator('div.fixed.inset-0').first();
 
         // Nur unterhalb des `md`-Breakpoints ist der Drawer geschlossen und der Trigger sichtbar; ab
         // `md` ist `isVisible()` dauerhaft false und der Zweig entfällt. Die Prüfung ist damit
         // viewport-agnostisch, der Drawer wird auf Mobile wie bisher vor dem Link-Klick geöffnet.
-        if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
+        //
+        // Der Drawer-Zustand wird an `aria-expanded` des Triggers gelesen, nicht an einem
+        // Backdrop-Overlay. Ein `fixed inset-0`-Scrim kann den Zustand hier ohnehin nicht
+        // belegen: der Drawer ist unterhalb `md` mit `w-full` exakt viewport-breit und ab `md`
+        // `md:relative` — ein darunterliegender `z-40`-Scrim hätte auf keinem Viewport eine
+        // treffbare Fläche. `aria-expanded` ist der Vertrag, den alle drei Header
+        // (GlobalSearchHeader, ManagementDashboard, ClientDashboard) setzen und den
+        // client/optin.spec.ts bereits als Zustandsquelle prüft.
+        if (await menuBtn.isVisible()) {
             await expect(async () => {
-                if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
+                if (await menuBtn.isVisible() && (await menuBtn.getAttribute('aria-expanded')) !== 'true') {
                     await menuBtn.click();
                 }
-                await expect(backdrop).toBeVisible({ timeout: 2000 });
+                await expect(menuBtn).toHaveAttribute('aria-expanded', 'true', { timeout: 2000 });
             }).toPass({ timeout: 10000 });
         }
 

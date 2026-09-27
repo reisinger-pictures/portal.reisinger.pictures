@@ -66,6 +66,6 @@ test.describe('Product Batch Edit Workflow', () => {
         
         // Sicherstellen, dass Batch-Modus sich geschlossen hat und die neuen Werte da sind
         await expect(page.getByText('Updated Desc 1').and(page.locator(':visible')).first()).toBeVisible();
-        await expect(page.getByText('150.00 €').and(page.locator(':visible')).first()).toBeVisible();
+        await expect(page.getByText('150,00 €').and(page.locator(':visible')).first()).toBeVisible();
     });
 });

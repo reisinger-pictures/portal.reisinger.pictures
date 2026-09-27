@@ -153,15 +153,42 @@ export class KanbanHelper {
             .first();
     }
 
-    async waitForCreate(endpoint: string) {
-        await this.page.waitForResponse(
+    /**
+     * Subscribes to the create response and returns the pending promise.
+     *
+     * `page.waitForResponse` attaches its page listener SYNCHRONOUSLY when
+     * called, so the subscription is live the moment this method runs — the
+     * returned promise does not have to be awaited for the listener to exist.
+     * That is what makes the registration order in the caller the whole game:
+     *
+     *   WRONG — the POST often lands before the listener exists, and
+     *           `waitForResponse` has no response history, so it then waits
+     *           out its entire budget and fails although the mutation worked:
+     *     await kanban.submit();
+     *     await kanban.waitForCreate(endpoint);
+     *
+     *   RIGHT — subscribe first, trigger second (see `submitAndAwaitCreate`
+     *           in projects-board.spec.ts / production-board.spec.ts):
+     *     const created = kanban.waitForCreate(endpoint);
+     *     await kanban.submit();
+     *     await created;
+     *
+     * Measured on an idle box, 12 of 20 runs cleared the create response by
+     * only 6–12 ms — a lost race there is a load-INVERTED flake: the faster the
+     * backend answers, the likelier the post-click subscription misses it.
+     */
+    waitForCreate(endpoint: string) {
+        return this.page.waitForResponse(
             res => res.url().includes(endpoint) && res.request().method() === 'POST',
             { timeout: 15000 },
         );
     }
 
-    async waitForDelete(endpoint: string) {
-        await this.page.waitForResponse(
+    /**
+     * Same contract as {@link waitForCreate} for the confirm-modal DELETE.
+     */
+    waitForDelete(endpoint: string) {
+        return this.page.waitForResponse(
             res => res.url().includes(endpoint) && res.request().method() === 'DELETE',
             { timeout: 15000 },
         );

@@ -1,48 +1,65 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { ToastHelper } from '../helpers/ToastHelper';
+import { withGlobalSettingsLock, SHOOTING_CALCULATOR_SETTINGS_LOCK } from '../helpers/GlobalSettingsLock';
 
 test.describe('Package Calculator Configuration (G2)', () => {
     let helper: E2ESessionHelper;
     let superAdmin = { email: '', password: '' };
 
     /**
-     * The calculator settings are global, brand-scoped state, not per-user.
-     * The verification test used to depend on the configuration test having run
-     * first and saved them, which is a hidden order dependency: under parallel
-     * workers another test can overwrite the values between the save and the
-     * read, and the assertion then sees a different price. Observed as 319.00
-     * EUR instead of 229.00 EUR, with the locator resolving stably 14 times, so
-     * it was never a timing problem.
+     * The calculator settings are global, brand-scoped state, not per-user, and
+     * the portal has a single brand — so every worker of a run reads and writes
+     * the very same `settings` row. Saving them therefore races any other spec
+     * that opens the calculator, and the assertion on the other side then sees a
+     * different price. That is an order dependency, and a serial run hides it
+     * completely.
      *
-     * Every test now establishes the values it relies on itself.
+     * This spec sits on both sides of that race: it writes the settings *and*
+     * reads them back. So each test runs its complete save-then-assert sequence
+     * inside one exclusive critical section, and restores the values it found on
+     * the way out — a run that ends here leaves the shared row as it started.
      */
-    const applyCalculatorSettings = async (page: Page) => {
-        const auth = new AuthHelper(page);
-        const sidebar = new SidebarHelper(page);
-
-        await auth.login(superAdmin.email, superAdmin.password);
-        await sidebar.navigateTo('Einstellungen');
-        await expect(page.locator('h1:has-text("System-Einstellungen")')).toBeVisible();
-
-        const cardBody = page.locator('main h2:has-text("Paket-Rechner Konfiguration")').first()
-            .locator('..').locator('..');
-        await expect(cardBody).toBeVisible();
-
-        await cardBody.locator('.form-control').filter({ hasText: 'Stundensatz' }).locator('input[type="number"]').fill('95');
-        await cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Bilder' }).locator('input[type="number"]').fill('12');
-        await cardBody.locator('.form-control').filter({ hasText: 'Reportage-Aufschlag' }).locator('input[type="number"]').fill('25');
-
-        await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
-        await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
+    const withCalculatorSettings = async (body: () => Promise<void>) => {
+        await withGlobalSettingsLock(SHOOTING_CALCULATOR_SETTINGS_LOCK, async () => {
+            const settingsBefore = await helper.getShootingCalculatorSettings();
+            try {
+                await body();
+            } finally {
+                await helper.setShootingCalculatorSettings(settingsBefore);
+            }
+        });
     };
 
-    test.beforeEach(async ({ request, page }) => {
+    /**
+     * Log in and open the calculator settings card, returning its body.
+     *
+     * This deliberately stays *outside* the lock: waiting for the lock is charged
+     * to the test's own timeout budget, so the critical section only covers the
+     * shared-state access — the save and everything that reads it back. Nothing
+     * asserted below depends on when this page happened to load.
+     *
+     * The values themselves are written through the settings form, because the
+     * form is the subject of this spec; an API write would stop testing it.
+     */
+    const openCalculatorSettings = async (page: Page): Promise<Locator> => {
+        await new AuthHelper(page).login(superAdmin.email, superAdmin.password);
+        await new SidebarHelper(page).navigateTo('Einstellungen');
+        await expect(page.locator('h1:has-text("System-Einstellungen")')).toBeVisible();
+
+        const card = page.locator('main h2:has-text("Paket-Rechner Konfiguration")').first();
+        await expect(card).toBeVisible();
+        return card.locator('..').locator('..');
+    };
+
+    const field = (cardBody: Locator, label: string) =>
+        cardBody.locator('.form-control').filter({ hasText: label }).locator('input[type="number"]');
+
+    test.beforeEach(async ({ request }) => {
         helper = new E2ESessionHelper(request);
         superAdmin = await helper.createIsolatedUser('super_admin');
-        await applyCalculatorSettings(page);
     });
 
     test.afterEach(async () => {
@@ -50,67 +67,67 @@ test.describe('Package Calculator Configuration (G2)', () => {
     });
 
     test('Admin can configure package calculator settings', { tag: ['@feature:admin:calculator'] }, async ({ page }) => {
-        // Settings are written by beforeEach so this test does not depend on
-        // ordering. It asserts that what was saved is read back.
-        const cardBody = page.locator('main h2:has-text("Paket-Rechner Konfiguration")').first()
-            .locator('..').locator('..');
+        const cardBody = await openCalculatorSettings(page);
 
-        await expect(cardBody.locator('.form-control').filter({ hasText: 'Stundensatz' }).locator('input[type="number"]'))
-            .toHaveValue('95');
-        await expect(cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Bilder' }).locator('input[type="number"]'))
-            .toHaveValue('12');
-        await expect(cardBody.locator('.form-control').filter({ hasText: 'Reportage-Aufschlag' }).locator('input[type="number"]'))
-            .toHaveValue('25');
+        await withCalculatorSettings(async () => {
+            // Saved and read back inside the same critical section, so what the
+            // form shows is what this test just wrote — no other worker can have
+            // replaced the value in between. It asserts the save/read round trip.
+            await field(cardBody, 'Stundensatz').fill('95');
+            await field(cardBody, 'Outdoor-Bilder').fill('12');
+            await field(cardBody, 'Reportage-Aufschlag').fill('25');
+
+            await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
+            await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
+
+            await expect(field(cardBody, 'Stundensatz')).toHaveValue('95');
+            await expect(field(cardBody, 'Outdoor-Bilder')).toHaveValue('12');
+            await expect(field(cardBody, 'Reportage-Aufschlag')).toHaveValue('25');
+        });
     });
 
     test('Admin can set outdoor multiplier and verify it in the shooting calculator', { tag: ['@feature:admin:calculator'] }, async ({ page }) => {
-        const auth = new AuthHelper(page);
-        const sidebar = new SidebarHelper(page);
+        const cardBody = await openCalculatorSettings(page);
 
-        // Log in and save all calculator settings via the UI form to ensure correct brand scope
-        await auth.login(superAdmin.email, superAdmin.password);
-        await sidebar.navigateTo('Einstellungen');
+        // The save and the calculator verification share one critical section:
+        // they read the same shared row, so a concurrent writer between them
+        // would be exactly the bug this guard exists for.
+        await withCalculatorSettings(async () => {
+            await field(cardBody, 'Grundpreis').fill('50');
+            await field(cardBody, 'Stundensatz').fill('80');
+            await field(cardBody, 'Outdoor-Bilder').fill('20');
+            await field(cardBody, 'Bilder pro Stunde').fill('6');
 
-        await expect(page.locator('h1:has-text("System-Einstellungen")')).toBeVisible();
+            await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
+            await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
 
-        const calculatorCard = page.locator('main h2:has-text("Paket-Rechner Konfiguration")').first();
-        await expect(calculatorCard).toBeVisible();
-        const cardBody = calculatorCard.locator('..').locator('..');
+            // Wait for the form to reflect the saved hourly rate (ensures SWR cache is fresh)
+            await expect(field(cardBody, 'Stundensatz')).toHaveValue('80');
 
-        await cardBody.locator('.form-control').filter({ hasText: 'Grundpreis' }).locator('input[type="number"]').fill('50');
-        await cardBody.locator('.form-control').filter({ hasText: 'Stundensatz' }).locator('input[type="number"]').fill('80');
-        await cardBody.locator('.form-control').filter({ hasText: 'Outdoor-Bilder' }).locator('input[type="number"]').fill('20');
-        await cardBody.locator('.form-control').filter({ hasText: 'Bilder pro Stunde' }).locator('input[type="number"]').fill('6');
+            // Navigate to manual offer page and open calculator
+            await new SidebarHelper(page).navigateTo('Manuelles Angebot');
 
-        await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
-        await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
+            await page.locator('button:has-text("Paket-Kalkulator")').click();
+            const calcModal = page.locator('.modal-open');
+            await expect(calcModal).toBeVisible();
 
-        // Wait for the form to reflect the saved hourly rate (ensures SWR cache is fresh)
-        await expect(cardBody.locator('.form-control').filter({ hasText: 'Stundensatz' }).locator('input[type="number"]')).toHaveValue('80');
+            // Enter values: 90 min, 15 images
+            await calcModal.locator('.form-control', { hasText: 'Dauer (Min.)' }).locator('input').fill('90');
+            await calcModal.locator('.form-control', { hasText: 'Inkl. Bilder' }).locator('input').fill('15');
 
-        // Navigate to manual offer page and open calculator
-        await sidebar.navigateTo('Manuelles Angebot');
+            // Activate outdoor
+            await calcModal.locator('label').filter({ hasText: 'Outdoor-Shooting' }).locator('input[type="checkbox"]').check();
 
-        await page.locator('button:has-text("Paket-Kalkulator")').click();
-        const calcModal = page.locator('.modal-open');
-        await expect(calcModal).toBeVisible();
+            // Calculate & add
+            await calcModal.getByRole('button', { name: 'Berechnen & Hinzufügen' }).click();
+            await expect(calcModal).toBeHidden();
 
-        // Enter values: 90 min, 15 images
-        await calcModal.locator('.form-control', { hasText: 'Dauer (Min.)' }).locator('input').fill('90');
-        await calcModal.locator('.form-control', { hasText: 'Inkl. Bilder' }).locator('input').fill('15');
+            // Verify result:
+            // Base 50 + Time 120 + (Images (80/20)*15 = 60) = 230 → psych 229
+            const itemTitleInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
+            await expect(itemTitleInput).toHaveValue('Individuelles Shooting-Paket', { timeout: 10000 });
 
-        // Activate outdoor
-        await calcModal.locator('label').filter({ hasText: 'Outdoor-Shooting' }).locator('input[type="checkbox"]').check();
-
-        // Calculate & add
-        await calcModal.getByRole('button', { name: 'Berechnen & Hinzufügen' }).click();
-        await expect(calcModal).toBeHidden();
-
-        // Verify result:
-        // Base 50 + Time 120 + (Images (80/20)*15 = 60) = 230 → psych 229
-        const itemTitleInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
-        await expect(itemTitleInput).toHaveValue('Individuelles Shooting-Paket', { timeout: 10000 });
-
-        await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('229.00 €');
+            await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('229,00 €');
+        });
     });
 });

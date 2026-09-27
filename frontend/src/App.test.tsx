@@ -2,6 +2,7 @@ import {render, screen} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {MemoryRouter, Route, Routes, useLocation} from 'react-router-dom';
 import {ProtectedRoute} from './App';
+import App from './App';
 import {useAuth} from './logic/useAuth';
 import {usePermissions} from './logic/usePermissions';
 
@@ -11,6 +12,17 @@ vi.mock('./logic/useAuth', () => ({
 
 vi.mock('./logic/usePermissions', () => ({
     usePermissions: vi.fn(),
+}));
+
+// Throwing a never-resolving promise suspends the boundary indefinitely, which
+// is the production state while the lazy ProtectedDashboard chunk is being
+// fetched. Only the `Suspense fallback boot signal` block below renders <App/>;
+// the ProtectedRoute cases render the route element directly and never reach
+// this module.
+vi.mock('./ui/ProtectedDashboard', () => ({
+    default: () => {
+        throw new Promise<never>(() => {});
+    },
 }));
 
 function CurrentLocation() {
@@ -34,14 +46,28 @@ describe('ProtectedRoute trailing-slash normalization', () => {
         vi.mocked(useAuth).mockReturnValue({
             user: {
                 id: 'user-1',
+                guest_id: null,
                 name: 'Admin',
                 email: 'admin@example.com',
+                billing_name: null,
+                billing_company: null,
+                billing_street: null,
+                billing_zip: null,
+                billing_city: null,
+                brand: null,
+                is_cross_brand: false,
                 is_super_admin: true,
                 is_admin: true,
                 is_photographer: true,
+                is_org_admin: false,
+                is_power_user: false,
                 is_pending: false,
                 can_edit_metadata: true,
+                can_purchase_upgrades: false,
                 roles: ['admin'],
+                transient_galleries: [],
+                transient_meta_galleries: [],
+                photographer_gallery_groups: [],
             },
             isLoading: false,
             isError: undefined,
@@ -122,5 +148,32 @@ describe('ProtectedRoute trailing-slash normalization', () => {
         expect(screen.getByRole('heading', {name: 'Authentifizierung'})).toBeInTheDocument();
         expect(screen.queryByRole('heading', {name: 'Privates Profil'})).not.toBeInTheDocument();
         expect(screen.getByRole('status', {name: 'Aktuelle Route'})).toHaveTextContent('/');
+    });
+});
+
+/**
+ * The Suspense fallback is one half of a contract whose other half lives in the
+ * Playwright helper: `AuthHelper.login()` can only wait for "the boot is
+ * finished" by asserting the ABSENCE of both boot loaders, because the
+ * ProtectedDashboard chunk is the window in which `app-loader` does not exist at
+ * all. So the two test ids have to be a set that is actually reachable:
+ *
+ *   - `app-loader-fallback` is on screen for the whole chunk fetch. If it were
+ *     renamed or dropped, the helper's first wait would silently go vacuous
+ *     again — an assertion that can never fail, which is the defect itself.
+ *   - `app-loader` is absent for that same window, which is exactly why it
+ *     cannot carry the wait on its own. Asserted here so that reasoning stays
+ *     pinned to the rendered markup instead of a comment that can rot.
+ */
+describe('Suspense fallback boot signal', () => {
+    it('renders app-loader-fallback while the route chunk is in flight, and app-loader is absent', () => {
+        render(
+            <MemoryRouter>
+                <App/>
+            </MemoryRouter>
+        );
+
+        expect(screen.getByTestId('app-loader-fallback')).toBeInTheDocument();
+        expect(screen.queryByTestId('app-loader')).not.toBeInTheDocument();
     });
 });
