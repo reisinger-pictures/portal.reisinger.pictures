@@ -31,9 +31,19 @@ describe('MobileBrandLink', () => {
 
         const name = screen.getByText('Reisinger Foto Portal');
         expect(name).toBeInTheDocument();
-        // `truncate` clipped the name to "Reisinger Fot…" on a phone. The
-        // class must not come back.
-        expect(name).not.toHaveClass('truncate');
+
+        // jsdom applies no CSS, so this can only be a class-list check: the
+        // class names are the only thing observable here, never the rendered
+        // layout. `truncate` (overflow-hidden + text-ellipsis + nowrap) clipped
+        // the name to "Reisinger Fot…" on a phone; the other mechanisms below
+        // clip identically and must not sneak back in either. The real layout
+        // guard — scrollWidth vs clientWidth in a browser — is the Playwright
+        // spec `tests/e2e/photographer/mobile-brand-lockup.spec.ts`.
+        const truncationClasses = ['truncate', 'text-ellipsis', 'overflow-hidden', 'whitespace-nowrap'];
+        const applied = Array.from(name.classList).filter(
+            (className) => truncationClasses.includes(className) || className.startsWith('line-clamp-'),
+        );
+        expect(applied).toEqual([]);
     });
 
     it('links to the portal home', () => {
