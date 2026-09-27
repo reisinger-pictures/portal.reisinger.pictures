@@ -46,7 +46,9 @@ test.describe('Gallery Invite Link Workflow', () => {
         await modal.clickButton('Generieren');
         await expect(page.locator('text=Erfolgreich generiert!')).toBeVisible();
         const inviteLinkAnon = await modal.activeModal.locator('input[readonly]').inputValue();
-        await modal.clickButton('Schließen');
+        // The header close and the footer's "Schließen" share a name, so scope to
+        // the footer — see the InviteModal footer note.
+        await page.getByRole('dialog').locator('.modal-action').getByRole('button', { name: 'Schließen', exact: true }).click();
         await auth.logout();
 
         // 2. Anonymous Guest redeems link
@@ -104,7 +106,8 @@ test.describe('Gallery Invite Link Workflow', () => {
 
         await expect(page.locator('text=Erfolgreich generiert!')).toBeVisible();
         const inviteLink = await modal.activeModal.locator('input[readonly]').inputValue();
-        await modal.clickButton('Schließen');
+        // Scoped to the footer, as above.
+        await page.getByRole('dialog').locator('.modal-action').getByRole('button', { name: 'Schließen', exact: true }).click();
         await auth.logout();
 
         // 2. Anonymous Guest redeems link
