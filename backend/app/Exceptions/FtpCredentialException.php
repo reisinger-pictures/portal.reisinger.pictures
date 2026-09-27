@@ -16,9 +16,11 @@ use RuntimeException;
  * because no factory here takes one.
  *
  * One more portal-side precondition lives here as of P1-M33: `rate_limited`.
- * The reset is the only recovery path for a lost camera password, which makes it
- * an unlimited mint for valid credentials unless the portal caps it. That cap
- * is enforced before any request leaves the process, so it belongs with the
+ * The reset is the only recovery path for a lost camera password, but it does
+ * not mint credentials: it **replaces** the password, so the quota bounds how
+ * often one account can invalidate its own working camera and how much
+ * read-modify-write load it puts on SFTPGo — not how many credentials exist. The
+ * cap is enforced before any request leaves the process, so it belongs with the
  * other "the portal stopped this" reasons and not with `SftpGoException`.
  *
  * The fourth portal-side precondition is `not_resettable` (P1-M58): the account

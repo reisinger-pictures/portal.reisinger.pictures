@@ -218,6 +218,16 @@ class SettingsController extends Controller
             'web' => $resolver->get('term_web'),
             'print' => $resolver->get('term_print'),
             'original' => $resolver->get('term_original'),
+            // Resolution prices, in cents — the unit they are stored in
+            // (DatabaseSeeder: 'price_web' => '7500', directly above its
+            // "Per-image license base prices are stored in cents" note on
+            // `base_price`). Served verbatim as the text the `settings.value`
+            // column holds, like every other factor on this endpoint, because
+            // the frontend hydrates euros with `parseInt(...)/100` and its
+            // `getRequiredTerm()` throws when a price factor is absent.
+            'price_web' => $resolver->get('price_web'),
+            'price_print' => $resolver->get('price_print'),
+            'price_original' => $resolver->get('price_original'),
             'base_price' => $resolver->get('base_price'),
             'calc_base_price' => $resolver->get('calc_base_price'),
             'calc_hourly_rate' => $resolver->get('calc_hourly_rate'),
@@ -293,6 +303,21 @@ class SettingsController extends Controller
             'term_web' => 'nullable|string',
             'term_print' => 'nullable|string',
             'term_original' => 'nullable|string',
+            // Resolution prices in cents, the unit the licence card submits
+            // (`Math.round(euros * 100)`) and the table stores. `integer` is
+            // the unit guard: a fractional amount means a caller sent euros,
+            // and storing that would be off by two decimal orders of
+            // magnitude. `nullable` (write-when-present) rather than
+            // `required` because this endpoint is also written by clients that
+            // send a partial payload — the shooting calculator's save carries
+            // only `calc_*` plus the `mult_*` multipliers — and because the
+            // three keys reach the table solely through the idempotent
+            // `DatabaseSeeder`, so a row that predates them must not turn
+            // every save into a 422. `min:0` matches the card's `min="0"`
+            // input, so a deliberately free tier stays saveable.
+            'price_web' => 'nullable|integer|min:0',
+            'price_print' => 'nullable|integer|min:0',
+            'price_original' => 'nullable|integer|min:0',
         ]);
 
         // Map legacy `srp_*` request keys to unprefixed brand-scoped settings keys.
