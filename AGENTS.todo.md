@@ -559,6 +559,30 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   domänenskaliert sind. Zusätzlich drei fast identische 80–107-Zeilen-Specs für
   Negativ-Berechtigungen mit identischem 85-Zeilen-Setup. **Eigene Aufgabe, keine
   Nebenwirkung eines Cleanup.**
+- [ ] Entscheidung offen: **die Lizenzbegriffe-Antwort mischt drei Einheiten,
+  und das ist ein Rechenproblem, kein Darstellungsproblem.** `base_price`,
+  `setup_fee`, `privacy_fee`, `extra_image_fee` und die `price_*` sind
+  **Cent**; `calc_base_price` und `calc_hourly_rate` sind **Euro**; die
+  `mult_*` und `calc_flatrate_multiplier` sind **Faktor**. Nachgewiesen an
+  `CalculatorSettingsCard.tsx`: Z. 47 schickt `data.calc_base_price` ohne `×100`,
+  Z. 52 schickt `srp_base_price` mit `Math.round(… * 100)` — zwei Felder derselben
+  Karte, zwei Einheiten, eine Zeile Unterschied. `ShootingCalculatorSettingsTest:209-210`
+  pinnt `'49.99'` / `'99.5'` für die `calc_*`-Felder, die Dezimal-Annahme ist also
+  gewollt und testgeschützt. **Konsequenz:** Die Owner-Entscheidung vom 2026-09-27
+  („API gibt Cent-Integer aus, `settings.value` bleibt `text`") verschiebt das
+  Problem nur, solange die Einheit nirgends steht — für `calc_*` wäre sie falsch.
+  Vorher braucht es die Einheit am Feld oder im Vertrag. Einheitentabelle und
+  Richtung stehen in `features/infrastructure/28-settings-key-meaning.md`.
+- [ ] **`V004__ecommerce_and_governance.php:131` seedet `base_price => '35.00'`** —
+  35 Cent, was dem Centvertrag widerspricht und unter der Validierung `min:500`
+  liegt. Der aktuelle `DatabaseSeeder:160` schreibt `'8000'` und überschreibt das,
+  und `backend/AGENTS.md` schreibt Seeden nach jeder Migration vor — ein reines
+  `migrate` ohne Seed hinterlässt aber 35, und dann liefert ein Speichern aus der
+  Rechner-Karte 422, weil sie den Wert round-tripped (0,35 → 35). **Gefunden bei der
+  Umsetzung der Validierungsregel, nicht vorher.** Der Wert wurde bewusst nicht
+  angefasst, weil eine Abschwächung von `min:500` den ganzen Zweck der Regel
+  aufheben würde; die konsistente Auflösung ist, den Seedwert auf einen
+  cent-konformen Betrag zu heben.
 - [ ] **`contracts.spec.ts` ist mit 617 Zeilen / 8 Tests die schwerste Datei** und
   mischt Vertrags-Lifecycle, Rabatt-Summen, Token-Rotation und einen
   Tiptap-Reload-Regress.
@@ -1268,35 +1292,6 @@ alle mit Regressionstest:
 
 **Offen (aus dieser Runde):**
 
-- [ ] manuell prüfen: P1-M54 gegen `b2c9bde`/`f3aa0d3` abgleichen und schließen: der Eintrag ist als offen geführt, sein eigener Text nennt den Stand als erledigt. **P1-M54 — Entzug des Kamera-Kontos bei Rollenverlust.** Wer aufhoert
-  Fotograf zu sein, behaelt heute ein funktionierendes SFTPGo-Credential auf ein
-  Verzeichnis, das seine Fotos enthaelt. `deleteUser()` haengt ausschliesslich am
-  Slug-Wechsel. Migration V043 (Enum `+revoked`, `ftp_revoked_at`), fail-closed
-  wie beim Slug-Wechsel. Schema-Entscheidung steht in 19-ftp 7.16. **Erledigt
-  (b2c9bde).** Der Wiedereintritt (entzogen → wieder Fotograf) ist bewusst
-  derselbe Uebergang und keine Sonderfall-Verzweigung.
-  **Nachgezogen (f3aa0d3):** `provisionAndShow()` schrieb bis dahin **keine**
-  Spalte — sein Kommentar stammte aus der Zeit vor V041. Damit meldete das Portal
-  `pending`, waehrend SFTPGo einen lebenden Account hielt, und mit `revoked` wurde
-  daraus ein echter Widerspruch. Jetzt schreibt die Provisionierung `active` +
-  `ftp_provisioned_at`.
-- [ ] manuell prüfen: P1-M55 gegen `bf7a431` abgleichen und schließen — der Eintrag ist als offen geführt, sein eigener Text nennt den Stand als erledigt. **P1-M55 — Der Image-Freshness-Gate fordert noch `@sha256`-Digests
-  (CI-Blocker beim naechsten Push).** `7b80c2a` hat den Digest aus dem Compose
-  entfernt und den PHP-Vertrag auf Tags umgestellt, aber
-  `tests/infrastructure/verify-image-freshness.sh` verlangt in `resolve_pin()`
-  weiterhin einen Digest. Lokal rot; CI ist nur gruen, weil die betroffenen
-  Commits **noch nicht gepusht** sind. Achtung Beweislast: der Gate muss seine
-  Substanz behalten (Alter des Artefakts aus dem `created`-Feld, 14-Tage-Rahmen,
-  anonyme Erreichbarkeit) — ein mutabler Tag ist kein immutabler Pin, diese
-  Einschraenkung gehoert ehrlich in `deployment/image-pin-freshness.md`.
-  **Erledigt (bf7a431).** Zwei Blocker mehr als erwartet, beide real:
-  `portal-e2e:v2026.09.24` **existierte nicht** in GHCR (der Tag war in `7b80c2a`
-  erfunden; publiziert sind nur `latest` und `1.62.1`) — der E2E-Job haette das
-  Image nicht pullen koennen. Und `verify-image-nonroot.sh` verglich seit der
-  Tag-Migration einen Digest mit einem Tag-Namen und war dadurch **immer** rot,
-  nicht umgebungsbedingt. Beides gefixt. Der Gate prueft jetzt das Alter des
-  Artefakts hinter dem Tag (14-Tage-Fenster) statt einen Repository-Pin gegen den
-  Tag — die frueher zugesicherte Immutabilitaet entfaellt damit bewusst.
 - [ ] **P1-M56 — Das Profilformular verschluckt das Einmal-Passwort.** Der
   Backend-Fix aus P1-M50 liefert `ftp_password`, aber die Profilansicht ignoriert
   es. Ein Fotograf, der seinen Slug im Profil aendert, verliert das Passwort also
@@ -1307,43 +1302,6 @@ alle mit Regressionstest:
   wenn der Dienst fehlt. Die Absicherung darf **nicht** aufgeweicht werden; der
   E2E-Stack braucht einen erreichbaren SFTPGo oder einen Fake. Harness-Referenz:
   `tests/scripts/ftp-transport-test/`. *In Arbeit.*
-- [ ] manuell prüfen: P1-M58 gegen `c020422` abgleichen und schließen — der Eintrag ist als offen geführt, sein eigener Text nennt den Stand als erledigt. **P1-M58 (P0) — Es gibt keinen Pfad, der ein Konto zum ERSTEN Mal anlegt.**
-  `provisionAndShow()` wird an **genau einer** Stelle aufgerufen:
-  `AuthController` im Slug-**Wechsel**-Zweig. Ein Fotograf, der seinen Slug nie
-  aendert, bekommt also nie ein Konto, und die Oberflaeche bietet als einzige
-  Aktion „Neues Kamera-Passwort" an — was `resetPassword()` aufruft, das ueber
-  `findUser()` einen existierenden Account voraussetzt und sonst 404 liefert. Der
-  Text im `pending`-Zustand sagt „Fordere zuerst die Zugangsdaten an", aber es
-  gibt keinen Weg dafuer. **Das blockiert den Kamera-Test aus der Oberflaeche
-  (P1-M32) und ist damit genau das Ziel dieser Runde.** Entweder braucht es einen
-  eigenen Provisionierungs-Endpunkt, oder der Reset-Pfad muss ein fehlendes Konto
-  bewusst anlegen (mit derselben Fail-closed- und Quota-Disziplin). Das ist eine
-  Designentscheidung mit Auth-Bezug. **Erledigt (c020422).** Zwei Ursache,
-  ein Guard: Der Reset-Endpunkt provisioniert bei `pending` und lehnt `revoked`
-  und `error` ab — `revoked` darf sich nicht durch einen Klick wiederbeleben,
-  sonst waere der Entzug wertlos. Und der Slug-Wechsel-Zweig in `AuthController`
-  loeschte **bedingungslos**, also gegen einen nie existierenden Account → 404 →
-  Fail-closed → 500: ein Fotograf konnte seinen ersten Slug-Wechsel nie
-  durchfuehren. Der Delete ist jetzt an `STATUS_ACTIVE` gekoppelt, derselbe
-  Guard wie `revoke()`. Der Guard ist eine **Allowlist** (nur `active`), damit
-  ein kuenftiger Enum-Wert per Default abgelehnt wird. Bestands-Fixtures
-  pinnen jetzt explizit `active` — sie rotierten bisher implizit gegen einen
-  nie provisionierten Account und prueften damit den Falschen.
-- [ ] manuell prüfen: P1-M59 gegen `a5820fa`/`95ac30a` abgleichen und schließen — der Eintrag ist als offen geführt, sein eigener Text nennt den Stand als erledigt. **P1-M59 — `features/` nennt an mehreren Stellen noch `@sha256`-Digests
-  als Pin-Mechanik.** Gemeldet vom Gate-Agenten, bewusst nicht geaendert (Spec-
-  Entscheidung): `features/infrastructure/01-deployment.md:27,135-136,139,141`,
-  `29-production-operations-runnbook.md:96`, `28-ci-test-image.md:4,20,23,34,44,46,47,51,139`,
-  `features/e2e-test-strategy.md:135`, `features/ai/02-testing-strategy.md:20`
-  (letzteres betrifft ein anderes Image, Kontext pruefen). `PORTAL_E2E_IMAGE` ist
-  reine Doku, kein Code — geprueft. **Erledigt (a5820fa).** `features/ai/
-  02-testing-strategy.md:20` traf doch dasselbe `portal-base:8.5` (Beleg:
-  `AIServiceImageBudgetTest.php:126`), wurde praezisiert. Der Composer-Digest
-  `a5f59b9f…` in `28-ci-test-image.md` war reiner Pin-Wert ohne Belegfunktion
-  und ist entfernt; `d762…` blieb, weil er die Build-Log-Evidenz traegt.
-  **Nachzuholen:** `deployment/validate-production-env.sh:118` sagte noch
-  „update the compose digest" — gefixt in `95ac30a`, inklusive der
-  Policy-Test-Assertion.
-**Offen:**
 
 - [ ] manuell prüfen: Zertifikat `cert.pem` aus dem Container auf die Speicherkarte kopieren und in der Kamera „Zielserver vertrauen → Aktivieren" setzen (Canon Error 48, cam.start.canon UG-06_Network_0230). **P1-M32 — echter Kamera-Test.** Weiterhin der einzige offene
   Schrittpunkt. Zusätzlich zur Upload-Prüfung: das Zertifikat
@@ -1434,31 +1392,11 @@ hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
   `AI_ENABLED=false` bei **leerem** `AI_API_KEY` — das Verhalten ist damit
   unbestimmt) und `PhotoHistoryModal` (Multipart-Feldnamen des Uploads
   unverifiziert). Beides wuerde einen Capture-Zyklus verbrennen.
-- [ ] manuell prüfen: gegenstandslos — `LicenseSelectorModal` wurde am 2026-09-27 per Owner-Entscheidung gelöscht. Inventur-Eintrag schließen. **Toter Code, gefunden bei der Inventur:** `LicenseSelectorModal` hat
-  **null Importer** repo-weit (nur die eigene Definition; die ~25 Treffer in
-  `locale/de/messages.po` sind stale Uebersetzungen). Nicht erfassbar, weil nie
-  gerendert. Gehoert als Cleanup, nicht als Screenshot-Arbeit — **nicht** im
-  Rahmen dieser Runde entschieden, da Loeschen eines Client-Features eine
-  Produktfrage ist.
 - [ ] **Abdeckungs-SOLL fuer die Dialoge:** der aktuelle Stand ist
   `photographer-guide-dialog` plus die vier neuen Eintraege. Die Gallery-Familie
   (8 Eintraege) haengt an **einem** Gallery-Seed in `seeds.ts`; der wird als
   Referenzfall zuerst gebaut und verifiziert, bevor die uebrigen darauf
   aufsetzen.
-- [ ] manuell prüfen: gegenstandslos — `flex-wrap` sitzt inzwischen am inneren Container (Z. 24), gemessen bei 360/375/390/414 px: Überlauf 613 → 0 px. Befund-Eintrag schließen. **Befund aus dem Dialog-Capture: Galerie-Aktionsleiste laeuft auf Mobile
-  horizontal ueber — medium, vorbestehend, nicht von dieser Runde verursacht.**
-  Beleg: `filled/mobile/gallery-photographer-team-dialog-sec0.png` — der
-  Breadcrumb ist links abgeschnitten („ashboard"), „Fotografen..." klebt am
-  rechten Rand, und **„Einladungslink..." sowie „E-Mail senden..." liegen
-  komplett ausserhalb des Viewports**. Ursache in
-  `ManagementGalleryActions.tsx` belegt: der aeussere Container (Z. 21) ist
-  `flex flex-wrap gap-4`, der **innere** (Z. 24) dagegen nur `flex gap-2` — ohne
-  `flex-wrap`, koennen die bis zu sieben Aktions-Buttons also nicht umbrechen.
-  Fix waere `flex flex-wrap gap-2` an Z. 24. **Nicht angefasst:** es ist eine
-  eigene Flaeche, und sechs der noch offenen Dialoge erben diesen Zustand — die
-  Aufnahmen zeigen ihn deshalb zunaechst so, wie er ist, statt ihn zu
-  beschönigen. Sichtpruefung des Dialogs selbst: **sauber** (Titel
-  „Fotografen-Team", Galerie, `Zugriffs-Status (Fotografen)`, Info-Alert).
 
 ### Dialog-UI-Review 2026-09-27 — Auswertung aller 13 Dialog-Aufnahmen
 
@@ -1491,38 +1429,6 @@ Produktionsfehler verkauft worden waere.
   `TT.MM.JJJJ`. Solange das fehlt, sind **alle** kuenftigen Aufnahmen bei
   Datums- und Zahlenformaten irrefuehrend. Fix: `locale: 'de-DE'` in `use` der
   Screenshot-Config, danach ein Lauf.
-- [ ] manuell prüfen: gegenstandslos — `formatCurrency.ts` ist ausgeliefert (12 Vitest-Tests, davon einer als benannte Regression gegen den `toFixed`-String). Der `toFixed`-Teil des Befunds war von Anfang an unzutreffend; die Nicht-Änderung an `VolumePresetSettingsCard` war begründet. Befund-Eintrag schließen. ~~**Echter Bug daneben: `toFixed()` statt Locale-Format.**~~ **TEILWEISE
-  ZURUECKGENOMMEN — Befund war teilweise falsch zugeordnet, dazu unten ein
-  Follow-up.** `ShootingCalculatorModal.tsx:228-229` war ein echter Fehler und
-  ist behoben. Die `toFixed(2)`-Stellen in `VolumePresetSettingsCard` waren
-  **kein** Fehler: sie liefern den `value` eines `<input type="number">`, und
-  `1.234,50` waere per HTML-Spec ein ungueltiger Float — das Feld rendert
-  **leer**. Schlimmer: `parsePriceCents` macht
-  `Number.parseFloat(raw.replace(',', '.'))`, und `parseFloat('1.234,50')`
-  stoppt am Komma und liefert `1.234` — es waere **falsch abgerechnet** worden.
-  Die Repo-Regressionstests pinnen das (`VolumePresetSettingsCard.test.tsx:56`
-  erwartet `basePrice.value === '1.0'`). Das im Screenshot sichtbare `30.00` ist
-  in diesem Feld also **korrekt** — Maschinenwert, nicht Anzeige. Lehre: bei
-  gemeldeten Formatbefunden zuerst fragen, **wo** der Wert steht, nicht nur wie
-  er aussieht.
-  **Umgesetzt:** `src/logic/formatCurrency.ts` mit `formatEuro` (Anzeige, Locale
-  hart auf `de-DE` gepinnt, nie von der Browser-Sprache geerbt) und
-  `formatEuroInputValue` (Maschinenwert, Punkt-Dezimal). `Intl` liefert das
-  schmale NBSP vor `€` mit, also `369,00 €`. Nicht-endliche Werte ergeben
-  `--- €` und **nicht** `NaN €`, nach der bestehenden App-Konvention aus
-  `formatMoney` — in einem Abrechnungswerkzeug darf ein kaputter Wert nicht als
-  `0,00 €` durchgehen. 12 Vitest-Tests, davon einer als benannte Regression,
-  der ausdruecklich pinnt, dass die Ausgabe **nicht** der `toFixed`-String ist;
-  alle Erwartungen mit explizitem ` `, damit ein normales Leerzeichen sie
-  nicht erfuellt.
-- [ ] **Offener Follow-up: `formatMoney` in `src/logic/utils.ts` hat denselben
-  Bug** — `(cents/100).toFixed(2) + ' €'`, also Punkt-Dezimal, und ist in
-  **13 weiteren Komponenten** im Einsatz; `utils.test.ts:20-34` pinnt die
-  en-US-Ausgabe sogar als Erwartung. In dieser Runde bewusst nicht angefasst,
-  weil es fremde Dateien und fremde Tests betrifft. Richtig waere,
-  `formatMoney` als duennen Wrapper ueber `formatEuro` zu legen und die drei
-  betroffenen Testdateien mitzuziehen — sonst bleibt der Fehler an 13 Stellen
-  stehen, waehrend die zwei grossen Dialoge schon richtig rechnen.
 - [ ] **Vorbestehender Policy-Verstoss, separat:** `VolumePresetSettingsCard.tsx:170`
   nutzt `sm:grid-cols-[1fr_auto_auto]`. Klammer-Syntax ist laut `frontend/AGENTS.md`
   verboten; vorbestehend und nicht Teil des Formatierungs-Fixes, deshalb nicht
@@ -1660,20 +1566,6 @@ derselbe Fehler wie bei der Auth-Drosselung: eine Zahl aus dem Kontext
 gerissen und zur Entscheidung gemacht.
 
 **Folgepunkte aus der Waehrungs-Migration (2026-09-27):**
-- [ ] manuell prüfen: gegenstandslos — der Lingui-Template-Fall ist gelöst (reine gruppierte Zahl im Placeholder, `€` in der Message; 400.013 Werte mit 0 Abweichungen). Befund-Eintrag schließen. **`useVolumeLicensing.ts:137`** — `(priceCents/100).toFixed(0)` in einem
-  `t`-Template. Echter Restfehler (keine Tausendertrennung, normales Leerzeichen
-  vor `€`), aber **nicht** durch `formatEuro` loesbar: eine formatierte
-  Waehrungs-Zeichenkette laesst sich nicht in eine Message mit Placeholder
-  einbetten, ohne die Message zu spalten und das Placeable zu verlieren.
-  Braucht eine eigene Entscheidung (eigener Platzhalter, z. B. `{price}` plus
-  separate `€`-Position).
-- [ ] manuell prüfen: gegenstandslos — `formatBasisPointsAsPercent` ist gelöscht, `formatPercent` rechnet exakt mit `BigInt` ohne Division. Befund-Eintrag schließen. **Zwei Prozent-Formatter mit unterschiedlicher Ausgabe.**
-  `formatPercent` (neu, in `formatCurrency.ts`) und das bestehende
-  `formatBasisPointsAsPercent` (Vertrags-Preisgrenze) liefern `10,5 %` bzw.
-  `10.5%` und schneiden Nullen unterschiedlich. Gleiche Einheit, anderes
-  Ergebnis — das ist genau die Divergenz, die die Formatter-Extraktion eigentlich
-  verhindern soll. **Nicht** im Aufgabenumfang geaendert, weil
-  `ContractSignView.test.tsx:249` die bestehende Ausgabe pinnt.
 - [~] wartet auf einen `@smoke`-Lauf, der den Drawer-Schließvorgang nach der Scrim-Entfernung bestätigt — lastabhängig, tritt vor dem Galerie-Aufbau auf und ist von den FTP-/Dialog-Änderungen unabhängig. **Vorbestehender Mobile-Flake im geteilten Login-Helfer:** `AuthHelper.ts:48`,
   `await expect(backdrop).toBeHidden({ timeout: 5000 })` beim Schliessen des
   Sidebar-Drawers. Lastabhaengig, tritt **vor** dem Gallery-Aufbau auf und ist
@@ -1804,39 +1696,10 @@ gerissen und zur Entscheidung gemacht.
      Die Shell besitzt keinen Testid-Hook.
   6. **`ManagementOrgsView` und `ManagementOrgDetailView` haben keine
      Unit-Testdateien.** Beide sind jetzt konform, aber ungeschuetzt.
-- [ ] manuell prüfen: gegenstandslos als Kandidatenliste — zwei sind migriert, drei sind begründet blockiert. Der tatsächliche offene Punkt steht im Folgeeintrag („Was `ModalShell` für die drei blockierten Dialoge braucht"). **Fuenf Dialoge bauen das bounded Layout noch von Hand** und sind damit
-  Kandidaten fuer `bodyClassName` + `scrollableBody`:
-  `RatingStatusModal` und die Kamera-Anleitung in `ManagementFtpInbox` (90vh),
-  `GalleryAccessModal` und `PhotographerTeamModal` (80vh), `AIBatchEditModal`
-  (`h-90vh`). Sie ueberspringen nicht den a11y-Contract (sie gehen durch die
-  Shell), aber sie handrollen die Scroll-Grenze. `RatingStatusModal` braucht
-  dafuer zusaetzlich ein `space-y-8`-Knob, sonst entsteht eine verschachtelte
-  Scrollregion mit doppeltem Abstand.
 - [ ] **Veraltete Zahl im Quelltext, nicht in der Doku:** `ModalShell.tsx:64` und
   `:101` sagen im Kommentar weiterhin **„the eighteen dialogs"** — es sind 28.
   Der Doku-Agent hat das nicht angefasst, weil es Quellcode ist. **Erst nach dem
   `ModalShell`-Agenten anfassen** (Konflikt auf derselben Datei).
-- [ ] manuell prüfen: Board-Bereinigung — mit diesem Commit erledigt: 413 erledigte Einträge sind entfernt statt abgehakt, die vier genannten Einträge sind weg statt als erledigt abgehakt. Rest: nur noch der Push. **Board-Bereinigung, nach dem Push:** die oben genannten vier Eintraege
-  als „durch Loeschung weggefallen, nie ausgeliefert" kennzeichnen statt sie als
-  erledigt stehen zu lassen.
-- [ ] manuell prüfen: gegenstandslos — `LicenseSettingsCard.tsx` wurde am 2026-09-27 gelöscht, die Datei existiert nicht mehr. Befund-Eintrag schließen. **Vorbestehender a11y-Mangel in derselben Datei, gefunden aber bewusst
-  nicht angefasst:** **10 von 17 Feldern haben verwaiste Labels** — das `<label>`
-  ist Geschwister des Controls **ohne `htmlFor`**, also haben `base_price` und
-  alle neun Term-Textareas **leere Accnames**. Und die drei `mult_*`-Felder
-  kuendigen sich nur als **`„%"`** an, weil ihr aeusseres `Aufschlag: …`-Label
-  ebenfalls verwaist ist und daisyUIs inneres Label nur den `span` enthaelt —
-  dieselbe Fehlerfamilie wie das behobene `"Preis: Web €"`, nur ohne `htmlFor`.
-  Die Korrektur ist das **eigene Muster der Datei** (`htmlFor`+`id`,
-  `aria-hidden` auf dem Einheiten-`span`). Der Agent hat sie **nicht** angewandt,
-  weil sie Accnames aendert und er kein Playwright fuer den E2E-Impact laufen
-  lassen konnte — eine richtige Vorsicht, aber **10 unbenannte Felder in einer
-  Admin-Karte sind ein Defekt, kein Trade-off**. Nachzuziehen, sobald die
-  Playwright-Besetzung frei ist.
-- [ ] manuell prüfen: gegenstandslos — betrifft `LicenseSettingsCard.tsx` (gelöscht am 2026-09-27). Befund-Eintrag schließen. **Derselbe Fund, zweite Haelfte:** `base_price` und die `mult_*`-Felder
-  tragen **kein `required`**, obwohl das Zod-Schema sie als Pflicht fuehrt — der
-  CSS-Stern rendert also nicht. Gleiche Vorsicht wie oben: `required` kann
-  native Formularvalidierung in E2E ausloesen. Beides zusammen in einem
-  Durchgang erledigen, inklusive E2E-Gegenprobe.
 - [~] wartet auf eine Live-Reproduktion im Lastbereich 15–22 und einen positiven Beleg für die 6-von-8-Schieflage auf Mobile; die mobile Hälfte hat bisher keinen Mobile-spezifischen Defekt ergeben. **Was der Agent nicht klaeren konnte, offen gesagt:** (a) Er konnte die
   Fehler **nicht reproduzieren**; er hat den Bereich zwischen „gesaettigte Box"
   (Last 15, 22/22 gruen) und den gemeldeten Lasten 186–334 eingegrenzt, diesen

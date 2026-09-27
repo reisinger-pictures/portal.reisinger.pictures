@@ -70,11 +70,39 @@ unbemerkt geblieben und die Regeldiskrepanz mit verdeckt.
    kanonischen Namen nicht kennen. Also gehört die Regel auf den Key
    (siehe `SettingResolver`) oder unmittelbar vor das Schreiben, nach der
    Zuordnung.
-4. **`numeric` für ganzzahlige Cent-Beträge ist zu weit.** `base_price`
-   wird mit `integer` geprüft, `calc_base_price` und die `srp_*`-Felder
-   mit `numeric` — eine Fließkommazahl für einen ganzzahligen Betrag. Der
-   Folgefehler ist derselbe wie oben: zwei Namen, zwei Regeln, und die
-   schwächere gewinnt, wenn man sie wählt.
+4. **`numeric` ist nur dort zu weit, wo der Key ein ganzzahliger
+   Centbetrag ist.** Siehe unten: `calc_base_price` ist **Euro**, nicht Cent,
+   und seine Dezimal-Annahme ist ein testgeschützter Vertrag. Eine pauschale
+   Umstellung auf `integer` hätte diesen Vertrag gebrochen.
+
+## Die Einheit steht nicht am Feldnamen — sie steht nirgends
+
+Bei der Umsetzung dieser Regel zeigte sich, dass die Typfrage größer ist als
+zunächst angenommen: **dieselbe Antwort mischt drei Einheiten.**
+
+| Einheit | Felder | Nachweis |
+|---|---|---|
+| **Cent** (Integer) | `base_price`, `setup_fee`, `privacy_fee`, `extra_image_fee`, `price_web`, `price_print`, `price_original` | `CalculatorSettingsCard` schreibt `Math.round(euros * 100)` und liest `/100` |
+| **Euro** (Fließkomma) | `calc_base_price`, `calc_hourly_rate` | dieselbe Karte schreibt `data.calc_base_price` **ohne** `×100` und liest **ohne** `/100`; `ShootingCalculatorSettingsTest:209-210` pinnt `'49.99'` und `'99.5'` |
+| **Faktor** (dimensionslos) | `mult_commercial`, `mult_unlimited`, `mult_international`, `calc_flatrate_multiplier` | geseedet als `'2.0'` |
+
+Der Unterschied zwischen der ersten und der zweiten Zeile ist eine einzige
+Zeile im Frontend — Zeile 47 schickt Euro, Zeile 52 schickt Cent, für zwei
+Felder derselben Karte. Es gibt **kein** Feld, das die Einheit mitteilt, und
+keinen Vertrag, der sie festlegt. Ein Client, der `calc_base_price` wie
+`base_price` behandelt, liegt um den Faktor 100 daneben.
+
+Das ist die eigentliche Beobachtung hinter der ursprünglichen Frage nach den
+Typen, und sie ist schärfer als „die Beträge sind Strings": Strings sind ein
+Darstellungsproblem, gemischte Einheiten sind ein **Rechen**problem.
+
+Umgesetzt ist deshalb nur das, was belegt ist: `setup_fee`, `privacy_fee` und
+`extra_image_fee` wurden von `numeric` auf `integer` gewechselt, weil sie auf
+allen drei Wegen Cent sind (geseedet 5000/20000/1500, geschrieben
+`Math.round(euros * 100)`, gelesen `Number(value)/100`). `numeric` akzeptierte
+dort einen Bruchcent wie `'5000.5'` — ein Wert, den kein Client erzeugen und
+kein Verbraucher darstellen kann. Die `calc_*`-Felder bleiben bewusst
+`numeric`.
 
 ## Abgrenzung: Mandantenfähigkeit
 
@@ -91,7 +119,19 @@ nur vervielfachen — dann eben pro Marke statt einmal.
 ## Nicht getroffene Entscheidung: der API-Typ
 
 Ob die API Geldbeträge als Cent-Integer oder als Text ausgibt, ist eine
-getrennte Frage und wird hier nicht entschieden. Beobachtung aus dem
-Anlass: `settings.value` ist `text`, deshalb stehen in der Antwort
-`base_price` als `'19900'` und `mult_commercial` als `'2.0'` — und nur am
-Feldnamen erkennbar ist, ob durch 100 geteilt werden muss.
+getrennte Frage und wird hier **nicht** entschieden. `settings.value` ist
+`text`, deshalb steht in der Antwort `base_price` als `'19900'` und
+`mult_commercial` als `'2.0'`.
+
+Die Owner-Entscheidung vom 2026-09-27 ist die Richtung, aber noch kein
+Umbau: **die API ist die Grenze, nicht die Datenbank.** Draußen sollen
+Cent-Integer heraus, innen darf `settings` ein Key-Value-Paar mit
+String-Werten bleiben — dort ist der Text nicht ein Makel, sondern das Format
+eines Stores, der heterogene Werte hält.
+
+Diese Entscheidung allein genügt aber nicht, weil sie das Problem nur
+verschiebt: Solange `calc_base_price` in Euro und `base_price` in Cent
+kommt, ist „die API gibt Cent-Integer aus" für die `calc_*`-Felder falsch.
+**Vorher muss die Einheit am Feld oder im Vertrag stehen**, sonst typisiert
+die API zwei verschiedene Größen in dasselbe Format. Die Einheitentabelle
+oben ist der Kandidat dafür; die Entscheidung ist offen.
