@@ -16,6 +16,7 @@ status: active
 
 ## 3. UI/UX Rules
 - **Modal Actions (Mobile First):** Modal-Buttons im Fußbereich müssen auf mobilen Geräten die volle Breite einnehmen und vertikal gestapelt werden (`flex flex-col sm:flex-row gap-3 w-full`, Buttons mit `w-full sm:w-auto`).
+  - **Dialog-Höhe:** daisyUI macht `.modal-box` zur Scrollregion (`max-height:100vh; overflow-y:auto`). Ein Dialog, dessen Inhalt eine Viewport-Höhe überschreiten kann, setzt `scrollableBody` auf `ModalShell`/`ModalDialogShell` — **opt-in, nicht Default**; Begründung und Regel: `features/tech/08-dialog-height-contract.md`.
   - **Form Standard Styling (STRICT):**
   - **Größen:** Alle Formularelemente (Inputs, Selects, Buttons) nutzen in regulären Formularen die Standardgröße 'md' (DaisyUI Default, kein `-sm` oder `-xs` Suffix). Dies sorgt für bessere Bedienbarkeit auf Touch-Geräten.
   - **Ausnahme (Table Context):** Innerhalb von engmaschigen Tabellen (z.B. Batch-Edits, User-Listen) und für Modal-Schließen-Buttons (`btn-circle absolute`) sind `input-sm`, `btn-sm` und `btn-xs` ausdrücklich erlaubt, um die Übersichtlichkeit zu wahren.

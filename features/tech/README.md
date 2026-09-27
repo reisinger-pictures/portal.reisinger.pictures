@@ -7,3 +7,4 @@
 * [Security and perf refinement](05-security-and-perf-refinement.md)
 * [Internationalisierung (i18n)](06-i18n-internationalization.md)
 * [Architectural decisions](07-architectural-decisions.md)
+* [Dialog-Höhenvertrag](08-dialog-height-contract.md) - `ModalShell`/`ModalDialogShell`: opt-in `scrollableBody`, `.modal-box` als Scrollregion, offene Migrationswellen.
