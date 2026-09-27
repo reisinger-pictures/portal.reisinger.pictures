@@ -46,6 +46,14 @@ const catalog: ModelRegistrationCheck = {
     },
 };
 
+// Budget: the person-count tests are structurally the heaviest in the suite and
+// their cost is inherent to what they assert, not incidental. Reaching
+// MAX_PERSONS_PER_REGISTRATION (10) means 9 sequential "add person" clicks, each
+// re-rendering every existing person block (8 questions + photo upload each) —
+// O(n^2) renders, on top of per-keystroke `userEvent` work. Measured: 0.76s on an
+// idle machine, 5.03s in the full parallel suite and 5.67s isolated while the
+// host was at load average 27. 15000 ms is 2.6x the worst observed run, so a
+// real regression (an extra network round-trip, a lost await) still trips it.
 describe('RegistrationForm person state', () => {
     const submit = vi.fn();
 
@@ -289,4 +297,4 @@ describe('RegistrationForm person state', () => {
         expect(onFatalError).not.toHaveBeenCalled();
         expect(await screen.findByText('Serverfehler')).toBeInTheDocument();
     });
-});
+}, 15_000);

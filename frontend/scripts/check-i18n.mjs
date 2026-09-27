@@ -80,6 +80,22 @@ function isLinguiMacroTag(node, macroBindings) {
     && macroBindings.has(node.tag.text);
 }
 
+/**
+ * Cheap pre-filter for the tree walk. `collectLinguiMacroBindings` derives
+ * `macroBindings` *exclusively* from import declarations whose module specifier
+ * is `@lingui/core/macro`. Without such an import the binding set is empty, so
+ * `isLinguiMacroTag` never matches and neither the direct-tag branch nor the
+ * macro-bearing-factory branch (`functionContainsLinguiMacro`) can ever report
+ * a violation — the file provably contributes `[]`.
+ *
+ * Parsing ~2/3 of the `src` tree to reach that conclusion is pure waste, and
+ * this guard runs both in `pnpm build` (prebuild) and in
+ * `scripts/check-i18n.test.mjs`. The pattern stays deliberately permissive
+ * (optional backslash-escaped slashes, tolerated whitespace) so a false
+ * positive can only cost a parse, never a missed violation.
+ */
+const LINGUI_MACRO_MODULE_REFERENCE = /lingui\s*(?:\\?\/)\s*core\s*(?:\\?\/)\s*macro/;
+
 function collectLinguiMacroBindings(sourceFile) {
   const bindings = new Set();
   for (const statement of sourceFile.statements) {
@@ -164,11 +180,15 @@ function getImmediatelyInvokedFunction(node) {
  * treated as module-scope execution as well.
  */
 export function findModuleScopeLinguiMacros(source, filePath = "fixture.tsx") {
+  // `setParentNodes: false` — the traversal below only uses `forEachChild` and
+  // the explicit-sourcefile forms `getStart(sourceFile)` / `getText(sourceFile)`,
+  // none of which read `node.parent`. Linking parents for every node in the tree
+  // is measurable overhead on a 300+ file scan, so it stays off.
   const sourceFile = ts.createSourceFile(
     filePath,
     source,
     ts.ScriptTarget.Latest,
-    true,
+    false,
     filePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
   const macroBindings = collectLinguiMacroBindings(sourceFile);
@@ -218,10 +238,17 @@ export function findModuleScopeLinguiMacros(source, filePath = "fixture.tsx") {
 }
 
 export function findModuleScopeLinguiMacrosInTree(sourceRoot = resolve(root, "src")) {
-  return collectTypeScriptFiles(sourceRoot).flatMap(filePath => {
+  const violations = [];
+  for (const filePath of collectTypeScriptFiles(sourceRoot)) {
     const source = readFileSync(filePath, "utf8");
-    return findModuleScopeLinguiMacros(source, filePath);
-  });
+    // See LINGUI_MACRO_MODULE_REFERENCE: no reference to the macro module means
+    // the file cannot contain a module-scope macro, so it is not parsed at all.
+    if (!LINGUI_MACRO_MODULE_REFERENCE.test(source)) {
+      continue;
+    }
+    violations.push(...findModuleScopeLinguiMacros(source, filePath));
+  }
+  return violations;
 }
 
 const isMainModule = Boolean(
