@@ -21,26 +21,68 @@ use Throwable;
  * no `ftp_credentials` table and no FTP-related use of
  * `FILE_ENCRYPTION_KEY`.
  *
- * Password shape `^[a-z0-9]{16,24}$`, because a camera cannot type a special
- * character into its configuration screen and mixed case would turn a keyboard
- * layout into a support case. 16 characters from a 36-symbol alphabet are
- * ~82.7 bits, 24 are ~124 bits — the range is drawn per call, so a leaked
- * password cannot be narrowed down by length.
+ * Password shape `/^[a-km-zA-HJ-NP-Z2-9]{10,12}$/`: `[a-zA-Z0-9]` minus the
+ * five ambiguous symbols (`0`, `O`, `1`, `l`, `I`) — 57 symbols. Three
+ * decisions are folded into that one line, and all three are deliberate
+ * rather than incidental:
+ *
+ * - **No special characters.** Unchanged from the original rule: a camera cannot
+ *   type `-`, `&` or `!` into its configuration screen, so the alphabet is
+ *   strictly alphanumeric.
+ * - **Mixed case is allowed, which reverses the original rule** (owner decision,
+ *   2026-09-27). The original rationale — mixed case would turn a keyboard
+ *   layout into a support case — was a considered trade-off, recorded here
+ *   because it is being *overridden*, not because it was an oversight. It
+ *   assumes a human retyping the password. The password is displayed in a
+ *   monospace face, so characters are read one at a time and the case is
+ *   legible; nobody has to retype it from memory. **Do not restore the
+ *   lowercase-only alphabet from that sentence** — the mixed-case shape was
+ *   requested, the entropy cost below is the price that was accepted for it,
+ *   and the ambiguous five are excluded as the second half of the same deal.
+ * - **The ambiguous five are removed, not merely made visible.** On a camera
+ *   screen a misread `0`/`O` or `1`/`l` is not a mistake the photographer can
+ *   notice, it is a failed authentication and a regeneration. Rendering them
+ *   readably is not enough, so they do not enter the alphabet at all.
+ *
+ * The length range is 10–12 characters, drawn per call, so a leaked password
+ * cannot be narrowed down by length. Entropy is `length × log2(57)`, and
+ * `log2(57) ≈ 5.833` bits per character: **10 characters are ~58.3 bits, 12 are
+ * ~70.0**. The previous shape was 36 symbols at 16–24 characters, `log2(36) ≈
+ * 5.170`, i.e. **~82.7 to ~124.1 bits**.
+ *
+ * So the new range does *not* sit inside the old one — it sits entirely below
+ * it, the floor by ~24 bits and the ceiling by ~54. Stated plainly, because a
+ * docblock that hides this is worse than no docblock: **the minimum strength of
+ * a camera password went down**, and that is a real reduction in brute-force
+ * space, not a rounding difference. It was accepted knowingly (owner decision,
+ * 2026-09-27) for two reasons. An online attacker gains nothing from the
+ * alphabet: the hourly quota below bounds how fast one account can rotate its
+ * **own** credential, and this class never stores the password, so there is no
+ * offline target here at all — an offline attack would have to target SFTPGo's
+ * own credential store, a separate system with its own protection that this
+ * class neither writes nor reads. What the reduction buys is the point of the
+ * change: 16–24 characters is "extrem schwer auf der Kamera einzugeben", and a
+ * password that cannot be entered is a camera that never uploads.
+ *
+ * The string is 37 % shorter at the bottom of the old range (16 → 10) and 50 %
+ * at the top (24 → 12). That shortening is the *compensation* for mixed case,
+ * not a side effect of the alphabet.
  *
  * The reset is the third leg of that flow and the only recovery path (P1-M33).
- * Because the old password is gone for good, an unthrottled reset endpoint is an
- * unlimited, unobserved mint for valid camera credentials — so `resetAndShow()`
- * enforces a per-account quota and writes an audit row for every attempt it
- * lets through. Neither half is optional: the quota bounds how many credentials
- * exist, the audit row is what makes a reset attributable afterwards.
+ * Because the old password is gone for good, an unthrottled reset endpoint lets
+ * one account rotate the credential of a working camera as often as it likes —
+ * so `resetAndShow()` enforces a per-account quota and writes an audit row for
+ * every attempt it lets through. Neither half is optional: the quota bounds how
+ * much disruption one account can cause, the audit row is what makes a reset
+ * attributable afterwards.
  */
 class FtpCredentialService
 {
-    public const PASSWORD_PATTERN = '/^[a-z0-9]{16,24}$/';
+    public const PASSWORD_PATTERN = '/^[a-km-zA-HJ-NP-Z2-9]{10,12}$/';
 
-    public const PASSWORD_MIN_LENGTH = 16;
+    public const PASSWORD_MIN_LENGTH = 10;
 
-    public const PASSWORD_MAX_LENGTH = 24;
+    public const PASSWORD_MAX_LENGTH = 12;
 
     /**
      * The `ftp_account_status` values the revocation path has to tell apart
@@ -72,15 +114,41 @@ class FtpCredentialService
     /**
      * Resets allowed per account and per hour (P1-M33).
      *
-     * Three is a deliberate number and deliberately a constant rather than an
-     * ops knob: it is a security rule from the task board, not a capacity
-     * setting, and a value in `config/app.php` could be shipped as 0 — which
-     * would silently turn the recovery path off. A photographer who really lost
-     * a password three times in an hour is a support case, not a legitimate
-     * third attempt, and the limit costs nothing in normal operation because a
-     * reset that succeeds is not repeated.
+     * Ten is a deliberate number and deliberately a constant rather than an ops
+     * knob: it is a security rule, not a capacity setting, and a value in
+     * `config/app.php` could be shipped as 0 — which would silently turn the
+     * recovery path off.
+     *
+     * **Raising it from three to ten weakens the guard, and that is the honest
+     * headline** (owner decision, 2026-09-27). Three was measured against a
+     * photographer who already knows what they are doing, and it fails the case
+     * that actually arrives: someone at a camera, fumbling a dial, mistyping a
+     * password they cannot re-read. Every retry re-issues the credential, so a
+     * low quota turns a transcription problem into an hour-long lockout with no
+     * way out. The trade was accepted deliberately, not by accident — the
+     * compensation is the audit row below, and the two have to be read
+     * together: a wider quota means a longer trail, not a quieter one.
+     *
+     * What the quota bounds is worth stating precisely, because the obvious
+     * phrasing is wrong. A reset **replaces** the password, so at any moment
+     * there is exactly one valid credential per account and no reset ever mints
+     * a second one. The limit is therefore *not* a cap on how many credentials
+     * exist. It bounds two real things:
+     *
+     * 1. **Disruption of a working camera.** Every rotation invalidates the
+     *    password the camera is holding, so an unthrottled endpoint lets one
+     *    account knock an uploader offline as often as it clicks.
+     * 2. **Load on the SFTPGo API.** Each rotation is a read-modify-write
+     *    (`findUser()` then the update) against a live service, so the endpoint
+     *    would otherwise be an amplifier for unauthenticated-ish request volume.
+     *
+     * The compensating control is the audit row, and it does not scale with the
+     * number: `recordResetAttempt()` writes one row for every attempt that got
+     * past the quota, successful or not. Raising the limit from three to ten
+     * lengthens the trail and weakens nothing about attribution — a burst of ten
+     * resets is ten attributable rows, not one buried row.
      */
-    public const RESET_LIMIT_PER_HOUR = 3;
+    public const RESET_LIMIT_PER_HOUR = 10;
 
     public const RESET_WINDOW_SECONDS = 3600;
 
@@ -104,11 +172,19 @@ class FtpCredentialService
 
     /**
      * Everything outside the camera alphabet is removed, whatever the random
-     * string factory produces. `Str::random()` is a base64 alphabet with mixed
-     * case, so lowercasing and filtering are what turn it into a camera-safe
-     * string; the final check against PASSWORD_PATTERN is the guarantee.
+     * string factory produces. `Str::random()` yields base64 with `/`, `+` and
+     * `=` stripped, so it hands over 62 alphanumeric symbols; this class drops
+     * the five a camera screen renders ambiguously (`0`, `O`, `1`, `l`, `I`) and
+     * keeps 57. Its character class is the exact complement of the one in
+     * PASSWORD_PATTERN, deliberately: filter and verification are two halves of
+     * one contract, and a class written in two shapes has to be read twice to be
+     * checked.
+     *
+     * The mixed case the factory produces is **kept** (see the class docblock) —
+     * lowercasing here would quietly undo the owner decision, which is why there
+     * is no `Str::lower()` left in the generation path.
      */
-    private const NON_CAMERA_CHARACTERS = '/[^a-z0-9]/';
+    private const NON_CAMERA_CHARACTERS = '/[^a-km-zA-HJ-NP-Z2-9]/';
 
     private const GENERATION_ATTEMPTS = 8;
 
@@ -183,12 +259,13 @@ class FtpCredentialService
         $length = random_int(self::PASSWORD_MIN_LENGTH, self::PASSWORD_MAX_LENGTH);
 
         for ($attempt = 0; $attempt < self::GENERATION_ATTEMPTS; $attempt++) {
-            // 64 raw characters leave ample margin after filtering, so the
+            // 64 raw characters leave ample margin after filtering (57 of the
+            // 62 alphanumeric symbols `Str::random()` produces survive), so the
             // length check below practically never needs a second attempt.
             $candidate = (string) preg_replace(
                 self::NON_CAMERA_CHARACTERS,
                 '',
-                Str::lower(Str::random(64)),
+                Str::random(64),
             );
             $candidate = substr($candidate, 0, $length);
 

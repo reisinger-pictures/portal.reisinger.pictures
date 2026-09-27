@@ -62,12 +62,13 @@ class FtpPasswordResetEndpointTest extends TestCase
     }
 
     /**
-     * The recovery path must not be able to lock a photographer out. Three
-     * resets are allowed, the fourth is answered with 429, a German message and
-     * a `Retry-After` — a client needs the header to back off correctly instead
-     * of hammering the button, which would keep extending the window.
+     * The recovery path must not be able to lock a photographer out. As many
+     * resets as `RESET_LIMIT_PER_HOUR` allows are served, the next one is
+     * answered with 429, a German message and a `Retry-After` — a client needs
+     * the header to back off correctly instead of hammering the button, which
+     * would keep extending the window.
      */
-    public function test_the_fourth_call_is_answered_with_429(): void
+    public function test_the_call_past_the_hourly_limit_is_answered_with_429(): void
     {
         $this->fakeSuccessfulService();
         $user = $this->photographer();
