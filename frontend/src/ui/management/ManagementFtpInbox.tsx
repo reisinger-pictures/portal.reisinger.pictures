@@ -187,9 +187,12 @@ export default function ManagementFtpInbox() {
                 </h2>
 
                 <div className="flex gap-4 items-center bg-base-100 p-4 rounded-box mt-2">
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                         <p className="text-sm opacity-70"><Trans>Dein Upload-Ordner</Trans></p>
-                        <code className="font-bold font-mono text-lg">{status.ftp_folder}</code>
+                        {/* Der Ordner ist ein ohne Leerzeichen path, der nur mitten im
+                            Token umbrechen kann. `break-all` macht das vorhersagbar —
+                            sonst stapelt ein langer Slug die Karte auf Mobile. */}
+                        <code className="font-bold font-mono text-base md:text-lg break-all">{status.ftp_folder}</code>
                     </div>
                     <div className="text-right">
                         <p className="text-sm opacity-70"><Trans>Bilder in der Warteschlange</Trans></p>
