@@ -137,8 +137,13 @@ class DatabaseSeeder extends Seeder
         $this->command->info("Seede Katalog/Settings für Brand '{$brandCode}'...");
 
         // --- Standard-Lizenzen & Preise (brand-scoped via the brand column) ---
-        // Production restart seeding is insert-if-missing: values edited by an
-        // administrator are authoritative and must never be reset to defaults.
+        // The seeder is authoritative for the settings rows it declares: `upsert`
+        // on the (key, brand) primary key writes its own value, so a key an
+        // earlier migration already created (V004: base_price/term_*, V005: the
+        // bank keys) ends up with the seeder's value instead of the migration's.
+        // `insertOrIgnore` silently skipped exactly those rows. A `db:seed`
+        // therefore also overwrites values an operator set through the UI for
+        // these 28 keys — see backend/AGENTS.md (Database Setup Policy).
         $settingDefaults = [
             'price_web' => '7500',
             'price_print' => '14500',
@@ -180,7 +185,11 @@ class DatabaseSeeder extends Seeder
             array_keys($settingDefaults),
             array_values($settingDefaults)
         );
-        DB::table('settings')->insertOrIgnore($settingRows);
+        // `settings` has a composite primary key (key, brand) — V019 restored it
+        // after V018 dropped it — so (key, brand) is a valid upsert conflict
+        // target on SQLite as well as MySQL/MariaDB. Idempotent: a repeated
+        // seed updates the rows it owns instead of failing on the primary key.
+        DB::table('settings')->upsert($settingRows, ['key', 'brand'], ['value']);
 
         // --- Produkte & Katalog (Preise, Pakete, Rabatte) ---
         $products = [

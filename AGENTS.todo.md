@@ -573,16 +573,33 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   Problem nur, solange die Einheit nirgends steht — für `calc_*` wäre sie falsch.
   Vorher braucht es die Einheit am Feld oder im Vertrag. Einheitentabelle und
   Richtung stehen in `features/infrastructure/28-settings-key-meaning.md`.
-- [ ] **`V004__ecommerce_and_governance.php:131` seedet `base_price => '35.00'`** —
-  35 Cent, was dem Centvertrag widerspricht und unter der Validierung `min:500`
-  liegt. Der aktuelle `DatabaseSeeder:160` schreibt `'8000'` und überschreibt das,
-  und `backend/AGENTS.md` schreibt Seeden nach jeder Migration vor — ein reines
-  `migrate` ohne Seed hinterlässt aber 35, und dann liefert ein Speichern aus der
-  Rechner-Karte 422, weil sie den Wert round-tripped (0,35 → 35). **Gefunden bei der
-  Umsetzung der Validierungsregel, nicht vorher.** Der Wert wurde bewusst nicht
-  angefasst, weil eine Abschwächung von `min:500` den ganzen Zweck der Regel
-  aufheben würde; die konsistente Auflösung ist, den Seedwert auf einen
-  cent-konformen Betrag zu heben.
+- [ ] **Vor dem Deploy zu prüfen: steht `base_price` auf Produktion auf 35?**
+  Ursache und Behebung sind erledigt, der Produktionswert ist es nicht.
+  `V004__ecommerce_and_governance.php:131` legt `base_price => '35.00'` an — 35 Cent,
+  unter der seit dem 2026-09-27 geltenden Validierung `min:500`. Der `DatabaseSeeder`
+  schrieb sein `'8000'` nur nie durch, weil er `insertOrIgnore` benutzte; jetzt schreibt
+  er per `upsert` (Owner-Entscheidung 2026-09-27, in `backend/AGENTS.md` festgehalten).
+  **Das hilft nur einer frischen oder neu geseedeten Datenbank.** Eine bestehende
+  Produktionsdatenbank behält 35, bis dort ein `db:seed` läuft — und dann liefert ein
+  Speichern aus der Rechner-Karte 422, weil sie den Wert round-tripped (0,35 → 35). Genau
+  das war der CI-Fehler an `package-calculator-config.spec.ts`.
+  **Gegenprobe auf dem Host** (nicht aus dem Repository ableitbar, deshalb hier und nicht
+  geraten): Wert von `base_price` in der `settings`-Tabelle für `brand = 'rp'` lesen. Steht
+  er unter 500, ist es kein Code-Fehler, sondern ein Datenwert — dann entweder einmalig
+  über die Rechner-Karte auf einen cent-konformen Betrag setzen oder gezielt korrigieren.
+  Steht er auf einem plausiblen Wert, ist nichts zu tun; `min:500` greift dann nicht.
+- [ ] **`GalleryGroup::firstOrCreate()` in `DatabaseSeeder.php:116` ist nicht
+  mandantenfest** — der Lookup-Schlüssel ist `slug` **allein**, `brand` steht nur in den
+  Values (Z. 118). Trifft `firstOrCreate` auf eine Zeile mit derselben Slug, aber
+  fremdem `brand`, wird **diese** Zeile zurückgegeben und stillschweigend übernommen; der
+  nachfolgende Reparaturversuch `if ($group->brand === null)` (Z. 121) greift nur bei
+  `null` und lässt einen falschen, nicht-nullen `brand` stehen. Heute unkritisch, weil es
+  nur eine Marke gibt (`rp`); mit der zweiten Marke adoptiert der Seeder fremde Gruppen.
+  **Gefunden beim Lesen des Seeders im Zuge der `insertOrIgnore`-Korrektur, nicht durch
+  einen Test.** Bewusst nicht angefasst: die Korrektur gehört in dieselbe Entscheidung
+  wie die mandantensichere Settings-Zuordnung (siehe
+  `features/infrastructure/28-settings-key-meaning.md`, Abschnitt Mandantenfähigkeit),
+  nicht in einen nebenbei laufenden Seeder-Fix.
 - [ ] **`contracts.spec.ts` ist mit 617 Zeilen / 8 Tests die schwerste Datei** und
   mischt Vertrags-Lifecycle, Rabatt-Summen, Token-Rotation und einen
   Tiptap-Reload-Regress.
