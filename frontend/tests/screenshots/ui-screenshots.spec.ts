@@ -116,7 +116,7 @@ async function captureSections(
 }
 
 /**
- * UI login using the sidebar login form (header menu button → backdrop modal →
+ * UI login using the sidebar login form (header menu button → mobile drawer →
  * E-Mail/Passwort inputs → Enter). A plain admin lands on "/".
  */
 async function loginAdminViaUi(page: Page): Promise<void> {
@@ -134,16 +134,19 @@ async function loginViaUi(page: Page, email: string, password: string): Promise<
     await expect(page.getByTestId('app-loader').first()).toBeHidden({ timeout: 10000 });
     await expect(page.locator('main').first()).toBeVisible({ timeout: 10000 });
 
-    const menuBtn = page.locator('header button').filter({ has: page.locator('svg') }).first();
+    // The trigger is located semantically, not by its icon: `aria-expanded` on it is
+    // the drawer-state signal both the open gate and the dismissal assert on. The
+    // previous visual selector (`header button` filtered by an inner `svg`) could not
+    // carry that contract — the drawer trigger renders an iconify span.
+    const menuBtn = page.getByRole('button', { name: 'Menü öffnen' }).first();
     const emailInput = page.locator('input[placeholder="E-Mail Adresse"]').first();
-    const backdrop = page.locator('div.fixed.inset-0').first();
 
-    if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
+    if (await menuBtn.isVisible()) {
         await expect(async () => {
-            if (await menuBtn.isVisible() && !(await backdrop.isVisible())) {
+            if (await menuBtn.isVisible() && (await menuBtn.getAttribute('aria-expanded')) !== 'true') {
                 await menuBtn.click();
             }
-            await expect(backdrop).toBeVisible({ timeout: 2000 });
+            await expect(menuBtn).toHaveAttribute('aria-expanded', 'true', { timeout: 2000 });
         }).toPass({ timeout: 10000 });
     }
 
@@ -155,9 +158,18 @@ async function loginViaUi(page: Page, email: string, password: string): Promise<
         await expect(emailInput).toBeHidden({ timeout: 15000 });
     }
 
-    if (await backdrop.isVisible()) {
-        await backdrop.click();
-        await expect(backdrop).toBeHidden({ timeout: 5000 });
+    // Dismiss via the drawer's own close button and assert the state transition.
+    // A backdrop scrim used to cover this, but below `md` the drawer is `w-full`
+    // (viewport-wide) and from `md` up the scrim was `md:hidden`, so it had no
+    // exposed surface at any viewport width and was not a reliable click target.
+    if (await menuBtn.isVisible() && (await menuBtn.getAttribute('aria-expanded')) === 'true') {
+        const closeBtn = page.getByRole('button', { name: 'Menü schließen', exact: true }).first();
+        await expect(async () => {
+            if ((await menuBtn.getAttribute('aria-expanded')) === 'true') {
+                await closeBtn.click();
+            }
+            await expect(menuBtn).toHaveAttribute('aria-expanded', 'false', { timeout: 1000 });
+        }).toPass({ timeout: 10000 });
     }
 
     await expect(page).toHaveURL(/\/(admin.*)?$/);

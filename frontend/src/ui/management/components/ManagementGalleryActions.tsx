@@ -21,7 +21,13 @@ export default function ManagementGalleryActions({ gallery, canSendMail, downloa
         <div className="flex flex-wrap gap-4 items-center">
             {gallery.type === 'delivery' && <span className="badge badge-ghost font-normal">{downloadsCount || 0} <Trans>Downloads</Trans></span>}
             {isPhotographer && (
-                <div className="flex gap-2">
+                /* The inner row carries up to seven buttons and must wrap itself:
+                   a non-wrapping flex row is sized to its min-content width, i.e.
+                   the sum of all buttons, which pushed "Einladungslink..." and
+                   "E-Mail senden..." outside a phone viewport and made the whole
+                   page scroll sideways. The outer wrapper wrapping is not enough —
+                   the buttons live one level deeper. */
+                <div className="flex flex-wrap gap-2">
                     {gallery.type === 'selection' && (
                         <button onClick={onOpenRatings} className="btn btn-outline btn-primary btn-sm">
                             <span className="iconify mdi--star-outline"></span> <Trans>Bewertungen...</Trans>

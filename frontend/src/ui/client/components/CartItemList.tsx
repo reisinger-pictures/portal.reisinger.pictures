@@ -4,6 +4,7 @@ import type {CartPricingGroup, VolumeLicensingResult} from '../../../logic/CartC
 import {CartItem} from '../../../logic/CartContext';
 import {DEFAULT_PRESET_KEY} from '../../../logic/useVolumeLicensing';
 import {formatMoney} from '../../../logic/utils';
+import {formatEuroDecimal} from '../../../logic/formatCurrency';
 
 export interface CartItemListProps {
     items: CartItem[];
@@ -94,7 +95,7 @@ export const CartItemList = ({
                     {volumeGroups.map(group => {
                         const payableCount = group.items.filter(item => !item.isQuote).length;
                         const groupPrice = group.pricePerItemCents ?? 0;
-                        const pricePerItemStr = formatMoney(groupPrice);
+                        const pricePerItemStr = formatEuroDecimal(groupPrice / 100);
                         const tierNum = group.tierIndex;
                         const nextCount = group.nextTierCount;
                         const nextLabel = group.nextTierLabel;
@@ -107,7 +108,7 @@ export const CartItemList = ({
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="badge badge-primary badge-sm uppercase text-xs tracking-wider"><Trans>Mengenrabatt</Trans></span>
                                     <span className="text-sm font-semibold">
-                                        <Trans>{pricePerItemStr} pro Bild (Tier {tierNum})</Trans>
+                                        <Trans>{pricePerItemStr}{'\u00A0'}€ pro Bild (Tier {tierNum})</Trans>
                                     </span>
                                     {group.presetName && <span className="text-xs opacity-70">{group.presetName}</span>}
                                 </div>
@@ -215,11 +216,11 @@ export const CartItemList = ({
                     <span className="font-bold text-lg"><Trans>Gesamtsumme</Trans></span>
                     {isVolumeLicensingMode && volumeGroups.map(group => {
                         const groupPayableCount = group.items.filter(item => !item.isQuote).length;
-                        const groupTotalPriceText = formatMoney(group.pricePerItemCents ?? 0);
+                        const groupTotalPriceText = formatEuroDecimal((group.pricePerItemCents ?? 0) / 100);
                         const groupTotalTierIndex = group.tierIndex;
                         return (
                             <span key={`total-${group.key}`} className="text-xs opacity-60">
-                                <Trans>{groupPayableCount} Bilder × {groupTotalPriceText} (Tier {groupTotalTierIndex})</Trans>
+                                <Trans>{groupPayableCount} Bilder × {groupTotalPriceText}{'\u00A0'}€ (Tier {groupTotalTierIndex})</Trans>
                             </span>
                         );
                     })}
