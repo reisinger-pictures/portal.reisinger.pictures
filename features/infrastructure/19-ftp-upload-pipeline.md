@@ -61,10 +61,18 @@ All endpoints are under `auth:api` + `management` middleware.
 
 ### 3.1 `GET /api/management/ftp/status`
 
-Returns:
-- `ftp_folder`: The user's inbox directory name (`/` + `ftp_slug` or `id`).
+Read-only and free of SFTPGo contact (§7.5). Returns:
+
+- `ftp_folder`: The user's inbox directory name (`/` + `ftp_slug`, falling back to the user `id`).
 - `file_count`: Count of `.jpg`/`.jpeg`/`.JPG`/`.JPEG` files in the inbox.
-- `current_target_gallery`: Currently selected gallery (with loaded relation).
+- `current_target_gallery`: Currently selected gallery (with loaded relation), or `null`.
+- `ftp_account_status`: The stored provisioning state from `users.ftp_account_status` — `pending` / `active` / `revoked` / `error` (§7.4, §7.16). Never a live query.
+- `ftp_provisioned_at`: Timestamp of the last successful provisioning, ISO-8601, or `null`.
+- `ftp_account_error`: Provider text for the `error` state, otherwise `null`.
+- `ftp_reset_limit_per_hour`: `FtpCredentialService::RESET_LIMIT_PER_HOUR` — the hourly camera-password reset quota, exposed so the UI quotes the rule instead of copying it (§7.6a).
+- `connection`: The camera connection details as `FtpConnectionDetails::toArray()` — `configured`, `host`, `username`, `path`, `sftp_port`, `ftps_port`, `pasv_port_start`, `pasv_port_end`, `ftps_tls_mode`. Carries no secret; the password only ever leaves `POST /api/management/ftp/reset-password`. The frontend mirror is `FtpConnection` in `frontend/src/logic/ftpConnection.ts`.
+
+`ftp_folder`, `file_count` and `current_target_gallery` are the original fields; the account fields, the reset quota and `connection` are additive. The frontend contract is `FtpStatus` in `frontend/src/logic/useFtp.ts`.
 
 ### 3.2 `POST /api/management/ftp/target`
 
