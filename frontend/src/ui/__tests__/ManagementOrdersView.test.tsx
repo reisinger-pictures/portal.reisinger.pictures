@@ -189,6 +189,58 @@ describe('ManagementOrdersView', () => {
         expect(mutate).toHaveBeenCalledTimes(1);
     });
 
+    // The quote dialog used to be a bare `div.modal` + `.modal-box`: no dialog
+    // role, no accessible name, no focus trap, no Escape. It is now on
+    // ModalShell, so the shared contract applies to it too.
+    it('exposes the quote dialog as a named aria-modal dialog and closes it on Escape', async () => {
+        const user = userEvent.setup();
+
+        vi.mocked(useSWR).mockReturnValue({
+            data: mockOrders,
+            error: undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        } as never);
+
+        renderView();
+
+        await user.click(screen.getByText('Kalkulieren & Antworten'));
+
+        const dialog = screen.getByRole('dialog', { name: 'Angebot kalkulieren & senden' });
+        expect(dialog).toHaveAttribute('aria-modal', 'true');
+
+        // Escape now reaches the dialog and unmounts it. It did nothing before,
+        // so this is the assertion that would have failed pre-migration.
+        await user.keyboard('{Escape}');
+        expect(screen.queryByRole('dialog', { name: 'Angebot kalkulieren & senden' })).not.toBeInTheDocument();
+    });
+
+    // Pinned deliberately. The price field carries `autoFocus`, and React
+    // applies that during commit — but the focus trap's effect runs afterwards
+    // and moves focus to the first focusable element, which is the shell's
+    // labelled close button. So on open the dialog no longer lands the caret in
+    // the price field. This is a real change in where focus starts, recorded
+    // here so it is a decision rather than an accident; if the price field
+    // should win, the shell needs an initial-focus hook and this test moves
+    // with it.
+    it('puts initial focus on the labelled close button rather than the autoFocus price field', async () => {
+        const user = userEvent.setup();
+
+        vi.mocked(useSWR).mockReturnValue({
+            data: mockOrders,
+            error: undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        } as never);
+
+        renderView();
+
+        await user.click(screen.getByText('Kalkulieren & Antworten'));
+
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Schließen' }));
+        expect(document.activeElement).not.toBe(screen.getByPlaceholderText('z.B. 450.00'));
+    });
+
     it('does not label the rights field as optional', async () => {
         const user = userEvent.setup();
 

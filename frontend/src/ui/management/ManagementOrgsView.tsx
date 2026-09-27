@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '../../logic/usePermissions';
 import PageLayout from '../components/PageLayout';
 import EmptyState from '../components/EmptyState';
+import ModalDialogShell from '../components/ModalDialogShell';
 
 export default function ManagementOrgsView() {
     const { orgs, createOrg, isLoading } = useOrgs();
@@ -82,11 +83,20 @@ export default function ManagementOrgsView() {
             </div>
 
             {isCreateOpen && (
-                <div className="modal modal-open">
-                    <div className="modal-box relative">
-                        <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setCreateOpen(false)}>✕</button>
-                        <h3 className="font-bold text-lg mb-4"><Trans>Neue Organisation anlegen</Trans></h3>
-                        <form onSubmit={handleCreate} className="space-y-4">
+                <ModalDialogShell
+                    title={<Trans>Neue Organisation anlegen</Trans>}
+                    onClose={() => setCreateOpen(false)}
+                    // Creating only — an existing organisation is deleted from
+                    // the detail view, not here, so the shared footer must not
+                    // offer a delete. See the `editing` note in TextSnippetModal.
+                    editing={false}
+                    isSubmitting={isCreating}
+                    onSubmit={handleCreate}
+                    // No `noValidate` on purpose: the name field is `required`
+                    // and this form was written to keep native constraint
+                    // validation, so the shell must leave it on.
+                >
+                            <div className="space-y-4">
                             <div className="form-control">
                                 <label className="label"><span className="label-text font-bold"><Trans>Name (z.B. Firma XYZ)</Trans></span></label>
                                 <input type="text" required value={newName} onChange={e => setNewName(e.target.value)} className="input input-bordered" />
@@ -115,14 +125,8 @@ export default function ManagementOrgsView() {
                                 <option value="disabled"><Trans>Deaktiviert</Trans></option>
                                 </select>
                             </div>
-                            <div className="modal-action col-span-full">
-                                <button type="button" className="btn btn-ghost" onClick={() => setCreateOpen(false)}><Trans>Abbrechen</Trans></button>
-                                <button type="submit" className="btn btn-primary" disabled={isCreating}><Trans>Speichern</Trans></button>
                             </div>
-                        </form>
-                    </div>
-                    <div className="modal-backdrop" onClick={() => setCreateOpen(false)}></div>
-                </div>
+                </ModalDialogShell>
             )}
         </div>
         </PageLayout>

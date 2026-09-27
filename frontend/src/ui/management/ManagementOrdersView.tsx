@@ -7,6 +7,7 @@ import { useUI } from '../components/UIContext';
 import { Order, OrderItem } from '../../api';
 import { formatMoney } from '../../logic/utils';
 import WysiwygEditor from '../components/WysiwygEditor';
+import ModalShell from '../components/ModalShell';
 
 
 
@@ -117,10 +118,25 @@ export default function ManagementOrdersView() {
             </div>
 
             {quoteOrder && (
-                <div className="modal modal-open z-50">
-                    <div className="modal-box relative">
-                        <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => setQuoteOrder(null)}>✕</button>
-                        <h3 className="font-bold text-xl mb-4"><Trans>Angebot kalkulieren & senden</Trans></h3>
+                // `ModalShell`, not `ModalDialogShell`: the fields are driven
+                // by `useState` and the primary action is an `onClick`, so this
+                // is a viewer/editor with no form to submit. Its footer is
+                // therefore passed in rather than generated — the send button's
+                // `disabled` rule is this view's own and must not be replaced by
+                // the shell's `isSubmitting` shorthand.
+                <ModalShell
+                    title={<Trans>Angebot kalkulieren & senden</Trans>}
+                    onClose={() => setQuoteOrder(null)}
+                    className="z-50"
+                    footer={
+                        <div className="modal-action col-span-full">
+                            <button className="btn btn-ghost" onClick={() => setQuoteOrder(null)}><Trans>Abbrechen</Trans></button>
+                            <button className="btn btn-primary" onClick={handleSendQuote} disabled={!customPrice || !quoteMessage || isGenerating}>
+                                {isGenerating ? <span className="loading loading-spinner"></span> : <Trans>Kalkulieren & E-Mail senden</Trans>}
+                            </button>
+                        </div>
+                    }
+                >
                         <p className="text-sm opacity-80 mb-4"><Trans>Lege einen Gesamtpreis für die angefragten Bilder fest und verfasse eine Nachricht an den Kunden.</Trans></p>
 
                         <div className="bg-base-200 p-4 rounded-box mb-4 text-sm max-h-40 overflow-y-auto">
@@ -151,16 +167,7 @@ export default function ManagementOrdersView() {
                             <label className="label"><span className="label-text font-bold"><Trans>Nutzungsrechte</Trans></span></label>
                             <WysiwygEditor value={rightsText} onChange={setRightsText} />
                         </div>
-
-                        <div className="modal-action col-span-full">
-                            <button className="btn btn-ghost" onClick={() => setQuoteOrder(null)}><Trans>Abbrechen</Trans></button>
-                            <button className="btn btn-primary" onClick={handleSendQuote} disabled={!customPrice || !quoteMessage || isGenerating}>
-                                {isGenerating ? <span className="loading loading-spinner"></span> : <Trans>Kalkulieren & E-Mail senden</Trans>}
-                            </button>
-                        </div>
-                    </div>
-                    <div className="modal-backdrop" onClick={() => setQuoteOrder(null)}></div>
-                </div>
+                </ModalShell>
             )}
         </div>
     );
