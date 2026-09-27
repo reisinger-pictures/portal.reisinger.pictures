@@ -14,8 +14,8 @@ msgstr ""
 "Plural-Forms: \n"
 
 #: src/logic/utils.ts
-msgid "--- €"
-msgstr "--- €"
+#~ msgid "--- €"
+#~ msgstr "--- €"
 
 #: src/ui/management/ManagementModelsView.tsx
 msgid "„Beste Übereinstimmung\" gewichtet Lust stärker als Erfahrung."
@@ -178,8 +178,12 @@ msgid "← Zurück"
 msgstr "← Zurück"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "+ {upgradePriceFormatted} €"
-msgstr "+ {upgradePriceFormatted} €"
+msgid "+ {upgradePriceFormatted}"
+msgstr "+ {upgradePriceFormatted}"
+
+#: src/ui/client/components/LicenseSelectorModal.tsx
+#~ msgid "+ {upgradePriceFormatted} €"
+#~ msgstr "+ {upgradePriceFormatted} €"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "< 50€ (Rollover)"
@@ -321,7 +325,6 @@ msgstr "Ab"
 msgid "Ab {minQuantity} Bildern {price}€ pro Bild"
 msgstr "Ab {minQuantity} Bildern {price}€ pro Bild"
 
-#: src/ui/components/GalleryModal.tsx
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/components/UIProvider.tsx
 #: src/ui/components/WysiwygEditor.tsx
@@ -1793,12 +1796,16 @@ msgstr "Die Passwörter stimmen nicht überein."
 #~ msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera eingerichtet werden kann."
 
 #: src/ui/management/FtpConnectionRows.tsx
-msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Den Kamera-Zugang kannst du trotzdem einrichten — im Dashboard unter FTP Inbox → Kamera-Konto, die Anleitung dazu öffnest du über „Anleitung öffnen\"."
-msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Den Kamera-Zugang kannst du trotzdem einrichten — im Dashboard unter FTP Inbox → Kamera-Konto, die Anleitung dazu öffnest du über „Anleitung öffnen\"."
+#~ msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Den Kamera-Zugang kannst du trotzdem einrichten — im Dashboard unter FTP Inbox → Kamera-Konto, die Anleitung dazu öffnest du über „Anleitung öffnen\"."
+#~ msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Den Kamera-Zugang kannst du trotzdem einrichten — im Dashboard unter FTP Inbox → Kamera-Konto, die Anleitung dazu öffnest du über „Anleitung öffnen\"."
 
 #: src/ui/management/FtpConnectionRows.tsx
 #~ msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Ohne diese Angaben lässt sich die Kamera nicht einrichten."
 #~ msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Ohne diese Angaben lässt sich die Kamera nicht einrichten."
+
+#: src/ui/management/FtpConnectionRows.tsx
+msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Wie du die Kamera einrichtest, erklärt die Anleitung — im Dashboard unter FTP Inbox über „Anleitung öffnen\"."
+msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Wie du die Kamera einrichtest, erklärt die Anleitung — im Dashboard unter FTP Inbox über „Anleitung öffnen\"."
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Die Sicherheitsprüfung ist nicht konfiguriert. Bitte wende dich an den Support."
@@ -2608,8 +2615,12 @@ msgid "Folgen des Widerrufs"
 msgstr "Folgen des Widerrufs"
 
 #: src/ui/management/KameraEinrichtungContent.tsx
-msgid "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
-msgstr "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
+msgid "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind {resetLimitPerHour} Anforderungen pro Stunde möglich."
+msgstr "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind {resetLimitPerHour} Anforderungen pro Stunde möglich."
+
+#: src/ui/management/KameraEinrichtungContent.tsx
+#~ msgid "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
+#~ msgstr "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
 
 #: src/ui/KameraEinrichtung.tsx
 #~ msgid "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Neues Kamera-Passwort\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
@@ -2873,8 +2884,12 @@ msgid "Gesamtbetrag"
 msgstr "Gesamtbetrag"
 
 #: src/ui/management/components/invoice/InvoiceTotalSummary.tsx
-msgid "Gesamtbetrag: {totalFormatted} €"
-msgstr "Gesamtbetrag: {totalFormatted} €"
+msgid "Gesamtbetrag: {totalFormatted}"
+msgstr "Gesamtbetrag: {totalFormatted}"
+
+#: src/ui/management/components/invoice/InvoiceTotalSummary.tsx
+#~ msgid "Gesamtbetrag: {totalFormatted} €"
+#~ msgstr "Gesamtbetrag: {totalFormatted} €"
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "Gesamtsumme"
@@ -3798,7 +3813,6 @@ msgid "Lokal:"
 msgstr "Lokal:"
 
 #: src/ui/components/GalleryGroupModal.tsx
-#: src/ui/components/GalleryModal.tsx
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
@@ -5439,7 +5453,6 @@ msgstr "Spalte davor hinzufügen"
 msgid "Spalte löschen"
 msgstr "Spalte löschen"
 
-#: src/ui/components/GalleryModal.tsx
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
 #: src/ui/management/components/CouponFormDrawer.tsx

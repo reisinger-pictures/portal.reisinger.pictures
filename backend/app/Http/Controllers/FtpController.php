@@ -6,6 +6,7 @@ use App\Http\Resources\GalleryResource;
 use App\Models\Gallery;
 use App\Models\Photo;
 use App\Services\AuthorizationService;
+use App\Services\FtpCredentialService;
 use App\Services\PhotoProcessingService;
 use App\Values\FtpConnectionDetails;
 use Illuminate\Http\JsonResponse;
@@ -90,6 +91,17 @@ class FtpController extends Controller
             'ftp_account_status' => $user->ftp_account_status,
             'ftp_provisioned_at' => $user->ftp_provisioned_at,
             'ftp_account_error' => $user->ftp_account_error,
+            // The hourly credential-reset quota, read from the constant the guard
+            // itself uses rather than from a literal. The camera setup guide quotes
+            // this number to the photographer ("Es sind n Anforderungen pro Stunde
+            // möglich"), and that copy is what goes stale when the rule changes: the
+            // quota was raised from three to ten on 2026-09-27 while the guide still
+            // said three. Exposing the value here makes the guide a reader of the
+            // rule instead of a second copy of it, so the two cannot disagree. A
+            // constant is the right source for the same reason it is a constant and
+            // not config: this is a security rule, and the UI may describe it but
+            // must never define it.
+            'ftp_reset_limit_per_hour' => FtpCredentialService::RESET_LIMIT_PER_HOUR,
             // What a camera has to be configured with. Read from the same
             // variables the compose publishes, so the UI cannot show a port
             // the container does not listen on, and it carries no secret — the

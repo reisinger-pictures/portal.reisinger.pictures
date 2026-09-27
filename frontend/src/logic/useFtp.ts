@@ -36,6 +36,16 @@ export interface FtpStatus {
     /** Provider text for `error`, `null` in every other state. */
     ftp_account_error: string | null;
     /**
+     * How many camera passwords the account may request per hour.
+     *
+     * Read from the backend, never written down in the frontend. The camera setup
+     * guide quotes this number to the photographer, and the number it quoted was
+     * three while the server enforced ten — the copy was its own copy of a security
+     * rule and therefore went stale on the raise. A prop makes the guide a reader of
+     * the rule; the guide must not get to define it.
+     */
+    ftp_reset_limit_per_hour: number;
+    /**
      * What a camera has to be configured with. Absent values mean the server
      * has not declared them, which is reported rather than guessed — see
      * `FtpConnection`.
@@ -85,7 +95,8 @@ export function useFtp() {
      * unreachable" (503) from "the cached account does not exist" (404). Swallowing
      * that into one generic failure would leave the photographer guessing which of
      * those three they are looking at — and retrying blindly is exactly what the
-     * 3-per-hour quota punishes. The caller shows the message and does not retry.
+     * hourly quota (`ftp_reset_limit_per_hour`) punishes. The caller shows the
+     * message and does not retry.
      *
      * The status is refetched because a successful reset is what moves
      * `ftp_account_status` from `pending` to `active`, and that transition is the

@@ -45,6 +45,11 @@ const statusPayload = (overrides: Record<string, unknown> = {}) => ({
     ftp_account_status: 'pending',
     ftp_provisioned_at: null,
     ftp_account_error: null,
+    // The guide quotes the reset quota from this field, so a stub without it
+    // would render the sentence with a hole in it — the same drift the prop
+    // replaced, only inside the fixture. Deliberately not the production value:
+    // the guide is expected to show what the response says, whatever that is.
+    ftp_reset_limit_per_hour: 7,
     connection: CONNECTION,
     ...overrides,
 });
@@ -215,7 +220,7 @@ test.describe('Kamera einrichten: Anleitung und Zugangsdaten', () => {
         // so it is addressed from the page — the same as every other toast
         // assertion in this suite.
         await expect(page.locator('.toast')).toContainText('Zu viele Passwort-Änderungen');
-        // Three resets per hour is the backend quota. A client-side retry or a
+        // The hourly reset quota is the backend rule. A client-side retry or a
         // re-enabled button would spend the remaining quota on guesses, so exactly
         // one request may reach the endpoint.
         await expect.poll(() => resetCalls).toBe(1);
