@@ -2635,9 +2635,53 @@ gerissen und zur Entscheidung gemacht.
     Workern serialisiert. Das ist der Verstaerker, der externe Last in
     E2E-Latenz uebersetzt. Nicht geaendert (out of scope), aber die
     Grundursache, warum hier Testbudgets echten Spielraum brauchen.
-- [ ] **Methodische Korrektur, die der Agent selbst vorgenommen hat:** Der erste
-  kombinierte Lauf mit `--repeat-each 3 --workers 3` erzeugte **einen** Fehler
-  in `production-board.spec.ts:78` (58,4 s) — **das war sein eigenes Artefakt.**
+- [x] **Sichtpruefung der Dialog-Migration: 44 Aufnahmen, 0 Fehlschlaege, 1,7 min.**
+  Die zwei Stellen, die **keine** Assertion abdecken kann, sind mit den Augen
+  geprueft und **beide bestaetigt**:
+  **`RatingStatusModal`** (Desktop und Mobile): Box auf 90vh, Titel oben fest,
+  beide Tabellen scrollen innen, der 2rem-Abstand zwischen „Beteiligte Personen"
+  und „Detaillierte Auswertungen" ist vorhanden, nichts unten abgeschnitten. Die
+  sichtbaren Empty-States („Es sind aktuell keine Personen freigeschaltet") sind
+  **Harness-Seeds, kein Produktzustand**.
+  **Kamera-Anleitung in `ManagementFtpInbox`**: Box 90vh, Inhalt scrollt innen,
+  die Abschlusswarnung am Ende **vollstaendig lesbar**, unten ein **weicher Fade
+  statt eines harten Schnitts** — genau die Wirkung, die der mitgewanderte
+  `scroll-fade-bottom` haben soll. Der Titel bleibt oben stehen.
+  **Eigener Fehler, unterwegs passiert:** Meine 44 Aufnahmen waren nach dem Lauf
+  **weg** — der `UploadHelper`-Agent hatte parallel eine Playwright-Suite gestartet,
+  und Playwright **loescht `test-results/` bei jedem Start**. Ich hatte diese
+  Eigenschaft selbst notiert und trotzdem nicht abgesichert, habe dann aber auf
+  die Bildquelle statt auf die Erkenntnis reagiert: Lauf wiederholt, 44/44,
+  155 PNG. **Regel daraus:** In einem Baum mit parallelen Agenten sind
+  Bild-Artefakte **fluechtig** — sie direkt nach dem eigenen Lauf auswerten oder
+  vorher kopieren, nie spaeter auf sie als Beweis bauen.
+- [x] **Toter `UploadHelper`-Zweig entfernt — mit einer Korrektur an meiner
+  Diagnose, die zu unseren Ungunsten ausfaellt.** `uploadSampleImage` las
+  `if (!res)` und behielt einen `else`-Arm, der „Upload request timed out (no
+  response received)" fuer eine Antwort erfand, die es nie gab. **Praeziser als
+  meine Beschreibung:** Der Arm war **nie erreichbar**, auch nicht beim Timeout —
+  `await uploadPromise` warf bereits in der Zeile **oberhalb** des `if`. Der
+  alte Code **sah aus**, als behandelte er Timeouts, und tat es nicht. Der
+  beobachtbare Defekt war also **latent, nicht aktiv**; der Fix beseitigt eine
+  **vorgetaeuschte Faehigkeit**, keinen lebenden Bug.
+  **Vierfach belegt, und der vierte Beleg ist der aussagekraeftigste:** Eine
+  `console.error`-Sonde im `else`-Arm des **alten** Codes druckte ueber alle drei
+  echten Ausgaenge nie — und ein **Negativkontrollversuch**, ein vierter Fall, der
+  `null` aufloest (der alte Vertrag), liess sie **feuern**. Die Messung war also
+  nicht blind. Dazu vollstaendige Fallanalyse (eine echte Wartebedingung hat drei
+  Ausgaenge: 2xx, non-2xx, nie-beantwortet — und der dritte wirft oberhalb) und
+  eine Kompilierzeit-Nichtnullbarkeits-Zusicherung, die zum Beweis umgedreht
+  wurde.
+  **Nur `UploadHelper` trug die Fiktion:** `ModalHelper` war bereits korrekt,
+  `AuthHelper` verwirft den Wert, und die `E2ESessionHelper`-Treffer sind
+  `APIResponse` aus `request.*` — ein anderer Vertrag. Alle **32** Vorkommen
+  geprueft.
+  **Bekannte Einschraenkung, vom Agenten offengelegt:** Einer der neuen Tests ist
+  ein **Quelltext-Waechter** (liest `UploadHelper.ts` und behauptet, es enthalte
+  weder „timed out" noch „no response received"). Die Verhaltenstests koennen einen
+  wiedereingefuehrten toten Zweig **nicht** erkennen — er waere wieder tot und sie
+  wuerden trotzdem gruen. **Mein Call:** behalten, weil genau diese Luecke sonst
+  unbewacht waere — aber es ist eine Testart, die man bewusst waehlt.
   Die Datei ist `mode: 'serial'`; `--repeat-each N` mit `workers > 1` laesst N
   *gleichzeitige* Kopien auf dasselbe geteilte Board laufen, genau was der
   Kopfkommentar der Datei verbietet. **Ein `serial`-Describe mit
