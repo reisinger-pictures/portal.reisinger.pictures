@@ -2412,12 +2412,17 @@ gerissen und zur Entscheidung gemacht.
   Ergebnis — das ist genau die Divergenz, die die Formatter-Extraktion eigentlich
   verhindern soll. **Nicht** im Aufgabenumfang geaendert, weil
   `ContractSignView.test.tsx:249` die bestehende Ausgabe pinnt.
-- [ ] **`LicenseSettingsCard`: Vorschau ist fabriziert.** Sie zeigt
+- [x] **`LicenseSettingsCard`: Vorschau war fabriziert — durch Loeschung
+  gegenstandslos, nicht ausgeliefert.** Sie zeigte
   `calculateUpgradePrice(previewTerms, …)` aus festen Defaults (75/145/450),
-  aber die Karte rendert **keine** `price_*`-Felder und `reset()` setzt sie nie —
-  die Vorschau zeigt also nie die gespeicherten Konditionen. Von der
-  Formatumstellung nicht verursacht, aber beim Nachlesen aufgefallen: eine Zahl,
-  die nicht stimmt, ist schlimmer als eine, die fehlt.
+  obwohl die Karte keine `price_*`-Felder rendete und `reset()` sie nie
+  setzte. Von der Formatumstellung nicht verursacht, beim Nachlesen aufgefallen.
+  Der Befund fuehrte zur Owner-Entscheidung „Felder ergaenzen", danach kam die
+  Feststellung, dass die Karte **nirgends eingehängt** ist, und der Owner hat
+  daraufhin die **Loeschung** entschieden. Dieser Eintrag beschreibt also einen
+  Defekt, der **behoben wurde, indem das betroffene Objekt wegfiel** — nicht
+  durch eine Korrektur, die ausgeliefert wurde. Wer die Preisfelder sucht,
+  findet sie nicht, weil es sie nicht gibt.
 - [ ] **Vorbestehender Mobile-Flake im geteilten Login-Helfer:** `AuthHelper.ts:48`,
   `await expect(backdrop).toBeHidden({ timeout: 5000 })` beim Schliessen des
   Sidebar-Drawers. Lastabhaengig, tritt **vor** dem Gallery-Aufbau auf und ist
@@ -2427,6 +2432,788 @@ gerissen und zur Entscheidung gemacht.
   korrigierte Preis-Anzeige dort (`1500.00 €` -> `15,00 €`, weil
   `calculateUpgradePrice` Cent zurueckgibt) ist damit gegenstandslos — die
   Loesung ist Loeschung, nicht Anzeigefix. Entscheidung des Owners offen.
+
+**Format-/Layout-Runde 2026-09-27 (alle vier Punkte erledigt):**
+- [x] **Prozent-Formatter vereinheitlicht.** `formatBasisPointsAsPercent` geloescht,
+  `formatPercent` nimmt jetzt die **gespeicherte Einheit** (Hundertstel-Prozent) und
+  teilt die Ziffern mit `BigInt` — **ohne jede Division**. Der naheliegende Weg
+  (`formatPercent(basisPoints / 100)`) wurde gemessen und **verworfen**: bei
+  1 Mio. zufaelligen sicheren Ganzzahlen weichen Float-Weg und exakter Weg in
+  **7,84 %** der Faelle ab, bei `MAX_SAFE_INTEGER` in der letzten Stelle
+  (`90.071.992.547.409,90 %` gegen `...91 %`). Nebenwirkung: `formatPercent`
+  liefert fuer Nicht-Ganzzahlen einen Platzhalter, waehrend der alte Helfer
+  **warf** — ein fehlerhafter Prozentpreis leerte previously die Signaturansicht.
+- [x] **Waehrung im Lingui-Template geloest** (`useVolumeLicensing`): Der Wert
+  `{price}` ist jetzt eine reine, gruppierte Zahl, das `€` bleibt in der Message —
+  Zahl und Symbol verschweisst sind genau das, was die Aufgabe verbot. Die
+  Aequivalenz `Intl maximumFractionDigits: 0` zu `toFixed(0)` ist ueber
+  **400.013 Werte mit 0 Abweichungen** geprueft. Nebenbei fand der Agent einen
+  Fehler im **eigenen** ersten Wächter: `Intl` rendert `-0.4` als `-0`, und
+  `-0.4 !== 0`.
+- [x] **DaisyUI-Falle, die repo-weit gilt:** `.input { width: 100% }` wird
+  **unlayered** geliefert, **nach** der gesamten Utility-Schicht. Damit ist
+  **jede `width`-Utility auf einem `.input` wirkungslos** — auch `w-36` selbst;
+  nur `max-width` ueberlebt. Der erste Kompositionsversuch lief deshalb auf
+  **146 px Seitenueberlauf**, und `sm:basis-max` ist keine Tailwind-4.3.3-Utility,
+  sondern wird vom JIT stillschweigend fallengelassen — genau die Gefahr, vor der
+  die JIT-Policy warnt. Endstand ueber **10 Viewport-Breiten pixelidentisch** zum
+  alten Grid.
+- [x] **Mobile-Ueberlauf der Galerie-Aktionsleiste behoben:** `flex-wrap` auf dem
+  **inneren** Container (Z. 24). Gemessen bei 360/375/390/414 px: Ueberlauf
+  **613 -> 0 px**, Button-Reihen 1 -> 4, rechte Kante 972,6 -> 294,5 px. Damit ist
+  auch der seitliche Seitenscroll weg, der die Brotkrume abschnitt.
+- [~] **Drei weitere Instanzen derselben Message-Muster-Beschaendigung**, die
+  ausserhalb des Auftragsumfangs lagen: `ManagementMetaGalleryView.tsx:113-116`,
+  `CartItemList.tsx:97,110`, `VolumeLicensingCard.tsx:40,101` reichen je einen
+  `formatMoney()`-String (mit Symbol) als Placeholder-Wert ein. Nach dem Muster
+  derselben Aufgabe zu bereinigen. **Wichtig:** `formatEuroWhole` rundet auf ganze
+  Euro — fuer Warenkorbzeilen mit Cent ist das falsch, dort braucht es einen
+  gruppierten Dezimalwert **ohne** Symbol. Nicht pauschal vereinheitlichen.
+- [~] **`w-36` / `w-24` auf den Preis-/Mengenfeldern sind wirkungslos** und wurden
+  trotzdem behalten, weil sie die gemeinte Breite dokumentieren (mit Kommentar).
+  Entweder `max-width` (ueberlebt die Kaskade) oder Klasse weg — beides zugleich
+  ist ein Widerspruch.
+- [x] **Toter App-Code, Scrim entfernt (Owner-Entscheidung 2026-09-27):** der
+  Scrim-`onClick` in `DashboardLayout.tsx` und `ClientDashboard.tsx` war **bei
+  jeder Viewport-Breite unerreichbar** — unterhalb `md` liegt der Drawer
+  randvoll (`z-50 w-full`) darueber, ab `md` ist der Scrim `md:hidden`. Scrim und
+  Handler sind entfernt; Schliessen laeuft ueber `Menü schließen`, Escape und
+  System-Geste. `onMenuClick` (der **Oeffnen**-Handler) bleibt. **Vier echte
+  Abhaengigkeiten waren nicht erwartet**, am wichtigsten: `SidebarHelper`
+  benutzte den Scrim als **einziges** Erkennungsmerkmal fuer „Drawer offen" —
+  ohne ihn waere jede `sidebar.navigateTo()` auf Mobile in einen 10-s-Timeout
+  gelaufen; jetzt `aria-expanded`, das alle drei Header ohnehin setzen.
+- [~] **TypeScript-Luecke, die `tsc -b` nie sieht:** `tsconfig.app.json`
+  schliesst `*.test.tsx` aus, und `tsconfig.tests.json` nimmt nur `tests`,
+  `src/test-setup.tsx`, `src/ui/__tests__` und `src/logic/__tests__`. Damit liegt
+  **`src/ui/components/__tests__/` in keinem TS-Programm** — dieselbe Luecke
+  gilt fuer `src/ui/management/components/__tests__/`. Folge: `tsc -b` und damit
+  `pnpm build` **typenpruefen diese Testdateien nie**, obwohl sie ausgefuehrt
+  werden; ein Typfehler dort faellt erst zur Laufzeit auf. Zusaetzlich ignoriert
+  ESLint `src/**/__tests__` per Design, also gibt es fuer diesen Pfad **kein**
+  Lint-Signal. Die Datei wurde deshalb manuell mit `--strict --noUnusedLocals`
+  gegengeprueft.
+- [~] **Gegenmassnahme: `src/ui/**/__tests__` in ein TS-Programm aufnehmen** —
+  entweder `tsconfig.tests.json` erweitern oder ein eigenes Projekt dafuer.
+  Solange das offen ist, ist „`pnpm build` ist gruen" fuer diese Testdateien nur
+  eine halbe Aussage. Der Ausschluss aus dem **Produktions**-Bundle
+  (`tsconfig.app.json`) muss dabei erhalten bleiben.
+
+**Owner-Entscheidungen 2026-09-27 (alle vier umgesetzt):**
+- [x] **`LicenseSelectorModal` geloescht.** Erneute Todespruefung vor dem
+  Loeschen fand **keinen** Importer, keine dynamische/Lazy-Referenz, keine
+  Route, kein Barrel-Re-Export; der Name `LicenseSelector` trifft die **lebende**
+  `LicenseSelectorCard` (Import in `PhotoDetailView.tsx:19`), nicht den Dialog.
+  `git rm`; **22 von 26** Katalogeintraegen wurden obsolet, **4 waren geteilt**
+  und blieben aktiv (`"Foto"`, `"In den Warenkorb gelegt"`, `"Inklusive"`,
+  `"Lizenz wählen"`), aktive msgids 1550 -> 1528, **0 Kollateralverlust**.
+  Methodische Lehre des Agenten: sein **erster** `.po`-Parser uebersprang
+  `#~ msgid`-Zeilen und meldete „0 obsolete", was wie ein hartes Prune aussah und
+  der Aufgabe widersprach — erst der korrigierte Parser zeigte die 22 als `#~`.
+  Lingui markiert obsolet, es prunet nicht von Hand.
+- [x] **`LicenseSettingsCard` hatte echte Preisfelder — nie ausgeliefert.** Die
+  Felder waren technisch korrekt, aber die Karte ist gelöscht, also kam die
+  Arbeit nie an. Die Erkenntnisse bleiben trotzdem gültig und sind hier
+  festgehalten, weil sie beim nächsten Aufräumen gebraucht werden: `price_web`/
+  `price_print`/`price_original` als `required`-Felder (`valueAsNumber`, Punkt als
+  Dezimaltrenner — ein `type="number"` lehnt das Komma ab). Nebenbei: die
+  `useWatch`-Aufrufe hatten `defaultValue` und **keine** gebundenen Felder — die
+  Uhr konnte nur ihren eigenen Default zurueckgeben. Und ein a11y-Fund: daisyUI
+  setzt das Control in ein
+  **zweites** `<label>`, wodurch der accname beide verketten und das Feld als
+  „Preis: Web €" angesagt wurde; `aria-hidden` auf dem Einheiten-`span`.
+- [~] **Offen: die drei Preise persistieren nicht (Backend).**
+  `SettingsController::updateLicenseTerms()` validiert sie nicht, und
+  `validate()` **wirft nicht gelistete Schluessel weg** -> `SettingResolver::set()`
+  sieht sie nie; der Read-Pfad liefert sie auch nicht zurueck. Die drei Keys
+  **existieren** in der Tabelle (ge-seedet in Cent: 7500/14500/45000), aber kein
+  Controller liest oder schreibt sie. Sichtbare Folge: ein eingegebener Preis
+  schnellt nach dem Speichern auf den Default zurueck. Ohne diesen Fix ist die
+  Owner-Entscheidung „Felder ergaenzen" wertlos — laeuft.
+- [x] **`ModalShell`-Inertheit dauerhaft getestet.** Drei Tests: `bodyClassName`
+  ohne Opt-in wirkungslos, `bodyClassName` **angetippt** statt ersetzt,
+  Off-Pfad-Struktur unveraendert. Die Rechtfertigung des Tests war
+  unerwartet deutlich: **alle 13 vorbestehenden Tests der Datei blieben gruen**,
+  als `scrollableBody` per Sabotage zum Default gemacht wurde — die Scroll-Grenze
+  waere unter **jeden** Dialog gewandert und die Suite haette geschwiegen. Und der
+  **erste** Sabotage-Versuch des Agenten `passed` selbst, weil `querySelectorAll`
+  seine eigene Wurzel nie matcht; der Leck auf die Box war unsichtbar. Beides
+  erkannt und geschlossen (`shasum`-Nachweis des Reverts).
+- [x] **Zwei Kleinbefunde aus dem Loesch-Auftrag, unterschiedlich erledigt:**
+  Das **Mojibake** `F?r` in `LicenseSelectorCard.test.tsx:59,289` ist behoben —
+  es waren **drei** Vorkommen (59, **60**, 289), nicht zwei, und kein `U+FFFD`
+  bleibt in `src/`. Die **literalen deutschen JSX-Textknoten** in
+  `LicenseSettingsCard.tsx:235` waren nie ausgeliefert: Es waren nicht zwei,
+  sondern **25** (der Folgeauftrag zaehlte sie voll), und die Datei ist geloescht.
+  Der Befund ist damit gegenstandslos, war aber richtig erkannt.
+- [x] **Login-/Logout-Flake behoben — zwei Ursachen, beide belegt:**
+  **(1) Die mehrdeutige Spinner-Klasse.** `logout()` wartete auf
+  `.loading-spinner.loading-lg` mit `.first()`. Diese Klasse steht an **43
+  Stellen** in `src/` (u. a. `App.tsx:57` `SuspenseFallback` **ohne** Testid und
+  `SearchView.tsx:25`); der Testid `app-loader` existiert genau zweimal. Ein
+  Binding-Probe zeigte **10/10-mal** einen Nicht-`app-loader`-Spinner, und die
+  Latenz lag bei **p50 4317 ms** gegen ein 5000-ms-Budget — der Logout hing am
+  `/api/search`-Feed. Jetzt: Bootstrap ueber `app-loader`, Endsigemal ueber die
+  **Session-Eigenschaft** (Login-Formular `toBeAttached` **und** „Abmelden"
+  `toHaveCount(0)`), nicht ueber ein Render-Artefakt. `toBeAttached` ist bewusst:
+  das Formular liegt off-canvas (`x = -456` bei 480 px Viewport) und `toBeVisible`
+  war aus dem falschen Grund gruen.
+  **(2) Die Scrim-Assertion.** Nach der Scrim-Entfernung musste sie weichen.
+- [x] **Korrektur zu einem Subagenten-Bericht (wichtig, nicht nur Kosmetik):** Der
+  Logout-Agent schrieb, `div.fixed.inset-0` **existiere in dieser App gar nicht**
+  (`querySelectorAll(...).length === 0`), die Assertion sei „by construction"
+  unerfuellbar gewesen. Das ist **falsch**. Der Scrim existierte in `HEAD` —
+  `fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity` in
+  `DashboardLayout.tsx:76` **und** `ClientDashboard.tsx:25` — und ist nur deshalb
+  jetzt weg, weil der Scrim-Agent ihn waehrend desselben Laufs entfernt hat. Der
+  Agent hat den **Working Tree nach der Aenderung eines anderen Agenten** gemessen
+  und daraus ueber den Ausgangszustand geschlossen. Sein **Fix bleibt richtig**
+  (die Assertion musste so oder so weichen), die **Begruendung nicht**.
+- [ ] **Vierte Verwechslung derselben Klasse in dieser Sitzung** → vorbeugende
+  Regel: Wenn mehrere Agenten denselben Working Tree veraendern, muss eine
+  Aussage ueber „wie der Code aussieht" an einen **Commit** gebunden werden
+  (`git show HEAD:<pfad>`), nie an den Working Tree. Die ersten drei waren:
+  Throttle-Zahl aus einem Subagenten-Bericht uebernommen, zwei `gh run list`-Eintraege
+  fuer einen CI-Lauf gehalten, ein einzelner Shard-Fehlerauszug fuer den ganzen Lauf.
+- [~] **Zwei vorbestehende E2E-Fehler neu eingeordnet — beide testseitig, und
+  die Last-Attribution war bei beiden falsch:**
+  - **`ecommerce.spec.ts` — reproduziert (3 von 4 Fehlschlaege).** Der
+    **401 war kein Auth-Fehler**, sondern ein Artefakt des Zeitbudgets: der
+    Test lief in die 60-s-Grenze, waehrend der Galerie-`POST` noch unterwegs
+    war; Playwright verwarf den Browser-Kontext, die Anfrage kam ohne Session
+    an, und der Fehler verschwand vollstaendig, sobald das Budget stimmte. Die
+    ZIP-Stufe selbst ist zuverlaessig und schnell (`downloadMs` 449–1049) — der
+    Download-Event war ein **Fehlschluss**; die Antwort lebt in einem
+    `_blank`-Popup, weshalb `page.waitForResponse('/download-zip')` nie
+    matcht. **Die Fix ist ein Timeout, und deshalb ist sie begruendet statt
+    erfunden:** entfernt wurde `test.setTimeout(60000)` — die **einzige** Stelle
+    im E2E-Satz, die den kalibrierten Standard **nach unten** ueberschrieb. Der
+    Kommentar („Erhoehtes Timeout") stammt aus der Zeit, als 30 s Playwright-Default
+    war. `playwright.config.ts` setzt `timeout: 120000`, `frontend/AGENTS.md`
+    fuehrt 120 s als ausdruecklich freigegebenes Budget mit Pruefspur — und
+    dieser Test **ist** ein Login/Upload/Checkout-Fluss. Er erbt jetzt den
+    gemessenen Standard, statt einen veralteten, unkalibrierten zu fahren.
+  - **`projects-board.spec.ts` — nicht reproduzierbar, aber verifiziert.** Der
+    Agent hat nicht „konnte nicht reproduziert" gebucht, sondern messbar gemacht:
+    eine Sonde zeichnete **jede** `POST /api/management/projects`-Antwort mit
+    Wanduhr-Stempel auf, unabhaengig von jeder Wartung. Entscheidend ist die
+    **Renn-Marge** = Antwortankunft − Abonnementzeit: bei 20 Proben raeumten
+    **12 von 20 die Antwort in ≤12 ms ab, Minimum 6 ms**, und der App stellte in
+    100 % der Laeufe genau **eine** POST mit Status **201** an die richtige URL.
+    **Die Last-Zuordnung war invertiert:** bei Last 10 lagen die Margen bei
+    7–342 ms, bei Last 5 bei 6–12 ms. Ein *schnelleres* Backend verkleinert das
+    Fenster — der Flake wird wahrscheinlicher, wenn die Maschine gesund ist.
+    Der Mechanismus wurde separat bewiesen: ein Abonnement **nach** der Antwort
+    wartet sein **komplettes** Budget und scheitert, obwohl die Anfrage 200
+    lieferte — `page.waitForResponse` hat keinen Antwortpuffer.
+    **Die Passzahl ist ausdruecklich NICHT der Beweis** — sie ist vor und nach
+    dem Fix identisch (63/3). Der Beweis sind die 6–12 ms plus der
+    Mechanismustest; die Fix beseitigt das Rennen **konstruktiv** (Listener vor
+    dem auslösenden Klick), nicht durch ein breiteres Fenster.
+  - **Derselbe Defekt in der Geschwister-Spec mitgefixt:** 5 Stellen in
+    `production-board.spec.ts` registrierten den Listener **nach** dem Klick.
+    Dokumentiert an `KanbanHelper.waitForCreate`/`waitForDelete`, damit die
+    Falle an der API sichtbar ist. **60/60 gruen** mit `--workers 1`.
+- [ ] **Offen und ausdruecklich nicht als geloest gebucht:** (a) Die
+  **Last-36,9-Variante** des `projects-board`-Fehlers bleibt unerklaert. Das
+  behobene Rennen wird unter Last *leichter* zu gewinnen; was bei Last 36,9
+  einen 15-s-`waitForResponse`-Timeout erzeugt hat, ist mit hoher Wahrschein-
+  lichkeit eine **eigenstaendige, lastgebundene Ursache**. (b) Im
+  Fehler-Schnappschuss stand `Galerie-Typ` wieder auf `Privat`, obwohl
+  `selectByLabel` zuvor `Delivery (Downloads)` erfolgreich gewaehlt hatte — das
+  deutet auf eine spaete asynchrone Re-Renderung, die das Formular zuruecksetzt.
+  Der Agent hat das nicht verfolgt und **nicht als Befund ausgegeben**.
+- [ ] **Zwei Umgebungsbefunde, die die Messungen dieser Sitzung erklaeren:**
+  - **Fremder Prozess auf der Box:** `target/debug/deps/kittest_snapshots` aus
+    `~/dev/LuminaRust` respawnte mehrfach bei **1678–1709 % CPU** auf 18 Kernen
+    und trieb die Last auf **186–334**. Die frueher notierten „Last 36,9" sind
+    mit hoher Wahrscheinlichkeit dieselbe Art externer Kontamination und
+    ueberhaupt nicht diesem Repository zuzuschreiben. **Jede Lastzahl dieser
+    Sitzung ist vor diesem Hintergrund zu lesen.**
+  - **Der E2E-Backend laeuft als `php artisan serve` mit ungesetztem
+    `PHP_CLI_SERVER_WORKERS`**, also **einzelgängig** und hinter 8 Playwright-
+    Workern serialisiert. Das ist der Verstaerker, der externe Last in
+    E2E-Latenz uebersetzt. Nicht geaendert (out of scope), aber die
+    Grundursache, warum hier Testbudgets echten Spielraum brauchen.
+- [ ] **Methodische Korrektur, die der Agent selbst vorgenommen hat:** Der erste
+  kombinierte Lauf mit `--repeat-each 3 --workers 3` erzeugte **einen** Fehler
+  in `production-board.spec.ts:78` (58,4 s) — **das war sein eigenes Artefakt.**
+  Die Datei ist `mode: 'serial'`; `--repeat-each N` mit `workers > 1` laesst N
+  *gleichzeitige* Kopien auf dasselbe geteilte Board laufen, genau was der
+  Kopfkommentar der Datei verbietet. **Ein `serial`-Describe mit
+  `--repeat-each` braucht `--workers 1`.** Als Beleg: R4 bestand isoliert 8/8
+  (7,3–8,9 s) und die ganze Datei 60/60 mit `--workers 1`.
+- [x] **Regressionstest fuer `AuthHelper` vorhanden.** Neuer
+  `tests/e2e/helpers/AuthHelper.test.ts` nach dem Mechanismus aus
+  `SidebarHelper.test.ts:83`: Der Harness loest per `page.locator` **nur** die
+  Selektoren auf, die der Helfer legitim braucht, und **wirft** bei allem anderen
+  mit einer Fehlermeldung, die das Problem benennt. Das ist der richtige
+  Mechanismus, weil er den echten Helfer-Codepfad ausfuehrt und damit unabhaengig
+  davon greift, **wie** der Selektor geschrieben ist, an welcher Methode er haengt
+  und wo er steht — eine Source-Regex wuerde an einer Umbenennung vorbeilaufen.
+  Zwei Waechter: Scrim-Selektor (`inset-0`) und die mehrdeutige Spinner-Klasse
+  (nacktes `.first()` auf `loading-spinner` + `loading-lg`). **Nicht vakuoes:**
+  beide Sabotagen schlugen mit der jeweils beabsichtigten Begruendung fehl
+  (Scrim 1/2, Spinner 1/2), danach byte-identischer Revert (`6285` Bytes).
+- [x] **Preis-Hydrierung nachgezogen — die fehlende zweite Haelfte.** Der Agent
+  hat sich **exakt** an `base_price` gehalten
+  (`parseInt(terms.base_price || '3500', 10) / 100`) und dasselbe Idiom fuer die
+  drei neuen Keys benutzt, mit `String(DEFAULT_PRICE_WEB * 100)` als
+  Legacy-`null`-Fallback: `parseInt(terms.price_web || '7500', 10) / 100`.
+  `reset()` stellt jetzt die **persistierten** Werte wieder her, nicht die
+  Konstanten. Test-Fixture bewusst **nicht** 75/145/450 (`'9000'/'18000'/'52000'`
+  -> 90/180/520) — **vorher 4 von 5 rot**, u. a. das haengende
+  `123.45` mit gehaltenem `75`: genau das Zurueckschnappen. Die drei
+  „KNOWN BACKEND GAP"-Kommentare sind entfernt und durch den echten Vertrag
+  ersetzt (Cent als Text, `nullable` fuer Altzeilen).
+- [x] **TypeScript-Luecke geschlossen und `tsc -b` gruen.** `tsconfig.tests.json`
+  enthaelt jetzt `src/**/*.test.ts` / `src/**/*.test.tsx` statt vier Einzelpfade;
+  `src/**/__tests__` liegt damit in einem TS-Programm. Der Ausschluss aus dem
+  Produktions-Bundle (`tsconfig.app.json` schliesst `*.test.tsx`) bleibt.
+  **Der Beleg fuer den Preis der Luecke:** `ModelDetailModal.test.tsx` hatte einen
+  `Element`-vs-`HTMLElement`-Fehler — er war **schon immer da und unsichtbar**,
+  weil die Datei in keinem Programm lag; nach der Korrektur des `include` wurde er
+  geprueft und behoben. Zwei parallel laufende Agenten meldeten mitten im Lauf
+  „50 Fehler in `src/**/__tests__/**`" bzw. rote `pnpm build`-Laeufe in
+  `CartItemList.test.tsx`/`ModelDetailModal.test.tsx` — das war der Zwischenstand
+  aus unfertigen Nachbar-Edits, nicht der Endzustand.
+- [x] **Die Doku-Zahlen zur Dialog-Inventur sind neu gegen den Code ermittelt.**
+  Der Doku-Agent hatte die Zahl „18 Dialoge" und die Liste der
+  Eigenbau-`modal-box` ausdruecklich **nicht** aus dem Code verifiziert
+  (§3 Punkt 2 und §5 Punkt 2 in
+  `features/tech/08-dialog-height-contract.md`) und deshalb unangetastet
+  gelassen. Neu gezaehlt (`grep -rnE '<Modal(Shell|DialogShell)' frontend/src`,
+  ohne Tests): **28 Dialog-Oberflaechen ueber die Shells, 0 mit eigenem
+  Markup.** Die 18 waren zu Recht, aber nur fuer `HEAD` (`161dc9e`):
+  18 + 11 (die Welle) − 1 (`LicenseSelectorModal.tsx` geloescht, ohne
+  Ersatz) = 28. `ModalShell` ist die einzige Datei, die
+  `<dialog>`/`.modal-box` schreibt.
+  §3 Punkt 2 war zusaetzlich unvollstaendig: nicht drei, sondern **fuenf**
+  Dialoge bauen das bounded Layout selbst — `RatingStatusModal` und die
+  Kamera-Anleitung in `ManagementFtpInbox` (je 90vh), `GalleryAccessModal`
+  und `PhotographerTeamModal` (je 80vh), `AIBatchEditModal` (`h-90vh`).
+  `GalleryModal` stand in dieser Gruppe und ist inzwischen umgestellt.
+  Neuer Abschnitt §6 im Feature-Dokument haelt Zaehlregel, vollstaendige
+  Liste und Herleitung der Zahl fest.
+  **Offen (Code, nicht Doku):** `ModalShell.tsx:64` und `:101` nennen weiterhin
+  "the eighteen dialogs" — Kommentartext in Code, hier nicht angefasst.
+- [x] **Message-Muster: vier Stellen + eine Zusatzinstanz.** Alle vier rendern
+  **Cent**, deshalb kam `formatEuroDecimal` (neu: gruppiert, 2 Dezimalstellen,
+  **ohne** Symbol und ohne NBSP) zum Einsatz und **nicht** `formatEuroWhole` —
+  dessen Rundung haette `40,00 €` zu `40 €` gemacht, also den Text veraendert.
+  Byte-Nachweis: die `.po`-msgid enthaelt U+00A0 vor dem `€`. Zusatzinstanz
+  `CartItemList.tsx:218/222` (identischer Defekt in einer benannten Datei).
+  **Außerhalb des Auftrags, gleiche Familie, offen:** `CouponInput.tsx:65`
+  (`<Trans>{packageQuantity} Fotos für {packagePriceText}</Trans>` mit
+  `packagePriceText = formatMoney(...)`).
+- [x] **Ungewickelte Literale:** 4 Stellen des Vorschau-Blocks in
+  `LicenseSettingsCard.tsx` in `<Trans>` gewickelt. **Die Praemisse des Auftrags
+  war falsch:** die Datei enthielt **gar kein** `<Trans>` und hat weiterhin ca. 20
+  ungewickelte deutsche Literale (`Preis: Web`, `Nutzung: Redaktionell`,
+  `Lizenz-Einstellungen speichern`). Die Datei komplett zu wicken ist eine
+  eigene Entscheidung, getroffen.
+- [x] **Mojibake:** **drei** Vorkommen (Z. 59, **60**, 289), nicht zwei.
+- [x] **Tote Breitenklassen:** in `VolumePresetSettingsCard.tsx` (nicht in
+  `VolumeLicensingCard.tsx` — die hat keine Inputs). **Entfernt** statt in
+  `max-w-*` umgewandelt, weil `max-w-*` das Desktop-Layout **veraendern**
+  wuerde, waehrend das Entfernen belegtermaessen nichts aendert.
+- [x] **TypeScript-Luecke: neun Verzeichnisse, nicht zwei.** Weil `src/ui/__tests__`
+  und `src/logic/__tests__` Blattverzeichnisse sind, fehlten auch
+  `src/App.test.tsx`, `src/main.test.tsx`, `src/ui/client/__tests__`,
+  `src/ui/client/components/*.test.tsx`, `src/ui/management/__tests__`,
+  `src/ui/photographer/components/__tests__`, `src/logic/utils/__tests__`.
+  **50 Fehler in 15 Dateien, alle behoben** — durchgaengig echte
+  Test-Drift (partielle Mocks, unvollstaendige Fixtures), **kein** fehlender
+  Typ-Import. Gates: `tsc -b` 0, `lint:fix` 0, `build` 0, `test:run` 137/1201.
+- [x] **`exact: true` bei `getByRole` — Agentenbehauptung BESTAETIGT, meine
+  Vermutung war falsch.** Ich hatte den Punkt als offen gefuehrt und (b) notiert
+  („wenn `exact` gueltig ist, war die Entfernung eine stillschweigende
+  Abschaerfung, zuruecknehmen"). Die eigene Nachpruefung entschied es anders:
+  `ByRoleOptions` in der installierten `@testing-library/dom@10.4.1` enthaelt
+  **null** Vorkommen von `exact` (Typseite) und `dist/queries/role.js` ebenfalls
+  **null** (Laufzeitseite). `exact` ist also **weder erlaubt noch ausgewertet** —
+  es war an beiden Stellen reine Attrappe. Das Entfernen in
+  `VolumeLicensingCard.presetId.test.tsx` ist damit **korrekt und keine
+  Abschaerfung**: das Matching lief vorher und laeuft jetzt ueber `name`
+  unveraendert. Methodische Lehre fuer mich: Meine Skepsis war berechtigt, aber
+  ich haette sie mit **einem** Blick in `types/queries.d.ts` erledigen koennen,
+  statt drei Suchpfade zu raten (`dist/queries/*.d.ts` existiert in diesem Paket
+  nicht — die Typen liegen in `types/`, nicht `dist/`).
+- [x] **11-Dialog-Welle abgeschlossen.** Die Aufgabenbeschreibung war **zu
+  pessimistisch**: Sechs der elf hatten bereits Rolle, Namen, Fokusfalle und
+  Escape; **fuenf** hatten gar nichts. Alle elf haben jetzt ein echtes
+  `<dialog>`, ein beschriftetes Schliessen-Element (acht davon), den
+  `onCancel`-Top-of-Suard, Fokus-Rueckstellung beim Schliessen und einen
+  `aria-describedby`-Slot gewonnen. **Dialog 1 hat zusaetzlich
+  Backdrop-Close** gewonnen, den es vorher nicht hatte. Funktional nichts
+  verloren: gleiche Felder, Labels, Aktionen, Reihenfolge, deutsche Strings,
+  Datenpfad. **Keine bestehende Assertion geaendert.** Neuer
+  `DialogAccessibilityContract.test.tsx` (8 Tests, benannt + `aria-modal` +
+  Escape) — **nicht vakuoes**: Rueckversetzen von `ModelInviteDialog` und
+  `CouponFormDrawer` auf `HEAD` laesst genau diese beiden fehlschlagen, die
+  sechs bereits konformen bleiben gruen. `ManagementOrdersView.test.tsx` +2
+  Tests. Gates: `lint:fix` sauber, `build` 0, `test:run` **138 Dateien / 1211
+  Tests**.
+- [x] **Befund am Gate selbst: `tsc -b` ist inkrementell.** Ein veraltetes
+  `tsbuildinfo` hat die 50 Fehler in 15 Testdateien **versteckt**; erst
+  `tsc -b --force` hat sie sichtbar gemacht und den gemeinsamen Build
+  blockiert. Vorbeugende Regel: bei einem gruenen `tsc -b` nach laengeren
+  parallelen Laeufen **`tsc -b --force`** laufen lassen, sonst beruht „gruen"
+  teilweise auf einem Zwischenstand. (Zur Zurechnung: Der TS-Agent meldete die
+  50 Fehler als von ihm behoben, der Wellen-Agent meldet, die „Besitzer-Agenten"
+  haetten sie nach seinem `--force` behoben. Beide Berichte koennen nicht
+  vollstaendig stimmen; **entscheidend ist, dass `tsc -b` jetzt 0 meldet** —
+  eigenstaendig gemessen.)
+- [ ] **Sechs Produktfragen aus der Welle, keine Implementierungsdetails:**
+  1. **Fokusfalle schlaegt `autoFocus`.** In `ManagementOrdersView` lag der
+     Cursor vorher im Preisfeld; jetzt landet der Fokus auf dem Schliessen-
+     Element. Ist bewusst getestet, damit es eine Entscheidung ist. Soll das
+     Preisfeld gewinnen, braucht die Shell einen Initial-Fokus-Hook.
+  2. **`maxWidth` ist halb implementiert.** Nur `'2xl'` erzeugt eine Klasse;
+     `'lg'`/`'xl'` werden akzeptiert und still verworfen. Entweder Skala
+     implementieren oder Typ eingrenzen.
+  3. **`editing={false}` ist in fuenf Dialogen eine Namenskollision.** In
+     `ModalDialogShell` bedeutet `editing` „hat Loeschaktion fuer einen
+     bestehenden Datensatz", in `TextSnippetModal`/`ProductModal`/
+     `CustomerModal`/`CouponFormDrawer` „ist das eine Editsitzung". Das
+     Domain-`editing` zu uebergeben, rendert einen `Loeschen`-Button ohne
+     Handler. An jeder Stelle dokumentiert, aber eine Falle.
+  4. **`CouponFormDrawer`: Escape und Backdrop loesen jetzt die
+     Ungespeichert-Warnung aus.** Vorher taten das nur Schliessen und Abbrechen —
+     diese beiden Wege konnten getippte Eingabe still verwerfen. Vermutlich
+     richtig, aber Nutzer werden es spueren.
+  5. **`ModelInviteDialog` brauchte einen Wrapper-`<div>`** fuer
+     `data-testid="model-invite-dialog"`, durch das 8 E2E-Assertions scope.
+     Die Shell besitzt keinen Testid-Hook.
+  6. **`ManagementOrgsView` und `ManagementOrgDetailView` haben keine
+     Unit-Testdateien.** Beide sind jetzt konform, aber ungeschuetzt.
+- [x] **`exact`-Frage geklaert — die Behauptung des TS-Agenten war richtig.**
+  Eigenstaendig geprueft an der installierten `@testing-library/dom@10.4.1`:
+  `ByRoleOptions` (`types/queries.d.ts:69ff`) enthaelt **null** Vorkommen von
+  `exact` (Mitglieder: `suggest`, `hidden`, `selected`, `busy`, `checked`,
+  `pressed`, `current`, `expanded`, `level`, `value`, `queryFallbacks`, `name`,
+  `description`), und `dist/queries/role.js` wertet `exact` **nirgends** aus.
+  `getByRole('button', {name: 'x', exact: true})` ist also ein **Typfehler** und
+  wurde zur Laufzeit stillschweigend ignoriert. Das Entfernen an den zwei Stellen
+  aendert die Testsemantik **nicht** — vorher wie nachher Substring-Matching.
+  Es war also **keine Abschaerfung**, sondern ein still wirkender Fehler, den
+  erst die geschlossene TS-Luecke sichtbar gemacht hat. Das ist der
+  durchgaengige Wert dieser Luecke: nicht dass sie rot wurde, sondern dass sie
+  Fehler sichtbar macht, die seit Jahren wirkungslos mitliefen.
+- [x] **Dialog-Inventur aus dem Code neu ermittelt (Agent, 2026-09-27).**
+  `ModalShell.tsx` ist die **einzige** Datei in `frontend/src/`, die ein `<dialog>`
+  oder eine `.modal-box` erzeugt (nicht-test) — die Frage „umgeht diese Fläche
+  den Contract?" reduziert sich damit auf „ruft sie die Shell?".
+  **A — durch die geteilten Shells: 28** (15 direkt `ModalShell` + 13
+  `ModalDialogShell`). **B — eigenes Markup, Contract umgehend: 0.**
+  Von den 28 setzen **5** `scrollableBody`.
+  **Die Zahl 18 wurde nicht fortgeschrieben, sondern bis `161dc9e`
+  zurueckverfolgt:** dort 19 Shell-Aufrufstellen, minus der internen von
+  `ModalDialogShell` = 18 durch die Shells, plus 11 eigene `modal-box` = 29
+  Dialoge. Die 18 stimmten fuer einen aelteren Baum. Dann +11 (Migration)
+  −1 (`LicenseSelectorModal` geloescht, ohne Ersatz) = **28**.
+  **Anzahlregel, die das Aufgehen erst erlaubt** (in §6.1 dokumentiert): pro
+  **Renderstelle**, nicht pro Instanz und nicht pro Aufrufer. Der interne Aufruf
+  `ModalDialogShell` -> `ModalShell` ist derselbe Dialog; der globale Confirm im
+  `UIProvider` zaehlt **einmal**, egal aus wie vielen Stellen `confirm()`
+  aufgerufen wird (gezählt wird, wo gerendert wird, nicht wo benutzt); verschachtelte
+  Dialoge zaehlen einzeln; Toasts, Dropdowns und Popover zaehlen nicht.
+- [ ] **Fuenf Dialoge bauen das bounded Layout noch von Hand** und sind damit
+  Kandidaten fuer `bodyClassName` + `scrollableBody`:
+  `RatingStatusModal` und die Kamera-Anleitung in `ManagementFtpInbox` (90vh),
+  `GalleryAccessModal` und `PhotographerTeamModal` (80vh), `AIBatchEditModal`
+  (`h-90vh`). Sie ueberspringen nicht den a11y-Contract (sie gehen durch die
+  Shell), aber sie handrollen die Scroll-Grenze. `RatingStatusModal` braucht
+  dafuer zusaetzlich ein `space-y-8`-Knob, sonst entsteht eine verschachtelte
+  Scrollregion mit doppeltem Abstand.
+- [ ] **Veraltete Zahl im Quelltext, nicht in der Doku:** `ModalShell.tsx:64` und
+  `:101` sagen im Kommentar weiterhin **„the eighteen dialogs"** — es sind 28.
+  Der Doku-Agent hat das nicht angefasst, weil es Quellcode ist. **Erst nach dem
+  `ModalShell`-Agenten anfassen** (Konflikt auf derselben Datei).
+- [x] **`LicenseSettingsCard` geloescht (Owner-Entscheidung 2026-09-27).** Der
+  a11y-Agent fand beim Nachpruefen seines eigenen E2E-Greifs die Ursache fuer
+  die Vorsicht des Voragenten: **die Karte ist nirgends eingehängt** — kein
+  statischer Import, kein dynamisches `import()`, keine Route, nur der eigene
+  Unit-Test. Sie ist die **einzige** der fuenf Settingskarten in diesem Muster
+  mit null Verwendungen; die anderen vier (`LicenseCatalogSettings`,
+  `VolumePresetSettingsCard`, `CalculatorSettingsCard`, `WatermarkSettingsCard`)
+  haben je genau eine.
+  **Konsequenz, offen ausgesprochen:** Die gesamte Preisfeld-Arbeit dieser Runde
+  — drei `required`-Felder, Cent-Persistenz im Backend, Round-Trip-Test,
+  Hydrierung aus der API, 85 Accname-Tests — ist an einer Oberflaeche gelandet,
+  die kein Nutzer sieht. Ein nicht eingebundenes Formular hat **keinen**
+  Zugaenglichkeitsnutzen, gleich gut es beschriftet ist.
+  **Der Backend-Vertrag bleibt bewusst bestehen:** `updateLicenseTerms()`
+  validiert und liefert `price_*` in Cent weiter, die Owner-Entscheidung dazu
+  steht unveraendert. Die Karte geht, der Vertrag nicht — er greift, sobald
+  eine Karte ihn benutzt.
+  **Nebenbefund, der generalisiert:** Ein **vorbestehender Test hatte den
+  Defekt festgeschrieben** — er pruefte, dass die drei `mult_*`-Felder als
+  `"%"` antworten, und sein eigener Kommentar nannte das „the pre-refactor state
+  of this file". Der Agent hat das als Fehlpinning erkannt und durch zwei
+  `it.each`-Tests ueber die richtigen Namen ersetzt, statt es zu uebernehmen.
+  **Regel daraus:** Ein Test, der einen Fehler festhaelt und sich selbst als
+  „Zustand vor der Korrektur" kommentiert, ist kein Beweis fuer den Fehler,
+  sondern eine Freigabe, ihn zu behalten.
+  **Meine Vorgabe war zudem falsch:** ich schrieb „17 Felder", es sind **16**
+  (10 verwaiste + 3 `price_*` + 3 `mult_*`); die Rechnung des Agenten war richtig,
+  nur die Gesamtzahl in meiner Anweisung nicht. Mit der Karte geloescht ist die
+  Zahl ohnehin gegenstandslos, der Fehler in meiner Vorgabe aber nicht.
+  **Vier Board-Eintraege beschreiben Arbeit an einer Datei, die es nicht mehr
+  gibt** — `:2509` („hat echte Preisfelder"), `:2801` („25 weitere deutsche
+  Literale"), `:2415` und `:2534`. Sie sind **nicht** ausgeliefert, sondern durch
+  die Loeschung weggefallen. Wer die Preisfelder sucht, findet sie nicht, weil
+  es sie nicht gibt, nicht weil sie vergessen wurden.
+  **Verworfen wurden dabei 153 Einfuegungen / 59 Loeschungen nie committeter
+  Arbeit** (`git rm -f` auf einer getrackten Datei mit uncommitteten
+  Aenderungen): die `price_*`-Verdrahtung, die `DEFAULT_PRICE_*`-Refaktorierung,
+  die Euro-zu-Cent-Umrechnung, die `aria-hidden`-Accname-Fixes und die
+  `<Trans>`-Lokalisierung. Korrekt nach der Entscheidung — die Karte ist tot,
+  ihr zu widerlegen war nachgелеitet —, aber es ist weg. Eine Kopie samt Diff
+  liegt ausserhalb des Repos unter
+  `…/T/opencode/license-card-salvage/`, falls die Cent-Umrechnung spaeter
+  gebraucht wird (sie entspricht dem, was `E2ESessionHelper.ts:189` fuer den
+  Test-Setup dokumentiert).
+  **Katalogdelta:** **27 msgids obsolet** (`#~`), aktiv 1555 -> 1528, **null**
+  Kollateralverluste aus der parallelen Arbeit. **3 geteilte msgids korrekt
+  aktiv geblieben**, nur ohne Karten-Referenz: `Basispreis` (-> `VolumePresetSettingsCard`),
+  `Muss positiv sein` (-> `CalculatorSettingsCard`), `Fehler beim Speichern`
+  (-> 16 lebende Dateien). Kein obsoleter msgid wird noch in `src/` referenziert
+  (alle 27 gegengeprueft). Die 27 Strings **bleiben** in `messages.js` — das ist
+  etabliertes Verhalten dieses Repos, ein Kontrolltest zeigt 49 von 69
+  vorbestehenden obsoleten msgids genauso, und die kompilierte Datei traegt
+  ueberhaupt kein `obsolete`-Flag. Die `.po` ist die Quelle der Wahrheit.
+  **Nebenbefund mit Verallgemeinerungswert:** Das Repo hat **keine Barrel-Dateien**
+  (`find src -name "index.ts*"` liefert nichts), also gibt es auch keine
+  Re-Export-Flaeche, ueber die die Karte haette erreichbar sein koennen. Und ihr
+  **einziger exportierter Symbol war die Default-Funktion** — `createLicenseSettingsSchema`,
+  `LicenseSettingsFormValues`, `DEFAULT_PRICE_*` und `previewFactor` waren alle
+  modulprivat, es konnte also gar nichts Gemeinsames hier gewohnt haben. Genau
+  darum gab `tsc -b --force` **null Bytes** aus: beim Loeschen ging nichts
+  Kaputtes verloren.
+- [ ] **Board-Bereinigung, nach dem Push:** die oben genannten vier Eintraege
+  als „durch Loeschung weggefallen, nie ausgeliefert" kennzeichnen statt sie als
+  erledigt stehen zu lassen.
+- [x] **`CouponInput.tsx:65` — letzte Instanz des Message-Musters.** Auf
+  `formatEuroDecimal` umgestellt (Cent bleiben Cent; `formatEuroWhole` haette
+  `1.234,50` auf `1.235` gerundet) und `€` mit **U+00A0** in die Message
+  verschoben. Katalog bestaetigt: `msgid "{packageQuantity} Fotos für
+  {packagePriceText}\u00A0€"`, Hex `c2 a0` = NBSP, `e2 82 ac` = `€`, alter Eintrag
+  korrekt als `#~` obsolet, und `messages.js` speichert den Betrag als
+  **Placeable** mit `\xA0€` als Literaltext.
+  **Nicht-Vakuositätsnachweis in der richtigen Form:** Der Agent hat die
+  exakten `textContent`-Assertions geschrieben, dann per `git show` die
+  **Vorher-Komponente** wiederhergestellt und dieselben Tests **gegen den alten
+  Code** laufen lassen — **6 von 6 grün**, danach wieder seine Version. Genau
+  das ist der richtige Nachweis für einen Refactor, der den sichtbaren Text
+  nicht ändern darf: Die Tests müssen gegen **beide** Stände gelten.
+- [x] **25 weitere deutsche Literale in `LicenseSettingsCard.tsx` in `<Trans>`
+  gewickelt — ebenfalls nie ausgeliefert, die Datei ist geloescht.** Der Befund
+  selbst war korrekt (Toasts, Ueberschriften, Einleitung, Feldlabels, Button).
+  Der Agent hatte die Datei vorher als „hat **kein** `<Trans>`" beschrieben, was
+  falsch war — 4 Literale waren bereits gewickelt, er zaehlte die restlichen 25.
+  Reine
+  `€`/`%`-Einheitenglyphen bewusst **nicht** gewickelt — Symbole, keine Prosa,
+  passend zum bestehenden `aria-hidden`-Muster.
+  **Accnames gegengeprueft, nicht behauptet:** Vor und nach der Umstellung eine
+  Accname-Tabelle (`el.labels` plus `aria-hidden`-Filterung) fuer alle 18
+  Controls gebaut und `diff`iert — Ergebnis **IDENTISCH**. Die drei
+  `Preis:`-Spinbuttons loesen weiterhin auf genau `Preis: Web` / `Print` /
+  `Original` und **nicht** auf `"Preis: Web €"`; der `htmlFor`+`id`+`aria-hidden`
+  ueberlebt die `<Trans>`-Grenze. Als Tests festgeschrieben.
+- [ ] **Vorbestehender a11y-Mangel in derselben Datei, gefunden aber bewusst
+  nicht angefasst:** **10 von 17 Feldern haben verwaiste Labels** — das `<label>`
+  ist Geschwister des Controls **ohne `htmlFor`**, also haben `base_price` und
+  alle neun Term-Textareas **leere Accnames**. Und die drei `mult_*`-Felder
+  kuendigen sich nur als **`„%"`** an, weil ihr aeusseres `Aufschlag: …`-Label
+  ebenfalls verwaist ist und daisyUIs inneres Label nur den `span` enthaelt —
+  dieselbe Fehlerfamilie wie das behobene `"Preis: Web €"`, nur ohne `htmlFor`.
+  Die Korrektur ist das **eigene Muster der Datei** (`htmlFor`+`id`,
+  `aria-hidden` auf dem Einheiten-`span`). Der Agent hat sie **nicht** angewandt,
+  weil sie Accnames aendert und er kein Playwright fuer den E2E-Impact laufen
+  lassen konnte — eine richtige Vorsicht, aber **10 unbenannte Felder in einer
+  Admin-Karte sind ein Defekt, kein Trade-off**. Nachzuziehen, sobald die
+  Playwright-Besetzung frei ist.
+- [ ] **Derselbe Fund, zweite Haelfte:** `base_price` und die `mult_*`-Felder
+  tragen **kein `required`**, obwohl das Zod-Schema sie als Pflicht fuehrt — der
+  CSS-Stern rendert also nicht. Gleiche Vorsicht wie oben: `required` kann
+  native Formularvalidierung in E2E ausloesen. Beides zusammen in einem
+  Durchgang erledigen, inklusive E2E-Gegenprobe.
+- [x] **Unit-Tests fuer die beiden bislang ungetesteten Views:**
+  `ManagementOrgsView` (6 Tests) und `ManagementOrgDetailView` (8 Tests).
+  **+14 Tests, 0 Loeschungen, 0 Skips** (139 Dateien/1212 -> 142/1253).
+  `tsc -b --force` gruen. Beide Dialoge behaupten zusaetzlich per
+  `within(dialog)` **kein `Loeschen`** im Footer — genau die `editing={false}`-
+  Entscheidung, die beide Views im Kommentar begruenden.
+  **Zwei Dinge, die ein Klick-Test nicht koennte:** Ein Klick auf einen
+  `type="submit"`-Button unterscheidet **nicht**, ob ein formularweites
+  `onSubmit` oder ein Button-`onClick` gegriffen hat. Der Agent ist deshalb
+  bewusst von der Klick-Vorlage abgewichen und loest `fireEvent.submit(form)`
+  aus, prueft den Button separat auf seinen Typ. Und `getByDisplayValue('')`
+  ist mehrdeutig (beide Textfelder starten leer); die Felder werden ueber das
+  deutsche Label der zugehoerigen `.form-control` erreicht, nicht per Index.
+  **Vollstaendige Mocks per `async importOriginal` ueber das echte Modul
+  gespreitet** — dadurch ist `vi.mocked(...).mockReturnValue(...)` gegen den
+  echten Hook-Typ geprueft. `tsc` bewies es: es wies **9** `Element`-zu-
+  `HTMLElement`-Fehler in den neuen Dateien zurueck, die mit `instanceof` statt
+  mit Cast behoben wurden.
+- [ ] **Vorbedingung vor dem Commit: Wegwerf-Probedateien.** Im Baum lagen
+  `zz-probe.test.tsx`, `zz-race-probe.spec.ts`, `zz-ecom-probe.spec.ts` — Reste
+  laufender Sabotage- und Diagnoseversuche. **Sie laufen mit jedem Gate mit und
+  verfaelschen jedes Ergebnis**; ein Agent musste sich bereits achtmal mit `tsc`
+  darum drehen, und die rot gewordene Testdatei wechselte ueber drei Laeufe die
+  Identitaet. **Nicht** vorzeitig loeschen, solange die Agenten darauf arbeiten —
+  aber **vor dem Commit alle `zz*`/`*probe*`/`__gap_probe*` aus `src/` und
+  `tests/` entfernen** und danach das Gate ueber `tsc -b --force` wiederholen.
+  Die inhaltlichen Tests, die dabei entstanden sind, bleiben: `AuthHelper.test.ts`
+  und `GlobalSettingsLock.test.ts` sind echte Regressionswaechter.
+- [ ] **Gefunden, nicht gefixt (beides im Auftrag ausgeschlossen):**
+  **(a)** `ManagementOrgDetailView` hat **keine Wache fuer eine fehlende
+  Route-Parameter**-Angabe: `id!` an fuenf Stellen (`updateOrg`, `syncUsers`,
+  `syncGroups`, `deleteOrg` und die Invite-URL). Ausserhalb einer passenden
+  Route liefert `useParams()` `{}` und der Invite geht an
+  `/orgs/undefined/invites`. Im echten Router nicht erreichbar, deshalb
+  niedrige Schwere — aber die neuen Tests mounten deshalb bewusst eine echte
+  `<Route path="/orgs/:id">`, und das ist fuer einen Leser ueberraschend.
+  **(b)** `ManagementOrgsView:63` **verdeckt das `t`-Makro** durch den
+  Map-Parameter (`orgs?.map(t => ...)`), und `ManagementOrgsView` hat einen um
+  10 Leerzeichen falsch eingerückten Block (Z. 99, 128). Beides kosmetisch,
+  aber die Verdeckung des Lingui-Makros ist genau die Sorte Falle, die später
+  jemanden teuer zu stehen kommt.
+- [x] **`ModalShell`-API-Luecken alle drei geschlossen:**
+  - **`maxWidth`: Typ verengt auf `'default' | '2xl'`, Skala NICHT gebaut.** Die
+    Skala haette die Falle nicht beseitigt: `max-w-lg` **ist** 32rem, ein
+    Aufrufer mit `maxWidth="lg"` landete also ohnehin bei daisyUIs 32rem — dem
+    exakt stillen Resize, den das Problem ausloest. Bauen haette den Fehler nur
+    von „verworfene Klasse" zu „verworfen aussehende Klasse" verschoben. Die
+    reelle Spannweite ist ohnehin groesser (der Baum nutzt `max-w-lg` bis
+    `max-w-7xl`), `boxClassName` ist der dokumentierte Ausweg fuer alles andere.
+    **Belegt, dass kein Aufrufer betroffen ist:** alle fuenf Passstellen sind
+    `maxWidth="2xl"`, die anderen 14 uebergeben nichts — die Vereinigung ist eine
+    reine Typaenderung. Drei Aufrufstellen-Kommentare, die den alten Defekt
+    dokumentierten, waren durch die Fix **invertiert** und wurden korrigiert.
+  - **`boxTestId?: string`**: rendert `data-testid` auf der `.modal-box`.
+    `boxClassName` kann keinen Testid tragen (es ist ein Klassen-String), deshalb
+    eine eigene Prop statt einer Ueberladung. **Nicht** durch
+    `ModalDialogShell` durchgereicht — kein Verbraucher braucht es, und
+    toter Durchreichen ist kein Vertrag. `ModelInviteDialog` nutzt sie, der
+    Wrapper-`<div>` ist **geloescht**; vorher alle acht E2E-Assertions geprueft
+    (alle `toBeVisible` bzw. per Rolle/Tabelle innerhalb des id) — die Box
+    umschliesst streng, was der Wrapper umschloss.
+  - **`editing`: lokale Variablen umbenannt, Prop unangetastet.** Destructuring
+    auf den jeweiligen Datensatznamen (`editingSnippet: snippet` usw.). Die
+    **Prop-Namen bleiben**, also brauchten **keine** der elf Aufrufstellen eine
+    Aenderung — das hielt den Agenten aus Dateien heraus, die anderen gehoeren.
+  - **Nicht-Vakuositätsnachweis ueber Markupvergleich:** 25 Eintraege
+    (14 Shell-Prop-Kombinationen plus sechs Komponenten in Anlegen- und
+    Bearbeiten-Modus) gerendertes `innerHTML` vor und nach. **24 von 25
+    byte-identisch**, die einzige Differenz ist `ModelInviteDialog` — der
+    Testid umzieht auf die Box, −11 Zeichen. In den fuenf Hole-3-Dateien
+    aenderte sich **nur der Bezeichner in einer Ternary-Bedingung**, gleiche
+    Truthiness, keine Klasse, kein Attribut.
+- [x] **`@smoke` rot (8 von 62) — vollstaendig geklaert, KEINE Produkt- oder
+  Testaenderung noetig.** Der Agent hat **drei Vorgaben widerlegt**, zwei davon
+  haetten die Untersuchung in die Irre fuehren:
+  **(a) Port 4321 ist NICHT fremd, sondern unser Portal** (PID 52533 =
+  `portal.reisinger.pictures/frontend/node_modules/.bin/vite`); das fremde Projekt
+  ist `open-accreditation` auf **5173**. Ich hatte eine Notiz aus dem
+  Harness-Kommentar (`tests/screenshots/harness.ts:10`) als Messwert behandelt —
+  der Kommentar beschreibt eine *andere* Konfiguration, nicht diesen Rechner.
+  **(b) `PLAYWRIGHT_BASE_URL` wird im Repo NIRGENDS gelesen**,
+  `playwright.config.ts:39` hardcodet `baseURL: 'http://localhost:4321'`. Meine
+  Vorgabe waere ein **stiller No-Op** gewesen: getestet haette 4321, waehrend es
+  so aussah, als ziele ich auf 4322. **Gefaehrlichste Fehlerklasse dieser
+  Sitzung — einer, der gruen aussieht.** Nebenbei: viele Specs hardcoden
+  `localhost:4321` zusaetzlich in `page.goto`/`auth.login`/`toHaveURL`, die Suite
+  setzt 4321 also wirklich voraus.
+  **(c) Meine Haupt-Hypothese war falsch:** `getByRole('main')` matcht nicht
+  *mehrfach* (`.first()` also harmlos), sondern liefert **null** Treffer
+  (`element(s) not found`). Es gibt kein zweites `main`; `DashboardLayout.tsx:81`
+  rendert genau eines.
+  **Befund, **deterministisch statt per Hoffnung bewiesen:** Der Agent hat den
+  Lazy-`ProtectedDashboard`-Chunk gestellt statt auf Last 300 zu warten. Damit
+  reproduzierte er die Artefakt-Signatur exakt:
+  `chunkRequested: true`, `appLoaderCountInDom: 0`,
+  `appLoaderGuardPassed: true` (**der Waechter passt, obwohl die App nicht
+  gebootet ist**), `mainCount: 0`, `alertRoleCount: 1`. Der nackte, inhaltlose
+  `- alert` ist der **immer gemountete, leere globale Toast** aus
+  `UIProvider.tsx:159`. Ein React- Absturz ist ausgeschlossen: dessen
+  `ErrorBoundary`-Fallback rendert `ErrorMessage` als daisyUI `.alert`-**Klasse**
+  (nicht `role="alert"`) mit Ueberschrift und Text — im Snapshot war beides nicht.
+  **Gruppen:** **B (4 Fehler)** = App war noch nicht gebootet; **A (4 Fehler)** =
+  der Backend-Request war nach 15 s noch unterwegs. Fuer A ist der Fingerabdruck
+  der **unbenannte `button [disabled]`** neben `button "Abbrechen"`:
+  `ModalDialogShell.tsx:89-90` rendert genau so, wenn `isSubmitting` true ist.
+  Beides heisst: das Formular war korrekt gefuellt und der POST wirklich offen.
+  **Klassifikation fuer alle acht: (c) umgebungsbedingt.** Heutige Aenderungen
+  sind ausgeschlossen — die `app-loader`-/`getByRole('main')`-Zeilen sind
+  unveraenderter **Kontext** im heutigen `AuthHelper.ts`-Diff, alle mtimes liegen
+  vor dem 16:20-Lauf. **Verifiziert:** bei Last 1,4–3,9 bestehen **alle 62 in
+  2,2 min** (der 12,8-min-Lauf war eine **5,8-fache** Verlangsamung). Stripe
+  braucht **weder Mock noch Tunnel** — die Spec faehrt die echte Test-API
+  (`api.stripe.com` antwortete in 0,146 s); ein fehlender Schluessel haette
+  **401 „Invalid API Key"** ergeben, nicht ein Timeout. Der PHP-Fehler
+  (`Maximum execution time of 30 seconds exceeded` **innerhalb** von
+  `CurlClient.php:572`) ist der Beweis fuer Verhungerung.
+- [x] **Vakuoese Bootstrap-Wartebedingung in `AuthHelper.login()` behoben.**
+  `app-loader` wird *innerhalb* von `ProtectedDashboard`/`ProtectedRoute`
+  gerendert und existiert **waehrend** des Lazy-Chunk-Fetches nicht (gemessen:
+  Anzahl 0). `toBeHidden()` passte deshalb **sofort** — der Waechter verbrauchte
+  in der Reproduktion **4 ms** seines 15-s-Budgets, waehrend `getByRole('main')`
+  **0** Elemente hatte. **Deterministisch reproduziert**, indem der Chunk ueber
+  `page.route` 6 s gehalten wurde, statt auf Last zu warten.
+  **Fix:** `SuspenseFallback` (`App.tsx:64`) bekommt
+  `data-testid="app-loader-fallback"`, und `login()` wartet in Boot-Reihenfolge
+  auf **Abwesenheit** beider Loader (`toHaveCount(0, {timeout: 15000})`), bevor
+  `main` behauptet wird. Dieselbe 6-s-Sperre jetzt: **6153 ms** — der Waechter
+  verfolgt den echten Boot. **`toHaveCount(0)` ist der entscheidende Punkt:**
+  `toBeHidden` konnte nichts beobachten, denn Abwesenheit *ist* sein
+  Erfolgszustand. **Kein Timeout erhoeht**; die Budgets sind getrennt, damit ein
+  Fehlschlag sagt, *welche* Phase hing, statt zu einem "main not found"
+  zusammenzufallen.
+  **Der Regressionswaechter wurde erweitert, nicht geweicht:** Allowlist von
+  einer auf zwei Test-Ids, weiterhin geschlossen (eine dritte wirft); der
+  Login-Test pinnt jetzt **Mechanik statt Ergebnis** (Reihenfolge der erwarteten
+  Locators, `toHaveCount` genau zweimal mit `(0, {timeout: 15000})`, und dass
+  `toBeHidden` den Boot-Wait **nicht** mehr traegt); dazu **4 neue Tests** unter
+  `describe('AuthHelper guard is live, not vacuous')` — ein Waechter gegen einen
+  nicht scheiternden Waechter muss selbst beweisen, dass er lebt, sonst ist eine
+  geschlossene Tuer, die niemand ausloest, von einer zu unterscheiden, die nicht
+  funktioniert.
+  **Befund beim Sabotieren, der geschlossen wurde:** Das Entfernen des Testids aus
+  `App.tsx` **vakuoisierte den Helfer-Waechter lautlos** zurueck
+  (`newGuardPassed: true, guardMs: 6, mainCount: 0`) — **nichts im Repo pruefte
+  diese Kopplung.** `src/App.test.tsx` prueft jetzt die **Defektsignatur selbst**
+  am gerenderten Markup: Fallback vorhanden **und** `app-loader` in diesem Fenster
+  abwesend.
+  **Grenze, im Code-Kommentar festgehalten und nicht beschoenigt:** Das macht den
+  Wait scheiternfaehig und die Budgets getrennt zurechenbar. Es macht die Suite
+  **nicht** ueberlebensfaehig bei extremer CPU-Verhungerung — dort laesst weiterhin
+  das `main`-Budget ab, und es wurde **kein** Timeout erhoeht, um das zu verdecken.
+- [x] **Verschlucktes Timeout in `NetworkHelper` behoben — Fehlattribution
+  beseitigt.** `waitForManagementMutation` fing den Timeout ab und gab `null`
+  zurueck; `ModalHelper.submitModal` **brancierte** auf `!res`, warnte nach stdout
+  und liess danach `expect(locator).toBeHidden()` laufen. Deshalb stand in der
+  Zusammenfassung "modal not hidden", obwohl die Create-Anfrage nie beantwortet
+  wurde.
+  **Mechanismus:** Playwright-`page.waitForResponse()` **ist** bereits das
+  Warte-Primitive und **wirft** bereits. Das `.catch()` **war** der gesamte Defekt.
+  Es wurde entfernt und um die eine Tatsache ergaenzt, die das Primitive nicht
+  kennen kann (Endpunkt, Methode, Timeout) — **an Ort und Stelle mutiert**, nicht
+  ersetzt, damit `name`, Konstruktor und die Timeout-Klassifizierung des Reporters
+  erhalten bleiben. **Ein bewusster Waechter:** ein **Nicht**-Timeout-Fehler
+  (geschlossene Seite, abgestuerzter Kontext) wird **unveraendert** weitergereicht —
+  "Target page, context or browser has been closed" als "keine Antwort"
+  umzudeklarieren wuerde eine wahre Aussage durch eine falsche ersetzen.
+  **Vorher/Nachher an einem echten Szenario** (POST an `/api/management/galleries`,
+  das **nie** beantwortet wird): vorher 30 s und der Fehler zeigte auf
+  `.modal-open` (`toBeHidden` failed, `Timeout: 15000ms`) — das echte Signal
+  landete in `stdout` und erschien **nirgends** im Fehler. Nachher 17,9 s:
+  ```
+  TimeoutError: [NetworkHelper] No response for POST/PUT/DELETE request matching
+  "/api/management/galleries" within 15000ms. The request was never answered, so
+  whatever is asserted after this point is measuring the failure, not the feature.
+  ```
+  `toBeHidden` wird nicht mehr erreicht — es ist also **wahr** ueber das Modal,
+  wenn es feuert. **Kein Catch-all added**, der die Verwirrung zurueckbruechte.
+  **Die typunsichere Luege ist weg:** `null as unknown as Response` steht nur noch
+  in Kommentaren und im Test, nicht mehr im Helper.
+  **Vorbestehende Race, die das Werfen erst erzeugt hat (von beiden Agenten
+  unabhaengig gefunden):** Die Wartebedingung startet **vor** dem Klick; wirft der
+  Klick zuerst, meldet Node den noch offenen Timeout als **unhandled rejection**
+  und **beschuldigt den Klick**. `submitModal` haengt jetzt einen Handler an und
+  traegt das Ergebnis zum await-Punkt; `ModalHelper.test.ts` pinnt, dass **kein**
+  `unhandledRejection` feuert.
+  **Ehrliche Kopplungen, die der Agent gemeldet hat:** `UploadHelper.uploadSampleImage`
+  *(ausserhalb seines Auftrags, nicht angefasst)* brancierte auf `!res` und
+  komponierte eigene Fehlertexte; dieser Zweig ist jetzt **toter Code**, denn ein
+  Timeout wirft vorher. Kein Informationsverlust (die neue Meldung nennt
+  `/api/management/upload`, 30000 ms und traegt Playwrights Original), aber Text
+  und Herkunft der Fehlermeldung aendern sich. Und rund **25
+  `submitModal`-Aufrufstellen** kehren bei Timeout nicht mehr `{}` zurueck,
+  sondern werfen — **das ist beabsichtigt** und genau der Punkt, wird aber
+  nachzupruefen sein.
+- [ ] **Was der Agent nicht klaeren konnte, offen gesagt:** (a) Er konnte die
+  Fehler **nicht reproduzieren**; er hat den Bereich zwischen „gesaettigte Box"
+  (Last 15, 22/22 gruen) und den gemeldeten Lasten 186–334 eingegrenzt, diesen
+  aber als 10–20-fache Ueberlastung nicht reproduziert. Die Mechanismen stuetzen
+  sich auf **Artefakt-Forensik plus deterministischen Mechanismusnachweis**, nicht
+  auf eine Live-Reproduktion. (b) Die **6-von-8-Schieflage auf Mobile kann er
+  nicht erklaeren**: Gruppe B ueberspannt beide Viewports, Gruppe A ist 4/4
+  Mobile — bei 31 Tests pro Projekt mit Chance erklaerbar, aber **kein positiver
+  Beleg** fuer eine Mobile-spezifische Ursache und kein Mobile-spezifischer
+  Defekt gefunden.
+  Typhaelfte der `maxWidth`-Fix hat **keinen** Unit-Test und kann keinen haben —
+  Vitest typprueft nicht. Der Sabotage-Nachweis zeigt es exakt: mit verengter
+  Union meldet `tsc` `TS2322`, **ohne** Union schluckt `tsc` `"lg"` kommentarlos.
+  Dieser Teil haengt **ausschliesslich** an `tsc -b --force` im Build-Gate. Wenn
+  jemand `tsc -b` ohne `--force` fahren laesst, ist genau diese Haelfte ungesichert.
+- [ ] **`features/tech/08-dialog-height-contract.md` traegt den neuen
+  Prop-Vertrag noch nicht:** die verengte `maxWidth`-Union und die neue
+  `boxTestId` fehlen. Doku ist meine Aufgabe, Datei wird aber gerade von einem
+  anderen Agenten angefasst — nachziehen, wenn der durch ist. **Erledigt sich
+  teilweise mit der Zeilenzahl-Korrektur unten**, sobald kein Agent mehr an der
+  Datei arbeitet.
+- [x] **Fuenf handgerollte Bodies migriert — zwei gelungen, drei bewusst
+  blockiert.** Bei allen drei Blockern wurde die Kandidatenmigration **angewandt,
+  der Markup-Diff als Beleg aufgenommen und die Datei dann byteweise
+  zurueckgesetzt** (`cmp` geprueft, `git status` sauber). Das ist die richtige
+  Reihenfolge: erst belegen, dass es nicht geht, dann nicht machen.
+  - **`RatingStatusModal`: migriert.** `boxClassName="max-w-5xl"` +
+    `scrollableBody` + `bodyClassName="space-y-8"`, Wrapper-`<div>` entfallen.
+    Diff **genau zwei Zeilen** im geladenen Zustand: die Box ist eine
+    **Umsortierung** derselben drei Utilities, die Region ist die alte
+    Wrapper-Klasse plus `min-h-0`. Kein Element hinzugefuegt oder entfernt.
+  - **Kamera-Anleitung in `ManagementFtpInbox`: migriert**, Diff **eine Zeile**,
+    Box-Zeile **byte-identisch** — die Klassenliste reproduziert sich in
+    Originalreihenfolge. `scroll-fade-bottom` und `pb-8` sind mit dem
+    Scroll-Port gewandert (Falle #1).
+  - **Die `space-y-8`-Frage ist geloest, nicht blockiert.** Der naive Port
+    behaelt den Wrapper **und** gibt `space-y-8` an die Shell-Region — das ergibt
+    eine **verschachtelte Scrollregion plus tote Marge**. Stattdessen entfiel der
+    Wrapper, die zwei Abschnitte sind direkte Kinder der Region, `space-y-8`
+    wandert in `bodyClassName`. Da `space-y-8` zu `> * + * { margin-top }`
+    kompiliert, entsteht derselbe 2rem-Abstand; das `h4.mt-4` des zweiten
+    Abschnitts kollabiert vorher wie nachher (max(2rem, 1rem) = 2rem).
+  - **`GalleryAccessModal`, `PhotographerTeamModal`, `AIBatchEditModal`:
+    blockiert, Markup byte-identisch zur Basislinie.** Identische Ursache:
+    `scrollableBody` legt **jedes** Kind in die Scrollregion, alle drei brauchen
+    aber Inhalt **oberhalb** davon. Bei `GalleryAccessModal` wandern
+    Galeriezeile, Suchfeld und Zaehlung in die Region (das `shrink-0` des Feldes
+    wird wirkungslos) und die Liste verliert ihren eigenen Scrollbereich,
+    wodurch der Sticky-Verlauf keine Grenze mehr markiert. Bei
+    `AIBatchEditModal` ist der festzuhaltende Inhalt ausgerechnet das
+    **Global-Kontext-Feld** — genau die Steuerung, die das Scrollen der Zeilen
+    ueberleben muss. Zusaetzlich, und **von einem Aufrufer nicht behebbar:** im
+    gebauten Stylesheet liegt `.max-h-80vh` bei Offset 172622 und `.max-h-90vh`
+    bei 172650 — **90vh gewinnt die Kaskade**, ein Opt-in hebt die Deckelung also
+    still um 10vh.
+- [ ] **Was `ModalShell` fuer die drei blockierten Dialoge braucht** (nicht Teil
+  dieser Aufgabe; die Datei gehoert einem abgeschlossenen Agenten): eine Region
+  **zwischen** Kopf und begrenztem Body, in die der Aufrufer festen Inhalt legt
+  (`bodyHead`/`pinned`-Slot), plus eine Moeglichkeit, eine engere Hoehe als
+  90vh zu benennen, ohne zwei konkurrierende `max-h`-Utilities (z. B. dass das
+  Opt-in eine Hoehe entgegennimmt oder der 90vh-Deckel ueberschreibbar wird).
+  Damit wandern alle drei auf `bodyClassName` fuer Rahmen und Hintergrund der
+  Liste.
+- [ ] **Nebenbefund, vom Agenten selbst korrigiert:** im Ladezustand von
+  `RatingStatusModal` loest `flex-1` in einem Block-Elternteil zu nichts auf, der
+  Spinner waere nach oben gesprungen; auf `h-full` geaendert. Der Fehlerzustand
+  liegt nun 8 px schmaler (die `pr-2` der Region). **Das ist der eine Punkt, der
+  auf dem Bildschirm geprueft werden muss** — benannt, nicht geraten.
+- [ ] **Weitere veraltete Aussagen in `08-dialog-height-contract.md`:**
+  - [x] §2 Z. 65-68 stand im **Praesens**, dass `GalleryModal` `ModalShell`
+    direkt rendere, ein eigenes `<form>` besitze und die Submit-Zeile
+    dupliziere. Eigenstaendig geprueft: `GalleryModal.tsx:15` importiert
+    `ModalDialogShell`, Verwendung ab `:184`, Abschluss `:349` — die Kopie ist
+    weg, seit der Shell `boxClassName` durchreicht. Auf Vergangenheit
+    umgestellt und die Aufloesung als eigener Absatz notiert.
+  - [ ] §2 Z. 43 nennt noch „die **drei** Dialoge, die das Layout vorher von Hand
+    gebaut haben". **Bewusst NICHT angefasst:** die Zahl ist bereits jetzt falsch,
+    und der Migrations-Agent arbeitet genau an diesen fuenf — eine Zahl ueber
+    einen Baum zu schreiben, den ein anderer Agent gerade veraendert, waere die
+    fuenfte Wiederholung derselben Fehlerklasse. **Erst nach der Migration neu
+    ermitteln**, dann in einem Zug mit der Zahl in `ModalShell.tsx:64`/`:101`.
 - [x] **Zusatz:** literale `\u2014` in JSX-Text der Fehlertabelle des Guides
   entsprachen keinem Escape und rendeten als `\u2014` → durch echte Em-Dashes
   ersetzt.
