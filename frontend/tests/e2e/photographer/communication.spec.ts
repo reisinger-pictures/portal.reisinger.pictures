@@ -110,6 +110,8 @@ test.describe('Communication Workflow (Flows E, F)', () => {
         await confirmModal.getByRole('button', { name: 'Widerrufen' }).click();
 
         await expect(page.locator('td').filter({ hasText: 'Noch keine Einladungen' })).toBeVisible();
-        await modal.clickButton('Schließen');
+        // The header close and the footer's "Schließen" share a name, so scope to
+        // the footer — see the InviteModal footer note.
+        await page.getByRole('dialog').locator('.modal-action').getByRole('button', { name: 'Schließen', exact: true }).click();
     });
 });

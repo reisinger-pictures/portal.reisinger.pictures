@@ -69,8 +69,19 @@ export default function InviteModal({galleryId, galleryType, onClose}: InviteMod
             icon="mdi--link-variant"
             onClose={onClose}
             maxWidth="2xl"
+            // `modal-action` is the shared footer convention (ModalDialogShell,
+            // ModelDetailModal) and adds no geometry of its own in daisyUI 5 —
+            // `display: flex`, `justify-content: flex-end`, `margin-top: 1.5rem`,
+            // so `mt-6` only restates that margin.
+            //
+            // Like ModelDetailModal, this dialog has two controls named
+            // "Schließen": the shell's labelled header close and this footer. A
+            // header close and a footer close are ordinary together, and dropping
+            // the footer one to keep a test locator unambiguous would remove a
+            // user-facing affordance to suit the test. The specs that close this
+            // dialog are scoped to the footer instead.
             footer={
-                <div className="mt-6 flex justify-end">
+                <div className="modal-action mt-6">
                     <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Schließen</Trans></button>
                 </div>
             }

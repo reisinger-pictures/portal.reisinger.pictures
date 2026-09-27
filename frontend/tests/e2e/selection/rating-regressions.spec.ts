@@ -58,7 +58,9 @@ test.describe('Selection rating regressions', () => {
             await modal.clickButton('Generieren');
             await expect(main.getByText('Erfolgreich generiert!')).toBeVisible();
             const inviteLink = await modal.activeModal.locator('input[readonly]').inputValue();
-            await modal.clickButton('Schließen');
+            // The header close and the footer's "Schließen" share a name, so scope
+            // to the footer — see the InviteModal footer note.
+            await page.getByRole('dialog').locator('.modal-action').getByRole('button', { name: 'Schließen', exact: true }).click();
 
             let guestRatingRequests = 0;
             page.on('request', request => {
