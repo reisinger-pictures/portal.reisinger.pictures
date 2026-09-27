@@ -174,6 +174,17 @@ async function applyNavStep(page: Page, step: UiReviewNavStep, seed: Record<stri
         return;
     }
 
+    if (step.kind === 'click') {
+        if (!step.target) throw new Error('nav step "click" requires target');
+        // A dialog leaves the URL untouched, so it is reachable only by activation.
+        await page.locator('main').locator(step.target).click();
+        if (step.waitFor) {
+            await expect(page.locator('main').locator(step.waitFor)).toBeVisible({ timeout: 10000 });
+        }
+        await waitForAppSettled(page);
+        return;
+    }
+
     if (!step.label || !step.valueKey) throw new Error('nav step "fill" requires label and valueKey');
     await page.locator('main').getByLabel(step.label, { exact: true }).fill(String(seed[step.valueKey] ?? ''));
     await waitForAppSettled(page);

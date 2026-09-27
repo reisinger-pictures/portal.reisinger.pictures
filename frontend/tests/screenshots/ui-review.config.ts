@@ -25,7 +25,7 @@ export interface UiReviewSeedContext {
 export type UiReviewSeed = (context: UiReviewSeedContext) => Promise<Record<string, unknown>>;
 
 export interface UiReviewNavStep {
-    kind: 'goto' | 'fill';
+    kind: 'goto' | 'fill' | 'click';
     /** `goto`: route pattern; `:param` tokens are resolved from the seed result. */
     path?: string;
     /** `fill`: why this UI step is needed (documentation). */
@@ -34,6 +34,19 @@ export interface UiReviewNavStep {
     label?: string;
     /** `fill`: seed key providing the value. */
     valueKey?: string;
+    /**
+     * `click`: locator (scoped to <main>) of the element to activate.
+     *
+     * Needed for states a route load cannot reach. A dialog is the case: it
+     * changes nothing about the URL, so `goto` has nothing to express — the
+     * only way in is the button that opens it.
+     */
+    target?: string;
+    /**
+     * `click`: locator that must become visible after the activation (e.g. the
+     * dialog itself), so a capture never races the open animation.
+     */
+    waitFor?: string;
 }
 
 export interface UiReviewRoute {
@@ -117,6 +130,21 @@ export const uiReviewConfig: UiReviewConfig = {
                 filled: context => seedPhotographer(context.request),
             },
             note: 'Photographer landing: the FTP inbox with the camera connection table, the credentials button, the account status and the button that opens the setup guide dialog. Photographer-only, so the admin login cannot reach it.',
+        },
+        {
+            // A dialog changes nothing about the URL, so it is only reachable by
+            // activation — the `click` nav step exists for exactly this case.
+            name: 'photographer-guide-dialog',
+            path: '/',
+            states: ['filled'],
+            auth: 'photographer',
+            seeds: {
+                filled: context => seedPhotographer(context.request),
+            },
+            nav: [
+                { kind: 'click', target: 'button:has-text("Anleitung öffnen")', waitFor: '[role="dialog"]' },
+            ],
+            note: 'The camera setup guide as a dialog. Captured because the dialog is the surface the owner asked for and a route load cannot reach it.',
         },
         {
             name: 'admin-models',
