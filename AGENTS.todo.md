@@ -1995,8 +1995,8 @@ Erstmals das Screenshot-Harness auf die neuen Oberflaechen angewendet
 |---|---|---|---|
 | medium | `KameraEinrichtung.tsx` (Schritt 2) | Der Guide nennt **„Neues Kamera-Passwort"**, aber der Button heißt fuer `pending` **„Kamera-Zugang einrichten"**. Ein Fotograf, der dem Guide folgt, sucht einen Button, den es nicht gibt — und genau diese Diskrepanz hat den Slug-Wechsel-Blockade beheben sollen. | Beide Labels nennen, oder den zustandabhaehngigen Text erklären. **Erledigt 2026-09-26: der Guide nennt jetzt den pending-Button „Kamera-Zugang einrichten".** |
 | medium | `ManagementFtpInbox.tsx:57` | **„Fuer FTPS ist kein Verschluesselungsmodus hinterlegt — bitte den Support kontaktieren"**. Wird nur angezeigt, wenn der Modus fehlt (in Produktion gesetzt). „Support kontaktieren" ist fuer einen Fotografen eine Sackgasse: er kann eine Server-Konfiguration nicht aendern. | Neutralere Formulierung ohne Support-Weg, z. B. was fehlt und warum. **Erledigt 2026-09-26: neutrale Formulierung „Ohne diesen Modus kann die Kamera FTPS nicht aushandeln — nutze daher SFTP" (Inbox und Guide).** |
-| low | `photographer-dashboard` (Mobile) | Der lange Upload-Ordner-Pfad (`ftp_folder`) bricht ueber **drei Zeilen** um und quetscht die Karte | Zeilenumbruch kontrollieren (`break-all` nur fuer lange Pfade) oder kuerzer anzeigen |
-| low | Header (Mobile) | **„Reisinger Fot…"** abgeschnitten | Vorbestehend, nicht von dieser Runde — nur vermerkt |
+| low | `photographer-dashboard` (Mobile) | Der lange Upload-Ordner-Pfad (`ftp_folder`) bricht ueber **drei Zeilen** um und quetscht die Karte | Zeilenumbruch kontrollieren (`break-all` nur fuer lange Pfade) oder kuerzer anzeigen. **Erledigt 2026-09-27: `break-all` + `text-base md:text-lg` in `ManagementFtpInbox.tsx`, linke Spalte `min-w-0` — der Pfad bricht jetzt kontrolliert in zwei Zeilen.** |
+| low | Header (Mobile) | **„Reisinger Fot…"** abgeschnitten | Vorbestehend, nicht von dieser Runde — nur vermerkt. **Erledigt 2026-09-27: Root Cause war eine dreifach duplizierte Kopfzeile — nicht der zuerst gefixte `GlobalSearchHeader`. Siehe Folge-Runde unten.** |
 
 **Nicht Beanstandungen:** Die Verbindungstabelle rendert auf beiden Viewports sauber;
 die Status-Warnung (`pending`) und der Button sitzen in einer Zeile; die
@@ -2027,18 +2027,45 @@ Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
   waehrend der pending-Button „Kamera-Zugang einrichten" heisst → Guide nennt jetzt
   den zustandskorrekten Button.
 
-**Offener Folge-Task (Harness-Luecke):**
-- [ ] **Dialog-Zustaende sind vom Screenshot-Harness nicht erfassbar.** Das
-  Manifest (`tests/screenshots/ui-review.config.ts`) kennt als Nav-Schritt nur
-  `goto` und `fill`; es gibt kein `click`. Damit ist der Kamera-Anleitungs-Dialog
-  — die neue, vom Owner ausdruecklich gewuenschte Oberflaeche — screenshot-seitig
-  **strukturell ungeprueft**; abgesichert ist er bisher nur funktional (E2E
-  `kamera-einrichtung.spec.ts`: Werte, Abschnitte, Schliessen) und per
-  Sichtpruefung des Implementierers. Fix: kleinen `click`-Nav-Schritt (Locator +
-  optionales `waitFor`) im Manifest-Typ und im Spec ergaenzen, dann einen
-  Manifest-Eintrag „FTP Inbox mit offener Anleitung" aufnehmen und nach
-  `ui-review-checklist.md` bewerten (Dialoghoehe, Scroll-Verhalten,
-  Tabellen-Ueberlauf auf Mobile).
+**Folge-Task (Harness-Luecke) — erledigt 2026-09-27:**
+- [x] **Dialog-Zustaende sind vom Screenshot-Harness erfassbar.** Ein HTML-
+  `<dialog>` ist screenshot-faehig wie jede andere Oberflaeche — die Luecke war
+  ein Artefakt des Harness, keine Eigenschaft von Dialogen. Das Manifest
+  (`tests/screenshots/ui-review.config.ts`) kannte als Nav-Schritt nur `goto` und
+  `fill`; es fehlte `click`. Da ein Dialog die URL nicht aendert, kann ihn `goto`
+  grundsaetzlich nicht ausdruecken — der einzige Weg hinein ist die Aktivierung.
+  Jetzt ergaenzt: `UiReviewNavStep` um `kind: 'click'` mit `target` (Locator, auf
+  `<main>` gescoped) und optional `waitFor` (Locator, der nach dem Klick sichtbar
+  sein muss — verhindert ein Rennen gegen die Oeffnungsanimation);
+  Manifest-Eintrag `photographer-guide-dialog` („FTP Inbox mit offener
+  Anleitung"). Aufnahmen unter
+  `test-results/ui-screenshots/filled/{desktop,mobile}/photographer-guide-dialog*.png`;
+  Dialoghoehe, Close-Button, Backdrop und Wertetabelle visuell geprueft.
+
+**Folge-Runde 2026-09-27 (die zwei `low`-Befunde umgesetzt):**
+- [x] **Upload-Ordner-Pfad (Mobile)** — `ManagementFtpInbox.tsx`: `<code>` auf
+  `break-all` + `text-base md:text-lg`, linke Spalte `min-w-0`. Ein Pfad hat keine
+  Leerzeichen und kann nur mitten im Token umbrechen; `break-all` macht das
+  vorhersagbar, statt den Pfad ueber drei Zeilen zu stapeln. Abnahme:
+  Mobile-Screenshot.
+- [x] **Header „Reisinger Fot…" (Mobile)** — **Root Cause war eine dreifach
+  duplizierte Kopfzeile, nicht der Header, den der erste Fix traf.** Das
+  Marken-Lockup (Logo + Portalname, `truncate max-w-28`) existierte in
+  `ManagementDashboard.tsx`, `ClientDashboard.tsx` **und**
+  `GlobalSearchHeader.tsx`; das Fotografen-Dashboard rendert den Header aus
+  `ManagementDashboard`. Der erste Fix aenderte nur `GlobalSearchHeader` — die
+  Ellipse blieb sichtbar, weil das gerenderte Element ein anderes war. Beleg:
+  `curl` auf den Dev-Server lieferte das Modul bereits ohne `truncate`, waehrend
+  der Screenshot die Ellipse zeigte → das gerenderte Element musste ein anderes
+  sein; `grep -rn "max-w-28" src/` zeigte die drei Kopien. **Fix:** neues
+  gemeinsames `MobileBrandLink` (`src/ui/components/`) — der Name bricht in eine
+  zweite Zeile (`leading-tight`) statt abgeschnitten zu werden; die
+  Kopfzeilenhoehe bleibt gleich, weil sie vom ~48 px hohen Suchfeld bestimmt
+  wird. Alle drei Aufrufer nutzen es; Vitest-Test ergaenzt.
+  **Lehre:** Bei einem UI-Fix zuerst pruefen, ob das Muster dupliziert ist
+  (`grep` nach der Klasse/Komponente) — sonst fixt man eine Kopie und die
+  Anzeige bleibt defekt. **Skill-Konsequenz:** die `ui-review`-Checkliste ist um
+  den Punkt ergaenzt, dass ein Befund vor dem Fix auf Duplikate zu pruefen ist.
 - [x] **Zusatz:** literale `\u2014` in JSX-Text der Fehlertabelle des Guides
   entsprachen keinem Escape und rendeten als `\u2014` → durch echte Em-Dashes
   ersetzt.
