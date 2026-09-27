@@ -237,16 +237,20 @@ export default function ManagementFtpInbox() {
                         title={<Trans>Kamera einrichten</Trans>}
                         icon="mdi--camera"
                         onClose={() => setShowGuide(false)}
-                        boxClassName="w-11/12 max-w-5xl max-h-90vh flex flex-col"
+                        boxClassName="w-11/12 max-w-5xl"
+                        // `scroll-fade-bottom` fades the last 2rem so the cut of the
+                        // scroll region reads as scrollable instead of broken, and
+                        // `pb-8` (exactly 2rem) keeps that band clear of the closing
+                        // alert. Both travel with the scroll port: the region that
+                        // scrolls is the one the shell builds, so the mask has to sit
+                        // there and not on the box that merely bounds it — on the box
+                        // it would fade nothing. This dialog has no footer, so the
+                        // band can sit directly at the end without hiding anything
+                        // below.
+                        bodyClassName="scroll-fade-bottom pb-8"
+                        scrollableBody
                     >
-                        {/* `scroll-fade-bottom` fades the last 2rem so the cut of
-                            the scroll region reads as scrollable instead of broken,
-                            and `pb-8` (exactly 2rem) keeps that band clear of the
-                            closing alert. This dialog has no footer, so the band can
-                            sit directly at the end without hiding anything below. */}
-                        <div className="flex-1 overflow-y-auto pr-2 scroll-fade-bottom pb-8">
-                            <KameraEinrichtungContent connection={status.connection} resetLimitPerHour={status.ftp_reset_limit_per_hour} />
-                        </div>
+                        <KameraEinrichtungContent connection={status.connection} resetLimitPerHour={status.ftp_reset_limit_per_hour} />
                     </ModalShell>
                 )}
 

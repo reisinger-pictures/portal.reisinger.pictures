@@ -11,6 +11,7 @@ import {apiMutate} from '../../api';
 import {useUI} from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
 import PageLayout from '../components/PageLayout';
+import ModalDialogShell from '../components/ModalDialogShell';
 
 interface OrgSettingsProps {
     name: string;
@@ -344,15 +345,23 @@ export default function ManagementOrgDetailView() {
             </div>
 
             {isInviteModalOpen && (
-                <div className="modal modal-open">
-                    <div className="modal-box relative">
-                        <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-                                onClick={() => setInviteModalOpen(false)}>✕
-                        </button>
-                        <h3 className="font-bold text-lg mb-4"><Trans>Nutzer in Organisation einladen</Trans></h3>
+                <ModalDialogShell
+                    title={<Trans>Nutzer in Organisation einladen</Trans>}
+                    onClose={() => setInviteModalOpen(false)}
+                    // Inviting only — this dialog has no delete action for an
+                    // existing member, so the shared footer must not offer one.
+                    // See the `editing` note in TextSnippetModal.
+                    editing={false}
+                    isSubmitting={isInviting}
+                    onSubmit={handleInvite}
+                    // No `noValidate` on purpose: the e-mail field is `required`
+                    // and this form was written to keep native constraint
+                    // validation, so the shell must leave it on.
+                    submitText={t`Einladung Senden`}
+                >
                         <p className="text-sm opacity-70 mb-4"><Trans>Der Nutzer erhält eine E-Mail mit einem Link, um sein
                             Passwort festzulegen und wird automatisch dieser Organisation zugewiesen.</Trans></p>
-                        <form onSubmit={handleInvite} className="space-y-4">
+                        <div className="space-y-4">
                             <div className="form-control">
                                 <label className="label"><span
                                     className="label-text font-bold"><Trans>E-Mail Adresse</Trans></span></label>
@@ -360,19 +369,8 @@ export default function ManagementOrgDetailView() {
                                        onChange={e => setInviteEmail(e.target.value)}
                                         className="input input-bordered w-full" placeholder={t`kollege@firma.de`}/>
                             </div>
-                            <div className="modal-action col-span-full">
-                                <button type="button" className="btn btn-ghost"
-                                        onClick={() => setInviteModalOpen(false)}><Trans>Abbrechen</Trans>
-                                </button>
-                                <button type="submit" className="btn btn-primary" disabled={isInviting}>
-                                    {isInviting ?
-                                        <span className="loading loading-spinner"></span> : <Trans>Einladung Senden</Trans>}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                    <div className="modal-backdrop" onClick={() => setInviteModalOpen(false)}></div>
-                </div>
+                        </div>
+                </ModalDialogShell>
             )}
         </PageLayout>
     );
