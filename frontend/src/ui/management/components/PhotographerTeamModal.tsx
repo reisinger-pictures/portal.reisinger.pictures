@@ -66,6 +66,12 @@ export default function PhotographerTeamModal({ isOpen, onClose, item, isGroup, 
     };
 
     return (
+        // Still hand-rolled, deliberately. `scrollableBody` puts *every* child into
+        // the scroll region, and the gallery line plus the access-status select have
+        // to stay put while the photographer list moves below them — a select that
+        // scrolls away is a select you cannot change. The bound is a second blocker:
+        // the opt-in adds `max-h-90vh`, and two `max-h` utilities on one element are
+        // decided by stylesheet order, where 90vh follows 80vh and wins.
         <ModalShell
             title={<Trans>Fotografen-Team</Trans>}
             icon="mdi--camera-account"

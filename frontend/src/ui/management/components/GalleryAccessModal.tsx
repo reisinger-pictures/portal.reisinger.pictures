@@ -58,6 +58,13 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
     };
 
     return (
+        // Still hand-rolled, deliberately. `scrollableBody` puts *every* child into
+        // the scroll region, and this dialog needs the gallery line, the search field
+        // and the count pinned above a list that scrolls on its own — the field has
+        // to stay reachable while the list moves under it. The bound is a second
+        // blocker: the opt-in adds `max-h-90vh`, and two `max-h` utilities on one
+        // element are decided by stylesheet order, where 90vh follows 80vh and wins.
+        // Migrating this needs a shell that holds a region between header and body.
         <ModalShell
             title={<Trans>Nutzer-Zugriff verwalten</Trans>}
             icon="mdi--account-key"

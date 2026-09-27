@@ -1,9 +1,9 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import {useId, useState} from 'react';
+import {useState} from 'react';
 import {Role, UserDetailed, UserRole} from '../../../logic/useUsers';
 import {FlatGroup, Gallery} from '../../../logic/useGalleries';
-import { useFocusTrap } from '../../../logic/useFocusTrap';
+import ModalShell from '../../components/ModalShell';
 
 interface UserPermissionsModalProps {
     user: UserDetailed;
@@ -33,8 +33,6 @@ export default function UserPermissionsModal({
     const [brand, setBrand] = useState<string | null>(user.brand ?? null);
     const [canPurchaseUpgrades, setCanPurchaseUpgrades] = useState<boolean>(user.can_purchase_upgrades ?? false);
     const [isSaving, setIsSaving] = useState(false);
-    const titleId = useId();
-    const dialogRef = useFocusTrap<HTMLDivElement>(true, { onEscape: onClose });
 
     const selectedRoleNames = (roles ?? [])
         .filter(r => selRoles.includes(r.id))
@@ -82,17 +80,23 @@ export default function UserPermissionsModal({
     };
 
     const userNameEdit = user.name;
+    // `ModalShell`, not `ModalDialogShell`: this dialog has no <form> at all.
+    // Its state lives in `useState` and the save button calls `handleSave`
+    // directly, so there is nothing for a submit footer to submit and no
+    // `editing`/`isSubmitting` pair to describe. The footer below is therefore
+    // this dialog's own, verbatim — only its container changed.
     return (
-        <div
-            className="modal modal-open"
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
+        <ModalShell
+            title={<Trans>{userNameEdit} bearbeiten</Trans>}
+            onClose={onClose}
+            boxClassName="max-w-4xl"
+            footer={
+                <div className="modal-action col-span-full mt-6">
+                    <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
+                    <button className="btn btn-primary" type="button" disabled={isSaving} onClick={handleSave}><Trans>Speichern</Trans></button>
+                </div>
+            }
         >
-            <div className="modal-box max-w-4xl relative">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 id={titleId} className="font-bold text-2xl mb-1"><Trans>{userNameEdit} bearbeiten</Trans></h3>
                 <p className="opacity-70 mb-6 flex items-center gap-2">
                     <span className="iconify mdi--email-outline"></span> {user.email}
                 </p>
@@ -191,13 +195,6 @@ export default function UserPermissionsModal({
                         ))}
                     </div>
                 </div>
-
-                <div className="modal-action col-span-full mt-6">
-                    <button className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
-                    <button className="btn btn-primary" type="button" disabled={isSaving} onClick={handleSave}><Trans>Speichern</Trans></button>
-                </div>
-            </div>
-            <div className="modal-backdrop"></div>
-        </div>
+        </ModalShell>
     );
 }

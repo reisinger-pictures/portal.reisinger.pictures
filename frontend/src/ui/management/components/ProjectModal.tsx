@@ -1,15 +1,15 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useEffect, useId } from 'react';
+import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useUI } from '../../components/UIContext';
 import AutocompleteInput from '../../components/AutocompleteInput';
+import ModalDialogShell from '../../components/ModalDialogShell';
 import { Customer } from '../../../api';
 import { Project, ProjectInput } from '../../../logic/useProjectsBoard';
 import { useUsers } from '../../../logic/useUsers';
-import { useFocusTrap } from '../../../logic/useFocusTrap';
 
 export interface BoardStatusOption { value: string; label: string; }
 
@@ -46,7 +46,11 @@ interface Props {
     initial?: { client_name?: string; email?: string };
 }
 
-export default function ProjectModal({ isOpen, onClose, editing, onSave, initial, defaultStatus, statusOptions }: Props) {
+// This one renames more than the others: the prop was literally called `editing`
+// while the shell it renders into takes a prop called `editing` that means
+// something else entirely ("has a delete action"). The record is `project` here,
+// so the two can no longer be confused at the call site below.
+export default function ProjectModal({ isOpen, onClose, editing: project, onSave, initial, defaultStatus, statusOptions }: Props) {
     "use no memo";
     const projectSchema = createProjectSchema();
     const paymentOptions = createPaymentOptions();
@@ -70,21 +74,18 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
     useEffect(() => {
         if (isOpen) {
             reset({
-                client_name: editing?.client_name ?? initial?.client_name ?? '',
-                email: editing?.email ?? initial?.email ?? '',
-                phone: editing?.phone ?? '',
-                package: editing?.package ?? '',
-                price_eur: editing?.price_cents != null ? String(editing.price_cents / 100) : '',
-                payment_status: editing?.payment_status ?? 'open',
-                status: editing?.status ?? defaultStatus ?? '',
-                assignee_id: editing?.assignee?.id ?? '',
-                notes: editing?.notes ?? '',
+                client_name: project?.client_name ?? initial?.client_name ?? '',
+                email: project?.email ?? initial?.email ?? '',
+                phone: project?.phone ?? '',
+                package: project?.package ?? '',
+                price_eur: project?.price_cents != null ? String(project.price_cents / 100) : '',
+                payment_status: project?.payment_status ?? 'open',
+                status: project?.status ?? defaultStatus ?? '',
+                assignee_id: project?.assignee?.id ?? '',
+                notes: project?.notes ?? '',
             });
         }
-    }, [isOpen, editing, initial, defaultStatus, reset]);
-
-    const titleId = useId();
-    const dialogRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: onClose });
+    }, [isOpen, project, initial, defaultStatus, reset]);
 
     if (!isOpen) return null;
 
@@ -110,22 +111,25 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
     };
 
     return (
-        <div
-            className="modal modal-open"
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
+        <ModalDialogShell
+            title={project ? <Trans>Projekt bearbeiten</Trans> : <Trans>Neues Projekt anlegen</Trans>}
+            onClose={onClose}
+            // Deleting a project happens on the card, not in this dialog, and
+            // the dialog has no delete action of its own. The value that would
+            // mean "a project is being edited" is `project`, not `editing` — see
+            // the `editing` note in TextSnippetModal.
+            editing={false}
+            isSubmitting={isSubmitting}
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+            // See CustomerModal: `max-w-2xl` is also what `maxWidth="2xl"`
+            // renders, so this stays on `boxClassName` with the markup it has
+            // always had.
+            boxClassName="max-w-2xl"
         >
-            <div className="modal-box max-w-2xl">
-                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 id={titleId} className="font-bold text-xl mb-6">
-                    {editing ? <Trans>Projekt bearbeiten</Trans> : <Trans>Neues Projekt anlegen</Trans>}
-                </h3>
-                <form onSubmit={handleSubmit(onSubmit)} noValidate>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control md:col-span-2">
-                            {editing ? (
+                            {project ? (
                                 <>
                                     <label className="label"><span className="label-text font-bold"><Trans>Kundenname</Trans></span></label>
                                     <input required type="text" {...register('client_name')} className={`input input-bordered w-full ${errors.client_name ? 'input-error' : ''}`} />
@@ -196,16 +200,7 @@ export default function ProjectModal({ isOpen, onClose, editing, onSave, initial
                                 {users?.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                             </select>
                         </div>
-                    </div>
-                    <div className="modal-action">
-                        <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
-                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                            {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
-                        </button>
-                    </div>
-                </form>
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+                </div>
+        </ModalDialogShell>
     );
 }

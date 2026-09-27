@@ -1,11 +1,11 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useEffect, useId } from 'react';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Product } from '../../../api';
-import { useFocusTrap } from '../../../logic/useFocusTrap';
+import ModalDialogShell from '../../components/ModalDialogShell';
 
 const createProductSchema = () => z.object({
     type: z.enum(['item', 'discount_fixed', 'discount_percent']),
@@ -23,7 +23,9 @@ interface Props {
     onSave: (data: Partial<Product>) => Promise<void>;
 }
 
-export default function ProductModal({ isOpen, onClose, editingProduct, onSave }: Props) {
+// Renamed on destructuring, see TextSnippetModal: the record is `product`, and
+// `editing` in this file belongs to the shell's delete-action prop.
+export default function ProductModal({ isOpen, onClose, editingProduct: product, onSave }: Props) {
     "use no memo";
     const productSchema = createProductSchema();
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProductFormValues>({
@@ -33,13 +35,13 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
     useEffect(() => {
         if (isOpen) {
             reset({
-                type: editingProduct?.type || 'item',
-                name: editingProduct?.name || '',
-                description: editingProduct?.description || '',
-                price: editingProduct ? editingProduct.price / 100 : 0
+                type: product?.type || 'item',
+                name: product?.name || '',
+                description: product?.description || '',
+                price: product ? product.price / 100 : 0
             });
         }
-    }, [isOpen, editingProduct, reset]);
+    }, [isOpen, product, reset]);
 
     const onSubmit = async (data: ProductFormValues) => {
         try {
@@ -51,27 +53,29 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
         }
     };
 
-    const titleId = useId();
-    const dialogRef = useFocusTrap<HTMLDivElement>(isOpen, { onEscape: onClose });
-
     if (!isOpen) return null;
 
     return (
-        <div
-            className="modal modal-open z-50"
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
+        <ModalDialogShell
+            title={product ? <Trans>Katalog-Eintrag bearbeiten</Trans> : <Trans>Neuen Eintrag anlegen</Trans>}
+            icon="mdi--package-variant-closed"
+            onClose={onClose}
+            // This dialog has no delete action for an existing entry, so the
+            // shared footer must not offer one — and the value that would mean
+            // "an entry is being edited" is `product`, not `editing`. See the
+            // `editing` note in TextSnippetModal.
+            editing={false}
+            isSubmitting={isSubmitting}
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+            className="z-50"
         >
-            <div className="modal-box relative">
-                <button type="button" className="btn btn-circle btn-ghost absolute right-2 top-2" onClick={onClose}>✕</button>
-                <h3 id={titleId} className="font-bold text-xl mb-6 flex items-center gap-2">
-                    <span className="iconify mdi--package-variant-closed text-primary"></span>
-                    {editingProduct ? <Trans>Katalog-Eintrag bearbeiten</Trans> : <Trans>Neuen Eintrag anlegen</Trans>}
-                </h3>
-
-                <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4" noValidate>
+                {/* The two-column grid used to sit on the <form> itself. The
+                    shell owns the form and leaves it unclassed, so the grid
+                    moves onto a wrapper around the fields; the two columns and
+                    the field order are unchanged. The submit row leaves the grid
+                    entirely and is rendered by the shared footer. */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="form-control">
                         <label className="label"><span className="label-text font-bold"><Trans>Typ</Trans></span></label>
                         <select required {...register('type')} className="select select-bordered">
@@ -93,16 +97,7 @@ export default function ProductModal({ isOpen, onClose, editingProduct, onSave }
                         <label className="label"><span className="label-text font-bold"><Trans>Standard-Wert</Trans></span></label>
                         <input required type="number" step="0.01" min="0" {...register('price', { valueAsNumber: true })} className={`input input-bordered font-mono ${errors.price ? 'input-error' : ''}`} />
                     </div>
-
-                    <div className="modal-action col-span-full mt-6">
-                        <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Abbrechen</Trans></button>
-                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                            {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
-                        </button>
-                    </div>
-                </form>
-            </div>
-            <div className="modal-backdrop" onClick={onClose}></div>
-        </div>
+                </div>
+        </ModalDialogShell>
     );
 }

@@ -29,14 +29,49 @@ interface ModalShellProps {
     icon?: string;
     onClose: () => void;
     modalRef?: RefObject<HTMLDialogElement | null>;
-    maxWidth?: 'default' | 'lg' | 'xl' | '2xl';
+    /**
+     * The box width, as a two-state choice: daisyUI's own `.modal-box` default
+     * (`max-width: 32rem`) or `max-w-2xl`.
+     *
+     * Two states rather than a scale, deliberately. This prop used to accept
+     * `'lg'` and `'xl'` and drop both, which is the worst of the fates an
+     * accepted value can have: a caller writing `maxWidth="lg"` got a dialog at
+     * daisyUI's 32rem, so the box silently changed size and nothing said so.
+     * Implementing the scale would not have removed that trap — `max-w-lg` *is*
+     * 32rem, so the silent 32rem is still what a migrating caller gets — and it
+     * would not have covered the widths these dialogs actually use, which run
+     * from `max-w-lg` to `max-w-7xl` and pass the top of the scale through
+     * `boxClassName` regardless. So the type was narrowed instead: `'lg'` and
+     * `'xl'` are a compile error at the call site now, not a silent resize.
+     * Every other width goes through `boxClassName`, which is the escape hatch
+     * this prop never needed to grow into.
+     */
+    maxWidth?: 'default' | '2xl';
     /** Rendered in the header next to the title, e.g. a save-state indicator. */
     secondaryAction?: ReactNode;
     descriptionId?: string;
     /** Applied to the <dialog> wrapper. */
     className?: string;
-    /** Applied to the modal-box, for dialogs wider than the maxWidth scale. */
+    /** Applied to the modal-box, for any width the two states above do not express. */
     boxClassName?: string;
+    /**
+     * `data-testid` for the modal-box.
+     *
+     * The shell owns the box, and without a hook here a consumer that needed a
+     * stable handle on *the dialog itself* had to invent one: ModelInviteDialog
+     * wrapped its whole content in an extra `<div>` purely to carry
+     * `data-testid="model-invite-dialog"`, which eight E2E assertions scope
+     * through. `boxClassName` cannot carry a testid — it is a class string — so
+     * this prop exists rather than an overload of that one.
+     *
+     * Left unset it renders no attribute at all, which is what keeps every
+     * other dialog byte-identical. The count is deliberately not written down
+     * here: dialogs are added and migrated, and a number in this comment went
+     * stale the moment the eleven own-`modal-box` dialogs came over. See
+     * `features/tech/08-dialog-height-contract.md` §6.2 for the current
+     * inventory and the counting rule that makes it reproducible.
+     */
+    boxTestId?: string;
     /** When provided, children and footer render inside a form element. */
     onFormSubmit?: (e: React.FormEvent) => void;
     /**
@@ -74,6 +109,35 @@ interface ModalShellProps {
      * scrolling the form out from under the user.
      */
     scrollableBody?: boolean;
+    /**
+     * Escape hatch for the bounded body region, and only for it: the caller
+     * cannot reach it any other way, because the shell creates it.
+     *
+     * `scrollableBody` puts the scroll boundary on a region the shell owns
+     * (`flex-1 min-h-0 overflow-y-auto`), which is what makes the footer stay
+     * reachable — but it also means the boundary is a knob nobody but the shell
+     * can turn. A dialog whose content needs the boundary *tuned* then has
+     * nowhere to put that tuning: ModelDetailModal fades its last 2rem with
+     * `scroll-fade-bottom` and keeps `pb-10` clear of it, and both of those are
+     * only correct on the element that actually scrolls. Left on the box, the
+     * fade would sit outside the scroll port and the boundary would slice the
+     * last row of text with nothing softening it — the exact defect the UI
+     * review caught cutting "Linz"/"Österreich" through the glyphs.
+     *
+     * So the boundary is tunable, but only from the inside: the classes land on
+     * the body, and the caller stays responsible for keeping any mask it adds in
+     * step with that body's padding.
+     *
+     * Deliberately inert without `scrollableBody`. In the default layout there
+     * is no bounded body — children and footer render straight into the box, so
+     * there is no region for the class to land on. The prop is accepted and
+     * dropped rather than folded into `boxClassName` on the caller's behalf,
+     * because silently reinterpreting it as a box class would move the DOM
+     * under the other eighteen dialogs the moment one of them passed it. Passing
+     * it without the opt-in is a mistake that stays visibly a mistake: nothing
+     * changes.
+     */
+    bodyClassName?: string;
     children: ReactNode;
 }
 
@@ -87,10 +151,12 @@ export default function ModalShell({
     descriptionId,
     className = '',
     boxClassName = '',
+    boxTestId,
     onFormSubmit,
     noValidate = false,
     footer,
     scrollableBody = false,
+    bodyClassName = '',
     children,
 }: ModalShellProps) {
     // `max-h-90vh flex flex-col` is what the hand-rolled long dialogs already
@@ -125,9 +191,17 @@ export default function ModalShell({
     // `shrink-0` wrapper is the shell's, not the caller's, so the guarantee
     // "the footer never gets squeezed out" holds for every caller instead of
     // depending on each footer remembering to carry that class.
+    //
+    // `bodyClassName` is appended after the shell's own classes so a caller tunes
+    // the scroll region rather than replacing it, and `.trim()` keeps the string
+    // byte-identical to the shell's when the prop is unused. This element is only
+    // ever rendered on the `scrollableBody` branch, which is what makes the prop
+    // inert everywhere else — see its docblock.
     const boundedBody = (
         <>
-            <div className="flex-1 min-h-0 overflow-y-auto pr-2">{children}</div>
+            <div className={`flex-1 min-h-0 overflow-y-auto pr-2 ${bodyClassName}`.trim()}>
+                {children}
+            </div>
             {footer ? <div className="shrink-0">{footer}</div> : null}
         </>
     );
@@ -178,7 +252,7 @@ export default function ModalShell({
                 onClose();
             }}
         >
-            <div className={`modal-box relative ${widthClass}`}>
+            <div className={`modal-box relative ${widthClass}`} data-testid={boxTestId}>
                 <button
                     type="button"
                     className="btn btn-circle btn-ghost absolute right-2 top-2"

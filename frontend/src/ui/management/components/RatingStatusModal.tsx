@@ -61,18 +61,32 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
     if (!isOpen) return null;
 
     return (
+        // Two tables, each of which grows with the gallery: the ratings export is
+        // one row per rated photo, so this is the one dialog here whose content
+        // routinely outgrows a viewport. `scrollableBody` is therefore the layout:
+        // the shell bounds the box, owns the scroll region, and the 2rem between
+        // the two sections travels with it in `bodyClassName` — the sections are
+        // direct children of that region now, which is the same gap `space-y-8`
+        // produced when it sat on a wrapper this component owned.
         <ModalShell
             title={<span className="text-2xl"><Trans>Bewertungen & Status</Trans></span>}
             onClose={onClose}
-            boxClassName="max-w-5xl flex flex-col max-h-90vh"
+            boxClassName="max-w-5xl"
+            bodyClassName="space-y-8"
+            scrollableBody
         >
-                
                 {isLoading ? (
-                    <div className="flex-1 flex items-center justify-center p-10"><span className="loading loading-spinner loading-lg text-primary"></span></div>
+                    // `h-full`, not `flex-1`: the spinner used to be a flex item of
+                    // the box and filled the height the header left over. Its
+                    // ancestor is now the shell's scroll region — a block — where
+                    // `flex-1` resolves to nothing and the spinner would jump to
+                    // the top of the dialog. Filling the region instead keeps it
+                    // centred in exactly the space it was centred in before.
+                    <div className="h-full flex items-center justify-center p-10"><span className="loading loading-spinner loading-lg text-primary"></span></div>
                 ) : error ? (
                     <ErrorMessage message={t`Fehler beim Laden der Bewertungen.`} />
                 ) : (
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-8">
+                    <>
                         <div>
                             <h4 className="font-bold text-lg mb-3 flex items-center gap-2">
                                 <span className="iconify mdi--account-group"></span> <Trans>Beteiligte Personen</Trans>
@@ -139,7 +153,7 @@ export default function RatingStatusModal({ galleryId, isOpen, onClose }: Props)
                                 </table>
                             </div>
                         </div>
-                    </div>
+                    </>
                 )}
         </ModalShell>
     );
