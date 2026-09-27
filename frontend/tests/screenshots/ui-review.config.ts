@@ -40,6 +40,12 @@ export interface UiReviewNavStep {
      * Needed for states a route load cannot reach. A dialog is the case: it
      * changes nothing about the URL, so `goto` has nothing to express — the
      * only way in is the button that opens it.
+     *
+     * `fill`: the `fill` locator, scoped to <main>, that takes precedence over
+     * `label`; use it when several controls share an accessible name. On
+     * `/admin-models` three controls are called "Suche" (global search input,
+     * global search submit button, model filter input), so a label-only step
+     * there is a Playwright strict-mode violation.
      */
     target?: string;
     /**
@@ -159,11 +165,93 @@ export const uiReviewConfig: UiReviewConfig = {
                 {
                     kind: 'fill',
                     label: 'Suche',
+                    // Disambiguator: three controls on this page carry the
+                    // accessible name "Suche" (global search input, global
+                    // search submit button, model filter input), so the label
+                    // alone is a strict-mode violation.
+                    target: '#model-filter-q',
                     valueKey: 'q',
                     reason: 'The Models search filters React state, not the URL — the seed value must be typed into the "Suche" input for a deterministic filled/empty table.',
                 },
             ],
             note: 'filled = one model registered through the public API (search filters to its unique first name). empty = a search term without matches → EmptyState "Keine Models gefunden".',
+        },
+
+        // ---- Dialoge (nur per Klick erreichbar) --------------------------------
+        // Like `photographer-guide-dialog` above: a dialog changes nothing about
+        // the URL, so each entry needs a `click` nav step to be reachable.
+        {
+            // Flow: an admin prices a package with the calculator before writing
+            // a manual invoice.
+            name: 'shooting-calculator-dialog',
+            path: '/admin-manual-invoice',
+            states: ['filled'],
+            auth: 'admin',
+            nav: [
+                {
+                    kind: 'click',
+                    target: 'role=button[name="Paket-Kalkulator"]',
+                    waitFor: 'role=dialog[name="Standard Tarif Rechner"]',
+                },
+            ],
+            note: 'The package calculator as a dialog on the manual-invoice page. The dialog is named "Standard Tarif Rechner" because the calculator opens in its default mode.',
+        },
+        {
+            // Flow: a photographer creates a new photo job from the production
+            // board.
+            name: 'photo-job-dialog',
+            path: '/boards?tab=production',
+            states: ['filled'],
+            auth: 'photographer',
+            seeds: {
+                filled: context => seedPhotographer(context.request),
+            },
+            nav: [
+                // One "Neuer Auftrag" button is rendered per production column,
+                // so the name alone matches all of them (strict-mode
+                // violation). `nth=0` pins the first column deterministically —
+                // which is also the board's default status
+                // (`defaultStatus = columns[0].status`).
+                { kind: 'click', target: 'role=button[name="Neuer Auftrag"] >> nth=0', waitFor: 'role=dialog[name="Neuen Auftrag anlegen"]' },
+            ],
+            note: 'The new photo-job form as a dialog. The trigger is an icon-only button whose accessible name comes from its title, hence the role/name locator.',
+        },
+        {
+            // Flow: an admin switches to the Volume-Pricing tab and creates a
+            // new preset.
+            name: 'volume-preset-dialog',
+            path: '/settings',
+            states: ['filled'],
+            auth: 'admin',
+            nav: [
+                { kind: 'click', target: 'label.tab:has-text("Volume-Pricing")', waitFor: 'role=button[name="Neues Preset"]' },
+                { kind: 'click', target: 'role=button[name="Neues Preset"]', waitFor: 'role=dialog[name="Neues Volume-Preset"]' },
+            ],
+            note: 'The new volume preset as a dialog. The Volume-Pricing tab is not the default, so the first step activates the tab that the second step acts on.',
+        },
+        {
+            // Flow: an admin searches the seeded model and opens its detail
+            // dialog.
+            name: 'model-detail-dialog',
+            path: '/admin-models',
+            states: ['filled'],
+            auth: 'admin',
+            seeds: {
+                filled: context => seedRegisteredModel(context.request),
+            },
+            nav: [
+                {
+                    kind: 'fill',
+                    label: 'Suche',
+                    // Same disambiguator as `admin-models` above — same page,
+                    // same three "Suche" controls.
+                    target: '#model-filter-q',
+                    valueKey: 'q',
+                    reason: 'The Models search filters React state, not the URL — the seed value must be typed into the "Suche" input for a deterministic filled/empty table.',
+                },
+                { kind: 'click', target: 'role=button[name*="UIReview"]', waitFor: 'role=dialog' },
+            ],
+            note: 'The detail dialog of the seeded model. The search step is copied from `admin-models` above so the table shows that single model. Only `role=dialog` is asserted: the dialog\'s accessible name is the model\'s display name, which the harness cannot substitute.',
         },
     ],
 };
