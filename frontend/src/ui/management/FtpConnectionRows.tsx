@@ -32,30 +32,60 @@ const connectionLabels: Record<FtpConnectionField, ReactElement> = {
  * than assembling rows themselves, so the two pages cannot disagree about which
  * values exist: an unknown port is dropped on both, and an empty list on both
  * means "not configured" on both.
+ *
+ * Above `sm` this is an ordinary two-column table: daisyUI's `table` classes, the
+ * header row, the per-cell row separators.
+ *
+ * Below `sm` the two columns do not fit, and no amount of `word-break` tuning can
+ * make them fit: the guide dialog hands the table 270px on a 412px phone, the label
+ * column claims 159px of it, and the value is a single unbreakable mono token of
+ * 169px that then has to be reassembled from three lines before it can be typed
+ * into a camera. A column narrower than its content cannot be fixed by choosing a
+ * different break point — so below `sm` the row stops being two columns and becomes
+ * two stacked blocks, label above value, each with the full table width. The DOM
+ * order and the element names stay exactly as they are (still `tr`, still `td`,
+ * label cell first): only the display of the wrappers changes, which keeps the
+ * `thead`'s column semantics, keeps the value selectable as one string, and keeps
+ * every existing locator (`td`, `tr` filtered by its label) pointing at the same
+ * element.
+ *
+ * Two details of that switch are load-bearing:
+ *
+ * - `sr-only sm:not-sr-only` on the header row: stacked, there is no second column
+ *   for "Wert" to name, so the row is not rendered — but it stays in the DOM, and
+ *   therefore in the accessibility tree, as the cells' column header.
+ * - `max-sm:border-b-0!` on the label cell: daisyUI draws the row separator as a
+ *   `border-bottom` on every cell but the last row's, so in the stacked layout it
+ *   would land *between* a label and its own value. The value cell keeps that
+ *   border, which is where the row separator belongs. The `!` is required because
+ *   daisyUI ships its cell rules in a cascade layer that comes after Tailwind's
+ *   utilities; `max-sm` keeps the desktop separator — which the label cell needs
+ *   there — untouched.
  */
 export function FtpConnectionRows({rows}: {rows: FtpConnectionRow[]}) {
     return (
         <div className="overflow-x-auto bg-base-100 rounded-box border border-base-300 shadow-sm">
             <table className="table table-zebra w-full">
-                <thead>
+                <thead className="sr-only sm:not-sr-only">
                     <tr>
                         <th><Trans>Einstellung</Trans></th>
                         <th><Trans>Wert</Trans></th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody className="block sm:table-row-group">
                     {rows.map(row => (
-                        <tr key={row.field}>
-                            {/* Paired with the value cell below: a `whitespace-nowrap`
-                                label can never yield width, so on a narrow viewport
-                                the value column got no room to wrap into. */}
-                            <td className="text-sm">{connectionLabels[row.field]}</td>
-                            {/* The value is a single unbreakable mono token (host,
-                                port range, path). `break-all` breaks it at a chosen
-                                point on a narrow viewport instead of after a hyphen;
-                                `sm:break-normal` restores the normal breaking rules
-                                from `sm` up, where there is room again. */}
-                            <td><code className="font-mono text-sm break-all sm:break-normal">{row.value}</code></td>
+                        <tr key={row.field} className="block sm:table-row">
+                            {/* `block sm:table-cell` on the cells is what makes the row
+                                two blocks instead of two columns: a `table-cell` inside a
+                                `block` row would be wrapped in an anonymous, shrink-to-fit
+                                table and stay as narrow as its content — the same defect in
+                                a different guise. */}
+                            <td className="text-sm block sm:table-cell max-sm:border-b-0!">{connectionLabels[row.field]}</td>
+                            {/* The value is a single unbreakable mono token (host, port
+                                range, path). `break-all` is now only the safety net for a
+                                value that is longer than the whole stacked row; `sm:break-normal`
+                                restores the normal breaking rules from `sm` up. */}
+                            <td className="block sm:table-cell"><code className="font-mono text-sm break-all sm:break-normal">{row.value}</code></td>
                         </tr>
                     ))}
                 </tbody>
