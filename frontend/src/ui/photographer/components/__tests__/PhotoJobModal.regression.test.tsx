@@ -21,7 +21,7 @@ vi.mock('../../../components/UIContext', () => ({
     useUI: vi.fn(),
 }));
 
-import { useUsers } from '../../../../logic/useUsers';
+import { useUsers, type UserDetailed } from '../../../../logic/useUsers';
 import { useProtectedGalleries } from '../../../../logic/useGalleries';
 import { useLightroomCatalogs } from '../../../../logic/useLightroomCatalogs';
 import { useUI } from '../../../components/UIContext';
@@ -44,6 +44,22 @@ const editingJob: PhotoJob = {
     notes: null,
 };
 
+function detailedUser(overrides: Partial<UserDetailed> & Pick<UserDetailed, 'id' | 'name'>): UserDetailed {
+    return {
+        email: '',
+        is_super_admin: false,
+        is_admin: false,
+        is_photographer: false,
+        is_pending: false,
+        can_edit_metadata: false,
+        flatrate_level: 'none',
+        roles: [],
+        gallery_groups: [],
+        galleries: [],
+        ...overrides,
+    };
+}
+
 function getControl(label: string): HTMLElement {
     return screen.getByText(label).closest('.form-control') as HTMLElement;
 }
@@ -63,8 +79,19 @@ function getSelect(label: string): HTMLSelectElement {
 describe('PhotoJobModal board save regression', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(useUsers).mockReturnValue({ users: [assignee] });
-        vi.mocked(useProtectedGalleries).mockReturnValue({ tree: { root_galleries: [], groups: [] } });
+        vi.mocked(useUsers).mockReturnValue({ users: [detailedUser(assignee)], roles: [], createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn() });
+        vi.mocked(useProtectedGalleries).mockReturnValue({
+            tree: { root_galleries: [], groups: [] },
+            isLoading: false,
+            isError: undefined,
+            mutate: vi.fn(),
+            createGroup: vi.fn(),
+            createGallery: vi.fn(),
+            deleteGallery: vi.fn(),
+            updateGroup: vi.fn(),
+            deleteGroup: vi.fn(),
+            updateGallery: vi.fn(),
+        });
         vi.mocked(useLightroomCatalogs).mockReturnValue({
             lightroomCatalogs: [],
             isLoading: false,
@@ -73,7 +100,7 @@ describe('PhotoJobModal board save regression', () => {
             update: vi.fn(),
             remove: vi.fn(),
         });
-        vi.mocked(useUI).mockReturnValue({ showToast: vi.fn() });
+        vi.mocked(useUI).mockReturnValue({ showToast: vi.fn(), confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
     });
 
     it('keeps the photo job data open when saving rejects', async () => {
@@ -127,7 +154,7 @@ describe('PhotoJobModal board save regression', () => {
     });
 
     it('keeps the current assignee selectable when the user list is unavailable', async () => {
-        vi.mocked(useUsers).mockReturnValue({ users: undefined });
+        vi.mocked(useUsers).mockReturnValue({ users: undefined, roles: [], createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn() });
         renderWithProviders(
             <PhotoJobModal
                 isOpen

@@ -21,11 +21,15 @@ function setupMocks(overrides: Record<string, unknown> = {}) {
 
     vi.mocked(useAI).mockReturnValue({
         isAvailable: true,
+        mode: 'server',
+        modelId: 'gpt-4o',
+        generateMetadata: vi.fn(),
         generateMetadataFromText: mockGenerateMetadataFromText,
+        updateBaseUrl: vi.fn(),
         ...overrides,
     });
 
-    vi.mocked(useUI).mockReturnValue({ showToast });
+    vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
 
     return { mockGenerateMetadataFromText, showToast };
 }

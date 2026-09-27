@@ -29,7 +29,7 @@
   "include": [
     "tests",
     "src/test-setup.tsx",
-    "src/ui/__tests__",
-    "src/logic/__tests__"
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx"
   ]
 }

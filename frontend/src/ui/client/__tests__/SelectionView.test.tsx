@@ -1,10 +1,9 @@
 import {act, screen, waitFor} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import type {ReactNode} from 'react';
-import type {User} from '../../../api';
+import type {AuthMeUser} from '../../../api';
 import type {useGallery} from '../../../logic/useGallery';
 import {useAuth} from '../../../logic/useAuth';
-import {usePhotoSwipe} from '../../../logic/usePhotoSwipe';
 import {useUI} from '../../components/UIContext';
 import {renderWithProviders} from '../../../test-setup';
 import SelectionView from '../SelectionView';
@@ -64,19 +63,33 @@ vi.mock('../components/NotificationsOptIn', () => ({
     default: () => null,
 }));
 
-const authenticatedUser: User = {
+const authenticatedUser: AuthMeUser = {
     id: 'user-1',
+    guest_id: null,
     name: 'Test User',
     email: 'user@example.com',
+    billing_name: null,
+    billing_company: null,
+    billing_street: null,
+    billing_zip: null,
+    billing_city: null,
+    brand: null,
+    is_cross_brand: false,
     is_super_admin: false,
     is_admin: false,
     is_photographer: false,
+    is_org_admin: false,
+    is_power_user: false,
     is_pending: false,
     can_edit_metadata: false,
+    can_purchase_upgrades: false,
     roles: [],
+    transient_galleries: [],
+    transient_meta_galleries: [],
+    photographer_gallery_groups: [],
 };
 
-const ratePhoto = vi.fn<(photoId: string, rating: number, comment: string) => Promise<void>>().mockResolvedValue(undefined);
+const ratePhoto = vi.fn<(photoId: string, rating: number, comment?: string) => Promise<void>>().mockResolvedValue(undefined);
 const showToast = vi.fn();
 const confirm = vi.fn<(options: unknown) => Promise<boolean>>();
 

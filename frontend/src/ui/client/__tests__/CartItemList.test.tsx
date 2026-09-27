@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../../../test-setup';
 import { CartItemList } from '../components/CartItemList';
-import type { CartItem } from '../../../logic/CartContext';
+import type { CartItemListProps } from '../components/CartItemList';
+import type { CartItem, CartPricingGroup } from '../../../logic/CartContext';
 
 /**
  * Money is rendered by `formatMoney`, i.e. `Intl` de-DE: comma decimal
@@ -30,7 +31,7 @@ const mockItems: CartItem[] = [
     },
 ];
 
-const defaultProps = {
+const defaultProps: CartItemListProps = {
     items: [] as CartItem[],
     handleUpdateItem: vi.fn(),
     removeFromCart: vi.fn(),
@@ -39,7 +40,7 @@ const defaultProps = {
     volumeLicensing: undefined,
 };
 
-function renderList(props: Partial<typeof defaultProps> = {}) {
+function renderList(props: Partial<CartItemListProps> = {}) {
     return renderWithProviders(
         <CartItemList {...defaultProps} {...props} />,
     );
@@ -148,6 +149,7 @@ describe('CartItemList', () => {
                 nextTierLabel: '20 Bilder (20 €)',
                 tiers: [],
                 isVolumePricing: true,
+                isLoading: false,
             },
         });
 
@@ -168,6 +170,7 @@ describe('CartItemList', () => {
                 nextTierLabel: '',
                 tiers: [],
                 isVolumePricing: true,
+                isLoading: false,
             },
         });
 
@@ -187,6 +190,7 @@ describe('CartItemList', () => {
                 nextTierLabel: '10 Bilder (25 €)',
                 tiers: [],
                 isVolumePricing: true,
+                isLoading: false,
             },
         });
 
@@ -209,6 +213,7 @@ describe('CartItemList', () => {
                 nextTierLabel: '10 Bilder (25 €)',
                 tiers: [],
                 isVolumePricing: true,
+                isLoading: false,
             },
         });
 
@@ -254,7 +259,7 @@ describe('CartItemList', () => {
         const scopeItem: CartItem = {...mockItems[0], photoId: 'scope', galleryId: 'scope-gallery', price: 500};
         const presetAItem: CartItem = {...mockItems[0], photoId: 'preset-a', galleryId: 'gallery-a', price: 0};
         const presetBItem: CartItem = {...mockItems[1], photoId: 'preset-b', galleryId: 'gallery-b', price: 0};
-        const groups = [
+        const groups: CartPricingGroup[] = [
             {
                 key: 'scope_licensing|default', licensingMode: 'scope_licensing' as const,
                 presetId: 'default', presetName: null, items: [scopeItem], itemIds: ['scope'],
@@ -280,6 +285,7 @@ describe('CartItemList', () => {
             items: [scopeItem, presetAItem, presetBItem],
             totalAmount: 11500,
             volumeLicensing: {
+                isLoading: false,
                 tierIndex: 0, isMaxTier: true, pricePerItemCents: 4000, totalCents: 11000,
                 nextTierCount: 0, nextTierLabel: '', tiers: [], isVolumePricing: true, groups,
                 groupedTotalCents: 11500, volumeSubtotalCents: 11000,
@@ -295,7 +301,7 @@ describe('CartItemList', () => {
     });
 
     it('keeps explicit scope groups on their server item prices even if legacy flags are inconsistent', () => {
-        const scopeGroups = [{
+        const scopeGroups: CartPricingGroup[] = [{
             key: 'scope_licensing|default',
             licensingMode: 'scope_licensing' as const,
             presetId: 'default',
@@ -325,6 +331,7 @@ describe('CartItemList', () => {
                 nextTierLabel: '',
                 tiers: [],
                 isVolumePricing: true,
+                isLoading: false,
                 groups: scopeGroups,
                 groupedTotalCents: 4000,
             },

@@ -21,9 +21,9 @@ import { usePhoto } from '../../../../logic/usePhoto';
 import { useUI } from '../../../components/UIContext';
 
 const mockPhotos = [
-    { id: 'p1', title: '', description: '', keywords: '', location: '', city: '', state: '', country: '', iso_country: '', thumb_url: '/thumb1.jpg', url: '/full1.jpg' },
-    { id: 'p2', title: '', description: '', keywords: '', location: '', city: '', state: '', country: '', iso_country: '', thumb_url: '/thumb2.jpg', url: '/full2.jpg' },
-    { id: 'p3', title: '', description: '', keywords: '', location: '', city: '', state: '', country: '', iso_country: '', thumb_url: '/thumb3.jpg', url: '/full3.jpg' },
+    { id: 'p1', gallery_id: 'g1', filename: 'p1.jpg', lr_uuid: 'uuid-p1', width: 100, height: 100, rating: 0, comment: '', title: '', description: '', keywords: '', location: '', city: '', state: '', country: '', iso_country: '', thumb_url: '/thumb1.jpg', url: '/full1.jpg' },
+    { id: 'p2', gallery_id: 'g1', filename: 'p2.jpg', lr_uuid: 'uuid-p2', width: 100, height: 100, rating: 0, comment: '', title: '', description: '', keywords: '', location: '', city: '', state: '', country: '', iso_country: '', thumb_url: '/thumb2.jpg', url: '/full2.jpg' },
+    { id: 'p3', gallery_id: 'g1', filename: 'p3.jpg', lr_uuid: 'uuid-p3', width: 100, height: 100, rating: 0, comment: '', title: '', description: '', keywords: '', location: '', city: '', state: '', country: '', iso_country: '', thumb_url: '/thumb3.jpg', url: '/full3.jpg' },
 ];
 
 function setupMocks(overrides: Record<string, unknown> = {}) {
@@ -43,9 +43,12 @@ function setupMocks(overrides: Record<string, unknown> = {}) {
 
     vi.mocked(usePhoto).mockReturnValue({
         updateMetadata: mockUpdateMetadata,
+        getVersions: vi.fn(),
+        revertMetadata: vi.fn(),
+        deletePhoto: vi.fn(),
     });
 
-    vi.mocked(useUI).mockReturnValue({ showToast });
+    vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
 
     return { mockGenerateMetadata, mockUpdateMetadata, showToast };
 }
