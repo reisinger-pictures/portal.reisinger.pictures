@@ -78,6 +78,7 @@ describe('VolumeLicensingCard', () => {
             clearCart: vi.fn(),
             totalAmount: 0,
             itemCount: items.length,
+            unresolvedItemCount: 0,
         });
         vi.mocked(useUI).mockReturnValue({
             showToast,

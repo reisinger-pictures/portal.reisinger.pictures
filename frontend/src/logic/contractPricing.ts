@@ -297,16 +297,6 @@ export function fixedPointToMajorUnits(value: number, scale: number = CONTRACT_S
     return result;
 }
 
-/** Format basis points as a human-readable percentage without float division. */
-export function formatBasisPointsAsPercent(basisPoints: number): string {
-    const units = safeIntegerToBigInt(basisPoints);
-    const sign = units < 0n ? '-' : '';
-    const absolute = units < 0n ? -units : units;
-    const whole = absolute / 100n;
-    const fraction = (absolute % 100n).toString().padStart(2, '0').replace(/0+$/, '');
-    return `${sign}${whole}${fraction === '' ? '' : `.${fraction}`}%`;
-}
-
 const checkedAdd = (left: number, right: number): number => {
     const result = safeIntegerToBigInt(left) + safeIntegerToBigInt(right);
     return bigintToSafeNumber(result);

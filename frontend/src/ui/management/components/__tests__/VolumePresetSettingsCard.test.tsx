@@ -4,6 +4,7 @@ import {renderWithProviders} from '../../../../test-setup';
 import userEvent from '@testing-library/user-event';
 import VolumePresetSettingsCard from '../VolumePresetSettingsCard';
 import {useVolumePresets} from '../../../../logic/useVolumePresets';
+import type {VolumePresetPayload} from '../../../../logic/useVolumePresets';
 
 vi.mock('../../../../logic/useVolumePresets', () => ({
     useVolumePresets: vi.fn(),
@@ -22,7 +23,7 @@ vi.mock('../../../components/ModalDialogShell', () => ({
     ),
 }));
 
-function mockPresets(createPreset: ReturnType<typeof vi.fn>) {
+function mockPresets(createPreset: (payload: VolumePresetPayload) => Promise<void>) {
     vi.mocked(useVolumePresets).mockReturnValue({
         presets: [],
         isLoading: false,
@@ -40,7 +41,7 @@ describe('VolumePresetSettingsCard', () => {
 
     it('keeps a partially typed decimal and commits the parsed base price', async () => {
         const user = userEvent.setup();
-        const createPreset = vi.fn().mockResolvedValue(undefined);
+        const createPreset = vi.fn<(payload: VolumePresetPayload) => Promise<void>>().mockResolvedValue(undefined);
         mockPresets(createPreset);
 
         const {container} = renderWithProviders(<VolumePresetSettingsCard />);
@@ -67,7 +68,7 @@ describe('VolumePresetSettingsCard', () => {
 
     it('commits decimal tier prices and integer quantities', async () => {
         const user = userEvent.setup();
-        const createPreset = vi.fn().mockResolvedValue(undefined);
+        const createPreset = vi.fn<(payload: VolumePresetPayload) => Promise<void>>().mockResolvedValue(undefined);
         mockPresets(createPreset);
 
         const {container} = renderWithProviders(<VolumePresetSettingsCard />);

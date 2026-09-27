@@ -4,6 +4,7 @@ import {Trans, Plural} from "@lingui/react/macro";
 import {useCart} from '../../../logic/CartContext';
 import {useUI} from '../../components/UIContext';
 import {formatMoney} from '../../../logic/utils';
+import {formatEuroDecimal} from '../../../logic/formatCurrency';
 import {useVolumeLicensing} from '../../../logic/useVolumeLicensing';
 
 export interface VolumeLicensingCardProps {
@@ -37,7 +38,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
         onAddToCart();
     };
 
-    const bestPrice = formatMoney(tiers[tiers.length - 1]?.priceCents ?? 0);
+    const bestPrice = formatEuroDecimal((tiers[tiers.length - 1]?.priceCents ?? 0) / 100);
     return (
         <div data-testid="volume-pricing-card" className="bg-base-100 p-5 md:p-6 rounded-box border border-base-300 shadow-sm flex flex-col gap-5">
             <h4 className="font-bold text-xl flex items-center gap-2">
@@ -98,7 +99,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
             {!isLoading && isVolumePricing && isMaxTier && (
                 <div className="text-sm text-center text-success font-semibold bg-success/5 p-3 rounded-box border border-success/20">
                     <span className="iconify mdi--check-circle inline-block mr-1"></span>
-                    <Trans>Bester Rabatt aktiv — {bestPrice} pro Bild</Trans>
+                    <Trans>Bester Rabatt aktiv — {bestPrice}{'\u00A0'}€ pro Bild</Trans>
                 </div>
             )}
 

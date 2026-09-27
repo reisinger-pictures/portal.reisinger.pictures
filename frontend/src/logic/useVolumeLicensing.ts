@@ -19,6 +19,7 @@ import {
     VolumeTierConfig,
 } from './CartContext';
 import {useLicenseTerms} from './useLicenseTerms';
+import {formatEuroWhole} from './formatCurrency';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -134,11 +135,17 @@ export function calculateVolumeTier(
     // Checkout clamps legacy/non-monotonic tier data to the base price. Mirror
     // that rule here so previews and totals can never exceed server pricing.
     const priceCents = Math.max(0, Math.min(basePriceCents, tier.priceCents));
-    const price = (priceCents / 100).toFixed(0);
+    // `priceCents` is the source of truth; the label only ever shows whole euros.
+    // The amount goes into the message as a *placeable value* and the symbol
+    // stays in the message text: a formatted "1.200 €" as one placeholder value
+    // would weld number and symbol together (no regrouping, no reordering by a
+    // translator), and `(priceCents / 100).toFixed(0)` would lose the thousands
+    // separator on top of that.
+    const price = formatEuroWhole(priceCents / 100);
     const minQuantity = tier.minQuantity;
     const label = minQuantity === 0
-        ? t`${price}€ pro Bild`
-        : t`Ab ${minQuantity} Bildern ${price}€ pro Bild`;
+        ? t`${{price}} € pro Bild`
+        : t`Ab ${{minQuantity}} Bildern ${{price}} € pro Bild`;
 
     return {
         priceCents,

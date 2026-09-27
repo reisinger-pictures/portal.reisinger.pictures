@@ -94,8 +94,12 @@ msgstr "{galleryCount} Downloads"
 #~ msgstr "{groupNextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {groupNextTierLabel}"
 
 #: src/ui/client/components/CartItemList.tsx
-msgid "{groupPayableCount} Bilder × {groupTotalPriceText} (Tier {groupTotalTierIndex})"
-msgstr "{groupPayableCount} Bilder × {groupTotalPriceText} (Tier {groupTotalTierIndex})"
+#~ msgid "{groupPayableCount} Bilder × {groupTotalPriceText} (Tier {groupTotalTierIndex})"
+#~ msgstr "{groupPayableCount} Bilder × {groupTotalPriceText} (Tier {groupTotalTierIndex})"
+
+#: src/ui/client/components/CartItemList.tsx
+msgid "{groupPayableCount} Bilder × {groupTotalPriceText} € (Tier {groupTotalTierIndex})"
+msgstr "{groupPayableCount} Bilder × {groupTotalPriceText} € (Tier {groupTotalTierIndex})"
 
 #: src/ui/client/components/CartItemList.tsx
 #~ msgid "{groupPriceText} pro Bild (Tier {groupTierIndex})"
@@ -114,8 +118,12 @@ msgid "{nextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis zum 
 msgstr "{nextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis zum nächsten Rabatt:"
 
 #: src/ui/client/components/CouponInput.tsx
-msgid "{packageQuantity} Fotos für {packagePriceText}"
-msgstr "{packageQuantity} Fotos für {packagePriceText}"
+#~ msgid "{packageQuantity} Fotos für {packagePriceText}"
+#~ msgstr "{packageQuantity} Fotos für {packagePriceText}"
+
+#: src/ui/client/components/CouponInput.tsx
+msgid "{packageQuantity} Fotos für {packagePriceText} €"
+msgstr "{packageQuantity} Fotos für {packagePriceText} €"
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "{payableCount} Bilder"
@@ -130,16 +138,28 @@ msgid "{photoCount} Bilder"
 msgstr "{photoCount} Bilder"
 
 #: src/logic/useVolumeLicensing.ts
-msgid "{price}€ pro Bild"
-msgstr "{price}€ pro Bild"
+msgid "{price} € pro Bild"
+msgstr "{price} € pro Bild"
+
+#: src/logic/useVolumeLicensing.ts
+#~ msgid "{price}€ pro Bild"
+#~ msgstr "{price}€ pro Bild"
 
 #: src/ui/management/ManagementMetaGalleryView.tsx
-msgid "{pricePerItem} pro Bild (Tier {tierIndex})"
-msgstr "{pricePerItem} pro Bild (Tier {tierIndex})"
+msgid "{pricePerItem} € pro Bild (Tier {tierIndex})"
+msgstr "{pricePerItem} € pro Bild (Tier {tierIndex})"
+
+#: src/ui/management/ManagementMetaGalleryView.tsx
+#~ msgid "{pricePerItem} pro Bild (Tier {tierIndex})"
+#~ msgstr "{pricePerItem} pro Bild (Tier {tierIndex})"
 
 #: src/ui/client/components/CartItemList.tsx
-msgid "{pricePerItemStr} pro Bild (Tier {tierNum})"
-msgstr "{pricePerItemStr} pro Bild (Tier {tierNum})"
+msgid "{pricePerItemStr} € pro Bild (Tier {tierNum})"
+msgstr "{pricePerItemStr} € pro Bild (Tier {tierNum})"
+
+#: src/ui/client/components/CartItemList.tsx
+#~ msgid "{pricePerItemStr} pro Bild (Tier {tierNum})"
+#~ msgstr "{pricePerItemStr} pro Bild (Tier {tierNum})"
 
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "{progress}% abgeschlossen"
@@ -178,8 +198,8 @@ msgid "← Zurück"
 msgstr "← Zurück"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "+ {upgradePriceFormatted}"
-msgstr "+ {upgradePriceFormatted}"
+#~ msgid "+ {upgradePriceFormatted}"
+#~ msgstr "+ {upgradePriceFormatted}"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
 #~ msgid "+ {upgradePriceFormatted} €"
@@ -194,12 +214,12 @@ msgid "< 50€ (Übertrag ins nächste Monat)"
 msgstr "< 50€ (Übertrag ins nächste Monat)"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "1 Jahr (x1)"
-msgstr "1 Jahr (x1)"
+#~ msgid "1 Jahr (x1)"
+#~ msgstr "1 Jahr (x1)"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "1 Jahr:"
-msgstr "1 Jahr:"
+#~ msgid "1 Jahr:"
+#~ msgstr "1 Jahr:"
 
 #: src/ui/Privacy.tsx
 #~ msgid "1. Automatische Datenerfassung und IP-Adressen"
@@ -218,8 +238,8 @@ msgid "1. IP-Adressen und technische Protokolle"
 msgstr "1. IP-Adressen und technische Protokolle"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "1. Nutzungsart"
-msgstr "1. Nutzungsart"
+#~ msgid "1. Nutzungsart"
+#~ msgstr "1. Nutzungsart"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "1. Typ / Grundhonorar"
@@ -238,8 +258,8 @@ msgid "2. Cookies und Authentifizierung"
 msgstr "2. Cookies und Authentifizierung"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "2. Nutzungsdauer"
-msgstr "2. Nutzungsdauer"
+#~ msgid "2. Nutzungsdauer"
+#~ msgstr "2. Nutzungsdauer"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "2. Optionale Zuschläge"
@@ -322,26 +342,23 @@ msgid "Ab"
 msgstr "Ab"
 
 #: src/logic/useVolumeLicensing.ts
-msgid "Ab {minQuantity} Bildern {price}€ pro Bild"
-msgstr "Ab {minQuantity} Bildern {price}€ pro Bild"
+msgid "Ab {minQuantity} Bildern {price} € pro Bild"
+msgstr "Ab {minQuantity} Bildern {price} € pro Bild"
+
+#: src/logic/useVolumeLicensing.ts
+#~ msgid "Ab {minQuantity} Bildern {price}€ pro Bild"
+#~ msgstr "Ab {minQuantity} Bildern {price}€ pro Bild"
 
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/components/UIProvider.tsx
 #: src/ui/components/WysiwygEditor.tsx
-#: src/ui/management/components/CouponFormDrawer.tsx
-#: src/ui/management/components/CreateUserModal.tsx
 #: src/ui/management/components/EditableTableRow.tsx
 #: src/ui/management/components/EmailComposerModal.tsx
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
-#: src/ui/management/components/ProductModal.tsx
-#: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/components/ShootingCalculatorModal.tsx
-#: src/ui/management/components/TextSnippetModal.tsx
 #: src/ui/management/components/UserPermissionsModal.tsx
 #: src/ui/management/ManagementOrdersView.tsx
-#: src/ui/management/ManagementOrgDetailView.tsx
-#: src/ui/management/ManagementOrgsView.tsx
 msgid "Abbrechen"
 msgstr "Abbrechen"
 
@@ -723,9 +740,37 @@ msgstr "Auf Anfrage"
 msgid "Auf X günstigste Bilder beschränken"
 msgstr "Auf X günstigste Bilder beschränken"
 
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Auflösung: Original"
+#~ msgstr "Auflösung: Original"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Auflösung: Print"
+#~ msgstr "Auflösung: Print"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Auflösung: Web"
+#~ msgstr "Auflösung: Web"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Auflösungs-Preise (€)"
+#~ msgstr "Auflösungs-Preise (€)"
+
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Aufnahmedatum"
 msgstr "Aufnahmedatum"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Aufschlag: Kommerziell"
+#~ msgstr "Aufschlag: Kommerziell"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Aufschlag: Unbegrenzte Dauer"
+#~ msgstr "Aufschlag: Unbegrenzte Dauer"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Aufschlag: Weltweit"
+#~ msgstr "Aufschlag: Weltweit"
 
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Auftrag aktualisiert"
@@ -1053,8 +1098,12 @@ msgid "Bester Rabatt aktiv"
 msgstr "Bester Rabatt aktiv"
 
 #: src/ui/client/components/VolumeLicensingCard.tsx
-msgid "Bester Rabatt aktiv — {bestPrice} pro Bild"
-msgstr "Bester Rabatt aktiv — {bestPrice} pro Bild"
+msgid "Bester Rabatt aktiv — {bestPrice} € pro Bild"
+msgstr "Bester Rabatt aktiv — {bestPrice} € pro Bild"
+
+#: src/ui/client/components/VolumeLicensingCard.tsx
+#~ msgid "Bester Rabatt aktiv — {bestPrice} pro Bild"
+#~ msgstr "Bester Rabatt aktiv — {bestPrice} pro Bild"
 
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Bestimmt, welche Auflösungen direkt ohne Checkout geladen werden können."
@@ -1515,6 +1564,14 @@ msgstr "Datum"
 msgid "Datum / Zeit"
 msgstr "Datum / Zeit"
 
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Dauer: 1 Jahr"
+#~ msgstr "Dauer: 1 Jahr"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Dauer: Unbegrenzt"
+#~ msgstr "Dauer: Unbegrenzt"
+
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "DE"
 msgstr "DE"
@@ -1575,8 +1632,8 @@ msgid "Dein WLAN; bei einem Fehlschlag „Offline konfigurieren\" wählen"
 msgstr "Dein WLAN; bei einem Fehlschlag „Offline konfigurieren\" wählen"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Deine Berechtigung erlaubt keine Upgrade-Käufe."
-msgstr "Deine Berechtigung erlaubt keine Upgrade-Käufe."
+#~ msgid "Deine Berechtigung erlaubt keine Upgrade-Käufe."
+#~ msgstr "Deine Berechtigung erlaubt keine Upgrade-Käufe."
 
 #: src/ui/OrgInviteView.tsx
 msgid "Deine Bestellungen können über die Organisation abgerechnet werden"
@@ -1921,8 +1978,8 @@ msgid "Download"
 msgstr "Download"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Download startet..."
-msgstr "Download startet..."
+#~ msgid "Download startet..."
+#~ msgstr "Download startet..."
 
 #: src/ui/management/components/ManagementGalleryActions.tsx
 msgid "Downloads"
@@ -2638,7 +2695,6 @@ msgstr "Formatierung entfernen"
 msgid "Fortschritt"
 msgstr "Fortschritt"
 
-#: src/ui/client/components/LicenseSelectorModal.tsx
 #: src/ui/components/SearchBarWithSuggestions.tsx
 #: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/ModelProfileAccessView.tsx
@@ -2909,8 +2965,12 @@ msgid "Gespeichert!"
 msgstr "Gespeichert!"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Gesperrt"
-msgstr "Gesperrt"
+#~ msgid "Gesperrt"
+#~ msgstr "Gesperrt"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Gilt für Redaktionell, 1 Jahr, Web."
+#~ msgstr "Gilt für Redaktionell, 1 Jahr, Web."
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/ManagementCouponsView.tsx
@@ -3110,7 +3170,6 @@ msgid "In den Warenkorb"
 msgstr "In den Warenkorb"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
-#: src/ui/client/components/LicenseSelectorModal.tsx
 msgid "In den Warenkorb gelegt"
 msgstr "In den Warenkorb gelegt"
 
@@ -3151,7 +3210,6 @@ msgid "Inkludiertes Flatrate-Level"
 msgstr "Inkludiertes Flatrate-Level"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
-#: src/ui/client/components/LicenseSelectorModal.tsx
 msgid "Inklusive"
 msgstr "Inklusive"
 
@@ -3164,6 +3222,10 @@ msgstr "Instanzen"
 #: src/ui/ModelRegistrationView.tsx
 msgid "Intern"
 msgstr "Intern"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "International (Weltweit)"
+#~ msgstr "International (Weltweit)"
 
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "IPTC Metadaten"
@@ -3516,12 +3578,12 @@ msgid "Kommentare"
 msgstr "Kommentare"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Kommerziell (x3)"
-msgstr "Kommerziell (x3)"
+#~ msgid "Kommerziell (x3)"
+#~ msgstr "Kommerziell (x3)"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Kommerziell:"
-msgstr "Kommerziell:"
+#~ msgid "Kommerziell:"
+#~ msgstr "Kommerziell:"
 
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Konkret bedeutet dies für Bestellungen in diesem Portal: Wenn Sie beim Kauf Ihrer Fotos der sofortigen Ausführung des Vertrages zustimmen (sofortiger Download unmittelbar nach Zahlungsabschluss) und dies ausdrücklich per Checkbox bestätigen, haben Sie zur Kenntnis genommen, dass Ihr Rücktritts- bzw. Widerrufsrecht mit Beginn des Downloads vorzeitig erlischt."
@@ -3668,12 +3730,12 @@ msgid "Land"
 msgstr "Land"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Längste Kante max. 2560px"
-msgstr "Längste Kante max. 2560px"
+#~ msgid "Längste Kante max. 2560px"
+#~ msgstr "Längste Kante max. 2560px"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Längste Kante max. 4000px"
-msgstr "Längste Kante max. 4000px"
+#~ msgid "Längste Kante max. 4000px"
+#~ msgstr "Längste Kante max. 4000px"
 
 #: src/ui/management/ManagementSettingsView.tsx
 msgid "Laravel"
@@ -3779,13 +3841,24 @@ msgid "Lizenz (Auflösung)"
 msgstr "Lizenz (Auflösung)"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
-#: src/ui/client/components/LicenseSelectorModal.tsx
 msgid "Lizenz wählen"
 msgstr "Lizenz wählen"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Lizenz-Einstellungen speichern"
+#~ msgstr "Lizenz-Einstellungen speichern"
 
 #: src/ui/management/components/PricingSettingsTabs.tsx
 msgid "Lizenz-Katalog"
 msgstr "Lizenz-Katalog"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Lizenzbedingungen gespeichert"
+#~ msgstr "Lizenzbedingungen gespeichert"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Lizenzen & Preise"
+#~ msgstr "Lizenzen & Preise"
 
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Lizenzierte Bilder als ZIP herunterladen"
@@ -3908,8 +3981,8 @@ msgid "Maximal 900%"
 msgstr "Maximal 900%"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Maximale Originalauflösung"
-msgstr "Maximale Originalauflösung"
+#~ msgid "Maximale Originalauflösung"
+#~ msgstr "Maximale Originalauflösung"
 
 #: src/ui/components/Sidebar.tsx
 msgid "Medien"
@@ -4183,7 +4256,6 @@ msgid "Muss mindestens 1 sein"
 msgstr "Muss mindestens 1 sein"
 
 #: src/ui/management/components/CalculatorSettingsCard.tsx
-#: src/ui/management/components/LicenseSettingsCard.tsx
 msgid "Muss positiv sein"
 msgstr "Muss positiv sein"
 
@@ -4297,6 +4369,10 @@ msgstr "Name:"
 #: src/ui/management/components/ModelInviteDialog.tsx
 msgid "name@beispiel.de"
 msgstr "name@beispiel.de"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "National (Inland)"
+#~ msgstr "National (Inland)"
 
 #: src/logic/modelRegistration.ts
 #: src/ui/management/components/ModelDetailModal.tsx
@@ -4573,6 +4649,14 @@ msgstr "Nutzer-Zugriff verwalten"
 msgid "Nutzerrechte gespeichert."
 msgstr "Nutzerrechte gespeichert."
 
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Nutzung: Kommerziell"
+#~ msgstr "Nutzung: Kommerziell"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Nutzung: Redaktionell"
+#~ msgstr "Nutzung: Redaktionell"
+
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Nutzungsrechte"
 msgstr "Nutzungsrechte"
@@ -4727,8 +4811,12 @@ msgid "Original"
 msgstr "Original"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Original (Cover)"
-msgstr "Original (Cover)"
+#~ msgid "Original (Cover)"
+#~ msgstr "Original (Cover)"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Original + Kommerziell + Unbegrenzt + Weltweit:"
+#~ msgstr "Original + Kommerziell + Unbegrenzt + Weltweit:"
 
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Original Master-File (4.00x)"
@@ -4782,6 +4870,10 @@ msgstr "Paket-Kalkulator"
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Pärchen"
 msgstr "Pärchen"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Passe die Rechtstexte an, die dem Kunden beim Checkout angezeigt werden, und definiere den Basispreis für Bildverkäufe."
+#~ msgstr "Passe die Rechtstexte an, die dem Kunden beim Checkout angezeigt werden, und definiere den Basispreis für Bildverkäufe."
 
 #: src/ui/management/FtpConnectionRows.tsx
 msgid "Passiver Bereich (Firewall)"
@@ -4910,6 +5002,22 @@ msgstr "Preis / Stück"
 msgid "Preis wird geladen…"
 msgstr "Preis wird geladen…"
 
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Preis-Faktoren (Zuschläge in %)"
+#~ msgstr "Preis-Faktoren (Zuschläge in %)"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Preis: Original"
+#~ msgstr "Preis: Original"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Preis: Print"
+#~ msgstr "Preis: Print"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Preis: Web"
+#~ msgstr "Preis: Web"
+
 #: src/ui/management/components/PricingSettingsTabs.tsx
 msgid "Preise & Lizenzen"
 msgstr "Preise & Lizenzen"
@@ -4925,6 +5033,10 @@ msgstr "Preisgruppe {galleryNames}"
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Preisstruktur (retroaktiv)"
 msgstr "Preisstruktur (retroaktiv)"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Preisvorschau für Kunden ohne Flatrate"
+#~ msgstr "Preisvorschau für Kunden ohne Flatrate"
 
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Preset bearbeiten"
@@ -4947,8 +5059,12 @@ msgid "Print (A4)"
 msgstr "Print (A4)"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Print (bis A4)"
-msgstr "Print (bis A4)"
+#~ msgid "Print (bis A4)"
+#~ msgstr "Print (bis A4)"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Print + Kommerziell + 1 Jahr:"
+#~ msgstr "Print + Kommerziell + 1 Jahr:"
 
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Print bis 4000px (2.00x)"
@@ -5185,12 +5301,12 @@ msgid "Rechte (Gruppen / Galerien)"
 msgstr "Rechte (Gruppen / Galerien)"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Redaktionell (x1)"
-msgstr "Redaktionell (x1)"
+#~ msgid "Redaktionell (x1)"
+#~ msgstr "Redaktionell (x1)"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Redaktionell:"
-msgstr "Redaktionell:"
+#~ msgid "Redaktionell:"
+#~ msgstr "Redaktionell:"
 
 #: src/ui/ModelRegistrationView.tsx
 msgid "Registrierung abgeschlossen. Dein Einladungslink ist damit verbraucht."
@@ -5271,7 +5387,6 @@ msgid "Schliessen"
 msgstr "Schliessen"
 
 #: src/ui/components/ModalShell.tsx
-#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/InviteModal.tsx
 #: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/components/ModelInviteDialog.tsx
@@ -5426,8 +5541,8 @@ msgid "Sofort (automatisch)"
 msgstr "Sofort (automatisch)"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Sofort Download"
-msgstr "Sofort Download"
+#~ msgid "Sofort Download"
+#~ msgstr "Sofort Download"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "Sonderanfrage (Angebot)"
@@ -5455,16 +5570,11 @@ msgstr "Spalte löschen"
 
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
-#: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/EditableTableRow.tsx
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
-#: src/ui/management/components/ProductModal.tsx
-#: src/ui/management/components/ProjectModal.tsx
-#: src/ui/management/components/TextSnippetModal.tsx
 #: src/ui/management/components/UserPermissionsModal.tsx
 #: src/ui/management/ManagementOrgDetailView.tsx
-#: src/ui/management/ManagementOrgsView.tsx
 #: src/ui/PhotoDetailView.tsx
 msgid "Speichern"
 msgstr "Speichern"
@@ -5886,12 +5996,12 @@ msgid "unbegrenzt"
 msgstr "unbegrenzt"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Unbegrenzt (x2)"
-msgstr "Unbegrenzt (x2)"
+#~ msgid "Unbegrenzt (x2)"
+#~ msgstr "Unbegrenzt (x2)"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Unbegrenzt:"
-msgstr "Unbegrenzt:"
+#~ msgid "Unbegrenzt:"
+#~ msgstr "Unbegrenzt:"
 
 #: src/ui/components/PhotoHistoryModal.tsx
 #: src/ui/management/components/ProjectModal.tsx
@@ -6060,6 +6170,10 @@ msgstr "Verbraucher haben bei Verträgen über digitale Inhalte und Fotoprodukte
 #: src/ui/LicenseTerms.tsx
 msgid "Verbrauchern steht ein gesetzliches Widerrufsrecht zu. Die Details, insbesondere die 14-tägige Widerrufsfrist sowie die Bedingungen für das vorzeitige Erlöschen des Rücktrittsrechts bei digitalen Inhalten, sind in der"
 msgstr "Verbrauchern steht ein gesetzliches Widerrufsrecht zu. Die Details, insbesondere die 14-tägige Widerrufsfrist sowie die Bedingungen für das vorzeitige Erlöschen des Rücktrittsrechts bei digitalen Inhalten, sind in der"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Verbreitungsraum (Gebiet)"
+#~ msgstr "Verbreitungsraum (Gebiet)"
 
 #: src/ui/management/ManagementProjectsBoard.tsx
 #: src/ui/photographer/PhotographerProductionBoard.tsx
@@ -6300,8 +6414,8 @@ msgid "Wähle deine Favoriten aus."
 msgstr "Wähle deine Favoriten aus."
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Wähle die gewünschte Auflösung für das Bild <0>{photoTitle}</0>."
-msgstr "Wähle die gewünschte Auflösung für das Bild <0>{photoTitle}</0>."
+#~ msgid "Wähle die gewünschte Auflösung für das Bild <0>{photoTitle}</0>."
+#~ msgstr "Wähle die gewünschte Auflösung für das Bild <0>{photoTitle}</0>."
 
 #: src/ui/components/Sidebar.tsx
 msgid "Warenkorb"
@@ -6328,8 +6442,12 @@ msgid "Web & Social"
 msgstr "Web & Social"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
-msgid "Web & Social Media"
-msgstr "Web & Social Media"
+#~ msgid "Web & Social Media"
+#~ msgstr "Web & Social Media"
+
+#: src/ui/management/components/LicenseSettingsCard.tsx
+#~ msgid "Web + Redaktionell + 1 Jahr:"
+#~ msgstr "Web + Redaktionell + 1 Jahr:"
 
 #: src/ui/Privacy.tsx
 #~ msgid "Webserver-Logs können technisch bedingt IP-Adressen enthalten. Sie werden nach wenigen Tagen rotiert und gelöscht. Für den Missbrauchsschutz werden checkoutbezogene IP-Angaben zusätzlich in einer pseudonymisierten, rotierbaren Form zur zeitlich begrenzten Limitierung von Versuchen verarbeitet."

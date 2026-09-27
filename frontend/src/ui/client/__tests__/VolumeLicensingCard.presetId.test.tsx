@@ -108,7 +108,7 @@ describe('VolumeLicensingCard with a real volume-licensing payload', () => {
         expect(card.getAllByText('40,00 €').length).toBeGreaterThanOrEqual(1);
         expect(screen.queryByText('Ein unerwarteter Fehler ist aufgetreten')).not.toBeInTheDocument();
 
-        const button = card.getByRole('button', {name: 'In den Warenkorb', exact: true});
+        const button = card.getByRole('button', {name: 'In den Warenkorb'});
         expect(button).toBeEnabled();
         await user.click(button);
         expect(addToCart).toHaveBeenCalledWith(expect.objectContaining({
@@ -161,6 +161,6 @@ describe('VolumeLicensingCard with a real volume-licensing payload', () => {
         )).not.toThrow();
 
         const card = within(screen.getByTestId('volume-pricing-card'));
-        expect(card.getByRole('button', {name: 'In den Warenkorb', exact: true})).toBeEnabled();
+        expect(card.getByRole('button', {name: 'In den Warenkorb'})).toBeEnabled();
     });
 });

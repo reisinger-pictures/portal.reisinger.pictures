@@ -166,20 +166,34 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
             <div className="flex flex-col gap-2 mb-4">
                 {tiers.slice(1).map((row, index) => {
                     const realIndex = index + 1;
+                    // `1fr auto auto` in bracket syntax is banned and Tailwind has
+                    // no `auto` grid track, so the three tracks are a flex row:
+                    // `sm:flex-1` is the `1fr`, `sm:max-w-fit` is an `auto` track
+                    // (an auto track is minmax(min-content, max-content), i.e.
+                    // content sizing), and `sm:shrink-0` keeps the price field at
+                    // that size instead of letting the growing neighbour squeeze a
+                    // number input. The mobile layout stays a stacked column, as
+                    // `grid-cols-1` had it.
+                    //
+                    // No `width` utility belongs on an `input` here: daisyUI ships
+                    // `.input{width:100%}` unlayered, after the whole utility layer,
+                    // so a `w-24`/`w-36` on the controls would be a dead class.
+                    // Only `max-width` survives that cascade — which is why the
+                    // price field is capped with `sm:max-w-fit`.
                     return (
-                        <div key={realIndex} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] items-center gap-3 bg-base-200 p-3 rounded-box border border-base-300">
-                            <div className="flex items-center gap-2">
+                        <div key={realIndex} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-base-200 p-3 rounded-box border border-base-300">
+                            <div className="flex items-center gap-2 sm:flex-1">
                                 <span className="font-bold opacity-70 whitespace-nowrap"><Trans>Ab</Trans></span>
                                 <input
                                     type="number" min="0" step="1"
-                                    className="input input-bordered w-24 text-right"
+                                    className="input input-bordered text-right"
                                     value={row.min_quantity}
                                     onChange={e => updateTier(realIndex, { min_quantity: e.target.value })}
                                     onBlur={() => updateTier(realIndex, { min_quantity: normalizeQuantityDraft(row.min_quantity) })}
                                 />
                                 <span className="font-bold opacity-70 whitespace-nowrap"><Trans>Bildern</Trans></span>
                             </div>
-                            <label className="input input-bordered w-36">
+                            <label className="input input-bordered sm:max-w-fit sm:shrink-0">
                                 <input
                                     type="number" min="0" step="0.01"
                                     className="grow text-right"
@@ -189,7 +203,7 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
                                 />
                                 <span className="font-bold opacity-70">€</span>
                             </label>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 sm:shrink-0">
                                 <button
                                     type="button"
                                     className="btn btn-ghost btn-sm btn-circle"

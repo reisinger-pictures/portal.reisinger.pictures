@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type {InvoiceDiscount, InvoiceItem} from '../../api';
 import type {ManualInvoiceWireLine} from '../contractPricing';
+import { formatPercent } from '../formatCurrency';
 import {
     calculateContractTotal,
     calculateEditorContractTotal,
@@ -12,7 +13,6 @@ import {
     calculateManualInvoiceWireLineTotal,
     calculateWireLineTotal,
     fixedPointToMajorUnits,
-    formatBasisPointsAsPercent,
     CONTRACT_MAX_SAFE_INTEGER,
     CONTRACT_PERCENT_SCALE,
     CONTRACT_SNAPSHOT_SCALE,
@@ -22,6 +22,9 @@ import {
     serializeContractSnapshot,
     serializeManualInvoiceLines,
 } from '../contractPricing';
+
+/** Matches the U+00A0 that {@link formatPercent} puts in front of the unit. */
+const NBSP = '\u00A0';
 
 const item = (price: number, qty = 1): InvoiceItem => ({
     type: 'item',
@@ -217,8 +220,10 @@ describe('authoritative contract pricing', () => {
         });
         expect(calculateEditorItemTotal(item(10, 0.25), 'manual')).toBe(250);
         expect(calculateEditorItemTotal(item(10, 0.25), 'contract')).toBe(0);
-        expect(formatBasisPointsAsPercent(1000)).toBe('10%');
-        expect(formatBasisPointsAsPercent(1001)).toBe('10.01%');
+        // One percentage formatter for the whole app: the discount line of the
+        // signing view and the product tables render the same stored unit.
+        expect(formatPercent(1000)).toBe(`10,00${NBSP}%`);
+        expect(formatPercent(1001)).toBe(`10,01${NBSP}%`);
     });
 
     it('uses the JavaScript safe-integer boundary for canonical writes and bounded legacy reads', () => {
@@ -380,10 +385,11 @@ describe('fixed-point scales', () => {
     });
 
     it('is the divisor the percent formatter actually uses', () => {
-        // formatBasisPointsAsPercent renders whole = abs / 100, so it assumes
-        // a scale of exactly 100 units per percent. Pin the two together.
-        expect(formatBasisPointsAsPercent(CONTRACT_PERCENT_SCALE)).toBe('100%');
-        expect(formatBasisPointsAsPercent(CONTRACT_PERCENT_SCALE / 8)).toBe('12.5%');
+        // formatPercent reads the stored hundredths, so it assumes a scale of
+        // exactly 100 units per percent. Pin the two together. It renders German
+        // ("12,50 %"), not the old contract-side "12.5%".
+        expect(formatPercent(CONTRACT_PERCENT_SCALE)).toBe(`100,00${NBSP}%`);
+        expect(formatPercent(CONTRACT_PERCENT_SCALE / 8)).toBe(`12,50${NBSP}%`);
     });
 });
 
