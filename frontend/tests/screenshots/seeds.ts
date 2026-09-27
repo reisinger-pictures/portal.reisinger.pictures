@@ -43,10 +43,45 @@ type PhotographerCredentials = {
     password: string;
 };
 
+/**
+ * A `type` alias for the same reason as `PhotographerCredentials` above — and
+ * it MUST stay one: every gallery seed (`seedGallery`,
+ * `seedSelectionGallery`, `seedNotifiedGallery`) returns this type into the
+ * manifest's `Record<string, unknown>` seed slot, and converting it to an
+ * `interface` breaks `tsc -b` on `tests/`.
+ *
+ * `id` is the numeric primary key of the created gallery, normalised to a
+ * string. It is not a route param — the public route is addressed by slug — but
+ * the notification opt-in endpoint is addressed by id
+ * (`POST /api/galleries/:id/opt-in`), so a seed that has to produce a
+ * recipient needs it.
+ */
+type SeededGallery = {
+    id: string;
+    slug: string;
+};
+
+/**
+ * A `type` alias for the same reason as `SeededGallery` above — the group seed
+ * returns into the same `Record<string, unknown>` slot, where only an object
+ * literal type gets an implicit index signature.
+ */
+type SeededGalleryGroup = {
+    id: string;
+};
+
+/** Admin login of the harness, same defaults as E2ESessionHelper and the spec. */
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@example.com';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'admin';
+
 let openInviteCache: OpenInvite | null = null;
 let inviteListCache: Record<string, unknown> | null = null;
 let registeredModelCache: RegisteredModel | null = null;
 let photographerCache: PhotographerCredentials | null = null;
+let galleryCache: SeededGallery | null = null;
+let selectionGalleryCache: SeededGallery | null = null;
+let notifiedGalleryCache: SeededGallery | null = null;
+let galleryGroupCache: SeededGalleryGroup | null = null;
 
 /**
  * Create one admin invite and resolve its magic-link token from Mailpit. The
@@ -173,4 +208,228 @@ export async function seedPhotographer(request: APIRequestContext): Promise<Phot
     photographerCache = await helper.createIsolatedUser('photographer');
 
     return photographerCache;
+}
+
+/**
+ * Filled state of a management gallery: one delivery gallery created through
+ * the management API, so a gallery-scoped dialog has a gallery to hang on.
+ *
+ * The admin account is used for the create call because the harness route logs
+ * in as admin: GalleryService::storeGallery attaches a creating *photographer*
+ * to the new gallery, and `E2ETestUserSeeder` gives admin every role, so the
+ * same session that creates the gallery can also open its dialogs.
+ *
+ * `is_public: true` is what makes the gallery loadable at all:
+ * GalleryFrontendController::show only serves a private gallery to a user with
+ * gallery access, and the public entry point is a plain slug lookup.
+ *
+ * The returned slug is the one from the RESPONSE, not the one sent — the
+ * service runs it through SlugService::makeUnique, which appends a counter on
+ * a collision, and a stale slug would 404 the route.
+ */
+export async function seedGallery(request: APIRequestContext): Promise<SeededGallery> {
+    if (galleryCache) return galleryCache;
+
+    const helper = new E2ESessionHelper(request);
+    const cookie = await helper.loginAs(ADMIN_EMAIL, ADMIN_PASSWORD);
+
+    const suffix = uniqueId();
+    const response = await request.post('/api/management/galleries', {
+        data: {
+            name: `UI Review Galerie ${suffix}`,
+            slug: `ui-review-galerie-${suffix}`,
+            type: 'delivery',
+            is_public: true,
+        },
+        headers: { 'Accept': 'application/json', 'Cookie': cookie },
+    });
+
+    if (!response.ok()) {
+        throw new Error(`UI-review seed: gallery creation failed (${response.status()}): ${await response.text()}`);
+    }
+
+    const body = (await response.json()) as { gallery?: { id?: string | number; slug?: string } };
+    const slug = body.gallery?.slug;
+    const id = body.gallery?.id;
+    if (!slug || id === undefined || id === null) {
+        throw new Error(`UI-review seed: gallery creation returned no id/slug: ${JSON.stringify(body)}`);
+    }
+
+    // `GalleryResource` passes the raw primary key through, so the JSON type is
+    // not guaranteed — normalise it to the string every seed type declares.
+    galleryCache = { id: String(id), slug };
+    return galleryCache;
+}
+
+/**
+ * Filled state of a management *selection* gallery — the second gallery the
+ * action-row dialogs need, because "Bewertungen..." is the one trigger on
+ * that row that only renders for `gallery.type === 'selection'`
+ * (ManagementGalleryActions.tsx:25).
+ *
+ * Same reasoning as `seedGallery` above, and deliberately the same payload
+ * shape, so the two seeds stay comparable side by side. Two things differ:
+ *
+ * 1. The create body is not shared with `seedGallery` — that seed is proven
+ *    and the two differ in a load-bearing way (see `is_public` below), so
+ *    duplicating ~20 lines beats a helper whose parameter would only exist to
+ *    be told apart.
+ * 2. `is_public: true` is sent for symmetry, but the backend deliberately
+ *    OVERRIDES it: `GalleryService::storeGallery` forces `is_public` (and
+ *    `is_free_download`) to `false` for every selection gallery — a
+ *    free-download group must not turn a selection gallery into an
+ *    unrestricted original-download surface (GalleryService.php:118 and the
+ *    re-assert at 138-143). A selection gallery is therefore never public.
+ *
+ * The route stays loadable anyway, via the super-admin bypass rather than via
+ * `is_public`: `GalleryFrontendController::show` lets a non-public gallery
+ * through when `AuthorizationService::canAccessGallery()` is true, and that
+ * returns `true` immediately for a cross-brand super admin
+ * (AuthorizationService.php:868-870). The harness admin qualifies — it is
+ * created with `brand => null` and every `UserRole` including
+ * `UserRole::SUPER_ADMIN` (E2ETestUserSeeder.php:20-29). Without that bypass
+ * the SPA route would render "Galerie nicht gefunden." for a logged-out reader
+ * and "Kein Zugriff auf diese Galerie." for a non-admin one.
+ */
+export async function seedSelectionGallery(request: APIRequestContext): Promise<SeededGallery> {
+    if (selectionGalleryCache) return selectionGalleryCache;
+
+    const helper = new E2ESessionHelper(request);
+    const cookie = await helper.loginAs(ADMIN_EMAIL, ADMIN_PASSWORD);
+
+    const suffix = uniqueId();
+    const response = await request.post('/api/management/galleries', {
+        data: {
+            name: `UI Review Auswahlgalerie ${suffix}`,
+            slug: `ui-review-auswahlgalerie-${suffix}`,
+            type: 'selection',
+            is_public: true,
+        },
+        headers: { 'Accept': 'application/json', 'Cookie': cookie },
+    });
+
+    if (!response.ok()) {
+        throw new Error(`UI-review seed: selection gallery creation failed (${response.status()}): ${await response.text()}`);
+    }
+
+    const body = (await response.json()) as { gallery?: { id?: string | number; slug?: string } };
+    const slug = body.gallery?.slug;
+    const id = body.gallery?.id;
+    if (!slug || id === undefined || id === null) {
+        throw new Error(`UI-review seed: selection gallery creation returned no id/slug: ${JSON.stringify(body)}`);
+    }
+
+    selectionGalleryCache = { id: String(id), slug };
+    return selectionGalleryCache;
+}
+
+/**
+ * Filled state of the delivery gallery's "E-Mail senden..." dialog: the
+ * delivery gallery of `seedGallery`, plus one recipient that has opted in to
+ * notifications.
+ *
+ * The opt-in is the load-bearing part of this seed, and it cannot be skipped:
+ * `ManagementGalleryActions` renders the trigger unconditionally
+ * (ManagementGalleryActions.tsx:47) but disables it unless `canSendMail`, and
+ * `ManagementGalleryView` computes that as `(notified_count || 0) > 0`
+ * (ManagementGalleryView.tsx:89). `notified_count` is the number of
+ * `user_galleries` rows for that gallery with `wants_notifications = true`
+ * (GalleryFrontendController::show, GalleryFrontendController.php:124) — a
+ * gallery with no recipient therefore renders a disabled button and the
+ * manifest's `click` step would sit in Playwright's actionability wait until
+ * the test times out, with a timeout as the only symptom.
+ *
+ * The recipient is produced by `E2ESessionHelper::createIsolatedUser` with
+ * `assignGalleryId` + `wantsNotifications`, which runs the whole chain: create a
+ * `client` user, assign it the gallery, then POST
+ * `/api/galleries/:id/opt-in` with `{ wants_notifications: true }`
+ * (E2ESessionHelper.ts:182-187). Both options are required together — the
+ * opt-in endpoint is IDOR-guarded by `canAccessGallery()`
+ * (NotificationController.php:63), so the user needs the gallery assignment
+ * before the opt-in can be stored.
+ *
+ * The gallery itself is the CACHED one from `seedGallery` on purpose: this
+ * seed adds a recipient, not a second gallery, so the dialog entries keep
+ * sharing one gallery per worker.
+ */
+export async function seedNotifiedGallery(request: APIRequestContext): Promise<SeededGallery> {
+    if (notifiedGalleryCache) return notifiedGalleryCache;
+
+    const gallery = await seedGallery(request);
+
+    const helper = new E2ESessionHelper(request);
+    await helper.createIsolatedUser('client', {
+        assignGalleryId: gallery.id,
+        wantsNotifications: true,
+    });
+
+    // `createIsolatedUser` does not assert the opt-in response (E2ESessionHelper.ts:183),
+    // so a 403 from the IDOR guard would stay silent and surface as a click
+    // timeout on a disabled button instead. One public read of the same payload
+    // the page renders turns that into a legible seed error. `GET
+    // /api/galleries/{slug}` is outside the auth:api group
+    // (routes/api.php:132) and the gallery is public, so no extra login is
+    // needed for this check.
+    const check = await request.get(`/api/galleries/${gallery.slug}`, {
+        headers: { 'Accept': 'application/json' },
+    });
+    if (!check.ok()) {
+        throw new Error(`UI-review seed: notified_count check failed (${check.status()}): ${await check.text()}`);
+    }
+    const payload = (await check.json()) as { notified_count?: number };
+    if (!payload.notified_count) {
+        throw new Error(
+            `UI-review seed: gallery ${gallery.slug} still has notified_count=0 after the opt-in, `
+            + 'so "E-Mail senden..." would render disabled.',
+        );
+    }
+
+    notifiedGalleryCache = gallery;
+    return notifiedGalleryCache;
+}
+
+/**
+ * Filled state of a meta-gallery (gallery group): one group created through the
+ * management API, so the `/meta/:id` route has a group to load and the
+ * `GalleryGroupModal` mounted on that route has a group to edit.
+ *
+ * The create call is the proven one from
+ * tests/e2e/admin/gallery-modals.spec.ts:44-54 — same endpoint, same
+ * `adminHeaders` (the harness admin session), same
+ * `{ group: { id } }` response shape. `is_public: true` is chosen over the
+ * spec's `null` so the dialog's "Sichtbarkeits-Vorgabe" select shows a
+ * concrete policy ("Öffentlich erzwingen") instead of the neutral
+ * "Keine Vorgabe" — the group only has to exist, and a definite value is the
+ * more informative capture.
+ *
+ * No slug is needed: the route param is the group's numeric id
+ * (`/meta/:id` in App.tsx:106, read by `useMetaGallery` which fetches
+ * `/api/management/gallery-groups/{id}`).
+ */
+export async function seedGalleryGroup(request: APIRequestContext): Promise<SeededGalleryGroup> {
+    if (galleryGroupCache) return galleryGroupCache;
+
+    const helper = new E2ESessionHelper(request);
+    const cookie = await helper.loginAs(ADMIN_EMAIL, ADMIN_PASSWORD);
+
+    const response = await request.post('/api/management/gallery-groups', {
+        data: {
+            name: `UI Review Meta-Galerie ${uniqueId()}`,
+            is_public: true,
+        },
+        headers: { 'Accept': 'application/json', 'Cookie': cookie },
+    });
+
+    if (!response.ok()) {
+        throw new Error(`UI-review seed: gallery group creation failed (${response.status()}): ${await response.text()}`);
+    }
+
+    const body = (await response.json()) as { group?: { id?: string | number } };
+    const id = body.group?.id;
+    if (id === undefined || id === null) {
+        throw new Error(`UI-review seed: gallery group creation returned no id: ${JSON.stringify(body)}`);
+    }
+
+    galleryGroupCache = { id: String(id) };
+    return galleryGroupCache;
 }

@@ -11,7 +11,7 @@
 
 import type { APIRequestContext } from '@playwright/test';
 import { SCREENSHOT_OUTPUT_DIR } from './harness';
-import { seedOpenModelInvite, seedPhotographer, seedRegisteredModel } from './seeds';
+import { seedGallery, seedGalleryGroup, seedNotifiedGallery, seedOpenModelInvite, seedPhotographer, seedRegisteredModel, seedSelectionGallery } from './seeds';
 
 export type UiReviewState = 'filled' | 'empty';
 export type UiReviewViewport = 'desktop' | 'mobile';
@@ -252,6 +252,138 @@ export const uiReviewConfig: UiReviewConfig = {
                 { kind: 'click', target: 'role=button[name*="UIReview"]', waitFor: 'role=dialog' },
             ],
             note: 'The detail dialog of the seeded model. The search step is copied from `admin-models` above so the table shows that single model. Only `role=dialog` is asserted: the dialog\'s accessible name is the model\'s display name, which the harness cannot substitute.',
+        },
+        {
+            // Flow: an admin assigns the photographers of a delivery gallery to
+            // an existing group of the organisation.
+            name: 'gallery-photographer-team-dialog',
+            path: '/galleries/:slug',
+            states: ['filled'],
+            auth: 'admin',
+            seeds: {
+                filled: context => seedGallery(context.request),
+            },
+            nav: [
+                { kind: 'click', target: 'role=button[name="Fotografen..."]', waitFor: 'role=dialog[name="Fotografen-Team"]' },
+            ],
+            note: 'The photographer team of one seeded delivery gallery as a dialog. A gallery has to exist for a dialog scoped to it, so this is the reference entry for the other gallery dialogs: everything else on this action row (Vorgaben, Zugriff, KI Beschriftung, Einladungslink, E-Mail senden) reuses this seed and this route unchanged. "Bewertungen..." is the one exception — it only renders for a selection gallery, so it needs a second seed. The action row is photographer-gated, which the admin login satisfies because the E2E admin carries every role.',
+        },
+        {
+            // Flow: an admin grants a registered user access to the gallery
+            // instead of publishing it.
+            name: 'gallery-access-dialog',
+            path: '/galleries/:slug',
+            states: ['filled'],
+            auth: 'admin',
+            seeds: {
+                filled: context => seedGallery(context.request),
+            },
+            nav: [
+                { kind: 'click', target: 'role=button[name="Zugriff..."]', waitFor: 'role=dialog[name="Nutzer-Zugriff verwalten"]' },
+            ],
+            note: 'The per-user access list of one seeded delivery gallery as a dialog. This trigger is NOT gallery-type-gated: it only needs `onOpenAccess`, which ManagementGalleryView passes whenever `isAdmin` is true — so the delivery seed of `gallery-photographer-team-dialog` is reused unchanged. Because the dialog lists the brand users with a search field, it is captured filled on its first render rather than in an empty state.',
+        },
+        {
+            // Flow: an admin issues a client invite link for the gallery.
+            name: 'gallery-invite-dialog',
+            path: '/galleries/:slug',
+            states: ['filled'],
+            auth: 'admin',
+            seeds: {
+                filled: context => seedGallery(context.request),
+            },
+            nav: [
+                { kind: 'click', target: 'role=button[name="Einladungslink..."]', waitFor: 'role=dialog[name="Einladungen verwalten"]' },
+            ],
+            note: 'The invite management of one seeded delivery gallery as a dialog. This trigger is not gallery-type-gated either — it is the one action on the row that renders for every gallery type, so the delivery seed is reused unchanged. The dialog is captured before a link is generated, so its generated-link field and the invite list are still empty.',
+        },
+        {
+            // Flow: an admin sets the metadata defaults that are applied to
+            // every photo of the gallery.
+            name: 'gallery-metadata-defaults-dialog',
+            path: '/galleries/:slug',
+            states: ['filled'],
+            auth: 'admin',
+            seeds: {
+                filled: context => seedGallery(context.request),
+            },
+            nav: [
+                { kind: 'click', target: 'role=button[name="Vorgaben..."]', waitFor: 'role=dialog[name="Metadaten-Vorgaben"]' },
+            ],
+            note: 'The metadata defaults of one seeded delivery gallery as a dialog. This trigger IS gallery-type-gated: ManagementGalleryActions renders "Vorgaben..." only for `gallery.type === "delivery"`, which is why this entry reuses the delivery seed and would show no button at all on the selection gallery.',
+        },
+        {
+            // Flow: a photographer checks which client rated which photo of a
+            // selection gallery and blocks the gallery once the rating is done.
+            name: 'gallery-rating-status-dialog',
+            path: '/galleries/:slug',
+            states: ['filled'],
+            auth: 'admin',
+            seeds: {
+                // The second seed — the ONLY trigger on the action row that a
+                // delivery gallery cannot satisfy.
+                filled: context => seedSelectionGallery(context.request),
+            },
+            nav: [
+                { kind: 'click', target: 'role=button[name="Bewertungen..."]', waitFor: 'role=dialog[name="Bewertungen & Status"]' },
+            ],
+            note: 'The rating and blocking status of one seeded selection gallery as a dialog. This trigger is the inverse of "Vorgaben...": ManagementGalleryActions renders "Bewertungen..." only for `gallery.type === "selection"`, so it needs its own seed — on the delivery gallery of the entries above the button does not exist. The seeded selection gallery has no photos and no ratings, so the capture shows the empty ratings table; the blocking controls appear per rated photo.',
+        },
+        {
+            // Flow: an admin writes a custom mail to everyone on the gallery
+            // who opted in to notifications.
+            name: 'gallery-email-composer-dialog',
+            path: '/galleries/:slug',
+            states: ['filled'],
+            auth: 'admin',
+            seeds: {
+                // The ONLY action on the row that is gated on data, not on a
+                // role or a gallery type: `canSendMail = notified_count > 0`
+                // (ManagementGalleryView.tsx:89), so the button renders
+                // disabled until a recipient has opted in. The seed therefore
+                // reuses the delivery gallery and ADDS an opted-in client.
+                filled: context => seedNotifiedGallery(context.request),
+            },
+            nav: [
+                { kind: 'click', target: 'role=button[name="E-Mail senden..."]', waitFor: 'role=dialog[name="Nachricht an Kunden senden"]' },
+            ],
+            note: 'The custom-mail composer of one seeded delivery gallery as a dialog. This is the one trigger on the action row whose enabled state depends on seeded DATA rather than on a role or a gallery type: it is disabled while `notified_count` is 0, which is why this entry needs `seedNotifiedGallery` (a client that opted in) and not the plain delivery seed — on that one the click would hang on a disabled button. The dialog is captured before sending, so it shows the default subject/body with the `{user_name}` / `{gallery_name}` / `{link}` variables unexpanded.',
+        },
+        {
+            // Flow: an admin opens the gallery settings to change its type,
+            // visibility, licensing mode or folder.
+            name: 'gallery-edit-dialog',
+            path: '/galleries/:slug',
+            states: ['filled'],
+            auth: 'admin',
+            seeds: {
+                filled: context => seedGallery(context.request),
+            },
+            nav: [
+                // The heading pencil is icon-only, so its accessible name comes
+                // from the daisyUI `data-tip` — a role/name locator cannot match
+                // it. The tooltip attribute is unique in the app (only
+                // ManagementGalleryView.tsx:81 carries it).
+                { kind: 'click', target: 'button[data-tip="Galerie bearbeiten"]', waitFor: 'role=dialog[name="Galerie bearbeiten"]' },
+            ],
+            note: 'The gallery settings form of one seeded delivery gallery as a dialog, opened from the pencil next to the gallery title. Not the same trigger as the action-row dialogs: it is the heading pencil, gated on `isPhotographer` (which the harness admin satisfies), and it mounts the SAME `GalleryModal` that the dashboard\'s "Neue Galerie" button opens — the dialog is named "Galerie bearbeiten" here and "Neue Galerie" there, because GalleryModal picks the title from `editingGallery` (GalleryModal.tsx:172). The dialog\'s accessible name therefore happens to equal the tooltip, which is why it is still read from the component rather than assumed.',
+        },
+        {
+            // Flow: an admin opens the meta-gallery settings from the heading
+            // pencil of the meta-gallery page.
+            name: 'meta-gallery-edit-dialog',
+            path: '/meta/:id',
+            states: ['filled'],
+            auth: 'admin',
+            seeds: {
+                // The gallery-group seed: the meta-gallery route is addressed by
+                // the group's id, not by a gallery slug.
+                filled: context => seedGalleryGroup(context.request),
+            },
+            nav: [
+                { kind: 'click', target: 'button[data-tip="Meta-Galerie bearbeiten"]', waitFor: 'role=dialog[name="Meta-Galerie bearbeiten"]' },
+            ],
+            note: 'The meta-gallery (folder) settings form as a dialog on the meta-gallery page. This is the group-level twin of `gallery-edit-dialog` and it lives on a DIFFERENT route: `/meta/:id` (App.tsx:106), where the id is the gallery group\'s primary id — not a `/galleries/*` slug, which the gallery route reads out of a splat. The trigger is the same icon-only heading pencil, gated on `isAdmin`, and the route mounts `GalleryModals` with `editingGroup={group}` (ManagementMetaGalleryView.tsx:227), so `GalleryGroupModal` renders its editing title "Meta-Galerie bearbeiten" (GalleryGroupModal.tsx:131) and its delete button. The seeded group has no child galleries, so the capture shows an empty meta-gallery behind the dialog.',
         },
     ],
 };
