@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class SettingsControllerTest extends TestCase
@@ -45,6 +46,20 @@ class SettingsControllerTest extends TestCase
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
 
         return auth('api')->login($user);
+    }
+
+    /**
+     * Minimum payload `updateLicenseTerms()` accepts — the three `mult_*`
+     * multipliers are `required` there. Mirrors the contract the shooting
+     * calculator's own partial saves rely on.
+     */
+    private function validLicenseTermsPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'mult_commercial' => '2.0',
+            'mult_unlimited' => '1.5',
+            'mult_international' => '1.5',
+        ], $overrides);
     }
 
     public function test_get_license_terms_is_public(): void
@@ -270,6 +285,165 @@ class SettingsControllerTest extends TestCase
                 'base_price' => 1000,
             ])
             ->assertStatus(422);
+    }
+
+    /**
+     * Regression: the three resolution prices were neither validated on write
+     * nor served on read, so `$request->validate()` dropped them from
+     * `$validated`, `SettingResolver::set()` never saw them, and the refetch
+     * that follows a save had nothing to hydrate the card from — a price typed
+     * into the licence settings snapped back to its default.
+     *
+     * Unit contract: the card edits euros and submits cents
+     * (`Math.round(euros * 100)`), and the `settings` table stores cents —
+     * `DatabaseSeeder` seeds `'price_web' => '7500'` / `'price_print' =>
+     * '14500'` / `'price_original' => '45000'` directly above its comment
+     * "Per-image license base prices are stored in cents" (which annotates
+     * `base_price => '8000'`, validated as `integer|min:500`). The read
+     * therefore has to hand the stored cents back verbatim, because
+     * `pricingLogic.getRequiredTerm()` parseInts them and
+     * `LicenseSelectorModal` divides the resulting upgrade price by 100 for
+     * display.
+     *
+     * The three values are deliberately *not* round hundreds, so a stray ×100
+     * or ÷100 on either leg fails this test instead of hiding behind a value
+     * that is symmetric under both.
+     */
+    public function test_update_license_terms_round_trips_the_resolution_prices_in_cents(): void
+    {
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                'price_web' => 12345,
+                'price_print' => 24901,
+                'price_original' => 89999,
+            ]))
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        // Write leg: the raw `settings.value` string *is* the stored cents.
+        $this->assertDatabaseHas('settings', ['key' => 'price_web', 'brand' => 'rp', 'value' => '12345']);
+        $this->assertDatabaseHas('settings', ['key' => 'price_print', 'brand' => 'rp', 'value' => '24901']);
+        $this->assertDatabaseHas('settings', ['key' => 'price_original', 'brand' => 'rp', 'value' => '89999']);
+
+        // Read leg: the public endpoint returns the same cents, unchanged.
+        $terms = $this->getJson('/api/settings/license-terms')->assertStatus(200);
+        $this->assertSame('12345', $terms->json('price_web'));
+        $this->assertSame('24901', $terms->json('price_print'));
+        $this->assertSame('89999', $terms->json('price_original'));
+
+        // Round trip in the card's own unit: the stored cents hydrate back into
+        // the euros that were typed in (123.45 / 249.01 / 899.99) — the same
+        // `parseInt(...)/100` the licence card performs.
+        $this->assertSame(123.45, (int) $terms->json('price_web') / 100);
+        $this->assertSame(249.01, (int) $terms->json('price_print') / 100);
+        $this->assertSame(899.99, (int) $terms->json('price_original') / 100);
+    }
+
+    /**
+     * The card hydrates `price_*` from the public endpoint, and
+     * `pricingLogic.getRequiredTerm()` throws "Kritischer Systemfehler" when a
+     * price factor is missing. Pin both the presence and the JSON *type*: the
+     * `settings.value` column is text, and every sibling price factor on this
+     * endpoint is served as a string, not a number.
+     */
+    public function test_get_license_terms_exposes_the_resolution_prices_as_strings(): void
+    {
+        Setting::updateOrCreate(['key' => 'price_web', 'brand' => 'rp'], ['value' => '7500']);
+        Setting::updateOrCreate(['key' => 'price_print', 'brand' => 'rp'], ['value' => '14500']);
+        Setting::updateOrCreate(['key' => 'price_original', 'brand' => 'rp'], ['value' => '45000']);
+
+        $terms = $this->getJson('/api/settings/license-terms')
+            ->assertStatus(200)
+            ->assertJsonStructure(['price_web', 'price_print', 'price_original'])
+            ->assertJsonPath('price_web', '7500')
+            ->assertJsonPath('price_print', '14500')
+            ->assertJsonPath('price_original', '45000');
+
+        $this->assertIsString($terms->json('price_web'));
+        $this->assertIsString($terms->json('price_print'));
+        $this->assertIsString($terms->json('price_original'));
+    }
+
+    /**
+     * The three keys only ever reach the table through `DatabaseSeeder`
+     * (`insertOrIgnore`, per brand), so a row that predates them simply has no
+     * `price_*` value. Reads must degrade to `null` and a partial save — the
+     * shooting calculator's own save carries only `calc_*` plus the
+     * multipliers — must still succeed instead of 422-ing the whole endpoint.
+     */
+    public function test_resolution_prices_absent_from_the_table_do_not_break_reads_or_partial_saves(): void
+    {
+        $this->assertDatabaseMissing('settings', ['key' => 'price_web']);
+
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                'calc_base_price' => '75',
+            ]))
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('settings', ['key' => 'calc_base_price', 'brand' => 'rp', 'value' => '75']);
+
+        $this->getJson('/api/settings/license-terms')
+            ->assertStatus(200)
+            ->assertJsonPath('price_web', null)
+            ->assertJsonPath('price_print', null)
+            ->assertJsonPath('price_original', null);
+    }
+
+    /**
+     * Cents are whole numbers, so a fractional amount is the signal that a
+     * caller sent euros instead — reject it rather than store a price that is
+     * off by two decimal orders of magnitude. `min:0` matches the card's
+     * `min="0"` input, so a deliberately free tier is still saveable.
+     */
+    #[DataProvider('invalidResolutionPriceProvider')]
+    public function test_update_license_terms_rejects_invalid_resolution_prices(string $key, mixed $value): void
+    {
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                $key => $value,
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([$key]);
+    }
+
+    public static function invalidResolutionPriceProvider(): array
+    {
+        return [
+            'price_web dezimal (euros statt cents)' => ['price_web', '75.5'],
+            'price_print negativ' => ['price_print', -1],
+            'price_original nicht-numerisch' => ['price_original', 'free'],
+        ];
+    }
+
+    /**
+     * `ConvertEmptyStringsToNull` plus the `nullable` rules make an empty
+     * price a "leave it alone" signal, exactly like every other key on this
+     * endpoint. Guard the direction that would cost money: a save that omits or
+     * blanks a price must never wipe the stored one.
+     */
+    public function test_an_empty_resolution_price_keeps_the_stored_value(): void
+    {
+        Setting::updateOrCreate(['key' => 'price_web', 'brand' => 'rp'], ['value' => '7500']);
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                'price_web' => '',
+                'price_print' => 24901,
+            ]))
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('settings', ['key' => 'price_web', 'brand' => 'rp', 'value' => '7500']);
+        $this->assertDatabaseHas('settings', ['key' => 'price_print', 'brand' => 'rp', 'value' => '24901']);
     }
 
     public function test_watermark_update_dispatches_retryable_cache_invalidation_job(): void

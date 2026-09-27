@@ -8,11 +8,15 @@ use Illuminate\Support\Facades\Schema;
  * Audit trail for FTP/SFTP camera password resets (P1-M33).
  *
  * The show-once flow of feature doc 7.3 makes the reset the *only* recovery
- * path for a lost camera password — there is nothing to restore. That also makes
- * the endpoint an unlimited, unobserved mint for valid credentials: SftpGoClient
- * (P1-M22) and FtpCredentialService (P1-M23) guarantee that a password never
- * reaches a log, and neither of them says *how often* one may be reset. This
- * table is the observation half of the answer; the rate limit is the other half
+ * path for a lost camera password — there is nothing to restore. It is *not*,
+ * however, a way to mint credentials: a reset **replaces** the password, so at
+ * any moment there is exactly one valid credential per account and no reset ever
+ * creates a second one. What is unobserved without this table is how often an
+ * account rotates the credential a working camera is holding, and each rotation
+ * is a read-modify-write against the live SFTPGo API. SftpGoClient (P1-M22) and
+ * FtpCredentialService (P1-M23) guarantee that a password never reaches a log,
+ * and neither of them says *how often* one may be reset. This table is the
+ * observation half of the answer; the rate limit is the other half
  * (FtpCredentialService::RESET_LIMIT_PER_HOUR).
  *
  * Schema decision, documented up front as required by backend/AGENTS.md:
