@@ -2176,6 +2176,20 @@ hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
   (8 Eintraege) haengt an **einem** Gallery-Seed in `seeds.ts`; der wird als
   Referenzfall zuerst gebaut und verifiziert, bevor die uebrigen darauf
   aufsetzen.
+- [ ] **Befund aus dem Dialog-Capture: Galerie-Aktionsleiste laeuft auf Mobile
+  horizontal ueber — medium, vorbestehend, nicht von dieser Runde verursacht.**
+  Beleg: `filled/mobile/gallery-photographer-team-dialog-sec0.png` — der
+  Breadcrumb ist links abgeschnitten („ashboard"), „Fotografen..." klebt am
+  rechten Rand, und **„Einladungslink..." sowie „E-Mail senden..." liegen
+  komplett ausserhalb des Viewports**. Ursache in
+  `ManagementGalleryActions.tsx` belegt: der aeussere Container (Z. 21) ist
+  `flex flex-wrap gap-4`, der **innere** (Z. 24) dagegen nur `flex gap-2` — ohne
+  `flex-wrap`, koennen die bis zu sieben Aktions-Buttons also nicht umbrechen.
+  Fix waere `flex flex-wrap gap-2` an Z. 24. **Nicht angefasst:** es ist eine
+  eigene Flaeche, und sechs der noch offenen Dialoge erben diesen Zustand — die
+  Aufnahmen zeigen ihn deshalb zunaechst so, wie er ist, statt ihn zu
+  beschönigen. Sichtpruefung des Dialogs selbst: **sauber** (Titel
+  „Fotografen-Team", Galerie, `Zugriffs-Status (Fotografen)`, Info-Alert).
 - [x] **Zusatz:** literale `\u2014` in JSX-Text der Fehlertabelle des Guides
   entsprachen keinem Escape und rendeten als `\u2014` → durch echte Em-Dashes
   ersetzt.
