@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import {useState} from 'react';
 import {Product} from '../../../api';
+import {formatEuro, formatPercent} from '../../../logic/formatCurrency';
 
 export interface BatchUpdate {
     id: string;
@@ -12,6 +13,18 @@ export interface BatchUpdate {
 interface BatchData {
     description: string;
     price: number;
+}
+
+/**
+ * The `price` column carries two units depending on the product type: cents for
+ * items and fixed discounts, hundredths of a percent for percentage discounts.
+ * The type therefore selects the formatter — a fixed discount is an amount,
+ * a percentage discount is not.
+ */
+function formatProductValue(price: number, type: Product['type']): string {
+    return type === 'discount_percent'
+        ? formatPercent(price / 100)
+        : formatEuro(price / 100);
 }
 
 interface ProductBatchTableProps {
@@ -157,7 +170,7 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                                     </label>
                                 ) : (
                                     <div className="font-mono font-bold text-primary whitespace-nowrap">
-                                        {(p.price / 100).toFixed(2)} {p.type === 'discount_percent' ? '%' : '€'}
+                                        {formatProductValue(p.price, p.type)}
                                     </div>
                                 )}
                             </td>
@@ -249,7 +262,7 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                                 </label>
                             ) : (
                                 <div className="font-mono font-bold text-primary text-lg">
-                                    {(p.price / 100).toFixed(2)} {p.type === 'discount_percent' ? '%' : '€'}
+                                    {formatProductValue(p.price, p.type)}
                                 </div>
                             )}
                         </div>

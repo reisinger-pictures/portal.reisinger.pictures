@@ -7,6 +7,7 @@ import ErrorMessage from './components/ErrorMessage';
 import { fetchSignContract, sendPageExit, submitSign, SignContractResponse } from '../logic/useContractJoin';
 import { useContractHeartbeat } from '../logic/useContractHeartbeat';
 import { calcAge } from '../logic/utils';
+import { formatEuro } from '../logic/formatCurrency';
 import { sanitizeHtml } from '../logic/sanitizeHtml';
 import {
     calculateContractTotal,
@@ -14,10 +15,6 @@ import {
     formatBasisPointsAsPercent,
     normalizeContractSnapshot,
 } from '../logic/contractPricing';
-
-function formatMoney(cents: number): string {
-    return (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
-}
 
 type ContractItem = SignContractResponse['contract']['items'][number];
 
@@ -200,8 +197,8 @@ function ContractSignTokenView({ token }: { token: string }) {
                                                     {item.notes && <><br /><small className="text-base-content/50">{item.notes}</small></>}
                                                 </td>
                                                 <td className="text-right">{item.qty}</td>
-                                                <td className="text-right">{formatMoney(item.price)}</td>
-                                                <td className="text-right">{formatMoney(contractItemTotal(item))}</td>
+                                                <td className="text-right">{formatEuro(item.price / 100)}</td>
+                                                <td className="text-right">{formatEuro(contractItemTotal(item) / 100)}</td>
                                             </tr>
                                         ))}
                                         {discounts.length > 0 && (
@@ -211,7 +208,7 @@ function ContractSignTokenView({ token }: { token: string }) {
                                             <tr key={`d-${i}`}>
                                                 <td colSpan={2}>{d.description}</td>
                                                 <td className="text-right text-error">
-                                                    {d.type === 'discount_percent' ? formatBasisPointsAsPercent(d.price) : formatMoney(d.price)}
+                                                    {d.type === 'discount_percent' ? formatBasisPointsAsPercent(d.price) : formatEuro(d.price / 100)}
                                                 </td>
                                                 <td className="text-right text-error">-</td>
                                             </tr>
@@ -220,7 +217,7 @@ function ContractSignTokenView({ token }: { token: string }) {
                                     <tfoot>
                                         <tr className="text-lg font-bold">
                                             <td colSpan={3} className="text-right"><Trans>Gesamtbetrag</Trans></td>
-                                            <td className="text-right">{formatMoney(grandTotal)}</td>
+                                            <td className="text-right">{formatEuro(grandTotal / 100)}</td>
                                         </tr>
                                     </tfoot>
                                 </table>

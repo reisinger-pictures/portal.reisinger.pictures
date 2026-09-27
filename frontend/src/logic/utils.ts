@@ -1,11 +1,21 @@
-import {t} from "@lingui/core/macro";
+import {formatEuro} from './formatCurrency';
 
 /**
- * Format cents to Euro string
+ * Formats a cent amount for display, in German notation.
+ *
+ * Compatibility wrapper only: it preserves the cents-in / string-out contract
+ * that the existing `*_cents` call sites depend on, while the presentation
+ * rules live in exactly one place. New code should convert to euros and call
+ * `formatEuro` directly.
+ *
+ * The localised output must never become a number input value. A number input
+ * sanitiser clears a comma, and the price parser reads the field back with
+ * `Number.parseFloat`, which stops at the first comma — so "1.234,50 €" would
+ * be parsed as `1.234` and the wrong amount billed. Machine values therefore go
+ * through `formatEuroInputValue`, which keeps the period.
  */
 export function formatMoney(cents: number): string {
-    if (!Number.isFinite(cents)) return t`--- €`;
-    return (cents / 100).toFixed(2) + ' €';
+    return formatEuro(cents / 100);
 }
 
 export function calcAge(birthDate: Date, reference: Date = new Date()): number {

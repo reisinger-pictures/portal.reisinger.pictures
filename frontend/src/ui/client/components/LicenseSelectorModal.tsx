@@ -5,6 +5,7 @@ import {useState} from 'react';
 import {t} from "@lingui/core/macro";
 import {Trans} from "@lingui/react/macro";
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
+import {formatEuro} from '../../../logic/formatCurrency';
 import {useCart} from '../../../logic/CartContext';
 import {useUI} from '../../components/UIContext';
 import ModalShell from '../../components/ModalShell';
@@ -134,7 +135,11 @@ export default function LicenseSelectorModal({photo, onClose}: LicenseSelectorMo
                 {tiers.map(tier => {
                     const covered = isCovered(user?.flatrate_level, tier.id, usage, duration) || photo?.gallery?.effective_is_free_download;
                     const upgradePrice = calculateUpgradePrice(terms, user?.flatrate_level, tier.id, usage, duration);
-                    const upgradePriceFormatted = upgradePrice.toFixed(2);
+                    // calculateUpgradePrice reads the stored terms, which are in cents
+                    // (price_print === '2500'), and its result is what handleAddToCart
+                    // puts into the cart — so the display has to divide by 100 exactly
+                    // like LicenseSelectorCard does via formatMoney.
+                    const upgradePriceFormatted = formatEuro(upgradePrice / 100);
                     const canBuy = true; // Stripe-Käufe sind für jeden angemeldeten User erlaubt
 
                     return (
@@ -158,7 +163,7 @@ export default function LicenseSelectorModal({photo, onClose}: LicenseSelectorMo
                                     <button onClick={() => handleAddToCart(tier.id, upgradePrice)}
                                             className="btn btn-primary w-full">
                                         <span
-                                            className="iconify mdi--cart-plus"></span> <Trans>+ {upgradePriceFormatted} €</Trans>
+                                            className="iconify mdi--cart-plus"></span> <Trans>+ {upgradePriceFormatted}</Trans>
                                     </button>
                                 ) : (
                                     <button disabled className="btn btn-disabled w-full"

@@ -112,8 +112,8 @@ describe('CouponInput', () => {
             />,
         );
 
-        expect(screen.getByTestId('coupon-discount')).toHaveTextContent('25.00 €');
-        expect(screen.queryByText('10.00 €')).not.toBeInTheDocument();
+        expect(screen.getByTestId('coupon-discount')).toHaveTextContent('25,00 €');
+        expect(screen.queryByText('10,00 €')).not.toBeInTheDocument();
     });
 
     it('shows invalid state with error message', () => {

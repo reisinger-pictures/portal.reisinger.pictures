@@ -291,7 +291,7 @@ describe('ManagementMetaGalleryView', () => {
             'Complete server gallery',
         );
         expect(screen.getByTestId('meta-gallery-pricing-group-server-preset')).toHaveTextContent('12 Bilder');
-        expect(screen.getByTestId('meta-gallery-volume-subtotal')).toHaveTextContent('300.00 €');
+        expect(screen.getByTestId('meta-gallery-volume-subtotal')).toHaveTextContent('300,00 €');
     });
 
     it('renders grouped totals for mixed child galleries and keeps volume coupons available', () => {
@@ -370,11 +370,11 @@ describe('ManagementMetaGalleryView', () => {
         expect(screen.getByRole('tab', {name: 'Coupons'})).toBeInTheDocument();
         expect(screen.getByRole('article', {
             name: 'Preisgruppe First displayed gallery',
-        })).toHaveTextContent('80.00 €');
-        expect(screen.getByTestId('meta-gallery-pricing-group-preset-a')).toHaveTextContent('80.00 €');
-        expect(screen.getByTestId('meta-gallery-pricing-group-preset-b')).toHaveTextContent('70.00 €');
+        })).toHaveTextContent('80,00 €');
+        expect(screen.getByTestId('meta-gallery-pricing-group-preset-a')).toHaveTextContent('80,00 €');
+        expect(screen.getByTestId('meta-gallery-pricing-group-preset-b')).toHaveTextContent('70,00 €');
         expect(screen.getByTestId('meta-gallery-pricing-group-default')).toHaveTextContent('Scope-Lizenz');
-        expect(screen.getByTestId('meta-gallery-volume-subtotal')).toHaveTextContent('150.00 €');
+        expect(screen.getByTestId('meta-gallery-volume-subtotal')).toHaveTextContent('150,00 €');
     });
 
     it('aggregates repeated photos by child gallery and group', () => {

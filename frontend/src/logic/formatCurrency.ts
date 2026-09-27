@@ -48,6 +48,33 @@ export function formatEuro(amount: number): string {
 }
 
 /**
+ * Product and discount rows share one `price` column but two different units:
+ * cents for `discount_fixed`/`item`, and hundredths of a percent for
+ * `discount_percent`. A percentage therefore has to be localised just as
+ * carefully as a currency amount — a period here would sit right next to a
+ * comma inside the same table cell.
+ *
+ * `Intl`'s `percent` style is deliberately NOT used: it multiplies by 100, and
+ * the stored values are already scaled to hundredths (1000 → "10,00 %").
+ */
+const PERCENT_FORMATTER = new Intl.NumberFormat('de-DE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+});
+
+/**
+ * Formats a percentage (major units, i.e. already divided by 100) for display:
+ * German decimal separator, exactly two decimals, unit behind the same
+ * non-breaking space {@link formatEuro} uses.
+ *
+ * Non-finite input yields a placeholder, matching {@link formatEuro}.
+ */
+export function formatPercent(percent: number): string {
+    if (!Number.isFinite(percent)) return `---${NBSP}%`;
+    return `${PERCENT_FORMATTER.format(percent)}${NBSP}%`;
+}
+
+/**
  * Formats an amount in euros for a controlled `<input type="number">` draft.
  *
  * Deliberately NOT localised: a number input rejects a comma decimal separator

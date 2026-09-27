@@ -3,7 +3,6 @@ import {screen} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {Photo} from '../../../logic/useGallery';
 import type {CartItem} from '../../../logic/CartContext';
-import {formatMoney} from '../../../logic/utils';
 import {useCart} from '../../../logic/CartContext';
 import {useVolumeLicensing} from '../../../logic/useVolumeLicensing';
 import {useUI} from '../../components/UIContext';
@@ -55,6 +54,14 @@ const items: CartItem[] = [
     },
 ];
 
+/**
+ * Prices are rendered by `formatMoney`, i.e. `Intl` de-DE: comma decimal
+ * separator plus a U+00A0 between amount and symbol. Testing Library collapses
+ * that non-breaking space to a normal one before matching, so the expectations
+ * below spell the amounts out in German with a plain space — which also keeps
+ * them independent of the formatter under test.
+ */
+
 describe('VolumeLicensingCard', () => {
     const addToCart = vi.fn();
     const showToast = vi.fn();
@@ -101,8 +108,8 @@ describe('VolumeLicensingCard', () => {
 
         expect(useVolumeLicensing).toHaveBeenCalledWith(items, 'displayed-gallery');
         expect(screen.getByTestId('volume-pricing-card')).toBeInTheDocument();
-        expect(screen.getAllByText(formatMoney(6000)).length).toBeGreaterThanOrEqual(2);
-        expect(screen.getByText(formatMoney(4000))).toBeInTheDocument();
+        expect(screen.getAllByText('60,00 €').length).toBeGreaterThanOrEqual(2);
+        expect(screen.getByText('40,00 €')).toBeInTheDocument();
     });
 
     it('adds the displayed gallery and the same custom-preset price to the cart', async () => {
@@ -144,7 +151,7 @@ describe('VolumeLicensingCard', () => {
 
         const button = screen.getByRole('button', {name: 'In den Warenkorb'});
         expect(button).toBeDisabled();
-        expect(screen.queryByText(formatMoney(0))).not.toBeInTheDocument();
+        expect(screen.queryByText('0,00 €')).not.toBeInTheDocument();
         expect(screen.getByTestId('volume-price-loading')).toBeInTheDocument();
 
         await user.click(button);

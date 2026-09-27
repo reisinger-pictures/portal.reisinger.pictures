@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatEuro, formatEuroInputValue } from '../formatCurrency';
+import { formatEuro, formatEuroInputValue, formatPercent } from '../formatCurrency';
 
 /**
  * `Intl` separates the symbol from the amount with U+00A0, never with a plain
@@ -73,5 +73,37 @@ describe('formatEuroInputValue', () => {
         expect(formatEuroInputValue(Number.NaN)).toBe('0.00');
         expect(formatEuroInputValue(Number.POSITIVE_INFINITY)).toBe('0.00');
         expect(formatEuroInputValue(Number.NEGATIVE_INFINITY)).toBe('0.00');
+    });
+});
+
+describe('formatPercent', () => {
+    it('formats a percentage with exactly two decimals', () => {
+        // Values are already scaled to hundredths by the caller, so 10 is 10 %.
+        expect(formatPercent(10)).toBe(`10,00${NBSP}%`);
+        expect(formatPercent(0)).toBe(`0,00${NBSP}%`);
+        expect(formatPercent(7.5)).toBe(`7,50${NBSP}%`);
+    });
+
+    it('regression: never emits the locale-independent toFixed(2) output', () => {
+        // The old product tables rendered `${(price / 100).toFixed(2)} %`, i.e.
+        // a percent sat next to a German amount in the same column.
+        expect(formatPercent(7.5)).not.toBe('7.50 %');
+        expect(formatPercent(7.5)).not.toContain('7.50');
+    });
+
+    it('uses a period as thousands separator and a comma as decimal separator', () => {
+        expect(formatPercent(1234.5)).toBe(`1.234,50${NBSP}%`);
+    });
+
+    it('never appends a currency symbol to a percentage', () => {
+        // The product `price` column mixes euro amounts with percentages; a
+        // percentage must not be dressed as money.
+        expect(formatPercent(10)).not.toContain('€');
+    });
+
+    it('returns a placeholder instead of NaN for non-finite input', () => {
+        expect(formatPercent(Number.NaN)).toBe(`---${NBSP}%`);
+        expect(formatPercent(Number.POSITIVE_INFINITY)).toBe(`---${NBSP}%`);
+        expect(formatPercent(Number.NEGATIVE_INFINITY)).toBe(`---${NBSP}%`);
     });
 });

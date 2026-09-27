@@ -3,7 +3,14 @@ import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../../../test-setup';
 import { CartItemList } from '../components/CartItemList';
 import type { CartItem } from '../../../logic/CartContext';
-import { formatMoney } from '../../../logic/utils';
+
+/**
+ * Money is rendered by `formatMoney`, i.e. `Intl` de-DE: comma decimal
+ * separator plus a U+00A0 between amount and symbol. Testing Library collapses
+ * that non-breaking space to a normal one before matching, so the expectations
+ * below spell the amounts out in German with a plain space — which also keeps
+ * them independent of the formatter under test.
+ */
 
 const mockItems: CartItem[] = [
     {
@@ -48,7 +55,7 @@ describe('CartItemList', () => {
 
         expect(screen.getByText('Deine Lizenzen')).toBeInTheDocument();
         expect(screen.getByText('Gesamtsumme')).toBeInTheDocument();
-        expect(screen.getByText(formatMoney(0))).toBeInTheDocument();
+        expect(screen.getByText('0,00 €')).toBeInTheDocument();
     });
 
     it('renders cart items with thumbnails and names', () => {
@@ -65,7 +72,7 @@ describe('CartItemList', () => {
     it('displays correct total amount', () => {
         renderList({ items: mockItems, totalAmount: 4000 });
 
-        expect(screen.getByText(formatMoney(4000))).toBeInTheDocument();
+        expect(screen.getByText('40,00 €')).toBeInTheDocument();
     });
 
     it('calls removeFromCart when delete button is clicked', async () => {
@@ -183,7 +190,7 @@ describe('CartItemList', () => {
             },
         });
 
-        const priceElements = screen.getAllByText(formatMoney(3000));
+        const priceElements = screen.getAllByText('30,00 €');
         expect(priceElements.length).toBeGreaterThanOrEqual(2);
         const volumeLabels = screen.getAllByText('(Volumenpreis)');
         expect(volumeLabels.length).toBe(2);
@@ -205,7 +212,7 @@ describe('CartItemList', () => {
             },
         });
 
-        expect(screen.getByText(/2 Bilder × 30\.00 € \(Tier 1\)/)).toBeInTheDocument();
+        expect(screen.getByText(/2 Bilder × 30,00 € \(Tier 1\)/)).toBeInTheDocument();
     });
 
     it('hides volume banner when not in volume licensing mode', () => {
@@ -282,9 +289,9 @@ describe('CartItemList', () => {
 
         expect(screen.getByTestId('volume-pricing-group-preset-a')).toHaveTextContent('Preset A');
         expect(screen.getByTestId('volume-pricing-group-preset-b')).toHaveTextContent('Preset B');
-        expect(screen.getAllByText(formatMoney(4000)).length).toBeGreaterThan(0);
-        expect(screen.getAllByText(formatMoney(7000)).length).toBeGreaterThan(0);
-        expect(screen.getByText(formatMoney(500))).toBeInTheDocument();
+        expect(screen.getAllByText('40,00 €').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('70,00 €').length).toBeGreaterThan(0);
+        expect(screen.getByText('5,00 €')).toBeInTheDocument();
     });
 
     it('keeps explicit scope groups on their server item prices even if legacy flags are inconsistent', () => {
@@ -324,9 +331,9 @@ describe('CartItemList', () => {
         });
 
         expect(screen.queryByTestId('volume-pricing-groups')).not.toBeInTheDocument();
-        expect(screen.getByText(formatMoney(mockItems[0].price))).toBeInTheDocument();
-        expect(screen.getByText(formatMoney(mockItems[1].price))).toBeInTheDocument();
-        expect(screen.queryByText(formatMoney(9999))).not.toBeInTheDocument();
+        expect(screen.getByText('15,00 €')).toBeInTheDocument();
+        expect(screen.getByText('25,00 €')).toBeInTheDocument();
+        expect(screen.queryByText('99,99 €')).not.toBeInTheDocument();
     });
 
     it('shows the server-consistent discount and net total', () => {
@@ -337,12 +344,12 @@ describe('CartItemList', () => {
             netTotalAmount: 4500,
         });
 
-        expect(screen.getByTestId('cart-subtotal')).toHaveTextContent('Zwischensumme: 60.00 €');
-        expect(screen.getByTestId('cart-discount')).toHaveTextContent('Rabatt: −15.00 €');
+        expect(screen.getByTestId('cart-subtotal')).toHaveTextContent('Zwischensumme: 60,00 €');
+        expect(screen.getByTestId('cart-discount')).toHaveTextContent('Rabatt: −15,00 €');
         expect(screen.getByTestId('cart-discount-note')).toHaveTextContent(
             'Der Rabatt wird auf den serverberechneten Warenkorb angewendet.',
         );
-        expect(screen.getByTestId('cart-total')).toHaveTextContent('45.00 €');
+        expect(screen.getByTestId('cart-total')).toHaveTextContent('45,00 €');
     });
 
     it('shows mock data tax notice', () => {
