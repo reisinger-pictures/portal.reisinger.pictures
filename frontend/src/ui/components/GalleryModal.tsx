@@ -12,7 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toSlug } from '../../logic/utils';
 import CheckboxGroup from '../components/CheckboxGroup';
-import ModalDialogShell from './ModalDialogShell';
+import ModalShell from './ModalShell';
 
 const createGallerySchema = () => z.object({
     name: z.string().min(1, t`Name ist erforderlich`),
@@ -167,171 +167,202 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
     if (!isOpen) return null;
     if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
 
+    // ModalShell, not ModalDialogShell — and this component renders its own
+    // <form> and its own submit row instead of letting the shell wrap them.
+    //
+    // Ten fields plus four option cards do not fit in a viewport. `.modal-box`
+    // caps itself at 100vh and scrolls, so the dialog "fits" while the submit
+    // row sits below the fold: Speichern is only reachable by scrolling the
+    // whole form. The repo's answer to a long dialog is a bounded flex-column
+    // box with a scrolling body and a footer that stays put (the camera guide
+    // in ManagementFtpInbox, the ratings in RatingStatusModal); that needs
+    // `boxClassName`, which ModalDialogShell does not forward.
+    //
+    // The shell-owned <form> is the second half of the problem: it carries no
+    // classes, so it is a plain block between the flex box and the body, and a
+    // `flex-1 overflow-y-auto` body cannot shrink through it (the form's
+    // automatic minimum size is its content height). Owning the form lets it be
+    // a flex column, so the body scrolls and the submit row stays visible. The
+    // submit row's markup matches ModalDialogShell's verbatim for the same
+    // reason GalleryMetadataDefaultsModal keeps its own: the shared footer
+    // cannot be laid out this way.
     return (
-        <ModalDialogShell
+        <ModalShell
             title={editingGallery ? <Trans>Galerie bearbeiten</Trans> : <Trans>Neue Galerie</Trans>}
             icon="mdi--image-multiple"
             onClose={onClose}
-            onDelete={handleDelete}
-            editing={!!editingGallery}
-            isSubmitting={isSubmitting}
-            onSubmit={handleSubmit(onSubmit)}
             maxWidth="2xl"
+            boxClassName="max-h-90vh flex flex-col"
             secondaryAction={!editingGallery ? (
                 <button type="button" className="btn btn-xs btn-outline" onClick={() => { onClose(); onOpenGroupModal(); }}>
                     <Trans>Ordner / Meta-Galerie erstellen</Trans>
                 </button>
             ) : undefined}
         >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="form-control w-full">
-                    <label className="label" htmlFor="gallery-name"><span className="label-text font-bold"><Trans>Name der Galerie</Trans></span></label>
-                    <input id="gallery-name" type="text" {...register('name')}
-                           onChange={(e) => {
-                               setValue('name', e.target.value, { shouldDirty: true });
-                               if (!editingGallery && !dirtyFields.slug && e.target.value) {
-                                   setValue('slug', toSlug(e.target.value));
-                               }
-                           }}
-                           className="input input-bordered w-full" />
-                </div>
-                <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold"><Trans>URL Slug</Trans></span></label>
-                    <input type="text" {...register('slug')} onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty: true, shouldTouch: true})} className="input input-bordered w-full text-sm font-mono opacity-70" />
-                </div>
-            </div>
+            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+                <div className="flex-1 overflow-y-auto pr-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div className="form-control w-full">
+                            <label className="label" htmlFor="gallery-name"><span className="label-text font-bold"><Trans>Name der Galerie</Trans></span></label>
+                            <input id="gallery-name" type="text" {...register('name')}
+                                   onChange={(e) => {
+                                       setValue('name', e.target.value, { shouldDirty: true });
+                                       if (!editingGallery && !dirtyFields.slug && e.target.value) {
+                                           setValue('slug', toSlug(e.target.value));
+                                       }
+                                   }}
+                                   className="input input-bordered w-full" />
+                        </div>
+                        <div className="form-control w-full">
+                            <label className="label"><span className="label-text font-bold"><Trans>URL Slug</Trans></span></label>
+                            <input type="text" {...register('slug')} onChange={(e) => setValue('slug', toSlug(e.target.value), {shouldDirty: true, shouldTouch: true})} className="input input-bordered w-full text-sm font-mono opacity-70" />
+                        </div>
+                    </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="form-control w-full">
-                    <label className="label" htmlFor="gallery-type"><span className="label-text font-bold"><Trans>Galerie-Typ</Trans></span></label>
-                    <select id="gallery-type" {...register('type')}
-                            onChange={(e) => {
-                                setValue('type', e.target.value as 'delivery' | 'selection', { shouldDirty: true });
-                                if (e.target.value === 'selection') {
-                                    setValue('is_live', false);
-                                    setValue('is_public', false);
-                                }
-                            }}
-                            className="select select-bordered w-full">
-                        <option value="delivery"><Trans>Delivery (Downloads)</Trans></option>
-                        <option value="selection"><Trans>Auswahl (Ratings)</Trans></option>
-                    </select>
-                </div>
-                <div className="form-control w-full">
-                    <label className="label" htmlFor="gallery-visibility"><span className="label-text font-bold"><Trans>Sichtbarkeit</Trans></span></label>
-                    <select
-                        id="gallery-visibility"
-                        name="is_public"
-                        disabled={isVisibilityForced}
-                        value={effectiveVisibility ? 'true' : 'false'}
-                        onChange={e => setExplicitVisibility(e.target.value === 'true')}
-                        className="select select-bordered w-full"
-                    >
-                        <option value="false"><Trans>Privat (Nur mit Link / Passwort)</Trans></option>
-                        <option value="true"><Trans>Öffentlich (Für alle sichtbar)</Trans></option>
-                    </select>
-                    {isVisibilityForced && (
-                        <label className="label pt-1 pb-0">
-                            <span className="label-text-alt text-warning leading-tight whitespace-normal break-words">
-                                {watchType === 'selection' ? t`Bewertungs-Galerien sind zwingend privat.` : t`Wird durch Meta-Galerie erzwungen`}
-                            </span>
-                        </label>
-                    )}
-                </div>
-            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div className="form-control w-full">
+                            <label className="label" htmlFor="gallery-type"><span className="label-text font-bold"><Trans>Galerie-Typ</Trans></span></label>
+                            <select id="gallery-type" {...register('type')}
+                                    onChange={(e) => {
+                                        setValue('type', e.target.value as 'delivery' | 'selection', { shouldDirty: true });
+                                        if (e.target.value === 'selection') {
+                                            setValue('is_live', false);
+                                            setValue('is_public', false);
+                                        }
+                                    }}
+                                    className="select select-bordered w-full">
+                                <option value="delivery"><Trans>Delivery (Downloads)</Trans></option>
+                                <option value="selection"><Trans>Auswahl (Ratings)</Trans></option>
+                            </select>
+                        </div>
+                        <div className="form-control w-full">
+                            <label className="label" htmlFor="gallery-visibility"><span className="label-text font-bold"><Trans>Sichtbarkeit</Trans></span></label>
+                            <select
+                                id="gallery-visibility"
+                                name="is_public"
+                                disabled={isVisibilityForced}
+                                value={effectiveVisibility ? 'true' : 'false'}
+                                onChange={e => setExplicitVisibility(e.target.value === 'true')}
+                                className="select select-bordered w-full"
+                            >
+                                <option value="false"><Trans>Privat (Nur mit Link / Passwort)</Trans></option>
+                                <option value="true"><Trans>Öffentlich (Für alle sichtbar)</Trans></option>
+                            </select>
+                            {isVisibilityForced && (
+                                <label className="label pt-1 pb-0">
+                                    <span className="label-text-alt text-warning leading-tight whitespace-normal break-words">
+                                        {watchType === 'selection' ? t`Bewertungs-Galerien sind zwingend privat.` : t`Wird durch Meta-Galerie erzwungen`}
+                                    </span>
+                                </label>
+                            )}
+                        </div>
+                    </div>
 
             
-            <div className="form-control w-full mb-4">
-                <label className="label"><span className="label-text font-bold"><Trans>Zugeordnete Organisationen</Trans></span></label>
-                <div className="flex flex-wrap gap-3 p-3 bg-base-200 rounded-box border border-base-300">
-                    {orgs?.map(org => (
-                        <label key={org.id} className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={(watchOrgIds ?? []).includes(org.id)}
-                                onChange={() => {
-                                    const current = watchOrgIds ?? [];
-                                    if (current.includes(org.id)) {
-                                        setValue('org_ids', current.filter(id => id !== org.id), { shouldDirty: true });
-                                    } else {
-                                        setValue('org_ids', [...current, org.id], { shouldDirty: true });
-                                    }
-                                }}
-                                className="checkbox checkbox-sm checkbox-primary"
-                            />
-                            <span className="text-sm">{org.name}</span>
-                        </label>
-                    ))}
-                    {(!orgs || orgs.length === 0) && (
-                        <span className="text-sm opacity-50 italic"><Trans>Keine Organisationen verfügbar</Trans></span>
-                    )}
-                </div>
-            </div>
-
-            <div className="form-control w-full mb-4">
-                <label className="label" htmlFor="gallery-group"><span className="label-text font-bold"><Trans>In welchem Ordner soll die Galerie liegen?</Trans></span></label>
-                <select id="gallery-group" {...register('gallery_group_id')} className="select select-bordered w-full">
-                    <option value="">-- <Trans>Oberste Ebene (Root)</Trans> --</option>
-                    {availableGroups.map(g => <option key={g.id} value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>)}
-                </select>
-            </div>
-
-            <div className="form-control w-full mb-4">
-                <label className="label"><span className="label-text font-bold"><Trans>Lizenzierungsmodus</Trans></span></label>
-                <select {...register('licensing_mode')} className="select select-bordered w-full">
-                    <option value=""><Trans>Brand-Standard</Trans></option>
-                    <option value="scope_licensing"><Trans>Scope-Lizenzierung</Trans></option>
-                    <option value="volume_licensing"><Trans>Volume-Lizenzierung</Trans></option>
-                </select>
-            </div>
-
-            {watchLicensingMode === 'volume_licensing' && (
-                <div className="form-control w-full mb-4">
-                    <label className="label"><span className="label-text font-bold"><Trans>Volume-Preset</Trans></span></label>
-                    <select {...register('volume_preset_id')} className="select select-bordered w-full">
-                        <option value=""><Trans>Brand-Standard</Trans></option>
-                        {volumePresets?.map(p => (
-                            <option key={p.id} value={String(p.id)}>
-                                {p.name}{p.is_default ? ' (Standard)' : ''}
-                            </option>
-                        ))}
-                    </select>
-                    <label className="label pt-1 pb-0">
-                        <span className="label-text-alt opacity-70 leading-tight whitespace-normal break-words">
-                            <Trans>Definiert die Mengenrabatt-Staffeln für diese Galerie. Ohne Auswahl gilt das Standard-Preset der Brand.</Trans>
-                        </span>
-                    </label>
-                </div>
-            )}
-
-            {watchType === 'delivery' && (
-                <div className="space-y-3 mb-4">
-                    <CheckboxGroup items={[
-                        { name: 'is_free_download', label: t`Kostenlosen Download erlauben`, description: t`Deaktiviert Wasserzeichen & Lizenzen. Direkter Download für Gäste.` },
-                        { name: 'is_editorial_only', label: t`Nur für redaktionelle Nutzung (Shop)`, description: t`Sperrt kommerzielle Lizenzen im Checkout.` },
-                        { name: 'is_hidden', label: t`Im Frontend verstecken`, description: t`Wird nicht in Suchergebnissen oder Feeds gelistet.` },
-                    ]} register={register} />
-
-                    <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full hover:bg-base-300/50 transition-colors">
-                        <input type="checkbox" {...register('is_live')} className="checkbox checkbox-primary shrink-0" />
-                        <div>
-                            <span className="label-text font-bold block"><Trans>LIVE Galerie</Trans></span>
-                            <span className="label-text-alt opacity-70 leading-tight block mt-1"><Trans>Automatischer Refresh für Besucher alle 10 Sekunden.</Trans></span>
+                    <div className="form-control w-full mb-4">
+                        <label className="label"><span className="label-text font-bold"><Trans>Zugeordnete Organisationen</Trans></span></label>
+                        <div className="flex flex-wrap gap-3 p-3 bg-base-200 rounded-box border border-base-300">
+                            {orgs?.map(org => (
+                                <label key={org.id} className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={(watchOrgIds ?? []).includes(org.id)}
+                                        onChange={() => {
+                                            const current = watchOrgIds ?? [];
+                                            if (current.includes(org.id)) {
+                                                setValue('org_ids', current.filter(id => id !== org.id), { shouldDirty: true });
+                                            } else {
+                                                setValue('org_ids', [...current, org.id], { shouldDirty: true });
+                                            }
+                                        }}
+                                        className="checkbox checkbox-sm checkbox-primary"
+                                    />
+                                    <span className="text-sm">{org.name}</span>
+                                </label>
+                            ))}
+                            {(!orgs || orgs.length === 0) && (
+                                <span className="text-sm opacity-50 italic"><Trans>Keine Organisationen verfügbar</Trans></span>
+                            )}
                         </div>
-                    </label>
-                </div>
-            )}
+                    </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 pt-4 border-t border-base-300">
-                <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold"><Trans>Passwort</Trans></span></label>
-                    <input type="text" {...register('password')} className="input input-bordered w-full" placeholder={editingGallery ? t`Leer = Aktuelles behalten` : t`Leer = Nur Magic Link`} />
+                    <div className="form-control w-full mb-4">
+                        <label className="label" htmlFor="gallery-group"><span className="label-text font-bold"><Trans>In welchem Ordner soll die Galerie liegen?</Trans></span></label>
+                        <select id="gallery-group" {...register('gallery_group_id')} className="select select-bordered w-full">
+                            <option value="">-- <Trans>Oberste Ebene (Root)</Trans> --</option>
+                            {availableGroups.map(g => <option key={g.id} value={g.id}>{'- '.repeat(g.depth)}{g.name}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="form-control w-full mb-4">
+                        <label className="label"><span className="label-text font-bold"><Trans>Lizenzierungsmodus</Trans></span></label>
+                        <select {...register('licensing_mode')} className="select select-bordered w-full">
+                            <option value=""><Trans>Brand-Standard</Trans></option>
+                            <option value="scope_licensing"><Trans>Scope-Lizenzierung</Trans></option>
+                            <option value="volume_licensing"><Trans>Volume-Lizenzierung</Trans></option>
+                        </select>
+                    </div>
+
+                    {watchLicensingMode === 'volume_licensing' && (
+                        <div className="form-control w-full mb-4">
+                            <label className="label"><span className="label-text font-bold"><Trans>Volume-Preset</Trans></span></label>
+                            <select {...register('volume_preset_id')} className="select select-bordered w-full">
+                                <option value=""><Trans>Brand-Standard</Trans></option>
+                                {volumePresets?.map(p => (
+                                    <option key={p.id} value={String(p.id)}>
+                                        {p.name}{p.is_default ? ' (Standard)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <label className="label pt-1 pb-0">
+                                <span className="label-text-alt opacity-70 leading-tight whitespace-normal break-words">
+                                    <Trans>Definiert die Mengenrabatt-Staffeln für diese Galerie. Ohne Auswahl gilt das Standard-Preset der Brand.</Trans>
+                                </span>
+                            </label>
+                        </div>
+                    )}
+
+                    {watchType === 'delivery' && (
+                        <div className="space-y-3 mb-4">
+                            <CheckboxGroup items={[
+                                { name: 'is_free_download', label: t`Kostenlosen Download erlauben`, description: t`Deaktiviert Wasserzeichen & Lizenzen. Direkter Download für Gäste.` },
+                                { name: 'is_editorial_only', label: t`Nur für redaktionelle Nutzung (Shop)`, description: t`Sperrt kommerzielle Lizenzen im Checkout.` },
+                                { name: 'is_hidden', label: t`Im Frontend verstecken`, description: t`Wird nicht in Suchergebnissen oder Feeds gelistet.` },
+                            ]} register={register} />
+
+                            <label className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 w-full hover:bg-base-300/50 transition-colors">
+                                <input type="checkbox" {...register('is_live')} className="checkbox checkbox-primary shrink-0" />
+                                <div>
+                                    <span className="label-text font-bold block"><Trans>LIVE Galerie</Trans></span>
+                                    <span className="label-text-alt opacity-70 leading-tight block mt-1"><Trans>Automatischer Refresh für Besucher alle 10 Sekunden.</Trans></span>
+                                </div>
+                            </label>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 pt-4 border-t border-base-300">
+                        <div className="form-control w-full">
+                            <label className="label"><span className="label-text font-bold"><Trans>Passwort</Trans></span></label>
+                            <input type="text" {...register('password')} className="input input-bordered w-full" placeholder={editingGallery ? t`Leer = Aktuelles behalten` : t`Leer = Nur Magic Link`} />
+                        </div>
+                        <div className="form-control w-full">
+                            <label className="label"><span className="label-text font-bold"><Trans>Ablaufdatum</Trans></span></label>
+                            <input type="date" {...register('expires_at')} className="input input-bordered w-full" />
+                        </div>
+                    </div>
                 </div>
-                <div className="form-control w-full">
-                    <label className="label"><span className="label-text font-bold"><Trans>Ablaufdatum</Trans></span></label>
-                    <input type="date" {...register('expires_at')} className="input input-bordered w-full" />
+                <div className="modal-action flex justify-between mt-8 shrink-0">
+                    {editingGallery ? (
+                        <button type="button" className="btn btn-outline btn-error" onClick={handleDelete}><Trans>Löschen</Trans></button>
+                    ) : <div></div>}
+                    <div>
+                        <button type="button" className="btn btn-ghost mr-2" onClick={onClose}><Trans>Abbrechen</Trans></button>
+                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                            {isSubmitting ? <span className="loading loading-spinner"></span> : <Trans>Speichern</Trans>}
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </ModalDialogShell>
+            </form>
+        </ModalShell>
     );
 }

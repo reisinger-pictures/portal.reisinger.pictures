@@ -4,7 +4,7 @@ import { Trans } from '@lingui/react/macro';
 import { useVolumePresets } from '../../../logic/useVolumePresets';
 import { useUI } from '../../components/UIContext';
 import ModalDialogShell from '../../components/ModalDialogShell';
-import { formatMoney } from '../../../logic/utils';
+import { formatEuro, formatEuroInputValue } from '../../../logic/formatCurrency';
 
 interface TierEditorRow {
     min_quantity: number;
@@ -21,6 +21,10 @@ interface PresetEditorProps {
 /**
  * Editable string draft so partially typed decimals (e.g. "1.") survive the
  * keystroke instead of being normalised to "1.00" on every change.
+ *
+ * The values stay machine-readable (`formatEuroInputValue`, not `formatEuro`):
+ * they are the `value` of `<input type="number">` fields and are parsed back
+ * with `Number.parseFloat`, both of which reject a comma decimal separator.
  */
 interface TierDraft {
     min_quantity: string;
@@ -28,7 +32,7 @@ interface TierDraft {
 }
 
 function toTierDraft(row: TierEditorRow): TierDraft {
-    return {min_quantity: String(row.min_quantity), price: (row.price_cents / 100).toFixed(2)};
+    return {min_quantity: String(row.min_quantity), price: formatEuroInputValue(row.price_cents / 100)};
 }
 
 function parsePriceCents(raw: string): number {
@@ -42,8 +46,8 @@ function parseMinQuantity(raw: string): number {
 }
 
 function normalizePriceDraft(raw: string): string {
-    const cents = parsePriceCents(raw);
-    return Number.isFinite(cents) ? (Math.max(0, cents) / 100).toFixed(2) : '0.00';
+    // Math.max(0, NaN) is NaN, and formatEuroInputValue maps that to '0.00'.
+    return formatEuroInputValue(Math.max(0, parsePriceCents(raw)) / 100);
 }
 
 function normalizeQuantityDraft(raw: string): string {
@@ -69,7 +73,7 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
         const nextMin = (Number.isFinite(lastQuantity) ? lastQuantity : 0) + 10;
         const lastCents = last ? parsePriceCents(last.price) : Number.NaN;
         const nextCents = Math.max(0, (Number.isFinite(lastCents) ? lastCents : 0) - 500);
-        setTiers(prev => [...prev, {min_quantity: String(nextMin), price: (nextCents / 100).toFixed(2)}]);
+        setTiers(prev => [...prev, {min_quantity: String(nextMin), price: formatEuroInputValue(nextCents / 100)}]);
     };
 
     const removeTier = (index: number) => {
@@ -141,16 +145,16 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
                     <span className="badge badge-primary badge-sm uppercase px-2"><Trans>Basispreis</Trans></span>
                     <span className="text-sm font-bold"><Trans>pro Bild (ab 0 Bildern)</Trans></span>
                 </div>
-                <div className="flex items-center gap-2">
+                <label className="input input-bordered input-lg w-full">
                     <input
                         type="number" min="0" step="0.01"
-                        className="input input-bordered w-36 text-right text-lg"
+                        className="grow text-right"
                         value={basePriceDraft}
                         onChange={e => updateTier(0, { price: e.target.value })}
                         onBlur={() => updateTier(0, { price: normalizePriceDraft(basePriceDraft) })}
                     />
-                    <span className="font-bold opacity-70 text-lg">€</span>
-                </div>
+                    <span className="font-bold opacity-70">€</span>
+                </label>
             </div>
 
             {/* Mengenrabatt-Staffeln */}
@@ -175,16 +179,16 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
                                 />
                                 <span className="font-bold opacity-70 whitespace-nowrap"><Trans>Bildern</Trans></span>
                             </div>
-                            <div className="flex items-center gap-1">
+                            <label className="input input-bordered w-36">
                                 <input
                                     type="number" min="0" step="0.01"
-                                    className="input input-bordered w-32 text-right"
+                                    className="grow text-right"
                                     value={row.price}
                                     onChange={e => updateTier(realIndex, { price: e.target.value })}
                                     onBlur={() => updateTier(realIndex, { price: normalizePriceDraft(row.price) })}
                                 />
                                 <span className="font-bold opacity-70">€</span>
-                            </div>
+                            </label>
                             <div className="flex items-center gap-1">
                                 <button
                                     type="button"
@@ -295,13 +299,13 @@ export default function VolumePresetSettingsCard() {
                                         </div>
                                     </td>
                                     <td className="text-right font-mono font-bold whitespace-nowrap">
-                                        {formatMoney(preset.tiers[0]?.price_cents ?? 0)}
+                                        {formatEuro((preset.tiers[0]?.price_cents ?? 0) / 100)}
                                     </td>
                                     <td>
                                         <div className="flex flex-wrap gap-1.5">
                                             {preset.tiers.slice(1).map((tier, index) => (
                                                 <span key={index} className="badge badge-ghost badge-sm font-mono">
-                                                    Ab {tier.min_quantity} → {formatMoney(tier.price_cents)}
+                                                    Ab {tier.min_quantity} → {formatEuro(tier.price_cents / 100)}
                                                 </span>
                                             ))}
                                         </div>

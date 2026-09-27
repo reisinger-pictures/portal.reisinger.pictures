@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import { Trans } from "@lingui/react/macro";
+import { Trans, Plural } from "@lingui/react/macro";
 import {useState} from 'react';
 import useSWR from 'swr';
 import {apiMutate, fetcher} from '../../../api';
@@ -69,10 +69,25 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
                 <input
                     type="text"
                     placeholder={t`Nutzer suchen...`}
-                    className="input input-bordered w-full mb-4 shrink-0"
+                    className="input input-bordered w-full mb-2 shrink-0"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                 />
+
+                {/* The list below is a scroll container, so its bottom edge falls
+                    wherever the remaining space ends — mid-row. With more users
+                    than fit, the last visible row was sliced through the middle of
+                    its glyphs, which reads as a rendering accident instead of as
+                    "there is more below". Two affordances, neither of which
+                    touches the data: the count states how many entries the list
+                    holds, and the fade covers the cut-off row instead of
+                    guillotining it. `sticky bottom-0` rather than an absolutely
+                    positioned overlay, so the fade stays pinned to the bottom of
+                    the scrollport at any offset and comes to rest in flow once
+                    the end of the list is reached. */}
+                <p className="text-sm opacity-70 mb-2 shrink-0">
+                    <Plural value={filteredUsers?.length ?? 0} one="# Nutzer" other="# Nutzer" />
+                </p>
 
                 <div className="flex-1 overflow-y-auto border border-base-300 rounded-box p-2">
                     {isLoading ? (
@@ -82,25 +97,32 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
                             {filteredUsers?.map(u => {
                                 const hasAccess = u.galleries.some(g => g.id === galleryId);
                                 return (
+                                    // Name and action share one line, the email sits
+                                    // below it: an action centred against the whole
+                                    // name/email block lands between the two lines
+                                    // instead of on the name's line. This mirrors the
+                                    // label/action row in ManagementFtpInbox.
                                     <div key={u.id}
-                                         className="flex items-center justify-between p-2 hover:bg-base-200 rounded">
-                                        <div>
-                                            <div className="font-bold">{u.name}</div>
-                                            <div className="text-sm opacity-70">{u.email}</div>
+                                         className="p-2 hover:bg-base-200 rounded">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="font-bold min-w-0 break-words">{u.name}</div>
+                                            <button
+                                                className={`btn btn-sm w-28 shrink-0 ${hasAccess ? 'btn-error btn-outline' : 'btn-primary'}`}
+                                                onClick={() => toggleAccess(u.id, hasAccess)}
+                                                disabled={processingId === u.id}
+                                            >
+                                                {processingId === u.id ? <span
+                                                    className="loading loading-spinner"></span> : (hasAccess ? <Trans>Entfernen</Trans> : <Trans>Hinzufügen</Trans>)}
+                                            </button>
                                         </div>
-                                        <button
-                                            className={`btn btn-sm w-28 ${hasAccess ? 'btn-error btn-outline' : 'btn-primary'}`}
-                                            onClick={() => toggleAccess(u.id, hasAccess)}
-                                            disabled={processingId === u.id}
-                                        >
-                                            {processingId === u.id ? <span
-                                                className="loading loading-spinner"></span> : (hasAccess ? <Trans>Entfernen</Trans> : <Trans>Hinzufügen</Trans>)}
-                                        </button>
+                                        <div className="text-sm opacity-70 break-words mt-1">{u.email}</div>
                                     </div>
                                 );
                             })}
                         </div>
                     )}
+                    <div aria-hidden="true"
+                         className="sticky bottom-0 h-8 pointer-events-none rounded-b-box bg-linear-to-t from-base-100 to-transparent"></div>
                 </div>
         </ModalShell>
     );
