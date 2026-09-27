@@ -19,6 +19,92 @@ use Symfony\Component\Finder\Finder;
 
 class SettingsController extends Controller
 {
+    /**
+     * Validation rule per **settings key** — deliberately not per the name the key
+     * carries in a request. A legacy `srp_*` spelling is only an alternative name
+     * for one of these keys and inherits that key's rule, so a client cannot pick
+     * a weaker rule by picking an older name
+     * (features/infrastructure/28-settings-key-meaning.md).
+     *
+     * `setup_fee`, `privacy_fee` and `extra_image_fee` are listed because the
+     * endpoint *writes* them, not because they are request names — their only
+     * request spelling is the legacy one (see LEGACY_ONLY_KEYS).
+     */
+    private const LICENSE_TERM_RULES = [
+        'base_price' => 'nullable|integer|min:500',
+        'calc_base_price' => 'nullable|numeric|min:0',
+        'calc_hourly_rate' => 'nullable|numeric|min:0',
+        'calc_images_per_hour' => 'nullable|integer|min:1',
+        'calc_outdoor_images_per_hour' => 'nullable|integer|min:1',
+        'calc_flatrate_multiplier' => 'nullable|numeric|min:1|max:10',
+        'term_editorial' => 'nullable|string',
+        'term_commercial' => 'nullable|string',
+        'term_1_year' => 'nullable|string',
+        'term_unlimited' => 'nullable|string',
+        'term_territory_national' => 'nullable|string',
+        'term_territory_international' => 'nullable|string',
+        'mult_commercial' => 'required|numeric|min:1',
+        'mult_unlimited' => 'required|numeric|min:1',
+        'mult_international' => 'required|numeric|min:1',
+        'term_web' => 'nullable|string',
+        'term_print' => 'nullable|string',
+        'term_original' => 'nullable|string',
+        // Resolution prices in cents, the unit the licence card submits
+        // (`Math.round(euros * 100)`) and the table stores. `integer` is
+        // the unit guard: a fractional amount means a caller sent euros,
+        // and storing that would be off by two decimal orders of
+        // magnitude. `nullable` (write-when-present) rather than
+        // `required` because this endpoint is also written by clients that
+        // send a partial payload — the shooting calculator's save carries
+        // only `calc_*` plus the `mult_*` multipliers — and because the
+        // three keys reach the table solely through the idempotent
+        // `DatabaseSeeder`, so a row that predates them must not turn
+        // every save into a 422. `min:0` matches the card's `min="0"`
+        // input, so a deliberately free tier stays saveable.
+        'price_web' => 'nullable|integer|min:0',
+        'price_print' => 'nullable|integer|min:0',
+        'price_original' => 'nullable|integer|min:0',
+        // The three SRP fees are cent amounts like `price_*`, not euros: the
+        // calculator card submits `Math.round(euros * 100)`, the seeder stores
+        // 5000 / 20000 / 1500, and every consumer reads them back as
+        // `Number(value)/100`. `integer` is therefore the same unit guard
+        // `price_*` already carries — `numeric` would admit a fractional cent
+        // (`'5000.5'`) that no client can produce and no consumer can
+        // represent, and store it indistinguishably from a validated amount.
+        // `min:0` stays, matching the card's `min="0"` input, so a
+        // deliberately free setup fee remains saveable.
+        'setup_fee' => 'nullable|integer|min:0',
+        'privacy_fee' => 'nullable|integer|min:0',
+        'extra_image_fee' => 'nullable|integer|min:0',
+    ];
+
+    /**
+     * Legacy `srp_*` request spelling => the settings key it writes.
+     *
+     * Pure backwards compatibility with the pre-rename frontend payload, not a
+     * second API (spec §3.2/§6): both spellings write the same key and are held
+     * to the same rule. The read endpoint keeps serving both names.
+     */
+    private const LEGACY_REQUEST_SPELLINGS = [
+        'srp_base_price' => 'base_price',
+        'srp_setup_fee' => 'setup_fee',
+        'srp_privacy_fee' => 'privacy_fee',
+        'srp_extra_image_fee' => 'extra_image_fee',
+    ];
+
+    /**
+     * Settings keys the endpoint writes that are *not* request names: the only
+     * way a client can write them is the legacy `srp_*` spelling, so they must
+     * not become an additional spelling of the API. `base_price` is
+     * deliberately absent — it is a request name in its own right *and* the
+     * target of `srp_base_price`.
+     */
+    private const LEGACY_ONLY_KEYS = [
+        'setup_fee',
+        'privacy_fee',
+        'extra_image_fee',
+    ];
+
     public function getSystemInfo()
     {
         // Build time = newest modification time of ANY PHP file in the backend
@@ -280,60 +366,30 @@ class SettingsController extends Controller
         // in updateBillingDetails() (separater Endpunkt).
         // `srp_*` request keys are kept for frontend backward-compat but mapped to unprefixed,
         // brand-scoped settings keys on write (spec §3.2/§6).
-        $validated = $request->validate([
-            'base_price' => 'nullable|integer|min:500',
-            'calc_base_price' => 'nullable|numeric|min:0',
-            'calc_hourly_rate' => 'nullable|numeric|min:0',
-            'calc_images_per_hour' => 'nullable|integer|min:1',
-            'calc_outdoor_images_per_hour' => 'nullable|integer|min:1',
-            'calc_flatrate_multiplier' => 'nullable|numeric|min:1|max:10',
-            'srp_base_price' => 'nullable|numeric|min:0',
-            'srp_setup_fee' => 'nullable|numeric|min:0',
-            'srp_privacy_fee' => 'nullable|numeric|min:0',
-            'srp_extra_image_fee' => 'nullable|numeric|min:0',
-            'term_editorial' => 'nullable|string',
-            'term_commercial' => 'nullable|string',
-            'term_1_year' => 'nullable|string',
-            'term_unlimited' => 'nullable|string',
-            'term_territory_national' => 'nullable|string',
-            'term_territory_international' => 'nullable|string',
-            'mult_commercial' => 'required|numeric|min:1',
-            'mult_unlimited' => 'required|numeric|min:1',
-            'mult_international' => 'required|numeric|min:1',
-            'term_web' => 'nullable|string',
-            'term_print' => 'nullable|string',
-            'term_original' => 'nullable|string',
-            // Resolution prices in cents, the unit the licence card submits
-            // (`Math.round(euros * 100)`) and the table stores. `integer` is
-            // the unit guard: a fractional amount means a caller sent euros,
-            // and storing that would be off by two decimal orders of
-            // magnitude. `nullable` (write-when-present) rather than
-            // `required` because this endpoint is also written by clients that
-            // send a partial payload — the shooting calculator's save carries
-            // only `calc_*` plus the `mult_*` multipliers — and because the
-            // three keys reach the table solely through the idempotent
-            // `DatabaseSeeder`, so a row that predates them must not turn
-            // every save into a 422. `min:0` matches the card's `min="0"`
-            // input, so a deliberately free tier stays saveable.
-            'price_web' => 'nullable|integer|min:0',
-            'price_print' => 'nullable|integer|min:0',
-            'price_original' => 'nullable|integer|min:0',
-        ]);
+        //
+        // The request contract is derived from LICENSE_TERM_RULES so that every
+        // settings key carries exactly one rule and every spelling that writes
+        // it runs through that rule: a key only reachable through a legacy
+        // spelling is not a request name of its own, and a legacy spelling
+        // inherits the rule of the key it writes. Deriving both from one table
+        // is what keeps `base_price` and `srp_base_price` from drifting apart
+        // again — and the 422 is still reported under the name the client sent.
+        $rules = self::LICENSE_TERM_RULES;
+        foreach (self::LEGACY_ONLY_KEYS as $settingsKey) {
+            unset($rules[$settingsKey]);
+        }
+        foreach (self::LEGACY_REQUEST_SPELLINGS as $spelling => $settingsKey) {
+            $rules[$spelling] = self::LICENSE_TERM_RULES[$settingsKey];
+        }
+
+        $validated = $request->validate($rules);
 
         // Map legacy `srp_*` request keys to unprefixed brand-scoped settings keys.
-        $srpKeyMap = [
-            'srp_base_price' => 'base_price',
-            'srp_setup_fee' => 'setup_fee',
-            'srp_privacy_fee' => 'privacy_fee',
-            'srp_extra_image_fee' => 'extra_image_fee',
-        ];
-
         foreach ($validated as $key => $value) {
             if ($value === null) {
                 continue;
             }
-            $settingsKey = $srpKeyMap[$key] ?? $key;
-            $resolver->set($settingsKey, $value);
+            $resolver->set(self::LEGACY_REQUEST_SPELLINGS[$key] ?? $key, $value);
         }
 
         return response()->json(['success' => true]);

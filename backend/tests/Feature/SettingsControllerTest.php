@@ -62,6 +62,15 @@ class SettingsControllerTest extends TestCase
         ], $overrides);
     }
 
+    /**
+     * The brand-scoped `settings.value` exactly as stored — the write leg's
+     * whole truth, independent of how any response formats it.
+     */
+    private function storedSetting(string $key, string $brand = 'rp'): ?string
+    {
+        return Setting::where('key', $key)->where('brand', $brand)->value('value');
+    }
+
     public function test_get_license_terms_is_public(): void
     {
         Setting::updateOrCreate(
@@ -444,6 +453,219 @@ class SettingsControllerTest extends TestCase
 
         $this->assertDatabaseHas('settings', ['key' => 'price_web', 'brand' => 'rp', 'value' => '7500']);
         $this->assertDatabaseHas('settings', ['key' => 'price_print', 'brand' => 'rp', 'value' => '24901']);
+    }
+
+    // ------------------------------------------------------------------
+    // Rule belongs to the settings key, not to the request spelling
+    // (features/infrastructure/28-settings-key-meaning.md)
+    //
+    // `base_price` and `srp_base_price` are two spellings of ONE settings key.
+    // The mapping is deliberate backwards compatibility, not a bug — but while
+    // the rule hung off the request term, the legacy name got a weaker rule
+    // (`nullable|numeric|min:0`) than the canonical one (`integer|min:500`).
+    // A client could therefore pick the weak rule by picking the old name, and
+    // the stored value was indistinguishable from a validated one.
+    //
+    // The negative direction is the whole point: a round-trip test proves only
+    // that a value *arrived*, which is exactly why this went unnoticed.
+    // ------------------------------------------------------------------
+
+    /**
+     * The legacy spelling must be held to the canonical rule, so every value
+     * the canonical name rejects is rejected under the legacy name too — and
+     * nothing lands in between.
+     *
+     * Before the fix all four rows below returned 200 and wrote to `base_price`
+     * (`1` → `'1'`, `1.5` → `'1.5'`), because the legacy key was validated as
+     * `nullable|numeric|min:0` while the canonical key rejected the identical
+     * input on both the integer rule and the minimum.
+     */
+    #[DataProvider('basePriceRejectedByTheCanonicalRuleProvider')]
+    public function test_legacy_srp_base_price_is_rejected_wherever_the_canonical_name_is(mixed $value): void
+    {
+        Setting::updateOrCreate(['key' => 'base_price', 'brand' => 'rp'], ['value' => '8000']);
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                'srp_base_price' => $value,
+            ]))
+            // Reported under the name the client actually sent.
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['srp_base_price']);
+
+        // A rejected payload must not leave a value behind — that is the part
+        // that made the hole invisible: the row looked like any other write.
+        $this->assertSame('8000', $this->storedSetting('base_price'));
+    }
+
+    public static function basePriceRejectedByTheCanonicalRuleProvider(): array
+    {
+        return [
+            'unter dem Mindestwert' => [1],
+            'dezimal (cent-Betrag)' => ['1.5'],
+            'dezimal über dem Mindestwert' => ['500.5'],
+            'dezimal mit Nachkommastelle als Float' => [1.5],
+            'negativ' => [-500],
+            'knapp unter dem Mindestwert' => [499],
+        ];
+    }
+
+    /**
+     * The other direction of the same guard: the canonical name still rejects
+     * the identical input, so the fix closed the legacy hole instead of moving
+     * it to the other spelling.
+     */
+    #[DataProvider('basePriceRejectedByTheCanonicalRuleProvider')]
+    public function test_canonical_base_price_still_rejects_the_same_values(mixed $value): void
+    {
+        Setting::updateOrCreate(['key' => 'base_price', 'brand' => 'rp'], ['value' => '8000']);
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                'base_price' => $value,
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['base_price']);
+
+        $this->assertSame('8000', $this->storedSetting('base_price'));
+    }
+
+    /**
+     * Backwards compatibility has to survive the fix: a valid value under the
+     * legacy name is still accepted, still writes the same settings key, and
+     * still produces byte-identical storage to the canonical spelling — the
+     * difference is the name on the wire, nothing else.
+     */
+    #[DataProvider('acceptedBasePriceProvider')]
+    public function test_legacy_and_canonical_base_price_produce_identical_storage(mixed $value): void
+    {
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                'base_price' => $value,
+            ]))
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+        $viaCanonicalName = $this->storedSetting('base_price');
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                'srp_base_price' => $value,
+            ]))
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+        $viaLegacyName = $this->storedSetting('base_price');
+
+        $this->assertNotNull($viaCanonicalName);
+        $this->assertSame($viaCanonicalName, $viaLegacyName);
+        $this->assertSame((string) $value, $viaLegacyName);
+
+        // One row, two names in the response — the response shape is unchanged
+        // and both members read that single row.
+        $this->assertSame(1, Setting::where('key', 'base_price')->where('brand', 'rp')->count());
+        $terms = $this->getJson('/api/settings/license-terms')->assertStatus(200);
+        $this->assertSame($viaLegacyName, $terms->json('base_price'));
+        $this->assertSame($viaLegacyName, $terms->json('srp_base_price'));
+    }
+
+    public static function acceptedBasePriceProvider(): array
+    {
+        return [
+            'exakt am Mindestwert' => [500],
+            'Seed-Default' => [8000],
+            'als Text gesendeter Cent-Betrag' => ['12345'],
+        ];
+    }
+
+    /**
+     * The mapping itself is the compatibility contract and must not be "fixed"
+     * away: all four legacy spellings still reach their unprefixed target.
+     */
+    public function test_all_four_legacy_spellings_still_write_their_mapped_key(): void
+    {
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                'srp_base_price' => 8000,
+                'srp_setup_fee' => 5000,
+                'srp_privacy_fee' => 20000,
+                'srp_extra_image_fee' => 1500,
+            ]))
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertSame('8000', $this->storedSetting('base_price'));
+        $this->assertSame('5000', $this->storedSetting('setup_fee'));
+        $this->assertSame('20000', $this->storedSetting('privacy_fee'));
+        $this->assertSame('1500', $this->storedSetting('extra_image_fee'));
+
+        // …and no unprefixed `srp_*` row was created alongside them.
+        $this->assertSame(0, Setting::where('key', 'like', 'srp_%')->count());
+    }
+
+    /**
+     * The three SRP fees are cent amounts (`Math.round(euros * 100)` on the
+     * card, 5000 / 20000 / 1500 in the seeder, read back as `Number(v)/100`),
+     * so they carry the same `integer` unit guard as `price_*`. `numeric`
+     * admitted a fractional cent such as `'5000.5'` — a value no client can
+     * produce and no consumer can represent, stored indistinguishably from a
+     * validated amount. `min:0` is unchanged, so a free setup fee stays legal.
+     */
+    #[DataProvider('legacyFeeProvider')]
+    public function test_srp_fees_reject_a_fractional_cent(string $spelling, string $settingsKey): void
+    {
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                $spelling => '5000.5',
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([$spelling]);
+
+        $this->assertNull($this->storedSetting($settingsKey));
+
+        // The whole value stays saveable — only the fraction is refused.
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                $spelling => 5000,
+            ]))
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertSame('5000', $this->storedSetting($settingsKey));
+    }
+
+    /**
+     * The three fee keys are write targets, not request names. Deriving the
+     * rules from the key table must not promote them to an additional spelling
+     * of the API — the legacy name stays their only entry point.
+     */
+    #[DataProvider('legacyFeeProvider')]
+    public function test_fee_keys_are_not_reachable_under_their_unprefixed_name(string $spelling, string $settingsKey): void
+    {
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
+                $settingsKey => 5000,
+            ]))
+            ->assertStatus(200);
+
+        $this->assertNull($this->storedSetting($settingsKey));
+    }
+
+    public static function legacyFeeProvider(): array
+    {
+        return [
+            'setup_fee' => ['srp_setup_fee', 'setup_fee'],
+            'privacy_fee' => ['srp_privacy_fee', 'privacy_fee'],
+            'extra_image_fee' => ['srp_extra_image_fee', 'extra_image_fee'],
+        ];
     }
 
     public function test_watermark_update_dispatches_retryable_cache_invalidation_job(): void
