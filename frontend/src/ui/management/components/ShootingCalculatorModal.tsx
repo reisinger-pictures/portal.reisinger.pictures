@@ -5,6 +5,7 @@ import {InvoiceDiscount, InvoiceItem} from '../../../api';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import ModalShell from '../../components/ModalShell';
 import {calculateB2CFlexPrice, calculateShootingPrice, ShootingDiscount, DEFAULT_OUTDOOR_IMAGES_PER_HOUR} from '../../../logic/shootingCalculator';
+import {formatEuro} from '../../../logic/formatCurrency';
 
 interface ShootingCalculatorModalProps {
     isOpen: boolean;
@@ -225,8 +226,8 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                     <span className="font-bold text-lg text-base-content">Wert:</span>
                     <div className="text-right">
                         {calcMode === 'rp' && calcDiscount !== '0' && <div
-                            className="text-sm font-mono line-through opacity-50">{packagePriceEuro.toFixed(2)} €</div>}
-                        <div className="text-2xl font-mono font-bold text-primary">{finalPriceEuro.toFixed(2)} €</div>
+                            className="text-sm font-mono line-through opacity-50">{formatEuro(packagePriceEuro)}</div>}
+                        <div className="text-2xl font-mono font-bold text-primary">{formatEuro(finalPriceEuro)}</div>
                     </div>
                 </div>
         </ModalShell>

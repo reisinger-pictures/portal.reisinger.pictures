@@ -80,9 +80,20 @@ export default function InviteModal({galleryId, galleryType, onClose}: InviteMod
                     {/* Linke Spalte: Neu generieren */}
                     <div>
                         <h4 className="font-bold mb-2"><Trans>Neuen Link generieren</Trans></h4>
+                        {/* `whitespace-normal` is load-bearing on every option card
+                            below. daisyUI's `.label` sets `white-space: nowrap`:
+                            the description cannot wrap, the text column (a flex
+                            item with the default `min-width: auto`) refuses to
+                            shrink below the whole sentence, and the overflow is
+                            cut off by `.modal-box`'s scroll container without an
+                            ellipsis — the tail of the sentence is simply gone.
+                            daisyUI exempts only `.label:has(input[type=checkbox])`,
+                            which is why the checkbox card wrapped while both radio
+                            cards lost text. The class therefore sits on all
+                            three, so no card depends on that special case. */}
                         <div className="form-control mb-3">
                             <label
-                                className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border border-base-300">
+                                className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border border-base-300 whitespace-normal">
                                 <input type="radio" name="linkType" className="radio-primary radio"
                                        checked={linkType === 'mass'} onChange={() => {
                                     setLinkType('mass');
@@ -96,7 +107,7 @@ export default function InviteModal({galleryId, galleryType, onClose}: InviteMod
                         </div>
                         <div className="form-control mb-3">
                             <label
-                                className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border border-base-300">
+                                className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box w-full border border-base-300 whitespace-normal">
                                 <input type="radio" name="linkType" className="radio-primary radio"
                                        checked={linkType === 'personal'} onChange={() => setLinkType('personal')}/>
                                 <div>
@@ -118,7 +129,7 @@ export default function InviteModal({galleryId, galleryType, onClose}: InviteMod
                         {galleryType === 'delivery' && (
                             <div className="form-control mb-3">
                                 <label
-                                    className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 hover:bg-base-300/50 transition-colors">
+                                    className="cursor-pointer label justify-start gap-4 bg-base-200 p-3 rounded-box border border-base-300 hover:bg-base-300/50 transition-colors whitespace-normal">
                                     <input type="checkbox" className="checkbox-primary checkbox shrink-0" checked={canEditMeta}
                                            onChange={e => setCanEditMeta(e.target.checked)}/>
                                     <div>

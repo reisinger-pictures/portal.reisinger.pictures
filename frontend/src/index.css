@@ -146,6 +146,20 @@
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
+/* A scroll region that stops in the middle of a row reads as a rendering bug,
+   not as "there is more below". Fading the last band out turns the cut into an
+   affordance. `to bottom` + a transparent end: alpha is the mask channel, so the
+   gradient runs opaque → hidden, the opposite of a top fade.
+
+   The band is 2rem, so the caller needs a bottom padding of at least that much:
+   the mask always covers the last 2rem of the padding box, and without the
+   padding it would also fade the content once the region is scrolled to its end
+   (and, in a dialog, the footer that lives there). */
+@utility scroll-fade-bottom {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent 100%);
+}
+
 @layer utilities {
     .input {
         @apply w-full;

@@ -49,6 +49,11 @@ msgstr "[Name des Fotografen / Unternehmens]"
 msgid "[PLZ, Ort]"
 msgstr "[PLZ, Ort]"
 
+#. placeholder {0}: filteredUsers?.length ?? 0
+#: src/ui/management/components/GalleryAccessModal.tsx
+msgid "{0, plural, one {# Nutzer} other {# Nutzer}}"
+msgstr "{0, plural, one {# Nutzer} other {# Nutzer}}"
+
 #. placeholder {0}: group.nextTierCount
 #. placeholder {1}: group.nextTierLabel
 #: src/ui/client/components/CartItemList.tsx
@@ -316,6 +321,7 @@ msgstr "Ab"
 msgid "Ab {minQuantity} Bildern {price}€ pro Bild"
 msgstr "Ab {minQuantity} Bildern {price}€ pro Bild"
 
+#: src/ui/components/GalleryModal.tsx
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/components/UIProvider.tsx
 #: src/ui/components/WysiwygEditor.tsx
@@ -1783,8 +1789,16 @@ msgid "Die Passwörter stimmen nicht überein."
 msgstr "Die Passwörter stimmen nicht überein."
 
 #: src/ui/management/FtpConnectionRows.tsx
-msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera eingerichtet werden kann."
-msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera eingerichtet werden kann."
+#~ msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera eingerichtet werden kann."
+#~ msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera eingerichtet werden kann."
+
+#: src/ui/management/FtpConnectionRows.tsx
+msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Den Kamera-Zugang kannst du trotzdem einrichten — im Dashboard unter FTP Inbox → Kamera-Konto, die Anleitung dazu öffnest du über „Anleitung öffnen\"."
+msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Den Kamera-Zugang kannst du trotzdem einrichten — im Dashboard unter FTP Inbox → Kamera-Konto, die Anleitung dazu öffnest du über „Anleitung öffnen\"."
+
+#: src/ui/management/FtpConnectionRows.tsx
+#~ msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Ohne diese Angaben lässt sich die Kamera nicht einrichten."
+#~ msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Ohne diese Angaben lässt sich die Kamera nicht einrichten."
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Die Sicherheitsprüfung ist nicht konfiguriert. Bitte wende dich an den Support."
@@ -3784,6 +3798,7 @@ msgid "Lokal:"
 msgstr "Lokal:"
 
 #: src/ui/components/GalleryGroupModal.tsx
+#: src/ui/components/GalleryModal.tsx
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
@@ -5424,6 +5439,7 @@ msgstr "Spalte davor hinzufügen"
 msgid "Spalte löschen"
 msgstr "Spalte löschen"
 
+#: src/ui/components/GalleryModal.tsx
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
 #: src/ui/management/components/CouponFormDrawer.tsx

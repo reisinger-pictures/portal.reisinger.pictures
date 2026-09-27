@@ -238,7 +238,12 @@ export default function ManagementFtpInbox() {
                         onClose={() => setShowGuide(false)}
                         boxClassName="w-11/12 max-w-5xl max-h-90vh flex flex-col"
                     >
-                        <div className="flex-1 overflow-y-auto pr-2">
+                        {/* `scroll-fade-bottom` fades the last 2rem so the cut of
+                            the scroll region reads as scrollable instead of broken,
+                            and `pb-8` (exactly 2rem) keeps that band clear of the
+                            closing alert. This dialog has no footer, so the band can
+                            sit directly at the end without hiding anything below. */}
+                        <div className="flex-1 overflow-y-auto pr-2 scroll-fade-bottom pb-8">
                             <KameraEinrichtungContent connection={status.connection} />
                         </div>
                     </ModalShell>

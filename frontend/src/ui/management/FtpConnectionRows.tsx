@@ -46,8 +46,16 @@ export function FtpConnectionRows({rows}: {rows: FtpConnectionRow[]}) {
                 <tbody>
                     {rows.map(row => (
                         <tr key={row.field}>
-                            <td className="whitespace-nowrap text-sm">{connectionLabels[row.field]}</td>
-                            <td><code className="font-mono text-sm">{row.value}</code></td>
+                            {/* Paired with the value cell below: a `whitespace-nowrap`
+                                label can never yield width, so on a narrow viewport
+                                the value column got no room to wrap into. */}
+                            <td className="text-sm">{connectionLabels[row.field]}</td>
+                            {/* The value is a single unbreakable mono token (host,
+                                port range, path). `break-all` breaks it at a chosen
+                                point on a narrow viewport instead of after a hyphen;
+                                `sm:break-normal` restores the normal breaking rules
+                                from `sm` up, where there is room again. */}
+                            <td><code className="font-mono text-sm break-all sm:break-normal">{row.value}</code></td>
                         </tr>
                     ))}
                 </tbody>
@@ -61,6 +69,24 @@ export function FtpConnectionRows({rows}: {rows: FtpConnectionRow[]}) {
  *
  * Naming no missing field on purpose: which env var is unset is an admin
  * detail, and the photographer's only action is the same either way.
+ *
+ * The copy states the consequence and points at the guide, and deliberately
+ * does **not** promise that setting up the account will succeed. The two
+ * buttons are rendered outside this branch on the inbox card, so they are
+ * visible here — but whether provisioning actually completes when the
+ * deployment has not declared its FTP values is not something this component
+ * can know, and an unverified promise is the same failure mode as the dead end
+ * it replaces. The guide, by contrast, exists unconditionally and is useful
+ * whether or not the account can be created yet.
+ *
+ * "Contact support" was the original dead end: nobody can fix a server
+ * configuration from the outside, so the sentence sent the photographer
+ * somewhere they could not act.
+ *
+ * Located by section heading, never by proximity. This component renders in
+ * two places — the inbox card and, through FtpConnectionBlock, inside the
+ * guide dialog — and only the inbox carries the buttons. "FTP Inbox" is a
+ * heading that is on screen there, so the pointer stays true in both.
  */
 export function FtpConnectionUnconfigured() {
     return (
@@ -69,8 +95,8 @@ export function FtpConnectionUnconfigured() {
             <div>
                 <h3 className="font-bold"><Trans>Verbindungsdaten der Kamera nicht verfügbar</Trans></h3>
                 <p className="text-sm"><Trans>Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine
-                    Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera
-                    eingerichtet werden kann.</Trans></p>
+                    Verbindungsdaten anzeigen. Wie du die Kamera einrichtest, erklärt die
+                    Anleitung — im Dashboard unter FTP Inbox über „Anleitung öffnen".</Trans></p>
             </div>
         </div>
     );

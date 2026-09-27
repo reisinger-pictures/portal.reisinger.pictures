@@ -13,15 +13,11 @@ vi.mock('../UIContext', () => ({
     useUI: () => ({ showToast: vi.fn(), confirm: vi.fn().mockResolvedValue(true) }),
 }));
 
-vi.mock('../ModalDialogShell', () => ({
-    default: ({children, onSubmit}: {children: React.ReactNode; onSubmit: (e: React.FormEvent) => void}) => (
-        <form onSubmit={onSubmit}>
-            {children}
-            <button type="submit">Speichern</button>
-        </form>
-    ),
-}));
-
+// The dialog does not go through ModalDialogShell any more: it renders
+// ModalShell and owns its <form> and submit row, because the shell's unclassed
+// form blocks the bounded-height dialog with a scrolling body (see the comment
+// in GalleryModal). The assertions below therefore run against the real shell
+// instead of a stub that handed them a submit button.
 function setupSwr(presets: Array<{id: number; name: string; is_default: boolean}> = []) {
     vi.mocked(useSWR).mockImplementation(((key: unknown) => {
         if (key === '/api/management/orgs') {

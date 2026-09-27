@@ -95,6 +95,31 @@ function answerIsEmpty(answer: ModelProfileAnswer): boolean {
     return formatValue(answer.value) === '–';
 }
 
+/**
+ * Label of a section *inside* the "Profil-Angaben" group, e.g. "Basisdaten".
+ *
+ * It used to be `h4 font-bold text-lg` — byte-identical to the group heading it
+ * sits under, so the UI review read one flat level. It is now one step down on
+ * all three axes that carry hierarchy: size (16 vs 18), weight (600 vs 700) and
+ * contrast, plus `h5` for the same step in the outline. The spacing carries the
+ * rest: this label hugs its own fields (`mb-1`) while the group-to-group gap stays
+ * at `mb-6`, so a level group is closer to its own content than to the next one.
+ */
+const sectionHeadingClass = 'text-base font-semibold text-base-content/70 mb-1';
+
+/**
+ * Heading of a *group* in this dialog: "Fotos", "Profil-Zugang", "Profil-Angaben".
+ *
+ * All three are the same level, but they did not carry the same class: identical
+ * classes with two different margins — `mb-2` on two of them, `mb-1` on
+ * "Profil-Angaben". Equal siblings that space themselves differently read as two
+ * different levels, which is exactly what the UI review saw. `mb-1` is the one to
+ * keep: a group heading hugs its OWN group, and the gap to the next group already
+ * comes from the `mb-6` on the group wrapper. If one of the three ever looks too
+ * tight, change it here for all three — not at one of the three call sites.
+ */
+const groupHeadingClass = 'font-bold text-lg mb-1';
+
 export default function ModelDetailModal({ model, onClose, onChanged, pinnedCategories = [] }: Props) {
     const { showToast, confirm } = useUI();
     const { isSuperAdmin, isAdmin } = usePermissions();
@@ -248,7 +273,7 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
                 !answer.key.startsWith('willingness_') && !answer.key.startsWith('experience_'));
             return (
                 <div key={section.key} className="mb-6" data-testid={`model-section-${section.key}`}>
-                    <h4 className="font-bold text-lg mb-2">{section.label}</h4>
+                    <h5 className={sectionHeadingClass}>{section.label}</h5>
                     <div className="overflow-x-auto mb-3">
                         <table className="table table-sm" data-testid="model-skill-matrix">
                             <thead>
@@ -281,7 +306,7 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
         }
         return (
             <div key={section.key} className="mb-6" data-testid={`model-section-${section.key}`}>
-                <h4 className="font-bold text-lg mb-2">{section.label}</h4>
+                <h5 className={sectionHeadingClass}>{section.label}</h5>
                 <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">{section.answers.map(renderAnswerRow)}</dl>
             </div>
         );
@@ -297,12 +322,20 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
         // unambiguous would have removed a user-facing affordance to suit the
         // test. The three CRM specs that close this dialog are scoped to the
         // footer instead.
+        //
+        // The modal-box is also the scroll region (`max-h-90vh overflow-y-auto`),
+        // so without an affordance the boundary slices whatever row it lands on —
+        // in the UI review it cut "Linz"/"Österreich" through the glyphs, which
+        // reads as broken rather than as scrollable. `scroll-fade-bottom` fades
+        // the last 2rem; `pb-10` (2.5rem) keeps that band clear of the content
+        // and of the footer, so nothing is faded once the box is scrolled to its
+        // end.
         <ModalShell
             title={<span className="text-2xl min-w-0 break-words">{model.display_name ?? t`Unbenanntes Model`}</span>}
             icon="mdi--account-details"
             onClose={onClose}
             className="z-50"
-            boxClassName="max-w-4xl max-h-90vh overflow-y-auto"
+            boxClassName="max-w-4xl max-h-90vh overflow-y-auto pb-10 scroll-fade-bottom"
             secondaryAction={
                 <span className={`badge shrink-0 h-auto whitespace-normal ${modelLifecycleBadgeClass(model.lifecycle_status)}`}>
                     {modelLifecycleLabel(model.lifecycle_status)}
@@ -367,7 +400,12 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
                             </div>
                         )}
                     </div>
-                    <div className="rounded-box bg-base-200 p-3">
+                    {/* The age proof and the data state are one pair: on a 2-column
+                        grid the age proof used to take a single column (48% of the
+                        width) while the data state spanned both, which left ~150px of
+                        dead space next to it. `col-span-2` on mobile stacks them at the
+                        same width; `md:col-span-1` keeps the desktop 1 + 3 split. */}
+                    <div className="rounded-box bg-base-200 p-3 col-span-2 md:col-span-1">
                         <div className="text-xs opacity-60"><Trans>Altersnachweis</Trans></div>
                         <div className="font-bold">
                             {model.age_proof_required
@@ -395,7 +433,7 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
                 </div>
 
                 <div className="mb-6" data-testid="model-photo-gallery">
-                    <h4 className="font-bold text-lg mb-2"><Trans>Fotos</Trans></h4>
+                    <h4 className={groupHeadingClass}><Trans>Fotos</Trans></h4>
                     {model.photos.length === 0 ? (
                         <p className="opacity-50 text-sm"><Trans>Keine Fotos hinterlegt.</Trans></p>
                     ) : (
@@ -451,7 +489,7 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
                 </div>
 
                 <div className="mb-6" data-testid="model-access-link">
-                    <h4 className="font-bold text-lg mb-2"><Trans>Profil-Zugang</Trans></h4>
+                    <h4 className={groupHeadingClass}><Trans>Profil-Zugang</Trans></h4>
                     {accessLink ? (
                         <div className="rounded-box bg-base-200 p-3">
                             <input type="text" readOnly value={accessLink.url} className="input input-bordered input-sm w-full font-mono text-xs" data-testid="model-access-link-url" />
@@ -480,7 +518,12 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
                     )}
                 </div>
 
-                <h4 className="font-bold text-lg mb-2"><Trans>Profil-Angaben</Trans></h4>
+                {/* `mb-1` (via `groupHeadingClass`) instead of the `mb-2` the other
+                    two group headings used: this heading owns every section below
+                    it, so it has to sit closer to the first one than that group
+                    does to the next one. The level itself is carried by the scale
+                    (see `sectionHeadingClass`), not by the gap. */}
+                <h4 className={groupHeadingClass}><Trans>Profil-Angaben</Trans></h4>
                 {sectionGroups.length === 0 ? (
                     <p className="opacity-50 text-sm py-4"><Trans>Keine Antworten gespeichert.</Trans></p>
                 ) : (

@@ -23,6 +23,14 @@ export default defineConfig({
     ],
     use: {
         baseURL: SCREENSHOTS_BASE_URL,
+        // Pinned, not inherited: nothing here and no device profile defines a
+        // locale, so Chromium fell back to the developer's host language — which
+        // is why a native <input type="date"> rendered mm/dd/yyyy inside an
+        // otherwise German UI. A German photographer on a German browser sees
+        // TT.MM.JJJJ, so the English rendering was a capture-fidelity bug, not a
+        // product bug. Pinning it here makes every capture reproducible on any
+        // developer machine; both projects inherit it.
+        locale: 'de-DE',
         trace: 'off',
         video: 'off',
     },
