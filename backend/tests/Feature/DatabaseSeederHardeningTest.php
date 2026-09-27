@@ -34,7 +34,14 @@ class DatabaseSeederHardeningTest extends TestCase
         (new DatabaseSeeder)->run();
     }
 
-    public function test_reseed_preserves_custom_settings_and_does_not_import_locations(): void
+    /**
+     * The seeder is authoritative for the settings rows it declares, so a
+     * re-seed restores them — an operator value set through the UI for one of
+     * the 28 declared keys is not preserved (owner decision, documented in
+     * backend/AGENTS.md, Database Setup Policy). The seed still stays
+     * network-free and never imports locations.
+     */
+    public function test_reseed_restores_declared_settings_and_does_not_import_locations(): void
     {
         Http::fake();
 
@@ -49,7 +56,7 @@ class DatabaseSeederHardeningTest extends TestCase
         $this->assertDatabaseHas('settings', [
             'key' => 'price_web',
             'brand' => Brand::B2B->value,
-            'value' => '9999',
+            'value' => '7500',
         ]);
         $this->assertDatabaseHas('settings', [
             'key' => 'price_print',
