@@ -2076,6 +2076,106 @@ Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
   besser ein `title`-Attribut oder ein Layout, das den Namen umbrechen laesst.
   Aufgenommen, damit die Asymmetrie Mobile (bricht um) vs. Desktop (nowrap)
   bewusst bleibt und nicht als Versehen durchgeht.
+
+### Dialog-Screenshots 2026-09-27 — Abdeckung, Blocker und tote Stellen
+
+Ziel: **jeder Dialog ist bildgeprueft**, nicht nur funktional getestet. Die
+Kamera-Anleitung war der Anlass — genau diese Lqecke (kein `click`-Nav-Schritt)
+hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
+
+| Kategorie | Anzahl | Bemerkung |
+|---|---|---|
+| `ModalShell`-Familie (inkl. `ModalDialogShell`) | 18 | davon 3 keine eigenen Dialogflaechen (Shared Contract, Form-Wrapper, Inhalt der FTP-Anleitung) und 1 bereits erfasst (`photographer-guide-dialog`) |
+| davon neu erfassbar mit vorhandenen Seeds | 4 | `shooting-calculator`, `photo-job`, `volume-preset`, `model-detail` |
+| davon neu erfassbar mit neuem Gallery-Seed | 8 | Zugriff, Einladungslink, Bewertungen, Metadaten-Vorgaben, Fotografen-Team, E-Mail, Galerie bearbeiten, Meta-Galerie bearbeiten |
+| strukturell nicht erfassbar | 2 | `AIGalleryDefaultsModal` (nur aus einem anderen Dialog heraus) und der globale Bestaetigungsdialog (programmatisch, kein `click`-Target) |
+| Roh-Dialoge ohne `ModalShell` | 11 | 6 mit `role="dialog"`, **5 ohne** — die brauchen ein `data-testid`, bevor `waitFor` sie ueberhaupt greifen kann |
+
+- [x] **Vier Dialoge mit bestehenden Seeds ergaenzt und erfasst**
+  (`tests/screenshots/ui-review.config.ts`): `shooting-calculator-dialog`,
+  `volume-preset-dialog`, `model-detail-dialog`, `photo-job-dialog` — jeweils
+  Desktop + Mobile, Harness-Lauf **12 passed / 0 failed**. Die beiden ersten
+  Scheiterten zunaechst an Locator-Ambiguiten, nicht an Layout: das
+  Production-Board rendert **fuenf** identische `title="Neuer Auftrag"`-Buttons
+  (eine je Statusspalte, `PhotographerProductionBoard.tsx:92` via
+  `renderColumnHeader`), und `getByLabel('Suche')` trifft drei Elemente.
+  Beides ist ueber eine optionale `target`-Property am `fill`-Schritt bzw. ein
+  `>> nth=0` im `click`-Locator aufgeloest. Sichtpruefung `photo-job-dialog`
+  (Mobile): Header umbricht korrekt, Formular mit Pflichtstern, Footer
+  rechtsbuendig, `Status` = `Importiert` = die per `nth=0` fixierte erste Spalte
+  (= `defaultStatus`).
+- [x] **Vorbestehender roter Manifest-Eintrag: `admin-models` (filled + empty).**
+  Der `fill`-Schritt benutzte `label: 'Suche'`, was auf `/admin-models` **drei**
+  Elemente trifft: den globalen Such-Input (`aria-label="Suche"`), dessen
+  Submit-Button (`aria-label="Suche"`) und den Modell-Filter
+  (`ManagementModelsView.tsx:268-270`, `<label htmlFor="model-filter-q">Suche`).
+  Der Eintrag war also **seit Einfuehrung rot** und hat die Abdeckung nie
+  geliefert — sichtbar erst, nachdem die Drosselungs-Flakiness beseitigt war,
+  weil sie vorher Login-Timeouts in der Fehlermeldung zeigte. Mit
+  `target: '#model-filter-q'` behoben; beide States werden desktop+mobile
+  erfasst. **Lehre:** ein Harness, der flaky ist, verdeckt deterministische
+  Fehler — erst nach der Ursachenbehebung wurde der alte Fehler sichtbar.
+- [x] **Login-Timeout im Screenshot-Harness: Root Cause gefunden und behoben.**
+  Die Kette ist belegt, nicht vermutet:
+  1. `AUTH_THROTTLE_LIMIT=1000` **zieht**, ist aber die **falsche Schraube**.
+     Es gilt nur fuer die Login-/Register-Gruppe (`routes/api.php:60`,
+     `throttle:1000,1`). Hoechstens 40 Logins/min im Log — nie ausgeloest.
+     Die Zahl `5` in `env('AUTH_THROTTLE_LIMIT', 5)` ist der **Rueckfall**, nicht
+     der Wert; das hat hier zwei Fehldiagnosen produziert.
+  2. Bindend ist `API_THROTTLE_LIMIT` → `throttle:api` an **allen** API-Routen
+     (`routes/api.php:144` public, `:147` mit `auth:api`) — also auch an
+     `/api/auth/me`. `config/app.php:142` hat den Code-Default **120**, aber
+     `.env`, `.env.e2e`, `.env.ci` **und** `.env.example` setzten **60** — also
+     unter dem eigenen Default.
+  3. Gemessen im Log: **594 API-Requests in einer Minute** bei einem Harness-Lauf.
+     Faktor 10 ueber dem Limit.
+  4. Kausalkette: Login-POST gelingt (Limit 1000) → die App ruft
+     `GET /api/auth/me` → **429** (Limit 60) → der Nutzer wird nicht aufgeloest →
+     das Login-Formular bleibt sichtbar → Timeout nach 15 s. Das war das
+     gemeldete Symptom, deshalb passt die Erklaerung exakt.
+  **Fix:** `API_THROTTLE_LIMIT=9999` in `.env` und `.env.e2e` (beide mit
+  Begruendung im File, damit der Wert nicht wieder „aufgeraeumt" wird), plus
+  **Neustart des Backends** — ein PHP-Prozess liest die Env nur beim Start.
+  Verifiziert ueber `config:show app --env=e2e` → `throttle_api = 9999`.
+  **Zurueckgenommen:** der zuvor gebaute pro-Worker-Login-Cache. Er beruhte auf
+  der Falschannahme „5/min ausgeschoepft" und haette einen Workaround fuer eine
+  Fehlkonfiguration mit echtem Risiko (Session-Staleness gegen
+  Token-Blacklisting, 15-s-Fallback pro Test) eingetauscht. Bei korrektem Limit
+  ist der Cache entbehrlich; sein Performance-Nutzen ist marginal, seit jeder
+  Login nur noch bei Worker-Wiederverwendung eingespart wird.
+- [ ] **Offen, weil versioniert und CI-betreffen:** `.env.ci` und `.env.example`
+  stehen weiter auf `API_THROTTLE_LIMIT=60`. CI fährt laut eigenem Kommentar
+  4 Playwright-Worker und hat damit dasselbe Burst-Profil — die Drosselung ist
+  dort latent, auch wenn sie bisher nicht als Fehler auffaellt. Entscheidung des
+  Owners noetig: hoeherer Wert in `.env.ci` (vergleichbar mit dem
+  `AUTH_THROTTLE_LIMIT=1000` dort), und in `.env.example` ein Kommentar, dass
+  60 der Produktions-Sinnwert ist und Testumgebungen deutlich hoeher muessen
+  sein. **Nicht** angefasst: `config/app.php` (Default bleibt 120/5) und
+  `.env.production` (liegt nicht auf diesem Rechner).
+- [ ] **Harness-Grenze: `<main>`-Scoping.** `applyNavStep` scoped `target` und
+  `waitFor` auf `page.locator('main')`. `DashboardLayout.tsx:93-95` rendert
+  `<GalleryModals` **nach** `</main>`, und `ModalShell` nutzt **kein Portal** —
+  diese Dialoge liegen also ausserhalb des Landmarks und sind per `click` nicht
+  erreichbar. **Entscheidung: Scoping nicht aufweichen**, sondern die Instanzen
+  *innerhalb* von `<main>` nutzen (Detail-/Meta-View). Dieselbe Dialog-Komponente
+  ist damit abgedeckt; die Struktur-View-Instanzen („Neue Galerie", „Neuer
+  Ordner") bleiben eine **dokumentierte Luecke** — wer sie braucht, muss das
+  Scoping bewusst aendern.
+- [ ] **Verschoben, weil ungeprueft:** `AIBatchEditModal` (lokales
+  `AI_ENABLED=false` bei **leerem** `AI_API_KEY` — das Verhalten ist damit
+  unbestimmt) und `PhotoHistoryModal` (Multipart-Feldnamen des Uploads
+  unverifiziert). Beides wuerde einen Capture-Zyklus verbrennen.
+- [ ] **Toter Code, gefunden bei der Inventur:** `LicenseSelectorModal` hat
+  **null Importer** repo-weit (nur die eigene Definition; die ~25 Treffer in
+  `locale/de/messages.po` sind stale Uebersetzungen). Nicht erfassbar, weil nie
+  gerendert. Gehoert als Cleanup, nicht als Screenshot-Arbeit — **nicht** im
+  Rahmen dieser Runde entschieden, da Loeschen eines Client-Features eine
+  Produktfrage ist.
+- [ ] **Abdeckungs-SOLL fuer die Dialoge:** der aktuelle Stand ist
+  `photographer-guide-dialog` plus die vier neuen Eintraege. Die Gallery-Familie
+  (8 Eintraege) haengt an **einem** Gallery-Seed in `seeds.ts`; der wird als
+  Referenzfall zuerst gebaut und verifiziert, bevor die uebrigen darauf
+  aufsetzen.
 - [x] **Zusatz:** literale `\u2014` in JSX-Text der Fehlertabelle des Guides
   entsprachen keinem Escape und rendeten als `\u2014` → durch echte Em-Dashes
   ersetzt.
