@@ -117,15 +117,10 @@ class DatabaseSeeder extends Seeder
      * silently inherit the first brand's group — and with it its `is_public`
      * policy and its whole subtree.
      *
-     * A slug that already belongs to a DIFFERENT brand cannot be duplicated:
-     * `gallery_groups.slug` is globally unique (V001:
-     * `$table->string('slug')->unique();`, live index
-     * `gallery_groups_slug_unique`), so the per-`(brand, slug)` uniqueness this
-     * method would need does not exist yet. Creating a separate row is
-     * therefore impossible without a schema migration, and silently reusing
-     * the foreign row is exactly the tenant-isolation defect to prevent. The
-     * seeder fails loudly instead, so adding a second brand surfaces here
-     * rather than leaking the first brand's tree.
+     * Since V046 `gallery_groups.slug` is unique per `(brand, slug)`, so a slug
+     * that already belongs to another brand is no obstacle: this brand gets its
+     * own row with the same slug. Before V046 the schema was globally unique
+     * and this method had to fail loudly instead; that limitation is gone.
      *
      * `null` is an ambiguous brand value: `AsBrand` allows it, and it is also
      * the historical marker of a pre-brand (legacy) row. The row's data alone
@@ -147,30 +142,26 @@ class DatabaseSeeder extends Seeder
             return $ownGroup;
         }
 
-        $existing = GalleryGroup::query()->where('slug', $slug)->first();
+        $legacy = GalleryGroup::query()
+            ->where('slug', $slug)
+            ->whereNull('brand')
+            ->first();
 
-        if ($existing === null) {
-            return GalleryGroup::create([
-                'slug' => $slug,
-                ...$attributes,
-                'brand' => $brand,
-            ]);
+        if ($legacy !== null) {
+            $legacy->brand = $brand;
+            $legacy->save();
+
+            return $legacy;
         }
 
-        if ($existing->brand === null) {
-            $existing->brand = $brand;
-            $existing->save();
-
-            return $existing;
-        }
-
-        $owner = BrandRegistry::normalizeId($existing->brand);
-
-        throw new \RuntimeException(
-            "GalleryGroup slug '{$slug}' already belongs to brand '{$owner}', cannot seed it for brand '{$brand->value}'. "
-            .'The slug column is globally unique, so a second brand cannot own the same slug; give the new brand its own slug '
-            .'or migrate the uniqueness to (brand, slug).'
-        );
+        // Another brand may already own this slug (V046 makes `(brand, slug)`
+        // the unique key). That is expected and safe: create this brand's own
+        // row instead of refusing or reusing the foreign one.
+        return GalleryGroup::create([
+            'slug' => $slug,
+            ...$attributes,
+            'brand' => $brand,
+        ]);
     }
 
     /**
