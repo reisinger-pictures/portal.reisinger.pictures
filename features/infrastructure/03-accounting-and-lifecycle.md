@@ -15,7 +15,7 @@ status: active
 ## 1b. Tax Handling (Kleinunternehmerregelung)
 - **tax_rate = null:** All `invoice_snapshots` store `tax_rate` as `null` (nullable decimal column). A null value means "no VAT applicable."
 - **No VAT display:** When `tax_rate` is null, PDF invoices show no tax line. The Kleinunternehmer legal notice is rendered in the PDF footer template.
-- **All prices are net:** `total_net` and `total_gross` are identical when `tax_rate` is null. The system does not compute or display VAT amounts.
+- **All prices are net:** `total_net` and `total_gross` are identical when `tax_rate` is null. The system does not compute or display VAT amounts. Both columns are **integer cents** (`V004__ecommerce_and_governance.php:83-84`, `integer`); the shop path writes the same `$totalNetCents` into both (`backend/app/Services/CheckoutService.php:1594`) that it stores as `orders.total_amount` (`:1047`). `tax_rate` itself is **not** money — it is a percentage in points (`decimal(5,2)`, `V004:85`; nullable since `V025__consolidated_after_v024.php:35`). Unit rule: [`../tech/02-backend-architecture.md` § 4](../tech/02-backend-architecture.md).
 - **Scope:** Applies to all invoice types — shop orders (CheckoutService), manual invoices (InvoiceService), and contract invoices (ContractCloseService).
 
 ## 2. Collective Invoices (Sammelrechnung) vs. Direct Invoice

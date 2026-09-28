@@ -85,7 +85,7 @@ This directory serves as the single source of truth for all technical concepts, 
 
 ### 💻 Tech & Architecture
 * [01-database-schema.md](tech/01-database-schema.md) - UUIDs and migration strategy.
-* [02-backend-architecture.md](tech/02-backend-architecture.md) - Stateless API and ZIP streaming.
+* [02-backend-architecture.md](tech/02-backend-architecture.md) - Stateless API and ZIP streaming. **§ 4 ist der eine Money-/Einheitenvertrag des Repos** — wer eine Geldeinheit sucht, beginnt dort.
 * [03-frontend-architecture.md](tech/03-frontend-architecture.md) - React, Vite, SWR, and UI rules.
 * [04-testing-guidelines.md](tech/04-testing-guidelines.md) - Strict UI-first testing rules.
 * [05-security-and-perf-refinement.md](tech/05-security-and-perf-refinement.md) - Security and performance hardening.

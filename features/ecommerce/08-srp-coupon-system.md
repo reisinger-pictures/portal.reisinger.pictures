@@ -14,9 +14,33 @@ Three coupon types, defined by the `type` column:
 
 | Type | `value` meaning | Example |
 |---|---|---|
-| `fixed` | Fixed discount in Euro (stored as DECIMAL, converted to cents) | `value=5` → −5,00 € |
-| `percentage` | Percentage discount (0–100). When `max_items` is set, applies only to the X cheapest items. | `value=10` → −10 % (entire cart) or `value=50, max_items=3` → 50% off the 3 cheapest items |
-| `photo_package` | **Until N photos for a flat price Y €** (Foto-Paket / Volume-Licensing-Gutschein). N = `package_quantity`, Y = `package_price_cents`. Semantics, calculation & data model: **§3a**. | `package_quantity=10`, `package_price_cents=4000` → „10 Fotos für 40 €" |
+| `fixed` | Fixed discount, **`value` in Euro** (stored as DECIMAL, converted to cents on read) | `value=5` → −5,00 € |
+| `percentage` | Percentage discount (0–100), `value` in **percentage points**. When `max_items` is set, applies only to the X cheapest items. | `value=10` → −10 % (entire cart) or `value=50, max_items=3` → 50% off the 3 cheapest items |
+| `photo_package` | **Until N photos for a flat price Y €** (Foto-Paket / Volume-Licensing-Gutschein). N = `package_quantity`, Y = `package_price_cents` (**integer cents**). Semantics, calculation & data model: **§3a**. | `package_quantity=10`, `package_price_cents=4000` → „10 Fotos für 40 €" |
+
+> **`value` ist ein Discriminator-Feld, und das ist eine Ausnahme von der
+> Cent-Regel — die einzige im Repo.** Die Regel
+> ([`../tech/02-backend-architecture.md` § 4](../tech/02-backend-architecture.md)
+> Nummer 2) lautet: Für ein Feld, dessen Einheit von einem Geschwister-Discriminator
+> abhängt, gilt **ein** Feld, und die Einheit wird durch den `type`-Wert
+> bestimmt. Der Geldzweig (`fixed`) ist nach dieser Regel **Cent** — er ist es
+> nicht. `CouponService::applyCoupon()` rechnet bei `fixed` mit
+> `(int) round((float) $coupon->value * 100)`
+> (`backend/app/Services/CouponService.php:224`), bei `percentage` mit
+> `min(max((float) $coupon->value, 0), 100)` (`:231`) — zwei Einheiten, ein
+> Feld, entschieden durch `type`.
+>
+> **Diese Ausnahme ist dokumentiert, nicht Versehen.** Sie wird hier
+> festgehalten, weil eine Spalte `DECIMAL(10,2)` named `value` ohne
+> Einheitenangabe der Grund für die Regel war: `10` bedeutet bei einem Coupon
+> 10 €, beim anderen 10 %. Die Spaltenbeschreibung in § 7 nennt die Einheit
+> deshalb ab jetzt am Feld, und der Leseweg beweist sie:
+> `value=5` bei `type=fixed` ergibt `discountCents = 500`.
+>
+> **Offen, nicht entschieden:** ob `value` bei `fixed` auf Cent umgestellt wird
+> (was einen Discriminator-Zweig und die Spaltenmigration betrifft) oder die
+> Euro-Lesart als bewusste Ausnahme bleibt. Die Entscheidung gehört dem Owner;
+> sie ist **nicht** Teil der Cent-Entscheidung vom 2026-09-28.
 
 ### 2. Scope
 
@@ -223,10 +247,10 @@ Die Pricing-Strategie (`VolumeLicensingStrategy`) darf niemals lautlos auf den C
 | `brand` | string(20) NOT NULL | Brand-Isolation; aktuell wird die konfigurierte `rp`-Brand verwendet |
 | `code` | VARCHAR(50) NOT NULL | Human-readable code |
 | `type` | ENUM('fixed','percentage','photo_package') NOT NULL | Discount type (see §1 / §3a) |
-| `value` | DECIMAL(10,2) NOT NULL | Amount / percent (unused for `photo_package`) |
+| `value` | DECIMAL(10,2) NOT NULL | **Unit depends on `type`** (§1): Euro for `fixed`, percentage points for `percentage`, unused for `photo_package`. Not cents — see the documented exception above |
 | `max_items` | INT UNSIGNED NULL | When type=percentage: limit discount to X cheapest items (NULL = entire cart) |
 | `package_quantity` | INT UNSIGNED NULL | When type=photo_package: N (number of photos included in the bundle) |
-| `package_price_cents` | INT NULL | When type=photo_package: flat price Y € in cents (Stripe-conform) |
+| `package_price_cents` | INT NULL | When type=photo_package: flat price Y € in **integer cents** (Stripe-conform). **Achtung, Schreibpfad:** der Admin-Write-Pfad erwartet hier tatsächlich **Euro** und multipliziert mit 100 — `CouponAdminController::normalizePackagePrice()` (`backend/app/Http/Controllers/CouponAdminController.php:105-106`) macht `(int) round((float) $validated['package_price_cents'] * 100)`. Ein Feldname, der die Einheit im Speicher nennt, und ein Schreibpfad, der eine andere erwartet |
 | `scope_type` | ENUM('global','gallery','meta_gallery','photographer','organisation') NOT NULL DEFAULT 'global' | Scope type |
 | `scope_id` | CHAR(36) NULL | Target ID (galleries / gallery_groups / tenants) |
 | `max_uses_global` | INT UNSIGNED NULL | Global usage limit (NULL = unlimited) |

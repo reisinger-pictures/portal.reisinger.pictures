@@ -19,7 +19,7 @@ under brand `rp` (reisinger.pictures) MUST only see `rp` rows; the same applies 
 | Table | Purpose | T-17 / U-03 |
 |-------|---------|-------------|
 | `products` | Pakete / discounts (Shooting Calculator + manual invoices) | brand-scoped CRUD |
-| `license_use_cases` | Per-image licensing base prices | brand-scoped read + admin CRUD |
+| `license_use_cases` | Per-image licensing base prices | brand-scoped read + admin CRUD; `base_price` is **integer cents** (`V010__rsv_licensing.php:17` `integer`, geseedet `4500`–`45000` in `:35-38`, Integer-Cast in `backend/app/Models/LicenseUseCase.php:21`) |
 | `license_modifiers` | License surcharge modifiers | brand-scoped read + admin CRUD |
 | `settings` | Global key/value config (prices, multipliers, terms, calc, watermark) | **migrated from `srp_` prefix to `brand` column** |
 | `customers` | CRM customers | brand-scoped CRUD (U-03) |
