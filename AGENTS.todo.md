@@ -695,18 +695,24 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   (`Brand` als ENUM mit zwei Werten, 6 Tabellen; tatsächlich VARCHAR + Cast auf **19**
   Modellen). **`11` und `12` stehen auf „Soll-Zustand (Ziel)" ohne superseded-Marker.**
   Lebende Quelle: `21-brand-config-driven.md` + `22-brand-settings-overlay.md`.
-- [ ] **`wysiwyg-editor.spec.ts` schlägt reproduzierbar fehl und ist VORBESTEHEND** —
-  Zählung der Listenelemente 1 statt 2 (Tiptap-Listenbehandlung). Zuletzt angefasst am
-  **2026-09-26** (`069df63`), also vor der Geldeeinheiten-Welle; der Test ruft nur
-  `createIsolatedUser`/`teardown` auf, die niemand in dieser Welle angefasst hat.
-  **Gefunden von S1, der es korrekt nicht in einen Geldeeinheiten-Commit aufgenommen
-  hat** — nach der Zero-Pre-existing-Failures-Policy ein eigener Task. Nicht als
-  „pre-existing" abtun: die Policy verbietet das Label ausdrücklich.
+- [ ] **`wysiwyg-editor.spec.ts` — **lokal** fehlschlagend, in CI grün.** Gemessen am
+  2026-09-28, CI-Run `36389471967`: `wysiwyg-editor.spec.ts:19` **✓** und `:101` **✓**.
+  S1 hatte lokal einen Fehlschlag gemeldet (Zählung der Listenelemente 1 statt 2,
+  Tiptap-Listenbehandlung); in CI tritt er **nicht** auf. Der Eintrag war zunächst als
+  „reproduzierbar fehlend" notiert — das ist durch die Messung **widerlegt** und hiermit
+  korrigiert. Das letzte Anfassen liegt am **2026-09-26** (`069df63`), also vor der
+  Welle. **Befund, kein Task:** der Fehlschlag ist ein **Lokationsphänomen**, und die
+  Zero-Pre-existing-Failures-Policy ist hier nicht einschlägig, weil kein CI-Run rot ist.
+  Siehe den nächsten Eintrag — beide haben dieselbe Form.
 - [ ] **Flaky: Fototest-Gruppe liefert 7, dann 12, dann 0 Fehlschläge für denselben
   Code** (`FileDeliveryControllerTest`, `ModelPhoto*`). Ursache laut S1:
   `Storage::fake('local')`, während die `photos`-Disk auf das echte `../photos` schreibt —
-  der Test prüft also womöglich gegen den echten Plattenzustand. Die Policy verlangt,
-  dass Flaky bis zur Stabilisierung debugged wird, nicht dass sie toleriert wird.
+  der Test prüft also womöglich gegen den echten Plattenzustand. Ebenfalls **lokal**,
+  CI ist grün. **Gemeinsame Form mit dem wysiwyg-Eintrag:** beide entstehen in der
+  lokalen Umgebung und nicht in CI. **Deshalb ist die Frage nicht „welcher Test ist
+  kaputt", sondern „was unterscheidet die lokale E2E-Umgebung von CI"** — vermutlich der
+  geteilte Plattenzustand unter `../photos` und ein vom CI abweichender Seed. Das ist die
+  eigentliche Aufgabe; die beiden Symptome sind ihre Anzeichen.
 - [ ] **Die Doku ist an zwei Stellen hinter dem Code zurückgeblieben, weil der
   Doku-Agent vor dem Code gelandet ist.** `07-psychological-pricing.md:33` sagt noch,
   die Umstellung sei „in Arbeit", und `28-settings-key-meaning.md:102` führt
@@ -716,7 +722,14 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   beiden Stellen nach**; die Belegregeln aus §3 (Zeilenanker mit Zitat, Zahlen mit
   Befehl) sind der Grund, warum das auffällt und nicht still verschwindet.
 - [ ] **S1 hat die gemeinsame E2E-Datenbank migriert und geseedet — und dabei die
-  Migration des Coupon-Agenten mit angewandt.** Parallele Agenten auf demselben Working
+  Migration des Coupon-Agenten mit angewandt.** Auch der Coupon-E2E-Test, den S2 unter
+  8 Workern als flaky gemeldet hat (`coupon-checkout-revalidation.spec.ts:168`),
+  bestand im CI-Run `36389471967` unter voller Shard-Last **✓** — die Flakiness
+  reproduziert ebenfalls nicht. **Muster über drei Befunde hinweg:** wysiwyg-Editor,
+  Foto-Tests und dieser Coupon-Test scheitern **lokal** und bestehen in CI. Bevor
+  irgendetwas davon als Code-Defekt behandelt wird, ist die lokale E2E-Umgebung zu
+  untersuchen — sonst wird ein Umgebungsproblem dreimal als drei Fehler behoben.
+  Parallele Agenten auf demselben Working
   Tree teilen nicht nur den Git-Index, sondern jeden Nebenzustand, den sie per Kommando
   verändern. Ein `migrate` auf einer geteilten E2E-DB ist kein lokaler Schritt.
   **Für künftige parallele Wellen: getrennte Datenbanken pro Agent, oder die
