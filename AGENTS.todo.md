@@ -695,6 +695,43 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   (`Brand` als ENUM mit zwei Werten, 6 Tabellen; tatsächlich VARCHAR + Cast auf **19**
   Modellen). **`11` und `12` stehen auf „Soll-Zustand (Ziel)" ohne superseded-Marker.**
   Lebende Quelle: `21-brand-config-driven.md` + `22-brand-settings-overlay.md`.
+- [ ] **`wysiwyg-editor.spec.ts` schlägt reproduzierbar fehl und ist VORBESTEHEND** —
+  Zählung der Listenelemente 1 statt 2 (Tiptap-Listenbehandlung). Zuletzt angefasst am
+  **2026-09-26** (`069df63`), also vor der Geldeeinheiten-Welle; der Test ruft nur
+  `createIsolatedUser`/`teardown` auf, die niemand in dieser Welle angefasst hat.
+  **Gefunden von S1, der es korrekt nicht in einen Geldeeinheiten-Commit aufgenommen
+  hat** — nach der Zero-Pre-existing-Failures-Policy ein eigener Task. Nicht als
+  „pre-existing" abtun: die Policy verbietet das Label ausdrücklich.
+- [ ] **Flaky: Fototest-Gruppe liefert 7, dann 12, dann 0 Fehlschläge für denselben
+  Code** (`FileDeliveryControllerTest`, `ModelPhoto*`). Ursache laut S1:
+  `Storage::fake('local')`, während die `photos`-Disk auf das echte `../photos` schreibt —
+  der Test prüft also womöglich gegen den echten Plattenzustand. Die Policy verlangt,
+  dass Flaky bis zur Stabilisierung debugged wird, nicht dass sie toleriert wird.
+- [ ] **Die Doku ist an zwei Stellen hinter dem Code zurückgeblieben, weil der
+  Doku-Agent vor dem Code gelandet ist.** `07-psychological-pricing.md:33` sagt noch,
+  die Umstellung sei „in Arbeit", und `28-settings-key-meaning.md:102` führt
+  `calc_base_price`/`calc_hourly_rate` weiterhin als **Euro**. Beides stimmt seit
+  `754df6c` nicht mehr. **Kein Fehler des Doku-Agenten** — er hat die Entscheidung
+  dokumentiert, während die Umsetzung noch lief. **Wer die Welle abschließt, zieht die
+  beiden Stellen nach**; die Belegregeln aus §3 (Zeilenanker mit Zitat, Zahlen mit
+  Befehl) sind der Grund, warum das auffällt und nicht still verschwindet.
+- [ ] **S1 hat die gemeinsame E2E-Datenbank migriert und geseedet — und dabei die
+  Migration des Coupon-Agenten mit angewandt.** Parallele Agenten auf demselben Working
+  Tree teilen nicht nur den Git-Index, sondern jeden Nebenzustand, den sie per Kommando
+  verändern. Ein `migrate` auf einer geteilten E2E-DB ist kein lokaler Schritt.
+  **Für künftige parallele Wellen: getrennte Datenbanken pro Agent, oder die
+  Datenbankmigration dem Agenten zuweisen, der nach allen anderen fertig ist.**
+  Ergänzung zu §5.6.
+- [ ] **Meine eigene Rundungsanweisung war unvollständig, und ich habe sie als geprüft
+  ausgegeben.** Für die Umstellung von `roundToPsychologicalValue` auf Cent habe ich
+  Schwellen und Raster skaliert und behauptet, das Verhalten bleibe exakt erhalten —
+  nachgerechnet an `round(v/5)*5` gegen `round(v_cents/500)*500`. Den Abzug
+  `rounded -= 1` habe ich nicht mitgerechnet. **Gemessen:** 278.472 von 285.543 Beträgen
+  ab 12 € weichen ab (97,5 %); 12,00 € wird zu 9,99 € statt 9,00 €. Der Abzug erzeugt
+  die **…9**-Endung, er ist also genau der, der **nicht** skaliert werden darf. S1 hat
+  es erkannt, gegen 227.667 Beträge verifiziert und korrigiert; ich habe unabhängig
+  nachgerechnet und die Zahl bestätigt. **Muster:** eine N-teilige Äquivalenzbehauptung
+  entweder für alle N Teile belegen oder ausdrücklich sagen, welche Teile ungeprüft sind.
 - [ ] Entscheidung offen: **die Lizenzbegriffe-Antwort mischt drei Einheiten,
   und das ist ein Rechenproblem, kein Darstellungsproblem.** `base_price`,
   `setup_fee`, `privacy_fee`, `extra_image_fee` und die `price_*` sind
