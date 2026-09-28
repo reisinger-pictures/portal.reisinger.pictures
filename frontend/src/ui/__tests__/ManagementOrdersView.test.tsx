@@ -215,15 +215,12 @@ describe('ManagementOrdersView', () => {
         expect(screen.queryByRole('dialog', { name: 'Angebot kalkulieren & senden' })).not.toBeInTheDocument();
     });
 
-    // Pinned deliberately. The price field carries `autoFocus`, and React
-    // applies that during commit — but the focus trap's effect runs afterwards
-    // and moves focus to the first focusable element, which is the shell's
-    // labelled close button. So on open the dialog no longer lands the caret in
-    // the price field. This is a real change in where focus starts, recorded
-    // here so it is a decision rather than an accident; if the price field
-    // should win, the shell needs an initial-focus hook and this test moves
-    // with it.
-    it('puts initial focus on the labelled close button rather than the autoFocus price field', async () => {
+    // Moved with D-12. This test used to pin the opposite: that the price field
+    // carries `autoFocus` but the trap's effect runs afterwards and moves focus
+    // to the shell's labelled close button. The owner's decision is that
+    // `autoFocus` wins, so the expectation is inverted here and the code was not
+    // bent to keep the old assertion.
+    it('lands initial focus in the autoFocus price field rather than the close button', async () => {
         const user = userEvent.setup();
 
         vi.mocked(useSWR).mockReturnValue({
@@ -237,8 +234,8 @@ describe('ManagementOrdersView', () => {
 
         await user.click(screen.getByText('Kalkulieren & Antworten'));
 
-        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Schließen' }));
-        expect(document.activeElement).not.toBe(screen.getByPlaceholderText('z.B. 450.00'));
+        expect(document.activeElement).toBe(screen.getByPlaceholderText('z.B. 450.00'));
+        expect(document.activeElement).not.toBe(screen.getByRole('button', { name: 'Schließen' }));
     });
 
     it('does not label the rights field as optional', async () => {
