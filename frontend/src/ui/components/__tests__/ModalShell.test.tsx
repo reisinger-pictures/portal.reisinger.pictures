@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../../test-setup';
@@ -174,6 +175,103 @@ describe('ModalShell', () => {
             await userEvent.tab();
             expect(outside).not.toHaveFocus();
         }
+    });
+
+    /**
+     * D-12 — a dialog declares its own initial focus with React's standard
+     * `autoFocus`, and the shell's trap must not override it.
+     *
+     * 23 of the 28 dialogs here begin with a form control, so the trap's
+     * "first focusable element" — the shell's labelled close button — was the
+     * wrong place to start almost everywhere. The owner's decision was to let
+     * `autoFocus` win inside `useFocusTrap` rather than grow a prop or move
+     * focus per dialog.
+     */
+    it('keeps initial focus on the element the dialog marks with autoFocus', () => {
+        renderWithProviders(
+            <ModalShell title="Bestellung" onClose={vi.fn()}>
+                <input data-testid="field" autoFocus />
+            </ModalShell>,
+        );
+
+        expect(screen.getByTestId('field')).toHaveFocus();
+        expect(screen.getByRole('button', { name: 'Schließen' })).not.toHaveFocus();
+    });
+
+    it('focuses the labelled close button when the dialog has no focusable content', () => {
+        // RatingStatusModal and the camera guide in ManagementFtpInbox have no
+        // focusable content of their own, so the shell's close button is the
+        // only reachable start — the unchanged fallback for a dialog that
+        // declares no `autoFocus`.
+        renderWithProviders(
+            <ModalShell title="Status" onClose={vi.fn()}>
+                <p>Nur Text</p>
+            </ModalShell>,
+        );
+
+        expect(screen.getByRole('button', { name: 'Schließen' })).toHaveFocus();
+    });
+
+    it('returns focus to the trigger after Escape even when the dialog declares autoFocus', async () => {
+        // The invariant D-12 explicitly repairs: the return target is captured
+        // before the dialog's `autoFocus` lands, so closing puts focus back on
+        // the control that opened the dialog.
+        const user = userEvent.setup();
+
+        function Harness() {
+            const [isOpen, setIsOpen] = useState(false);
+            return (
+                <>
+                    <button type="button" data-testid="trigger" onClick={() => setIsOpen(true)}>
+                        Öffnen
+                    </button>
+                    {isOpen && (
+                        <ModalShell title="Bestellung" onClose={() => setIsOpen(false)}>
+                            <input data-testid="field" autoFocus />
+                        </ModalShell>
+                    )}
+                </>
+            );
+        }
+
+        renderWithProviders(<Harness />);
+        const trigger = screen.getByTestId('trigger');
+
+        await user.click(trigger);
+        expect(screen.getByTestId('field')).toHaveFocus();
+
+        await user.keyboard('{Escape}');
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(trigger).toHaveFocus();
+    });
+
+    it('lets the inner dialog keep its own autoFocus when dialogs are nested', async () => {
+        // AIGalleryDefaultsModal opens inside GalleryMetadataDefaultsModal.
+        // Mount order alone is not nesting, so the inner trap has to win on
+        // document order — which is what `isTopmostTrapContainer` already
+        // resolves for Escape and what the trap stack now does for focus too.
+        const user = userEvent.setup();
+
+        function Harness() {
+            const [isInnerOpen, setIsInnerOpen] = useState(false);
+            return (
+                <ModalShell title="Äußeres Dialog" onClose={vi.fn()}>
+                    <button type="button" data-testid="open-inner" onClick={() => setIsInnerOpen(true)}>
+                        Innen öffnen
+                    </button>
+                    {isInnerOpen && (
+                        <ModalShell title="Inneres Dialog" onClose={vi.fn()}>
+                            <input data-testid="inner-field" autoFocus />
+                        </ModalShell>
+                    )}
+                </ModalShell>
+            );
+        }
+
+        renderWithProviders(<Harness />);
+        await user.click(screen.getByTestId('open-inner'));
+
+        expect(screen.getByTestId('inner-field')).toHaveFocus();
     });
 
     it('scrolls the body and keeps the footer outside it when asked to', () => {

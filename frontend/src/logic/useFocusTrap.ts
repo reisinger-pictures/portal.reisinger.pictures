@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useInsertionEffect, useRef } from 'react';
 
 const FOCUSABLE_SELECTOR = [
     'a[href]',
@@ -105,6 +105,37 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>(
     const containerRef = useRef<T | null>(null);
     const onEscapeRef = useRef<(() => void) | undefined>(options?.onEscape);
 
+    // The element that had focus before this dialog opened — the trigger whose
+    // focus has to come back when the dialog closes.
+    //
+    // It cannot be read where it is used (the passive effect below): React
+    // focuses an `autoFocus` element imperatively in `commitMount`, which runs
+    // in the layout phase of the very commit that mounts the dialog. By the
+    // time that effect runs, `document.activeElement` is already the dialog's
+    // own field, so reading it there records the field and restoration on close
+    // has nothing to return to. The insertion phase is the only hook phase that
+    // runs before every layout effect, so it is the last point at which
+    // `activeElement` is still the trigger.
+    //
+    // Captured once per activation: re-renders while the dialog is open would
+    // otherwise overwrite the trigger with whatever is focused now. Deliberately
+    // a `useInsertionEffect` and not a new prop or a per-dialog ref — the hook
+    // stays the only owner of focus.
+    const previousFocusRef = useRef<HTMLElement | null>(null);
+    const capturedPreviousFocusRef = useRef(false);
+
+    useInsertionEffect(() => {
+        if (!isActive) {
+            capturedPreviousFocusRef.current = false;
+            return;
+        }
+        if (capturedPreviousFocusRef.current) return;
+
+        const activeElement = document.activeElement;
+        previousFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
+        capturedPreviousFocusRef.current = true;
+    });
+
     useEffect(() => {
         onEscapeRef.current = options?.onEscape;
     }, [options?.onEscape]);
@@ -121,8 +152,7 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>(
             trapStacks.set(ownerDocument, stack);
         }
 
-        const activeElement = ownerDocument.activeElement;
-        const previousFocus = activeElement instanceof HTMLElement ? activeElement : null;
+        const previousFocus = previousFocusRef.current;
         const entry: FocusTrapEntry = {
             container,
             previousFocus,
@@ -143,7 +173,18 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>(
             focusableElements[0].focus();
         };
 
-        focusFirstElement();
+        // D-12: React's `autoFocus` runs during the commit, before this effect,
+        // so when a dialog declares one focus is already inside the container.
+        // Moving it to the first focusable element (the shell's labelled close
+        // button) would override the dialog's own declaration. A dialog without
+        // `autoFocus` leaves focus on its trigger — outside the container — so
+        // the fallback still runs and behaviour is unchanged there.
+        const focusIsAlreadyInside =
+            ownerDocument.activeElement instanceof Node &&
+            container.contains(ownerDocument.activeElement);
+        if (!focusIsAlreadyInside) {
+            focusFirstElement();
+        }
 
         const handleKeyDown = (event: KeyboardEvent) => {
             if (!isTopTrap(stack, entry)) return;

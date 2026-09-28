@@ -69,6 +69,23 @@ describe('RatingStatusModal', () => {
         expect(await screen.findByText(/Fehler beim Laden der Bewertungen\./)).toBeInTheDocument();
         expect(fetch).not.toHaveBeenCalled();
     });
+
+    it('starts focus on the shell close button, as the dialog has no focusable content of its own', async () => {
+        // D-12's fallback: this dialog declares no `autoFocus` and its two
+        // tables hold no focusable element, so the labelled close button is the
+        // only reachable start. The other such dialog is the camera guide in
+        // ManagementFtpInbox; this is the one a unit test can render directly.
+        vi.mocked(fetcher)
+            .mockResolvedValueOnce(exportRatings)
+            .mockResolvedValueOnce(ratingStatus);
+
+        renderWithProviders(
+            <RatingStatusModal galleryId="gallery-1" isOpen={true} onClose={vi.fn()} />,
+        );
+        await screen.findByText('Alex Example');
+
+        expect(screen.getByRole('button', { name: 'Schließen' })).toHaveFocus();
+    });
 });
 
 /**
