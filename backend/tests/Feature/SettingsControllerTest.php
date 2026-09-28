@@ -336,28 +336,34 @@ class SettingsControllerTest extends TestCase
         $this->assertDatabaseHas('settings', ['key' => 'price_print', 'brand' => 'rp', 'value' => '24901']);
         $this->assertDatabaseHas('settings', ['key' => 'price_original', 'brand' => 'rp', 'value' => '89999']);
 
-        // Read leg: the public endpoint returns the same cents, unchanged.
+        // Read leg: the public endpoint returns the same cents, as JSON
+        // integers (owner decision 2026-09-27: the API types its money).
         $terms = $this->getJson('/api/settings/license-terms')->assertStatus(200);
-        $this->assertSame('12345', $terms->json('price_web'));
-        $this->assertSame('24901', $terms->json('price_print'));
-        $this->assertSame('89999', $terms->json('price_original'));
+        $this->assertSame(12345, $terms->json('price_web'));
+        $this->assertSame(24901, $terms->json('price_print'));
+        $this->assertSame(89999, $terms->json('price_original'));
 
-        // Round trip in the card's own unit: the stored cents hydrate back into
+        // Round trip in the card's own unit: the served cents hydrate back into
         // the euros that were typed in (123.45 / 249.01 / 899.99) — the same
-        // `parseInt(...)/100` the licence card performs.
-        $this->assertSame(123.45, (int) $terms->json('price_web') / 100);
-        $this->assertSame(249.01, (int) $terms->json('price_print') / 100);
-        $this->assertSame(899.99, (int) $terms->json('price_original') / 100);
+        // `/100` the licence card performs.
+        $this->assertSame(123.45, $terms->json('price_web') / 100);
+        $this->assertSame(249.01, $terms->json('price_print') / 100);
+        $this->assertSame(899.99, $terms->json('price_original') / 100);
     }
 
     /**
      * The card hydrates `price_*` from the public endpoint, and
      * `pricingLogic.getRequiredTerm()` throws "Kritischer Systemfehler" when a
-     * price factor is missing. Pin both the presence and the JSON *type*: the
-     * `settings.value` column is text, and every sibling price factor on this
-     * endpoint is served as a string, not a number.
+     * price factor is missing. Pin both the presence and the JSON *type*.
+     *
+     * The type used to be pinned as a **string**, which was true while every
+     * value on this endpoint was the raw `settings.value` text. Owner decision
+     * 2026-09-27 inverted it: money leaves the API as a JSON integer, so that
+     * a client cannot mistake a cent amount for anything else. The non-money
+     * members of the same response stay text — that is what keeps them
+     * distinguishable — and are pinned in `ShootingCalculatorSettingsTest`.
      */
-    public function test_get_license_terms_exposes_the_resolution_prices_as_strings(): void
+    public function test_get_license_terms_exposes_the_resolution_prices_as_cent_integers(): void
     {
         Setting::updateOrCreate(['key' => 'price_web', 'brand' => 'rp'], ['value' => '7500']);
         Setting::updateOrCreate(['key' => 'price_print', 'brand' => 'rp'], ['value' => '14500']);
@@ -366,13 +372,13 @@ class SettingsControllerTest extends TestCase
         $terms = $this->getJson('/api/settings/license-terms')
             ->assertStatus(200)
             ->assertJsonStructure(['price_web', 'price_print', 'price_original'])
-            ->assertJsonPath('price_web', '7500')
-            ->assertJsonPath('price_print', '14500')
-            ->assertJsonPath('price_original', '45000');
+            ->assertJsonPath('price_web', 7500)
+            ->assertJsonPath('price_print', 14500)
+            ->assertJsonPath('price_original', 45000);
 
-        $this->assertIsString($terms->json('price_web'));
-        $this->assertIsString($terms->json('price_print'));
-        $this->assertIsString($terms->json('price_original'));
+        $this->assertIsInt($terms->json('price_web'));
+        $this->assertIsInt($terms->json('price_print'));
+        $this->assertIsInt($terms->json('price_original'));
     }
 
     /**
@@ -390,12 +396,12 @@ class SettingsControllerTest extends TestCase
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/management/settings/license-terms', $this->validLicenseTermsPayload([
-                'calc_base_price' => '75',
+                'calc_base_price' => 7500,
             ]))
             ->assertStatus(200)
             ->assertJson(['success' => true]);
 
-        $this->assertDatabaseHas('settings', ['key' => 'calc_base_price', 'brand' => 'rp', 'value' => '75']);
+        $this->assertDatabaseHas('settings', ['key' => 'calc_base_price', 'brand' => 'rp', 'value' => '7500']);
 
         $this->getJson('/api/settings/license-terms')
             ->assertStatus(200)
@@ -564,11 +570,13 @@ class SettingsControllerTest extends TestCase
         $this->assertSame((string) $value, $viaLegacyName);
 
         // One row, two names in the response — the response shape is unchanged
-        // and both members read that single row.
+        // and both members read that single row. Money goes out as a JSON
+        // integer, so the response member is the stored cents as a number, not
+        // the stored text.
         $this->assertSame(1, Setting::where('key', 'base_price')->where('brand', 'rp')->count());
         $terms = $this->getJson('/api/settings/license-terms')->assertStatus(200);
-        $this->assertSame($viaLegacyName, $terms->json('base_price'));
-        $this->assertSame($viaLegacyName, $terms->json('srp_base_price'));
+        $this->assertSame((int) $viaLegacyName, $terms->json('base_price'));
+        $this->assertSame((int) $viaLegacyName, $terms->json('srp_base_price'));
     }
 
     public static function acceptedBasePriceProvider(): array

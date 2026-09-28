@@ -32,8 +32,19 @@ class SettingsController extends Controller
      */
     private const LICENSE_TERM_RULES = [
         'base_price' => 'nullable|integer|min:500',
-        'calc_base_price' => 'nullable|numeric|min:0',
-        'calc_hourly_rate' => 'nullable|numeric|min:0',
+        // The two studio-calculator money fields, in cents like every other
+        // money key (owner decision 2026-09-28) and held to exactly the rule
+        // `base_price` already carries. `integer` is the unit guard: a
+        // fractional amount means the caller sent euros, and storing that
+        // would be off by two decimal orders of magnitude. It was `numeric`
+        // before, which is what let a client pick a weaker rule for a money
+        // field than its own sibling in the same form — the defect the
+        // settings-key-meaning decision (features/infrastructure/28) is about.
+        // `min:500` (5 €) matches `base_price`; a deliberately free tier is
+        // not a configuration the calculator can price, and the write path has
+        // always rejected the sub-minimum for the other cent fields.
+        'calc_base_price' => 'nullable|integer|min:500',
+        'calc_hourly_rate' => 'nullable|integer|min:500',
         'calc_images_per_hour' => 'nullable|integer|min:1',
         'calc_outdoor_images_per_hour' => 'nullable|integer|min:1',
         'calc_flatrate_multiplier' => 'nullable|numeric|min:1|max:10',
@@ -304,26 +315,27 @@ class SettingsController extends Controller
             'web' => $resolver->get('term_web'),
             'print' => $resolver->get('term_print'),
             'original' => $resolver->get('term_original'),
-            // Resolution prices, in cents — the unit they are stored in
-            // (DatabaseSeeder: 'price_web' => '7500', directly above its
-            // "Per-image license base prices are stored in cents" note on
-            // `base_price`). Served verbatim as the text the `settings.value`
-            // column holds, like every other factor on this endpoint, because
-            // the frontend hydrates euros with `parseInt(...)/100` and its
-            // `getRequiredTerm()` throws when a price factor is absent.
-            'price_web' => $resolver->get('price_web'),
-            'price_print' => $resolver->get('price_print'),
-            'price_original' => $resolver->get('price_original'),
-            'base_price' => $resolver->get('base_price'),
-            'calc_base_price' => $resolver->get('calc_base_price'),
-            'calc_hourly_rate' => $resolver->get('calc_hourly_rate'),
+            // Money leaves this endpoint as a JSON **integer** in cents
+            // (owner decisions 2026-09-27/28: the API types its money, and
+            // every monetary amount is cents). `settings.value` is a `text`
+            // column, so these are stored as the text `'8000'` and projected
+            // here — per key, via moneyInCents(), never as a blanket cast over
+            // the response. The factors, the counts and the licence texts in
+            // the same payload keep the stored string, because their typing is
+            // exactly what tells a consumer which is which.
+            'price_web' => $this->moneyInCents($resolver, 'price_web'),
+            'price_print' => $this->moneyInCents($resolver, 'price_print'),
+            'price_original' => $this->moneyInCents($resolver, 'price_original'),
+            'base_price' => $this->moneyInCents($resolver, 'base_price'),
+            'calc_base_price' => $this->moneyInCents($resolver, 'calc_base_price'),
+            'calc_hourly_rate' => $this->moneyInCents($resolver, 'calc_hourly_rate'),
             'calc_images_per_hour' => $resolver->get('calc_images_per_hour'),
             'calc_outdoor_images_per_hour' => $resolver->get('calc_outdoor_images_per_hour'),
             'calc_flatrate_multiplier' => $resolver->get('calc_flatrate_multiplier'),
-            'srp_base_price' => $resolver->get('base_price'),
-            'srp_setup_fee' => $resolver->get('setup_fee'),
-            'srp_privacy_fee' => $resolver->get('privacy_fee'),
-            'srp_extra_image_fee' => $resolver->get('extra_image_fee'),
+            'srp_base_price' => $this->moneyInCents($resolver, 'base_price'),
+            'srp_setup_fee' => $this->moneyInCents($resolver, 'setup_fee'),
+            'srp_privacy_fee' => $this->moneyInCents($resolver, 'privacy_fee'),
+            'srp_extra_image_fee' => $this->moneyInCents($resolver, 'extra_image_fee'),
             'pricing_strategy' => $pricingStrategy,
             // Wire contract: `preset_id` is the `volume_presets.id` primary key
             // and is serialised as a JSON *number*. The frontend treats it as an
@@ -339,6 +351,28 @@ class SettingsController extends Controller
                 ])->values(),
             ] : null,
         ]);
+    }
+
+    /**
+     * One money field of the licence-terms response, as a JSON integer.
+     *
+     * Applied per key, not across the response: a blanket cast would type the
+     * dimensionless factors, the image counts and the licence texts as money
+     * too, and the typing is the only thing on the wire that says which is
+     * which.
+     *
+     * A missing setting stays `null` rather than becoming `0`. A `0` here is a
+     * price — a free base price, a free quote — and silently manufacturing one
+     * out of an absent row is a worse failure than a `null` a client has to
+     * handle. The write path (`LICENSE_TERM_RULES`, `integer|min:500`) is what
+     * keeps the column numeric, so no non-numeric value can reach this cast
+     * through the application.
+     */
+    private function moneyInCents(SettingResolver $resolver, string $key): ?int
+    {
+        $value = $resolver->get($key);
+
+        return $value === null ? null : (int) $value;
     }
 
     /**

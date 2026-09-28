@@ -69,6 +69,13 @@ test.describe('Package Calculator Configuration (G2)', () => {
     test('Admin can configure package calculator settings', { tag: ['@feature:admin:calculator'] }, async ({ page }) => {
         const cardBody = await openCalculatorSettings(page);
 
+        // Every value below is typed into the *form*, and the form edits euros:
+        // `mapApiToForm` divides the served cents by 100 and `mapFormToApi`
+        // multiplies by 100 again. So 95 here is 95 €/h = 9500 cents on the wire,
+        // and that is what the card is being asked to do — these assertions are
+        // not euro values the API should have rejected. The API-side unit is
+        // pinned separately in `manual-documents.spec.ts`, which writes through
+        // `E2ESessionHelper` and therefore cannot speak euros at all.
         await withCalculatorSettings(async () => {
             // Saved and read back inside the same critical section, so what the
             // form shows is what this test just wrote — no other worker can have
@@ -103,7 +110,6 @@ test.describe('Package Calculator Configuration (G2)', () => {
 
             // Wait for the form to reflect the saved hourly rate (ensures SWR cache is fresh)
             await expect(field(cardBody, 'Stundensatz')).toHaveValue('80');
-
             // Navigate to manual offer page and open calculator
             await new SidebarHelper(page).navigateTo('Manuelles Angebot');
 
@@ -122,8 +128,11 @@ test.describe('Package Calculator Configuration (G2)', () => {
             await calcModal.getByRole('button', { name: 'Berechnen & Hinzufügen' }).click();
             await expect(calcModal).toBeHidden();
 
-            // Verify result:
-            // Base 50 + Time 120 + (Images (80/20)*15 = 60) = 230 → psych 229
+            // Verify result. The calculator computes in cents since the
+            // 2026-09-28 cents decision, and the modal converts to euros for the
+            // invoice line, so the assertion below is the same price as before
+            // the unit change, computed on a different scale:
+            // 5000 + 12000 + ((8000/20)*15 = 6000) = 23000 → psych 22900 = 229,00 €.
             const itemTitleInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
             await expect(itemTitleInput).toHaveValue('Individuelles Shooting-Paket', { timeout: 10000 });
 

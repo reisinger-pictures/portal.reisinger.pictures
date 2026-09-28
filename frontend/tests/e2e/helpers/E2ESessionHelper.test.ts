@@ -69,3 +69,78 @@ describe('E2ESessionHelper.createIsolatedUser', () => {
         );
     });
 });
+
+/**
+ * The unit guard on the E2E session helper.
+ *
+ * Without it the helper is unit-blind: it accepts `'50'` and `50` for
+ * `calc_base_price` alike, so after the 2026-09-28 euros → cents change every
+ * calculator spec would still pass — the fixture writes euros into a cents
+ * field, the assertion reads euros back out of it, and the two errors cancel.
+ * These cases fail if the guard is ever removed.
+ */
+describe('E2ESessionHelper calculator money settings are unit-checked', () => {
+    const settingsPayload = (money: Record<string, unknown>) => ({
+        calc_base_price: 5000,
+        calc_hourly_rate: 8000,
+        calc_images_per_hour: '6',
+        calc_outdoor_images_per_hour: '8',
+        calc_flatrate_multiplier: '1.2',
+        ...money,
+    });
+
+    const helperFor = (payload: Record<string, unknown>) => {
+        const post = vi.fn().mockResolvedValue(loginResponse());
+        const get = vi.fn().mockResolvedValue(response({ ok: true, body: payload }));
+        return new E2ESessionHelper(requestWith(post, get, vi.fn()));
+    };
+
+    it('accepts integer cent amounts', async () => {
+        await expect(helperFor(settingsPayload({})).getShootingCalculatorSettings()).resolves.toEqual({
+            calc_base_price: 5000,
+            calc_hourly_rate: 8000,
+            calc_images_per_hour: '6',
+            calc_outdoor_images_per_hour: '8',
+            calc_flatrate_multiplier: '1.2',
+        });
+    });
+
+    it.each([
+        ['the old euro value as text', '50'],
+        ['a sub-cent amount as text', '50.5'],
+        ['a fractional cent amount', 5000.5],
+    ])('rejects %s for calc_base_price as not an integer cent amount', async (_name, value) => {
+        await expect(helperFor(settingsPayload({ calc_base_price: value })).getShootingCalculatorSettings())
+            .rejects.toThrow(/"calc_base_price" is money and must be integer cents/s);
+    });
+
+    it.each([
+        ['the old euro value as a number', 50],
+        ['an amount just below the minimum', 499],
+    ])('rejects %s as a euro amount written into a cents field', async (_name, value) => {
+        // A *numeric* euro amount is a well-formed integer that simply sits
+        // below the endpoint's own `min:500`, so the guard reports it as what it
+        // is rather than as a type problem. Both spellings of "50 €" are
+        // rejected; only the diagnosis differs.
+        await expect(helperFor(settingsPayload({ calc_base_price: value })).getShootingCalculatorSettings())
+            .rejects.toThrow(/"calc_base_price" is \d+ cents, below the 500-cent minimum/s);
+    });
+
+    it('rejects an explicit null as a missing value', async () => {
+        await expect(helperFor(settingsPayload({ calc_base_price: null })).getShootingCalculatorSettings())
+            .rejects.toThrow(/calc_base_price" is missing from/);
+    });
+
+    it('does not apply the money rule to the counts and the factor', async () => {
+        // `calc_images_per_hour` and `calc_flatrate_multiplier` are not money:
+        // a count and a dimensionless factor keep their stored text, and a
+        // blanket "everything numeric" rule would reject the factor's '1.2'.
+        await expect(helperFor(settingsPayload({
+            calc_images_per_hour: '12',
+            calc_flatrate_multiplier: '1.35',
+        })).getShootingCalculatorSettings()).resolves.toMatchObject({
+            calc_images_per_hour: '12',
+            calc_flatrate_multiplier: '1.35',
+        });
+    });
+});
