@@ -73,7 +73,11 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       `config('app.throttle_api')` wäre grün, egal was die Datei enthält.
       **Rot nachgewiesen:** `.env.ci` auf 60 → 2 failed; `.env.example` auf 1000 → 2 failed.
       Gate danach grün: 2828 passed, 3 skipped, 0 failed (14457 Assertions).
-- [ ] **D-7 — `scripts/check-i18n.mjs` auf Satzebene erweitern.** Vor dem Abarbeiten der 246.
+- [ ] **D-7 — Regel umgesetzt, die 212 sind die Restarbeit.** `check-i18n.mjs` meldet jetzt
+      **einen** Befund pro Satzlauf statt pro Textknoten; 246 → 212 (Befehl im Board-Eintrag).
+      29 Tests in `check-i18n.test.mjs`, davon 15 neu, plus zwei Fixtures. **Rot nachgewiesen:**
+      `PROSE_LONE_TOKEN_MIN_LENGTH` 6 → 99 lässt `flags a raw German JSX text node` fallen.
+      Offen: die 212 Findings abarbeiten, dann `CHECK_I18N_UNLOCALIZED_STRICT=1` scharf stellen.
 - [ ] **D-8 — `frontend/tests/e2e/admin/` nach Domäne aufteilen.** Eigene Arbeit.
 - [ ] **D-9 — Sidebar: Portalname bricht um** statt still gekürzt zu werden.
 - [ ] **D-10 — Dialoge innerhalb von `<main>` rendern**, Scoping bleibt unangetastet.
@@ -123,7 +127,7 @@ geltende Regel steht in `AGENTS.md` §14.
 | D-5 | Aufräumen plus Meldeschwelle, oder nur melden | die Rückfrage „nicht relevant auf diesem Host?" hat die Messung beantwortet: gilt dem Deploy-Host, dort ist es Deploy-Arbeit neben D-1 |
 | D-6 | nur `.env.ci` anheben, `.env.example` unkommentiert lassen | 60 als Produktions-Sinnwert soll sichtbar bleiben |
 | D-6 | unverändert lassen (60 als Canary) | der nächste parallelsinnige Test wird flaky statt rot |
-| D-7 | Regel unverändert, 246 manuell abarbeiten | erzeugt bei zerrissenen Sätzen mehr Rauschen als Nutzen |
+| D-7 | Regel unverändert, die Findings manuell abarbeiten | erzeugt bei zerrissenen Sätzen mehr Rauschen als Nutzen |
 | D-7 | als Altlast dokumentieren, nicht abarbeiten | die Regelerweiterung ist billiger als 246 Einzelbefunde |
 | D-8 | nach Akteur aufteilen, oder Taxonomie stehen lassen | die übrigen Verzeichnisse sind nach Domäne benannt |
 | D-9 | `truncate` mit `title`, oder so lassen | stille Kürzung ohne sichtbaren Effekt; Umbruch löst die Asymmetrie |
@@ -211,7 +215,7 @@ braucht, nicht nach Schwere oder Familie.
 | ~~P1-M28~~ | **Erledigt** — Concurrency-Guard | FTP-Block |
 | ~~P1-M30~~ | **Erledigt** — Migration V041 | FTP-Block |
 | ~~P1-M27~~ | **Erledigt** — Kamera-Spec + Harness | FTP-Block |
-| FE-2 (halb) | i18n-AST-Regel gebaut, meldet 246 Treffer, warnt nur | unten |
+| FE-2 (halb) | i18n-AST-Regel gebaut und satzebenen erweitert, meldet 212 Treffer, warnt nur | unten |
 | P1-M24 | Ordner-Anlage und UID-Modell auf dem Host | FTP-Block |
 | ~~P1-M26~~ | **Erledigt 2026-09-26** — `status()` zeigt den Provisionierungsstatus | FTP-Block |
 | ~~P1-M33~~ | **Erledigt 2026-09-26** — Reset mit Rate-Limit und Audit-Trail | FTP-Block |
@@ -299,35 +303,40 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [ ] **D-7 — i18n-Regel auf Satzebene erweitern, dann die 246 abarbeiten.**
-  `CHECK_I18N_UNLOCALIZED_STRICT=1 node scripts/check-i18n.mjs` meldet **246**
-  Treffer in **33** Dateien: `jsx-text` 175, `jsx-attribute` 44,
-  `helper-argument` 27 (Scan über 331 Quellen:
-  `find src -type f \( -name '*.ts' -o -name '*.tsx' \) | wc -l`).
-  **Warn-only, Exit 0** — ein Gate, das an 246 Altbefunden scheitert, benutzt
-  niemand. `CHECK_I18N_UNLOCALIZED_STRICT=1` schaltet auf harten Fehlschlag
-  (verifiziert: Exit 1), sobald der Bestand auf 0 ist.
-  **Nicht abgearbeitet, bleibt als Altlast im Repo:** die 246. Die größten Brocken
-  (`findUnlocalizedStringsInTree()`, Treffer pro Datei): `LicenseCatalogSettings.tsx` (62),
-  `BrandSettingsCard.tsx` (25), `ShootingCalculatorModal.tsx` (24),
-  `BillingDetailsCard.tsx` (21), `CalculatorSettingsCard.tsx` (18).
-  **Zwei Befund-Arten, die keine echten Rückstände sind.** Rund 31 sind Nicht-Prosa:
-  17 Tier-Bezeichner (`Web`/`Print`/`Original`), 3 Kameracodes (`Error 41`), 11
-  Produkt- und Markennamen (`Logo`, `Cloudflare Turnstile`). Bewusst **nicht** über
-  eine Allowlist unterdrückt — eine Liste, die niemand pflegt, wird zur nächsten
-  stillen Ausnahme. Dazu eine vierte Art, die die Regel nicht unterscheidet:
-  **an Interpolationsstellen zerrissene Sätze.** `Jahre (geb. {x})` ergibt zwei
-  JsxText-Knoten (`Jahre (geb.` und `)`); einzeln zu beheben ist sinnlos.
-  **Das ist die offene Entscheidung (nicht agentenseitig): Führt die Regel ihre
-  Meldungen auf Satzebene zusammen — oder nicht?**
-  - **Option A — Regel erweitern:** benachbarte JsxText-Knoten um ein
-    Interpolationsloch zu einem Satz zusammenführen und Nicht-Prosa erkennen — die
-    246 sinken auf eine echte Zahl, das Rauschen verschwindet.
-  - **Option B — Regel unverändert lassen:** die 246 manuell nach Kategorien
-    abarbeiten und die zerrissenen Sätze als bekanntes, akzeptiertes Rauschen führen.
-  Erst diese Entscheidung macht die Abarbeitung sinnvoll.
+- [ ] **D-7 — Regel erweitert; die 212 verbliebenen Findings abarbeiten.** Der Regel-Teil von D-7
+  ist fertig, die Abarbeitung nicht. **Befundzahl 246 → 212**, Befehl:
+  `cd frontend && node --input-type=module -e "import { findUnlocalizedStringsInTree } from
+  './scripts/check-i18n.mjs'; console.log(findUnlocalizedStringsInTree().length)"`
+  — beide Stände an derselben Stelle gemessen, die HEAD-Version über
+  `git show HEAD:frontend/scripts/check-i18n.mjs` in eine Probedatei unter `scripts/`.
+  Aufteilung heute: `jsx-text` 141, `jsx-attribute` 44, `helper-argument` 27.
+  **Was die Regel jetzt kann:** benachbarte `JsxText`/`JsxExpression`-Kinder eines
+  Elternknotens bilden **einen** Satzlauf und werden **einmal** gemeldet; ein JSX-Element
+  oder Fragment ist eine harte Grenze. `Jahre (geb. {x})` ist damit **ein** Befund.
+  Danach trennt `isProseText` echte Prosa von Nicht-Prosa: kein Buchstabe, Maschinenwert,
+  Einheitenfragment, rein dynamischer Lauf, einzelnes kurzes Wort, nur Stoppwörter.
+  **Fehlerrichtung, absichtlich gewählt:** die meisten Ausschlüsse **unterschätzen** — sie
+  können echten Text übersehen. Das ist die schlechtere Richtung, weil Rauschen sichtbar ist
+  und ein übersehener Fund nicht. Genau eine Heuristik **überzählt** (Literal neben einem
+  Ausdruck), damit das Zusammenführen keinen vorbestehenden Befund verliert.
+  **Bewusst keine Allowlist.** Eine Liste, die niemand pflegt, wird zur nächsten stillen
+  Ausnahme — Tier-Bezeichner, Kameracodes und Markennamen sind deshalb über die Struktur
+  ausgeschlossen, nicht über eine Liste.
+  **Warn-only, Exit 0** — ein Gate, das an 212 Altbefunden scheitert, benutzt niemand.
+  `CHECK_I18N_UNLOCALIZED_STRICT=1` schaltet auf harten Fehlschlag (verifiziert: Exit 1),
+  sobald der Bestand auf 0 ist.
+  **Größte verbleibende Brocken** (`findUnlocalizedStringsInTree()`, Treffer pro Datei):
+  `LicenseCatalogSettings.tsx` (62), `BrandSettingsCard.tsx` (25),
+  `ShootingCalculatorModal.tsx` (24), `BillingDetailsCard.tsx` (21),
+  `CalculatorSettingsCard.tsx` (18). Häufigste Attribute: `placeholder` (25), `title` (8),
+  `aria-label` (5), `alt` (5).
   **Reihenfolge (Plan, keine Entscheidung):** `helper-argument` (27) zuerst, dann die
   `management/`-Konzentration. Umschalten auf `CHECK_I18N_UNLOCALIZED_STRICT=1` erst bei 0.
+  **Zwei Befunde, die die Regel zu Recht meldet und die keine Regelmängel sind:**
+  `Impressum.tsx:43` steht eine blanke URL zwischen zwei `<Trans>`-Geschwistern — zur Laufzeit
+  ein ungewrapter Textknoten, also ein echter Fund. `UserTable.tsx:53` und
+  `ManagementStatsView.tsx:105` (`{n} Gruppen, {n} Galerien`) meldet die Regel vor wie nach der
+  Erweiterung: Eingaben für die Abarbeitung, keine Mängel der Regel.
 <!-- FTP-Konten: Ansatz am 2026-09-26 von pure-pw/pure-ftpd auf SFTPGo
      umgestellt. P1-M17..P1-M20 sind durch P1-M21..P1-M29 abgeloest.
      Begruendung: (a) pure-ftpd kann AES128-SHA nicht anbieten, damit

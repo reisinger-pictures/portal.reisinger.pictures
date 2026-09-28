@@ -154,7 +154,7 @@ Nach 3 erfolglosen Versuchen, einen fehlschlagenden Test zu fixen, MUSS der Agen
 **i18n-Regel (D-7):** `scripts/check-i18n.mjs` wird **auf Satzebene erweitert** und lernt,
 Prosa von Nicht-Prosa zu unterscheiden — begründet in §14/D-7. Praktisch: `Jahre (geb. {x})`
 ist ein Befund, nicht zwei. Das Gate bleibt **warn-only mit Exit 0**, bis der Zähler 0 ist;
-`CHECK_I18N_UNLOCALIZED_STRICT=1` wird erst dann scharf. Wer die 246 einzeln behebt, statt
+`CHECK_I18N_UNLOCALIZED_STRICT=1` wird erst dann scharf. Wer die 212 einzeln behebt, statt
 zuerst die Regel zu erweitern, produziert bei diesem Muster Rauschen ohne Nutzen.
 
 **`frontend/tests/e2e/admin/` (D-8):** wird **nach Domäne** aufgeteilt, analog zu `client/`,
@@ -425,12 +425,23 @@ entscheiden".
 
 ### Test- & Repo-Struktur
 
-- **D-7 — i18n-Regel (246 ungewrapte Strings):** die Regel wird **auf Satzebene erweitert** und
-  lernt, Prosa von Nicht-Prosa zu unterscheiden. *Warum:* `Jahre (geb. {x})` ergibt zwei
-  JsxText-Knoten (`Jahre (geb.` und `)`); einzeln zu beheben ist sinnlos, und ohne die Erweiterung
-  produziert die Regel mehr Rauschen als Nutzen. Die Regel muss zuerst lernen, was **kein** Satz
-  ist, bevor sie Sätze melden soll. Das Gate bleibt bis zum Zähler 0 warn-only;
-  `CHECK_I18N_UNLOCALIZED_STRICT=1` wird erst bei 0 umgestellt.
+- **D-7 — i18n-Regel: Meldungen auf Satzebene, Prosa von Nicht-Prosa getrennt.** Benachbarte
+  `JsxText`/`JsxExpression`-Kinder eines Elternknotens bilden **einen** Lauf und werden **einmal**
+  gemeldet; ein JSX-Element oder Fragment ist eine harte Grenze. *Warum:* `Jahre (geb. {x})`
+  ergibt zwei JsxText-Knoten (`Jahre (geb.` und `)`); einzeln zu beheben ist sinnlos, und ohne die
+  Erweiterung produziert die Regel mehr Rauschen als Nutzen. Die Regel musste zuerst lernen, was
+  **kein** Satz ist, bevor sie Sätze melden soll. **Gemessen:** 246 → **212** Befunde.
+  Befehl, aus `frontend/` — beide Stände dort gemessen, der Vorher-Stand über
+  `git show HEAD:frontend/scripts/check-i18n.mjs` in einer Probedatei unter `scripts/`:
+  `node --input-type=module -e "import { findUnlocalizedStringsInTree } from
+  './scripts/check-i18n.mjs'; console.log(findUnlocalizedStringsInTree().length)"`
+  **Fehlerrichtung ist benannt und absichtlich:** `MACHINE_VALUE`, `isUnitFragmentText`,
+  `PROSE_LONE_TOKEN_MIN_LENGTH`, `SINGLE_NON_COPY_WORDS` und `PROSE_STOPWORDS` **unterschätzen**
+  — sie können echten Text übersehen, und das ist die schlechtere Richtung, weil Rauschen sichtbar
+  ist und ein Fund nicht. Die einzige **überzählende** Heuristik ist die Ausnahme für Literale
+  neben einem Ausdruck, bewusst so, damit das Zusammenführen keinen vorbestehenden Befund
+  verliert. Das Gate bleibt bis zum Zähler 0 warn-only; `CHECK_I18N_UNLOCALIZED_STRICT=1` wird
+  erst bei 0 umgestellt — die 212 sind die Aufgabe, die bis dahin offen bleibt.
 - **D-8 — `frontend/tests/e2e/admin/`:** **nach Domäne aufteilen**, analog zu den bereits sauber
   skalierten Verzeichnissen `client/`, `photographer/`, `crm/`, `delivery/`, `selection/`.
   *Warum:* 34 von 89 Specs (38 %) liegen flach in einem Verzeichnis, das Pricing, CRM-Dokumente,
