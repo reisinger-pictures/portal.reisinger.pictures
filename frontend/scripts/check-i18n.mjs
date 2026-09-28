@@ -18,8 +18,8 @@
  *
  * A separate AST pass additionally reports user-visible strings that no Lingui
  * macro wraps (raw JSX text/attributes, literals handed to the toast/confirm
- * sinks). It is warn-only by default so the pre-existing backlog does not turn
- * the build red; `CHECK_I18N_UNLOCALIZED_STRICT=1` promotes it to a failure.
+ * sinks). Any such finding fails the check: the strings must be wrapped in a
+ * Lingui macro (`t`…` or `<Trans>`).
  */
 
 import { execFileSync } from "node:child_process";
@@ -828,13 +828,10 @@ function fail(message) {
 }
 
 /**
- * New unlocalized-string rule, rolled out warn-only: the first scan against
- * `src` is expected to find pre-existing German literals, and a gate that fails
- * on that backlog would simply stop being run. Set
- * `CHECK_I18N_UNLOCALIZED_STRICT=1` to promote it to a hard failure once the
- * backlog is empty — no code change required.
+ * Unlocalized-string findings are always fatal: a raw literal that is
+ * user-visible copy must be wrapped in a Lingui macro (`t`…`) or a `<Trans>`
+ * block. A pre-existing backlog is not a reason to let the build pass.
  */
-const UNLOCALIZED_STRINGS_ARE_FATAL = process.env.CHECK_I18N_UNLOCALIZED_STRICT === "1";
 const UNLOCALIZED_REPORT_LIMIT = 25;
 
 function reportUnlocalizedStrings() {
@@ -863,10 +860,10 @@ function reportUnlocalizedStrings() {
     console.warn(`   … and ${findings.length - UNLOCALIZED_REPORT_LIMIT} more`);
   }
 
-  if (UNLOCALIZED_STRINGS_ARE_FATAL) {
-    fail("user-visible strings must be wrapped in a Lingui macro (t`…` or <Trans>)");
-  }
-  console.warn("   (warn-only; set CHECK_I18N_UNLOCALIZED_STRICT=1 to make this a failure)\n");
+  fail(
+    "user-visible strings must be wrapped in a Lingui macro (`t`…` or `<Trans>`); "
+    + "re-run `node scripts/check-i18n.mjs` after fixing to see the remaining findings",
+  );
 }
 
 function run() {

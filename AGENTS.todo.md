@@ -115,7 +115,8 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       **einen** Befund pro Satzlauf statt pro Textknoten; 246 → 212 (Befehl im Board-Eintrag).
       29 Tests in `check-i18n.test.mjs`, davon 15 neu, plus zwei Fixtures. **Rot nachgewiesen:**
       `PROSE_LONE_TOKEN_MIN_LENGTH` 6 → 99 lässt `flags a raw German JSX text node` fallen.
-      Offen: die 212 Findings abarbeiten, dann `CHECK_I18N_UNLOCALIZED_STRICT=1` scharf stellen.
+      Offen: die 212 Findings abarbeiten. **Owner-Vorgabe: nie warning, immer fail** — das Gate
+      ist ab sofort scharf (Exit 1), der Build bleibt rot, bis der Zähler 0 steht.
 - [ ] **D-8 — `frontend/tests/e2e/admin/` nach Domäne aufteilen.** Eigene Arbeit.
 - [ ] **D-9 — Sidebar: Portalname bricht um** statt still gekürzt zu werden.
 - [ ] **D-10 — Dialoge innerhalb von `<main>` rendern**, Scoping bleibt unangetastet.
@@ -396,16 +397,17 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   **Bewusst keine Allowlist.** Eine Liste, die niemand pflegt, wird zur nächsten stillen
   Ausnahme — Tier-Bezeichner, Kameracodes und Markennamen sind deshalb über die Struktur
   ausgeschlossen, nicht über eine Liste.
-  **Warn-only, Exit 0** — ein Gate, das an 212 Altbefunden scheitert, benutzt niemand.
-  `CHECK_I18N_UNLOCALIZED_STRICT=1` schaltet auf harten Fehlschlag (verifiziert: Exit 1),
-  sobald der Bestand auf 0 ist.
+  **Immer fail, Exit 1** (Owner-Vorgabe) — der warn-only-Pfad ist entfernt. Befunde lassen
+  `prebuild` und damit jeden `pnpm build` scheitern, lokal wie in CI, bis der Zähler 0 steht.
   **Größte verbleibende Brocken** (`findUnlocalizedStringsInTree()`, Treffer pro Datei):
-  `LicenseCatalogSettings.tsx` (62), `BrandSettingsCard.tsx` (25),
-  `ShootingCalculatorModal.tsx` (24), `BillingDetailsCard.tsx` (21),
-  `CalculatorSettingsCard.tsx` (18). Häufigste Attribute: `placeholder` (25), `title` (8),
+  `LicenseCatalogSettings.tsx` (55), `BrandSettingsCard.tsx` (23),
+  `ShootingCalculatorModal.tsx` (20), `BillingDetailsCard.tsx` (16),
+  `CalculatorSettingsCard.tsx` (15) — gemessen in der Analysewelle, die Vorgängerzahlen
+  (62/25/24/21/18) standen noch auf dem Pre-D-7-Stand. Häufigste Attribute: `placeholder` (25), `title` (8),
   `aria-label` (5), `alt` (5).
   **Reihenfolge (Plan, keine Entscheidung):** `helper-argument` (27) zuerst, dann die
-  `management/`-Konzentration. Umschalten auf `CHECK_I18N_UNLOCALIZED_STRICT=1` erst bei 0.
+  `management/`-Konzentration. Scharfschaltung sofort (Owner-Vorgabe) — Fixierung unter
+  rotem Build.
   **Zwei Befunde, die die Regel zu Recht meldet und die keine Regelmängel sind:**
   `Impressum.tsx:43` steht eine blanke URL zwischen zwei `<Trans>`-Geschwistern — zur Laufzeit
   ein ungewrapter Textknoten, also ein echter Fund. `UserTable.tsx:53` und

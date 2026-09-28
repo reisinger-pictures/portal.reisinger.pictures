@@ -151,10 +151,10 @@ The system and workflow are managed via a Main/Secondary Model architecture to p
 **Max 3 Fix-Versuche für Tests (STRICT):**
 Nach 3 erfolglosen Versuchen, einen fehlschlagenden Test zu fixen, MUSS der Agent an den Benutzer zurückgeben mit einer Analyse was schiefgeht. Keine Endlos-Fix-Loops.
 
-**i18n-Regel (D-7):** `scripts/check-i18n.mjs` wird **auf Satzebene erweitert** und lernt,
-Prosa von Nicht-Prosa zu unterscheiden — begründet in §14/D-7. Praktisch: `Jahre (geb. {x})`
-ist ein Befund, nicht zwei. Das Gate bleibt **warn-only mit Exit 0**, bis der Zähler 0 ist;
-`CHECK_I18N_UNLOCALIZED_STRICT=1` wird erst dann scharf. Wer die 212 einzeln behebt, statt
+**i18n-Regel (D-7):** `scripts/check-i18n.mjs` meldet **auf Satzebene** und unterscheidet
+Prosa von Nicht-Prosa — begründet in §14/D-7. Praktisch: `Jahre (geb. {x})`
+ist ein Befund, nicht zwei. Das Gate ist **immer fail (Exit 1)**, warn-only ist entfernt
+(Owner-Vorgabe, §14/D-7). Wer die 212 einzeln behebt, statt
 zuerst die Regel zu erweitern, produziert bei diesem Muster Rauschen ohne Nutzen.
 
 **`frontend/tests/e2e/admin/` (D-8):** wird **nach Domäne** aufgeteilt, analog zu `client/`,
@@ -454,8 +454,13 @@ entscheiden".
   — sie können echten Text übersehen, und das ist die schlechtere Richtung, weil Rauschen sichtbar
   ist und ein Fund nicht. Die einzige **überzählende** Heuristik ist die Ausnahme für Literale
   neben einem Ausdruck, bewusst so, damit das Zusammenführen keinen vorbestehenden Befund
-  verliert. Das Gate bleibt bis zum Zähler 0 warn-only; `CHECK_I18N_UNLOCALIZED_STRICT=1` wird
-  erst bei 0 umgestellt — die 212 sind die Aufgabe, die bis dahin offen bleibt.
+  verliert. **Owner-Vorgabe: nie warning, immer fail.** Der warn-only-Pfad ist entfernt — Befunde
+  sind ab sofort ein harter Fehlschlag (Exit 1), lokal wie in CI, nicht erst bei 0.
+  *Warum:* warn-only fault vor sich hin; die 212 standen seit der Regelerweiterung
+  unverändert. Preis, bewusst gewählt: der Build ist rot, bis Bestand plus Regelarbeit
+  (URL-Filter im JSX-Text-Pfad, die drei Fragment-Befunde, `PLZ`/`BIC`-Grenzfälle) auf 0
+  stehen — daneben läuft keine andere Frontend-Arbeit mit grünem Build. Die 212 bleiben
+  die Aufgabe, nur nicht mehr im Warnmodus.
 - **D-8 — `frontend/tests/e2e/admin/`:** **nach Domäne aufteilen**, analog zu den bereits sauber
   skalierten Verzeichnissen `client/`, `photographer/`, `crm/`, `delivery/`, `selection/`.
   *Warum:* 34 von 89 Specs (38 %) liegen flach in einem Verzeichnis, das Pricing, CRM-Dokumente,
