@@ -26,8 +26,8 @@ der Vite-Server werden bewusst separat gestartet.
 ### 1. Der reguläre Start
 1. Starte **`🐳 [Run] Start Docker (Dev)`**. Das startet ausschließlich den lokalen
    Meilisearch-Service auf Port `7700` (keine Datenbank und kein Mailpit).
-2. Starte das Backend über deine lokale PHP-Umgebung bzw. Laravel Herd
-   (`portal.test`).
+2. Starte das Backend über deine lokale PHP-Umgebung (PHP 8.5+ via Homebrew):
+   `cd backend && php artisan serve` (läuft auf `http://localhost:8000`).
 3. Starte **`⚡ [Run] Frontend: Start Frontend`**. Der Vite-Dev-Server läuft danach
    auf **http://localhost:4321**.
 
@@ -58,9 +58,8 @@ beiden Docker-Run-Configs automatisch gestartet. Starte ihn bei Bedarf mit
 5. Führe **`⚙️ [Setup] Backend: DB Migration (Update)`** aus. Die Config verwendet
    `php artisan migrate --seed`; der Seed ist für den Bootstrap-Admin erforderlich.
 
-*(Bei Laravel Herd genügt für die aktuelle RP-Konfiguration
-`herd secure portal.test`; eine separate `portal-srp.test`-Domain ist nicht
-mehr Teil des aktuellen Brand-Setups.)*
+*(Für die aktuelle RP-Konfiguration ist keine separate
+`portal-srp.test`-Domain mehr Teil des Brand-Setups.)*
 
 ### 3. Wartung & Herunterfahren
 * **Index aktualisieren:** Wenn du Probleme mit der Suche hast, führe
@@ -87,7 +86,7 @@ zuvor `rclone` über ein SFTP-Remote). `./sync.sh --dry-run` zeigt den
 Der Sync ersetzt weder Migration noch Seed und ist kein Ersatz für den
 fail-closed Deployment-Start.
 
-### macOS: exiftool & ImageMagick für Laravel Herd
+### macOS: exiftool & ImageMagick für PHP
 
 Das Backend ruft per Symfony `Process` zwei externe CLI-Tools auf: **`exiftool`** (EXIF-Metadaten, MIME-Validierung) und **ImageMagick (`magick`/`convert`)**. Beide müssen im `PATH` des Webserver-Prozesses liegen — aber sie werden an **verschiedenen** Stellen gebraucht, und diese Datei hat das früher falsch zusammengezogen.
 
@@ -103,7 +102,7 @@ Das Backend ruft per Symfony `Process` zwei externe CLI-Tools auf: **`exiftool`*
 | `ImageProcessor.php:431` | `exiftool -TagsFromFile` | `applyCenteredWatermark()` → `PhotoDownloadController.php:676`, `FileDeliveryController.php:317` | nein — Auslieferung |
 | `DownscaleEditorialMasterFiles.php:34`, `:39` | `magick`, sonst `convert` | Kommando `app:downscale-editorial` | nein |
 
-**Problem auf macOS:** Laravel Herd betreibt PHP-FPM als GUI-Daemon via `launchd`. GUI-Prozesse erben beim Systemstart nur `/usr/local/bin` und die Systempfade aus `/etc/paths` — **nicht** die Shell-Config (`~/.zshrc`). Homebrew installiert die Tools unter `/opt/homebrew/bin` (Apple Silicon) bzw. `/usr/local/bin` (Intel). Auf Intel-Macs sind die Tools somit automatisch erreichbar, auf Apple Silicon jedoch **nicht**.
+**Problem auf macOS:** Wenn PHP als GUI-Daemon via `launchd` betriebt wird (z. B. Herd), erben GUI-Prozesse beim Systemstart nur `/usr/local/bin` und die Systempfade aus `/etc/paths` — **nicht** die Shell-Config (`~/.zshrc`). Homebrew installiert die Tools unter `/opt/homebrew/bin` (Apple Silicon) bzw. `/usr/local/bin` (Intel). Auf Intel-Macs sind die Tools somit automatisch erreichbar, auf Apple Silicon jedoch **nicht**.
 
 **Lösung (einmalig, Apple Silicon):** Lege Symlinks im systemweiten `PATH` an, den auch `launchd`/PHP-FPM lesen:
 
@@ -118,7 +117,7 @@ sudo ln -s /opt/homebrew/bin/convert /usr/local/bin/convert
 - **`exiftool` ist der Upload-Fix.** Ohne ihn schlagen Bild-Uploads mit `422 "Die hochgeladene Datei ist kein gültiges oder lesbares Bild."` fehl: der serverseitige MIME-Check läuft ins Leere (`ImageController.php:55` → `if (! $process->isSuccessful() || ! str_contains($process->getOutput(), 'image/')) {`, Fehlerantwort `:56`).
 - **`magick`/`convert` sind es nicht.** Sie werden nur von `php artisan app:downscale-editorial` gebraucht — und das läuft **täglich um 04:00** (`backend/routes/console.php:22` → `Schedule::command('app:downscale-editorial')->dailyAt('04:00')->withoutOverlapping()->onOneServer();`). Fehlen die Binaries, schlägt dieses Kommando still fehl und protokolliert `Log::error("Downscale failed for photo …")` (`DownscaleEditorialMasterFiles.php:52`); der Upload-Pfad bemerkt es nicht, weil er GD benutzt. Die Symlinks bleiben also nötig — aber aus **diesem** Grund, nicht wegen der Uploads.
 
-Danach Laravel Herd einmal neu starten, damit PHP-FPM die Tools findet.
+Danach den PHP-Prozess neu starten, damit er die Tools findet.
 
 ### Login-Daten (Lokal)
 - **Dashboard:** Verwende die lokal gesetzten `ADMIN_EMAIL`/`ADMIN_PASSWORD` aus

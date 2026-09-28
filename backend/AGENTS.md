@@ -6,12 +6,44 @@ Global rules (Definition of Done, AI workflow & TODO management, E2E tag policy,
 
 ## Commands
 
-Backend tests (PHP via Herd — PATH muss das PHP-Binary enthalten):
+Backend tests — **`php` auf dem PATH muss 8.5 oder neuer sein.** `backend/composer.json:12`
+verlangt `"php": "^8.5"`, und `backend/vendor/composer/platform_check.php:7` erzwingt das mit
+`if (!(PHP_VERSION_ID >= 80500))`.
+
+**Vor dem ersten Befehl prüfen, nicht danach:**
+
+```bash
+php -r 'echo PHP_VERSION, PHP_EOL;'   # muss 8.5+ sein, sonst artisan startet nicht
+```
+
+**Verweist `php` auf eine falsche Version, sieht der Fehler aus wie ein Abhängigkeitsproblem
+und ist keiner.** Jeder `php artisan`-Aufruf bricht dann ab mit
+`Composer detected issues in your platform` — ein Fatal in
+`vendor/composer/autoload_real.php`, also genau dort, wo ein kaputtes `vendor/` oder eine
+fehlgeschlagene Installation vermutet wird. Die wahrscheinlichste Ursache ist trotzdem nur
+die PHP-Version. `composer install` löst das nicht, es erzeugt den Fehler erst.
+
+macOS (Homebrew) — `php` wird via Homebrew installiert und liegt unter `/opt/homebrew/bin/php`:
+
+```bash
+cd backend && php artisan test
+```
+
+Windows (Git Bash) — derselbe Zweck, anderer Pfad:
 
 ```bash
 export PATH="/c/Users/flori/.config/herd/bin/php85:$PATH"
 cd backend && php artisan test
 ```
+
+Verlässlicher als ein `export` ist der Aufruf über das Binary selbst, wenn das `export`
+vergessen wurde: `/opt/homebrew/bin/php artisan test` aus `backend/`.
+
+**Belegt 2026-09-28:** `php` zeigte auf 8.4.25, `php85` auf 8.5.10. Mit dem 8.4-Shim starzte
+weder `php artisan --version` nor `scripts/e2e-up.sh`; der Fehler dort lautete
+`Composer detected issues in your platform`, und die E2E-Suite schlug daraufhin mit
+`net::ERR_CONNECTION_REFUSED` fehl, weil das Backend gar nicht hochkam. Zwei Ebenen der
+Fehlermeldung, eine Ursache.
 
 Backend Formatting — Pint (STRICT, CI-Gate seit 2026-09-26):
 
