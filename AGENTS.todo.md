@@ -822,7 +822,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 <details><summary>AI/Media/Storage/Payouts (8)</summary>
 
 - [ ] **AIS-2:** `DeletePhotoFilesJob.php:55-71` + `CleanupDerivatives.php:36-39` löschen die neuen `.watermark.json`-Marker nicht mit → 2+ Marker pro Foto-Delete dauerhaft.
-- [ ] **AIS-3:** Beide AI-POST-Routen nur `throttle:api` (120/min) → 120 kostenpflichtige Analysen/min + ~160 MB GD. `throttle:ai-generate`.
 - [ ] **AIS-4:** `ImageProcessor.php:146-177` `generateThumbnail()` ohne `removeFailedOutput`/`isValidImageFile`/`imagecreatetruecolor`-Check → uncaught `TypeError`, Teil-`.webp` bleibt.
 - [ ] **AIS-5:** `DurableDispatchService.php:85-121` — Model-Files und Customer-Search nutzen `afterCommit` statt `afterCommitDurably` → Crash zwischen COMMIT und Callback lässt DSGVO-Dateien/Meilisearch-Dokument zurück.
 - [ ] **AIS-6:** `UuidDatabaseFailedJobProvider.php:28-32` wirft bei Payload ohne UUID → Job nie in `failed_jobs`, blockiert endlos. `Str::uuid7()`-Fallback.
@@ -846,11 +845,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 <details><summary>Authorization/Brand (5, alle P2 — Bereich READY)</summary>
 
-- [ ] **AUTH-1:** `GalleryService.php:106-119,197-200` — `resolveAuthoritativeGroupBrand()` prüft **nicht** Manage-Recht auf der Zielgruppe → jeder same-brand Photographer kann in die Gruppe eines anderen hängen und deren `is_public`-Policy erben (`:253-258`).
-- [ ] **AUTH-2:** `AuthorizationService.php:413-475` — registrierte User vertrauen `transient_invites.gallery_ids` aus dem JWT ohne Abgleich mit dem Live-Invite (Gast-Pfad `:357-405` ist strikt). Latent fail-open.
-- [ ] **AUTH-3:** `FileDeliveryController.php:33,50,66` — `size` nur `^_thumbs/(\d+)/`, `Photo::DERIVATIVE_SIZES` nie angewandt → beliebige Verzeichnisse/unwatermarked Full-Size-Intermediate.
-- [ ] **AUTH-4:** `User.php:55` `stripe_customer_id` in `$fillable` ohne Notwendigkeit (alle Writer nutzen `forceFill`).
-- [ ] **AUTH-5:** Breadcrumb-`while`-Loops (`GalleryFrontendController.php:93-102`, `SearchController.php:245-254`, `MailController.php:35-40`) ohne Visited-Set; `MediaVisibilityService.php:109-124`/`BrandRegistry.php:158-176` ohne Depth-Cap.
 
 </details>
 
