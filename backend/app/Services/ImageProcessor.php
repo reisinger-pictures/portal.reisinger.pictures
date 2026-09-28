@@ -552,8 +552,21 @@ class ImageProcessor
 
         $written = @file_put_contents($temporaryPath, $contents, LOCK_EX);
         if ($written !== strlen($contents) || ! @rename($temporaryPath, $this->watermarkMarkerPath($destPath))) {
-            @unlink($temporaryPath);
-            @unlink($this->watermarkMarkerPath($destPath));
+            // A bare `@unlink` hides a permission problem behind an identical
+            // success path, so a temp file that survives deletion would grow the
+            // disk invisibly (AIS-7). Warn only on the failure path.
+            if (! $this->unlinkPath($temporaryPath)) {
+                Log::warning('image_processor.watermark_temp_unlink_failed', [
+                    'path' => $temporaryPath,
+                ]);
+            }
+
+            // Deliberately no marker cleanup here. The only caller,
+            // applyCenteredWatermark(), runs removeFailedOutput() on our false
+            // return, and that verifies and logs a residual marker exactly
+            // once (AIS-7). Calling removeWatermarkMarker() here duplicated
+            // the same warning for the same path (three warnings instead of
+            // two for one failed generation), so it must not be re-added.
 
             return false;
         }
