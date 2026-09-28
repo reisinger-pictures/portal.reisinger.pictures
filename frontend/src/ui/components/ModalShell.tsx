@@ -55,14 +55,16 @@ interface ModalShellProps {
     /** Applied to the modal-box, for any width the two states above do not express. */
     boxClassName?: string;
     /**
-     * `data-testid` for the modal-box.
+     * `data-testid` for the modal-box, so a caller can address the dialog
+     * element it does not own.
      *
      * The shell owns the box, and without a hook here a consumer that needed a
-     * stable handle on *the dialog itself* had to invent one: ModelInviteDialog
-     * wrapped its whole content in an extra `<div>` purely to carry
-     * `data-testid="model-invite-dialog"`, which eight E2E assertions scope
-     * through. `boxClassName` cannot carry a testid — it is a class string — so
-     * this prop exists rather than an overload of that one.
+     * stable handle on the dialog had to invent one: ModelInviteDialog wrapped
+     * its whole content in an extra `<div>` purely to carry
+     * `data-testid="model-invite-dialog"`, which the E2E assertions in
+     * `tests/e2e/crm/` scope through. `boxClassName` cannot carry a testid — it
+     * is a class string — so this prop exists rather than an overload of that
+     * one.
      *
      * Left unset it renders no attribute at all, which is what keeps every
      * other dialog byte-identical. The count is deliberately not written down
@@ -71,7 +73,7 @@ interface ModalShellProps {
      * `features/tech/08-dialog-height-contract.md` §6.2 for the current
      * inventory and the counting rule that makes it reproducible.
      */
-    boxTestId?: string;
+    testId?: string;
     /** When provided, children and footer render inside a form element. */
     onFormSubmit?: (e: React.FormEvent) => void;
     /**
@@ -138,8 +140,47 @@ interface ModalShellProps {
      * changes.
      */
     bodyClassName?: string;
+    /**
+     * Content that stays out of the scrolling body: rendered between the header
+     * and the body region, inside a `shrink-0` wrapper, so a search field or a
+     * control that changes the list below it does not scroll away with that
+     * list.
+     *
+     * It exists for the bounded layout, where the shell owns the scroll region
+     * a head can be pinned above (`scrollableBody`). Without that opt-in it
+     * still renders, in the same place, but pins nothing — there is no region
+     * for it to be pinned above.
+     */
+    bodyHead?: ReactNode;
+    /**
+     * The bounded box height, as one of two named values. Each maps to exactly
+     * one static class (`max-h-80vh` / `max-h-90vh`, both `@utility`
+     * definitions in `index.css`) and is applied only in the bounded layout.
+     *
+     * Named rather than free-form for the two reasons the repo has already paid
+     * for: a height interpolated into a class name is invisible to Tailwind's
+     * content scan and is purged from the production bundle, and a caller
+     * stacking its own `max-h-*` onto the shell's leaves the winner to
+     * stylesheet order instead of to intent. `'90vh'` is the default because it
+     * is the bound the opt-in has always used.
+     */
+    height?: ModalShellHeight;
     children: ReactNode;
 }
+
+/** Named heights for the bounded box; see `height` above and `BOUNDED_HEIGHT_CLASS`. */
+type ModalShellHeight = '80vh' | '90vh';
+
+/**
+ * The one place a named height becomes a class. Kept as a module-level map so
+ * the class strings are static literals — Tailwind has to see `max-h-80vh` and
+ * `max-h-90vh` written out to keep them, and an interpolated `` `max-h-${height}` ``
+ * would look like compliance and break in production.
+ */
+const BOUNDED_HEIGHT_CLASS: Record<ModalShellHeight, string> = {
+    '80vh': 'max-h-80vh',
+    '90vh': 'max-h-90vh',
+};
 
 export default function ModalShell({
     title,
@@ -151,24 +192,27 @@ export default function ModalShell({
     descriptionId,
     className = '',
     boxClassName = '',
-    boxTestId,
+    testId,
     onFormSubmit,
     noValidate = false,
     footer,
     scrollableBody = false,
     bodyClassName = '',
+    bodyHead,
+    height = '90vh',
     children,
 }: ModalShellProps) {
-    // `max-h-90vh flex flex-col` is what the hand-rolled long dialogs already
-    // pass as `boxClassName` (the camera guide in ManagementFtpInbox,
+    // `BOUNDED_HEIGHT_CLASS[height]` is what the hand-rolled long dialogs
+    // already pass as `boxClassName` (the camera guide in ManagementFtpInbox,
     // RatingStatusModal), so the shared mode lands on the same height the repo
     // already agreed on rather than a second, competing one. The `false` branch
     // contributes an empty string that `.filter(Boolean)` drops, which is what
-    // keeps the non-opt-in class list exactly as it was.
+    // keeps the non-opt-in class list exactly as it was; `height` is ignored
+    // there, like `bodyClassName`, because there is no bounded box to cap.
     const widthClass = [
         maxWidth === '2xl' ? 'max-w-2xl' : '',
         boxClassName,
-        scrollableBody ? 'max-h-90vh flex flex-col' : '',
+        scrollableBody ? `${BOUNDED_HEIGHT_CLASS[height]} flex flex-col` : '',
     ]
         .filter(Boolean)
         .join(' ');
@@ -252,7 +296,7 @@ export default function ModalShell({
                 onClose();
             }}
         >
-            <div className={`modal-box relative ${widthClass}`} data-testid={boxTestId}>
+            <div className={`modal-box relative ${widthClass}`} data-testid={testId}>
                 <button
                     type="button"
                     className="btn btn-circle btn-ghost absolute right-2 top-2"
@@ -269,6 +313,13 @@ export default function ModalShell({
                     </h3>
                     {secondaryAction}
                 </div>
+
+                {/* Between the header and the body, and `shrink-0`: in the
+                    bounded layout this is the region that stays put while the
+                    body below it scrolls. Its own wrapper (rather than the head
+                    nodes directly) is what makes the pin a guarantee of the
+                    shell instead of something every caller has to remember. */}
+                {bodyHead ? <div className="shrink-0">{bodyHead}</div> : null}
 
                 {body}
             </div>

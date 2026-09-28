@@ -141,7 +141,7 @@ export default function ModelInviteDialog({ onClose }: Props) {
     // `onFormSubmit` would have had to wrap the table in a <form> too.
     //
     // `data-testid="model-invite-dialog"` used to sit on the hand-rolled
-    // `.modal-box`; the shell owns the box, so it arrives through `boxTestId`
+    // `.modal-box`; the shell owns the box, so it arrives through `testId`
     // instead. The wrapper `<div>` that carried it while the shell had no such
     // hook is gone: every assertion that scopes through the id (the create
     // button, the invite table) targets content that is a descendant of the box
@@ -153,7 +153,7 @@ export default function ModelInviteDialog({ onClose }: Props) {
             onClose={onClose}
             className="z-50"
             boxClassName="max-w-4xl"
-            boxTestId="model-invite-dialog"
+            testId="model-invite-dialog"
             // The invite list is unbounded in rows, so this dialog can outgrow
             // a viewport. The bound is unchanged at 90vh; what changes is that
             // the scroll region is the body, which keeps the footer close below

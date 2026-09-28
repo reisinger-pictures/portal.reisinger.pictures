@@ -310,17 +310,93 @@ describe('ModalShell', () => {
     });
 
     /**
-     * `boxTestId` — the hook that lets a caller address the box it cannot own.
+     * `bodyHead` — the region for controls that sit *above* the list that
+     * scrolls.
+     *
+     * `scrollableBody` puts every child into the scroll region, which is wrong
+     * for the three list dialogs: their search field, access select and context
+     * input have to stay reachable while the list moves under them. The head is
+     * therefore a region of its own, outside the scroll port, pinned by the
+     * shell rather than by each caller remembering a class.
+     */
+    it('pins a body head above the scrolling body and keeps it out of it', () => {
+        renderShell({
+            scrollableBody: true,
+            bodyHead: <div data-testid="shell-head">Kopf</div>,
+        });
+
+        const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        const head = screen.getByTestId('shell-head');
+        const body = screen.getByTestId('shell-content').parentElement as HTMLElement;
+
+        // The head's wrapper is a direct child of the box…
+        expect(head.parentElement?.parentElement).toBe(box);
+        // …the body is not an ancestor of it, so scrolling the list cannot
+        // carry the head out of view…
+        expect(body).not.toContainElement(head);
+        // …and it sits above the body.
+        const children = Array.from(box.children);
+        expect(children.indexOf(head.parentElement as HTMLElement)).toBeLessThan(children.indexOf(body));
+    });
+
+    it('renders no body head when none is given', () => {
+        // The off-path: the `shrink-0` wrapper belongs to the head, so its
+        // absence is observable — a dialog that passes no `bodyHead` must not
+        // gain an element between its header and its body.
+        const { container } = renderShell({ scrollableBody: true });
+
+        const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        expect(container.querySelector('.shrink-0')).toBeNull();
+        const body = screen.getByTestId('shell-content').parentElement as HTMLElement;
+        expect(body.parentElement).toBe(box);
+    });
+
+    /**
+     * `height` — the named bound, so a caller never stacks a `max-h-*`.
+     *
+     * GalleryAccessModal and PhotographerTeamModal hand-rolled
+     * `max-h-80vh` on `boxClassName`; opting into the bounded layout would have
+     * added the shell's `max-h-90vh` alongside it, and stylesheet order — not
+     * intent — would pick the winner. The named value is what removes that
+     * decision from the caller.
+     */
+    it('applies exactly one named max-height class in the bounded layout', () => {
+        const eighty = renderShell({ scrollableBody: true, height: '80vh' });
+        let box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        expect(box).toHaveClass('max-h-80vh', 'flex', 'flex-col');
+        expect(box).not.toHaveClass('max-h-90vh');
+        eighty.unmount();
+
+        renderShell({ scrollableBody: true });
+        box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        expect(box).toHaveClass('max-h-90vh', 'flex', 'flex-col');
+        expect(box).not.toHaveClass('max-h-80vh');
+    });
+
+    it('ignores the height without the opt-in', () => {
+        // Same contract as `bodyClassName`: without `scrollableBody` there is no
+        // bounded box, so a height would cap a box the shell never bounded.
+        renderShell({ height: '80vh' });
+
+        const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        expect(box).not.toHaveClass('max-h-80vh');
+        expect(box).not.toHaveClass('max-h-90vh');
+    });
+
+    /**
+     * `testId` — the hook that lets a caller address the box it cannot own.
      *
      * ModelInviteDialog carried `data-testid="model-invite-dialog"` on a wrapper
-     * element purely because the shell exposed no way to place one, and eight
-     * E2E assertions scope through that id. Both properties matter and they pull
-     * in opposite directions: the id has to end up on the box (otherwise the
-     * wrapper stays and the hole is only papered over), and the 28
-     * dialogs that ask for nothing must not grow an attribute they never had.
+     * element purely because the shell exposed no way to place one, and the E2E
+     * assertions in `tests/e2e/crm/model-access.spec.ts` and
+     * `model-registration.spec.ts` scope through that id. Both properties
+     * matter and they pull in opposite directions: the id has to end up on the
+     * box (otherwise the wrapper stays and the hole is only papered over), and
+     * the dialogs that ask for nothing must not grow an attribute they never
+     * had.
      */
     it('puts a caller-supplied testid on the modal-box itself', () => {
-        renderShell({ boxTestId: 'harness-dialog' });
+        renderShell({ testId: 'harness-dialog' });
 
         const box = screen.getByTestId('harness-dialog');
         // The box, not a stand-in for it: `boxClassName` cannot carry a testid,

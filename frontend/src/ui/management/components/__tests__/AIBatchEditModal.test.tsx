@@ -219,4 +219,26 @@ describe('AIBatchEditModal', () => {
             expect(showToast).toHaveBeenCalledWith('error', expect.stringContaining('Fehler'));
         });
     });
+
+    // The migration onto the shell's bounded layout. The context card and the
+    // rows used to share one hand-rolled `h-90vh` box with an inner scroll list;
+    // now the shell bounds the box and the head sits outside its scroll region.
+    // This pins that wiring: dropping `bodyHead` would take the global-context
+    // input into the scroll region with the rows, and the tests above — which
+    // only read values and click buttons — would not notice.
+    it('keeps the context head out of the scroll region and bounds the box at 90vh', () => {
+        setupMocks();
+
+        renderWithProviders(<AIBatchEditModal isOpen={true} onClose={vi.fn()} photos={mockPhotos} galleryId="g1" />);
+
+        const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        expect(box).toHaveClass('max-h-90vh', 'flex', 'flex-col');
+
+        const scroller = box.querySelector('.overflow-y-auto') as HTMLElement;
+        expect(scroller).not.toBeNull();
+        // The control that changes the batch stays outside the region the rows
+        // scroll in; the rows themselves are inside it.
+        expect(scroller).not.toContainElement(screen.getByPlaceholderText(/z\.B\. Sommerfest/i));
+        expect(scroller).toContainElement(screen.getAllByPlaceholderText(/Spezifischer Bild-Kontext/i)[0]);
+    });
 });

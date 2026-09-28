@@ -43,6 +43,13 @@ interface ModalDialogShellProps {
      * the default.
      */
     scrollableBody?: boolean;
+    /**
+     * Forwarded to ModalShell: `data-testid` on the modal-box, so a caller can
+     * address the dialog it cannot own without wrapping its content in an
+     * element that exists only to carry the id. Left unset, the box renders no
+     * `data-testid` at all.
+     */
+    testId?: string;
     children: ReactNode;
 }
 
@@ -73,6 +80,7 @@ export default function ModalDialogShell({
     className = '',
     boxClassName,
     scrollableBody = false,
+    testId,
     children,
 }: ModalDialogShellProps) {
     // No `shrink-0` on this row, on purpose: in the bounded layout ModalShell
@@ -105,6 +113,7 @@ export default function ModalDialogShell({
             className={className}
             boxClassName={boxClassName}
             scrollableBody={scrollableBody}
+            testId={testId}
             onFormSubmit={onSubmit}
             noValidate={noValidate}
             footer={footer}

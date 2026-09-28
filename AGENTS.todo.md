@@ -5,15 +5,21 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **87 offene Positionen**
-> über 1735 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **86 offene Positionen**
+> über 1775 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
-> Gründe, warum sie noch steht: **17× `manuell prüfen:`** (der Owner sieht es sich selbst
+> Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **24**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **22**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
+>
+> **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
+> Entscheidungen liegen in `AGENTS.md` §14, ihr Umsetzungsstand im Protokoll ganz oben.
+> Die letzte offene Entscheidung war D-12 (Initial-Fokus) und ist am selben Tag entschieden
+> worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
+> entstanden ist — nicht, dass eine vergessene offen blieb.
 >
 > **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
 > Entscheidungen liegen in `AGENTS.md` §14, ihr Umsetzungsstand im Protokoll ganz oben.
@@ -81,8 +87,20 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 - [ ] **D-8 — `frontend/tests/e2e/admin/` nach Domäne aufteilen.** Eigene Arbeit.
 - [ ] **D-9 — Sidebar: Portalname bricht um** statt still gekürzt zu werden.
 - [ ] **D-10 — Dialoge innerhalb von `<main>` rendern**, Scoping bleibt unangetastet.
-- [ ] **D-11 — `ModalShell`: benannte Höhe plus `bodyHead`, und die drei handge-rollten Dialoge
-      migrieren.** Slot und Migration gehören in denselben Commit.
+- [x] **D-11 — benannte Höhe plus `bodyHead`, drei handge-rollte Dialoge mitmigriert.**
+      `ModalShellHeight = '80vh' | '90vh'` mit `BOUNDED_HEIGHT_CLASS` als **statischer**
+      Literal-Tabelle; ein interpoliertes `max-h-${height}` würde Tailwinds Content-Scan nicht
+      überleben, und genau das wäre Compliance, die im Bundle fehlt. `@utility max-h-80vh` /
+      `max-h-90vh` in `index.css`, und `max-h-80vh` kommt im gebauten CSS vor (geprüft in
+      `dist/assets/*.css`). **Ein Slot, kein zwei:** `bodyHead?: ReactNode` ohne separates
+      `pinned`-Flag, weil kein Aufrufer es bräuchte — ungenutztes Boolean-API wäre derselbe
+      Fehler, den D-11 abstellt. Migriert: `GalleryAccessModal`, `PhotographerTeamModal`,
+      `AIBatchEditModal`. **Nicht gestapelt:** die 80vh-Dialoge tragen ihr eigenes festes
+      `h-80vh`, kein `max-h-80vh` — sonst stünden zwei `max-h-*` nebeneinander.
+      Tests: 36 Shell-Unit-Tests, 15 Dialog-Verdrahtungstests, je einer pro Dialog neu
+      (`PhotographerTeamModal.test.tsx` ganz neu). Der Kopf wird geprüft, indem getestet wird,
+      dass er **nicht** im `.overflow-y-auto`-Bereich liegt.
+      **Offen bleibt die visuelle Prüfung** — siehe `manuell prüfen:` unten.
 - [ ] **D-12 — React `autoFocus` gewinnt; der Fokus wandert ins erste Feld des Dialogs.**
       Umgesetzt als Reihenfolge-Entscheidung in `useFocusTrap`, **kein** neuer Prop.
       **Pflichtteil derselben Änderung:** der Rückkehr-Zielpunkt wird vor dem Mount des
@@ -100,8 +118,13 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       rechtliche Teil bleibt eine benannte Lücke mit Owner.
 - [ ] **D-17 — Prompt-Injection-Policy und SMTP-Duplicate-Policy einzeln festlegen**; die
       Queue-/Mail-/Worker-/Scheduler-Evidenz bleibt ein eigener Eintrag.
-- [ ] **D-18 — `testId`-Prop auf `ModalShell` und `ModalDialogShell`.** Kein Dialog braucht
-      einen Wrapper-`<div>` nur für `data-testid`.
+- [x] **D-18 — `testId` auf beiden Shells; `ModelInviteDialog` ohne Wrapper.** Bei HEAD war das
+      **halb umgesetzt, unter anderem Namen**: `boxTestId` auf `ModalShell`, seit `659a5a5`,
+      und `ModelInviteDialog` nutzte es bereits. D-18 hat den Namen auf `testId` vereinheitlicht
+      und `ModalDialogShell` ergänzt — ein Namens- und ein Abdeckungsbedarf, kein Neuschreiben.
+      `data-testid` landet auf der `.modal-box`, die 7 E2E-Referenzen (3 Assertions,
+      4 Locator-Ketten) scopen unverändert. **Die Zahl 8 im ursprünglichen Board-Eintrag war
+      falsch** und ist durch die gemessene ersetzt.
 - [ ] **D-19 — Unit-Testdateien für `ManagementOrgsView` und `ManagementOrgDetailView`.**
 - [ ] **D-20 — `ModalDialogShell` verliert `editing`; der Lösch-Button folgt aus `onDelete`.**
       **Enthält einen Pflicht-Schritt:** `GalleryModal` und `GalleryGroupModal` übergeben
@@ -144,7 +167,7 @@ geltende Regel steht in `AGENTS.md` §14.
 | D-20 | `readOnly` als negierender Rename (Vorschlag des Owners) | **widerlegt durch Messung:** `editing={!!initialName}` wird zu `readOnly={!initialName}`, beim Bearbeiten truthy → der Button rendert weiter. Der Rename ändert den Namen, nicht den toten Button. Dazu ist der Name sachlich falsch (der Dialog ist editierbar) und kollidiert mit `CartItemList.tsx:15` |
 | D-20 | nur den Live-Bug in `VolumePresetSettingsCard.tsx:118` beheben | `editing` und `onDelete` blieben unabhängig; der nächste Aufrufer trennt sie wieder |
 | D-21 | Kollision als dokumentierte Falle belassen | sie ist es zwar, aber D-20 nimmt den Shell-Bedeutungsträger weg — das Wort bliebe zweimal im selben Baum |
-| D-18 | Assertions auf sichtbare Merkmale umstellen | die 8 Assertions prüfen dann nicht mehr, welches Dialogelement gemeint ist |
+| D-18 | Assertions auf sichtbare Merkmale umstellen | die 3 `expect`-Assertions prüfen dann nicht mehr, welches Dialogelement gemeint ist (die 4 Locator-Ketten ebenso) |
 | D-19 | nur `ManagementOrgsView` testen, oder bewusst ungetestet lassen | die Detail-View bleibt die ungeschütztere; „bewusst" wäre eine Feststellung ohne Deckung |
 | D-16 | vollständig ausarbeiten, oder nach Kategorie trennen | der rechtliche Teil ist DPO-Freigabe und wird nicht erfunden |
 | D-17 | beide Policies bündeln, oder beide als akzeptiertes Risiko | zwei Systeme, zwei Reviewer; „bewusst offen" wäre begründungspflichtig |
@@ -178,6 +201,18 @@ unverändert gegenüber dem vorigen Deploy, Homepage **200**.
   Ungespeichert-Warnung auslösen — vorher taten das nur „Schließen" und „Abbrechen",
   und getippte Eingabe konnte still verworfen werden. Worauf es ankommt: beide
   Abbruchwege fragen nach, keiner verwirft mehr.
+- [ ] manuell prüfen: **Dialoghöhen und gepinnter Kopf per Screenshot** — `pnpm
+  test:screenshots:grep "screenshot (gallery-access-dialog|gallery-photographer-team-dialog)"`,
+  Ergebnis unter `frontend/test-results/ui-screenshots/filled/`. Prüfen: (a) Kopf und Suchfeld
+  stehen fest, während die Liste scrollt, (b) der Rahmen um die Liste scrollt **mit** dem Inhalt
+  und nicht weg, (c) auf Mobile verdeckt der untere Fade die letzte Zeile nicht unerreichbar.
+  **Warum offen:** der umsetzende Agent meldete 8 Captures mit konkreten Befunden, im Baum lag
+  danach **keine einzige PNG** — `SCREENSHOT_OUTPUT_DIR` ist `test-results/ui-screenshots`
+  (`tests/screenshots/harness.ts:17`) und der Ordner war leer. Kein Beweis gegen die Beobachtung,
+  `test-results/` ist gitignored und wird von jedem Lauf geleert — aber auch **kein Beleg
+  dafür**. Höhen- und Slot-Aussage sind derzeit nur durch Unit-Tests gedeckt, nicht durch ein
+  Bild. **`AIBatchEditModal` ist gar nicht abgedeckt:** keine Manifest-Route, und die gesäten
+  Galerien haben keine Fotos, im Harness also nicht aufrufbar.
 - [ ] manuell prüfen: **Softtastatur auf einem echten Mobilgerät** — nach D-12 wandert der
   Fokus bei 23 von 28 Dialogen in ein Eingabefeld, und auf Touch öffnet sich damit sofort die
   Tastatur. **Kein Test im Repo misst das**, und ohne Gerät ist es nicht messbar. Einen
@@ -1685,8 +1720,6 @@ gerissen und zur Entscheidung gemacht.
 
 - [ ] **D-13 — `maxWidth` auf `'2xl'` einschränken.** Nur `'2xl'` erzeugt heute eine Klasse;
   `'lg'` und `'xl'` werden akzeptiert und still verworfen — der Prop lügt.
-- [ ] **D-18 — `testId`-Prop auf `ModalShell` und `ModalDialogShell`.** `ModelInviteDialog`
-  brauchte einen Wrapper-`<div>` nur für `data-testid`, durch den 8 E2E-Assertions scopen.
 - [ ] **D-19 — Unit-Testdateien für `ManagementOrgsView` und `ManagementOrgDetailView`.** Beide
   waren „jetzt konform, aber ungeschützt"; Konformität ist keine Abdeckung.
 - [ ] **D-20 — `ModalDialogShell` verliert `editing`; der Lösch-Button folgt aus `onDelete`.**
@@ -1738,7 +1771,6 @@ gerissen und zur Entscheidung gemacht.
   Union meldet `tsc` `TS2322`, **ohne** Union schluckt `tsc` `"lg"` kommentarlos.
   Dieser Teil haengt **ausschliesslich** an `tsc -b --force` im Build-Gate. Wenn
   jemand `tsc -b` ohne `--force` fahren laesst, ist genau diese Haelfte ungesichert.
-- [ ] **D-11 — `ModalShell`: benannte Höhe plus `bodyHead`, drei handge-rollte Dialoge mitmigrieren.**
 - [~] wartet auf ein späteres Aufräumen der Stack-Env — der Wert hat keinen Secret-Bezug, wird aber über die Ports-Liste geführt. **`SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN`** ist im Compose ein
   Container-Wert ohne Secret-Bezug, wird aber über die Ports-Liste geführt; bei
   einem späteren Aufräumen prüfen, ob es in die Stack-Env gehört.

@@ -227,16 +227,45 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
         // handler anywhere in this dialog — it saves per row, not on submit.
         // There is no `modal-action` footer either; the only header-right
         // control is the batch button, which goes to `secondaryAction`.
-        // The bounded layout stays hand-rolled for the same reason as the other
-        // list dialogs: `scrollableBody` would take the batch progress and the
-        // global-context card into the scroll region with the rows, and the
-        // context field is exactly the control that has to survive scrolling the
-        // photo list. The `h-90vh` bound itself would survive the opt-in.
+        // Migrated onto the bounded layout: the batch progress and the
+        // global-context card are the head, because the context field is exactly
+        // the control that has to survive scrolling the photo list. The bound is
+        // the named `90vh`; the fixed `h-90vh` it used before would have sat
+        // beside the shell's own `max-h-90vh` and left the winner to the
+        // stylesheet.
         <ModalShell
             title={<span className="text-2xl"><Trans>KI Beschriftung</Trans></span>}
             icon="mdi--robot-outline"
             onClose={onClose}
-            boxClassName="w-11/12 max-w-7xl h-90vh flex flex-col bg-base-200"
+            boxClassName="w-11/12 max-w-7xl bg-base-200"
+            height="90vh"
+            scrollableBody
+            bodyClassName="bg-base-100 rounded-box border border-base-300 p-2 space-y-2"
+            bodyHead={
+                <>
+                    {isGeneratingAll && (
+                        <div className="mb-4">
+                            <progress className="progress progress-primary w-full" value={progress} max="100"></progress>
+                            <div className="text-xs text-center mt-1 opacity-70"><Trans>{progress}% abgeschlossen</Trans></div>
+                        </div>
+                    )}
+
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 mb-4 bg-base-100 p-4 rounded-box shadow-sm border border-base-300">
+                        <div className="flex-1 w-full">
+                            <label className="label py-0"><span className="label-text font-bold"><Trans>Globaler Kontext (Für alle Bilder)</Trans></span></label>
+                            <input type="text" value={globalContext} onChange={e => setGlobalContextOverride(e.target.value)} placeholder={t`z.B. Sommerfest der Firma XYZ in Wien, 2026`} className="input input-sm input-bordered w-full" />
+                        </div>
+                        <div className="shrink-0 border-t lg:border-t-0 lg:border-l border-base-300 pt-2 lg:pt-0 lg:pl-4">
+                            <label className="label py-0"><span className="label-text font-bold"><Trans>KI-Modus</Trans></span></label>
+                            <div className="flex gap-2 items-center">
+                                {mode === 'server' && <div className="badge badge-success badge-sm shrink-0"><Trans>Server:</Trans> {modelId}</div>}
+                                {mode === 'local' && <div className="badge badge-warning badge-sm shrink-0"><Trans>Lokal:</Trans> {modelId}</div>}
+                                {mode === 'unavailable' && <div className="badge badge-error badge-sm shrink-0"><Trans>Nicht verfügbar</Trans></div>}
+                            </div>
+                        </div>
+                    </div>
+                </>
+            }
             secondaryAction={
                 <button
                     onClick={handleGenerateAll}
@@ -249,62 +278,38 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
             }
         >
 
-                {isGeneratingAll && (
-                    <div className="mb-4">
-                        <progress className="progress progress-primary w-full" value={progress} max="100"></progress>
-                        <div className="text-xs text-center mt-1 opacity-70"><Trans>{progress}% abgeschlossen</Trans></div>
-                    </div>
-                )}
-                
-                <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 mb-4 bg-base-100 p-4 rounded-box shadow-sm border border-base-300">
-                    <div className="flex-1 w-full">
-                        <label className="label py-0"><span className="label-text font-bold"><Trans>Globaler Kontext (Für alle Bilder)</Trans></span></label>
-                        <input type="text" value={globalContext} onChange={e => setGlobalContextOverride(e.target.value)}                         placeholder={t`z.B. Sommerfest der Firma XYZ in Wien, 2026`} className="input input-sm input-bordered w-full" />
-                    </div>
-                    <div className="shrink-0 border-t lg:border-t-0 lg:border-l border-base-300 pt-2 lg:pt-0 lg:pl-4">
-                        <label className="label py-0"><span className="label-text font-bold"><Trans>KI-Modus</Trans></span></label>
-                        <div className="flex gap-2 items-center">
-                            {mode === 'server' && <div className="badge badge-success badge-sm shrink-0"><Trans>Server:</Trans> {modelId}</div>}
-                            {mode === 'local' && <div className="badge badge-warning badge-sm shrink-0"><Trans>Lokal:</Trans> {modelId}</div>}
-                            {mode === 'unavailable' && <div className="badge badge-error badge-sm shrink-0"><Trans>Nicht verfügbar</Trans></div>}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto bg-base-100 rounded-box border border-base-300 p-2 space-y-2">
-                    {rows.map((row, idx) => {
-                        const p = photos.find(x => x.id === row.photoId);
-                        const isTitleTooLong = row.title.length > 120;
-                        return (
-                            <div key={row.photoId} className="flex flex-col md:flex-row gap-4 p-3 bg-base-200/50 rounded-box border border-base-300">
-                                <div className="w-full md:w-32 shrink-0">
-                                    <img src={p?.thumb_url} className="w-full h-auto object-cover rounded shadow-sm aspect-video" alt="Thumb" />
+                {rows.map((row, idx) => {
+                    const p = photos.find(x => x.id === row.photoId);
+                    const isTitleTooLong = row.title.length > 120;
+                    return (
+                        <div key={row.photoId} className="flex flex-col md:flex-row gap-4 p-3 bg-base-200/50 rounded-box border border-base-300">
+                            <div className="w-full md:w-32 shrink-0">
+                                <img src={p?.thumb_url} className="w-full h-auto object-cover rounded shadow-sm aspect-video" alt="Thumb" />
+                            </div>
+                            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <input type="text" value={row.specificContext} onChange={e => updateRowField(idx, 'specificContext', e.target.value)} placeholder={t`Spezifischer Bild-Kontext`} className="input input-sm input-bordered md:col-span-2" />
+                                <div className="relative">
+                                    <input type="text" value={row.title} onChange={e => updateRowField(idx, 'title', e.target.value)} placeholder={t`Titel`} className={`input input-sm input-bordered w-full pr-14 ${isTitleTooLong ? 'input-error text-error' : ''}`} />
+                                    <span className={`absolute right-2 top-1.5 text-xs ${isTitleTooLong ? 'text-error font-bold' : 'opacity-50'}`}>${row.title.length}/120</span>
                                 </div>
-                                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    <input type="text" value={row.specificContext} onChange={e => updateRowField(idx, 'specificContext', e.target.value)}                                     placeholder={t`Spezifischer Bild-Kontext`} className="input input-sm input-bordered md:col-span-2" />
-                                    <div className="relative">
-                                        <input type="text" value={row.title} onChange={e => updateRowField(idx, 'title', e.target.value)}                                         placeholder={t`Titel`} className={`input input-sm input-bordered w-full pr-14 ${isTitleTooLong ? 'input-error text-error' : ''}`} />
-                                        <span className={`absolute right-2 top-1.5 text-xs ${isTitleTooLong ? 'text-error font-bold' : 'opacity-50'}`}>${row.title.length}/120</span>
-                                    </div>
-                                    <input type="text" value={row.keywords} onChange={e => updateRowField(idx, 'keywords', e.target.value)} placeholder={t`Keywords`} className="input input-sm input-bordered" />
-                                    <textarea value={row.description} onChange={e => updateRowField(idx, 'description', e.target.value)} placeholder={t`Beschreibung`} className="textarea textarea-bordered textarea-sm md:col-span-2 h-16 leading-tight"></textarea>
-                                    <div className="grid grid-cols-2 gap-2 md:col-span-2">
-                                        <input type="text" value={row.location} onChange={e => updateRowField(idx, 'location', e.target.value)} placeholder={t`Ort/Gebäude`} className="input input-sm input-bordered" />
-                                        <input type="text" value={row.city} onChange={e => updateRowField(idx, 'city', e.target.value)} placeholder={t`Stadt`} className="input input-sm input-bordered" />
-                                    </div>
-                                </div>
-                                <div className="flex flex-col gap-2 w-full md:w-32 shrink-0 justify-end">
-                                    <button onClick={() => handleGenerate(idx)} disabled={!isAvailable || row.isGenerating || isGeneratingAll} className="btn btn-sm btn-primary w-full">
-                                        {row.isGenerating ? <span className="loading loading-spinner loading-xs"></span> : <Trans>KI Generieren</Trans>}
-                                    </button>
-                                    <button onClick={() => handleSave(idx)} disabled={row.isSaving || isTitleTooLong} className="btn btn-sm btn-outline w-full">
-                                        {row.isSaving ? <span className="loading loading-spinner loading-xs"></span> : <Trans>Speichern</Trans>}
-                                    </button>
+                                <input type="text" value={row.keywords} onChange={e => updateRowField(idx, 'keywords', e.target.value)} placeholder={t`Keywords`} className="input input-sm input-bordered" />
+                                <textarea value={row.description} onChange={e => updateRowField(idx, 'description', e.target.value)} placeholder={t`Beschreibung`} className="textarea textarea-bordered textarea-sm md:col-span-2 h-16 leading-tight"></textarea>
+                                <div className="grid grid-cols-2 gap-2 md:col-span-2">
+                                    <input type="text" value={row.location} onChange={e => updateRowField(idx, 'location', e.target.value)} placeholder={t`Ort/Gebäude`} className="input input-sm input-bordered" />
+                                    <input type="text" value={row.city} onChange={e => updateRowField(idx, 'city', e.target.value)} placeholder={t`Stadt`} className="input input-sm input-bordered" />
                                 </div>
                             </div>
-                        );
-                    })}
-                </div>
+                            <div className="flex flex-col gap-2 w-full md:w-32 shrink-0 justify-end">
+                                <button onClick={() => handleGenerate(idx)} disabled={!isAvailable || row.isGenerating || isGeneratingAll} className="btn btn-sm btn-primary w-full">
+                                    {row.isGenerating ? <span className="loading loading-spinner loading-xs"></span> : <Trans>KI Generieren</Trans>}
+                                </button>
+                                <button onClick={() => handleSave(idx)} disabled={row.isSaving || isTitleTooLong} className="btn btn-sm btn-outline w-full">
+                                    {row.isSaving ? <span className="loading loading-spinner loading-xs"></span> : <Trans>Speichern</Trans>}
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
         </ModalShell>
     );
 }

@@ -58,79 +58,83 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
     };
 
     return (
-        // Still hand-rolled, deliberately. `scrollableBody` puts *every* child into
-        // the scroll region, and this dialog needs the gallery line, the search field
-        // and the count pinned above a list that scrolls on its own — the field has
-        // to stay reachable while the list moves under it. The bound is a second
-        // blocker: the opt-in adds `max-h-90vh`, and two `max-h` utilities on one
-        // element are decided by stylesheet order, where 90vh follows 80vh and wins.
-        // Migrating this needs a shell that holds a region between header and body.
+        // Migrated onto the shell's bounded layout. It needed the region the old
+        // comment asked for — one *between* the header and the body — which is
+        // what `bodyHead` is: the gallery line, the search field and the count
+        // stay pinned while the list scrolls under them. The bound is named now
+        // (`height="80vh"`), so the shell emits one `max-h-80vh` instead of
+        // 80vh stacking against its own 90vh default.
         <ModalShell
             title={<Trans>Nutzer-Zugriff verwalten</Trans>}
             icon="mdi--account-key"
             onClose={onClose}
-            boxClassName="max-w-2xl flex flex-col max-h-80vh"
+            boxClassName="max-w-2xl"
+            height="80vh"
+            scrollableBody
+            bodyClassName="border border-base-300 rounded-box p-2"
+            bodyHead={
+                <>
+                    <p className="text-sm opacity-70 mb-4"><Trans>Galerie:</Trans> <strong>{galleryName}</strong></p>
+
+                    <input
+                        type="text"
+                        placeholder={t`Nutzer suchen...`}
+                        className="input input-bordered w-full mb-2"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                    />
+
+                    {/* The list below is the shell's scroll region, so its bottom
+                        edge falls wherever the remaining space ends — mid-row.
+                        With more users than fit, the last visible row was sliced
+                        through the middle of its glyphs, which reads as a
+                        rendering accident instead of as "there is more below".
+                        Two affordances, neither of which touches the data: the
+                        count states how many entries the list holds, and the
+                        fade covers the cut-off row instead of guillotining it.
+                        `sticky bottom-0` rather than an absolutely positioned
+                        overlay, so the fade stays pinned to the bottom of the
+                        scrollport at any offset and comes to rest in flow once
+                        the end of the list is reached. */}
+                    <p className="text-sm opacity-70 mb-2">
+                        <Plural value={filteredUsers?.length ?? 0} one="# Nutzer" other="# Nutzer" />
+                    </p>
+                </>
+            }
         >
-                <p className="text-sm opacity-70 mb-4"><Trans>Galerie:</Trans> <strong>{galleryName}</strong></p>
-
-                <input
-                    type="text"
-                    placeholder={t`Nutzer suchen...`}
-                    className="input input-bordered w-full mb-2 shrink-0"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                />
-
-                {/* The list below is a scroll container, so its bottom edge falls
-                    wherever the remaining space ends — mid-row. With more users
-                    than fit, the last visible row was sliced through the middle of
-                    its glyphs, which reads as a rendering accident instead of as
-                    "there is more below". Two affordances, neither of which
-                    touches the data: the count states how many entries the list
-                    holds, and the fade covers the cut-off row instead of
-                    guillotining it. `sticky bottom-0` rather than an absolutely
-                    positioned overlay, so the fade stays pinned to the bottom of
-                    the scrollport at any offset and comes to rest in flow once
-                    the end of the list is reached. */}
-                <p className="text-sm opacity-70 mb-2 shrink-0">
-                    <Plural value={filteredUsers?.length ?? 0} one="# Nutzer" other="# Nutzer" />
-                </p>
-
-                <div className="flex-1 overflow-y-auto border border-base-300 rounded-box p-2">
-                    {isLoading ? (
-                        <div className="flex justify-center p-8"><span className="loading loading-spinner"></span></div>
-                    ) : (
-                        <div className="flex flex-col gap-1">
-                            {filteredUsers?.map(u => {
-                                const hasAccess = u.galleries.some(g => g.id === galleryId);
-                                return (
-                                    // Name and action share one line, the email sits
-                                    // below it: an action centred against the whole
-                                    // name/email block lands between the two lines
-                                    // instead of on the name's line. This mirrors the
-                                    // label/action row in ManagementFtpInbox.
-                                    <div key={u.id}
-                                         className="p-2 hover:bg-base-200 rounded">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="font-bold min-w-0 break-words">{u.name}</div>
-                                            <button
-                                                className={`btn btn-sm w-28 shrink-0 ${hasAccess ? 'btn-error btn-outline' : 'btn-primary'}`}
-                                                onClick={() => toggleAccess(u.id, hasAccess)}
-                                                disabled={processingId === u.id}
-                                            >
-                                                {processingId === u.id ? <span
-                                                    className="loading loading-spinner"></span> : (hasAccess ? <Trans>Entfernen</Trans> : <Trans>Hinzufügen</Trans>)}
-                                            </button>
-                                        </div>
-                                        <div className="text-sm opacity-70 break-words mt-1">{u.email}</div>
+                {isLoading ? (
+                    <div className="flex justify-center p-8"><span className="loading loading-spinner"></span></div>
+                ) : (
+                    <div className="flex flex-col gap-1">
+                        {filteredUsers?.map(u => {
+                            const hasAccess = u.galleries.some(g => g.id === galleryId);
+                            return (
+                                // Name and action share one line, the email sits
+                                // below it: an action centred against the whole
+                                // name/email block lands between the two lines
+                                // instead of on the name's line. This mirrors the
+                                // label/action row in ManagementFtpInbox.
+                                <div key={u.id}
+                                     className="p-2 hover:bg-base-200 rounded">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="font-bold min-w-0 break-words">{u.name}</div>
+                                        <button
+                                            className={`btn btn-sm w-28 shrink-0 ${hasAccess ? 'btn-error btn-outline' : 'btn-primary'}`}
+                                            onClick={() => toggleAccess(u.id, hasAccess)}
+                                            disabled={processingId === u.id}
+                                        >
+                                            {processingId === u.id ? <span
+                                                className="loading loading-spinner"></span> : (hasAccess ? <Trans>Entfernen</Trans> : <Trans>Hinzufügen</Trans>)}
+                                        </button>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                    <div aria-hidden="true"
-                         className="sticky bottom-0 h-8 pointer-events-none rounded-b-box bg-linear-to-t from-base-100 to-transparent"></div>
-                </div>
+                                    <div className="text-sm opacity-70 break-words mt-1">{u.email}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+                <div aria-hidden="true"
+                     className="sticky bottom-0 h-8 pointer-events-none rounded-b-box bg-linear-to-t from-base-100 to-transparent"></div>
         </ModalShell>
     );
 }

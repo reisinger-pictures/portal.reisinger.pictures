@@ -530,9 +530,14 @@ entscheiden".
 - **D-18 — `testId` als Prop auf `ModalShell` und `ModalDialogShell`:** die Schells
   nehmen einen optionalen `testId` an, damit kein Dialog einen Wrapper-`<div>` braucht, dessen
   einziger Zweck `data-testid` ist. *Warum:* `ModelInviteDialog` trug genau einen solchen Wrapper,
-  durch den 8 E2E-Assertions scopen. Bei 28 Aufrufstellen ist „selten" aber nicht „nie" — die
-  andere Alternative, die Assertions auf sichtbare Merkmale umzustellen, macht die Assertions
-  unschärfer: sie prüfen dann nicht mehr, welches Dialogelement gemeint ist.
+  durch den die E2E-Referenzen auf diesen Dialog scopen. **Die Zahl 8 aus der ersten Fassung
+  dieses Eintrags war falsch und ist ersetzt:** gemessen sind **7** Referenzen, davon **3**
+  `expect`-Assertions und 4 Locator-/Click-Ketten — `grep -rn 'model-invite-dialog' frontend/tests | wc -l` → 7, davon `grep -c expect` → 3 Assertions und 4 Locator-/Click-Ketten. Bei 28 Aufrufstellen ist
+  „selten" aber nicht „nie" — die andere Alternative, die Assertions auf sichtbare Merkmale
+  umzustellen, macht die Assertions unschärfer: sie prüfen dann nicht mehr, welches
+  Dialogelement gemeint ist. **Ersetzt, nicht ergänzt:** der Zustand bei HEAD war bereits
+  halb umgesetzt, nur unter dem anderen Namen `boxTestId` und nur an `ModalShell`; D-18 hat
+  den Namen auf `testId` vereinheitlicht und `ModalDialogShell` ergänzt.
 - **D-19 — `ManagementOrgsView` und `ManagementOrgDetailView` bekommen Unit-Testdateien**, beide,
   nach dem Muster der übrigen Management-Views. *Warum:* beide waren „jetzt konform, aber
   ungeschützt" — die Konformität schließt die Lücke nicht, sie verlagert sie auf die

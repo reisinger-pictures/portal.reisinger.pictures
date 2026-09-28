@@ -36,7 +36,8 @@ Scrollregion und hält den Footer darunter fest:
 
 | Element | Klasse | Aufgabe |
 |---|---|---|
-| `.modal-box` | `max-h-90vh flex flex-col` | begrenzt die Höhe, wird Flex-Column |
+| `.modal-box` | `max-h-80vh`/`max-h-90vh` (über `height`) `flex flex-col` | begrenzt die Höhe, wird Flex-Column |
+| Head-Wrapper (`bodyHead`) | `shrink-0` | hält den Kopf außerhalb der Scrollregion |
 | Body-Wrapper | `flex-1 min-h-0 overflow-y-auto pr-2` | scrollt den Inhalt, nicht den Footer |
 | Footer-Wrapper | `shrink-0` | verhindert, dass der Footer weggedrückt wird |
 
@@ -45,17 +46,17 @@ die das Layout von Hand gebaut haben, bereits als `boxClassName` mitgegeben
 haben. Der geteilte Modus landet damit auf der Höhe, auf die sich das Repo
 schon geeinigt hatte, und nicht auf einer zweiten, konkurrierenden.
 
-> **Historische Formulierung, ausdrücklich nicht fortgeschrieben.** Dieser
-> Absatz stand ursprünglich mit der Zahl „**drei** Dialoge". Diese Zahl war
-> schon vor der Bereinigung falsch und ist es heute erst recht: Die Migration
-> der elf eigenen `modal-box`-Dialoge hat die Menge verändert, und eine Zahl
-> über eine Menge zu schreiben, die sich im selben Zug bewegt, ergibt
-> zuverlässig eine falsche Zahl. Zwei Dialoge führen den 90vh-Bound heute als
-> `scrollableBody` über die Shell (`RatingStatusModal`, die Kamera-Anleitung in
-> `ManagementFtpInbox`); **drei weitere handrollen den begrenzten Box weiterhin**
-> (`GalleryAccessModal`, `PhotographerTeamModal` mit je 80vh, `AIBatchEditModal`
-  mit `h-90vh`), weil sie Inhalt **oberhalb** der Scrollregion festhalten müssen
-  — siehe §6.3 für die Sperre und das, was die Shell dafür bräuchte.
+> **Historische Formulierung, ausdrücklich nicht fortgeschrieben — inzwischen
+> überholt (D-11).** Dieser Absatz stand ursprünglich mit der Zahl „**drei**
+> Dialoge". Diese Zahl war schon vor der Bereinigung falsch: die Migration der
+> elf eigenen `modal-box`-Dialoge hat die Menge verändert, und eine Zahl über
+> eine Menge zu schreiben, die sich im selben Zug bewegt, ergibt zuverlässig
+> eine falsche Zahl. Der letzte Satz beschrieb damals **drei handgerollte
+> begrenzte Boxen** (`GalleryAccessModal`, `PhotographerTeamModal`, `AIBatchEditModal`),
+> die Inhalt **oberhalb** der Scrollregion festhalten mussten. **Diese drei
+> sind mit D-11 auf die Shell migriert und handrollen nichts mehr**; sie hängen
+> ihren Kopf jetzt über `bodyHead` auf (§2.2). Die damals fehlende
+> Shell-Fähigkeit existiert seither, §6.3 führt die verbleibende Menge (null).
 
 `shrink-0` liegt beim **Shell**, nicht beim Aufrufer. Deshalb gilt die
 Zusage „der Footer wird nie weggeschnitten" für jeden Aufrufer und hängt nicht
@@ -85,7 +86,57 @@ nutzt den gemeinsamen Submit-Pfad. Das ist der Dialog, an dem der geteilte
 Modus zuerst bewiesen wurde; die spätere Welle hat ihn auf weitere Dialoge
 ausgedehnt.
 
-### 2.1 `scroll-fade-bottom` — die Affordance an der Scroll-Grenze
+### 2.1 Die benannte Höhe — `height`
+
+Die Box-Höhe ist eine **benannte** Prop mit **statischer Klasse je Wert**; einen
+freien Wert gibt es nicht. Deklariert ist sie in `ModalShell.tsx` als
+`BOUNDED_HEIGHT_CLASS` mit genau zwei Einträgen:
+
+| Wert | Klasse |
+|---|---|
+| `'80vh'` | `max-h-80vh` |
+| `'90vh'` (Default) | `max-h-90vh` |
+
+Beide Klassen sind `@utility`-Definitionen in `frontend/src/index.css`
+(`@utility max-h-80vh` → `max-height: 80vh`, `@utility max-h-90vh` →
+`max-height: 90vh`). Die Benennung ist keine Formsache: eine interpolierte
+Klasse (`` `max-h-${value}` ``) sieht wie eine Lösung aus und verschwindet im
+Produktions-Bundle, weil Tailwinds Content-Scan sie nicht als Literal findet.
+Die Prop wirkt nur im begrenzten Modus; ohne `scrollableBody` wird sie
+verworfen (wie `bodyClassName`), weil es keine begrenzte Box gibt, die sie
+fassen könnte.
+
+Der Anlass war ein Stapel: `GalleryAccessModal` und `PhotographerTeamModal`
+trugen `max-h-80vh` per `boxClassName`, der Opt-in fügt aber seine eigene
+`max-h-90vh` hinzu. Bei zwei Regeln gleicher Spezifität entscheidet die
+Reihenfolge im Stylesheet, nicht die Absicht des Aufrufers. Mit
+`height="80vh"` emittiert die Shell genau **eine** `max-h-*`-Klasse.
+
+### 2.2 Der Kopf-Slot — `bodyHead`
+
+Ein Dialog mit Inhalt **über** der Scrollregion hat sich bis D-11 einen
+zweiten, eigenen begrenzten Box gebaut. `bodyHead` ist die geteilte Antwort:
+die Shell rendert ihn zwischen Header und Body, in einem eigenen
+`shrink-0`-Wrapper und **außerhalb** der Scrollregion. Ein Suchfeld, ein
+Zugriffs-Select oder ein Kontext-Eingabefeld bleibt damit erreichbar, während
+die Liste darunter scrollt.
+
+Die Sperre ist die des Shells, nicht die des Aufrufers: der `shrink-0`-Wrapper
+gehört zum Slot, statt eine Klasse zu sein, die jeder Dialog sich merken muss.
+Der Slot wirkt nur dort, wo die Shell eine Scrollregion besitzt, über die er
+gespannt werden kann (`scrollableBody`); ohne den Opt-in rendert er an
+derselben Stelle, pinnt aber nichts — es gibt keine Region, über der er läge.
+
+Der Rahmen der Liste wandert mit dem Scrollport. War der
+`flex-1 overflow-y-auto border rounded-box` bisher ein dialog-eigener
+Container, ist die Scrollregion jetzt der Body des Shells; der Rahmen wird über
+`bodyClassName` an genau diese Region gehängt, damit er nicht mit dem Inhalt
+wegscrollt.
+
+Drei Dialoge sind mit diesem Slot migriert (D-11): `GalleryAccessModal`,
+`PhotographerTeamModal` und `AIBatchEditModal`.
+
+### 2.3 `scroll-fade-bottom` — die Affordance an der Scroll-Grenze
 
 **Was sie tut.** `scroll-fade-bottom` ist eine Tailwind-4-`@utility` in
 `frontend/src/index.css`:
@@ -149,33 +200,33 @@ rendern (§6), und das an einem Tag. Drei Gründe dagegen:
   Footer in einer Spalte ist für den Normalfall die richtige Antwort; die
   bounded Layoutform für einen Dialog, der ohnehin nicht scrollt, ist
   zusätzliche Struktur ohne zusätzlichen Nutzen.
-- **Drei Dialoge bauen sich das bounded Layout bis heute selbst.**
-  `GalleryAccessModal` und `PhotographerTeamModal` tragen `max-h-80vh flex
-  flex-col` per `boxClassName`, `AIBatchEditModal` `h-90vh flex flex-col` —
-  jeweils mit einem eigenen `flex-1 overflow-y-auto` als Body. Das ist eine
-  zweite, parallele Implementierung derselben Idee. Ein Default-Wechsel würde
-  ihnen eine **zweite, verschachtelte** Scrollregion geben, während die geteilte
-  Lösung sie schrittweise ablösen soll. `GalleryModal` war der Dialog, an dem
-  die geteilte Lösung zuerst durchgezogen wurde (§2); `RatingStatusModal` und
-  die Kamera-Anleitung in `ManagementFtpInbox` sind inzwischen ebenfalls auf
-  `scrollableBody` umgestellt und stehen deshalb nicht mehr in dieser Gruppe
-  (§6.2, Nr. 19 und 24).
+- **Drei Dialoge bauten sich das bounded Layout bis D-11 selbst — inzwischen
+  migriert.** `GalleryAccessModal` und `PhotographerTeamModal` trugen
+  `max-h-80vh flex flex-col` per `boxClassName`, `AIBatchEditModal`
+  `h-90vh flex flex-col` — jeweils mit einem eigenen `flex-1 overflow-y-auto`
+  als Body. Das war eine zweite, parallele Implementierung derselben Idee, und
+  genau der Grund, aus dem ein **Default**-Wechsel hier nicht trägt: er hätte
+  ihnen eine zweite, verschachtelte Scrollregion gegeben. D-11 hat ihnen
+  stattdessen den fehlenden Shell-Baustein gegeben (`bodyHead` plus benannte
+  Höhe, §2.1/§2.2) und sie damit auf dieselbe Lösung gezogen.
+  `GalleryModal` war der Dialog, an dem die geteilte Lösung zuerst durchgezogen
+  wurde (§2); `RatingStatusModal` und die Kamera-Anleitung in
+  `ManagementFtpInbox` sind ebenfalls auf `scrollableBody` umgestellt (§6.2,
+  Nr. 19 und 24).
 - **Einige Dialoge haben die Grenze bewusst gestellt.** `ModelDetailModal`
   blendet die letzten `2rem` per `scroll-fade-bottom` aus und hält `pb-10`
   frei davon — das liest sich nur auf dem Element als „unten ist mehr", das
-  tatsächlich scrollt (§2.1). Genau dieses Detail ist an dem Dialog bereits
+  tatsächlich scrollt (§2.3). Genau dieses Detail ist an dem Dialog bereits
   aufgefallen: als der Body zur Scrollregion wurde, beschrieb die auf der Box
   verbliebene Ausblendung ein Band, unter dem nichts mehr durchlief, und der
   Hinweis zeigte ins Leere. Der Fix hat Maske und Scrollport gemeinsam auf den
   Body verschoben. Ein Default-Wechsel müsste diese Verschiebung für alle 28
   Dialoge auf einmal leisten, statt sie pro Dialog zu entscheiden.
 
-Der Preis des Defaults wäre also eine sichtbare Änderung überall, um fünf
+Der Preis des Defaults wäre also eine sichtbare Änderung überall, um die
 Dialoge zu reparieren, deren Inhalt die Viewport-Höhe tatsächlich
-überschreitet. Das sind genau die fünf, die den Opt-in gesetzt haben:
-`GalleryModal`, `ModelDetailModal`, `ModelInviteDialog`, `TextSnippetModal` und
-`CouponFormDrawer` (§6). Opt-in dreht die Beweislast um: wer umschaltet, kann
-begründen, dass sein Inhalt zu groß ist.
+überschreitet — genau die, die den Opt-in gesetzt haben (§6.2). Opt-in dreht
+die Beweislast um: wer umschaltet, kann begründen, dass sein Inhalt zu groß ist.
 
 ## 4. Die Regel
 
@@ -190,17 +241,23 @@ mindestens ein Formular oder eine Liste enthält, die bei realer Datenmenge
 
 ## 5. Bekannte Folgepunkte
 
-Ein Vertrag ohne seine offenen Enden wird missverstanden. Beide Punkte sind
-inzwischen erledigt und stehen als Beleg hier.
+Ein Vertrag ohne seine offenen Enden wird missverstanden. Die folgenden Punkte
+sind inzwischen erledigt und stehen als Beleg hier.
 
 - **`ModelDetailModal` — erledigt 2026-09-27.** Der Dialog hat den
   `bodyClassName`-Escape-Hatch bekommen und umgestellt: statt
   `boxClassName="max-w-4xl max-h-90vh overflow-y-auto pb-10 scroll-fade-bottom"`
   trägt er `scrollableBody` plus `bodyClassName="pb-10 scroll-fade-bottom"`.
   Die Ausblendung liegt damit auf dem Body, dem Element, das tatsächlich
-  scrollt (§2.1). Auf der Box hätte sie nichts mehr maskiert, weil die Box
+  scrollt (§2.3). Auf der Box hätte sie nichts mehr maskiert, weil die Box
   seither nicht mehr scrollt. Der Punkt bleibt hier, weil der Vertrag damit an
   einem echten Dialog durchgezogen ist und nicht nur beschrieben.
+- **Die drei handgerollten begrenzten Boxen — erledigt mit D-11 (2026-09-28).**
+  `GalleryAccessModal`, `PhotographerTeamModal` und `AIBatchEditModal` hängen
+  ihren Kopf jetzt über `bodyHead` außerhalb der Scrollregion und nennen ihre
+  Höhe über `height` (`80vh`, `80vh`, `90vh`), statt eine zweite `.modal-box`
+  zu bauen (§2.1/§2.2). Damit ist die zweite, parallele Implementierung aus §3
+  weg; §6.3 führt die verbleibende Menge (null).
 - **Die elf Dialoge, die ihr eigenes `modal-box` bauten, sind migriert.**
   Über `ModalShell` laufen `UserPermissionsModal`, `ModelInviteDialog` und der
   Inline-Dialog in `ManagementOrdersView`; über `ModalDialogShell`
@@ -247,6 +304,17 @@ Konkret heißt das:
   Dialog rendert über `ModalDialogShell`.
 - Testdateien (`__tests__/`, `*.test.tsx`) zählen nicht mit.
 
+**Die Shell-Props, auf denen dieses Inventar aufsetzt.** `ModalShell` besitzt die
+Box und gibt sie dem Aufrufer über drei Hebel: `boxClassName` (freie Klassen),
+`testId` (optionales `data-testid` **auf der `.modal-box`**, D-18) sowie
+`height`/`bodyHead` (§2.1/§2.2). `ModalDialogShell` reicht `scrollableBody`,
+`boxClassName` und `testId` durch; `height`/`bodyHead` sind dort **nicht**
+exponiert, weil kein Formular-Dialog sie bisher braucht. `testId` ist die
+Antwort auf den Wrapper, den `ModelInviteDialog` sonst nur für
+`data-testid="model-invite-dialog"` um seinen Inhalt gelegt hätte: der Hook
+sitzt auf der Box, die die Shell ohnehin rendert, und ohne Wert rendert die Box
+kein `data-testid` — die übrigen Dialoge bleiben byte-gleich.
+
 ### 6.2 Gruppe A — über die Shells: 28
 
 | # | Dialog | Shell | `scrollableBody` | Datei |
@@ -255,18 +323,18 @@ Konkret heißt das:
 | 2 | Meta-Galerie anlegen/bearbeiten | `ModalDialogShell` | nein | `ui/components/GalleryGroupModal.tsx` |
 | 3 | Änderungshistorie | `ModalShell` | nein | `ui/components/PhotoHistoryModal.tsx` |
 | 4 | Globaler Bestätigungsdialog | `ModalDialogShell` | nein | `ui/components/UIProvider.tsx` |
-| 5 | KI-Beschriftung | `ModalShell` | nein | `ui/management/components/AIBatchEditModal.tsx` |
+| 5 | KI-Beschriftung | `ModalShell` | ja | `ui/management/components/AIBatchEditModal.tsx` |
 | 6 | KI-Vorgaben-Vorschlag | `ModalShell` | nein | `ui/management/components/AIGalleryDefaultsModal.tsx` |
 | 7 | Rabattcode anlegen/bearbeiten | `ModalDialogShell` | ja | `ui/management/components/CouponFormDrawer.tsx` |
 | 8 | Nutzer einladen | `ModalDialogShell` | nein | `ui/management/components/CreateUserModal.tsx` |
 | 9 | Kunde anlegen/bearbeiten | `ModalDialogShell` | nein | `ui/management/components/CustomerModal.tsx` |
 | 10 | Nachricht an Kunden | `ModalShell` | nein | `ui/management/components/EmailComposerModal.tsx` |
-| 11 | Nutzer-Zugriff (Galerie) | `ModalShell` | nein | `ui/management/components/GalleryAccessModal.tsx` |
+| 11 | Nutzer-Zugriff (Galerie) | `ModalShell` | ja | `ui/management/components/GalleryAccessModal.tsx` |
 | 12 | Metadaten-Vorgaben | `ModalShell` | nein | `ui/management/components/GalleryMetadataDefaultsModal.tsx` |
 | 13 | Einladungen verwalten | `ModalShell` | nein | `ui/management/components/InviteModal.tsx` |
 | 14 | Model-Detail | `ModalShell` | ja | `ui/management/components/ModelDetailModal.tsx` |
 | 15 | Einladung erstellen | `ModalShell` | ja | `ui/management/components/ModelInviteDialog.tsx` |
-| 16 | Fotografen-Team | `ModalShell` | nein | `ui/management/components/PhotographerTeamModal.tsx` |
+| 16 | Fotografen-Team | `ModalShell` | ja | `ui/management/components/PhotographerTeamModal.tsx` |
 | 17 | Katalog-Eintrag | `ModalDialogShell` | nein | `ui/management/components/ProductModal.tsx` |
 | 18 | Projekt anlegen/bearbeiten | `ModalDialogShell` | nein | `ui/management/components/ProjectModal.tsx` |
 | 19 | Bewertungen & Status | `ModalShell` | ja | `ui/management/components/RatingStatusModal.tsx` |
@@ -280,9 +348,12 @@ Konkret heißt das:
 | 27 | Organisation anlegen | `ModalDialogShell` | nein | `ui/management/ManagementOrgsView.tsx` |
 | 28 | Auftrag anlegen/bearbeiten | `ModalDialogShell` | nein | `ui/photographer/components/PhotoJobModal.tsx` |
 
-15 über `ModalShell` direkt, 13 über `ModalDialogShell`. Davon **7** mit
-`scrollableBody` (Nr. 1, 7, 14, 15, 19, 21, 24), 21 im Default-Layout — davon
-drei mit handgerolltem begrenztem Box, siehe §6.3.
+15 über `ModalShell` direkt, 13 über `ModalDialogShell`. Davon **10** mit
+`scrollableBody` (Nr. 1, 5, 7, 11, 14, 15, 16, 19, 21, 24), 18 im
+Default-Layout. Keine handgerollte begrenzte Box mehr, siehe §6.3. Der Zähler
+ist aus der `ja`-Spalte dieser Tabelle reproduzierbar (Repo-Root):
+`grep -E '^\| [0-9]+ \|' features/tech/08-dialog-height-contract.md | grep -c '| ja |'`
+→ 10.
 
 ### 6.3 Gruppe B — eigenes Markup: 0
 
@@ -292,17 +363,19 @@ zwangsläufig eine der beiden Shells und erbt damit `role="dialog"`,
 `aria-modal`, den zugänglichen Namen, die Fokusfalle, Escape und den
 Backdrop-Klick.
 
-Drei Dialoge begrenzen ihre Box trotzdem selbst, statt den Modus zu setzen —
-das ist die verbleibende Teilmenge, die §3 als „zweite, parallele
-Implementierung" führt. `RatingStatusModal` und die Kamera-Anleitung in
-`ManagementFtpInbox` standen früher in dieser Tabelle; sie sind inzwischen auf
-`scrollableBody` umgestellt (§6.2, Nr. 19 und 24):
+Die frühere Teilmenge, die §3 als „zweite, parallele Implementierung" führte,
+ist **leer**. `RatingStatusModal` und die Kamera-Anleitung in
+`ManagementFtpInbox` waren früher auf `scrollableBody` umgestellt worden
+(§6.2, Nr. 19 und 24); die letzten drei — `GalleryAccessModal`,
+`PhotographerTeamModal`, `AIBatchEditModal` — sind mit D-11 nachgezogen und
+hängen ihren Kopf über `bodyHead` auf (§2.2). Kein Dialog setzt seinen
+begrenzten Box mehr selbst.
 
-| Dialog | `boxClassName` | eigene Scrollregion |
+| Dialog | vorher `boxClassName` | heute |
 |---|---|---|
-| `GalleryAccessModal` | `max-w-2xl flex flex-col max-h-80vh` | `flex-1 overflow-y-auto` |
-| `PhotographerTeamModal` | `max-w-2xl flex flex-col max-h-80vh` | `flex-1 overflow-y-auto` |
-| `AIBatchEditModal` | `w-11/12 max-w-7xl h-90vh flex flex-col` | `flex-1 overflow-y-auto` |
+| `GalleryAccessModal` | `max-w-2xl flex flex-col max-h-80vh` | `height="80vh"` + `bodyHead` |
+| `PhotographerTeamModal` | `max-w-2xl flex flex-col max-h-80vh` | `height="80vh"` + `bodyHead` |
+| `AIBatchEditModal` | `w-11/12 max-w-7xl h-90vh flex flex-col` | `height="90vh"` + `bodyHead` |
 
 Ein Dialog aus Gruppe A kann beides kombinieren — der Modus und eine eigene
 Höhe. `TextSnippetModal` tut das: `scrollableBody` plus
