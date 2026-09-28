@@ -4,11 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\GalleryGroup;
 use Database\Seeders\DatabaseSeeder;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
-use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -17,9 +15,11 @@ use Tests\TestCase;
  * seeded once per brand; a slug owned by one brand must never be handed to
  * another brand.
  *
- * The second brand is represented as a raw brand id on the row. `AsBrand`
- * round-trips ids it does not know as plain strings, so these tests do not
- * depend on the `Brand` enum containing more than its one current case.
+ * Since V046 `gallery_groups.slug` is unique per `(brand, slug)`, so a second
+ * brand owns its own row for the same slug. The second brand is represented as
+ * a raw brand id on the row. `AsBrand` round-trips ids it does not know as
+ * plain strings, so these tests do not depend on the `Brand` enum containing
+ * more than its one current case.
  */
 class DatabaseSeederGalleryGroupBrandIsolationTest extends TestCase
 {
@@ -37,15 +37,13 @@ class DatabaseSeederGalleryGroupBrandIsolationTest extends TestCase
     /**
      * A root slug that already belongs to another brand must not be reused.
      *
-     * `gallery_groups.slug` is globally unique (V001:
-     * `$table->string('slug')->unique();`, live index
-     * `gallery_groups_slug_unique`), so the seeder cannot create a second row
-     * for the same slug. The tenant-safe outcome is therefore to refuse
-     * loudly, not to return the foreign group. The pre-fix slug-only
-     * `firstOrCreate` silently returned the `srp` group and the seed finished;
-     * this test catches exactly that silent inheritance.
+     * V046 makes `(brand, slug)` the unique key, so the tenant-safe outcome is
+     * to create the active brand's own row — not to return the foreign group
+     * (the pre-fix slug-only `firstOrCreate` did exactly that) and not to
+     * refuse a state the schema now permits. The foreign row must stay
+     * untouched.
      */
-    public function test_seeder_refuses_to_reuse_a_group_owned_by_another_brand(): void
+    public function test_seeder_creates_its_own_group_when_another_brand_owns_the_slug(): void
     {
         GalleryGroup::query()->create([
             'slug' => 'privat',
@@ -54,10 +52,18 @@ class DatabaseSeederGalleryGroupBrandIsolationTest extends TestCase
             'brand' => 'srp',
         ]);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage("GalleryGroup slug 'privat' already belongs to brand 'srp'");
-
         $this->seed(DatabaseSeeder::class);
+
+        $groups = GalleryGroup::query()->where('slug', 'privat')->get();
+
+        $this->assertCount(2, $groups);
+        $this->assertNotNull($groups->firstWhere('brand', 'rp'));
+        $this->assertNotNull($groups->firstWhere('brand', 'srp'));
+
+        // No silent inheritance: the foreign row keeps its own attributes.
+        $foreign = $groups->firstWhere('brand', 'srp');
+        $this->assertSame('Fremde Marke', $foreign->name);
+        $this->assertTrue($foreign->is_public);
     }
 
     /**
@@ -86,7 +92,7 @@ class DatabaseSeederGalleryGroupBrandIsolationTest extends TestCase
 
     /**
      * The seeder remains idempotent: a second run neither duplicates the
-     * eight root groups nor creates a second row for a given slug.
+     * eight root groups nor creates a second row for a given `(brand, slug)`.
      */
     public function test_seeder_is_idempotent_for_one_brand(): void
     {
@@ -98,17 +104,16 @@ class DatabaseSeederGalleryGroupBrandIsolationTest extends TestCase
     }
 
     /**
-     * Documents the schema constraint that makes the intended
-     * "two rows, one per brand, same slug" property impossible today: slugs
-     * are globally unique, not unique per `(brand, slug)`. Until that index is
-     * migrated, the seeder can only refuse a cross-brand slug collision.
+     * Documents the V046 schema constraint: two brands may share a slug, while
+     * the same brand may not. The full invariant, including the index shape
+     * and the application-level uniqueness, lives in
+     * {@see GalleryGroupSlugPerBrandUniqueTest}.
      */
-    public function test_schema_rejects_a_second_brand_sharing_a_slug(): void
+    public function test_schema_allows_a_second_brand_to_share_a_slug(): void
     {
         GalleryGroup::query()->create(['slug' => 'privat', 'name' => 'Brand A', 'brand' => 'rp']);
-
-        $this->expectException(QueryException::class);
-
         GalleryGroup::query()->create(['slug' => 'privat', 'name' => 'Brand B', 'brand' => 'srp']);
+
+        $this->assertSame(2, GalleryGroup::query()->where('slug', 'privat')->count());
     }
 }
