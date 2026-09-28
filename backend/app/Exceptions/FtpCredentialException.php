@@ -40,6 +40,8 @@ class FtpCredentialException extends RuntimeException
 
     public const REASON_UNUSABLE_INBOX_PATH = 'unusable_inbox_path';
 
+    public const REASON_UNCREATABLE_INBOX_DIRECTORY = 'uncreatable_inbox_directory';
+
     public const REASON_RATE_LIMITED = 'rate_limited';
 
     public const REASON_NOT_RESETTABLE = 'not_resettable';
@@ -92,6 +94,23 @@ class FtpCredentialException extends RuntimeException
         return new self(
             self::REASON_UNUSABLE_INBOX_PATH,
             'Das FTP-Inbox-Verzeichnis (FTP_STORAGE_PATH) ist nicht als absoluter Pfad konfiguriert.',
+        );
+    }
+
+    /**
+     * The inbox directory could not be created, so the slug is not stored (D-2).
+     *
+     * Path and operating-system reason are both in the message: this failure is
+     * almost always an operator problem (a missing bind mount, a read-only
+     * filesystem, wrong permissions on `ftp/`), and a message without the
+     * concrete path cannot be acted on.
+     */
+    public static function couldNotCreateInboxDirectory(string $path, string $reason): self
+    {
+        return new self(
+            self::REASON_UNCREATABLE_INBOX_DIRECTORY,
+            "Das FTP-Verzeichnis '{$path}' konnte nicht angelegt werden: {$reason}. "
+            .'Der FTP-Login wurde nicht gespeichert. Bitte den Host-Pfad und seine Schreibberechtigung prüfen.',
         );
     }
 

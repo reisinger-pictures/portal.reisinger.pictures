@@ -34,13 +34,19 @@ class FtpCredentialRevocationTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const INBOX_ROOT = '/var/www/ftp';
+    /**
+     * A real, writable inbox root: `provisionAndShow()` creates `ftp/<slug>` on
+     * disk before it creates the account (D-2).
+     */
+    private string $inboxRoot;
 
     private const SFTPGO_BASE_URL = 'http://sftpgo.test:8080';
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->inboxRoot = $this->useTemporaryFtpInboxRoot();
 
         $this->configureSftpGo();
         $this->fakeSftpGo();
@@ -277,7 +283,7 @@ class FtpCredentialRevocationTest extends TestCase
                 'admin_username' => null,
                 'admin_password' => null,
             ], $overrides),
-            'filesystems.disks.ftp_inbox.root' => self::INBOX_ROOT,
+            'filesystems.disks.ftp_inbox.root' => $this->inboxRoot,
         ]);
     }
 
@@ -314,7 +320,7 @@ class FtpCredentialRevocationTest extends TestCase
             'id' => 7,
             'username' => $account,
             'status' => 1,
-            'home_dir' => self::INBOX_ROOT.'/'.$account,
+            'home_dir' => $this->inboxRoot.'/'.$account,
             'description' => 'Portal FTP-Kamera-Zugang',
             'permissions' => ['/' => ['*']],
             'virtual_folders' => [],

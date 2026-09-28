@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Support\FtpInboxDirectory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -108,10 +109,42 @@ class ProvisionFtpFoldersTest extends TestCase
 
         $this->artisan('ftp:provision-folders --fix-permissions')->assertExitCode(0);
 
+        clearstatcache(true, $this->root.'/alpen');
         $perms = fileperms($this->root.'/alpen');
         $this->assertNotFalse($perms);
         // setgid is bit 02000; without it an upload lands in the wrong group
         // and the importing backend cannot read it.
         $this->assertSame(02000, $perms & 02000, 'the setgid bit is what makes new uploads group-readable');
+        // The repair target is the same constant the slug write path uses, so
+        // the repair cannot widen a directory either path just created (D-2).
+        $this->assertSame(FtpInboxDirectory::MODE, $perms & 07777);
+    }
+
+    /**
+     * The regression the mode change exists for: `2777` was the value the
+     * previous constant produced, and a repair run must **narrow** it, not keep
+     * it or widen anything. Asserted as an end-to-end file-mode fact rather than
+     * against the constant alone, because the previous defect was precisely that
+     * the constant and the repair command disagreed.
+     */
+    public function test_fix_permissions_narrows_a_world_writable_directory(): void
+    {
+        User::factory()->create(['ftp_slug' => 'alpen']);
+
+        // The state the previous constant left on the deploy host.
+        mkdir($this->root.'/alpen', 0700);
+        chmod($this->root.'/alpen', 02777);
+
+        $this->artisan('ftp:provision-folders --fix-permissions')->assertExitCode(0);
+
+        clearstatcache(true, $this->root.'/alpen');
+        $perms = fileperms($this->root.'/alpen');
+        $this->assertNotFalse($perms);
+        $this->assertSame(
+            FtpInboxDirectory::MODE,
+            $perms & 07777,
+            'the repair run must bring an existing 2777 directory to the constant',
+        );
+        $this->assertSame(0, $perms & 0002, 'the repair run must remove world-write');
     }
 }

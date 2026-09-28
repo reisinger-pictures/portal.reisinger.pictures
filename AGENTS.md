@@ -393,14 +393,28 @@ entscheiden".
   `restart` ≠ `recreate`. Der Deploy dieser Änderung ist ein **Recreate**, kein Restart, und
   geschieht erst nach grünem CI.
 - **D-2 — Anlage von `ftp/<ftp_slug>` (P1-M24, P1):** die **Software legt das Verzeichnis selbst
-  an**, beim Setzen des FTP-Slugs, mit korrekter Ownership und `2777`+setgid. Der konkrete
-  Mechanismus ist Implementierungsfrage, nicht Teil dieser Entscheidung. **Schlägt die Anlage fehl,
-  schlägt auch das Setzen des Slugs fehl** — mit verwertbarer Meldung und ohne den Slug zu
-  speichern. *Warum:* die SFTPGo-Doku sagt ausdrücklich *"you have to create the folder on disk
-  yourself"*. Und der Zustand „Slug gesetzt, Ordner fehlt" darf gar nicht erst entstehen können:
-  er ist genau der Zustand, den der Befund verhindert, und er wäre später nur noch schwerer zu
-  entdecken. `chown -R` per Entrypoint auf `/home/webadmin/websites` bleibt ausgeschlossen
+  an**, beim Setzen des FTP-Slugs, mit korrekter Ownership und **`2775`**+setgid — Gruppe
+  schreibbar, **Welt nicht**. **Schlägt die Anlage fehl, schlägt auch das Setzen des Slugs fehl** —
+  mit verwertbarer Meldung und ohne den Slug zu speichern. *Warum:* die SFTPGo-Doku sagt ausdrücklich
+  *"you have to create the folder on disk yourself"*. Und der Zustand „Slug gesetzt, Ordner fehlt"
+  darf gar nicht erst entstehen können: er ist genau der Zustand, den der Befund verhindert, und er
+  wäre später nur noch schwerer zu entdecken. `chown -R` per Entrypoint auf
+  `/home/webadmin/websites` bleibt ausgeschlossen
   (`features/infrastructure/19-ftp-upload-pipeline.md` §7.9).
+  **Die Zahl `2775` ist eine Grenze in beide Richtungen, und beide Ränder sind belegt:**
+  `2777` (Welt schreibbar) ist **ersetzt**, weil jeder Prozess mit Schreibbedarf entweder
+  Eigentümer oder in `webgroup` ist und ein Dritter dort nichts zu suchen hat; `2755` (Gruppe nur
+  lesbar) **bricht den Import**, weil `FtpController::process()` nach dem Upload `unlink($file)`
+  macht und UID 1000 damit weder anlegen noch löschen kann — belegt in `AGENTS.todo.md` unter D-1
+  und gewarnt in `tests/scripts/ftp-transport-test/verify.sh:563`. **Tragend ist die
+  Gruppenvererbung, nicht das Welt-Schreibrecht:** ohne setgid landet ein Upload in der Gruppe des
+  anlegenden Prozesses statt in `webgroup`, und der importierende Backend verliert den Zugriff.
+  **Zwei Pfade, weil es zwei waren:** der Slug-Schreibpfad und `provisionAndShow()` (Weg
+  „Neues Kamera-Passwort" bei einem `pending`-Konto). Beide rufen
+  `App\Support\FtpInboxDirectory::ensure()`. **Reihenfolge: Ordner zuerst, Konto danach.** Die
+  SFTPGo-Admin-API hat kein Rollback für einen angelegten User, also ist „Konto zuerst" die
+  Reihenfolge, die den verbotenen Zustand erzeugen *kann*; „Ordner zuerst" hinterlässt im
+  Fehlerfall höchstens ein leeres Verzeichnis, das der nächste `ensure()` wiederverwendet.
 - **D-3 — Branch-Protection für `main`:** **bewusst nicht gesetzt.** *Warum:* Owner-Entscheidung.
   `GET /branches/main/protection` → `404 Branch not protected`; der `CI gate (push)` läuft grün,
   erzwingt sich aber selbst nicht. Trust-Frage an der Repo-/Org-Einstellung, keine Code-Aufgabe.

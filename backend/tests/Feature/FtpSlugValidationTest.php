@@ -36,16 +36,19 @@ class FtpSlugValidationTest extends TestCase
 
     /**
      * The inbox root the service derives the account's home directory from.
-     * Fixed rather than read from `filesystems.php`, because the derivation is
-     * one of the things these tests assert on.
+     * A real, writable directory, because the slug write path creates
+     * `ftp/<slug>` before it commits (D-2) — and because the derivation is one
+     * of the things these tests assert on, the same value is used for both.
      */
-    private const INBOX_ROOT = '/var/www/ftp';
+    private string $inboxRoot;
 
     private const SFTPGO_BASE_URL = 'http://sftpgo.test:8080';
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->inboxRoot = $this->useTemporaryFtpInboxRoot();
 
         $this->configureSftpGo();
         $this->fakeSftpGo();
@@ -279,7 +282,7 @@ class FtpSlugValidationTest extends TestCase
             $this->assertSame('j-doe', $body['username']);
             // Derived from the `ftp_inbox` root, so the two containers agree on
             // one path instead of two constants that can drift apart.
-            $this->assertSame(self::INBOX_ROOT.'/j-doe', $body['home_dir']);
+            $this->assertSame($this->inboxRoot.'/j-doe', $body['home_dir']);
             $this->assertSame(['/' => ['*']], $body['permissions']);
             $this->assertSame(1, $body['status']);
 
@@ -372,7 +375,7 @@ class FtpSlugValidationTest extends TestCase
                 'admin_username' => null,
                 'admin_password' => null,
             ], $overrides),
-            'filesystems.disks.ftp_inbox.root' => self::INBOX_ROOT,
+            'filesystems.disks.ftp_inbox.root' => $this->inboxRoot,
         ]);
     }
 
@@ -427,7 +430,7 @@ class FtpSlugValidationTest extends TestCase
             'id' => 7,
             'username' => $account,
             'status' => 1,
-            'home_dir' => self::INBOX_ROOT.'/'.$account,
+            'home_dir' => $this->inboxRoot.'/'.$account,
             'description' => 'Portal FTP-Kamera-Zugang',
             'permissions' => ['/' => ['*']],
             'virtual_folders' => [],

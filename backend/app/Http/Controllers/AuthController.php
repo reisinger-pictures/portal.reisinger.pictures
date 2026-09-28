@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\AutoJoinPolicy;
 use App\Enums\Brand;
 use App\Enums\UserRole;
+use App\Exceptions\FtpCredentialException;
 use App\Mail\ActivateAccountMail;
 use App\Models\Org;
 use App\Models\OrgInvite;
@@ -14,6 +15,7 @@ use App\Services\AIService;
 use App\Services\AuthorizationService;
 use App\Services\FtpCredentialService;
 use App\Support\BrandRegistry;
+use App\Support\FtpInboxDirectory;
 use App\Support\FtpSlug;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
@@ -21,6 +23,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -251,13 +254,18 @@ class AuthController extends Controller
             ]
         );
 
+        // Set by the slug-change branch when the old folder is retained, and read
+        // after the transaction: before the commit a warning would be a lie if the
+        // transaction rolled back.
+        $orphanedInboxPath = null;
+
         // Das Rueckgabewert wird absichtlich weitergegeben. `DB::transaction()`
         // liefert den Wert der Closure zurueck; ohne ihn zu benutzen,
         // antwortete der Slug-Wechsel mit `{"success": true}` und das soeben
         // erzeugte Passwort wurde niemandem angezeigt — ein working account,
         // dessen Passwort niemand kennt, mit dem Reset-Endpunkt (3x/Stunde)
         // als einzigem Ausweg. Die Nicht-Slug-Aenderungen liefern null.
-        $credentialResponse = DB::transaction(function () use ($user, $validated) {
+        $credentialResponse = DB::transaction(function () use ($user, $validated, &$orphanedInboxPath) {
             // P1-M34: Ein Slug-Wechsel ist ein Reset. Der alte SFTPGo-Account
             // wird gelöscht, der neue Account mit einem neuen Passwort
             // angelegt. Das Passwort wird einmal zurückgegeben, nicht
@@ -269,6 +277,39 @@ class AuthController extends Controller
             $newSlug = $validated['ftp_slug'] ?? null;
 
             if ($newSlug && $oldSlug !== $newSlug) {
+                // D-2 (AGENTS.md §14): the software creates `ftp/<newSlug>`
+                // itself, and the slug is stored only if that succeeded. SFTPGo
+                // does not create the folder ("you have to create the folder on
+                // disk yourself", feature doc 7.9), so without this the account
+                // would point at a directory that does not exist — which does not
+                // surface as an error from the portal, only as an empty inbox.
+                //
+                // It runs before the old account is deleted on purpose: that
+                // keeps the two failure modes apart. A folder that cannot be
+                // created changes *nothing at all*, while a stored slug whose
+                // folder is missing is the state D-2 exists to make
+                // unrepresentable. Looked at from the other side: a failed
+                // delete after this point leaves the slug unchanged and the new
+                // folder behind, which is harmless litter (see the warning
+                // below) — the reverse order would leave a live account without
+                // a folder.
+                try {
+                    FtpInboxDirectory::ensure($newSlug);
+                } catch (FtpCredentialException $exception) {
+                    return response()->json(['error' => $exception->getMessage()], 500);
+                }
+
+                // The old folder is deliberately not deleted: it can still hold
+                // uploads that were not imported yet, and removing it would
+                // destroy them. The operator is told about it once the
+                // transaction has committed.
+                if ($oldSlug !== null && $oldSlug !== '') {
+                    $oldInboxPath = FtpInboxDirectory::pathFor($oldSlug);
+                    if (is_dir($oldInboxPath)) {
+                        $orphanedInboxPath = $oldInboxPath;
+                    }
+                }
+
                 $credentialSvc = app(FtpCredentialService::class);
 
                 // 1. Alten Account löschen (falls vorhanden). Wenn SFTPGo
@@ -312,6 +353,14 @@ class AuthController extends Controller
 
             return null;
         });
+
+        if ($orphanedInboxPath !== null) {
+            // The owner has to learn about the retained folder: it is litter
+            // that still holds photographs, and the previous account (and so the
+            // camera configured with it) no longer exists. Deleting it is not
+            // something the portal may decide on its own.
+            Log::warning('Der FTP-Ordner des vorherigen Logins bleibt erhalten.', ['path' => $orphanedInboxPath]);
+        }
 
         return $credentialResponse ?? response()->json(['success' => true]);
     }

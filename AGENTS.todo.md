@@ -5,15 +5,21 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **86 offene Positionen**
-> über 1775 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **87 offene Positionen**
+> über 1812 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **22**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **23**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
+>
+> **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
+> Entscheidungen liegen in `AGENTS.md` §14, ihr Umsetzungsstand im Protokoll ganz oben.
+> Die letzte offene Entscheidung war D-12 (Initial-Fokus) und ist am selben Tag entschieden
+> worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
+> entstanden ist — nicht, dass eine vergessene offen blieb.
 >
 > **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
 > Entscheidungen liegen in `AGENTS.md` §14, ihr Umsetzungsstand im Protokoll ganz oben.
@@ -68,8 +74,28 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 - [ ] **D-1 — SFTPGo auf `user: "1002:82"` umstellen und deployen.** Compose-Datei ändern,
       committen, pushen, **grünes CI für genau den gepushten Head abwarten**, dann Recreate
       (§13: Restart ≠ Recreate, und `sync.sh` migriert nicht).
-- [ ] **D-2 — `ftp/<ftp_slug>` beim Setzen des Slugs anlegen; schlägt die Anlage fehl, schlägt
-      das Setzen fehl.** Noch nicht begonnen.
+- [x] **D-2 — `App\Support\FtpInboxDirectory::ensure()` auf beiden Pfaden, `2775`, Ordner vor
+      Konto.** Slug-Schreibpfad **und** `provisionAndShow()` (sonst entsteht „Konto ohne Ordner"
+      weiter über „Neues Kamera-Passwort"). Reihenfolge begründet: die SFTPGo-Admin-API hat kein
+      Rollback für einen angelegten User, also erzeugt nur „Konto zuerst" den verbotenen Zustand;
+      „Ordner zuerst" hinterlässt höchstens ein leeres Verzeichnis, das `ensure()` wiederverwendet.
+      **Rechte `2775`, und die erste Fassung dieser Anweisung war falsch:** es stand `02755`,
+      beschrieben als `rwx/rws/r-x` — das ist `02775`. `02755` wäre Gruppe `r-s` **ohne**
+      Schreibrecht, und damit wäre `FtpController::process()` mit seinem `unlink($file)` gebrochen.
+      Der umsetzende Agent hat die Zahl nicht befolgt und `02775` gesetzt; vier unabhängige Belege
+      aus dem Repo stützen ihn (`deployment/docker-compose.yml:466`, D-1 im Board, und
+      `verify.sh:563` warnt genau bei `2755`). **Eine Zahl, die eine Funktion kaputtmacht, ist kein
+      Tippfehler, sondern ein Befund** — die Grenze steht jetzt beidseitig im Register.
+      **Nachweis:** `ProvisionFtpFoldersTest` zeigt, dass `--fix-permissions` ein bestehendes
+      `2777`-Verzeichnis **auf** `2775` verengt und das Welt-Schreibrecht entfernt — vorher hätte
+      der Repair-Lauf es auf dem Deploy-Host still ausgeweitet. Sechs Testdateien standen auf einem
+      festen `/var/www/ftp`, den es weder auf macOS noch in CI gibt; sie laufen jetzt über
+      `useTemporaryFtpInboxRoot()`. **Die Fehlersimulation ist bewusst `ENOENT` über einen
+      nicht existierenden Elternpfad mit nicht-rekursivem `mkdir`**, nicht `chmod` — CI fährt die
+      Suite als root, wo ein `chmod`-Fixture ignoriert wird und der Test aus dem falschen Grund
+      grün wäre.
+      **Offen, bewusst nicht entschieden:** der Reset-Endpunkt antwortet bei Anlagefehler mit **422**,
+      der Slug-Pfad mit **500** — dieselbe Ursache, zwei Codes. Als Folge-Position unten.
 - [x] **D-6 — `API_THROTTLE_LIMIT` steht auf 1000 in `backend/.env.ci`**, mit deutschem
       Kommentar im Block der übrigen Throttle-Werte; `backend/.env.example` kommentiert
       englisch, dass 60 der Produktions-Sinnwert ist — jede Datei folgt ihrer eigenen
@@ -201,6 +227,14 @@ unverändert gegenüber dem vorigen Deploy, Homepage **200**.
   Ungespeichert-Warnung auslösen — vorher taten das nur „Schließen" und „Abbrechen",
   und getippte Eingabe konnte still verworfen werden. Worauf es ankommt: beide
   Abbruchwege fragen nach, keiner verwirft mehr.
+- [ ] **Anlagefehler: 422 oder 500?** Die SFTPGo-Verzeichnis-Anlage schlägt auf zwei Wegen fehl
+  und antwortet zweimal unterschiedlich: der Slug-Pfad gibt **500** (Serverzustand — fehlender
+  Mount, read-only, fehlende Rechte), der Reset-Endpunkt **422** (das ist dessen dokumentierte
+  Klasse für Portal-Voraussetzungen). Der umsetzende Agent hat den Controller bewusst nicht
+  angefasst, weil die Entscheidung nur „kein Konto ohne Ordner" verlangt hat und nicht den Code.
+  **Zu entscheiden:** ein Code für beide, oder zwei mit Begründung? Beides ist vertretbar —
+  wichtiger ist, dass es Absicht ist und nicht Zufall. Betrifft
+  `FtpCredentialController::fromCredentialException()`.
 - [ ] manuell prüfen: **Dialoghöhen und gepinnter Kopf per Screenshot** — `pnpm
   test:screenshots:grep "screenshot (gallery-access-dialog|gallery-photographer-team-dialog)"`,
   Ergebnis unter `frontend/test-results/ui-screenshots/filled/`. Prüfen: (a) Kopf und Suchfeld
@@ -405,7 +439,9 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   SFTPGo-Doku: *"Virtual folder auto creation on user add/update … you have
   to create the folder on disk yourself"* — SFTPGo legt nichts an. Der Ordner
   `ftp/<ftp_slug>` muss auf dem Host existieren, mit `1002:webgroup` und
-  `2777`, **bevor** oder im selben Schritt wie der User.
+  **`2775`** — Gruppe schreibbar, Welt nicht; **nicht** `2777` (durch D-2 ersetzt) und
+  **nicht** `2755` (d damit kann UID 1000 weder anlegen noch `unlink`en) —
+  **bevor** oder im selben Schritt wie der User.
   **Designprinzip (2026-09-26):** Jeder User bekommt einen eigenen physischen
   Ordner auf dem Host, auf den er eingeschränkt ist. SFTPGo konfiguriert das
   als `home_dir` — der User sieht nur sein eigenes Verzeichnis, nicht die
@@ -575,13 +611,14 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   implizit über root funktioniert, bricht dann. Konkret verifiziert: mit
   `2755` auf `ftp/<slug>` konnte UID 1000 **weder anlegen noch `unlink`en** —
   und `FtpController::process()` macht genau das (`unlink($file)` nach dem
-  Import). Ein solcher Ordner ist mit `2777` entschärft (passiert am
+  Import). Der ursprüngliche Vorschlag, das mit `2777` zu entschärfen, ist **durch zwei
+  Entscheidungen ersetzt**: D-1 nimmt SFTPGo auf `1002:82`, und D-2 setzt `2775` statt
   2026-09-26), die Fehlerklasse bleibt aber: **jeder neue Pfad mit `2755` unter
   `/home/webadmin/websites` bricht beim UID-Wechsel.**
   **Zweite, verwandte Diskrepanz:** `sftpgo` läuft als `1000:1000`, der
   Host-Pfad gehört `1002:webgroup`. Dateien, die der Dienst anlegt, werden
   dadurch `1000`-owned statt `1002`. Funktional auffällig wird es nicht
-  (2777 + setgid ⇒ Gruppe erbt sich, Lesen/Löschen gelingt), aber es
+  (setgid ⇒ Gruppe erbt sich, Lesen/Löschen gelingt), aber es
   mischt die Ownership-Modelle im Website-Baum — dieselbe Art Unordnung wie
   der `r1`-Vorfall vom 2026-09-26, nur leiser. **Zu entscheiden:** läuft
   SFTPGo als `1002:82`, oder bleibt `1000` und die Site-Konvention wird für
@@ -594,7 +631,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   **Tests:** (a) PHPUnit/Shell-Test, der `Config.User` des laufenden Containers
   gegen die `user:`-Deklaration im Compose stellt und bei Abweichung
   fehlschlägt — als eigener Vertrag, nicht im Image-Test; (b) Test, dass jede
-  unter `/home/webadmin/websites` angelegte Inbox `2777` und `1002:webgroup`
+  unter `/home/webadmin/websites` angelegte Inbox `2775` und `1002:webgroup`
   **oder** die dokumentierte Ausnahme ist; (c) `verify-image-nonroot.sh` um
   einen Hinweis ergänzen, dass es `user:`-Overrides im Compose **nicht**
   abdeckt.

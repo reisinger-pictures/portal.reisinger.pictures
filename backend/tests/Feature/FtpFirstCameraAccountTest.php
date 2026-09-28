@@ -41,7 +41,11 @@ class FtpFirstCameraAccountTest extends TestCase
 
     private const SFTPGO_BASE_URL = 'http://sftpgo.test:8080';
 
-    private const INBOX_ROOT = '/var/www/ftp';
+    /**
+     * A real, writable inbox root: `provisionAndShow()` creates `ftp/<slug>` on
+     * disk before it creates the account (D-2).
+     */
+    private string $inboxRoot;
 
     /**
      * Makes every fixture's slug unique. `users.ftp_slug` is unique, and the
@@ -56,6 +60,8 @@ class FtpFirstCameraAccountTest extends TestCase
     {
         parent::setUp();
 
+        $this->inboxRoot = $this->useTemporaryFtpInboxRoot();
+
         config([
             'services.sftpgo' => [
                 'base_url' => self::SFTPGO_BASE_URL,
@@ -63,7 +69,7 @@ class FtpFirstCameraAccountTest extends TestCase
                 'admin_username' => null,
                 'admin_password' => null,
             ],
-            'filesystems.disks.ftp_inbox.root' => self::INBOX_ROOT,
+            'filesystems.disks.ftp_inbox.root' => $this->inboxRoot,
         ]);
 
         $this->fakeSftpGo();
@@ -114,12 +120,72 @@ class FtpFirstCameraAccountTest extends TestCase
             $body = $request->data();
             $this->assertSame($slug, $body['username']);
             $this->assertSame($password, $body['password'], 'The shown password must be the stored one.');
-            $this->assertSame(self::INBOX_ROOT.'/'.$slug, $body['home_dir']);
+            $this->assertSame($this->inboxRoot.'/'.$slug, $body['home_dir']);
             $this->assertSame(['/' => ['*']], $body['permissions']);
             $this->assertSame(1, $body['status']);
 
             return true;
         });
+    }
+
+    /**
+     * D-2 for the reset path: a first-time provisioning creates the inbox
+     * directory, not only the SFTPGo account. Before this, a photographer who
+     * never changed their (auto-generated) slug and used "Neues Kamera-Passwort"
+     * got an account with no directory behind it — an account pointing at a
+     * folder that is not there, which from the portal looks like an empty inbox.
+     */
+    public function test_a_first_provision_creates_the_inbox_directory(): void
+    {
+        $photographer = $this->photographer();
+        $token = auth('api')->login($photographer);
+        $slug = (string) $photographer->ftp_slug;
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/ftp/reset-password')
+            ->assertOk();
+
+        $this->assertDirectoryExists($this->inboxRoot.'/'.$slug);
+    }
+
+    /**
+     * The same failure contract as the slug path: if the directory cannot be
+     * created, no account is created either.
+     *
+     * The ordering is the guarantee. `provisionAndShow()` ensures the directory
+     * *before* it calls SFTPGo, because the Admin API has no rollback for a
+     * created user — an account created first and then failed on `mkdir()` would
+     * be exactly the state D-2 exists to make unrepresentable. The residue of
+     * this order is an empty directory, which is harmless and reused on the next
+     * call.
+     *
+     * A missing parent with non-recursive `mkdir()` is the failure the deployed
+     * pipeline actually risks (an absent bind mount), and it fails for every
+     * user including root. A `chmod 0500` fixture would not: CI runs the suite
+     * as root, so the permission would be ignored and the test would be green
+     * for the wrong reason.
+     */
+    public function test_a_first_provision_that_cannot_create_the_directory_creates_no_account(): void
+    {
+        $photographer = $this->photographer();
+        $token = auth('api')->login($photographer);
+
+        config(['filesystems.disks.ftp_inbox.root' => $this->inboxRoot.'/absent']);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/ftp/reset-password');
+
+        // The endpoint classifies a portal-side precondition as 422 (`fromCredentialException()`).
+        $response->assertStatus(422);
+        $this->assertNull($response->json('password'));
+
+        // The whole decision rests on this assertion: nothing reached SFTPGo.
+        Http::assertNothingSent();
+
+        $after = $photographer->fresh();
+        $this->assertSame('pending', $after?->ftp_account_status);
+        $this->assertNull($after?->ftp_provisioned_at);
+        $this->assertDirectoryDoesNotExist($this->inboxRoot.'/absent/'.$photographer->ftp_slug);
     }
 
     /**
@@ -405,7 +471,7 @@ class FtpFirstCameraAccountTest extends TestCase
             'id' => 7,
             'username' => $account,
             'status' => 1,
-            'home_dir' => self::INBOX_ROOT.'/'.$account,
+            'home_dir' => $this->inboxRoot.'/'.$account,
             'description' => 'Portal FTP-Kamera-Zugang',
             'permissions' => ['/' => ['*']],
             'virtual_folders' => [],
