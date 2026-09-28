@@ -715,6 +715,28 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   kennen muss — **nicht** durch Raten behoben. Wenn sie behoben werden soll, braucht
   es zuerst den Policy-Text an einer lesbaren Stelle im Repo; das ist eine
   Owner-Entscheidung und eine Frage an den `proxy-stack`.
+- [ ] **ENTSCHEIDUNG OFFEN — der bedingte Seed ist auf der Platte, aber nicht aktiv,
+  weil der Container neu erzeugt werden muss und der Compose-Stack extern verwaltet
+  wird.** `app:seed-if-fresh` ist deployt (Rsync), der Container wurde neu gestartet —
+  und trotzdem lief wieder `db:seed`, weil `docker restart` die
+  Erzeugungskonfiguration verwendet (siehe §13, neue Regel). **Konsequenz:** Der
+  Schutz gegen die 28 überschriebenen Keys ist derzeit **nicht wirksam**; jeder
+  Neustart schreibt sie erneut. Gemessen: `users` hat 1 Zeile, also würde
+  `app:seed-if-fresh` korrekt überspringen — er läuft nur nie.
+  **Das Problem ist nicht das Kommando, sondern der Stack:** Die
+  Compose-Labels des laufenden Containers nennen
+  `com.docker.compose.project.working_dir = /data/compose/23` und
+  `config_files = /data/compose/23/docker-compose.yml` — **dieses Verzeichnis existiert
+  auf dem Host nicht mehr** (`ls /data/compose` zeigt nur `1`, und darin nur `site`).
+  `docker compose ls` listet kein Projekt. Der Stack wird also über ein externes
+  Werkzeug verwaltet (dockge/Portainer), und seine Quelle ist über SSH nicht
+  auffindbar. **Deshalb habe ich den Container bewusst nicht neu erzeugt:** eine
+  handgeschriebene `docker compose up -d` gegen eine Quelle, die ich nicht
+  einsehen kann, kann `environment`, `volumes` oder `networks` verlieren und das
+  Backend mitnehmen. **Frage an den Owner:** über welches Werkzeug wird der
+  `portal-reisinger-pictures`-Stack verwaltet, und kann der Container dort neu
+  erzeugt werden, ohne dass die Konfiguration neu eingetragen werden muss? Erst dann
+  wirkt der Schutz.
 - [ ] manuell prüfen: **Auszahlungsdaten nach dem automatischen Seed** — Stand ist
   gemessen und **korrekt**: `bank_holder` = `Florian Reisinger`, `bank_iban` =
   `DE96100110012179986174`, `bank_bic` = `NTSBDEB1XXX`, `company_*` = Linz,

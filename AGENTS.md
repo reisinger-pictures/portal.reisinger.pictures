@@ -228,11 +228,25 @@ führt keine Migration aus. Deshalb gilt:
   teils den neuen und teils den alten Code ausfuehrt — und das sieht aus
   wie ein inkonsistenter Zustand, nicht wie ein Caching-Problem. Wer den
   Neustart weglaesst, debuggt einen Fehler, den es nicht gibt.
-  Der Neustart seedet **nicht**: der Entrypoint fuehrt seit 2026-09-28
-  `php artisan app:seed-if-fresh` statt `db:seed --force` aus, und das seedet nur
-  eine Datenbank ohne Admin-User. Vorher ueberschrieb der Neustart die 28
-  autoritativen `settings`-Keys des Seeders — die 28 Keys sind in
-  `backend/AGENTS.md` (Database Setup Policy) aufgefuehrt.
+  Der Neustart seedet **nicht** — aber **erst, seit der Container neu erzeugt wurde**:
+  der Entrypoint führt `php artisan app:seed-if-fresh` statt `db:seed --force` aus,
+  und das seedet nur eine Datenbank ohne Admin-User. Vorher überschrieb der Neustart
+  die 28 autoritativen `settings`-Keys des Seeders — die 28 Keys sind in
+  `backend/AGENTS.md` (Database Setup Policy) aufgeführt. **Solange der Container nicht
+  neu erzeugt ist, gilt die alte Fassung weiter**, siehe die nächste Regel.
+- **Neustart ≠ Recreate (STRICT, 2026-09-28).** `docker restart portal_backend`
+  startet einen **bestehenden** Container mit der Konfiguration, mit der er
+  **erzeugt** wurde. Änderungen an `command:`, `entrypoint:`, `environment:` oder
+  `volumes:` in `deployment/docker-compose.yml` werden dabei **nicht** übernommen —
+  sie sind zum Erzeugungszeitpunkt in den Container gebacken. **Belegt:** Der
+  Entrypoint wurde von `db:seed --force` auf `app:seed-if-fresh` umgestellt und mit
+  `sync.sh` übertragen; nach `docker restart` lief trotzdem wieder
+  `INFO Seeding database.`, und **beide** erwarteten Ausgaben von
+  `app:seed-if-fresh` erschienen gar nicht. `docker inspect` zeigte
+  `Created: 2026-09-28T07:19:33` — vor der Änderung.
+  **Regel:** Nach einer Änderung an `command:`, `entrypoint:`, `environment:` oder
+  `volumes:` muss der Container **neu erzeugt** werden, nicht neu gestartet. Ein
+  Neustart genügt ausschließlich für PHP-, Frontend- und sonstigen Dateiinhalt.
 - **Frontend-Sync braucht keinen Neustart.** `dist/` ist statisch, der
   Webserver liest pro Request neu. Er braucht aber einen **aktuellen**
   Bundle — siehe die Frische-Regel unten.
