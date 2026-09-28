@@ -345,8 +345,9 @@ führt keine Migration aus. Deshalb gilt:
 - **D-4 — `.env.production` bleibt unverschlüsselt und unrotiert**, als akzeptiertes Risiko.
   Wer eine Rotation vorschlägt, hat die Entscheidung nicht gelesen: sie ist getroffen, und
   ein Repo-Risiko besteht nicht (gitignored, nie committet).
-- **D-6 — `API_THROTTLE_LIMIT` ist in `.env.ci` 1000**, in `.env.example` kommentiert (60 ist
-  der Produktions-Sinnwert). `config/app.php` und `.env.production` bleiben unangetastet.
+- **D-6 — `API_THROTTLE_LIMIT` ist in `backend/.env.ci:40` 1000** (heute dort `=60`), in
+  `backend/.env.example:41` kommentiert (60 ist der Produktions-Sinnwert). `config/app.php`
+  und `.env.production` bleiben unangetastet.
 
 ## 14. Entscheidungen des Owners (2026-09-28)
 
@@ -403,9 +404,10 @@ entscheiden".
   Deploy-Host. Damit ist der Punkt **Deploy-Arbeit** und gehört neben D-1, denn 12 GB Reserve sind
   für einen Stack-Recreate mit Image-Pulls knapp. Der eigene Fußabdruck (~1 GB) ist vernachlässigbar.
 - **D-6 — `API_THROTTLE_LIMIT` in CI:** auf **1000** anheben, vergleichbar mit
-  `AUTH_THROTTLE_LIMIT=1000` dort, und in `.env.example` kommentieren, dass **60 der
-  Produktions-Sinnwert** ist und Testumgebungen deutlich höher müssen sein. `config/app.php`
-  (Default 120/5) und `.env.production` bleiben unangetastet. *Warum:* CI fährt laut eigenem
+  `AUTH_THROTTLE_LIMIT=1000` dort (`backend/.env.ci:36`), und in `backend/.env.example`
+  kommentieren, dass **60 der Produktions-Sinnwert** ist und Testumgebungen deutlich höher
+  müssen sein. `config/app.php` (Default 120/5) und `.env.production` bleiben
+  unangetastet. *Warum:* CI fährt laut eigenem
   Kommentar 4 Playwright-Worker und hat dasselbe Burst-Profil wie lokal mit 8 — die Drosselung ist
   dort latent, auch wenn sie bisher nicht als Fehler auffaellt.
 
@@ -426,16 +428,19 @@ entscheiden".
 
 ### UI-Verhalten
 
-- **D-9 — Portalname in der Sidebar (`Sidebar.tsx:51`):** das **Layout bricht den Namen um**,
-  statt ihn still zu kürzen. *Warum:* `whitespace-nowrap` ohne Truncation lässt einen längeren
-  Namen ungebremst überlaufen — genau die Fehlerklasse, die am Mobile-Header gerade behoben
-  wurde. Stille Kürzung ohne sichtbaren Effekt ist schlechter als Umbruch; die Asymmetrie
+- **D-9 — Portalname in der Sidebar**
+  (`frontend/src/ui/components/Sidebar.tsx:51`,
+  `<span className="whitespace-nowrap">{portalName}</span>`): das **Layout bricht den Namen
+  um**, statt ihn still zu kürzen. *Warum:* `whitespace-nowrap` ohne Truncation lässt einen
+  längeren Namen ungebremst überlaufen — genau die Fehlerklasse, die am Mobile-Header
+  gerade behoben wurde. Stille Kürzung ohne sichtbaren Effekt ist schlechter als Umbruch; die Asymmetrie
   Mobile (bricht um) vs. Desktop (nowrap) verschwindet damit.
 - **D-10 — `<main>`-Scoping im E2E-Harness:** das Scoping wird **nicht aufgeweicht**; stattdessen
   wird die **Struktur geändert**, damit die Dialoge innerhalb von `<main>` rendern.
-  *Warum:* `DashboardLayout.tsx:93-95` rendert `<GalleryModals` **nach** `</main>`, und
-  `ModalShell` nutzt **kein Portal** — die acht Struktur-View-Instanzen sind per `click` nicht
-  erreichbar. Ein Testfix hätte das Scoping geschwächt, ohne die Ursache zu beheben.
+  *Warum:* `frontend/src/ui/components/DashboardLayout.tsx:88` schließt `</main>`, Z.90 rendert
+  `<GalleryModals` — die Dialoge stehen also **nach** `</main>`, und `ModalShell` nutzt
+  **kein Portal**; die acht Struktur-View-Instanzen sind per `click` nicht erreichbar. Ein
+  Testfix hätte das Scoping geschwächt, ohne die Ursache zu beheben.
 - **D-11 — `ModalShell`:** die **benannte Höhe wird eingeführt** (statische Klasse je Wert, kein
   freier Wert) **und die drei handge-rollten Dialoge werden migriert**. `GalleryAccessModal`,
   `PhotographerTeamModal` und `AIBatchEditModal` bekommen den `bodyHead`/`pinned`-Slot, und die
