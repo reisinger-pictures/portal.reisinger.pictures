@@ -32,8 +32,8 @@ Da wir eine maßgeschneiderte SaaS-Architektur verwenden, weicht dieses Setup in
   php artisan scout:sync-index-settings
   ```
 
-## 4b. Code Coverage (PHPUnit + Herd Xdebug)
-* **Coverage-Treiber:** Herd liefert Xdebug 3.5 als vorkompilierte Extension mit. Für PHP 8.5 ist sie über `/Applications/Herd.app/Contents/Resources/xdebug/xdebug-85-arm64.so` verfügbar. In `/Users/florianreisinger/Library/Application Support/Herd/config/php/85/xdebug.ini` wird sie geladen (Architektur beachten: `-arm64` vs `-x86`). `xdebug.mode=off` hält die Performance-Auswirkung für alle normalen Läufe bei null.
+## 4b. Code Coverage (PHPUnit + Xdebug)
+* **Coverage-Treiber:** Xdebug kann via PECL installiert werden (`pecl install xdebug`). Die Extension liegt dann unter `/opt/homebrew/lib/php/pecl/20250930/xdebug.so` (Pfad variiert je nach PHP-Version). In `/opt/homebrew/etc/php/8.5/conf.d/ext-xdebug.ini` wird sie geladen. `xdebug.mode=off` hält die Performance-Auswirkung für alle normalen Läufe bei null.
 * **Ausführen:** Coverage ist nur aktiv, wenn der Mode beim Lauf gesetzt wird:
   ```bash
   # Kanban-Board-Feature
