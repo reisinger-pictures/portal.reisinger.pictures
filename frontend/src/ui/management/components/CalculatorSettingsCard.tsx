@@ -122,9 +122,9 @@ export default function CalculatorSettingsCard() {
                 mult_unlimited: terms?.mult_unlimited || '1.5',
                 mult_international: terms?.mult_international || '1.5'
             });
-            showToast('success', 'Kalkulator-Einstellungen gespeichert.');
+            showToast('success', t`Kalkulator-Einstellungen gespeichert.`);
         } catch {
-            showToast('error', 'Fehler beim Speichern.');
+            showToast('error', t`Fehler beim Speichern.`);
         }
     };
 

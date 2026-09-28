@@ -1,4 +1,5 @@
 import {useState, useEffect, useRef, ReactNode} from 'react';
+import {t} from "@lingui/core/macro";
 import {CartItem, CartContext} from './CartContext';
 import {useAuth} from './useAuth';
 import {useUI} from '../ui/components/UIContext';
@@ -27,7 +28,7 @@ export function CartProvider({children}: CartProviderProps) {
         queueMicrotask(() => {
             const result = loadCartState(cartKey);
             if (result.error === 'invalid-json') {
-                showToast('error', 'Warenkorb konnte nicht geladen werden.');
+                showToast('error', t`Warenkorb konnte nicht geladen werden.`);
             }
             setCartState(result);
             loadingRef.current = false;
@@ -38,7 +39,7 @@ export function CartProvider({children}: CartProviderProps) {
     useEffect(() => {
         if (loadingRef.current) return;
         if (!persistCartItems(cartKey, items, quoteToken)) {
-            showToast('error', 'Warenkorb konnte nicht gespeichert werden.');
+            showToast('error', t`Warenkorb konnte nicht gespeichert werden.`);
         }
     }, [items, quoteToken, cartKey, showToast]);
 

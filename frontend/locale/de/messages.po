@@ -871,6 +871,10 @@ msgstr "Automatischer Refresh für Besucher alle 10 Sekunden."
 msgid "Backend:"
 msgstr "Backend:"
 
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "Bankdaten gespeichert."
+msgstr "Bankdaten gespeichert."
+
 #: src/logic/modelRegistration.ts
 msgid "Basisdaten"
 msgstr "Basisdaten"
@@ -2555,6 +2559,7 @@ msgstr "Fehler beim Setzen des Standards"
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
+#: src/ui/management/components/LicenseCatalogSettings.tsx
 #: src/ui/management/components/PhotographerTeamModal.tsx
 #: src/ui/management/components/ProfileSettingsCard.tsx
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
@@ -2571,6 +2576,10 @@ msgstr "Fehler beim Speichern"
 msgid "Fehler beim Speichern der Einstellung."
 msgstr "Fehler beim Speichern der Einstellung."
 
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Fehler beim Speichern der Markeneinstellungen."
+msgstr "Fehler beim Speichern der Markeneinstellungen."
+
 #: src/ui/management/ManagementUserView.tsx
 msgid "Fehler beim Speichern der Rechte."
 msgstr "Fehler beim Speichern der Rechte."
@@ -2580,6 +2589,8 @@ msgid "Fehler beim Speichern einiger Einträge"
 msgstr "Fehler beim Speichern einiger Einträge"
 
 #: src/ui/management/components/AIBatchEditModal.tsx
+#: src/ui/management/components/BillingDetailsCard.tsx
+#: src/ui/management/components/CalculatorSettingsCard.tsx
 #: src/ui/management/ManagementContractView.tsx
 #: src/ui/ModelProfileAccessView.tsx
 #: src/ui/PhotoDetailView.tsx
@@ -2605,6 +2616,10 @@ msgstr "Fehler beim Widerrufen."
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Fehler beim Wiederherstellen der Version."
 msgstr "Fehler beim Wiederherstellen der Version."
+
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Fehler beim Zurücksetzen der Markeneinstellungen."
+msgstr "Fehler beim Zurücksetzen der Markeneinstellungen."
 
 #: src/ui/management/components/CreateUserModal.tsx
 msgid "Fehler: {createError}"
@@ -2981,9 +2996,25 @@ msgstr "Global"
 msgid "Globaler Kontext (Für alle Bilder)"
 msgstr "Globaler Kontext (Für alle Bilder)"
 
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Grundhonorar aktualisiert"
+msgstr "Grundhonorar aktualisiert"
+
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "Grundhonorar durch Flatrate gedeckt"
 msgstr "Grundhonorar durch Flatrate gedeckt"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Grundhonorar gelöscht"
+msgstr "Grundhonorar gelöscht"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Grundhonorar hinzugefügt"
+msgstr "Grundhonorar hinzugefügt"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Grundhonorar wirklich löschen?"
+msgstr "Grundhonorar wirklich löschen?"
 
 #: src/logic/modelRegistration.ts
 msgid "Gruppe"
@@ -3170,6 +3201,7 @@ msgid "In den Warenkorb"
 msgstr "In den Warenkorb"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
+#: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "In den Warenkorb gelegt"
 msgstr "In den Warenkorb gelegt"
 
@@ -3270,6 +3302,10 @@ msgstr "Join-Link"
 #: src/ui/management/ManagementContractView.tsx
 msgid "Join-Link gültig bis"
 msgstr "Join-Link gültig bis"
+
+#: src/ui/management/components/CalculatorSettingsCard.tsx
+msgid "Kalkulator-Einstellungen gespeichert."
+msgstr "Kalkulator-Einstellungen gespeichert."
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Kalkulieren & Antworten"
@@ -3912,6 +3948,10 @@ msgstr "Löschen fehlgeschlagen"
 msgid "Löschen nicht möglich (bereits verwendet)"
 msgstr "Löschen nicht möglich (bereits verwendet)"
 
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Löschen?"
+msgstr "Löschen?"
+
 #: src/ui/management/components/ModelDetailModal.tsx
 msgid "Löscht das Profil dauerhaft – inklusive aller Fotos, des Altersnachweises und der Act-Mitgliedschaften. Diese Aktion kann nicht rückgängig gemacht werden."
 msgstr "Löscht das Profil dauerhaft – inklusive aller Fotos, des Altersnachweises und der Act-Mitgliedschaften. Diese Aktion kann nicht rückgängig gemacht werden."
@@ -3943,6 +3983,14 @@ msgstr "Manuelles Angebot"
 #: src/ui/InviteView.tsx
 msgid "maria@beispiel.de"
 msgstr "maria@beispiel.de"
+
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Markeneinstellungen auf Standard zurückgesetzt."
+msgstr "Markeneinstellungen auf Standard zurückgesetzt."
+
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Markeneinstellungen gespeichert."
+msgstr "Markeneinstellungen gespeichert."
 
 #: src/ui/components/Sidebar.tsx
 msgid "Marketing"
@@ -4357,6 +4405,14 @@ msgstr "Name ist erforderlich"
 #: src/ui/management/components/CustomerModal.tsx
 msgid "Name oder Ansprechpartner ist erforderlich"
 msgstr "Name oder Ansprechpartner ist erforderlich"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Name und Preis sind Pflichtfelder"
+msgstr "Name und Preis sind Pflichtfelder"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Name und Zuschlag sind Pflichtfelder"
+msgstr "Name und Zuschlag sind Pflichtfelder"
 
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Name, E-Mail oder Ort"
@@ -6421,6 +6477,14 @@ msgstr "Wähle deine Favoriten aus."
 msgid "Warenkorb"
 msgstr "Warenkorb"
 
+#: src/logic/CartProvider.tsx
+msgid "Warenkorb konnte nicht geladen werden."
+msgstr "Warenkorb konnte nicht geladen werden."
+
+#: src/logic/CartProvider.tsx
+msgid "Warenkorb konnte nicht gespeichert werden."
+msgstr "Warenkorb konnte nicht gespeichert werden."
+
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Wartet auf Freigabe"
 msgstr "Wartet auf Freigabe"
@@ -6880,6 +6944,22 @@ msgstr "Zusätzlicher Kontext für KI"
 #: src/ui/management/ManagementManualInvoiceView.tsx
 msgid "Zusatztexte / Sonderkonditionen"
 msgstr "Zusatztexte / Sonderkonditionen"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Zuschlag aktualisiert"
+msgstr "Zuschlag aktualisiert"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Zuschlag gelöscht"
+msgstr "Zuschlag gelöscht"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Zuschlag hinzugefügt"
+msgstr "Zuschlag hinzugefügt"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Zuschlag wirklich löschen?"
+msgstr "Zuschlag wirklich löschen?"
 
 #: src/ui/management/components/ProjectModal.tsx
 #: src/ui/photographer/components/PhotoJobModal.tsx

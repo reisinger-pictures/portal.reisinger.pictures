@@ -299,7 +299,12 @@ export function findModuleScopeLinguiMacrosInTree(sourceRoot = resolve(root, "sr
 function looksLikeTechnicalValue(value) {
   const trimmed = value.trim();
   if (/^#[0-9a-fA-F]{3,8}$/.test(trimmed)) return true;
-  if (/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(trimmed)) return true;
+  // `scheme://…`, a leading `/` absolute path, or `scheme:payload` — but NOT a
+  // bare `Label:` (the scheme branch used to match any `word:` prefix, which
+  // swallowed real labels like `Flatrate:`/`Rechnung:` that merely end in a
+  // colon). `:[^\s]` requires actual payload after the colon, `:\/\/` keeps
+  // `https://…` working even though its payload starts with a slash.
+  if (/^(?:\/|[a-z][a-z0-9+.-]*:\/\/|[a-z][a-z0-9+.-]*:[^\s])/i.test(trimmed)) return true;
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return true;
   return /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i.test(trimmed);
 }
@@ -311,12 +316,11 @@ const HTML_ENTITY_REFERENCE = /&(?:#[0-9]+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);
  * A letter in the Unicode sense — digits, punctuation and whitespace do not
  * count.
  *
- * NOTE (not this task's scope, and NOT dead code): `recordString` below calls
- * this on the node-level path. The sentence-level path added by D-7 does not
- * call it — it inlines the same test as `literalCarriesLetters`. That is the
- * real hazard: two copies of one predicate, free to drift. Left as-is because
- * unifying them is a refactor, not a rule change, and this task was the rule.
- * If one is ever changed, change both or collapse them into this function.
+ * NOTE (NOT dead code): `recordString` below calls this on the node-level path.
+ * The sentence-level path added by D-7 no longer does — it judges runs through
+ * `isProseText` (a letter test is part of that taxonomy). This function is
+ * therefore only reached for literals/attributes/helper arguments; it stays in
+ * use and should not be removed with the sentence path.
  */
 function containsLetter(text) {
   return /\p{L}/u.test(text.replace(HTML_ENTITY_REFERENCE, " "));
@@ -688,10 +692,12 @@ export function findUnlocalizedStrings(source, filePath = "fixture.tsx") {
    * Aufschlag)`), not two. Dynamic children contribute only a space, never
    * their source text — there is nothing literal in them to translate.
    *
-   * The run errs toward **over**-reporting: when a run mixes a literal with an
-   * expression, `isProseText` only has to accept the literal part for the whole
-   * run to be reported, so `{groups} Gruppen, {galleries} Galerien` still
-   * yields the two literal findings it yielded before.
+   * The run still errs toward **over**-reporting, but no longer on bare
+   * fragments: when a run mixes a literal with an expression the run is
+   * reported even if the merged text is not prose — provided a literal segment
+   * is itself prose by the taxonomy (`{groups} Gruppen, {galleries} Galerien`,
+   * `{n} Galerien`). A short non-copy fragment (`vom`, `User`, `Ab`) is not
+   * resurrected merely because an expression sits next to it.
    */
   function recordJsxTextRuns(parent) {
     const children = parent.children;
@@ -730,18 +736,31 @@ export function findUnlocalizedStrings(source, filePath = "fixture.tsx") {
     if (!staticText) {
       return;
     }
+    // A run that *is* a technical value — the real case is a bare URL rendered
+    // as its own JSX text node (`Impressum.tsx`'s external-link paragraph) — is
+    // not copy, exactly as `recordString` already excludes it for literals and
+    // attributes. Without this the sentence-level path reported the URL even
+    // though the node-level path never did, because `looksLikeTechnicalValue`
+    // was only wired into `recordString`.
+    if (looksLikeTechnicalValue(staticText)) {
+      return;
+    }
 
     const hasLiteral = run.some(child => ts.isJsxText(child));
     const isNodeLevelEquivalent = run.length === 1 && hasLiteral;
     // The over-reporting exemption (report a literal merely because it sits
-    // next to an expression) still requires a LETTER in the literal: `:`, `/`,
-    // `·`, `( )` next to an expression are punctuation, not copy. Without this
-    // guard the grouping change reintroduces the single-character noise the
-    // old `containsLetter` filter removed.
-    const literalCarriesLetters = /\p{L}/u.test(
-      staticText.replace(HTML_ENTITY_REFERENCE, " "),
-    );
-    const literalSiblingOfExpression = hasLiteral && run.length > 1 && literalCarriesLetters;
+    // next to an expression) reports a run that is not prose on its own so
+    // that merging never loses a pre-existing node-level finding. It requires
+    // the literal itself to be prose by the same taxonomy: a bare punctuation
+    // fragment (`:`, `/`, `·`) is not copy, and neither is a short
+    // function-word/unit fragment (`vom`, `User`, `Ab`) — resurrecting those
+    // merely because an expression sits next to them is the noise D-7's merge
+    // was allowed to keep, not a finding it must keep. A genuinely prose
+    // literal beside an expression (`{n} Galerien`) still reports.
+    const literalIsProse = run
+      .filter(child => ts.isJsxText(child))
+      .some(child => isProseText(child.text).prose);
+    const literalSiblingOfExpression = hasLiteral && run.length > 1 && literalIsProse;
     const { prose, mode } = isProseText(staticText);
     if (!prose && !literalSiblingOfExpression) {
       return;

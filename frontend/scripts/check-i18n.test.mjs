@@ -229,17 +229,37 @@ describe('check-i18n prose taxonomy (D-7)', () => {
     expect(violations[0].text).toBe('Gruppen, Galerien');
   });
 
-  it('keeps prose and a bare URL as separate findings when a JSX element separates them', () => {
+  it('keeps prose on both sides of a link while the bare URL is filtered as a technical value', () => {
+    const source = [
+      'export const Link = () => (',
+      '  <p>Die Kommission stellt eine Plattform bereit unter <a href="https://ec.europa.eu/consumers/odr/">https://ec.europa.eu/consumers/odr/</a> finden Sie uns.</p>',
+      ');',
+    ].join('\n');
+
+    const violations = findUnlocalizedStrings(source, 'fixture.tsx');
+
+    // A JSX element (`<a>`) is a hard grouping boundary, so the prose on either
+    // side is its own run. The URL inside the link is a technical value and is
+    // excluded wherever it appears — including the sentence-level JSX text path
+    // (`Impressum.tsx:43`), which had lost `looksLikeTechnicalValue`.
+    expect(violations.map(violation => violation.text)).toEqual([
+      'Die Kommission stellt eine Plattform bereit unter',
+      'finden Sie uns.',
+    ]);
+  });
+
+  it('filters the bare URL in the real Impressum shape while keeping the prose runs', () => {
     const filePath = resolve(process.cwd(), 'scripts/fixtures/i18n/trans-adjacent-link.tsx');
     const violations = findUnlocalizedStrings(readFileSync(filePath, 'utf8'), filePath);
 
-    // A JSX element (`<a>`) is a hard grouping boundary: the prose before it,
-    // the bare URL inside it and the prose after it stay three logical runs.
-    // This pins that grouping does not silently merge across markup and does
-    // not lose the prose either side. See AGENTS.todo.md for the finding.
+    // The fixture mirrors `Impressum.tsx:43`. Before the rule extension the
+    // sentence-level path reported the bare URL inside the `<a>` as a third
+    // finding; it is now filtered as a technical value, while the prose on
+    // either side of the link boundary still reports. (The fixture imports no
+    // macro, so its `<Trans>` tags are ordinary elements and their text is
+    // exactly the prose the grouping keeps.)
     expect(violations.map(violation => violation.text)).toEqual([
       'Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit, die Sie unter',
-      'https://ec.europa.eu/consumers/odr/',
       'finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle…',
     ]);
   });
@@ -290,6 +310,26 @@ describe('check-i18n prose taxonomy (D-7)', () => {
       const source = 'export const Filler = () => <span>der die das</span>;';
       expect(findUnlocalizedStrings(source, 'fixture.tsx')).toEqual([]);
     });
+
+    it('excludes a short function-word fragment beside an expression', () => {
+      // Real shape: ClientOrdersView.tsx:47 `<h2>… vom {date}</h2>`. "vom" is a
+      // lone token below the prose length and must not be resurrected merely
+      // because `{date}` sits next to it.
+      const source = 'export const Meta = ({ a, b }: { a: string; b: string }) => <h2>{a} vom {b}</h2>;';
+      expect(findUnlocalizedStrings(source, 'fixture.tsx')).toEqual([]);
+    });
+
+    it('excludes a short lone noun fragment beside an expression', () => {
+      // Real shape: ManagementOrgsView.tsx:70 `{t.users_count || 0} User`.
+      const source = 'export const Count = ({ n }: { n: number }) => <div>{n} User</div>;';
+      expect(findUnlocalizedStrings(source, 'fixture.tsx')).toEqual([]);
+    });
+
+    it('excludes a unit prefix fragment beside an expression', () => {
+      // Real shape: VolumePresetSettingsCard.tsx:325 `Ab {min} → {price}`.
+      const source = 'export const Range = ({ min, price }: { min: number; price: string }) => <span>Ab {min} → {price}</span>;';
+      expect(findUnlocalizedStrings(source, 'fixture.tsx')).toEqual([]);
+    });
   });
 
   describe('still reports prose (the positive case)', () => {
@@ -321,6 +361,39 @@ describe('check-i18n prose taxonomy (D-7)', () => {
         { category: 'helper-argument', text: 'showToast(…, "Grundhonorar aktualisiert")' },
       ]);
       expect(violations).toHaveLength(1);
+    });
+
+    it('still reports a genuine prose literal sitting beside an expression', () => {
+      const source = 'export const Count = ({ n }: { n: number }) => <span>{n} Galerien</span>;';
+      const violations = findUnlocalizedStrings(source, 'fixture.tsx');
+
+      expect(violations).toHaveLength(1);
+      expect(violations[0].text).toBe('Galerien');
+    });
+
+    it('keeps the literal-beside-expression exemption for a prose segment', () => {
+      // The merged run ("Galerien der") is not prose on its own — one content
+      // word plus a stopword — so this finding exists *only* because the
+      // exemption still fires when a literal segment is prose by itself. It
+      // guards that narrowing the exemption did not lose this pre-existing
+      // finding, which is exactly what D-7's overcount was there to prevent.
+      const source = 'export const Count = ({ n }: { n: number }) => <span>Galerien {n} der</span>;';
+      const violations = findUnlocalizedStrings(source, 'fixture.tsx');
+
+      expect(violations).toHaveLength(1);
+      expect(violations[0].text).toBe('Galerien der');
+    });
+
+    it('still reports a label that ends in a colon (not a URL scheme)', () => {
+      // Pins the `looksLikeTechnicalValue` fix: its scheme branch used to match
+      // any leading `word:`, which silently swallowed real labels such as
+      // `Flatrate:`/`Rechnung:`/`Rollover:`. A bare URL is a technical value, a
+      // colon-suffixed label is copy.
+      const source = 'export const Rows = ({ level }: { level: string }) => <span>Flatrate: {level}</span>;';
+      const violations = findUnlocalizedStrings(source, 'fixture.tsx');
+
+      expect(violations).toHaveLength(1);
+      expect(violations[0].text).toBe('Flatrate:');
     });
   });
 });
