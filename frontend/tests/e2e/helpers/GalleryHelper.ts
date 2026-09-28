@@ -15,9 +15,25 @@ export class GalleryHelper {
     }
 
     async createAndOpenDeliveryGallery(name: string, visibility?: string): Promise<string | undefined> {
+        return this.createAndOpenGallery(name, 'Delivery (Downloads)', visibility);
+    }
+
+    /**
+     * Create and open a selection (rating) gallery through the real gallery
+     * modal.
+     *
+     * The visibility select is intentionally not filled: a selection gallery is
+     * private by definition, so the control is disabled and the type alone
+     * carries the contract.
+     */
+    async createAndOpenSelectionGallery(name: string): Promise<string | undefined> {
+        return this.createAndOpenGallery(name, 'Auswahl (Ratings)');
+    }
+
+    private async createAndOpenGallery(name: string, type: string, visibility?: string): Promise<string | undefined> {
         await this.sidebar.openNewGalleryModal();
         const form = new FormHelper(this.page, this.modal);
-        await form.fillGalleryModal({ name, type: 'Delivery (Downloads)', visibility });
+        await form.fillGalleryModal({ name, type, visibility });
         const res = await this.modal.submitModal('Speichern', '/api/management/galleries');
         if (res?.gallery?.id && this.sessionHelper) {
             this.sessionHelper.trackGallery(res.gallery.id);
