@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
 import WatermarkSettingsCard from '../management/components/WatermarkSettingsCard';
 
@@ -111,7 +111,19 @@ describe('WatermarkSettingsCard', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals();
+        vi.restoreAllMocks();
     });
+
+    // ----------------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------------
+
+    const preview = () => screen.getByTestId('watermark-preview');
+    const previewSpinner = () => preview().querySelector('.loading-spinner');
+    const expectPreviewError = () =>
+        expect(within(preview()).getByRole('alert')).toHaveTextContent(
+            'Brand-Logo konnte nicht geladen werden.',
+        );
 
     // ----------------------------------------------------------------------
     // Access control
@@ -160,6 +172,79 @@ describe('WatermarkSettingsCard', () => {
     });
 
     // ----------------------------------------------------------------------
+    // Preview outcome: ready, loading, failed
+    // ----------------------------------------------------------------------
+
+    it('shows the rendered preview and no error state when the render succeeds', async () => {
+        renderWithProviders(<WatermarkSettingsCard />);
+
+        await waitFor(() => {
+            expect(within(preview()).getByAltText('Watermark Preview')).toHaveAttribute(
+                'src',
+                'data:image/png;base64,test',
+            );
+        });
+        expect(within(preview()).queryByRole('alert')).toBeNull();
+        expect(previewSpinner()).toBeNull();
+    });
+
+    it('shows the loading state while the first render is in flight', async () => {
+        // A render that never settles is a spinner; a render that settles with
+        // null is a failure. These must not look alike.
+        vi.mocked(renderSvgToDataUrl).mockReturnValue(new Promise(() => {}));
+
+        renderWithProviders(<WatermarkSettingsCard />);
+
+        await waitFor(() => {
+            expect(screen.getByText(/Lade Logo/i)).toBeInTheDocument();
+        });
+        expect(previewSpinner()).not.toBeNull();
+        expect(within(preview()).queryByRole('alert')).toBeNull();
+    });
+
+    it('shows an error instead of a spinner when the render returns null', async () => {
+        // This is the production failure: the CSP blocks the image source, the
+        // renderer resolves null, and nothing but a console line used to remain.
+        vi.mocked(renderSvgToDataUrl).mockResolvedValue(null);
+
+        renderWithProviders(<WatermarkSettingsCard />);
+
+        await waitFor(expectPreviewError);
+        expect(previewSpinner()).toBeNull();
+        expect(screen.queryByText(/Lade Logo/i)).not.toBeInTheDocument();
+    });
+
+    it('shows an error instead of a spinner when the render rejects', async () => {
+        // The inner render promise was neither returned nor caught, so a
+        // rejection used to escape unhandled and leave the state untouched.
+        vi.mocked(renderSvgToDataUrl).mockRejectedValue(new Error('CSP refused blob:'));
+
+        renderWithProviders(<WatermarkSettingsCard />);
+
+        await waitFor(expectPreviewError);
+        expect(previewSpinner()).toBeNull();
+    });
+
+    it('clears the error state when a later render succeeds', async () => {
+        vi.mocked(renderSvgToDataUrl)
+            .mockResolvedValueOnce(null)
+            .mockResolvedValue('data:image/png;base64,recovered');
+
+        renderWithProviders(<WatermarkSettingsCard />);
+        await waitFor(expectPreviewError);
+
+        fireEvent.change(screen.getByRole('slider'), { target: { value: '0.5' } });
+
+        await waitFor(() => {
+            expect(within(preview()).getByAltText('Watermark Preview')).toHaveAttribute(
+                'src',
+                'data:image/png;base64,recovered',
+            );
+        });
+        expect(within(preview()).queryByRole('alert')).toBeNull();
+    });
+
+    // ----------------------------------------------------------------------
     // No render call when blob is unavailable
     // ----------------------------------------------------------------------
 
@@ -175,10 +260,10 @@ describe('WatermarkSettingsCard', () => {
 
         renderWithProviders(<WatermarkSettingsCard />);
 
-        // The loading indicator should be visible (no preview)
-        await waitFor(() => {
-            expect(screen.getByText(/Lade Logo/i)).toBeInTheDocument();
-        });
+        // A refused logo request is a failure, not a load that never finishes:
+        // the card has to say so rather than spin forever.
+        await waitFor(expectPreviewError);
+        expect(previewSpinner()).toBeNull();
 
         // renderSvgToDataUrl should have been called 0 times so far
         // (fetch failed, so the initial render never fired)
@@ -190,6 +275,16 @@ describe('WatermarkSettingsCard', () => {
         fireEvent.change(slider, { target: { value: '0.5' } });
 
         // renderSvgToDataUrl must NOT be called because serverSvgBlob is null
+        expect(vi.mocked(renderSvgToDataUrl)).not.toHaveBeenCalled();
+    });
+
+    it('shows an error when the logo request rejects', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+        renderWithProviders(<WatermarkSettingsCard />);
+
+        await waitFor(expectPreviewError);
+        expect(previewSpinner()).toBeNull();
         expect(vi.mocked(renderSvgToDataUrl)).not.toHaveBeenCalled();
     });
 });
