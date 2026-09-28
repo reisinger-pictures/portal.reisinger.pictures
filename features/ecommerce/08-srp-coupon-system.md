@@ -34,13 +34,20 @@ Three coupon types, defined by the `type` column:
 > festgehalten, weil eine Spalte `DECIMAL(10,2)` named `value` ohne
 > Einheitenangabe der Grund für die Regel war: `10` bedeutet bei einem Coupon
 > 10 €, beim anderen 10 %. Die Spaltenbeschreibung in § 7 nennt die Einheit
-> deshalb ab jetzt am Feld, und der Leseweg beweist sie:
-> `value=5` bei `type=fixed` ergibt `discountCents = 500`.
+> deshalb ab jetzt am Feld, und der Leseweg belegt den heutigen Stand:
+> `value=5` bei `type=fixed` ergibt `discountCents = 500`
+> (`CouponService.php:224`).
 >
-> **Offen, nicht entschieden:** ob `value` bei `fixed` auf Cent umgestellt wird
-> (was einen Discriminator-Zweig und die Spaltenmigration betrifft) oder die
-> Euro-Lesart als bewusste Ausnahme bleibt. Die Entscheidung gehört dem Owner;
-> sie ist **nicht** Teil der Cent-Entscheidung vom 2026-09-28.
+> **Achtung beim Lesen: dieser Abschnitt ist gemessen, nicht entschieden.** Die
+> Belege oben (`CouponService.php:224` und `:231`) beziehen sich auf `82e8d17`,
+> den letzten Commit **vor** der Umstellung; im Arbeitsverzeichnis sind sie
+> womöglich schon verschoben. Eine Umstellung des `fixed`-Zweigs auf Cent liegt
+> beim Code-Agenten in Arbeit und ist **nicht Teil der Owner-Entscheidung vom
+> 2026-09-28** (die betraf nur Geldfelder, die bereits eine Geldeinheit hatten).
+> Sobald sie landet, ist der Ausnahme-Block zu streichen und § 1 sowie die
+> Schemazeile in § 7 auf Cent umzuschreiben — `value` ist dann **keine**
+> Ausnahme mehr, sondern ein gewöhnliches Centfeld. Die Regel
+> (`../tech/02-backend-architecture.md` § 4) ändert sich dadurch nicht.
 
 ### 2. Scope
 
