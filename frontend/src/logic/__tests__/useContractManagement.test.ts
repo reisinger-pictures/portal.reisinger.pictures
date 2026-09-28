@@ -102,6 +102,26 @@ describe('normalizeManagementContract total handling', () => {
         expect(normalizeManagementContract(input).total).toBe(fallbackTotal(input));
     });
 
+    it('preserves the exact Number.MAX_SAFE_INTEGER boundary', () => {
+        const input = contract({total: Number.MAX_SAFE_INTEGER});
+
+        // The exact boundary is still a safe integer, so the server total wins
+        // even though the computed snapshot total would be 50000.
+        expect(normalizeManagementContract(input).total).toBe(Number.MAX_SAFE_INTEGER);
+    });
+
+    it('falls back when the wire total is not a number', () => {
+        // The typed input says `number`, but the wire is untrusted JSON: a
+        // numeric string or null must not be coerced into a trusted total.
+        const numericString = contract({total: '60000' as unknown as number});
+        const nullTotal = contract({total: null as unknown as number});
+
+        // The computed snapshot total is 50000; the string would wrongly read
+        // as 60000 if it were trusted.
+        expect(normalizeManagementContract(numericString).total).toBe(50000);
+        expect(normalizeManagementContract(nullTotal).total).toBe(50000);
+    });
+
     it('recomputes an ordered discount chain when falling back', () => {
         const input = contract({
             items: [wireItem({price: 25000, qty: 2})],
