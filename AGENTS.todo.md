@@ -634,6 +634,67 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   (speist heute Euro in ein `_cents`-Feld), `coupon-admin-crud.spec.ts`.
   *Für jeden neuen Test:* vorher schlägig erweisen. Ein Test, der vorher grün ist,
   beweist nichts und ist zu verwerfen — nicht zu liefern.
+- [ ] **HÖCHSTE PRIORITÄT — eine doppelte Migrationsnummer ist ein Produktionsvorfall,
+  kein Doku-Schönheitsfehler. Die Frontier-Aussage ist in sieben Dateien repliziert und
+  alle sieben sind falsch.** „V038 ist die Frontier, neue Änderungen ab V039" steht in
+  `21-brand-config-driven.md:18-20`, `b2b/11-kanban-board.md:58-59`,
+  `security/card-testing-protection.md:14,60` und `08-srp-coupon-system.md:123`;
+  „V036–V040 ist die Frontier" in `tech/01-database-schema.md:11`, Root-`AGENTS.md` §7
+  und `backend/AGENTS.md`. Tatsächlich liegt V043 im Baum, eine neue Migration ist also
+  **V044**. **Einzige richtige Quelle ist `tech/07-architectural-decisions.md:8` (AD-2).**
+  Korrektur: Frontier-Behauptung aus allen sechs anderen Dateien **streichen und durch
+  einen Zeiger auf AD-2 ersetzen** — nicht die Zahl aktualisieren, denn sie ist dann
+  wieder eine kopierbare Liste über einer wachsenden Menge. **Belegt:** beide Audits vom
+  2026-09-28 fanden die Aussage unabhängig voneinander; das Repo widerspricht sich
+  selbst (`01` sagt V040, `07` sagt V043).
+- [ ] **Betriebsdoku enthält Befehle, die nicht funktionieren, und Zustände, die nicht
+  stimmen** — operativer Audit, alle mit `file:line`:
+  **`deployment/README.md:233` `docker compose down pureftp`** — es gibt keinen
+  `pureftp`-Service (`docker-compose.yml` kennt db, search, composer_init, backend,
+  sftpgo); der letzte Cutover-Schritt ist so nicht ausführbar.
+  **`deployment/README.md:246`** verweist bei „Upload bricht ohne Fehler ab" auf
+  `ufw status` — `ufw` ist auf dem Host nicht installiert, §2 derselben Datei hat auf
+  firewalld umgestellt und diese Zeile übersehen.
+  **`backend/README.md:19`** nennt Imagick, `ImageController`, Thumbnail-**Upload** und
+  1024px — es ist GD, `ImageProcessor::generateThumbnail()`, on-demand bei Auslieferung;
+  die 1024 existiert nur als Hash-Salz. **`README.md:92`** führt die Skalierung auf
+  ImageMagick via Symfony Process zurück; `magick`/`convert` kommen nur in
+  `DownscaleEditorialMasterFiles.php:34,39` vor, `Process` nur für exiftool — die dortigen
+  Reparaturanweisungen (Symlink nach `/usr/local/bin`) beheben damit nichts.
+  **`tests/scripts/ftp-transport-test/README.md:199-203,16-23,243`** behaupten im
+  Präsens, es gebe keine FTPS-/SFTP-Bindings (es gibt sie, `docker-compose.yml:340,422`),
+  der Scanner laufe rot (er nicht mehr, `ci-security-contract.sh:643`) und
+  `SFTPGO_DEFAULT_ADMIN_PERMISSIONS` werde gesetzt (wird nicht).
+  **`backend/README.md:6,15`** nennt den Fotospeicherpfad `{gallery_slug}` (es ist die
+  UUID, plus `_thumbs/`) und bezeichnet Magic Links als „geplant" (sind implementiert,
+  `App.tsx:118`, `routes/api.php:104,126`).
+  **`deployment/README.md:192-200`** listet 3 der 7 automatischen Entrypoint-Wirkungen
+  und lässt `db:seed --force` weg — genau die, die 28 Produktions-Settings überschreibt.
+- [ ] **`features/security/env-hardening.md:44,190` weist auf `backend/.env.encrypted`
+  als Wiederherstellungsweg** — die Datei existiert nicht und ist laut
+  Root-`.gitignore:47-49` **bewusst** nie getrackt („Verschlüsselte .env-Backups bleiben
+  bewusst lokal und werden nie committed"). Ein Operator, der einen getrackten
+  Secret-Blob sucht, findet nichts; das im Dokument genannte Prüfkommando
+  `git ls-files | grep -E '(^|/)\.env'` erzeugt zudem nicht die behauptete Ausgabe.
+  **Korrektur:** als absichtlich ungetrackt kennzeichnen, nicht als wiederherstellbar.
+- [ ] **Zwei `features/`-Dateien sind kein gültiges UTF-8** —
+  `features/ecommerce/05-manual-invoices.md` und `features/delivery/02-audit-logs.md`
+  enthalten Byte `0x97` (cp1252-En-Dash). Jedes Werkzeug, das sie als UTF-8 liest,
+  verstummelt oder ersetzt das Zeichen; beim Audit musste der Link-Checker mit
+  `errors='replace'` arbeiten. Beide liegen im Abrechnungs-/Audit-Bereich, wo ein
+  verschlucktes Zeichen eine verschluckte Einschränkung sein kann.
+- [ ] **`features/` beschreibt die gelöschte SRP-Marke weiter im Präsens** (Audit-Muster
+  1, höchste Ausbeute für einen zweiten Durchgang): `Brand::SRP`, `srp_`-Präfixe,
+  `srp-light`-Themes, `story.`/`buy.`-Domains und `isSrp()` wurden am 2026-07-14
+  entfernt. Betroffen mindestens `06-multi-domain-branding.md` (Frontmatter
+  `status: active`; `grep -rn isSrp frontend/src` → 0 Treffer, `index.css:21,53,82`
+  kennt nur `rp-light`/`rp-dark`, `app/Mail/BrandAwareMail.php` existiert nicht, es heißt
+  `AbstractBrandAwareMailable.php`), ferner `09-brand-context-queue-cli.md` (4 falsche
+  Zeilenanker, eine Methode existiert gar nicht), `11-brand-settings-separation.md:13`
+  („**ohne** Brand-Feld" — es gibt eins) und `12-brand-registry-and-settings-fixes.md`
+  (`Brand` als ENUM mit zwei Werten, 6 Tabellen; tatsächlich VARCHAR + Cast auf **19**
+  Modellen). **`11` und `12` stehen auf „Soll-Zustand (Ziel)" ohne superseded-Marker.**
+  Lebende Quelle: `21-brand-config-driven.md` + `22-brand-settings-overlay.md`.
 - [ ] Entscheidung offen: **die Lizenzbegriffe-Antwort mischt drei Einheiten,
   und das ist ein Rechenproblem, kein Darstellungsproblem.** `base_price`,
   `setup_fee`, `privacy_fee`, `extra_image_fee` und die `price_*` sind
