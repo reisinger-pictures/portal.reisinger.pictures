@@ -6,15 +6,20 @@
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
 > Entscheidungsdurchgang):** Dieses Board enthält **87 offene Positionen**
-> über 1695 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> über 1735 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
-> Gründe, warum sie noch steht: **16× `manuell prüfen:`** (der Owner
-> sieht es sich nach einem Deploy an), **1× `Entscheidung offen:`**
-> (der Owner muss entscheiden — nach dem Durchgang vom 2026-09-28 ist davon **eine**
-> übrig: D-12, Initial-Fokus, das ist auftragsgemäß offen), **46× `wartet auf`**
-> (Bedingung oder Folgetask fehlt noch). Die restlichen **24** sind
-> **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
+> Gründe, warum sie noch steht: **17× `manuell prüfen:`** (der Owner sieht es sich selbst
+> an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
+> **0× `Entscheidung offen:`** (der Owner muss entscheiden),
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **24**
+> sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
+>
+> **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
+> Entscheidungen liegen in `AGENTS.md` §14, ihr Umsetzungsstand im Protokoll ganz oben.
+> Die letzte offene Entscheidung war D-12 (Initial-Fokus) und ist am selben Tag entschieden
+> worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
+> entstanden ist — nicht, dass eine vergessene offen blieb.
 >
 > **Gemessen, nicht geschätzt** (die Zahlen oben sind aus `grep -cE
 > '^[[:space:]]*[-*]?[[:space:]]*\[\[[x ~]\]]' AGENTS.todo.md` abgeleitet, **ohne** den
@@ -74,8 +79,18 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 - [ ] **D-10 — Dialoge innerhalb von `<main>` rendern**, Scoping bleibt unangetastet.
 - [ ] **D-11 — `ModalShell`: benannte Höhe plus `bodyHead`, und die drei handge-rollten Dialoge
       migrieren.** Slot und Migration gehören in denselben Commit.
-- [ ] **D-12 — Initial-Fokus: erst vorlegen, dann entscheiden, dann umsetzen.** Die Regel steht
-      nicht; bis zur Vorlage gilt der Status quo. **Reihenfolge nicht umstellen.**
+- [ ] **D-12 — React `autoFocus` gewinnt; der Fokus wandert ins erste Feld des Dialogs.**
+      Umgesetzt als Reihenfolge-Entscheidung in `useFocusTrap`, **kein** neuer Prop.
+      **Pflichtteil derselben Änderung:** der Rückkehr-Zielpunkt wird vor dem Mount des
+      Dialoginhalts festgehalten — sonst gibt der Trap den Fokus beim Schließen nicht an den
+      Auslöser zurück, und aus dem heutigen Einzelfall `ManagementOrdersView` wird der
+      Regelfall. Bricht genau einen gepinnten Test (`ManagementOrdersView.test.tsx:226-242`),
+      der wörtlich festhält, dass er mit dieser Entscheidung wandert.
+      **Ausgeschlossen:** die drei zuerst verworfenen Varianten bleiben verworfen, und neu
+      verworfen sind B (DOM umsortieren, verschiebt die Tab-Reihenfolge in allen 28),
+      C (auf das `<dialog>` fokussieren, hilft der Datenerfassung nicht) und D (`showModal()`,
+      gründlicher, greift aber über `ModalHelper` in 36 E2E-Dateien — als eigene Welle
+      zurückgestellt, **nicht** verworfen).
 - [ ] **D-13 — `maxWidth` auf `'2xl'` einschränken.**
 - [ ] **D-16 — technische Dokumentation der Stripe-Identifikatoren vervollständigen**; der
       rechtliche Teil bleibt eine benannte Lücke mit Owner.
@@ -114,7 +129,11 @@ geltende Regel steht in `AGENTS.md` §14.
 | D-9 | `truncate` mit `title`, oder so lassen | stille Kürzung ohne sichtbaren Effekt; Umbruch löst die Asymmetrie |
 | D-10 | Scoping im Harness aufweichen, oder die Lücke dokumentiert lassen | Testfix schwächt die Regel; Strukturänderung behebt die Ursache |
 | D-11 | nur benannte Höhe, oder nichts ändern | ein Slot ohne Migration wäre unbenutzte API in 28 Aufrufstellen |
-| D-12 | Fokusfalle behalten, Hook in der Shell, Einzelfall im Dialog | **alle drei** unzulänglich; daher erst ausarbeiten und vorlegen |
+| D-12 | Fokusfalle behalten, Hook in der Shell, Einzelfall im Dialog | **alle drei** unzulänglich; daher erst ausarbeiten und vorlegen. Die Recherche hat danach bestätigt, dass alle drei **weiterhin** unzulänglich sind — und eine vierte Option gefunden |
+| D-12 | B: DOM umsortieren, Close-Button hinter den Inhalt | verschiebt die **Tab-Reihenfolge** in allen 28 Dialogen, nicht nur den Anfangsfokus |
+| D-12 | C: auf das `<dialog>`-Element fokussieren | beste Screenreader-Ansage, aber es setzt den Cursor in **kein** Feld — scheitert am eigentlichen Einwand |
+| D-12 | D: `showModal()` als einzige Antwort | die einzige Option, die auch die Hintergrund-Inertheit mitlöst; greift aber über `ModalHelper` (`.modal-open`) in 36 E2E-Dateien ein. **Nicht verworfen**, sondern als eigene Welle zurückgestellt |
+| D-12 | Rückkehr-Zielpunkt über einen neuen `initialFocusRef`-Prop | der sauberere Rückweg, aber genau die Form der verworfenen Variante 2 — nur für den Rückweg statt für den Hinweg |
 | D-13 | Skala vollständig bauen, oder unverändert dokumentieren | ein Prop, der seine Hälfte verwirft, lügt |
 | D-14 | nur Schließen und Abbrechen fragen, oder Undo-Toast | ein Modal, der sich nicht schließen lässt, ist eine Sackgasse |
 | D-15 | Frist festlegen und Löschpfad implementieren, oder Frist selbst nennen | Owner-Entscheidung: **unbegrenzt, bewusst so** |
@@ -155,11 +174,19 @@ unverändert gegenüber dem vorigen Deploy, Homepage **200**.
   Ungespeichert-Warnung auslösen — vorher taten das nur „Schließen" und „Abbrechen",
   und getippte Eingabe konnte still verworfen werden. Worauf es ankommt: beide
   Abbruchwege fragen nach, keiner verwirft mehr.
+- [ ] manuell prüfen: **Softtastatur auf einem echten Mobilgerät** — nach D-12 wandert der
+  Fokus bei 23 von 28 Dialogen in ein Eingabefeld, und auf Touch öffnet sich damit sofort die
+  Tastatur. **Kein Test im Repo misst das**, und ohne Gerät ist es nicht messbar. Einen
+  Formular-Dialog auf dem Telefon öffnen und prüfen: verdeckt die Tastatur den Inhalt oder den
+  Bestätigen-Knopf? Ist das ein Fehler oder ein Gewinn? Auf Desktop entfällt der Effekt ganz,
+  weil es dort keine Softtastatur gibt — deshalb zählt nur das Gerät.
 - [ ] manuell prüfen: Tastatur-Fokusreihenfolge in den elf migrierten Dialogen —
   die elf Dialoge der Welle nacheinander per Tastatur öffnen (Tab / Shift-Tab) und
-  prüfen, dass der Fokus **in der Dialog-Box bleibt** und auf dem beschrifteten
-  Schließen-Element landet (nicht auf dem Seiten-Hintergrund, nicht in der
-  Adressleiste). **Kein Test deckt die Reihenfolge ab** — `DialogAccessibilityContract.test.tsx`
+  prüfen, dass der Fokus **in der Dialog-Box bleibt**. Wo genau er landet, hängt nach D-12
+  davon ab, ob der Dialog ein `autoFocus`-Element auszeichnet: **mit** `autoFocus` dort,
+  **ohne** auf dem beschrifteten Schließen-Element — auf keinen Fall auf dem
+  Seiten-Hintergrund oder in der Adressleiste. **Nach dem Schließen gehört der Fokus auf den
+  Auslöser**; das ist der Teil, den D-12 ausdrücklich mit repariert. **Kein Test deckt die Reihenfolge ab** — `DialogAccessibilityContract.test.tsx`
   prüft Namen, `aria-modal` und Escape, nicht die Tab-Reihenfolge.
 
 ---
@@ -1666,11 +1693,22 @@ gerissen und zur Entscheidung gemacht.
   Die fünf Dialoge, die dem Board als „fünf" bekannt sind — die fünfte ist `ProjectModal` — geben
   heute literal `editing={false}`, gepinnt durch `editingDeleteActionSemantics.test.tsx`; die
   Falle ist dokumentiert, nicht lebendig.
-- [ ] Entscheidung offen: **D-12 — Initial-Fokus in den Dialogen: erst vorlegen, dann
-  entscheiden.** Alle drei angebotenen Varianten wurden als unzulänglich verworfen (Fokusfalle
-  ignoriert Datenerfassung, Shell-Hook erzeugt zwei Fokusverantwortungen, Einzelfall bleibt
-  inkonsistent zu den übrigen 25). **Bis die Vorlage da ist, gilt der Status quo:** Fokusfalle,
-  Fokus auf dem Schließen-Element. **Reihenfolge nicht umstellen.**
+- [ ] **D-12 — Initial-Fokus: React `autoFocus` gewinnen lassen.** In `useFocusTrap` die
+  Reihenfolge umkehren: liegt beim Öffnen bereits der Fokus **innerhalb** des Dialogs, bleibt
+  er dort, statt auf das erste fokussierbare Element (der Schließen-Button) gesetzt zu werden.
+  Dialoge ohne `autoFocus` bleiben unverändert. **Gleich mitzubauen:** der Rückkehr-Zielpunkt
+  muss **vor** dem Mount des Dialoginhalts festgehalten werden — `useFocusTrap.ts:124` liest
+  `activeElement` nach dem React-Commit und erfasst sonst das Feld im Dialog selbst.
+  **Nicht per Selektor:** React 19 fokussiert `autoFocus` imperativ und rendert **kein**
+  `autofocus`-Attribut; `querySelector('[autofocus]')` findet nichts.
+  **Bricht genau einen Test:** `ManagementOrdersView.test.tsx:226-242` pinnt das Gegenteil und
+  sagt, dass es mit dieser Entscheidung wandert — der Test wird angepasst, nicht der Code.
+  **Neu zu decken:** (a) Fokus bleibt beim deklarierten `autoFocus`-Feld, (b) Rückgabe an den
+  Auslöser nach Escape, (c) erstes Element **deaktiviert** → erstes aktiviertes gewinnt,
+  (d) Dialog ganz ohne fokussierbaren Inhalt (`RatingStatusModal`, Kamera-Hinweis) →
+  Schließen-Element, (e) **verschachtelte** Dialoge (`AIGalleryDefaultsModal` in
+  `GalleryMetadataDefaultsModal`): der innere gewinnt. Kein destruktives Element mit
+  `autoFocus` auszeichnen — das ist die Regel, keine Ausnahme.
 - ~~D-14~~ **`CouponFormDrawer`: Escape und Backdrop lösen die Ungespeichert-Warnung bereits aus**
   — bestätigt, keine Änderung (`CouponFormDrawer.tsx:210-213` beschreibt, dass die Shell
   Kopf-Button, Backdrop, Escape und Abbrechen über einen Prop routet). Der Nutzer wird den

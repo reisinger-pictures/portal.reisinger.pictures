@@ -235,9 +235,10 @@ Offene Security-/Infra-TODOs (P1-I1–P1-I8) siehe `AGENTS.todo.md`; P2-T5 ist a
 - **`ModalDialogShell` kennt kein `editing`.** Der Lösch-Button folgt aus `onDelete`; ein
   `editing`-Prop existiert dort nicht mehr. Wer einen Lösch-Button ohne Handler findet, hat
   einen Aufrufer ohne `onDelete` — das ist ab jetzt ein Fehler, kein Design (D-20).
-- **Initial-Fokus: es gibt noch keine Regel, der Status quo gilt** (Fokusfalle, Fokus auf dem
-  Schließen-Element), bis D-12 vorliegt. Wer jetzt eine Regel erfindet, überschreibt eine
-  ausstehende Entscheidung.
+- **Initial-Fokus wandert in das `autoFocus`-Element des Dialogs**, sonst auf das Schließen-Element.
+  Kein Dialog braucht dafür eigenen Fokuscode, und die Shell behält die einzige Fokusverantwortung
+  (D-12). **Niemals** ein destruktives Element mit `autoFocus` auszeichnen — die Aktion, die den
+  Fehler auslöst, soll nicht den ersten Tastendruck bekommen.
 
 ## 10. IntelliJ Run-Configs (.run) — Benennungs-Konvention (STRICT)
 
@@ -459,14 +460,30 @@ entscheiden".
   ist seit `4474444` / `659a5a5` erledigt und per Screenshot verifiziert; offen war nur die
   Architekturfrage. Ein Slot **ohne** Migration wäre unbenutzte API in einer Komponente mit 28
   Aufrufstellen und verstößt gegen die No-Dead-Code-Haltung des Repos.
-- **D-12 — Initial-Fokus in Dialogen:** **noch keine Regel — erst vorlegen.** Der Agent arbeitet
-  die beste Fokuslösung über **alle** Dialoge aus und legt sie mit Vor-/Nachteilen und
-  E2E-Implikationen vor; die Entscheidung fällt danach, die Umsetzung danach. *Warum:* die drei
-  naheliegenden Wege wurden als Varianten angeboten und als unzulänglich verworfen — Fokusfalle
-  behalten ignoriert Datenerfassung, ein Hook in der Shell erzeugt zwei Stellen mit
-  Fokusverantwortung, ein Einzelfall im Dialog bleibt inkonsistent zu den übrigen 25. Ein Dialog
-  mit Formularbeginn braucht eine Regel für alle, keine Ausnahme für drei. **Bis zur Vorlage gilt
-  der Status quo** (Fokusfalle, Fokus auf dem Schließen-Element).
+- **D-12 — Initial-Fokus in Dialogen: React `autoFocus` gewinnt.** Der Fokus wandert in das
+  Element, das der Dialog selbst als `autoFocus` auszeichnet; ohne diese Auszeichnung bleibt es
+  beim heutigen Default (das beschriftete Schließen-Element). Umgesetzt als **Reihenfolge-Entscheidung
+  im Trap**, nicht als neuer Prop und nicht als Änderung am DOM. *Warum:* die Recherche hat
+  gemessen, dass **23 von 28** Produktionsdialogen mit einem Eingabefeld beginnen (28 = 39
+  Aufrufstellen minus 10 in Tests minus 1 der inneren `ModalShell` in `ModalDialogShell.tsx`;
+  `grep -rnE '<Modal(Shell|DialogShell)' frontend/src | wc -l`) — der heutige Default auf das
+  Schließen-Element ignoriert also fast überall die Datenerfassung. Entscheidend war ein bereits
+  vorhandener Widerspruch: `ManagementOrdersView.test.tsx:224` hält fest, dass das Preisfeld
+  `autoFocus` trägt und der Trap es danach überschreibt — *„if the price field should win, the
+  shell needs an initial-focus hook and this test moves with it"*. Das Repo hatte die Regel also
+  geschrieben und selbst abgeschaltet; D-12 macht sie wahr, statt eine vierte zu erfinden.
+  **Die drei zuvor verworfenen Varianten bleiben verworfen**, und A ist keine von ihnen: die
+  Fokusverantwortung bleibt **eine** (die Shell), kein Dialog bekommt Sondercode, und der Dialog
+  benutzt ein Standard-Prop. **Pflichtteil derselben Änderung:** der Rückkehr-Zielpunkt wird
+  **vor** dem Mount des Dialoginhalts festgehalten. `useFocusTrap.ts:124` liest `activeElement`
+  nach dem React-Commit und erfasst daher bei jedem `autoFocus`-Dialog das Feld **im** Dialog; ohne
+  diese Korrektur würde die Umleitung den Fokus beim Schließen nicht auf den Auslöser zurückgeben —
+  aus einem Einzelfall würde der Regelfall. *Nicht Teil dieser Entscheidung:* `showModal()` (Variante
+  D) bleibt das gründlichere Ziel, weil nur es die Hintergrund-Inertheit mitlöst — sie greift aber
+  über `ModalHelper` (`tests/e2e/helpers/ModalHelper.ts:28`, `.modal-open`) in bis zu 36 E2E-Dateien
+  ein und ist eine eigene Welle. **React-Falle für den Umsetzer:** React 19 fokussiert `autoFocus`
+  imperativ in `commitMount` und rendert **kein** `autofocus`-Attribut — `querySelector('[autofocus]')`
+  findet nichts. Die Lösung ist die Reihenfolge, kein Selektor.
 - **D-13 — `maxWidth` an `ModalShell`:** der Typ wird auf **`'2xl'`** eingeschränkt. *Warum:*
   heute erzeugt nur `'2xl'` eine Klasse, `'lg'` und `'xl'` werden akzeptiert und still verworfen —
   der Prop lügt. Ein Compile-Error ist ehrlicher als ein Dialog, der sich wie `'2xl'` verhält.
