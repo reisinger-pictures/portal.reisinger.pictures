@@ -12,14 +12,14 @@ Brands are configured **statically** via `config/brands.php`. The `brands` DB ta
 
 To add a new brand: add an entry to `config/brands.php` (+ optional `Brand` enum case + the code paths that need to know about it). New brands are a **code change**, not a DB row. This is intentional — single-brand is the current reality and the previous multi-tenant SRP concept is obsolete.
 
-### Migration frontier
+### Migration state
 
 The V025/V029/V030 references in the implementation history below describe
-historical changes, not the current migration frontier. `V038` is the current
-repository frontier (V037 Guest-Ownership, V036 Card-Testing); new schema
-changes must be separate `V039+` files. V035 is the last recorded deployed
-migration. Do not amend or replace a deployed migration, and keep the mandatory
-seed step after every migration path.
+historical changes, not the current migration state. The current state — including
+the number a new migration takes — is stated in exactly one place,
+`features/tech/07-architectural-decisions.md` (AD-2), which is measured against
+both the repository and production. Do not amend or replace a deployed migration,
+and keep the mandatory seed step after every migration path.
 
 ## Historical implementation reference (2026-07-14; not present in this checkout)
 

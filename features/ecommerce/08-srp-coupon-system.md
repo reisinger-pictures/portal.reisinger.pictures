@@ -151,8 +151,9 @@ bleiben auf dem Basispreis und zeigen den Mengenrabatt separat. Coupon wird **na
 Volume-Preisberechnung angewendet.
 
 **Data Model (Migration V030):** eigene, separate Migration
-(`V030__add_photo_package_to_coupons.php`). V038 ist die aktuelle
-Repository-Migrations-Frontier; V030 beschreibt nur die Coupon-Erweiterung.
+(`V030__add_photo_package_to_coupons.php`). V030 beschreibt nur die
+Coupon-Erweiterung; der aktuelle Migrations-Stand steht ausschließlich in
+`features/tech/07-architectural-decisions.md` (AD-2).
 Tabelle `coupons` erweitern um `package_quantity INT UNSIGNED NULL` (N) und
 `package_price_cents INT NULL` (Y, Stripe-konform). `Coupon::$fillable` + `$casts` ergänzen.
 Für `photo_package` sind `value` und `max_items` **ungenutzt** (bleiben NULL/0). `down()` darf leer bleiben.
