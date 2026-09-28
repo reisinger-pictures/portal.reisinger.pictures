@@ -563,25 +563,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   domänenskaliert sind. Zusätzlich drei fast identische 80–107-Zeilen-Specs für
   Negativ-Berechtigungen mit identischem 85-Zeilen-Setup. **Eigene Aufgabe, keine
   Nebenwirkung eines Cleanup.**
-- [ ] **`features/security/env-hardening.md:44,190` weist auf `backend/.env.encrypted`
-  als Wiederherstellungsweg** — die Datei existiert nicht und ist laut
-  Root-`.gitignore:47-49` **bewusst** nie getrackt („Verschlüsselte .env-Backups bleiben
-  bewusst lokal und werden nie committed"). Ein Operator, der einen getrackten
-  Secret-Blob sucht, findet nichts; das im Dokument genannte Prüfkommando
-  `git ls-files | grep -E '(^|/)\.env'` erzeugt zudem nicht die behauptete Ausgabe.
-  **Korrektur:** als absichtlich ungetrackt kennzeichnen, nicht als wiederherstellbar.
-- [ ] **`features/` beschreibt die gelöschte SRP-Marke weiter im Präsens** (Audit-Muster
-  1, höchste Ausbeute für einen zweiten Durchgang): `Brand::SRP`, `srp_`-Präfixe,
-  `srp-light`-Themes, `story.`/`buy.`-Domains und `isSrp()` wurden am 2026-07-14
-  entfernt. Betroffen mindestens `06-multi-domain-branding.md` (Frontmatter
-  `status: active`; `grep -rn isSrp frontend/src` → 0 Treffer, `index.css:21,53,82`
-  kennt nur `rp-light`/`rp-dark`, `app/Mail/BrandAwareMail.php` existiert nicht, es heißt
-  `AbstractBrandAwareMailable.php`), ferner `09-brand-context-queue-cli.md` (4 falsche
-  Zeilenanker, eine Methode existiert gar nicht), `11-brand-settings-separation.md:13`
-  („**ohne** Brand-Feld" — es gibt eins) und `12-brand-registry-and-settings-fixes.md`
-  (`Brand` als ENUM mit zwei Werten, 6 Tabellen; tatsächlich VARCHAR + Cast auf **19**
-  Modellen). **`11` und `12` stehen auf „Soll-Zustand (Ziel)" ohne superseded-Marker.**
-  Lebende Quelle: `21-brand-config-driven.md` + `22-brand-settings-overlay.md`.
 - [ ] **E2E ist strukturell blind für CSP-Verstöße — und lässt sich das nicht
   vollständig remedieren.** Befund aus der Wasserzeichen-Reparatur: `playwright.config.ts`
   hat **keinen** `webServer`-Block, der E2E-Server ist ein separat gestarteter
@@ -653,25 +634,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   `reisinger.pictures`, ist die falsche Domain erwischt: `APP_URL` ist
   `portal.reisinger.pictures`. Steht der Wert unter 500, ist es ein Datenwert und kein
   Code-Fehler.
-- [ ] **`GalleryGroup::firstOrCreate()` in `DatabaseSeeder.php:116` ist nicht
-  mandantenfest** — der Lookup-Schlüssel ist `slug` **allein**, `brand` steht nur in den
-  Values (Z. 118). Trifft `firstOrCreate` auf eine Zeile mit derselben Slug, aber
-  fremdem `brand`, wird **diese** Zeile zurückgegeben und stillschweigend übernommen; der
-  nachfolgende Reparaturversuch `if ($group->brand === null)` (Z. 121) greift nur bei
-  `null` und lässt einen falschen, nicht-nullen `brand` stehen. Heute unkritisch, weil es
-  nur eine Marke gibt (`rp`); mit der zweiten Marke adoptiert der Seeder fremde Gruppen.
-  **Gefunden beim Lesen des Seeders im Zuge der `insertOrIgnore`-Korrektur, nicht durch
-  einen Test.** Bewusst nicht angefasst: die Korrektur gehört in dieselbe Entscheidung
-  wie die mandantensichere Settings-Zuordnung (siehe
-  `features/infrastructure/28-settings-key-meaning.md`, Abschnitt Mandantenfähigkeit),
-  nicht in einen nebenbei laufenden Seeder-Fix.
-- [ ] **`contracts.spec.ts` ist mit 617 Zeilen / 8 Tests die schwerste Datei** und
-  mischt Vertrags-Lifecycle, Rabatt-Summen, Token-Rotation und einen
-  Tiptap-Reload-Regress.
-- [ ] **Tag-Kollisionen:** `crm/model-filters.spec.ts`, `model-lifecycle-filter.spec.ts`
-  und `model-delete.spec.ts` tragen alle `@feature:model-registration`, obwohl
-  sie Filter, rollengebundenen Lifecycle und DSGVO-Löschung prüfen — Abdeckung
-  vorhanden, aber per Tag nicht selektierbar.
 
 ### Abweichungen bei der Umsetzung (2026-09-26) — zwei Audits, nicht blind übernommen
 
