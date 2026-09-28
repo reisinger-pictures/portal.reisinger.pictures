@@ -127,9 +127,12 @@ final class DurableDispatchService
      * is removed only after the primary dispatch succeeds. Consequently a
      * process crash between COMMIT and callback execution leaves a retryable
      * outbox row behind, while a rollback removes both the business mutation
-     * and the intent. This is intentionally separate from the legacy
-     * afterCommit() method: CRM model cleanup keeps its established fallback
-     * timing and compatibility contract.
+     * and the intent. This is intentionally separate from the plain
+     * afterCommit() method, which registers a bare post-commit callback and
+     * writes its fallback only after COMMIT: a crash between COMMIT and
+     * callback execution runs neither, so nothing is persisted and nothing
+     * is retried. That method has no production caller and is retained as
+     * public API.
      *
      * @param  array<string, mixed>  $context
      */
