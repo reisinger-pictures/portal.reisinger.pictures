@@ -47,6 +47,25 @@ E2E (Playwright):
 - Nur spezifisches Feature, z. B. checkout: `cd frontend && npx playwright test --grep @feature:checkout`
 - Nur fehlgeschlagene wiederholen: `cd frontend && npx playwright test --last-failed`
 
+**Die Server startet Playwright selbst.** `playwright.config.ts` deklariert ein `webServer`-Array
+(Backend über `bash scripts/e2e-up.sh` auf Port 8001, Frontend über `pnpm dev` auf 4321 mit
+`VITE_API_PROXY=http://127.0.0.1:8001`) und **wartet** auf beide. `scripts/e2e-up.sh` macht dabei
+den vollständigen Aufbau — Services, `.env.e2e`, `migrate:fresh --seed`, Fixtures, Scout-Index —
+bevor es per `exec` zu `artisan serve` wird; ein Kaltstart liefert also eine **vorbereitete** DB,
+keine leere. `reuseExistingServer` ist true: läuft `e2e-up.sh` bereits von Hand, wird es
+wiederverwendet. **Unter CI ist der Block nicht gesetzt** — der Workflow startet dort sein eigenes
+Backend auf **8000** und sein eigenes Vite auf 4321, und ein zweiter Starter würde sich mit ihnen
+anlegen.
+
+**Warum das nachträglich kam.** Am 2026-09-28 waren nach einem PHP-Problem 18 Smoke-Specs mit
+`net::ERR_CONNECTION_REFUSED` rot — 18 Specs, die nicht defekt waren, sondern keinen Server
+fanden. Jeder Fehlschlag sah gleich aus und keiner sagte warum; die Zahl skaliert mit der Suite,
+die Ursache bleibt eine. Ein toter Server muss **eine** Diagnose ergeben, nicht eine pro Spec.
+
+**Ohne `VITE_API_PROXY` zeigt der Vite-Proxy auf `https://portal.test`** (`vite.config.ts`), und
+das braucht Valet/Herd. Auf dieser Maschine ist Herd nicht installiert, der Default ist ein toter
+Host. Deshalb setzt der `webServer`-Eintrag die Variable ausdrücklich.
+
 Jeder neue E2E-Test benötigt mindestens einen funktionalen Tag (`@smoke`,
 `@regression` oder `@feature:<name>`); `@mobile` ist nur ein zusätzlicher
 Device-Tag und ersetzt keinen funktionalen Tag.

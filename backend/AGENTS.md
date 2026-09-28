@@ -16,6 +16,13 @@ verlangt `"php": "^8.5"`, und `backend/vendor/composer/platform_check.php:7` erz
 php -r 'echo PHP_VERSION, PHP_EOL;'   # muss 8.5+ sein, sonst artisan startet nicht
 ```
 
+Für Skripte ist `scripts/check-php-version.sh` die Fassung zum Aufrufen: es liest die Anforderung
+aus `composer.json` (keine zweite Kopie der Zahl), prüft zusätzlich ein verwaistes
+`auto_prepend_file` und bricht mit einer klaren Meldung ab. `scripts/e2e-up.sh` ruft es in
+Schritt 0 auf, also **bevor** irgendein Container angefasst wird — gemessen am 2026-09-28 starb
+das Skript sonst erst in Schritt 3, und der Playwright-Lauf meldete daraufhin
+`net::ERR_CONNECTION_REFUSED` für Specs, die völlig in Ordnung waren.
+
 **Verweist `php` auf eine falsche Version, sieht der Fehler aus wie ein Abhängigkeitsproblem
 und ist keiner.** Jeder `php artisan`-Aufruf bricht dann ab mit
 `Composer detected issues in your platform` — ein Fatal in

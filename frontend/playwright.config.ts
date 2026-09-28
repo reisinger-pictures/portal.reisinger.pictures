@@ -27,6 +27,54 @@ export default defineConfig({
     // defense in depth in addition to the workflow's no-upload policy.
     outputDir: isCi ? '/tmp/portal-playwright-results' : 'test-results',
     preserveOutput: isCi ? 'never' : 'always',
+    // Playwright starts the servers it needs and WAITS for them.
+    //
+    // Without this block a dead server produced one identical
+    // `net::ERR_CONNECTION_REFUSED` per spec — 18 of them in the smoke run on
+    // 2026-09-28 — and none of them said *why*. The specs were fine; nothing was
+    // listening. That is the single worst shape a test failure can take, because
+    // the count scales with the suite while the cause stays at one.
+    //
+    // `port` rather than `url` for the backend on purpose: Playwright treats only
+    // 2xx/3xx/400/401/402/403 as "up", and this backend has no health route —
+    // `/api/auth/me` without the `Accept: application/json` header renders an
+    // HTML error page, which is neither. A port check asks the only question
+    // that actually matters here: is something listening.
+    //
+    // Omitted under CI on purpose: the workflow starts its own backend on :8000
+    // and its own Vite on :4321, and a second starter would race them. CI is
+    // green on that path and must stay untouched.
+    webServer: isCi
+        ? undefined
+        : [
+              {
+                  // Runs the full preparation (services, .env.e2e, migrate, seed,
+                  // fixtures, Scout index) and then execs `artisan serve`, so
+                  // starting from nothing gives a usable database, not an empty
+                  // one. The timeout covers that, not just the server boot.
+                  // `cwd: '..'` is the repo root, so the path is relative to
+                  // there — not to frontend/. Getting this wrong exits 127.
+                  command: 'bash scripts/e2e-up.sh',
+                  cwd: '..',
+                  port: 8001,
+                  reuseExistingServer: true,
+                  timeout: 300_000,
+                  stdout: 'ignore',
+                  stderr: 'pipe',
+              },
+              {
+                  command: 'pnpm dev',
+                  // Without this the proxy falls back to `https://portal.test`,
+                  // which needs Valet/Herd — not installed here. The specs would
+                  // then talk to whatever that host resolves to.
+                  env: {VITE_API_PROXY: 'http://127.0.0.1:8001'},
+                  url: 'http://localhost:4321/',
+                  reuseExistingServer: true,
+                  timeout: 120_000,
+                  stdout: 'ignore',
+                  stderr: 'pipe',
+              },
+          ],
     use: {
         baseURL: 'http://localhost:4321',
         // SECURITY: a Playwright trace serializes the browser storage state,
