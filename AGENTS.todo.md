@@ -1303,9 +1303,6 @@ alle mit Regressionstest:
   Reihenfolgegarantie „Inbox-Datei wird erst nach Storage- **und** DB-Erfolg
   gelöscht" plus `FtpProcessConcurrencyTest` (9 Tests). Ein Download wäre
   Bequemlichkeit, keine Lücke.
-- [ ] omäne — bewusst außerhalb des Auftrags gemeldet, nicht Teil einer anderen Runde. **`useBrandSettings.test.ts`** nutzt `reisinger.pictures` als Fixture ohne
-  semantischen Grund (anders als `useBrand.test.ts`, wo es zwingend ist) — auf
-  `.invalid` umstellen. Von einem Subagenten gemeldet, außerhalb des Auftrags.
 - [ ] manuell prüfen: Dublette — dieselbe Rotation wie oben; einmal ausführen und **beide** Einträge schließen. **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen der
   aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen.
 
