@@ -716,36 +716,41 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   Welle. **Befund, kein Task:** der Fehlschlag ist ein **Lokationsphänomen**, und die
   Zero-Pre-existing-Failures-Policy ist hier nicht einschlägig, weil kein CI-Run rot ist.
   **Nachgemessen 2026-09-28:** `npx playwright test tests/e2e/admin/wysiwyg-editor.spec.ts`
-  → **18/18 grün** (2 + 4×4, beide Viewports). Keine Regression: das letzte Anfassen von
-  `WysiwygEditor.tsx` liegt am **2026-08-18** (`b84f87f`), und die geprüfte Zählung
-  (`spec:43`, `ol li`) hat der Commit `069df63` nicht angefasst.
-  **Belegte latente Fragilität — nicht deren Ursache:** `spec:39-43` klickt den
-  Toolbar-Button und tippt sofort mit `pressSequentially`, **ohne vorher zu prüfen, ob
-  der Listen-Befehl überhaupt gegriffen hat**; `:43` ist die erste und einzige Prüfung,
-  ob die Liste entstanden ist. Ein verworfener Befehl erscheint deshalb genau als
-  „1 Listenelement statt 2". Frisches Vite und ≤2 Worker in CI verdecken das, 8 lokale
-  Worker und ein seit zwei Tagen laufender Dev-Server nicht.
-  **Der Mechanismus des Auftretens bleibt `unbelegt`** — der folgende Eintrag
-  berührt diese Datei nicht.
-- [ ] **Gefundene Ursache für beide Playwright-Gruppen: der Checkout-Throttle drosselt
-  lokal alle Worker über ein gemeinsames IP-Budget.** `CheckoutKey.php:25-32` legt
-  **pro IP** einen Bucket an; alle lokalen Worker laufen auf `127.0.0.1` und teilen
-  sich damit **ein** Budget. `CheckoutRiskService.php:29` zählt `checkout-quota-day` mit
-  86400 s TTL, `:34-36` fasst drei Buckets je Checkout an.
-  **Die Divergenz ist gemessen, nicht vermutet:** `backend/.env` enthält **null**
-  `CHECKOUT_THROTTLE_*`-Keys (`grep -cE '^CHECKOUT_THROTTLE' backend/.env` → 0), also
-  greifen die Defaults aus `config/app.php:146-148` — **5 / User-Stunde, 10 /
-  IP-Stunde, 30 / IP-Tag**. `.env.ci` setzt alle drei auf **1000** (`ci.yml:163`). Der
-  E2E-Stack fährt `CACHE_STORE=database`, die Zähler liegen also in der geteilten
-  `cache`-Tabelle statt in einem worker-lokalen Cache.
-  **Das erklärt die gemeldete Signatur vollständig:** rot bei 8 Workern, grün isoliert
-  und seriell, grün in CI. Am 2026-09-28 reproduziert wurde es nicht, weil die Läufe
-  bei Last ~4/18 unter der Schwelle blieben — **die Signatur ist erklärt, der Fehler
-  heute nicht reproduziert.**
-  **Nicht die Ursache der Foto-Gruppe:** die ist PHPUnit und berührt den Throttle nicht.
-  **Fix, lokal und nicht im Repo:** `CHECKOUT_THROTTLE_*` in `backend/.env` auf 1000
-  setzen wie in `.env.ci`. `.env.example` trägt zu Recht 5/10/30 — das ist der
-  Produktionswert, und diese Datei wird **nicht** geändert.
+  → **4/4 grün**. Die Datei enthält **2 Testdefinitionen × 2 Projekte** (Desktop Chrome,
+  Mobile Chrome); `--list` zählt `Total: 4 tests in 1 file`. Die frühere Angabe
+  „18/18" in diesem Board war falsch und ist hiermit korrigiert. Keine Regression: das
+  letzte Anfassen von `WysiwygEditor.tsx` liegt am **2026-08-18** (`b84f87f`), und die
+  geprüfte Zählung (`ol li`) hat der Commit `069df63` nicht angefasst.
+  **Die latente Fragilität ist seit 2026-09-28 behoben.** Der Spec prüft jetzt zwischen
+  Toolbar-Klick und dem Tippen, dass der Listen-Befehl gegriffen hat — über die
+  `btn-neutral`-Klasse des Buttons, die aus `toolbarUi.orderedList` stammt, also aus
+  `ed.isActive('orderedList')` (`WysiwygEditor.tsx:231`, verwendet in `:303`). Das ist
+  der Zustand des Editors selbst und keine DOM-Sonde; `toHaveClass` wiederholt ohne
+  festen Wartezeit-Befehl. Beweis, dass es beißt: ohne den Klick meldet die neue Zeile
+  `Received string: "btn btn-sm btn-ghost"` — **vor** der `ol li`-Zählung, die vorher
+  allein „1 statt 2" hätte sagen müssen.
+  **Der Mechanismus des ursprünglichen Auftretens bleibt `unbelegt`.** Die Trennung ist
+  trotzdem echt: ein Fehlschlag in der `ol li`-Zählung bedeutet jetzt „der Befehl griff
+  und der Inhalt stimmt nicht", nicht mehr „der Befehl griff vielleicht nicht".
+- [ ] **Hypothese geprüft und widerlegt: der Checkout-Throttle war die Ursache der
+  8-Worker-Flakiness nicht.** Die Kette „`backend/.env` setzt keine
+  `CHECKOUT_THROTTLE_*`-Keys, also greifen die Defaults 5/10/30, und weil
+  `CheckoutKey.php:25-32` **pro IP** zählt, teilen sich alle acht Worker auf
+  `127.0.0.1` ein Budget" bricht an der zweiten Gliedstelle: **das lokale E2E-Backend
+  lief nie mit den Defaults.** `scripts/e2e-up.sh:32` setzt
+  `readonly E2E_CHECKOUT_LIMIT=1000`, `:169-171` setzt alle drei
+  `CHECKOUT_THROTTLE_*` darauf, `:208-210` reicht sie im `exec env`-Block noch einmal
+  durch. `backend/.env.e2e` enthält daher `CHECKOUT_THROTTLE_USER_PER_HOUR=1000`,
+  `…_IP_PER_HOUR=1000`, `…_IP_PER_DAY=1000` — **an der Datei geprüft, die der E2E-Lauf
+  tatsächlich benutzt.** Eingeführt am **2026-09-23** in `d46f95a`, also **vor** dem
+  gemeldeten Fehlschlag. `.env.ci:44-46` führt dieselben drei Werte.
+  **Wo die Defaults trotzdem greifen:** bei einem Entwickler-Backend unter
+  `php artisan serve` **ohne** `e2e-up.sh`. Für den Coupon-E2E-Test ist damit **keine
+  Ursache etabliert** — genau wie bei der Foto-Gruppe. Nicht weiter raten, welches
+  Budget wo greift.
+  **Bewahrt:** dass die E2E-Umgebung sich in einer Konfiguration von CI unterscheidet,
+  ist für beide Playwright-Gruppen widerlegt. Die Signatur bleibt unerklärt: der
+  Coupon-Test scheitert an 8 Workern und ist grün isoliert, seriell und in CI.
 - [ ] **Flaky: Fototest-Gruppe liefert 7, dann 12, dann 0 Fehlschläge für denselben
   Code** (`FileDeliveryControllerTest`, `ModelPhoto*`). **Die bisherige Ursachenangabe
   ist widerlegt.** Sie lautete `Storage::fake('local')`, während die `photos`-Disk auf
@@ -845,6 +850,7 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   und `model-delete.spec.ts` tragen alle `@feature:model-registration`, obwohl
   sie Filter, rollengebundenen Lifecycle und DSGVO-Löschung prüfen — Abdeckung
   vorhanden, aber per Tag nicht selektierbar.
+
 ### Abweichungen bei der Umsetzung (2026-09-26) — zwei Audits, nicht blind übernommen
 
 - **`CouponInput.test.tsx:148` war ein Fehlalarm.** `removeCoupon()` wird mit
@@ -923,6 +929,7 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 #### P1
 
 - [ ] **INFRA-2:** `ci.yml` E2E-`container:` ohne `options: --user root`, `Dockerfile.e2e` endet auf `USER www-data` (uid 1000) → Checkout/`pnpm install` schreiben in einen uid-1000-fremden Host-Mount → EACCES. Nie gelaufen, weil CI am Pull starb. **CI-blockierend.**
+
 #### P2 (Details je Workstream)
 
 <details><summary>INFRA (10)</summary>
@@ -1334,7 +1341,7 @@ getrennt.
 
 ---
 
-## 🟢 CODE REVIEW (2026-09-12) — Full-Main-Audit (9 Subareas) — FIXED & VERIFIED
+## CODE REVIEW (2026-09-12) — Full-Main-Audit (9 Subareas) — umgesetzt; zwei Befunde 2026-09-24 wiedereröffnet
 
 > Methodik: 9 read-only Subagenten über Backend (Auth/Security, Checkout/Payments, Controllers/Requests, Modelle/Data, AI/Mail/Jobs), Frontend (Logic, UI), Infra/CI, Lua/Tests. Fixes durch **separate** Implementer-Subagenten, nie der Reviewer.
 > **Status (2026-09-12):** Alle P0- und die meisten P1-Findings umgesetzt + getestet. **Verifikation:** Backend `php artisan test` **1392 passed / 0 failed (3452 Assertions)**; Frontend `pnpm test:run` **628 passed**, `pnpm lint:fix` 0, `pnpm build` grün.
@@ -1345,22 +1352,25 @@ getrennt.
 
 ### P0-A — Brand-Isolation (Kernursache, Backend) — 🔴 OFFEN: P0-A13 (MEDIUM) REOPENED
 
-> Die Einträge unten dokumentieren die **behobenen und verifizierten Findings**;
-> die Checkboxen `[x]` stehen für Fix + Verifikation, nicht für eine offene
-> Restarbeit. Dieser Block ist ein historischer Snapshot vom 2026-09-12; der
-> aktuelle 2026-09-24-Audit reopeniert P0-A13 unter CR-BE-010 und leitet daraus
-> keinen aktuellen Fixabschluss ab.
+> **Was hier noch steht — und was nicht:** Die behobenen Findings des
+> 2026-09-12-Audits sind am 2026-09-28 aus dieser Liste entfernt worden; sie stehen in
+> den Commits, die sie geschlossen haben, nicht in einer Arbeitsliste (§3). Übrig bleibt
+> genau **eine offene Position**: der unten stehende, von CR-BE-004/CR-BE-010
+> wiedereröffnete Befund. Es gibt hier **keine `[x]`-Einträge** — die frühere Konvention,
+> mit der ein Kästchen hier Erledigung signalisierte, wird nicht mehr verwendet.
 
 - [ ] **P0-A13 (MEDIUM; reopened)** `FileDeliveryController`: Original-Leak bei `is_public` + `restricted_photographers` schließen — `:35,54-72`. Historischer Eintrag; der aktuelle Befundstatus ist CR-BE-004/CR-BE-010, nicht der historische `[x]`-Nachweis.
+
 ### P0-B — Checkout/Payments (Geld) — 🔴 OFFEN: P0-B7 (MEDIUM) REOPENED
 
-> Die Einträge unten dokumentieren die **behobenen und verifizierten Findings**;
-> B16 ist durch die dokumentierte Entscheidung „kein VAT" als fachlich geprüft
-> markiert. Der Block ist ein historischer Snapshot vom 2026-09-12; der aktuelle
-> 2026-09-24-Audit reopeniert P0-B7 unter CR-BE-002/CR-BE-010 und leitet daraus
-> keinen aktuellen Fixabschluss ab.
+> **Was hier noch steht — und was nicht:** Die behobenen Findings des
+> 2026-09-12-Audits sind am 2026-09-28 entfernt worden (§3); B16 ist über die
+> dokumentierte Entscheidung „kein VAT" fachlich geprüft. Übrig bleibt genau **eine
+> offene Position**: der von CR-BE-002/CR-BE-010 wiedereröffnete Befund unten. Es
+> gibt hier **keine `[x]`-Einträge**.
 
 - [ ] **P0-B7 (MEDIUM; reopened)** `ContractJoinController`: fremdes `personal_token` nicht herausgeben (E-Mail-Bindung/Proof) — `:74-126`. Historischer Eintrag; der aktuelle Befundstatus ist CR-BE-002/CR-BE-010, nicht der historische `[x]`-Nachweis.
+
 ### P1 — AI / Mail / Jobs / Console — 🟡 OFFENE FOLLOW-UPS (Live-Nachweis + Policy-Entscheidung)
 
 - [~] wartet auf den Live-Scheduler-/Importnachweis; der Code ist verifiziert. **P1-A5 (MEDIUM; historischer Befund, Verifikation offen)** `import-locations` lief im früheren Boot-Flow über HTTP mit `truncate()`. Im aktuellen Working Tree ruft `deployment/docker-compose.yml` den Import beim Boot nicht mehr auf; `routes/console.php` plant ihn wöchentlich und der Command nutzt einen Lock/transactionalen Refresh. Live-Scheduler-/Importnachweis bleibt offen.
@@ -1370,6 +1380,7 @@ getrennt.
 
 - [ ] Entscheidung offen: siehe P1-I1 oben — Produktions-Secret-Handling/Rotation für `.env.production`. **P1-I1 (HIGH; historischer Befund, Verifikation offen)** `.env.production` liegt mit Live-Secrets (Stripe live, whsec, SMTP, Make, AI-Key, APP_KEY, JWT_SECRET, DB) unverschlüsselt auf Platte (nicht getrackt, aber Risiko) → Secrets rotieren/Secret-Manager. Die aktuellen Config-Defaults sind dokumentiert (`APP_DEBUG=false`); Produktions-Secret-Handling und Rotation bleiben offen.
 - [~] wartet auf einen echten Auto-Merge-Lauf und die Branch-Protection für `main`; die statische Verifikation des Gates ist grün, die Durchsetzung ist es nicht. **P1-I3 (HALB OFFEN — Static-Verifikation grün, Live-Durchsetzung fehlt) (MEDIUM; Aggregate-Gate statisch verifiziert, Branch-Protection/Live-Merge offen):** `automerge.yml` übergibt Dependabot-Metadaten sicher per `env` und wartet ausschließlich auf den exakten Push-Check `CI gate (push)`. Das dynamisch benannte CI-Gate hängt von Security, Backend, Frontend und der vollständigen E2E-Matrix ab und prüft deren Resultate explizit; `allowed-conclusions` bleibt `success`, `fail-on-no-checks` ist fail-closed und `checks-discovery-timeout: 2100` deckt die Check-Entdeckung ab. Dependabot-PR-seitige secret-dependent E2E- und Aggregate-Jobs werden per Actor/Event-Bedingung absichtlich übersprungen; der Push-Lauf desselben Head-SHA bleibt allein autoritativ, normale Same-Repo-PRs bleiben fail-closed. Der job-level `timeout-minutes: 65` ist die echte Gesamtgrenze (25m CI + 35m Discovery + 5m Checkout/Merge-Puffer). `actionlint`, Security-Contract, Shell-Syntax und Diff-Check werden vor Commit erneut geprüft; ein echter Auto-Merge-Lauf und Branch-Protection werden daraus nicht abgeleitet.
+
 ### P1 — Modelle / Services / Data-Integrity — ✅ überwiegend FIXED (M3/M12 teilw.)
 
 > **Wichtiger Kontext:** `Brand`-Enum enthält aktuell nur `rp` (SRP in V025/V031 entfernt) → viele Brand-Isolation-Lücken (P0-A*) sind **latent**, nicht live ausnutzbar. Sie werden dennoch gefixt, weil ein zweiter Brand sie sofort scharf macht.
@@ -1425,6 +1436,7 @@ getrennt.
   Widget-Test deckt die Turnstile-Komponente ab, nicht den Checkout-Pfad im Browser.
   **Abgrenzung:** Der 3DS-Live-Strom bleibt `manuell prüfen` (Eintrag oben) und ist
   ausdrücklich *nicht* Teil dieser Lücke — er ist nicht automatisierbar.
+
 ## Produktionsdeploy SFTPGo — Vorfall vom 2026-09-26 (abgeschlossen)
 
 Der Cutover auf SFTPGo hat die Produktion am 2026-09-26 mehrfach lahmgelegt.
@@ -1495,6 +1507,7 @@ alle mit Regressionstest:
   `.invalid` umstellen. Von einem Subagenten gemeldet, außerhalb des Auftrags.
 - [ ] manuell prüfen: Dublette — dieselbe Rotation wie oben; einmal ausführen und **beide** Einträge schließen. **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen der
   aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen.
+
 ## UI-Review 2026-09-26 — Screenshot-Verifikation der neuen Oberflaechen
 
 Erstmals das Screenshot-Harness auf die neuen Oberflaechen angewendet
