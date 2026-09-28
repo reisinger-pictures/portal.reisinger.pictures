@@ -328,7 +328,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   nicht den Smoke-Lauf blockiert.
 - [~] wartet auf die Umsetzung des `reconcileAccount()`-Pfads. Die frühere Blockade durch den Doppel-ID-Konflikt ist entfallen (die `P1-M`-Invariante ist leer, Kommando in der ID-Übersicht oben); den Spaltenteil, den die Einstiegs-Übersicht zu Recht als erledigt führt, hat V041 geliefert und getestet — `php artisan test --filter='FtpAccountStatusMigrationTest|FtpProvisioningStatusTest'` ergibt **16 passed (70 assertions)**. Offen ist allein die Reconciliation, die `features/infrastructure/19-ftp-upload-pipeline.md` §7.16 ausdrücklich führt: „`reconcileAccount()` (P1-M30) ist der vorgesehene Weg und bleibt offen". **P1-M30 (P0) — Spalte für den Provisionierungsstatus auf `users`.**
   **Festgelegt am 2026-09-26:** die Source of Truth ist eine Spalte, **kein**
-  Live-Query gegen SFTPGo. Begründung: `FtpController::status()` (`:21-39`)
+  Live-Query gegen SFTPGo. Begründung: `FtpController::status()`
   ist ein Endpoint für den Fotografen; ein Live-Query würde die UI vom Dienst
   abhängig machen, während P1-M26 verlangt, dass der Import ohne SFTPGo
   weiterläuft. Beides zugleich ist nicht möglich. Zusätzlich würde ein
@@ -826,7 +826,7 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
 **Welle-0-Triage-Ergebnis (Read-only gegen `HEAD=59f9ec6`; 2026-09-24):**
 - **Kanonisch aktiv:** CR-PAY-010, CR-FE-030, CR-CRM-008, CR-TEST-012, CR-FE-041, P1-F7 sowie die verbleibenden Reste aus P1-F10/F11, P1-A6/A7, P1-M9/M14 und das Model-Person-Count-Limit.
 - **Bereits gefixt/stale oder duplicate:** P1-F1–F6/F8/F9/F12, P1-A1–A4, P1-L1–L6 (nur echte Lightroom-Runtime bleibt als Evidence offen), P1-M1/M2/M10–M13/M15, CR-FE-011/019/023/024/034/039, CR-TEST-005, CR-INF-005/006/019, P0-A13/P0-B7/CR-BE-010, CR-CODE-001 sowie die Age-Proof-Positivfallzeile. Die historischen Checkboxen dürfen nicht als neue Bugs double-countet werden.
-  - **Korrigiert 2026-09-26 (DOC-8):** `P0-A13`, `P0-B7` und `CR-BE-010` standen in dieser Pauschalliste als gefixt, waehrend `CR-BE-010` (Z. 619) und die Einzelposition `P0-A13 (MEDIUM; reopened)` (Z. 815) sie ausdruecklich als NICHT gefixt fuehren. Die Einzeleintraege sind massgeblich, die Pauschalliste war falsch. **P0-A13 und P0-B7 sind OFFEN.**
+  - **Korrigiert 2026-09-26 (damals als DOC-8 gefuehrt; diese DOC-Position ist inzwischen aus dem Board entfernt):** `P0-A13`, `P0-B7` und `CR-BE-010` standen in dieser Pauschalliste als gefixt, waehrend der Einzeleintrag `CR-BE-010` (P2, Review-Integritaet) und die damals wiedereroeffnete Einzelposition `P0-A13 (MEDIUM; reopened)` sie ausdruecklich als NICHT gefixt fuehren. Die Einzeleintraege sind massgeblich, die Pauschalliste war falsch. **Nachtrag 2026-09-28:** Der damalige Stand („nicht gefixt") ist fuer `P0-A13` und `P0-B7` ueberholt — beide sind am 2026-09-28 nachweislich als Nicht-Leck geschlossen, nicht „nie gemeldet": die Begruendung steht in den Bloecken „P0-A … geschlossen 2026-09-28" und „P0-B … geschlossen 2026-09-28" weiter unten. **`CR-BE-010` ist davon nicht erfasst** und wird hier **nicht** mitgeschlossen: der P2-Review-Integritaets-Eintrag bleibt ohne Abschlussvermerk offen.
 - **Nur Verification/Environment:** Tag-Playwright-Ausführung, MariaDB-Migration/E2E, GHCR-/Deployment-/Secret-/Scheduler-/Storage-Nachweise, Plugin-Live-Runtime und Card-Testing-Betriebschecklisten. Diese Blöcke benötigen keinen erfundenen lokalen PASS.
 - **Schema-Entscheidung:** CR-BE-018/CR-DATA-005/CR-DATA-018 bleiben bis zur realen Multi-Connection-/Template-Scope-Entscheidung offen; bestehende V036–V038 dürfen fachlich konsolidiert werden, V039+ nur bei nachgewiesenem unvermeidbarem Defizit. V037 hat zusätzlich einen MariaDB-CHECK-Kompatibilitätsblocker.
 - **CI-Status 2026-09-24:** Der historische Run `36013526580` auf `59f9ec6` bleibt rot (V037/MariaDB-Fehler 1901; Frontend/Backend ansonsten grün). `e1f397d` beseitigte den Migrationsblocker; der darauffolgende Run `36024267904` war rot und deckte die nachgelagerten E2E-/Harness-Befunde auf. Der fokussierte Reparaturcommit `8904c10` ist gepusht; Run `36035927250` ist abgeschlossen rot. Image-Build `36024267953` ist grün; Registry-Namespace/Pullability bleibt separat offen.
@@ -1090,8 +1090,6 @@ getrennt.
 
 ### P0-A — Brand-Isolation (Kernursache, Backend) — geschlossen 2026-09-28 (P0-A13 als Nicht-Leak nachgewiesen)
 
-> **Was hier noch steht — und was nicht:** Die behobenen Findings des
-> 2026-09-12-Audits sind am 2026-09-28 aus dieser Liste entfernt worden; sie stehen in
 > **Was hier noch steht — und was nicht:** Die behobenen Findings des
 > 2026-09-12-Audits sind am 2026-09-28 entfernt worden (§3); sie stehen in den
 > Commits, die sie geschlossen haben. Der wiedereröffnete Befund `P0-A13` ist am
