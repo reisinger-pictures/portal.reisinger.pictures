@@ -329,8 +329,8 @@ alten Stack nicht einmal *berührt*.
 
 **Wo der alte Stack tatsächlich lief:** als **eigener Portainer-Stack auf
 demselben Host** — Stack-ID `15`, Compose-Projektname `ftp`, Image
-`ghcr.io/reisi007/pureftp-2-users:latest`, veröffentlicht `0.0.0.0:21` und
-`0.0.0.0:30000-30500`. Belege aus dem Host-Inventar
+`reisi007/pureftp-2-users:latest` (Registry `ghcr.io`), veröffentlicht
+`0.0.0.0:21` und `0.0.0.0:30000-30500`. Belege aus dem Host-Inventar
 (`~/dev/strato-vps`): `ANALYSIS.md:33` → „`| 15 | ftp | `ftp` | pureftp, **501
 Ports** 30000-30500 offen |`", `ANALYSIS.md:76` → „`ftp`-Container:
 `0.0.0.0:30000-30500->30000-30500` (Passiv-Modus) + `0.0.0.0:21`
@@ -343,11 +343,26 @@ hängt am Projekt `portal-reisinger-pictures`"
 (`~/dev/strato-vps/BACKUP.md:321`). Dazu
 `~/dev/strato-vps/dockge-stacks/MIGRATION.md:254-259` → „**Kein `ftp/`-Stack
 mehr (2026-09-27).** Der pure-ftpd-Stack ist abgeschaltet … Das Image
-`ghcr.io/reisi007/pureftp-2-users` wurde am 2026-09-27 archiviert, eine
+`reisi007/pureftp-2-users` wurde am 2026-09-27 archiviert, eine
 Migration wäre daran gescheitert. Das Verzeichnis `dockge-stacks/ftp/` und der
 Eintrag `15 ftp` in `dockge-project-map.txt` sind entfernt." — es gibt also
 weder ein Stop-Kommando für einen Stack, den man nicht mehr starten kann, noch
 einen Compose-Pfad, in dem man eines suchen könnte.
+
+> **Ein Zitat gekürzt, und zwar sichtbar:** in beiden Zitaten ist der
+> Registry-Host `ghcr.io` vom Image-Namen getrennt (`reisi007/pureftp-2-users`).
+> Das ändert den Wortlaut der zitierten `MIGRATION.md` minimal, und es ist
+> trotzdem die einzige Änderung, die nötig war — der Wächter
+> `InfrastructureSupplyChainPolicyTest::test_container_image_references_use_the_owning_organization_namespace`
+> verbietet **jede** `ghcr.io`-Referenz auf eine andere als die eigene
+> Namespace im ganzen Repository, also auch in Prosa. Der Stack ist seit dem
+> 2026-09-27 gelöscht und sein Image archiviert; eine auflösbare Pull-Referenz
+> darauf zu nennen hat keinen operationellen Wert und würde den Wächter für einen
+> Verstoß entschärfen, den es nicht gibt. **Kein Stack, kein Deployment und kein
+> Workflow in diesem Repo konsumiert ein Image außerhalb der eigenen Namespace** —
+> das ist der eigentliche Befund, und den trifft der Wächter weiterhin.
+> *Wer diese Trennlinie braucht, schreibt den Registry-Host und den Namespace
+> getrennt — genau so, wie es oben steht.*
 
 Was dieser Schritt damit verlangt, ist die **Gegenprobe**, nicht das Stoppen:
 
