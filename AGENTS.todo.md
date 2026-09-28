@@ -695,6 +695,26 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   (`Brand` als ENUM mit zwei Werten, 6 Tabellen; tatsächlich VARCHAR + Cast auf **19**
   Modellen). **`11` und `12` stehen auf „Soll-Zustand (Ziel)" ohne superseded-Marker.**
   Lebende Quelle: `21-brand-config-driven.md` + `22-brand-settings-overlay.md`.
+- [ ] **HOCH — `db:seed --force` läuft bei jedem Containerstart und überschreibt jetzt
+  28 Produktions-Keys. Ein nach §13 vorgeschriebener Neustart ist damit kein sicherer
+  Schritt mehr.** `deployment/docker-compose.yml:267` führt im Entrypoint
+  `php artisan migrate --force && php artisan db:seed --force && php artisan admin:update`
+  aus. **Vor dem Wechsel `insertOrIgnore`→`upsert` war der Seed für bereits vorhandene
+  Zeilen ein No-Op; seit der Owner-Entscheidung schreibt er sie.** Der Neustart am
+  2026-09-28 hat deshalb `calc_base_price`/`calc_hourly_rate` migriert **und** alle
+  28 Keys mit dem Seederwert überschrieben — ohne dass ich es beabsichtigt hatte; den
+  Befund aus dem operativen Audit hatte ich gelesen und nicht beachtet.
+  **Gemessener Schaden: keiner für die 12 vorher gemessenen Werte** (`base_price` 8000,
+  Gebühren 5000/20000/1500, `price_*` 7500/14500/45000, `mult_*` 2.0/1.5/1.5, `calc_*`
+  nach Migration 5000/8000) und **keiner für die drei Lizenztexte** — alle decken sich
+  mit dem Seeder. **Nicht gemessen und damit unbekannt:** `bank_holder`, `bank_iban`,
+  `bank_bic` und die `company_*`. Die habe ich vorher nicht erfasst, und sie sind
+  **auszahlungsrelevant** — falls der Owner sie über die Oberfläche je abweichend
+  gesetzt hatte, stehen dort jetzt die Werte des Seeders.
+  **Offene Frage an den Owner:** soll der Entrypoint weiterhin seeden? §13 schreibt den
+  Neustart vor, und der Neustart ist damit nicht mehr risikofrei. Die Regel in
+  `backend/AGENTS.md` („vor `db:seed` in Produktion prüfen") greift hier **nicht**,
+  weil der Seed gar nicht vom Menschen ausgelöst wird, sondern von jedem Restart.
 - [ ] **`wysiwyg-editor.spec.ts` — **lokal** fehlschlagend, in CI grün.** Gemessen am
   2026-09-28, CI-Run `36389471967`: `wysiwyg-editor.spec.ts:19` **✓** und `:101` **✓**.
   S1 hatte lokal einen Fehlschlag gemeldet (Zählung der Listenelemente 1 statt 2,
