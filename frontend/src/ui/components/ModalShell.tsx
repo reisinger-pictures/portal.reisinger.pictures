@@ -96,7 +96,7 @@ interface ModalShellProps {
      * already worked around it locally (RatingStatusModal, the camera guide in
      * ManagementFtpInbox, GalleryModal) by hand-rolling `boxClassName` and a
      * `flex-1 overflow-y-auto` body. But making the bounded layout the default
-     * would move the scroll boundary under every one of the eighteen dialogs
+     * would move the scroll boundary under every one of the 28 dialogs
      * that render here, including ones that tuned that boundary on purpose:
      * ModelDetailModal fades its last 2rem with `scroll-fade-bottom` and keeps
      * `pb-10` clear of it, which only reads as "there is more below" while the
@@ -133,7 +133,7 @@ interface ModalShellProps {
      * there is no region for the class to land on. The prop is accepted and
      * dropped rather than folded into `boxClassName` on the caller's behalf,
      * because silently reinterpreting it as a box class would move the DOM
-     * under the other eighteen dialogs the moment one of them passed it. Passing
+     * under the other 28 dialogs the moment one of them passed it. Passing
      * it without the opt-in is a mistake that stays visibly a mistake: nothing
      * changes.
      */
