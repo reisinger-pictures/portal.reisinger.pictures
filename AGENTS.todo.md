@@ -715,16 +715,70 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   korrigiert. Das letzte Anfassen liegt am **2026-09-26** (`069df63`), also vor der
   Welle. **Befund, kein Task:** der Fehlschlag ist ein **Lokationsphänomen**, und die
   Zero-Pre-existing-Failures-Policy ist hier nicht einschlägig, weil kein CI-Run rot ist.
-  Siehe den nächsten Eintrag — beide haben dieselbe Form.
+  **Nachgemessen 2026-09-28:** `npx playwright test tests/e2e/admin/wysiwyg-editor.spec.ts`
+  → **18/18 grün** (2 + 4×4, beide Viewports). Keine Regression: das letzte Anfassen von
+  `WysiwygEditor.tsx` liegt am **2026-08-18** (`b84f87f`), und die geprüfte Zählung
+  (`spec:43`, `ol li`) hat der Commit `069df63` nicht angefasst.
+  **Belegte latente Fragilität — nicht deren Ursache:** `spec:39-43` klickt den
+  Toolbar-Button und tippt sofort mit `pressSequentially`, **ohne vorher zu prüfen, ob
+  der Listen-Befehl überhaupt gegriffen hat**; `:43` ist die erste und einzige Prüfung,
+  ob die Liste entstanden ist. Ein verworfener Befehl erscheint deshalb genau als
+  „1 Listenelement statt 2". Frisches Vite und ≤2 Worker in CI verdecken das, 8 lokale
+  Worker und ein seit zwei Tagen laufender Dev-Server nicht.
+  **Der Mechanismus des Auftretens bleibt `unbelegt`** — der folgende Eintrag
+  berührt diese Datei nicht.
+- [ ] **Gefundene Ursache für beide Playwright-Gruppen: der Checkout-Throttle drosselt
+  lokal alle Worker über ein gemeinsames IP-Budget.** `CheckoutKey.php:25-32` legt
+  **pro IP** einen Bucket an; alle lokalen Worker laufen auf `127.0.0.1` und teilen
+  sich damit **ein** Budget. `CheckoutRiskService.php:29` zählt `checkout-quota-day` mit
+  86400 s TTL, `:34-36` fasst drei Buckets je Checkout an.
+  **Die Divergenz ist gemessen, nicht vermutet:** `backend/.env` enthält **null**
+  `CHECKOUT_THROTTLE_*`-Keys (`grep -cE '^CHECKOUT_THROTTLE' backend/.env` → 0), also
+  greifen die Defaults aus `config/app.php:146-148` — **5 / User-Stunde, 10 /
+  IP-Stunde, 30 / IP-Tag**. `.env.ci` setzt alle drei auf **1000** (`ci.yml:163`). Der
+  E2E-Stack fährt `CACHE_STORE=database`, die Zähler liegen also in der geteilten
+  `cache`-Tabelle statt in einem worker-lokalen Cache.
+  **Das erklärt die gemeldete Signatur vollständig:** rot bei 8 Workern, grün isoliert
+  und seriell, grün in CI. Am 2026-09-28 reproduziert wurde es nicht, weil die Läufe
+  bei Last ~4/18 unter der Schwelle blieben — **die Signatur ist erklärt, der Fehler
+  heute nicht reproduziert.**
+  **Nicht die Ursache der Foto-Gruppe:** die ist PHPUnit und berührt den Throttle nicht.
+  **Fix, lokal und nicht im Repo:** `CHECKOUT_THROTTLE_*` in `backend/.env` auf 1000
+  setzen wie in `.env.ci`. `.env.example` trägt zu Recht 5/10/30 — das ist der
+  Produktionswert, und diese Datei wird **nicht** geändert.
 - [ ] **Flaky: Fototest-Gruppe liefert 7, dann 12, dann 0 Fehlschläge für denselben
-  Code** (`FileDeliveryControllerTest`, `ModelPhoto*`). Ursache laut S1:
-  `Storage::fake('local')`, während die `photos`-Disk auf das echte `../photos` schreibt —
-  der Test prüft also womöglich gegen den echten Plattenzustand. Ebenfalls **lokal**,
-  CI ist grün. **Gemeinsame Form mit dem wysiwyg-Eintrag:** beide entstehen in der
-  lokalen Umgebung und nicht in CI. **Deshalb ist die Frage nicht „welcher Test ist
-  kaputt", sondern „was unterscheidet die lokale E2E-Umgebung von CI"** — vermutlich der
-  geteilte Plattenzustand unter `../photos` und ein vom CI abweichender Seed. Das ist die
-  eigentliche Aufgabe; die beiden Symptome sind ihre Anzeichen.
+  Code** (`FileDeliveryControllerTest`, `ModelPhoto*`). **Die bisherige Ursachenangabe
+  ist widerlegt.** Sie lautete `Storage::fake('local')`, während die `photos`-Disk auf
+  das echte `../photos` schreibt. Das kann nicht eintreten:
+  `Illuminate/Support/Facades/Storage.php:106` setzt die Wurzel eines gefaekten Disks
+  **immer** auf `storage_path('framework/testing/disks/'.$disk)`, nie auf die
+  konfigurierte Wurzel, und `:112` leert sie bei jedem Aufruf. Zudem faken die
+  Unterlagen genau die Disk, die sie lesen: `ModelFileStore.php:29` (`DISK = 'local'`)
+  gegen `ModelPhotoTest.php:36`; `FileDeliveryController.php:57` (`disk('photos')`)
+  gegen `FileDeliveryControllerTest.php:27` (`fake('photos')`). **Alle 28 Fundstellen
+  von `Storage::disk('photos')` in `backend/tests` sind korrekt** — 0 Fehlgebrauch.
+  **Nachgemessen 2026-09-28:** 15 aufeinanderfolgende Läufe der vier Klassen, je
+  63 Tests / 216 Assertions, **0 Fehlschläge** (3 seriell, danach 12 weitere seriell).
+  **Offen bleibt:** die Ursache ist damit **nicht identifiziert**, nur nicht die
+  behauptete. Für die gemeldeten 7/12/0 existiert **kein Artefakt**, die Prämisse
+  selbst ist ungeprüft. `phpunit.xml:40` setzt `DB_DATABASE=:memory:`; eine
+  `migrate:fresh` auf einer DB-Datei kann diese Gruppe also nicht beeinflussen.
+  **Keine zweite Ursache erfinden, um sie passend zu machen.**
+- [ ] **`assertMailpitSentTo` benutzt den gepufferten Weg, obwohl die korrigierte
+  Variante im selben Trait existiert** — 6 Testklassen betroffen. Die Falle ist im
+  Trait bereits **beschrieben und behoben**, nur nicht überall angewandt:
+  `getMailpitMessageByEmail()` (`backend/tests/Support/MailpitAssertions.php:21-36`)
+  sucht über `getMailpitMessagesByRecipient()` und trägt einen Kommentar, der genau
+  diesen Fehler samt Messung dokumentiert. `assertMailpitSentTo`
+  (`MailpitAssertions.php:45-55`) ruft dagegen weiter `getMailpitMessages()`
+  (`:16-19`), das `/messages` **ohne Limit-Parameter** abruft — Mailpit liefert dann
+  standardmäßig die 50 neuesten, und `assertMailpitSentTo` filtert clientseitig. Bei
+  gefüllter Mailbox fällt die gesuchte Nachricht aus dem Fenster und die Assertion
+  meldet sie als fehlend. **Betroffen:** `ContractCloseTest`, `AuthControllerTest`,
+  `UserControllerTest`, `CheckoutServiceTest`, `InvoiceServiceTest`,
+  `NotificationOptInTest`. **Warum es auffällt:** das lokale Mailpit ist langlebig und
+  sammelt, das CI-Mailpit startet jeden Lauf leer — dieselbe Divergenz wie beim
+  Throttle, eine Ebene tiefer.
 - [ ] **Die Doku ist an zwei Stellen hinter dem Code zurückgeblieben, weil der
   Doku-Agent vor dem Code gelandet ist.** `07-psychological-pricing.md:33` sagt noch,
   die Umstellung sei „in Arbeit", und `28-settings-key-meaning.md:102` führt
@@ -1242,7 +1296,7 @@ getrennt.
 
 ---
 
-## ✅ ERLEDIGT (2026-09-18/19) — Model-Registrierung (Magic-Link) + Profile-Iteration
+## Model-Registrierung (Magic-Link) + Profile-Iteration (2026-09-18/19 deployiert) — OFFENE Restarbeiten
 
 > Plan: `~/.opencode/plan/model-registrierung.md` · SOLL: `features/crm/05-model-registration.md` + `features/crm/06-model-profile-iteration.md`.
 > Admin lädt eine Managerperson per kopierbarem Magic-Link ein (Mail optional); diese registriert login-frei einen **Act** mit 1..n Personen (je Person = CRM-Customer + ModelProfile). Altersnachweis **immer Pflicht**. Fragenkatalog **Code-first + Answers-Snapshot**.
@@ -1264,7 +1318,7 @@ getrennt.
 **Model-Zugang (User-Anforderung 2026-09-19) — umgesetzt**
 ---
 
-## ✅ ERLEDIGT (2026-09-19) — E2E-Ausbau Runde 2 (Model-Registrierung/-Zugang)
+## E2E-Ausbau Runde 2 (Model-Registrierung/-Zugang, 2026-09-19) — Verifikationslauf erledigt, Restarbeit OFFEN
 
 > Auftrag: Lücken der Runde-2-Features mit **echten Nutzer-Interaktionen** schließen (semantische, gescopte Locators, Tags, kein `page.goto`-SPA-Missbrauch, keine localStorage-Injektion).
 > **Historischer Verifikationsstand:** `pnpm vitest run` **706 passed**, `pnpm lint:fix` 0, `pnpm build` grün; `npx playwright test --grep "@feature:model-registration|@feature:model-access" --workers=1` **20 passed** (Desktop + Mobile). Dieser Lauf betraf die E2E-Erweiterung; Backend-Code blieb unverändert.
@@ -1289,7 +1343,7 @@ getrennt.
 > **Regeln:** Jeder Fix braucht einen Regressionstest (DoD, Bugfix = mind. 1 Test). Backend-Fix gilt nur mit grünem `php artisan test`; Frontend mit `pnpm test:run` + `lint:fix` + `build`.
 > Priorität: **P0** = Security/Geld (kritisch/hoch), **P1** = funktionale Bugs, **P2** = Härtung/Hygiene.
 
-### P0-A — Brand-Isolation (Kernursache, Backend) — 🟡 HISTORISCHER FIX-STAND (nicht aktueller Auditabschluss)
+### P0-A — Brand-Isolation (Kernursache, Backend) — 🔴 OFFEN: P0-A13 (MEDIUM) REOPENED
 
 > Die Einträge unten dokumentieren die **behobenen und verifizierten Findings**;
 > die Checkboxen `[x]` stehen für Fix + Verifikation, nicht für eine offene
@@ -1298,7 +1352,7 @@ getrennt.
 > keinen aktuellen Fixabschluss ab.
 
 - [ ] **P0-A13 (MEDIUM; reopened)** `FileDeliveryController`: Original-Leak bei `is_public` + `restricted_photographers` schließen — `:35,54-72`. Historischer Eintrag; der aktuelle Befundstatus ist CR-BE-004/CR-BE-010, nicht der historische `[x]`-Nachweis.
-### P0-B — Checkout/Payments (Geld) — 🟡 HISTORISCHER FIX-STAND (nicht aktueller Auditabschluss; B16 dokumentiert)
+### P0-B — Checkout/Payments (Geld) — 🔴 OFFEN: P0-B7 (MEDIUM) REOPENED
 
 > Die Einträge unten dokumentieren die **behobenen und verifizierten Findings**;
 > B16 ist durch die dokumentierte Entscheidung „kein VAT" als fachlich geprüft
@@ -1307,12 +1361,12 @@ getrennt.
 > keinen aktuellen Fixabschluss ab.
 
 - [ ] **P0-B7 (MEDIUM; reopened)** `ContractJoinController`: fremdes `personal_token` nicht herausgeben (E-Mail-Bindung/Proof) — `:74-126`. Historischer Eintrag; der aktuelle Befundstatus ist CR-BE-002/CR-BE-010, nicht der historische `[x]`-Nachweis.
-### P1 — AI / Mail / Jobs / Console — 🟡 HISTORISCHER STAND / OFFENE FOLLOW-UPS
+### P1 — AI / Mail / Jobs / Console — 🟡 OFFENE FOLLOW-UPS (Live-Nachweis + Policy-Entscheidung)
 
 - [~] wartet auf den Live-Scheduler-/Importnachweis; der Code ist verifiziert. **P1-A5 (MEDIUM; historischer Befund, Verifikation offen)** `import-locations` lief im früheren Boot-Flow über HTTP mit `truncate()`. Im aktuellen Working Tree ruft `deployment/docker-compose.yml` den Import beim Boot nicht mehr auf; `routes/console.php` plant ihn wöchentlich und der Command nutzt einen Lock/transactionalen Refresh. Live-Scheduler-/Importnachweis bleibt offen.
 - [ ] Entscheidung offen: siehe A7 Operations/Decisions — Prompt-Injection- und SMTP-Duplikat-Policy. **P1-A7 (historical umbrella):** aktive Code-Subblöcke R1–R7 sind verifiziert; Operations-Evidence und Product Decisions bleiben als separate Tasks.
 
-### P1 — Infra / CI / Deploy — 🟡 HISTORISCHER STAND; KONFIGURATIONSAENDERUNGEN OHNE AKTUELLEN GESAMTNACHWEIS
+### P1 — Infra / CI / Deploy — 🟡 OFFEN: Produktions-Secret-Handling (Entscheidung) + Auto-Merge/Branch-Protection (Live-Nachweis)
 
 - [ ] Entscheidung offen: siehe P1-I1 oben — Produktions-Secret-Handling/Rotation für `.env.production`. **P1-I1 (HIGH; historischer Befund, Verifikation offen)** `.env.production` liegt mit Live-Secrets (Stripe live, whsec, SMTP, Make, AI-Key, APP_KEY, JWT_SECRET, DB) unverschlüsselt auf Platte (nicht getrackt, aber Risiko) → Secrets rotieren/Secret-Manager. Die aktuellen Config-Defaults sind dokumentiert (`APP_DEBUG=false`); Produktions-Secret-Handling und Rotation bleiben offen.
 - [~] wartet auf einen echten Auto-Merge-Lauf und die Branch-Protection für `main`; die statische Verifikation des Gates ist grün, die Durchsetzung ist es nicht. **P1-I3 (HALB OFFEN — Static-Verifikation grün, Live-Durchsetzung fehlt) (MEDIUM; Aggregate-Gate statisch verifiziert, Branch-Protection/Live-Merge offen):** `automerge.yml` übergibt Dependabot-Metadaten sicher per `env` und wartet ausschließlich auf den exakten Push-Check `CI gate (push)`. Das dynamisch benannte CI-Gate hängt von Security, Backend, Frontend und der vollständigen E2E-Matrix ab und prüft deren Resultate explizit; `allowed-conclusions` bleibt `success`, `fail-on-no-checks` ist fail-closed und `checks-discovery-timeout: 2100` deckt die Check-Entdeckung ab. Dependabot-PR-seitige secret-dependent E2E- und Aggregate-Jobs werden per Actor/Event-Bedingung absichtlich übersprungen; der Push-Lauf desselben Head-SHA bleibt allein autoritativ, normale Same-Repo-PRs bleiben fail-closed. Der job-level `timeout-minutes: 65` ist die echte Gesamtgrenze (25m CI + 35m Discovery + 5m Checkout/Merge-Puffer). `actionlint`, Security-Contract, Shell-Syntax und Diff-Check werden vor Commit erneut geprüft; ein echter Auto-Merge-Lauf und Branch-Protection werden daraus nicht abgeleitet.
@@ -1332,101 +1386,23 @@ getrennt.
 
 ---
 
-## ✅ ERLEDIGT (2026-09-09) — OpenCode Go Compliance (User-Agent + Session-Header)
-
-> Mail 2026-09-07 (OpenCode Go): 1) kein missbräuchlicher Traffic, 2) proper User-Agent (kein generischer), 3) `x-opencode-session`-Header für Prompt-Caching.
-> Befund: 3) ✅ erfüllt (`HasSessionHeader`, default `x-opencode-session`, Prefix `portal-`, Tests grün), 1) ✅ kein Retry/Polling (ein Request pro `callAI()`, timeout 120), 2) ❌ fehlt (kein `User-Agent` in `buildHeaders`, fällt auf Guzzle-Default zurück).
-> Vorgabe User: User-Agent hart auf `reisinger.pictures Portal` setzen. Wenn nur das → gleich commit+push+CI grün, sonst manuelle Bestätigung.
-
-- Verifiziert 2026-09-09: volle Suite 1213 passed / 0 failed (3012 Assertions); `HasUserAgent`-Concern, 3 UA-Regressionstests; Urteil READY_TO_COMMIT.
-
----
-
----
-
-## ✅ Erledigt (2026-08-19) — F3 + P1 + A1 Komplett
-
-Alle drei Pakete implementiert, verifiziert und committed (22 Commits; der
-historische Snapshot lag damals ahead of `origin/main`, der aktuelle
-Commit-Stand ist synchron):
-
-| Paket | Umfang | Tests |
-|-------|--------|-------|
-| **F3** Brand Settings Admin-UI | Backend (Service/Controller/Routes) + Frontend (Hook/Card/E2E) + Doku | 24 PHP, 4 Vitest, E2E spec |
-| **P1** Coupon `photo_package` | V030 Migration, Service, Frontend (Form/Listen), E2E | 72 PHP, 4 Vitest, E2E spec (4 Tests) |
-| **A1** Authorization Refactoring (Steps 1–7) | Model-Delegation, Gates, Middleware, Policies, Controllers (6a–6f), PurchaseService | 1192 PHP, Zero `$user->is_*` in Controllers/Policies |
-
-**Letzter Stand:** 1192/0 PHPUnit, 593/0 Vitest, lint+build 0.
-
----
-
-## ✅ Erledigt (2026-08-18) — CI/Test-Image + Tooling
-
-- **portal-e2e Docker-Image:** CI-Beschleunigung (−33% Critical Path), Stripe-Idempotency-Race behoben; die aktuelle Matrix umfasst drei Desktop- und drei Mobile-Sub-Shards plus einen dedizierten seriellen Eintrag (sieben Matrix-Einträge). Historische Timing-/Shard-Zahlen sind keine Freshness-Garantie. Doku: `features/infrastructure/28-ci-test-image.md`.
-- **CodeGraph Pre-Commit-Hook (optional):** `.githooks/pre-commit` attempts `codegraph sync -q`, but its directory-only guard and fails-open behavior do not prove initialization or freshness. Doku: `AGENTS.md` §11.
-- **Zentrales Skills-Repo:** `agents-skills` (GitHub), Skills global registriert. Doku: `AGENTS.md` §12.
-
-## ✅ Erledigt (2026-08-18) — WYSIWYG + PDF + Responsive UI
-
-- Tasks A–L: WYSIWYG-Resize, PDF-Entduplizierung, Kalkulation-oben, Typografie (orphans/widows), Baustein-Select entfernt, Item-/Discount-Responsive-Layout, Löschen rechtsbündig, Rabatt-Gesamt-Spalte.
-- Kanban PDF-Drop E2E-Test.
-
----
-
 ## 🟡 OFFEN (Future) — pricing_strategy als Brand-Setting
 
-- Langfristig: `pricing_strategy` je Brand in Admin-UI editierbar (DB-Overlay, Choke-Point `BrandRegistry::buildFromArray()`). Doku: `features/infrastructure/17-pricing-strategy-pattern.md` §7.
+- [ ] `pricing_strategy` je Brand im Admin-UI editierbar machen (DB-Overlay am Choke-Point `BrandRegistry::buildFromArray()`). Langfristige Arbeit, kein Blocker: laut `features/infrastructure/17-pricing-strategy-pattern.md` §5 („Presets and legacy settings") ist der Editor heute **nicht** Teil der Brand-Settings-Overlay-Whitelist — bis dahin bleiben DB-Setting und Galerie-Felder die autoritativen Stellschrauben.
 
-## 🟡 OFFEN (manuell) — Prod-Infra
+## 🚫 Blockiert — Dependency-Migration TypeScript 6→7
 
-- **Portainer Stack-Redeploy** für `portal-base:8.5`: historischer User-Hinweis
-  vom 2026-08-31; der Live-Status ist aus dem Repository nicht verifizierbar
-  und wird hier nicht als erledigt behauptet.
-  - Anm. 2026-09-19: Model-Deploy (`3db7437`) durch User redeployed.
-
----
-
-## ✅ ERLEDIGT (2026-08-31, magenta) — Prod-Bildlieferung: Header-Mismatch (X-Sendfile vs X-Accel-Redirect)
-
-- **Fix:** `.env.production` → `PROXY_DELIVERY_HEADER=X-Accel-Redirect` + `PHOTO_STORAGE_PATH=/var/www/photos`; `deployment/docker-compose.yml` → Pass-through `PHOTO_STORAGE_PATH=${PHOTO_STORAGE_PATH}` ergänzt; Backend-Container neu deployt.
-- **Verifiziert:** alle `/api/media/*`-Größen (250/400/800/1200/2000) + Original-Branch liefern echte WebP/JPEG-Bytes (10–780 KB), kein `x-sendfile`/`x-accel-redirect`-Leak mehr; `/context`, `license-terms`, alle SPA-Chunks 200.
-- **Restbefund:** „Fehler persistierte" war Browser-Cache der leeren `immutable`-Antworten (max-age 1 Jahr) + alte Bundle-Stände — nach Cache-Leeren + Voll-Refresh behoben.
-- **Git-Stand:** Die `PHOTO_STORAGE_PATH`-/`PROXY_DELIVERY_HEADER`-Korrektur ist in Commit `6dc023c` enthalten; sie ist nicht mehr ein uncommitted `M` im Working Tree.
+- [~] wartet auf TypeScript-7-Support im Tooling. **Nachzuziehen, sobald das Tooling
+  TS7 deklariert.** TS 7.0 ist zu frisch: kein Support durch die
+  Vite/Rolldown-Babel-Pipeline, den ESLint-Typescript-Stack oder das
+  React-Compiler-Preset.
+  **Verifiziert 2026-09-28, unverändert seit 2026-08-25:** `frontend/package.json`
+  deklariert `"typescript": "^6.0.3"`, installiert ist `6.0.3`
+  (`node -p "require('./frontend/node_modules/typescript/package.json').version"`).
 
 ---
 
-## 🟠 OFFEN (2026-08-31) — Rücktrittsrecht-Compliance für Foto-Downloads
-
-> Ziel: Rücktrittsrecht erlischt rechtskonform (nur digitale Produkte, kein physischer Mix → §13a Mischkorb n/a).
-> Plan: `~/.opencode/plan/withdrawal-rights-compliance.md`. Hinweis: Rechtstext-Wording vor Go-live juristisch absegnen lassen.
-
-**WI-A Backend — Consent-Erzwingung + Protokollierung**
-**WI-B Backend — Widerruf-Absatz in Kaufmail + Rechnungs-PDF**
-**WI-C Frontend — Checkout-Text verfeinern („sofortiger Download“ explizit) + Schema-Factory**
-**WI-D Frontend — Rechtliche Seiten AGB + Widerrufsbelehrung**
-**WI-E Docs**
-**Verifikation (Subagent, nie Implementierer)** → ✅ abgeschlossen (31.08.2026): Backend 1200/2989, Frontend 597, lint+build 0, `@smoke` 58 passed, `@feature:legal` 6 passed (nach Fix der Test-Deklinationsform „sofortiger Download“). Diff-Review PASS, Gesamturteil READY_TO_COMMIT.
----
-
-## 📋 Archivierte Backlog-Pläne (2026-08-04)
-
-> Nur Referenz. Umsetzung abgeschlossen oder obsolet.
-
-- **A1** User-God-Entity → ✅ erledigt (Steps 1–7, siehe oben)
-- **F3** Brand Settings UI → ✅ erledigt (siehe oben)
-- **P1** Coupon photo_package → ✅ erledigt (siehe oben)
-- **Stack-Konsolidierung** → ❌ OBSOLET (SQLite-Richtung)
-
----
-
-## 🚫 Blockiert (Dependency-Migration 2026-08-23)
-
-- **typescript 6→7:** Risiko durch TS7, erst nach Framework-Support. TS 7.0 ist zu frisch (kein Support durch Vite/Rolldown-Babel-Pipeline, ESLint-Typescript-Stack, React-Compiler-Preset). `frontend/package.json` bleibt bei `^6.0.3`. Nachzuziehen, sobald das Tooling TS7 deklariert.
-  - Verifiziert 2026-08-25: weiterhin offen (`frontend/package.json`: `"typescript": "^6.0.3"`).
-
----
-
-## 🟡 IMPLEMENTIERT / HISTORISCHE VERIFIKATION — BETRIEB, ROLLOUT & FINAL REVIEW OFFEN (2026-09-24) — Card-Testing-Schutz (SOLL: V036)
+## 🟡 Card-Testing-Schutz (SOLL: V036, 2026-09-24) — implementiert; BETRIEB, ROLLOUT & FINAL REVIEW OFFEN
 
 > Approved architecture: `features/security/card-testing-protection.md`. V036 und die zugehörige Implementierung sind im aktuellen Working Tree vorhanden. Der CI-Lauf `35917265654` auf Commit `e73d5cf` ist ein **historischer Verifikationsdatensatz**; er liegt vor den aktuellen uncommitted Änderungen und ist kein Nachweis für diesen vollständigen Working Tree. Eine lokale E2E-Ausführung wurde in diesem Docs-only-Pass nicht gestartet. Betriebs-, Rollout- und Final-Review-Gates bleiben ausdrücklich offen; diese Dokumentationskorrektur behauptet keine neuen Application-Tests.
 
@@ -1438,7 +1414,17 @@ Commit-Stand ist synchron):
 - [ ] Monitoring/Runbook für PI-Rate, Replays, User/IP-429, Failure-Velocity, Identity-Mismatch/Quarantäne, Cleanup, Account-Age-Rejections und Turnstile anlegen; Logs ohne PAN/CVC/Secret/Raw-Turnstile-Token.
 - [ ] Entscheidung offen: Zweck, Legal Ground, konkrete Retention und Lösch-/Anonymisierungsregeln der Stripe-Identifikatoren — fachliche DPO-/Rechtsfreigabe. Datenschutzhinweise/ROPA/Prozessor-/DPA- und Cookie-Dokumentation für Stripe-Customer-/PI-IDs, IP(+Hash), Fingerprint, Failure-Codes und Turnstile finalisieren. `Privacy.tsx` enthält bereits einen technischen Teilabschnitt; Zweck/Legal-Ground, konkrete Retention, Lösch-/Anonymisierungsregeln und DPO-/Rechtsfreigabe sind noch nicht nachgewiesen.
 
-**Tests — verpflichtender DoD**
+**Tests**
+
+- [ ] **E2E-Lücke Card-Testing** (Owner-Entscheidung 2026-09-28, aus der leeren
+  DoD-Marke an dieser Stelle entstanden): Automatisierte Tests existieren für Schema,
+  Rate-Limit und Turnstile — 28 Fälle in `CardTestingSchemaTest.php` (6),
+  `CheckoutRateLimitTest.php` (7), `CheckoutRiskTurnstileTest.php` (14) und
+  `TurnstileWidget.test.tsx` (1) —, aber **kein einziges Playwright-E2E**:
+  `grep -rlniE "card.?test|turnstile|3ds" tests/e2e` liefert 0 Treffer. Der
+  Widget-Test deckt die Turnstile-Komponente ab, nicht den Checkout-Pfad im Browser.
+  **Abgrenzung:** Der 3DS-Live-Strom bleibt `manuell prüfen` (Eintrag oben) und ist
+  ausdrücklich *nicht* Teil dieser Lücke — er ist nicht automatisierbar.
 ## Produktionsdeploy SFTPGo — Vorfall vom 2026-09-26 (abgeschlossen)
 
 Der Cutover auf SFTPGo hat die Produktion am 2026-09-26 mehrfach lahmgelegt.
@@ -1454,42 +1440,27 @@ alle mit Regressionstest:
   bleibt zu.
 - [ ] manuell prüfen: `AI_API_KEY` und `ADMIN_PASSWORD` im Portal-/Host-Secret-Store rotieren — beide sind beim Auslesen der aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen. **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen
   der aufgelösten Compose-Datei im Klartext durch das Terminal gelaufen.
-- [~] wartet auf den Schema-Abgleich auf dem Host. **`GET /api/management/ftp/status`
-  liefert 500, wenn die Spalte fehlt** — gemessen am 2026-09-27 gegen
-  `V041__add_ftp_account_status_to_users.php`: `FtpController::status()` liest
-  `$user->ftp_account_status` (Z. 91), und `sync.sh` enthält keinen
-  `artisan`-Aufruf (§13). Ist der Code synchronisiert, die Migration aber nie
-  gelaufen, liefert genau dieser Feldzugriff einen 500er.
-  **Gegenprobe auf dem Host:** `docker exec portal_backend php artisan migrate:status | grep -E 'V04[123]'` —
-  steht dort `pending`, ist die Migration der Fix und kein Code.
-  **Der vorige Eintrag war dreifach falsch und ist hiermit ersetzt:** es heißt `GET`,
-  nicht `POST` (`backend/routes/api.php:259` definiert ausschließlich `Route::get`);
-  ohne Auth liefert die Route **401**, keinen 500, weil sie in der Gruppe
-  `['auth:api', 'management']` (Z. 180) hängt und dieser Guard eine
-  `AuthenticationException` als JSON rendert; und die bisherige Begründung, Laravel
-  suche eine fehlende `login`-Route, trifft nicht zu — `auth:api` konsultiert nie eine
-  `login`-Route, und eine solche existiert in `backend/routes/` ohnehin nicht.
-- [~] wartet auf dieselbe Host-Messung wie der Eintrag darüber; die veraltete Angabe
-  selbst ist rein dokumentarisch. **Der Migrationszeiger in `AGENTS.md` (Zeile 100) und
-  `backend/AGENTS.md` (Zeile 40) ist veraltet** — beide behaupten, „V036–V040 sind die
-  aktuelle nicht-produktive Repository-Frontier" und „eine neue V041+-Migration ist nur
-  zulässig, wenn …". Im Repository liegen V041, V042 und V043 (Stand 2026-09-26), und
-  alle drei sind mit Schema-Entscheidung dokumentiert — V041 mit Schema/Backfill/Rollback
-  unter „Offene Code-Arbeit" (Schema-Block `ftp_account_status`), V042 und V043 in
-  `19-ftp-upload-pipeline.md` und `07-architectural-decisions.md`. Dort steht als
-  Reihenende noch „V040", was ebenfalls überholt ist.
-  **Die Zahlen nicht auffüllen, bevor sie gemessen sind:** Die *Frontier*-Angabe ist
-  eindeutig veraltet und steht unabhängig vom Host fest — im Repository liegen V036–V043,
-  also ist „V036–V040" durch „V036–V043" zu ersetzen. Die *deployte* Angabe („zuletzt
-  deployte Migration: V035") ist dagegen **nicht** aus dem Repository ableitbar, weil
-  `sync.sh` keine Migration ausführt (§13): dieselbe Messung
-  (`migrate:status` auf dem Host) entscheidet, ob V035 der Stand bleibt oder durch einen
-  späteren Wert ersetzt werden muss. Beide Werte einzeln geraten wären genau die
-  Fehlklassenzuordnung, die §3 (Aussage an eine Messung binden) verhindern soll.
+- [~] wartet auf einen authentifizierten Aufruf. **Die bisher angegebene Ursache ist
+  ausgeschlossen.** Die Gegenprobe aus diesem Eintrag wurde am 2026-09-28 ausgeführt:
+  `docker exec portal_backend php artisan migrate:status` → **45 `Ran`, 0 `Pending`**,
+  `V041__add_ftp_account_status_to_users.php` ist also gelaufen und die Spalte
+  `ftp_account_status` existiert in Produktion. Der beschriebene Mechanismus — ein
+  Feldzugriff auf eine fehlende Spalte in `FtpController::status()` (Z. 91) — kann damit
+  nicht mehr greifen.
+  **Was offen bleibt:** ein authentifizierter `GET /api/management/ftp/status` ist nie
+  erfolgt. Ohne Auth liefert die Route nachweislich **401**, nicht 500
+  (`backend/routes/api.php:259` definiert ausschließlich `Route::get`; die Gruppe
+  `['auth:api','management']` rendert `AuthenticationException` als JSON). Damit ist
+  **weder ein 500er belegt noch ein Funktionieren** — der Zustand ist `unbelegt`, nicht
+  „in Arbeit".
+  **Korrigierte Diagnose aus dem Vorgänger, weiterhin gültig:** es heißt `GET`, nicht
+  `POST`; und die Begründung, Laravel suche eine fehlende `login`-Route, trifft nicht zu
+  — `auth:api` konsultiert nie eine `login`-Route, und eine solche existiert in
+  `backend/routes/` ohnehin nicht.
 - [~] wartet auf die Anforderung des Owners. Bisher nicht umgesetzt. **dev-vm-Container aus `volume-backup.sh` ausschließen** (angefordert,
   nicht umgesetzt).
 
-### Nachtrag 2026-09-26, Kamera-Setup aus der Oberfläche bedienbar machen
+## Nachtrag 2026-09-26, Kamera-Setup aus der Oberfläche bedienbar machen
 
 **Offen (aus dieser Runde):**
 
@@ -1524,7 +1495,7 @@ alle mit Regressionstest:
   `.invalid` umstellen. Von einem Subagenten gemeldet, außerhalb des Auftrags.
 - [ ] manuell prüfen: Dublette — dieselbe Rotation wie oben; einmal ausführen und **beide** Einträge schließen. **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen der
   aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen.
-### UI-Review 2026-09-26 — Screenshot-Verifikation der neuen Oberflaechen
+## UI-Review 2026-09-26 — Screenshot-Verifikation der neuen Oberflaechen
 
 Erstmals das Screenshot-Harness auf die neuen Oberflaechen angewendet
 (`tests/screenshots/`, Manifest um `kamera-einrichtung` und
@@ -1557,7 +1528,7 @@ Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
   Aufgenommen, damit die Asymmetrie Mobile (bricht um) vs. Desktop (nowrap)
   bewusst bleibt und nicht als Versehen durchgeht.
 
-### Dialog-Screenshots 2026-09-27 — Abdeckung, Blocker und tote Stellen
+## Dialog-Screenshots 2026-09-27 — Abdeckung, Blocker und tote Stellen
 
 Ziel: **jeder Dialog ist bildgeprueft**, nicht nur funktional getestet. Die
 Kamera-Anleitung war der Anlass — genau diese Lqecke (kein `click`-Nav-Schritt)
@@ -1599,7 +1570,7 @@ hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
   Referenzfall zuerst gebaut und verifiziert, bevor die uebrigen darauf
   aufsetzen.
 
-### Dialog-UI-Review 2026-09-27 — Auswertung aller 13 Dialog-Aufnahmen
+## Dialog-UI-Review 2026-09-27 — Auswertung aller 13 Dialog-Aufnahmen
 
 Vollauf `pnpm test:screenshots`: **44 passed / 0 failed (1,6 min)**, 13 Dialoge ×
 Desktop/Mobile. Auswertung in zwei Hälften (5 + 8 Dialoge) gegen
@@ -1722,7 +1693,7 @@ Produktionsfehler verkauft worden waere.
   zu versprechen, dass das Anlegen klappt. Der Kommentar haelt fest, warum die
   Zusage weg ist.
 
-### CI-Befund 2026-09-27 (Push fa8e19d) — zwei Ursachen, beide belegt
+## CI-Befund 2026-09-27 (Push fa8e19d) — zwei Ursachen, beide belegt
 
 **1. `Frontend (Lint, Build, Vitest)` rot am Schritt „Build" (Lint war gruen).**
 `check-i18n.mjs` schlug auf einem **unberuehrten** Checkout fehl. Ursache: Ich
