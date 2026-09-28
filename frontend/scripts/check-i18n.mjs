@@ -307,9 +307,195 @@ function looksLikeTechnicalValue(value) {
 /** Matches HTML entities so `&nbsp;`, `&mdash;`, `&#8230;` are not read as letters. */
 const HTML_ENTITY_REFERENCE = /&(?:#[0-9]+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g;
 
-/** A letter in the Unicode sense — digits, punctuation and whitespace do not count. */
+/**
+ * A letter in the Unicode sense — digits, punctuation and whitespace do not
+ * count.
+ *
+ * NOTE (not this task's scope, and NOT dead code): `recordString` below calls
+ * this on the node-level path. The sentence-level path added by D-7 does not
+ * call it — it inlines the same test as `literalCarriesLetters`. That is the
+ * real hazard: two copies of one predicate, free to drift. Left as-is because
+ * unifying them is a refactor, not a rule change, and this task was the rule.
+ * If one is ever changed, change both or collapse them into this function.
+ */
 function containsLetter(text) {
   return /\p{L}/u.test(text.replace(HTML_ENTITY_REFERENCE, " "));
+}
+
+// ---------------------------------------------------------------------------
+// Sentence-level taxonomy (D-7).
+//
+// A JSX text run that React splits into several adjacent text nodes —
+// `Jahre (geb. {x})` becomes `Jahre (geb. ` + {x} + `)` — is ONE logical unit,
+// not two findings. So the scan groups adjacent `JsxText` / `JsxExpression`
+// children first, then asks whether the group is prose. The taxonomy is
+// deliberately explicit because the failure direction matters: a rule that
+// under-reports real copy is worse than a noisy one, since the noise is visible
+// and the miss is not.
+//
+// Excluded as non-prose (each regex/label says which way it errs):
+//   - values with no letter at all (numbers, currency, `%`, `+`, `(`, `)`) —
+//     exact by construction
+//   - technical machine values (`MAILCHIMP`, `DE`) — under-reports, so an
+//     uppercase literal that IS user-facing copy is silently skipped
+//   - unit fragments (`Min.`, `Stk.`, `Bilder/Std.`, `Inkl. Bilder`) —
+//     under-reports; a short two-word label made only of unit-ish words would
+//     be skipped too
+//   - fully dynamic texts (`{count}` alone) — no literal to translate
+//   - lone words below `PROSE_LONE_TOKEN_MIN_LENGTH` (`Preis`, `Name`, `Firma`)
+//     — under-reports by design; longer lone words (`Galerien`) stay reported
+// ---------------------------------------------------------------------------
+
+/**
+ * Closed-class German function words excluded from the prose-word count, so a
+ * sentence is dominated by its content rather than by its articles. These are
+ * the only words that may appear in a `flow` group without contributing to the
+ * two-word threshold.
+ */
+const PROSE_STOPWORDS = new Set([
+  "der", "die", "das", "und", "oder", "im", "am",
+]);
+
+/**
+ * Known non-copy words. A text made only of these (plus punctuation/numbers)
+ * is a fragment, not user-facing copy. The list errs toward **over**-reporting:
+ * a genuine lone-word label such as `Galerien` or `Name` is not included and
+ * therefore still flagged.
+ */
+const SINGLE_NON_COPY_WORDS = new Set([
+  "and", "classifying", "stk", "min", "max", "inkl", "ca", "bzw", "etc",
+  "vs", "nr", "std", "bild", "web", "print", "original", "zip", "abcdefghijklmnopqrstuvwxyz",
+]);
+
+/**
+ * A standalone machine value — an uppercase token (`MAILCHIMP`, `DE`, `ZIP`)
+ * or a nested identifier (`reportage-paket`, `calc_outdoor_images_per_hour`).
+ * `looksLikeTechnicalValue` already covers e-mails/hostnames/URLs/paths; this
+ * covers the letters-only machine values it lets through.
+ *
+ * The uppercase half is tested against the RAW text (case matters — `MAILCHIMP`
+ * is a machine value, `Mailchimp` could be copy); the identifier half against
+ * the lowercased token.
+ *
+ * Direction: mostly **under**-reports, so a shouty sentence written entirely in
+ * capitals (`FEHLER`) is skipped. That is accepted: the repo's UI copy is
+ * sentence case, and the alternative (flagging every uppercase token) trades
+ * this rare miss for a stream of `MAILCHIMP`/`DE` noise.
+ */
+const MACHINE_VALUE_UPPERCASE = /^[A-Z0-9_]+$/u;
+const MACHINE_VALUE_IDENTIFIER = /^[a-z0-9]+(?:[_-][a-z0-9]+)+$/u;
+
+/**
+ * A unit fragment or a ratio (`Min.`, `Stk.`, `Bilder/Std.`, `Bilder pro
+ * Stunde`, `Outdoor-Bilder/Std.`, `Inkl. Bilder`): every letter token is either
+ * a known unit word/abbreviation or a single letter, and there are at most
+ * `UNIT_FRAGMENT_MAX_PROSE_WORDS` letter tokens in all. Evaluated on the RAW
+ * text rather than on `tokenizeProseText`, because the tokeniser strips `/` and
+ * `.` — which are exactly the characters that make `Bilder/Std.` one unit
+ * fragment instead of two prose words.
+ *
+ * Direction: **under**-reports by design. A short German two-word label that
+ * happens to consist of unit-ish words (`Bier Wirt`) would be skipped; the
+ * trade is deliberate, because the counter-case (every `Bilder/Std.` in a
+ * pricing table reported as prose) is the noise this rule exists to remove.
+ */
+const UNIT_FRAGMENT_WORDS = new Set([
+  "bild", "bilder", "stk", "std", "std.", "min", "min.", "inkl", "inkl.",
+  "stunde", "stunden", "pro", "max", "ca", "bzw", "etc", "nr", "vs", "and",
+]);
+const UNIT_FRAGMENT_MAX_PROSE_WORDS = 3;
+const UNIT_FRAGMENT_LETTER_TOKEN = /^\p{L}{1,2}\.?$/u;
+
+/** True when every letter token is a unit word/abbreviation; see `UNIT_FRAGMENT_WORDS`. */
+function isUnitFragmentText(text) {
+  const letterTokens = text
+    .replace(HTML_ENTITY_REFERENCE, " ")
+    .toLowerCase()
+    .replace(NON_LETTER_RUN, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean);
+  if (letterTokens.length === 0 || letterTokens.length > UNIT_FRAGMENT_MAX_PROSE_WORDS) {
+    return false;
+  }
+  return letterTokens.every(
+    token => UNIT_FRAGMENT_WORDS.has(token) || UNIT_FRAGMENT_LETTER_TOKEN.test(token),
+  );
+}
+
+/**
+ * A single prose-ish word flags a finding only from this length on. Len 6 keeps
+ * short German nouns out (`Preis`, `Name`, `Firma` are all below it and are the
+ * deliberate under-report); longer labels (`Portrait`, `Speichern`, `Galerien`)
+ * stay reported and are treated as copy.
+ */
+const PROSE_LONE_TOKEN_MIN_LENGTH = 6;
+
+/** Whitespace-run normaliser shared by the grouping join and `record`. */
+const WHITESPACE_RUN = /\s+/g;
+
+/** A run of characters that has no letter (digits, currency, punctuation). */
+const NON_LETTER_RUN = /[^\p{L}]+/u;
+
+/**
+ * The letter-carrying tokens of a text, entities neutralised and lowercased.
+ * Whitespace is dropped along with the rest of `NON_LETTER_RUN`, so a word
+ * broken by a newline (`Grund\n  honorar`) still reads as one token.
+ */
+function tokenizeProseText(text) {
+  return text
+    .replace(HTML_ENTITY_REFERENCE, " ")
+    .toLowerCase()
+    .replace(NON_LETTER_RUN, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean);
+}
+
+/**
+ * True when a text is prose (user-facing copy) and therefore belongs behind a
+ * Lingui macro. Two directions, both named in the caller: a `classifying` group
+ * (at least one literal sibling) or single-word `lone-token` groups may still
+ * under-report known non-copy words; every other prose hit is exact.
+ *
+ * A multi-word group is prose when at least two of its words are not stopwords;
+ * a hyphenated identifier (`reportage-paket`) splits on the hyphen and
+ * therefore counts as two words — it is reported, which is the safe direction.
+ * A single-word group is prose when the word is neither a known non-copy word
+ * nor shorter than `PROSE_LONE_TOKEN_MIN_LENGTH`.
+ */
+function isProseText(text) {
+  if (!/\p{L}/u.test(text.replace(HTML_ENTITY_REFERENCE, " "))) {
+    return { prose: false };
+  }
+  const raw = text.replace(HTML_ENTITY_REFERENCE, " ").trim();
+  const tokens = tokenizeProseText(text);
+  if (isUnitFragmentText(text)) {
+    return { prose: false };
+  }
+  if (tokens.length === 1) {
+    const [only] = tokens;
+    // `raw` is checked for the uppercase case: `MAILCHIMP` is a machine value,
+    // `Mailchimp` is not (and stays reported as a lone word).
+    if (
+      SINGLE_NON_COPY_WORDS.has(only)
+      || MACHINE_VALUE_UPPERCASE.test(raw)
+      || MACHINE_VALUE_IDENTIFIER.test(only)
+    ) {
+      return { prose: false };
+    }
+    if (only.length < PROSE_LONE_TOKEN_MIN_LENGTH) {
+      return { prose: false };
+    }
+    return { prose: true, mode: "lone-token" };
+  }
+  const proseWords = tokens.filter(
+    token => !PROSE_STOPWORDS.has(token) && !MACHINE_VALUE_IDENTIFIER.test(token),
+  ).length;
+  if (proseWords >= 2) {
+    return { prose: true, mode: "flow" };
+  }
+  return { prose: false };
 }
 
 /**
@@ -407,11 +593,21 @@ function isUserVisibleAttribute(name, value) {
  * any other imported `@lingui/react/macro` component) or is produced by the
  * `t` tagged template — both notions are collected at the top of this function.
  *
+ * JSX text is scanned at SENTENCE level (D-7): the adjacent `JsxText` /
+ * `JsxExpression` children of one parent are grouped into a single logical
+ * run before `isProseText` decides, so `Jahre (geb. {x})` is one finding, not
+ * two. A group is reported under its first child's anchor with the group's
+ * `staticText` joined by a single space (`Jahre (geb. )`).
+ *
  * Deliberately not reported: pure whitespace/punctuation/entity text,
- * `data-*`/`className`/`href`/id attributes (outside `USER_VISIBLE_ATTRIBUTES`),
- * ARIA token values and id references, colour literals, URLs/paths/hostnames/
- * e-mails, and everything in test files (filtered by
- * `findUnlocalizedStringsInTree`).
+ * machine values (`MAILCHIMP`, `DE`, `pdf`), fully dynamic texts (`{count}`),
+ * unit fragments (`Bilder/Std.`, `Min.`), lone words known not to be copy
+ * (`stk`, `web`, `print`) and lone words below
+ * `PROSE_LONE_TOKEN_MIN_LENGTH`, `data-*`/`className`/`href`/id attributes
+ * (outside `USER_VISIBLE_ATTRIBUTES`), ARIA token values and id references,
+ * colour literals, URLs/paths/hostnames/e-mails, and everything in test files
+ * (filtered by `findUnlocalizedStringsInTree`). See the taxonomy comment above
+ * `PROSE_STOPWORDS` for which way each exclusion errs.
  */
 export function findUnlocalizedStrings(source, filePath = "fixture.tsx") {
   const sourceFile = ts.createSourceFile(
@@ -424,15 +620,16 @@ export function findUnlocalizedStrings(source, filePath = "fixture.tsx") {
   const macroComponentBindings = collectLinguiMacroComponentBindings(sourceFile);
   const violations = [];
 
-  function record(node, category, text) {
+  function record(node, category, text, extras) {
     const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-    const normalized = text.replace(/\s+/g, " ").trim();
+    const normalized = text.replace(WHITESPACE_RUN, " ").trim();
     violations.push({
       filePath,
       line: position.line + 1,
       column: position.character + 1,
       category,
       text: normalized.length > 120 ? `${normalized.slice(0, 117)}…` : normalized,
+      ...extras,
     });
   }
 
@@ -482,7 +679,81 @@ export function findUnlocalizedStrings(source, filePath = "fixture.tsx") {
     }
   }
 
-  function visit(node, insideMacro) {
+  /**
+   * Report logical JSX text runs. A run is the longest sequence of adjacent
+   * `JsxText` / `JsxExpression` children of one parent; a JSX element or
+   * fragment is a hard boundary. The run is reported once, anchored at its
+   * first child, and its literal segments are joined by a single space, so
+   * `Reportage-Paket (+{m}% Aufschlag)` is ONE finding (`Reportage-Paket (+ %
+   * Aufschlag)`), not two. Dynamic children contribute only a space, never
+   * their source text — there is nothing literal in them to translate.
+   *
+   * The run errs toward **over**-reporting: when a run mixes a literal with an
+   * expression, `isProseText` only has to accept the literal part for the whole
+   * run to be reported, so `{groups} Gruppen, {galleries} Galerien` still
+   * yields the two literal findings it yielded before.
+   */
+  function recordJsxTextRuns(parent) {
+    const children = parent.children;
+    let index = 0;
+    while (index < children.length) {
+      const member = children[index];
+      if (!ts.isJsxText(member) && !ts.isJsxExpression(member)) {
+        index++;
+        continue;
+      }
+
+      const run = [];
+      while (
+        index < children.length
+        && (ts.isJsxText(children[index]) || ts.isJsxExpression(children[index]))
+      ) {
+        run.push(children[index]);
+        index++;
+      }
+
+      // A run of expressions only carries no literal to translate.
+      const firstLiteral = run.findIndex(ts.isJsxText);
+      if (firstLiteral !== -1) {
+        recordJsxTextRun(run.slice(firstLiteral));
+      }
+    }
+  }
+
+  /** Report one run; see `recordJsxTextRuns` for the boundary rules. */
+  function recordJsxTextRun(run) {
+    const staticText = run
+      .map(child => (ts.isJsxText(child) ? child.text : " "))
+      .join(" ")
+      .replace(WHITESPACE_RUN, " ")
+      .trim();
+    if (!staticText) {
+      return;
+    }
+
+    const hasLiteral = run.some(child => ts.isJsxText(child));
+    const isNodeLevelEquivalent = run.length === 1 && hasLiteral;
+    // The over-reporting exemption (report a literal merely because it sits
+    // next to an expression) still requires a LETTER in the literal: `:`, `/`,
+    // `·`, `( )` next to an expression are punctuation, not copy. Without this
+    // guard the grouping change reintroduces the single-character noise the
+    // old `containsLetter` filter removed.
+    const literalCarriesLetters = /\p{L}/u.test(
+      staticText.replace(HTML_ENTITY_REFERENCE, " "),
+    );
+    const literalSiblingOfExpression = hasLiteral && run.length > 1 && literalCarriesLetters;
+    const { prose, mode } = isProseText(staticText);
+    if (!prose && !literalSiblingOfExpression) {
+      return;
+    }
+
+    record(run[0], "jsx-text", staticText, {
+      classification: mode ?? (hasLiteral ? "flow" : undefined),
+      nodeLevelEquivalent: isNodeLevelEquivalent,
+    });
+  }
+
+  function visit(node, insideMacro, insideElementChildren) {
     if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
       const openingElement = ts.isJsxElement(node) ? node.openingElement : node;
       if (!insideMacro) {
@@ -497,13 +768,20 @@ export function findUnlocalizedStrings(source, filePath = "fixture.tsx") {
       const tagName = ts.isIdentifier(openingElement.tagName) ? openingElement.tagName.text : undefined;
       const childInsideMacro = insideMacro
         || (tagName !== undefined && macroComponentBindings.has(tagName));
-      ts.forEachChild(node, child => visit(child, childInsideMacro));
+      if (!childInsideMacro && ts.isJsxElement(node)) {
+        recordJsxTextRuns(node);
+      }
+      // Children of a `JsxElement` are consumed by `recordJsxTextRuns`; the
+      // flag keeps the standalone `JsxText` branch from reporting them twice.
+      ts.forEachChild(node, child => visit(child, childInsideMacro, ts.isJsxElement(node)));
       return;
     }
 
     if (ts.isJsxText(node)) {
-      if (!insideMacro) {
-        recordString(node, "jsx-text", node.text);
+      // Reached only via a non-`JsxElement` parent (e.g. a JSX fragment); there
+      // is no child list to group against, so report the run on its own.
+      if (!insideMacro && !insideElementChildren) {
+        recordJsxTextRun([node]);
       }
       return;
     }
@@ -512,10 +790,10 @@ export function findUnlocalizedStrings(source, filePath = "fixture.tsx") {
       recordHelperArguments(node);
     }
 
-    ts.forEachChild(node, child => visit(child, insideMacro));
+    ts.forEachChild(node, child => visit(child, insideMacro, false));
   }
 
-  visit(sourceFile, false);
+  visit(sourceFile, false, false);
   return violations;
 }
 
