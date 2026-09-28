@@ -30,11 +30,20 @@ status: active
 
 Beschlossen vom Owner am **2026-09-28**.
 
-> **Zeilennummern in `frontend/`** beziehen sich hier auf `82e8d17`, den letzten
-> Commit **vor** der Cent-Umstellung des Shooting-Kalkulators. Diese Umstellung
-> läuft parallel; die Belege unten unter „in Arbeit" beschreiben deshalb den
-> alten Stand, und ihre Zeilennummern lösen sich nur gegen diesen Commit auf.
-> Belege aus `backend/` und aus `database/migrations/` sind nicht betroffen.
+> **Zeilennummern, die einen Zustand „in Arbeit" beschreiben**, beziehen sich
+> auf `82e8d17`, den letzten Commit **vor** der Cent-Umstellung. Betroffen sind
+> alle Belege zu `frontend/src/logic/shootingCalculator.ts`,
+> `frontend/src/ui/management/components/CalculatorSettingsCard.tsx` und
+> `CouponService.php`. Im Arbeitsverzeichnis sind sie womöglich schon
+> verschoben, weil die Umstellung parallel läuft. Belege aus
+> `database/migrations/` und aus stabilen Backend-Dateien sind nicht betroffen.
+>
+> **Historische Zeilennummern** sind mit dem obigen Hinweis gemeint.
+>
+> **Belege hier sind zitiert, nicht nur nummeriert** (AGENTS.md § 3, Belegregel 1):
+> jede Zeilennummer nennt das Zitierte daneben — den Feldnamen, den
+> Konfigurationsschlüssel, den Variablennamen — damit ein Leser sie prüfen kann,
+> ohne die Datei zu öffnen.
 
 1. **Jeder Geldbetrag ist Cent — im Speicher und in der API, ausnahmslos,
    auch bei ganzzahligen Euro-Beträgen.** Es gibt keine Ausnahme der Form
