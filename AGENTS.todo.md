@@ -821,12 +821,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 <details><summary>AI/Media/Storage/Payouts (8)</summary>
 
-- [ ] **AIS-2:** `DeletePhotoFilesJob.php:55-71` + `CleanupDerivatives.php:36-39` löschen die neuen `.watermark.json`-Marker nicht mit → 2+ Marker pro Foto-Delete dauerhaft.
-- [ ] **AIS-4:** `ImageProcessor.php:146-177` `generateThumbnail()` ohne `removeFailedOutput`/`isValidImageFile`/`imagecreatetruecolor`-Check → uncaught `TypeError`, Teil-`.webp` bleibt.
-- [ ] **AIS-5:** `DurableDispatchService.php:85-121` — Model-Files und Customer-Search nutzen `afterCommit` statt `afterCommitDurably` → Crash zwischen COMMIT und Callback lässt DSGVO-Dateien/Meilisearch-Dokument zurück.
-- [ ] **AIS-7:** `ImageProcessor.php:539-545,613-619` unterdrückt `@unlink` ohne Verifikation/Log.
-- [ ] **AIS-8:** `AIService.php:300,318,422-424` AI-Tempfiles in `sys_get_temp_dir()`; `app:cleanup-temp` fegt nur `storage/app/private/temp`.
-- [ ] **AIS-9:** `ImportLocations.php:202` kompletter Body im Memory, `:329-345` Extraction vor Größen-Check. Streamen mit Byte-Cap.
 
 </details>
 
@@ -849,9 +843,7 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 <details><summary>Tests/Dokumentation (15)</summary>
 
-- [ ] **TST-1:** `useContractManagement.ts:71` `normalizeManagementContract()` (Server-Total/Legacy-Fallback, money-facing) hat **keinen** Vitest.
 - [~] wartet auf einen MySQL-/MariaDB-Testlauf — die beiden Tests sind driver-gated und laufen auf CI-SQLite `:memory:` immer skipped, die V039-Uniqueness-Invariante hat so keinen automatisierten Nachweis. **TST-3:** `ContractSignerIdentityRaceTest.php:26,30` + `ContractSignerIdentityTest.php:217,223` sind driver-gated und laufen auf CI-SQLite `:memory:` immer skipped → V039-Uniqueness-Invariante ohne automatisierten Nachweis.
-- [ ] **TST-4:** `PhotoDownloadControllerTest.php:288-293,145-150` — `photo_count`-Tests haben ordered == prepared und laufen mit **alter und neuer** Logik; nur der Null-Fall diskriminiert. Fall `0 < prepared < ordered` fehlt.
 </details>
 
 ### ✅ Finaler unabhängiger Review (DeepSeek-v4.1, 2026-09-26) — Blocker behoben
