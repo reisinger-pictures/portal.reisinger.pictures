@@ -1,6 +1,6 @@
 # Environment File & Secret Hardening
 
-## Status: Active (reviewed 2026-09-24)
+## Status: Active (reviewed 2026-09-28)
 
 ## Motivation
 
@@ -41,13 +41,17 @@ Die ausdrücklich erlaubten Dateien sind nicht alle Starter-Templates:
 | --------------------------------- | ------------------------------------------------------ |
 | `backend/.env.example`            | Dev-Template mit Platzhaltern (APP, DB, Mail, Scout, Stripe, AI, JWT, File Encryption) |
 | `backend/.env.ci`                 | **CI-only Fixture**: wird von den Workflows als `.env` verwendet; enthält Test-/Platzhalterwerte, keine Produktionskonfiguration und kein Developer-Setup |
-| `backend/.env.encrypted`          | **Verschlüsselter Blob/Backup**, kein Template und keine Starterlaubnis; nicht ungeprüft kopieren, entschlüsseln oder in einen lokalen `.env` übernehmen |
 | `frontend/.env.example`           | Frontend-Default-Template (`VITE_STRIPE_PUBLIC_KEY` Platzhalter) |
 | `frontend/.env.local.example`     | Frontend-Local-Dev-Template (override `.env`)          |
 
-Die beiden Backend-Dateien `.env.ci` und `.env.encrypted` sind bewusste
-Allowlist-Ausnahmen im Root-`.gitignore`; ihre Existenz bedeutet **nicht**, dass
-sie als lokales Entwicklungs- oder Produktions-Setup verwendet werden dürfen.
+Die einzige Allowlist-Ausnahme neben den `*.example`-Templates ist
+`backend/.env.ci` (`.gitignore:55` → `!.env.ci`); das Ignore-Muster `.env*`
+(`.gitignore:54`) greift ansonsten für alle Env-Dateien. `backend/.env.encrypted`
+ist **keine** Allowlist-Ausnahme und wird deshalb nie getrackt; die Absicht steht
+als Kommentar im Root-`.gitignore` (`.gitignore:58` → `# Verschlüsselte
+.env-Backups bleiben bewusst lokal und werden nie committed.`). Diese
+Klassifizierung ist maschinell prüfbar: `git check-ignore -v backend/.env.encrypted`
+→ `.gitignore:54:.env*	backend/.env.encrypted`.
 
 ### Ungetrackte Dateien (lokal auf Disk, NICHT committed)
 
@@ -57,9 +61,15 @@ bzw. werden im Deployment injiziert:
 - `backend/.env`, `backend/.env.local`, `backend/.env.production` etc.
 - `frontend/.env`, `frontend/.env.local`
 - `backend/storage/*.key`
+- `backend/.env.encrypted` — ein lokaler, verschlüsselter Env-Blob/Backup. Die
+  Datei ist **nicht** getrackt und existiert in einem frischen Checkout **nicht**
+  (Stand HEAD); sie ist kein Bestandteil der Wiederherstellung. Ein früherer Stand
+  hatte sie kurzzeitig getrackt (hinzugefügt in `6eaf5d4`, entfernt in `e1f397d`,
+  reproduzierbar mit
+  `git log --diff-filter=AD --format='%h %ad %s' --date=short -- backend/.env.encrypted`).
 
-`.env.ci` und `.env.encrypted` sind davon ausgenommen: Beide sind tracked, aber
-mit der jeweils oben beschriebenen CI-/Backup-Klassifizierung.
+`.env.ci` ist davon ausgenommen: Es ist tracked, mit der oben beschriebenen
+CI-Klassifizierung.
 
 ### Test-Fixtures
 
@@ -164,8 +174,9 @@ composer setup
 
 Der Seed ist Teil des Setup-Vertrags und provisionsiert den Bootstrap-Admin
 über `ADMIN_EMAIL`/`ADMIN_PASSWORD` (siehe `backend/AGENTS.md`, „Database Setup
-Policy“). `.env.ci` und `.env.encrypted` sind keine Ersatzkopien für diese lokale
-Konfiguration.
+Policy“). `.env.ci` ist keine Ersatzkopie für diese lokale Konfiguration;
+`backend/.env.encrypted` existiert nicht im Repo (siehe „Ungetrackte Dateien“)
+und ist daher schon gar kein Setup-Ersatz.
 
 ### Frontend
 
@@ -187,9 +198,11 @@ pnpm install
   Verifikation via `git log -S` (alle Patterns leer). Force-Push erforderlich.
   Backup: `portal-backup-20260721-155854.bundle`.
 - **Tracked Test-/Backup-Dateien:** `backend/.env.ci` ist ausschließlich ein
-  CI-Fixture; `backend/.env.encrypted` ist ein verschlüsselter Blob und darf
-  nicht als `.env`-Vorlage oder als Beweis für sichere lokale Secrets verwendet
-  werden. Ihre getrackte Präsenz ist kein Freibrief zum Kopieren/Entschlüsseln.
+  CI-Fixture. `backend/.env.encrypted` ist **nicht** getrackt und liegt in keinem
+  Checkout; ein lokal gehaltenes verschlüsseltes Backup darf nicht als
+  `.env`-Vorlage oder als Beweis für sichere lokale Secrets verwendet werden.
+  Reproduzierbar mit `git ls-files | grep -E '(^|/)\.env'` — es erscheinen nur
+  `backend/.env.ci` und die drei `*.example`-Dateien, kein `.env.encrypted`.
 - **`phpunit.xml`-Credentials:** SQLite-`:memory:` plus localhost-Service-Fixtures,
   akzeptiert. Die MariaDB-Werte in `.env.ci` gehören zum separaten E2E-Service-
   betrieb und sind nicht der PHPUnit-Test-DB-Vertrag.
@@ -217,5 +230,11 @@ pnpm install
 git grep -nE 'sk_test_[0-9A-Za-z]{20,}|sk_live_|pk_live_[0-9A-Za-z]{20,}' -- ':!*.md' ':!features/'
 
 # 2. Getrackte Env-Dateien klassifizieren (nicht ungeprüft als Starter verwenden)
-git ls-files | grep -E '(^|/)\.env'   # enthält neben *.example auch backend/.env.ci und backend/.env.encrypted
+git ls-files | grep -E '(^|/)\.env'
+# Ausgabe (Stand HEAD, geprüft 2026-09-28):
+#   backend/.env.ci
+#   backend/.env.example
+#   frontend/.env.example
+#   frontend/.env.local.example
+# backend/.env.encrypted ist bewusst NICHT enthalten (siehe „Ungetrackte Dateien").
 ```

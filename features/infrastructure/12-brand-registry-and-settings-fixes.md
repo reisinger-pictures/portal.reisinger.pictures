@@ -1,6 +1,16 @@
 # Brand-Registry, Brand-ENUM & Settings-Reparaturen — Konzept (SOLL)
 
-> **Status:** Beschreibt den Soll-Zustand (Ziel).
+> **⚠️ Status:** `superseded` (korrigiert 2026-09-28). Das zentrale Ziel dieses
+> Dokuments — `Brand` als ENUM mit den Werten `rp | srp` über sechs Tabellen — ist
+> nicht der Ist-Stand. Aktueller Vertrag:
+> [`21-brand-config-driven.md`](21-brand-config-driven.md),
+> [`22-brand-settings-overlay.md`](22-brand-settings-overlay.md),
+> [`20-setting-resolver.md`](20-setting-resolver.md).
+> Gemessener Ist-Stand:
+> - `App\Enums\Brand` hat genau einen Case: `backend/app/Enums/Brand.php:15` → `case B2B = 'rp';` (`Brand::SRP` existiert nicht).
+> - Die `brand`-Spalten sind VARCHAR, nicht ENUM. `backend/database/migrations/V025__consolidated_after_v024.php:266` → `$brand = $t->string('brand', 20);` (SQLite-Pfad) bzw. `:274` → `MODIFY COLUMN \`brand\` VARCHAR(20)` (MySQL-Pfad), für die 13 Einträge in `$brandTables` (`:245-259`); `contracts.brand` separat in `:278-281`. Reproduzierbar: `sed -n '245,259p' backend/database/migrations/V025__consolidated_after_v024.php | grep -c "=> \["` → 13.
+> - Der `AsBrand`-Cast ist auf **19** Models angewandt: `grep -rl 'AsBrand' backend/app/Models | wc -l` → 19.
+> - `BrandRegistry::isSrp()` (§2.3) existiert nicht mehr; die Auflösung ist config-getrieben (`BrandRegistry::currentId()`).
 > Verknüpft: `features/infrastructure/07-lightroom-multi-tenant-gap.md`,
 > `features/infrastructure/08-org-brand-concept.md`,
 > `features/infrastructure/09-brand-context-queue-cli.md`,
