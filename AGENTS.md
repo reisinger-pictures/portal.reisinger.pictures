@@ -50,6 +50,28 @@ beschreiben zwei Dateien eine Regel und driften auseinander.
     - **wartet auf eine Entscheidung** — `[ ] Entscheidung offen: <Frage>`
     - **wartet auf eine Bedingung** — `[~] wartet auf <Bedingung>`
   - **5. Ein Eintrag, der eine Zahl oder einen Zustand beschreibt, wird mit dem Stand von heute eingetragen und mit der Quelle des Nachweises.** Keine Zahl ohne Herleitung, kein Zustand ohne Commit.
+- **Belegregeln für `features/` (STRICT).** Zwei Muster haben in den
+  Dokumentations-Audits vom 2026-09-28 wiederholt Kosten verursacht, weil sie **still
+  veralten, statt zu irren** — sie zeigen keinen Fehler, nur eine halbe Wahrheit:
+  1. **Zeilenanker verrotten.** `file.php:NN` ohne das Zitierte daneben ist für einen
+     Leser nicht überprüfbar und wirkt dennoch wie ein Beleg. Eine verschobene Zeile sieht
+     genauso aus wie eine richtige. **Regel: wer `file:NN` nennt, zitiert die Zeile mit**
+     (nicht `SettingsController.php:34`, sondern `SettingsController.php:34` →
+     `LICENSE_TERM_RULES['base_price']`), oder nennt nur den Symbolnamen.
+  2. **Zahlen ohne Herleitung.** Eine Zahl in Prosa ohne danebenstehenden Befehl, der sie
+     reproduziert, kann später von niemandem widerlegt werden. **Regel: jede Zahl trägt
+     ihren Befehl** — das Repo hat das Vorbild, die 28 Dialoge mit
+     `grep -rnE '<Modal(Shell|DialogShell)' frontend/src` — **oder sie verliert ihre Zahl.**
+  Beide Regeln gelten auch für `AGENTS.md` und für die Betriebsdoku unter `deployment/`.
+- **Einen Befund, der behoben wurde, kennzeichnen statt ihn im Präsens zu lassen.**
+  Sonst kann der Leser Fact und Fix nicht unterscheiden. Beispiel aus dem Audit:
+  „Der Scanner läuft deshalb an HEAD rot" war einmal wahr, wurde behoben, und die
+  Behauptung stand weiter im Präsens — inklusive der Empfehlung, einen roten
+  CI-Job zu akzeptieren.
+- **Eine Aussage, die ein Nachbar-Dokument überholt hat, gehört als `superseded`
+  gekennzeichnet, nicht stillschweigend ersetzt.** Mindestens vier Dokumente unter
+  `features/infrastructure/` beschreiben eine Marke `srp`, die es seit dem 2026-07-14
+  nicht mehr gibt, im Präsens und mit `status: active`.
 - **Zero Pre-existing Failures Policy (STRICT):** Pre-existing Test-Failures (PHPUnit, Vitest, Playwright) MÜSSEN immer behoben werden, bevor neue Arbeit beginnt. Ein "pre-existing" Label oder Ausrede ist nicht erlaubt — jeder Fehlerblock wird analysiert und gefixt, oder als akzeptiertes Risiko in `features/` dokumentiert. Dies gilt auch für flaky Tests: Diese werden bis zur Stabilisierung debugged.
 
 ## 4. AI Operating Rules (STRICT)
@@ -73,6 +95,7 @@ The system and workflow are managed via a Main/Secondary Model architecture to p
   3. Sofern fachlich sinnvoll **parallel delegieren** (unabhängige Tasks gleichzeitig an mehrere Implementer) — für den Koordination-/Token-Footprint prüfen.
   4. Jede Umsetzung von einem **separaten Subagenten verifizieren** lassen (Review, Tests, Build) — der Verifikator ist NIE der Implementer desselben Tasks.
   5. Bei visuellen Prüfungen (Layout, Screenshots, Bilder, Screenshots-Analyse) den **`vision`-Subagenten** nutzen.
+  6. **Kein `git add` und kein Commit, solange ein Subagent in diesem Working Tree läuft.** Der Index ist gemeinsam: `git add AGENTS.md` nimmt mit auf, was ein gleichzeitig arbeitender Agent bereits gestaged hat, und der eigene Commit behauptet dann etwas anderes als sein Inhalt. **Belegt am 2026-09-28:** ein Commit mit dem Titel „docs: fix the contradiction" enthielt 14 Dateien und 408 Zeilen aus `features/` — die Arbeit des laufenden Doku-Agenten. Inhalt war korrekt, die Nachricht falsch, und die Historie beantwortet die Frage „wann wurde der Geldeeinheiten-Vertrag geschrieben" fortan falsch. **Auf die Fertigmeldung warten, danach explizit die eigenen Dateien stagen, und `git show --stat` vor dem Commit prüfen.**
   Diese Regel wurde am 2026-07-31 etabliert, am 2026-08-02 konkretisiert und darf nicht umgangen werden.
 
 ## 6. Testing & E2E (STRICT)
