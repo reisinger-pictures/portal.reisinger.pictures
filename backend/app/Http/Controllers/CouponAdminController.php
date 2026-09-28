@@ -89,22 +89,24 @@ class CouponAdminController extends Controller
     /**
      * Normalize coupon input before persistence.
      *
-     * - For `photo_package` coupons, `value` / `max_items` are unused (the
-     *   `value` column is NOT NULL, so default it to 0) and the Euro-based
-     *   `package_price_cents` field (sent by the frontend as a flat price in €)
-     *   is mapped to its integer cents representation (Stripe-conform).
+     * `package_price_cents` needs no mapping: the wire is cents and the column
+     * is cents, and the request rules already reject a non-integer amount, so
+     * the value that arrives is the value that is stored. The conversion that
+     * used to live here (euro in, × 100 on the way to the column) is gone as of
+     * the owner decision on 2026-09-28 — every monetary amount is cents in
+     * storage and in the API, whole-euro amounts included. A `*_cents` field
+     * that speaks euros is the exact class of defect this removes.
+     *
+     * For `photo_package` coupons, `value` / `max_items` are unused (the
+     * `value` column is NOT NULL, so default it to 0).
      */
-    private function normalizePackagePrice(array $validated): array
+    private function normalizePhotoPackageInput(array $validated): array
     {
         if (($validated['type'] ?? null) === 'photo_package') {
             if (! isset($validated['value']) || $validated['value'] === '') {
                 $validated['value'] = 0;
             }
             $validated['max_items'] = null;
-
-            if (array_key_exists('package_price_cents', $validated) && $validated['package_price_cents'] !== null) {
-                $validated['package_price_cents'] = (int) round((float) $validated['package_price_cents'] * 100);
-            }
         }
 
         return $validated;
@@ -114,7 +116,7 @@ class CouponAdminController extends Controller
     {
         $user = auth()->user();
         $svc = app(AuthorizationService::class);
-        $validated = $this->normalizePackagePrice($request->validated());
+        $validated = $this->normalizePhotoPackageInput($request->validated());
 
         $validated['brand'] = BrandRegistry::currentId();
 
@@ -141,7 +143,7 @@ class CouponAdminController extends Controller
 
         $user = auth()->user();
         $svc = app(AuthorizationService::class);
-        $validated = $this->normalizePackagePrice($request->validated());
+        $validated = $this->normalizePhotoPackageInput($request->validated());
 
         if ($svc->isPhotographer($user) && ! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user)) {
             unset($validated['max_uses_global']);
@@ -224,7 +226,7 @@ class CouponAdminController extends Controller
 
         $user = auth()->user();
         $svc = app(AuthorizationService::class);
-        $validated = $this->normalizePackagePrice($request->validated());
+        $validated = $this->normalizePhotoPackageInput($request->validated());
 
         $validated['brand'] = BrandRegistry::currentId();
         $validated['scope_type'] = 'gallery';
@@ -303,7 +305,7 @@ class CouponAdminController extends Controller
 
         $user = auth()->user();
         $svc = app(AuthorizationService::class);
-        $validated = $this->normalizePackagePrice($request->validated());
+        $validated = $this->normalizePhotoPackageInput($request->validated());
 
         $validated['brand'] = BrandRegistry::currentId();
         $validated['scope_type'] = 'meta_gallery';

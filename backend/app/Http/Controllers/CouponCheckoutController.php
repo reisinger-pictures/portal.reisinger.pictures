@@ -66,6 +66,12 @@ class CouponCheckoutController extends Controller
             'coupon' => [
                 'code' => $coupon->code,
                 'type' => $coupon->type,
+                // Cents for `fixed`, percent for `percentage` — the unit is
+                // defined by `type`, and it is passed through as stored. There
+                // is no scaling on this read path: `discount_cents` below is
+                // priced by the same `applyCoupon` the cart and the order use,
+                // so a client that mirrors these values in `calculateCouponDiscount`
+                // cannot drift from the server price.
                 'value' => $coupon->value,
                 'max_items' => $coupon->max_items,
                 'package_quantity' => $coupon->package_quantity,

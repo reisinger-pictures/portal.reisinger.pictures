@@ -65,7 +65,7 @@ class PaymentPricingRegressionTest extends TestCase
             'brand' => Brand::B2B->value,
             'flatrate_level' => 'none',
         ]);
-        $coupon = Coupon::factory()->fixed(5)->create([
+        $coupon = Coupon::factory()->fixed(500)->create([
             'brand' => Brand::B2B->value,
             'code' => 'SCOPE-IGNORED',
             'active' => true,
@@ -174,7 +174,7 @@ class PaymentPricingRegressionTest extends TestCase
         ]);
         $firstPhoto = $this->createPhoto($firstGallery);
         $secondPhoto = $this->createPhoto($secondGallery);
-        $coupon = Coupon::factory()->fixed(5)->create([
+        $coupon = Coupon::factory()->fixed(500)->create([
             'brand' => Brand::B2B->value,
             'code' => 'ONCE-FIXED',
             'active' => true,
@@ -434,7 +434,7 @@ class PaymentPricingRegressionTest extends TestCase
         ]);
         $firstPhoto = $this->createPhoto($firstGallery);
         $secondPhoto = $this->createPhoto($secondGallery);
-        $coupon = Coupon::factory()->fixed(5)->scopedToGallery($secondGallery->id)->create([
+        $coupon = Coupon::factory()->fixed(500)->scopedToGallery($secondGallery->id)->create([
             'brand' => Brand::B2B->value,
             'code' => 'SECOND-GALLERY',
             'active' => true,
@@ -465,7 +465,7 @@ class PaymentPricingRegressionTest extends TestCase
         $secondGallery = $this->createGallery(['licensing_mode' => 'volume_licensing']);
         $firstPhoto = $this->createPhoto($firstGallery);
         $secondPhoto = $this->createPhoto($secondGallery);
-        $coupon = Coupon::factory()->fixed(5)->scopedToGallery($secondGallery->id)->create([
+        $coupon = Coupon::factory()->fixed(500)->scopedToGallery($secondGallery->id)->create([
             'brand' => Brand::B2B->value,
             'code' => 'DIRECT-SECOND',
             'active' => true,
@@ -506,7 +506,7 @@ class PaymentPricingRegressionTest extends TestCase
             'base_price' => 1000,
             'flatrate_tier' => 'original',
         ]);
-        $coupon = Coupon::factory()->fixed(5)->create([
+        $coupon = Coupon::factory()->fixed(500)->create([
             'brand' => Brand::B2B->value,
             'code' => 'MIXED-ONCE',
             'active' => true,

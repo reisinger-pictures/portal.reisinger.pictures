@@ -230,6 +230,11 @@ test.describe('Cart pricing and coupon integration', () => {
             const response = await helper.createCoupon({
                 code,
                 type,
+                // `value` is cents for `fixed` and a percent for `percentage`
+                // (owner decision 2026-09-28). The two branches of the same
+                // column are created side by side here, so a change that scaled
+                // the wrong one — 10 % becoming 1000 % — is visible in the
+                // expectations below rather than hidden by a shared helper.
                 value,
                 scope_type: 'global',
                 active: true,
@@ -240,7 +245,8 @@ test.describe('Cart pricing and coupon integration', () => {
         const fixedCode = `FIXED${suffix}`;
         const percentageCode = `PERCENT${suffix}`;
         const freeCode = `FREE${suffix}`;
-        await createCoupon(fixedCode, 'fixed', 10);
+        // 10 € = 1000 cents, unchanged in effect from the pre-migration `10`.
+        await createCoupon(fixedCode, 'fixed', 1000);
         await createCoupon(percentageCode, 'percentage', 50);
         await createCoupon(freeCode, 'percentage', 100);
 

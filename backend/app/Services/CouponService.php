@@ -221,7 +221,12 @@ class CouponService
 
         switch ($coupon->type) {
             case 'fixed':
-                $discountCents = (int) round((float) $coupon->value * 100);
+                // `value` is a count of cents for the money branch (owner
+                // decision 2026-09-28) and a percentage for the branch below —
+                // the unit is defined by `type`, never by the column alone.
+                // Multiplying here again would make every fixed coupon a
+                // hundredfold its price; V044 converted the stored rows.
+                $discountCents = (int) round((float) $coupon->value);
                 if ($discountCents > $currentTotalCents) {
                     $discountCents = $currentTotalCents;
                 }

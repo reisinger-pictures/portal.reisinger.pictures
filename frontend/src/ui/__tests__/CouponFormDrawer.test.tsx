@@ -125,17 +125,146 @@ describe('CouponFormDrawer', () => {
             expect(onSave).toHaveBeenCalledTimes(1);
         });
 
+        // 25 € typed, 2500 cents sent: the form is the boundary where the wire
+        // becomes money (owner decision 2026-09-28).
         expect(onSave).toHaveBeenCalledWith(
             expect.objectContaining({
                 code: 'TESTCODE',
                 type: 'fixed',
-                value: 25,
+                value: 2500,
                 scope_type: 'global',
                 active: true,
             }),
         );
 
         expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * The conversion boundary on the write path, and the two branches of the
+     * single `value` field in one test: `fixed` is money and is scaled,
+     * `percentage` is a percent and must not be. If the percentage branch were
+     * scaled too, 10 % would reach the API as 1000 %.
+     */
+    it('sends a fixed value as cents and a percentage value as percent', async () => {
+        const { unmount } = renderDrawer();
+        await userEvent.type(screen.getByPlaceholderText('z.B. SOMMER2026'), 'FIXEDX');
+        const selects = screen.getAllByRole('combobox');
+        await userEvent.selectOptions(selects[0], 'fixed');
+        const valueInput = screen.getAllByRole('spinbutton').find(
+            input => input.getAttribute('step') === '0.01',
+        )!;
+        await userEvent.clear(valueInput);
+        await userEvent.type(valueInput, '15');
+        await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+        await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+        expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({
+            type: 'fixed',
+            value: 1500,
+        }));
+        unmount();
+
+        onSave.mockClear();
+        renderDrawer();
+        await userEvent.type(screen.getByPlaceholderText('z.B. SOMMER2026'), 'PERCENTX');
+        const percentSelects = screen.getAllByRole('combobox');
+        await userEvent.selectOptions(percentSelects[0], 'percentage');
+        const percentInput = screen.getAllByRole('spinbutton').find(
+            input => input.getAttribute('step') === '0.01',
+        )!;
+        await userEvent.clear(percentInput);
+        await userEvent.type(percentInput, '15');
+        await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+        await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+        expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({
+            type: 'percentage',
+            value: 15,
+        }));
+    });
+
+    /**
+     * The other direction: a stored coupon is re-opened in the unit the admin
+     * reads, without drift. A `fixed` value of 1000 cents is 10,00 € in the
+     * field — and re-saving it must send 1000 back, not 100000. The
+     * `photo_package` sibling is pinned in the same pass because it travels
+     * through the identical code path.
+     */
+    it('loads a stored cents value into the euro field without drift', async () => {
+        const { unmount } = renderDrawer({
+            id: 1,
+            code: 'STORED',
+            type: 'fixed',
+            value: 1000,
+            scope_type: 'global',
+            active: true,
+            used_count: 0,
+        });
+        const valueInput = screen.getAllByRole('spinbutton').find(
+            input => input.getAttribute('step') === '0.01',
+        )!;
+        expect(valueInput).toHaveValue(10);
+        await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+        await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+        expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({value: 1000}));
+        unmount();
+
+        onSave.mockClear();
+        renderDrawer({
+            id: 2,
+            code: 'STOREDPCT',
+            type: 'percentage',
+            value: 15,
+            scope_type: 'global',
+            active: true,
+            used_count: 0,
+        });
+        const percentInput = screen.getAllByRole('spinbutton').find(
+            input => input.getAttribute('step') === '0.01',
+        )!;
+        expect(percentInput).toHaveValue(15);
+    });
+
+    /**
+     * `package_price_cents` in, `package_price_cents` out. The field was named
+     * cents and the backend multiplied by 100; now the drawer does, so 40,00 €
+     * typed is 4000 stored. The round trip below is what a photographer would
+     * actually see: re-open the coupon and the price is still 40,00 €.
+     */
+    it('sends the package price as cents and reads it back as the same euros', async () => {
+        const { unmount } = renderDrawer();
+        await userEvent.type(screen.getByPlaceholderText('z.B. SOMMER2026'), 'PHOTOPKG');
+        const selects = screen.getAllByRole('combobox');
+        await userEvent.selectOptions(selects[0], 'photo_package');
+        await userEvent.selectOptions(selects[1], 'global');
+        await userEvent.type(screen.getByPlaceholderText('z.B. 10'), '10');
+        await userEvent.type(screen.getByPlaceholderText('z.B. 40'), '40');
+        await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+        await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+        expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({
+            package_quantity: 10,
+            package_price_cents: 4000,
+        }));
+        unmount();
+
+        onSave.mockClear();
+        renderDrawer({
+            id: 3,
+            code: 'PHOTOPKG2',
+            type: 'photo_package',
+            value: 0,
+            package_quantity: 10,
+            package_price_cents: 4000,
+            scope_type: 'global',
+            active: true,
+            used_count: 0,
+        });
+        const priceInput = screen.getByPlaceholderText('z.B. 40');
+        expect(priceInput).toHaveValue(40);
+        await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+        await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+        expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({
+            package_price_cents: 4000,
+        }));
     });
 
     it('shows package fields when type=photo_package', async () => {
@@ -205,7 +334,8 @@ describe('CouponFormDrawer', () => {
                 code: 'PHOTOPKG',
                 type: 'photo_package',
                 package_quantity: 10,
-                package_price_cents: 40,
+                // 40,00 € typed, 4000 cents sent.
+                package_price_cents: 4000,
                 scope_type: 'global',
                 active: true,
             }),

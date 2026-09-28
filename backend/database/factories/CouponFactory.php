@@ -33,18 +33,25 @@ class CouponFactory extends Factory
     }
 
     /**
-     * Set the coupon type to fixed amount.
+     * Set the coupon type to a fixed amount, expressed in CENTS.
+     *
+     * The parameter is cents because that is what `value` holds for `fixed`
+     * (owner decision 2026-09-28). Naming it `amountEuros` and multiplying here
+     * would put the conversion this change removed straight back into the test
+     * fixtures, where it would hide a wrong unit instead of surfacing it: a
+     * test that seeds `fixed(10)` expecting 1000 cents has to mean it.
      */
-    public function fixed(float $amount): static
+    public function fixed(int $amountCents): static
     {
         return $this->state(fn (array $_) => [
             'type' => 'fixed',
-            'value' => $amount,
+            'value' => $amountCents,
         ]);
     }
 
     /**
-     * Set the coupon type to percentage.
+     * Set the coupon type to percentage. The parameter is a PERCENT — the
+     * sibling branch of the same `value` column.
      */
     public function percentage(float $percent): static
     {

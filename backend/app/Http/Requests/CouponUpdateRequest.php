@@ -37,10 +37,16 @@ class CouponUpdateRequest extends FormRequest
         $rules = [
             'code' => 'sometimes|string|max:50',
             'type' => 'sometimes|string|in:fixed,percentage,photo_package',
-            'value' => 'nullable|numeric|min:0|max:9999999.99',
+            // Cents for `fixed`, percent for `percentage` (see the `type` rule).
+            // The bound is the column's `decimal(10,2)` ceiling of
+            // 99999999.99 minus one unit; see CouponStoreRequest for why the
+            // old euro-based `max:9999999.99` no longer fits the money branch.
+            'value' => 'nullable|numeric|min:0|max:99999999',
             'max_items' => 'nullable|integer|min:1|max:999',
             'package_quantity' => 'nullable|integer',
-            'package_price_cents' => 'nullable|numeric',
+            // Cents, like the column it fills — `integer` so a price that is
+            // not a whole number of cents is rejected instead of rounded.
+            'package_price_cents' => 'nullable|integer|min:0',
             'scope_type' => 'sometimes|string|'.$scopeTypes,
             'scope_id' => 'nullable|string|required_if:scope_type,gallery,meta_gallery',
             'max_uses_global' => 'nullable|integer|min:1',
@@ -64,6 +70,10 @@ class CouponUpdateRequest extends FormRequest
             $req = $this;
             $data = $req->all();
 
+            // The unit of `value` is defined by `type`: a percentage here, a
+            // count of cents for `fixed` (see the `value` rule). See
+            // CouponStoreRequest for why the 100 % cap must not be applied to
+            // the money branch.
             if (($data['type'] ?? null) === 'percentage' && ($data['value'] ?? 0) > 100) {
                 $validator->errors()->add('value', 'Percentage value must not exceed 100.');
             }
@@ -79,7 +89,7 @@ class CouponUpdateRequest extends FormRequest
                 if (! isset($data['package_quantity']) || $data['package_quantity'] === '' || (int) ($data['package_quantity'] ?? 0) < 1) {
                     $validator->errors()->add('package_quantity', 'Package quantity must be at least 1.');
                 }
-                if (! isset($data['package_price_cents']) || $data['package_price_cents'] === '' || (float) ($data['package_price_cents'] ?? -1) < 0) {
+                if (! isset($data['package_price_cents']) || $data['package_price_cents'] === '') {
                     $validator->errors()->add('package_price_cents', 'Package price must not be negative.');
                 }
             }
