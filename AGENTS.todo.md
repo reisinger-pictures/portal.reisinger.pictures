@@ -1525,11 +1525,6 @@ alle mit Regressionstest:
 
 **Offen (aus dieser Runde):**
 
-- [ ] **P1-M56 — Das Profilformular verschluckt das Einmal-Passwort.** Der
-  Backend-Fix aus P1-M50 liefert `ftp_password`, aber die Profilansicht ignoriert
-  es. Ein Fotograf, der seinen Slug im Profil aendert, verliert das Passwort also
-  weiterhin unbemerkt — die Luecke ist nur eine Schicht hoeher gewandert.
-  *In Arbeit.*
 - [~] wartet auf einen erreichbaren SFTPGo im E2E-Stack (Harness-Referenz `tests/scripts/ftp-transport-test/`). Die Fail-closed-Absicherung darf **nicht** aufgeweicht werden. **P1-M57 — `profile-ftp-slug.spec.ts` ist rot, weil der E2E-Stack keinen
   SFTPGo hat.** Der Slug-Wechsel provisioniert jetzt und bricht fail-closed ab,
   wenn der Dienst fehlt. Die Absicherung darf **nicht** aufgeweicht werden; der
@@ -1654,19 +1649,6 @@ Produktionsfehler verkauft worden waere.
 | `volume-preset`: `€` ist Flex-Geschwister statt Feld-Suffix, Input dadurch schief | low | gemeldet |
 | `mm/dd/yyyy` im nativen Datumsfeld | medium | **WIDERLEGT — Harness-Artefakt**, siehe unten |
 
-- [ ] **Harness setzt keine Locale — `locale: 'de-DE'` fehlt.**
-  `playwright.screenshots.config.ts` und die Specs setzen nirgends eine Locale,
-  auch die Geraeteprofil nicht (`devices['Galaxy A55'].locale === undefined`).
-  Chromium faellt damit auf die Host-Sprache des Entwicklers zurueck. Deshalb
-  rendert das native `<input type="date">` **US-Format**, obwohl die UI deutsch
-  ist. **Das ist kein Produktionsfehler** — ein deutscher Fotograf sieht
-  `TT.MM.JJJJ`. Solange das fehlt, sind **alle** kuenftigen Aufnahmen bei
-  Datums- und Zahlenformaten irrefuehrend. Fix: `locale: 'de-DE'` in `use` der
-  Screenshot-Config, danach ein Lauf.
-- [ ] **Vorbestehender Policy-Verstoss, separat:** `VolumePresetSettingsCard.tsx:170`
-  nutzt `sm:grid-cols-[1fr_auto_auto]`. Klammer-Syntax ist laut `frontend/AGENTS.md`
-  verboten; vorbestehend und nicht Teil des Formatierungs-Fixes, deshalb nicht
-  mitgeschleust. Gehoert in einen eigenen Cleanup.
 - [ ] **Ausrichtung: dritte Instanz desselben Musters.** „Hinzufügen" in
   `gallery-access-dialog` zentriert gegen den Name/E-Mail-Block statt auf der
   Namenszeile — exakt die Form, die als erster Befund dieser Runde gemeldet und
@@ -1708,14 +1690,6 @@ Produktionsfehler verkauft worden waere.
   aendert nur die Bruchstelle, nicht die Tatsache des Bruchs — das ist keine
   Loesung. Braucht eine andere Spaltenlogik (z. B. `table-layout: fixed` mit
   `word-break` auf dem Wert), nicht eine weitere Klasse.
-- [ ] **Vorbestehender flaky Test, bei diesem Lauf beobachtet und
-  charakterisiert:** `SettingsControllerTest > system info build time refreshes
-  after cache clear` — `Failed asserting that 1787903378 is identical to
-  1787903379`. Ursache: Zeile 236 cached `now()->subDays(30)->getTimestamp()`,
-  Zeile 244 rechnet denselben Ausdruck nach einem HTTP-Roundtrip neu; liegen
-  die beiden ueber einer Sekundenweiche, differieren sie um 1. Isoliert gruen,
-  im Vollauf rot. Nach der Zero-Pre-existing-Failures-Policy ein eigenes Fix
-  (eine Zeile: `$stale` vor dem Request erfassen oder `freezeTime()`).
 - [~] wartet auf die Korrektur des zweiten Satzes in `V042__add_ftp_password_resets_audit_table.php` — er behauptet „unlimited, unobserved mint", was der Reset-Vertrag nicht ist. **Veralteter Migration-Docblock:** `V042__add_ftp_password_resets_audit_table.php`
   behauptet noch, die Endpoint waere „an unlimited, unobserved mint for valid
   credentials". Das ist falsch (ein Reset **ersetzt**, es gibt immer genau ein
@@ -1723,7 +1697,7 @@ Produktionsfehler verkauft worden waere.
   dokumentiert eine Schemadescheidung und ihr zweiter Satz ist noch richtig —
   deshalb nur geflaggt, nicht mitgeschleust.
 
-## CI-Befund 2026-09-27 (Push fa8e19d) — zwei Ursachen, beide belegt
+## CI-Befund 2026-09-27 (Push fa8e19d) — drei CI-Ursachen, alle belegt; danach sechs Dialog-Befunde aus derselben Welle
 
 **1. `Frontend (Lint, Build, Vitest)` rot am Schritt „Build" (Lint war gruen).**
 `check-i18n.mjs` schlug auf einem **unberuehrten** Checkout fehl. Ursache: Ich
@@ -1860,6 +1834,8 @@ gerissen und zur Entscheidung gemacht.
     Workern serialisiert. Das ist der Verstaerker, der externe Last in
     E2E-Latenz uebersetzt. Nicht geaendert (out of scope), aber die
     Grundursache, warum hier Testbudgets echten Spielraum brauchen.
+## Dialog-UI-Befunde aus derselben Welle (2026-09-27) — sechs Produktfragen, keine Implementierungsdetails
+
 - [ ] Entscheidung offen: je Frage einzeln: Initial-Fokus (Fokusfalle schlägt `autoFocus`), `maxWidth`-Skala bauen oder Typ eingrenzen, `editing`-Namenskollision in fünf Dialogen, `CouponFormDrawer` Escape/Backdrop, `ModelInviteDialog`-Wrapper, fehlende Unit-Tests für `ManagementOrgsView`/`ManagementOrgDetailView`. **Sechs Produktfragen aus der Welle, keine Implementierungsdetails:**
   1. **Fokusfalle schlaegt `autoFocus`.** In `ManagementOrdersView` lag der
      Cursor vorher im Preisfeld; jetzt landet der Fokus auf dem Schliessen-
@@ -1883,10 +1859,6 @@ gerissen und zur Entscheidung gemacht.
      Die Shell besitzt keinen Testid-Hook.
   6. **`ManagementOrgsView` und `ManagementOrgDetailView` haben keine
      Unit-Testdateien.** Beide sind jetzt konform, aber ungeschuetzt.
-- [ ] **Veraltete Zahl im Quelltext, nicht in der Doku:** `ModalShell.tsx:64` und
-  `:101` sagen im Kommentar weiterhin **„the eighteen dialogs"** — es sind 28.
-  Der Doku-Agent hat das nicht angefasst, weil es Quellcode ist. **Erst nach dem
-  `ModalShell`-Agenten anfassen** (Konflikt auf derselben Datei).
 - [~] wartet auf eine Live-Reproduktion im Lastbereich 15–22 und einen positiven Beleg für die 6-von-8-Schieflage auf Mobile; die mobile Hälfte hat bisher keinen Mobile-spezifischen Defekt ergeben. **Was der Agent nicht klaeren konnte, offen gesagt:** (a) Er konnte die
   Fehler **nicht reproduzieren**; er hat den Bereich zwischen „gesaettigte Box"
   (Last 15, 22/22 gruen) und den gemeldeten Lasten 186–334 eingegrenzt, diesen
