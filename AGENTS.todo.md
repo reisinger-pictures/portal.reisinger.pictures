@@ -119,13 +119,14 @@ prüfen, dann anfassen:
    den M-Positionen in der Reihenfolge M21 → M22 → M23 → M30.
 4. **Cutover** (P1-M36) erst, wenn 1–3 stehen und M27 beantwortet ist.
 
-> **Bekannte Störung:** fünf `P1-M`-IDs (`M9`, `M11`, `M14`, `M15`, `M16`), fünf
-> `DOC`-IDs (`3`, `4`, `6`, `7`, `8`) und **zwei `FE`-IDs (`FE-2`, `FE-8`)** sind
-> doppelt vergeben — Position **DOC-13**. Bei `FE-2` und `FE-8` ist die Folge
-> unmittelbar sichtbar: es gibt je eine offene und eine erledigte Definition,
-> und nur die **obere** zählt als offen. Ein Verweis auf „P1-M15" ist dagegen
-> nicht auflösbar, weil dort zwei verschiedene Befunde stehen. Nicht stumm
-> umnummeriert, das ist eine eigene Entscheidung.
+> **ID-Nennräume, am 2026-09-28 nachgemessen:** Die unter Position **DOC-13**
+> behaupteten Kollisionen sind **größtenteils erledigt**. Die `P1-M`-Kollision ist
+> aufgelöst — die dort formulierte Invariante ist leer, und `P1-M9a`/`P1-M9b` zeigen,
+> dass umnummeriert wurde. Von den fünf `DOC`-IDs ist keine doppelt, `DOC-7` kommt
+> gar nicht vor. `FE-2` ist keine Dublette (Index und Definition sagen beide „halb").
+> **Offen bleibt genau eine echte Doppelnennung:** `FE-8` steht in der Übersicht als
+> *erledigt* und im Arbeitsplan als offener Brocken. Wer nach unten scrollt und die
+> untere Zeile liest, hält den Stand für den anderen.
 
 ---
 
@@ -393,42 +394,42 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   Umschalten muss benannt sein, wer das macht und ab wann gegen P1-M27
   geprüft wird. Ohne diesen Schritt steht nach dem Umbau alles gleichzeitig
   still.
-- [ ] Entscheidung offen: zweite Erfassungswelle umnummerieren (mit Cross-Reference) oder ein `P1-M9a`/`P1-M9b`-Schema einführen? Keine stille Umnummerierung. **DOC-13 (neu 2026-09-26) — IDs im Board sind doppelt vergeben.** Zwei
-  Nummernräume kollidieren, nicht einer.
+- [ ] **DOC-13 — die Kollision ist behoben, die Entscheidung ist es nicht. Neu geprüft
+  2026-09-28: zwei Nummernräume kollidieren, nicht einer.** Die Eintragung trug
+  ursprünglich drei offene Unterpunkte; zwei davon halten der Messung nicht mehr.
 
-  **(a) Fünf P1-M-IDs:** `P1-M9`, `P1-M11`, `P1-M14`, `P1-M15` und `P1-M16`
-  definieren je **zwei verschiedene Befunde** (Zeilen 774ff. gegen 1300ff.).
-  Das ist keine Dublette, sondern eine Kollision aus zwei getrennten
-  Erfassungswellen — die LOW-Positionen (774ff.) und die späteren
-  Verifikationspositionen (1300ff.) teilen sich die Nummer.
-  **Warum das zählt:** ein Verweis auf „P1-M15" ist nicht auflösbar, und jede
-  Auswertung, die eine ID als Schlüssel nutzt, verwechselt zwei Themen. Bei
-  M15 ist das konkret gefährlich — der LOW-Befund (brand-fremde Gruppe) und der
-  P0-Befund (Brand-Guard) wurden als *dasselbe* Item geführt. Das ist vermutlich
-  auch die Ursache der in DOC-12 notierten Falschmeldung zu P1-M15.
-  **Zu entscheiden:** die zweite Welle umnummerieren (mit Cross-Reference an der
-  alten ID, damit alte Verweise nicht ins Leere zeigen) **oder** ein
-  `P1-M9a`/`P1-M9b`-Schema einführen. Keine stille Umnummerierung.
-  **Prüfbare Invariante:**
+  **(a) Fünf `P1-M`-IDs — erledigt, die Invariante ist erfüllt.** Der Eintrag führt
+  als Annahmekriterium wörtlich
   `grep -oE "^- \[.\] \*\*P1-M[0-9]+" AGENTS.todo.md | grep -oE "P1-M[0-9]+" |
-  sort | uniq -d` muss **leer** sein.
-  **Nicht Teil dieses Commits:** die Umbenennung ist eine inhaltliche
-  Entscheidung und wird nicht mit einer Verifikations- oder Doku-Änderung
-  vermischt.
+  sort | uniq -d` und verlangt, dass sie **leer** ist. Sie ist leer. Die
+  Umnummerierung **ist erfolgt** und war nicht still: `P1-M9a` und `P1-M9b` existieren
+  als eigene Positionen. Die Kollision zwischen der LOW-Welle und der späteren
+  Verifikationswelle ist damit aufgelöst. `P1-M9`, `P1-M14` und `P1-M16` kommen
+  heute ohnehin nur noch in diesem Text vor, eine zweite Definition existiert nicht.
+  Damit entfällt die offene Entscheidung „umnummerieren oder `a`/`b`-Schema" aus
+  diesem Board. Was aus (a) **bleibt**, ist eine Regel, keine Position: eine ID, die
+  zwei Befunde meint, macht jede Auswertung unzuverlässig, die sie als Schlüssel
+  nutzt. Bei M15 hat das nachweislich zu einer Falschmeldung geführt (DOC-12).
 
-  **(b) Fünf DOC-IDs, gleiches Muster:** `DOC-3`, `DOC-4`, `DOC-6`, `DOC-7` und
-  `DOC-8` sind je zweimal definiert — einmal in der Sektion „Offene
-  Dokumentations-Wahrheit" (ab Z. 304) und einmal in der späteren
-  Verifikationsliste (ab Z. 630). Die späteren Einträge tragen im Titel ein
-  Erledigungsdatum, sind also **nicht** dieselbe Position, sondern eine
-  Abschlussnotiz. Folge: „DOC-8 ist offen" und „DOC-8 ist erledigt" sind beide
-  im Board gleichzeitig belegbar.
+  **(b) Fünf DOC-IDs — am 2026-09-28 nachgemessen: nicht (mehr) belegt.** `DOC-3`,
+  `DOC-4`, `DOC-6` und `DOC-8` sind je **einmal** als Position definiert; `DOC-7`
+  kommt **null** Mal vor. Die zweite, widersprechende Definition ist mit den
+  `[x]`-Einträgen am 2026-09-28 entfernt worden. `DOC-3` ist als Position ganz
+  entfallen, weil die Frontier-Korrektur in `235453a` sie erledigt hat.
 
-  **(c) Zwei FE-IDs, zusätzlich gefunden 2026-09-26:** `FE-2` und `FE-8` sind je
-  zweimal definiert — offen in „Offene Code-Arbeit" (Z. 106/114), erledigt in der
-  Verifikationsliste (Z. 828/834). Anders als bei (b) ist das **nicht** harmlos:
-  bei beiden ist die **obere** Definition die richtige, die untere erledigte
-  beschreibt einen kleineren Umfang („6 Modals" statt der tatsächlichen 13).
+  **(c) Zwei FE-IDs — halb belegt, und eine Zahl war falsch.** `FE-2` ist **keine**
+  Dublette: Übersichtszeile und Einzeleintrag sagen beide „halb", es sind Index und
+  Definition, nicht zwei Befunde. Bei `FE-8` ist die Dublette real — die
+  Übersichtszeile führt es als *~~Erledigt~~*, der Arbeitsplan bei Z. 118 zugleich als
+  „größter bekannter Brocken". **Die Statusangabe „Erledigt" hält, die Begründung
+  nicht:** sie nennt „13/13 Modals auf `ModalShell`", und
+  `grep -rnE '<(ModalShell|ModalDialogShell)' frontend/src | grep -v __tests__ |
+  grep -v ModalDialogShell.tsx | awk -F: '{print $1}' | sort -u | wc -l` liefert
+  **28** Nutzungsdateien. Kein Dialog außerhalb der Shell gefunden. Also nicht
+  „13 von 13", sondern **28 von 28** — die Migration ist vollständig, die Zahl im
+  Board war veraltet. Was zu tun bleibt: die Widersprüchlichkeit zwischen Übersicht
+  („erledigt") und Arbeitsplan („Brocken") auflösen, indem der Plan auf den
+  tatsächlichen Stand gesetzt wird.
   Wer nach unten scrollt und die untere liest, hält FE-8 für erledigt und
   übersieht 13 Modals. **Deshalb** steht in der Einstiegs-Übersicht ausdrücklich,
   dass nur die obere zählt.
@@ -440,24 +441,32 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Dokumentations-Wahrheit (kein Code, aber irreführend)
 
-- [ ] **DOC-3** — 6 `features/**`-Dateien behaupten weiter „V038 = Frontier,
-  neu ab V039". Korrekt ist: **V035 deployt, V036–V040 Frontier.** Betroffen:
-  `features/README.md:62`, `features/b2b/11-kanban-board.md:59`,
-  `features/infrastructure/21-brand-config-driven.md:18-20`,
-  `features/tech/07-architectural-decisions.md:8`,
-  `features/security/card-testing-protection.md:14-15,60,106,627`,
-  `features/ecommerce/08-srp-coupon-system.md:123`.
+- [ ] **DOC-6 — Falschaussage, und die Fundstelle ist selbst falsch.** Das Board
+  schrieb die Kanban-Flakiness
+  `frontend/tests/e2e/helpers/KanbanHelper.ts:135,143,196,231` zu. **Die Datei hat
+  209 Zeilen — Zeile 231 existiert nicht, 196 ist leer.** `:135` ist
+  `expect(...).toBeVisible({ timeout: 10000 })`, also Playwrights Assertion-Timeout
+  und kein Verweilen. Der einzige Treffer für Wartezeiten steht bei `:85` und sagt
+  ausdrücklich: *„There are no retries or fixed dwell delays"*.
+  **Die Aussage „Flakiness durch Wartezeiten in diesem Helper" ist damit widerlegt;
+  die Ursache der Kanban-Flakiness bleibt davon unberührt unbekannt.** Keine
+  Zeilenangabe in diesem Board ohne Zitat daneben — `file:NN` ohne Zitat ist nicht
+  überprüfbar und sieht trotzdem wie ein Beleg aus.
 - [~] wartet auf einen Durchgang nach der Board-Bereinigung vom 2026-09-27 — die Widersprüche lagen an `[x]`-Einträgen, die entfernt wurden. **DOC-4 / DOC-5 / DOC-11** — das Board widerspricht sich selbst: Positionen
   sind an einer Stelle `[x] abgeschlossen` und an anderer als `offen` /
   `in Arbeit` geführt. Betroffen: CR-DATA-018/CR-BE-018 (Z. 284/341 vs. 543/545),
   CR-CRM-008 (Z. 282/283/338 vs. 618), CR-DOC-001 (Z. 410, behauptet „V038").
-- [ ] **DOC-6 — Falschaussage.** Z. 807 behauptet Flakiness durch
-  `KanbanHelper.ts:135,143,196,231`. `grep waitForTimeout` findet dort nur
-  Kommentare, die ausdrücklich sagen, dass es **keine** Retries und keine
-  festen Wartezeiten gibt. Widerspricht Z. 336 desselben Boards.
-- [~] wartet auf die Bereinigung der Abschnitte, die P0-A13/P0-B7 als gefixt führen — die Einzeleinträge sind maßgeblich und stehen jetzt offen. **DOC-8 / DOC-12** — Einträge sind als „gefixt/stale" versteckt, obwohl sie
-  anderswo als wiedereröffnet geführt werden (P0-A13/P0-B7; P1-M15, das in
-  `2bfaed8` mit 894-Zeilen-Test umgesetzt wurde).
+- [ ] **DOC-8 / DOC-12 — zur Hälfte erledigt (2026-09-28).** Der Teil, der
+  P0-A13/P0-B7 betraf, ist abgeschlossen: beide sind als **Nicht-Leak nachgewiesen**,
+  die Blöcke `P0-A`/`P0-B` tragen keinen offenen Eintrag mehr, und ihre Überschriften
+  behaupten keinen reopened Befund mehr. Damit ist DOC-12 für dieses Thema erledigt.
+  **Offen bleibt der P1-M15-Teil**, und er ist eine Folge der ID-Kollision, nicht
+  desselben Problems: `P1-M15` war über zwei Erfassungswellen hinweg doppelt belegt
+  (LOW-Befund und Brand-Guard), beide wurden als *ein* Item geführt, und daraus wurde
+  am 2026-09-25 in `2bfaed8` mit einem 894-Zeilen-Test eine Umsetzung gemeldet, die
+  den falschen Gegenstand behob. Die Nummern-Kollision selbst ist inzwischen behoben
+  (siehe DOC-13 (a), Invariante leer) — **die inhaltliche Frage, ob der LOW-Befund
+  je behoben wurde, ist das, was hier noch offen ist, und sie ist nicht gemessen.**
 
 ### Braucht eine Entscheidung oder Betriebs-Evidenz (kein Code)
 
@@ -1109,7 +1118,13 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
 **Test-Coverage-Audit der neuen Änderungen (2026-09-24; angefordert)**
 - **Frontend-Full-Gate 2026-09-25 (finaler Verifier):** `pnpm test:run` **126/126 Testdateien / 1005/1005 Tests**, `pnpm lint:fix`, `pnpm lint:e2e`, `pnpm build` inkl. TypeScript/i18n/Vite und Playwright-Collection **396 Tests/84 Dateien** grün; Diff-Checks grün. Browserlauf bleibt CI-/Stack-Follow-up.
 - **Review-Range:** `72f55da...HEAD` (Basis vor diesem Remediation-Commit; nach dem Push durch den späteren Reviewer auflösen)
-- **Backend-Full-Gate 2026-09-24:** Der offizielle `ghcr.io/reisi007/portal-base:8.5`-Containerlauf mit `--network host` und erreichbaren Meilisearch-/Mailpit-Diensten ist **PASS: 1.969 Tests, 0 Fehler, 6.276 Assertions** (1.962 Warnungen nur wegen fehlender lokaler `backend/.env`). Ein vorheriger Hostlauf war wegen der nicht erreichbaren Port-Forwardings umgebungsbedingt fehlgeschlagen und ist kein Code-Failure.
+- **Backend-Full-Gate 2026-09-24:** Der offizielle Containerlauf mit dem
+  `portal-base:8.5`-Image (Registry `ghcr.io`, Namespace `reisi007` — **vor** der
+  Migration auf `reisinger-pictures`) mit `--network host` und erreichbaren
+  Meilisearch-/Mailpit-Diensten ist **PASS: 1.969 Tests, 0 Fehler, 6.276 Assertions**
+  (1.962 Warnungen nur wegen fehlender lokaler `backend/.env`). Ein vorheriger
+  Hostlauf war wegen der nicht erreichbaren Port-Forwardings umgebungsbedingt
+  fehlgeschlagen und ist kein Code-Failure.
 - **Backend-Integration-Final 2026-09-25:** Focused SQLite-/Container-/MariaDB-Gates für GalleryTree/MetaGallery, Checkout, CRM, Invoice, AI und Storage grün; offizielles PHP-Container-GD/ExifTool und Live Meilisearch/Mailpit-Slices grün. Der Host-Full-Suite-Lauf bleibt wegen `.env`/GD/Meilisearch/Mailpit und der bestehenden V001-PostgreSQL-Einschränkung umgebungsbedingt; kein vollständiger Backend-PASS wird behauptet.
 
 **Bestätigte Findings aus dem unabhängigen Coverage-Audit (umgesetzt/verified; Umgebungs- und Folgeblocker separat)**
@@ -1133,7 +1148,11 @@ getrennt.
 **Historischer Setup-Recovery-Verifikationslauf (2026-09-24, separater Verifikations-Subagent)**
 - `frontend/pnpm run test:run`: **PASS**, 84 Dateien / 759 Tests; `pnpm lint:fix`: **PASS** ohne tracked Änderungen; `pnpm build`: **PASS**; PHP-Syntax: **PASS** (556/556); `git diff --check`: **PASS**.
 - **Historischer Recovery-Lauf:** `backend/php artisan test`: **PASS nach Setup-Recovery**, 1.718 Warnungen / 7 passed / 4.936 Assertions, 66,49 s. Zuvor **FAIL**, 695 failed / 1.023 Warnungen / 7 passed (2.876 Assertions). Debugging-Analyse: Die ursprünglichen Logs zeigten `Connection refused` zu Meilisearch `127.0.0.1:7701` und Mailpit `127.0.0.1:1025`; nach lokaler CI-Image-/Fallback-Bereitstellung und Installation der fehlenden Host-Pakete `php8.5-gd` sowie ExifTool lief die Suite vollständig grün. Dies war ein Setup-/Umgebungsfehler, keine Code-Regression; die geänderte Umgebung ist nicht tracked und ist nicht der Status des aktuellen Checkouts.
-- **Aktueller Full-Suite-Lauf (2026-09-24, final):** Im GD/ExifTool-Image `ghcr.io/reisi007/portal-base:8.5` mit frischem `TEST_TOKEN=finalcontract`, Meilisearch und Mailpit im gemeinsamen Docker-Netz: **1.964 Tests / 6.241 Assertions, 0 Fehler** (81,98 s). PHP-Syntax, gezieltes Pint und `git diff --check` sind ebenfalls grün.
+- **Aktueller Full-Suite-Lauf (2026-09-24, final):** Im GD/ExifTool-Image
+  `portal-base:8.5` (Registry `ghcr.io`, Namespace `reisi007` — **vor** der Migration
+  auf `reisinger-pictures`) mit frischem `TEST_TOKEN=finalcontract`, Meilisearch und
+  Mailpit im gemeinsamen Docker-Netz: **1.964 Tests / 6.241 Assertions, 0 Fehler**
+  (81,98 s). PHP-Syntax, gezieltes Pint und `git diff --check` sind ebenfalls grün.
 
 **Weitere verifizierte Dokumentations-/Infra-Befunde (009–016 Dokumentations-/Config-Konsistenz umgesetzt; 017–025 Dokumentations-only abgeschlossen)**
 **Provisorisches Code-Finding (unabhängige Verifikation abgeschlossen)**
@@ -1350,26 +1369,61 @@ getrennt.
 > **Regeln:** Jeder Fix braucht einen Regressionstest (DoD, Bugfix = mind. 1 Test). Backend-Fix gilt nur mit grünem `php artisan test`; Frontend mit `pnpm test:run` + `lint:fix` + `build`.
 > Priorität: **P0** = Security/Geld (kritisch/hoch), **P1** = funktionale Bugs, **P2** = Härtung/Hygiene.
 
-### P0-A — Brand-Isolation (Kernursache, Backend) — 🔴 OFFEN: P0-A13 (MEDIUM) REOPENED
+### P0-A — Brand-Isolation (Kernursache, Backend) — geschlossen 2026-09-28 (P0-A13 als Nicht-Leak nachgewiesen)
 
 > **Was hier noch steht — und was nicht:** Die behobenen Findings des
 > 2026-09-12-Audits sind am 2026-09-28 aus dieser Liste entfernt worden; sie stehen in
-> den Commits, die sie geschlossen haben, nicht in einer Arbeitsliste (§3). Übrig bleibt
-> genau **eine offene Position**: der unten stehende, von CR-BE-004/CR-BE-010
-> wiedereröffnete Befund. Es gibt hier **keine `[x]`-Einträge** — die frühere Konvention,
-> mit der ein Kästchen hier Erledigung signalisierte, wird nicht mehr verwendet.
+> **Was hier noch steht — und was nicht:** Die behobenen Findings des
+> 2026-09-12-Audits sind am 2026-09-28 entfernt worden (§3); sie stehen in den
+> Commits, die sie geschlossen haben. Der wiedereröffnete Befund `P0-A13` ist am
+> 2026-09-28 **als Nicht-Leak nachgewiesen und geschlossen** — dieser Block ist damit
+> leer. Es gibt hier **keine `[x]`-Einträge**;
+> die frühere Konvention, mit der ein Kästchen hier Erledigung signalisierte, wird
+> nicht mehr verwendet.
 
-- [ ] **P0-A13 (MEDIUM; reopened)** `FileDeliveryController`: Original-Leak bei `is_public` + `restricted_photographers` schließen — `:35,54-72`. Historischer Eintrag; der aktuelle Befundstatus ist CR-BE-004/CR-BE-010, nicht der historische `[x]`-Nachweis.
+> **P0-A13 — kein Leak, geschlossen (2026-09-28).** Der historische Leak war real:
+> ein Fotograf **ohne Zuweisung** auf einer öffentlichen `restricted_photographers`-Galerie
+> bekam das Original, weil der alte Zweig rein über die Rolle entschied
+> (`$user && ($svc->isAdmin($user) || $svc->isPhotographer($user))`). Behoben in
+> `f21d78d` durch den Weg über `canManageGallery`, das an
+> `canPhotographerAccessGallery` delegiert und damit `restricted_photographers`
+> durchsetzt. **Nachträglich mit einem Test festgenagelt**, den es vorher nicht gab:
+> `FileDeliveryControllerTest::test_unassigned_photographer_on_public_restricted_gallery_gets_watermark_not_original`
+> — mit dem historischen Code rot (403 erwartet, 200 erhalten), mit dem heutigen grün.
+> **Der verbleibende Weg, auf dem ein Gast ohne Auth das unmarkierte Original bekommt,
+> ist `effective_is_free_download` — und der ist gewolltes Produktverhalten**, nicht
+> Leck: `GalleryModal.tsx:324` („Deaktiviert Wasserzeichen … Direkter Download für
+> Gäste") und `features/delivery/03-file-delivery-controller.md:60`. Der dritte Test
+> grenzt das sauber ab: free_download umgeht die Wasserzeichen-Pflicht, **nicht** die
+> Authentifizierungspflicht einer privaten Galerie.
+> **Die Zeilenanker `:35,54-72` im alten Eintrag waren verrottet** — sie passten weder
+> zur heutigen noch zur historischen Datei. Künftig nach Symbol benennen
+> (`$logicalNeedsWatermark`, `canManageGallery`), nicht nach Zeile.
 
-### P0-B — Checkout/Payments (Geld) — 🔴 OFFEN: P0-B7 (MEDIUM) REOPENED
+### P0-B — Checkout/Payments (Geld) — geschlossen 2026-09-28 (P0-B7 als Nicht-Leak nachgewiesen)
 
 > **Was hier noch steht — und was nicht:** Die behobenen Findings des
 > 2026-09-12-Audits sind am 2026-09-28 entfernt worden (§3); B16 ist über die
-> dokumentierte Entscheidung „kein VAT" fachlich geprüft. Übrig bleibt genau **eine
-> offene Position**: der von CR-BE-002/CR-BE-010 wiedereröffnete Befund unten. Es
-> gibt hier **keine `[x]`-Einträge**.
+> dokumentierte Entscheidung „kein VAT" fachlich geprüft. Der wiedereröffnete
+> Befund `P0-B7` ist am 2026-09-28 **als Nicht-Leak nachgewiesen und geschlossen** —
+> dieser Block ist damit leer. Es gibt hier **keine
+> `[x]`-Einträge**.
 
-- [ ] **P0-B7 (MEDIUM; reopened)** `ContractJoinController`: fremdes `personal_token` nicht herausgeben (E-Mail-Bindung/Proof) — `:74-126`. Historischer Eintrag; der aktuelle Befundstatus ist CR-BE-002/CR-BE-010, nicht der historische `[x]`-Nachweis.
+> **P0-B7 — nicht reproduzierbar, geschlossen (2026-09-28).** Die Antwort kann keinen
+> fremden `personal_token` tragen: der 201-Body liefert ausschließlich den Token des
+> **in diesem Request erzeugten** Signers. Eine Kollision auf
+> `(join_scope_key, normalized_email)` scheitert geschlossen mit generischem 409
+> **ohne** Token, Namen oder Rollen — in beiden Schreibpfaden
+> (`ContractJoinController` und `ContractTemplateService`) und zusätzlich über den
+> V039-Unique-Index. `ContractSigner::$hidden` lässt `personal_token` außerhalb der
+> Join-Antwort gar nicht erst serialisieren. Festgenagelt in
+> `ContractJoinTest::test_standard_join_never_returns_a_pre_existing_signers_personal_token`
+> und der Template-Variante.
+> **Der einzige verbleibende Spalt ist die bewusst ungeprüfte E-Mail-Zugehörigkeit** —
+> eine akzeptierte Produktentscheidung (CTR-7, `ContractJoinTest.php:121`): wer einen
+> gültigen Join-Link hält, darf unter einer noch nicht vertraglich gebundenen Adresse
+> beitreten und bekommt den Token inline. Das war nie der gemeldete Befund, und es ist
+> dokumentiert entschieden, nicht übersehen.
 
 ### P1 — AI / Mail / Jobs / Console — 🟡 OFFENE FOLLOW-UPS (Live-Nachweis + Policy-Entscheidung)
 
