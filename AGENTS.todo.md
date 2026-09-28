@@ -158,29 +158,35 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [ ] **i18n-Rückstand: 246 ungewrapte Strings. Die Regel existiert, warnt aber nur.**
-  `check-i18n.mjs` hat die AST-Regel bekommen (`findUnlocalizedStrings`,
-  `findUnlocalizedStringsInTree`, `collectLinguiMacroComponentBindings`) und meldet
-  **246** Treffer in 33 Dateien: `jsx-text` 175, `jsx-attribute` 44,
-  `helper-argument` 27. Scan über 331 Dateien: 0,18 s.
+- [ ] Entscheidung offen: **i18n-Rückstand — erst entscheiden, ob die Regel auf Satzebene zusammenführt, dann abarbeiten.**
+  `CHECK_I18N_UNLOCALIZED_STRICT=1 node scripts/check-i18n.mjs` meldet **246**
+  Treffer in **33** Dateien: `jsx-text` 175, `jsx-attribute` 44,
+  `helper-argument` 27 (Scan über 331 Quellen:
+  `find src -type f \( -name '*.ts' -o -name '*.tsx' \) | wc -l`).
   **Warn-only, Exit 0** — ein Gate, das an 246 Altbefunden scheitert, benutzt
   niemand. `CHECK_I18N_UNLOCALIZED_STRICT=1` schaltet auf harten Fehlschlag
   (verifiziert: Exit 1), sobald der Bestand auf 0 ist.
-  **Nicht abgearbeitet, bleibt als Altlast im Repo:** die 246. Die größten Brocken:
-  `LicenseCatalogSettings.tsx` (62), `BrandSettingsCard.tsx` (25),
-  `ShootingCalculatorModal.tsx` (24), `BillingDetailsCard.tsx` (21),
-  `CalculatorSettingsCard.tsx` (18).
+  **Nicht abgearbeitet, bleibt als Altlast im Repo:** die 246. Die größten Brocken
+  (`findUnlocalizedStringsInTree()`, Treffer pro Datei): `LicenseCatalogSettings.tsx` (62),
+  `BrandSettingsCard.tsx` (25), `ShootingCalculatorModal.tsx` (24),
+  `BillingDetailsCard.tsx` (21), `CalculatorSettingsCard.tsx` (18).
   **Zwei Befund-Arten, die keine echten Rückstände sind.** Rund 31 sind Nicht-Prosa:
   17 Tier-Bezeichner (`Web`/`Print`/`Original`), 3 Kameracodes (`Error 41`), 11
   Produkt- und Markennamen (`Logo`, `Cloudflare Turnstile`). Bewusst **nicht** über
   eine Allowlist unterdrückt — eine Liste, die niemand pflegt, wird zur nächsten
   stillen Ausnahme. Dazu eine vierte Art, die die Regel nicht unterscheidet:
   **an Interpolationsstellen zerrissene Sätze.** `Jahre (geb. {x})` ergibt zwei
-  JsxText-Knoten (`Jahre (geb.` und `)`); einzeln zu beheben ist sinnlos. **Vor dem
-  Abarbeiten entscheiden, ob die Regel auf Satzebene zusammenführt** — sonst
-  produziert sie mehr Rauschen als Nutzen.
-  **Reihenfolge:** `helper-argument` (27) zuerst, dann die `management/`-Konzentration.
-  Umschalten auf `CHECK_I18N_UNLOCALIZED_STRICT=1` erst bei 0.
+  JsxText-Knoten (`Jahre (geb.` und `)`); einzeln zu beheben ist sinnlos.
+  **Das ist die offene Entscheidung (nicht agentenseitig): Führt die Regel ihre
+  Meldungen auf Satzebene zusammen — oder nicht?**
+  - **Option A — Regel erweitern:** benachbarte JsxText-Knoten um ein
+    Interpolationsloch zu einem Satz zusammenführen und Nicht-Prosa erkennen — die
+    246 sinken auf eine echte Zahl, das Rauschen verschwindet.
+  - **Option B — Regel unverändert lassen:** die 246 manuell nach Kategorien
+    abarbeiten und die zerrissenen Sätze als bekanntes, akzeptiertes Rauschen führen.
+  Erst diese Entscheidung macht die Abarbeitung sinnvoll.
+  **Reihenfolge (Plan, keine Entscheidung):** `helper-argument` (27) zuerst, dann die
+  `management/`-Konzentration. Umschalten auf `CHECK_I18N_UNLOCALIZED_STRICT=1` erst bei 0.
 <!-- FTP-Konten: Ansatz am 2026-09-26 von pure-pw/pure-ftpd auf SFTPGo
      umgestellt. P1-M17..P1-M20 sind durch P1-M21..P1-M29 abgeloest.
      Begruendung: (a) pure-ftpd kann AES128-SHA nicht anbieten, damit
@@ -362,78 +368,19 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   Umschalten muss benannt sein, wer das macht und ab wann gegen P1-M27
   geprüft wird. Ohne diesen Schritt steht nach dem Umbau alles gleichzeitig
   still.
-- [ ] **DOC-13 — die Kollision ist behoben, die Entscheidung ist es nicht. Neu geprüft
-  2026-09-28: zwei Nummernräume kollidieren, nicht einer.** Die Eintragung trug
-  ursprünglich drei offene Unterpunkte; zwei davon halten der Messung nicht mehr.
-
-  **(a) Fünf `P1-M`-IDs — erledigt, die Invariante ist erfüllt.** Der Eintrag führt
-  als Annahmekriterium wörtlich
-  `grep -oE "^- \[.\] \*\*P1-M[0-9]+" AGENTS.todo.md | grep -oE "P1-M[0-9]+" |
-  sort | uniq -d` und verlangt, dass sie **leer** ist. Sie ist leer. Die
-  Umnummerierung **ist erfolgt** und war nicht still: `P1-M9a` und `P1-M9b` existieren
-  als eigene Positionen. Die Kollision zwischen der LOW-Welle und der späteren
-  Verifikationswelle ist damit aufgelöst. `P1-M9`, `P1-M14` und `P1-M16` kommen
-  heute ohnehin nur noch in diesem Text vor, eine zweite Definition existiert nicht.
-  Damit entfällt die offene Entscheidung „umnummerieren oder `a`/`b`-Schema" aus
-  diesem Board. Was aus (a) **bleibt**, ist eine Regel, keine Position: eine ID, die
-  zwei Befunde meint, macht jede Auswertung unzuverlässig, die sie als Schlüssel
-  nutzt. Bei M15 hat das nachweislich zu einer Falschmeldung geführt (DOC-12).
-
-  **(b) Fünf DOC-IDs — am 2026-09-28 nachgemessen: nicht (mehr) belegt.** `DOC-3`,
-  `DOC-4`, `DOC-6` und `DOC-8` sind je **einmal** als Position definiert; `DOC-7`
-  kommt **null** Mal vor. Die zweite, widersprechende Definition ist mit den
-  `[x]`-Einträgen am 2026-09-28 entfernt worden. `DOC-3` ist als Position ganz
-  entfallen, weil die Frontier-Korrektur in `235453a` sie erledigt hat.
-
-  **(c) Zwei FE-IDs — halb belegt, und eine Zahl war falsch.** `FE-2` ist **keine**
-  Dublette: Übersichtszeile und Einzeleintrag sagen beide „halb", es sind Index und
-  Definition, nicht zwei Befunde. Bei `FE-8` war die Dublette real — die
-  Übersichtszeile führte es als *Erledigt*, der Arbeitsplan zugleich als
-  „größter bekannter Brocken". **Die Statusangabe „Erledigt" hielt, die Begründung
-  nicht:** sie nannte „13/13 Modals auf `ModalShell`", und
-  `grep -rnE '<(ModalShell|ModalDialogShell)' frontend/src | grep -v __tests__ |
-  grep -v ModalDialogShell.tsx | awk -F: '{print $1}' | sort -u | wc -l` liefert
-  **28** Nutzungsdateien (`UIProvider.tsx` ist die globale Bestätigung und zählt
-  mit; ohne sie 27). Dass kein Dialog außerhalb der Shell liegt, zeigt
-  `grep -rlE 'modal-open|role="dialog"|<dialog' frontend/src | grep -v __tests__ |
-  grep -v ModalShell.tsx` — leer. Also nicht
-  „13 von 13", sondern **28 von 28** — die Migration ist vollständig, die Zahl im
-  Board war veraltet. **Aufgelöst 2026-09-28:** der Arbeitsplan führt FE-8 nicht
-  mehr als offene Arbeit, und die Übersichtszeile trägt den nachgemessenen Stand.
-
-  **Gemeinsame Ursache:** mehrere unabhängige Erfassungswellen haben jeweils bei
-  1 begonnen, ohne dass ein ID-Schema vergeben wurde. Deshalb ist die Korrektur
-  eine **sprechende Säule** (Konvention: `FE-<n>`/`P1-<fam>-<n>` für offene
-  Positionen, `<id>#close` für Abschlussnotizen) und nicht bloß ein Umnummerieren.
 
 ### Offene Dokumentations-Wahrheit (kein Code, aber irreführend)
 
-- [ ] **DOC-6 — Falschaussage, und die Fundstelle ist selbst falsch.** Das Board
-  schrieb die Kanban-Flakiness
-  `frontend/tests/e2e/helpers/KanbanHelper.ts:135,143,196,231` zu. **Die Datei hat
-  209 Zeilen — Zeile 231 existiert nicht, 196 ist leer.** `:135` ist
-  `expect(...).toBeVisible({ timeout: 10000 })`, also Playwrights Assertion-Timeout
-  und kein Verweilen. Der einzige Treffer für Wartezeiten steht bei `:85` und sagt
-  ausdrücklich: *„There are no retries or fixed dwell delays"*.
-  **Die Aussage „Flakiness durch Wartezeiten in diesem Helper" ist damit widerlegt;
-  die Ursache der Kanban-Flakiness bleibt davon unberührt unbekannt.** Keine
-  Zeilenangabe in diesem Board ohne Zitat daneben — `file:NN` ohne Zitat ist nicht
-  überprüfbar und sieht trotzdem wie ein Beleg aus.
+- [ ] **Kanban-Flakiness — die Board-Angabe zur Ursache ist widerlegt, die echte
+  Ursache bleibt unbekannt.** Das Board schrieb sie Wartezeiten in
+  `frontend/tests/e2e/helpers/KanbanHelper.ts:135,143,196,231` zu. Das hält nicht:
+  Die Datei hat 209 Zeilen, `:196` ist leer, `:135` ist ein Assertion-Timeout, und
+  `:85` sagt ausdrücklich „There are no retries or fixed dwell delays". Welche
+  Ursache die Flakes tatsächlich haben, ist offen und nicht gemessen.
 - [~] wartet auf einen Durchgang nach der Board-Bereinigung vom 2026-09-27 — die Widersprüche lagen an `[x]`-Einträgen, die entfernt wurden. **DOC-4 / DOC-5 / DOC-11** — das Board widerspricht sich selbst: Positionen
   sind an einer Stelle `[x] abgeschlossen` und an anderer als `offen` /
   `in Arbeit` geführt. Betroffen: CR-DATA-018/CR-BE-018 (Z. 284/341 vs. 543/545),
   CR-CRM-008 (Z. 282/283/338 vs. 618), CR-DOC-001 (Z. 410, behauptet „V038").
-- [ ] **DOC-8 / DOC-12 — zur Hälfte erledigt (2026-09-28).** Der Teil, der
-  P0-A13/P0-B7 betraf, ist abgeschlossen: beide sind als **Nicht-Leak nachgewiesen**,
-  die Blöcke `P0-A`/`P0-B` tragen keinen offenen Eintrag mehr, und ihre Überschriften
-  behaupten keinen reopened Befund mehr. Damit ist DOC-12 für dieses Thema erledigt.
-  **Offen bleibt der P1-M15-Teil**, und er ist eine Folge der ID-Kollision, nicht
-  desselben Problems: `P1-M15` war über zwei Erfassungswellen hinweg doppelt belegt
-  (LOW-Befund und Brand-Guard), beide wurden als *ein* Item geführt, und daraus wurde
-  am 2026-09-25 in `2bfaed8` mit einem 894-Zeilen-Test eine Umsetzung gemeldet, die
-  den falschen Gegenstand behob. Die Nummern-Kollision selbst ist inzwischen behoben
-  (siehe DOC-13 (a), Invariante leer) — **die inhaltliche Frage, ob der LOW-Befund
-  je behoben wurde, ist das, was hier noch offen ist, und sie ist nicht gemessen.**
 
 ### Braucht eine Entscheidung oder Betriebs-Evidenz (kein Code)
 
@@ -556,33 +503,47 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 ### Strukturbefunde, nicht jetzt umgesetzt
 
-- [ ] **`admin/` ist ein Sammelbecken:** 31 von 84 Specs (37 %) in einem flachen
-  Verzeichnis, das Pricing, CRM-Dokumente, Tenant-Administration,
-  Galerie-Konfiguration und Projekt-Boards mischt, während `client/`,
-  `photographer/`, `crm/`, `delivery/` und `selection/` sauber actor- bzw.
-  domänenskaliert sind. Zusätzlich drei fast identische 80–107-Zeilen-Specs für
-  Negativ-Berechtigungen mit identischem 85-Zeilen-Setup. **Eigene Aufgabe, keine
-  Nebenwirkung eines Cleanup.**
-- [ ] **E2E ist strukturell blind für CSP-Verstöße — und lässt sich das nicht
-  vollständig remedieren.** Befund aus der Wasserzeichen-Reparatur: `playwright.config.ts`
-  hat **keinen** `webServer`-Block, der E2E-Server ist ein separat gestarteter
-  `pnpm dev` auf 4321 (`scripts/e2e-up.sh:200`), und `vite.config.ts:43-55` setzt im
-  `server`-Block **keinen** `headers`-Schlüssel. Die Suite läuft also **ohne jeden
-  CSP-Header** — `tests/e2e/admin/watermark.spec.ts:37` ist seit Juni grün, während in
-  Produktion jedes Rendern fehlschlug. **Warum trotzdem kein Header nachziehen:** Die
-  Produktions-CSP steht in **keinem File dieses Repositories**; sie lebt nur im
-  Caddy-Volume von `proxy-stack` (`proxy-stack_caddy_file/_data`). Eine E2E-Kopie
-  müsste `script-src`, `style-src` und `connect-src` raten, und ein Fehlversuch
-  erzeugt über 1000 Fehlschläge, die über das Produkt nichts aussagen.
+- [ ] Entscheidung offen: **`admin/` ist ein Sammelbecken — Ziel-Taxonomie festlegen, bevor umgebaut wird.**
+  **34** von **89** Specs (**38 %**) liegen flach in `frontend/tests/e2e/admin/`
+  (`find frontend/tests/e2e -name '*.spec.ts' | wc -l` → 89;
+  `ls frontend/tests/e2e/admin/*.spec.ts | wc -l` → 34) und das Verzeichnis mischt
+  Pricing, CRM-Dokumente, Tenant-Administration, Galerie-Konfiguration und
+  Projekt-Boards, während `client/`, `photographer/`, `crm/`, `delivery/` und
+  `selection/` sauber actor- bzw. domänenskaliert sind. Zusätzlich drei fast
+  identische Specs mit identischem 85-Zeilen-Setup (Zeilen 1–85 byte-gleich, nur
+  Zeile 8 und ab Zeile 86 verschieden): `no-b2b-label.spec.ts` (107),
+  `no-create-org.spec.ts` (102), `org-edit.spec.ts` (111) — die E2/E5/E6-Familie,
+  wobei E5/E6 Negativ-Berechtigungen sind und E2 der Positiv-Fall auf demselben
+  Gerüst. **Eigene Aufgabe, keine Nebenwirkung eines Cleanup.**
+  **Entscheidung: nach welcher Taxonomie wird geschnitten — Domäne (`preise`, `crm`,
+  `organisation`, `galerie`, `board`) oder Akteur — und wird die E2/E5/E6-Familie
+  dabei in ein gemeinsames Setup gezogen?** Ohne Zielstruktur erzeugt jede
+  Verschiebung nur einen zweiten Zwischenstand.
+- [~] wartet auf den CSP-Policy-Text an lesbarer Stelle im Repo. **E2E ist strukturell
+  blind für CSP-Verstöße — und lässt sich das nicht vollständig remedieren.**
+  Befund aus der Wasserzeichen-Reparatur: `playwright.config.ts` hat **keinen**
+  `webServer`-Block (`grep -n webServer frontend/playwright.config.ts` → kein Treffer),
+  der E2E-Server ist ein separat gestarteter `pnpm dev` auf 4321
+  (`scripts/e2e-up.sh:200` → `log "Frontend (separat): … pnpm dev"`), und
+  `vite.config.ts:43-55` setzt im `server`-Block **keinen** `headers`-Schlüssel
+  (`grep -n headers frontend/vite.config.ts` → kein Treffer). Die Suite läuft also
+  **ohne jeden CSP-Header** — `tests/e2e/admin/watermark.spec.ts:37` →
+  `const preview = page.locator('main img[alt="Watermark Preview"]')` ist seit Juni
+  grün, während in Produktion jedes Rendern fehlschlug. **Warum trotzdem kein Header
+  nachziehen:** Die Produktions-CSP steht in **keinem File dieses Repositories**; sie
+  lebt nur im Caddy-Volume von `proxy-stack` (`proxy-stack_caddy_file/_data`). Eine
+  E2E-Kopie müsste `script-src`, `style-src` und `connect-src` raten, und ein
+  Fehlversuch erzeugt über 1000 Fehlschläge, die über das Produkt nichts aussagen.
   **Was stattdessen getan wurde, und das ist der bessere Weg:** Der Renderer-Test
   erzwingt die Allowlist `['data:', 'https:']` in einem `Image`-Mock und verweigert
   alles andere mit `error` — die Suite prüft also die konkrete Invariante, ohne die
   Umgebung nachzubauen. Zwei Zusatztests sichern den Mock selbst ab.
   **Bleibende Lücke:** Andere künftige CSP-Blockaden (Skripte, Fonts, `connect-src`)
   bleiben für E2E unsichtbar. Das ist eine Eigenschaft der Testumgebung, die man
-  kennen muss — **nicht** durch Raten behoben. Wenn sie behoben werden soll, braucht
-  es zuerst den Policy-Text an einer lesbaren Stelle im Repo; das ist eine
-  Owner-Entscheidung und eine Frage an den `proxy-stack`.
+  kennen muss — **nicht** durch Raten behoben. **Bedingung für eine Remediation:**
+  der Policy-Text liegt zuerst lesbar im Repo; das ist eine Owner-Entscheidung und
+  eine Frage an den `proxy-stack`. **Bis dahin kein offener Bug, sondern eine
+  dokumentierte Blindstelle.**
 - [ ] manuell prüfen: **Auszahlungsdaten nach dem automatischen Seed** — Stand ist
   gemessen und **korrekt**: `bank_holder` = `Florian Reisinger`, `bank_iban` =
   `DE96100110012179986174`, `bank_bic` = `NTSBDEB1XXX`, `company_*` = Linz,
@@ -693,7 +654,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 - **CR-DATA-018/CR-BE-018:** Contract-E-Mail-Uniqueness zuerst mit bestehenden Mechanismen/Schema lösen; V039+ nur als letztes Mittel.
 - **CR-PAY-013/CR-CODE-002:** Purchase-time-Organisationszuordnung ist beschlossen; Snapshot-/Migrationsauswirkungen vor Implementierung spezifizieren.
 
-- [ ] **Welle 3 — historischer Backlog:** Historische P1/P2-Einträge entweder durch unabhängige Verifikation schließen oder mit aktuellem Reproduktionstest als offen bestätigen.
 - [~] wartet auf die Betriebsnachweise selbst (E2E-Harness, Live-Smoke, GHCR-/Dependency-/Deployment-/Live-Runtime-Nachweise, Secret-/Artifact-Hygiene). **Welle 4 — Betrieb/Release:** E2E-Harness, Live-Smoke, GHCR-/Dependency-/Deployment-/Live-Runtime-Nachweise und Secret-/Artifact-Hygiene abschließen.
 **Akzeptierte Risiken aus dieser Welle (User-Entscheidungen, 2026-09-25/26):**
 
@@ -795,7 +755,6 @@ Beide Org-Pakete sind `private`; `backend` und alle 7 E2E-Jobs scheitern mit `un
 - **Produktions-Exiftool-Timeout**: `PhotoDownloadController.php:225/228`, `ImageProcessor.php:254/401`, `PhotoProcessingService.php:85` rufen `Process::run()` ungeschützt mit 60 s Default. Auf einem überlasteten Host wird ein Download zum 500.
 - **P1-M11 D1**: die bewusst erhaltene `captured_at`-Divergenz (FTP persistiert, HTTP nicht) hat **keinen Repo-Test** — ein künftiges `captured_at` in `$fillable` würde stillschweigend greifen.
 - **P1-M11 D2**: `createWithId()` koppelt `PhotoProcessingService` per Ausnahmeliste; ein neues EXIF-Feld wirft `InvalidPhotoIdentifierException`, `FtpController` behält die Datei → der Import-Poll klemmt dauerhaft.
-- **P1-M15 F2**: `GalleryService::updateGroup()` ohne Brand-Chain-Guard; ein Cross-Brand-Super-Admin kann eine `srp`-Gruppe unter einen `rp`-Elternteil hängen. In `features/gallery/01-core-architecture.md` §8.5 als offen deklariert.
 - **P1-I5**: Non-Root-Eigenschaft des gepinnten `d762d47c` ist **unverifiziert** (Pull 401). Das Gate erzwingt den Nachweis, sobald die Pakete public sind.
 - **`preset_id`-Backend**: 3 neue PHPUnit-Tests wurden **nie ausgeführt**. `features/infrastructure/27-volume-licensing-presets.md:55` dokumentiert den numerischen Vertrag noch nicht.
 
@@ -818,7 +777,6 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
 - [~] wartet auf die gebauten Suites — fokussierte Suites zuerst, danach die Gates. **Payment-/Media-Gates:** fokussierte Suites zuerst, danach Full-PHPUnit, Full-Vitest, `pnpm lint:fix`, `pnpm build`, `@smoke` und feature-getaggte E2E-Läufe.
 
 ### Workstream B — CRM/Contract/Infra
-- [ ] Historische P1/P2-Einträge in stale/duplicate, active fix, product decision und verification/environment einteilen; nur aktive Findings mit aktuellem Reproduktionstest umsetzen.
 - [~] wartet auf Betriebs-/CI-Evidenz: GHCR-Pullability, Deployment-, Secret-, Scheduler-, Storage-Nachweise und die Plugin-Live-Runtime. E2E-Harness, Smoke, parallele Shards, GHCR-Digests/Pullability, Deployment-/Secret-/Scheduler-/Storage-Nachweise und Plugin-Live-Runtime als eigenständige Evidence-Tasks behandeln.
 - [~] wartet auf den Abschluss der Review- und Checklistenpunkte; die Betriebsnachweise (Monitoring/Runbook, Rollback, unabhängige Verifikation) stehen parallel aus. Vor Live-GO: Contract-/Card-Testing-Review, Radar/3DS/Webhook/Privacy-Checkliste, Monitoring/Runbook, Rollback und unabhängige Verifikation abschließen.
 
@@ -863,7 +821,7 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
 
 **Welle-0-Triage-Ergebnis (Read-only gegen `HEAD=59f9ec6`; 2026-09-24):**
 - **Kanonisch aktiv:** CR-PAY-010, CR-FE-030, CR-CRM-008, CR-TEST-012, CR-FE-041, P1-F7 sowie die verbleibenden Reste aus P1-F10/F11, P1-A6/A7, P1-M9/M14 und das Model-Person-Count-Limit.
-- **Bereits gefixt/stale oder duplicate:** P1-F1–F6/F8/F9/F12, P1-A1–A4, P1-L1–L6 (nur echte Lightroom-Runtime bleibt als Evidence offen), P1-M1/M2/M10–M13/M15, CR-FE-011/019/023/024/034/039, CR-TEST-005, CR-INF-005/006/019, P0-A13/P0-B7/CR-BE-010, CR-CODE-001 sowie die beiden Age-Proof-Positivfallzeilen. Die historischen Checkboxen dürfen nicht als neue Bugs double-countet werden.
+- **Bereits gefixt/stale oder duplicate:** P1-F1–F6/F8/F9/F12, P1-A1–A4, P1-L1–L6 (nur echte Lightroom-Runtime bleibt als Evidence offen), P1-M1/M2/M10–M13/M15, CR-FE-011/019/023/024/034/039, CR-TEST-005, CR-INF-005/006/019, P0-A13/P0-B7/CR-BE-010, CR-CODE-001 sowie die Age-Proof-Positivfallzeile. Die historischen Checkboxen dürfen nicht als neue Bugs double-countet werden.
   - **Korrigiert 2026-09-26 (DOC-8):** `P0-A13`, `P0-B7` und `CR-BE-010` standen in dieser Pauschalliste als gefixt, waehrend `CR-BE-010` (Z. 619) und die Einzelposition `P0-A13 (MEDIUM; reopened)` (Z. 815) sie ausdruecklich als NICHT gefixt fuehren. Die Einzeleintraege sind massgeblich, die Pauschalliste war falsch. **P0-A13 und P0-B7 sind OFFEN.**
 - **Nur Verification/Environment:** Tag-Playwright-Ausführung, MariaDB-Migration/E2E, GHCR-/Deployment-/Secret-/Scheduler-/Storage-Nachweise, Plugin-Live-Runtime und Card-Testing-Betriebschecklisten. Diese Blöcke benötigen keinen erfundenen lokalen PASS.
 - **Schema-Entscheidung:** CR-BE-018/CR-DATA-005/CR-DATA-018 bleiben bis zur realen Multi-Connection-/Template-Scope-Entscheidung offen; bestehende V036–V038 dürfen fachlich konsolidiert werden, V039+ nur bei nachgewiesenem unvermeidbarem Defizit. V037 hat zusätzlich einen MariaDB-CHECK-Kompatibilitätsblocker.
@@ -1091,7 +1049,6 @@ getrennt.
 **Backend (PHPUnit) — implementiert & verifiziert**
 **Frontend (Vitest + Playwright) — implementiert & verifiziert**
 **Offen (User-Entscheidungen / Nachträge)**
-- [ ] Age-Proof-Positivfall (Re-Upload **ohne** vorhandenen Proof) — durch die UI nicht erzeugbar, siehe Analyse unten (produktionsseitig auf `age_proof_path`-NULL beschränkt)
 - [ ] Lokale E2E-Flakiness `database is locked` (SQLite `busy_timeout=null`) → Workaround `--workers=1`; Fix wäre `busy_timeout`/WAL (Backend)
 - Hinweis (Setup): lokale `backend/.env` braucht `MODEL_REGISTRATION_THROTTLE_LIMIT=1000` (Parität zu `.env.ci`), sonst 429-Flakes im E2E-Grep-Lauf. `.env` ist gitignored.
 
@@ -1110,7 +1067,7 @@ getrennt.
 **Neue/geänderte Tests**
 **Gefundener & gefixter Frontend-Bug (durch den neuen E2E-Test aufgedeckt)**
 **Bewusst ausgelassen (begründet)**
-- [ ] **Age-Proof-Positivfall (Re-Upload ohne vorhandenen Proof):** nicht ohne Backend-Eingriff erzeugbar. `ProfileEditForm` blendet das Feld nur bei `profile.age_proof_required && !profile.age_proof_uploaded_at` ein; das öffentliche `POST /api/model-registration/{token}` erzwingt den Nachweis (`required`, v2), und der Owner-`POST /api/model-profil/{token}` setzt `age_proof_required=true` + die Datei (beim Bestehen bleibt `age_proof_uploaded_at` gesetzt). `age_proof_path === null` bei `age_proof_required === true` ist damit nur über Altbestände/einen direkten DB-Reset erreichbar — ein solcher Zustand existiert produktionsseitig nicht regulär.
+- **Age-Proof-Positivfall (Re-Upload ohne vorhandenen Proof):** nicht ohne Backend-Eingriff erzeugbar. `ProfileEditForm` blendet das Feld nur bei `profile.age_proof_required && !profile.age_proof_uploaded_at` ein; das öffentliche `POST /api/model-registration/{token}` erzwingt den Nachweis (`required`, v2), und der Owner-`POST /api/model-profil/{token}` setzt `age_proof_required=true` + die Datei (beim Bestehen bleibt `age_proof_uploaded_at` gesetzt). `age_proof_path === null` bei `age_proof_required === true` ist damit nur über Altbestände/einen direkten DB-Reset erreichbar — ein solcher Zustand existiert produktionsseitig nicht regulär.
 
 **Umgebungs-Hinweise (kein Code-Delta)**
 - Lokal scheiterte der Lauf zunächst an `429 Too Many Attempts`: das (gitignored) `backend/.env` hat **keinen** `MODEL_REGISTRATION_THROTTLE_LIMIT` → Limiter-Default 10/min. CI setzt in `backend/.env.ci` `MODEL_REGISTRATION_THROTTLE_LIMIT=1000`. Für die Verifikation wurde `.env` temporär auf 1000 gesetzt und danach **byte-identisch wiederhergestellt** (md5-geprüft).
