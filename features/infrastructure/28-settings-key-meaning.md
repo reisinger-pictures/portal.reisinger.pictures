@@ -70,10 +70,13 @@ unbemerkt geblieben und die Regeldiskrepanz mit verdeckt.
    kanonischen Namen nicht kennen. Also gehört die Regel auf den Key
    (siehe `SettingResolver`) oder unmittelbar vor das Schreiben, nach der
    Zuordnung.
-4. **`numeric` ist nur dort zu weit, wo der Key ein ganzzahliger
-   Centbetrag ist.** Siehe unten: `calc_base_price` ist **Euro**, nicht Cent,
-   und seine Dezimal-Annahme ist ein testgeschützter Vertrag. Eine pauschale
-   Umstellung auf `integer` hätte diesen Vertrag gebrochen.
+4. **`numeric` ist nur dort zuweit, wo der Key ein ganzzahliger
+   Centbetrag ist.** Das war die Begründung, `calc_base_price` und
+   `calc_hourly_rate` von `numeric` auf `integer` zu heben — und diese beiden
+   Felder sind inzwischen Cent. Ihre Einheit stand nie zur Entscheidung offen,
+   sie wurde entschieden: `754df6c`. Die pauschale Aussage gilt weiter:
+   `numeric` bleibt richtig, wo der Key **kein** ganzzahliger Centbetrag ist,
+   also bei `calc_flatrate_multiplier` und den drei `mult_*`-Faktoren.
 
 ## Die Einheit steht nicht am Feldnamen — sie stand nirgends
 
@@ -99,7 +102,7 @@ zunächst angenommen: **dieselbe Antwort mischt drei Einheiten.**
 |---|---|---|
 | **Cent** (Integer) | `base_price`, `setup_fee`, `privacy_fee`, `extra_image_fee` | Seeder `DatabaseSeeder.php:164-168`, unter dem Kommentar „Per-image license base prices are stored in cents": `'8000'`, `'5000'`, `'20000'`, `'1500'`. Karte `CalculatorSettingsCard.tsx:38-41` liest `/100`, `:52-55` schreibt `Math.round(x * 100)` — für **genau diese vier** |
 | **Cent** (Integer) | `price_web`, `price_print`, `price_original` | Seeder `DatabaseSeeder.php:148-150` → `'7500'`, `'14500'`, `'45000'`; serverseitige Begründung `SettingsController.php:307-313`; verbraucht als Roh-Integer **ohne** `/100` in `pricingLogic.ts:55-58` über `getRequiredTerm` (`:14`, blankes `parseInt`) |
-| **Euro** (Fließkomma) | `calc_base_price`, `calc_hourly_rate` | Seeder `DatabaseSeeder.php:159-160` → `'50'` / `'80'`; dieselbe Karte schreibt `data.calc_base_price` **ohne** `×100` (`CalculatorSettingsCard.tsx:47`) und liest **ohne** `/100` (`:33-34`); `ShootingCalculatorSettingsTest:209-210` pinnt `'49.99'` und `'99.5'` |
+| **Cent** (Integer) | `calc_base_price`, `calc_hourly_rate` | Seeder `DatabaseSeeder.php:164-165` → `'5000'` / `'8000'`; Migration `V045` rechnet bestehende Zeilen wert-erhaltend um (`50 → 5000`, `80 → 8000`) und bricht ab, sobald ein Wert `>= 1000` bereits cent-konform aussieht; die Karte behandelt sie jetzt **identisch** zu den vier `srp_*`-Feldern: `/ CENTS_PER_EURO` beim Lesen (`CalculatorSettingsCard.tsx:64-65`), `Math.round(x * CENTS_PER_EURO)` beim Schreiben (`:78-79`). **Vorher stand hier „Euro (Fließkomma)"** — das war der Grund für die Umstellung. `ShootingCalculatorSettingsTest.php:408-409` weist `'49.99'` und `'99.5'` jetzt als **abgelehnt** nach („Dezimal (früher gültig)"). |
 | **Faktor** (dimensionslos) | `mult_commercial`, `mult_unlimited`, `mult_international` | `DatabaseSeeder.php:151-153` → `'2.0'`, `'1.5'`, `'1.5'` |
 | **Faktor** (dimensionslos) | `calc_flatrate_multiplier` | `DatabaseSeeder.php:163` → `'1.2'` |
 
@@ -124,11 +127,13 @@ zunächst angenommen: **dieselbe Antwort mischt drei Einheiten.**
 >    `original · 2 · 3 · 2 − web`. In Euro wären das 15 € und 170 € Aufpreis
 >    für **ein** Bild; in Cent sind es die Dimensionen, die der Key verspricht.
 
-Der Unterschied zwischen der ersten Cent-Zeile und der Euro-Zeile ist eine
-einzige Zeile im Frontend — `CalculatorSettingsCard.tsx:47` schickt Euro,
-`:52` schickt Cent, für zwei Felder derselben Karte. Es gab **kein** Feld, das
+Der Unterschied zwischen der ersten Cent-Zeile und der Euro-Zeile war **eine
+einzige Zeile im Frontend** — `CalculatorSettingsCard.tsx:47` schickte Euro,
+`:52` schickte Cent, für zwei Felder derselben Karte. Es gab **kein** Feld, das
 die Einheit mitteilt, und keinen Vertrag, der sie festlegt. Ein Client, der
-`calc_base_price` wie `base_price` behandelt, liegt um den Faktor 100 daneben.
+`calc_base_price` wie `base_price` behandelte, lag um den Faktor 100 daneben.
+Seit `754df6c` ist die Karte einheitlich: alle sechs Geldfelder lesen mit
+`/ CENTS_PER_EURO` und schreiben mit `Math.round(x * CENTS_PER_EURO)`.
 
 Das ist die eigentliche Beobachtung hinter der ursprünglichen Frage nach den
 Typen, und sie ist schärfer als „die Beträge sind Strings": Strings sind ein
@@ -162,14 +167,16 @@ Nummer 3.
 5000/20000/1500, geschrieben `Math.round(euros * 100)`, gelesen
 `Number(value)/100`). `numeric` akzeptierte dort einen Bruchcent wie
 `'5000.5'` — einen Wert, den kein Client erzeugen und kein Verbraucher
-darstellen kann. Die `calc_*`-Felder bleiben bewusst `numeric`.
+darstellen kann. `numeric` bleibt deshalb bei den Feldern, die **keine**
+Geldbeträge sind: `calc_flatrate_multiplier` und die drei `mult_*`-Faktoren.
 
-**In Arbeit, nicht erledigt:** die Umstellung von `calc_base_price` und
-`calc_hourly_rate` auf Cent. Der Zielzustand ist entschieden
-(`../tech/02-backend-architecture.md` § 4 Nummer 1), der Ist-Stand ist
-gemessen, die Umsetzung liegt beim Code-Agenten. Bis dahin gilt: diese beiden
-Felder sind **Geld in Euro** und damit ein offener Vertragsbruch, den dieses
-Dokument nicht beschönigt.
+**Erledigt in `754df6c`:** `calc_base_price` und `calc_hourly_rate` sind Cent.
+Ihre Validierung wurde von `nullable|numeric|min:0` auf `nullable|integer|min:500`
+gehoben — identisch zu `base_price`. Damit ist `min:500` der einheitliche
+Einheitenwächter über **alle** Geldfelder dieses Endpoints; jeder Key, der einen
+Bruchcent annähme, wäre ein Loch derselben Art wie der Legacy-Alias oben.
+`ShootingCalculatorSettingsTest.php:408-409` pinnt das: `'49.99'` und `'99.5'`
+sind jetzt abgelehnt, nicht mehr gültig.
 
 ## Warum das ein geschriebener Vertrag ist
 
@@ -227,23 +234,26 @@ pro Marke nützt nur, wenn die Bedeutung am Key hängt. Solange die
 Bedeutung am Anfragetermin hängt, würde eine zweite Marke denselben Fehler
 nur vervielfachen — dann eben pro Marke statt einmal.
 
-## Der API-Typ: entschieden, Umsetzung in Arbeit
+## Der API-Typ: entschieden und umgesetzt
 
 `settings.value` ist `text` (`V001__initial_portal_schema.php:223`), deshalb
 liefert MySQL **jeden** Wert als JSON-**String** zurück — `base_price` kommt als
 `"8000"`, `mult_commercial` als `"2.0"`. Das ist der Ist-Stand und die
 Formatgrenze eines Stores, der heterogene Werte hält.
 
-**Die Entscheidung ist gefallen:** Die API ist die Grenze, nicht die
-Datenbank. Draußen gehen **Geld als Integer** heraus (§ 4 Nummer 4), innen darf
-`settings` ein Key-Value-Paar mit String-Werten bleiben. Die Umstellung der
-Geldfelder auf Integer in der Antwort ist **in Arbeit** (Code-Seite, nicht in
-diesem Commit).
+**Die Entscheidung ist gefallen und umgesetzt:** Die API ist die Grenze, nicht
+die Datenbank. Draußen gehen **Geld als Integer** heraus (§ 4 Nummer 4), innen
+darf `settings` ein Key-Value-Paar mit String-Werten bleiben. Die Geldfelder
+stehen seit `754df6c` und `9d31e8e` in der Antwort als Integer; die
+Faktoren und Anzahlen behalten ihre bisherige Form, weil sie keine
+Geldbeträge sind.
 
-Diese Entscheidung allein genügt aber nicht, weil sie das Problem nur
-verschiebt: Solange `calc_base_price` in Euro und `base_price` in Cent kommt,
-ist „die API gibt Cent-Integer aus" für die `calc_*`-Felder falsch. Genau
-deshalb steht die Einheit jetzt am Feld und nicht nur in einem Umstellungs-
-plan. Ein Client wendet heute `Number(value)` an; das ist auf der sicheren
-Seite. Wer die Einheit aus dem JSON-Typ ableitet, hat sie nicht — der Typ sagt
-sie nicht.
+Diese Entscheidung allein hätte das Problem nur verschoben: Solange
+`calc_base_price` in Euro und `base_price` in Cent aus demselben Endpoint
+gekommen wären, wäre „die API gibt Cent-Integer aus" für die `calc_*`-Felder
+falsch gewesen. Genau deshalb musste die Einheit **jedes** Geldfeldes feststehen,
+**bevor** die Antwort umgestellt wurde — nicht danach.
+
+Ein Client wendet heute `Number(value)` an; das ist auf der sicheren Seite.
+Wer die Einheit aus dem JSON-Typ ableitet, hat sie nicht — der Typ sagt sie
+nicht.
