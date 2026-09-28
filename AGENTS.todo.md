@@ -66,7 +66,7 @@ braucht, nicht nach Schwere oder Familie.
 
 | Position | Was | Quelle |
 |---|---|---|
-| ~~FE-8~~ | **Erledigt** — 13/13 Modals auf `ModalShell` | unten |
+| ~~FE-8~~ | **Erledigt** — `ModalShell`-Migration vollständig: 28/28 Nutzungsdateien (inkl. `UIProvider`; Beleg + Kommando in DOC-13 (c)) | unten |
 | ~~P1-M21~~ | **Erledigt** — `FtpSlug` + Validierung | FTP-Block |
 | ~~P1-M22~~ | **Erledigt** — `SftpGoClient` + `FtpCredentialService` | FTP-Block |
 | ~~P1-M23~~ | **Erledigt** — Passwort-Fluss | FTP-Block |
@@ -115,8 +115,8 @@ prüfen, dann anfassen:
    FTPS überhaupt der Weg ist. Danach ist die Grundsatzentscheidung belegt.
 2. **Harness bauen** (P1-M35) — beantwortet die Cipher-Frage und ist die
    Grundlage für den Integrationstest (P1-M38).
-3. **A-Gruppe abarbeiten**, beginnend mit FE-8 (größter bekannter Brocken) und
-   den M-Positionen in der Reihenfolge M21 → M22 → M23 → M30.
+3. **A-Gruppe abarbeiten** — die M-Positionen in der Reihenfolge
+   M21 → M22 → M23 → M30.
 4. **Cutover** (P1-M36) erst, wenn 1–3 stehen und M27 beantwortet ist.
 
 > **ID-Nennräume, am 2026-09-28 nachgemessen:** Die unter Position **DOC-13**
@@ -124,9 +124,10 @@ prüfen, dann anfassen:
 > aufgelöst — die dort formulierte Invariante ist leer, und `P1-M9a`/`P1-M9b` zeigen,
 > dass umnummeriert wurde. Von den fünf `DOC`-IDs ist keine doppelt, `DOC-7` kommt
 > gar nicht vor. `FE-2` ist keine Dublette (Index und Definition sagen beide „halb").
-> **Offen bleibt genau eine echte Doppelnennung:** `FE-8` steht in der Übersicht als
-> *erledigt* und im Arbeitsplan als offener Brocken. Wer nach unten scrollt und die
-> untere Zeile liest, hält den Stand für den anderen.
+> **Aufgelöst am 2026-09-28:** Die letzte offene Doppelnennung ist beseitigt —
+> `FE-8` stand in der Übersicht als *erledigt* und im Arbeitsplan als offener
+> Brocken; der Arbeitsplan führt es nicht mehr als offene Arbeit, und die
+> Übersichtszeile trägt den nachgemessenen Stand (28/28, Beleg in DOC-13 (c)).
 
 ---
 
@@ -386,20 +387,19 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
   **(c) Zwei FE-IDs — halb belegt, und eine Zahl war falsch.** `FE-2` ist **keine**
   Dublette: Übersichtszeile und Einzeleintrag sagen beide „halb", es sind Index und
-  Definition, nicht zwei Befunde. Bei `FE-8` ist die Dublette real — die
-  Übersichtszeile führt es als *~~Erledigt~~*, der Arbeitsplan bei Z. 118 zugleich als
-  „größter bekannter Brocken". **Die Statusangabe „Erledigt" hält, die Begründung
-  nicht:** sie nennt „13/13 Modals auf `ModalShell`", und
+  Definition, nicht zwei Befunde. Bei `FE-8` war die Dublette real — die
+  Übersichtszeile führte es als *Erledigt*, der Arbeitsplan zugleich als
+  „größter bekannter Brocken". **Die Statusangabe „Erledigt" hielt, die Begründung
+  nicht:** sie nannte „13/13 Modals auf `ModalShell`", und
   `grep -rnE '<(ModalShell|ModalDialogShell)' frontend/src | grep -v __tests__ |
   grep -v ModalDialogShell.tsx | awk -F: '{print $1}' | sort -u | wc -l` liefert
-  **28** Nutzungsdateien. Kein Dialog außerhalb der Shell gefunden. Also nicht
+  **28** Nutzungsdateien (`UIProvider.tsx` ist die globale Bestätigung und zählt
+  mit; ohne sie 27). Dass kein Dialog außerhalb der Shell liegt, zeigt
+  `grep -rlE 'modal-open|role="dialog"|<dialog' frontend/src | grep -v __tests__ |
+  grep -v ModalShell.tsx` — leer. Also nicht
   „13 von 13", sondern **28 von 28** — die Migration ist vollständig, die Zahl im
-  Board war veraltet. Was zu tun bleibt: die Widersprüchlichkeit zwischen Übersicht
-  („erledigt") und Arbeitsplan („Brocken") auflösen, indem der Plan auf den
-  tatsächlichen Stand gesetzt wird.
-  Wer nach unten scrollt und die untere liest, hält FE-8 für erledigt und
-  übersieht 13 Modals. **Deshalb** steht in der Einstiegs-Übersicht ausdrücklich,
-  dass nur die obere zählt.
+  Board war veraltet. **Aufgelöst 2026-09-28:** der Arbeitsplan führt FE-8 nicht
+  mehr als offene Arbeit, und die Übersichtszeile trägt den nachgemessenen Stand.
 
   **Gemeinsame Ursache:** mehrere unabhängige Erfassungswellen haben jeweils bei
   1 begonnen, ohne dass ein ID-Schema vergeben wurde. Deshalb ist die Korrektur
