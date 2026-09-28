@@ -16,7 +16,7 @@ test.describe('Model-Filter & Deeplink', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Bereitschafts-Kategorie + Stufe schreibt URL-Parameter, Abwählen entfernt ihn, Reload behält den Filter', { tag: ['@feature:model-registration'] }, async ({ page }) => {
+    test('Bereitschafts-Kategorie + Stufe schreibt URL-Parameter, Abwählen entfernt ihn, Reload behält den Filter', { tag: ['@feature:model-registration', '@feature:model-filters'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -59,7 +59,7 @@ test.describe('Model-Filter & Deeplink', () => {
         ).toHaveAttribute('aria-pressed', 'true');
     });
 
-    test('?model=<id>-Deeplink öffnet den Detail-Dialog; Schließen entfernt den Parameter', { tag: ['@feature:model-registration'] }, async ({ page, request }) => {
+    test('?model=<id>-Deeplink öffnet den Detail-Dialog; Schließen entfernt den Parameter', { tag: ['@feature:model-registration', '@feature:model-filters'] }, async ({ page, request }) => {
         const auth = new AuthHelper(page);
 
         // Fixture via the sanctioned API helper (no DB/localStorage hacking).
