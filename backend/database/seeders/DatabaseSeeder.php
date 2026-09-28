@@ -156,8 +156,13 @@ class DatabaseSeeder extends Seeder
             'term_original' => 'Originalauflösung. Kommerzielle Werbung & uneingeschränkte Nutzung.',
             'term_territory_national' => 'Nutzung nur im Inland (national).',
             'term_territory_international' => 'Weltweite, uneingeschränkte räumliche Nutzung.',
-            'calc_base_price' => '50',
-            'calc_hourly_rate' => '80',
+            // Money is cents, whole-euro amounts included (owner decision
+            // 2026-09-28). These two were euros — `'50'` / `'80'` — until
+            // V045__calculator_money_fields_to_cents converted the stored rows;
+            // V016__calculator_settings_defaults still seeds the euro values and
+            // must not be edited, so the migration supersedes it.
+            'calc_base_price' => '5000',
+            'calc_hourly_rate' => '8000',
             'calc_images_per_hour' => '6',
             'calc_outdoor_images_per_hour' => '8',
             'calc_flatrate_multiplier' => '1.2',

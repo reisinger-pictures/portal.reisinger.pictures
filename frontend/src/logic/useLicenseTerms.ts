@@ -4,6 +4,19 @@ import {apiMutate, fetcher} from '../api';
 /**
  * Scalar setting values of `/api/settings/license-terms`.
  *
+ * **Every money field is a cent amount served as a JSON number** (owner
+ * decisions 2026-09-27 and 2026-09-28), even though `settings.value` is a
+ * `text` column and the stored form is the text `'8000'`. Money is therefore
+ * `number | undefined` here, and so is the index signature — a response member
+ * that is a factor (`mult_*`, `calc_flatrate_multiplier`), a count
+ * (`calc_images_per_hour`, `calc_outdoor_images_per_hour`) or licence text
+ * stays the stored `string`, which is also the only way a consumer can tell a
+ * cent amount from a plain number at a glance.
+ *
+ * A consumer that needs text (`parseInt`, `String(...)`) has to say so, which
+ * is the point: a silent string/number mixup is what made one form send two
+ * units in the first place.
+ *
  * The index signature only describes the *scalar* settings this response
  * carries. `volume_pricing` is the one object-valued member and is therefore
  * NOT covered by it: it holds `preset_id` (a number) plus a tier list. Any
@@ -14,18 +27,27 @@ import {apiMutate, fetcher} from '../api';
  * photo page.
  */
 export interface LicenseTerms {
-    calc_base_price?: string;
-    calc_hourly_rate?: string;
+    /** Cent amount. */
+    calc_base_price?: number;
+    /** Cent amount. */
+    calc_hourly_rate?: number;
+    /** A count, not money. */
     calc_images_per_hour?: string;
+    /** A count, not money. */
     calc_outdoor_images_per_hour?: string;
+    /** A dimensionless factor, not money. */
     calc_flatrate_multiplier?: string;
-    srp_base_price?: string;
-    srp_setup_fee?: string;
-    srp_privacy_fee?: string;
-    srp_extra_image_fee?: string;
+    /** Cent amount. */
+    srp_base_price?: number;
+    /** Cent amount. */
+    srp_setup_fee?: number;
+    /** Cent amount. */
+    srp_privacy_fee?: number;
+    /** Cent amount. */
+    srp_extra_image_fee?: number;
     pricing_strategy?: string;
 
-    [key: string]: string | undefined;
+    [key: string]: string | number | undefined;
 }
 
 export interface LicenseTermsPayload {

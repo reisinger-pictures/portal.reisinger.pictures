@@ -4,7 +4,10 @@ import {useState} from 'react';
 import {InvoiceDiscount, InvoiceItem} from '../../../api';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import ModalShell from '../../components/ModalShell';
-import {calculateB2CFlexPrice, calculateShootingPrice, ShootingDiscount, DEFAULT_OUTDOOR_IMAGES_PER_HOUR} from '../../../logic/shootingCalculator';
+import {
+    calculateB2CFlexPrice, calculateShootingPrice, ShootingDiscount,
+    CENTS_PER_EURO, DEFAULT_OUTDOOR_IMAGES_PER_HOUR
+} from '../../../logic/shootingCalculator';
 import {formatEuro} from '../../../logic/formatCurrency';
 
 interface ShootingCalculatorModalProps {
@@ -45,16 +48,19 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
             setup: srpSetup,
             extraImages: srpExtra,
             isFullyPrivate: srpPrivate,
-            srp_base_price: terms?.srp_base_price ? String(Number(terms.srp_base_price) / 100) : undefined,
-            srp_setup_fee: terms?.srp_setup_fee ? String(Number(terms.srp_setup_fee) / 100) : undefined,
-            srp_privacy_fee: terms?.srp_privacy_fee ? String(Number(terms.srp_privacy_fee) / 100) : undefined,
-            srp_extra_image_fee: terms?.srp_extra_image_fee ? String(Number(terms.srp_extra_image_fee) / 100) : undefined,
+            // The API serves cents; this calculator works in euros.
+            srp_base_price: terms?.srp_base_price ? Number(terms.srp_base_price) / CENTS_PER_EURO : undefined,
+            srp_setup_fee: terms?.srp_setup_fee ? Number(terms.srp_setup_fee) / CENTS_PER_EURO : undefined,
+            srp_privacy_fee: terms?.srp_privacy_fee ? Number(terms.srp_privacy_fee) / CENTS_PER_EURO : undefined,
+            srp_extra_image_fee: terms?.srp_extra_image_fee ? Number(terms.srp_extra_image_fee) / CENTS_PER_EURO : undefined,
         });
         packagePriceEuro = res.packagePrice;
         finalPriceEuro = res.finalPrice;
         discountAbsolute = res.discountAbsolute;
     } else {
         const res = calculateShootingPrice({
+            // Handed over as the cents the API serves: the studio calculator
+            // computes in cents and hands cents back.
             calc_base_price: terms?.calc_base_price,
             calc_hourly_rate: terms?.calc_hourly_rate,
             calc_images_per_hour: terms?.calc_images_per_hour,
@@ -67,9 +73,12 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
             isReorder: calcIsReorder,
             discount: calcDiscount,
         });
-        packagePriceEuro = res.packagePrice;
-        finalPriceEuro = res.finalPrice;
-        discountAbsolute = res.discountAbsolute;
+        // The euro boundary of this dialog, in one place: the calculator
+        // reasons in cents, while `formatEuro` and the invoice line below both
+        // take euros. Two calculators, one explicit conversion each.
+        packagePriceEuro = res.packagePrice / CENTS_PER_EURO;
+        finalPriceEuro = res.finalPrice / CENTS_PER_EURO;
+        discountAbsolute = res.discountAbsolute / CENTS_PER_EURO;
     }
 
     const handleCalculate = () => {

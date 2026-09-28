@@ -164,18 +164,25 @@ test.describe('Manual Documents & CRM Workflow', () => {
         // access is inside it: the write has to precede the navigation, because
         // `ShootingCalculatorModal` fetches the terms when the page mounts.
         await withGlobalSettingsLock(SHOOTING_CALCULATOR_SETTINGS_LOCK, async () => {
+            // Money is cents (owner decision 2026-09-28, whole-euro amounts
+            // included), so 50 € is 5000 and 80 €/h is 8000. `E2ESessionHelper`
+            // rejects a non-integer or sub-minimum cent amount on both the read
+            // and the write leg, so this fixture cannot silently go back to euros
+            // and quietly re-pass with a calculator that now reads cents.
             const effective = await helper.setShootingCalculatorSettings({
-                calc_base_price: 50,
-                calc_hourly_rate: 80,
+                calc_base_price: 5000,
+                calc_hourly_rate: 8000,
                 calc_images_per_hour: 6,
                 calc_outdoor_images_per_hour: 8,
                 calc_flatrate_multiplier: 1.2,
             });
             // Guard the premise of the arithmetic asserted below: these are the
             // factors the calculator modal will consume, not merely what was sent.
+            // The money fields come back as cent numbers, the counts and the
+            // factor as the stored text — the API's own typing.
             expect(effective).toEqual({
-                calc_base_price: '50',
-                calc_hourly_rate: '80',
+                calc_base_price: 5000,
+                calc_hourly_rate: 8000,
                 calc_images_per_hour: '6',
                 calc_outdoor_images_per_hour: '8',
                 calc_flatrate_multiplier: '1.2',
@@ -204,10 +211,13 @@ test.describe('Manual Documents & CRM Workflow', () => {
             const itemTitleInput = page.locator('.form-control').filter({ hasText: 'Titel / Name' }).locator('input').first();
             await expect(itemTitleInput).toHaveValue('Individuelles Shooting-Paket', { timeout: 10000 });
 
-            // Gesamtsumme prüfen. Mit den oben gesetzten Faktoren:
-            // Basis 50 + Zeit (1 h × 80) + Bilder ((80/6) × 6) = 210 → psychologisch 209;
-            // davon 50 % Rabatt: 104,50 → psychologisch gerundet 105.
-            // Der Rabattposten im Beleg ist 209 − 105 = 104, die Summe also 105,00 €.
+            // Gesamtsumme prüfen. Mit den oben gesetzten Faktoren, in Cent
+            // gerechnet (Owner-Entscheidung 2026-09-28) und für den Beleg
+            // zurück in Euro:
+            // Basis 5000 + Zeit (1 h × 8000) + Bilder ((8000/6) × 6) = 21000 →
+            // psychologisch 20900; davon 50 % Rabatt: 10450 → 10500.
+            // Der Rabattposten im Beleg ist 20900 − 10500 = 10400 = 104,00 €,
+            // die Summe also 105,00 €.
             await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('105,00 €');
         });
     });

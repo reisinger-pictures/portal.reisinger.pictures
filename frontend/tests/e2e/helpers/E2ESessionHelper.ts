@@ -13,6 +13,9 @@ const e2eBrandSettings = {
 /**
  * The five pricing factors the shooting-calculator modal consumes, in the exact
  * spelling of `/api/settings/license-terms`.
+ *
+ * Two of them are money, three are not — and that split is the reason this
+ * helper cannot be unit-blind.
  */
 const SHOOTING_CALCULATOR_SETTING_KEYS = [
     'calc_base_price',
@@ -22,9 +25,38 @@ const SHOOTING_CALCULATOR_SETTING_KEYS = [
     'calc_flatrate_multiplier',
 ] as const;
 
-type ShootingCalculatorSettingKey = typeof SHOOTING_CALCULATOR_SETTING_KEYS[number];
+/**
+ * The subset that is money, and therefore in **cents** (owner decision
+ * 2026-09-28: every monetary amount is cents, whole-euro amounts included).
+ *
+ * `calc_images_per_hour` / `calc_outdoor_images_per_hour` are counts and
+ * `calc_flatrate_multiplier` a dimensionless factor; none of them is scaled.
+ */
+const SHOOTING_CALCULATOR_MONEY_KEYS = ['calc_base_price', 'calc_hourly_rate'] as const;
 
-export type ShootingCalculatorSettings = Record<ShootingCalculatorSettingKey, string>;
+/**
+ * Smallest cent amount the licence-terms endpoint accepts for the two money
+ * fields — `integer|min:500`, the rule `base_price` has always carried. Used
+ * only to catch a unit error, never to accept or reject a legitimate value.
+ */
+const MIN_CENTS_PER_MONEY_FIELD = 500;
+
+type ShootingCalculatorSettingKey = typeof SHOOTING_CALCULATOR_SETTING_KEYS[number];
+type ShootingCalculatorMoneyKey = typeof SHOOTING_CALCULATOR_MONEY_KEYS[number];
+type ShootingCalculatorNonMoneyKey = Exclude<ShootingCalculatorSettingKey, ShootingCalculatorMoneyKey>;
+
+/**
+ * The five calculator factors in the API's own typing: the two money fields as
+ * cent **numbers**, the two counts and the factor as the stored **text**.
+ *
+ * Typing the record this way is what makes the unit check hold on the restore
+ * leg as well. A record of strings (`'5000'`) would have to be stringified to
+ * be written and re-parsed to be checked, and a stringified amount is exactly
+ * what a `× 100` bug looks like after it has been through `String()`.
+ */
+export type ShootingCalculatorSettings =
+    & Record<ShootingCalculatorMoneyKey, number>
+    & Record<ShootingCalculatorNonMoneyKey, string>;
 
 /**
  * `PUT /management/settings/license-terms` validates these three as `required`,
@@ -33,8 +65,42 @@ export type ShootingCalculatorSettings = Record<ShootingCalculatorSettingKey, st
  */
 const LICENSE_MULTIPLIER_KEYS = ['mult_commercial', 'mult_unlimited', 'mult_international'] as const;
 
+/**
+ * Reject a money field that is not an integer cent amount.
+ *
+ * Without this the helper is unit-blind: it would keep accepting `'50'` for
+ * `calc_base_price`, and every calculator E2E test would still pass after the
+ * unit changed — the fixtures would go on writing euros into a cents field and
+ * the assertions would go on reading euros back out of it, with the two errors
+ * cancelling. That is the exact shape of the defect the 2026-09-28 cents
+ * decision removed from production code: a value that is a valid *euro* amount
+ * landing in a column that means cents, silently.
+ *
+ * The check is deliberately about the *unit*, not about a particular number: any
+ * integer at or above the endpoint's own minimum is a plausible cent amount,
+ * while `'50'` and `50.5` can only be euros or sub-cent fractions.
+ */
+const isShootingCalculatorMoneyKey = (key: string): key is ShootingCalculatorMoneyKey =>
+    (SHOOTING_CALCULATOR_MONEY_KEYS as readonly string[]).includes(key);
+
+const assertIntegerCents = (key: string, value: unknown): void => {
+    if (typeof value !== 'number' || !Number.isInteger(value)) {
+        throw new Error(
+            `Calculator setting "${key}" is money and must be integer cents from ` +
+            `/api/settings/license-terms, got ${JSON.stringify(value)} (${typeof value}). ` +
+            `Euros are not accepted here — a spec that means 50 € has to write 5000.`,
+        );
+    }
+    if (value < MIN_CENTS_PER_MONEY_FIELD) {
+        throw new Error(
+            `Calculator setting "${key}" is ${value} cents, below the ${MIN_CENTS_PER_MONEY_FIELD}-cent ` +
+            `minimum the licence-terms endpoint enforces. That is a euro amount written into a cents field.`,
+        );
+    }
+};
+
 const pickShootingCalculatorSettings = (payload: Record<string, unknown>): ShootingCalculatorSettings => {
-    const settings: Partial<ShootingCalculatorSettings> = {};
+    const settings: Record<string, number | string> = {};
     for (const key of SHOOTING_CALCULATOR_SETTING_KEYS) {
         const value = payload[key];
         if (typeof value !== 'string' && typeof value !== 'number') {
@@ -42,10 +108,16 @@ const pickShootingCalculatorSettings = (payload: Record<string, unknown>): Shoot
                 `Calculator setting "${key}" is missing from /api/settings/license-terms: ${JSON.stringify(payload)}`,
             );
         }
-        settings[key] = String(value);
+        settings[key] = value;
     }
 
-    // Every key of the record was validated above, so the partial is complete.
+    for (const key of SHOOTING_CALCULATOR_MONEY_KEYS) {
+        assertIntegerCents(key, settings[key]);
+    }
+
+    // Every key of the record was validated above: the money keys are integers
+    // and the others are the text the endpoint serves, so the cast states the
+    // check rather than papering over it.
     return settings as ShootingCalculatorSettings;
 };
 
@@ -194,6 +266,11 @@ export class E2ESessionHelper {
      *
      * Writing is only safe while holding `SHOOTING_CALCULATOR_SETTINGS_LOCK`:
      * the row is shared by every worker of the run.
+     *
+     * The two money keys are in **cents** (owner decision 2026-09-28), and both
+     * this method and {@link E2ESessionHelper.getShootingCalculatorSettings}
+     * enforce it, so a spec cannot write euros and then read euros back and call
+     * the round trip a success.
      */
     async setShootingCalculatorSettings(
         settings: Partial<Record<ShootingCalculatorSettingKey, string | number>>,
@@ -204,6 +281,12 @@ export class E2ESessionHelper {
         for (const key of SHOOTING_CALCULATOR_SETTING_KEYS) {
             const value = settings[key];
             if (value === undefined) continue;
+            // Held to the same unit contract on the way out as on the way in:
+            // a spec cannot introduce the euro/cent mismatch it would then be
+            // unable to detect when reading the row back.
+            if (isShootingCalculatorMoneyKey(key)) {
+                assertIntegerCents(key, value);
+            }
             payload[key] = String(value);
         }
         if (Object.keys(payload).length === 0) {

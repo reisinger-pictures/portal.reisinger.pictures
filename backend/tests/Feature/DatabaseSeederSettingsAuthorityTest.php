@@ -51,8 +51,8 @@ class DatabaseSeederSettingsAuthorityTest extends TestCase
         'term_original' => 'Originalauflösung. Kommerzielle Werbung & uneingeschränkte Nutzung.',
         'term_territory_national' => 'Nutzung nur im Inland (national).',
         'term_territory_international' => 'Weltweite, uneingeschränkte räumliche Nutzung.',
-        'calc_base_price' => '50',
-        'calc_hourly_rate' => '80',
+        'calc_base_price' => '5000',
+        'calc_hourly_rate' => '8000',
         'calc_images_per_hour' => '6',
         'calc_outdoor_images_per_hour' => '8',
         'calc_flatrate_multiplier' => '1.2',
@@ -151,6 +151,21 @@ class DatabaseSeederSettingsAuthorityTest extends TestCase
             '8000',
             Setting::query()->where('key', 'base_price')->where('brand', Brand::B2B->value)->value('value')
         );
+
+        // The same has to hold for the two studio-calculator amounts, which
+        // carry the identical divide-then-multiply since the cents decision.
+        // They are the pair that used to skip the multiplication, so a
+        // regression here is a quote off by a factor of 100.
+        $this->assertSame(5000, $payload['calc_base_price']);
+        $this->assertSame(8000, $payload['calc_hourly_rate']);
+        $this->assertSame(
+            '5000',
+            Setting::query()->where('key', 'calc_base_price')->where('brand', Brand::B2B->value)->value('value')
+        );
+        $this->assertSame(
+            '8000',
+            Setting::query()->where('key', 'calc_hourly_rate')->where('brand', Brand::B2B->value)->value('value')
+        );
     }
 
     /**
@@ -223,9 +238,13 @@ class DatabaseSeederSettingsAuthorityTest extends TestCase
      * response (`mapApiToForm` then `mapFormToApi`, plus the `mult_*`
      * fallbacks from `onSubmit`).
      *
-     * The cent-valued `srp_*` fields are divided by 100 when the form is
-     * hydrated and multiplied back by 100 with `Math.round` on submit, so the
-     * round trip is exercised exactly as the browser performs it.
+     * The cent-valued money fields — `calc_base_price`, `calc_hourly_rate` and
+     * the four `srp_*` fees — are divided by 100 when the form is hydrated and
+     * multiplied back by 100 with `Math.round` on submit, so the round trip is
+     * exercised exactly as the browser performs it. Before the 2026-09-28 cents
+     * decision the two `calc_*` fields took only the first leg, which is how
+     * one form ended up sending euros for the studio calculator and cents for
+     * the flex one.
      *
      * @param  array<string, mixed>  $terms
      * @return array<string, float|int>
@@ -235,8 +254,8 @@ class DatabaseSeederSettingsAuthorityTest extends TestCase
         $flatrateSurcharge = round(((float) $terms['calc_flatrate_multiplier'] - 1) * 100);
 
         return [
-            'calc_base_price' => (float) $terms['calc_base_price'],
-            'calc_hourly_rate' => (float) $terms['calc_hourly_rate'],
+            'calc_base_price' => $this->eurosToCents($terms['calc_base_price']),
+            'calc_hourly_rate' => $this->eurosToCents($terms['calc_hourly_rate']),
             'calc_images_per_hour' => (int) $terms['calc_images_per_hour'],
             'calc_outdoor_images_per_hour' => (int) $terms['calc_outdoor_images_per_hour'],
             'calc_flatrate_multiplier' => 1 + ($flatrateSurcharge / 100),
