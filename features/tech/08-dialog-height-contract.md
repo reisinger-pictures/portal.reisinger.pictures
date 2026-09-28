@@ -2,7 +2,7 @@
 
 > **Status:** Soll-Zustand.
 > Domain: `tech`
-> Stand: 2026-09-27
+> Stand: 2026-09-28
 > Betrifft: `frontend/src/ui/components/ModalShell.tsx`,
 > `frontend/src/ui/components/ModalDialogShell.tsx`.
 
@@ -149,17 +149,17 @@ rendern (§6), und das an einem Tag. Drei Gründe dagegen:
   Footer in einer Spalte ist für den Normalfall die richtige Antwort; die
   bounded Layoutform für einen Dialog, der ohnehin nicht scrollt, ist
   zusätzliche Struktur ohne zusätzlichen Nutzen.
-- **Fünf Dialoge bauen sich das bounded Layout bis heute selbst.**
-  `RatingStatusModal` und die Kamera-Anleitung in `ManagementFtpInbox` tragen
-  `max-h-90vh flex flex-col` per `boxClassName`, `GalleryAccessModal` und
-  `PhotographerTeamModal` `max-h-80vh flex flex-col`, `AIBatchEditModal`
-  `h-90vh flex flex-col` — jeweils mit einem eigenen `flex-1 overflow-y-auto`
-  als Body. Das ist eine zweite, parallele Implementierung derselben Idee. Ein
-  Default-Wechsel würde ihnen eine **zweite, verschachtelte** Scrollregion
-  geben, während die geteilte Lösung sie schrittweise ablösen soll.
-  `GalleryModal` stand bis zur Umstellung auf `scrollableBody` in dieser Gruppe
-  und ist deshalb nicht mehr darin: es ist der Dialog, an dem die geteilte
-  Lösung zuerst durchgezogen wurde (§2).
+- **Drei Dialoge bauen sich das bounded Layout bis heute selbst.**
+  `GalleryAccessModal` und `PhotographerTeamModal` tragen `max-h-80vh flex
+  flex-col` per `boxClassName`, `AIBatchEditModal` `h-90vh flex flex-col` —
+  jeweils mit einem eigenen `flex-1 overflow-y-auto` als Body. Das ist eine
+  zweite, parallele Implementierung derselben Idee. Ein Default-Wechsel würde
+  ihnen eine **zweite, verschachtelte** Scrollregion geben, während die geteilte
+  Lösung sie schrittweise ablösen soll. `GalleryModal` war der Dialog, an dem
+  die geteilte Lösung zuerst durchgezogen wurde (§2); `RatingStatusModal` und
+  die Kamera-Anleitung in `ManagementFtpInbox` sind inzwischen ebenfalls auf
+  `scrollableBody` umgestellt und stehen deshalb nicht mehr in dieser Gruppe
+  (§6.2, Nr. 19 und 24).
 - **Einige Dialoge haben die Grenze bewusst gestellt.** `ModelDetailModal`
   blendet die letzten `2rem` per `scroll-fade-bottom` aus und hält `pb-10`
   frei davon — das liest sich nur auf dem Element als „unten ist mehr", das
@@ -269,19 +269,20 @@ Konkret heißt das:
 | 16 | Fotografen-Team | `ModalShell` | nein | `ui/management/components/PhotographerTeamModal.tsx` |
 | 17 | Katalog-Eintrag | `ModalDialogShell` | nein | `ui/management/components/ProductModal.tsx` |
 | 18 | Projekt anlegen/bearbeiten | `ModalDialogShell` | nein | `ui/management/components/ProjectModal.tsx` |
-| 19 | Bewertungen & Status | `ModalShell` | nein | `ui/management/components/RatingStatusModal.tsx` |
+| 19 | Bewertungen & Status | `ModalShell` | ja | `ui/management/components/RatingStatusModal.tsx` |
 | 20 | Tarif-Rechner | `ModalShell` | nein | `ui/management/components/ShootingCalculatorModal.tsx` |
 | 21 | Textbaustein | `ModalDialogShell` | ja | `ui/management/components/TextSnippetModal.tsx` |
 | 22 | Nutzer bearbeiten | `ModalShell` | nein | `ui/management/components/UserPermissionsModal.tsx` |
 | 23 | Volume-Preset | `ModalDialogShell` | nein | `ui/management/components/VolumePresetSettingsCard.tsx` |
-| 24 | Kamera einrichten | `ModalShell` | nein | `ui/management/ManagementFtpInbox.tsx` |
+| 24 | Kamera einrichten | `ModalShell` | ja | `ui/management/ManagementFtpInbox.tsx` |
 | 25 | Angebot kalkulieren & senden | `ModalShell` | nein | `ui/management/ManagementOrdersView.tsx` |
 | 26 | Nutzer in Organisation einladen | `ModalDialogShell` | nein | `ui/management/ManagementOrgDetailView.tsx` |
 | 27 | Organisation anlegen | `ModalDialogShell` | nein | `ui/management/ManagementOrgsView.tsx` |
 | 28 | Auftrag anlegen/bearbeiten | `ModalDialogShell` | nein | `ui/photographer/components/PhotoJobModal.tsx` |
 
-15 über `ModalShell` direkt, 13 über `ModalDialogShell`. Davon **5** mit
-`scrollableBody` (Nr. 1, 7, 14, 15, 21), 23 im Default-Layout.
+15 über `ModalShell` direkt, 13 über `ModalDialogShell`. Davon **7** mit
+`scrollableBody` (Nr. 1, 7, 14, 15, 19, 21, 24), 21 im Default-Layout — davon
+drei mit handgerolltem begrenztem Box, siehe §6.3.
 
 ### 6.3 Gruppe B — eigenes Markup: 0
 
@@ -291,14 +292,14 @@ zwangsläufig eine der beiden Shells und erbt damit `role="dialog"`,
 `aria-modal`, den zugänglichen Namen, die Fokusfalle, Escape und den
 Backdrop-Klick.
 
-Fünf Dialoge begrenzen ihre Box trotzdem selbst, statt den Modus zu setzen —
+Drei Dialoge begrenzen ihre Box trotzdem selbst, statt den Modus zu setzen —
 das ist die verbleibende Teilmenge, die §3 als „zweite, parallele
-Implementierung" führt:
+Implementierung" führt. `RatingStatusModal` und die Kamera-Anleitung in
+`ManagementFtpInbox` standen früher in dieser Tabelle; sie sind inzwischen auf
+`scrollableBody` umgestellt (§6.2, Nr. 19 und 24):
 
 | Dialog | `boxClassName` | eigene Scrollregion |
 |---|---|---|
-| `RatingStatusModal` | `max-w-5xl flex flex-col max-h-90vh` | `flex-1 overflow-y-auto pr-2` |
-| Kamera-Anleitung in `ManagementFtpInbox` | `w-11/12 max-w-5xl max-h-90vh flex flex-col` | `flex-1 overflow-y-auto pr-2` + `scroll-fade-bottom pb-8` |
 | `GalleryAccessModal` | `max-w-2xl flex flex-col max-h-80vh` | `flex-1 overflow-y-auto` |
 | `PhotographerTeamModal` | `max-w-2xl flex flex-col max-h-80vh` | `flex-1 overflow-y-auto` |
 | `AIBatchEditModal` | `w-11/12 max-w-7xl h-90vh flex flex-col` | `flex-1 overflow-y-auto` |
