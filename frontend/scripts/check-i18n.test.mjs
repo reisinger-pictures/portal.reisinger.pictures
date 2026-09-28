@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -5,6 +6,7 @@ import {
   findModuleScopeLinguiMacros,
   findModuleScopeLinguiMacrosInTree,
   findUnlocalizedStrings,
+  findUnlocalizedStringsInTree,
 } from './check-i18n.mjs';
 
 describe('check-i18n Lingui scope guard', () => {
@@ -320,6 +322,22 @@ describe('check-i18n prose taxonomy (D-7)', () => {
       ]);
       expect(violations).toHaveLength(1);
     });
+  });
+});
+
+describe('check-i18n runner', () => {
+  it('makes unlocalized-string findings fatal (no warn-only path)', () => {
+    const script = resolve(process.cwd(), 'scripts/check-i18n.mjs');
+    const result = spawnSync(process.execPath, [script], { encoding: 'utf8' });
+
+    // D-7: unlocalized-string findings are always fatal. The checked-in source
+    // tree still carries them, so this pins the runner's exit contract rather
+    // than only the pure finder. If the backlog is ever driven to zero this
+    // precondition fails loudly and the runner must be re-checked, instead of
+    // the test passing for a different reason.
+    expect(findUnlocalizedStringsInTree().length).toBeGreaterThan(0);
+    expect(result.status, result.stderr).toBe(1);
+    expect(result.stderr).toContain('must be wrapped in a Lingui macro');
   });
 });
 
