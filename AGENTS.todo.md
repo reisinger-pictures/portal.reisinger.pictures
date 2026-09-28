@@ -573,21 +573,21 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   Problem nur, solange die Einheit nirgends steht — für `calc_*` wäre sie falsch.
   Vorher braucht es die Einheit am Feld oder im Vertrag. Einheitentabelle und
   Richtung stehen in `features/infrastructure/28-settings-key-meaning.md`.
-- [ ] **Vor dem Deploy zu prüfen: steht `base_price` auf Produktion auf 35?**
-  Ursache und Behebung sind erledigt, der Produktionswert ist es nicht.
-  `V004__ecommerce_and_governance.php:131` legt `base_price => '35.00'` an — 35 Cent,
-  unter der seit dem 2026-09-27 geltenden Validierung `min:500`. Der `DatabaseSeeder`
-  schrieb sein `'8000'` nur nie durch, weil er `insertOrIgnore` benutzte; jetzt schreibt
-  er per `upsert` (Owner-Entscheidung 2026-09-27, in `backend/AGENTS.md` festgehalten).
-  **Das hilft nur einer frischen oder neu geseedeten Datenbank.** Eine bestehende
-  Produktionsdatenbank behält 35, bis dort ein `db:seed` läuft — und dann liefert ein
-  Speichern aus der Rechner-Karte 422, weil sie den Wert round-tripped (0,35 → 35). Genau
-  das war der CI-Fehler an `package-calculator-config.spec.ts`.
-  **Gegenprobe auf dem Host** (nicht aus dem Repository ableitbar, deshalb hier und nicht
-  geraten): Wert von `base_price` in der `settings`-Tabelle für `brand = 'rp'` lesen. Steht
-  er unter 500, ist es kein Code-Fehler, sondern ein Datenwert — dann entweder einmalig
-  über die Rechner-Karte auf einen cent-konformen Betrag setzen oder gezielt korrigieren.
-  Steht er auf einem plausiblen Wert, ist nichts zu tun; `min:500` greift dann nicht.
+- [ ] **Gegenprobe vor jedem Deploy, der `base_price` berührt:** Der Wert der
+  `base_price`-Zeile ist **nicht** aus dem Repository ableitbar, weil `insertOrIgnore`
+  (jetzt `upsert`) den Seederwert nur beim Anlegen der Zeile schreibt und eine bestehende
+  Zeile unangetastet lässt. Am **2026-09-28** auf Produktion gemessen: `base_price = 8000`,
+  `price_web = 7500`, `price_print = 14500`, `price_original = 45000` — also plausibel, und
+  `min:500` greift nicht. **Damit ist der Auslöser des CI-Fehlers an
+  `package-calculator-config.spec.ts` auf frischen Datenbanken begrenzt** (dort stand
+  `35.00`, 35 Cent, weil `V004:131` die Zeile vorbelegt). Produktion war nie betroffen,
+  weil dort über die Oberfläche gesetzte Werte stehen. **Vor dem nächsten Deploy aber
+  erneut messen**, und zwar lesend über die öffentliche Route
+  `GET https://portal.reisinger.pictures/api/settings/license-terms` (liefert
+  `base_price` und `srp_base_price`) — steigt die Antwort mit 301 auf
+  `reisinger.pictures`, ist die falsche Domain erwischt: `APP_URL` ist
+  `portal.reisinger.pictures`. Steht der Wert unter 500, ist es ein Datenwert und kein
+  Code-Fehler.
 - [ ] **`GalleryGroup::firstOrCreate()` in `DatabaseSeeder.php:116` ist nicht
   mandantenfest** — der Lookup-Schlüssel ist `slug` **allein**, `brand` steht nur in den
   Values (Z. 118). Trifft `firstOrCreate` auf eine Zeile mit derselben Slug, aber
