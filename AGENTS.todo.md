@@ -638,67 +638,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   **Der Mechanismus des ursprünglichen Auftretens bleibt `unbelegt`.** Die Trennung ist
   trotzdem echt: ein Fehlschlag in der `ol li`-Zählung bedeutet jetzt „der Befehl griff
   und der Inhalt stimmt nicht", nicht mehr „der Befehl griff vielleicht nicht".
-- [ ] **Hypothese geprüft und widerlegt: der Checkout-Throttle war die Ursache der
-  8-Worker-Flakiness nicht.** Die Kette „`backend/.env` setzt keine
-  `CHECKOUT_THROTTLE_*`-Keys, also greifen die Defaults 5/10/30, und weil
-  `CheckoutKey.php:25-32` **pro IP** zählt, teilen sich alle acht Worker auf
-  `127.0.0.1` ein Budget" bricht an der zweiten Gliedstelle: **das lokale E2E-Backend
-  lief nie mit den Defaults.** `scripts/e2e-up.sh:32` setzt
-  `readonly E2E_CHECKOUT_LIMIT=1000`, `:169-171` setzt alle drei
-  `CHECKOUT_THROTTLE_*` darauf, `:208-210` reicht sie im `exec env`-Block noch einmal
-  durch. `backend/.env.e2e` enthält daher `CHECKOUT_THROTTLE_USER_PER_HOUR=1000`,
-  `…_IP_PER_HOUR=1000`, `…_IP_PER_DAY=1000` — **an der Datei geprüft, die der E2E-Lauf
-  tatsächlich benutzt.** Eingeführt am **2026-09-23** in `d46f95a`, also **vor** dem
-  gemeldeten Fehlschlag. `.env.ci:44-46` führt dieselben drei Werte.
-  **Wo die Defaults trotzdem greifen:** bei einem Entwickler-Backend unter
-  `php artisan serve` **ohne** `e2e-up.sh`. Für den Coupon-E2E-Test ist damit **keine
-  Ursache etabliert** — genau wie bei der Foto-Gruppe. Nicht weiter raten, welches
-  Budget wo greift.
-  **Bewahrt:** dass die E2E-Umgebung sich in einer Konfiguration von CI unterscheidet,
-  ist für beide Playwright-Gruppen widerlegt. Die Signatur bleibt unerklärt: der
-  Coupon-Test scheitert an 8 Workern und ist grün isoliert, seriell und in CI.
-- [ ] **Flaky: Fototest-Gruppe liefert 7, dann 12, dann 0 Fehlschläge für denselben
-  Code** (`FileDeliveryControllerTest`, `ModelPhoto*`). **Die bisherige Ursachenangabe
-  ist widerlegt.** Sie lautete `Storage::fake('local')`, während die `photos`-Disk auf
-  das echte `../photos` schreibt. Das kann nicht eintreten:
-  `Illuminate/Support/Facades/Storage.php:106` setzt die Wurzel eines gefaekten Disks
-  **immer** auf `storage_path('framework/testing/disks/'.$disk)`, nie auf die
-  konfigurierte Wurzel, und `:112` leert sie bei jedem Aufruf. Zudem faken die
-  Unterlagen genau die Disk, die sie lesen: `ModelFileStore.php:29` (`DISK = 'local'`)
-  gegen `ModelPhotoTest.php:36`; `FileDeliveryController.php:57` (`disk('photos')`)
-  gegen `FileDeliveryControllerTest.php:27` (`fake('photos')`). **Alle 28 Fundstellen
-  von `Storage::disk('photos')` in `backend/tests` sind korrekt** — 0 Fehlgebrauch.
-  **Nachgemessen 2026-09-28:** 15 aufeinanderfolgende Läufe der vier Klassen, je
-  63 Tests / 216 Assertions, **0 Fehlschläge** (3 seriell, danach 12 weitere seriell).
-  **Offen bleibt:** die Ursache ist damit **nicht identifiziert**, nur nicht die
-  behauptete. Für die gemeldeten 7/12/0 existiert **kein Artefakt**, die Prämisse
-  selbst ist ungeprüft. `phpunit.xml:40` setzt `DB_DATABASE=:memory:`; eine
-  `migrate:fresh` auf einer DB-Datei kann diese Gruppe also nicht beeinflussen.
-  **Keine zweite Ursache erfinden, um sie passend zu machen.**
-- [ ] **S1 hat die gemeinsame E2E-Datenbank migriert und geseedet — und dabei die
-  Migration des Coupon-Agenten mit angewandt.** Auch der Coupon-E2E-Test, den S2 unter
-  8 Workern als flaky gemeldet hat (`coupon-checkout-revalidation.spec.ts:168`),
-  bestand im CI-Run `36389471967` unter voller Shard-Last **✓** — die Flakiness
-  reproduziert ebenfalls nicht. **Muster über drei Befunde hinweg:** wysiwyg-Editor,
-  Foto-Tests und dieser Coupon-Test scheitern **lokal** und bestehen in CI. Bevor
-  irgendetwas davon als Code-Defekt behandelt wird, ist die lokale E2E-Umgebung zu
-  untersuchen — sonst wird ein Umgebungsproblem dreimal als drei Fehler behoben.
-  Parallele Agenten auf demselben Working
-  Tree teilen nicht nur den Git-Index, sondern jeden Nebenzustand, den sie per Kommando
-  verändern. Ein `migrate` auf einer geteilten E2E-DB ist kein lokaler Schritt.
-  **Für künftige parallele Wellen: getrennte Datenbanken pro Agent, oder die
-  Datenbankmigration dem Agenten zuweisen, der nach allen anderen fertig ist.**
-  Ergänzung zu §5.6.
-- [ ] **Meine eigene Rundungsanweisung war unvollständig, und ich habe sie als geprüft
-  ausgegeben.** Für die Umstellung von `roundToPsychologicalValue` auf Cent habe ich
-  Schwellen und Raster skaliert und behauptet, das Verhalten bleibe exakt erhalten —
-  nachgerechnet an `round(v/5)*5` gegen `round(v_cents/500)*500`. Den Abzug
-  `rounded -= 1` habe ich nicht mitgerechnet. **Gemessen:** 278.472 von 285.543 Beträgen
-  ab 12 € weichen ab (97,5 %); 12,00 € wird zu 9,99 € statt 9,00 €. Der Abzug erzeugt
-  die **…9**-Endung, er ist also genau der, der **nicht** skaliert werden darf. S1 hat
-  es erkannt, gegen 227.667 Beträge verifiziert und korrigiert; ich habe unabhängig
-  nachgerechnet und die Zahl bestätigt. **Muster:** eine N-teilige Äquivalenzbehauptung
-  entweder für alle N Teile belegen oder ausdrücklich sagen, welche Teile ungeprüft sind.
 - [ ] **Gegenprobe vor jedem Deploy, der `base_price` berührt:** Der Wert der
   `base_price`-Zeile ist **nicht** aus dem Repository ableitbar, weil `insertOrIgnore`
   (jetzt `upsert`) den Seederwert nur beim Anlegen der Zeile schreibt und eine bestehende
@@ -811,7 +750,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 #### P1
 
-- [ ] **INFRA-2:** `ci.yml` E2E-`container:` ohne `options: --user root`, `Dockerfile.e2e` endet auf `USER www-data` (uid 1000) → Checkout/`pnpm install` schreiben in einen uid-1000-fremden Host-Mount → EACCES. Nie gelaufen, weil CI am Pull starb. **CI-blockierend.**
 
 #### P2 (Details je Workstream)
 
