@@ -695,6 +695,26 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   (`Brand` als ENUM mit zwei Werten, 6 Tabellen; tatsächlich VARCHAR + Cast auf **19**
   Modellen). **`11` und `12` stehen auf „Soll-Zustand (Ziel)" ohne superseded-Marker.**
   Lebende Quelle: `21-brand-config-driven.md` + `22-brand-settings-overlay.md`.
+- [ ] **E2E ist strukturell blind für CSP-Verstöße — und lässt sich das nicht
+  vollständig remedieren.** Befund aus der Wasserzeichen-Reparatur: `playwright.config.ts`
+  hat **keinen** `webServer`-Block, der E2E-Server ist ein separat gestarteter
+  `pnpm dev` auf 4321 (`scripts/e2e-up.sh:200`), und `vite.config.ts:43-55` setzt im
+  `server`-Block **keinen** `headers`-Schlüssel. Die Suite läuft also **ohne jeden
+  CSP-Header** — `tests/e2e/admin/watermark.spec.ts:37` ist seit Juni grün, während in
+  Produktion jedes Rendern fehlschlug. **Warum trotzdem kein Header nachziehen:** Die
+  Produktions-CSP steht in **keinem File dieses Repositories**; sie lebt nur im
+  Caddy-Volume von `proxy-stack` (`proxy-stack_caddy_file/_data`). Eine E2E-Kopie
+  müsste `script-src`, `style-src` und `connect-src` raten, und ein Fehlversuch
+  erzeugt über 1000 Fehlschläge, die über das Produkt nichts aussagen.
+  **Was stattdessen getan wurde, und das ist der bessere Weg:** Der Renderer-Test
+  erzwingt die Allowlist `['data:', 'https:']` in einem `Image`-Mock und verweigert
+  alles andere mit `error` — die Suite prüft also die konkrete Invariante, ohne die
+  Umgebung nachzubauen. Zwei Zusatztests sichern den Mock selbst ab.
+  **Bleibende Lücke:** Andere künftige CSP-Blockaden (Skripte, Fonts, `connect-src`)
+  bleiben für E2E unsichtbar. Das ist eine Eigenschaft der Testumgebung, die man
+  kennen muss — **nicht** durch Raten behoben. Wenn sie behoben werden soll, braucht
+  es zuerst den Policy-Text an einer lesbaren Stelle im Repo; das ist eine
+  Owner-Entscheidung und eine Frage an den `proxy-stack`.
 - [ ] manuell prüfen: **Auszahlungsdaten nach dem automatischen Seed** — Stand ist
   gemessen und **korrekt**: `bank_holder` = `Florian Reisinger`, `bank_iban` =
   `DE96100110012179986174`, `bank_bic` = `NTSBDEB1XXX`, `company_*` = Linz,
