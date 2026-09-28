@@ -5,8 +5,9 @@
 # 1. `#` inside a folded `command: >` block. The folded scalar joins every line
 #    into ONE line, and `sh` starts a comment at a `#` that appears mid-line. The
 #    comment then swallows the rest of the line — the path loop, `migrate`,
-#    `db:seed` and the final `exec`. Observed effect: the backend never reached
-#    php-fpm and Docker restarted it in a loop while the log stayed quiet.
+#    `app:seed-if-fresh` and the final `exec`. Observed effect: the backend
+#    never reached php-fpm and Docker restarted it in a loop while the log
+#    stayed quiet.
 #
 # 2. `$` inside a folded `command: >` block. Docker Compose v5.0.2 emits every
 #    command substitution as `$$(...)`, even when the file already contains
@@ -89,12 +90,24 @@ fi
 
 # The migration gate and the supervisor hand-off must all be reachable.
 for step in 'validate-production-env || exit 1' 'ops:validate-production || exit 1' \
-            'migrate --force' 'db:seed --force' 'admin:update' \
+            'migrate --force' 'app:seed-if-fresh' 'admin:update' \
             'ftp:provision-folders --fix-permissions' 'scout:sync-index-settings' \
             'queue:restart' 'exec /usr/local/bin/portal-backend-supervisor'; do
     grep -qF -- "$step" <<<"$CMD_BLOCK" \
         || fail "the start sequence lost a step: $step"
 done
+
+# The seed must stay conditional. `DatabaseSeeder` writes its 28 declared
+# `settings` keys with `upsert` on (key, brand) and is therefore authoritative
+# for exactly those keys, while AGENTS.md §13 mandates `docker restart
+# portal_backend` after every sync with PHP changes. An unconditional
+# `db:seed --force` in the start sequence therefore rewrote 28 production keys
+# on every mandated restart, without a human ever running the seed — discovered
+# during a real deploy on 2026-09-28. Owner decision: the seed stays for a
+# first install, but only a never-seeded database is seeded.
+if grep -qF 'artisan db:seed' <<<"$CMD_BLOCK"; then
+    fail 'the start sequence seeds unconditionally; it must call app:seed-if-fresh'
+fi
 
 # --- 3. a published port must have a listener behind it ----------------------
 # The camera-facing port is the left half of `ports:`, the container port the

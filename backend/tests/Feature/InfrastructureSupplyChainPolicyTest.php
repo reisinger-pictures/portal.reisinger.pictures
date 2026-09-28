@@ -462,9 +462,16 @@ PHP;
         // frueheren `case`-Verzweigung mit `/*) ;;` nachempfunden.
         $this->assertStringContainsString("printenv PHOTO_STORAGE_PATH | grep -q '^/'", $compose);
         $this->assertStringContainsString(
-            'php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1',
+            'php artisan migrate --force && php artisan app:seed-if-fresh && php artisan admin:update || exit 1',
             $compose
         );
+        // Der Seed darf nicht unbedingt laufen. `DatabaseSeeder` ist fuer die 28
+        // von ihm deklarierten `settings`-Keys autoritativ (upsert auf key/brand),
+        // und `AGENTS.md` §13 schreibt `docker restart portal_backend` nach jedem
+        // PHP-Sync vor — mit `db:seed --force` im Entrypoint hat damit jeder
+        // Neustart 28 Produktions-Keys ueberschrieben, ohne dass ein Mensch den
+        // Seed ausgeloest haette. Owner-Entscheidung 2026-09-28.
+        $this->assertStringNotContainsString('artisan db:seed', $compose);
         $this->assertStringNotContainsString('app:import-locations', $compose);
     }
 

@@ -45,7 +45,7 @@ status: active
   Schritt** im Backend-Start und wird nicht als ungeschützter Nachlauf
   ausgeführt.
 - **Fail-closed Sequenz:** Nach den Env-/Identitäts-/Pfad-Guards aus §9 führt der
-  Start `php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1`
+  Start `php artisan migrate --force && php artisan app:seed-if-fresh && php artisan admin:update || exit 1`
   aus. Ein Fehler bei Migration, Seed **oder** Admin-Provisionierung beendet den
   Compose-Start, bevor `queue:work`, Scheduler oder PHP-FPM gestartet werden.
 - **Credentials:** `ADMIN_EMAIL` und `ADMIN_PASSWORD` müssen gesetzt sein; es
@@ -53,6 +53,17 @@ status: active
   `firstOrCreate` an. `admin:update` legt ihn bei Bedarf an und rotiert das
   Passwort eines bestehenden Accounts aus denselben Env-Werten; ein fehlender
   Wert lässt das Command fehlschlagen.
+- **Bedingter Seed (Owner-Entscheidung 2026-09-28):** `app:seed-if-fresh` ruft
+  denselben `DatabaseSeeder` auf, aber nur wenn die `users`-Tabelle leer ist —
+  die Invariante, auf die der Start angewiesen ist (ohne Seed existiert kein
+  Admin, der Login ist tot). Eine leere `settings`-Tabelle taugt nicht als
+  Signal, weil Migrationen dort bereits Zeilen anlegen (V004 `base_price`/
+  `term_*`, V005 die Bank-Keys); keine Migration legt dagegen einen User an.
+  Reihenfolge im Start ist Teil des Vertrags: der Seed läuft **vor**
+  `admin:update`, sonst wäre der Admin aus `admin:update` selbst das Signal.
+  Bewusster Seed in Produktion bleibt möglich, aber nur manuell:
+  `php artisan db:seed --force`, mit der Vorprüfung aus
+  `backend/AGENTS.md` (Database Setup Policy).
 
 ## 8. Secrets, Environment & Debug Defaults
 
@@ -112,7 +123,7 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
   `backend/config/services.php`; explizit leere Werte bleiben leer. Insbesondere
   bleibt ein leerer Header-Name die dokumentierte Session-Deaktivierung.
 - **Migrations-/Seed-/Admin-Gate:** Erst nach diesen Guards führt der Start
-  `php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1`
+  `php artisan migrate --force && php artisan app:seed-if-fresh && php artisan admin:update || exit 1`
   aus. Ein Fehler in **einem** dieser Schritte verhindert `queue:work`, den
   Scheduler und PHP-FPM. `admin:update` ist damit Teil desselben
   fail-closed Gates; ein fehlgeschlagener Admin-Schritt darf nicht als

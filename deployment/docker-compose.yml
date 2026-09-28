@@ -264,7 +264,7 @@ services:
       php artisan cache:clear || exit 1;
       php artisan optimize || exit 1;
       php artisan ops:validate-production || exit 1;
-      php artisan migrate --force && php artisan db:seed --force && php artisan admin:update || exit 1;
+      php artisan migrate --force && php artisan app:seed-if-fresh && php artisan admin:update || exit 1;
       php artisan ftp:provision-folders --fix-permissions || exit 1;
       php artisan scout:sync-index-settings || exit 1;
       php artisan queue:restart || exit 1;
