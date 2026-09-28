@@ -121,6 +121,14 @@ const pickShootingCalculatorSettings = (payload: Record<string, unknown>): Shoot
     return settings as ShootingCalculatorSettings;
 };
 
+/**
+ * The roles `/api/management/roles` serves to the bootstrap admin.
+ *
+ * Kept as a named union so the specs and `createIsolatedUser` cannot drift
+ * apart on a typo'd role name.
+ */
+type IsolatedUserRole = 'admin' | 'photographer' | 'client' | 'power_user' | 'customer_manager' | 'super_admin';
+
 type VolumePresetResponse = {
     id: string | number;
     name: string;
@@ -330,7 +338,7 @@ export class E2ESessionHelper {
         return cookieHeader;
     }
 
-    async createIsolatedUser(roleName: 'admin' | 'photographer' | 'client' | 'power_user' | 'customer_manager' | 'super_admin', options?: { assignGalleryId?: string, wantsNotifications?: boolean, brand?: string }) {
+    async createIsolatedUser(roleName: IsolatedUserRole, options?: { assignGalleryId?: string, wantsNotifications?: boolean, brand?: string, additionalRoles?: IsolatedUserRole[] }) {
         await this.ensureAdminLogin();
         const uniqueId = Math.random().toString(36).substring(2, 10);
         const email = `e2e-${roleName}-${uniqueId}@example.com`;
@@ -359,12 +367,23 @@ export class E2ESessionHelper {
         if (!role) throw new Error(`Role ${roleName} was not returned by /api/management/roles`);
         const roleId = role.id;
 
+        // Some UI entry points are gated by two roles at once: the management
+        // gallery action row only renders for photographers, and "Zugriff..."
+        // additionally requires admin. A single-role user can never reach that
+        // button, so the extra roles go into the same `role_ids` set the base
+        // role already uses (one PUT assigns the complete set).
+        const additionalRoleIds = (options?.additionalRoles ?? []).map((name) => {
+            const additional = roles.find((candidate) => candidate.name === name);
+            if (!additional) throw new Error(`Role ${name} was not returned by /api/management/roles`);
+            return additional.id;
+        });
+
         // U-02: non-super-admin users must have a brand assigned. Super-admin is cross-brand.
         const brand = options?.brand ?? (roleName === 'super_admin' ? null : 'rp');
 
         const updateUserRes = await this.request.put(`/api/management/users/${userId}`, {
             data: {
-                role_ids: [roleId],
+                role_ids: [roleId, ...additionalRoleIds],
                 gallery_ids: options?.assignGalleryId ? [options.assignGalleryId] : [],
                 gallery_group_ids: [],
                 can_edit_metadata: false,
