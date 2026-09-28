@@ -11,8 +11,10 @@ status: approved-soll
 **Approved SOLL architecture (2026-09-23).** This document is the
 implementation contract for the checkout/card-testing defense. V036 and the
 implementation sources are present in the current tree; V036 remains the
-separate Card-Testing migration, while V038 is the current repository frontier
-(V037 is the preceding Guest-Ownership migration). Operational rollout, final
+separate Card-Testing migration. The current migration state — including the
+number a new migration takes — is stated in exactly one place,
+`features/tech/07-architectural-decisions.md` (AD-2), and is deliberately not
+restated here. Operational rollout, final
 review, and any current-tree verification remain tracked in `AGENTS.todo.md`; CI
 references in that board are historical evidence, not a claim about every
 uncommitted change. The existing checkout flow in
@@ -57,9 +59,8 @@ Radar or 3DS and does not attempt to make a client-side signal authoritative.
 All schema changes for this feature belong in the separate migration
 `backend/database/migrations/V036__card_testing_defenses.php`. Do not amend
 V035 or an already deployed migration. V036 remains the Card-Testing migration
-(current repository frontier: V038; new changes start at V039) and must be
-followed by the normal seed step in development/CI (`migrate --seed` or
-`migrate:fresh --seed`).
+and must be followed by the normal seed step in development/CI (`migrate --seed`
+or `migrate:fresh --seed`).
 
 ### 2.1 User-to-Stripe-customer mapping
 

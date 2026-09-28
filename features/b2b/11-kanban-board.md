@@ -48,16 +48,17 @@ Die Boards visualisieren den Fortschritt von eingehender Anfrage bis zur Auslief
 
 ---
 
-## 3. Datenmodell (historische V025–V027; V038 Frontier)
+## 3. Datenmodell (historische V025–V027)
 
 `V025__consolidated_after_v024.php` is the historical migration that creates
 the board tables (`photo_jobs`, `projects`, `workflow_logs`, and
 `lightroom_catalogs`). `V026` adds the board notes and removes the obsolete
 `is_private` flag; `V027` migrates the photo-job workflow to the current status
 values in §4. These migrations are historical/deployed inputs and are not
-rewritten. The current repository frontier is `V038` (V037 Guest-Ownership,
-V036 Card-Testing); every new schema change is a separate `V039+` migration.
-No already deployed migration (`V001`–`V035`) may be amended.
+rewritten. The current migration state — including which number a new migration
+takes — is stated in exactly one place, `features/tech/07-architectural-decisions.md`
+(AD-2); this document deliberately does not repeat it. No already deployed
+migration may be amended.
 
 The board tables use UUID primary keys (`HasUuids`), `foreignUuid` foreign keys,
 and an indexed `brand` column (`string(4)`). The current status enums, including
