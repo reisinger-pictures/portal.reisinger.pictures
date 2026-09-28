@@ -10,16 +10,17 @@
 ## 2. Definition of Done (DoD)
 
 **Die DoD selbst steht in [`DoD.md`](DoD.md)** — menschenlesbar, bewusst kurz, ohne
-Kommandos. Das ist die kanonische Aussage, was „fertig" bedeutet. Dieser Abschnitt
-wiederholt sie **nicht**, sondern ergänzt sie um das, was ein Agent ausführen muss:
-welche Testart zu welcher Änderung gehört und welche Kommandos fehlerfrei laufen
-müssen. Wer die Definition ändert, ändert `DoD.md` — sonst beschreiben zwei Dateien
-eine Regel und driften auseinander.
+Kommandos. Ein Task gilt als **abgeschlossen**, wenn die beiden Kriterien dort erfüllt
+sind: **Tests existieren** und **`features/` ist aktuell**.
 
-Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien aus `DoD.md` erfüllt
-sind (Tests existieren, `features/` ist aktuell).
+Dieser Abschnitt wiederholt die Definition nicht. Er sagt, **wie** ein Agent das erste
+Kriterium erfüllt — die Testart folgt aus der Art der Änderung — und ergänzt **ein
+drittes Gate**, das nur für Agenten gilt und nicht Teil der Definition für Menschen ist.
 
-**1. Tests existieren**
+Wer die Definition selbst ändert, ändert `DoD.md`, nicht diesen Abschnitt. Sonst
+beschreiben zwei Dateien eine Regel und driften auseinander.
+
+**Kriterium 1 — Tests existieren** (die Testart folgt aus der Art der Änderung):
 
 - Backend-Änderungen (Controller, Services, Modelle, Gates, Middleware): → **PHPUnit Feature/Unit Tests**
 - Frontend-Logik (Hooks, Utils, API-Layer): → **Vitest Unit Tests**
@@ -27,7 +28,7 @@ sind (Tests existieren, `features/` ist aktuell).
 - Bug-Fixes: → **mindestens ein Regression-Test**, der den Bug reproduziert (PHPUnit oder E2E)
 - Refactoring / Dead-Code-Removal: → kann ohne Tests auskommen, muss im Commit begründet werden
 
-**2. Codequalität ist gut**
+**Drittes Gate (nur Agenten) — Codequalität ist gut:**
 
 - Frontend: `pnpm lint:fix && pnpm build` läuft fehlerfrei; `pnpm build` enthält bereits TypeScript- und i18n-Prüfungen. `tsc -b` ist nur eine optionale Zusatzdiagnose und kein Ersatz.
 - Backend: `php artisan test` (alle bestehenden Tests grün)

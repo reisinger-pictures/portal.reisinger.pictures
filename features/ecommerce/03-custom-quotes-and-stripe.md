@@ -31,7 +31,7 @@ locked price — the standard pricing strategies are bypassed for these items.
 
 - **Offer Creation (Photographer):** The photographer defines:
   - `photos` — the negotiated photo IDs
-  - `price` — the **locked, payable** package price (charged as-is at checkout)
+  - `price` — the **locked, payable** package price, in **integer cents** (charged as-is at checkout). The wire type is enforced, not assumed: `OfferTokenService::issue()` takes `int $price` (`backend/app/Services/OfferTokenService.php:78`) and `verify()` rejects anything that is not an `int` or is `< 1` (`:122`). Unit rule: [`../tech/02-backend-architecture.md` § 4](../tech/02-backend-architecture.md).
   - `rights_text` / **custom conditions** — the negotiated usage terms (territory, duration,
     exclusivity, editorial/commercial, free-text clauses). These are an integral part of the offer.
 - **Token Generation:** The backend issues a signed JWT (`QuoteLinkService` → `OfferTokenService`,

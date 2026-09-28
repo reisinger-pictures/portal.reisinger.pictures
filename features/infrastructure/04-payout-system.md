@@ -10,7 +10,7 @@ status: active
 The system remunerates photographers based on actual usage (downloads) by end customers. To guarantee financial security and fairness, a "Weighted Share" model is applied within isolated flat-rate pools.
 
 ### 1.1 Core Rules
-* **Currency & Data Type (Money Pattern):** Implicitly Euro (€). All financial values are stored as integers in **Cents**.
+* **Currency & Data Type (Money Pattern):** All monetary amounts are **cents**, in storage and on the API, without exception. The money rule itself is stated once and only once, in [`../tech/02-backend-architecture.md` § 4](../tech/02-backend-architecture.md) (Owner-Entscheidung 2026-09-28); this line scopes it to the payout tables, it does not restate it. The currency is fixed to EUR and is not stored as a column. Two payout columns are deliberately **not** money and keep their own unit: `total_shares` / `total_shares_earned` are `decimal(12,4)` share counts (`V011__payout_system.php:21,32`) and `photographer_share_percent` is a percentage in points (`V011__payout_system.php:19`, default `50`).
 * **Isolated Flatrate Pools:** Each sold flat-rate category (e.g., "Basic Package", "Premium Package") forms a completely isolated money pool per month.
 * **Weighted Shares:** Within a pool, revenues are *not* split 1:1 by the number of downloads. Instead, each download generates "shares" based on its value (e.g., resolution/license). 
   * *Example:* A "Web/Editorial" download generates 1 share. A "High-Res/Commercial" download generates 4 shares (multipliers are derived from `PricingFactor` / `LicenseUseCase`).
