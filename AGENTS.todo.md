@@ -74,7 +74,7 @@ braucht, nicht nach Schwere oder Familie.
 | ~~P1-M28~~ | **Erledigt** — Concurrency-Guard | FTP-Block |
 | ~~P1-M30~~ | **Erledigt** — Migration V041 | FTP-Block |
 | ~~P1-M27~~ | **Erledigt** — Kamera-Spec + Harness | FTP-Block |
-| FE-2 (halb) | i18n-Wächter braucht AST-Regel für ungewrapte Strings | unten |
+| FE-2 (halb) | i18n-AST-Regel gebaut, meldet 246 Treffer, warnt nur | unten |
 | P1-M24 | Ordner-Anlage und UID-Modell auf dem Host | FTP-Block |
 | ~~P1-M26~~ | **Erledigt 2026-09-26** — `status()` zeigt den Provisionierungsstatus | FTP-Block |
 | ~~P1-M33~~ | **Erledigt 2026-09-26** — Reset mit Rate-Limit und Audit-Trail | FTP-Block |
@@ -157,10 +157,29 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [ ] **FE-2 (halb) — i18n-Wächter fehlt.** Die drei zitierten Strings sind
-  gefixt, aber `check-i18n.mjs` erkennt einen **ungewrappten** String nicht: er
-  wird nie extrahiert, also nie gesehen. Es braucht eine AST-Regel für
-  benutzersichtbare Strings außerhalb der Lingui-Makros.
+- [ ] **i18n-Rückstand: 246 ungewrapte Strings. Die Regel existiert, warnt aber nur.**
+  `check-i18n.mjs` hat die AST-Regel bekommen (`findUnlocalizedStrings`,
+  `findUnlocalizedStringsInTree`, `collectLinguiMacroComponentBindings`) und meldet
+  **246** Treffer in 33 Dateien: `jsx-text` 175, `jsx-attribute` 44,
+  `helper-argument` 27. Scan über 331 Dateien: 0,18 s.
+  **Warn-only, Exit 0** — ein Gate, das an 246 Altbefunden scheitert, benutzt
+  niemand. `CHECK_I18N_UNLOCALIZED_STRICT=1` schaltet auf harten Fehlschlag
+  (verifiziert: Exit 1), sobald der Bestand auf 0 ist.
+  **Nicht abgearbeitet, bleibt als Altlast im Repo:** die 246. Die größten Brocken:
+  `LicenseCatalogSettings.tsx` (62), `BrandSettingsCard.tsx` (25),
+  `ShootingCalculatorModal.tsx` (24), `BillingDetailsCard.tsx` (21),
+  `CalculatorSettingsCard.tsx` (18).
+  **Zwei Befund-Arten, die keine echten Rückstände sind.** Rund 31 sind Nicht-Prosa:
+  17 Tier-Bezeichner (`Web`/`Print`/`Original`), 3 Kameracodes (`Error 41`), 11
+  Produkt- und Markennamen (`Logo`, `Cloudflare Turnstile`). Bewusst **nicht** über
+  eine Allowlist unterdrückt — eine Liste, die niemand pflegt, wird zur nächsten
+  stillen Ausnahme. Dazu eine vierte Art, die die Regel nicht unterscheidet:
+  **an Interpolationsstellen zerrissene Sätze.** `Jahre (geb. {x})` ergibt zwei
+  JsxText-Knoten (`Jahre (geb.` und `)`); einzeln zu beheben ist sinnlos. **Vor dem
+  Abarbeiten entscheiden, ob die Regel auf Satzebene zusammenführt** — sonst
+  produziert sie mehr Rauschen als Nutzen.
+  **Reihenfolge:** `helper-argument` (27) zuerst, dann die `management/`-Konzentration.
+  Umschalten auf `CHECK_I18N_UNLOCALIZED_STRICT=1` erst bei 0.
 <!-- FTP-Konten: Ansatz am 2026-09-26 von pure-pw/pure-ftpd auf SFTPGo
      umgestellt. P1-M17..P1-M20 sind durch P1-M21..P1-M29 abgeloest.
      Begruendung: (a) pure-ftpd kann AES128-SHA nicht anbieten, damit
@@ -171,36 +190,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
      entfaellt die urspruenglich geplante verschluesselte
      ftp_credentials-Tabelle samt FILE_ENCRYPTION_KEY vollstaendig. -->
 
-- [ ] **P1-M21 (P0) — `users.ftp_slug` als FTP-/SFTP-Username braucht
-  Zeichen- und Längenvalidierung.** `AuthController.php:230` erlaubt
-  `string|max:255|unique` mit `Str::slug()`-Normalisierung (`:221-225`).
-  Das ist als Anzeigename in Ordnung, als **Login-Name** nicht: SFTPGo und
-  pure-ftpd haben harte Grenzen, und Punkt/`@`/Slash sind in Freigabepfaden
-  nicht erlaubt. Wird relevant, sobald `ftp_slug` als Accountname verwendet
-  wird (P1-M18/P1-M22).
-  **Zielregel:** `^[a-z0-9][a-z0-9_-]{2,31}$` — kleingeschrieben, keine
-  Sonderzeichen, max. 32 Zeichen.
-  **Zu klären:** was mit den aus `@`-Localparts erzeugten Slugs passiert
-  (`Str::slug` lässt Punkte zu, z. B. `j.doe`), und wie ein bereits
-  vergebenes, aber regelwidriges Slug migriert wird — Slug umbenennen ist
-  eine Fremdschlüssel-Änderung an `storage/app/private`.
-  **Tests:** PHPUnit für die Regel (Slug-Äquivalente gültig, `a.b`/`a@b`/`a/b`/
-  zu lang/führender Unterstrich abgelehnt, Uniqueness greift weiterhin) +
-  Playwright-E2E für den Fehlerhinweis in `ProfileSettingsCard.tsx:82-92`.
-- [ ] **P1-M22 (P0) — SFTPGo-Admin-API-Client im Portal.** Ersetzt die
-  geplante `pure-pw`-Anbindung aus P1-M18. Nachweislich existiert
-  `drakkan/sftpgo` mit Admin-API v2 (`POST /api/v2/users`, Auth über
-  `POST /api/v2/token` mit JWT oder Header `X-SFTPGO-API-KEY`).
-  **Neu:** `app/Services/SftpGoClient.php` mit `provisionUser()`,
-  `resetPassword()`, `deleteUser()`, `listFolders()`. **Kein** eigener
-  FTP-Client-Talk im Portal — nur HTTP gegen den Dienst.
-  **Zeitfenster:** Jetzt, solange es nur einen Fotografen gibt. Später
-  müssten bestehende lokal gepflegte Ordner durch provisioniert ersetzt
-  werden, und der Pfad geht in die Fremdschlüssel-Änderung aus P1-M21.
-  **Tests:** PHPUnit mit gemocktem HTTP-Client für jede Methode inkl.
-  Fehlerpfade (SFTPGo nicht erreichbar, Benutzer existiert bereits,
-  4xx/5xx); ein Test muss sicherstellen, dass **kein** Passwort im Log oder
-  in einer Exception landet.
 - [~] wartet auf die Produktentscheidung, ob Fotografen ihr Passwort selbst ändern dürfen (Confirm-Flow mit aktuellem Passwort) oder nur der Admin. **P1-M23 (P0) — Passwort-Erzeugung und Show-once, statt Verschlüsselung
   at rest.** Das ist die **entscheidende Entlastung gegenüber P1-M18** und
   der eigentliche Grund für den Wechsel: SFTPGo hält das Passwort, das
@@ -242,20 +231,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   setgid-Bit) plus PHPUnit, dass ein nicht zugänglicher Ordner zu einem
   verständlichen Fehler führt und der User-Status im Portal als
   „wartet auf Ordner" geführt wird.
-- [ ] **P1-M25 (P1) — `FtpController` bleibt unverändert; das ist Absicht und
-  muss getestet bleiben.** Weil SFTPGo auf **denselben** Host-Pfad
-  `/home/webadmin/websites/ftp` schreibt und der Bind-Mount
-  `-> /var/www/ftp` erhalten bleibt, funktionieren die Disk `ftp_inbox`
-  (`config/filesystems.php:49-53`) und `getInboxPath()`
-  (`app/Http/Controllers/FtpController.php:151-156`) unverändert weiter.
-  **Kein** Umbau auf den `sftp`-Flysystem-Treiber — das wäre ein Netzwerk-
-  Roundtrip nach localhost pro Datei plus Credentials im Portal für den
-  eigenen Host.
-  **Bewachung:** `FtpImportTest` (9 Tests) deckt das ab und muss nach dem
-  Stack-Wechsel grün bleiben. Zusätzlich sollte ein Test die Annahme
-  festhalten, dass `ftp_inbox` ein **lokales** Verzeichnis ist — sonst
-  „refaktoriert" jemand den Import auf `Storage::disk('sftp')` und es wird
-  langsamer und geheimnisvoller.
 - [~] wartet auf die Host-Bindings 2222/989/50000-50100 — ohne sie antwortet im Container nichts, und jedes Messergebnis ist ein Fehlschluss (5 Ursachen, siehe M46). **P1-M35 (P0, neu 2026-09-26) — Testinfrastruktur für den
   Datei-Transport aufbauen; Config-Weg und Cipher-Frage fallen dabei ab.**
   **Neu gefasst 2026-09-26:** Das ist **kein Messskript-Problem**, sondern ein
@@ -340,14 +315,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   ist der Test — er ist **kein** PHPUnit-Fall, sondern ein Skript mit
   Playwright-Tag `@feature:ftp-transport`, damit er getrennt ausführbar ist und
   nicht den Smoke-Lauf blockiert.
-- [ ] **P1-M28 (P2) — `FtpController::process()` hat keinen Concurrency-Guard.**
-  `features/infrastructure/19-ftp-upload-pipeline.md:129` hält fest: kein
-  Lock, doppelte Verarbeitung derselben Datei möglich, Annahme
-  „single-user access". Sobald mehrere Fotografen parallel importieren
-  (P1-M22), ist das keine Annahme mehr, sondern ein Fehler.
-  **Tests:** PHPUnit mit zwei konkurrierenden `process()`-Aufrufen auf
-  dieselbe Datei muss genau eine `Photo`-Zeile und eine `unlink()`-Aktion
-  ergeben.
 - [~] wartet auf den Abschluss von DOC-13: die Einstiegs-Tabelle oben führt P1-M30 als erledigt (Migration V041), dieser Eintrag als offen. Erst den Doppel-ID-Konflikt auflösen, dann entscheiden. **P1-M30 (P0) — Spalte für den Provisionierungsstatus auf `users`.**
   **Festgelegt am 2026-09-26:** die Source of Truth ist eine Spalte, **kein**
   Live-Query gegen SFTPGo. Begründung: `FtpController::status()` (`:21-39`)
@@ -548,16 +515,44 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 ### Lücken, die Geld betreffen — höchste Priorität
 
-- [ ] **`usePayouts.ts` ungetestet** (`useAdminPayouts`, `useMyPayouts`) —
-  Admin-Auszahlungen; E2E deckt die UI, nicht die Zustandsübergänge des Hooks.
-- [ ] **E2E-Lücken bei Use-Cases:** `GalleryAccessModal` (Button „Zugriff…",
-  admin-only), `RatingStatusModal` (Button „Bewertungen…", nur bei
-  `type === 'selection'`), `AIGalleryDefaultsModal` (Button „KI generieren",
-  **innerhalb** von `GalleryMetadataDefaultsModal`) — `grep` findet keinen Spec,
-  der sie öffnet. `photographer/ai-gallery-defaults.spec.ts:26` **sieht** aus wie
-  Abdeckung, öffnet aber nur das Eltern-Modal und klickt „KI generieren" nie;
-  der Kopfkommentar behauptet, AT-03-E4 sei entfernt, der Test existiert aber.
-  Außerdem `TextSnippetModal` („Neuer Baustein") ohne Spec.
+- [~] wartet auf die 9 neuen Tests in `src/logic/__tests__/usePayouts.test.ts`, die
+  `useAdminPayouts` und `useMyPayouts` abdecken. **Der Einwand war berechtigt:**
+  `ManagementPayoutsView.test.tsx:6` mockt `../../logic/usePayouts` komplett weg und
+  testet nur den Monat/Jahr-Fallback der View — die Zustandsübergaben des Hooks waren
+  tatsächlich ungetestet.
+  **Was der Hook wirklich tut, gegen die Vermutung:** die Monat/Jahr-Auswahl liegt in
+  `ManagementPayoutsView.tsx:12-14` mit Klemmung beim Leeren (`:70-83`), **nicht** im
+  Hook. Es gibt **keinen** Fehlerzustand — kein Hook destrukturiert `error`; die View
+  leitet ihren Fehlerzweig aus `!data` ab. Und **kein** Refetch: die Hooks nehmen keine
+  Argumente, die einzige Revalidierung ist das explizite `mutate()` nach erfolgreicher
+  Mutation. Diese drei Wege wurden deshalb **nicht** getestet, statt sie zu erfinden.
+  Abgedeckt sind der SWR-Schlüssel je Hook, der Loading-Zustand, die beiden Mutatoren
+  mit exaktem Pfad und Body, und die **Reihenfolge** — ein fehlgeschlagener POST
+  revalidiert nicht. Die Reihenfolge ist als Zusicherung getestet und beißt: mit
+  absichtlich gebrochenem `await`-Verhältnis wurde `does not revalidate when
+  calculateMonth rejects` rot.
+- [~] wartet auf die 4 neuen Specs, die alle vier Dialoge über die echte UI öffnen:
+  `admin/gallery-access-modal.spec.ts`, `admin/rating-status-modal.spec.ts`,
+  `admin/text-snippets-modal.spec.ts` und `AT-03-E5` in
+  `photographer/ai-gallery-defaults.spec.ts`. 10 passed (Desktop + Mobile).
+  **Die Board-Angabe „admin-only" für `GalleryAccessModal` war falsch, und sie wäre in
+  einem gescheiterten Test aufgefallen:** die Aktionszeile hängt an `isPhotographer`
+  (`ManagementGalleryActions.tsx:23`) *und* bekommt `onOpenAccess` nur für Admins
+  (`ManagementGalleryView.tsx:95`) — es braucht **beide** Rollen. Gelöst über
+  `createIsolatedUser('photographer', { additionalRoles: ['admin'] })` statt die Spec zu
+  schwächen, und ohne den gesäten Bootstrap-Admin zu benutzen.
+  **Die drei Modal-Bedingungen:** `RatingStatusModal` braucht eine Galerie mit
+  `type === 'selection'` (`GalleryHelper.createAndOpenSelectionGallery`, neu);
+  `AIGalleryDefaultsModal` liegt **verschachtelt** in `GalleryMetadataDefaultsModal`, und
+  der Spec prüft, dass das Kind aufgeht **während das Eltern-Modal offen bleibt**; die
+  KI-Generierung selbst wird **nicht** ausgelöst, weil sie einen Live-AI-Dienst braucht
+  und das Stubben von `/api/ai/*` verboten ist.
+  **Der lügende Kommentar ist korrigiert.** Er behauptete, `AT-03-E4` sei entfernt
+  worden, weil es `/api/ai/status`, `/api/auth/me` und
+  `/api/ai/generate-metadata-text` mocke. Falsch auf beiden Zählern: der Test
+  existiert, und diese drei Pfade kamen **nur innerhalb der Notiz** vor — ein
+  `page.route`/`route.fulfill` existiert in der Datei nicht. Die neue Notiz sagt das
+  ausdrücklich, statt die alte Behauptung zu tilgen.
 
 ### Strukturbefunde, nicht jetzt umgesetzt
 
@@ -1705,14 +1700,6 @@ Produktionsfehler verkauft worden waere.
   Absicht: sie entfaellt, sobald `ModalDialogShell` `boxClassName` durchreicht
   und einen Klassen-Hook fuer das `<form>` anbietet. Dann wandert `GalleryModal`
   zurueck auf die geteilte Shell.
-- [ ] manuell prüfen: kein offener Task — die Entscheidung ist dokumentiert (die vierte Ebene braucht die Fehlerfarbe und mehr Luft). Eintrag schließen. **Vierte Gruppenueberschrift bewusst nicht vereinheitlicht:**
-  „DSGVO-Loeschung" (`ModelDetailModal.tsx:537`) traegt
-  `font-bold text-lg text-error mb-2` und ist eine vierte Instanz derselben
-  Ebene, benutzt `groupHeadingClass` aber nicht, weil sie die Fehlerfarbe
-  braucht. Das `mb-2` ist hier **gewollt**: sie steht in einem eigenen
-  `mt-6 border-t pt-4`-Block direkt vor dem destruktiven Bereich und soll mehr
-  Luft davor haben als die drei neutralen Gruppen. Festgehalten, damit die
-  Asymmetrie als Entscheidung gelesen wird und nicht als Versaeumnis.
 
 **Umsetzung 2026-09-27 (alle gegen frische Aufnahmen verifiziert):**
 - [~] wartet auf eine andere Spaltenlogik (`table-layout: fixed` mit `word-break` auf dem Wert). `break-all` verschiebt nur die Bruchstelle und ist damit keine Lösung. **Nicht behoben, ehrlich als offen gefuehrt: Mid-Token-Bruch in der
@@ -1735,30 +1722,6 @@ Produktionsfehler verkauft worden waere.
   Credential) und wurde im Service-Docblock bereits korrigiert. Die Migration
   dokumentiert eine Schemadescheidung und ihr zweiter Satz ist noch richtig —
   deshalb nur geflaggt, nicht mitgeschleust.
-- [ ] manuell prüfen: kein offener Task — die Zahl ist korrigiert (58,3 Bit statt der behaupteten 91,5). Die Lehre steht im Text. Eintrag schließen. **Meine eigene Rechnung war falsch — korrigiert.** Fuer das neue
-  Passwort hatte ich `57^10 ≈ 91,5 Bit` behauptet und daraus geschlossen, die
-  neue Spanne liege innerhalb der alten („kein Sicherheitsverlust"). Falsch:
-  `log2(57) ≈ 5,833`, also **58,3 Bit** bei 10 Zeichen und **70,0** bei 12,
-  gegenueber **82,7–124,1** vorher. Die neue Spanne liegt **unter** der alten.
-  Der Subagent hat die falschen Zahlen abgelehnt und die echten hineingeschrieben
-  statt sie zu uebernehmen. **Lehre:** Entropie nicht aus dem Gefuehl
-  herleiten — `length * log2(alphabet)` ist eine Einzeilung, und eine
-  Sicherheitsaussage gehoert nicht in einen Kommentar, der man selbst nicht
-  nachgerechnet hat. Die Reduktion ist bewusst in Kauf genommen (Online-Angriff
-  durch die Quote begrenzt, Offline-Angriff braucht den SFTPGo-Store, den diese
-  Klasse nie schreibt) — aber sie gehoerte **angesagt** zu werden, nicht als
-  Nebenwirkung verborgen.
-- [ ] manuell prüfen: kein offener Task — die Konsequenz wird genannt und auf die bedingungslos existierende Anleitung verwiesen. Eintrag schließen. **Support-Sackgasse im FTP-Inbox: Konflikt zwischen zwei Subagenten
-  aufgeloest.** Die eine Position: „hier gibt es keine Aktion". Die andere: „der
-  Fotograf kann einrichten". Geprueft: beide Buttons rendern **ausserhalb** des
-  `connectionRows.length === 0`-Zweigs, also bedingungslos — die erste Aussage
-  ist falsch. Aber ob `provisionAndShow` ohne deklarierte FTP-Env-Vars
-  **erfolgreich** ist, ist nicht verifizierbar, und der erste Text versprach es
-  („kannst du trotzdem einrichten") — eine ungepruefte Zusage ist derselbe
-  Fehler wie die Sackgasse, die sie ersetzen sollte. **Loesung:** Konsequenz
-  nennen und auf die Anleitung verweisen, die bedingungslos existiert, **ohne**
-  zu versprechen, dass das Anlegen klappt. Der Kommentar haelt fest, warum die
-  Zusage weg ist.
 
 ## CI-Befund 2026-09-27 (Push fa8e19d) — zwei Ursachen, beide belegt
 
@@ -1821,21 +1784,6 @@ gerissen und zur Entscheidung gemacht.
   trotzdem behalten, weil sie die gemeinte Breite dokumentieren (mit Kommentar).
   Entweder `max-width` (ueberlebt die Kaskade) oder Klasse weg — beides zugleich
   ist ein Widerspruch.
-- [ ] manuell prüfen: gegenprüfen und schließen: `tsconfig.tests.json` deckt inzwischen `src/**/*.test.ts(x)` ab, womit `src/**/__tests__` in einem TS-Programm liegt. Ist die Lücke wirklich zu, ist dieser Eintrag gegenstandslos. **TypeScript-Luecke, die `tsc -b` nie sieht:** `tsconfig.app.json`
-  schliesst `*.test.tsx` aus, und `tsconfig.tests.json` nimmt nur `tests`,
-  `src/test-setup.tsx`, `src/ui/__tests__` und `src/logic/__tests__`. Damit liegt
-  **`src/ui/components/__tests__/` in keinem TS-Programm** — dieselbe Luecke
-  gilt fuer `src/ui/management/components/__tests__/`. Folge: `tsc -b` und damit
-  `pnpm build` **typenpruefen diese Testdateien nie**, obwohl sie ausgefuehrt
-  werden; ein Typfehler dort faellt erst zur Laufzeit auf. Zusaetzlich ignoriert
-  ESLint `src/**/__tests__` per Design, also gibt es fuer diesen Pfad **kein**
-  Lint-Signal. Die Datei wurde deshalb manuell mit `--strict --noUnusedLocals`
-  gegengeprueft.
-- [ ] manuell prüfen: gegenprüfen und schließen: dieselbe TS-Lücke wie im Eintrag darüber, nur als Gegenmaßnahme formuliert. Solange „`pnpm build` ist grün" für diese Testdateien eine halbe Aussage bleibt, ist der Eintrag nicht zu. **Gegenmassnahme: `src/ui/**/__tests__` in ein TS-Programm aufnehmen** —
-  entweder `tsconfig.tests.json` erweitern oder ein eigenes Projekt dafuer.
-  Solange das offen ist, ist „`pnpm build` ist gruen" fuer diese Testdateien nur
-  eine halbe Aussage. Der Ausschluss aus dem **Produktions**-Bundle
-  (`tsconfig.app.json`) muss dabei erhalten bleiben.
 
 **Owner-Entscheidungen 2026-09-27 (alle vier umgesetzt):**
 - [~] wartet auf den Abschluss des Backend-Fixes — `SettingsController::updateLicenseTerms()` validiert `price_web`/`price_print`/`price_original` noch nicht, `validate()` wirft die ungelisteten Schlüssel weg, `SettingResolver::set()` sieht sie nie. **Offen: die drei Preise persistieren nicht (Backend).**
