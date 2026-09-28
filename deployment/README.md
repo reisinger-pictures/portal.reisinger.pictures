@@ -189,18 +189,86 @@ cd /data/compose/15/       # Portainer-Stack-Verzeichnis
 docker compose up -d
 ```
 
-Der `backend`-Entrypoint erledigt beim Start **automatisch**, ohne Zutun:
+Der `backend`-Entrypoint erledigt beim Start **automatisch**, ohne Zutun.
+Vollständig, in Ausführungsreihenfolge (`deployment/docker-compose.yml:246-272`) —
+die Liste vorher enthielt nur 3 Einträge und ließ unter anderem den Seed weg:
 
-- Migration (`V041` Provisionierungsstatus, `V042` Reset-Audit)
-- `php artisan ftp:provision-folders --fix-permissions` — legt `ftp/<slug>` für
-  jeden Fotografen an und setzt das **setgid-Bit**. Ohne setgid landet ein
-  Upload in der Gruppe des SFTPGo-Prozesses statt in `webgroup`, und der Import
-  kann die Datei nicht lesen.
-- `validate-production-env` — bricht ab, wenn ein Pflichtwert fehlt
+```bash
+# reproduziert die vollständige Schrittliste
+awk 'NR>=263 && NR<=272' deployment/docker-compose.yml \
+  | grep -oE 'php artisan [a-z:-]+|/usr/local/bin/[a-z-]+' | sort -u
+```
+
+0. **Fail-closed-Vorprüfung** — 17 `exit 1`-Guards (`docker-compose.yml:246-262`),
+   davon 12 über `printenv | grep`: UID **und** GID 1000, `APP_ENV=production`,
+   `APP_KEY`, `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
+   `PHOTO_STORAGE_PATH` (gesetzt, absolut, existierendes beschreibbares
+   Verzeichnis), `AI_SESSION_HEADER`/`AI_SESSION_PREFIX` (Zeichensatz),
+   Beschreibbarkeit von `/var/www/html` und `/var/www/ftp` sowie das Vorhandensein
+   von `validate-production-env` und `portal-backend-supervisor` im Image.
+   Fehlt **ein** Wert, startet der Container gar nicht.
+1. `validate-production-env` — bricht ab, wenn ein Pflichtwert fehlt
+2. `php artisan cache:clear` — leert den Anwendungs-Cache
+3. `php artisan optimize` — baut Config-/Route-/Event-Caches
+4. `php artisan ops:validate-production` — Betriebs-Vorprüfung
+5. `php artisan migrate --force` — **unbedingt**, jede offene Migration.
+   Stand 2026-09-28: 45 Migrationen, zuletzt `V045` (Geld-Felder in Cent)
+   (`ls backend/database/migrations/*.php | wc -l`)
+6. `php artisan app:seed-if-fresh` — **nur auf einer noch nie geseedeten
+   Datenbank**, siehe unten
+7. `php artisan admin:update` — **unbedingt**: legt den Bootstrap-Admin aus
+   `ADMIN_EMAIL`/`ADMIN_PASSWORD` an bzw. rotiert sein Passwort
+8. `php artisan ftp:provision-folders --fix-permissions` — legt `ftp/<slug>` für
+   jeden Fotografen an und setzt das **setgid-Bit**. Ohne setgid landet ein
+   Upload in der Gruppe des SFTPGo-Prozesses statt in `webgroup`, und der Import
+   kann die Datei nicht lesen.
+9. `php artisan scout:sync-index-settings` — Index-Einstellungen mit Meilisearch
+   synchronisieren
+10. `php artisan queue:restart` — wartende Queue-Worker beenden, damit sie den
+    neuen Code laden
+
+Danach `exec /usr/local/bin/portal-backend-supervisor` — das ist kein weiterer
+Seiteneffekt, sondern die Übergabe des Prozesses an den Supervisor. Jeder der
+Schritte 1-10 bricht den Start bei Fehler ab (`|| exit 1`); Schritt 6 ist eine
+`&&`-Kette mit 5 und 7.
+
+#### Der Seed ist bedingt (Owner-Entscheidung 2026-09-28)
+
+Bis 2026-09-28 stand hier `php artisan db:seed --force` — **unbedingt bei jedem
+Start**. Der `DatabaseSeeder` ist für die 28 von ihm deklarierten `settings`-Keys
+(`price_*`, `mult_*`, `term_*`, `calc_*`, `base_price`, `setup_fee`,
+`privacy_fee`, `extra_image_fee`, `bank_*`, `company_*`) autoritativ und
+überschreibt sie per `upsert`. Da `AGENTS.md` §13 nach **jedem** Sync mit
+PHP-Änderungen `docker restart portal_backend` vorschreibt, überschrieb jeder
+vorgeschriebene Neustart diese 28 Produktions-Keys — ohne dass ein Mensch den
+Seed ausgelöst hätte, und damit auch außerhalb der Reichweite der Warnung
+„vor `db:seed` in Produktion prüfen" in `backend/AGENTS.md`. Bei einem echten
+Deploy am 2026-09-28 entdeckt.
+
+`php artisan app:seed-if-fresh` behält die Automatik für die Erstinstallation
+und lässt die laufende Produktion unangetastet: geseedet wird nur, wenn die
+`users`-Tabelle leer ist (ohne Seed gibt es keinen Admin, also ist der Login tot
+— `backend/AGENTS.md`, Database Setup Policy). Eine leere `settings`-Tabelle ist
+kein brauchbares Signal, weil Migrationen dort bereits Zeilen anlegen (V004
+`base_price`/`term_*`, V005 die Bank-Keys). Ein Neustart auf einer geseedeten
+Datenbank ist damit ein No-op.
+
+Ein Seed wird bewusst nur noch manuell ausgelöst, mit der Vorprüfung aus
+`backend/AGENTS.md`:
+
+```bash
+docker compose exec backend php artisan db:seed --force
+```
+
+Falls ein Seed nach dem Anlegen des Admins abgebrochen ist, überspringt
+`app:seed-if-fresh` die Datenbank beim nächsten Start (die `users`-Tabelle ist
+dann nicht mehr leer). Abhilfe ist dasselbe manuelle Kommando — der Seeder ist
+idempotent.
 
 ### Nachkontrollieren
 
 ```bash
+docker compose logs backend | grep seed-if-fresh     # "Fresh database seeded." oder "already seeded"
 docker compose logs backend | grep ftp:provision   # Ordner-Anlage
 docker compose logs sftpgo | grep -iE "error|fatal"
 docker compose exec sftpgo sh -c 'id'             # muss uid=1000 sein

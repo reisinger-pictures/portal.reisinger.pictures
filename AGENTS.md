@@ -228,6 +228,11 @@ führt keine Migration aus. Deshalb gilt:
   teils den neuen und teils den alten Code ausfuehrt — und das sieht aus
   wie ein inkonsistenter Zustand, nicht wie ein Caching-Problem. Wer den
   Neustart weglaesst, debuggt einen Fehler, den es nicht gibt.
+  Der Neustart seedet **nicht**: der Entrypoint fuehrt seit 2026-09-28
+  `php artisan app:seed-if-fresh` statt `db:seed --force` aus, und das seedet nur
+  eine Datenbank ohne Admin-User. Vorher ueberschrieb der Neustart die 28
+  autoritativen `settings`-Keys des Seeders — die 28 Keys sind in
+  `backend/AGENTS.md` (Database Setup Policy) aufgefuehrt.
 - **Frontend-Sync braucht keinen Neustart.** `dist/` ist statisch, der
   Webserver liest pro Request neu. Er braucht aber einen **aktuellen**
   Bundle — siehe die Frische-Regel unten.
