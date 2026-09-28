@@ -93,8 +93,33 @@ Begründung:
   - **Follow-up:** Den Default-Preset-Pfad von `BrandRegistry::currentOrDefault()` auf die **Galerie-Brand** umstellen (analog zu `getEffectiveLicensingModeAttribute()`), damit die vollständige Licensing-Kette `gallery → mode → preset` durchgängig galerie-gebunden ist. Bewusst **nicht** Teil von P1-M15: es ist eine eigene Entscheidung mit Checkout-/Preis-Reichweite.
 - **Re-Parenting:** `updateGallery()` erzwingt dieselbe Invariante. Weil die Brand wechseln kann, wird ein **bestehender** Preset beim markanten Brand-Wechsel mitgeprüft: ein RP-Preset auf einer nach `srp` verschobenen Galerie wird mit 422 abgelehnt, statt still als Fremd-Referenz zu stranden.
 
-### 8.5 Bewusst *nicht* Teil dieser Entscheidung
-Der **Gruppe ⇄ Gruppe**-Fall (`GroupRequest::parent_id` ohne Brand-Pflicht für cross-brand Super-Admins) ist eine eigene Entscheidung und bleibt offen. Bis dahin ist er durch §8.2 fail-closed **eindämmt**: eine Galerie in einem gemischten Brand-Baum wird abgelehnt, statt inkohärent persistiert zu werden.
+### 8.5 Gruppe ⇄ Gruppe — überholt (vormals „bewusst *nicht* Teil dieser Entscheidung")
+
+> **⚠️ Status: `superseded` (2026-09-26, Commit `43e8943`).** Dieser Abschnitt
+> erklärte den **Gruppe ⇄ Gruppe**-Fall für bewusst außerhalb dieser Entscheidung
+> und offen. Der Fall ist inzwischen im Service verankert und getestet. Die
+> historische Aussage wird nicht stillschweigend ersetzt, sondern als überholt
+> gekennzeichnet.
+
+`GalleryService::assertParentAssignmentIsSound()` prüft die neue Parent-Zuweisung
+einer Gruppe und wird aus `GalleryService::updateGroup()` aufgerufen. Sie lehnt
+eine Parent-Gruppe aus einer **fremden Brand** ab (`BrandRegistry::normalizeId($parent->brand) !== $groupBrand`)
+und verhindert einen **Zyklus**, wenn der neue Parent ein eigener Nachfahre der
+verschobenen Gruppe ist. Beide Achsen sind in `GalleryGroupParentAssignmentTest`
+abgedeckt — u. a. „reparenting under a foreign brand parent is rejected" und
+„store group under a foreign brand parent is rejected".
+
+- **Asymmetrie zwischen Create und Update (bewusst so, keine Lücke):**
+  `GalleryService::storeGroup()` prüft die Parent-Brand **inline** gegen die
+  aufgelöste Host-/Current-Brand (`BrandRegistry::currentOrDefault()`); auf einen
+  Zyklus-Check verzichtet der Create bewusst, weil eine noch nicht existierende
+  Gruppe kein Vorfahre einer bestehenden sein kann. `GalleryService::updateGroup()`
+  ruft stattdessen den gemeinsamen Helper und prüft dort eine Brand über
+  `requireGroupBrand($group)` — also die **Brand der Gruppe selbst** — plus Zyklus.
+
+Der host-gebundene **Default-Preset-Fallback** aus §8.4 (bei `volume_licensing`
+ohne expliziten `volume_preset_id`) ist davon **nicht** erfasst und bleibt
+**offen** — bewusst nicht Teil von P1-M15.
 
 ## 9. Management UI Pattern
 - **Explorer-Ansicht:** Die Struktur- und Galerieverwaltung befindet sich nicht in der Sidebar, sondern in einer eigenen, großzügigen Hauptansicht (`/galleries`).
