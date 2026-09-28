@@ -72,4 +72,26 @@ describe('GalleryAccessModal user list affordances', () => {
         expect(screen.getByText('e2e-photographer-zxxo5jq6@example.com')).toBeInTheDocument();
         expect(screen.queryByText('prohaska.jalon@example.org')).not.toBeInTheDocument();
     });
+
+    // The migration onto the shell's bounded layout. The search field used to be
+    // pinned by a hand-rolled `max-h-80vh` box plus its own scroll list; now the
+    // shell owns both. This pins that wiring: the head must stay outside the
+    // region that scrolls, and the box must carry the named 80vh bound and not
+    // the shell's 90vh default. Without it, dropping `bodyHead` would let the
+    // search field scroll away with the list and the behaviour tests above would
+    // still be green.
+    it('keeps the search head out of the scroll region and bounds the box at 80vh', () => {
+        renderModal();
+
+        const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        expect(box).toHaveClass('max-h-80vh', 'flex', 'flex-col');
+        expect(box).not.toHaveClass('max-h-90vh');
+
+        const scroller = box.querySelector('.overflow-y-auto') as HTMLElement;
+        expect(scroller).not.toBeNull();
+        // The list scrolls; the head that scopes it does not live in that region.
+        expect(scroller).not.toContainElement(screen.getByPlaceholderText('Nutzer suchen...'));
+        expect(scroller).not.toContainElement(screen.getByText('3 Nutzer'));
+        expect(scroller).toContainElement(screen.getByText('prohaska.jalon@example.org'));
+    });
 });

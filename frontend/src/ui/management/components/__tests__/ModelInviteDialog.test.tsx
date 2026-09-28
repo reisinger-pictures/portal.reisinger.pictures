@@ -8,7 +8,7 @@ import type { ModelInvite } from '../../../../logic/useModelInvites';
 /**
  * The E2E contract of `data-testid="model-invite-dialog"`.
  *
- * Eight assertions in `tests/e2e/crm/model-access.spec.ts` and
+ * The E2E assertions in `tests/e2e/crm/model-access.spec.ts` and
  * `model-registration.spec.ts` scope through that id: they click the
  * "Einladung erstellen" button inside it and read the invite table inside it.
  * When this dialog rendered a hand-rolled `.modal-box`, the id sat on the box.

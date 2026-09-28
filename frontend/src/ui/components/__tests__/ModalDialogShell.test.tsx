@@ -296,4 +296,24 @@ describe('ModalDialogShell', () => {
         const box = (container.querySelector('.modal-box') as HTMLElement).className;
         expect(box).toContain('max-w-4xl');
     });
+
+    it('forwards testId to the modal-box, not a wrapper', () => {
+        // The same hook ModalShell exposes, so a form dialog reaches it too: a
+        // caller that needs a stable handle on the dialog it does not own must
+        // not wrap its content in an element whose only job is the testid.
+        renderDialog(vi.fn(), { testId: 'dialog-shell-testid' });
+
+        const box = screen.getByTestId('dialog-shell-testid');
+        expect(box).toHaveClass('modal-box');
+        expect(box).toBe(screen.getByRole('dialog').firstElementChild);
+        // …and it still encloses what a scoped locator reaches.
+        expect(box).toContainElement(screen.getByTestId('dialog-content'));
+    });
+
+    it('renders no testid on the box when none is asked for', () => {
+        renderDialog();
+
+        const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        expect(box).not.toHaveAttribute('data-testid');
+    });
 });
