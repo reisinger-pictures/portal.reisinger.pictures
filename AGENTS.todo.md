@@ -4,21 +4,124 @@
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
-> **Struktur-Hinweis (2026-09-27, nach der Board-Bereinigung):** Dieses Board
-> enthält **142 offene Positionen** über 1841 Zeilen,
-> **0 erledigte** — erledigte Einträge werden entfernt, nicht abgehakt
-> (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
-> Gründe, warum sie noch steht: **32× `manuell prüfen:`** (der Owner
-> sieht es sich nach einem Deploy an), **16× `Entscheidung offen:`**
-> (der Owner muss entscheiden), **45× `wartet auf`** (Bedingung oder
-> Folgetask fehlt noch). Die restlichen **49** sind **gewöhnliche,
-> sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein Präfix
-> ohne Grund wäre schlechter als keiner.
+> **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
+> Entscheidungsdurchgang):** Dieses Board enthält **87 offene Positionen**
+> über 1695 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
+> Gründe, warum sie noch steht: **16× `manuell prüfen:`** (der Owner
+> sieht es sich nach einem Deploy an), **1× `Entscheidung offen:`**
+> (der Owner muss entscheiden — nach dem Durchgang vom 2026-09-28 ist davon **eine**
+> übrig: D-12, Initial-Fokus, das ist auftragsgemäß offen), **46× `wartet auf`**
+> (Bedingung oder Folgetask fehlt noch). Die restlichen **24** sind
+> **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
+> Präfix ohne Grund wäre schlechter als keiner.
+>
+> **Gemessen, nicht geschätzt** (die Zahlen oben sind aus `grep -cE
+> '^[[:space:]]*[-*]?[[:space:]]*\[\[[x ~]\]]' AGENTS.todo.md` abgeleitet, **ohne** den
+> Entscheidungs-Protokoll am Dateianfang, dessen Checkboxen eine andere Bedeutung
+> haben — siehe dort). **Nicht** mitgezählt wird das Entscheidungs-Protokoll: seine
+> `0`-Zeilen bedeuten „die Entscheidung ist in Kraft", nicht „die Arbeit ist fertig".
 > Die Positionen liegen in **11 von 22 `##`-Abschnitten**
 > mit offenen Positionen. Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
 > Wer hier eine Position sucht, nutzt `grep -n '^- \['
 > AGENTS.todo.md` und nicht die Reihenfolge im Dokument.
+
+## 🗳 Entscheidungs-Protokoll (Owner, 2026-09-28)
+
+**Was gilt, steht in `AGENTS.md` §14 (D-1 bis D-17).** Dieser Abschnitt sagt nur, **ob es schon
+gilt** — und hält fest, welche Ansätze zurückgezogen wurden, damit sie nicht erneut
+implementiert werden.
+
+**Zur Form — und warum dieses Board doch `[x]` enthält:** §3 Board-Hygiene verbietet `[x]` für
+**Arbeitspositionen**, weil ein abgehakter Eintrag wie eine offene aussieht. Das gilt hier nicht:
+eine Entscheidung ist eine Aussage, keine Aufgabe, und ihr Zustand ist genau zweiwertig. Ein
+`[x]` bedeutet hier **„die Entscheidung ist in Kraft"**, ein `[ ]` **„die Entscheidung steht, ist
+aber nicht umgesetzt"**. Beide Formen stehen ausschließlich in diesem Abschnitt, nie im Board
+darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
+
+### Stand
+
+- [x] **D-3 — Branch-Protection für `main` bleibt aus.** Entscheidung ist die Entscheidung;
+      keine Aktion. Das fehlende Gate darf in keinem Audit als Befund aufgerollt werden.
+- [x] **D-4 — `.env.production` bleibt unverschlüsselt und unrotiert.** Keine Aktion, kein
+      Repo-Risiko. Steht als akzeptiertes Risiko in `AGENTS.md` §14/D-4.
+- [x] **D-5 — die Speicherwarnung gilt dem Deploy-Host.** Die Unterscheidung ist gemessen
+      (dev-Host 3 % / 477 GB frei, Deploy-Host 97 % / 12 GB frei) und in D-1 verlinkt.
+- [x] **D-14 — Escape und Backdrop lösen in `CouponFormDrawer` die Ungespeichert-Warnung aus.**
+      Das Verhalten ist bereits so (`CouponFormDrawer.tsx:210-213` beschreibt, dass die Shell
+      Kopf-Button, Backdrop, Escape und Abbrechen über einen Prop routet); die Entscheidung
+      bestätigt es, sie ändert nichts.
+- [x] **D-15 — Altersnachweis: kein Löschpfad, unbegrenzte Aufbewahrung.** Keine Aktion, die
+      technische Folge ist das Nicht-Bauen.
+- [ ] **D-1 — SFTPGo auf `user: "1002:82"` umstellen und deployen.** Compose-Datei ändern,
+      committen, pushen, **grünes CI für genau den gepushten Head abwarten**, dann Recreate
+      (§13: Restart ≠ Recreate, und `sync.sh` migriert nicht).
+- [ ] **D-2 — `ftp/<ftp_slug>` beim Setzen des Slugs anlegen; schlägt die Anlage fehl, schlägt
+      das Setzen fehl.** Noch nicht begonnen.
+- [ ] **D-6 — `API_THROTTLE_LIMIT` in `.env.ci` auf 1000**, Kommentar in `.env.example`.
+      Zwei versionierte Dateien, kleinster offener Punkt hier.
+- [ ] **D-7 — `scripts/check-i18n.mjs` auf Satzebene erweitern.** Vor dem Abarbeiten der 246.
+- [ ] **D-8 — `frontend/tests/e2e/admin/` nach Domäne aufteilen.** Eigene Arbeit.
+- [ ] **D-9 — Sidebar: Portalname bricht um** statt still gekürzt zu werden.
+- [ ] **D-10 — Dialoge innerhalb von `<main>` rendern**, Scoping bleibt unangetastet.
+- [ ] **D-11 — `ModalShell`: benannte Höhe plus `bodyHead`, und die drei handge-rollten Dialoge
+      migrieren.** Slot und Migration gehören in denselben Commit.
+- [ ] **D-12 — Initial-Fokus: erst vorlegen, dann entscheiden, dann umsetzen.** Die Regel steht
+      nicht; bis zur Vorlage gilt der Status quo. **Reihenfolge nicht umstellen.**
+- [ ] **D-13 — `maxWidth` auf `'2xl'` einschränken.**
+- [ ] **D-16 — technische Dokumentation der Stripe-Identifikatoren vervollständigen**; der
+      rechtliche Teil bleibt eine benannte Lücke mit Owner.
+- [ ] **D-17 — Prompt-Injection-Policy und SMTP-Duplicate-Policy einzeln festlegen**; die
+      Queue-/Mail-/Worker-/Scheduler-Evidenz bleibt ein eigener Eintrag.
+- [ ] **D-18 — `testId`-Prop auf `ModalShell` und `ModalDialogShell`.** Kein Dialog braucht
+      einen Wrapper-`<div>` nur für `data-testid`.
+- [ ] **D-19 — Unit-Testdateien für `ManagementOrgsView` und `ManagementOrgDetailView`.**
+- [ ] **D-20 — `ModalDialogShell` verliert `editing`; der Lösch-Button folgt aus `onDelete`.**
+      **Enthält einen Pflicht-Schritt:** `GalleryModal` und `GalleryGroupModal` übergeben
+      `onDelete` heute bedingungslos und müssen es auf „nur bei existierendem Datensatz"
+      beschränken, sonst bekommt der Create-Dialog einen Lösch-Button.
+- [ ] **D-21 — Domänen-Prop `editing` in `ProjectModal`, `PhotoJobModal`, `TextSnippetModal`,
+      `ProductModal`, `CustomerModal`, `CouponFormDrawer` umbenennen.** Die Aufrufer
+      `ManagementProjectsBoard.tsx:219` und `PhotographerProductionBoard.tsx:170` ziehen mit.
+
+### Verworfen — nicht erneut implementieren
+
+Zurückgezogen am 2026-09-28. Der Owner hat jede dieser Varianten gesehen und verworfen; die
+geltende Regel steht in `AGENTS.md` §14.
+
+| Zu | Verworfene Variante | Warum verworfen |
+|---|---|---|
+| D-1 | `1000:1000` behalten, Ausnahme für ein Verzeichnis dokumentiert | mischt zwei Ownership-Modelle im Website-Baum |
+| D-1 | Drift nur dokumentieren, Recreate aufschieben | der erste spontane `up -d` bricht dann trotzdem alles |
+| D-2 | manueller Host-Schritt bzw. UI-Warnung statt automatischer Anlage | der Zustand „Slug gesetzt, Ordner fehlt" bliebe möglich |
+| D-2 | Setzen gelingt, Fehler erst beim Import | Fehler käme zu spät und wäre schwerer zu entdecken |
+| D-3 | Branch-Protection mit verpflichtendem CI-Status, oder mit Review-Pflicht | Trust-Frage; der Owner entscheidet, main bleibt ungeschützt |
+| D-4 | Secrets rotieren, oder zusätzlich Secret-Manager einführen | kein Repo-Risiko; ein Code-Fix kopiert das Secret nur umher |
+| D-5 | Aufräumen plus Meldeschwelle, oder nur melden | die Rückfrage „nicht relevant auf diesem Host?" hat die Messung beantwortet: gilt dem Deploy-Host, dort ist es Deploy-Arbeit neben D-1 |
+| D-6 | nur `.env.ci` anheben, `.env.example` unkommentiert lassen | 60 als Produktions-Sinnwert soll sichtbar bleiben |
+| D-6 | unverändert lassen (60 als Canary) | der nächste parallelsinnige Test wird flaky statt rot |
+| D-7 | Regel unverändert, 246 manuell abarbeiten | erzeugt bei zerrissenen Sätzen mehr Rauschen als Nutzen |
+| D-7 | als Altlast dokumentieren, nicht abarbeiten | die Regelerweiterung ist billiger als 246 Einzelbefunde |
+| D-8 | nach Akteur aufteilen, oder Taxonomie stehen lassen | die übrigen Verzeichnisse sind nach Domäne benannt |
+| D-9 | `truncate` mit `title`, oder so lassen | stille Kürzung ohne sichtbaren Effekt; Umbruch löst die Asymmetrie |
+| D-10 | Scoping im Harness aufweichen, oder die Lücke dokumentiert lassen | Testfix schwächt die Regel; Strukturänderung behebt die Ursache |
+| D-11 | nur benannte Höhe, oder nichts ändern | ein Slot ohne Migration wäre unbenutzte API in 28 Aufrufstellen |
+| D-12 | Fokusfalle behalten, Hook in der Shell, Einzelfall im Dialog | **alle drei** unzulänglich; daher erst ausarbeiten und vorlegen |
+| D-13 | Skala vollständig bauen, oder unverändert dokumentieren | ein Prop, der seine Hälfte verwirft, lügt |
+| D-14 | nur Schließen und Abbrechen fragen, oder Undo-Toast | ein Modal, der sich nicht schließen lässt, ist eine Sackgasse |
+| D-15 | Frist festlegen und Löschpfad implementieren, oder Frist selbst nennen | Owner-Entscheidung: **unbegrenzt, bewusst so** |
+| D-20 | `readOnly` als negierender Rename (Vorschlag des Owners) | **widerlegt durch Messung:** `editing={!!initialName}` wird zu `readOnly={!initialName}`, beim Bearbeiten truthy → der Button rendert weiter. Der Rename ändert den Namen, nicht den toten Button. Dazu ist der Name sachlich falsch (der Dialog ist editierbar) und kollidiert mit `CartItemList.tsx:15` |
+| D-20 | nur den Live-Bug in `VolumePresetSettingsCard.tsx:118` beheben | `editing` und `onDelete` blieben unabhängig; der nächste Aufrufer trennt sie wieder |
+| D-21 | Kollision als dokumentierte Falle belassen | sie ist es zwar, aber D-20 nimmt den Shell-Bedeutungsträger weg — das Wort bliebe zweimal im selben Baum |
+| D-18 | Assertions auf sichtbare Merkmale umstellen | die 8 Assertions prüfen dann nicht mehr, welches Dialogelement gemeint ist |
+| D-19 | nur `ManagementOrgsView` testen, oder bewusst ungetestet lassen | die Detail-View bleibt die ungeschütztere; „bewusst" wäre eine Feststellung ohne Deckung |
+| D-16 | vollständig ausarbeiten, oder nach Kategorie trennen | der rechtliche Teil ist DPO-Freigabe und wird nicht erfunden |
+| D-17 | beide Policies bündeln, oder beide als akzeptiertes Risiko | zwei Systeme, zwei Reviewer; „bewusst offen" wäre begründungspflichtig |
+
+**Zurückgezogen heißt nicht vergessen:** Wenn jemand eine dieser Varianten erneut vorschlägt,
+ist die Frage nicht „ist das besser?", sondern „ist D-x überholt?" — und dann wird **D-x in
+`AGENTS.md` §14 ersetzt**, nicht ergänzt.
 
 ---
 
@@ -162,7 +265,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [ ] Entscheidung offen: **i18n-Rückstand — erst entscheiden, ob die Regel auf Satzebene zusammenführt, dann abarbeiten.**
+- [ ] **D-7 — i18n-Regel auf Satzebene erweitern, dann die 246 abarbeiten.**
   `CHECK_I18N_UNLOCALIZED_STRICT=1 node scripts/check-i18n.mjs` meldet **246**
   Treffer in **33** Dateien: `jsx-text` 175, `jsx-attribute` 44,
   `helper-argument` 27 (Scan über 331 Quellen:
@@ -220,7 +323,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   `Str::random` + Prüfschleife) und dafür, dass im Request-Log/Response
   nach dem Show-once **kein** Klartext mehr auftaucht; Playwright-E2E für
   Anzeige und Reset.
-- [ ] Entscheidung offen: Wer legt den Ordner an — Host-Script oder Admin-Schritt? (Niemals `chown -R` durch einen Entrypoint auf `/home/webadmin/websites`, siehe 19-ftp 7.9.) **P1-M24 (P1) — Ordner-Anlage und UID-Modell klären.** Aus der
+- [ ] **D-2 — `ftp/<ftp_slug>` beim Setzen des Slugs anlegen; schlägt die Anlage fehl, schlägt das Setzen fehl.**
   SFTPGo-Doku: *"Virtual folder auto creation on user add/update … you have
   to create the folder on disk yourself"* — SFTPGo legt nichts an. Der Ordner
   `ftp/<ftp_slug>` muss auf dem Host existieren, mit `1002:webgroup` und
@@ -365,13 +468,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   **Tests:** PHPUnit, dass die Disk-/Config-Definition ohne Secret auskommt
   (kein Literal in der versionierten Compose-Datei), plus ein
   Konfigurations-Test auf die gesetzten Platzhalter.
-- [ ] Entscheidung offen: wer die Canon neu konfiguriert und ab wann das gegen P1-M27 geprüft wird — ohne benannten Owner steht nach dem Umbau alles gleichzeitig still. **P1-M32 (P2) — Kameraneukonfiguration hat einen Owner.** Wenn SFTPGo
-  pure-ftpd ablöst, muss die Kamera neu konfiguriert werden: Host/Port, neues
-  Passwort, ggf. SFTP statt FTPS. Das ist **kein Code-Task** und gehört in
-  keinem Board-Eintrag, weil es bisher niemandem zugewiesen war. Vor dem
-  Umschalten muss benannt sein, wer das macht und ab wann gegen P1-M27
-  geprüft wird. Ohne diesen Schritt steht nach dem Umbau alles gleichzeitig
-  still.
 
 ### Offene Dokumentations-Wahrheit (kein Code, aber irreführend)
 
@@ -388,7 +484,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Braucht eine Entscheidung oder Betriebs-Evidenz (kein Code)
 
-- [ ] Entscheidung offen: läuft SFTPGo als `1002:82` (Host-Konvention) oder bleibt `1000:1000` mit dokumentierter Ausnahme für genau dieses Verzeichnis? Vor dem Stack-Recreate zu entscheiden. **P1-I9 (P0) — Deployment-Drift: `portal_backend` läuft als root, das
+- [ ] **D-1 — SFTPGo auf `user: "1002:82"` umstellen und nach grünem CI deployen.**
   versionierte Compose fordert `user: "1000:1000"`.** Verifiziert 2026-09-26.
   **Befund:** `deployment/docker-compose.yml:58` deklariert
   `user: "1000:1000"` für `backend`. Der laufende Container hat
@@ -427,12 +523,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   recreated), kein Code. Vorher die UID-Fragen oben entscheiden, sonst wird der
   Restart zum Ausfalltag.
 
-- [ ] Entscheidung offen: Branch-Protection setzen? Repo-/Org-Einstellung mit Trust-Fragen, bewusst nicht vom Agenten gesetzt. Gewichtet schwerer als jeder einzelne P1-Befund. **Branch-Protection für `main` fehlt** — `GET /branches/main/protection`
-  antwortet `404 Branch not protected`. Der `CI gate (push)` existiert und läuft
-  grün, aber **nichts erzwingt ihn**. Das ist der gewichtigste offene Punkt für
-  „prod deploy ready" und wiegt schwerer als jeder einzelne P1-Befund. **Bewusst
-  nicht vom Agenten gesetzt:** Branch-Protection ist eine Repo-/Org-Einstellung
-  mit Trust-Fragen und gehört dem Owner.
 - [~] wartet auf einen echten Scheduler-Lauf (`app:import-locations`) plus einen Importer-Lauf. Kein Code offen. **P1-A5** — nur noch Live-Nachweis: ein echter Scheduler-Lauf
   (`app:import-locations`, wöchentlich mit `withoutOverlapping()->onOneServer()`)
   und ein Importer-Lauf. Kein Code offen.
@@ -442,11 +532,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Bewusst NICHT geändert
 
-- [ ] Entscheidung offen: Produktions-Secret-Handling: Rotation und/oder Secret-Manager. Kein Repo-Risiko, nur lokale Hygiene — deshalb ausdrücklich kein Code-Fix. **P1-I1** — `.env.production` liegt mit Live-Secrets auf der Platte, ist
-  aber korrekt gitignored (`.gitignore:54:.env*`) und war **nie** committet
-  (`git log --all -- .env.production` ist leer). Kein Repo-Risiko, nur
-  lokale Hygiene. **Kein Code-Fix**, sonst würde das Secret nur in den falschen
-  Ort kopiert.
 
 ---
 
@@ -507,7 +592,7 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 ### Strukturbefunde, nicht jetzt umgesetzt
 
-- [ ] Entscheidung offen: **`admin/` ist ein Sammelbecken — Ziel-Taxonomie festlegen, bevor umgebaut wird.**
+- [ ] **D-8 — `admin/` nach Domäne aufteilen.**
   **34** von **89** Specs (**38 %**) liegen flach in `frontend/tests/e2e/admin/`
   (`find frontend/tests/e2e -name '*.spec.ts' | wc -l` → 89;
   `ls frontend/tests/e2e/admin/*.spec.ts | wc -l` → 34) und das Verzeichnis mischt
@@ -789,7 +874,7 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
 **Zusätzlich gestartete aktive Teilaufgaben:**
 **Read-only Implementierungs-Audit (2026-09-25; Testquellen vorhanden, Ausführung/Verifier offen):**
 - [~] wartet auf den Abschluss der A7-Subblöcke — R1–R7 sind verifiziert, übrig sind Operations-Evidenz und Product Decisions. **P1-A7 Audit-Split (2026-09-25):** P1-A6 bleibt separat verifiziert. A7 ist in aktive Bugs (malformed provider response, image byte/pixel budget, session-prefix/header validation, manual delete ordering, scheduled cleanup durability, unchecked temp deletion, quote mail-loss), Operations-Evidence (queue/mail/worker/scheduler), Product Decisions (Prompt-Injection, SMTP duplicate policy) und stale/fixed Source-Punkte aufgeteilt. Keine pauschale A7-Schließung.
-- [ ] Entscheidung offen: Prompt-Injection-Policy und SMTP-Duplikat-Policy; die Queue-/Mail-/Worker-/Scheduler-Evidenz steht ohnehin aus. **A7 Operations/Decisions:** Queue-/Mail-/Worker-/Scheduler-Evidence sowie Prompt-Injection- und SMTP-Duplikat-Policy separat entscheiden/dokumentieren.
+- [ ] **D-17 — Prompt-Injection-Policy und SMTP-Duplicate-Policy einzeln festlegen.**
 - [ ] manuell prüfen: in `https://github.com/orgs/reisinger-pictures/packages/container/package/portal-base` → Settings → Change visibility → **Public** (analog `portal-e2e`). Abnahme: anonymer Manifest-Fetch liefert **200** statt 401, bei unveränderten Digests (`portal-base:8.5@sha256:d762d47c…`). Der E2E-Job zieht sein Image auf Job-Ebene, ein Registry-Login kommt dort zu spät — es bleibt nur `public`. **GHCR-Pakete public schalten (Owner-Aktion, 2026-09-25):** `portal-base` und `portal-e2e` im Org-Namespace sind `private`. Der Namespace-Fix ist committed, aber **die Sichtbarkeit kann nicht per CLI geändert werden** — `PATCH /orgs/reisinger-pictures/packages/container/<pkg>` liefert mit Token-Scopes `read:packages,write:packages,admin:org` ein generisches `404 Not Found` ohne Docs-Anker, während `GET` das Paket liefert und ein nicht existierender Name `{"message":"Package not found."}` ergibt ⇒ die Update-Route fehlt für diesen Token, es liegt nicht an den Scopes.
   - **Manuell als Org-Admin:** `https://github.com/orgs/reisinger-pictures/packages/container/package/portal-base` → Settings → Change visibility → Public; analog `portal-e2e`.
   - **Abnahme:** anonymes Manifest-Fetch liefert `200` (aktuell `401`) **und** die gepinnten Digests bleiben unverändert — `portal-base:8.5@sha256:d762d47c…`, `portal-e2e@sha256:<neu nach Rebuild>`.
@@ -797,7 +882,6 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
   - **⚠️ KORREKTUR 2026-09-25 — ist DOCH blockierend, für die gesamte CI:** Der obige Satz war falsch. Die CI hat **keinen** Registry-Login und läuft bewusst ohne `packages`-Scope; `ci.yml:17-24` dokumentiert das als Least-Privilege-Design („pulled anonymously from public GHCR“). Nach dem Namespace-Umstieg auf `reisinger-pictures/*` in `d7f3596` sind beide Pakete privat, damit bricht der Pull ab. Beleg aus CI-Lauf `36168928448` (Job `108183657407`, ~17 s, dann Abbruch): `Unable to find image … locally` + `docker: … /v2/reisinger-pictures/portal-base/manifests/sha256:d762d47c…: unauthorized` + `##[error]Process completed with exit code 125.` Die Steps „Prepare environment“, „Install dependencies“, „Generate app key“ und „Run PHPUnit“ fehlen im Log vollständig — PHPUnit startete nie.
   - **Warum kein Login-Step als Alternative:** Der `backend`-Job zieht sein Image in einem Step, dort würde ein `docker/login-action` + `packages: read` helfen. Der `e2e`-Job nutzt aber `container:` auf **Job-Ebene** (`ci.yml:226`); dieses Image pullt der Runner, **bevor** der erste Step läuft. Ein Login kommt dort zu spät — es bleibt nur `public` oder eine strukturelle Umbau-Umstellung des E2E-Jobs.
   - **Reihenfolge:** Pakete public schalten → neuer Push → E2E-Jobs müssen wieder laufen. Der Backend-Job ist erst danach verwertbar prüfbar. Vorher ist jeder weitere Push ein bekannter roter Lauf, deshalb ist der Namespace-Fix bewusst **noch nicht** erneut gepusht.
-- [ ] Entscheidung offen: Freigabe des plattenfüllenden Fremd-Bestands (`/projects/LuminaRust` 152 GB, Docker-Volumes 82,75 GB). Unser eigener Fußabdruck ist mit ~1 GB vernachlässigbar; nichts davon wurde angefasst. **Host-Speicherwarnung (2026-09-25, nicht unser Repo):** `/` ist zu 97 % belegt (12 GB frei). Ursache sind **fremde** Projekte auf demselben Host — `/projects/LuminaRust` 152 GB, `lumina-denoise-closeout-target-final` 13 GB, `lumina-r5-target` 12 GB, Docker-Volumes 82.75 GB (u. a. `lumina-g09-cull-rustup`). Unser eigener Fußabdruck: Worktree `/projects/e2e-baseline` 541 MB, `/tmp/native-verify` 538 MB. Nichts davon angefasst — Freigabe ist eine Betreiber-Entscheidung, aber Composer-/Playwright-Läufe können bei 12 GB Rest unschlagbar werden.
 **Checkout-Verifier-Blocker (Implementierung 2026-09-25; unabhängige Verifikation folgt):**
 - Immediate-Stripe-Replay verlangt jetzt eine explizite, passende aktive Brand; die Null-/Fingerprint-Legacy-Lookups wurden aus dem positiven Claim-Pfad entfernt. Regressionen für Null-Brand/PI-Exact-Key, Lock-Timeout und Unique-Constraint-Race sind deterministisch und ohne Sleeps umgesetzt.
 - Invoice-Mail nutzt den bestehenden `invoice_snapshots`-JSON-Vertrag als nicht ablaufenden Enqueue-Claim (`InvoiceSnapshot::MAIL_DISPATCH_KEY`) und eine transaktionale Queue-Claim-Schicht. Das ist ausdrücklich **at-most-once durable enqueue**, nicht exactly-once SMTP delivery. Queue-/Marker-Fehler vor dem Commit rollieren den Claim zurück und sind retrybar; Worker-/SMTP-Fehler können mehrfach versucht werden, ein terminaler Job bleibt in `failed_jobs` und verhindert eine automatische zweite Enqueue. Production mit nicht-transaktionaler Queue wird fail-closed abgewiesen. Keine V039+-Migration; der Marker wird aus öffentlichen Snapshot-Resources entfernt.
@@ -1076,7 +1160,6 @@ getrennt.
 
 **Future (nur TODO, nicht umsetzen)**
 - [ ] Contact Sheet Phase 3 (Bulk/Ergebnisliste) + Phase 4 (signierter Extern-Link) — Plan: `~/.opencode/plan/pdf-contact-sheet-export.md`
-- [ ] Entscheidung offen: die Aufbewahrungsfrist für Altersnachweise und das zugehörige Löschkonzept; die beiden UI-Punkte (Kategorien-Admin, Personen-Bestätigungslink) sind davon unabhängig und umsetzbar. Kategorien-Admin-UI; Personen-Bestätigungslink; Löschkonzept für Altersnachweise (Aufbewahrungsfrist)
 
 **Model-Zugang (User-Anforderung 2026-09-19) — umgesetzt**
 ---
@@ -1163,11 +1246,9 @@ getrennt.
 ### P1 — AI / Mail / Jobs / Console — 🟡 OFFENE FOLLOW-UPS (Live-Nachweis + Policy-Entscheidung)
 
 - [~] wartet auf den Live-Scheduler-/Importnachweis; der Code ist verifiziert. **P1-A5 (MEDIUM; historischer Befund, Verifikation offen)** `import-locations` lief im früheren Boot-Flow über HTTP mit `truncate()`. Im aktuellen Working Tree ruft `deployment/docker-compose.yml` den Import beim Boot nicht mehr auf; `routes/console.php` plant ihn wöchentlich und der Command nutzt einen Lock/transactionalen Refresh. Live-Scheduler-/Importnachweis bleibt offen.
-- [ ] Entscheidung offen: siehe A7 Operations/Decisions — Prompt-Injection- und SMTP-Duplikat-Policy. **P1-A7 (historical umbrella):** aktive Code-Subblöcke R1–R7 sind verifiziert; Operations-Evidence und Product Decisions bleiben als separate Tasks.
 
 ### P1 — Infra / CI / Deploy — 🟡 OFFEN: Produktions-Secret-Handling (Entscheidung) + Auto-Merge/Branch-Protection (Live-Nachweis)
 
-- [ ] Entscheidung offen: siehe P1-I1 oben — Produktions-Secret-Handling/Rotation für `.env.production`. **P1-I1 (HIGH; historischer Befund, Verifikation offen)** `.env.production` liegt mit Live-Secrets (Stripe live, whsec, SMTP, Make, AI-Key, APP_KEY, JWT_SECRET, DB) unverschlüsselt auf Platte (nicht getrackt, aber Risiko) → Secrets rotieren/Secret-Manager. Die aktuellen Config-Defaults sind dokumentiert (`APP_DEBUG=false`); Produktions-Secret-Handling und Rotation bleiben offen.
 - [~] wartet auf einen echten Auto-Merge-Lauf und die Branch-Protection für `main`; die statische Verifikation des Gates ist grün, die Durchsetzung ist es nicht. **P1-I3 (HALB OFFEN — Static-Verifikation grün, Live-Durchsetzung fehlt) (MEDIUM; Aggregate-Gate statisch verifiziert, Branch-Protection/Live-Merge offen):** `automerge.yml` übergibt Dependabot-Metadaten sicher per `env` und wartet ausschließlich auf den exakten Push-Check `CI gate (push)`. Das dynamisch benannte CI-Gate hängt von Security, Backend, Frontend und der vollständigen E2E-Matrix ab und prüft deren Resultate explizit; `allowed-conclusions` bleibt `success`, `fail-on-no-checks` ist fail-closed und `checks-discovery-timeout: 2100` deckt die Check-Entdeckung ab. Dependabot-PR-seitige secret-dependent E2E- und Aggregate-Jobs werden per Actor/Event-Bedingung absichtlich übersprungen; der Push-Lauf desselben Head-SHA bleibt allein autoritativ, normale Same-Repo-PRs bleiben fail-closed. Der job-level `timeout-minutes: 65` ist die echte Gesamtgrenze (25m CI + 35m Discovery + 5m Checkout/Merge-Puffer). `actionlint`, Security-Contract, Shell-Syntax und Diff-Check werden vor Commit erneut geprüft; ein echter Auto-Merge-Lauf und Branch-Protection werden daraus nicht abgeleitet.
 
 ### P1 — Modelle / Services / Data-Integrity — ✅ überwiegend FIXED (M3/M12 teilw.)
@@ -1229,7 +1310,7 @@ getrennt.
 - [ ] manuell prüfen: im Stripe-Dashboard getrennte Test-/Live-Keys bzw. RAKs, least privilege, Webhook-Signing-Secrets und Endpoint-Subscriptions für Success/Failed/Dispute/Refund prüfen; zusätzlich Radar-/Card-Testing-/High-Risk-Regeln, Review-Queue, False-Positive-Rollback und Alerts dokumentieren. Getrennte Test-/Live-Keys bzw. RAKs, least privilege, Webhook-Signing-Secrets und Endpoint-Subscription für Success/Failed/Dispute/Refund prüfen; **Stripe Dashboard/Radar**: Velocity-/Card-Testing-/High-Risk-Regeln, Review-Queue, False-Positive-Rollback und Alerts dokumentieren.
 - [ ] manuell prüfen: den 3DS-Strom live durchspielen: SCA, frictionless, challenge, failure, timeout, mobile und return. Radar darf die lokalen Limits nicht ersetzen; Payment-Method-Settings und Testkarten mitverifizieren. **3DS-Betriebscheckliste**: SCA/frictionless/challenge/failure/timeout/mobile/return testen; Radar nicht als Ersatz für lokale Limits verwenden, Payment-Method-Settings und Testkarten verifizieren.
 - [ ] Monitoring/Runbook für PI-Rate, Replays, User/IP-429, Failure-Velocity, Identity-Mismatch/Quarantäne, Cleanup, Account-Age-Rejections und Turnstile anlegen; Logs ohne PAN/CVC/Secret/Raw-Turnstile-Token.
-- [ ] Entscheidung offen: Zweck, Legal Ground, konkrete Retention und Lösch-/Anonymisierungsregeln der Stripe-Identifikatoren — fachliche DPO-/Rechtsfreigabe. Datenschutzhinweise/ROPA/Prozessor-/DPA- und Cookie-Dokumentation für Stripe-Customer-/PI-IDs, IP(+Hash), Fingerprint, Failure-Codes und Turnstile finalisieren. `Privacy.tsx` enthält bereits einen technischen Teilabschnitt; Zweck/Legal-Ground, konkrete Retention, Lösch-/Anonymisierungsregeln und DPO-/Rechtsfreigabe sind noch nicht nachgewiesen.
+- [ ] **D-16 — technische Doku der Stripe-Identifikatoren vervollständigen; rechtlicher Teil bleibt benannte Lücke.**
 
 **Tests**
 
@@ -1328,7 +1409,7 @@ Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
 **Folge-Runde 2026-09-26 (die drei Kernbefunde des Owners umgesetzt):**
 **Folge-Task (Harness-Luecke) — erledigt 2026-09-27:**
 **Folge-Runde 2026-09-27 (die zwei `low`-Befunde umgesetzt):**
-- [ ] Entscheidung offen: `truncate` wäre hier *korrekt*, aber die stille Kürzung ohne sichtbaren Effekt ist schlechter — `title`-Attribut oder ein Layout, das den Namen umbrechen lässt? Betrifft `Sidebar.tsx:51` — **Latentes Risiko, bewusst nicht angefasst (kein Regressionsfall):**
+- [ ] **D-9 — Sidebar: Portalname bricht um** statt still gekürzt zu werden.
   `Sidebar.tsx:51` rendert den Portalnamen mit `whitespace-nowrap` **ohne**
   Truncation. Bei der aktuellen Breite passt der Name (Desktop-Screenshot
   bestaetigt), aber eine schmalere Sidebar oder ein laengerer Portalanme liesse
@@ -1353,7 +1434,7 @@ hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
 | strukturell nicht erfassbar | 2 | `AIGalleryDefaultsModal` (nur aus einem anderen Dialog heraus) und der globale Bestaetigungsdialog (programmatisch, kein `click`-Target) |
 | Roh-Dialoge ohne `ModalShell` | 11 | 6 mit `role="dialog"`, **5 ohne** — die brauchen ein `data-testid`, bevor `waitFor` sie ueberhaupt greifen kann |
 
-- [ ] Entscheidung offen: `API_THROTTLE_LIMIT` in `.env.ci` anheben (vergleichbar mit `AUTH_THROTTLE_LIMIT=1000`) und in `.env.example` kommentieren, dass 60 der Produktions-Sinnwert ist. `config/app.php` und `.env.production` bleiben unangetastet. **Offen, weil versioniert und CI-betreffen:** `.env.ci` und `.env.example`
+- [ ] **D-6 — `API_THROTTLE_LIMIT` in `.env.ci` auf 1000**, Kommentar in `.env.example`.
   stehen weiter auf `API_THROTTLE_LIMIT=60`. CI fährt laut eigenem Kommentar
   4 Playwright-Worker und hat damit dasselbe Burst-Profil — die Drosselung ist
   dort latent, auch wenn sie bisher nicht als Fehler auffaellt. Entscheidung des
@@ -1362,7 +1443,7 @@ hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
   60 der Produktions-Sinnwert ist und Testumgebungen deutlich hoeher muessen
   sein. **Nicht** angefasst: `config/app.php` (Default bleibt 120/5) und
   `.env.production` (liegt nicht auf diesem Rechner).
-- [ ] Entscheidung offen: soll das `<main>`-Scoping für die acht Gallery-Aktions-Dialoge bewusst aufgeweicht werden, oder bleiben sie bis zu einer eigenen `ModalShell`-Arbeit eine dokumentierte Lücke? Die bisherige Entscheidung lautet „nicht aufweichen". **Harness-Grenze: `<main>`-Scoping.** `applyNavStep` scoped `target` und
+- [ ] **D-10 — Dialoge innerhalb von `<main>` rendern, Scoping bleibt unangetastet.**
   `waitFor` auf `page.locator('main')`. `DashboardLayout.tsx:93-95` rendert
   `<GalleryModals` **nach** `</main>`, und `ModalShell` nutzt **kein Portal** —
   diese Dialoge liegen also ausserhalb des Landmarks und sind per `click` nicht
@@ -1566,29 +1647,35 @@ gerissen und zur Entscheidung gemacht.
     Grundursache, warum hier Testbudgets echten Spielraum brauchen.
 ## Dialog-UI-Befunde aus derselben Welle (2026-09-27) — sechs Produktfragen, keine Implementierungsdetails
 
-- [ ] Entscheidung offen: je Frage einzeln: Initial-Fokus (Fokusfalle schlägt `autoFocus`), `maxWidth`-Skala bauen oder Typ eingrenzen, `editing`-Namenskollision in fünf Dialogen, `CouponFormDrawer` Escape/Backdrop, `ModelInviteDialog`-Wrapper, fehlende Unit-Tests für `ManagementOrgsView`/`ManagementOrgDetailView`. **Sechs Produktfragen aus der Welle, keine Implementierungsdetails:**
-  1. **Fokusfalle schlaegt `autoFocus`.** In `ManagementOrdersView` lag der
-     Cursor vorher im Preisfeld; jetzt landet der Fokus auf dem Schliessen-
-     Element. Ist bewusst getestet, damit es eine Entscheidung ist. Soll das
-     Preisfeld gewinnen, braucht die Shell einen Initial-Fokus-Hook.
-  2. **`maxWidth` ist halb implementiert.** Nur `'2xl'` erzeugt eine Klasse;
-     `'lg'`/`'xl'` werden akzeptiert und still verworfen. Entweder Skala
-     implementieren oder Typ eingrenzen.
-  3. **`editing={false}` ist in fuenf Dialogen eine Namenskollision.** In
-     `ModalDialogShell` bedeutet `editing` „hat Loeschaktion fuer einen
-     bestehenden Datensatz", in `TextSnippetModal`/`ProductModal`/
-     `CustomerModal`/`CouponFormDrawer` „ist das eine Editsitzung". Das
-     Domain-`editing` zu uebergeben, rendert einen `Loeschen`-Button ohne
-     Handler. An jeder Stelle dokumentiert, aber eine Falle.
-  4. **`CouponFormDrawer`: Escape und Backdrop loesen jetzt die
-     Ungespeichert-Warnung aus.** Vorher taten das nur Schliessen und Abbrechen —
-     diese beiden Wege konnten getippte Eingabe still verwerfen. Vermutlich
-     richtig, aber Nutzer werden es spueren.
-  5. **`ModelInviteDialog` brauchte einen Wrapper-`<div>`** fuer
-     `data-testid="model-invite-dialog"`, durch das 8 E2E-Assertions scope.
-     Die Shell besitzt keinen Testid-Hook.
-  6. **`ManagementOrgsView` und `ManagementOrgDetailView` haben keine
-     Unit-Testdateien.** Beide sind jetzt konform, aber ungeschuetzt.
+- [ ] **D-13 — `maxWidth` auf `'2xl'` einschränken.** Nur `'2xl'` erzeugt heute eine Klasse;
+  `'lg'` und `'xl'` werden akzeptiert und still verworfen — der Prop lügt.
+- [ ] **D-18 — `testId`-Prop auf `ModalShell` und `ModalDialogShell`.** `ModelInviteDialog`
+  brauchte einen Wrapper-`<div>` nur für `data-testid`, durch den 8 E2E-Assertions scopen.
+- [ ] **D-19 — Unit-Testdateien für `ManagementOrgsView` und `ManagementOrgDetailView`.** Beide
+  waren „jetzt konform, aber ungeschützt"; Konformität ist keine Abdeckung.
+- [ ] **D-20 — `ModalDialogShell` verliert `editing`; der Lösch-Button folgt aus `onDelete`.**
+  **Erreichbarer Defekt, den der Board nie nannte:** `VolumePresetSettingsCard.tsx:118` übergibt
+  `editing={!!initialName}` **ohne** `onDelete` — seit `e053f70` (2026-08-13) rendert dort ein
+  `Löschen`-Button mit `onClick={undefined}`, ein stiller Totklick. **Pflicht-Schritt:**
+  `GalleryModal` und `GalleryGroupModal` übergeben `onDelete` heute bedingungslos und müssen es
+  auf „nur bei existierendem Datensatz" beschränken, sonst bekommt der Create-Dialog einen
+  Lösch-Button. Der vorgeschlagene Rename in `readOnly` hätte diesen Fall **nicht** behoben.
+- [ ] **D-21 — Domänen-Prop `editing` in den sechs Dialogen umbenennen** (`ProjectModal`,
+  `PhotoJobModal`, `TextSnippetModal`, `ProductModal`, `CustomerModal`, `CouponFormDrawer`).
+  Aufrufer `ManagementProjectsBoard.tsx:219` und `PhotographerProductionBoard.tsx:170` ziehen mit.
+  Die fünf Dialoge, die dem Board als „fünf" bekannt sind — die fünfte ist `ProjectModal` — geben
+  heute literal `editing={false}`, gepinnt durch `editingDeleteActionSemantics.test.tsx`; die
+  Falle ist dokumentiert, nicht lebendig.
+- [ ] Entscheidung offen: **D-12 — Initial-Fokus in den Dialogen: erst vorlegen, dann
+  entscheiden.** Alle drei angebotenen Varianten wurden als unzulänglich verworfen (Fokusfalle
+  ignoriert Datenerfassung, Shell-Hook erzeugt zwei Fokusverantwortungen, Einzelfall bleibt
+  inkonsistent zu den übrigen 25). **Bis die Vorlage da ist, gilt der Status quo:** Fokusfalle,
+  Fokus auf dem Schließen-Element. **Reihenfolge nicht umstellen.**
+- ~~D-14~~ **`CouponFormDrawer`: Escape und Backdrop lösen die Ungespeichert-Warnung bereits aus**
+  — bestätigt, keine Änderung (`CouponFormDrawer.tsx:210-213` beschreibt, dass die Shell
+  Kopf-Button, Backdrop, Escape und Abbrechen über einen Prop routet). Der Nutzer wird den
+  Verlust des getippten Texts spüren; das ist der bewusst gewählte Preis, kein Versehen. Steht
+  als D-14 in `AGENTS.md` §14.
 - [~] wartet auf eine Live-Reproduktion im Lastbereich 15–22 und einen positiven Beleg für die 6-von-8-Schieflage auf Mobile; die mobile Hälfte hat bisher keinen Mobile-spezifischen Defekt ergeben. **Was der Agent nicht klaeren konnte, offen gesagt:** (a) Er konnte die
   Fehler **nicht reproduzieren**; er hat den Bereich zwischen „gesaettigte Box"
   (Last 15, 22/22 gruen) und den gemeldeten Lasten 186–334 eingegrenzt, diesen
@@ -1604,7 +1691,7 @@ gerissen und zur Entscheidung gemacht.
   Union meldet `tsc` `TS2322`, **ohne** Union schluckt `tsc` `"lg"` kommentarlos.
   Dieser Teil haengt **ausschliesslich** an `tsc -b --force` im Build-Gate. Wenn
   jemand `tsc -b` ohne `--force` fahren laesst, ist genau diese Haelfte ungesichert.
-- [ ] Entscheidung offen: **`ModalShell` braucht eine Region zwischen Kopf und begrenztem Body** (`bodyHead`/`pinned`-Slot) plus eine benannte Höhe unter 90vh, damit die zwei 80vh-Dialoge keine konkurrierenden `max-h`-Utilities stapeln. **Der Footer-Scroll-Befund selbst ist erledigt** (`4474444`, `659a5a5`, verifiziert per Screenshot auf Desktop und Mobile) — offen ist nur die Architekturfrage, und sie ist bewusst zurückgestellt worden: (1) die drei betroffenen Dialoge `GalleryAccessModal`, `PhotographerTeamModal` und `AIBatchEditModal` pinnen Kopf und Footer **bereits selbst** (jeder mit einem Kommentar, der `scrollableBody` bewusst ablehnt) — es wäre also ein Refactor, kein Fix; (2) ein unbenutzter Slot in einer Komponente mit 28 Aufrufstellen verstößt gegen die No-Dead-Code-Haltung des Repos; (3) `features/tech/08-dialog-height-contract.md` §3/§6.3 führt die drei als akzeptierte Teilmenge. **Wer entscheidet:** Zieltaxonomie des Slots und ob die drei Dialoge migriert werden. `ModalShell.tsx:171` setzt derzeit fest `max-h-90vh`.
+- [ ] **D-11 — `ModalShell`: benannte Höhe plus `bodyHead`, drei handge-rollte Dialoge mitmigrieren.**
 - [~] wartet auf ein späteres Aufräumen der Stack-Env — der Wert hat keinen Secret-Bezug, wird aber über die Ports-Liste geführt. **`SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN`** ist im Compose ein
   Container-Wert ohne Secret-Bezug, wird aber über die Ports-Liste geführt; bei
   einem späteren Aufräumen prüfen, ob es in die Stack-Env gehört.

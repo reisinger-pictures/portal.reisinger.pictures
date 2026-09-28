@@ -76,7 +76,24 @@ beschreiben zwei Dateien eine Regel und driften auseinander.
 
 ## 4. AI Operating Rules (STRICT)
 
-- **ESLint Auto-Fix Policy (STRICT):** Always use `pnpm lint:fix` (= `eslint . --fix --max-warnings 0`) instead of plain `pnpm lint`. Auto-fix handles formatting and trivial rules — never fix those by hand. The plain `lint` script (without `--fix`) is reserved for CI/PR checks only.
+- **ESLint Auto-Fix Policy (STRICT):**
+  Always use `pnpm lint:fix` (= `eslint . --fix --max-warnings 0`) instead of plain `pnpm lint`. Auto-fix handles formatting and trivial rules — never fix those by hand. The plain `lint` script (without `--fix`) is reserved for CI/PR checks only.
+- **Text-Einsatz in eine Markdown-Liste: am ENDE des Eintrags verankern, nicht an seinem
+  ersten Satz.** Wer einen neuen Eintrag hinter einem bestehenden einfügen will und den Anker auf
+  die Kopfzeile des bestehenden setzt, landet mit dem neuen Text **zwischen** dessen Überschrift
+  und dessen Körper — der Eintrag wird lautlos zerrissen, und nichts im Ergebnis meldet einen
+  Fehler. **Belegt vierfach am 2026-09-28, in einer einzigen Sitzung:** §6 (der „Max 3
+  Fix-Versuche"-Satz landete am Ende des D-8-Blocks), §14/D-17 (D-18 und D-19 landeten zwischen
+  D-17s Kopf und Körper), §9 (die D-20-Regel landete zwischen der D-18-Überschrift und ihrem
+  Absatz) und **§4 selbst** — die Regel landete zwischen der ESLint-Überschrift und ihrem Satz,
+  also in dem Eintrag, der unmittelbar darüber steht. Alle vier Male war die Einfüge-Operation
+  selbst korrekt und der Round-Trip-Check sauber; der Fehler fiel erst beim **Lesen** auf. Der
+  vierte Fall ist der aussagekräftigste: die Regel wurde geschrieben und im selben Schritt
+  dagegen verstoßen — ein Anker wird offenbar nicht deshalb richtig, dass man gerade darüber
+  gelesen hat.
+  **Regel:** das letzte Merkmal des Zieleintrags bestimmen, nicht das erste. Und nach jedem
+  Text-Einsatz in ein Dokument prüfen, ob Überschrift und Körper des Nachbareintrags **an-
+  einander** stehen — nicht nur, ob die Zeilenzahl stimmt.
 - **Test Debugging Transparency:** When analyzing test failure reports, you must explicitly document your debugging progress and thought process before proposing a fix. Explain what failed, why it failed based on the logs/DOM snapshots, and how the fix addresses the root cause.
 - **Patching & File Modification (CRITICAL):**
   - Multi-line Regex for search-and-replace in code is STRICTLY FORBIDDEN. It is too brittle.
@@ -125,7 +142,23 @@ The system and workflow are managed via a Main/Secondary Model architecture to p
 3. Frontend Unit-Tests schreiben (`pnpm vitest run`)
 4. Erst danach: E2E-Tests fixen (`npx playwright test`)
 
-**Max 3 Fix-Versuche für Tests (STRICT):** Nach 3 erfolglosen Versuchen, einen fehlschlagenden Test zu fixen, MUSS der Agent an den Benutzer zurückgeben mit einer Analyse was schiefgeht. Keine Endlos-Fix-Loops.
+**Max 3 Fix-Versuche für Tests (STRICT):**
+Nach 3 erfolglosen Versuchen, einen fehlschlagenden Test zu fixen, MUSS der Agent an den Benutzer zurückgeben mit einer Analyse was schiefgeht. Keine Endlos-Fix-Loops.
+
+**i18n-Regel (D-7):** `scripts/check-i18n.mjs` wird **auf Satzebene erweitert** und lernt,
+Prosa von Nicht-Prosa zu unterscheiden — begründet in §14/D-7. Praktisch: `Jahre (geb. {x})`
+ist ein Befund, nicht zwei. Das Gate bleibt **warn-only mit Exit 0**, bis der Zähler 0 ist;
+`CHECK_I18N_UNLOCALIZED_STRICT=1` wird erst dann scharf. Wer die 246 einzeln behebt, statt
+zuerst die Regel zu erweitern, produziert bei diesem Muster Rauschen ohne Nutzen.
+
+**`frontend/tests/e2e/admin/` (D-8):** wird **nach Domäne** aufgeteilt, analog zu `client/`,
+`photographer/`, `crm/`, `delivery/`, `selection/`. Begründet in §14/D-8. Der Umbau ist eine
+eigene Arbeit; **kein nebenbei auszuführender Cleanup** — jede Verschiebung ohne vorher
+festgelegte Zielstruktur erzeugt nur einen zweiten Zwischenstand.
+**Unit-Test-Abdeckung der Management-Views (D-19):** `ManagementOrgsView` und
+`ManagementOrgDetailView` besitzen Testdateien. „Konform" ist keine Abdeckung — eine View ohne
+Testdatei ist nur durch die Build-Prüfung geschützt, nicht durch eine Prüfung ihres Verhaltens
+(begründet in §14/D-19).
 
 ## 7. Modules
 
@@ -175,6 +208,30 @@ Offene Security-/Infra-TODOs (P1-I1–P1-I8) siehe `AGENTS.todo.md`; P2-T5 ist a
 - HTML-Sanitize beim Persistieren (Symfony `HtmlSanitizer`) + beim Render (DOMPurify)
 - Vertragssigning mit optimistischer Concurrency (`content_version` in UPDATE-WHERE)
 - Keine Eigenbau-Kryptografie (Security-Critical nur etablierte Pakete/Bordmittel, Entscheidung 2026-09-19)
+
+**UI-Verhaltensregeln (Owner-Entscheidungen 2026-09-28, §14/D-9 bis D-14 — nicht regredieren):**
+
+- **Portalname in der Sidebar bricht um**, statt still gekürzt zu werden. `whitespace-nowrap`
+  ohne Umbruch ist der Fehler, den D-9 abschafft.
+- **Das `<main>`-Scoping im E2E-Harness wird nicht aufgeweicht.** Wenn ein Dialog per `click`
+  nicht erreichbar ist, wird die **Struktur** geändert, nicht das Scoping (D-10).
+- **`ModalShell` führt eine benannte Höhe** (statische Klasse je Wert) und hat einen
+  `bodyHead`/`pinned`-Slot. Der Slot existiert **nur zusammen mit** der Migration der drei
+  handge-rollten Dialoge — ungenutzte API in einer Komponente mit 28 Aufrufstellen ist
+  toter Code (D-11).
+- **`maxWidth` akzeptiert nur `'2xl'`.** `'lg'` und `'xl'` werden nicht still verworfen, sie
+  sind nicht im Typ (D-13).
+- **Escape und Backdrop lösen in `CouponFormDrawer` die Ungespeichert-Warnung aus**, genau
+  wie Schließen und Abbrechen (D-14).
+- **`ModalShell` und `ModalDialogShell` nehmen einen `testId` an.** Kein Dialog braucht einen
+  Wrapper-`<div>` nur für `data-testid`; wenn doch einer existiert, ist er entweder überflüssig
+  oder der `testId` wurde nicht gesetzt (D-18).
+- **`ModalDialogShell` kennt kein `editing`.** Der Lösch-Button folgt aus `onDelete`; ein
+  `editing`-Prop existiert dort nicht mehr. Wer einen Lösch-Button ohne Handler findet, hat
+  einen Aufrufer ohne `onDelete` — das ist ab jetzt ein Fehler, kein Design (D-20).
+- **Initial-Fokus: es gibt noch keine Regel, der Status quo gilt** (Fokusfalle, Fokus auf dem
+  Schließen-Element), bis D-12 vorliegt. Wer jetzt eine Regel erfindet, überschreibt eine
+  ausstehende Entscheidung.
 
 ## 10. IntelliJ Run-Configs (.run) — Benennungs-Konvention (STRICT)
 
@@ -274,6 +331,193 @@ führt keine Migration aus. Deshalb gilt:
 - **Reihenfolge:** Sync → Neustart → Gegenprobe. Die Gegenprobe ist der
   Health-Check plus ein Request, der den neuen Code zwingt (kein
   `cache:clear`-Verhalten, das der Neustart ohnehin erledigt).
+
+### Owner-Entscheidungen zum Deploy (2026-09-28, §14)
+
+- **D-1 — SFTPGo läuft als `user: "1002:82"`**, nicht `1000:1000`. `deployment/docker-compose.yml`
+  ist die entsprechende Datei. Der laufende Stack wurde seit Einführung der `user:`-Zeile nie
+  neu erzeugt und läuft als root; der erste spontane `docker compose up -d` fällt deshalb auf
+  1000 zurück und bricht `FtpController::process()` (anlegen + `unlink` unter `2755`).
+  **Diese Änderung ist ein Recreate, kein Restart** — siehe die Recreate-Regel oben. Deploy
+  erst nach grünem CI für genau den gepushten Head. Vorher prüfen, dass auf `/` genug Reserve
+  ist: der Deploy-Host stand am 2026-09-28 bei 12 GB frei (D-5), der dev-Host bei 477 GB — die
+  Warnung gilt dem Deploy-Host.
+- **D-4 — `.env.production` bleibt unverschlüsselt und unrotiert**, als akzeptiertes Risiko.
+  Wer eine Rotation vorschlägt, hat die Entscheidung nicht gelesen: sie ist getroffen, und
+  ein Repo-Risiko besteht nicht (gitignored, nie committet).
+- **D-6 — `API_THROTTLE_LIMIT` ist in `.env.ci` 1000**, in `.env.example` kommentiert (60 ist
+  der Produktions-Sinnwert). `config/app.php` und `.env.production` bleiben unangetastet.
+
+## 14. Entscheidungen des Owners (2026-09-28)
+
+**Diese Liste ist die dauerhafte Quelle für Produkt-, Betriebs- und Strukturentscheidungen —
+nicht der Chatverlauf.** Sie entstand am 2026-09-28, als 17 offene Board-Positionen beantwortet
+wurden. Format: **Frage → Entscheidung → warum**. Eine Position, die hier steht, ist nicht „noch zu
+entscheiden".
+
+**Zwei Leseregeln, ohne sie driftet die Liste:**
+
+- **Ersetzen, nicht daneben stehen lassen.** Eine später verworfene Entscheidung wird an dieser
+  Stelle überschrieben. Wer eine alte Zeile liest, muss sie für gültig oder für abgelöst halten
+  können — nicht für beides. Die zurückgezogenen Varianten stehen gebündelt im
+  Entscheidungs-Protokoll in `AGENTS.todo.md` unter „Verworfen", damit sie nicht erneut
+  implementiert werden.
+- **Der Umsetzungsstand steht nicht hier, sondern im Protokoll.** Diese Liste sagt, *was* gilt;
+  `AGENTS.todo.md` sagt, *ob es schon gilt*. Ein Eintrag hier ohne Zeile im Protokoll ist eine
+  Lücke in der Dokumentation, kein Freibrief.
+
+### Betrieb & Deployment
+
+- **D-1 — UID-Modell für SFTPGo (P1-I9, P0):** SFTPGo läuft als **`1002:82`**, der
+  Host-Konvention des Website-Baums. `deployment/docker-compose.yml` wird entsprechend
+  umgestellt und **automatisch deployt**, sobald der gepushte Head CI-grün ist. *Warum:* das
+  versionierte Compose fordert `user: "1000:1000"`, der laufende Stack wurde seit dieser Zeile
+  nie neu erzeugt und läuft als root (`docker exec portal_backend id` → `uid=0(root)`). Beim
+  nächsten Recreate fällt alles auf 1000 zurück, und mit `2755` auf `ftp/<slug>` kann UID 1000
+  **weder anlegen noch `unlink`en** — genau das macht `FtpController::process()`. Eine zweite UID
+  im selben Baum zu mischen wäre dieselbe Unordnung wie der `r1`-Vorfall vom 2026-09-26, nur
+  leiser. **Grenze:** `AGENTS.md` §13 bleibt bindend — `sync.sh` führt keine Migration aus, und
+  `restart` ≠ `recreate`. Der Deploy dieser Änderung ist ein **Recreate**, kein Restart, und
+  geschieht erst nach grünem CI.
+- **D-2 — Anlage von `ftp/<ftp_slug>` (P1-M24, P1):** die **Software legt das Verzeichnis selbst
+  an**, beim Setzen des FTP-Slugs, mit korrekter Ownership und `2777`+setgid. Der konkrete
+  Mechanismus ist Implementierungsfrage, nicht Teil dieser Entscheidung. **Schlägt die Anlage fehl,
+  schlägt auch das Setzen des Slugs fehl** — mit verwertbarer Meldung und ohne den Slug zu
+  speichern. *Warum:* die SFTPGo-Doku sagt ausdrücklich *"you have to create the folder on disk
+  yourself"*. Und der Zustand „Slug gesetzt, Ordner fehlt" darf gar nicht erst entstehen können:
+  er ist genau der Zustand, den der Befund verhindert, und er wäre später nur noch schwerer zu
+  entdecken. `chown -R` per Entrypoint auf `/home/webadmin/websites` bleibt ausgeschlossen
+  (`features/infrastructure/19-ftp-upload-pipeline.md` §7.9).
+- **D-3 — Branch-Protection für `main`:** **bewusst nicht gesetzt.** *Warum:* Owner-Entscheidung.
+  `GET /branches/main/protection` → `404 Branch not protected`; der `CI gate (push)` läuft grün,
+  erzwingt sich aber selbst nicht. Trust-Frage an der Repo-/Org-Einstellung, keine Code-Aufgabe.
+  **Folge:** das fehlende Gate darf in keinem Audit erneut als Befund aufgerollt werden.
+- **D-4 — Produktions-Secret-Handling (P1-I1):** **als akzeptiertes Risiko dokumentiert**, keine
+  Rotation, kein Secret-Manager. *Warum:* `.env.production` ist korrekt gitignored
+  (`.gitignore:54:.env*`) und war **nie** committet (`git log --all -- .env.production` ist leer).
+  Kein Repo-Risiko, nur lokale Hygiene auf einem Single-Host-Deployment. Ein Code-Fix würde das
+  Secret nur an einen anderen Ort kopieren.
+- **D-5 — Host-Speicher:** gilt dem **Deploy-Host**, nicht dem Entwickler-Rechner. *Warum:*
+  gemessen am 2026-09-28 — auf dem dev-Host ist `/` zu **3 %** belegt (477 GB frei) und
+  `/projects/LuminaRust` existiert dort nicht; die 97 % / 12 GB frei und die 152 GB gehören zum
+  Deploy-Host. Damit ist der Punkt **Deploy-Arbeit** und gehört neben D-1, denn 12 GB Reserve sind
+  für einen Stack-Recreate mit Image-Pulls knapp. Der eigene Fußabdruck (~1 GB) ist vernachlässigbar.
+- **D-6 — `API_THROTTLE_LIMIT` in CI:** auf **1000** anheben, vergleichbar mit
+  `AUTH_THROTTLE_LIMIT=1000` dort, und in `.env.example` kommentieren, dass **60 der
+  Produktions-Sinnwert** ist und Testumgebungen deutlich höher müssen sein. `config/app.php`
+  (Default 120/5) und `.env.production` bleiben unangetastet. *Warum:* CI fährt laut eigenem
+  Kommentar 4 Playwright-Worker und hat dasselbe Burst-Profil wie lokal mit 8 — die Drosselung ist
+  dort latent, auch wenn sie bisher nicht als Fehler auffaellt.
+
+### Test- & Repo-Struktur
+
+- **D-7 — i18n-Regel (246 ungewrapte Strings):** die Regel wird **auf Satzebene erweitert** und
+  lernt, Prosa von Nicht-Prosa zu unterscheiden. *Warum:* `Jahre (geb. {x})` ergibt zwei
+  JsxText-Knoten (`Jahre (geb.` und `)`); einzeln zu beheben ist sinnlos, und ohne die Erweiterung
+  produziert die Regel mehr Rauschen als Nutzen. Die Regel muss zuerst lernen, was **kein** Satz
+  ist, bevor sie Sätze melden soll. Das Gate bleibt bis zum Zähler 0 warn-only;
+  `CHECK_I18N_UNLOCALIZED_STRICT=1` wird erst bei 0 umgestellt.
+- **D-8 — `frontend/tests/e2e/admin/`:** **nach Domäne aufteilen**, analog zu den bereits sauber
+  skalierten Verzeichnissen `client/`, `photographer/`, `crm/`, `delivery/`, `selection/`.
+  *Warum:* 34 von 89 Specs (38 %) liegen flach in einem Verzeichnis, das Pricing, CRM-Dokumente,
+  Tenant-Administration, Galerie-Konfiguration und Projekt-Boards mischt. Der Eintrag hielt fest:
+  „Eigene Aufgabe, keine Nebenwirkung eines Cleanup" — ohne Zielstruktur erzeugt jede Verschiebung
+  nur einen zweiten Zwischenstand.
+
+### UI-Verhalten
+
+- **D-9 — Portalname in der Sidebar (`Sidebar.tsx:51`):** das **Layout bricht den Namen um**,
+  statt ihn still zu kürzen. *Warum:* `whitespace-nowrap` ohne Truncation lässt einen längeren
+  Namen ungebremst überlaufen — genau die Fehlerklasse, die am Mobile-Header gerade behoben
+  wurde. Stille Kürzung ohne sichtbaren Effekt ist schlechter als Umbruch; die Asymmetrie
+  Mobile (bricht um) vs. Desktop (nowrap) verschwindet damit.
+- **D-10 — `<main>`-Scoping im E2E-Harness:** das Scoping wird **nicht aufgeweicht**; stattdessen
+  wird die **Struktur geändert**, damit die Dialoge innerhalb von `<main>` rendern.
+  *Warum:* `DashboardLayout.tsx:93-95` rendert `<GalleryModals` **nach** `</main>`, und
+  `ModalShell` nutzt **kein Portal** — die acht Struktur-View-Instanzen sind per `click` nicht
+  erreichbar. Ein Testfix hätte das Scoping geschwächt, ohne die Ursache zu beheben.
+- **D-11 — `ModalShell`:** die **benannte Höhe wird eingeführt** (statische Klasse je Wert, kein
+  freier Wert) **und die drei handge-rollten Dialoge werden migriert**. `GalleryAccessModal`,
+  `PhotographerTeamModal` und `AIBatchEditModal` bekommen den `bodyHead`/`pinned`-Slot, und die
+  zwei 80vh-Dialoge hören auf, `max-h`-Utilities zu stapeln. *Warum:* der Footer-Scroll-Befund
+  ist seit `4474444` / `659a5a5` erledigt und per Screenshot verifiziert; offen war nur die
+  Architekturfrage. Ein Slot **ohne** Migration wäre unbenutzte API in einer Komponente mit 28
+  Aufrufstellen und verstößt gegen die No-Dead-Code-Haltung des Repos.
+- **D-12 — Initial-Fokus in Dialogen:** **noch keine Regel — erst vorlegen.** Der Agent arbeitet
+  die beste Fokuslösung über **alle** Dialoge aus und legt sie mit Vor-/Nachteilen und
+  E2E-Implikationen vor; die Entscheidung fällt danach, die Umsetzung danach. *Warum:* die drei
+  naheliegenden Wege wurden als Varianten angeboten und als unzulänglich verworfen — Fokusfalle
+  behalten ignoriert Datenerfassung, ein Hook in der Shell erzeugt zwei Stellen mit
+  Fokusverantwortung, ein Einzelfall im Dialog bleibt inkonsistent zu den übrigen 25. Ein Dialog
+  mit Formularbeginn braucht eine Regel für alle, keine Ausnahme für drei. **Bis zur Vorlage gilt
+  der Status quo** (Fokusfalle, Fokus auf dem Schließen-Element).
+- **D-13 — `maxWidth` an `ModalShell`:** der Typ wird auf **`'2xl'`** eingeschränkt. *Warum:*
+  heute erzeugt nur `'2xl'` eine Klasse, `'lg'` und `'xl'` werden akzeptiert und still verworfen —
+  der Prop lügt. Ein Compile-Error ist ehrlicher als ein Dialog, der sich wie `'2xl'` verhält.
+- **D-14 — `CouponFormDrawer`, Escape und Backdrop:** **beide lösen die Ungespeichert-Warnung
+  aus**, verwerfen also wie Schließen und Abbrechen den getippten Text. *Warum:* ein Modal, das
+  sich nicht schließen lässt, ist eine Sackgasse. Der Verlust ist der Preis, und der Warnhinweis
+  wird an vier Wegen statt an zwei gezeigt. Der Nutzer wird es spüren — das ist der bewusst
+  gewählte Preis, kein Versehen.
+
+### Produkt, Recht, Policy
+
+- **D-15 — Altersnachweis: kein Löschkonzept, unbegrenzte Aufbewahrung, bewusst so.** Die
+  technische Folge: kein Löschpfad, keine Frist, die UI bleibt unverändert
+  (`ProfileEditForm` blendet das Feld nur bei
+  `profile.age_proof_required && !profile.age_proof_uploaded_at` ein). *Warum:* Owner-Entscheidung
+  vom 2026-09-28. **Als Fakt, nicht als Streitfrage:** ein Ausweisdokumenten-Scan ist ein
+  personenbezogenes Datum nach Art. 4 Abs. 1 DSGVO, und Art. 5 Abs. 1 lit. e verlangt eine
+  *bestimmte* Speicherdauer — „unbegrenzt" ist also selbst eine Position, die begründet werden
+  muss. Sie ist hier begründet: bewusst, als Entscheidung, und nicht als Versehen. Die
+  zurückgezogene Alternative (Frist setzen, Löschpfad implementieren) steht im Protokoll unter
+  „Verworfen".
+- **D-16 — Stripe-Identifikatoren (Customer-/PI-IDs, IP(+Hash), Fingerprint, Failure-Codes,
+  Turnstile):** **vorerst nur technisch konsistent** dokumentieren, der rechtliche Teil bleibt eine
+  **benannte Lücke mit Owner**. *Warum:* Zweck, Legal Ground, Retention und
+  Lösch-/Anonymisierungsregeln sind fachliche DPO-/Rechtsfreigabe, und es gibt keinen DPO in
+  Reichweite. `Privacy.tsx` enthält bereits einen technischen Teilabschnitt; ihn zu vervollständigen
+  ist belegbar, den rechtlichen Teil zu erfinden nicht.
+- **D-17 — A7 Betriebs-Policies:** Prompt-Injection-Policy und SMTP-Duplicate-Policy werden
+  **einzeln** festgelegt, nicht gebündelt. *Warum:* sie betreffen zwei verschiedene Systeme mit
+  zwei verschiedenen Reviewern — das Modell auf der einen, die Mail-Zustellung auf der anderen
+  Seite. Die Queue-/Mail-/Worker-/Scheduler-Evidenz bleibt ein **eigener** Eintrag: das ist
+  Betriebsnachweis, nicht Policy.
+- **D-18 — `testId` als Prop auf `ModalShell` und `ModalDialogShell`:** die Schells
+  nehmen einen optionalen `testId` an, damit kein Dialog einen Wrapper-`<div>` braucht, dessen
+  einziger Zweck `data-testid` ist. *Warum:* `ModelInviteDialog` trug genau einen solchen Wrapper,
+  durch den 8 E2E-Assertions scopen. Bei 28 Aufrufstellen ist „selten" aber nicht „nie" — die
+  andere Alternative, die Assertions auf sichtbare Merkmale umzustellen, macht die Assertions
+  unschärfer: sie prüfen dann nicht mehr, welches Dialogelement gemeint ist.
+- **D-19 — `ManagementOrgsView` und `ManagementOrgDetailView` bekommen Unit-Testdateien**, beide,
+  nach dem Muster der übrigen Management-Views. *Warum:* beide waren „jetzt konform, aber
+  ungeschützt" — die Konformität schließt die Lücke nicht, sie verlagert sie auf die
+  Build-Prüfung. Ohne Testdatei ist die Formulierung eine Feststellung ohne Deckung.
+- **D-20 — `ModalDialogShell` verliert das `editing`-Prop; der Lösch-Button wird aus
+  `onDelete` abgeleitet.** Die Shell rendert `Löschen` **nur**, wenn `onDelete` übergeben ist.
+  *Warum:* gemessen ist das Prop eine einzige Sorge, an genau einer Stelle gelesen
+  (`ModalDialogShell.tsx:84`) — es gibt nichts zu splitten. Und die Umbenennung in ein
+  negierendes `readOnly` hätte den einzigen **erreichbaren** Defekt nicht behoben:
+  `VolumePresetSettingsCard.tsx:118` übergibt `editing={!!initialName}` **ohne** `onDelete`, also
+  rendert dort seit `e053f70` (2026-08-13) ein `Löschen`-Button mit `onClick={undefined}` — kein
+  Fehler, keine Warnung, nur ein toter Button. Aus `editing={!!initialName}` würde
+  `readOnly={!initialName}`; beim Bearbeiten ist `initialName` truthy, der Button rendert
+  weiter. Der Rename hätte den Namen geändert, nicht den Button. Diese Herleitung macht
+  „Button ohne Handler" strukturell nicht darstellbar und lässt ein **required** Prop aus 20
+  Aufrufstellen **verschwinden**, statt es in 20 umzubenennen. **Pflicht-Schritt dabei:**
+  `GalleryModal` und `GalleryGroupModal` übergeben `onDelete` heute bedingungslos und müssen es
+  künftig nur bei existierendem Datensatz tun — sonst bekommt der Create-Dialog einen
+  Lösch-Button.
+- **D-21 — die fünf Dialoge benennen ihr Domänen-`editing` um.** `ProjectModal`,
+  `PhotoJobModal`, `TextSnippetModal`, `ProductModal`, `CustomerModal` und `CouponFormDrawer`
+  führen ein Domänen-Prop mit demselben Namen, das der Shell-Prop hatte. *Warum:* D-20 nimmt den
+  Shell-Bedeutungsträger weg, aber das Wort bliebe zweimal im selben Komponentenbaum — einmal
+  fachlich, einmal strukturell. Die Kollision ist heute eine **dokumentierte Falle**, kein
+  lebender Durchschlag: die Dialoge geben literal `editing={false}`, gepinnt durch
+  `editingDeleteActionSemantics.test.tsx`. Der Rename beseitigt die Wortgleichheit restlos; die
+  Aufrufer in `ManagementProjectsBoard.tsx:219` und `PhotographerProductionBoard.tsx:170` reichen
+  das Domänen-Prop durch und müssen mitziehen. **Nebenbefund, ausdrücklich festgehalten:** das Board
+  sprach von „fünf Dialogen" und nannte vier — die fünfte ist `ProjectModal`.
 
 ## TODO (UI-Review)
 
