@@ -559,6 +559,40 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   domänenskaliert sind. Zusätzlich drei fast identische 80–107-Zeilen-Specs für
   Negativ-Berechtigungen mit identischem 85-Zeilen-Setup. **Eigene Aufgabe, keine
   Nebenwirkung eines Cleanup.**
+- [ ] **Owner-Entscheidung 2026-09-28: alle Geldbeträge in Cent — im Speicher und in
+  der API, ohne Ausnahme.** Ausdrücklich **auch bei ganzzahligen Euro-Beträgen**:
+  es gibt keine „50 € ist ja rund, das bleibt stehen"-Ausnahme, und keine
+  „ist praktisch immer ganzzahlig"-Begründung. **DasFrontend erwartet bei Eurobeträgen
+  immer Cent.** Damit ist der Zielzustand definiert; der Ist-Stand erfüllt ihn nicht.
+  **Gemessen ist die Inkonsistenz genau:** von neun Geldfeldern in der
+  `settings`-Antwort sind **sieben in Cent** (`base_price` 8000, `setup_fee` 5000,
+  `privacy_fee` 20000, `extra_image_fee` 1500, `price_web` 7500, `price_print` 14500,
+  `price_original` 45000) und **zwei in Euro** (`calc_base_price` 50, `calc_hourly_rate`
+  80). Ursache ist nicht der Speicher, sondern die Karte:
+  `CalculatorSettingsCard.tsx` Z. 47 sendet `calc_base_price` unverändert, Z. 52 sendet
+  `srp_base_price` als `Math.round(x * 100)` — ein Formular, zwei Einheiten.
+  **Nicht Geld und deshalb bewusst ausgenommen:** `calc_flatrate_multiplier` 1.2,
+  `mult_commercial` 2.0, `mult_unlimited` 1.5, `mult_international` 1.5
+  (dimensionslose Faktoren), `calc_images_per_hour` 6, `calc_outdoor_images_per_hour` 8
+  (Anzahlen), alle Prozente. Diese Felder dürfen **nicht** mit „alles Integer"-Umstellung
+  mitgezogen werden.
+  **Zwei Teilentscheidungen stehen noch aus und werden nicht geraten:**
+  **(1) Datenmigration** — `calc_base_price` 50 → 5000 und `calc_hourly_rate` 80 → 8000
+  sind **Wertänderungen**, keine Typänderungen. Eine bestehende Zeile mit bereits
+  cent-konformem Wert (z. B. 5000 als „5000 €") würde beim blinden `× 100` zu 500000.
+  **Vor der Migration ist zu klären, wie ein bestehender Wert von einem bereits
+  umgestellten unterscheidbar ist** — oder ob die Umstellung für die zwei Keys ohne
+  automatische Backfill erfolgt und der Wert manuell gesetzt wird. Das ist eine
+  Datenentscheidung und gehört dem Owner, nicht einer geratenen Heuristik.
+  **(2) API-Typ** — `settings.value` ist `text`, daher liefert MySQL **alle** Werte als
+  String (`base_price` kommt als `'8000'`). Ob die API Cent als `int` oder weiter als
+  String ausgibt, ist nicht entschieden; die Entscheidung „die API typisiert" vom
+  2026-09-27 deckt die Richtung, nicht den Typ.
+  **Analyse läuft** (drei Aufträge parallel, 2026-09-28): Backend-Feldinventur,
+  Frontend-Feldinventur, Doku-Feldinventur. Der Doku-Auftrag prüft die Vermutung, dass
+  `features/` inzwischen inkonsistent ist — dort steht bisher nirgends eine
+  verbindliche Einheitenaussage pro Feld, was der eigentliche Grund für diese
+  Inkonsistenz ist.
 - [ ] Entscheidung offen: **die Lizenzbegriffe-Antwort mischt drei Einheiten,
   und das ist ein Rechenproblem, kein Darstellungsproblem.** `base_price`,
   `setup_fee`, `privacy_fee`, `extra_image_fee` und die `price_*` sind
