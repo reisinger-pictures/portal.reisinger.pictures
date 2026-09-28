@@ -21,7 +21,7 @@ test.describe('Model-Lifecycle-Filter (Super-Admin only)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Super-Admin sieht die Status-Optionen Aktiv, Inaktiv und Alle', { tag: ['@feature:model-registration'] }, async ({ page }) => {
+    test('Super-Admin sieht die Status-Optionen Aktiv, Inaktiv und Alle', { tag: ['@feature:model-registration', '@feature:model-lifecycle-filter'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const superUser = await helper.createIsolatedUser('super_admin');
@@ -36,7 +36,7 @@ test.describe('Model-Lifecycle-Filter (Super-Admin only)', () => {
         await expect(statusSelect.getByRole('option', { name: 'Alle', exact: true })).toHaveCount(1);
     });
 
-    test('Normaler Admin sieht nur Aktiv; Deep-Link auf Inaktiv wird mit Toast zurueckgesetzt', { tag: ['@feature:model-registration'] }, async ({ page }) => {
+    test('Normaler Admin sieht nur Aktiv; Deep-Link auf Inaktiv wird mit Toast zurueckgesetzt', { tag: ['@feature:model-registration', '@feature:model-lifecycle-filter'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const adminUser = await helper.createIsolatedUser('admin');

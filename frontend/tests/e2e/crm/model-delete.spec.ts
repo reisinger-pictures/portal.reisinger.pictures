@@ -14,7 +14,7 @@ test.describe('Model löschen (DSGVO)', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Super-Admin löscht ein Model; normaler Admin sieht den Löschen-Button nicht', { tag: ['@feature:model-registration'] }, async ({ page }) => {
+    test('Super-Admin löscht ein Model; normaler Admin sieht den Löschen-Button nicht', { tag: ['@feature:model-registration', '@feature:model-delete'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -58,7 +58,7 @@ test.describe('Model löschen (DSGVO)', () => {
         await expect(page.locator('[data-testid^="model-card-"]')).toHaveCount(0, { timeout: 15000 });
     });
 
-    test('Super-Admin bricht die DSGVO-Löschung ab; Profil bleibt erhalten', { tag: ['@feature:model-registration'] }, async ({ page }) => {
+    test('Super-Admin bricht die DSGVO-Löschung ab; Profil bleibt erhalten', { tag: ['@feature:model-registration', '@feature:model-delete'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
