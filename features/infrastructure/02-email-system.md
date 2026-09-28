@@ -25,15 +25,31 @@ status: active
 - Dieses Modal bietet einen Live-Preview-Toggle, der die eingegebenen Variablen (z. B. `{user_name}`, `{link}`) durch Dummy-Daten ersetzt und das finale HTML rendert.
 
 ## 4. Brand-Aware Emails (EMAIL-01–04)
-- Alle 7 Mail-Klassen (`InvoiceMail`, `CustomMail`, `GalleryInviteMail`, `ActivateAccountMail`, `RatingFinishedMail`, `NotificationMail`, `OrgInviteMail`) nutzen das `BrandAwareMail` Trait.
-- Das Trait stellt sicher:
-  - **Brand Context Restoration:** `ensureBrandContext()` stellt den Brand bei Queue-Workern wieder her (captured via `initializeBrand()` im Konstruktor).
-  - **Frontend URL (EMAIL-01):** `brandFrontendUrl()` liefert `config('app.frontend_url_srp')` für SRP, sonst `config('app.frontend_url')`.
-  - **Logo URL (EMAIL-02):** `brandLogoUrl()` kombiniert Frontend-URL mit `/android-chrome-192x192.png`.
-  - **Sender (EMAIL-03):** `applyBrandFrom()` setzt Absender per `config('mail.from_srp.*')` für SRP.
-  - **BCC (EMAIL-04):** `brandBcc()` liest `config('services.accounting_email_srp')` oder `accounting_email_rp`.
+- **Alle 13 Mailable-Klassen erben von `AbstractBrandAwareMailable`** — geprüft mit
+  `grep -l 'extends AbstractBrandAwareMailable' backend/app/Mail/*.php | wc -l` → 13, und
+  `ls -1 backend/app/Mail/*.php | wc -l` → 14 Dateien, davon eine abstrakte Basis.
+  **Korrigiert 2026-09-28:** diese Passage behauptete *alle 7 Mail-Klassen* und nannte ein
+  **Trait** `BrandAwareMail`. Es sind 13 konkrete Klassen, und die gemeinsame Basis ist eine
+  **abstrakte Klasse**, kein Trait. Das Symbol `BrandAwareMail` existiert nirgends im Repo
+  (`find backend -iname 'BrandAwareMail*'` ist leer).
+- Die Basisklasse stellt sicher:
+  - **Brand Context Restoration:** über die Eigenschaft `public ?Brand $brand = null` und
+    `initializeBrand(?Brand $brand = null)`, die `BrandRegistry::current()` als Rückfall nutzt —
+    beide in `AbstractBrandAwareMailable.php:17-24`. **Korrigiert 2026-09-28:** die Passage nannte
+    eine Methode `ensureBrandContext()`; die existiert nirgends (`grep -rn ensureBrandContext
+    backend/app backend/tests` ist leer).
+  - **Frontend URL (EMAIL-01):** `brandFrontendUrl()` in `AbstractBrandAwareMailable.php:27`.
+  - **Logo URL (EMAIL-02):** `brandLogoUrl()` — von den Mails über `$this->brandLogoUrl()`
+    aufgerufen, z. B. `ModelInviteMail.php:28`.
+  - **Sender (EMAIL-03):** `applyBrandFrom()` in `AbstractBrandAwareMailable.php:53`.
+  - **BCC (EMAIL-04):** `brandBcc()` in `AbstractBrandAwareMailable.php:46`.
+- Die Basisklasse erbt zusätzlich `implements ShouldQueue` mit `$tries = 3` und
+  `$backoff = [30, 60, 120]` (`AbstractBrandAwareMailable.php:18` und `:20`) — deshalb greifen
+  die Retry-Semantiken aus D-17 auch dort, wo der Aufrufer synchron sendet.
 - Templates erhalten `$logoUrl` via `->with()` und nutzen `??=` als Fallback.
-- Siehe `backend/app/Mail/BrandAwareMail.php` und `features/infrastructure/06-multi-domain-branding.md`.
+- Siehe `backend/app/Mail/AbstractBrandAwareMailable.php` und
+  `features/infrastructure/06-multi-domain-branding.md`.
+
 
 ## 5. Local Testing
 - Der lokale `Mailpit`-Service fängt alle ausgehenden E-Mails im Development-/CI-Testmodus ab.
