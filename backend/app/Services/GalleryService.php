@@ -24,12 +24,18 @@ class GalleryService
      */
     public function storeGroup(array $data): GalleryGroup
     {
+        // Resolve the brand before the slug: the slug is unique per
+        // `(brand, slug)` (V046), so the uniqueness check must be scoped to the
+        // brand the row is about to be persisted with.
+        $brand = BrandRegistry::currentOrDefault()->value;
+
         $slug = $this->slugService->makeUnique(
             $data['slug'] ?? $data['name'],
-            'gallery_groups'
+            'gallery_groups',
+            'slug',
+            null,
+            $brand
         );
-
-        $brand = BrandRegistry::currentOrDefault()->value;
 
         // A new group takes the actor's brand, so a parent from another brand
         // would immediately violate the one-brand-per-tree invariant. No cycle
@@ -70,7 +76,16 @@ class GalleryService
     {
         $slug = ! empty($data['slug']) ? Str::slug($data['slug']) : Str::slug($data['name']);
         if ($slug !== $group->slug) {
-            $slug = $this->slugService->makeUnique($slug, 'gallery_groups');
+            // Scope to the group's brand: `gallery_groups.slug` is unique per
+            // `(brand, slug)` (V046). A group without a normalizable brand
+            // falls back to the global check, which is stricter and safe.
+            $slug = $this->slugService->makeUnique(
+                $slug,
+                'gallery_groups',
+                'slug',
+                null,
+                BrandRegistry::normalizeId($group->brand)
+            );
         }
 
         $this->assertParentAssignmentIsSound($group, $data['parent_id'] ?? null);
