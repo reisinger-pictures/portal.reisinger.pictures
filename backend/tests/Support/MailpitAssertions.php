@@ -44,13 +44,17 @@ trait MailpitAssertions
 
     protected function assertMailpitSentTo(string $email, int $expectedCount = 1): void
     {
-        $messages = $this->getMailpitMessages();
-        $matched = array_filter($messages, fn ($m) => collect($m['To'] ?? [])->pluck('Address')->contains($email));
+        // Recipient-scoped search, not the global message list. The query is
+        // already `to:<email>`, so a client-side filter on `To` would be
+        // redundant. GET /messages applies a default limit (50) and returns
+        // only the most recent messages, which is how this assertion silently
+        // missed older mail on a long-lived or heavily parallel Mailpit.
+        $messages = $this->getMailpitMessagesByRecipient($email);
 
         $this->assertGreaterThanOrEqual(
             $expectedCount,
-            count($matched),
-            "Expected at least {$expectedCount} mail(s) to {$email} in Mailpit, found ".count($matched)
+            count($messages),
+            "Expected at least {$expectedCount} mail(s) to {$email} in Mailpit, found ".count($messages)
         );
     }
 
