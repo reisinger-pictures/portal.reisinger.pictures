@@ -563,76 +563,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   domänenskaliert sind. Zusätzlich drei fast identische 80–107-Zeilen-Specs für
   Negativ-Berechtigungen mit identischem 85-Zeilen-Setup. **Eigene Aufgabe, keine
   Nebenwirkung eines Cleanup.**
-- [ ] **Owner-Entscheidung 2026-09-28: alle Geldbeträge in Cent — im Speicher und in
-  der API, ohne Ausnahme.** Ausdrücklich **auch bei ganzzahligen Euro-Beträgen**:
-  es gibt keine „50 € ist ja rund, das bleibt stehen"-Ausnahme, und keine
-  „ist praktisch immer ganzzahlig"-Begründung. **DasFrontend erwartet bei Eurobeträgen
-  immer Cent.** Damit ist der Zielzustand definiert; der Ist-Stand erfüllt ihn nicht.
-  **Gemessen ist die Inkonsistenz genau:** von neun Geldfeldern in der
-  `settings`-Antwort sind **sieben in Cent** (`base_price` 8000, `setup_fee` 5000,
-  `privacy_fee` 20000, `extra_image_fee` 1500, `price_web` 7500, `price_print` 14500,
-  `price_original` 45000) und **zwei in Euro** (`calc_base_price` 50, `calc_hourly_rate`
-  80). Ursache ist nicht der Speicher, sondern die Karte:
-  `CalculatorSettingsCard.tsx` Z. 47 sendet `calc_base_price` unverändert, Z. 52 sendet
-  `srp_base_price` als `Math.round(x * 100)` — ein Formular, zwei Einheiten.
-  **Nicht Geld und deshalb bewusst ausgenommen:** `calc_flatrate_multiplier` 1.2,
-  `mult_commercial` 2.0, `mult_unlimited` 1.5, `mult_international` 1.5
-  (dimensionslose Faktoren), `calc_images_per_hour` 6, `calc_outdoor_images_per_hour` 8
-  (Anzahlen), alle Prozente. Diese Felder dürfen **nicht** mit „alles Integer"-Umstellung
-  mitgezogen werden.
-  **Zwei Teilentscheidungen stehen noch aus und werden nicht geraten:**
-  **(1) Datenmigration** — `calc_base_price` 50 → 5000 und `calc_hourly_rate` 80 → 8000
-  sind **Wertänderungen**, keine Typänderungen. Eine bestehende Zeile mit bereits
-  cent-konformem Wert (z. B. 5000 als „5000 €") würde beim blinden `× 100` zu 500000.
-  **Vor der Migration ist zu klären, wie ein bestehender Wert von einem bereits
-  umgestellten unterscheidbar ist** — oder ob die Umstellung für die zwei Keys ohne
-  automatische Backfill erfolgt und der Wert manuell gesetzt wird. Das ist eine
-  Datenentscheidung und gehört dem Owner, nicht einer geratenen Heuristik.
-  **(2) API-Typ** — `settings.value` ist `text`, daher liefert MySQL **alle** Werte als
-  String (`base_price` kommt als `'8000'`). Ob die API Cent als `int` oder weiter als
-  String ausgibt, ist nicht entschieden; die Entscheidung „die API typisiert" vom
-  2026-09-27 deckt die Richtung, nicht den Typ.
-  **Analyse läuft** (drei Aufträge parallel, 2026-09-28): Backend-Feldinventur,
-  Frontend-Feldinventur, Doku-Feldinventur. Der Doku-Auftrag prüft die Vermutung, dass
-  `features/` inzwischen inkonsistent ist — dort steht bisher nirgends eine
-  verbindliche Einheitenaussage pro Feld, was der eigentliche Grund für diese
-  Inkonsistenz ist.
-- [ ] **HÖCHSTE PRIORITÄT — eine doppelte Migrationsnummer ist ein Produktionsvorfall,
-  kein Doku-Schönheitsfehler. Die Frontier-Aussage ist in sieben Dateien repliziert und
-  alle sieben sind falsch.** „V038 ist die Frontier, neue Änderungen ab V039" steht in
-  `21-brand-config-driven.md:18-20`, `b2b/11-kanban-board.md:58-59`,
-  `security/card-testing-protection.md:14,60` und `08-srp-coupon-system.md:123`;
-  „V036–V040 ist die Frontier" in `tech/01-database-schema.md:11`, Root-`AGENTS.md` §7
-  und `backend/AGENTS.md`. Tatsächlich liegt V043 im Baum, eine neue Migration ist also
-  **V044**. **Einzige richtige Quelle ist `tech/07-architectural-decisions.md:8` (AD-2).**
-  Korrektur: Frontier-Behauptung aus allen sechs anderen Dateien **streichen und durch
-  einen Zeiger auf AD-2 ersetzen** — nicht die Zahl aktualisieren, denn sie ist dann
-  wieder eine kopierbare Liste über einer wachsenden Menge. **Belegt:** beide Audits vom
-  2026-09-28 fanden die Aussage unabhängig voneinander; das Repo widerspricht sich
-  selbst (`01` sagt V040, `07` sagt V043).
-- [ ] **Betriebsdoku enthält Befehle, die nicht funktionieren, und Zustände, die nicht
-  stimmen** — operativer Audit, alle mit `file:line`:
-  **`deployment/README.md:233` `docker compose down pureftp`** — es gibt keinen
-  `pureftp`-Service (`docker-compose.yml` kennt db, search, composer_init, backend,
-  sftpgo); der letzte Cutover-Schritt ist so nicht ausführbar.
-  **`deployment/README.md:246`** verweist bei „Upload bricht ohne Fehler ab" auf
-  `ufw status` — `ufw` ist auf dem Host nicht installiert, §2 derselben Datei hat auf
-  firewalld umgestellt und diese Zeile übersehen.
-  **`backend/README.md:19`** nennt Imagick, `ImageController`, Thumbnail-**Upload** und
-  1024px — es ist GD, `ImageProcessor::generateThumbnail()`, on-demand bei Auslieferung;
-  die 1024 existiert nur als Hash-Salz. **`README.md:92`** führt die Skalierung auf
-  ImageMagick via Symfony Process zurück; `magick`/`convert` kommen nur in
-  `DownscaleEditorialMasterFiles.php:34,39` vor, `Process` nur für exiftool — die dortigen
-  Reparaturanweisungen (Symlink nach `/usr/local/bin`) beheben damit nichts.
-  **`tests/scripts/ftp-transport-test/README.md:199-203,16-23,243`** behaupten im
-  Präsens, es gebe keine FTPS-/SFTP-Bindings (es gibt sie, `docker-compose.yml:340,422`),
-  der Scanner laufe rot (er nicht mehr, `ci-security-contract.sh:643`) und
-  `SFTPGO_DEFAULT_ADMIN_PERMISSIONS` werde gesetzt (wird nicht).
-  **`backend/README.md:6,15`** nennt den Fotospeicherpfad `{gallery_slug}` (es ist die
-  UUID, plus `_thumbs/`) und bezeichnet Magic Links als „geplant" (sind implementiert,
-  `App.tsx:118`, `routes/api.php:104,126`).
-  **`deployment/README.md:192-200`** listet 3 der 7 automatischen Entrypoint-Wirkungen
-  und lässt `db:seed --force` weg — genau die, die 28 Produktions-Settings überschreibt.
 - [ ] **`features/security/env-hardening.md:44,190` weist auf `backend/.env.encrypted`
   als Wiederherstellungsweg** — die Datei existiert nicht und ist laut
   Root-`.gitignore:47-49` **bewusst** nie getrackt („Verschlüsselte .env-Backups bleiben
@@ -640,12 +570,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   Secret-Blob sucht, findet nichts; das im Dokument genannte Prüfkommando
   `git ls-files | grep -E '(^|/)\.env'` erzeugt zudem nicht die behauptete Ausgabe.
   **Korrektur:** als absichtlich ungetrackt kennzeichnen, nicht als wiederherstellbar.
-- [ ] **Zwei `features/`-Dateien sind kein gültiges UTF-8** —
-  `features/ecommerce/05-manual-invoices.md` und `features/delivery/02-audit-logs.md`
-  enthalten Byte `0x97` (cp1252-En-Dash). Jedes Werkzeug, das sie als UTF-8 liest,
-  verstummelt oder ersetzt das Zeichen; beim Audit musste der Link-Checker mit
-  `errors='replace'` arbeiten. Beide liegen im Abrechnungs-/Audit-Bereich, wo ein
-  verschlucktes Zeichen eine verschluckte Einschränkung sein kann.
 - [ ] **`features/` beschreibt die gelöschte SRP-Marke weiter im Präsens** (Audit-Muster
   1, höchste Ausbeute für einen zweiten Durchgang): `Brand::SRP`, `srp_`-Präfixe,
   `srp-light`-Themes, `story.`/`buy.`-Domains und `isSrp()` wurden am 2026-07-14
@@ -678,28 +602,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   kennen muss — **nicht** durch Raten behoben. Wenn sie behoben werden soll, braucht
   es zuerst den Policy-Text an einer lesbaren Stelle im Repo; das ist eine
   Owner-Entscheidung und eine Frage an den `proxy-stack`.
-- [ ] **ENTSCHEIDUNG OFFEN — der bedingte Seed ist auf der Platte, aber nicht aktiv,
-  weil der Container neu erzeugt werden muss und der Compose-Stack extern verwaltet
-  wird.** `app:seed-if-fresh` ist deployt (Rsync), der Container wurde neu gestartet —
-  und trotzdem lief wieder `db:seed`, weil `docker restart` die
-  Erzeugungskonfiguration verwendet (siehe §13, neue Regel). **Konsequenz:** Der
-  Schutz gegen die 28 überschriebenen Keys ist derzeit **nicht wirksam**; jeder
-  Neustart schreibt sie erneut. Gemessen: `users` hat 1 Zeile, also würde
-  `app:seed-if-fresh` korrekt überspringen — er läuft nur nie.
-  **Das Problem ist nicht das Kommando, sondern der Stack:** Die
-  Compose-Labels des laufenden Containers nennen
-  `com.docker.compose.project.working_dir = /data/compose/23` und
-  `config_files = /data/compose/23/docker-compose.yml` — **dieses Verzeichnis existiert
-  auf dem Host nicht mehr** (`ls /data/compose` zeigt nur `1`, und darin nur `site`).
-  `docker compose ls` listet kein Projekt. Der Stack wird also über ein externes
-  Werkzeug verwaltet (dockge/Portainer), und seine Quelle ist über SSH nicht
-  auffindbar. **Deshalb habe ich den Container bewusst nicht neu erzeugt:** eine
-  handgeschriebene `docker compose up -d` gegen eine Quelle, die ich nicht
-  einsehen kann, kann `environment`, `volumes` oder `networks` verlieren und das
-  Backend mitnehmen. **Frage an den Owner:** über welches Werkzeug wird der
-  `portal-reisinger-pictures`-Stack verwaltet, und kann der Container dort neu
-  erzeugt werden, ohne dass die Konfiguration neu eingetragen werden muss? Erst dann
-  wirkt der Schutz.
 - [ ] manuell prüfen: **Auszahlungsdaten nach dem automatischen Seed** — Stand ist
   gemessen und **korrekt**: `bank_holder` = `Florian Reisinger`, `bank_iban` =
   `DE96100110012179986174`, `bank_bic` = `NTSBDEB1XXX`, `company_*` = Linz,
@@ -773,29 +675,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   selbst ist ungeprüft. `phpunit.xml:40` setzt `DB_DATABASE=:memory:`; eine
   `migrate:fresh` auf einer DB-Datei kann diese Gruppe also nicht beeinflussen.
   **Keine zweite Ursache erfinden, um sie passend zu machen.**
-- [ ] **`assertMailpitSentTo` benutzt den gepufferten Weg, obwohl die korrigierte
-  Variante im selben Trait existiert** — 6 Testklassen betroffen. Die Falle ist im
-  Trait bereits **beschrieben und behoben**, nur nicht überall angewandt:
-  `getMailpitMessageByEmail()` (`backend/tests/Support/MailpitAssertions.php:21-36`)
-  sucht über `getMailpitMessagesByRecipient()` und trägt einen Kommentar, der genau
-  diesen Fehler samt Messung dokumentiert. `assertMailpitSentTo`
-  (`MailpitAssertions.php:45-55`) ruft dagegen weiter `getMailpitMessages()`
-  (`:16-19`), das `/messages` **ohne Limit-Parameter** abruft — Mailpit liefert dann
-  standardmäßig die 50 neuesten, und `assertMailpitSentTo` filtert clientseitig. Bei
-  gefüllter Mailbox fällt die gesuchte Nachricht aus dem Fenster und die Assertion
-  meldet sie als fehlend. **Betroffen:** `ContractCloseTest`, `AuthControllerTest`,
-  `UserControllerTest`, `CheckoutServiceTest`, `InvoiceServiceTest`,
-  `NotificationOptInTest`. **Warum es auffällt:** das lokale Mailpit ist langlebig und
-  sammelt, das CI-Mailpit startet jeden Lauf leer — dieselbe Divergenz wie beim
-  Throttle, eine Ebene tiefer.
-- [ ] **Die Doku ist an zwei Stellen hinter dem Code zurückgeblieben, weil der
-  Doku-Agent vor dem Code gelandet ist.** `07-psychological-pricing.md:33` sagt noch,
-  die Umstellung sei „in Arbeit", und `28-settings-key-meaning.md:102` führt
-  `calc_base_price`/`calc_hourly_rate` weiterhin als **Euro**. Beides stimmt seit
-  `754df6c` nicht mehr. **Kein Fehler des Doku-Agenten** — er hat die Entscheidung
-  dokumentiert, während die Umsetzung noch lief. **Wer die Welle abschließt, zieht die
-  beiden Stellen nach**; die Belegregeln aus §3 (Zeilenanker mit Zitat, Zahlen mit
-  Befehl) sind der Grund, warum das auffällt und nicht still verschwindet.
 - [ ] **S1 hat die gemeinsame E2E-Datenbank migriert und geseedet — und dabei die
   Migration des Coupon-Agenten mit angewandt.** Auch der Coupon-E2E-Test, den S2 unter
   8 Workern als flaky gemeldet hat (`coupon-checkout-revalidation.spec.ts:168`),
