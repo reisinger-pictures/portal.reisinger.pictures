@@ -324,6 +324,85 @@ class FileDeliveryControllerTest extends TestCase
             ->assertStatus(200);
     }
 
+    /**
+     * `is_free_download` removes the watermark/licence requirement — it is not
+     * an authentication bypass. A private free-download gallery must still
+     * reject an unauthenticated caller before any file is exposed.
+     */
+    public function test_free_download_does_not_bypass_the_private_gallery_auth_gate(): void
+    {
+        $gallery = Gallery::factory()->create([
+            'type' => 'delivery',
+            'is_public' => false,
+            'is_free_download' => true,
+        ]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, $this->fixtureContent);
+
+        $this->get('/api/media/'.$gallery->slug.'/'.$photo->id.'.jpg')
+            ->assertStatus(401)
+            ->assertJson(['error' => 'Unauthenticated']);
+    }
+
+    /**
+     * P0-A13 boundary: a photographer without an assignment to a
+     * `restricted_photographers` gallery passes the public gallery gate (public
+     * galleries need no authentication) but must NOT receive the unwatermarked
+     * original. `canManageGallery()` routes through
+     * `canPhotographerAccessGallery()`, which honours the restriction; a
+     * regression to a role-only bypass would serve the original here.
+     */
+    public function test_unassigned_photographer_on_public_restricted_gallery_gets_watermark_not_original(): void
+    {
+        $photographer = $this->user();
+        $this->attachRole($photographer, UserRole::PHOTOGRAPHER);
+        $gallery = Gallery::factory()->create([
+            'brand' => 'rp',
+            'type' => 'delivery',
+            'is_public' => true,
+            'is_free_download' => false,
+            'restricted_photographers' => true,
+        ]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, $this->fixtureContent);
+
+        $this->actingAs($photographer, 'api')
+            ->get('/api/media/'.$gallery->slug.'/'.$photo->id.'.jpg')
+            ->assertStatus(403)
+            ->assertJson(['error' => 'Zugriff auf Original-Ressource verweigert. Wasserzeichen erforderlich.']);
+
+        // The watermarked variant stays available to the same photographer.
+        $this->actingAs($photographer, 'api')
+            ->get('/api/media/'.$gallery->slug.'/watermarked/'.$photo->id.'.jpg')
+            ->assertStatus(200);
+    }
+
+    /**
+     * Control for the P0-A13 boundary: an assignment to the restricted gallery
+     * grants management access, so the assigned photographer may take the
+     * original. This pins that the restriction denies only foreign
+     * photographers, not every photographer.
+     */
+    public function test_assigned_photographer_on_public_restricted_gallery_can_get_original(): void
+    {
+        $photographer = $this->user();
+        $this->attachRole($photographer, UserRole::PHOTOGRAPHER);
+        $gallery = Gallery::factory()->create([
+            'brand' => 'rp',
+            'type' => 'delivery',
+            'is_public' => true,
+            'is_free_download' => false,
+            'restricted_photographers' => true,
+        ]);
+        $photographer->photographerGalleries()->attach($gallery->id);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, $this->fixtureContent);
+
+        $this->actingAs($photographer, 'api')
+            ->get('/api/media/'.$gallery->slug.'/'.$photo->id.'.jpg')
+            ->assertStatus(200);
+    }
+
     // ---------------------------------------------------------------
     // THUMBNAIL DELIVERY
     // ---------------------------------------------------------------

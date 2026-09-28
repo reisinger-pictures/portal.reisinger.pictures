@@ -154,6 +154,103 @@ class ContractJoinTest extends TestCase
         $this->getJson('/api/contracts/sign/'.$token)->assertOk();
     }
 
+    /**
+     * P0-B7 boundary: a join response may only carry the token of the signer
+     * created by that request, bound to the e-mail supplied in it. It must
+     * never return a pre-existing signer's credential — neither for a new,
+     * distinct identity nor by colliding with an existing canonical identity.
+     */
+    public function test_standard_join_never_returns_a_pre_existing_signers_personal_token(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'join_token' => 'token-binding',
+            'available_roles' => ['Model'],
+            'brand' => Brand::B2B,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'name' => 'Existing Signer',
+            'email' => 'existing@example.com',
+            'personal_token' => 'pre-existing-direct-token',
+            'status' => 'joined',
+        ]);
+
+        // A distinct, not-yet-joined identity receives its own fresh token and
+        // that token resolves back to the requested identity.
+        $new = $this->postJson('/api/contracts/join/token-binding', [
+            'name' => 'Newcomer',
+            'email' => 'newcomer@example.com',
+            'roles' => ['Model'],
+        ]);
+        $new->assertCreated();
+        $this->assertNotSame('pre-existing-direct-token', $new->json('personal_token'));
+        $this->assertStringNotContainsString('pre-existing-direct-token', $new->getContent());
+        $this->getJson('/api/contracts/sign/'.$new->json('personal_token'))
+            ->assertOk()
+            ->assertJsonPath('signer.email', 'newcomer@example.com');
+
+        // Colliding with the existing canonical identity fails closed and
+        // discloses neither the token nor the name/roles of that signer.
+        $collision = $this->postJson('/api/contracts/join/token-binding', [
+            'name' => 'Impostor',
+            'email' => '  EXISTING@EXAMPLE.COM  ',
+            'roles' => ['Model'],
+        ]);
+        $collision->assertStatus(409);
+        $collision->assertExactJson(['error' => ContractSigner::DUPLICATE_JOIN_ERROR]);
+        $this->assertStringNotContainsString('pre-existing-direct-token', $collision->getContent());
+        $this->assertStringNotContainsString('Existing Signer', $collision->getContent());
+        $collision->assertJsonMissingPath('personal_token');
+
+        // The pre-existing token still resolves to the original signer.
+        $this->getJson('/api/contracts/sign/pre-existing-direct-token')
+            ->assertOk()
+            ->assertJsonPath('signer.email', 'existing@example.com');
+    }
+
+    public function test_template_join_never_returns_a_pre_existing_signers_personal_token(): void
+    {
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'join_token' => 'tpl-token-binding',
+            'available_roles' => ['Model'],
+            'brand' => Brand::B2B,
+        ]);
+        $instance = Contract::factory()->create([
+            'type' => 'contract',
+            'template_id' => $template->id,
+            'status' => 'active',
+            'brand' => Brand::B2B,
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $instance->id,
+            'name' => 'Existing Template Signer',
+            'email' => 'existing-template@example.com',
+            'personal_token' => 'pre-existing-template-token',
+            'status' => 'joined',
+        ]);
+
+        // The template scope collision fails closed without a token or any
+        // other part of the pre-existing signer.
+        $collision = $this->postJson('/api/contracts/join/tpl-token-binding', [
+            'name' => 'Impostor',
+            'email' => '  EXISTING-TEMPLATE@EXAMPLE.COM  ',
+            'roles' => ['Model'],
+        ]);
+
+        $collision->assertStatus(409);
+        $collision->assertExactJson(['error' => ContractSigner::DUPLICATE_JOIN_ERROR]);
+        $this->assertStringNotContainsString('pre-existing-template-token', $collision->getContent());
+        $this->assertStringNotContainsString('Existing Template Signer', $collision->getContent());
+        $collision->assertJsonMissingPath('personal_token');
+
+        // No second instance or signer was created by the rejected join.
+        $this->assertDatabaseCount('contracts', 2);
+        $this->assertDatabaseCount('contract_signers', 1);
+    }
+
     public function test_multiple_roles_rejected(): void
     {
         $contract = Contract::factory()->create([
