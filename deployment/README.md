@@ -17,7 +17,7 @@
 | 3. Backup + Restore-Test | Owner, SSH | 10 Minuten |
 | 4. `docker compose up -d` | Owner, SSH | 3 Minuten |
 | 5. Kamera testen | Fotograf | 20 Minuten |
-| 6. `pure-ftpd` abschalten | Owner, SSH | 1 Minute |
+| 6. `pure-ftpd` abschalten | Owner, SSH | 1 Minute → **schon geschehen (2026-09-27), nur noch Gegenprobe, siehe Schritt 6** |
 
 **Es gibt keinen Hand-Schritt für Ordner, Rechte oder Passwörter.** Das erledigt
 der Stack selbst (Schritt 4).
@@ -104,9 +104,21 @@ firewall-cmd --zone=public --list-ports
 # 8080/tcp BLEIBT ZU. Nicht öffnen.
 ```
 
-**Stand 2026-09-26:** in der Zone `public` steht bislang nur
-`2222/tcp 10000-10600/tcp`. **989 und die passive Range fehlen**, FTPS ist also
-von außen noch nicht erreichbar. 2222 ist bereits offen.
+**Stand 2026-09-26:** in der Zone `public` stand bislang nur
+`2222/tcp 10000-10600/tcp`. **989 und die passive Range fehlten**, FTPS war also
+von außen noch nicht erreichbar. 2222 war bereits offen.
+
+> **Überholt — Stand 2026-09-27:** Der obige Zustand ist **nicht mehr der Stand**.
+> Gemessen wurde am 2026-09-27: `989/tcp 2222/tcp 10000-10600/tcp
+> 50000-50100/tcp` (`~/dev/strato-vps/ANALYSIS.md:969-971`). `989` und die
+> passive Range stehen inzwischen **drin**; `10000-10600/tcp` ist eine Altlast
+> ohne Dienst. Die drei `firewall-cmd`-Zeilen oben sind deshalb **kein**
+> Pflichtschritt mehr, sondern die Anleitung für den Fall, dass die Range fehlt.
+> **Vorher prüfen**, dann nur die fehlende Regel ergänzen:
+>
+> ```bash
+> firewall-cmd --zone=public --list-ports
+> ```
 
 | Port | Warum | Wenn fehlt |
 |---|---|---|
@@ -293,17 +305,94 @@ Kurzfassung: der Test ist der einzige offene Cutover-Schritt (P1-M32). Zuerst SF
 probieren — ein Port, kein Zertifikat, keine passive Range. Nur wenn die Kamera SFTP
 nicht spricht, FTPS mit dem importierten Stammzertifikat.
 
-## 6. `pure-ftpd` abschalten
+## 6. `pure-ftpd` abschalten — **bereits erledigt (2026-09-27), nur noch prüfen**
 
-**Erst** wenn ein echter Kamera-Upload vollständig durchgelaufen ist.
+Die Reihenfolgeregel „erst abschalten, wenn ein echter Kamera-Upload
+vollständig durchgelaufen ist" gilt unverändert — sie ist nur inzwischen durch
+die Tatsachen überholt.
+
+Bis hierher stand an dieser Stelle `docker compose down pureftp`. **Diesen
+Befehl gibt es nicht, und er hat nie funktioniert.** `pure-ftpd` war nie ein
+Service dieses Compose-Projekts. Die vollständige Service-Liste:
 
 ```bash
-docker compose down pureftp
+$ docker compose -f deployment/docker-compose.yml config --services 2>/dev/null
+db
+search
+sftpgo
+composer_init
+backend
 ```
+
+Kein `pureftp`. Ein `docker compose down` aus dem Portal-Verzeichnis hätte den
+alten Stack nicht einmal *berührt*.
+
+**Wo der alte Stack tatsächlich lief:** als **eigener Portainer-Stack auf
+demselben Host** — Stack-ID `15`, Compose-Projektname `ftp`, Image
+`ghcr.io/reisi007/pureftp-2-users:latest`, veröffentlicht `0.0.0.0:21` und
+`0.0.0.0:30000-30500`. Belege aus dem Host-Inventar
+(`~/dev/strato-vps`): `ANALYSIS.md:33` → „`| 15 | ftp | `ftp` | pureftp, **501
+Ports** 30000-30500 offen |`", `ANALYSIS.md:76` → „`ftp`-Container:
+`0.0.0.0:30000-30500->30000-30500` (Passiv-Modus) + `0.0.0.0:21`
+(Klartext-FTP)“, `ANALYSIS.md:823` → „`| Compose |
+/data/compose/15/docker-compose.yml (2026-09-26 wiederhergestellt) |`".
+
+**Erledigt ist er außerhalb dieses Repos.** Am 2026-09-27 verifiziert
+abgeschaltet: „nichts auf Port 21, kein `pure-ftpd`-Container, `portal_sftpgo`
+hängt am Projekt `portal-reisinger-pictures`"
+(`~/dev/strato-vps/BACKUP.md:321`). Dazu
+`~/dev/strato-vps/dockge-stacks/MIGRATION.md:254-259` → „**Kein `ftp/`-Stack
+mehr (2026-09-27).** Der pure-ftpd-Stack ist abgeschaltet … Das Image
+`ghcr.io/reisi007/pureftp-2-users` wurde am 2026-09-27 archiviert, eine
+Migration wäre daran gescheitert. Das Verzeichnis `dockge-stacks/ftp/` und der
+Eintrag `15 ftp` in `dockge-project-map.txt` sind entfernt." — es gibt also
+weder ein Stop-Kommando für einen Stack, den man nicht mehr starten kann, noch
+einen Compose-Pfad, in dem man eines suchen könnte.
+
+Was dieser Schritt damit verlangt, ist die **Gegenprobe**, nicht das Stoppen:
+
+```bash
+# Muss die leere Liste zurückgeben (grep-Exit 1 = nichts gefunden).
+# Ein Treffer heißt: der alte Stack läuft doch noch.
+docker ps -a --format '{{.Image}}  {{.Names}}' | grep -i 'reisi007/pureftp'
+```
+
+Bewusst **ohne** Treffer-Muster `ftp` — das trifft auch `portal_sftpgo`, weil
+`s**ftp**go` die Buchstaben `ftp` enthält.
+
+Trifft die Regel doch, ist das eine **Abweichung vom dokumentierten Zustand** und
+gehört geklärt, nicht stillschweigend beseitigt. Zuerst ermitteln, wo der Stack
+läuft:
+
+```bash
+docker inspect <container> \
+  --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}'
+```
+
+Erst mit diesem Pfad ist ein Stop-Befehl bildbar. Diese Datei nennt hier
+bewusst **kein** `docker compose down`: der Pfad `15` ist entfernt, ein darauf
+gesetztes `docker compose -p ftp down` würde an der fehlenden Compose-Datei
+scheitern und dabei so tun, als sei der Schritt getan.
 
 Rollback-Fenster: Solange der erste echte Import nicht durch ist, **beide**
 Zugänge parallel lassen. Der alte Zugang ist der Fallback, falls SFTPGo sich im
 Betrieb doch anders verhält als im Test.
+
+> **⚠️ Dieses Fenster ist am 2026-09-27 geschlossen worden, und zwar vor der
+> Kamera-Bestätigung.** Der alte Stack ist abgeschaltet, sein Image archiviert
+> (Beleg oben). Schritt 3 des verbindlichen Runbooks — „Kamera bestätigt den
+> neuen Zugang (P1-M32) — mit der echten Kamera und einem echten Upload"
+> (`features/infrastructure/19-ftp-upload-pipeline.md:853`) — steht laut Board
+> weiterhin offen: „[ ] manuell prüfen: erstes Kamera-Foto über FTPS/SFTP
+> hochladen und prüfen, dass `FtpController::process()` es der Galerie zuordnet …
+> P1-M32 — echter Kamera-Test. Heute ausdrücklich offengelassen."
+> (`AGENTS.todo.md:1483`). Die Reihenfolge aus 7.12 wurde also nicht eingehalten,
+> und zwar außerhalb dieses Repos.
+>
+> Praktische Folge: Wer heute noch von einem Parallelbetrieb liest, liest einen
+> Plan. Ein Fallback auf den alten Zugang gibt es **nicht** mehr. Wenn SFTPGo im
+> echten Betrieb nicht trägt, ist der einzige Weg ein manueller: `ftp`-Stack
+> samt Image aus einem Backup zurückholen — nicht der hier gestrichene Schritt.
 
 ---
 
@@ -311,13 +400,61 @@ Betrieb doch anders verhält als im Test.
 
 | Symptom | Ursache | Lösung |
 |---|---|---|
-| Upload bricht ohne Fehler ab | passive Range zu | `ufw status` prüfen — 50000–50100 |
+| Upload bricht ohne Fehler ab | passive Range zu | `firewall-cmd --zone=public --list-ports` — muss `50000-50100/tcp` enthalten |
 | `Connection refused` auf 2222/989 | Port-Mapping oder Firewall | beide prüfen |
 | Kamera verlangt Passwort neu | Provisionierung nicht gelaufen | Portal-Status prüfen (M26-Spalten) |
 | `no such table: schema_version` | `sftpgo_data`-Volume nicht persistiert | Volume prüfen, sonst verliert jeder Neustart alle Konten |
 | `401` auf `/api/v2/token` | Admin-User fehlt | `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` prüfen |
 | Datei liegt da, Import sieht sie nicht | setgid fehlt | `ftp:provision-folders --fix-permissions` |
 | `FTP_STORAGE_PATH` relativer Fehler | Config-Fehler | muss absolut sein, z.B. `/home/webadmin/websites/ftp` |
+
+#### Korrektur 2026-09-28 — die Zeile „Upload bricht ohne Fehler ab“
+
+Hier stand `ufw status` prüfen. Das ist derselbe Fehler, den §2 derselben Datei
+oben bereits korrigiert hat: **auf diesem Host ist `ufw` nicht installiert**
+(§2 → „Auf diesem Host ist `ufw` nicht installiert — die Firewall ist
+**firewalld**“). Wer §2 glaubte und in diese Tabelle kam, hat einen Befehl
+getippt, den es auf der Maschine nicht gibt — und damit den einen Verdacht
+verloren, der zu diesem Symptom passt.
+
+**Was stattdessen zu prüfen ist: die passive Datenrange, nicht der Dienststatus.**
+Der Fehlerfall ist der stille: TLS und der Control-Port funktionieren, der
+Datenkanal kommt nicht zustande. Die Range muss *erlaubt* sein, nicht ein
+Dienst *laufen*:
+
+```bash
+# Muss 50000-50100/tcp ausgeben.
+firewall-cmd --zone=public --list-ports
+```
+
+Zur Verifikation beider Seiten dieser Aussage:
+
+- **Die Range-Syntax ist die aus §2.** Dort steht dieselbe Form zum Öffnen:
+  `firewall-cmd --permanent --zone=public --add-port=50000-50100/tcp`
+  (`deployment/README.md:98`, also zwei Absätze weiter oben in derselben Datei).
+- **Die Ausgabeform des Prüfbefehls ist gemessen.** Der Hostzustand vom
+  2026-09-27 wurde mit genau diesem Kommando erfasst
+  (`~/dev/strato-vps/ANALYSIS.md:969-971`):
+
+  ```text
+  firewalld public zone (verifiziert 2026-09-27):
+    services: cockpit dhcpv6-client ftp http https ssh
+    ports:    989/tcp  2222/tcp  10000-10600/tcp  50000-50100/tcp
+  ```
+
+  Die Range steht dort in genau der Schreibweise, in der sie auch fehlen würde.
+
+Fehlt `50000-50100/tcp` in der Liste, ist es die Firewall, und die Abhilfe steht
+in §2. Steht sie **drin** und der Upload stirbt trotzdem, ist die Firewall nicht
+die Ursache — dann ist der Kanal nicht veröffentlicht, und die nächste Stelle
+ist das Mapping:
+
+```bash
+docker port portal_sftpgo    # muss 2222, 989 UND 50000-50100 zeigen
+```
+
+Beleg für dieses Kommando: `~/dev/strato-vps/ANALYSIS.md:978` → „`docker port
+portal_sftpgo` zeigt nur 989, 2222 und 50000–50100“.
 
 ### Messfalle bei Cipher-Tests
 
