@@ -596,27 +596,36 @@ entscheiden".
   *Warum:* gemessen ist das Prop eine einzige Sorge, an genau einer Stelle gelesen
   (`ModalDialogShell.tsx:84`) — es gibt nichts zu splitten. Und die Umbenennung in ein
   negierendes `readOnly` hätte den einzigen **erreichbaren** Defekt nicht behoben:
-  `VolumePresetSettingsCard.tsx:118` übergibt `editing={!!initialName}` **ohne** `onDelete`, also
-  rendert dort seit `e053f70` (2026-08-13) ein `Löschen`-Button mit `onClick={undefined}` — kein
-  Fehler, keine Warnung, nur ein toter Button. Aus `editing={!!initialName}` würde
+  `VolumePresetSettingsCard.tsx:118` übergab `editing={!!initialName}` **ohne** `onDelete`, also
+  renderte dort seit `e053f70` (2026-08-13) bis zur Umsetzung ein `Löschen`-Button mit
+  `onClick={undefined}` — kein Fehler, keine Warnung, nur ein toter Button. Aus `editing={!!initialName}` würde
   `readOnly={!initialName}`; beim Bearbeiten ist `initialName` truthy, der Button rendert
   weiter. Der Rename hätte den Namen geändert, nicht den Button. Diese Herleitung macht
   „Button ohne Handler" strukturell nicht darstellbar und lässt ein **required** Prop aus 20
   Aufrufstellen **verschwinden**, statt es in 20 umzubenennen. **Pflicht-Schritt dabei:**
-  `GalleryModal` und `GalleryGroupModal` übergeben `onDelete` heute bedingungslos und müssen es
-  künftig nur bei existierendem Datensatz tun — sonst bekommt der Create-Dialog einen
-  Lösch-Button.
+  `GalleryModal` und `GalleryGroupModal` übergaben `onDelete` bedingungslos; seit der Umsetzung
+  tun sie es nur bei existierendem Datensatz — sonst bekäme der Create-Dialog einen
+  Lösch-Button. **Umgesetzt:** die Shell kennt kein `editing` mehr, der Button folgt aus
+  `onDelete`; der tote Button in `VolumePresetSettingsCard` entfiel ersatzlos. Gepinnt durch
+  `ModalDialogShell.test.tsx` (mit/ohne `onDelete`) sowie je einen Create-/Edit-Fall in
+  `GalleryModal.test.tsx` und `GalleryGroupModal.test.tsx`.
 - **D-21 — die fünf Dialoge benennen ihr Domänen-`editing` um.** `ProjectModal`,
   `PhotoJobModal`, `TextSnippetModal`, `ProductModal`, `CustomerModal` und `CouponFormDrawer`
   führen ein Domänen-Prop mit demselben Namen, das der Shell-Prop hatte. *Warum:* D-20 nimmt den
   Shell-Bedeutungsträger weg, aber das Wort bliebe zweimal im selben Komponentenbaum — einmal
-  fachlich, einmal strukturell. Die Kollision ist heute eine **dokumentierte Falle**, kein
-  lebender Durchschlag: die Dialoge geben literal `editing={false}`, gepinnt durch
+  fachlich, einmal strukturell. Die Kollision war bis zur Umsetzung eine **dokumentierte Falle**,
+  kein lebender Durchschlag: die Dialoge gaben literal `editing={false}`, gepinnt durch
   `editingDeleteActionSemantics.test.tsx`. Der Rename beseitigt die Wortgleichheit restlos; die
   Aufrufer in `ManagementProjectsBoard.tsx:219` und `PhotographerProductionBoard.tsx:170` reichen
   das Domänen-Prop durch und müssen mitziehen. **Nebenbefund, ausdrücklich festgehalten:** das Board
   sprach von „fünf Dialogen" und nannte vier — die fünfte ist `ProjectModal`.
-
+  **Umgesetzt:** lokal umbenannt (`snippet`, `product`, `customer`, `coupon`, `project`,
+  `photoJob`); die externen Props heißen weiter `editingSnippet`/`editingProduct`/
+  `editingCustomer`/`editingCoupon` bzw. `editing` (`ProjectModal`, `PhotoJobModal`), die Aufrufer
+  sind unverändert. Gepinnt wird die Konsequenz, nicht die Benennung:
+  `editingDeleteActionSemantics.test.tsx` öffnet alle sechs auf existierenden Datensätzen und
+  assertiert keinen Lösch-Button. Ein späterer externer Rename wäre eine neue Entscheidung,
+  kein Teil von D-21.
 ## TODO (UI-Review)
 
 UI-Review-Screenshot-Skill noch nicht angewendet (Playwright-Harness + Vision-Analyse). Referenz: ocg-price-tracker/tests/screenshots (ui-screenshots.spec.ts mit Section-Captures).

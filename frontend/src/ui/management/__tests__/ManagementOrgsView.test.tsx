@@ -174,7 +174,7 @@ describe('ManagementOrgsView', () => {
 
         // One assertion covers role, aria-labelledby wiring and the name text.
         expect(dialog).toHaveAttribute('aria-modal', 'true');
-        // The view passes `editing={false}` on purpose: an existing organisation
+        // The view passes no `onDelete` on purpose: an existing organisation
         // is deleted from the detail view, so this dialog must not offer it.
         expect(within(dialog).queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
 

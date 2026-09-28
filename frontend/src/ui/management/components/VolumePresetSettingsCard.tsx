@@ -115,7 +115,10 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
             title={initialName ? t`Preset bearbeiten` : t`Neues Volume-Preset`}
             icon="mdi--currency-eur"
             onClose={onCancel}
-            editing={!!initialName}
+            // No `onDelete` on purpose: a preset is deleted from the table row,
+            // not from this editor. Until D-20 this site passed
+            // `editing={!!initialName}` without a handler, which rendered a
+            // `Löschen` button wired to nothing whenever a name was set.
             isSubmitting={saving}
             onSubmit={handleSave}
             maxWidth="2xl"

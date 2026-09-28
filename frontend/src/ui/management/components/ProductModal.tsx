@@ -24,7 +24,8 @@ interface Props {
 }
 
 // Renamed on destructuring, see TextSnippetModal: the record is `product`, and
-// `editing` in this file belongs to the shell's delete-action prop.
+// the shell's delete button follows `onDelete` (D-20), which this dialog does
+// not pass.
 export default function ProductModal({ isOpen, onClose, editingProduct: product, onSave }: Props) {
     "use no memo";
     const productSchema = createProductSchema();
@@ -60,11 +61,9 @@ export default function ProductModal({ isOpen, onClose, editingProduct: product,
             title={product ? <Trans>Katalog-Eintrag bearbeiten</Trans> : <Trans>Neuen Eintrag anlegen</Trans>}
             icon="mdi--package-variant-closed"
             onClose={onClose}
-            // This dialog has no delete action for an existing entry, so the
-            // shared footer must not offer one — and the value that would mean
-            // "an entry is being edited" is `product`, not `editing`. See the
-            // `editing` note in TextSnippetModal.
-            editing={false}
+            // No delete action for an existing entry, so no `onDelete` and the
+            // shell renders no delete button. The edit session is `product`, an
+            // unrelated value. See TextSnippetModal.
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit(onSubmit)}
             noValidate

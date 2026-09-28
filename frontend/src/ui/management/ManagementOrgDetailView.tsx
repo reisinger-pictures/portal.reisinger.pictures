@@ -348,10 +348,9 @@ export default function ManagementOrgDetailView() {
                 <ModalDialogShell
                     title={<Trans>Nutzer in Organisation einladen</Trans>}
                     onClose={() => setInviteModalOpen(false)}
-                    // Inviting only — this dialog has no delete action for an
-                    // existing member, so the shared footer must not offer one.
-                    // See the `editing` note in TextSnippetModal.
-                    editing={false}
+                    // Inviting only — no delete action for an existing member,
+                    // so there is no `onDelete` and the shell renders no delete
+                    // button.
                     isSubmitting={isInviting}
                     onSubmit={handleInvite}
                     // No `noValidate` on purpose: the e-mail field is `required`

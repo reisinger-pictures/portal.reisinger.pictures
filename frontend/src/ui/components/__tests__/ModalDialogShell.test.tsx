@@ -11,7 +11,6 @@ function renderDialog(onClose = vi.fn(), props: Partial<React.ComponentProps<typ
             <ModalDialogShell
                 title="Galerie bearbeiten"
                 onClose={onClose}
-                editing={false}
                 isSubmitting={false}
                 onSubmit={(event) => event.preventDefault()}
                 {...props}
@@ -57,7 +56,6 @@ describe('ModalDialogShell', () => {
                     title="Externe Referenz"
                     modalRef={dialogRef}
                     onClose={vi.fn()}
-                    editing={false}
                     isSubmitting={false}
                     onSubmit={(event) => event.preventDefault()}
                 >
@@ -112,7 +110,6 @@ describe('ModalDialogShell', () => {
                         <ModalDialogShell
                             title="Dialog"
                             onClose={() => setIsOpen(false)}
-                            editing={false}
                             isSubmitting={false}
                             onSubmit={(event) => event.preventDefault()}
                         >
@@ -149,7 +146,6 @@ describe('ModalDialogShell', () => {
                         <ModalDialogShell
                             title="Äußerer Dialog"
                             onClose={() => setOuterOpen(false)}
-                            editing={false}
                             isSubmitting={false}
                             onSubmit={(event) => event.preventDefault()}
                         >
@@ -160,7 +156,6 @@ describe('ModalDialogShell', () => {
                         <ModalDialogShell
                             title="Innerer Dialog"
                             onClose={() => setInnerOpen(false)}
-                            editing={false}
                             isSubmitting={false}
                             onSubmit={(event) => event.preventDefault()}
                         >
@@ -214,7 +209,6 @@ describe('ModalDialogShell', () => {
                             <ModalDialogShell
                                 title="Äußerer Dialog"
                                 onClose={() => setOuterOpen(false)}
-                                editing={false}
                                 isSubmitting={false}
                                 onSubmit={(event) => event.preventDefault()}
                             >
@@ -224,7 +218,6 @@ describe('ModalDialogShell', () => {
                                 <ModalDialogShell
                                     title="Innerer Dialog"
                                     onClose={() => setInnerOpen(false)}
-                                    editing={false}
                                     isSubmitting={false}
                                     onSubmit={(event) => event.preventDefault()}
                                 >
@@ -315,5 +308,29 @@ describe('ModalDialogShell', () => {
 
         const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
         expect(box).not.toHaveAttribute('data-testid');
+    });
+
+    it('renders a delete button and calls onDelete when one is passed', async () => {
+        const user = userEvent.setup();
+        const onDelete = vi.fn();
+        renderDialog(vi.fn(), { onDelete });
+
+        await user.click(screen.getByRole('button', { name: 'Löschen' }));
+
+        expect(onDelete).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders no delete button without onDelete, even for an existing record', () => {
+        // The shell used to decide this from a separate `editing` boolean, so a
+        // caller that passed the edit-session value there got a delete button
+        // wired to no handler (VolumePresetSettingsCard did exactly that). The
+        // button follows `onDelete` now (D-20); this is the negative half.
+        renderDialog();
+
+        expect(screen.queryByRole('button', { name: 'Löschen' })).toBeNull();
+        // The footer still renders its submit/cancel pair and stays aligned
+        // through the left-hand placeholder.
+        expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
     });
 });

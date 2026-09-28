@@ -47,9 +47,9 @@ interface Props {
 }
 
 // This one renames more than the others: the prop was literally called `editing`
-// while the shell it renders into takes a prop called `editing` that means
-// something else entirely ("has a delete action"). The record is `project` here,
-// so the two can no longer be confused at the call site below.
+// while the shell it rendered into used to take an `editing` prop meaning "has a
+// delete action". The shell derives its button from `onDelete` now (D-20), and
+// the record is `project` here.
 export default function ProjectModal({ isOpen, onClose, editing: project, onSave, initial, defaultStatus, statusOptions }: Props) {
     "use no memo";
     const projectSchema = createProjectSchema();
@@ -114,11 +114,9 @@ export default function ProjectModal({ isOpen, onClose, editing: project, onSave
         <ModalDialogShell
             title={project ? <Trans>Projekt bearbeiten</Trans> : <Trans>Neues Projekt anlegen</Trans>}
             onClose={onClose}
-            // Deleting a project happens on the card, not in this dialog, and
-            // the dialog has no delete action of its own. The value that would
-            // mean "a project is being edited" is `project`, not `editing` — see
-            // the `editing` note in TextSnippetModal.
-            editing={false}
+            // Deleting a project happens on the card, not in this dialog, so
+            // there is no `onDelete` and the shell renders no delete button. The
+            // edit session is `project`, an unrelated value. See TextSnippetModal.
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit(onSubmit)}
             noValidate

@@ -16,10 +16,10 @@ import { isTopmostTrapContainer, useFocusTrap } from '../../logic/useFocusTrap';
  * backdrop close, and a labelled close button. Consumers supply content.
  *
  * `onFormSubmit` is deliberately optional rather than required. ModalDialogShell
- * is form-shaped (submit footer, `editing`, `isSubmitting`) and only two of
+ * is form-shaped (submit footer, `isSubmitting`) and only two of
  * the affected modals actually have a form; the other eleven are viewers and
  * editors. Making the form mandatory would have forced those eleven to pass
- * `editing={false} isSubmitting={false} onSubmit={() => {}}` and to render a
+ * `isSubmitting={false} onSubmit={() => {}}` and to render a
  * submit button they do not want, which is worse than the defect. When it is
  * set, children and footer render inside a `<form>` so Enter-to-submit and
  * `type="submit"` keep working exactly as before.
