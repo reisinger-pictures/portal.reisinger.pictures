@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
 import WatermarkSettingsCard from '../management/components/WatermarkSettingsCard';
@@ -63,9 +63,21 @@ const defaultPermissions = {
 // Suite
 // --------------------------------------------------------------------------
 
+type ShowToast = (type: 'success' | 'error' | 'info', text: string) => void;
+
+let showToastMock: Mock<ShowToast>;
+let updateWatermarkMock: Mock<(formData: FormData) => Promise<void>>;
+
 describe('WatermarkSettingsCard', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+
+        // Kept as named references so the submit path can be asserted on the
+        // toast and on the payload the backend would receive.
+        showToastMock = vi.fn<ShowToast>();
+        updateWatermarkMock = vi
+            .fn<(formData: FormData) => Promise<void>>()
+            .mockResolvedValue(undefined);
 
         // --- mock implementations for the exported render functions ---
         vi.mocked(renderSvgToDataUrl).mockResolvedValue('data:image/png;base64,test');
@@ -74,11 +86,11 @@ describe('WatermarkSettingsCard', () => {
         // --- mock all consumed hooks ---
         vi.mocked(useSettings).mockReturnValue({
             watermark: undefined,
-            updateWatermark: vi.fn(),
+            updateWatermark: updateWatermarkMock,
         });
         vi.mocked(usePermissions).mockReturnValue(defaultPermissions);
         vi.mocked(useUI).mockReturnValue({
-            showToast: vi.fn(),
+            showToast: showToastMock,
             confirm: vi.fn(),
             hasUnsavedChanges: false,
             setUnsavedChanges: vi.fn(),
@@ -286,5 +298,96 @@ describe('WatermarkSettingsCard', () => {
         await waitFor(expectPreviewError);
         expect(previewSpinner()).toBeNull();
         expect(vi.mocked(renderSvgToDataUrl)).not.toHaveBeenCalled();
+    });
+
+    // ----------------------------------------------------------------------
+    // Submit: the card must never claim a result it did not achieve
+    // ----------------------------------------------------------------------
+
+    describe('submit', () => {
+        const pngBlob = (label: string) => new Blob([label], { type: 'image/png' });
+
+        const BUCKET_FIELDS = [
+            'bucket_500',
+            'bucket_1000',
+            'bucket_2000',
+            'bucket_500_sel',
+            'bucket_1000_sel',
+            'bucket_2000_sel',
+        ] as const;
+
+        const LOAD_ERROR = 'Brand-Logo konnte nicht geladen werden.';
+        const SAVED = 'Wasserzeichen erfolgreich generiert und gespeichert!';
+
+        const submitButton = () => screen.getByRole('button', { name: /generieren/i });
+
+        /** Render the card and wait until submitting is possible (logo loaded). */
+        const renderReadyCard = async () => {
+            renderWithProviders(<WatermarkSettingsCard />);
+            await waitFor(() => expect(submitButton()).toBeEnabled());
+        };
+
+        const submittedPayload = (): FormData => {
+            const [first] = updateWatermarkMock.mock.calls;
+            if (!first) throw new Error('updateWatermark was not called');
+            return first[0];
+        };
+
+        it('does not submit and does not claim success when every render returned null', async () => {
+            // The production failure: the renderer resolves null for all six
+            // buckets, the request used to go out carrying only opacity + svg,
+            // and the card reported a watermark that was never written.
+            vi.mocked(renderSvgToCanvas).mockResolvedValue(null);
+
+            await renderReadyCard();
+            fireEvent.click(submitButton());
+
+            await waitFor(() => {
+                expect(showToastMock).toHaveBeenCalledWith('error', LOAD_ERROR);
+            });
+            expect(updateWatermarkMock).not.toHaveBeenCalled();
+            expect(showToastMock).not.toHaveBeenCalledWith('success', expect.any(String));
+        });
+
+        it('submits nothing when a single bucket fails to render', async () => {
+            // Partial is not "good enough": ImageProcessor::resolveWatermarkAsset
+            // has no fallback for a missing bucket file — it returns null and the
+            // caller deletes the output, so every size in that bucket stops being
+            // produced. A partial write would also leave the newly saved svg next
+            // to rasters rendered from the previous logo and opacity.
+            vi.mocked(renderSvgToCanvas)
+                .mockResolvedValueOnce(pngBlob('500'))
+                .mockResolvedValueOnce(pngBlob('1000'))
+                .mockResolvedValueOnce(pngBlob('2000'))
+                .mockResolvedValueOnce(null);
+
+            await renderReadyCard();
+            fireEvent.click(submitButton());
+
+            await waitFor(() => {
+                expect(showToastMock).toHaveBeenCalledWith('error', LOAD_ERROR);
+            });
+            // The three buckets that did render are discarded rather than saved.
+            expect(updateWatermarkMock).not.toHaveBeenCalled();
+            expect(showToastMock).not.toHaveBeenCalledWith('success', expect.any(String));
+        });
+
+        it('submits all six buckets and reports success when every render succeeded', async () => {
+            vi.mocked(renderSvgToCanvas).mockResolvedValue(pngBlob('png'));
+
+            await renderReadyCard();
+            fireEvent.click(submitButton());
+
+            await waitFor(() => {
+                expect(showToastMock).toHaveBeenCalledWith('success', SAVED);
+            });
+
+            const payload = submittedPayload();
+            expect(payload.get('opacity')).toBe('0.15');
+            expect(payload.get('svg')).toBeInstanceOf(Blob);
+            for (const field of BUCKET_FIELDS) {
+                expect(payload.get(field), `missing ${field}`).toBeInstanceOf(Blob);
+            }
+        });
     });
 });

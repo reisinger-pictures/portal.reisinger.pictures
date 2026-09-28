@@ -44,6 +44,65 @@ const renderPreview = async (blob: Blob, opacity: number, apply: (result: Previe
     apply(dataUrl === null ? { status: 'failed' } : { status: 'ready', dataUrl });
 };
 
+/** One raster bucket: the form field it is posted as and the file name it carries. */
+interface WatermarkBucket {
+    readonly field: string;
+    readonly filename: string;
+    /** Target size in px; the backend picks the bucket by `min(width, height) / 3`. */
+    readonly size: number;
+    /** Selection galleries get a reduced alpha (see `SELECTION_OPACITY_FACTOR`). */
+    readonly reduced: boolean;
+}
+
+const WATERMARK_BUCKETS: readonly WatermarkBucket[] = [
+    { field: 'bucket_500', filename: '500.png', size: 500, reduced: false },
+    { field: 'bucket_1000', filename: '1000.png', size: 1000, reduced: false },
+    { field: 'bucket_2000', filename: '2000.png', size: 2000, reduced: false },
+    { field: 'bucket_500_sel', filename: '500_sel.png', size: 500, reduced: true },
+    { field: 'bucket_1000_sel', filename: '1000_sel.png', size: 1000, reduced: true },
+    { field: 'bucket_2000_sel', filename: '2000_sel.png', size: 2000, reduced: true },
+];
+
+/** Alpha factor for the selection galleries, so the watermark does not disturb image selection. */
+const SELECTION_OPACITY_FACTOR = 0.3;
+
+/**
+ * Render every bucket and assemble the payload — or return null if any render failed.
+ *
+ * All-or-nothing on purpose. The backend has no fallback for a missing bucket:
+ * every field is `nullable|file` and each `hasFile()` guard is independent, so a
+ * partial submission is stored exactly as sent — and on the read side
+ * `ImageProcessor::resolveWatermarkAsset` returns null for an absent bucket file,
+ * which makes the caller delete the output and fail. A missing `master_2000.png`
+ * does not merely leave large images unwatermarked, it stops them from being
+ * processed at all. A partial write is also internally inconsistent: the request
+ * always carries the current `svg` and opacity, so the new source would sit next
+ * to rasters still rendered from the *previous* logo.
+ *
+ * The alternative — submit what rendered and report the loss — would therefore
+ * trade a retryable click for a broken and mixed watermark set. The card submits
+ * the complete set or nothing, and says so.
+ */
+const buildWatermarkPayload = async (svg: Blob, opacity: number): Promise<FormData | null> => {
+    const fd = new FormData();
+    fd.append('opacity', opacity.toString());
+    fd.append('svg', svg, 'watermark.svg');
+
+    for (const bucket of WATERMARK_BUCKETS) {
+        const alpha = bucket.reduced ? opacity * SELECTION_OPACITY_FACTOR : opacity;
+        const png = await renderSvgToCanvas(svg, alpha, bucket.size);
+        if (!png) {
+            // Named, because "one of six silently" is what made this defect
+            // survive a deploy: nothing distinguished a full set from none.
+            console.error(`WatermarkSettingsCard: render failed for ${bucket.field}; nothing saved`);
+            return null;
+        }
+        fd.append(bucket.field, png, bucket.filename);
+    }
+
+    return fd;
+};
+
 export default function WatermarkSettingsCard() {
     "use no memo";
     const {watermark, updateWatermark} = useSettings();
@@ -116,23 +175,17 @@ export default function WatermarkSettingsCard() {
             return;
         }
 
-        const blob500 = await renderSvgToCanvas(serverSvgBlob, data.opacity, 500);
-        const blob1000 = await renderSvgToCanvas(serverSvgBlob, data.opacity, 1000);
-        const blob2000 = await renderSvgToCanvas(serverSvgBlob, data.opacity, 2000);
-        const selOpacity = data.opacity * 0.3;
-        const blob500Sel = await renderSvgToCanvas(serverSvgBlob, selOpacity, 500);
-        const blob1000Sel = await renderSvgToCanvas(serverSvgBlob, selOpacity, 1000);
-        const blob2000Sel = await renderSvgToCanvas(serverSvgBlob, selOpacity, 2000);
-
-        const fd = new FormData();
-        fd.append('opacity', data.opacity.toString());
-        fd.append('svg', serverSvgBlob, 'watermark.svg');
-        if (blob500) fd.append('bucket_500', blob500, '500.png');
-        if (blob1000) fd.append('bucket_1000', blob1000, '1000.png');
-        if (blob2000) fd.append('bucket_2000', blob2000, '2000.png');
-        if (blob500Sel) fd.append('bucket_500_sel', blob500Sel, '500_sel.png');
-        if (blob1000Sel) fd.append('bucket_1000_sel', blob1000Sel, '1000_sel.png');
-        if (blob2000Sel) fd.append('bucket_2000_sel', blob2000Sel, '2000_sel.png');
+        // Same msgid as the missing logo above, on purpose: a null render means
+        // the logo could not be turned into an image either way, and the card
+        // already uses this string for exactly that in the preview. The remedy is
+        // the same too — retry — so a second wording would add a msgid without
+        // adding information.
+        const fd = await buildWatermarkPayload(serverSvgBlob, data.opacity);
+        if (!fd) {
+            showToast('error', t`Brand-Logo konnte nicht geladen werden.`);
+            setGenerating(false);
+            return;
+        }
 
         try {
             await updateWatermark(fd);
