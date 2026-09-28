@@ -593,6 +593,47 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   `features/` inzwischen inkonsistent ist — dort steht bisher nirgends eine
   verbindliche Einheitenaussage pro Feld, was der eigentliche Grund für diese
   Inkonsistenz ist.
+- [ ] **Welle „Geldeinheit" — Umsetzung der Cent-Entscheidung, drei Stränge,
+  ausdrücklich mit Testauftrag.** Alle drei Stränge laufen als getrennte
+  Implementierungen, **ohne gemeinsame Dateien**, damit sie parallel entstehen können;
+  die Verifikation erfolgt anschließend durch einen vom jeweiligen Implementierenden
+  getrennten Durchgang.
+  **S1 · `calc_base_price` / `calc_hourly_rate` auf Cent, Ende zu Ende in EINEM
+  Commit.** Backend und Frontend dürfen **nicht auseinanderlaufen**: ein Fenster, in dem
+  die API Cent liefert und das Frontend Euro liest, macht Angebote 100-fach zu groß und
+  schreibt sie über `ShootingCalculatorModal.tsx:90` in eine Rechnungsposition — ohne
+  Fehler und ohne Wächter. Werte 50 → 5000 und 80 → 8000, also **Wertänderung**,
+  Data-only-Migration, kein Schemabedarf. `down()` wird nie ausgeführt, Rollback-Entscheidung
+  ins Docblock. **Rechner rechnet intern Cent, die Rundung bleibt identisch** (Owner):
+  Schwellen 12 → 1200 und 1000 → 100000, Raster 5 → 500 und 50 → 5000, Minimum
+  1 → 100 — und als **einzige** nicht einfach skalierbare Stelle der Teilbarkeitstest
+  `rounded % 10` → `% 1000` und `% 50` → `% 5000`. Er ist ein Teilbarkeitstest, kein
+  Betrag, und skaliert nicht mit der Größenordnung; ihn falsch zu skalieren lässt die
+  psychologische Endung still verschwinden.
+  **S2 · Coupon-Felder in derselben Welle** (Owner: „alles in einer Welle"):
+  `coupons.value` im Zweig `fixed` auf Cent, `coupons.value` im Zweig `percentage`
+  bleibt Prozent; `coupons.package_price_cents` spricht auf der Leitung Cent statt Euro,
+  wodurch `CouponAdminController.php:105-106` seine `× 100`-Umrechnung verliert. Spalten-
+  typ bleibt `decimal(10,2)` — Folge der Ein-Feld-Entscheidung, nicht zu kaschieren.
+  **S3 · Doku:** eine verbindliche Einheitenregel an **einer** Stelle, die zwei bereits
+  vorhandenen Formulierungen (`02-backend-architecture.md:22-24`, `04-payout-system.md:12`)
+  darauf ausrichtet, statt eine vierte zu erzeugen; drei falsche Angaben korrigiert;
+  sieben bis acht Geldfelder ohne Einheit bekommen eine.
+  **Testauftrag, ausdrücklich (DoD):**
+  *PHPUnit (S1, S2):* Round-Trip mit Einheitenmarke (nicht nur „ein Wert kam an");
+  Wächter gegen das stille ×100; **Rundungsäquivalenz** als Vergleich beider
+  Implementierungen, nicht als neue Erwartungswerte; `ShootingCalculatorSettingsTest:69`
+  von `'35.00'` auf Cent pinnen und die Fixture seeden, damit kein Testfixture in den
+  Euro-Zweig zurückfällt; Migration wandelt **nur** `type='fixed'` und meldet die
+  berührten Zeilen mit altem Wert.
+  *Vitest (S1, S2):* `shootingCalculator.test.ts` und `useCoupon.test.ts` — die ~20
+  Preiserwartungen müssen **nachweislich stehen bleiben**, sonst ändert sich das
+  Preisverhalten und nicht nur dessen Größenordnung.
+  *Playwright (S1, S2):* `package-calculator-config.spec.ts` (Euro-Fixtures 50/80 und
+  `'229,00 €'`), `manual-documents.spec.ts`, `coupon-photo-package.spec.ts`
+  (speist heute Euro in ein `_cents`-Feld), `coupon-admin-crud.spec.ts`.
+  *Für jeden neuen Test:* vorher schlägig erweisen. Ein Test, der vorher grün ist,
+  beweist nichts und ist zu verwerfen — nicht zu liefern.
 - [ ] Entscheidung offen: **die Lizenzbegriffe-Antwort mischt drei Einheiten,
   und das ist ein Rechenproblem, kein Darstellungsproblem.** `base_price`,
   `setup_fee`, `privacy_fee`, `extra_image_fee` und die `price_*` sind

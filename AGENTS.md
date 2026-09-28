@@ -9,7 +9,15 @@
 
 ## 2. Definition of Done (DoD)
 
-Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien erfüllt sind:
+**Die DoD selbst steht in [`DoD.md`](DoD.md)** — menschenlesbar, bewusst kurz, ohne
+Kommandos. Das ist die kanonische Aussage, was „fertig" bedeutet. Dieser Abschnitt
+wiederholt sie **nicht**, sondern ergänzt sie um das, was ein Agent ausführen muss:
+welche Testart zu welcher Änderung gehört und welche Kommandos fehlerfrei laufen
+müssen. Wer die Definition ändert, ändert `DoD.md` — sonst beschreiben zwei Dateien
+eine Regel und driften auseinander.
+
+Ein Task gilt nur dann als **abgeschlossen**, wenn BEIDE Kriterien aus `DoD.md` erfüllt
+sind (Tests existieren, `features/` ist aktuell).
 
 **1. Tests existieren**
 
