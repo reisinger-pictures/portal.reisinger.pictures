@@ -115,8 +115,9 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       **einen** Befund pro Satzlauf statt pro Textknoten; 246 → 212 (Befehl im Board-Eintrag).
       29 Tests in `check-i18n.test.mjs`, davon 15 neu, plus zwei Fixtures. **Rot nachgewiesen:**
       `PROSE_LONE_TOKEN_MIN_LENGTH` 6 → 99 lässt `flags a raw German JSX text node` fallen.
-      Offen: die 212 Findings abarbeiten. **Owner-Vorgabe: nie warning, immer fail** — das Gate
-      ist ab sofort scharf (Exit 1), der Build bleibt rot, bis der Zähler 0 steht.
+      Offen: Restbestand abarbeiten (Welle 1: Regelarbeit −4, `helper-argument` −27 → Zähler
+      181, verifiziert). **Owner-Vorgabe: nie warning, immer fail** — Gate scharf (Exit 1),
+      Build rot bis 0.
 - [ ] **D-8 — `frontend/tests/e2e/admin/` nach Domäne aufteilen.** Eigene Arbeit.
 - [ ] **D-9 — Sidebar: Portalname bricht um** statt still gekürzt zu werden.
 - [ ] **D-10 — Dialoge innerhalb von `<main>` rendern**, Scoping bleibt unangetastet.
@@ -384,7 +385,8 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   './scripts/check-i18n.mjs'; console.log(findUnlocalizedStringsInTree().length)"`
   — beide Stände an derselben Stelle gemessen, die HEAD-Version über
   `git show HEAD:frontend/scripts/check-i18n.mjs` in eine Probedatei unter `scripts/`.
-  Aufteilung heute: `jsx-text` 141, `jsx-attribute` 44, `helper-argument` 27.
+  Aufteilung heute: `jsx-text` 137, `jsx-attribute` 44, `helper-argument` 0 — Welle 1 brachte
+  −31 (212 → 181).
   **Was die Regel jetzt kann:** benachbarte `JsxText`/`JsxExpression`-Kinder eines
   Elternknotens bilden **einen** Satzlauf und werden **einmal** gemeldet; ein JSX-Element
   oder Fragment ist eine harte Grenze. `Jahre (geb. {x})` ist damit **ein** Befund.
@@ -400,19 +402,17 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   **Immer fail, Exit 1** (Owner-Vorgabe) — der warn-only-Pfad ist entfernt. Befunde lassen
   `prebuild` und damit jeden `pnpm build` scheitern, lokal wie in CI, bis der Zähler 0 steht.
   **Größte verbleibende Brocken** (`findUnlocalizedStringsInTree()`, Treffer pro Datei):
-  `LicenseCatalogSettings.tsx` (55), `BrandSettingsCard.tsx` (23),
-  `ShootingCalculatorModal.tsx` (20), `BillingDetailsCard.tsx` (16),
-  `CalculatorSettingsCard.tsx` (15) — gemessen in der Analysewelle, die Vorgängerzahlen
-  (62/25/24/21/18) standen noch auf dem Pre-D-7-Stand. Häufigste Attribute: `placeholder` (25), `title` (8),
+  `LicenseCatalogSettings.tsx` (39), `ShootingCalculatorModal.tsx` (20),
+  `BrandSettingsCard.tsx` (19), `BillingDetailsCard.tsx` (14),
+  `CalculatorSettingsCard.tsx` (13) — gemessen nach Welle 1 (31 Dateien tragen Befunde).
+  Häufigste Attribute: `placeholder` (25), `title` (8),
   `aria-label` (5), `alt` (5).
-  **Reihenfolge (Plan, keine Entscheidung):** `helper-argument` (27) zuerst, dann die
-  `management/`-Konzentration. Scharfschaltung sofort (Owner-Vorgabe) — Fixierung unter
-  rotem Build.
-  **Zwei Befunde, die die Regel zu Recht meldet und die keine Regelmängel sind:**
-  `Impressum.tsx:43` steht eine blanke URL zwischen zwei `<Trans>`-Geschwistern — zur Laufzeit
-  ein ungewrapter Textknoten, also ein echter Fund. `UserTable.tsx:53` und
+  **Reihenfolge (Plan, keine Entscheidung):** nächste Welle `jsx-attribute` (44), dann
+  `jsx-text`-Bulk. Build weiter rot (Owner-Vorgabe) bis 0.
+  **Eingaben für die Abarbeitung, keine Regelmängel:** `UserTable.tsx:53` und
   `ManagementStatsView.tsx:105` (`{n} Gruppen, {n} Galerien`) meldet die Regel vor wie nach der
-  Erweiterung: Eingaben für die Abarbeitung, keine Mängel der Regel.
+  Erweiterung. Die URL in `Impressum.tsx:43` meldet sie seit Welle 1 nicht mehr — technische
+  Werte filtert `looksLikeTechnicalValue` jetzt auch im JSX-Text-Pfad.
 <!-- FTP-Konten: Ansatz am 2026-09-26 von pure-pw/pure-ftpd auf SFTPGo
      umgestellt. P1-M17..P1-M20 sind durch P1-M21..P1-M29 abgeloest.
      Begruendung: (a) pure-ftpd kann AES128-SHA nicht anbieten, damit

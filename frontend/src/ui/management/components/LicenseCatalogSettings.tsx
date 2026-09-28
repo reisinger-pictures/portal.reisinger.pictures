@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useState } from 'react';
 import { useLicenseCatalog, LicenseUseCase, LicenseModifier } from '../../../logic/useLicenseCatalog';
 import { useUI } from '../../components/UIContext';
@@ -59,10 +60,10 @@ function UseCaseRow({ uc, onSave, onDelete }: UseCaseRowProps) {
     const handleSave = async () => {
         try {
             await onSave(uc.id, { ...data, base_price: Math.round(Number(data.base_price) * 100) });
-            showToast('success', 'Grundhonorar aktualisiert');
+            showToast('success', t`Grundhonorar aktualisiert`);
             setIsEditing(false);
         } catch {
-            showToast('error', 'Fehler beim Speichern');
+            showToast('error', t`Fehler beim Speichern`);
         }
     };
 
@@ -147,10 +148,10 @@ function ModifierRow({ mod, onSave, onDelete }: ModifierRowProps) {
     const handleSave = async () => {
         try {
             await onSave(mod.id, { ...data, percent_surcharge: Number(data.percent_surcharge) });
-            showToast('success', 'Zuschlag aktualisiert');
+            showToast('success', t`Zuschlag aktualisiert`);
             setIsEditing(false);
         } catch {
-            showToast('error', 'Fehler beim Speichern');
+            showToast('error', t`Fehler beim Speichern`);
         }
     };
 
@@ -217,34 +218,34 @@ export default function LicenseCatalogSettings() {
     const [newMod, setNewMod] = useState({ name: '', description: '', percent_surcharge: '', is_included_in_flatrate: false });
 
     const handleAddUseCase = async () => {
-        if (!newUc.name || !newUc.base_price) { showToast('error', 'Name und Preis sind Pflichtfelder'); return; }
+        if (!newUc.name || !newUc.base_price) { showToast('error', t`Name und Preis sind Pflichtfelder`); return; }
         try {
             await createUseCase({ name: newUc.name, description: newUc.description, base_price: Math.round(parseFloat(newUc.base_price) * 100), flatrate_tier: newUc.flatrate_tier, is_commercial: newUc.is_commercial });
-            showToast('success', 'Grundhonorar hinzugefügt');
+            showToast('success', t`Grundhonorar hinzugefügt`);
             setNewUc({ name: '', description: '', base_price: '', flatrate_tier: 'web', is_commercial: false });
-        } catch { showToast('error', 'Fehler beim Speichern'); }
+        } catch { showToast('error', t`Fehler beim Speichern`); }
     };
 
     const handleDeleteUC = async (id: string) => {
-        if (await confirm({ title: 'Löschen?', message: 'Grundhonorar wirklich löschen?', confirmColor: 'error' })) {
+        if (await confirm({ title: t`Löschen?`, message: t`Grundhonorar wirklich löschen?`, confirmColor: 'error' })) {
             await deleteUseCase(id);
-            showToast('success', 'Grundhonorar gelöscht');
+            showToast('success', t`Grundhonorar gelöscht`);
         }
     };
 
     const handleAddModifier = async () => {
-        if (!newMod.name || !newMod.percent_surcharge) { showToast('error', 'Name und Zuschlag sind Pflichtfelder'); return; }
+        if (!newMod.name || !newMod.percent_surcharge) { showToast('error', t`Name und Zuschlag sind Pflichtfelder`); return; }
         try {
             await createModifier({ name: newMod.name, description: newMod.description, percent_surcharge: parseFloat(newMod.percent_surcharge), is_included_in_flatrate: newMod.is_included_in_flatrate });
-            showToast('success', 'Zuschlag hinzugefügt');
+            showToast('success', t`Zuschlag hinzugefügt`);
             setNewMod({ name: '', description: '', percent_surcharge: '', is_included_in_flatrate: false });
-        } catch { showToast('error', 'Fehler beim Speichern'); }
+        } catch { showToast('error', t`Fehler beim Speichern`); }
     };
 
     const handleDeleteMod = async (id: string) => {
-        if (await confirm({ title: 'Löschen?', message: 'Zuschlag wirklich löschen?', confirmColor: 'error' })) {
+        if (await confirm({ title: t`Löschen?`, message: t`Zuschlag wirklich löschen?`, confirmColor: 'error' })) {
             await deleteModifier(id);
-            showToast('success', 'Zuschlag gelöscht');
+            showToast('success', t`Zuschlag gelöscht`);
         }
     };
 

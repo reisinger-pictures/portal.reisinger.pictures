@@ -68,9 +68,9 @@ export default function BillingDetailsCard() {
     const onSubmit = async (data: BillingFormValues) => {
         try {
             await updateBillingDetails(data);
-            showToast('success', 'Bankdaten gespeichert.');
+            showToast('success', t`Bankdaten gespeichert.`);
         } catch {
-            showToast('error', 'Fehler beim Speichern.');
+            showToast('error', t`Fehler beim Speichern.`);
         }
     };
 

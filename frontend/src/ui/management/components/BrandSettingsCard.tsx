@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useEffect } from 'react';
 import { useSWRConfig } from 'swr';
 import { useForm } from 'react-hook-form';
@@ -84,9 +85,9 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
             } catch {
                 // The write succeeded; a later mount/reload can retry this cache.
             }
-            showToast('success', 'Markeneinstellungen gespeichert.');
+            showToast('success', t`Markeneinstellungen gespeichert.`);
         } catch {
-            showToast('error', 'Fehler beim Speichern der Markeneinstellungen.');
+            showToast('error', t`Fehler beim Speichern der Markeneinstellungen.`);
         }
     };
 
@@ -110,9 +111,9 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
             } catch {
                 // The reset succeeded; the public cache can retry on the next load.
             }
-            showToast('success', 'Markeneinstellungen auf Standard zurückgesetzt.');
+            showToast('success', t`Markeneinstellungen auf Standard zurückgesetzt.`);
         } catch {
-            showToast('error', 'Fehler beim Zurücksetzen der Markeneinstellungen.');
+            showToast('error', t`Fehler beim Zurücksetzen der Markeneinstellungen.`);
         }
     };
 

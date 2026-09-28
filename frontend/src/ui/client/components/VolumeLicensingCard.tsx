@@ -34,7 +34,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
             galleryGroupId: photo.gallery?.gallery_group_id ?? undefined,
             price: pricePerItemCents,
         });
-        showToast('success', 'In den Warenkorb gelegt');
+        showToast('success', t`In den Warenkorb gelegt`);
         onAddToCart();
     };
 
