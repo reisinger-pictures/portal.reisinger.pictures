@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services;
 
 use App\Models\Gallery;
+use App\Models\GalleryGroup;
 use App\Services\SlugService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -131,5 +132,34 @@ class SlugServiceTest extends TestCase
         $slug = $this->service->makeUnique('!!! $$$ @@@', 'galleries', 'slug');
 
         $this->assertSame('at-at-at', $slug);
+    }
+
+    // ─── brand-scoped uniqueness (V046) ─────────────────────────────
+
+    public function test_brand_scoped_check_ignores_a_slug_owned_by_another_brand()
+    {
+        GalleryGroup::query()->create(['name' => 'A', 'slug' => 'privat', 'brand' => 'srp']);
+
+        $slug = $this->service->makeUnique('Privat', 'gallery_groups', 'slug', null, 'rp');
+
+        $this->assertSame('privat', $slug);
+    }
+
+    public function test_brand_scoped_check_still_suffixes_within_the_same_brand()
+    {
+        GalleryGroup::query()->create(['name' => 'A', 'slug' => 'privat', 'brand' => 'rp']);
+
+        $slug = $this->service->makeUnique('Privat', 'gallery_groups', 'slug', null, 'rp');
+
+        $this->assertSame('privat-1', $slug);
+    }
+
+    public function test_without_a_brand_the_check_stays_global()
+    {
+        GalleryGroup::query()->create(['name' => 'A', 'slug' => 'privat', 'brand' => 'srp']);
+
+        $slug = $this->service->makeUnique('Privat', 'gallery_groups', 'slug');
+
+        $this->assertSame('privat-1', $slug);
     }
 }

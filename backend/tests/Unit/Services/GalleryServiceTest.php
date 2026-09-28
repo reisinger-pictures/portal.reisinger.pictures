@@ -64,7 +64,7 @@ class GalleryServiceTest extends TestCase
         $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->once())
             ->method('makeUnique')
-            ->with('meine-gruppe', 'gallery_groups', 'slug', null)
+            ->with('meine-gruppe', 'gallery_groups', 'slug', null, 'rp')
             ->willReturn('meine-gruppe');
 
         $group = $this->service->storeGroup([
@@ -90,7 +90,7 @@ class GalleryServiceTest extends TestCase
         $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->once())
             ->method('makeUnique')
-            ->with('Meine Gruppe', 'gallery_groups', 'slug', null)
+            ->with('Meine Gruppe', 'gallery_groups', 'slug', null, 'rp')
             ->willReturn('meine-gruppe');
 
         $group = $this->service->storeGroup([
@@ -132,7 +132,7 @@ class GalleryServiceTest extends TestCase
         $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->once())
             ->method('makeUnique')
-            ->with('aktualisiert', 'gallery_groups', 'slug', null)
+            ->with('aktualisiert', 'gallery_groups', 'slug', null, 'rp')
             ->willReturn('aktualisiert');
 
         $updated = $this->service->updateGroup($group, [
@@ -158,7 +158,7 @@ class GalleryServiceTest extends TestCase
         $this->service = new GalleryService($this->slugService);
         $this->slugService->expects($this->once())
             ->method('makeUnique')
-            ->with('neuer-slug', 'gallery_groups', 'slug', null)
+            ->with('neuer-slug', 'gallery_groups', 'slug', null, 'rp')
             ->willReturn('neuer-slug-1');
 
         $updated = $this->service->updateGroup($group, [
