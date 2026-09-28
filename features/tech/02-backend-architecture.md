@@ -109,8 +109,10 @@ Beschlossen vom Owner am **2026-09-28**.
    (`V001__initial_portal_schema.php:223`), liefert MySQL **jeden**
    Settings-Wert als JSON-**String** zurück (`base_price` kommt als `"8000"`).
    Das ist der Ist-Stand dieser Spalte; die Regel ist bindend, und die
-   Umstellung der Geldfelder auf Integer in der Antwort ist **in Arbeit**
-   (Code-Seite, nicht in diesem Commit). Ein Client, der `Number(value)`
+      Umstellung der Geldfelder auf Integer in der Antwort ist mit `754df6c`
+    und `9d31e8e` abgeschlossen; Faktoren und Anzahlen behalten ihre Form,
+    weil sie keine Geldbeträge sind.
+      Ein Client, der `Number(value)`
    anwendet, ist auf der sicheren Seite; einer, der die Einheit aus dem Typ
    ableitet, ist es nicht — der Typ sagt sie nicht.
 
@@ -154,8 +156,8 @@ Geld-Varianten (`Product.php:19`, Integer-Cast) sowie
 `calc_hourly_rate` sind heute Euro (`DatabaseSeeder.php:159-160` → `'50'` /
 `'80'`), obwohl sie Geldfelder sind, und der Shooting-Kalkulator rechnet
 intern in Euro (`frontend/src/logic/shootingCalculator.ts:64-96`). Die
-Umstellung auf Cent ist damit **in Arbeit**; der Zielzustand und sein
-Nachweis stehen in `../infrastructure/28-settings-key-meaning.md` und
+Umstellung auf Cent ist mit `754df6c` abgeschlossen; Zielzustand und Nachweis stehen in
+`../infrastructure/28-settings-key-meaning.md` und
 `../ecommerce/07-psychological-pricing.md`.
 
 ## 5. Dependency Injection & Security

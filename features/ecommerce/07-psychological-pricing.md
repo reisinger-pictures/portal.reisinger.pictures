@@ -28,11 +28,12 @@ Das ist kein Bug, sondern der Zweck der psychologischen Preisrundung.
 > **Regel:** [`../tech/02-backend-architecture.md` § 4](../tech/02-backend-architecture.md)
 > Nummer 1 — jeder Geldbetrag ist Cent, im Speicher und in der API. Der
 > Shooting-Kalkulator ist keine Ausnahme. `calculateCustomStudioPrice()` in
-> `frontend/src/logic/shootingCalculator.ts:64-96` (Stand `82e8d17`) addiert
-> `basePrice`, `timePrice` und `imagesPrice` in **Euro** und rundet das Ergebnis
-> in Euro. Die Umstellung auf Cent ist **in Arbeit** (Code-Seite, nicht in
-> diesem Commit). Was hier festgeschrieben wird, ist das **Verhalten**, das
-> danach unverändert gilt — nicht die heutige Implementierung.
+> `frontend/src/logic/shootingCalculator.ts` addiert `basePrice`, `timePrice` und
+> `imagesPrice` und rundet das Ergebnis — **seit `754df6c` in Cent**, zuvor in Euro.
+> Die Umstellung ist abgeschlossen, Migration `V045` hat die gespeicherten Werte
+> wert-erhaltend umgerechnet (`50 → 5000`, `80 → 8000`). Was hier festgeschrieben
+> wird, ist das **Verhalten**, das vor und nach der Umstellung gilt — es ist
+> dasselbe geblieben, bis auf den Randfall unter 12 € weiter unten.
 
 **Die Invariante ist skalenunabhängig formuliert:** Die gerundete Ausgabe muss
 in Euro **dieselbe Zahl** ergeben wie heute. Eine preispsychologische Rundung,
