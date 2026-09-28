@@ -59,9 +59,15 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       (§13: Restart ≠ Recreate, und `sync.sh` migriert nicht).
 - [ ] **D-2 — `ftp/<ftp_slug>` beim Setzen des Slugs anlegen; schlägt die Anlage fehl, schlägt
       das Setzen fehl.** Noch nicht begonnen.
-- [ ] **D-6 — `API_THROTTLE_LIMIT` in `backend/.env.ci:40` auf 1000 anheben** (heute `=60`),
-      Kommentar in `backend/.env.example:41`.
-      Zwei versionierte Dateien, kleinster offener Punkt hier.
+- [x] **D-6 — `API_THROTTLE_LIMIT` steht auf 1000 in `backend/.env.ci`**, mit deutschem
+      Kommentar im Block der übrigen Throttle-Werte; `backend/.env.example` kommentiert
+      englisch, dass 60 der Produktions-Sinnwert ist — jede Datei folgt ihrer eigenen
+      Kommentarsprache. **Bewacht von** `ApiThrottleLimitPolicyTest` (4 Tests): er liest die
+      Datei als Text, prüft die Begründung mit und die Beziehung `ci > example`; driften
+      beide auf densellen Wert, ist die Entscheidung still zurückgenommen. Ein Test auf
+      `config('app.throttle_api')` wäre grün, egal was die Datei enthält.
+      **Rot nachgewiesen:** `.env.ci` auf 60 → 2 failed; `.env.example` auf 1000 → 2 failed.
+      Gate danach grün: 2828 passed, 3 skipped, 0 failed (14457 Assertions).
 - [ ] **D-7 — `scripts/check-i18n.mjs` auf Satzebene erweitern.** Vor dem Abarbeiten der 246.
 - [ ] **D-8 — `frontend/tests/e2e/admin/` nach Domäne aufteilen.** Eigene Arbeit.
 - [ ] **D-9 — Sidebar: Portalname bricht um** statt still gekürzt zu werden.
@@ -486,6 +492,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 ### Braucht eine Entscheidung oder Betriebs-Evidenz (kein Code)
 
 - [ ] **D-1 — SFTPGo auf `user: "1002:82"` umstellen und nach grünem CI deployen.**
+  läuft SFTPGo als `1002:82` (Host-Konvention) oder bleibt `1000:1000` mit dokumentierter Ausnahme für genau dieses Verzeichnis? Vor dem Stack-Recreate zu entscheiden. **P1-I9 (P0) — Deployment-Drift: `portal_backend` läuft als root, das
   versionierte Compose fordert `user: "1000:1000"`.** Verifiziert 2026-09-26.
   **Befund:** `deployment/docker-compose.yml:58` deklariert
   `user: "1000:1000"` für `backend`. Der laufende Container hat
@@ -1312,6 +1319,7 @@ getrennt.
 - [ ] manuell prüfen: den 3DS-Strom live durchspielen: SCA, frictionless, challenge, failure, timeout, mobile und return. Radar darf die lokalen Limits nicht ersetzen; Payment-Method-Settings und Testkarten mitverifizieren. **3DS-Betriebscheckliste**: SCA/frictionless/challenge/failure/timeout/mobile/return testen; Radar nicht als Ersatz für lokale Limits verwenden, Payment-Method-Settings und Testkarten verifizieren.
 - [ ] Monitoring/Runbook für PI-Rate, Replays, User/IP-429, Failure-Velocity, Identity-Mismatch/Quarantäne, Cleanup, Account-Age-Rejections und Turnstile anlegen; Logs ohne PAN/CVC/Secret/Raw-Turnstile-Token.
 - [ ] **D-16 — technische Doku der Stripe-Identifikatoren vervollständigen; rechtlicher Teil bleibt benannte Lücke.**
+  Zweck, Legal Ground, konkrete Retention und Lösch-/Anonymisierungsregeln der Stripe-Identifikatoren — fachliche DPO-/Rechtsfreigabe. Datenschutzhinweise/ROPA/Prozessor-/DPA- und Cookie-Dokumentation für Stripe-Customer-/PI-IDs, IP(+Hash), Fingerprint, Failure-Codes und Turnstile finalisieren. `Privacy.tsx` enthält bereits einen technischen Teilabschnitt; Zweck/Legal-Ground, konkrete Retention, Lösch-/Anonymisierungsregeln und DPO-/Rechtsfreigabe sind noch nicht nachgewiesen.
 
 **Tests**
 
@@ -1435,16 +1443,6 @@ hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
 | strukturell nicht erfassbar | 2 | `AIGalleryDefaultsModal` (nur aus einem anderen Dialog heraus) und der globale Bestaetigungsdialog (programmatisch, kein `click`-Target) |
 | Roh-Dialoge ohne `ModalShell` | 11 | 6 mit `role="dialog"`, **5 ohne** — die brauchen ein `data-testid`, bevor `waitFor` sie ueberhaupt greifen kann |
 
-- [ ] **D-6 — `API_THROTTLE_LIMIT` in `backend/.env.ci:40` auf 1000 anheben** (heute `=60`),
-  Kommentar in `backend/.env.example:41`.
-  stehen weiter auf `API_THROTTLE_LIMIT=60`. CI fährt laut eigenem Kommentar
-  4 Playwright-Worker und hat damit dasselbe Burst-Profil — die Drosselung ist
-  dort latent, auch wenn sie bisher nicht als Fehler auffaellt. Entscheidung des
-  Owners noetig: hoeherer Wert in `.env.ci` (vergleichbar mit dem
-  `AUTH_THROTTLE_LIMIT=1000` dort), und in `.env.example` ein Kommentar, dass
-  60 der Produktions-Sinnwert ist und Testumgebungen deutlich hoeher muessen
-  sein. **Nicht** angefasst: `config/app.php` (Default bleibt 120/5) und
-  `.env.production` (liegt nicht auf diesem Rechner).
 - [ ] **D-10 — Dialoge innerhalb von `<main>` rendern, Scoping bleibt unangetastet.**
   `waitFor` auf `page.locator('main')`. `DashboardLayout.tsx:93-95` rendert
   `<GalleryModals` **nach** `</main>`, und `ModalShell` nutzt **kein Portal** —

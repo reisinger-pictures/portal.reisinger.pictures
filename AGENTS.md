@@ -82,15 +82,21 @@ beschreiben zwei Dateien eine Regel und driften auseinander.
   ersten Satz.** Wer einen neuen Eintrag hinter einem bestehenden einfügen will und den Anker auf
   die Kopfzeile des bestehenden setzt, landet mit dem neuen Text **zwischen** dessen Überschrift
   und dessen Körper — der Eintrag wird lautlos zerrissen, und nichts im Ergebnis meldet einen
-  Fehler. **Belegt vierfach am 2026-09-28, in einer einzigen Sitzung:** §6 (der „Max 3
+  Fehler. **Belegt fünffach am 2026-09-28, in einer einzigen Sitzung:** §6 (der „Max 3
   Fix-Versuche"-Satz landete am Ende des D-8-Blocks), §14/D-17 (D-18 und D-19 landeten zwischen
   D-17s Kopf und Körper), §9 (die D-20-Regel landete zwischen der D-18-Überschrift und ihrem
-  Absatz) und **§4 selbst** — die Regel landete zwischen der ESLint-Überschrift und ihrem Satz,
-  also in dem Eintrag, der unmittelbar darüber steht. Alle vier Male war die Einfüge-Operation
-  selbst korrekt und der Round-Trip-Check sauber; der Fehler fiel erst beim **Lesen** auf. Der
-  vierte Fall ist der aussagekräftigste: die Regel wurde geschrieben und im selben Schritt
-  dagegen verstoßen — ein Anker wird offenbar nicht deshalb richtig, dass man gerade darüber
-  gelesen hat.
+  Absatz), **§4 selbst** — die Regel landete zwischen der ESLint-Überschrift und ihrem Satz, also
+  in dem Eintrag, der unmittelbar darüber steht — und `AGENTS.todo.md`, als dieselbe Operation
+  **anstatt** eines Einfügens eine Kopfzeile **ersetzte**: der kurze Entscheidungstitel verdrängte
+  den Satzanfang, und die erste Körperzeile begann mit „versionierte Compose fordert …" bzw.
+  „**Tests**" ohne seinen Anfang (D-1 und D-16). In allen fünf Fällen war die Operation selbst
+  korrekt und der Round-Trip-Check sauber; der Fehler fiel erst beim **Lesen** auf. Der vierte
+  Fall ist der lehrreichste: die Regel wurde geschrieben und im selben Schritt dagegen verstoßen —
+  ein Anker wird offenbar nicht deshalb richtig, dass man gerade darüber gelesen hat.
+  **Beide Vektoren, eine Regel:** nicht nur *einfügen* nach, sondern auch *ersetzen* einer
+  Kopfzeile vernichtet den Satz, der über die Zeilengrenze in den Körper lief. Wer eine
+  Kopfzeile tauscht, muss den ursprünglichen Text als erste Körperzeile wiederherstellen — oder
+  den ganzen Eintrag neu schreiben, nicht nur die erste Zeile.
   **Regel:** das letzte Merkmal des Zieleintrags bestimmen, nicht das erste. Und nach jedem
   Text-Einsatz in ein Dokument prüfen, ob Überschrift und Körper des Nachbareintrags **an-
   einander** stehen — nicht nur, ob die Zeilenzahl stimmt.
@@ -345,9 +351,14 @@ führt keine Migration aus. Deshalb gilt:
 - **D-4 — `.env.production` bleibt unverschlüsselt und unrotiert**, als akzeptiertes Risiko.
   Wer eine Rotation vorschlägt, hat die Entscheidung nicht gelesen: sie ist getroffen, und
   ein Repo-Risiko besteht nicht (gitignored, nie committet).
-- **D-6 — `API_THROTTLE_LIMIT` ist in `backend/.env.ci:40` 1000** (heute dort `=60`), in
-  `backend/.env.example:41` kommentiert (60 ist der Produktions-Sinnwert). `config/app.php`
-  und `.env.production` bleiben unangetastet.
+- **D-6 — `API_THROTTLE_LIMIT` steht auf 1000 in `backend/.env.ci`** (Schlüssel
+  `API_THROTTLE_LIMIT=1000`), und `backend/.env.example` kommentiert daneben, dass **60 der
+  Produktions-Sinnwert** ist und Testumgebungen deutlich höher müssen. `config/app.php`
+  (Default 120/5) und `.env.production` bleiben unangetastet. **Bewacht von**
+  `ApiThrottleLimitPolicyTest`, das die Datei als Text liest — ein Test auf `config('app.
+  throttle_api')` wäre grün, egal was die Datei enthält, und könnte nicht rot werden.
+  *Ankerform:* der **Schlüssel**, nicht die Zeilennummer — der eigene Kommentarblock hat die
+  Zeile beim Umsetzen von 40 auf 44 verschoben, ein Anker `file:NN` wäre sofort verrottet.
 
 ## 14. Entscheidungen des Owners (2026-09-28)
 
@@ -404,7 +415,7 @@ entscheiden".
   Deploy-Host. Damit ist der Punkt **Deploy-Arbeit** und gehört neben D-1, denn 12 GB Reserve sind
   für einen Stack-Recreate mit Image-Pulls knapp. Der eigene Fußabdruck (~1 GB) ist vernachlässigbar.
 - **D-6 — `API_THROTTLE_LIMIT` in CI:** auf **1000** anheben, vergleichbar mit
-  `AUTH_THROTTLE_LIMIT=1000` dort (`backend/.env.ci:36`), und in `backend/.env.example`
+  `AUTH_THROTTLE_LIMIT=1000` dort (Schlüssel in derselben Datei), und in `backend/.env.example`
   kommentieren, dass **60 der Produktions-Sinnwert** ist und Testumgebungen deutlich höher
   müssen sein. `config/app.php` (Default 120/5) und `.env.production` bleiben
   unangetastet. *Warum:* CI fährt laut eigenem
