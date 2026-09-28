@@ -1,6 +1,11 @@
 # Markenspezifische Settings-Trennung — Konzept (SOLL)
 
-> **Status:** Beschreibt den Soll-Zustand (Ziel).
+> **⚠️ Status:** `superseded` (korrigiert 2026-09-28). Das Dokument beschreibt ein
+> `srp_`-Präfix-Verfahren für eine zweite Marke; SRP wurde am 2026-07-14 entfernt
+> (siehe `AGENTS.md` §3). Der aktuelle Vertrag steht in
+> [`20-setting-resolver.md`](20-setting-resolver.md) (brand-scoped `SettingResolver`
+> auf `(key, brand)`), [`21-brand-config-driven.md`](21-brand-config-driven.md) und
+> [`22-brand-settings-overlay.md`](22-brand-settings-overlay.md).
 > Verknüpft: `features/infrastructure/06-multi-domain-branding.md`, `features/infrastructure/08-org-brand-concept.md`.
 
 ## 1. Kontext
@@ -10,9 +15,16 @@ werden über ein **String-Präfix** im `settings.key` getrennt:
 - **B2B** (`reisinger.pictures`) = kein Präfix, z. B. `bank_iban`.
 - **SRP** (`story.reisinger.pictures`) = `srp_`-Präfix, z. B. `srp_bank_iban`.
 
-Das `settings`-Model (`backend/app/Models/Setting.php`) ist ein plain key/value-Store **ohne**
-Brand-Feld, Scope oder typisierten Accessor. Die Trennung passiert verstreut in Consumern über das
-verteilte Muster `$pfx = config('app.brand') === 'story.reisinger.pictures' ? 'srp_' : ''`.
+Das `settings`-Model (`backend/app/Models/Setting.php`) ist ein key/value-Store **mit**
+`brand`-Spalte und zusammengesetztem Primärschlüssel `(key, brand)`
+(`:24` → `protected $fillable = ['key', 'value', 'brand'];`,
+`:26` → `protected $casts = ['brand' => AsBrand::class];`). Die frühere Annahme
+„ohne Brand-Feld“ ist damit überholt. Der brand-scoped Zugriff läuft zentral über den
+`SettingResolver` (`20-setting-resolver.md`), nicht mehr über das hier beschriebene
+verteilte `$pfx = config('app.brand') === 'story.reisinger.pictures' ? 'srp_' : ''`-Muster —
+`config('app.brand')` existiert nicht mehr und `story.reisinger.pictures` kommt im
+Code nicht vor (`grep -rn "config('app.brand')" backend/app` → nur ein Kommentar in
+`BackfillBrand.php`).
 
 ## 2. Soll-Zustand (Architektur)
 

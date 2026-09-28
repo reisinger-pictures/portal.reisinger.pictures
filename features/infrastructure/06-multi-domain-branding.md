@@ -1,10 +1,23 @@
 ---
 domain: infrastructure
 topic: multi-domain-branding
-status: active
+status: superseded
 ---
 
 # Technical Concept: Multi-Domain Branding & Dynamic Assets
+
+> **⚠️ Status:** `superseded` (korrigiert 2026-09-28) — beschreibt den früheren
+> Zwei-Marken-Stand (RP/SRP). Die Marke `SRP` wurde am 2026-07-14 entfernt
+> (siehe `AGENTS.md` §3). Gültige Quellen:
+> [`21-brand-config-driven.md`](21-brand-config-driven.md) (statische Brand-Config,
+> einziger Case `Brand::B2B = 'rp'`),
+> [`22-brand-settings-overlay.md`](22-brand-settings-overlay.md) (DB-Overlay),
+> [`20-setting-resolver.md`](20-setting-resolver.md) (brand-scoped Settings).
+> Konkrete, nicht mehr gültige Angaben in diesem Dokument:
+> - §2 `/public/brands/srp/` und §3 `srp-light`/`srp-dark` — `grep -rnE 'srp-(light|dark)' frontend/src` → 0 Treffer; `frontend/public/brands/` enthält nur `rp`.
+> - §5.1 `config('app.frontend_url_srp')`, `config('mail.from_srp.*')`, `config('services.accounting_email_srp')` — `grep -rn '_srp' backend/config` → 0 Treffer.
+> - §5.2 Trait `BrandAwareMail` / `backend/app/Mail/BrandAwareMail.php` — die Datei existiert nicht; Mailer erben von `backend/app/Mail/AbstractBrandAwareMailable.php` (`grep -rl 'extends AbstractBrandAwareMailable' backend/app/Mail | wc -l` → 13 Klassen).
+> - §6 Hostname `buy.localhost:4321` als SRP — `backend/config/brands.php` führt nur die `rp`-Hostnames; `story.reisinger.pictures` kommt im Code nicht vor (`grep -rn 'story.reisinger' frontend/src backend/app backend/config` → 0 Treffer).
 
 ## 1. Single Codebase, Dual Brand
 
@@ -63,7 +76,9 @@ Alle 7 Mail-Klassen nutzen das `BrandAwareMail` Trait. Es bietet:
 - `applyBrandFrom()` — setzt den E-Mail-Absender pro Brand
 - `brandBcc()` — liefert die BCC-Adresse pro Brand
 
-Siehe `backend/app/Mail/BrandAwareMail.php`.
+Siehe `backend/app/Mail/BrandAwareMail.php`. *(Historisch: diese Datei existiert
+nicht mehr; der Trait wurde durch `backend/app/Mail/AbstractBrandAwareMailable.php`
+ersetzt — siehe Status-Hinweis oben.)*
 
 ## 6. Hostname-Konvention (E2E Test Locators)
 
