@@ -10,12 +10,17 @@
 
 ## 1. Host-Vorbereinigung (vor Docker)
 
-- [ ] **Backup des gesamten `ftp`-Baums** inkl. `1002:webgroup`, `2777`/setgid
+- [ ] **Backup des gesamten `ftp`-Baums** inkl. `1002:webgroup`, `2775`/setgid
 - [ ] **Restore-Test** — nicht nur Backup vorhanden, sondern geprüft, dass ein
       Restore funktioniert
 - [ ] **SFTPGo-Ordner auf dem Host:** `ftp/<slug>` mit `1002:webgroup` und
-      `2777` (setgid) — neue Dateien erben die Gruppe. Kein gemeinsamer
-      `r1`-User mehr; jeder User bekommt sein eigenes Home.
+      `2775` (setgid, Gruppe schreibbar, **Welt nicht schreibbar**) — neue Dateien
+      erben die Gruppe. **Geändert 2026-09-28, siehe `AGENTS.md` §14/D-2:** vorher
+      stand hier `2777`. **Nicht** `2755` — damit kann UID 1000 weder anlegen noch
+      `unlink`en, und `FtpController::process()` macht genau das. Kein gemeinsamer
+      `r1`-User mehr; jeder User bekommt sein eigenes Home. Ab D-2 legt das Portal
+      den Ordner selbst an; dieser Punkt gilt nur für den Bestand und für den
+      Handbetrieb vor dem ersten Slug-Wechsel.
 - [ ] **`pure-ftpd` läuft noch** — nicht vor Kamerabestätigung abschalten
 
 ## 2. Docker-Stack (Portainer)

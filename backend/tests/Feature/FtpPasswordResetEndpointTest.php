@@ -25,11 +25,17 @@ class FtpPasswordResetEndpointTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const INBOX_ROOT = '/var/www/ftp';
+    /**
+     * A real, writable inbox root: `provisionAndShow()` creates `ftp/<slug>` on
+     * disk before it creates the account (D-2).
+     */
+    private string $inboxRoot;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->inboxRoot = $this->useTemporaryFtpInboxRoot();
 
         config([
             'services.sftpgo' => [
@@ -38,7 +44,7 @@ class FtpPasswordResetEndpointTest extends TestCase
                 'admin_username' => null,
                 'admin_password' => null,
             ],
-            'filesystems.disks.ftp_inbox.root' => self::INBOX_ROOT,
+            'filesystems.disks.ftp_inbox.root' => $this->inboxRoot,
         ]);
     }
 
@@ -289,7 +295,7 @@ class FtpPasswordResetEndpointTest extends TestCase
             'id' => 7,
             'username' => 'florian',
             'status' => 1,
-            'home_dir' => self::INBOX_ROOT.'/florian',
+            'home_dir' => $this->inboxRoot.'/florian',
             'permissions' => ['/' => ['*']],
         ];
 

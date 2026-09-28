@@ -6,6 +6,7 @@ use App\Exceptions\FtpAuditWriteException;
 use App\Exceptions\FtpCredentialException;
 use App\Models\FtpPasswordReset;
 use App\Models\User;
+use App\Support\FtpInboxDirectory;
 use App\Support\FtpSlug;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -293,6 +294,17 @@ class FtpCredentialService
      * was revoked and gets the role back provisions again, the column returns to
      * `active`, and `ftp_revoked_at` stays as the record of the past revocation.
      *
+     * **The inbox directory exists before the account does (D-2).** SFTPGo does
+     * not create `ftp/<slug>` ("you have to create the folder on disk
+     * yourself"), so `ensure()` runs *before* `provisionUser()`. The order is
+     * the guarantee, not a detail: the SFTPGo Admin API has no rollback for a
+     * created user, so an account created first and then failed on `mkdir()`
+     * would be exactly the state D-2 exists to make unrepresentable — a live
+     * account pointing at a folder that is not there, which from the portal
+     * looks like an empty inbox rather than an error. The reverse residue is
+     * harmless: a directory without an account is an empty folder that the next
+     * call reuses.
+     *
      * `forceFill()` because neither column is mass-assignable — they are set by
      * this service and by `revoke()`, never from request input.
      */
@@ -300,6 +312,11 @@ class FtpCredentialService
     {
         $username = $this->accountNameFor($user);
         $password = $this->generateCameraPassword();
+
+        // Fails closed: on a filesystem error this throws before any request
+        // leaves the process, so the status stays `pending` and no account is
+        // created (D-2). The same guarantee the slug write path gives.
+        FtpInboxDirectory::ensure($username);
 
         $this->sftpGo->provisionUser($username, $password, $this->homeDirectoryFor($username));
 
@@ -372,9 +389,11 @@ class FtpCredentialService
      * The `pending` branch is the one path that writes no audit row, and that is
      * deliberate rather than an oversight: an account *creation* is not a reset,
      * and this table is the reset trail. `provisionAndShow()` is also
-     * fail-closed on its own — it writes `active` + `ftp_provisioned_at` only
-     * after SFTPGo has accepted the account, so an unreachable service leaves the
-     * status at `pending` and the photographer can try again.
+     * fail-closed on its own — the inbox directory is ensured *before* the
+     * account is requested (D-2), and it writes `active` + `ftp_provisioned_at`
+     * only after SFTPGo has accepted the account, so neither a filesystem
+     * failure nor an unreachable service can leave the status claiming an
+     * account that is not usable.
      *
      * A failure of the audit write itself is *not* swallowed. On the rotation
      * path that means a broken database can answer 500 after the password was

@@ -24,11 +24,16 @@ class FtpCredentialServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const INBOX_ROOT = '/var/www/ftp';
+    private string $inboxRoot;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        // A real, writable inbox root: `provisionAndShow()` creates
+        // `ftp/<slug>` on disk before it creates the account (D-2), so a fixed
+        // `/var/www/ftp` would fail on a machine where it cannot be created.
+        $this->inboxRoot = $this->useTemporaryFtpInboxRoot();
 
         config([
             'services.sftpgo' => [
@@ -37,7 +42,7 @@ class FtpCredentialServiceTest extends TestCase
                 'admin_username' => null,
                 'admin_password' => null,
             ],
-            'filesystems.disks.ftp_inbox.root' => self::INBOX_ROOT,
+            'filesystems.disks.ftp_inbox.root' => $this->inboxRoot,
         ]);
     }
 
@@ -184,7 +189,7 @@ class FtpCredentialServiceTest extends TestCase
                 'id' => 7,
                 'username' => 'florian',
                 'status' => 1,
-                'home_dir' => self::INBOX_ROOT.'/florian',
+                'home_dir' => $this->inboxRoot.'/florian',
             ], 201),
         ]);
 
@@ -198,7 +203,7 @@ class FtpCredentialServiceTest extends TestCase
             $this->assertSame('POST', $request->method());
             $this->assertSame('florian', $request->data()['username']);
             $this->assertSame($password, $request->data()['password']);
-            $this->assertSame(self::INBOX_ROOT.'/florian', $request->data()['home_dir']);
+            $this->assertSame($this->inboxRoot.'/florian', $request->data()['home_dir']);
 
             return true;
         });
@@ -353,7 +358,7 @@ class FtpCredentialServiceTest extends TestCase
 
     public function test_a_trailing_slash_in_the_inbox_root_does_not_produce_a_double_slash(): void
     {
-        config(['filesystems.disks.ftp_inbox.root' => self::INBOX_ROOT.'/']);
+        config(['filesystems.disks.ftp_inbox.root' => $this->inboxRoot.'/']);
         Http::fake([
             'sftpgo.test:8080/api/v2/users' => Http::response(['id' => 7, 'username' => 'florian'], 201),
         ]);
@@ -363,7 +368,7 @@ class FtpCredentialServiceTest extends TestCase
         app(FtpCredentialService::class)->provisionAndShow($user);
 
         Http::assertSent(function (Request $request): bool {
-            $this->assertSame(self::INBOX_ROOT.'/florian', $request->data()['home_dir']);
+            $this->assertSame($this->inboxRoot.'/florian', $request->data()['home_dir']);
 
             return true;
         });

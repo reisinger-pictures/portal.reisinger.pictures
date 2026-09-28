@@ -41,7 +41,11 @@ class FtpSlugChangePasswordTest extends TestCase
 
     private const SFTPGO_BASE_URL = 'http://sftpgo.test:8080';
 
-    private const INBOX_ROOT = '/var/www/ftp';
+    /**
+     * A real, writable inbox root: the slug write path creates `ftp/<slug>`
+     * before it commits (D-2).
+     */
+    private string $inboxRoot;
 
     /**
      * The password the fake saw in the provisioning call.
@@ -58,6 +62,8 @@ class FtpSlugChangePasswordTest extends TestCase
         parent::setUp();
 
         $this->passwordSentToSftpGo = null;
+
+        $this->inboxRoot = $this->useTemporaryFtpInboxRoot();
 
         $this->configureSftpGo();
         $this->fakeSftpGo();
@@ -215,7 +221,7 @@ class FtpSlugChangePasswordTest extends TestCase
                 'admin_username' => null,
                 'admin_password' => null,
             ], $overrides),
-            'filesystems.disks.ftp_inbox.root' => self::INBOX_ROOT,
+            'filesystems.disks.ftp_inbox.root' => $this->inboxRoot,
         ]);
     }
 
@@ -247,7 +253,7 @@ class FtpSlugChangePasswordTest extends TestCase
                         'id' => 7,
                         'username' => $account,
                         'status' => 1,
-                        'home_dir' => self::INBOX_ROOT.'/'.$account,
+                        'home_dir' => $this->inboxRoot.'/'.$account,
                         'permissions' => ['/' => ['*']],
                     ], 201)
                     : Http::response(['message' => 'user deleted'], 200);

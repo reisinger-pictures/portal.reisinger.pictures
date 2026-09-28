@@ -39,11 +39,16 @@ class FtpFirstSlugChangeTest extends TestCase
 
     private const SFTPGO_BASE_URL = 'http://sftpgo.test:8080';
 
-    private const INBOX_ROOT = '/var/www/ftp';
+    private string $inboxRoot;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        // A real, writable inbox root: the slug write path creates
+        // `ftp/<slug>` before it commits (D-2), and the tests assert that the
+        // account's `home_dir` is derived from the same root.
+        $this->inboxRoot = $this->useTemporaryFtpInboxRoot();
 
         config([
             'services.sftpgo' => [
@@ -52,7 +57,6 @@ class FtpFirstSlugChangeTest extends TestCase
                 'admin_username' => null,
                 'admin_password' => null,
             ],
-            'filesystems.disks.ftp_inbox.root' => self::INBOX_ROOT,
         ]);
 
         $this->fakeSftpGo();
@@ -107,7 +111,7 @@ class FtpFirstSlugChangeTest extends TestCase
             $body = $request->data();
             $this->assertSame('j-doe', $body['username']);
             $this->assertSame($password, $body['password'], 'The shown password must be the stored one.');
-            $this->assertSame(self::INBOX_ROOT.'/j-doe', $body['home_dir']);
+            $this->assertSame($this->inboxRoot.'/j-doe', $body['home_dir']);
 
             return true;
         });
@@ -259,7 +263,7 @@ class FtpFirstSlugChangeTest extends TestCase
                         'id' => 7,
                         'username' => $account,
                         'status' => 1,
-                        'home_dir' => self::INBOX_ROOT.'/'.$account,
+                        'home_dir' => $this->inboxRoot.'/'.$account,
                         'permissions' => ['/' => ['*']],
                     ], 201)
                     : Http::response(['message' => 'user deleted'], 200);

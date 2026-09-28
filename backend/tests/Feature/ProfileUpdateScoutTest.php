@@ -19,11 +19,17 @@ class ProfileUpdateScoutTest extends TestCase
 
     private const SFTPGO_BASE_URL = 'http://sftpgo.test:8080';
 
-    private const INBOX_ROOT = '/var/www/ftp';
+    /**
+     * A real, writable inbox root: the slug write path creates `ftp/<slug>`
+     * before it commits (D-2).
+     */
+    private string $inboxRoot;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->inboxRoot = $this->useTemporaryFtpInboxRoot();
 
         // The slug half of this endpoint is a reset (P1-M34) and therefore runs
         // through the SFTPGo Admin API. Without a configured, faked service the
@@ -156,7 +162,7 @@ class ProfileUpdateScoutTest extends TestCase
                 'admin_username' => null,
                 'admin_password' => null,
             ], $overrides),
-            'filesystems.disks.ftp_inbox.root' => self::INBOX_ROOT,
+            'filesystems.disks.ftp_inbox.root' => $this->inboxRoot,
         ]);
     }
 
@@ -174,7 +180,7 @@ class ProfileUpdateScoutTest extends TestCase
                     'id' => 7,
                     'username' => $request->data()['username'] ?? 'unknown',
                     'status' => 1,
-                    'home_dir' => self::INBOX_ROOT.'/'.($request->data()['username'] ?? 'unknown'),
+                    'home_dir' => $this->inboxRoot.'/'.($request->data()['username'] ?? 'unknown'),
                     'permissions' => ['/' => ['*']],
                 ], 201)
                 : Http::response(['message' => 'user deleted'], 200),

@@ -18,6 +18,17 @@ class FtpSlugChangeResetTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // A real, writable inbox root: `provisionAndShow()` creates `ftp/<slug>`
+        // on disk before it creates the account (D-2). A fixed host path like
+        // `/home/webadmin/websites/ftp` cannot serve on a developer machine or
+        // in CI.
+        $this->useTemporaryFtpInboxRoot();
+    }
+
     public function test_delete_user_proxies_to_client(): void
     {
         $client = $this->mock(SftpGoClient::class);
@@ -44,8 +55,6 @@ class FtpSlugChangeResetTest extends TestCase
 
     public function test_provision_returns_generated_password(): void
     {
-        config(['filesystems.disks.ftp_inbox.root' => '/home/webadmin/websites/ftp']);
-
         $user = User::factory()->create(['ftp_slug' => 'valid-slug']);
 
         $client = $this->mock(SftpGoClient::class);
@@ -61,8 +70,6 @@ class FtpSlugChangeResetTest extends TestCase
 
     public function test_password_is_never_persisted(): void
     {
-        config(['filesystems.disks.ftp_inbox.root' => '/home/webadmin/websites/ftp']);
-
         $user = User::factory()->create(['ftp_slug' => 'valid-slug']);
 
         $client = $this->mock(SftpGoClient::class);
@@ -80,8 +87,6 @@ class FtpSlugChangeResetTest extends TestCase
 
     public function test_slug_change_flow_in_order(): void
     {
-        config(['filesystems.disks.ftp_inbox.root' => '/home/webadmin/websites/ftp']);
-
         $user = User::factory()->create(['ftp_slug' => 'old-slug']);
 
         $client = $this->mock(SftpGoClient::class);

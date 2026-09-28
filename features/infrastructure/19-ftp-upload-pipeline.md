@@ -682,11 +682,33 @@ Aus dem Vorfall vom 2026-09-26, verbindlich für jeden Prozess, der auf
 **Soll:**
 
 - SFTPGo läuft als eigener System-User, der auf `1002:webgroup` gemappt wird.
-- `ftp/<slug>` ist `1002:webgroup` mit `2777` (setgid), damit neue Dateien die
-  Gruppe erben.
+- `ftp/<slug>` ist `1002:webgroup` mit `2775` (setgid, Gruppe schreibbar, Welt
+  nicht schreibbar), damit neue Dateien die Gruppe erben. **Geändert 2026-09-28:**
+  vorher stand hier `2777`; das Welt-Schreibrecht ist entfallen, weil jeder
+  Prozess mit Schreibbedarf entweder Eigentümer oder in `webgroup` ist.
 - SFTPGo legt virtuelle Ordner **nicht** an (Doku: *"you have to create the
-  folder on disk yourself"*). Anlegen und Ownership-setzen ist ein
-  Host-seitiger Schritt, getrennt vom User-Provisioning (P1-M24).
+  folder on disk yourself"*). **Das Portal legt `ftp/<slug>` deshalb selbst an**
+  (D-2, `AGENTS.md` §14): `App\Support\FtpInboxDirectory::ensure()` läuft im
+  Slug-Schreibpfad **vor** dem Speichern. Schlägt die Anlage fehl, wird der Slug
+  **nicht** gespeichert und die Antwort nennt Pfad und Grund (fehlender Mount,
+  read-only, fehlende Rechte). Der Zustand „Slug gesetzt, Ordner fehlt" kann so
+  nicht entstehen — er sähe im Posteingang wie ein leerer Ordner aus, nicht wie
+  ein Fehler. `ftp:provision-folders` bleibt als Nachzieh- und Reparaturlauf für
+  Bestände; beide Pfade lesen den Modus aus derselben Konstante
+  (`FtpInboxDirectory::MODE`), damit der Reparaturlauf ein frisch angelegtes
+  Verzeichnis nicht still zurückstuft.
+- **Ownership ohne root:** Der Web-Prozess ist nicht root und chownt nichts
+  Fremdes. Die **Gruppe** erbt das neue Verzeichnis vom übergeordneten `ftp/`
+  über dessen **setgid**-Bit; das neue Verzeichnis trägt setgid weiter und gibt
+  es an spätere Uploads weiter, sodass der importierende Backend sie lesen und
+  löschen kann. Der **Eigentümer** ist die uid, unter der der Web-Prozess läuft —
+  deshalb muss der Prozess als uid des Baums laufen (D-1: `1002`).
+- **Slug-Wechsel A → B:** `ftp/B` wird angelegt, `ftp/A` bleibt **erhalten**.
+  Löschen wäre destruktiv — dort können noch nicht importierte Uploads liegen —
+  und der alte SFTPGo-Account ist bereits gelöscht, die Kamera lädt also nicht
+  mehr hinein. `AuthController::updateProfile()` schreibt beim Wechsel eine
+  Warnung mit dem Pfad des alten Ordners, damit der Owner ihn nach dem Import
+  bewusst aufräumt; stilles Löschen wäre der schlechtere Fehler.
 
 ### 7.10 Reihenfolge
 
@@ -710,7 +732,8 @@ viel Code darauf liegt.
 4. Formatregel für `ftp_slug` (P1-M21).
 5. `ftp_account_status`-Spalten (P1-M30).
 6. `SftpGoClient` + Passwort-Fluss (P1-M22, P1-M23, P1-M31).
-7. Ordner-Anlage auf dem Host (P1-M24).
+7. Ordner-Anlage (P1-M24, D-2): automatisch beim Setzen des Slugs; der
+   `ftp:provision-folders`-Lauf zieht Bestände nach und korrigiert Rechte.
 8. Firewall, Berechtigungen, Host-Umgebung (`strato-vps` 6e).
 9. **Cutover** nach §7.12 — inklusive Sicherung und Rollback-Fenster.
 10. Erst dann `pure-ftpd` stilllegen.

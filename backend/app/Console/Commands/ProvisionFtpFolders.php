@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Support\FtpInboxDirectory;
 use App\Support\FtpSlug;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Filesystem\Filesystem;
@@ -135,8 +136,10 @@ class ProvisionFtpFolders extends Command
             return;
         }
 
-        // 2775: rwxrwsr-x — group writable plus setgid, world not writable.
-        $desired = 02775;
+        // The same mode the slug write path uses (D-2), from one constant: two
+        // copies would let this repair run silently downgrade a directory the
+        // write path just created.
+        $desired = FtpInboxDirectory::MODE;
         if (($current & 07777) !== $desired) {
             @chmod($path, $desired);
             $this->line(sprintf('  mode %o -> %o on %s/', $current & 07777, $desired, $relative));
