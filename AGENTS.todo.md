@@ -5,13 +5,13 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **88 offene Positionen**
-> über 1837 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **86 offene Positionen**
+> über 1805 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **24**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **22**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
 >
@@ -246,44 +246,6 @@ unverändert gegenüber dem vorigen Deploy, Homepage **200**.
   Abbruchwege fragen nach, keiner verwirft mehr.
 - [ ] **Anlagefehler: 422 oder 500?** Die SFTPGo-Verzeichnis-Anlage schlägt auf zwei Wegen fehl
 
-- [ ] **PHP-8.5-Guard: `php artisan` stirbt an der falschen PHP-Version, nicht am Code.**
-  `backend/composer.json:12` verlangt `"php": "^8.5"`, und
-  `backend/vendor/composer/platform_check.php:7` erzwingt das mit
-  `if (!(PHP_VERSION_ID >= 80500))`. **Der Fehler trägt eine falsche Überschrift:** jeder
-  `php artisan`-Aufruf bricht dann mit `Composer detected issues in your platform` ab — einem
-  Fatal in `vendor/composer/autoload_real.php`, also genau dort, wo ein kaputtes `vendor/`
-  vermutet wird. `composer install` löst es nicht, es erzeugt den Fehler erst.
-  **Gemessen am 2026-09-28, zwei Wellen, und beide schlugen als Codefehler durch:**
-  1. `php` zeigte auf **8.4.25**. `scripts/e2e-up.sh` starb schon im Migrationsschritt, es kam
-     kein Backend auf 8001 hoch, und der Smoke-Lauf meldete **18 × `net::ERR_CONNECTION_REFUSED`**
-     — 18 Specs, die nicht defekt waren, sondern keinen Server fanden.
-  2. Mit laufendem Server, aber weiterhin falschem PHP, antwortete `/api/auth/login` mit
-     **HTTP 200 und einer HTML-Fehlerseite** (`Fatal error: Failed opening required
-     '/Applications/Herd.app/…/dump-loader.php'`). Die Tests meldeten daraufhin 44 Fehlschläge
-     mit `Admin login response did not contain an auth cookie` — ein Auth-Problem, das keines war.
-     **Ein 200 mit HTML-Body ist kein Erfolg**, und `loginRes.ok()` hat ihn passiert.
-  **Stand:** Die Umgebung ist inzwischen umgestellt — Herd ist entfernt, `php` ist
-  `/opt/homebrew/bin/php` (**8.5.11**), `auto_prepend_file` ist leer, und `backend/AGENTS.md`
-  beschreibt den Homebrew-Pfad (Commit `2214998`). **Offen bleibt der Guard selbst:** eine
-  Versionsprüfung **vor** `artisan`, die mit klarer Meldung abbricht statt mit einem
-  Composer-Fatal — sonst tritt derselbe Befund beim nächsten PHP-Wechsel erneut auf, und er
-  sieht dann wieder nach 18 kaputten Specs aus.
-- [ ] **Playwright startet seine Server nicht — ein toter Server sieht aus wie ein Testdefekt.**
-  `frontend/playwright.config.ts` hat **keine** `webServer`-Option; Frontend (4321) und E2E-
-  Backend (8001) laufen extern und nichts hält sie am Leben. Fällt einer davon aus, bekommt jeder
-  betroffene Spec `net::ERR_CONNECTION_REFUSED` statt einer klaren Ursache — im Smoke-Lauf waren
-  das 18 Fehlschläge, alle mit derselben, nicht mit dem jeweiligen Test zu tun habenden Ursache.
-  **Zu entscheiden und zu tun:** `webServer` mit `reuseExistingServer` setzen, damit Playwright
-  die Server **wartet** und den Start **verantwortet**. Das ist eine Entscheidung, weil es die
-  bestehende Handanleitung (`scripts/e2e-up.sh` im Vordergrund) mit einem Autostart überlagert —
-  beides parallel zu haben ist die eigentliche Falle.
-  und antwortet zweimal unterschiedlich: der Slug-Pfad gibt **500** (Serverzustand — fehlender
-  Mount, read-only, fehlende Rechte), der Reset-Endpunkt **422** (das ist dessen dokumentierte
-  Klasse für Portal-Voraussetzungen). Der umsetzende Agent hat den Controller bewusst nicht
-  angefasst, weil die Entscheidung nur „kein Konto ohne Ordner" verlangt hat und nicht den Code.
-  **Zu entscheiden:** ein Code für beide, oder zwei mit Begründung? Beides ist vertretbar —
-  wichtiger ist, dass es Absicht ist und nicht Zufall. Betrifft
-  `FtpCredentialController::fromCredentialException()`.
 - [ ] manuell prüfen: **Dialoghöhen und gepinnter Kopf per Screenshot** — `pnpm
   test:screenshots:grep "screenshot (gallery-access-dialog|gallery-photographer-team-dialog)"`,
   Ergebnis unter `frontend/test-results/ui-screenshots/filled/`. Prüfen: (a) Kopf und Suchfeld

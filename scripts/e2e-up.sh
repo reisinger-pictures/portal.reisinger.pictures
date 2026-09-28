@@ -7,6 +7,7 @@
 # von E2E-Tests unberührt bleibt.
 #
 # Ablauf (idempotent):
+#   0. PHP-Version gegen backend/composer.json prüfen (scripts/check-php-version.sh)
 #   1. Test-Services starten  (docker-compose.test.yml: Meili 7701 + SFTPGo Admin-API 18081)
 #   2. backend/.env.e2e generieren (aus backend/.env, Secrets werden übernommen)
 #   3. Eigene SQLite-DB anlegen + migrieren + seeden (env=e2e)
@@ -50,6 +51,15 @@ readonly E2E_SFTPGO_READY_TIMEOUT_SECONDS="${E2E_SFTPGO_READY_TIMEOUT_SECONDS:-6
 
 log()  { printf '[e2e-up] %s\n' "$*"; }
 fail() { printf '[e2e-up] FEHLER: %s\n' "$*" >&2; exit 1; }
+
+# --- 0. PHP-Version prüfen ----------------------------------------------------
+# Vor allem anderen, weil der Fehler sonst an einer Stelle auftaucht, an der
+# niemand nach PHP sucht: composer bricht in vendor/composer/autoload_real.php
+# ab, sobald eine Zeile `php artisan` läuft. Gemessen am 2026-09-28 starte
+# dieses Skript mit zu alter PHP nicht — es stirbt erst in Schritt 3, und der
+# Playwright-Lauf meldet daraufhin_connection_refused für Specs, die völlig
+# in Ordnung sind. Siehe scripts/check-php-version.sh.
+"$ROOT/scripts/check-php-version.sh" || fail "PHP-Voraussetzung nicht erfuellt (siehe Meldung oben)."
 
 # --- 1. Test-Services (Meili 7701) ------------------------------------------
 # Projektname bewusst NICHT gesetzt: docker-compose.test.yml definiert fixe
