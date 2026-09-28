@@ -38,10 +38,31 @@ return [
             'database' => env('DB_DATABASE', 'portal_db'),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
-            'transaction_mode' => 'DEFERRED',
+            // How long a writer waits for a held lock before failing. A null
+            // value leaves PHP's implicit default, which is 60000 ms on the
+            // PHP 8.5 build here — that is a minute-long stall, not "no wait".
+            // 5000 ms is bounded and comfortably exceeds a dev/E2E transaction,
+            // so a genuinely wedged writer fails within one request instead of
+            // hanging the run.
+            'busy_timeout' => env('DB_BUSY_TIMEOUT', 5000),
+            // WAL lets readers and one writer coexist, which is what a parallel
+            // E2E run against one file needs. WAL is persistent per file: an
+            // existing rollback-journal file is converted on first open, and a
+            // database already in WAL accepts the pragma again even with a live
+            // reader. Override with DELETE on filesystems without shared memory.
+            'journal_mode' => env('DB_JOURNAL_MODE', 'WAL'),
+            // NORMAL is the standard pairing for WAL: it is crash-safe (no
+            // corruption), only the most recent commits can be lost on power
+            // loss. The E2E database is rebuilt by `migrate:fresh` every run,
+            // so durability across a power cut is irrelevant here.
+            'synchronous' => env('DB_SYNCHRONOUS', 'NORMAL'),
+            // DEFERRED acquires the write lock lazily. A transaction that reads
+            // first and writes later then hits SQLITE_BUSY on the lock upgrade
+            // WITHOUT consulting the busy handler, so neither busy_timeout nor
+            // WAL can prevent "database is locked" — measured under contention.
+            // IMMEDIATE takes the write lock at BEGIN, where the busy handler
+            // does apply. Env-overridable for workloads that prefer DEFERRED.
+            'transaction_mode' => env('DB_TRANSACTION_MODE', 'IMMEDIATE'),
         ],
 
         'mysql' => [

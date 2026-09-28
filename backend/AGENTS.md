@@ -54,6 +54,8 @@ Ein bewusster Seed in Produktion bleibt möglich und ist dann die ausschließlic
 - Canonical Test-DB: SQLite `:memory:` (aus `phpunit.xml`).
 - `php artisan test --parallel` funktioniert out-of-the-box: jeder paratest-Worker-Prozess startet eine eigene, isolierte In-Memory-DB. Es existiert keine geteilte Instanz, auf der sich parallele Läufe gegenseitig zerstören können.
 
+**File-backed SQLite-Tuning (Dev + E2E):** Die vier Tuning-Keys der `sqlite`-Verbindung in `config/database.php` (`busy_timeout`, `journal_mode`, `synchronous`, `transaction_mode`, je per `DB_*`-Env übersteuerbar) wirken **nur auf dateibasierte DBs** — auf `:memory:` ist `journal_mode=WAL` still ein No-op und bleibt `memory`. Sie existieren für die lokale Dev-DB und die E2E-DB (`scripts/e2e-up.sh`). **Der eigentliche Fix gegen `database is locked` ist `transaction_mode=IMMEDIATE`:** eine `DEFERRED`-Transaktion, die erst liest und dann schreibt, bekommt beim Lock-Upgrade `SQLITE_BUSY`, ohne dass der Busy-Handler gefragt wird — dagegen helfen weder `busy_timeout` noch WAL. Abgesichert durch `tests/Unit/Support/SqliteConnectionTuningTest.php`.
+
 **KONKURRENZ-REGEL (STRICT, Subagenten):**
 
 - `RefreshDatabase` migriert die In-Memory-DB bei jedem PHPUnit-Prozessstart frisch. SQLite `:memory:` macht parallele Läufe von Natur aus isoliert — Kollisionen durch Tabellen-Drop auf einer geteilten DB sind ausgeschlossen.
