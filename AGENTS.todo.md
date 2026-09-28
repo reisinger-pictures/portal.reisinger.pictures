@@ -142,8 +142,19 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 - [ ] **D-13 — `maxWidth` auf `'2xl'` einschränken.**
 - [ ] **D-16 — technische Dokumentation der Stripe-Identifikatoren vervollständigen**; der
       rechtliche Teil bleibt eine benannte Lücke mit Owner.
-- [ ] **D-17 — Prompt-Injection-Policy und SMTP-Duplicate-Policy einzeln festlegen**; die
-      Queue-/Mail-/Worker-/Scheduler-Evidenz bleibt ein eigener Eintrag.
+- [ ] **D-17 — beide Policies einzeln entschieden, die Umsetzung steht aus.** Recherche abgeschlossen,
+      Entscheidung je **eine** Frage (nicht gebündelt, wie D-17 es verlangt). **SMTP:** beide Fenster
+      schließen — der Reset-/Aktivierungspfad, wo ein zweiter Klick per `updateOrInsert` den Token
+      überschreibt, den der Nutzer hält, und das Crashfenster in `ProcessModelLifecycle`, wo die Mail
+      eingereiht wird und `last_reminder_stage` erst danach gespeichert wird. **Prompt-Injection:**
+      das Risiko so festhalten, wie es ist, und den irreführenden Testnamen korrigieren — **keine**
+      Code- oder Modelländerung. *Erster Versuch zurückgenommen:* die erste Frage war auf Deutsch und
+      mit den Messwerten verstellt; die Antwort war „was ist das problem? english bitte" — die
+      Erklärung war zu dicht. **Merksatz für die nächste Frage: bei einer Policy zuerst sagen, was
+      das Problem in einer konkreten Handlung ist, dann messen.** Offen: `AIServicePromptInjectionTest`
+      umbenennen/umdokumentieren, die zwei prüfbaren Zusicherungen ergänzen (die drei Felder
+      verlassen ihren Block nie; der `detected_city`-Lookup bleibt lesend), und die Policy selbst in
+      `features/` festschreiben.
 - [x] **D-18 — `testId` auf beiden Shells; `ModelInviteDialog` ohne Wrapper.** Bei HEAD war das
       **halb umgesetzt, unter anderem Namen**: `boxTestId` auf `ModalShell`, seit `659a5a5`,
       und `ModelInviteDialog` nutzte es bereits. D-18 hat den Namen auf `testId` vereinheitlicht

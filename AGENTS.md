@@ -536,11 +536,46 @@ entscheiden".
   Lösch-/Anonymisierungsregeln sind fachliche DPO-/Rechtsfreigabe, und es gibt keinen DPO in
   Reichweite. `Privacy.tsx` enthält bereits einen technischen Teilabschnitt; ihn zu vervollständigen
   ist belegbar, den rechtlichen Teil zu erfinden nicht.
-- **D-17 — A7 Betriebs-Policies:** Prompt-Injection-Policy und SMTP-Duplicate-Policy werden
-  **einzeln** festgelegt, nicht gebündelt. *Warum:* sie betreffen zwei verschiedene Systeme mit
-  zwei verschiedenen Reviewern — das Modell auf der einen, die Mail-Zustellung auf der anderen
-  Seite. Die Queue-/Mail-/Worker-/Scheduler-Evidenz bleibt ein **eigener** Eintrag: das ist
-  Betriebsnachweis, nicht Policy.
+- **D-17 — Betriebs-Policies einzeln festgelegt.** Prompt-Injection und SMTP-Duplicate betreffen
+  zwei Systeme mit zwei Reviewern und werden deshalb **getrennt** entschieden, nicht gebündelt. Die
+  Queue-/Mail-/Worker-/Scheduler-Evidenz bleibt ein eigener Eintrag: das ist Betriebsnachweis, keine
+  Policy.
+  - **SMTP-Duplikate (entschieden):** die beiden Fenster schließen, die eine Nutzeraktion
+    **zerstören** oder eine Nachricht **senden**, obwohl der Zustand es schon erledigt hat. Erstens
+    der Reset-/Aktivierungspfad: `AuthController.php:113-116` und `UserController.php:121-124`
+    machen beide `updateOrInsert` auf `password_reset_tokens` — ein zweiter Klick **überschreibt den
+    Token, den der Nutzer in der Hand hält**, und die zweite Mail macht den Link der ersten tot.
+    Das ist die einzige Duplikatklasse mit dieser Folge. Zweitens das Crashfenster im Scheduler:
+    `ProcessModelLifecycle.php:114-121` reiht die Erinnerungsmail ein und speichert **erst danach**
+    `last_reminder_stage`, ohne Transaktionskopplung; ein Absturz dazwischen sendet am nächsten Tag
+    erneut. Beides wird in `InvoiceMailDispatcher` nachgebildet (Claim + Queue in **einer**
+    Transaktion). **Bewusst nicht gemacht:** kein flächendeckendes `ShouldBeUnique` über alle
+    Mails — gemessen kommt `ShouldBeUnique` und `uniqueId` im Repo **keinmal** vor, die Claims auf
+    Invoice, Dispute, Quote, Webhook, Scheduler und Vertragsabschluss sind getestet, und ein
+    beobachtetes Duplikat gibt es nicht. Die verbleibende Klasse (SMTP-Retry nach Transportfehler)
+    ist dokumentiert und bewusst akzeptiert: eine zusätzliche Kopie einer Rechnung, keine zweite
+    Belastung und kein zweiter Zustandswechsel.
+  - **Prompt-Injection (entschieden):** das Risiko **schriftlich festhalten, wie es wirklich
+    ist**, und den irreführenden Testnamen korrigieren — **keine** Code- oder Modelländerung. *Was
+    das Risiko ist:* jemand mit Metadatenrecht tippt Text in eines von drei Feldern
+    (`global_context`, `specific_context` je max 1000 Zeichen, `text_input` max 2000), der mit dem
+    Foto in den Prompt geht. Ein Modell kann die Grenze zwischen Daten und Anweisung verlieren
+    („Ignore previous instructions …") — die `<`/`>`-Maskierung hält das **nicht** auf, denn der
+    Angriff braucht kein solches Zeichen. *Wie begrenzt:* gemessen hat das Modell **keine** Tools,
+    **keine** Retrieval-Fähigkeit und **keine** Aktionsbefugnis; die Antwort sind fünf begrenzte
+    Metadatenfelder, und **nichts wird ohne menschlichen Klick gespeichert** (der einzige
+    serverseitige Aufrufer ist der Controller). Der trägende Schutz ist damit **menschliche
+    Prüfung**, nicht der Systemprompt. *Der eine echte, behebbare Mangel:*
+    `AIServicePromptInjectionTest` heißt wie ein Sicherheitstest, sagt in seinem eigenen Docblock
+    aber ausdrücklich, er prüfe „the request contract, not compliance by an external model" — er
+    belegt die Trennzeichen, **nicht** den Gehorsam des Modells. Wer ihn als Beleg zitiert, liegt
+    falsch; genau das wird korrigiert. *Neu zu behaupten sind nur die zwei prüfbaren Dinge:* die
+    drei Felder verlassen ihren Block nie, und der `detected_city`-Lookup bleibt lesend. **Was das
+    ausdrücklich nicht kauft:** Gehorsam des Modells. Der ist ohne Live-Provider nicht testbar,
+    und jeder Test, der das behauptet, misst sich selbst. *Nicht gemacht:* weder JSON-Block noch
+    getrennte Turns noch Ausgabefilterung — bei gemessener Reichweite und menschlicher Freigabe
+    trägt der Aufwand den Schaden nicht. *Randnotiz, kein Vektor:* Markenname, Galeriename, EXIF
+    und Dateiname gelangen **nicht** in den Prompt, und es gibt keinen OCR-Pfad.
 - **D-18 — `testId` als Prop auf `ModalShell` und `ModalDialogShell`:** die Schells
   nehmen einen optionalen `testId` an, damit kein Dialog einen Wrapper-`<div>` braucht, dessen
   einziger Zweck `data-testid` ist. *Warum:* `ModelInviteDialog` trug genau einen solchen Wrapper,
