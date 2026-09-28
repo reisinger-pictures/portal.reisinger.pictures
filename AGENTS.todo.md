@@ -59,7 +59,8 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       (§13: Restart ≠ Recreate, und `sync.sh` migriert nicht).
 - [ ] **D-2 — `ftp/<ftp_slug>` beim Setzen des Slugs anlegen; schlägt die Anlage fehl, schlägt
       das Setzen fehl.** Noch nicht begonnen.
-- [ ] **D-6 — `API_THROTTLE_LIMIT` in `.env.ci` auf 1000**, Kommentar in `.env.example`.
+- [ ] **D-6 — `API_THROTTLE_LIMIT` in `backend/.env.ci:40` auf 1000 anheben** (heute `=60`),
+      Kommentar in `backend/.env.example:41`.
       Zwei versionierte Dateien, kleinster offener Punkt hier.
 - [ ] **D-7 — `scripts/check-i18n.mjs` auf Satzebene erweitern.** Vor dem Abarbeiten der 246.
 - [ ] **D-8 — `frontend/tests/e2e/admin/` nach Domäne aufteilen.** Eigene Arbeit.
@@ -1434,7 +1435,8 @@ hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
 | strukturell nicht erfassbar | 2 | `AIGalleryDefaultsModal` (nur aus einem anderen Dialog heraus) und der globale Bestaetigungsdialog (programmatisch, kein `click`-Target) |
 | Roh-Dialoge ohne `ModalShell` | 11 | 6 mit `role="dialog"`, **5 ohne** — die brauchen ein `data-testid`, bevor `waitFor` sie ueberhaupt greifen kann |
 
-- [ ] **D-6 — `API_THROTTLE_LIMIT` in `.env.ci` auf 1000**, Kommentar in `.env.example`.
+- [ ] **D-6 — `API_THROTTLE_LIMIT` in `backend/.env.ci:40` auf 1000 anheben** (heute `=60`),
+  Kommentar in `backend/.env.example:41`.
   stehen weiter auf `API_THROTTLE_LIMIT=60`. CI fährt laut eigenem Kommentar
   4 Playwright-Worker und hat damit dasselbe Burst-Profil — die Drosselung ist
   dort latent, auch wenn sie bisher nicht als Fehler auffaellt. Entscheidung des
