@@ -66,7 +66,7 @@ braucht, nicht nach Schwere oder Familie.
 
 | Position | Was | Quelle |
 |---|---|---|
-| ~~FE-8~~ | **Erledigt** — `ModalShell`-Migration vollständig: 28/28 Nutzungsdateien (inkl. `UIProvider`; Beleg + Kommando in DOC-13 (c)) | unten |
+| ~~FE-8~~ | **Erledigt** — `ModalShell`-Migration vollständig: 28/28 Nutzungsdateien (inkl. `UIProvider`; Kommando in der ID-Übersicht unten) | unten |
 | ~~P1-M21~~ | **Erledigt** — `FtpSlug` + Validierung | FTP-Block |
 | ~~P1-M22~~ | **Erledigt** — `SftpGoClient` + `FtpCredentialService` | FTP-Block |
 | ~~P1-M23~~ | **Erledigt** — Passwort-Fluss | FTP-Block |
@@ -119,15 +119,19 @@ prüfen, dann anfassen:
    M21 → M22 → M23 → M30.
 4. **Cutover** (P1-M36) erst, wenn 1–3 stehen und M27 beantwortet ist.
 
-> **ID-Nennräume, am 2026-09-28 nachgemessen:** Die unter Position **DOC-13**
-> behaupteten Kollisionen sind **größtenteils erledigt**. Die `P1-M`-Kollision ist
-> aufgelöst — die dort formulierte Invariante ist leer, und `P1-M9a`/`P1-M9b` zeigen,
-> dass umnummeriert wurde. Von den fünf `DOC`-IDs ist keine doppelt, `DOC-7` kommt
-> gar nicht vor. `FE-2` ist keine Dublette (Index und Definition sagen beide „halb").
+> **ID-Nennräume, am 2026-09-28 nachgemessen:** Die früher behaupteten Kollisionen
+> sind **größtenteils erledigt**. Die `P1-M`-Kollision ist aufgelöst — die
+> Invariante ist leer:
+> `grep -oE "^- \[.\] \*\*P1-M[0-9]+" AGENTS.todo.md | grep -oE "P1-M[0-9]+" | sort | uniq -d`
+> (`P1-M9a`/`P1-M9b` zeigen, dass umnummeriert wurde). Von den fünf `DOC`-IDs ist
+> keine doppelt, `DOC-7` kommt gar nicht vor. `FE-2` ist keine Dublette (Index und
+> Definition sagen beide „halb").
 > **Aufgelöst am 2026-09-28:** Die letzte offene Doppelnennung ist beseitigt —
 > `FE-8` stand in der Übersicht als *erledigt* und im Arbeitsplan als offener
 > Brocken; der Arbeitsplan führt es nicht mehr als offene Arbeit, und die
-> Übersichtszeile trägt den nachgemessenen Stand (28/28, Beleg in DOC-13 (c)).
+> Übersichtszeile trägt den nachgemessenen Stand (28/28):
+> `grep -rnE '<(ModalShell|ModalDialogShell)' frontend/src | grep -v __tests__ | grep -v ModalDialogShell.tsx | awk -F: '{print $1}' | sort -u | wc -l`
+> gibt **28** aus (die globale Bestätigung `UIProvider.tsx` zählt mit).
 
 ---
 
@@ -322,7 +326,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   ist der Test — er ist **kein** PHPUnit-Fall, sondern ein Skript mit
   Playwright-Tag `@feature:ftp-transport`, damit er getrennt ausführbar ist und
   nicht den Smoke-Lauf blockiert.
-- [~] wartet auf den Abschluss von DOC-13: die Einstiegs-Tabelle oben führt P1-M30 als erledigt (Migration V041), dieser Eintrag als offen. Erst den Doppel-ID-Konflikt auflösen, dann entscheiden. **P1-M30 (P0) — Spalte für den Provisionierungsstatus auf `users`.**
+- [~] wartet auf die Umsetzung des `reconcileAccount()`-Pfads. Die frühere Blockade durch den Doppel-ID-Konflikt ist entfallen (die `P1-M`-Invariante ist leer, Kommando in der ID-Übersicht oben); den Spaltenteil, den die Einstiegs-Übersicht zu Recht als erledigt führt, hat V041 geliefert und getestet — `php artisan test --filter='FtpAccountStatusMigrationTest|FtpProvisioningStatusTest'` ergibt **16 passed (70 assertions)**. Offen ist allein die Reconciliation, die `features/infrastructure/19-ftp-upload-pipeline.md` §7.16 ausdrücklich führt: „`reconcileAccount()` (P1-M30) ist der vorgesehene Weg und bleibt offen". **P1-M30 (P0) — Spalte für den Provisionierungsstatus auf `users`.**
   **Festgelegt am 2026-09-26:** die Source of Truth ist eine Spalte, **kein**
   Live-Query gegen SFTPGo. Begründung: `FtpController::status()` (`:21-39`)
   ist ein Endpoint für den Fotografen; ein Live-Query würde die UI vom Dienst
@@ -1400,25 +1404,6 @@ Produktionsfehler verkauft worden waere.
   Dialog-Component nicht auffindbar, `Geburtsdatum` liegt in
   `CustomerModal.tsx:117` und `ManagementContractView.tsx:494` als natives
   Date-Input, die Quelle des gerenderten Werts blieb offen.
-- [ ] **Architektur-Follow-up: der Footer liegt in der Scroll-Region — Problem
-  ist `ModalShell`, nicht der Einzelfall.** Aus zwei unabhaengigen Befunden
-  bestaetigt: `gallery-edit-dialog` („Speichern" unterhalb der Falz) und
-  `ModelDetailModal` (Footer scrollt mit dem Inhalt weg). Ursache: `ModalShell`
-  legt die Scroll-Region auf `.modal-box`, und daisyUI setzt darauf
-  `max-height:100vh; overflow-y:auto`; der Footer wird **darin** gerendert. Ein
-  `flex-1 overflow-y-auto`-Body kann zudem durch das unklassierte `<form>`
-  nicht schrumpfen. Das betrifft **alle Formular-Dialoge**, nicht nur die zwei
-  gefundenen. Zusaetzlich nimmt `ModalDialogShell` **kein** `boxClassName` an und
-  reicht es nicht durch, obwohl `ModalShell` es kann — der bounded-height-Pfad
-  ist ueber die geteilte Shell also gar nicht erreichbar.
-  **Entschieden: jetzt nicht.** Die Aenderung beruehrt 18 Dialog-Oberflaechen
-  und gehoert in eine eigene, gepruefte Arbeit statt als Schlussstueck in eine
-  UI-Bug-Runde. `GalleryModal` traegt deshalb vorerst einen lokalen Fix (eigenes
-  `<form>` + Submit-Zeile, `boxClassName="max-h-90vh flex flex-col"`, an drei
-  Viewports gemessen verifiziert). Das ist **Duplikation mit Vorbehalt**, nicht
-  Absicht: sie entfaellt, sobald `ModalDialogShell` `boxClassName` durchreicht
-  und einen Klassen-Hook fuer das `<form>` anbietet. Dann wandert `GalleryModal`
-  zurueck auf die geteilte Shell.
 
 **Umsetzung 2026-09-27 (alle gegen frische Aufnahmen verifiziert):**
 - [~] wartet auf eine andere Spaltenlogik (`table-layout: fixed` mit `word-break` auf dem Wert). `break-all` verschiebt nur die Bruchstelle und ist damit keine Lösung. **Nicht behoben, ehrlich als offen gefuehrt: Mid-Token-Bruch in der
@@ -1611,14 +1596,7 @@ gerissen und zur Entscheidung gemacht.
   Union meldet `tsc` `TS2322`, **ohne** Union schluckt `tsc` `"lg"` kommentarlos.
   Dieser Teil haengt **ausschliesslich** an `tsc -b --force` im Build-Gate. Wenn
   jemand `tsc -b` ohne `--force` fahren laesst, ist genau diese Haelfte ungesichert.
-- [ ] **Was `ModalShell` fuer die drei blockierten Dialoge braucht** (nicht Teil
-  dieser Aufgabe; die Datei gehoert einem abgeschlossenen Agenten): eine Region
-  **zwischen** Kopf und begrenztem Body, in die der Aufrufer festen Inhalt legt
-  (`bodyHead`/`pinned`-Slot), plus eine Moeglichkeit, eine engere Hoehe als
-  90vh zu benennen, ohne zwei konkurrierende `max-h`-Utilities (z. B. dass das
-  Opt-in eine Hoehe entgegennimmt oder der 90vh-Deckel ueberschreibbar wird).
-  Damit wandern alle drei auf `bodyClassName` fuer Rahmen und Hintergrund der
-  Liste.
+- [ ] Entscheidung offen: **`ModalShell` braucht eine Region zwischen Kopf und begrenztem Body** (`bodyHead`/`pinned`-Slot) plus eine benannte Höhe unter 90vh, damit die zwei 80vh-Dialoge keine konkurrierenden `max-h`-Utilities stapeln. **Der Footer-Scroll-Befund selbst ist erledigt** (`4474444`, `659a5a5`, verifiziert per Screenshot auf Desktop und Mobile) — offen ist nur die Architekturfrage, und sie ist bewusst zurückgestellt worden: (1) die drei betroffenen Dialoge `GalleryAccessModal`, `PhotographerTeamModal` und `AIBatchEditModal` pinnen Kopf und Footer **bereits selbst** (jeder mit einem Kommentar, der `scrollableBody` bewusst ablehnt) — es wäre also ein Refactor, kein Fix; (2) ein unbenutzter Slot in einer Komponente mit 28 Aufrufstellen verstößt gegen die No-Dead-Code-Haltung des Repos; (3) `features/tech/08-dialog-height-contract.md` §3/§6.3 führt die drei als akzeptierte Teilmenge. **Wer entscheidet:** Zieltaxonomie des Slots und ob die drei Dialoge migriert werden. `ModalShell.tsx:171` setzt derzeit fest `max-h-90vh`.
 - [~] wartet auf ein späteres Aufräumen der Stack-Env — der Wert hat keinen Secret-Bezug, wird aber über die Ports-Liste geführt. **`SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN`** ist im Compose ein
   Container-Wert ohne Secret-Bezug, wird aber über die Ports-Liste geführt; bei
   einem späteren Aufräumen prüfen, ob es in die Stack-Env gehört.
