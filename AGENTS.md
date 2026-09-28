@@ -197,7 +197,22 @@ führt keine Migration aus. Deshalb gilt:
   wie ein inkonsistenter Zustand, nicht wie ein Caching-Problem. Wer den
   Neustart weglaesst, debuggt einen Fehler, den es nicht gibt.
 - **Frontend-Sync braucht keinen Neustart.** `dist/` ist statisch, der
-  Webserver liest pro Request neu.
+  Webserver liest pro Request neu. Er braucht aber einen **aktuellen**
+  Bundle — siehe die Frische-Regel unten.
+- **Vor jedem Sync mit Frontend-Änderungen: `pnpm lint:fix && pnpm build`.**
+  `sync.sh` baut nicht selbst; es überträgt ein **vorgebautes** `dist/`.
+  Ein `dist/`, das älter ist als der letzte Frontend-Commit, wird
+  kommentarlos übertragen — und der Deploy ist dann erfolgreich, trägt aber
+  den alten Stand. **Belege vom 2026-09-28:** `dist/index.html` war von
+  18:58, die sechs Frontend-Commits kamen um 19:17/19:18. Die Dialog-Welle
+  und die Layout-Korrekturen waren nicht im Bundle.
+- **Ein Bundle-Hash-Vergleich beweist Übertragung, nicht Frische.** Host und
+  lokal tragen denselben Dateinamen, solange beide veraltet sind — der
+  Vergleich sagt dann „identisch" und meint „beide alt". Er ist als
+  Integritätsnachweis tauglich und als Freshness-Nachweis wertlos. Für
+  Frische zählt die Reihenfolge: **Commit-Zeitstempel des letzten
+  Frontend-Commits gegen `mtime` von `dist/index.html`.** Ist das `dist/`
+  jünger, ist der Bundle aktuell.
 - **Migrationen laufen nicht mit.** `sync.sh` ist kein Deploy im Sinne von
   `migrate --force && db:seed --force`. Wer eine Migration braucht, macht
   sie bewusst und getrennt — und seedet danach, wie `backend/AGENTS.md`
