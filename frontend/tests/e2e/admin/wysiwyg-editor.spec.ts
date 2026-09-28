@@ -37,6 +37,14 @@ test.describe('WYSIWYG-Editor', () => {
         await editor.press('End');
         await editor.press('Enter');
         await page.getByRole('button', { name: 'Nummerierte Liste' }).click();
+        // Verify the list command applied BEFORE typing. The toolbar button
+        // reflects `editor.isActive('orderedList')` via `useEditorState`
+        // (WysiwygEditor.tsx:303) and only flips to `btn-neutral` once the
+        // command's transaction has landed — the same reactive pattern the
+        // "Fett" assertion above relies on. Without this check a dropped
+        // toolbar command surfaces one assertion later as a wrong `ol li`
+        // count, indistinguishable from genuinely wrong content.
+        await expect(page.getByRole('button', { name: 'Nummerierte Liste' })).toHaveClass(/btn-neutral/);
         await editor.pressSequentially('Punkt eins');
         await editor.press('Enter');
         await editor.pressSequentially('Punkt zwei');

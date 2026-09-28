@@ -476,6 +476,44 @@ PHP;
     }
 
     /**
+     * The isolated local E2E backend runs every Playwright worker on
+     * 127.0.0.1, so the per-IP checkout limiter bucket (CheckoutKey::ip()) is
+     * shared by the whole run. With the production defaults in
+     * config/app.php (5/user-hour, 10/IP-hour, 30/IP-day) a full parallel run
+     * exhausts that one budget and checkouts fail with "Too Many Attempts" —
+     * green serially and in CI, red from roughly eight workers.
+     *
+     * CI carries the same three overrides in backend/.env.ci under
+     * "Checkout E2E workers share localhost". The local harness must keep
+     * all three, so assert the constant and every key that resolves to it.
+     */
+    public function test_isolated_e2e_backend_relaxes_every_checkout_throttle(): void
+    {
+        $script = $this->read('scripts/e2e-up.sh');
+
+        $this->assertMatchesRegularExpression(
+            '/^readonly E2E_CHECKOUT_LIMIT=1000$/m',
+            $script,
+            'scripts/e2e-up.sh must define E2E_CHECKOUT_LIMIT=1000; the three checkout throttles below resolve to it'
+        );
+
+        foreach ([
+            'CHECKOUT_THROTTLE_USER_PER_HOUR',
+            'CHECKOUT_THROTTLE_IP_PER_HOUR',
+            'CHECKOUT_THROTTLE_IP_PER_DAY',
+        ] as $key) {
+            // Anchored to the start of a line: a commented-out or otherwise
+            // prefixed `set_env` must not satisfy the gate.
+            $this->assertMatchesRegularExpression(
+                '/^set_env '.preg_quote($key, '/').' "\$E2E_CHECKOUT_LIMIT"$/m',
+                $script,
+                "scripts/e2e-up.sh must set {$key} to the relaxed E2E limit; every local worker shares "
+                    .'the per-IP bucket, so the production default would fail a parallel run'
+            );
+        }
+    }
+
+    /**
      * Raw YAML of a single top-level CI job. Job keys sit at two-space
      * indentation under `jobs:`, so the next key on that level closes the
      * block without needing a YAML parser.
