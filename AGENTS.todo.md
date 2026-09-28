@@ -1209,6 +1209,23 @@ getrennt.
 
 ---
 
+- [ ] manuell prüfen: **V046 ausdeployen** — `gallery_groups.slug` wird von global
+  unique auf unique per `(brand, slug)` umgestellt (Migration
+  `V046__gallery_group_slug_unique_per_brand.php`, Frontier und Zustand ausschließlich
+  in `features/tech/07-architectural-decisions.md` AD-2). **Aus drei Gründen Handarbeit
+  und nicht automatisiert:** (1) `sync.sh` führt keine Migration aus (§13), der Deploy
+  überträgt nur Code; (2) die Migration ist **nie auf MySQL/MariaDB gelaufen** — lokal
+  war kein Server verfügbar, verifiziert wurden Index-Form, `up`, `down`, erneutes
+  Anwenden und beide Preflight-Fehler ausschließlich auf SQLite gegen eine befüllte
+  Kopie; (3) sie verändert die Eindeutigkeitsbedingung einer Live-Tabelle, und
+  `down()` verweigert das Zurückrollen, sobald zwei Marken einen Slug teilen — dieser
+  Zustand ist mit `UNIQUE(slug)` nicht darstellbar. **Vor dem Deploy:** `docker exec
+  portal_backend php artisan migrate:status` (Soll aktuell 45 `Ran`, 0 `Pending`, V046
+  `Pending`) und ein Backup, weil `up()` bei Kollisionen abweist statt aufzulösen.
+  **Danach:** `brand`-Spalte auf NULL prüfen — `(brand, slug)` erfasst NULL-Marken nicht,
+  und die alte globale Eindeutigkeit entfällt mit; die Migration lässt solche Zeilen
+  bewusst unangetastet.
+
 ## 🟡 OFFEN (Future) — pricing_strategy als Brand-Setting
 
 - [ ] `pricing_strategy` je Brand im Admin-UI editierbar machen (DB-Overlay am Choke-Point `BrandRegistry::buildFromArray()`). Langfristige Arbeit, kein Blocker: laut `features/infrastructure/17-pricing-strategy-pattern.md` §5 („Presets and legacy settings") ist der Editor heute **nicht** Teil der Brand-Settings-Overlay-Whitelist — bis dahin bleiben DB-Setting und Galerie-Felder die autoritativen Stellschrauben.
