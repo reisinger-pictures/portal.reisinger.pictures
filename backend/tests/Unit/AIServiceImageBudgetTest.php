@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Exceptions\AIImageProcessingException;
 use App\Models\Photo;
 use App\Services\AIService;
+use App\Support\TempDirectory;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -16,9 +17,10 @@ class AIServiceImageBudgetTest extends TestCase
      *
      * AIService derives its temp prefix from `services.ai.temporary_prefix`, so
      * the "no temporary file left behind" assertions below observe exactly the
-     * files this invocation can create. sys_get_temp_dir() is global to the
-     * host: a sibling paratest worker's in-flight file in the production
-     * namespace is otherwise indistinguishable from a leak of this test.
+     * files this invocation can create. The AI temp directory is shared by
+     * every paratest worker of this class: a sibling worker's in-flight file in
+     * the production namespace is otherwise indistinguishable from a leak of
+     * this test.
      *
      * The namespace is longer than the six random characters tempnam() appends
      * to the default prefix, so the two namespaces are disjoint by structure
@@ -200,9 +202,10 @@ class AIServiceImageBudgetTest extends TestCase
         $before = $this->temporaryImageFiles();
         $photo = $this->storePhoto(str_repeat('x', AIService::MAX_IMAGE_BYTES + 1));
 
-        // A sibling paratest worker creates its temporary file in the shared
-        // system temp directory *inside* this test's observation window. That is
-        // exactly the race that used to make the leak assertion fail.
+        // Stands in for a sibling paratest worker's in-flight file in the
+        // shared, host-global system temp directory — the namespace a global
+        // glob scans, and exactly the race that used to make the leak
+        // assertion fail.
         $foreign = tempnam(sys_get_temp_dir(), AIService::DEFAULT_TEMPORARY_PREFIX);
         $this->assertIsString($foreign);
 
@@ -255,16 +258,25 @@ class AIServiceImageBudgetTest extends TestCase
     /**
      * Snapshot of the temporary files this invocation's namespace can hold.
      *
-     * Scoped to the pinned namespace on purpose: a global
-     * `glob(sys_get_temp_dir().'/ai_img_*')` also matches files that a
-     * concurrent worker is writing right now, which is what made these
-     * assertions fail intermittently under `--parallel`.
+     * The directory is resolved through App\Support\TempDirectory, the same
+     * resolver AIService uses, so the assertion observes where the service
+     * really writes. It must not be moved back to sys_get_temp_dir(): the
+     * service stopped writing there in 2b60b69 and only falls back to it when
+     * the app temp directory cannot be created, so a system-temp glob is blind
+     * to a real leak, and these assertions were green while observing nothing.
+     *
+     * Scoped to the pinned namespace on purpose. The AI temp directory is
+     * shared by every parallel paratest worker of this class, and this test's
+     * prefix is regenerated per process (`ai_img_u<random>_`), so only files
+     * this invocation could have created match. Widening the glob back to
+     * `TempDirectory::path('ai').'/*'` reintroduces the defect fixed in
+     * 7be1abd: a sibling worker's in-flight file reads as this test's leak.
      *
      * @return array<int, string>
      */
     private function temporaryImageFiles(): array
     {
-        $files = glob(sys_get_temp_dir().DIRECTORY_SEPARATOR.$this->temporaryPrefix.'*');
+        $files = glob(TempDirectory::path('ai').DIRECTORY_SEPARATOR.$this->temporaryPrefix.'*');
 
         return $files === false ? [] : $files;
     }
