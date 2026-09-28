@@ -5,15 +5,21 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **87 offene Positionen**
-> über 1812 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **88 offene Positionen**
+> über 1837 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **23**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **24**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
+>
+> **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
+> Entscheidungen liegen in `AGENTS.md` §14, ihr Umsetzungsstand im Protokoll ganz oben.
+> Die letzte offene Entscheidung war D-12 (Initial-Fokus) und ist am selben Tag entschieden
+> worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
+> entstanden ist — nicht, dass eine vergessene offen blieb.
 >
 > **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
 > Entscheidungen liegen in `AGENTS.md` §14, ihr Umsetzungsstand im Protokoll ganz oben.
@@ -239,6 +245,38 @@ unverändert gegenüber dem vorigen Deploy, Homepage **200**.
   und getippte Eingabe konnte still verworfen werden. Worauf es ankommt: beide
   Abbruchwege fragen nach, keiner verwirft mehr.
 - [ ] **Anlagefehler: 422 oder 500?** Die SFTPGo-Verzeichnis-Anlage schlägt auf zwei Wegen fehl
+
+- [ ] **PHP-8.5-Guard: `php artisan` stirbt an der falschen PHP-Version, nicht am Code.**
+  `backend/composer.json:12` verlangt `"php": "^8.5"`, und
+  `backend/vendor/composer/platform_check.php:7` erzwingt das mit
+  `if (!(PHP_VERSION_ID >= 80500))`. **Der Fehler trägt eine falsche Überschrift:** jeder
+  `php artisan`-Aufruf bricht dann mit `Composer detected issues in your platform` ab — einem
+  Fatal in `vendor/composer/autoload_real.php`, also genau dort, wo ein kaputtes `vendor/`
+  vermutet wird. `composer install` löst es nicht, es erzeugt den Fehler erst.
+  **Gemessen am 2026-09-28, zwei Wellen, und beide schlugen als Codefehler durch:**
+  1. `php` zeigte auf **8.4.25**. `scripts/e2e-up.sh` starb schon im Migrationsschritt, es kam
+     kein Backend auf 8001 hoch, und der Smoke-Lauf meldete **18 × `net::ERR_CONNECTION_REFUSED`**
+     — 18 Specs, die nicht defekt waren, sondern keinen Server fanden.
+  2. Mit laufendem Server, aber weiterhin falschem PHP, antwortete `/api/auth/login` mit
+     **HTTP 200 und einer HTML-Fehlerseite** (`Fatal error: Failed opening required
+     '/Applications/Herd.app/…/dump-loader.php'`). Die Tests meldeten daraufhin 44 Fehlschläge
+     mit `Admin login response did not contain an auth cookie` — ein Auth-Problem, das keines war.
+     **Ein 200 mit HTML-Body ist kein Erfolg**, und `loginRes.ok()` hat ihn passiert.
+  **Stand:** Die Umgebung ist inzwischen umgestellt — Herd ist entfernt, `php` ist
+  `/opt/homebrew/bin/php` (**8.5.11**), `auto_prepend_file` ist leer, und `backend/AGENTS.md`
+  beschreibt den Homebrew-Pfad (Commit `2214998`). **Offen bleibt der Guard selbst:** eine
+  Versionsprüfung **vor** `artisan`, die mit klarer Meldung abbricht statt mit einem
+  Composer-Fatal — sonst tritt derselbe Befund beim nächsten PHP-Wechsel erneut auf, und er
+  sieht dann wieder nach 18 kaputten Specs aus.
+- [ ] **Playwright startet seine Server nicht — ein toter Server sieht aus wie ein Testdefekt.**
+  `frontend/playwright.config.ts` hat **keine** `webServer`-Option; Frontend (4321) und E2E-
+  Backend (8001) laufen extern und nichts hält sie am Leben. Fällt einer davon aus, bekommt jeder
+  betroffene Spec `net::ERR_CONNECTION_REFUSED` statt einer klaren Ursache — im Smoke-Lauf waren
+  das 18 Fehlschläge, alle mit derselben, nicht mit dem jeweiligen Test zu tun habenden Ursache.
+  **Zu entscheiden und zu tun:** `webServer` mit `reuseExistingServer` setzen, damit Playwright
+  die Server **wartet** und den Start **verantwortet**. Das ist eine Entscheidung, weil es die
+  bestehende Handanleitung (`scripts/e2e-up.sh` im Vordergrund) mit einem Autostart überlagert —
+  beides parallel zu haben ist die eigentliche Falle.
   und antwortet zweimal unterschiedlich: der Slug-Pfad gibt **500** (Serverzustand — fehlender
   Mount, read-only, fehlende Rechte), der Reset-Endpunkt **422** (das ist dessen dokumentierte
   Klasse für Portal-Voraussetzungen). Der umsetzende Agent hat den Controller bewusst nicht
@@ -446,30 +484,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   `Str::random` + Prüfschleife) und dafür, dass im Request-Log/Response
   nach dem Show-once **kein** Klartext mehr auftaucht; Playwright-E2E für
   Anzeige und Reset.
-- [ ] **D-2 — `ftp/<ftp_slug>` beim Setzen des Slugs anlegen; schlägt die Anlage fehl, schlägt das Setzen fehl.**
-  SFTPGo-Doku: *"Virtual folder auto creation on user add/update … you have
-  to create the folder on disk yourself"* — SFTPGo legt nichts an. Der Ordner
-  `ftp/<ftp_slug>` muss auf dem Host existieren, mit `1002:webgroup` und
-  **`2775`** — Gruppe schreibbar, Welt nicht; **nicht** `2777` (durch D-2 ersetzt) und
-  **nicht** `2755` (d damit kann UID 1000 weder anlegen noch `unlink`en) —
-  **bevor** oder im selben Schritt wie der User.
-  **Designprinzip (2026-09-26):** Jeder User bekommt einen eigenen physischen
-  Ordner auf dem Host, auf den er eingeschränkt ist. SFTPGo konfiguriert das
-  als `home_dir` — der User sieht nur sein eigenes Verzeichnis, nicht die
-  anderer User. Kein gemeinsamer `r1`-User mehr. Die Kamera konfiguriert `/`
-  als Subpath und lädt direkt in das Home-Verzeichnis. **Die GUI-Auswahl des
-  Subfolders entfällt.**
-  **Zu entscheiden:** Wer macht das? Ein kleines Script auf dem Host, das die
-  Applikation aufruft, oder ein Admin-Schritt. **Wichtig:** Das ist exakt
-  die Stelle, an der der Ownership-Vorfall vom 2026-09-26 wieder passieren
-  kann (38.969 Dateien umgeschrieben, weil ein Entrypoint `chown -R` auf den
-  gemappten Website-Baum lief). **Verboten:** `chown -R` durch
-  Container-Entrypoints auf `/home/webadmin/websites`, und `adduser -h` auf
-  bestehende Pfade.
-  **Tests:** Shell-Test für das Script (existierender Ordner, falscher Owner,
-  setgid-Bit) plus PHPUnit, dass ein nicht zugänglicher Ordner zu einem
-  verständlichen Fehler führt und der User-Status im Portal als
-  „wartet auf Ordner" geführt wird.
 - [~] wartet auf die Host-Bindings 2222/989/50000-50100 — ohne sie antwortet im Container nichts, und jedes Messergebnis ist ein Fehlschluss (5 Ursachen, siehe M46). **P1-M35 (P0, neu 2026-09-26) — Testinfrastruktur für den
   Datei-Transport aufbauen; Config-Weg und Cipher-Frage fallen dabei ab.**
   **Neu gefasst 2026-09-26:** Das ist **kein Messskript-Problem**, sondern ein
