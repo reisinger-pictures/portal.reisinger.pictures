@@ -5,6 +5,25 @@ services:
     image: mariadb:11.4
     container_name: portal_db
     restart: unless-stopped
+    # PITR statt 24h-Datenverlust. log_bin war OFF, damit gab es keine
+    # Binlogs und bei einem Desaster nur den Tages-Dump -> groesster
+    # moeglicher Verlust 24 Stunden. Am 2026-09-28 verifiziert:
+    # log_bin=ON, binlog_format=ROW, binlog_expire_logs_seconds=604800.
+    #   ROW ist hier richtig: zeilenbasiert, damit ein Replay determinis-
+    #   tisch ist und nicht von Tabellenscan-Reihenfolge abhaengt.
+    #   7 Tage Aufbewahrung lokal; die Sicherung der Binlogs uebernimmt
+    #   das Backup, sonst waeren sie nach 7 Tagen weg.
+    # ACHTUNG 1: log_bin ist ein Startparameter -> erfordert Recreate des
+    # db-Dienstes, nicht nur Restart.
+    # ACHTUNG 2: Diese Datei ist die Quelle, aber sie laeuft nicht direkt.
+    # Portainer haelt eine eigene Kopie in portainer.db, und ein Stack-Update
+    # ueber die Portainer-UI deployt von dort — es wuerde diese Einstellung
+    # also wieder entfernen. Nach jeder Aenderung an dieser Datei den Stack 23
+    # in Portainer aktualisieren und den db-Dienst recreaten.
+    command:
+      - --log-bin=mariadb-bin
+      - --binlog-format=ROW
+      - --binlog-expire-logs-seconds=604800
     logging:
       driver: "json-file"
       options:
