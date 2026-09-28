@@ -1053,7 +1053,25 @@ getrennt.
 **Backend (PHPUnit) — implementiert & verifiziert**
 **Frontend (Vitest + Playwright) — implementiert & verifiziert**
 **Offen (User-Entscheidungen / Nachträge)**
-- [ ] Lokale E2E-Flakiness `database is locked` (SQLite `busy_timeout=null`) → Workaround `--workers=1`; Fix wäre `busy_timeout`/WAL (Backend)
+- [ ] Lokale E2E-Flakiness `database is locked`: **die im Board genannte Ursache ist
+  widerlegt.** Nicht `busy_timeout=null` — `pdo_sqlite` setzt implizit **60000 ms**,
+  und mit der alten Konfiguration wartete ein blockierter Writer gemessene **471 ms
+  und gelangte**; ein einminütiger Stall ist der tatsächliche Default, kein sofortiges
+  Scheitern. Die reproduzierbare Ursache ist `transaction_mode => 'DEFERRED'`: eine
+  Transaktion, die erst liest und später schreibt, bekommt beim Lock-Upgrade
+  `SQLITE_BUSY`, **ohne den Busy-Handler zu fragen** — dagegen helfen weder
+  `busy_timeout` noch WAL. Gemessen 16 Läufe je Kombination: DEFERRED scheitert in
+  jedem, IMMEDIATE in keinem, in beiden Journal-Modi. `IMMEDIATE` nimmt den
+  Write-Lock bei `BEGIN`, wo der Busy-Handler greift. **Fix committed** (`3a1c102`,
+  zusätzlich WAL und `busy_timeout=5000`), abgesichert durch
+  `backend/tests/Unit/Support/SqliteConnectionTuningTest.php` (3 Tests,
+  9 Assertions, revert-to-red gezeigt). **Workaround `--workers=1` bleibt**, weil die
+  volle Playwright-Flakiness nicht reproduziert wurde — das ist der einzige noch
+  offene Teil dieser Position: reproduzieren und entscheiden, ob der Workaround
+  entfallen kann. Der E2E-Backend ist ein single-threaded `php artisan serve`, also
+  erzeugen parallele Worker für sich allein keine DB-Konkurrenz; der wahrscheinlichere
+  Auslöser ist ein zweiter Prozess auf der geteilten Datei (die in `AGENTS.md` §5.7
+  beschriebene `migrate`-Kollision), den die Konfiguration nicht sicher macht.
 - Hinweis (Setup): lokale `backend/.env` braucht `MODEL_REGISTRATION_THROTTLE_LIMIT=1000` (Parität zu `.env.ci`), sonst 429-Flakes im E2E-Grep-Lauf. `.env` ist gitignored.
 
 **Future (nur TODO, nicht umsetzen)**
@@ -1388,11 +1406,6 @@ Produktionsfehler verkauft worden waere.
 | `volume-preset`: `€` ist Flex-Geschwister statt Feld-Suffix, Input dadurch schief | low | gemeldet |
 | `mm/dd/yyyy` im nativen Datumsfeld | medium | **WIDERLEGT — Harness-Artefakt**, siehe unten |
 
-- [ ] **Ausrichtung: dritte Instanz desselben Musters.** „Hinzufügen" in
-  `gallery-access-dialog` zentriert gegen den Name/E-Mail-Block statt auf der
-  Namenszeile — exakt die Form, die als erster Befund dieser Runde gemeldet und
-  daraufhin in der `ui-review`-Checkliste verankert wurde. Sie greift zum
-  wiederholten Mal; der Fix gehoert in die Komponente, nicht in die Checkliste.
 - [ ] manuell prüfen: am echten Gerät nachsehen: scrollen die Dialoge überhaupt (macOS überlagert Scrollbars, im Snapshot nicht sichtbar), ist `€` als Suffix gemeint, und wie groß sind die Tap-Targets der Kalkulator-Checkboxen? Davon hängt ab, ob die harten Schnitte UX-Bruch oder Snapshot-Artefakt sind. **Ungeprueft geblieben** (ausdruecklich als `unsicher` gemeldet, nicht
   uebernommen): ob die Dialoge ueberhaupt scrollen (macOS ueberlagert
   Scrollbars, im Snapshot nicht sichtbar) — davon haengt ab, ob die harten
