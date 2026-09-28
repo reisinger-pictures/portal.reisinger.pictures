@@ -316,7 +316,7 @@ describe('ModalShell', () => {
      * element purely because the shell exposed no way to place one, and eight
      * E2E assertions scope through that id. Both properties matter and they pull
      * in opposite directions: the id has to end up on the box (otherwise the
-     * wrapper stays and the hole is only papered over), and the eighteen
+     * wrapper stays and the hole is only papered over), and the 28
      * dialogs that ask for nothing must not grow an attribute they never had.
      */
     it('puts a caller-supplied testid on the modal-box itself', () => {
@@ -336,7 +336,7 @@ describe('ModalShell', () => {
 
     it('renders no testid at all when none is asked for', () => {
         // The off-path for the hook, and the reason it is safe to add: React
-        // omits an attribute whose value is `undefined`, so the other eighteen
+        // omits an attribute whose value is `undefined`, so the other 28
         // dialogs keep byte-identical markup. An always-present `data-testid`
         // would hang a new test handle on every dialog in the app.
         renderShell();
