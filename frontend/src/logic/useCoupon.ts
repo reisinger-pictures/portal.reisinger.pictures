@@ -25,6 +25,11 @@ import {apiMutate} from '../api';
 export interface CouponSummary {
     code: string;
     type: 'fixed' | 'percentage' | 'photo_package';
+    /**
+     * The unit is defined by `type`, never by this field alone: a count of
+     * CENTS for `fixed` (a whole-euro discount is e.g. 1000, not 10), a
+     * PERCENT for `percentage`. Owner decision 2026-09-28.
+     */
     value: number;
     /** Photo-package: number of photos (N). */
     package_quantity?: number;
@@ -214,10 +219,17 @@ export function calculateCouponDiscount(
     itemPricesCents: number[] = [],
 ): number {
     const total = Math.max(0, Math.round(finiteNumber(currentTotalCents)));
+    // Cents for `fixed`, percent for `percentage`. The two branches below use
+    // the same number in two different units, which is the whole point of the
+    // one-field design: `type` is the discriminator, and this function is where
+    // it is applied.
     const value = finiteNumber(coupon.value);
 
     if (coupon.type === 'fixed') {
-        return Math.min(total, Math.max(0, Math.round(value * 100)));
+        // `value` is CENTS for `fixed` (owner decision 2026-09-28), so it is
+        // the discount as-is. Multiplying here again would make every fixed
+        // coupon a hundredfold its price — clamped to the cart, i.e. free.
+        return Math.min(total, Math.max(0, Math.round(value)));
     }
 
     if (coupon.type === 'percentage') {

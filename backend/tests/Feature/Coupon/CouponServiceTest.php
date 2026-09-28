@@ -200,7 +200,7 @@ class CouponServiceTest extends TestCase
 
     public function test_apply_fixed_discount(): void
     {
-        $coupon = Coupon::factory()->fixed(5.00)->create(['brand' => 'rp', 'active' => true]);
+        $coupon = Coupon::factory()->fixed(500)->create(['brand' => 'rp', 'active' => true]);
         $items = $this->makePricedItems(10, 2500); // 10 × 2500 = 25000
         $total = 25000;
 
@@ -211,9 +211,58 @@ class CouponServiceTest extends TestCase
         $this->assertSame(500, $result['discountCents']);
     }
 
+    /**
+     * The conversion boundary, pinned on the *service* rather than on a
+     * fixture's magnitude.
+     *
+     * `value` is cents for `fixed`. The number that used to mean "10 €" is
+     * `10.00` in the column and is `1000` on the wire; both must produce the
+     * same 1000-cent discount against the same cart. If a second ×100 sneaks
+     * back into `applyCoupon`, this returns 100000 and the total clamps —
+     * a silent hundredfold, which is exactly the failure this change removes.
+     */
+    public function test_apply_fixed_discount_reads_value_as_cents(): void
+    {
+        $items = $this->makePricedItems(1, 3500);
+        $coupon = Coupon::factory()->fixed(1000)->create(['brand' => 'rp', 'active' => true]);
+
+        $result = $this->service->applyCoupon($coupon, $items, 3500);
+
+        // 10 EUR = 1000 cents, once.
+        $this->assertSame(1000, $result['discountCents']);
+        $this->assertSame(2500, $result['totalCents']);
+    }
+
+    /**
+     * The whole-euro case the owner decision calls out explicitly. A 10 €
+     * discount is `1000` cents, not `10` — and `10` cents (0,10 €) is a
+     * perfectly valid, very different discount. Both have to be honoured, so
+     * the test cannot pass by ignoring the value.
+     */
+    public function test_apply_fixed_discount_distinguishes_cents_from_whole_euros(): void
+    {
+        $items = $this->makePricedItems(1, 3500);
+
+        $tenCents = $this->service->applyCoupon(
+            Coupon::factory()->fixed(10)->create(['brand' => 'rp', 'active' => true]),
+            $items,
+            3500,
+        );
+        $tenEuros = $this->service->applyCoupon(
+            Coupon::factory()->fixed(1000)->create(['brand' => 'rp', 'active' => true]),
+            $items,
+            3500,
+        );
+
+        $this->assertSame(10, $tenCents['discountCents']);
+        $this->assertSame(3490, $tenCents['totalCents']);
+        $this->assertSame(1000, $tenEuros['discountCents']);
+        $this->assertSame(2500, $tenEuros['totalCents']);
+    }
+
     public function test_apply_fixed_discount_does_not_go_below_zero(): void
     {
-        $coupon = Coupon::factory()->fixed(999999.00)->create(['brand' => 'rp', 'active' => true]);
+        $coupon = Coupon::factory()->fixed(99999900)->create(['brand' => 'rp', 'active' => true]);
         $items = $this->makePricedItems(1, 1000);
         $total = 1000;
 

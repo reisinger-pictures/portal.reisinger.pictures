@@ -19,11 +19,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Coupons are brand-isolated and can be scoped globally, to a gallery,
  * to a meta-gallery (gallery group), or to a photographer's galleries.
  *
+ * Money units (owner decision 2026-09-28: every monetary amount is cents, in
+ * storage and in the API, whole-euro amounts included). `value` is one column
+ * with a unit defined by `type`, never by the column alone: a count of cents
+ * for `fixed`, a percentage for `percentage`, an unused placeholder `0` for
+ * `photo_package`. The column stays `decimal(10,2)` (V018) because one field
+ * was kept deliberately; a count of cents has no fraction, and V044 converted
+ * the stored `fixed` rows from euros.
+ *
  * @property int $id
  * @property string $brand
  * @property string $code
  * @property string $type fixed|percentage|photo_package
- * @property float $value
+ * @property float $value Cents for `fixed`, percent for `percentage`, 0 for `photo_package`.
  * @property int|null $max_items
  * @property int|null $package_quantity Photo-package: number of photos (N)
  * @property int|null $package_price_cents Photo-package: flat price Y in cents

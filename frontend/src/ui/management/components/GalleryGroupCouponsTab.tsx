@@ -37,9 +37,11 @@ const formatValue = (coupon: Coupon): string => {
     if (Number.isNaN(numeric)) return String(coupon.value);
     switch (coupon.type) {
         case 'fixed':
-            // Matches ManagementCouponsView: the stored value is in euros, so
-            // formatEuro is the single place the German notation is defined.
-            return formatEuro(numeric);
+            // `value` is cents for `fixed` (owner decision 2026-09-28) and
+            // `formatEuro` takes euros, so this is the one place the two meet.
+            // The percentage branch reads the same column in the other unit and
+            // is therefore not scaled.
+            return formatEuro(numeric / 100);
         case 'percentage':
             return `${numeric} %`;
         case 'photo_package':

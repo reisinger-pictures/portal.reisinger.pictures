@@ -5,6 +5,14 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * Coupon wire shape.
+ *
+ * Field names are stable; units are cents (owner decision 2026-09-28). `value`
+ * is cents for `fixed` and a percentage for `percentage` — the unit comes from
+ * the sibling `type`, not from the field name — while `package_price_cents`
+ * states its own unit in the name and always has.
+ */
 class CouponResource extends JsonResource
 {
     public function toArray(Request $request): array

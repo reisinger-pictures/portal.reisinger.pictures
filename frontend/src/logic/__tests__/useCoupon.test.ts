@@ -2,13 +2,15 @@ import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
 import {renderHook, act, waitFor} from '@testing-library/react';
 import useCoupon, {calculateCouponDiscount} from '../useCoupon';
 
+// `value` is cents for `fixed` (owner decision 2026-09-28), so 10 € is 1000 —
+// the same 1000 the server's `discount_cents` reports for its sample cart.
 const VALID_RESPONSE = {
     valid: true,
     coupon: {
         id: 1,
         code: 'SAVE10',
         type: 'fixed' as const,
-        value: 10,
+        value: 1000,
         scope_type: 'global' as const,
     },
     discount_cents: 1000,
@@ -453,9 +455,41 @@ describe('useCoupon', () => {
 });
 
 describe('calculateCouponDiscount', () => {
+    /**
+     * The conversion boundary, pinned on the fixture's magnitude.
+     *
+     * `value` is cents for `fixed` (owner decision 2026-09-28). The old fixture
+     * said `value: 10` and meant 10 €; it now says `value: 1000` and means the
+     * same 10 €, against the same 3500-cent cart. The chosen number is the
+     * conversion of the old one rather than a new round figure, so the
+     * assertion that matters — the discount is still exactly 1000 cents — is
+     * unchanged, and a leftover `* 100` in the implementation returns 100000
+     * (clamped to 3500) instead.
+     */
     it('uses the actual fixed-cart subtotal instead of the sample-cart response', () => {
-        expect(calculateCouponDiscount({code: 'FIXED', type: 'fixed', value: 10}, 3500)).toBe(1000);
-        expect(calculateCouponDiscount({code: 'FIXED', type: 'fixed', value: 99}, 3500)).toBe(3500);
+        expect(calculateCouponDiscount({code: 'FIXED', type: 'fixed', value: 1000}, 3500)).toBe(1000);
+        expect(calculateCouponDiscount({code: 'FIXED', type: 'fixed', value: 9900}, 3500)).toBe(3500);
+    });
+
+    /**
+     * The whole-euro case the decision calls out: 1000 cents is 10 €, 10 cents
+     * is 0,10 €. Both are legal, and they are two hundred times apart, so the
+     * test cannot pass by ignoring or by mis-scaling the value.
+     */
+    it('reads a fixed value as cents, not as euros', () => {
+        expect(calculateCouponDiscount({code: 'TENCENT', type: 'fixed', value: 10}, 3500)).toBe(10);
+        expect(calculateCouponDiscount({code: 'TENEUR', type: 'fixed', value: 1000}, 3500)).toBe(1000);
+    });
+
+    /**
+     * The sibling branch of the same `value` column. If the cents change had
+     * leaked into the percentage branch, 10 % would become a 1000 % discount —
+     * clamped to the cart, i.e. free. These two assertions are the ones that
+     * would catch it.
+     */
+    it('still reads a percentage value as a percent, not as cents', () => {
+        expect(calculateCouponDiscount({code: 'PERCENT', type: 'percentage', value: 10}, 8000)).toBe(800);
+        expect(calculateCouponDiscount({code: 'PERCENT', type: 'percentage', value: 25}, 8000)).toBe(2000);
     });
 
     it('uses the actual percentage-cart subtotal and supports a full discount', () => {

@@ -46,7 +46,10 @@ const formatValue = (coupon: Coupon): string => {
     if (Number.isNaN(numeric)) return String(coupon.value);
     switch (coupon.type) {
         case 'fixed':
-            return formatMoney(Math.round(numeric * 100));
+            // `value` is cents for `fixed` (owner decision 2026-09-28), so it is
+            // already the amount `formatMoney` wants. The percentage branch
+            // below reads the same column in the other unit.
+            return formatMoney(Math.round(numeric));
         case 'percentage':
             return `${numeric} %`;
         case 'photo_package':

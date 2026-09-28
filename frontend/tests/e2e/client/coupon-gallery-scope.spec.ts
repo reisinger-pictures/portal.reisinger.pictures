@@ -53,7 +53,9 @@ test.describe('Gallery-Scoped Coupons', () => {
         const couponCode = `GAL-${Math.random().toString(36).substring(2, 8)}`;
         const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
         const createRes = await request.post('/api/management/coupons', {
-            data: { code: couponCode, type: 'fixed', value: 10, scope_type: 'gallery', scope_id: galleryId, active: true },
+            // `value` is cents for `fixed` (owner decision 2026-09-28): 1000 is
+            // 10,00 €, which is the amount the assertion below pins.
+            data: { code: couponCode, type: 'fixed', value: 1000, scope_type: 'gallery', scope_id: galleryId, active: true },
             headers: couHeaders,
         });
         if (!createRes.ok()) throw new Error(`Coupon creation failed: ${await createRes.text()}`);
@@ -108,7 +110,9 @@ test.describe('Gallery-Scoped Coupons', () => {
         const couponCode = `GAL-${Math.random().toString(36).substring(2, 8)}`;
         const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
         const createRes2 = await request.post('/api/management/coupons', {
-            data: { code: couponCode, type: 'fixed', value: 10, scope_type: 'gallery', scope_id: galleryAId, active: true },
+            // Cents for `fixed`; this row is only about scope rejection, but the
+            // value must still be a valid amount.
+            data: { code: couponCode, type: 'fixed', value: 1000, scope_type: 'gallery', scope_id: galleryAId, active: true },
             headers: couHeaders,
         });
         const createRes2Json = await createRes2.json();

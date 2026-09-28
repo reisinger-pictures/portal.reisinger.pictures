@@ -29,7 +29,8 @@ test.describe('Coupon Admin CRUD', () => {
         const couponCode = `FIXED-${Math.random().toString(36).substring(2, 8)}`;
         const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
         const createRes = await request.post('/api/management/coupons', {
-            data: { code: couponCode, type: 'fixed', value: 15, scope_type: 'global', active: true },
+            // `value` is cents for `fixed` (owner decision 2026-09-28).
+            data: { code: couponCode, type: 'fixed', value: 1500, scope_type: 'global', active: true },
             headers: couHeaders,
         });
         const createResJson = await createRes.json();
@@ -50,7 +51,7 @@ test.describe('Coupon Admin CRUD', () => {
         const couponOrgCode = `ORG-${Math.random().toString(36).substring(2, 8)}`;
         const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
         const orgRes = await request.post('/api/management/coupons', {
-            data: { code: couponOrgCode, type: 'fixed', value: 10, scope_type: 'global', active: true },
+            data: { code: couponOrgCode, type: 'fixed', value: 1000, scope_type: 'global', active: true },
             headers: couHeaders,
         });
         const orgResJson = await orgRes.json();
@@ -124,7 +125,8 @@ test.describe('Coupon Admin CRUD', () => {
         const buyerCookie = await helper.loginAs(buyer.email, buyer.password, { brand: 'rp' });
         const couponCode = `USED-${suffix}`;
         const createResponse = await request.post('/api/management/coupons', {
-            data: { code: couponCode, type: 'fixed', value: 5, scope_type: 'global', active: true },
+            // Cents for `fixed`; this test is about the used-count guard.
+            data: { code: couponCode, type: 'fixed', value: 500, scope_type: 'global', active: true },
             headers: jsonHeaders(srpCookie),
         });
         const createBody = await createResponse.text();

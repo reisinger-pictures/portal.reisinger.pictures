@@ -132,7 +132,7 @@ class VolumeLicensingStrategyTest extends TestCase
 
     public function test_coupon_integration_with_fixed_discount(): void
     {
-        $coupon = Coupon::factory()->fixed(10.00)->create([
+        $coupon = Coupon::factory()->fixed(1000)->create([
             'brand' => 'rp',
             'active' => true,
         ]);
@@ -146,7 +146,7 @@ class VolumeLicensingStrategyTest extends TestCase
         $result = $strategy->calculateCart($items, $user, $coupon->code);
 
         // Volume: 5 × 3000 − 5 × 500 = 12500
-        // Coupon: fixed 10 EUR = 1000 cents
+        // Coupon: fixed 10 EUR = 1000 cents (`value` is cents for `fixed`)
         // Total: 12500 − 1000 = 11500
         $this->assertSame(11500, $result['totalCents']);
         $this->assertSame(1000, $result['discountCents']);

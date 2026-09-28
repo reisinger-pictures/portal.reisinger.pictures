@@ -37,10 +37,23 @@ class CouponStoreRequest extends FormRequest
         $rules = [
             'code' => 'required|string|max:50',
             'type' => 'required|string|in:fixed,percentage,photo_package',
-            'value' => 'nullable|numeric|min:0|max:9999999.99',
+            // Cents for `fixed`, percent for `percentage` (see the `type` rule).
+            // The bound is the column's `decimal(10,2)` ceiling of
+            // 99999999.99 minus one unit, i.e. the largest amount that still
+            // rounds without leaving the column. The previous rule
+            // (`max:9999999.99`) was written for euros; in cents it would have
+            // capped a fixed discount at 99 999,99 € and silently rejected
+            // larger-but-valid ones. A `percentage` value is capped at 100
+            // separately in `withValidator`, so this bound only ever governs
+            // the money branch.
+            'value' => 'nullable|numeric|min:0|max:99999999',
             'max_items' => 'nullable|integer|min:1|max:999',
             'package_quantity' => 'nullable|integer',
-            'package_price_cents' => 'nullable|numeric',
+            // Cents, like the column it fills. `integer` rather than `numeric`:
+            // a price that is not a whole number of cents is not a price the
+            // system can represent, and silently rounding it here would make
+            // the stored amount differ from the amount that was sent.
+            'package_price_cents' => 'nullable|integer|min:0',
             'scope_type' => 'required|string|'.$scopeTypes,
             'scope_id' => 'nullable|string|required_if:scope_type,gallery,meta_gallery',
             'max_uses_global' => 'nullable|integer|min:1',
@@ -86,6 +99,10 @@ class CouponStoreRequest extends FormRequest
             $req = $this;
             $data = $req->all();
 
+            // The unit of `value` is defined by `type`: a percentage here, a
+            // count of cents for `fixed` (see the `value` rule). A 100 % cap on
+            // the money branch would be a bug, not a safety net — 100 cents is
+            // a legitimate 1 € discount.
             if (($data['type'] ?? null) === 'percentage' && ($data['value'] ?? 0) > 100) {
                 $validator->errors()->add('value', 'Percentage value must not exceed 100.');
             }
@@ -101,7 +118,9 @@ class CouponStoreRequest extends FormRequest
                 if (! isset($data['package_quantity']) || $data['package_quantity'] === '' || (int) ($data['package_quantity'] ?? 0) < 1) {
                     $validator->errors()->add('package_quantity', 'Package quantity must be at least 1.');
                 }
-                if (! isset($data['package_price_cents']) || $data['package_price_cents'] === '' || (float) ($data['package_price_cents'] ?? -1) < 0) {
+                // Absent is the only case left here: `min:0` on the rule already
+                // rejects a negative price with the field name in the message.
+                if (! isset($data['package_price_cents']) || $data['package_price_cents'] === '') {
                     $validator->errors()->add('package_price_cents', 'Package price must not be negative.');
                 }
             }

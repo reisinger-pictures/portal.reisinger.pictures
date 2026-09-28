@@ -108,10 +108,17 @@ function toFormValues(coupon?: Coupon | null): CouponFormValues {
     return {
         code: coupon?.code ?? '',
         type: coupon?.type ?? 'fixed',
-        value: coupon?.value ?? 0,
+        // The stored unit depends on `type`: cents for `fixed`, percent for
+        // `percentage`. Both are entered in the unit the admin reads (€ / %),
+        // and converted at the form boundary — see `onSubmit`. A single
+        // division here would be wrong for `percentage`, which is not money.
+        value: coupon?.value != null
+            ? (coupon.type === 'fixed' ? coupon.value / 100 : coupon.value)
+            : 0,
         max_items: coupon?.max_items,
         package_quantity: coupon?.package_quantity,
-        // Backend stores cents; the form works in Euro.
+        // Cents in, cents out: the form is the only place that knows this is
+        // an amount an admin types in euros.
         package_price_cents: coupon?.package_price_cents != null ? coupon.package_price_cents / 100 : undefined,
         scope_type: coupon?.scope_type ?? 'global',
         scope_id: coupon?.scope_id ?? '',
@@ -168,11 +175,20 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon: coupo
         const payload: Partial<Coupon> = {
             code: data.code.trim(),
             type: data.type,
-            value: data.value,
+            // The wire is cents (owner decision 2026-09-28), so the euro the
+            // admin typed is converted here and nowhere else. For `percentage`
+            // the value passes through untouched — it is a percent, and
+            // multiplying it by 100 would turn 10 % into 1000 %.
+            value: data.value == null
+                ? undefined
+                : (data.type === 'fixed' ? Math.round(data.value * 100) : data.value),
             max_items: data.max_items,
             package_quantity: data.package_quantity,
-            // Form is in Euro; the backend maps to cents.
-            package_price_cents: data.package_price_cents,
+            // Same boundary for the package price: euro in the field, cents on
+            // the wire. The backend no longer scales this value.
+            package_price_cents: data.package_price_cents == null
+                ? undefined
+                : Math.round(data.package_price_cents * 100),
             scope_type: data.scope_type,
             scope_id: emptyToUndefined(data.scope_id),
             max_uses_global: data.max_uses_global,

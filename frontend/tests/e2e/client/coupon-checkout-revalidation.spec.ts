@@ -115,7 +115,7 @@ test.describe('Coupon Checkout Re-validation', () => {
         const couponId = await createCouponFixture(
             code,
             'fixed',
-            10,
+            1000, // cents for `fixed`; this test is about expiry, not the amount
             new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         );
 
@@ -168,7 +168,13 @@ test.describe('Coupon Checkout Re-validation', () => {
     test('Valid coupon applies discount', {tag: ['@feature:client:coupon']}, async ({page}) => {
         const {galleryName} = await setupGalleryWithPhoto(page);
         const code = `DISCOUNT${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-        await createCouponFixture(code, 'fixed', 10);
+        // `value` is cents for `fixed` (owner decision 2026-09-28): 1000 is
+        // 10,00 €, which is the amount the cart discount below asserts. The
+        // fixture number is the conversion of the pre-migration `10` and the
+        // rendered amount is unchanged, so this line survives a change of unit
+        // only if the change is complete — wire, column, service and the client
+        // preview all have to agree on cents.
+        await createCouponFixture(code, 'fixed', 1000);
 
         const auth = new AuthHelper(page);
         await auth.login(buyerUser.email, buyerUser.password, 'http://localhost:4321/');
