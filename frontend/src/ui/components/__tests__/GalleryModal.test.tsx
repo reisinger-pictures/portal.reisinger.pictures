@@ -348,4 +348,56 @@ describe('GalleryModal forced visibility', () => {
         await user.click(screen.getByRole('button', {name: 'Speichern'}));
         expect(onCreate.mock.calls[0][4]).toBe(false);
     });
+
+    it('offers no delete button in create mode', () => {
+        // GalleryModal passes `onDelete` only for an existing record (D-20); a
+        // create dialog that offered deletion would be a regression of exactly
+        // the rule the shell now encodes.
+        renderWithProviders(
+            <GalleryModal
+                isOpen
+                onClose={vi.fn()}
+                onOpenGroupModal={vi.fn()}
+                availableGroups={[]}
+                onCreate={vi.fn().mockResolvedValue(undefined)}
+                onUpdate={vi.fn().mockResolvedValue(undefined)}
+                onDelete={vi.fn().mockResolvedValue(undefined)}
+            />,
+        );
+
+        expect(screen.queryByRole('button', {name: 'Löschen'})).toBeNull();
+    });
+
+    it('deletes through the footer only in edit mode', async () => {
+        const user = userEvent.setup();
+        const onDelete = vi.fn().mockResolvedValue(undefined);
+        const editingGallery = {
+            id: 'gallery-1',
+            name: 'Bestehende Galerie',
+            slug: 'bestehende-galerie',
+            full_path: 'galleries/bestehende-galerie',
+            type: 'delivery' as const,
+            is_live: false,
+            is_public: true,
+        };
+
+        renderWithProviders(
+            <GalleryModal
+                isOpen
+                onClose={vi.fn()}
+                onOpenGroupModal={vi.fn()}
+                availableGroups={[]}
+                editingGallery={editingGallery}
+                onCreate={vi.fn().mockResolvedValue(undefined)}
+                onUpdate={vi.fn().mockResolvedValue(undefined)}
+                onDelete={onDelete}
+            />,
+        );
+
+        // `useUI.confirm` resolves true in this file, so the click walks the
+        // dialog's own handler rather than being short-circuited.
+        await user.click(screen.getByRole('button', {name: 'Löschen'}));
+
+        expect(onDelete).toHaveBeenCalledWith('gallery-1');
+    });
 });

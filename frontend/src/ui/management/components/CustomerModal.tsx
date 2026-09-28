@@ -30,7 +30,8 @@ interface Props {
 }
 
 // Renamed on destructuring, see TextSnippetModal: the record is `customer`, and
-// `editing` in this file belongs to the shell's delete-action prop.
+// the shell's delete button follows `onDelete` (D-20), which this dialog does
+// not pass.
 export default function CustomerModal({ isOpen, onClose, editingCustomer: customer, onSave }: Props) {
     "use no memo";
     // `useId` is still the source for every field id, for one concrete reason:
@@ -93,11 +94,9 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer: custom
             title={customer ? 'Kunde bearbeiten' : 'Neuen Kunden anlegen'}
             icon="mdi--account-details"
             onClose={onClose}
-            // This dialog has no delete action for an existing customer, so the
-            // shared footer must not offer one — and the value that would mean
-            // "a customer is being edited" is `customer`, not `editing`. See the
-            // `editing` note in TextSnippetModal.
-            editing={false}
+            // No delete action for an existing customer, so no `onDelete` and
+            // the shell renders no delete button. The edit session is
+            // `customer`, an unrelated value. See TextSnippetModal.
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit(onSubmit)}
             noValidate

@@ -229,7 +229,7 @@ describe('ManagementOrgDetailView', () => {
         // One assertion covers role, aria-labelledby wiring and the name text.
         expect(dialog).toHaveAttribute('aria-modal', 'true');
         // The page itself has a "Löschen" button; the dialog must not, because
-        // the view passes `editing={false}` — this dialog invites, it does not
+        // the view passes no `onDelete` — this dialog invites, it does not
         // remove an existing member. Scoped to the dialog on purpose.
         expect(within(dialog).queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
 

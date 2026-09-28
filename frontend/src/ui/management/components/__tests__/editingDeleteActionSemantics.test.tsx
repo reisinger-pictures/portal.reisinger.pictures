@@ -12,24 +12,21 @@ import type { Coupon } from '../CouponFormDrawer';
 import type { Project } from '../../../../logic/useProjectsBoard';
 
 /**
- * `editing` means two different things in this app, and this file is about the
- * one that is not the shell's.
+ * Five dialogs open on an *existing* record and each has no delete action of
+ * its own.
  *
- * `ModalDialogShell.editing` asks a single question: "does this dialog have a
- * delete action for an existing record?" It is a question about the *footer*,
- * and the shell's answer renders a `Löschen` button. Five dialogs also carry a
- * value that reads as "is this an edit session" — the record they were opened
- * with — and the two are unrelated: none of the five has a delete action, so all
- * five pass a literal `false` while editing a record that very much exists.
+ * `ModalDialogShell` used to ask that as a boolean `editing` — "does this
+ * dialog have a delete action for an existing record?" — which read exactly
+ * like the edit-session value the five carry (`editingSnippet`,
+ * `editingProduct`, …), one of them literally `editing`. So `editing={!!editing}`
+ * was a plausible edit that compiled, rendered, and shipped a delete button
+ * wired to no handler. D-20 removed the prop: the button follows `onDelete`,
+ * and none of the five passes one.
  *
- * That is a trap with one obvious wrong move in it. The props were named
- * `editingSnippet` / `editingProduct` / `editingCustomer` / `editingCoupon` /
- * `editing`, one of them exactly `editing`, so at every one of these call sites
- * `editing={!!editing}` is a plausible-looking edit that compiles, renders, and
- * ships a delete button wired to no handler. The local names are now the
- * records' own (`snippet`, `product`, `customer`, `coupon`, `project`), and this
- * test pins the consequence rather than the naming: opened on an existing
- * record, none of the five offers a delete action.
+ * The local names are the records' own (`snippet`, `product`, `customer`,
+ * `coupon`, `project`), and this test pins the consequence rather than the
+ * naming: opened on an existing record, none of the five offers a delete
+ * action.
  */
 const statusOptions = [{ value: 'anfrage', label: 'Anfrage' }];
 
@@ -122,10 +119,10 @@ describe('dialogs without a delete action', () => {
 
     /**
      * Each case is the dialog opened on an *existing* record — the state in
-     * which the shell's `editing` prop is supposed to turn the delete button on.
+     * which the shell's old `editing` prop used to turn the delete button on.
      * The `Löschen` button is the shell's, so the only way one can appear here
-     * is a caller passing the edit-session value into a prop that asks about
-     * delete actions.
+     * is now a caller passing `onDelete` into a dialog that has no delete
+     * action.
      */
     const cases: Array<[string, React.ReactNode, string]> = [
         [

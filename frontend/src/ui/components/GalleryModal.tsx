@@ -185,8 +185,7 @@ export default function GalleryModal({ isOpen, onClose, onOpenGroupModal, availa
             title={editingGallery ? <Trans>Galerie bearbeiten</Trans> : <Trans>Neue Galerie</Trans>}
             icon="mdi--image-multiple"
             onClose={onClose}
-            onDelete={handleDelete}
-            editing={!!editingGallery}
+            onDelete={editingGallery ? handleDelete : undefined}
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit(onSubmit)}
             maxWidth="2xl"

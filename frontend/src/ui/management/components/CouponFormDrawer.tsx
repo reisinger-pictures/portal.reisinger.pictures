@@ -134,7 +134,8 @@ function emptyToUndefined(value: string | undefined): string | undefined {
 }
 
 // Renamed on destructuring, see TextSnippetModal: the record is `coupon`, and
-// `editing` in this file belongs to the shell's delete-action prop.
+// the shell's delete button follows `onDelete` (D-20), which this dialog does
+// not pass.
 export default function CouponFormDrawer({ isOpen, onClose, editingCoupon: coupon, onSave }: Props) {
     "use no memo";
     const { confirm } = useUI();
@@ -213,12 +214,10 @@ export default function CouponFormDrawer({ isOpen, onClose, editingCoupon: coupo
             // previously discarded a dirty form with no warning, which was the
             // one place this dialog could lose typed input silently.
             onClose={handleClose}
-            // This dialog has no delete action for an existing coupon — codes
-            // are deactivated through the `Aktiv` checkbox — so the shared
-            // footer must not offer one, and the value that would mean "a coupon
-            // is being edited" is `coupon`, not `editing`. See the `editing` note
-            // in TextSnippetModal.
-            editing={false}
+            // No delete action for an existing coupon — codes are deactivated
+            // through the `Aktiv` checkbox — so no `onDelete` and the shell
+            // renders no delete button. The edit session is `coupon`, an
+            // unrelated value. See TextSnippetModal.
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit(onSubmit)}
             noValidate

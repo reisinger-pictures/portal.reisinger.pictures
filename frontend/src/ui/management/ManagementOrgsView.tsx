@@ -87,9 +87,8 @@ export default function ManagementOrgsView() {
                     title={<Trans>Neue Organisation anlegen</Trans>}
                     onClose={() => setCreateOpen(false)}
                     // Creating only — an existing organisation is deleted from
-                    // the detail view, not here, so the shared footer must not
-                    // offer a delete. See the `editing` note in TextSnippetModal.
-                    editing={false}
+                    // the detail view, not here, so there is no `onDelete` and
+                    // the shell renders no delete button.
                     isSubmitting={isCreating}
                     onSubmit={handleCreate}
                     // No `noValidate` on purpose: the name field is `required`

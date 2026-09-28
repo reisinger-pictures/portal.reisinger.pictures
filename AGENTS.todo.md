@@ -5,13 +5,13 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **86 offene Positionen**
-> über 1805 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **83 offene Positionen**
+> über 1784 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **22**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **19**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
 >
@@ -145,7 +145,7 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       C (auf das `<dialog>` fokussieren, hilft der Datenerfassung nicht) und D (`showModal()`,
       gründlicher, greift aber über `ModalHelper` in 36 E2E-Dateien — als eigene Welle
       zurückgestellt, **nicht** verworfen).
-- [ ] **D-13 — `maxWidth` auf `'2xl'` einschränken.**
+- [x] **D-13 — `maxWidth` auf `'2xl'` eingeschränkt (verifiziert, keine Änderung nötig).** Im Code vorgefunden und in der D-20-Welle verifiziert: `ModalShell.tsx` und `ModalDialogShell.tsx` tippen `maxWidth?: 'default' | '2xl'`, je mit Docblock; `tsc -b` verbietet `'lg'`/`'xl'` an der Aufrufstelle.
 - [ ] **D-16 — technische Dokumentation der Stripe-Identifikatoren vervollständigen**; der
       rechtliche Teil bleibt eine benannte Lücke mit Owner.
 - [ ] **D-17 — beide Policies einzeln entschieden, die Umsetzung steht aus.** Recherche abgeschlossen,
@@ -169,14 +169,8 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       4 Locator-Ketten) scopen unverändert. **Die Zahl 8 im ursprünglichen Board-Eintrag war
       falsch** und ist durch die gemessene ersetzt.
 - [ ] **D-19 — Unit-Testdateien für `ManagementOrgsView` und `ManagementOrgDetailView`.**
-- [ ] **D-20 — `ModalDialogShell` verliert `editing`; der Lösch-Button folgt aus `onDelete`.**
-      **Enthält einen Pflicht-Schritt:** `GalleryModal` und `GalleryGroupModal` übergeben
-      `onDelete` heute bedingungslos und müssen es auf „nur bei existierendem Datensatz"
-      beschränken, sonst bekommt der Create-Dialog einen Lösch-Button.
-- [ ] **D-21 — Domänen-Prop `editing` in `ProjectModal`, `PhotoJobModal`, `TextSnippetModal`,
-      `ProductModal`, `CustomerModal`, `CouponFormDrawer` umbenennen.** Die Aufrufer
-      `ManagementProjectsBoard.tsx:219` und `PhotographerProductionBoard.tsx:170` ziehen mit.
-
+- [x] **D-20 — `ModalDialogShell` kennt kein `editing`; der Lösch-Button folgt aus `onDelete`.** Umgesetzt und verifiziert: Footer nur unter `onDelete` (Handler ist `onDelete` — ein Button ohne Handler ist strukturell unmöglich); `GalleryModal`/`GalleryGroupModal` nur bei existierendem Datensatz; toter Button in `VolumePresetSettingsCard` ersatzlos entfallen. 148 Dateien / 1388 Tests, Lint + Build grün.
+- [x] **D-21 — Domänen-`editing` lokal umbenannt (`snippet`/`product`/`customer`/`coupon`/ `project`/`photoJob`).** Externe Props und Aufrufer (`ManagementProjectsBoard.tsx:219`, `PhotographerProductionBoard.tsx:170`) unverändert; Konsequenz gepinnt durch `editingDeleteActionSemantics.test.tsx`. Verifiziert.
 ### Verworfen — nicht erneut implementieren
 
 Zurückgezogen am 2026-09-28. Der Owner hat jede dieser Varianten gesehen und verworfen; die
@@ -1742,23 +1736,8 @@ gerissen und zur Entscheidung gemacht.
     Grundursache, warum hier Testbudgets echten Spielraum brauchen.
 ## Dialog-UI-Befunde aus derselben Welle (2026-09-27) — sechs Produktfragen, keine Implementierungsdetails
 
-- [ ] **D-13 — `maxWidth` auf `'2xl'` einschränken.** Nur `'2xl'` erzeugt heute eine Klasse;
-  `'lg'` und `'xl'` werden akzeptiert und still verworfen — der Prop lügt.
 - [ ] **D-19 — Unit-Testdateien für `ManagementOrgsView` und `ManagementOrgDetailView`.** Beide
   waren „jetzt konform, aber ungeschützt"; Konformität ist keine Abdeckung.
-- [ ] **D-20 — `ModalDialogShell` verliert `editing`; der Lösch-Button folgt aus `onDelete`.**
-  **Erreichbarer Defekt, den der Board nie nannte:** `VolumePresetSettingsCard.tsx:118` übergibt
-  `editing={!!initialName}` **ohne** `onDelete` — seit `e053f70` (2026-08-13) rendert dort ein
-  `Löschen`-Button mit `onClick={undefined}`, ein stiller Totklick. **Pflicht-Schritt:**
-  `GalleryModal` und `GalleryGroupModal` übergeben `onDelete` heute bedingungslos und müssen es
-  auf „nur bei existierendem Datensatz" beschränken, sonst bekommt der Create-Dialog einen
-  Lösch-Button. Der vorgeschlagene Rename in `readOnly` hätte diesen Fall **nicht** behoben.
-- [ ] **D-21 — Domänen-Prop `editing` in den sechs Dialogen umbenennen** (`ProjectModal`,
-  `PhotoJobModal`, `TextSnippetModal`, `ProductModal`, `CustomerModal`, `CouponFormDrawer`).
-  Aufrufer `ManagementProjectsBoard.tsx:219` und `PhotographerProductionBoard.tsx:170` ziehen mit.
-  Die fünf Dialoge, die dem Board als „fünf" bekannt sind — die fünfte ist `ProjectModal` — geben
-  heute literal `editing={false}`, gepinnt durch `editingDeleteActionSemantics.test.tsx`; die
-  Falle ist dokumentiert, nicht lebendig.
 - [ ] **D-12 — Initial-Fokus: React `autoFocus` gewinnen lassen.** In `useFocusTrap` die
   Reihenfolge umkehren: liegt beim Öffnen bereits der Fokus **innerhalb** des Dialogs, bleibt
   er dort, statt auf das erste fokussierbare Element (der Schließen-Button) gesetzt zu werden.

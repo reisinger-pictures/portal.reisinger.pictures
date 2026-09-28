@@ -130,8 +130,7 @@ export default function GalleryGroupModal({ isOpen, onClose, availableGroups, ed
         <ModalDialogShell
             title={editingGroup ? <Trans>Meta-Galerie bearbeiten</Trans> : <Trans>Neue Meta-Galerie erstellen</Trans>}
             onClose={onClose}
-            onDelete={handleDelete}
-            editing={!!editingGroup}
+            onDelete={editingGroup ? handleDelete : undefined}
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit(onSubmit)}
         >

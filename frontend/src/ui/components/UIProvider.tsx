@@ -172,7 +172,6 @@ export default function UIProvider({ children }: UIProviderProps) {
                     key={confirmState.id}
                     title={confirmState.options.title}
                     onClose={() => handleConfirm(false)}
-                    editing={false}
                     isSubmitting={false}
                     onSubmit={(event) => {
                         event.preventDefault();

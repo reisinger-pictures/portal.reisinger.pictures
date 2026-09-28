@@ -71,7 +71,11 @@ interface Props {
     onSave: (payload: PhotoJobInput & { status?: string }) => Promise<void>;
 }
 
-export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaultStatus, statusOptions }: Props) {
+// Renamed on destructuring, like ProjectModal: the prop is "the record this
+// dialog edits", and it stays `editing` for the callers, while the shell it
+// renders into now derives its delete button from `onDelete` (D-20) and takes
+// no `editing` at all.
+export default function PhotoJobModal({ isOpen, onClose, editing: photoJob, onSave, defaultStatus, statusOptions }: Props) {
     "use no memo";
     const photoJobSchema = createPhotoJobSchema();
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<PhotoJobFormValues>({
@@ -89,7 +93,7 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
     });
     const { showToast } = useUI();
     const { users } = useUsers();
-    const currentAssignee = editing?.assignee ?? null;
+    const currentAssignee = photoJob?.assignee ?? null;
     const assigneeOptions = mergeAssigneeOptions(users, currentAssignee);
     const { tree } = useProtectedGalleries();
     const { lightroomCatalogs, error: catalogsError } = useLightroomCatalogs();
@@ -99,17 +103,17 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
     useEffect(() => {
         if (isOpen) {
             reset({
-                title: editing?.title ?? '',
-                lightroom_catalog: editing?.lightroom_catalog ?? '',
-                total_count: editing?.total_count != null ? String(editing.total_count) : '',
-                selected_count: editing?.selected_count != null ? String(editing.selected_count) : '',
-                target_gallery_id: editing?.target_gallery_id ?? '',
-                status: editing?.status ?? defaultStatus ?? '',
-                assignee_id: editing?.assignee?.id ?? '',
-                notes: editing?.notes ?? '',
+                title: photoJob?.title ?? '',
+                lightroom_catalog: photoJob?.lightroom_catalog ?? '',
+                total_count: photoJob?.total_count != null ? String(photoJob.total_count) : '',
+                selected_count: photoJob?.selected_count != null ? String(photoJob.selected_count) : '',
+                target_gallery_id: photoJob?.target_gallery_id ?? '',
+                status: photoJob?.status ?? defaultStatus ?? '',
+                assignee_id: photoJob?.assignee?.id ?? '',
+                notes: photoJob?.notes ?? '',
             });
         }
-    }, [isOpen, editing, defaultStatus, reset]);
+    }, [isOpen, photoJob, defaultStatus, reset]);
 
     if (!isOpen) return null;
 
@@ -141,9 +145,8 @@ export default function PhotoJobModal({ isOpen, onClose, editing, onSave, defaul
         // the board test asserts. Caught by the E2E run, not by jsdom.
         <ModalDialogShell
             noValidate
-            title={editing ? <Trans>Auftrag bearbeiten</Trans> : <Trans>Neuen Auftrag anlegen</Trans>}
+            title={photoJob ? <Trans>Auftrag bearbeiten</Trans> : <Trans>Neuen Auftrag anlegen</Trans>}
             onClose={onClose}
-            editing={false}
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit(onSubmit)}
             maxWidth="2xl"

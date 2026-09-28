@@ -14,15 +14,6 @@ vi.mock('../UIContext', () => ({
     useUI: () => ({ showToast: vi.fn(), confirm: vi.fn().mockResolvedValue(true) }),
 }));
 
-vi.mock('../ModalDialogShell', () => ({
-    default: ({children, onSubmit}: {children: React.ReactNode; onSubmit: (e: React.FormEvent) => void}) => (
-        <form onSubmit={onSubmit}>
-            {children}
-            <button type="submit">Speichern</button>
-        </form>
-    ),
-}));
-
 const orgs = [
     {id: 'org-1', name: 'Org Eins', domain: null, invoice_frequency: 'immediate'},
     {id: 'org-2', name: 'Org Zwei', domain: null, invoice_frequency: 'immediate'},
@@ -165,5 +156,43 @@ describe('GalleryGroupModal', () => {
         expect(onUpdate).toHaveBeenCalledTimes(1);
         const extraOpts = onUpdate.mock.calls[0][5] as {org_id?: string | null};
         expect(extraOpts.org_id).toBeNull();
+    });
+
+    it('offers no delete button in create mode', () => {
+        // See GalleryModal: the shell's delete button follows `onDelete`
+        // (D-20), and GalleryGroupModal passes one only for an existing group.
+        renderWithProviders(
+            <GalleryGroupModal
+                isOpen
+                onClose={vi.fn()}
+                availableGroups={[]}
+                onCreate={vi.fn().mockResolvedValue(undefined)}
+                onUpdate={vi.fn().mockResolvedValue(undefined)}
+                onDelete={vi.fn().mockResolvedValue(undefined)}
+            />,
+        );
+
+        expect(screen.queryByRole('button', {name: 'Löschen'})).toBeNull();
+    });
+
+    it('deletes through the footer only in edit mode', async () => {
+        const user = userEvent.setup();
+        const onDelete = vi.fn().mockResolvedValue(undefined);
+
+        renderWithProviders(
+            <GalleryGroupModal
+                isOpen
+                onClose={vi.fn()}
+                availableGroups={[]}
+                editingGroup={editingGroup}
+                onCreate={vi.fn().mockResolvedValue(undefined)}
+                onUpdate={vi.fn().mockResolvedValue(undefined)}
+                onDelete={onDelete}
+            />,
+        );
+
+        await user.click(screen.getByRole('button', {name: 'Löschen'}));
+
+        expect(onDelete).toHaveBeenCalledWith('group-1');
     });
 });

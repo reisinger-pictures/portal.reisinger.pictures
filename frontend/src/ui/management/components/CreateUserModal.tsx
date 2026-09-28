@@ -64,9 +64,8 @@ export default function CreateUserModal({ isOpen, onClose, onCreate }: Props) {
             // cancelled invitation exactly as the hand-rolled handlers did.
             onClose={handleClose}
             // This dialog only ever creates a user; there is no delete action
-            // for an existing record, so the shared footer must not offer one —
-            // see the `editing` note in TextSnippetModal.
-            editing={false}
+            // for an existing record, so there is no `onDelete` and the shell
+            // renders no delete button.
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit(onSubmit)}
             noValidate

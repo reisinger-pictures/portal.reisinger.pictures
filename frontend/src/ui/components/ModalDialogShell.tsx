@@ -7,8 +7,14 @@ interface ModalDialogShellProps {
     title: ReactNode;
     icon?: string;
     onClose: () => void;
+    /**
+     * When provided, the footer renders a `Löschen` button wired to it. The
+     * delete action follows this prop and nothing else (D-20): a dialog opened
+     * on an existing record but with no delete path simply passes no
+     * `onDelete`, and the footer keeps the cancel/submit group right-aligned
+     * through the placeholder on the left.
+     */
     onDelete?: () => void;
-    editing: boolean;
     isSubmitting: boolean;
     onSubmit: (e: React.FormEvent) => void;
     /**
@@ -66,7 +72,6 @@ export default function ModalDialogShell({
     icon,
     onClose,
     onDelete,
-    editing,
     isSubmitting,
     onSubmit,
     noValidate = false,
@@ -89,7 +94,7 @@ export default function ModalDialogShell({
     // instead of hand-rolling one — which is what GalleryModal had to do.
     const footer = (
         <div className="modal-action col-span-full flex justify-between mt-8">
-            {editing ? (
+            {onDelete ? (
                 <button type="button" className="btn btn-outline btn-error" onClick={onDelete}><Trans>Löschen</Trans></button>
             ) : <div></div>}
             <div>

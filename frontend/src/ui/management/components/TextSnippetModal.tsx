@@ -24,9 +24,9 @@ interface Props {
 }
 
 // The prop is "the record this dialog edits", `null` meaning create a new one.
-// It is renamed on destructuring to the record's own name because `editing` is
-// already a word in this file with a different job — see the `editing={false}`
-// on ModalDialogShell below. Naming the record keeps the two apart.
+// It is renamed on destructuring to the record's own name so the edit session
+// is never read as an action: this dialog has no delete, so it passes no
+// `onDelete` to the shell below (whose delete button follows that prop, D-20).
 export default function TextSnippetModal({ isOpen, onClose, editingSnippet: snippet, onSave }: Props) {
     "use no memo";
     const snippetSchema = createSnippetSchema();
@@ -63,13 +63,10 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet: snip
             title={snippet ? <Trans>Textbaustein bearbeiten</Trans> : <Trans>Neuen Textbaustein anlegen</Trans>}
             icon="mdi--text-box-multiple"
             onClose={onClose}
-            // The shell's `editing` asks one question: "does this dialog have a
-            // delete action for an existing record?" A text snippet has none —
-            // deleting one is a list action — so the answer is a literal `false`.
-            // It stays a literal because the value that *would* mean "this is an
-            // edit session" is now called `snippet`, and the two readings of
-            // "editing" can no longer be mistaken for each other here.
-            editing={false}
+            // A text snippet has no delete action here — deleting one is a list
+            // action — so this dialog passes no `onDelete` and the shell renders
+            // no delete button. The edit session is `snippet`, an unrelated
+            // value.
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit(onSubmit)}
             noValidate
