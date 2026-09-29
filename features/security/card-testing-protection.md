@@ -14,13 +14,48 @@ implementation sources are present in the current tree; V036 remains the
 separate Card-Testing migration. The current migration state — including the
 number a new migration takes — is stated in exactly one place,
 `features/tech/07-architectural-decisions.md` (AD-2), and is deliberately not
-restated here. Operational rollout, final
-review, and any current-tree verification remain tracked in `AGENTS.todo.md`; CI
-references in that board are historical evidence, not a claim about every
-uncommitted change. The existing checkout flow in
+restated here. Operational rollout and final
+review remain tracked in `AGENTS.todo.md`; CI references in that board are
+historical evidence, not a claim about every uncommitted change. The existing
+checkout flow in
 [`features/ecommerce/09-stripe-checkout-flow.md`](../ecommerce/09-stripe-checkout-flow.md)
 remains the reference for order states and Stripe integration; the rules below
 take precedence where they add idempotency, identity, or abuse controls.
+
+### Current-tree verification (2026-09-29, read-only, HEAD `59de6a9`)
+
+Presence of the implementation and the shape of the test inventory were
+confirmed by **reading the tree**. No suite was executed in that pass, so
+nothing in this section is an execution result.
+
+- **Migration and services present.**
+  `ls backend/database/migrations/ | grep V036` →
+  `V036__card_testing_defenses.php`;
+  `ls backend/app/Services | grep -E "^(StripeCustomerService|StripeCheckoutKillSwitch|CheckoutIdempotencyService|CheckoutRiskService|CheckoutEligibilityService|TurnstileService|CheckoutService|StripePaymentService)\.php$" | wc -l`
+  → 8.
+- **Automated tests exist — and one of them is a Playwright E2E spec.**
+  `grep -cE '^\s*public function test' backend/tests/Feature/<file>` →
+  `CardTestingSchemaTest.php` 6, `CheckoutRateLimitTest.php` 7,
+  `CheckoutRiskTurnstileTest.php` 14 (27 PHPUnit methods);
+  `grep -cE '^\s*(it|test)\(' frontend/src/ui/client/components/TurnstileWidget.test.tsx`
+  → 1; `frontend/tests/e2e/client/turnstile-checkout.spec.ts` → 1 test tagged
+  `@regression`, `@feature:client:checkout`, `@feature:card-testing`. It primes
+  two checkout attempts, asserts the third returns `403` `turnstile_required`,
+  and asserts the widget token is submitted on the retry with an unchanged
+  `Idempotency-Key`.
+- **The board's claim that this feature has no Playwright E2E is outdated.**
+  That spec was added in `d46f95a` (2026-09-23) and is tracked in git;
+  `grep -rlniE "card.?test|turnstile|3ds" frontend/tests/e2e` returns two files,
+  not zero. Correcting that entry is board work and is deliberately not done
+  here.
+- **Not verified here:** that any of the three suites is green at this head. The
+  read-only pass ran no `php artisan` and no Playwright command. Verification is
+  still owed: `cd backend && php artisan test --filter
+  'CardTestingSchemaTest|CheckoutRateLimitTest|CheckoutRiskTurnstileTest'`,
+  `cd frontend && pnpm vitest run
+  src/ui/client/components/TurnstileWidget.test.tsx`, and `cd frontend && npx
+  playwright test --grep @feature:card-testing`. Section 12 step 5 (full backend
+  suite, frontend lint/build) remains open with it.
 
 ## 1. Goal and threat model
 
