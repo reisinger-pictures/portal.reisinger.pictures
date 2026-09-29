@@ -129,6 +129,45 @@ artifact_path_violation() {
     return 1
 }
 
+# Cloudflare's Turnstile only accepts a dummy site key together with the dummy
+# secret published for it, and the pair is duplicated across two harnesses: the
+# frontend Playwright webServer env and the local E2E backend stack. A one-sided
+# rename leaves both files internally consistent — no lint, type-check or unit
+# test sees a cross-file pair — while every registration fails on a Cloudflare
+# siteverify error that reads like a product defect. The two copies are compared
+# against each other rather than pinned twice, so the check cannot go green with
+# two literals that no longer belong together.
+
+# Prints the dummy site key a Playwright config declares, or nothing.
+turnstile_frontend_site_key() {
+    sed -nE "s/^const TURSTILE_DUMMY_SITE_KEY[[:space:]]*=[[:space:]]*'([^']*)';[[:space:]]*$/\1/p" "$1"
+}
+
+# Prints the dummy site key the local E2E harness declares, or nothing.
+turnstile_harness_site_key() {
+    sed -nE 's/^readonly E2E_TURNSTILE_SITE_KEY="([^"]*)"[[:space:]]*$/\1/p' "$1"
+}
+
+turnstile_pair_violation() {
+    local frontend_config="$1"
+    local e2e_script="$2"
+    local frontend_key harness_key
+
+    frontend_key="$(turnstile_frontend_site_key "$frontend_config")"
+    harness_key="$(turnstile_harness_site_key "$e2e_script")"
+
+    if [[ -z "$frontend_key" || -z "$harness_key" ]]; then
+        printf '%s\n' "a Turnstile harness no longer declares the dummy site key: $frontend_config / $e2e_script"
+        return 0
+    fi
+    if [[ "$frontend_key" != "$harness_key" ]]; then
+        printf '%s\n' \
+            "the Turnstile dummy site key drifted between harnesses ($frontend_config: $frontend_key, $e2e_script: $harness_key)"
+        return 0
+    fi
+    return 1
+}
+
 require_file "$AUTOMERGE_WORKFLOW"
 require_file "$CI_WORKFLOW"
 require_file "$PLAYWRIGHT_CONFIG"
@@ -584,6 +623,32 @@ if write_all_violation "$fixture_dir/clean.yml" >/dev/null \
     fail 'the clean fixture was rejected by a contract probe'
 fi
 
+# The Turnstile pairing probe must reject both a drifted pair and a harness that
+# stopped declaring the key, and must accept a matching pair. Without the drift
+# fixture the extraction could silently match nothing and the guard would pass
+# vacuously.
+cat > "$fixture_dir/turnstile-pair.config.ts" <<'TS'
+const TURSTILE_DUMMY_SITE_KEY = '1x00000000000000000000AA';
+TS
+cat > "$fixture_dir/turnstile-drift.config.ts" <<'TS'
+const TURSTILE_DUMMY_SITE_KEY = '1x00000000000000000000BB';
+TS
+cat > "$fixture_dir/turnstile-missing.config.ts" <<'TS'
+const isCi = process.env.CI === 'true';
+TS
+cat > "$fixture_dir/turnstile-pair.e2e-up.sh" <<'SH'
+readonly E2E_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
+SH
+if ! turnstile_pair_violation "$fixture_dir/turnstile-drift.config.ts" "$fixture_dir/turnstile-pair.e2e-up.sh" >/dev/null; then
+    fail 'the Turnstile site-key drift fixture was not rejected by the pairing probe'
+fi
+if ! turnstile_pair_violation "$fixture_dir/turnstile-missing.config.ts" "$fixture_dir/turnstile-pair.e2e-up.sh" >/dev/null; then
+    fail 'the missing Turnstile site-key fixture was not rejected by the pairing probe'
+fi
+if turnstile_pair_violation "$fixture_dir/turnstile-pair.config.ts" "$fixture_dir/turnstile-pair.e2e-up.sh" >/dev/null; then
+    fail 'the matching Turnstile fixture was rejected by the pairing probe'
+fi
+
 workflow_code="$TMP_ROOT/workflow-code"
 : >"$workflow_code"
 for workflow in "${workflow_files[@]}"; do
@@ -621,6 +686,23 @@ assert_contains "$PLAYWRIGHT_CONFIG" "        video: 'off'," \
     'Playwright video must be disabled'
 assert_contains "$CI_WORKFLOW" '          CI: "1"' \
     'the E2E step must explicitly identify CI mode'
+
+# 4c. The Turnstile dummy key pair must stay paired across both harnesses and
+# pinned to Cloudflare's documented always-pass values. The cross-file comparison
+# catches drift; the exact literals below additionally prevent both copies from
+# being changed together into something that is not the dummy pair at all.
+if message="$(turnstile_pair_violation "$PLAYWRIGHT_CONFIG" "$E2E_UP_SCRIPT")"; then
+    fail "$message"
+fi
+assert_contains "$PLAYWRIGHT_CONFIG" \
+    "const TURSTILE_DUMMY_SITE_KEY = '1x00000000000000000000AA';" \
+    'the Playwright config must keep Cloudflare'"'"'s documented always-pass dummy site key'
+assert_contains "$E2E_UP_SCRIPT" \
+    'readonly E2E_TURNSTILE_SITE_KEY="1x00000000000000000000AA"' \
+    'the local E2E harness must keep the same dummy site key the Playwright config injects'
+assert_contains "$E2E_UP_SCRIPT" \
+    'readonly E2E_TURNSTILE_SECRET="1x0000000000000000000000000000000AA"' \
+    'the local E2E harness must keep the dummy secret that belongs to the dummy site key'
 
 # 5. Runtime and image references are immutable. This checks syntax and the
 # repository's declared policy; it does not contact registries or prove that a

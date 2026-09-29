@@ -3,6 +3,16 @@ import process from 'node:process';
 
 const isCi = process.env.CI === 'true' || process.env.CI === '1';
 
+// Cloudflare's documented always-passing dummy site key — the documented
+// counterpart of the dummy secret `scripts/e2e-up.sh` hands the backend
+// (E2E_TURNSTILE_SITE_KEY / E2E_TURNSTILE_SECRET). Without it on the frontend
+// side, `ClientCartView` sees an empty key, renders its "no site key" notice
+// instead of the widget, and leaves the checkout button disabled — so the
+// Turnstile checkout spec fails on a missing Vite env var, not on a defect.
+// Never a real key: this value is public by definition and is only ever paired
+// with the dummy secret on an E2E-only backend.
+const TURSTILE_DUMMY_SITE_KEY = '1x00000000000000000000AA';
+
 export default defineConfig({
     testDir: './tests/e2e',
     testMatch: '**/*.spec.ts',
@@ -67,7 +77,20 @@ export default defineConfig({
                   // Without this the proxy falls back to `https://portal.test`,
                   // which needs Valet/Herd — not installed here. The specs would
                   // then talk to whatever that host resolves to.
-                  env: {VITE_API_PROXY: 'http://127.0.0.1:8001'},
+                  //
+                  // `VITE_TURNSTILE_SITE_KEY` mirrors the backend dummy pair from
+                  // `scripts/e2e-up.sh`; CI passes the same value in the
+                  // `pnpm dev` step env, so both paths converge on one key.
+                  // FALLBACK ONLY: an already-exported key wins, so a developer
+                  // (or any future harness) with a real key is never overridden
+                  // by the dummy. This block is skipped entirely under CI
+                  // (`webServer: isCi ? undefined : ...`), where the workflow
+                  // exports the key itself — so CI precedence cannot be affected.
+                  env: {
+                      VITE_API_PROXY: 'http://127.0.0.1:8001',
+                      VITE_TURNSTILE_SITE_KEY: process.env.VITE_TURNSTILE_SITE_KEY?.trim()
+                          || TURSTILE_DUMMY_SITE_KEY,
+                  },
                   url: 'http://localhost:4321/',
                   reuseExistingServer: true,
                   timeout: 120_000,
