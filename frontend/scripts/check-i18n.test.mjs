@@ -136,6 +136,54 @@ describe('check-i18n unlocalized string guard', () => {
     expect(findUnlocalizedStrings(source, 'fixture.tsx')).toEqual([]);
   });
 
+  it('flags a German camelCase ariaLabel prop on a custom component', () => {
+    // Real shape: `CustomerModal.tsx` passes the visible label of
+    // `AutocompleteInput` as `ariaLabel={t` + '`PLZ`' + `}`. React only accepts
+    // the camelCase spelling for a prop on a custom element, so the hyphenated
+    // `aria-` prefix branch never saw these — and an unwrapped `ariaLabel` is
+    // untranslated user-visible copy.
+    const source = [
+      'export const Location = () => (',
+      '  <AutocompleteInput ariaLabel="Stadt" value={value} onChange={onChange} />',
+      ');',
+    ].join('\n');
+
+    const violations = findUnlocalizedStrings(source, 'fixture.tsx');
+
+    expect(violations).toMatchObject([
+      { filePath: 'fixture.tsx', line: 2, category: 'jsx-attribute', text: 'ariaLabel="Stadt"' },
+    ]);
+    expect(violations).toHaveLength(1);
+  });
+
+  it('does not flag a technical, token or id-reference value on a camelCase aria prop', () => {
+    // The camelCase branch must share the hyphenated taxonomy, not widen it:
+    // a URL is a technical value, `true` is an enumerated ARIA token and
+    // `gallery-heading` is an id reference. All three stay silent, exactly like
+    // `aria-hidden="true"` and `aria-labelledby="gallery-heading"`.
+    const source = [
+      'export const Widget = () => (',
+      '  <AutocompleteInput',
+      '    ariaHidden="true"',
+      '    ariaLive="polite"',
+      '    ariaLabelledBy="gallery-heading"',
+      '    ariaLabel="https://example.com"',
+      '  />',
+      ');',
+    ].join('\n');
+
+    expect(findUnlocalizedStrings(source, 'fixture.tsx')).toEqual([]);
+  });
+
+  it('does not flag a camelCase aria prop that the t macro already wraps', () => {
+    const source = [
+      "import { t } from '@lingui/core/macro';",
+      'export const Location = () => <AutocompleteInput ariaLabel={t`Stadt`} />;',
+    ].join('\n');
+
+    expect(findUnlocalizedStrings(source, 'fixture.tsx')).toEqual([]);
+  });
+
   it('does not flag strings produced by the t macro', () => {
     const source = [
       "import { t } from '@lingui/core/macro';",
@@ -403,12 +451,15 @@ describe('check-i18n runner', () => {
     const script = resolve(process.cwd(), 'scripts/check-i18n.mjs');
     // `NODE_ENV` is scrubbed for the child because vitest sets `NODE_ENV=test`
     // in its workers, and `lingui extract` — which the runner shells out to via
-    // `pnpm lingui:extract` — dies there with `TypeError: emitter.removeListener
-    // is not a function` before it writes a single msgid, on Node 26. That is
-    // reproducible without vitest at all (`NODE_ENV=test pnpm run lingui:extract`
-    // → exit 1, same trace; unset → exit 0), so it is a lingui/Node
-    // incompatibility, not an i18n finding. The spawn has to measure the i18n
-    // contract and not that unrelated toolchain crash.
+    // `pnpm lingui:extract` — dies there before it writes a single msgid: lingui
+    // resolves its worker file by `NODE_ENV`, and under `NODE_ENV=test`
+    // `resolveWorkerFile` (`node_modules/@lingui/cli/dist/api/typedPool.js:9-11`)
+    // picks `extractWorkerWrapper.jiti.js`, which does not ship (only `.prod.js`
+    // exists) — the worker dies on module-not-found. That is reproducible without
+    // vitest at all (`NODE_ENV=test pnpm run lingui:extract` → exit 1, module
+    // not found; unset → exit 0), so it is a lingui packaging gap, not an i18n
+    // finding. The spawn has to measure the i18n contract and not that unrelated
+    // toolchain crash.
     const result = spawnSync(process.execPath, [script], {
       encoding: 'utf8',
       env: { ...process.env, NODE_ENV: undefined },
@@ -422,6 +473,29 @@ describe('check-i18n runner', () => {
     // this red. The exit assertion is what keeps such a finding fatal rather
     // than merely reported.
     expect(findUnlocalizedStringsInTree().length).toBe(0);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('i18n check passed');
+  });
+
+  it('survives NODE_ENV=test because the gate cleans the extract environment', () => {
+    // The defect was in the gate, not in the tests: the extract child inherited
+    // `NODE_ENV=test` (vitest sets it in its workers, and `NODE_ENV=test pnpm
+    // build` sets it for `prebuild`), and `lingui extract` then died before
+    // writing a single msgid — under `NODE_ENV=test` `resolveWorkerFile`
+    // (`node_modules/@lingui/cli/dist/api/typedPool.js:9-11`) resolves
+    // `extractWorkerWrapper.jiti.js`, which does not ship (only `.prod.js`
+    // exists), so the worker dies on module-not-found. So the runner test above
+    // had to scrub the value to get a green measurement — which hid the very
+    // failure it was measuring. The contract is now the opposite: the gate must
+    // pass **with** the hostile value, so this test hands it in deliberately
+    // and asserts the same exit code. Repro without vitest:
+    // `NODE_ENV=test pnpm build`.
+    const script = resolve(process.cwd(), 'scripts/check-i18n.mjs');
+    const result = spawnSync(process.execPath, [script], {
+      encoding: 'utf8',
+      env: { ...process.env, NODE_ENV: 'test' },
+    });
+
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain('i18n check passed');
   });

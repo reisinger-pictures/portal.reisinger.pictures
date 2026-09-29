@@ -5,13 +5,13 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **83 offene Positionen**
-> über 1741 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **82 offene Positionen**
+> über 1736 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **19**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **18**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
 >
@@ -373,11 +373,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [ ] **i18n-Folgearbeit (aus D-7): Checker-Lücke camelCase `ariaLabel`, `NODE_ENV`-Fragilität.**
-  Die Regel sieht `ariaLabel="…"` nicht (`USER_VISIBLE_ATTRIBUTES` + `aria-`-Präfix greifen nur
-  bei Bindestrich); 2 Literale (`CustomerModal.tsx:151/167`) sind gewrappt, die Lücke besteht weiter.
-  Getrennt: `NODE_ENV=test` crasht `lingui extract` (`emitter.removeListener`, Node 26) — der Gate-
-  Lauf braucht sauberes Env. Zähler 0 und Build grün bleiben davon unberührt.
 - [~] wartet auf die Produktentscheidung, ob Fotografen ihr Passwort selbst ändern dürfen (Confirm-Flow mit aktuellem Passwort) oder nur der Admin. **P1-M23 (P0) — Passwort-Erzeugung und Show-once, statt Verschlüsselung
   at rest.** Das ist die **entscheidende Entlastung gegenüber P1-M18** und
   der eigentliche Grund für den Wechsel: SFTPGo hält das Passwort, das
