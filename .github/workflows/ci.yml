@@ -322,8 +322,13 @@ jobs:
       # red job. CI is ephemeral, so running the job as root here is safe and
       # intentional. The non-root runtime guarantee belongs to the *production*
       # artifacts: deployment/Dockerfile's `USER www-data` plus the compose
-      # `user: "1000:1000"` (asserted by InfrastructureSupplyChainPolicyTest and
-      # tests/infrastructure/verify-image-nonroot.sh). Never drop this option
+      # `user: "1000:1000"` on backend and composer_init — sftpgo is the
+      # deliberate exception at `user: "1002:82"` (AGENTS.md D-1) — both
+      # asserted by InfrastructureSupplyChainPolicyTest, the only place that
+      # inspects compose `user:` values. The image side (published Config.User
+      # vs. the Dockerfile `USER`) is verified separately by
+      # tests/infrastructure/verify-image-nonroot.sh, which reads the compose
+      # file only to pin image tags. Never drop this option
       # without also making the mounted workspace writable by uid 1000.
       options: --user root
     strategy:
