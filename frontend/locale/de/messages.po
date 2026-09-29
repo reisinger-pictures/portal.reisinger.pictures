@@ -1942,6 +1942,10 @@ msgstr "Die Europäische Kommission stellt eine Plattform zur Online-Streitbeile
 msgid "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen."
 msgstr "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen."
 
+#: src/ui/Privacy.tsx
+msgid "Die IP-Risikoschlüssel werden als schlüsselabhängiger, nicht umkehrbarer Hash berechnet. In den Limitierungs- und Risikozählern wird ausschließlich der so abgeleitete Schlüssel geführt, nie die rohe IP-Adresse; der Schlüssel lässt sich nicht in eine IP-Adresse zurückrechnen."
+msgstr "Die IP-Risikoschlüssel werden als schlüsselabhängiger, nicht umkehrbarer Hash berechnet. In den Limitierungs- und Risikozählern wird ausschließlich der so abgeleitete Schlüssel geführt, nie die rohe IP-Adresse; der Schlüssel lässt sich nicht in eine IP-Adresse zurückrechnen."
+
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Die Kamera importiert ausschließlich eine Stammzertifikatsdatei mit genau diesen Dateinamen. Ein beliebig benanntes cert.pem wird übersprungen, ohne jede Fehlermeldung. Es kann nur ein Zertifikat importiert werden, und die Karte muss vorher eingesteckt sein."
 msgstr "Die Kamera importiert ausschließlich eine Stammzertifikatsdatei mit genau diesen Dateinamen. Ein beliebig benanntes cert.pem wird übersprungen, ohne jede Fehlermeldung. Es kann nur ein Zertifikat importiert werden, und die Karte muss vorher eingesteckt sein."
@@ -2050,6 +2054,10 @@ msgstr "Diese drei Fälle erzeugen keine Fehlermeldung in der Kamera. Sie sehen 
 msgid "Diese Einladung ist ungültig oder abgelaufen."
 msgstr "Diese Einladung ist ungültig oder abgelaufen."
 
+#: src/ui/Privacy.tsx
+msgid "Diese Fehlertelemetrie schreibt ausschließlich das signierte und eindeutig zuordenbare Zahlungsereignis von Stripe; ein Fehlversuch, der nur in Ihrem Browser sichtbar wird, verändert diese Werte nicht. Der Zähler der Fehlversuche ist nach oben begrenzt, und der Decline-Code wird auf Ziffern, Buchstaben und wenige Trennzeichen beschränkt sowie auf 64 Zeichen gekürzt."
+msgstr "Diese Fehlertelemetrie schreibt ausschließlich das signierte und eindeutig zuordenbare Zahlungsereignis von Stripe; ein Fehlversuch, der nur in Ihrem Browser sichtbar wird, verändert diese Werte nicht. Der Zähler der Fehlversuche ist nach oben begrenzt, und der Decline-Code wird auf Ziffern, Buchstaben und wenige Trennzeichen beschränkt sowie auf 64 Zeichen gekürzt."
+
 #: src/ui/components/GalleryModal.tsx
 msgid "Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!"
 msgstr "Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!"
@@ -2057,6 +2065,10 @@ msgstr "Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt k
 #: src/ui/Privacy.tsx
 msgid "Diese Plattform verwendet sogenannte \"HttpOnly\"-Cookies, um angemeldete Benutzer sicher zu authentifizieren. Diese Cookies speichern einen Authentifizierungs-Token (JWT) und sind für die technische Funktion des Portals (Zugriff auf private Galerien, Speichern von Bewertungen) zwingend erforderlich. Sie können nicht durch clientseitige Skripte (JavaScript) ausgelesen werden."
 msgstr "Diese Plattform verwendet sogenannte \"HttpOnly\"-Cookies, um angemeldete Benutzer sicher zu authentifizieren. Diese Cookies speichern einen Authentifizierungs-Token (JWT) und sind für die technische Funktion des Portals (Zugriff auf private Galerien, Speichern von Bewertungen) zwingend erforderlich. Sie können nicht durch clientseitige Skripte (JavaScript) ausgelesen werden."
+
+#: src/ui/Privacy.tsx
+msgid "Dieselbe Zuordnung aus Checkout-Fingerprint und einer zufälligen Checkout-Kennung Ihres Browsers wird auch für Bestellungen gespeichert, die über Rechnung oder Lieferschein abgerechnet werden. Sie dient dort allein dazu, einen wiederholten Absendevorgang von einer bewusst neuen Bestellung zu unterscheiden."
+msgstr "Dieselbe Zuordnung aus Checkout-Fingerprint und einer zufälligen Checkout-Kennung Ihres Browsers wird auch für Bestellungen gespeichert, die über Rechnung oder Lieferschein abgerechnet werden. Sie dient dort allein dazu, einen wiederholten Absendevorgang von einer bewusst neuen Bestellung zu unterscheiden."
 
 #: src/ui/management/components/PhotographerTeamModal.tsx
 msgid "Dieser Bereich ist aktuell für <0>alle Fotografen</0> freigegeben. Du musst keine expliziten Zuweisungen vornehmen."
@@ -2219,6 +2231,10 @@ msgstr "Eher nicht"
 #: src/ui/components/ManagementPageShell.tsx
 msgid "Ein Fehler ist aufgetreten."
 msgstr "Ein Fehler ist aufgetreten."
+
+#: src/ui/Privacy.tsx
+msgid "Ein Kundenkonto bei Stripe wird nicht bei der Registrierung angelegt, sondern erst mit der ersten zahlungspflichtigen Bestellung; für weitere Bestellungen wird es wiederverwendet. Im Portal ist dazu ausschließlich die Kennung hinterlegt. Mit dem Löschen eines Portalkontos durch den Betreiber entfällt diese Zuordnung im Portal; das bei Stripe angelegte Kundenkonto wird dabei nicht automatisch im Stripe-Dashboard gelöscht."
+msgstr "Ein Kundenkonto bei Stripe wird nicht bei der Registrierung angelegt, sondern erst mit der ersten zahlungspflichtigen Bestellung; für weitere Bestellungen wird es wiederverwendet. Im Portal ist dazu ausschließlich die Kennung hinterlegt. Mit dem Löschen eines Portalkontos durch den Betreiber entfällt diese Zuordnung im Portal; das bei Stripe angelegte Kundenkonto wird dabei nicht automatisch im Stripe-Dashboard gelöscht."
 
 #: src/ui/components/ErrorBoundary.tsx
 msgid "Ein unerwarteter Fehler ist aufgetreten"
@@ -2999,8 +3015,16 @@ msgid "Für den gewählten Kontaktweg fehlt die hinterlegte Angabe."
 msgstr "Für den gewählten Kontaktweg fehlt die hinterlegte Angabe."
 
 #: src/ui/Privacy.tsx
-msgid "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht."
-msgstr "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht."
+msgid "Für die sofortige Kartenzahlung prüft das Portal zusätzlich serverseitig das Erstellungsdatum Ihres Portalkontos sowie die Anzahl Ihrer Checkout-Versuche und der Versuche Ihrer IP-Adresse. Dafür werden Ihre Konto-ID, Ihr Kontoerstellungsdatum und der oben beschriebene IP-Risikoschlüssel verwendet; die Prüfung entscheidet, ob ein Zahlungsvorgang mit Stripe begonnen wird. Für Bestellungen per Rechnung, Lieferschein oder Angebot gilt diese Prüfung nicht."
+msgstr "Für die sofortige Kartenzahlung prüft das Portal zusätzlich serverseitig das Erstellungsdatum Ihres Portalkontos sowie die Anzahl Ihrer Checkout-Versuche und der Versuche Ihrer IP-Adresse. Dafür werden Ihre Konto-ID, Ihr Kontoerstellungsdatum und der oben beschriebene IP-Risikoschlüssel verwendet; die Prüfung entscheidet, ob ein Zahlungsvorgang mit Stripe begonnen wird. Für Bestellungen per Rechnung, Lieferschein oder Angebot gilt diese Prüfung nicht."
+
+#: src/ui/Privacy.tsx
+#~ msgid "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht."
+#~ msgstr "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht."
+
+#: src/ui/Privacy.tsx
+msgid "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht. Der Eintrag ist dem angemeldeten Portalkonto zugeordnet und wird ersetzt, sobald sich der Warenkorb ändert."
+msgstr "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht. Der Eintrag ist dem angemeldeten Portalkonto zugeordnet und wird ersetzt, sobald sich der Warenkorb ändert."
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Die Kamera kann FTPS damit nicht aushandeln — nutze stattdessen SFTP."
@@ -7024,6 +7048,10 @@ msgstr "Web & Social"
 msgid "Website: [Domain]"
 msgstr "Website: [Domain]"
 
+#: src/ui/Privacy.tsx
+msgid "Weder das Prüftoken noch die Antwort der Prüfung und auch das Prüfergebnis selbst werden im Portal gespeichert. Ihre Warenkorb- und Bestelldaten werden dabei nicht an Cloudflare übermittelt; übermittelt werden das Token, ein serverseitiger Schlüssel und die IP-Adresse des Checkout-Vorgangs."
+msgstr "Weder das Prüftoken noch die Antwort der Prüfung und auch das Prüfergebnis selbst werden im Portal gespeichert. Ihre Warenkorb- und Bestelldaten werden dabei nicht an Cloudflare übermittelt; übermittelt werden das Token, ein serverseitiger Schlüssel und die IP-Adresse des Checkout-Vorgangs."
+
 #: src/logic/modelRegistration.ts
 msgid "Weiblich"
 msgstr "Weiblich"
@@ -7365,6 +7393,10 @@ msgstr "Ziel-ID"
 #: src/ui/management/FtpConnectionRows.tsx
 msgid "Zielordner"
 msgstr "Zielordner"
+
+#: src/ui/Privacy.tsx
+msgid "Zu den in dieser Erklärung genannten Kennungen und Signalen sind die technischen Angaben vollständig beschrieben. Die zugehörigen Rechtsgrundlagen, die konkreten Aufbewahrungsfristen sowie die Regeln zu Löschung und Anonymisierung sind noch nicht abschließend festgelegt; der Betreiber teilt sie Ihnen auf Anfrage und mit der finalen Fassung dieser Erklärung mit."
+msgstr "Zu den in dieser Erklärung genannten Kennungen und Signalen sind die technischen Angaben vollständig beschrieben. Die zugehörigen Rechtsgrundlagen, die konkreten Aufbewahrungsfristen sowie die Regeln zu Löschung und Anonymisierung sind noch nicht abschließend festgelegt; der Betreiber teilt sie Ihnen auf Anfrage und mit der finalen Fassung dieser Erklärung mit."
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "zuerst „Vertrauenswürdige Zielserver\" auf Aktivieren"
