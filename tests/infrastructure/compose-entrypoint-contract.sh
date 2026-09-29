@@ -74,7 +74,11 @@ for token in '$$' '$(' '${'; do
 done
 
 # Identity and path guards must read the environment without expansion.
-for needed in 'id -u | grep -qx 1000' 'id -g | grep -qx 1000' 'printenv APP_ENV' \
+# The uid and gid literals are pinned independently because they have to agree
+# with the backend's `user:` — a stale gid literal makes the container refuse to
+# start while every other assertion here stays green. AGENTS.md D-1/D-2: the
+# backend runs 1000:82, group webgroup.
+for needed in 'id -u | grep -qx 1000' 'id -g | grep -qx 82' 'printenv APP_ENV' \
               'printenv APP_KEY' 'printenv JWT_SECRET' 'printenv FILE_ENCRYPTION_KEY' \
               'printenv ADMIN_EMAIL' 'printenv ADMIN_PASSWORD' 'printenv PHOTO_STORAGE_PATH' \
               'printenv AI_SESSION_HEADER' 'printenv AI_SESSION_PREFIX'; do
