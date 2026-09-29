@@ -85,18 +85,30 @@ export default function DashboardLayout({ children, currentView, header, mainCla
                             sidebarId,
                         })}
                         {children}
-                    </main>
 
-                    <GalleryModals
-                        availableGroups={flattenGroups(safeGroups)}
-                        isGroupModalOpen={isGroupModalOpen} setGroupModalOpen={setGroupModalOpen}
-                        isGalleryModalOpen={isGalleryModalOpen} setGalleryModalOpen={setGalleryModalOpen}
-                        editingGroup={editingGroup} editingGallery={editingGallery}
-                        defaultGroupId={prefillGroupId}
-                        onCreateGroup={createGroup} onCreateGallery={createGallery}
-                        onUpdateGroup={updateGroup} onUpdateGallery={updateGallery}
-                        onDeleteGroup={deleteGroup} onDeleteGallery={deleteGallery}
-                    />
+                        {/* D-10: the gallery dialogs render INSIDE the landmark.
+                            `ModalShell` opens a plain `<dialog open>` and uses no
+                            portal, so a dialog rendered after `</main>` is not a
+                            descendant of the landmark at all. Every landmark-scoped
+                            locator — the repo's E2E convention, `page.locator('main')
+                            .getByRole(...)` — then misses the dialog even though it is
+                            on screen, and `click()` fails on an element that is
+                            plainly there. Placing them inside `<main>` fixes the cause
+                            instead of weakening the scoping rule.
+                            `<dialog>` is `position: fixed` (daisyUI `.modal`), so it is
+                            out of flow and adds no box to the scrolling column — the
+                            change is invisible to the layout, only to the DOM tree. */}
+                        <GalleryModals
+                            availableGroups={flattenGroups(safeGroups)}
+                            isGroupModalOpen={isGroupModalOpen} setGroupModalOpen={setGroupModalOpen}
+                            isGalleryModalOpen={isGalleryModalOpen} setGalleryModalOpen={setGalleryModalOpen}
+                            editingGroup={editingGroup} editingGallery={editingGallery}
+                            defaultGroupId={prefillGroupId}
+                            onCreateGroup={createGroup} onCreateGallery={createGallery}
+                            onUpdateGroup={updateGroup} onUpdateGallery={updateGallery}
+                            onDeleteGroup={deleteGroup} onDeleteGallery={deleteGallery}
+                        />
+                    </main>
                 </div>
             </div>
         </DashboardContext.Provider>
