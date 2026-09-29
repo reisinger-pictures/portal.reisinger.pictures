@@ -211,6 +211,61 @@ export async function seedPhotographer(request: APIRequestContext): Promise<Phot
 }
 
 /**
+ * The ONE gallery seed the whole gallery family hangs on.
+ *
+ * Every gallery-scoped dialog entry (Fotografen-Team, Zugriff, Einladungslink,
+ * Bewertungen, Metadaten-Vorgaben, E-Mail, Galerie bearbeiten, Meta-Galerie
+ * bearbeiten) is created through this one function; the exported seeds below
+ * differ only in the definition they pass. That is deliberate: the family's
+ * determinism is a property of the single create-and-resolve contract, so it is
+ * fixed in one place instead of copied three times.
+ *
+ * Two server-side facts this contract has to respect, both found by reading
+ * rather than assuming:
+ *
+ * - `is_public` is sent but not trusted for a selection gallery:
+ *   `GalleryService::storeGallery` forces `is_public` (and `is_free_download`)
+ *   to `false` (GalleryService.php:118 and the re-assert at 138-143), and the
+ *   route stays loadable through the super-admin bypass instead — see
+ *   `seedSelectionGallery` below.
+ * - The slug is read from the RESPONSE, never echoed from the request:
+ *   `SlugService::makeUnique` appends a counter on a collision, and a stale
+ *   slug would 404 the route.
+ */
+async function createGallerySeed(
+    request: APIRequestContext,
+    definition: { name: string; slug: string; type: 'delivery' | 'selection'; isPublic: boolean; label: string },
+): Promise<SeededGallery> {
+    const helper = new E2ESessionHelper(request);
+    const cookie = await helper.loginAs(ADMIN_EMAIL, ADMIN_PASSWORD);
+
+    const response = await request.post('/api/management/galleries', {
+        data: {
+            name: definition.name,
+            slug: definition.slug,
+            type: definition.type,
+            is_public: definition.isPublic,
+        },
+        headers: { 'Accept': 'application/json', 'Cookie': cookie },
+    });
+
+    if (!response.ok()) {
+        throw new Error(`UI-review seed: ${definition.label} creation failed (${response.status()}): ${await response.text()}`);
+    }
+
+    const body = (await response.json()) as { gallery?: { id?: string | number; slug?: string } };
+    const slug = body.gallery?.slug;
+    const id = body.gallery?.id;
+    if (!slug || id === undefined || id === null) {
+        throw new Error(`UI-review seed: ${definition.label} creation returned no id/slug: ${JSON.stringify(body)}`);
+    }
+
+    // `GalleryResource` passes the raw primary key through, so the JSON type is
+    // not guaranteed — normalise it to the string every seed type declares.
+    return { id: String(id), slug };
+}
+
+/**
  * Filled state of a management gallery: one delivery gallery created through
  * the management API, so a gallery-scoped dialog has a gallery to hang on.
  *
@@ -230,34 +285,14 @@ export async function seedPhotographer(request: APIRequestContext): Promise<Phot
 export async function seedGallery(request: APIRequestContext): Promise<SeededGallery> {
     if (galleryCache) return galleryCache;
 
-    const helper = new E2ESessionHelper(request);
-    const cookie = await helper.loginAs(ADMIN_EMAIL, ADMIN_PASSWORD);
-
     const suffix = uniqueId();
-    const response = await request.post('/api/management/galleries', {
-        data: {
-            name: `UI Review Galerie ${suffix}`,
-            slug: `ui-review-galerie-${suffix}`,
-            type: 'delivery',
-            is_public: true,
-        },
-        headers: { 'Accept': 'application/json', 'Cookie': cookie },
+    galleryCache = await createGallerySeed(request, {
+        name: `UI Review Galerie ${suffix}`,
+        slug: `ui-review-galerie-${suffix}`,
+        type: 'delivery',
+        isPublic: true,
+        label: 'gallery',
     });
-
-    if (!response.ok()) {
-        throw new Error(`UI-review seed: gallery creation failed (${response.status()}): ${await response.text()}`);
-    }
-
-    const body = (await response.json()) as { gallery?: { id?: string | number; slug?: string } };
-    const slug = body.gallery?.slug;
-    const id = body.gallery?.id;
-    if (!slug || id === undefined || id === null) {
-        throw new Error(`UI-review seed: gallery creation returned no id/slug: ${JSON.stringify(body)}`);
-    }
-
-    // `GalleryResource` passes the raw primary key through, so the JSON type is
-    // not guaranteed — normalise it to the string every seed type declares.
-    galleryCache = { id: String(id), slug };
     return galleryCache;
 }
 
@@ -267,13 +302,14 @@ export async function seedGallery(request: APIRequestContext): Promise<SeededGal
  * that row that only renders for `gallery.type === 'selection'`
  * (ManagementGalleryActions.tsx:25).
  *
- * Same reasoning as `seedGallery` above, and deliberately the same payload
- * shape, so the two seeds stay comparable side by side. Two things differ:
+ * Same create-and-resolve contract as `seedGallery` above (`createGallerySeed`),
+ * and deliberately the same payload shape, so the two seeds stay comparable
+ * side by side. Two things differ:
  *
- * 1. The create body is not shared with `seedGallery` — that seed is proven
- *    and the two differ in a load-bearing way (see `is_public` below), so
- *    duplicating ~20 lines beats a helper whose parameter would only exist to
- *    be told apart.
+ * 1. Only the definition differs — type, name and slug. The two seeds carried a
+ *    copied ~20-line create-and-resolve body until `createGallerySeed` above
+ *    was extracted: the payload is identical apart from the definition, so one
+ *    function now takes the definition and returns the resolved gallery.
  * 2. `is_public: true` is sent for symmetry, but the backend deliberately
  *    OVERRIDES it: `GalleryService::storeGallery` forces `is_public` (and
  *    `is_free_download`) to `false` for every selection gallery — a
@@ -294,32 +330,14 @@ export async function seedGallery(request: APIRequestContext): Promise<SeededGal
 export async function seedSelectionGallery(request: APIRequestContext): Promise<SeededGallery> {
     if (selectionGalleryCache) return selectionGalleryCache;
 
-    const helper = new E2ESessionHelper(request);
-    const cookie = await helper.loginAs(ADMIN_EMAIL, ADMIN_PASSWORD);
-
     const suffix = uniqueId();
-    const response = await request.post('/api/management/galleries', {
-        data: {
-            name: `UI Review Auswahlgalerie ${suffix}`,
-            slug: `ui-review-auswahlgalerie-${suffix}`,
-            type: 'selection',
-            is_public: true,
-        },
-        headers: { 'Accept': 'application/json', 'Cookie': cookie },
+    selectionGalleryCache = await createGallerySeed(request, {
+        name: `UI Review Auswahlgalerie ${suffix}`,
+        slug: `ui-review-auswahlgalerie-${suffix}`,
+        type: 'selection',
+        isPublic: true,
+        label: 'selection gallery',
     });
-
-    if (!response.ok()) {
-        throw new Error(`UI-review seed: selection gallery creation failed (${response.status()}): ${await response.text()}`);
-    }
-
-    const body = (await response.json()) as { gallery?: { id?: string | number; slug?: string } };
-    const slug = body.gallery?.slug;
-    const id = body.gallery?.id;
-    if (!slug || id === undefined || id === null) {
-        throw new Error(`UI-review seed: selection gallery creation returned no id/slug: ${JSON.stringify(body)}`);
-    }
-
-    selectionGalleryCache = { id: String(id), slug };
     return selectionGalleryCache;
 }
 
