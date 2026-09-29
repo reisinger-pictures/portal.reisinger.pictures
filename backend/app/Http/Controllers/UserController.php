@@ -11,14 +11,13 @@ use App\Mail\ActivateAccountMail;
 use App\Models\Org;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ActivationTokenService;
 use App\Services\AuthorizationService;
 use App\Services\FtpCredentialService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
@@ -119,23 +118,25 @@ class UserController extends Controller
                 $user->save();
             }
 
-            $token = Str::random(64);
-            DB::table('password_reset_tokens')->updateOrInsert(
-                ['email' => $user->email],
-                ['token' => Hash::make($token), 'created_at' => now()]
-            );
+            // Claimed, never overwritten (D-17): see ActivationTokenService. A
+            // live token from an earlier issuance stays the link this person
+            // holds, so an admin who creates the same address twice cannot kill
+            // a mail that is already in flight.
+            $token = app(ActivationTokenService::class)->issue($user->email);
 
-            $link = BrandRegistry::frontendUrl().'/reset-password?token='.$token.'&email='.urlencode($user->email);
+            if ($token !== null) {
+                $link = BrandRegistry::frontendUrl().'/reset-password?token='.$token.'&email='.urlencode($user->email);
 
-            Mail::to($user->email)->send(
-                new ActivateAccountMail(
-                    $user->name,
-                    'Es wurde ein Account für dich angelegt. Klicke hier, um ein Passwort zu vergeben:',
-                    $link,
-                    'Account aktivieren',
-                    'Dein neuer Account'
-                )
-            );
+                Mail::to($user->email)->send(
+                    new ActivateAccountMail(
+                        $user->name,
+                        'Es wurde ein Account für dich angelegt. Klicke hier, um ein Passwort zu vergeben:',
+                        $link,
+                        'Account aktivieren',
+                        'Dein neuer Account'
+                    )
+                );
+            }
 
             return response()->json(['success' => true, 'user' => new UserResource($user)]);
         });

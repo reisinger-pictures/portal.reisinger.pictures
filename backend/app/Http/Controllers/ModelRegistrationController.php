@@ -14,6 +14,7 @@ use App\Models\ModelProfile;
 use App\Models\ModelRegistrationInvite;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ActivationTokenService;
 use App\Services\AuthorizationService;
 use App\Services\CustomerSearchSyncService;
 use App\Services\ModelFileCleanupService;
@@ -25,10 +26,8 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -632,27 +631,28 @@ class ModelRegistrationController extends Controller
 
             $this->assignClientRole($user);
 
-            $token = Str::random(64);
-            DB::table('password_reset_tokens')->updateOrInsert(
-                ['email' => $user->email],
-                ['token' => Hash::make($token), 'created_at' => now()]
-            );
+            // Claimed, never overwritten (D-17): see ActivationTokenService. A
+            // still valid token from an earlier registration stays the link this
+            // person holds, and no second activation mail is queued for it.
+            $token = app(ActivationTokenService::class)->issue($user->email);
 
-            $link = BrandRegistry::frontendUrl(Brand::tryFrom($brand))
-                .'/reset-password?token='.$token.'&email='.urlencode($user->email);
+            if ($token !== null) {
+                $link = BrandRegistry::frontendUrl(Brand::tryFrom($brand))
+                    .'/reset-password?token='.$token.'&email='.urlencode($user->email);
 
-            $activationMail = new ActivateAccountMail(
-                $user->name,
-                'Für dich wurde ein Portal-Konto angelegt. Klicke hier, um ein Passwort zu vergeben:',
-                $link,
-                'Account aktivieren',
-                'Dein Portal-Konto',
-                Brand::tryFrom($brand),
-            );
-            $recipient = $user->email;
-            $deferredMails[] = static function () use ($recipient, $activationMail): void {
-                Mail::to($recipient)->send($activationMail);
-            };
+                $activationMail = new ActivateAccountMail(
+                    $user->name,
+                    'Für dich wurde ein Portal-Konto angelegt. Klicke hier, um ein Passwort zu vergeben:',
+                    $link,
+                    'Account aktivieren',
+                    'Dein Portal-Konto',
+                    Brand::tryFrom($brand),
+                );
+                $recipient = $user->email;
+                $deferredMails[] = static function () use ($recipient, $activationMail): void {
+                    Mail::to($recipient)->send($activationMail);
+                };
+            }
         } else {
             // Never attach a legacy null-brand non-Super-Admin to a new
             // registration flow. The invite has a concrete brand; silently

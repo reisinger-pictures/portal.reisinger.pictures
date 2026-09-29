@@ -147,11 +147,11 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 - [x] **D-13 — `maxWidth` auf `'2xl'` eingeschränkt (verifiziert, keine Änderung nötig).** Im Code vorgefunden und in der D-20-Welle verifiziert: `ModalShell.tsx` und `ModalDialogShell.tsx` tippen `maxWidth?: 'default' | '2xl'`, je mit Docblock; `tsc -b` verbietet `'lg'`/`'xl'` an der Aufrufstelle.
 - [ ] **D-16 — technische Dokumentation der Stripe-Identifikatoren vervollständigen**; der
       rechtliche Teil bleibt eine benannte Lücke mit Owner.
-- [ ] **D-17 — beide Policies einzeln entschieden, die Umsetzung steht aus.** Recherche abgeschlossen,
-      Entscheidung je **eine** Frage (nicht gebündelt, wie D-17 es verlangt). **SMTP:** beide Fenster
-      schließen — der Reset-/Aktivierungspfad, wo ein zweiter Klick per `updateOrInsert` den Token
-      überschreibt, den der Nutzer hält, und das Crashfenster in `ProcessModelLifecycle`, wo die Mail
-      eingereiht wird und `last_reminder_stage` erst danach gespeichert wird. **Prompt-Injection:**
+- [ ] **D-17 — beide Policies einzeln entschieden, die Umsetzung steht teilweise.** Recherche abgeschlossen,
+      Entscheidung je **eine** Frage (nicht gebündelt, wie D-17 es verlangt). **SMTP:** erstes Fenster
+      geschlossen (`ActivationTokenService::issue()` + 7 Tests, verifiziert) — zweiter Klick ersetzt
+      keinen lebenden Token mehr, keine zweite Mail; zweites Fenster (Crash in `ProcessModelLifecycle`)
+      noch offen. **Prompt-Injection:**
       das Risiko so festhalten, wie es ist, und den irreführenden Testnamen korrigieren — **keine**
       Code- oder Modelländerung. *Erster Versuch zurückgenommen:* die erste Frage war auf Deutsch und
       mit den Messwerten verstellt; die Antwort war „was ist das problem? english bitte" — die
