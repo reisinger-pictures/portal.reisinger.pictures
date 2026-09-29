@@ -143,7 +143,9 @@ class FtpSlugDirectoryProvisioningTest extends TestCase
 
         $response = $this->putSlug($token, 'j-doe');
 
-        $response->assertStatus(500);
+        // 503: a host fault, not a request the photographer can fix — see
+        // FtpFirstCameraAccountTest for the same cause on the reset endpoint.
+        $response->assertStatus(503);
         $response->assertJsonStructure(['error']);
 
         // The whole decision rests on this assertion: the slug is not stored.
@@ -174,6 +176,45 @@ class FtpSlugDirectoryProvisioningTest extends TestCase
         // has to be able to tell a missing mount from a read-only filesystem or a
         // permission problem.
         $this->assertStringContainsString('No such file or directory', $error);
+    }
+
+    /**
+     * One cause, one status — the pin for the decision that the two paths
+     * answer the *same* code.
+     *
+     * `ensure()` fails once per host, not once per endpoint: a missing `ftp/`
+     * bind mount, a read-only filesystem or wrong permissions hit the slug
+     * change in the profile form and the first camera account in the inbox
+     * equally. They used to answer 500 and 422, which told a client that one
+     * host fault was a field error on one door and a server error on the other —
+     * and neither was true.
+     *
+     * Both requests run here against the same broken root, so the assertion is
+     * the equality of the two statuses, not a restatement of either one. A
+     * client that has to handle the failure cannot tell which door produced it,
+     * so the two must not disagree on what it means.
+     */
+    public function test_both_paths_that_create_the_inbox_directory_report_the_same_status(): void
+    {
+        config(['filesystems.disks.ftp_inbox.root' => $this->inboxRoot.'/absent']);
+
+        // Path 1: the profile form changes a slug.
+        $slugWriter = $this->photographer('old-slug');
+        $slugStatus = $this->putSlug(auth('api')->login($slugWriter), 'j-doe')->status();
+
+        // Path 2: the inbox provisions a first camera account (`pending` is the
+        // only state that reaches `ensure()`; an `active` account rotates).
+        $provisioner = $this->photographer('pending-slug', FtpCredentialService::STATUS_PENDING);
+        $resetStatus = $this->withHeaders([
+            'Authorization' => 'Bearer '.auth('api')->login($provisioner),
+        ])->postJson('/api/management/ftp/reset-password')->status();
+
+        $this->assertSame(503, $slugStatus);
+        $this->assertSame(
+            $slugStatus,
+            $resetStatus,
+            'A directory that cannot be created is one host fault; both doors must report it the same way.',
+        );
     }
 
     public function test_an_existing_directory_is_left_untouched(): void
@@ -210,12 +251,12 @@ class FtpSlugDirectoryProvisioningTest extends TestCase
      * account is live. The folder is created here for real — not through the code
      * under test — so the tests that assert on it are not circular.
      */
-    private function photographer(string $slug = 'max'): User
+    private function photographer(string $slug = 'max', string $status = FtpCredentialService::STATUS_ACTIVE): User
     {
         $user = User::factory()->create(['name' => 'Max Mustermann']);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
         $user->forceFill([
-            'ftp_account_status' => FtpCredentialService::STATUS_ACTIVE,
+            'ftp_account_status' => $status,
             'ftp_slug' => $slug,
         ])->save();
 

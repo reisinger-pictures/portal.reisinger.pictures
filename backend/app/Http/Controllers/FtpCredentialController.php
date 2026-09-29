@@ -49,6 +49,10 @@ class FtpCredentialController extends Controller
      * knows their password did not change — which matters, because the old
      * password is not restored if a partial success were reported as a failure
      * (feature doc 7.3: the reset is the only recovery path).
+     *
+     * The same applies to a 503: the inbox directory is a host dependency (see
+     * {@see FtpCredentialController::fromCredentialException()}), so an operator
+     * has to fix it and the photographer learns that nothing was written.
      */
     public function resetPassword(Request $request): JsonResponse
     {
@@ -79,9 +83,10 @@ class FtpCredentialController extends Controller
     }
 
     /**
-     * 429 for the quota, 409 for an account state that may not be re-issued, 422
-     * for every other portal-side precondition. The reason is not exposed in the
-     * payload: the message is the whole contract, and a client cannot act on a
+     * 429 for the quota, 409 for an account state that may not be re-issued, 503
+     * for an inbox directory the host will not give us, 422 for every other
+     * portal-side precondition. The reason is not exposed in the payload: the
+     * message is the whole contract, and a client cannot act on a
      * machine-readable variant of it.
      *
      * `not_resettable` is a conflict and not an unprocessable request: nothing
@@ -91,6 +96,16 @@ class FtpCredentialController extends Controller
      * would promise that a corrected input fixes it, and there is no input to
      * correct. The reset handler in the inbox already distinguishes 409, so the
      * status also reaches a client that can act on it.
+     *
+     * The inbox directory is the other case where there is nothing to correct in
+     * the request, but it is not a conflict either: a missing `ftp/` bind mount,
+     * a read-only filesystem or wrong permissions are an operator fault on the
+     * host, which is the same class of problem this controller already answers
+     * 503 for when SFTPGo is not configured or unreachable. The slug write path
+     * reports the same cause with the same code (`AuthController::
+     * updateProfile()`) — one cause, one status, so a client cannot learn from
+     * one door that the fault is a field error and from the other that it is a
+     * server error.
      */
     private function fromCredentialException(FtpCredentialException $exception): JsonResponse
     {
@@ -103,6 +118,11 @@ class FtpCredentialController extends Controller
                 ['error' => $exception->getMessage()],
                 429,
                 ['Retry-After' => (string) ($exception->retryAfterSeconds ?? 1)],
+            ),
+            FtpCredentialException::REASON_UNCREATABLE_INBOX_DIRECTORY,
+            FtpCredentialException::REASON_UNUSABLE_INBOX_PATH => response()->json(
+                ['error' => $exception->getMessage()],
+                503,
             ),
             default => response()->json(['error' => $exception->getMessage()], 422),
         };

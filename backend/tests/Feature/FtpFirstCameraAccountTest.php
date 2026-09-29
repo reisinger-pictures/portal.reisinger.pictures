@@ -175,8 +175,11 @@ class FtpFirstCameraAccountTest extends TestCase
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/ftp/reset-password');
 
-        // The endpoint classifies a portal-side precondition as 422 (`fromCredentialException()`).
-        $response->assertStatus(422);
+        // 503: the inbox directory is a host dependency (missing bind mount,
+        // read-only filesystem, wrong permissions), so there is nothing in the
+        // request to correct — the same status an unreachable SFTPGo gets, and
+        // the same one the slug write path gives for this identical cause.
+        $response->assertStatus(503);
         $this->assertNull($response->json('password'));
 
         // The whole decision rests on this assertion: nothing reached SFTPGo.
