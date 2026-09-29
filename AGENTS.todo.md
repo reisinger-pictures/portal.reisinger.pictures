@@ -5,13 +5,13 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **76 offene Positionen**
-> über 1679 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **75 offene Positionen**
+> über 1674 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **12**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **11**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
 >
@@ -110,8 +110,9 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       nicht existierenden Elternpfad mit nicht-rekursivem `mkdir`**, nicht `chmod` — CI fährt die
       Suite als root, wo ein `chmod`-Fixture ignoriert wird und der Test aus dem falschen Grund
       grün wäre.
-      **Offen, bewusst nicht entschieden:** der Reset-Endpunkt antwortet bei Anlagefehler mit **422**,
-      der Slug-Pfad mit **500** — dieselbe Ursache, zwei Codes. Als Folge-Position unten.
+      **Entschieden (D-22, 2026-09-29): einheitlich 503.** Ein Grund, ein Status — Host-/Config-Fehler
+      wie ein fehlender Mount liest sich wie die SFTPGo-Unerreichbarkeit; 422 bleibt den
+      Portal-Voraussetzungen. Umgesetzt in beiden Pfaden, Gleichheit gepinnt.
 - [x] **D-6 — `API_THROTTLE_LIMIT` steht auf 1000 in `backend/.env.ci`**, mit deutschem
       Kommentar im Block der übrigen Throttle-Werte; `backend/.env.example` kommentiert
       englisch, dass 60 der Produktions-Sinnwert ist — jede Datei folgt ihrer eigenen
@@ -145,21 +146,16 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       **Offen bleibt die visuelle Prüfung** — siehe `manuell prüfen:` unten.
 - [x] **D-12 — React `autoFocus` gewinnt (in `95f0362` umgesetzt, in dieser Welle verifiziert).** Reihenfolge-Entscheidung im Trap + Rückkehr-Zielpunkt vor Mount; 5 Fälle gepinnt; gepinnter Test invertiert. Verifiziert.
 - [x] **D-13 — `maxWidth` auf `'2xl'` eingeschränkt (verifiziert, keine Änderung nötig).** Im Code vorgefunden und in der D-20-Welle verifiziert: `ModalShell.tsx` und `ModalDialogShell.tsx` tippen `maxWidth?: 'default' | '2xl'`, je mit Docblock; `tsc -b` verbietet `'lg'`/`'xl'` an der Aufrufstelle.
-- [ ] **D-16 — technische Dokumentation der Stripe-Identifikatoren vervollständigen**; der
-      rechtliche Teil bleibt eine benannte Lücke mit Owner.
-- [ ] **D-17 — beide Policies einzeln entschieden, die Umsetzung steht teilweise.** Recherche abgeschlossen,
-      Entscheidung je **eine** Frage (nicht gebündelt, wie D-17 es verlangt). **SMTP:** erstes Fenster
-      geschlossen (`ActivationTokenService::issue()` + 7 Tests, verifiziert) — zweiter Klick ersetzt
-      keinen lebenden Token mehr, keine zweite Mail; zweites Fenster (Crash in `ProcessModelLifecycle`)
-      noch offen. **Prompt-Injection:**
-      das Risiko so festhalten, wie es ist, und den irreführenden Testnamen korrigieren — **keine**
-      Code- oder Modelländerung. *Erster Versuch zurückgenommen:* die erste Frage war auf Deutsch und
-      mit den Messwerten verstellt; die Antwort war „was ist das problem? english bitte" — die
-      Erklärung war zu dicht. **Merksatz für die nächste Frage: bei einer Policy zuerst sagen, was
-      das Problem in einer konkreten Handlung ist, dann messen.** Offen: `AIServicePromptInjectionTest`
-      umbenennen/umdokumentieren, die zwei prüfbaren Zusicherungen ergänzen (die drei Felder
-      verlassen ihren Block nie; der `detected_city`-Lookup bleibt lesend), und die Policy selbst in
-      `features/` festschreiben.
+- [x] **D-16 — technische Doku der Stripe-Identifikatoren vervollständigt (verifiziert).**
+  `Privacy.tsx` +6 technisch geerdete Absätze (Hash, Customer-Lifecycle, Gates, Webhook-
+  Telemetry, Session-Bindung, Turnstile-Nichtspeicherung); rechtlicher Teil bleibt benannte
+  Lücke mit Owner. Gepinnt durch `Privacy.test.tsx` (3/3) inkl. No-Retention/No-Artikel-Guard.
+  Verifiziert.
+- [x] **D-17 — beide Policies umgesetzt und verifiziert.** SMTP: erstens Token-Claim
+  (`ActivationTokenService::issue()`, 7 Tests), zweitens Scheduler-Transaktion (Claim vor
+  Enqueue, 3 Tests, gegenbelegt); full suite 2851 grün. Prompt-Injection: umbenannt in
+  `AIServiceUntrustedInputContractTest` + `AIDetectedCityLookupReadOnlyTest` (5 Tests).
+  Verifiziert.
 - [x] **D-18 — `testId` auf beiden Shells; `ModelInviteDialog` ohne Wrapper.** Bei HEAD war das
       **halb umgesetzt, unter anderem Namen**: `boxTestId` auf `ModalShell`, seit `659a5a5`,
       und `ModelInviteDialog` nutzte es bereits. D-18 hat den Namen auf `testId` vereinheitlicht
@@ -237,8 +233,6 @@ unverändert gegenüber dem vorigen Deploy, Homepage **200**.
   Ungespeichert-Warnung auslösen — vorher taten das nur „Schließen" und „Abbrechen",
   und getippte Eingabe konnte still verworfen werden. Worauf es ankommt: beide
   Abbruchwege fragen nach, keiner verwirft mehr.
-- [ ] **Anlagefehler: 422 oder 500?** Die SFTPGo-Verzeichnis-Anlage schlägt auf zwei Wegen fehl
-
 - [ ] manuell prüfen: **Dialoghöhen und gepinnter Kopf per Screenshot** — `pnpm
   test:screenshots:grep "screenshot (gallery-access-dialog|gallery-photographer-team-dialog)"`,
   Ergebnis unter `frontend/test-results/ui-screenshots/filled/`. Prüfen: (a) Kopf und Suchfeld
@@ -1355,8 +1349,9 @@ getrennt.
   DoD-Marke an dieser Stelle entstanden): Automatisierte Tests existieren für Schema,
   Rate-Limit und Turnstile — 28 Fälle in `CardTestingSchemaTest.php` (6),
   `CheckoutRateLimitTest.php` (7), `CheckoutRiskTurnstileTest.php` (14) und
-  `TurnstileWidget.test.tsx` (1) —, aber **kein einziges Playwright-E2E**:
-  `grep -rlniE "card.?test|turnstile|3ds" tests/e2e` liefert 0 Treffer. Der
+  `TurnstileWidget.test.tsx` (1) —, plus **ein** Playwright-E2E
+  (`turnstile-checkout.spec.ts`, `@feature:card-testing`, seit `d46f95a` — `grep -rlniE
+  "card.?test|turnstile|3ds" frontend/tests/e2e` liefert 2 Treffer; die frühere 0 war falsch). Der
   Widget-Test deckt die Turnstile-Komponente ab, nicht den Checkout-Pfad im Browser.
   **Abgrenzung:** Der 3DS-Live-Strom bleibt `manuell prüfen` (Eintrag oben) und ist
   ausdrücklich *nicht* Teil dieser Lücke — er ist nicht automatisierbar.

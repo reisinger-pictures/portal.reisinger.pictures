@@ -126,7 +126,7 @@ reliance therefore requires adversarial evaluation against every configured
 provider/model and operational review of generated metadata; output must remain
 untrusted until validated and rendered through the existing safety boundaries.
 The deterministic contracts are covered by
-`backend/tests/Unit/AIServicePromptInjectionTest.php` and the local request-body
+`backend/tests/Unit/AIServiceUntrustedInputContractTest.php` and the local request-body
 cases in `frontend/src/logic/__tests__/useAI.test.ts`.
 
 ## 4. Frontend Architecture

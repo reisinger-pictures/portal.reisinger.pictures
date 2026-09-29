@@ -299,7 +299,14 @@ class AuthController extends Controller
                 try {
                     FtpInboxDirectory::ensure($newSlug);
                 } catch (FtpCredentialException $exception) {
-                    return response()->json(['error' => $exception->getMessage()], 500);
+                    // 503, not 422 and not 500. The inbox directory is a host
+                    // dependency: a missing `ftp/` bind mount, a read-only
+                    // filesystem or wrong permissions cannot be corrected in the
+                    // request, so the portal is fine and the dependency is not.
+                    // Same reading, same code as an unreachable SFTPGo in
+                    // FtpCredentialController::statusForServiceFailure() — and the
+                    // reset endpoint answers this identical cause with 503 too.
+                    return response()->json(['error' => $exception->getMessage()], 503);
                 }
 
                 // The old folder is deliberately not deleted: it can still hold

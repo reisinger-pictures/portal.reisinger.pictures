@@ -104,6 +104,15 @@ class FtpCredentialException extends RuntimeException
      * almost always an operator problem (a missing bind mount, a read-only
      * filesystem, wrong permissions on `ftp/`), and a message without the
      * concrete path cannot be acted on.
+     *
+     * That operator problem is also what fixes the status code, and it is fixed
+     * for **both** callers: the reset endpoint (`FtpCredentialController::
+     * fromCredentialException()`) and the slug write path (`AuthController::
+     * updateProfile()`) answer 503. The same holds for
+     * {@see FtpCredentialException::unusableInboxPath()}, a configuration fault
+     * on the same host. The two paths used to answer 500 and 422 for one and the
+     * same cause, which told a client that a host fault was a field error on one
+     * door and a server error on the other.
      */
     public static function couldNotCreateInboxDirectory(string $path, string $reason): self
     {

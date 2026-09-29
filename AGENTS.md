@@ -559,15 +559,21 @@ entscheiden".
     Das ist die einzige Duplikatklasse mit dieser Folge. Zweitens das Crashfenster im Scheduler:
     `ProcessModelLifecycle.php:114-121` reiht die Erinnerungsmail ein und speichert **erst danach**
     `last_reminder_stage`, ohne Transaktionskopplung; ein Absturz dazwischen sendet am nächsten Tag
-    erneut (noch offen — `InvoiceMailDispatcher::queueOnce` deckt nur die Scheduler-Seite als Vorlage). **Bewusst nicht gemacht:** kein flächendeckendes `ShouldBeUnique` über alle
+    erneut (geschlossen: Claim vor Enqueue in **einer** Transaktion — `DB::transaction` mit
+    `lockForUpdate`, `ModelAccessToken::issueFor()` innerhalb, Log erst nach Commit; gepinnt durch
+    `ModelLifecycleReminderDispatchTest`, 3 Tests, gegen HEAD gegenbelegt). **Bewusst nicht gemacht:** kein flächendeckendes `ShouldBeUnique` über alle
     Mails — gemessen kommt `ShouldBeUnique` und `uniqueId` im Repo **keinmal** vor, die Claims auf
     Invoice, Dispute, Quote, Webhook, Scheduler und Vertragsabschluss sind getestet, und ein
     beobachtetes Duplikat gibt es nicht. Die verbleibende Klasse (SMTP-Retry nach Transportfehler)
     ist dokumentiert und bewusst akzeptiert: eine zusätzliche Kopie einer Rechnung, keine zweite
     Belastung und kein zweiter Zustandswechsel.
-  - **Prompt-Injection (entschieden):** das Risiko **schriftlich festhalten, wie es wirklich
-    ist**, und den irreführenden Testnamen korrigieren — **keine** Code- oder Modelländerung. *Was
-    das Risiko ist:* jemand mit Metadatenrecht tippt Text in eines von drei Feldern
+  - **Prompt-Injection (entschieden — umgesetzt):** das Risiko **schriftlich festhalten, wie es wirklich
+    ist** (so geschehen), und der irreführende Testname ist korrigiert:
+    `AIServicePromptInjectionTest` heißt jetzt `AIServiceUntrustedInputContractTest` — Docblock sagt,
+    was er belegt (Request-Vertrag) und was nicht (Modell-Gehorsam). Neu behauptet nur Belegbares:
+    die drei Felder verlassen ihren Block nie, und der `detected_city`-Lookup bleibt lesend
+    (`AIDetectedCityLookupReadOnlyTest`, Query-Log mit Non-Emptiness-Guard). *Was das Risiko ist:*
+    jemand mit Metadatenrecht tippt Text in eines von drei Feldern
     (`global_context`, `specific_context` je max 1000 Zeichen, `text_input` max 2000), der mit dem
     Foto in den Prompt geht. Ein Modell kann die Grenze zwischen Daten und Anweisung verlieren
     („Ignore previous instructions …") — die `<`/`>`-Maskierung hält das **nicht** auf, denn der
@@ -575,12 +581,7 @@ entscheiden".
     **keine** Retrieval-Fähigkeit und **keine** Aktionsbefugnis; die Antwort sind fünf begrenzte
     Metadatenfelder, und **nichts wird ohne menschlichen Klick gespeichert** (der einzige
     serverseitige Aufrufer ist der Controller). Der trägende Schutz ist damit **menschliche
-    Prüfung**, nicht der Systemprompt. *Der eine echte, behebbare Mangel:*
-    `AIServicePromptInjectionTest` heißt wie ein Sicherheitstest, sagt in seinem eigenen Docblock
-    aber ausdrücklich, er prüfe „the request contract, not compliance by an external model" — er
-    belegt die Trennzeichen, **nicht** den Gehorsam des Modells. Wer ihn als Beleg zitiert, liegt
-    falsch; genau das wird korrigiert. *Neu zu behaupten sind nur die zwei prüfbaren Dinge:* die
-    drei Felder verlassen ihren Block nie, und der `detected_city`-Lookup bleibt lesend. **Was das
+    Prüfung**, nicht der Systemprompt. **Was das
     ausdrücklich nicht kauft:** Gehorsam des Modells. Der ist ohne Live-Provider nicht testbar,
     und jeder Test, der das behauptet, misst sich selbst. *Nicht gemacht:* weder JSON-Block noch
     getrennte Turns noch Ausgabefilterung — bei gemessener Reichweite und menschlicher Freigabe
@@ -636,6 +637,16 @@ entscheiden".
   `editingDeleteActionSemantics.test.tsx` öffnet alle sechs auf existierenden Datensätzen und
   assertiert keinen Lösch-Button. Ein späterer externer Rename wäre eine neue Entscheidung,
   kein Teil von D-21.
+- **D-22 — Anlagefehler der SFTPGo-Verzeichnis-Anlage: einheitlich `503`.** Der Reset-Endpunkt
+  antwortete mit `422`, der Slug-Pfad mit `500` — dieselbe Ursache, zwei Codes. *Warum:* ein Grund,
+  ein Status. Ein fehlender Mount / nicht anlegbares Verzeichnis ist ein Host-/Config-Fehler, kein
+  Client-Fehler; `503` liest sich wie die bereits bestehende SFTPGo-Unerreichbarkeit. `422` bleibt den
+  Portal-Voraussetzungen. *Entscheidung vom 2026-09-29 (Owner, interaktiv):* `503` vor `422`/`500`.
+  **Umgesetzt:** `AuthController` (500→503) und `FtpCredentialController` (beide
+  `REASON_UNCREATABLE_*`-Arme vor dem 422-Default) mit Begründung an der Ursache
+  (`FtpCredentialException::couldNotCreateInboxDirectory()`); Gleichheit beider Pfade gepinnt durch
+  `FtpSlugDirectoryProvisioningTest` (gegen HEAD gegenbelegt: `500 is identical to 503`). Kein
+  `Retry-After` — passend zum bestehenden SFTPGo-503.
 ## TODO (UI-Review)
 
 UI-Review-Screenshot-Skill noch nicht angewendet (Playwright-Harness + Vision-Analyse). Referenz: ocg-price-tracker/tests/screenshots (ui-screenshots.spec.ts mit Section-Captures).
