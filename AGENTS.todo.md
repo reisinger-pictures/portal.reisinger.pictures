@@ -5,13 +5,13 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **78 offene Positionen**
-> über 1697 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **77 offene Positionen**
+> über 1685 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **14**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **13**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
 >
@@ -122,7 +122,11 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       **Rot nachgewiesen:** `.env.ci` auf 60 → 2 failed; `.env.example` auf 1000 → 2 failed.
       Gate danach grün: 2828 passed, 3 skipped, 0 failed (14457 Assertions).
 - [x] **D-7 — Regel umgesetzt, Bestand auf 0, Build grün.** Wellen: Flip (Exit 1), Regelarbeit −4, `helper-argument` −27, `jsx-attribute` −44, `jsx-text`-Bulk −137; je implementiert und unabhängig verifiziert (148 Dateien / 1396 Tests, `tsc`, ESLint, `pnpm build` Exit 0). Residuen, dokumentiert statt behoben: Einzel-Token-Unterzählung per Design (28 kurze Texte unter dem Netz, 5-mal deutsch) und `NODE_ENV=test`-Fragilität von `lingui extract` im Prebuild; Checker-Lücke camelCase `ariaLabel` als Folgearbeit unten.
-- [ ] **D-8 — `frontend/tests/e2e/admin/` nach Domäne aufteilen.** Eigene Arbeit.
+- [x] **D-8 — `admin/` nach Domäne aufgeteilt (34/34 in 11 Subdirs, verifiziert).** Reine Moves,
+  jede geänderte Zeile ein Import-Pfad (138/138, 0 nicht-Import); 83 defs, 162 Tests, Admin-Subtree
+  160+2, Smoke 62/62. Flakes: wysiwyg nicht reproduzierbar (4/4 grün, längst gefixt),
+  `database is locked` als prozessseitiger Zweitschreiber vermessen (kein Seriell-Fix), Kanban
+  ohne Befund. Verifiziert.
 - [x] **D-9 — Sidebar-Portalname bricht um.** `whitespace-nowrap` → `min-w-0 break-words leading-tight`; E2E misst Geometrie (nicht `scrollWidth`-Idiom, das blind ist). Verifiziert.
 - [x] **D-10 — Dialoge rendern innerhalb von `<main>`.** `<GalleryModals>` in `DashboardLayout` versetzt; Harness unberührt; `DashboardLayout.test.tsx` treibt echte Opens, Nicht-Vakuum empirisch belegt. Verifiziert.
 - [x] **D-11 — benannte Höhe plus `bodyHead`, drei handge-rollte Dialoge mitmigriert.**
@@ -640,22 +644,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 ### Strukturbefunde, nicht jetzt umgesetzt
 
-- [ ] **D-8 — `admin/` nach Domäne aufteilen.**
-  **34** von **89** Specs (**38 %**) liegen flach in `frontend/tests/e2e/admin/`
-  (`find frontend/tests/e2e -name '*.spec.ts' | wc -l` → 89;
-  `ls frontend/tests/e2e/admin/*.spec.ts | wc -l` → 34) und das Verzeichnis mischt
-  Pricing, CRM-Dokumente, Tenant-Administration, Galerie-Konfiguration und
-  Projekt-Boards, während `client/`, `photographer/`, `crm/`, `delivery/` und
-  `selection/` sauber actor- bzw. domänenskaliert sind. Zusätzlich drei fast
-  identische Specs mit identischem 85-Zeilen-Setup (Zeilen 1–85 byte-gleich, nur
-  Zeile 8 und ab Zeile 86 verschieden): `no-b2b-label.spec.ts` (107),
-  `no-create-org.spec.ts` (102), `org-edit.spec.ts` (111) — die E2/E5/E6-Familie,
-  wobei E5/E6 Negativ-Berechtigungen sind und E2 der Positiv-Fall auf demselben
-  Gerüst. **Eigene Aufgabe, keine Nebenwirkung eines Cleanup.**
-  **Entscheidung: nach welcher Taxonomie wird geschnitten — Domäne (`preise`, `crm`,
-  `organisation`, `galerie`, `board`) oder Akteur — und wird die E2/E5/E6-Familie
-  dabei in ein gemeinsames Setup gezogen?** Ohne Zielstruktur erzeugt jede
-  Verschiebung nur einen zweiten Zwischenstand.
 - [~] wartet auf den CSP-Policy-Text an lesbarer Stelle im Repo. **E2E ist strukturell
   blind für CSP-Verstöße — und lässt sich das nicht vollständig remedieren.**
   Befund aus der Wasserzeichen-Reparatur: `playwright.config.ts` hat **keinen**
@@ -664,7 +652,7 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   (`scripts/e2e-up.sh:200` → `log "Frontend (separat): … pnpm dev"`), und
   `vite.config.ts:43-55` setzt im `server`-Block **keinen** `headers`-Schlüssel
   (`grep -n headers frontend/vite.config.ts` → kein Treffer). Die Suite läuft also
-  **ohne jeden CSP-Header** — `tests/e2e/admin/watermark.spec.ts:37` →
+  **ohne jeden CSP-Header** — `tests/e2e/admin/settings/watermark.spec.ts:37` →
   `const preview = page.locator('main img[alt="Watermark Preview"]')` ist seit Juni
   grün, während in Produktion jedes Rendern fehlschlug. **Warum trotzdem kein Header
   nachziehen:** Die Produktions-CSP steht in **keinem File dieses Repositories**; sie
@@ -700,7 +688,7 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   korrigiert. Das letzte Anfassen liegt am **2026-09-26** (`069df63`), also vor der
   Welle. **Befund, kein Task:** der Fehlschlag ist ein **Lokationsphänomen**, und die
   Zero-Pre-existing-Failures-Policy ist hier nicht einschlägig, weil kein CI-Run rot ist.
-  **Nachgemessen 2026-09-28:** `npx playwright test tests/e2e/admin/wysiwyg-editor.spec.ts`
+  **Nachgemessen 2026-09-28:** `npx playwright test tests/e2e/admin/documents/wysiwyg-editor.spec.ts`
   → **4/4 grün**. Die Datei enthält **2 Testdefinitionen × 2 Projekte** (Desktop Chrome,
   Mobile Chrome); `--list` zählt `Total: 4 tests in 1 file`. Die frühere Angabe
   „18/18" in diesem Board war falsch und ist hiermit korrigiert. Keine Regression: das
@@ -950,7 +938,7 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
 - CI-Fix-Commit `8904c10` ist gepusht; Run `36035927250` auf diesem SHA ist **abgeschlossen rot**. Security-Contract, Backend und Frontend sind grün; Serial-E2E ist grün, sechs parallele E2E-Shards sind rot. Bestätigte Restursachen: Contract-Reset-Assertion, Search-History-State, Rating-PhotoLink, FTP-Navigation, Magic-Link, Cart-Ort/Detached-Link, Cart-Pricing-Sidebar und Coupon-Revalidation.
 - E2E-Laufzeit Run `36035927250`: Frontend 4m25s, Serial-E2E 6m51s, parallele Shards 5m36s–17m09s. Der langsamste parallele Shard erreichte den bisherigen `globalTimeout: 900000` und ließ 26 Tests nicht ausführen; deshalb ist der neue, begrenzte Whole-Suite-Budget `globalTimeout: 1500000` (25 Minuten), der gegenüber dem Maximalwert rund 7m51s CI-Puffer lässt. Per-Test bleibt `timeout: 120000` (120s) unverändert.
 - **E2E-Timeout-Entscheidung (User-Freigabe, 2026-09-25; auditbar):** Die gemessene Maximum-Baseline bleibt der langsamste parallele Shard aus Run `36035927250` mit **17m09s**; der serielle Lauf benötigte 6m51s. Die generische Doppelregel würde daraus 34m18s ergeben, aber der ausdrücklich freigegebene harte Cap bleibt bei **25 Minuten / 1500000 ms** (7m51s über dem gemessenen Maximum), mit **120000 ms / 120s pro Test**. Das ist eine bewusste Ausnahme von der Doppelregel, keine stillschweigende Timeout-Änderung; nach E2E-Änderungen sind neue Messung und explizite User-Freigabe erforderlich. In dieser Session wurde **kein Playwright-Lauf** ausgeführt; der Nachweis bleibt CI-gebunden.
-- [~] wartet auf den Push und den echten Browserlauf im CI-Job; lokal ausdrücklich kein Playwright-Lauf. **CI/E2E-Verifier-Blocker (Implementierung 2026-09-25; Browser-Nachweis folgt nach Push):** Dependabot wartet jetzt ausschließlich auf `CI gate (push)` mit einem 65-Minuten-Job-Gesamtlimit; der Security-Contract prüft Event-Suffix, exakten Filter, Actor/Event-Skip, Fail-closed-Dependencies und Timeout. CustomerModal behandelt `PLZ & Stadt` als benannte Gruppe mit individuellen `aria-label`-Comboboxen; E2E-Regressions decken CustomerModal/AutocompleteInput, ProfileSettingsCard, SearchBar und den privaten Rating-Route-Guard ab (Dateien: `frontend/tests/e2e/admin/management-save-regression.spec.ts`, `frontend/tests/e2e/photographer/photographer.spec.ts`, `frontend/tests/e2e/guest/guest-search-header.spec.ts`, `frontend/tests/e2e/selection/rating-regressions.spec.ts`). **TODO:** Nach Push den echten Browserlauf in CI abwarten und dort die sichtbaren Ergebnisse der getaggten Tests dokumentieren; lokal ausdrücklich kein Playwright-Lauf.
+- [~] wartet auf den Push und den echten Browserlauf im CI-Job; lokal ausdrücklich kein Playwright-Lauf. **CI/E2E-Verifier-Blocker (Implementierung 2026-09-25; Browser-Nachweis folgt nach Push):** Dependabot wartet jetzt ausschließlich auf `CI gate (push)` mit einem 65-Minuten-Job-Gesamtlimit; der Security-Contract prüft Event-Suffix, exakten Filter, Actor/Event-Skip, Fail-closed-Dependencies und Timeout. CustomerModal behandelt `PLZ & Stadt` als benannte Gruppe mit individuellen `aria-label`-Comboboxen; E2E-Regressions decken CustomerModal/AutocompleteInput, ProfileSettingsCard, SearchBar und den privaten Rating-Route-Guard ab (Dateien: `frontend/tests/e2e/admin/crm/management-save-regression.spec.ts`, `frontend/tests/e2e/photographer/photographer.spec.ts`, `frontend/tests/e2e/guest/guest-search-header.spec.ts`, `frontend/tests/e2e/selection/rating-regressions.spec.ts`). **TODO:** Nach Push den echten Browserlauf in CI abwarten und dort die sichtbaren Ergebnisse der getaggten Tests dokumentieren; lokal ausdrücklich kein Playwright-Lauf.
 - Timeout-Policy-Verifikation (2026-09-24): `pnpm exec tsc --noEmit -p tsconfig.node.json`, `pnpm lint:e2e`, `bash tests/infrastructure/ci-security-contract.sh` und `git diff --check` grün; gemäß Auftrag kein Browserlauf.
 - **Cart-Pricing-Sidebar (2026-09-24; Fix umgesetzt, Browser-Verifikation ausstehend):** Run `36035927250` scheiterte auf Desktop und Mobile bereits an den Käufer-Navigationen. `power_user` ist ein Non-Staff-Client; dessen `ClientDashboard` rendert absichtlich `Suche & Entdecken`, aber nicht den staff-only Eintrag `Galerien & Ordner`. `SidebarHelper.navigateToClientGalleries()` verwendet den deutschen Discovery-Eintrag; alle drei Cart-/Coupon-Tests und ihre Tags bleiben erhalten. `SidebarHelper.test.ts` deckt den Client-Link ab (2 fokussierte Vitest-Tests grün), fokussiertes ESLint und `git diff --check` sind grün. Playwright wurde gemäß Auftrag nicht lokal erneut ausgeführt.
 - **Coupon-Revalidation Branch-Readiness (2026-09-24; fokussierter Fix):** Der CI-Fehler war kein Overlay- oder Disabled-Klick: Nach `/photos/...` war der asynchrone `useLicensingMode`-Fallback zunächst die Scope-Karte, während der Fixture explizit Volume-Lizenzierung gesetzt hatte. `coupon-checkout-revalidation.spec.ts` navigiert den Nicht-Staff-Käufer jetzt über die deutsche Discovery-Seite, wartet semantisch auf die Galerieüberschrift und anschließend auf `volume-pricing-card` plus den aktiven deutschen Button `In den Warenkorb`; Invalid-/Expired-/Valid-Coupon-Semantik und `@feature:client:coupon` bleiben unverändert. Test-IDs und ein PhotoDetailView-Branch-Übergang sind durch fokussierte Vitest-Abdeckung geschützt. Lokales Playwright wurde nicht ausgeführt.

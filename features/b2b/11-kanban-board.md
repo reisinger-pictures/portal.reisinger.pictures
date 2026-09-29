@@ -347,7 +347,7 @@ Implementierung. Der aktuelle E2E-Abdeckungs- und Rest-Task-Stand gehört in
 `AGENTS.todo.md`; ein grüner Teil-Lauf (beispielsweise `@smoke`) ist keine
 Aussage, dass alle Board-Pfade oder Rollen vollständig verifiziert sind.
 
-Die vorhandenen Board-Specs (`frontend/tests/e2e/admin/projects-board.spec.ts`
+Die vorhandenen Board-Specs (`frontend/tests/e2e/admin/boards/projects-board.spec.ts`
 und `frontend/tests/e2e/photographer/production-board.spec.ts`) verwenden wegen
 ihres gemeinsamen dirty Board-Zustands einen seriellen Testmodus. Zusätzlich
 laufen `project-clear-fields` und `brand-settings` seriell, während

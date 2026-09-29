@@ -49,11 +49,11 @@ browser projects; explicit project skips (for example, the mobile skip in
 `brand-settings`) remain authoritative. The serial selection currently covers
 these five files:
 
-- `frontend/tests/e2e/admin/projects-board.spec.ts`
+- `frontend/tests/e2e/admin/boards/projects-board.spec.ts`
 - `frontend/tests/e2e/photographer/production-board.spec.ts`
-- `frontend/tests/e2e/admin/project-clear-fields.spec.ts`
-- `frontend/tests/e2e/admin/brand-settings.spec.ts`
-- `frontend/tests/e2e/admin/billing-details.spec.ts`
+- `frontend/tests/e2e/admin/boards/project-clear-fields.spec.ts`
+- `frontend/tests/e2e/admin/settings/brand-settings.spec.ts`
+- `frontend/tests/e2e/admin/commerce/billing-details.spec.ts`
 
 The first four use Playwright serial mode; billing-details is isolated because
 it writes global settings. This is a scheduling constraint for known shared

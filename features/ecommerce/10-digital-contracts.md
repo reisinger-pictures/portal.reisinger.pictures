@@ -192,4 +192,4 @@ POST   /api/contracts/sign/{personal_token}   → submit clickwrap signature (er
 | `src/logic/__tests__/contractPricing.test.ts` | Safe-integer/fixed-point Vitest regressions |
 | `src/logic/__tests__/useContractManagement.test.ts` | Vitest hook tests |
 | `src/logic/__tests__/useContractJoin.test.ts` | Vitest hook tests |
-| `tests/e2e/admin/contracts.spec.ts` | E2E: create → open → sign → close |
+| `tests/e2e/admin/documents/contracts.spec.ts` | E2E: create → open → sign → close |
