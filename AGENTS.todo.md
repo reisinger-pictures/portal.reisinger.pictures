@@ -5,13 +5,13 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **71 offene Positionen**
-> über 1639 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **70 offene Positionen**
+> über 1638 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **7**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **6**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
 >
@@ -1307,7 +1307,6 @@ getrennt.
 **Betrieb, Stripe Dashboard & Privacy**
 - [ ] manuell prüfen: im Stripe-Dashboard getrennte Test-/Live-Keys bzw. RAKs, least privilege, Webhook-Signing-Secrets und Endpoint-Subscriptions für Success/Failed/Dispute/Refund prüfen; zusätzlich Radar-/Card-Testing-/High-Risk-Regeln, Review-Queue, False-Positive-Rollback und Alerts dokumentieren. Getrennte Test-/Live-Keys bzw. RAKs, least privilege, Webhook-Signing-Secrets und Endpoint-Subscription für Success/Failed/Dispute/Refund prüfen; **Stripe Dashboard/Radar**: Velocity-/Card-Testing-/High-Risk-Regeln, Review-Queue, False-Positive-Rollback und Alerts dokumentieren.
 - [ ] manuell prüfen: den 3DS-Strom live durchspielen: SCA, frictionless, challenge, failure, timeout, mobile und return. Radar darf die lokalen Limits nicht ersetzen; Payment-Method-Settings und Testkarten mitverifizieren. **3DS-Betriebscheckliste**: SCA/frictionless/challenge/failure/timeout/mobile/return testen; Radar nicht als Ersatz für lokale Limits verwenden, Payment-Method-Settings und Testkarten verifizieren.
-- [ ] Monitoring/Runbook für PI-Rate, Replays, User/IP-429, Failure-Velocity, Identity-Mismatch/Quarantäne, Cleanup, Account-Age-Rejections und Turnstile anlegen; Logs ohne PAN/CVC/Secret/Raw-Turnstile-Token.
 **Tests**
 
 - [ ] **E2E-Lücke Card-Testing** (Owner-Entscheidung 2026-09-28, aus der leeren
