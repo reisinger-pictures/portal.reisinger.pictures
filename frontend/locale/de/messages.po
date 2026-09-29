@@ -732,6 +732,10 @@ msgstr "Anzahl Fotos muss mindestens 1 sein"
 msgid "Art"
 msgstr "Art"
 
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "AT..."
+msgstr "AT..."
+
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Auf Anfrage"
 msgstr "Auf Anfrage"
@@ -899,6 +903,7 @@ msgstr "Baustein angelegt"
 msgid "Baustein gelöscht"
 msgstr "Baustein gelöscht"
 
+#: src/ui/management/components/ProductBatchTable.tsx
 #: src/ui/management/components/UserTable.tsx
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 #: src/ui/management/ManagementCouponsView.tsx
@@ -1057,6 +1062,7 @@ msgstr "Beschreibe die Galerie — die KI generiert Vorschläge für Titel, Besc
 
 #: src/ui/components/IptcMetadataEditor.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
+#: src/ui/management/components/LicenseCatalogSettings.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
 msgid "Beschreibung"
 msgstr "Beschreibung"
@@ -1150,6 +1156,10 @@ msgstr "Bewertungs-Galerien sind zwingend privat."
 #: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Bezahlt"
 msgstr "Bezahlt"
+
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "BIC"
+msgstr "BIC"
 
 #: src/logic/modelRegistration.ts
 msgid "Bikini"
@@ -1393,6 +1403,10 @@ msgstr "Business / Corporate"
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Canon EOS R1 / R6 Mark II → Portal. Menüpfade und Nummerierung aus dem Canon-Handbuch, Abschnitt „Übertragen von Bildern auf einen FTP-Server\"."
 msgstr "Canon EOS R1 / R6 Mark II → Portal. Menüpfade und Nummerierung aus dem Canon-Handbuch, Abschnitt „Übertragen von Bildern auf einen FTP-Server\"."
+
+#: src/ui/client/components/TurnstileWidget.tsx
+msgid "Cloudflare Turnstile"
+msgstr "Cloudflare Turnstile"
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
@@ -1797,8 +1811,18 @@ msgid "Details"
 msgstr "Details"
 
 #: src/ui/client/DeliveryView.tsx
+#: src/ui/management/ManagementGalleryView.tsx
+#: src/ui/management/ManagementMetaGalleryView.tsx
 msgid "Details & Metadaten"
 msgstr "Details & Metadaten"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Details zur Lizenz..."
+msgstr "Details zur Lizenz..."
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "Details..."
+msgstr "Details..."
 
 #: src/ui/Privacy.tsx
 msgid "Die Aufbewahrung der IP-bezogenen Bestell- und Sicherheitsdaten richtet sich je nach Datenkategorie nach der geltenden Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten. Die IP-Risikoschlüssel laufen mit dem jeweiligen konfigurierten Limitierungsfenster ab. Die konkrete Frist und die zugrunde liegende Zuordnung teilt der Betreiber auf Anfrage mit."
@@ -2679,6 +2703,10 @@ msgid "Flatrate-Pools"
 msgstr "Flatrate-Pools"
 
 #: src/ui/management/components/ShootingCalculatorModal.tsx
+msgid "Flex Tarif"
+msgstr "Flex Tarif"
+
+#: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Flex Tarif Rechner"
 msgstr "Flex Tarif Rechner"
 
@@ -3536,6 +3564,10 @@ msgstr "Keine spezifische Organisation"
 msgid "Keine Statements vorhanden."
 msgstr "Keine Statements vorhanden."
 
+#: src/ui/management/ManagementTextSnippetsView.tsx
+msgid "Keine Textbausteine vorhanden."
+msgstr "Keine Textbausteine vorhanden."
+
 #: src/ui/components/GalleryGroupModal.tsx
 msgid "Keine Vorgabe (Unterordner entscheiden selbst)"
 msgstr "Keine Vorgabe (Unterordner entscheiden selbst)"
@@ -3759,6 +3791,7 @@ msgstr "Lädt..."
 
 #: src/ui/client/ClientCartView.tsx
 #: src/ui/components/IptcMetadataEditor.tsx
+#: src/ui/management/components/CustomerModal.tsx
 #: src/ui/management/components/RecipientFormSection.tsx
 #: src/ui/management/ManagementContractView.tsx
 #: src/ui/management/ManagementModelsView.tsx
@@ -3864,6 +3897,10 @@ msgstr "Link wurde kopiert."
 msgid "Link-Adresse"
 msgstr "Link-Adresse"
 
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "Linz"
+msgstr "Linz"
+
 #: src/ui/components/GalleryModal.tsx
 msgid "LIVE Galerie"
 msgstr "LIVE Galerie"
@@ -3913,6 +3950,12 @@ msgstr "Login"
 msgid "Login fehlgeschlagen."
 msgstr "Login fehlgeschlagen."
 
+#: src/ui/components/GuestLayout.tsx
+#: src/ui/components/MobileBrandLink.tsx
+#: src/ui/components/Sidebar.tsx
+msgid "Logo"
+msgstr "Logo"
+
 #: src/logic/useAuth.ts
 msgid "Logout fehlgeschlagen"
 msgstr "Logout fehlgeschlagen"
@@ -3926,6 +3969,7 @@ msgstr "Lokal:"
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/components/ProductBatchTable.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementCustomersView.tsx
 #: src/ui/management/ManagementOrgDetailView.tsx
@@ -4311,6 +4355,10 @@ msgstr "Muss positiv sein"
 msgid "Muster-Widerrufsformular"
 msgstr "Muster-Widerrufsformular"
 
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "Musterstraße 1"
+msgstr "Musterstraße 1"
+
 #: src/ui/management/ManagementContractView.tsx
 msgid "Nach Ablauf kann niemand mehr über den Link beitreten"
 msgstr "Nach Ablauf kann niemand mehr über den Link beitreten"
@@ -4390,6 +4438,10 @@ msgstr "Name / Notiz darf höchstens 255 Zeichen lang sein."
 #: src/ui/components/GalleryModal.tsx
 msgid "Name der Galerie"
 msgstr "Name der Galerie"
+
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "Name des Inhabers"
+msgstr "Name des Inhabers"
 
 #: src/ui/client/ClientCartView.tsx
 #: src/ui/components/GalleryGroupModal.tsx
@@ -4602,6 +4654,8 @@ msgstr "Noch keine Bewertungen vorhanden."
 
 #: src/ui/client/DeliveryView.tsx
 #: src/ui/client/SelectionView.tsx
+#: src/ui/management/ManagementGalleryView.tsx
+#: src/ui/management/ManagementMetaGalleryView.tsx
 msgid "Noch keine Bilder vorhanden"
 msgstr "Noch keine Bilder vorhanden"
 
@@ -4624,6 +4678,10 @@ msgstr "Noch keine Einladungen angelegt."
 #: src/ui/components/LightroomCatalogsProfileCard.tsx
 msgid "Noch keine Lightroom-Kataloge angelegt."
 msgstr "Noch keine Lightroom-Kataloge angelegt."
+
+#: src/ui/management/ManagementOrgsView.tsx
+msgid "Noch keine Organisationen angelegt."
+msgstr "Noch keine Organisationen angelegt."
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Noch keine Pools berechnet."
@@ -4900,6 +4958,7 @@ msgid "Ort/Gebäude"
 msgstr "Ort/Gebäude"
 
 #: src/ui/client/ClientCartView.tsx
+#: src/ui/management/components/BillingDetailsCard.tsx
 msgid "Österreich"
 msgstr "Österreich"
 
@@ -4997,6 +5056,7 @@ msgid "PHP"
 msgstr "PHP"
 
 #: src/ui/client/ClientCartView.tsx
+#: src/ui/management/components/CustomerModal.tsx
 #: src/ui/management/components/RecipientFormSection.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "PLZ"
@@ -5109,6 +5169,10 @@ msgstr "Preset gespeichert"
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Preset löschen?"
 msgstr "Preset löschen?"
+
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Primärfarbe (Hex)"
+msgstr "Primärfarbe (Hex)"
 
 #: src/ui/client/DeliveryView.tsx
 msgid "Print (A4)"
@@ -5388,6 +5452,14 @@ msgstr "Registrierung fehlgeschlagen"
 msgid "Reihenfolge nicht umstellen: erst Konto und Passwort, dann Kamera. Wer zuerst die Kamera konfiguriert, hat noch kein gültiges Passwort und wundert sich über Error 41."
 msgstr "Reihenfolge nicht umstellen: erst Konto und Passwort, dann Kamera. Wer zuerst die Kamera konfiguriert, hat noch kein gültiges Passwort und wundert sich über Error 41."
 
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Reisinger Foto Portal"
+msgstr "Reisinger Foto Portal"
+
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Reisinger Pictures"
+msgstr "Reisinger Pictures"
+
 #: src/ui/management/components/PhotographerTeamModal.tsx
 msgid "Restriktiv"
 msgstr "Restriktiv"
@@ -5477,6 +5549,10 @@ msgstr "Seite {page} von {lastPage}"
 #: src/ui/ContractSignView.tsx
 msgid "Seite neu laden"
 msgstr "Seite neu laden"
+
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Sekundärfarbe (Hex)"
+msgstr "Sekundärfarbe (Hex)"
 
 #: src/ui/management/ManagementSettingsView.tsx
 msgid "Sendet eine Test-E-Mail über den konfigurierten Mailer an deine eigene (Administrator-)Adresse."
@@ -5666,6 +5742,7 @@ msgstr "Sport / Fitness"
 
 #: src/ui/components/IptcMetadataEditor.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
+#: src/ui/management/components/CustomerModal.tsx
 #: src/ui/management/components/RecipientFormSection.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Stadt"
@@ -5702,6 +5779,10 @@ msgstr "Standard"
 #: src/ui/client/components/CartItemList.tsx
 msgid "Standard Lizenz"
 msgstr "Standard Lizenz"
+
+#: src/ui/management/components/ShootingCalculatorModal.tsx
+msgid "Standard Tarif"
+msgstr "Standard Tarif"
 
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Standard Tarif Rechner"
@@ -5912,8 +5993,13 @@ msgstr "Textbaustein löschen?"
 msgid "Textbausteine"
 msgstr "Textbausteine"
 
+#: src/ui/management/components/AIBatchEditModal.tsx
+msgid "Thumb"
+msgstr "Thumb"
+
 #: src/ui/components/IptcMetadataEditor.tsx
 #: src/ui/management/components/AIBatchEditModal.tsx
+#: src/ui/management/components/LicenseCatalogSettings.tsx
 #: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Titel"
 msgstr "Titel"
@@ -6497,6 +6583,10 @@ msgstr "Wasserzeichen erfolgreich generiert und gespeichert!"
 msgid "Wasserzeichen generieren & anwenden"
 msgstr "Wasserzeichen generieren & anwenden"
 
+#: src/ui/management/components/WatermarkSettingsCard.tsx
+msgid "Watermark Preview"
+msgstr "Watermark Preview"
+
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Web / Social-Media bis 2560px (1.00x)"
 msgstr "Web / Social-Media bis 2560px (1.00x)"
@@ -6672,6 +6762,14 @@ msgstr "z. B. WhatsApp-Kontakt Anna"
 msgid "z.B. 10"
 msgstr "z.B. 10"
 
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "z.B. 100"
+msgstr "z.B. 100"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "z.B. 150"
+msgstr "z.B. 150"
+
 #: src/ui/components/LightroomCatalogsProfileCard.tsx
 msgid "z.B. 2026-08"
 msgstr "z.B. 2026-08"
@@ -6687,6 +6785,10 @@ msgstr "z.B. 40"
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "z.B. 450.00"
 msgstr "z.B. 450.00"
+
+#: src/ui/management/ManagementOrgDetailView.tsx
+msgid "z.B. 50000 für 500€"
+msgstr "z.B. 50000 für 500€"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "Z.B. Exklusivrecht erforderlich..."
@@ -6710,9 +6812,21 @@ msgstr "z.B. Hochzeitsreportage im Wiener Burggarten, Mai 2026, Paar vor histori
 msgid "z.B. Maria Muster"
 msgstr "z.B. Maria Muster"
 
+#: src/ui/management/components/ProfileSettingsCard.tsx
+msgid "z.B. max"
+msgstr "z.B. max"
+
+#: src/ui/management/components/ProfileSettingsCard.tsx
+msgid "z.B. Max Mustermann"
+msgstr "z.B. Max Mustermann"
+
 #: src/ui/management/components/InviteModal.tsx
 msgid "z.B. Oma Erna"
 msgstr "z.B. Oma Erna"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "z.B. PR & Social Media"
+msgstr "z.B. PR & Social Media"
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "z.B. SOMMER2026"
@@ -6725,6 +6839,10 @@ msgstr "z.B. Sommerfest der Firma XYZ in Wien, 2026"
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
 msgid "z.B. Stammkundenrabatt"
 msgstr "z.B. Stammkundenrabatt"
+
+#: src/ui/management/components/LicenseCatalogSettings.tsx
+msgid "z.B. Titelseite"
+msgstr "z.B. Titelseite"
 
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "z.B. Werbung, Standard, Event"

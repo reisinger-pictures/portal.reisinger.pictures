@@ -131,7 +131,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
         >
 
                 <div className="tabs tabs-lift">
-                    <input type="radio" name="calc_tabs" className="tab" aria-label="Flex Tarif"
+                    <input type="radio" name="calc_tabs" className="tab" aria-label={t`Flex Tarif`}
                            checked={!useStandard} onChange={() => setUseStandard(false)} />
                     <div className="tab-content bg-base-100 border-base-300 p-4">
                         <div className="space-y-4">
@@ -178,7 +178,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                         </div>
                     </div>
 
-                    <input type="radio" name="calc_tabs" className="tab" aria-label="Standard Tarif"
+                    <input type="radio" name="calc_tabs" className="tab" aria-label={t`Standard Tarif`}
                            checked={useStandard} onChange={() => setUseStandard(true)} />
                     <div className="tab-content bg-base-100 border-base-300 p-4">
                         <div className="space-y-4">

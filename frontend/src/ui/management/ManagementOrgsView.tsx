@@ -78,7 +78,7 @@ export default function ManagementOrgsView() {
                     </div>
                 ))}
                 {orgs?.length === 0 && (
-                    <EmptyState icon="mdi--domain" title="Noch keine Organisationen angelegt." className="col-span-full py-12" />
+                    <EmptyState icon="mdi--domain" title={t`Noch keine Organisationen angelegt.`} className="col-span-full py-12" />
                 )}
             </div>
 

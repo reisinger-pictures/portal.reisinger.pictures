@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { ReactNode } from 'react';
 import { useBrand } from '../../logic/useBrand';
 
@@ -17,7 +18,7 @@ export default function GuestLayout({ children }: GuestLayoutProps) {
         <div className="flex min-h-dvh flex-col bg-base-200">
             <header role="banner" className="border-b border-base-300 bg-base-100">
                 <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-3">
-                    <img src={logoSrc} alt="Logo" className="h-8 w-8 rounded bg-base-100 shadow-sm" />
+                    <img src={logoSrc} alt={t`Logo`} className="h-8 w-8 rounded bg-base-100 shadow-sm" />
                     <span className="font-bold">{portalName}</span>
                 </div>
             </header>

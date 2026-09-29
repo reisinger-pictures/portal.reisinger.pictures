@@ -284,7 +284,7 @@ export default function AIBatchEditModal({ isOpen, onClose, photos, galleryId }:
                     return (
                         <div key={row.photoId} className="flex flex-col md:flex-row gap-4 p-3 bg-base-200/50 rounded-box border border-base-300">
                             <div className="w-full md:w-32 shrink-0">
-                                <img src={p?.thumb_url} className="w-full h-auto object-cover rounded shadow-sm aspect-video" alt="Thumb" />
+                                <img src={p?.thumb_url} className="w-full h-auto object-cover rounded shadow-sm aspect-video" alt={t`Thumb`} />
                             </div>
                             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2">
                                 <input type="text" value={row.specificContext} onChange={e => updateRowField(idx, 'specificContext', e.target.value)} placeholder={t`Spezifischer Bild-Kontext`} className="input input-sm input-bordered md:col-span-2" />

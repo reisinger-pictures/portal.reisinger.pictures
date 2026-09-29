@@ -176,7 +176,7 @@ export default function ManagementMetaGalleryView() {
                 {activeTab === 'bilder' && (
                     <>
                         {!isLoading && photos.length === 0 && (
-                            <EmptyState icon="mdi--image-off-outline" title="Noch keine Bilder vorhanden" message="Es befinden sich noch keine Bilder in den untergeordneten Galerien." />
+                            <EmptyState icon="mdi--image-off-outline" title={t`Noch keine Bilder vorhanden`} message="Es befinden sich noch keine Bilder in den untergeordneten Galerien." />
                         )}
 
                         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4" ref={galleryRef}>
@@ -196,7 +196,7 @@ export default function ManagementMetaGalleryView() {
                                             e.preventDefault();
                                             e.stopPropagation();
                                             navigate('/photos/' + photo.id);
-                                        }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title="Details & Metadaten">
+                                        }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title={t`Details & Metadaten`}>
                                             <span className="iconify mdi--open-in-new text-lg"></span>
                                         </button>
                                     </div>

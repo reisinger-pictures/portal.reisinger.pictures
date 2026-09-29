@@ -152,7 +152,7 @@ export default function ProfileSettingsCard() {
                                 <input
                                     id={ftpSlugInputId}
                                     type="text"
-                                    placeholder="z.B. max"
+                                    placeholder={t`z.B. max`}
                                     aria-invalid={ftpSlugError ? true : undefined}
                                     {...profileForm.register('ftp_slug')} 
                                     className={`input input-bordered join-item w-full font-mono text-sm ${ftpSlugError ? 'input-error' : ''}`}
@@ -169,7 +169,7 @@ export default function ProfileSettingsCard() {
                         <input
                             id={copyrightInputId}
                             type="text"
-                            placeholder="z.B. Max Mustermann"
+                            placeholder={t`z.B. Max Mustermann`}
                             {...profileForm.register('metadata_copyright')} 
                             className="input input-bordered w-full"
                         />

@@ -240,7 +240,7 @@ export default function WatermarkSettingsCard() {
                         <div className="absolute inset-0 opacity-10 bg-checkerboard"></div>
                         <div className={`flex flex-col items-center justify-center pointer-events-none h-full ${previewState.status === 'failed' ? 'w-full px-4' : 'w-1/3'}`}>
                             {previewState.status === 'ready' ? (
-                                <img src={previewState.dataUrl} alt="Watermark Preview" className="w-full h-full object-contain drop-shadow-md" />
+                                <img src={previewState.dataUrl} alt={t`Watermark Preview`} className="w-full h-full object-contain drop-shadow-md" />
                             ) : previewState.status === 'failed' ? (
                                 <div className="alert alert-error shadow-sm" role="alert">
                                     <span className="iconify mdi--alert-circle text-xl"></span>

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { Link } from 'react-router-dom';
 import { useBrand } from '../../logic/useBrand';
 
@@ -30,7 +31,7 @@ export default function MobileBrandLink({ hidden = false }: MobileBrandLinkProps
 
     return (
         <Link to="/" className={`md:hidden flex items-center gap-2 shrink-0 mr-1 ${hidden ? 'hidden' : ''}`}>
-            <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100" />
+            <img src={logoSrc} alt={t`Logo`} className="w-8 h-8 rounded shadow-sm bg-base-100" />
             <span className="font-bold text-sm leading-tight max-w-28 sm:max-w-48">{portalName}</span>
         </Link>
     );

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {useEffect, useRef} from 'react';
 
 const TURNSTILE_SCRIPT_ID = 'cloudflare-turnstile-api';
@@ -145,5 +146,5 @@ export function TurnstileWidget({siteKey, userId, onSuccess, onExpire, onError}:
         };
     }, [siteKey, userId]);
 
-    return <div ref={containerRef} data-testid="turnstile-widget" aria-label="Cloudflare Turnstile"/>;
+    return <div ref={containerRef} data-testid="turnstile-widget" aria-label={t`Cloudflare Turnstile`}/>;
 }
