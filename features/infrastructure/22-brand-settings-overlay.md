@@ -128,4 +128,4 @@ UI strings are German (UI policy); the underlying contracts/code are English.
 
 - `backend/tests/Feature/BrandSettingsControllerTest.php` — auth matrix (401 unauth, 403 admin-on-write, 200 super-admin), 422 validation cases (bad hex, bad email, bad url, unknown brand), null-reset, merge-precedence, public brand-config reflects override, no cross-brand leak.
 - `frontend/src/ui/__tests__/useBrandSettings.test.ts` — SWR keying, partial PUT, null-reset revalidation.
-- `frontend/tests/e2e/admin/brand-settings.spec.ts` — super-admin edits persist across reload (`@feature:admin:brand-settings`); normal admin does not see the card.
+- `frontend/tests/e2e/admin/settings/brand-settings.spec.ts` — super-admin edits persist across reload (`@feature:admin:brand-settings`); normal admin does not see the card.

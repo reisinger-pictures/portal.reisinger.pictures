@@ -92,7 +92,7 @@ F3 adds an **admin-UI for per-brand settings overrides** — deliberately **not*
 | Merge | `BrandRegistry::buildFromArray()` overlays DB overrides onto the config default before constructing `BrandConfig`. Merge precedence: **DB override > config default**; config-only keys (theme, logos, hostnames, `is_active`) are never touched. |
 | Frontend hook | `frontend/src/logic/useBrandSettings.ts` — SWR `GET`, `updateBrandSettings(brand, payload)` → `PUT`. Zod schema + partial-nullable `BrandSettingsPayload`. |
 | Frontend UI | `frontend/src/ui/management/components/BrandSettingsCard.tsx` — per-brand editor (RHF + zod, explicit "Speichern" button, "Auf Standard zurücksetzen" → `null` overrides), rendered **only for super_admins** inside `ManagementSettingsView.tsx` (`{isSuperAdmin && <BrandSettingsCard/>}`). |
-| Tests | `backend/tests/Feature/BrandSettingsControllerTest.php` (auth 401/403/200, 422 validation, null-reset, merge-precedence, no cross-brand leak), `frontend/src/ui/__tests__/useBrandSettings.test.ts`, `frontend/tests/e2e/admin/brand-settings.spec.ts` (`@feature:admin:brand-settings`). |
+| Tests | `backend/tests/Feature/BrandSettingsControllerTest.php` (auth 401/403/200, 422 validation, null-reset, merge-precedence, no cross-brand leak), `frontend/src/ui/__tests__/useBrandSettings.test.ts`, `frontend/tests/e2e/admin/settings/brand-settings.spec.ts` (`@feature:admin:brand-settings`). |
 
 ### Migration note
 

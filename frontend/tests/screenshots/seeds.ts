@@ -394,7 +394,7 @@ export async function seedNotifiedGallery(request: APIRequestContext): Promise<S
  * `GalleryGroupModal` mounted on that route has a group to edit.
  *
  * The create call is the proven one from
- * tests/e2e/admin/gallery-modals.spec.ts:44-54 — same endpoint, same
+ * tests/e2e/admin/galleries/gallery-modals.spec.ts:44-54 — same endpoint, same
  * `adminHeaders` (the harness admin session), same
  * `{ group: { id } }` response shape. `is_public: true` is chosen over the
  * spec's `null` so the dialog's "Sichtbarkeits-Vorgabe" select shows a
