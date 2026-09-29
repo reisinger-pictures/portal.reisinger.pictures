@@ -504,7 +504,9 @@ function isProseText(text) {
 
 /**
  * Attributes that carry human-readable text (as opposed to tokens, ids or
- * machine values) and are translatable when written as a literal.
+ * machine values) and are translatable when written as a literal. These are
+ * the **hyphenated** spellings; the camelCase `aria*` props of custom
+ * components are handled next to this set by `isAriaAttributeName`.
  */
 const USER_VISIBLE_ATTRIBUTES = new Set([
   "placeholder",
@@ -529,6 +531,23 @@ const ARIA_IDREF_ATTRIBUTES = new Set([
   "aria-labelledby",
   "aria-owns",
 ]);
+
+/**
+ * The same set with the hyphens removed, so both spellings of an ARIA
+ * attribute compare equal.
+ *
+ * Necessary because WAI-ARIA is not mechanically kebab-case: the DOM spelling
+ * of the id-reference attribute is `aria-labelledby`, while React's camelCase
+ * prop for the same thing is `ariaLabelledBy` — and splitting the prop at every
+ * capital yields `aria-labelled-by`, which is not an attribute that exists. A
+ * first version of the camelCase support compared that invented name against
+ * `ARIA_IDREF_ATTRIBUTES`, so `ariaLabelledBy="gallery-heading"` was reported
+ * as prose (pinned by the negative case in `check-i18n.test.mjs`). Comparing
+ * without hyphens matches the real attribute instead of a guessed one.
+ */
+const ARIA_IDREF_ATTRIBUTES_HYPHEN_FREE = new Set(
+  [...ARIA_IDREF_ATTRIBUTES].map(name => name.replace(/-/g, "")),
+);
 
 /**
  * Closed WAI-ARIA token sets. A literal equal to one of these
@@ -581,13 +600,37 @@ function getStringAttributeValue(initializer) {
   return undefined;
 }
 
+/**
+ * An `aria*` attribute reaches the checker in two spellings: hyphenated on DOM
+ * elements (`aria-label`) and camelCase on custom components, because that is
+ * the only spelling React accepts for a prop on an unknown element:
+ * `<AutocompleteInput ariaLabel="PLZ" />` (CustomerModal.tsx) forwards the
+ * label to the input it renders, while `aria-label` on that element would be a
+ * *different* prop. So the very same user-visible string arrives under two
+ * names, and the previous `name.startsWith("aria-")` branch only ever saw the
+ * DOM one — every camelCase `aria*` copy was invisible to the rule.
+ *
+ * Both spellings now share one taxonomy (id reference → token value → prose)
+ * instead of two, so the camelCase branch can only add findings for names that
+ * really are ARIA props: a token value (`ariaHidden="true"`) and an id
+ * reference (`ariaLabelledBy="gallery-heading"`) stay silent exactly like
+ * their hyphenated twins.
+ */
+const ARIA_CAMEL_CASE_PROP = /^aria[A-Z]/;
+
+function isAriaAttributeName(name) {
+  return name.startsWith("aria-") || ARIA_CAMEL_CASE_PROP.test(name);
+}
+
+function isAriaIdrefAttribute(name) {
+  return ARIA_IDREF_ATTRIBUTES_HYPHEN_FREE.has(name.toLowerCase().replace(/-/g, ""));
+}
+
 function isUserVisibleAttribute(name, value) {
   if (name === undefined) return false;
   if (USER_VISIBLE_ATTRIBUTES.has(name)) return true;
-  if (name.startsWith("aria-") && !ARIA_IDREF_ATTRIBUTES.has(name)) {
-    return !ARIA_ENUMERATED_VALUES.has(value.trim().toLowerCase());
-  }
-  return false;
+  if (!isAriaAttributeName(name) || isAriaIdrefAttribute(name)) return false;
+  return !ARIA_ENUMERATED_VALUES.has(value.trim().toLowerCase());
 }
 
 /**
@@ -608,10 +651,13 @@ function isUserVisibleAttribute(name, value) {
  * unit fragments (`Bilder/Std.`, `Min.`), lone words known not to be copy
  * (`stk`, `web`, `print`) and lone words below
  * `PROSE_LONE_TOKEN_MIN_LENGTH`, `data-*`/`className`/`href`/id attributes
- * (outside `USER_VISIBLE_ATTRIBUTES`), ARIA token values and id references,
- * colour literals, URLs/paths/hostnames/e-mails, and everything in test files
- * (filtered by `findUnlocalizedStringsInTree`). See the taxonomy comment above
- * `PROSE_STOPWORDS` for which way each exclusion errs.
+ * (outside `USER_VISIBLE_ATTRIBUTES`), ARIA token values and id references —
+ * for both spellings of an ARIA attribute, hyphenated on DOM elements
+ * (`aria-label`) and camelCase on custom components (`ariaLabel`, see
+ * `isAriaAttributeName`) — colour literals, URLs/paths/hostnames/e-mails, and
+ * everything in test files (filtered by `findUnlocalizedStringsInTree`). See
+ * the taxonomy comment above `PROSE_STOPWORDS` for which way each exclusion
+ * errs.
  */
 export function findUnlocalizedStrings(source, filePath = "fixture.tsx") {
   const sourceFile = ts.createSourceFile(
@@ -885,6 +931,34 @@ function reportUnlocalizedStrings() {
   );
 }
 
+/**
+ * The environment for the `lingui extract` child process, with `NODE_ENV`
+ * removed.
+ *
+ * Cause: `lingui extract` shells out to a worker pool, and lingui picks that
+ * worker's file by `NODE_ENV` — `node_modules/@lingui/cli/dist/api/typedPool.js`
+ * `resolveWorkerFile` resolves `extractWorkerWrapper.jiti.js` under
+ * `NODE_ENV=test` and `extractWorkerWrapper.prod.js` otherwise. Only the
+ * `.prod.js` file ships (`dist/workers/`), so the `NODE_ENV=test` worker dies
+ * with a module-not-found before a single msgid is written. Repro, independent
+ * of any test runner, from `frontend/`:
+ *   NODE_ENV=test pnpm run lingui:extract   → exit 1, module not found
+ *   pnpm run lingui:extract                 → exit 0
+ *
+ * Why it reaches this gate: `pnpm build` runs this script in `prebuild`, and
+ * `vitest` sets `NODE_ENV=test` in its workers — so `pnpm test:run` and
+ * `NODE_ENV=test pnpm build` both died in the extract, with a toolchain crash
+ * that says nothing about i18n. The defect is in the gate, so it is fixed at
+ * the spawn: the child gets a clean environment instead of inheriting a value
+ * that only ever breaks it. `delete` (not `NODE_ENV: undefined`) keeps this
+ * explicit rather than relying on spawn's undefined-skipping semantics.
+ */
+function environmentWithoutNodeEnv() {
+  const env = { ...process.env };
+  delete env.NODE_ENV;
+  return env;
+}
+
 function run() {
   console.log("🔍 Checking Lingui macro scopes...");
   const scopeViolations = findModuleScopeLinguiMacrosInTree();
@@ -900,7 +974,11 @@ function run() {
 
   console.log("🔍 Extracting i18n messages from sources...");
   try {
-    execFileSync("pnpm", ["lingui:extract"], { cwd: root, stdio: "inherit" });
+    execFileSync("pnpm", ["lingui:extract"], {
+      cwd: root,
+      stdio: "inherit",
+      env: environmentWithoutNodeEnv(),
+    });
   } catch {
     fail("lingui extract failed");
   }

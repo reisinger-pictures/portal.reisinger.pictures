@@ -461,8 +461,10 @@ entscheiden".
   (URL-Filter im JSX-Text-Pfad, die drei Fragment-Befunde, `PLZ`/`BIC`-Grenzfälle) auf 0
   stehen — daneben lief keine andere Frontend-Arbeit mit grünem Build. **Abgearbeitet:**
   Regel −4, helper −27, Attribute −44, jsx-text-Bulk −137; Zähler 0, Build grün, jede Welle
-  implementiert und unabhängig verifiziert. Residuen im Board: Einzel-Token-Unterzählung per
-  Design, `NODE_ENV`-Fragilität, camelCase-`ariaLabel` als Folge-Regelarbeit.
+  implementiert und unabhängig verifiziert. Erledigte Folgearbeit: camelCase-`ariaLabel` sieht
+  die Regel jetzt (hyphenfreier Abgleich gegen dieselbe Menge, testgepinnt); der Extract-Spawn
+  läuft mit bereinigtem Env (`NODE_ENV`-Crash belegt und behoben). Dauer-Residuum per Design:
+  Einzel-Token-Unterzählung (28 kurze Texte unter dem Netz, 5-mal deutsch).
 - **D-8 — `frontend/tests/e2e/admin/`:** **nach Domäne aufteilen**, analog zu den bereits sauber
   skalierten Verzeichnissen `client/`, `photographer/`, `crm/`, `delivery/`, `selection/`.
   *Warum:* 34 von 89 Specs (38 %) liegen flach in einem Verzeichnis, das Pricing, CRM-Dokumente,
