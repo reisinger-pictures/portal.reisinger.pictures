@@ -6,7 +6,7 @@
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
 > Entscheidungsdurchgang):** Dieses Board enthält **83 offene Positionen**
-> über 1784 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> über 1741 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
@@ -111,13 +111,7 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       `config('app.throttle_api')` wäre grün, egal was die Datei enthält.
       **Rot nachgewiesen:** `.env.ci` auf 60 → 2 failed; `.env.example` auf 1000 → 2 failed.
       Gate danach grün: 2828 passed, 3 skipped, 0 failed (14457 Assertions).
-- [ ] **D-7 — Regel umgesetzt, die 212 sind die Restarbeit.** `check-i18n.mjs` meldet jetzt
-      **einen** Befund pro Satzlauf statt pro Textknoten; 246 → 212 (Befehl im Board-Eintrag).
-      29 Tests in `check-i18n.test.mjs`, davon 15 neu, plus zwei Fixtures. **Rot nachgewiesen:**
-      `PROSE_LONE_TOKEN_MIN_LENGTH` 6 → 99 lässt `flags a raw German JSX text node` fallen.
-      Offen: Restbestand abarbeiten (Welle 1: −31 → 181; Welle 2: `jsx-attribute` −44 →
-      137, je verifiziert). **Owner-Vorgabe: nie warning, immer fail** — Gate scharf (Exit 1),
-      Build rot bis 0.
+- [x] **D-7 — Regel umgesetzt, Bestand auf 0, Build grün.** Wellen: Flip (Exit 1), Regelarbeit −4, `helper-argument` −27, `jsx-attribute` −44, `jsx-text`-Bulk −137; je implementiert und unabhängig verifiziert (148 Dateien / 1396 Tests, `tsc`, ESLint, `pnpm build` Exit 0). Residuen, dokumentiert statt behoben: Einzel-Token-Unterzählung per Design (28 kurze Texte unter dem Netz, 5-mal deutsch) und `NODE_ENV=test`-Fragilität von `lingui extract` im Prebuild; Checker-Lücke camelCase `ariaLabel` als Folgearbeit unten.
 - [ ] **D-8 — `frontend/tests/e2e/admin/` nach Domäne aufteilen.** Eigene Arbeit.
 - [ ] **D-9 — Sidebar: Portalname bricht um** statt still gekürzt zu werden.
 - [ ] **D-10 — Dialoge innerhalb von `<main>` rendern**, Scoping bleibt unangetastet.
@@ -379,53 +373,11 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [ ] **D-7 — Regel erweitert; die 212 verbliebenen Findings abarbeiten.** Der Regel-Teil von D-7
-  ist fertig, die Abarbeitung nicht. **Befundzahl 246 → 212**, Befehl:
-  `cd frontend && node --input-type=module -e "import { findUnlocalizedStringsInTree } from
-  './scripts/check-i18n.mjs'; console.log(findUnlocalizedStringsInTree().length)"`
-  — beide Stände an derselben Stelle gemessen, die HEAD-Version über
-  `git show HEAD:frontend/scripts/check-i18n.mjs` in eine Probedatei unter `scripts/`.
-  Aufteilung heute: `jsx-text` 137, sonst 0 — Welle 2 brachte −44 (181 → 137, alle
-  Attribut-Befunde gewrappt, Katalog +118 Zeilen, `messages.js` mitkompiliert).
-  **Was die Regel jetzt kann:** benachbarte `JsxText`/`JsxExpression`-Kinder eines
-  Elternknotens bilden **einen** Satzlauf und werden **einmal** gemeldet; ein JSX-Element
-  oder Fragment ist eine harte Grenze. `Jahre (geb. {x})` ist damit **ein** Befund.
-  Danach trennt `isProseText` echte Prosa von Nicht-Prosa: kein Buchstabe, Maschinenwert,
-  Einheitenfragment, rein dynamischer Lauf, einzelnes kurzes Wort, nur Stoppwörter.
-  **Fehlerrichtung, absichtlich gewählt:** die meisten Ausschlüsse **unterschätzen** — sie
-  können echten Text übersehen. Das ist die schlechtere Richtung, weil Rauschen sichtbar ist
-  und ein übersehener Fund nicht. Genau eine Heuristik **überzählt** (Literal neben einem
-  Ausdruck), damit das Zusammenführen keinen vorbestehenden Befund verliert.
-  **Bewusst keine Allowlist.** Eine Liste, die niemand pflegt, wird zur nächsten stillen
-  Ausnahme — Tier-Bezeichner, Kameracodes und Markennamen sind deshalb über die Struktur
-  ausgeschlossen, nicht über eine Liste.
-  **Immer fail, Exit 1** (Owner-Vorgabe) — der warn-only-Pfad ist entfernt. Befunde lassen
-  `prebuild` und damit jeden `pnpm build` scheitern, lokal wie in CI, bis der Zähler 0 steht.
-  **Größte verbleibende Brocken** (`findUnlocalizedStringsInTree()`, Treffer pro Datei):
-  `LicenseCatalogSettings.tsx` (29), `ShootingCalculatorModal.tsx` (18),
-  `BrandSettingsCard.tsx` (14), `CalculatorSettingsCard.tsx` (13),
-  `ManagementOrgDetailView.tsx` (8) — gemessen nach Welle 2 (22 Dateien tragen Befunde;
-  Befehl: `findUnlocalizedStringsInTree`, pro Datei gruppiert).
-  `aria-label` (5), `alt` (5).
-  **Reihenfolge (Plan, keine Entscheidung):** nächste Welle `jsx-text`-Bulk (137).
-  Build weiter rot (Owner-Vorgabe) bis 0. **Checker-Lücke, Folgewelle:** camelCase `ariaLabel`
-  (z. B. `CustomerModal.tsx:151/167` `PLZ`/`Stadt`) sieht die Regel nicht — 2 Literale heute,
-  außerhalb des Zählers; gehört in die Regelarbeit, nicht in den Bulk. Nebenbefund: Welle 1
-  hatte `messages.js` stale zurückgelassen (nur `.po` geschrieben); Welle 2 hat rekonziliert.
-  **Eingaben für die Abarbeitung, keine Regelmängel:** `UserTable.tsx:53` und
-  `ManagementStatsView.tsx:105` (`{n} Gruppen, {n} Galerien`) meldet die Regel vor wie nach der
-  Erweiterung. Die URL in `Impressum.tsx:43` meldet sie seit Welle 1 nicht mehr — technische
-  Werte filtert `looksLikeTechnicalValue` jetzt auch im JSX-Text-Pfad.
-<!-- FTP-Konten: Ansatz am 2026-09-26 von pure-pw/pure-ftpd auf SFTPGo
-     umgestellt. P1-M17..P1-M20 sind durch P1-M21..P1-M29 abgeloest.
-     Begruendung: (a) pure-ftpd kann AES128-SHA nicht anbieten, damit
-     erreicht die Kamera den Server nicht; (b) pure-ftpd liest die puredb
-     nur beim Start, PHP-verwaltete Passwoerter erfordern also Neustarts.
-     Der wichtigste Gewinn ist aber P1-M23: mit SFTPGo erzeugt PHP das
-     Passwort, zeigt es einmal an und speichert es gar nicht. Damit
-     entfaellt die urspruenglich geplante verschluesselte
-     ftp_credentials-Tabelle samt FILE_ENCRYPTION_KEY vollstaendig. -->
-
+- [ ] **i18n-Folgearbeit (aus D-7): Checker-Lücke camelCase `ariaLabel`, `NODE_ENV`-Fragilität.**
+  Die Regel sieht `ariaLabel="…"` nicht (`USER_VISIBLE_ATTRIBUTES` + `aria-`-Präfix greifen nur
+  bei Bindestrich); 2 Literale (`CustomerModal.tsx:151/167`) sind gewrappt, die Lücke besteht weiter.
+  Getrennt: `NODE_ENV=test` crasht `lingui extract` (`emitter.removeListener`, Node 26) — der Gate-
+  Lauf braucht sauberes Env. Zähler 0 und Build grün bleiben davon unberührt.
 - [~] wartet auf die Produktentscheidung, ob Fotografen ihr Passwort selbst ändern dürfen (Confirm-Flow mit aktuellem Passwort) oder nur der Admin. **P1-M23 (P0) — Passwort-Erzeugung und Show-once, statt Verschlüsselung
   at rest.** Das ist die **entscheidende Entlastung gegenüber P1-M18** und
   der eigentliche Grund für den Wechsel: SFTPGo hält das Passwort, das

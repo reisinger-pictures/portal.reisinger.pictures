@@ -47,16 +47,16 @@ const OrgSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFl
             <label className="label"><span className="label-text font-bold"><Trans>Rechnungs-Rhythmus</Trans></span></label>
             <select value={freq} onChange={e => setFreq(e.target.value as 'immediate' | 'monthly' | 'quarterly')}
                     className="select select-bordered">
-                <option value="immediate">Sofort (Einzelrechnung)</option>
-                <option value="monthly">Monatlich (Sammelrechnung)</option>
-                <option value="quarterly">Quartal (Sammelrechnung)</option>
+                <option value="immediate"><Trans>Sofort (Einzelrechnung)</Trans></option>
+                <option value="monthly"><Trans>Monatlich (Sammelrechnung)</Trans></option>
+                <option value="quarterly"><Trans>Quartal (Sammelrechnung)</Trans></option>
             </select>
         </div>
         <div className="form-control">
             <label className="label"><span className="label-text font-bold"><Trans>Standard-Flatrate-Level</Trans></span></label>
             <select value={defaultFlatrateLevel} onChange={e => setDefaultFlatrateLevel(e.target.value as 'none' | 'web' | 'print' | 'original')}
                     className="select select-bordered">
-                <option value="none">Keine Flatrate</option>
+                <option value="none"><Trans>Keine Flatrate</Trans></option>
                 <option value="web">Web</option>
                 <option value="print">Print</option>
                 <option value="original">Original</option>
@@ -64,7 +64,7 @@ const OrgSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFl
         </div>
         {defaultFlatrateLevel !== 'none' && (
             <div className="form-control">
-                <label className="label"><span className="label-text font-bold">Geteiltes Flatrate-Budget (Cent)</span></label>
+                <label className="label"><span className="label-text font-bold"><Trans>Geteiltes Flatrate-Budget (Cent)</Trans></span></label>
                 <input type="number" min="0" value={sharedFlatrateCents || ''}
                        onChange={e => setSharedFlatrateCents(Number(e.target.value))}
                        className="input input-bordered" placeholder={t`z.B. 50000 für 500€`}/>
@@ -74,9 +74,9 @@ const OrgSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFl
             <label className="label"><span className="label-text font-bold"><Trans>Auto-Join Policy</Trans></span></label>
             <select value={autoJoinPolicy} onChange={e => setAutoJoinPolicy(e.target.value as 'immediate' | 'requires_invite' | 'disabled')}
                     className="select select-bordered">
-                <option value="immediate">Sofort (automatisch)</option>
-                <option value="requires_invite">Einladung erforderlich</option>
-                <option value="disabled">Deaktiviert</option>
+                <option value="immediate"><Trans>Sofort (automatisch)</Trans></option>
+                <option value="requires_invite"><Trans>Einladung erforderlich</Trans></option>
+                <option value="disabled"><Trans>Deaktiviert</Trans></option>
             </select>
         </div>
         <button type="submit" className="btn btn-primary w-full mt-4"><Trans>Speichern</Trans></button>

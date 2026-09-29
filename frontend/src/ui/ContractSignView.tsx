@@ -241,7 +241,8 @@ function ContractSignTokenView({ token }: { token: string }) {
                                     if (!bd) return null;
                                     const birthDate = new Date(bd);
                                     const age = calcAge(birthDate);
-                                    return <><span className="font-bold">Alter:</span><span>{age} Jahre (geb. {birthDate.toLocaleDateString('de-DE')})</span></>;
+                                    const birthDateLabel = birthDate.toLocaleDateString('de-DE');
+                                    return <><span className="font-bold">Alter:</span><span><Trans>{age} Jahre (geb. {birthDateLabel})</Trans></span></>;
                                 })()}
                             </div>
                         </div>

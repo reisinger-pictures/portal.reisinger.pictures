@@ -81,6 +81,11 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
         discountAbsolute = res.discountAbsolute / CENTS_PER_EURO;
     }
 
+    // Plain values, hoisted out of the JSX: `<Trans>` takes a variable as its
+    // placeholder, not a member access or a call (`lingui/no-expression-in-message`).
+    const outdoorImagesPerHour = terms?.calc_outdoor_images_per_hour || DEFAULT_OUTDOOR_IMAGES_PER_HOUR;
+    const reportageSurchargePercent = Math.round((parseFloat(terms?.calc_flatrate_multiplier || '1.2') - 1) * 100);
+
     const handleCalculate = () => {
         let desc: string;
         let notes: string;
@@ -136,28 +141,28 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                     <div className="tab-content bg-base-100 border-base-300 p-4">
                         <div className="space-y-4">
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                                <label className="label font-bold text-sm mb-1">Bereich</label>
+                                <label className="label font-bold text-sm mb-1"><Trans>Bereich</Trans></label>
                                 <select className="select select-bordered w-full" value={srpType} onChange={e => {
                                     setSrpType(e.target.value as 'portrait' | 'couple' | 'nude');
                                     if (e.target.value !== 'nude') setSrpPrivate(false);
                                 }}>
-                                    <option value="portrait">Portrait</option>
-                                    <option value="couple">Pärchen</option>
-                                    <option value="nude">Akt & Boudoir</option>
+                                    <option value="portrait"><Trans>Portrait</Trans></option>
+                                    <option value="couple"><Trans>Pärchen</Trans></option>
+                                    <option value="nude"><Trans>Akt & Boudoir</Trans></option>
                                 </select>
                             </div>
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                                 <label className="label font-bold text-sm mb-1">Setup</label>
                                 <select className="select select-bordered w-full" value={srpSetup}
                                         onChange={e => setSrpSetup(e.target.value as 'outdoor' | 'outdoor_flash' | 'indoor')}>
-                                    <option value="outdoor">Outdoor (Natur)</option>
-                                    <option value="outdoor_flash">Mobiles Blitz-Setup (+50€)</option>
-                                    <option value="indoor">Fotostudio (+50€)</option>
+                                    <option value="outdoor"><Trans>Outdoor (Natur)</Trans></option>
+                                    <option value="outdoor_flash"><Trans>Mobiles Blitz-Setup (+50€)</Trans></option>
+                                    <option value="indoor"><Trans>Fotostudio (+50€)</Trans></option>
                                 </select>
                             </div>
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                                 <div className="label">
-                                    <span className="label-text font-bold">Zusätzliche Bilder</span>
+                                    <span className="label-text font-bold"><Trans>Zusätzliche Bilder</Trans></span>
                                     <span className="label-text-alt font-mono">{srpExtra} Stk.</span>
                                 </div>
                                 <input type="range" min="0" max="50" step="1" className="range range-primary w-full"
@@ -169,8 +174,8 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                                         <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                                checked={srpPrivate} onChange={e => setSrpPrivate(e.target.checked)}/>
                                         <div>
-                                            <span className="label-text font-bold block">Online-Verbot (Privacy Fee)</span>
-                                            <span className="label-text-alt opacity-70 block mt-1 leading-tight text-wrap">Absolutes Veröffentlichungsverbot (+200€)</span>
+                                            <span className="label-text font-bold block"><Trans>Online-Verbot (Privacy Fee)</Trans></span>
+                                            <span className="label-text-alt opacity-70 block mt-1 leading-tight text-wrap"><Trans>Absolutes Veröffentlichungsverbot (+200€)</Trans></span>
                                         </div>
                                     </label>
                                 </div>
@@ -185,7 +190,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                             <div
                                 className="grid grid-cols-2 gap-4 bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                                 <div className="form-control">
-                                    <label className="label font-bold text-sm mb-1"><span className="label-text font-bold">Dauer (Min.)</span></label>
+                                    <label className="label font-bold text-sm mb-1"><span className="label-text font-bold"><Trans>Dauer (Min.)</Trans></span></label>
                                     <input type="number" step="15" className="input input-bordered font-mono"
                                            value={calcDuration}
                                            onChange={e => setCalcDuration(parseInt(e.target.value) || 0)}/>
@@ -200,30 +205,30 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                                 <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
                                     <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                            checked={calcIsOutdoor} onChange={e => setCalcIsOutdoor(e.target.checked)}/>
-                                    <span className="label-text font-bold">Outdoor-Shooting (Bilder/Std.: {terms?.calc_outdoor_images_per_hour || DEFAULT_OUTDOOR_IMAGES_PER_HOUR})</span>
+                                    <span className="label-text font-bold"><Trans>Outdoor-Shooting (Bilder/Std.: {outdoorImagesPerHour})</Trans></span>
                                 </label>
                             </div>
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                                 <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
                                     <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                            checked={calcIsFlatrate} onChange={e => setCalcIsFlatrate(e.target.checked)}/>
-                                    <span className="label-text font-bold">Reportage-Paket (+{Math.round((parseFloat(terms?.calc_flatrate_multiplier || '1.2') - 1) * 100)}% Aufschlag)</span>
+                                    <span className="label-text font-bold"><Trans>Reportage-Paket (+{reportageSurchargePercent}% Aufschlag)</Trans></span>
                                 </label>
                             </div>
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                                 <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
                                     <input type="checkbox" className="checkbox checkbox-primary shrink-0"
                                            checked={calcIsReorder} onChange={e => setCalcIsReorder(e.target.checked)}/>
-                                    <span className="label-text font-bold">Nachbestellung (keine Setup-Gebühr)</span>
+                                    <span className="label-text font-bold"><Trans>Nachbestellung (keine Setup-Gebühr)</Trans></span>
                                 </label>
                             </div>
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
-                                <label className="label font-bold text-sm mb-1">Rabatt-Stufe</label>
+                                <label className="label font-bold text-sm mb-1"><Trans>Rabatt-Stufe</Trans></label>
                                 <select className="select select-bordered w-full" value={calcDiscount}
                                         onChange={e => setCalcDiscount(e.target.value as ShootingDiscount)}>
-                                    <option value="0">Kein Rabatt (0%)</option>
-                                    <option value="33">Studentenrabatt (33%)</option>
-                                    <option value="50">Special Deal OGs (50%)</option>
+                                    <option value="0"><Trans>Kein Rabatt (0%)</Trans></option>
+                                    <option value="33"><Trans>Studentenrabatt (33%)</Trans></option>
+                                    <option value="50"><Trans>Special Deal OGs (50%)</Trans></option>
                                 </select>
                             </div>
                         </div>

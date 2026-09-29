@@ -101,8 +101,8 @@ export default function InvoiceDiscountsSection({
                                 onChange={(e) => onDiscountChange(idx, 'type', e.target.value)}
                                 className="select select-sm select-bordered w-full bg-base-100"
                             >
-                                <option value="discount_fixed">Fixer Betrag (€)</option>
-                                <option value="discount_percent">Prozentual (%)</option>
+                                <option value="discount_fixed"><Trans>Fixer Betrag (€)</Trans></option>
+                                <option value="discount_percent"><Trans>Prozentual (%)</Trans></option>
                             </select>
                         </div>
 

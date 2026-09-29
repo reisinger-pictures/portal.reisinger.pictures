@@ -78,9 +78,9 @@ export default function ProductModal({ isOpen, onClose, editingProduct: product,
                     <div className="form-control">
                         <label className="label"><span className="label-text font-bold"><Trans>Typ</Trans></span></label>
                         <select required {...register('type')} className="select select-bordered">
-                            <option value="item">Leistung / Produkt</option>
-                            <option value="discount_fixed">Rabatt (Fixbetrag in €)</option>
-                            <option value="discount_percent">Rabatt (Prozentual in %)</option>
+                            <option value="item"><Trans>Leistung / Produkt</Trans></option>
+                            <option value="discount_fixed"><Trans>Rabatt (Fixbetrag in €)</Trans></option>
+                            <option value="discount_percent"><Trans>Rabatt (Prozentual in %)</Trans></option>
                         </select>
                     </div>
                     <div className="form-control">

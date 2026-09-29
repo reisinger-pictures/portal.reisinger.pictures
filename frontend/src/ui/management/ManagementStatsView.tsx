@@ -77,7 +77,9 @@ export default function ManagementStatsView() {
                                 </thead>
                                 
                                 <tbody>
-                                {filteredLogs?.map(log => (
+                                {filteredLogs?.map(log => {
+                                    const photoCount = log.payload?.photo_count || '?';
+                                    return (
                                     <tr key={log.id}>
                                         <td className="whitespace-nowrap text-sm opacity-70">
                                             {new Date(log.created_at).toLocaleString('de-DE')}
@@ -102,7 +104,7 @@ export default function ManagementStatsView() {
                                                     {log.item_type === 'full_zip' ? (
                                                         <div className="flex items-center gap-2">
                                                             <span className="badge badge-secondary badge-sm font-bold uppercase">ZIP</span>
-                                                            <span className="text-sm font-medium whitespace-nowrap opacity-80">({log.payload?.photo_count || '?'} Bilder)</span>
+                                                            <span className="text-sm font-medium whitespace-nowrap opacity-80"><Trans>({photoCount} Bilder)</Trans></span>
                                                         </div>
                                                     ) : (
                                                         <span className="badge badge-ghost badge-sm font-bold uppercase">BILD</span>
@@ -118,7 +120,8 @@ export default function ManagementStatsView() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                                 {(!filteredLogs || logs?.data.length === 0) && (
                                     <tr>
                                         <td colSpan={5} className="text-center opacity-50 py-8">

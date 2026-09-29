@@ -139,7 +139,10 @@ export default function ManagementPayoutsView() {
                             </tr>
                             </thead>
                             <tbody>
-                            {data.statements.map(stmt => (
+                            {data.statements.map(stmt => {
+                                const sharesEarned = stmt.total_shares_earned;
+                                const rolledOverAmount = formatMoney(stmt.rolled_over_amount_cents);
+                                return (
                                 <tr key={stmt.id}>
                                     <td className="whitespace-nowrap font-mono">{stmt.month} / {stmt.year}</td>
                                     <td>
@@ -147,9 +150,9 @@ export default function ManagementPayoutsView() {
                                         <div className="text-sm opacity-70">{stmt.sequence_number}</div>
                                     </td>
                                     <td className="text-sm font-mono">
-                                        {stmt.total_shares_earned} Shares<br/>
+                                        <Trans>{sharesEarned} Shares</Trans><br/>
                                         <span
-                                            className="opacity-50">Rollover: {formatMoney(stmt.rolled_over_amount_cents)}</span>
+                                            className="opacity-50"><Trans>Rollover: {rolledOverAmount}</Trans></span>
                                     </td>
                                     <td className="text-right font-mono font-bold text-base text-primary">
                                         {formatMoney(stmt.total_payable_cents)}
@@ -169,7 +172,8 @@ export default function ManagementPayoutsView() {
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                             {data.statements.length === 0 && <tr>
                                 <td colSpan={5} className="text-center py-6 opacity-50"><Trans>Keine Statements vorhanden.</Trans></td>
                             </tr>}

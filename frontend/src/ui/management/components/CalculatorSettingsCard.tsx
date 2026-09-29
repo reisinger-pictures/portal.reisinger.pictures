@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import {useEffect} from 'react';
 import {useLicenseTerms} from '../../../logic/useLicenseTerms';
 import {useUI} from '../../components/UIContext';
@@ -132,17 +133,17 @@ export default function CalculatorSettingsCard() {
         <div className="card bg-base-100 border border-base-300 shadow-sm">
             <div className="card-body p-6 md:p-8">
                 <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
-                    <span className="iconify mdi--calculator text-primary text-3xl"></span> Paket-Rechner Konfiguration
+                    <span className="iconify mdi--calculator text-primary text-3xl"></span> <Trans>Paket-Rechner Konfiguration</Trans>
                 </h2>
                 <p className="text-sm opacity-70 mb-6">
-                    Definiere die Parameter für den manuellen "Paket-Kalkulator" in Angeboten und Rechnungen.
+                    <Trans>Definiere die Parameter für den manuellen "Paket-Kalkulator" in Angeboten und Rechnungen.</Trans>
                 </p>
                 <form onSubmit={handleSubmit(onSubmit)}>
-                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary">Standard Tarif</div>
+                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary"><Trans>Standard Tarif</Trans></div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Grundpreis</span></label>
+                                className="label-text font-bold"><Trans>Grundpreis</Trans></span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('calc_base_price', {valueAsNumber: true})} />
                                 <span className="join-badge">€</span>
@@ -150,7 +151,7 @@ export default function CalculatorSettingsCard() {
                         </div>
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Stundensatz</span></label>
+                                className="label-text font-bold"><Trans>Stundensatz</Trans></span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('calc_hourly_rate', {valueAsNumber: true})} />
                                 <span className="join-badge">€</span>
@@ -166,7 +167,7 @@ export default function CalculatorSettingsCard() {
                         </div>
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Outdoor-Bilder/Std.</span></label>
+                                className="label-text font-bold"><Trans>Outdoor-Bilder/Std.</Trans></span></label>
                             <div className="join w-full">
                                 <input type="number" step="1" min="1" className="input input-bordered join-item w-full" {...register('calc_outdoor_images_per_hour', {valueAsNumber: true})} />
                                 <span className="join-badge">Stk</span>
@@ -174,7 +175,7 @@ export default function CalculatorSettingsCard() {
                         </div>
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Reportage-Aufschlag</span></label>
+                                className="label-text font-bold"><Trans>Reportage-Aufschlag</Trans></span></label>
                             <div className="join w-full">
                                 <input type="number" step="1" min="0" max="900" className="input input-bordered join-item w-full" {...register('calc_flatrate_surcharge', {valueAsNumber: true})} />
                                 <span className="join-badge">%</span>
@@ -182,18 +183,18 @@ export default function CalculatorSettingsCard() {
                         </div>
                     </div>
 
-                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary">Flex Tarif</div>
+                    <div className="mb-4 font-bold border-b border-base-300 pb-2 text-primary"><Trans>Flex Tarif</Trans></div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Basispreis</span></label>
+                                className="label-text font-bold"><Trans>Basispreis</Trans></span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_base_price', {valueAsNumber: true})} />
                                 <span className="join-badge">€</span>
                             </div>
                         </div>
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">Setup-Fee</span></label>
+                            <label className="label"><span className="label-text font-bold"><Trans>Setup-Fee</Trans></span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_setup_fee', {valueAsNumber: true})} />
                                 <span className="join-badge">€</span>
@@ -201,7 +202,7 @@ export default function CalculatorSettingsCard() {
                         </div>
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Extra-Bild</span></label>
+                                className="label-text font-bold"><Trans>Extra-Bild</Trans></span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_extra_image_fee', {valueAsNumber: true})} />
                                 <span className="join-badge">€</span>
@@ -209,7 +210,7 @@ export default function CalculatorSettingsCard() {
                         </div>
                         <div className="form-control">
                             <label className="label"><span
-                                className="label-text font-bold">Privacy-Fee</span></label>
+                                className="label-text font-bold"><Trans>Privacy-Fee</Trans></span></label>
                             <div className="join w-full">
                                 <input type="number" step="0.01" className="input input-bordered join-item w-full" {...register('srp_privacy_fee', {valueAsNumber: true})} />
                                 <span className="join-badge">€</span>
@@ -218,8 +219,7 @@ export default function CalculatorSettingsCard() {
                     </div>
 
                     <div className="mt-6 border-t border-base-300 pt-6">
-                        <button type="submit" disabled={isSubmitting} className="btn btn-primary px-8">Einstellungen
-                            anwenden
+                        <button type="submit" disabled={isSubmitting} className="btn btn-primary px-8"><Trans>Einstellungen anwenden</Trans>
                         </button>
                     </div>
                 </form>

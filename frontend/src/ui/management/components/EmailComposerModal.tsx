@@ -63,7 +63,7 @@ export default function EmailComposerModal({ isOpen, onClose, galleryId }: Email
                     <div className="flex justify-between items-end mb-2">
                         <label className="label p-0"><span className="label-text font-bold"><Trans>Nachricht</Trans></span></label>
                     </div>
-                    <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mb-2">Variablen: {"{user_name}"}, {"{gallery_name}"}, {"{link}"}</span>
+                    <span className="label-text-alt opacity-70 whitespace-normal break-words leading-tight inline-block mb-2"><Trans>Variablen: {"{user_name}"}, {"{gallery_name}"}, {"{link}"}</Trans></span>
                     
                     <WysiwygEditor value={mailBody} onChange={setMailBody} />
                 </div>

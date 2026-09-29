@@ -277,7 +277,7 @@ export default function VolumePresetSettingsCard() {
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 className="text-2xl font-bold flex items-center gap-2">
-                        <span className="iconify mdi--chart-gantt text-primary text-3xl"></span> Volume-Licensing Presets
+                        <span className="iconify mdi--chart-gantt text-primary text-3xl"></span> <Trans>Volume-Licensing Presets</Trans>
                     </h2>
                     <p className="text-sm opacity-70 mt-1 max-w-3xl">
                         <Trans>
@@ -299,9 +299,9 @@ export default function VolumePresetSettingsCard() {
                         <thead className="bg-base-200">
                             <tr>
                                 <th>Name</th>
-                                <th className="text-right">Basispreis</th>
-                                <th>Staffeln</th>
-                                <th className="text-right">Aktionen</th>
+                                <th className="text-right"><Trans>Basispreis</Trans></th>
+                                <th><Trans>Staffeln</Trans></th>
+                                <th className="text-right"><Trans>Aktionen</Trans></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -311,7 +311,7 @@ export default function VolumePresetSettingsCard() {
                                         <div className="font-bold flex items-center gap-2 flex-wrap">
                                             {preset.name}
                                             {preset.is_default && (
-                                                <span className="badge badge-primary badge-sm uppercase px-2">Standard</span>
+                                                <span className="badge badge-primary badge-sm uppercase px-2"><Trans>Standard</Trans></span>
                                             )}
                                         </div>
                                     </td>
