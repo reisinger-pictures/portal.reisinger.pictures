@@ -551,14 +551,15 @@ entscheiden".
   Policy.
   - **SMTP-Duplikate (entschieden):** die beiden Fenster schließen, die eine Nutzeraktion
     **zerstören** oder eine Nachricht **senden**, obwohl der Zustand es schon erledigt hat. Erstens
-    der Reset-/Aktivierungspfad: `AuthController.php:113-116` und `UserController.php:121-124`
-    machen beide `updateOrInsert` auf `password_reset_tokens` — ein zweiter Klick **überschreibt den
-    Token, den der Nutzer in der Hand hält**, und die zweite Mail macht den Link der ersten tot.
+    der Reset-/Aktivierungspfad: umgesetzt als Claim in `ActivationTokenService::issue()` — ein noch
+    gültiger Token wird nie ersetzt, der zweite Aufruf gibt `null` zurück und sendet keine zweite
+    Mail; aufgerufen in `AuthController`, `UserController` und `ModelRegistrationController`
+    (dritte Stelle, identischer Defekt). Ein zweiter Klick macht den Link der ersten Mail damit nicht
+    mehr tot.
     Das ist die einzige Duplikatklasse mit dieser Folge. Zweitens das Crashfenster im Scheduler:
     `ProcessModelLifecycle.php:114-121` reiht die Erinnerungsmail ein und speichert **erst danach**
     `last_reminder_stage`, ohne Transaktionskopplung; ein Absturz dazwischen sendet am nächsten Tag
-    erneut. Beides wird in `InvoiceMailDispatcher` nachgebildet (Claim + Queue in **einer**
-    Transaktion). **Bewusst nicht gemacht:** kein flächendeckendes `ShouldBeUnique` über alle
+    erneut (noch offen — `InvoiceMailDispatcher::queueOnce` deckt nur die Scheduler-Seite als Vorlage). **Bewusst nicht gemacht:** kein flächendeckendes `ShouldBeUnique` über alle
     Mails — gemessen kommt `ShouldBeUnique` und `uniqueId` im Repo **keinmal** vor, die Claims auf
     Invoice, Dispute, Quote, Webhook, Scheduler und Vertragsabschluss sind getestet, und ein
     beobachtetes Duplikat gibt es nicht. Die verbleibende Klasse (SMTP-Retry nach Transportfehler)

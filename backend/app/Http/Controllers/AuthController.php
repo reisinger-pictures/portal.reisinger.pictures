@@ -11,6 +11,7 @@ use App\Models\Org;
 use App\Models\OrgInvite;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ActivationTokenService;
 use App\Services\AIService;
 use App\Services\AuthorizationService;
 use App\Services\FtpCredentialService;
@@ -26,7 +27,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -110,23 +110,26 @@ class AuthController extends Controller
                 // DISABLED and IMMEDIATE: no auto-join at registration — deferred to password reset
             }
 
-            $token = Str::random(64);
-            DB::table('password_reset_tokens')->updateOrInsert(
-                ['email' => $user->email],
-                ['token' => Hash::make($token), 'created_at' => now()]
-            );
+            // The token row is claimed, never overwritten (D-17): a still valid
+            // token stays the one the person already holds in their inbox, and
+            // no second mail goes out. `resetPassword()` resolves the account by
+            // email at click time, so the earlier link activates *this* account —
+            // which is why the response stays the same success in both cases.
+            $token = app(ActivationTokenService::class)->issue($user->email);
 
-            $link = BrandRegistry::frontendUrl().'/reset-password?token='.$token.'&email='.urlencode($user->email);
+            if ($token !== null) {
+                $link = BrandRegistry::frontendUrl().'/reset-password?token='.$token.'&email='.urlencode($user->email);
 
-            Mail::to($user->email)->send(
-                new ActivateAccountMail(
-                    $user->name,
-                    'Willkommen! Um deinen Account zu aktivieren und ein sicheres Passwort zu vergeben, klicke bitte auf den folgenden Button:',
-                    $link,
-                    'Account aktivieren',
-                    'Account aktivieren'
-                )
-            );
+                Mail::to($user->email)->send(
+                    new ActivateAccountMail(
+                        $user->name,
+                        'Willkommen! Um deinen Account zu aktivieren und ein sicheres Passwort zu vergeben, klicke bitte auf den folgenden Button:',
+                        $link,
+                        'Account aktivieren',
+                        'Account aktivieren'
+                    )
+                );
+            }
 
             return response()->json(['success' => true, 'message' => 'Registrierung erfolgreich. Bitte prüfe deine E-Mails.']);
         });
