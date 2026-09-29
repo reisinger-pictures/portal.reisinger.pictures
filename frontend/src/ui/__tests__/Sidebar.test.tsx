@@ -162,6 +162,47 @@ describe('Sidebar', () => {
         expect(screen.getByText('Reisinger Foto Portal')).toBeInTheDocument();
     });
 
+    // D-9: the portal name must WRAP, not run past the sidebar's edge.
+    //
+    // It used to carry `whitespace-nowrap`, which is the mobile header's defect
+    // in a second place: no truncation mechanism at all, so a longer name simply
+    // overflows the box. The mobile counterpart (`MobileBrandLink`) already
+    // carries a class-list pin for exactly this reason; the sidebar was the one
+    // lockup that never got one, which is why the asymmetry survived.
+    //
+    // Scope of this assertion: jsdom applies no CSS, so the class list is the
+    // only thing observable here — never the rendered layout. The real layout
+    // guard is the Playwright spec
+    // `tests/e2e/photographer/mobile-brand-lockup.spec.ts`, which measures
+    // scrollWidth against clientWidth. What this pin adds is the DIRECTION of
+    // the fix: `break-words` (wrapping) rather than any of the clipping classes,
+    // which were explicitly rejected as the remedy.
+    it('lets the portal name wrap instead of clipping it', () => {
+        renderSidebar();
+
+        const name = screen.getByText('Reisinger Foto Portal');
+
+        const clippingClasses = [
+            'whitespace-nowrap',
+            'truncate',
+            'text-ellipsis',
+            'text-clip',
+            'overflow-hidden',
+        ];
+        const applied = Array.from(name.classList).filter(
+            className => clippingClasses.includes(className) || className.startsWith('line-clamp-'),
+        );
+        expect(applied).toEqual([]);
+
+        // The wrap itself needs two things a `whitespace-*` change alone does not
+        // give: the span is a flex item of the brand link, so it needs `min-w-0`
+        // to be allowed to shrink below its content width, and `break-words` for
+        // a name with no space to break at. Both are asserted, because dropping
+        // either one leaves the overflow in place.
+        expect(name).toHaveClass('min-w-0');
+        expect(name).toHaveClass('break-words');
+    });
+
     // ----------------------------------------------------------------------
     // Guest / Login
     // ----------------------------------------------------------------------

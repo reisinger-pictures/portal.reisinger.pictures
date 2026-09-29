@@ -5,13 +5,13 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **82 offene Positionen**
-> über 1736 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **78 offene Positionen**
+> über 1697 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **18**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **14**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
 >
@@ -123,8 +123,8 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       Gate danach grün: 2828 passed, 3 skipped, 0 failed (14457 Assertions).
 - [x] **D-7 — Regel umgesetzt, Bestand auf 0, Build grün.** Wellen: Flip (Exit 1), Regelarbeit −4, `helper-argument` −27, `jsx-attribute` −44, `jsx-text`-Bulk −137; je implementiert und unabhängig verifiziert (148 Dateien / 1396 Tests, `tsc`, ESLint, `pnpm build` Exit 0). Residuen, dokumentiert statt behoben: Einzel-Token-Unterzählung per Design (28 kurze Texte unter dem Netz, 5-mal deutsch) und `NODE_ENV=test`-Fragilität von `lingui extract` im Prebuild; Checker-Lücke camelCase `ariaLabel` als Folgearbeit unten.
 - [ ] **D-8 — `frontend/tests/e2e/admin/` nach Domäne aufteilen.** Eigene Arbeit.
-- [ ] **D-9 — Sidebar: Portalname bricht um** statt still gekürzt zu werden.
-- [ ] **D-10 — Dialoge innerhalb von `<main>` rendern**, Scoping bleibt unangetastet.
+- [x] **D-9 — Sidebar-Portalname bricht um.** `whitespace-nowrap` → `min-w-0 break-words leading-tight`; E2E misst Geometrie (nicht `scrollWidth`-Idiom, das blind ist). Verifiziert.
+- [x] **D-10 — Dialoge rendern innerhalb von `<main>`.** `<GalleryModals>` in `DashboardLayout` versetzt; Harness unberührt; `DashboardLayout.test.tsx` treibt echte Opens, Nicht-Vakuum empirisch belegt. Verifiziert.
 - [x] **D-11 — benannte Höhe plus `bodyHead`, drei handge-rollte Dialoge mitmigriert.**
       `ModalShellHeight = '80vh' | '90vh'` mit `BOUNDED_HEIGHT_CLASS` als **statischer**
       Literal-Tabelle; ein interpoliertes `max-h-${height}` würde Tailwinds Content-Scan nicht
@@ -139,18 +139,7 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       (`PhotographerTeamModal.test.tsx` ganz neu). Der Kopf wird geprüft, indem getestet wird,
       dass er **nicht** im `.overflow-y-auto`-Bereich liegt.
       **Offen bleibt die visuelle Prüfung** — siehe `manuell prüfen:` unten.
-- [ ] **D-12 — React `autoFocus` gewinnt; der Fokus wandert ins erste Feld des Dialogs.**
-      Umgesetzt als Reihenfolge-Entscheidung in `useFocusTrap`, **kein** neuer Prop.
-      **Pflichtteil derselben Änderung:** der Rückkehr-Zielpunkt wird vor dem Mount des
-      Dialoginhalts festgehalten — sonst gibt der Trap den Fokus beim Schließen nicht an den
-      Auslöser zurück, und aus dem heutigen Einzelfall `ManagementOrdersView` wird der
-      Regelfall. Bricht genau einen gepinnten Test (`ManagementOrdersView.test.tsx:226-242`),
-      der wörtlich festhält, dass er mit dieser Entscheidung wandert.
-      **Ausgeschlossen:** die drei zuerst verworfenen Varianten bleiben verworfen, und neu
-      verworfen sind B (DOM umsortieren, verschiebt die Tab-Reihenfolge in allen 28),
-      C (auf das `<dialog>` fokussieren, hilft der Datenerfassung nicht) und D (`showModal()`,
-      gründlicher, greift aber über `ModalHelper` in 36 E2E-Dateien — als eigene Welle
-      zurückgestellt, **nicht** verworfen).
+- [x] **D-12 — React `autoFocus` gewinnt (in `95f0362` umgesetzt, in dieser Welle verifiziert).** Reihenfolge-Entscheidung im Trap + Rückkehr-Zielpunkt vor Mount; 5 Fälle gepinnt; gepinnter Test invertiert. Verifiziert.
 - [x] **D-13 — `maxWidth` auf `'2xl'` eingeschränkt (verifiziert, keine Änderung nötig).** Im Code vorgefunden und in der D-20-Welle verifiziert: `ModalShell.tsx` und `ModalDialogShell.tsx` tippen `maxWidth?: 'default' | '2xl'`, je mit Docblock; `tsc -b` verbietet `'lg'`/`'xl'` an der Aufrufstelle.
 - [ ] **D-16 — technische Dokumentation der Stripe-Identifikatoren vervollständigen**; der
       rechtliche Teil bleibt eine benannte Lücke mit Owner.
@@ -174,7 +163,7 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       `data-testid` landet auf der `.modal-box`, die 7 E2E-Referenzen (3 Assertions,
       4 Locator-Ketten) scopen unverändert. **Die Zahl 8 im ursprünglichen Board-Eintrag war
       falsch** und ist durch die gemessene ersetzt.
-- [ ] **D-19 — Unit-Testdateien für `ManagementOrgsView` und `ManagementOrgDetailView`.**
+- [x] **D-19 — Unit-Testdateien für beide Management-Views (in `d606780` umgesetzt, verifiziert).** 6 + 8 Verhaltenstests, keine Konformitäts-Assertions. Verifiziert.
 - [x] **D-20 — `ModalDialogShell` kennt kein `editing`; der Lösch-Button folgt aus `onDelete`.** Umgesetzt und verifiziert: Footer nur unter `onDelete` (Handler ist `onDelete` — ein Button ohne Handler ist strukturell unmöglich); `GalleryModal`/`GalleryGroupModal` nur bei existierendem Datensatz; toter Button in `VolumePresetSettingsCard` ersatzlos entfallen. 148 Dateien / 1388 Tests, Lint + Build grün.
 - [x] **D-21 — Domänen-`editing` lokal umbenannt (`snippet`/`product`/`customer`/`coupon`/ `project`/`photoJob`).** Externe Props und Aufrufer (`ManagementProjectsBoard.tsx:219`, `PhotographerProductionBoard.tsx:170`) unverändert; Konsequenz gepinnt durch `editingDeleteActionSemantics.test.tsx`. Verifiziert.
 ### Verworfen — nicht erneut implementieren
@@ -1469,17 +1458,6 @@ Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
 **Folge-Runde 2026-09-26 (die drei Kernbefunde des Owners umgesetzt):**
 **Folge-Task (Harness-Luecke) — erledigt 2026-09-27:**
 **Folge-Runde 2026-09-27 (die zwei `low`-Befunde umgesetzt):**
-- [ ] **D-9 — Sidebar: Portalname bricht um** statt still gekürzt zu werden.
-  `Sidebar.tsx:51` rendert den Portalnamen mit `whitespace-nowrap` **ohne**
-  Truncation. Bei der aktuellen Breite passt der Name (Desktop-Screenshot
-  bestaetigt), aber eine schmalere Sidebar oder ein laengerer Portalanme liesse
-  ihn ungebremst ueberlaufen — genau die Klasse Fehler, die am Mobile-Header
-  gerade behoben wurde. Entscheidung offen: `truncate` waere hier *korrekt*
-  (einzeilige Navigationsleiste), aber mit sichtbarem Effekt statt stiller Kuerzung
-  besser ein `title`-Attribut oder ein Layout, das den Namen umbrechen laesst.
-  Aufgenommen, damit die Asymmetrie Mobile (bricht um) vs. Desktop (nowrap)
-  bewusst bleibt und nicht als Versehen durchgeht.
-
 ## Dialog-Screenshots 2026-09-27 — Abdeckung, Blocker und tote Stellen
 
 Ziel: **jeder Dialog ist bildgeprueft**, nicht nur funktional getestet. Die
@@ -1494,15 +1472,6 @@ hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
 | strukturell nicht erfassbar | 2 | `AIGalleryDefaultsModal` (nur aus einem anderen Dialog heraus) und der globale Bestaetigungsdialog (programmatisch, kein `click`-Target) |
 | Roh-Dialoge ohne `ModalShell` | 11 | 6 mit `role="dialog"`, **5 ohne** — die brauchen ein `data-testid`, bevor `waitFor` sie ueberhaupt greifen kann |
 
-- [ ] **D-10 — Dialoge innerhalb von `<main>` rendern, Scoping bleibt unangetastet.**
-  `waitFor` auf `page.locator('main')`. `DashboardLayout.tsx:93-95` rendert
-  `<GalleryModals` **nach** `</main>`, und `ModalShell` nutzt **kein Portal** —
-  diese Dialoge liegen also ausserhalb des Landmarks und sind per `click` nicht
-  erreichbar. **Entscheidung: Scoping nicht aufweichen**, sondern die Instanzen
-  *innerhalb* von `<main>` nutzen (Detail-/Meta-View). Dieselbe Dialog-Komponente
-  ist damit abgedeckt; die Struktur-View-Instanzen („Neue Galerie", „Neuer
-  Ordner") bleiben eine **dokumentierte Luecke** — wer sie braucht, muss das
-  Scoping bewusst aendern.
 - [~] wartet auf zwei ungeklärte Voraussetzungen: das `AI_ENABLED`-Verhalten bei leerem `AI_API_KEY` und die Multipart-Feldnamen des `PhotoHistoryModal`-Uploads. Beides würde sonst einen Capture-Zyklus verbrennen. **Verschoben, weil ungeprueft:** `AIBatchEditModal` (lokales
   `AI_ENABLED=false` bei **leerem** `AI_API_KEY` — das Verhalten ist damit
   unbestimmt) und `PhotoHistoryModal` (Multipart-Feldnamen des Uploads
@@ -1698,24 +1667,6 @@ gerissen und zur Entscheidung gemacht.
     Grundursache, warum hier Testbudgets echten Spielraum brauchen.
 ## Dialog-UI-Befunde aus derselben Welle (2026-09-27) — sechs Produktfragen, keine Implementierungsdetails
 
-- [ ] **D-19 — Unit-Testdateien für `ManagementOrgsView` und `ManagementOrgDetailView`.** Beide
-  waren „jetzt konform, aber ungeschützt"; Konformität ist keine Abdeckung.
-- [ ] **D-12 — Initial-Fokus: React `autoFocus` gewinnen lassen.** In `useFocusTrap` die
-  Reihenfolge umkehren: liegt beim Öffnen bereits der Fokus **innerhalb** des Dialogs, bleibt
-  er dort, statt auf das erste fokussierbare Element (der Schließen-Button) gesetzt zu werden.
-  Dialoge ohne `autoFocus` bleiben unverändert. **Gleich mitzubauen:** der Rückkehr-Zielpunkt
-  muss **vor** dem Mount des Dialoginhalts festgehalten werden — `useFocusTrap.ts:124` liest
-  `activeElement` nach dem React-Commit und erfasst sonst das Feld im Dialog selbst.
-  **Nicht per Selektor:** React 19 fokussiert `autoFocus` imperativ und rendert **kein**
-  `autofocus`-Attribut; `querySelector('[autofocus]')` findet nichts.
-  **Bricht genau einen Test:** `ManagementOrdersView.test.tsx:226-242` pinnt das Gegenteil und
-  sagt, dass es mit dieser Entscheidung wandert — der Test wird angepasst, nicht der Code.
-  **Neu zu decken:** (a) Fokus bleibt beim deklarierten `autoFocus`-Feld, (b) Rückgabe an den
-  Auslöser nach Escape, (c) erstes Element **deaktiviert** → erstes aktiviertes gewinnt,
-  (d) Dialog ganz ohne fokussierbaren Inhalt (`RatingStatusModal`, Kamera-Hinweis) →
-  Schließen-Element, (e) **verschachtelte** Dialoge (`AIGalleryDefaultsModal` in
-  `GalleryMetadataDefaultsModal`): der innere gewinnt. Kein destruktives Element mit
-  `autoFocus` auszeichnen — das ist die Regel, keine Ausnahme.
 - ~~D-14~~ **`CouponFormDrawer`: Escape und Backdrop lösen die Ungespeichert-Warnung bereits aus**
   — bestätigt, keine Änderung (`CouponFormDrawer.tsx:210-213` beschreibt, dass die Shell
   Kopf-Button, Backdrop, Escape und Abbrechen über einen Prop routet). Der Nutzer wird den

@@ -48,7 +48,7 @@ export default function Sidebar(props: SidebarProps) {
                 <div className="min-w-0 flex-1">
                     <Link to="/" className="flex items-center gap-3 text-xl font-bold text-base-content opacity-70 hover:opacity-100 mb-2 transition-opacity">
                         <img src={logoSrc} alt={t`Logo`} className="w-8 h-8 rounded shadow-sm bg-base-100 shrink-0"/>
-                        <span className="whitespace-nowrap">{portalName}</span>
+                        <span className="min-w-0 break-words leading-tight">{portalName}</span>
                     </Link>
                 </div>
                 {/* Mobile Close Button */}
