@@ -17,7 +17,7 @@
 # Mail: natives Homebrew-Mailpit (127.0.0.1:1025 SMTP / 8025 API), KEIN Container.
 #
 # Frontend (separat, Proxy auf den E2E-Backend):
-#   VITE_API_PROXY=http://127.0.0.1:8001 pnpm dev
+#   VITE_API_PROXY=http://127.0.0.1:8001 VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA pnpm dev
 #
 # E2E-Tests (Mailpit-API auf nativer Instanz 8025 — Default des MailpitHelper):
 #   pnpm test:e2e
@@ -207,7 +207,7 @@ log "Lade E2E-Location-Fixtures und aktualisiere den Test-Suchindex ..."
 
 # --- 5. Backend isoliert starten --------------------------------------------
 log "Starte E2E-Backend auf http://127.0.0.1:${PORT} (STRG+C = Stopp)"
-log "Frontend (separat):   VITE_API_PROXY=http://127.0.0.1:${PORT} pnpm dev"
+log "Frontend (separat):   VITE_API_PROXY=http://127.0.0.1:${PORT} VITE_TURNSTILE_SITE_KEY=${E2E_TURNSTILE_SITE_KEY} pnpm dev"
 log "E2E-Tests:            pnpm test:e2e (Mailpit 8025 = Helper-Default)"
 # Keep the isolated backend authoritative even if the invoking IDE exports
 # production or CI values. The official dummy-key compatibility path is CI-only.

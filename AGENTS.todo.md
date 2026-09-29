@@ -5,13 +5,13 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **70 offene Positionen**
-> über 1638 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **69 offene Positionen**
+> über 1627 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **6**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **5**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
 >
@@ -1308,17 +1308,6 @@ getrennt.
 - [ ] manuell prüfen: im Stripe-Dashboard getrennte Test-/Live-Keys bzw. RAKs, least privilege, Webhook-Signing-Secrets und Endpoint-Subscriptions für Success/Failed/Dispute/Refund prüfen; zusätzlich Radar-/Card-Testing-/High-Risk-Regeln, Review-Queue, False-Positive-Rollback und Alerts dokumentieren. Getrennte Test-/Live-Keys bzw. RAKs, least privilege, Webhook-Signing-Secrets und Endpoint-Subscription für Success/Failed/Dispute/Refund prüfen; **Stripe Dashboard/Radar**: Velocity-/Card-Testing-/High-Risk-Regeln, Review-Queue, False-Positive-Rollback und Alerts dokumentieren.
 - [ ] manuell prüfen: den 3DS-Strom live durchspielen: SCA, frictionless, challenge, failure, timeout, mobile und return. Radar darf die lokalen Limits nicht ersetzen; Payment-Method-Settings und Testkarten mitverifizieren. **3DS-Betriebscheckliste**: SCA/frictionless/challenge/failure/timeout/mobile/return testen; Radar nicht als Ersatz für lokale Limits verwenden, Payment-Method-Settings und Testkarten verifizieren.
 **Tests**
-
-- [ ] **E2E-Lücke Card-Testing** (Owner-Entscheidung 2026-09-28, aus der leeren
-  DoD-Marke an dieser Stelle entstanden): Automatisierte Tests existieren für Schema,
-  Rate-Limit und Turnstile — 28 Fälle in `CardTestingSchemaTest.php` (6),
-  `CheckoutRateLimitTest.php` (7), `CheckoutRiskTurnstileTest.php` (14) und
-  `TurnstileWidget.test.tsx` (1) —, plus **ein** Playwright-E2E
-  (`turnstile-checkout.spec.ts`, `@feature:card-testing`, seit `d46f95a` — `grep -rlniE
-  "card.?test|turnstile|3ds" frontend/tests/e2e` liefert 2 Treffer; die frühere 0 war falsch). Der
-  Widget-Test deckt die Turnstile-Komponente ab, nicht den Checkout-Pfad im Browser.
-  **Abgrenzung:** Der 3DS-Live-Strom bleibt `manuell prüfen` (Eintrag oben) und ist
-  ausdrücklich *nicht* Teil dieser Lücke — er ist nicht automatisierbar.
 
 ## Produktionsdeploy SFTPGo — Vorfall vom 2026-09-26 (abgeschlossen)
 
