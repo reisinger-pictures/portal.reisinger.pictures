@@ -19,10 +19,10 @@ use App\Exceptions\FtpCredentialException;
  *
  * ## Ownership without root
  *
- * The web process is not root (deployment: `user: "1000:1000"` today, `1002:82`
- * once D-1 is deployed) and it must not `chown` a foreign target — a `chown -R`
- * over the website tree is explicitly forbidden (feature doc 7.9, incident
- * 2026-09-26). Neither is needed here:
+ * The web process is not root (deployment: backend `user: "1000:82"`, sftpgo
+ * `user: "1002:82"` per D-1) and it must not `chown` a foreign target — a
+ * `chown -R` over the website tree is explicitly forbidden (feature doc 7.9,
+ * incident 2026-09-26). Neither is needed here:
  *
  * - The **group** is inherited from the parent `ftp/` because that directory
  *   carries the **setgid** bit, and the new directory inherits setgid with it.

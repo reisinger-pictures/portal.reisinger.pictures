@@ -84,7 +84,7 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
 
 ## 9. Produktion-Sicherheits-Gatekeeper
 - **Identitäts-Guard:** Der `backend`-Container verweigert den Start, wenn er
-  nicht als UID:GID `1000:1000` läuft.
+  nicht als UID:GID `1000:82` läuft.
 - **Credential-/Pfad-Guard:** Er verweigert den Start bei leerem
   `APP_KEY`, `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, `ADMIN_EMAIL`,
   `ADMIN_PASSWORD` oder `PHOTO_STORAGE_PATH`. `PHOTO_STORAGE_PATH` muss ein
@@ -98,7 +98,7 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
   2026-09-26: 38.969 Dateien). Ein `stat`-Vergleich auf `1000:1000` wäre damit
   unerfüllbar, ohne die bindende Regel zu brechen. Maßgeblich ist die
   Schreibbarkeit der laufenden UID; die Identität selbst bleibt über den
-  Identitäts-Guard und `user: "1000:1000"` erzwungen. Der Fotospeicher
+  Identitäts-Guard und `user: "1000:82"` erzwungen. Der Fotospeicher
   `/home/webadmin/portal/images` liegt außerhalb des `websites`-Baums und ist
   auf `1000:1000` mit `2775` gesetzt.
 - **Keine Shell-Expansion im Compose-`command:`:** Docker Compose v5.0.2 gibt

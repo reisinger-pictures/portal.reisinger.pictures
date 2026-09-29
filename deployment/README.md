@@ -61,7 +61,7 @@ Kamera stehen, sonst schreibt die Kamera in einen Ordner, den der Import nie lie
 
 ### Einmalige Host-Voraussetzung: Fotospeicher
 
-Der Backend läuft als `1000:1000`, der Fotospeicher gehörte `33:33` mit `755`.
+Der Backend läuft als `1000:82`, der Fotospeicher gehörte `33:33` mit `755`.
 Ohne diesen Schritt verweigert der fail-closed Guard den Start mit
 `PHOTO_STORAGE_PATH ist fuer UID 1000 nicht schreibbar`:
 
