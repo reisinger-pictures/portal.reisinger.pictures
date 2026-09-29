@@ -341,14 +341,21 @@ führt keine Migration aus. Deshalb gilt:
 
 ### Owner-Entscheidungen zum Deploy (2026-09-28, §14)
 
-- **D-1 — SFTPGo läuft als `user: "1002:82"`**, nicht `1000:1000`. `deployment/docker-compose.yml`
-  ist die entsprechende Datei. Der laufende Stack wurde seit Einführung der `user:`-Zeile nie
-  neu erzeugt und läuft als root; der erste spontane `docker compose up -d` fällt deshalb auf
-  1000 zurück und bricht `FtpController::process()` (anlegen + `unlink` unter `2755`).
+- **D-1 — SFTPGo läuft als `user: "1002:82"`**, Backend als `user: "1000:82"`.
+  `deployment/docker-compose.yml` ist die entsprechende Datei (sftpgo `:469`, backend `:77`).
+  **Gemessen am 2026-09-29 auf dem Deploy-Host** (SSH via Keychain-Key): sftpgo läuft noch als
+  `1000:1000` (erzeugt 2026-09-27), backend als `1000:1000` (neu erzeugt 2026-09-29T07:19:32Z —
+  durch wen, ist offen); Portainer-Stack 23 ist auf dem Host weg (`/data/compose/23` fehlt),
+  die Container laufen verwaist. Der ftp-Baum steht bereits auf `1002:82` mit setgid
+  (`/home/webadmin/websites/ftp` + `florian/`), das Volume `portal-reisinger-pictures_sftpgo_data`
+  noch auf `1000:1000`, Prod-DB auf V045 (Repo: V046), `/` hat 215 GB frei (D-5 damit erledigt),
+  `base_price`/`srp_base_price` stehen auf 8000 (Gegenprobe bestanden).
+  **Owner-Entscheidungen vom 2026-09-29 (interaktiv):** Deploy-Weg „Portainer neu" (Stack neu
+  anlegen, dann dort deployen); Backend `1000:82` (Gruppe 82 schließt die D-2-2775-Lücke für neu
+  angelegte Slug-Verzeichnisse); V046 reitet mit (`migrate --force` + Seed-Policy im selben
+  Fenster); `sftpgo_data` wird auf `1002:82` gechownt.
   **Diese Änderung ist ein Recreate, kein Restart** — siehe die Recreate-Regel oben. Deploy
-  erst nach grünem CI für genau den gepushten Head. Vorher prüfen, dass auf `/` genug Reserve
-  ist: der Deploy-Host stand am 2026-09-28 bei 12 GB frei (D-5), der dev-Host bei 477 GB — die
-  Warnung gilt dem Deploy-Host.
+  erst nach grünem CI für genau den gepushten Head.
 - **D-4 — `.env.production` bleibt unverschlüsselt und unrotiert**, als akzeptiertes Risiko.
   Wer eine Rotation vorschlägt, hat die Entscheidung nicht gelesen: sie ist getroffen, und
   ein Repo-Risiko besteht nicht (gitignored, nie committet).
@@ -382,14 +389,15 @@ entscheiden".
 ### Betrieb & Deployment
 
 - **D-1 — UID-Modell für SFTPGo (P1-I9, P0):** SFTPGo läuft als **`1002:82`**, der
-  Host-Konvention des Website-Baums. `deployment/docker-compose.yml` wird entsprechend
-  umgestellt und **automatisch deployt**, sobald der gepushte Head CI-grün ist. *Warum:* das
-  versionierte Compose fordert `user: "1000:1000"`, der laufende Stack wurde seit dieser Zeile
-  nie neu erzeugt und läuft als root (`docker exec portal_backend id` → `uid=0(root)`). Beim
-  nächsten Recreate fällt alles auf 1000 zurück, und mit `2755` auf `ftp/<slug>` kann UID 1000
-  **weder anlegen noch `unlink`en** — genau das macht `FtpController::process()`. Eine zweite UID
-  im selben Baum zu mischen wäre dieselbe Unordnung wie der `r1`-Vorfall vom 2026-09-26, nur
-  leiser. **Grenze:** `AGENTS.md` §13 bleibt bindend — `sync.sh` führt keine Migration aus, und
+  Host-Konvention des Website-Baums; Backend läuft als **`1000:82`**, damit `FtpController::process()`
+  (anlegen + `unlink`) auch in neu angelegten `2775`+setgid-Verzeichnissen schreiben kann.
+  `deployment/docker-compose.yml` trägt beide Zeilen. *Warum:* mit `2775` auf `ftp/<slug>` kann ein
+  Backend mit Gruppe `1000` **weder anlegen noch `unlink`en** — genau das macht der Import. Eine zweite
+  UID im selben Baum zu mischen wäre dieselbe Unordnung wie der `r1`-Vorfall vom 2026-09-26, nur
+  leiser. **Stand 2026-09-29 (gemessen):** sftpgo läuft noch `1000:1000`, backend `1000:1000`;
+  Portainer-Stack 23 ist hostseitig weg — Deploy-Weg ist „Portainer neu" (Owner, interaktiv),
+  mit V046-Migration und `sftpgo_data`-Chown auf `1002:82` im selben Fenster.
+  **Grenze:** `AGENTS.md` §13 bleibt bindend — `sync.sh` führt keine Migration aus, und
   `restart` ≠ `recreate`. Der Deploy dieser Änderung ist ein **Recreate**, kein Restart, und
   geschieht erst nach grünem CI.
 - **D-2 — Anlage von `ftp/<ftp_slug>` (P1-M24, P1):** die **Software legt das Verzeichnis selbst

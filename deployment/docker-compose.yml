@@ -74,7 +74,12 @@ services:
 
   backend:
     image: ghcr.io/reisinger-pictures/portal-base:8.5
-    user: "1000:1000"
+    # UID 1000 (Host-Konvention des Website-Baums), GID 82 = webgroup.
+    # D-1/D-2: `FtpController::process()` legt das Inbox-Verzeichnis an und
+    # `unlink`t die Datei danach wieder. In einem 2775+setgid-Verzeichnis
+    # kann UID 1000 das nur ueber die Gruppe. Start-Guard weiter unten
+    # (GID-Zeile) muss mit dieser Zahl uebereinstimmen.
+    user: "1000:82"
     container_name: portal_backend
     restart: unless-stopped
     depends_on:
@@ -239,9 +244,15 @@ services:
     # Bewusst NUR Existenz + Schreibbarkeit fuer die laufende UID, kein
     # Ownership-Vergleich: 19-ftp 7.9 verbietet das Umstellen von
     # /home/webadmin/websites auf 1000:1000, der Host haelt 1002:webgroup
-    # mit 2775+setgid. Ein stat-Vergleich auf 1000:1000 waere damit
-    # unerfuellbar, ohne die bindende Regel zu brechen. Die Identitaet
-    # selbst ist weiterhin ueber `user: 1000:1000` erzwungen.
+    # mit 2775+setgid. Ein stat-Vergleich auf die Backend-Identitaet waere
+    # damit unerfuellbar, ohne die bindende Regel zu brechen. Die Identitaet
+    # selbst ist weiterhin ueber die `user:`-Zeile dieses Stanzas erzwungen:
+    # UID 1000, GID 82. D-1/D-2, 2026-09-29 — vorher stand dort 1000:1000,
+    # und genau diese fehlende Gruppenzugehoerigkeit waere der Grund gewesen,
+    # aus dem `FtpController::process()` das Anlegen bzw. `unlink`en in einem
+    # 2775+setgid-Inbox-Verzeichnis scheitert. Die GID-Zeile des Guards
+    # weiter unten muss dieselbe Zahl nennen, sonst verweigert der Container
+    # den Start.
     # ACHTUNG — zwei Compose-v5-Fallen in diesem Block, beide schon produktiv
     # aufgefallen. 1) KEIN `#` innerhalb von `command:`, auch nicht als
     # Kommentar: `command: >` ist ein gefalteter Skalar, alle Zeilen werden zu
@@ -263,7 +274,7 @@ services:
     command: >
       sh -c "
       id -u | grep -qx 1000 || { echo 'FATAL: Backend muss als UID 1000 laufen. Start verweigert (fail-closed)!'; exit 1; };
-      id -g | grep -qx 1000 || { echo 'FATAL: Backend muss als GID 1000 laufen. Start verweigert (fail-closed)!'; exit 1; };
+      id -g | grep -qx 82 || { echo 'FATAL: Backend muss als GID 82 (webgroup) laufen. Start verweigert (fail-closed)!'; exit 1; };
       printenv APP_ENV | grep -qx production || { echo 'FATAL: APP_ENV muss im Produktions-Stack production sein. Start verweigert (fail-closed)!'; exit 1; };
       printenv APP_KEY | grep -q . || { echo 'FATAL: APP_KEY ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
       printenv JWT_SECRET | grep -q . || { echo 'FATAL: JWT_SECRET ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };

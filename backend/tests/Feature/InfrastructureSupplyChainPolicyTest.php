@@ -433,13 +433,19 @@ PHP;
         $dockerfile = $this->read('deployment/Dockerfile');
         $e2eDockerfile = $this->read('deployment/Dockerfile.e2e');
 
-        // Two services run as 1000:1000: backend and composer_init. sftpgo is
-        // the exception and runs as 1002:82 — the website tree's own uid:gid —
-        // so an upload inherits group webgroup via setgid instead of landing in
-        // the uploader's own group. The count is a regression guard: a third
-        // occurrence means a new service was added without deciding its runtime
-        // user, and losing the two asserted below means one was silently changed.
-        $this->assertSame(2, substr_count($compose, 'user: "1000:1000"'));
+        // composer_init is the last service left on 1000:1000. Both
+        // long-running services carry the website tree's group webgroup (82)
+        // instead, because that is what lets them write inside 2775+setgid
+        // directories:
+        //   - sftpgo as 1002:82 — an upload must inherit group webgroup via
+        //     setgid instead of landing in the uploader's own group;
+        //   - backend as 1000:82 — `FtpController::process()` creates the
+        //     inbox directory and then `unlink`s the uploaded file again,
+        //     which UID 1000 in group 1000 cannot do in such a directory.
+        // The count is a regression guard: a further occurrence means a new
+        // service was added without deciding its runtime user, and losing the
+        // two asserted below means one was silently changed.
+        $this->assertSame(1, substr_count($compose, 'user: "1000:1000"'));
         // The sftpgo user is asserted inside its own stanza, not file-wide: a
         // global `user: "1002:82"` elsewhere would satisfy a plain
         // assertStringContainsString while the service itself stayed on 1000.
@@ -456,6 +462,40 @@ PHP;
                 '',
                 $this->composeService('sftpgo')
             )
+        );
+        // Same two steps for the backend, whose group is the D-1 subject: a
+        // 1000:1000 backend recreates exactly the 2775+setgid failure D-2
+        // exists to prevent, and it is invisible at runtime until an import
+        // tries to unlink its own upload.
+        $this->assertMatchesRegularExpression(
+            '/^\s*user:\s*"1000:82"$/m',
+            $this->composeService('backend'),
+            'the backend service must run as 1000:82; see AGENTS.md D-1 and D-2'
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/^\s*user:/m',
+            str_replace(
+                'user: "1000:82"',
+                '',
+                $this->composeService('backend')
+            )
+        );
+        // The fail-closed startup guard pins uid *and* gid as a shell string
+        // inside `command:`. Both literals have to agree with the `user:`
+        // above: a gid literal of 1000 next to a service running as 82 makes
+        // the container refuse to start, and nothing else in this file would
+        // ever notice — the guard is a string, not compose state. Before D-1
+        // this is exactly the drift that would have shipped.
+        $this->assertStringContainsString(
+            "id -u | grep -qx 1000 || { echo 'FATAL: Backend muss als UID 1000 laufen. Start verweigert (fail-closed)!'; exit 1; }",
+            $compose,
+            'the fail-closed startup guard must still pin the backend to UID 1000'
+        );
+        $this->assertStringContainsString(
+            "id -g | grep -qx 82 || { echo 'FATAL: Backend muss als GID 82 (webgroup) laufen. Start verweigert (fail-closed)!'; exit 1; }",
+            $compose,
+            'the fail-closed gid guard must name the same group as the backend `user:`; '
+                .'a stale literal refuses the start while every other assertion in this class stays green'
         );
         $this->assertStringContainsString('USER www-data', $dockerfile);
         $this->assertStringContainsString('USER www-data', $e2eDockerfile);

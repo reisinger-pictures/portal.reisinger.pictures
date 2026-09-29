@@ -46,8 +46,9 @@
       Kein gültiges Zertifikat nötig, kein Host-Setup.
 - [ ] **Volume `sftpgo_data` mounten** → `/var/lib/sftpgo` (ohne das ist die
       Instanz nach jedem Neustart ohne Admin-User)
-- [ ] **Container-User:** `1000:1000` (wie Backend) — **nicht** `1002:webgroup`,
-      weil der Container auf den Host-Pfad schreibt
+- [ ] **Container-User:** `1002:82` (Host-Konvention des Website-Baums, D-1) —
+      **nicht** `1000:82` wie das Backend, weil der Container auf den Host-Pfad
+      schreibt
 
 ## 3. Firewall (Host)
 

@@ -17,7 +17,7 @@ evidence listed below on the target host.
 The current deployment uses the provisioned MariaDB service. It does **not**
 introduce Redis, Horizon, Supervisor, or another external process manager.
 The shell supervisor in `deployment/backend-supervisor.sh` is intentionally
-small and runs inside the existing PHP-FPM container as UID/GID `1000:1000`.
+small and runs inside the existing PHP-FPM container as UID/GID `1000:82`.
 The base-image workflow rebuilds the image when that script or the raw preflight
 script changes. It publishes to the **org namespace
 `ghcr.io/reisinger-pictures/portal-base`** via

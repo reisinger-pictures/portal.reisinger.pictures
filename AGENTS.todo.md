@@ -126,7 +126,8 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 - [x] **D-8 — `admin/` nach Domäne aufgeteilt (34/34 in 11 Subdirs, verifiziert).** Reine Moves,
   jede geänderte Zeile ein Import-Pfad (138/138, 0 nicht-Import); 83 defs, 162 Tests, Admin-Subtree
   160+2, Smoke 62/62. Flakes: wysiwyg nicht reproduzierbar (4/4 grün, längst gefixt),
-  `database is locked` als prozessseitiger Zweitschreiber vermessen (kein Seriell-Fix), Kanban
+  `database is locked` als prozessseitiger Zweitschreiber auf der lokalen SQLite-Datei
+    (`database.e2e.sqlite`; MariaDB 11.4 ist nur die CI-Schicht) vermessen (kein Seriell-Fix), Kanban
   ohne Befund. Verifiziert.
 - [x] **D-9 — Sidebar-Portalname bricht um.** `whitespace-nowrap` → `min-w-0 break-words leading-tight`; E2E misst Geometrie (nicht `scrollWidth`-Idiom, das blind ist). Verifiziert.
 - [x] **D-10 — Dialoge rendern innerhalb von `<main>`.** `<GalleryModals>` in `DashboardLayout` versetzt; Harness unberührt; `DashboardLayout.test.tsx` treibt echte Opens, Nicht-Vakuum empirisch belegt. Verifiziert.
