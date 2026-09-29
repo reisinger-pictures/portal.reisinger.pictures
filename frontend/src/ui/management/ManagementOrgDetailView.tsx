@@ -67,7 +67,7 @@ const OrgSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFl
                 <label className="label"><span className="label-text font-bold">Geteiltes Flatrate-Budget (Cent)</span></label>
                 <input type="number" min="0" value={sharedFlatrateCents || ''}
                        onChange={e => setSharedFlatrateCents(Number(e.target.value))}
-                       className="input input-bordered" placeholder="z.B. 50000 für 500€"/>
+                       className="input input-bordered" placeholder={t`z.B. 50000 für 500€`}/>
             </div>
         )}
         <div className="form-control">

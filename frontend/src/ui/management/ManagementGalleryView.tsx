@@ -127,7 +127,7 @@ export default function ManagementGalleryView() {
                         )}
 
                         {!isLoading && photos.length === 0 && (
-                            <EmptyState icon="mdi--image-off-outline" title="Noch keine Bilder vorhanden">
+                            <EmptyState icon="mdi--image-off-outline" title={t`Noch keine Bilder vorhanden`}>
                                 {gallery.is_live ? (
                                     <p className="mt-2 text-warning flex items-center gap-2">
                                         <span className="iconify mdi--autorenew animate-spin"></span>
@@ -147,7 +147,7 @@ export default function ManagementGalleryView() {
                                     </a>
                                     {gallery.type === 'delivery' && (
                                         <div className="absolute top-2 right-2 opacity-100 z-10">
-                                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate('/photos/' + photo.id); }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title="Details & Metadaten">
+                                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate('/photos/' + photo.id); }} className="btn btn-circle btn-sm btn-neutral shadow-lg" title={t`Details & Metadaten`}>
                                                 <span className="iconify mdi--open-in-new text-lg"></span>
                                             </button>
                                         </div>

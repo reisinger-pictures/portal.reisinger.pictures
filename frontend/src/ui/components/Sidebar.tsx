@@ -47,7 +47,7 @@ export default function Sidebar(props: SidebarProps) {
             <div className="p-6 border-b border-base-300 flex justify-between items-start relative">
                 <div className="min-w-0 flex-1">
                     <Link to="/" className="flex items-center gap-3 text-xl font-bold text-base-content opacity-70 hover:opacity-100 mb-2 transition-opacity">
-                        <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded shadow-sm bg-base-100 shrink-0"/>
+                        <img src={logoSrc} alt={t`Logo`} className="w-8 h-8 rounded shadow-sm bg-base-100 shrink-0"/>
                         <span className="whitespace-nowrap">{portalName}</span>
                     </Link>
                 </div>

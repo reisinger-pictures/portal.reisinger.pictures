@@ -158,7 +158,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer: custom
                                             setValue('zip', loc.postal_code || watchZip || '');
                                             setValue('country', loc.country || watchCountry || '');
                                         }}
-                                        placeholder="PLZ"
+                                        placeholder={t`PLZ`}
                                     />
                                 </div>
                                 <div className="flex-1">
@@ -174,7 +174,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer: custom
                                             setValue('zip', loc.postal_code || watchZip || '');
                                             setValue('country', loc.country || watchCountry || '');
                                         }}
-                                        placeholder="Stadt"
+                                        placeholder={t`Stadt`}
                                     />
                                 </div>
                             </div>
@@ -182,7 +182,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer: custom
                         <div className="form-control md:col-span-2">
                             <AutocompleteInput<LocationResult>
                                 id={countryInputId}
-                                label="Land"
+                                label={t`Land`}
                                 value={watchCountry || ''}
                                 onChange={(val) => setValue('country', val)}
                                 endpoint="/api/search/locations?type=country&q="

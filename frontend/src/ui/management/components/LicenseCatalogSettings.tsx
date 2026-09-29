@@ -97,8 +97,8 @@ function UseCaseRow({ uc, onSave, onDelete }: UseCaseRowProps) {
                 <>
                     <td>
                         <div className="flex flex-col gap-2">
-                            <input type="text" className="input input-bordered w-full" value={data.name || ''} onChange={e => setData({...data, name: e.target.value})} placeholder="Titel" />
-                            <input type="text" className="input input-bordered w-full text-sm" value={data.description || ''} onChange={e => setData({...data, description: e.target.value})} placeholder="Beschreibung" />
+                            <input type="text" className="input input-bordered w-full" value={data.name || ''} onChange={e => setData({...data, name: e.target.value})} placeholder={t`Titel`} />
+                            <input type="text" className="input input-bordered w-full text-sm" value={data.description || ''} onChange={e => setData({...data, description: e.target.value})} placeholder={t`Beschreibung`} />
                         </div>
                     </td>
                     <td>
@@ -187,8 +187,8 @@ function ModifierRow({ mod, onSave, onDelete }: ModifierRowProps) {
                 <>
                     <td>
                         <div className="flex flex-col gap-2">
-                            <input type="text" className="input input-bordered w-full" value={data.name || ''} onChange={e => setData({...data, name: e.target.value})} placeholder="Titel" />
-                            <input type="text" className="input input-bordered w-full text-sm" value={data.description || ''} onChange={e => setData({...data, description: e.target.value})} placeholder="Beschreibung" />
+                            <input type="text" className="input input-bordered w-full" value={data.name || ''} onChange={e => setData({...data, name: e.target.value})} placeholder={t`Titel`} />
+                            <input type="text" className="input input-bordered w-full text-sm" value={data.description || ''} onChange={e => setData({...data, description: e.target.value})} placeholder={t`Beschreibung`} />
                         </div>
                     </td>
                     <td>
@@ -302,11 +302,11 @@ export default function LicenseCatalogSettings() {
                         <div className="bg-base-200/50 p-4 rounded-box border border-base-300 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Neuer Titel</span></label>
-                                <input type="text" placeholder="z.B. PR & Social Media" value={newUc.name} onChange={e=>setNewUc({...newUc, name: e.target.value})} className="input input-bordered w-full" required />
+                                <input type="text" placeholder={t`z.B. PR & Social Media`} value={newUc.name} onChange={e=>setNewUc({...newUc, name: e.target.value})} className="input input-bordered w-full" required />
                             </div>
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Beschreibung</span></label>
-                                <input type="text" placeholder="Details zur Lizenz..." value={newUc.description} onChange={e=>setNewUc({...newUc, description: e.target.value})} className="input input-bordered w-full" />
+                                <input type="text" placeholder={t`Details zur Lizenz...`} value={newUc.description} onChange={e=>setNewUc({...newUc, description: e.target.value})} className="input input-bordered w-full" />
                             </div>
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Flatrate-Basis</span></label>
@@ -326,7 +326,7 @@ export default function LicenseCatalogSettings() {
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Preis</span></label>
                                 <div className="join w-full">
-                                    <input type="number" step="0.01" placeholder="z.B. 150" value={newUc.base_price} onChange={e=>setNewUc({...newUc, base_price: e.target.value})} className="input input-bordered join-item w-full" required />
+                                    <input type="number" step="0.01" placeholder={t`z.B. 150`} value={newUc.base_price} onChange={e=>setNewUc({...newUc, base_price: e.target.value})} className="input input-bordered join-item w-full" required />
                                     <span className="join-badge">€</span>
                                 </div>
                             </div>
@@ -374,11 +374,11 @@ export default function LicenseCatalogSettings() {
                         <div className="bg-base-200/50 p-4 rounded-box border border-base-300 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Neuer Zuschlag</span></label>
-                                <input type="text" placeholder="z.B. Titelseite" value={newMod.name} onChange={e=>setNewMod({...newMod, name: e.target.value})} className="input input-bordered w-full" required />
+                                <input type="text" placeholder={t`z.B. Titelseite`} value={newMod.name} onChange={e=>setNewMod({...newMod, name: e.target.value})} className="input input-bordered w-full" required />
                             </div>
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Beschreibung</span></label>
-                                <input type="text" placeholder="Details..." value={newMod.description} onChange={e=>setNewMod({...newMod, description: e.target.value})} className="input input-bordered w-full" />
+                                <input type="text" placeholder={t`Details...`} value={newMod.description} onChange={e=>setNewMod({...newMod, description: e.target.value})} className="input input-bordered w-full" />
                             </div>
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">&zwnj;</span></label>
@@ -390,7 +390,7 @@ export default function LicenseCatalogSettings() {
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">Aufschlag</span></label>
                                 <div className="join w-full">
-                                    <input type="number" step="0.01" placeholder="z.B. 100" value={newMod.percent_surcharge} onChange={e=>setNewMod({...newMod, percent_surcharge: e.target.value})} className="input input-bordered join-item w-full" required />
+                                    <input type="number" step="0.01" placeholder={t`z.B. 100`} value={newMod.percent_surcharge} onChange={e=>setNewMod({...newMod, percent_surcharge: e.target.value})} className="input input-bordered join-item w-full" required />
                                     <span className="join-badge">%</span>
                                 </div>
                             </div>

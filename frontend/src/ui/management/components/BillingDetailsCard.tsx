@@ -90,7 +90,7 @@ export default function BillingDetailsCard() {
                             <label className="label"><span className="label-text font-bold">Firmenname / Kontoinhaber</span></label>
                             <input type="text"
                                    className="input input-bordered"
-                                   placeholder="Name des Inhabers"
+                                   placeholder={t`Name des Inhabers`}
                                    disabled={!canEdit}
                                    required
                                    {...register('bank_holder')} />
@@ -100,7 +100,7 @@ export default function BillingDetailsCard() {
                             <label className="label"><span className="label-text font-bold">Straße & Hausnummer</span></label>
                             <input type="text"
                                    className="input input-bordered"
-                                   placeholder="Musterstraße 1"
+                                   placeholder={t`Musterstraße 1`}
                                    disabled={!canEdit}
                                    required
                                    {...register('company_street')} />
@@ -120,7 +120,7 @@ export default function BillingDetailsCard() {
                                 <label className="label"><span className="label-text font-bold">Stadt</span></label>
                                 <input type="text"
                                        className="input input-bordered w-full"
-                                       placeholder="Linz"
+                                       placeholder={t`Linz`}
                                        disabled={!canEdit}
                                        required
                                        {...register('company_city')} />
@@ -131,7 +131,7 @@ export default function BillingDetailsCard() {
                             <label className="label"><span className="label-text font-bold">Land</span></label>
                             <input type="text"
                                    className="input input-bordered"
-                                   placeholder="Österreich"
+                                   placeholder={t`Österreich`}
                                    disabled={!canEdit}
                                    {...register('company_country')} />
                         </div>
@@ -154,7 +154,7 @@ export default function BillingDetailsCard() {
                             <label className="label"><span className="label-text font-bold">IBAN</span></label>
                             <input type="text"
                                    className="input input-bordered font-mono"
-                                   placeholder="AT..."
+                                   placeholder={t`AT...`}
                                    disabled={!canEdit}
                                    required
                                    {...register('bank_iban')} />
@@ -164,7 +164,7 @@ export default function BillingDetailsCard() {
                             <label className="label"><span className="label-text font-bold">BIC</span></label>
                             <input type="text"
                                    className="input input-bordered font-mono"
-                                   placeholder="BIC"
+                                   placeholder={t`BIC`}
                                    disabled={!canEdit}
                                    {...register('bank_bic')} />
                         </div>

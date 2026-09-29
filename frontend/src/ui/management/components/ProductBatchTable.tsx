@@ -178,12 +178,12 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                             {!isBatchMode && (
                                 <td className="text-right align-middle">
                                     <div className="flex justify-end gap-1">
-                                        <button className="btn btn-ghost btn-xs btn-square" title="Bearbeiten"
+                                        <button className="btn btn-ghost btn-xs btn-square" title={t`Bearbeiten`}
                                                 onClick={() => onEdit(p)}>
                                             <span className="iconify mdi--pencil text-base"></span>
                                         </button>
                                         <button className="btn btn-ghost btn-xs btn-square text-error"
-                                                onClick={() => onDelete(p.id)} title="Löschen">
+                                                onClick={() => onDelete(p.id)} title={t`Löschen`}>
                                             <span className="iconify mdi--trash-can text-base"></span>
                                         </button>
                                     </div>
@@ -238,7 +238,7 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                                     className="input input-sm input-bordered w-full"
                                     value={batchData[p.id]?.description ?? ''}
                                     onChange={e => updateField(p.id, 'description', e.target.value)}
-                                    placeholder="Optional"
+                                    placeholder={t`Optional`}
                                 />
                             ) : (
                                 <div className="text-sm opacity-80 leading-relaxed">{p.description ||

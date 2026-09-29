@@ -122,14 +122,14 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="form-control md:col-span-2">
                     <label className="label"><span className="label-text font-bold">Markenname</span></label>
-                    <input type="text" className="input input-bordered" placeholder="Reisinger Pictures"
+                    <input type="text" className="input input-bordered" placeholder={t`Reisinger Pictures`}
                            disabled={!canEdit} required {...register('name')} />
                     {errors.name && <span className="text-error text-xs mt-1">{errors.name.message}</span>}
                 </div>
 
                 <div className="form-control md:col-span-2">
                     <label className="label"><span className="label-text font-bold">Portal-Name</span></label>
-                    <input type="text" className="input input-bordered" placeholder="Reisinger Foto Portal"
+                    <input type="text" className="input input-bordered" placeholder={t`Reisinger Foto Portal`}
                            disabled={!canEdit} required {...register('portal_name')} />
                     {errors.portal_name &&
                         <span className="text-error text-xs mt-1">{errors.portal_name.message}</span>}
@@ -137,7 +137,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
 
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">Absender-Name</span></label>
-                    <input type="text" className="input input-bordered" placeholder="Reisinger Foto Portal"
+                    <input type="text" className="input input-bordered" placeholder={t`Reisinger Foto Portal`}
                            disabled={!canEdit} required {...register('from_name')} />
                     {errors.from_name && <span className="text-error text-xs mt-1">{errors.from_name.message}</span>}
                 </div>
@@ -177,7 +177,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">Primärfarbe (Hex)</span></label>
                     <input type="text" className="input input-bordered font-mono" placeholder="#1E5631"
-                           aria-label="Primärfarbe (Hex)" required
+                           aria-label={t`Primärfarbe (Hex)`} required
                            disabled={!canEdit} {...register('primary_color')} />
                     {errors.primary_color &&
                         <span className="text-error text-xs mt-1">{errors.primary_color.message}</span>}
@@ -186,7 +186,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">Sekundärfarbe (Hex)</span></label>
                     <input type="text" className="input input-bordered font-mono" placeholder="#A4B494"
-                           aria-label="Sekundärfarbe (Hex)" required
+                           aria-label={t`Sekundärfarbe (Hex)`} required
                            disabled={!canEdit} {...register('secondary_color')} />
                     {errors.secondary_color &&
                         <span className="text-error text-xs mt-1">{errors.secondary_color.message}</span>}

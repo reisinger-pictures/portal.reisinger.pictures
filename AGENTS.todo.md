@@ -115,8 +115,8 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       **einen** Befund pro Satzlauf statt pro Textknoten; 246 → 212 (Befehl im Board-Eintrag).
       29 Tests in `check-i18n.test.mjs`, davon 15 neu, plus zwei Fixtures. **Rot nachgewiesen:**
       `PROSE_LONE_TOKEN_MIN_LENGTH` 6 → 99 lässt `flags a raw German JSX text node` fallen.
-      Offen: Restbestand abarbeiten (Welle 1: Regelarbeit −4, `helper-argument` −27 → Zähler
-      181, verifiziert). **Owner-Vorgabe: nie warning, immer fail** — Gate scharf (Exit 1),
+      Offen: Restbestand abarbeiten (Welle 1: −31 → 181; Welle 2: `jsx-attribute` −44 →
+      137, je verifiziert). **Owner-Vorgabe: nie warning, immer fail** — Gate scharf (Exit 1),
       Build rot bis 0.
 - [ ] **D-8 — `frontend/tests/e2e/admin/` nach Domäne aufteilen.** Eigene Arbeit.
 - [ ] **D-9 — Sidebar: Portalname bricht um** statt still gekürzt zu werden.
@@ -385,8 +385,8 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   './scripts/check-i18n.mjs'; console.log(findUnlocalizedStringsInTree().length)"`
   — beide Stände an derselben Stelle gemessen, die HEAD-Version über
   `git show HEAD:frontend/scripts/check-i18n.mjs` in eine Probedatei unter `scripts/`.
-  Aufteilung heute: `jsx-text` 137, `jsx-attribute` 44, `helper-argument` 0 — Welle 1 brachte
-  −31 (212 → 181).
+  Aufteilung heute: `jsx-text` 137, sonst 0 — Welle 2 brachte −44 (181 → 137, alle
+  Attribut-Befunde gewrappt, Katalog +118 Zeilen, `messages.js` mitkompiliert).
   **Was die Regel jetzt kann:** benachbarte `JsxText`/`JsxExpression`-Kinder eines
   Elternknotens bilden **einen** Satzlauf und werden **einmal** gemeldet; ein JSX-Element
   oder Fragment ist eine harte Grenze. `Jahre (geb. {x})` ist damit **ein** Befund.
@@ -402,13 +402,16 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   **Immer fail, Exit 1** (Owner-Vorgabe) — der warn-only-Pfad ist entfernt. Befunde lassen
   `prebuild` und damit jeden `pnpm build` scheitern, lokal wie in CI, bis der Zähler 0 steht.
   **Größte verbleibende Brocken** (`findUnlocalizedStringsInTree()`, Treffer pro Datei):
-  `LicenseCatalogSettings.tsx` (39), `ShootingCalculatorModal.tsx` (20),
-  `BrandSettingsCard.tsx` (19), `BillingDetailsCard.tsx` (14),
-  `CalculatorSettingsCard.tsx` (13) — gemessen nach Welle 1 (31 Dateien tragen Befunde).
-  Häufigste Attribute: `placeholder` (25), `title` (8),
+  `LicenseCatalogSettings.tsx` (29), `ShootingCalculatorModal.tsx` (18),
+  `BrandSettingsCard.tsx` (14), `CalculatorSettingsCard.tsx` (13),
+  `ManagementOrgDetailView.tsx` (8) — gemessen nach Welle 2 (22 Dateien tragen Befunde;
+  Befehl: `findUnlocalizedStringsInTree`, pro Datei gruppiert).
   `aria-label` (5), `alt` (5).
-  **Reihenfolge (Plan, keine Entscheidung):** nächste Welle `jsx-attribute` (44), dann
-  `jsx-text`-Bulk. Build weiter rot (Owner-Vorgabe) bis 0.
+  **Reihenfolge (Plan, keine Entscheidung):** nächste Welle `jsx-text`-Bulk (137).
+  Build weiter rot (Owner-Vorgabe) bis 0. **Checker-Lücke, Folgewelle:** camelCase `ariaLabel`
+  (z. B. `CustomerModal.tsx:151/167` `PLZ`/`Stadt`) sieht die Regel nicht — 2 Literale heute,
+  außerhalb des Zählers; gehört in die Regelarbeit, nicht in den Bulk. Nebenbefund: Welle 1
+  hatte `messages.js` stale zurückgelassen (nur `.po` geschrieben); Welle 2 hat rekonziliert.
   **Eingaben für die Abarbeitung, keine Regelmängel:** `UserTable.tsx:53` und
   `ManagementStatsView.tsx:105` (`{n} Gruppen, {n} Galerien`) meldet die Regel vor wie nach der
   Erweiterung. Die URL in `Impressum.tsx:43` meldet sie seit Welle 1 nicht mehr — technische

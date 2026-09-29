@@ -80,7 +80,7 @@ export default function ManagementTextSnippetsView() {
                     </div>
                 ))}
                 {snippets?.length === 0 && (
-                    <EmptyState title="Keine Textbausteine vorhanden." className="col-span-full py-12 border-dashed" />
+                    <EmptyState title={t`Keine Textbausteine vorhanden.`} className="col-span-full py-12 border-dashed" />
                 )}
             </div>
             <TextSnippetModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} editingSnippet={editingSnippet} onSave={handleSave} />
