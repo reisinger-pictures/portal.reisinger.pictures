@@ -78,7 +78,8 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 - [x] **D-15 — Altersnachweis: kein Löschpfad, unbegrenzte Aufbewahrung.** Keine Aktion, die
       technische Folge ist das Nicht-Bauen.
 - [ ] **D-1 — SFTPGo auf `user: "1002:82"` umstellen und deployen.** Compose-Datei ändern,
-      committen, pushen, **grünes CI für genau den gepushten Head abwarten**, dann Recreate
+      committen, pushen, **grünes CI für genau den gepushten Head abwarten** (erfüllt: Run `36540161681`, 11/11
+      Jobs success auf `58de577`), dann Recreate
       Restart ≠ Recreate, und `sync.sh` migriert nicht). **Scope bestätigt (Owner): sftpgo-only** —
       keine Backend-UID-Änderung; die Backend-Lücke (1000 kommt nach Recreate nicht mehr an
       `2775`/`1002:webgroup`-Inboxen: kein `mkdir`/`unlink`, `@chmod` still) bleibt offene Frage
