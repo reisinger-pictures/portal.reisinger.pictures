@@ -433,10 +433,30 @@ PHP;
         $dockerfile = $this->read('deployment/Dockerfile');
         $e2eDockerfile = $this->read('deployment/Dockerfile.e2e');
 
-        // Three services run as 1000:1000: backend, sftpgo, and composer_init.
-        // The count is a regression guard — a fourth occurrence means a new
-        // service was added without deciding its runtime user.
-        $this->assertSame(3, substr_count($compose, 'user: "1000:1000"'));
+        // Two services run as 1000:1000: backend and composer_init. sftpgo is
+        // the exception and runs as 1002:82 — the website tree's own uid:gid —
+        // so an upload inherits group webgroup via setgid instead of landing in
+        // the uploader's own group. The count is a regression guard: a third
+        // occurrence means a new service was added without deciding its runtime
+        // user, and losing the two asserted below means one was silently changed.
+        $this->assertSame(2, substr_count($compose, 'user: "1000:1000"'));
+        // The sftpgo user is asserted inside its own stanza, not file-wide: a
+        // global `user: "1002:82"` elsewhere would satisfy a plain
+        // assertStringContainsString while the service itself stayed on 1000.
+        $this->assertMatchesRegularExpression(
+            '/^\s*user:\s*"1002:82"$/m',
+            $this->composeService('sftpgo'),
+            'the sftpgo service must run as 1002:82; see AGENTS.md D-1 and features/infrastructure/19-ftp-upload-pipeline.md 7.9'
+        );
+        // ... and it must not keep the inherited value, in either spelling.
+        $this->assertDoesNotMatchRegularExpression(
+            '/^\s*user:/m',
+            str_replace(
+                'user: "1002:82"',
+                '',
+                $this->composeService('sftpgo')
+            )
+        );
         $this->assertStringContainsString('USER www-data', $dockerfile);
         $this->assertStringContainsString('USER www-data', $e2eDockerfile);
         // Schreibbarkeit statt Eigentum. 19-ftp 7.9 verbietet `chown -R` auf
@@ -511,6 +531,24 @@ PHP;
                     .'the per-IP bucket, so the production default would fail a parallel run'
             );
         }
+    }
+
+    /**
+     * Raw YAML of a single service from deployment/docker-compose.yml. Service
+     * keys sit at two-space indentation under `services:`, so the next key on
+     * that level — or any top-level key such as `networks:` — closes the block,
+     * without needing a YAML parser.
+     */
+    private function composeService(string $name): string
+    {
+        $contents = $this->read('deployment/docker-compose.yml');
+        $pattern = '/^  '.preg_quote($name, '/').':[ \t]*$(.*?)(?=^  [\w-]+:[ \t]*$|^[\w-]+:[ \t]*$|\z)/ms';
+        $matched = preg_match($pattern, $contents, $matches);
+
+        $this->assertSame(1, $matched, "docker-compose.yml must define exactly one {$name} service");
+        $this->assertNotEmpty(trim($matches[1]), "the {$name} service must not be empty");
+
+        return $matches[1];
     }
 
     /**

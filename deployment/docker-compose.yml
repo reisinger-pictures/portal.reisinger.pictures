@@ -466,7 +466,7 @@ services:
     # in 2775+setgid trotzdem, und neue Dateien erben die Gruppe webgroup —
     # genau das soll 7.9. Deshalb wird hier nichts gechownt, weder von hier
     # noch aus dem Backend-Entrypoint.
-    user: "1000:1000"
+    user: "1002:82"
 
 networks:
   webnet:

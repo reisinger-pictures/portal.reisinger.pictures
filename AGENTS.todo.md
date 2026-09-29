@@ -79,7 +79,16 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       technische Folge ist das Nicht-Bauen.
 - [ ] **D-1 — SFTPGo auf `user: "1002:82"` umstellen und deployen.** Compose-Datei ändern,
       committen, pushen, **grünes CI für genau den gepushten Head abwarten**, dann Recreate
-      (§13: Restart ≠ Recreate, und `sync.sh` migriert nicht).
+      Restart ≠ Recreate, und `sync.sh` migriert nicht). **Scope bestätigt (Owner): sftpgo-only** —
+      keine Backend-UID-Änderung; die Backend-Lücke (1000 kommt nach Recreate nicht mehr an
+      `2775`/`1002:webgroup`-Inboxen: kein `mkdir`/`unlink`, `@chmod` still) bleibt offene Frage
+      vor dem Recreate. **Zugang: weiter offen** — alle drei lokalen Keys denied; `id_rsa`
+      (Owner-Wahl) ist passphrase-gesperrt und damit ohne Interaktion unbenutzbar; Fingerprints
+      zum Abgleich geliefert. **Repo-Seite verifiziert** (Stanza-Test + Gegenproben, pint, compose
+      config). **Zwei neue Prüfpunkte vor dem Recreate:** (a) Named Volume `sftpgo_data`
+      (`/var/lib/sftpgo`) ist plausibel root-owned (Container lief als root) — nach Recreate muss
+      1002 dort schreiben können, sonst startet sftpgo nicht; (b) `tests/scripts/ftp-transport-test/`
+      bleibt absichtlich auf `1000:1000` (Standalone-Harness) und divergiert damit von Prod.
 - [x] **D-2 — `App\Support\FtpInboxDirectory::ensure()` auf beiden Pfaden, `2775`, Ordner vor
       Konto.** Slug-Schreibpfad **und** `provisionAndShow()` (sonst entsteht „Konto ohne Ordner"
       weiter über „Neues Kamera-Passwort"). Reihenfolge begründet: die SFTPGo-Admin-API hat kein
