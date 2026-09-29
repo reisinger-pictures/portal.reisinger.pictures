@@ -491,7 +491,7 @@ export default function ManagementContractView() {
                                            className="input input-sm input-bordered"/>
                                 </div>
                                 <div className="form-control">
-                                    <label className="label py-1"><span className="label-text text-sm font-bold">Geburtsdatum</span></label>
+                                    <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Geburtsdatum</Trans></span></label>
                                     <input type="date" value={billingDetails.birthdate || ''}
                                            onChange={e => handleBillingField('birthdate', e.target.value)}
                                            className="input input-sm input-bordered"/>

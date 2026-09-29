@@ -85,12 +85,12 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet: snip
         >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div className="form-control">
-                        <label className="label"><span className="label-text font-bold">Titel (Intern)</span></label>
+                        <label className="label"><span className="label-text font-bold"><Trans>Titel (Intern)</Trans></span></label>
                         <input required type="text" {...register('title')} className={`input input-bordered ${errors.title ? 'input-error' : ''}`} />
                         {errors.title && <span className="text-error text-xs mt-1">{errors.title.message}</span>}
                     </div>
                     <div className="form-control">
-                        <label className="label"><span className="label-text font-bold">Kürzel (Shortcut)</span></label>
+                        <label className="label"><span className="label-text font-bold"><Trans>Kürzel (Shortcut)</Trans></span></label>
                         <div className="join w-full">
                             <span className="btn no-animation join-item bg-base-300 border-base-300 font-mono opacity-70">/</span>
                             <input type="text" required {...register('shortcut')} className={`input input-bordered join-item w-full font-mono lowercase ${errors.shortcut ? 'input-error' : ''}`} />
@@ -100,7 +100,7 @@ export default function TextSnippetModal({ isOpen, onClose, editingSnippet: snip
                 </div>
 
                 <div className="form-control mb-4">
-                    <label className="label"><span className="label-text font-bold">Inhalt (HTML)</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Inhalt (HTML)</Trans></span></label>
                     <input type="hidden" required />
                     <WysiwygEditor value={watchContentHtml || ''} onChange={val => setValue('content_html', val)} />
                     {errors.content_html && <span className="text-error text-xs mt-1">{errors.content_html.message}</span>}

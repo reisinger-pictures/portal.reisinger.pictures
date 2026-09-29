@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useEffect, useId } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -111,7 +112,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer: custom
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control">
-                            <label className="label" htmlFor={nameInputId}><span className="label-text font-bold">Name / Ansprechpartner</span></label>
+                            <label className="label" htmlFor={nameInputId}><span className="label-text font-bold"><Trans>Name / Ansprechpartner</Trans></span></label>
                             <input id={nameInputId} type="text" required {...register('name')} className={`input input-bordered ${errors.name ? 'input-error' : ''}`} />
                             {errors.name && <span className="text-error text-xs mt-1">{errors.name.message}</span>}
                         </div>
@@ -120,20 +121,20 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer: custom
                             <input id={companyInputId} type="text" {...register('company')} className="input input-bordered" />
                         </div>
                         <div className="form-control">
-                            <label className="label" htmlFor={emailInputId}><span className="label-text font-bold">E-Mail Adresse</span></label>
+                            <label className="label" htmlFor={emailInputId}><span className="label-text font-bold"><Trans>E-Mail Adresse</Trans></span></label>
                             <input id={emailInputId} type="email" {...register('email')} className={`input input-bordered ${errors.email ? 'input-error' : ''}`} />
                             {errors.email && <span className="text-error text-xs mt-1">{errors.email.message}</span>}
                         </div>
                         <div className="form-control">
-                            <label className="label" htmlFor={birthdateInputId}><span className="label-text font-bold">Geburtsdatum</span></label>
+                            <label className="label" htmlFor={birthdateInputId}><span className="label-text font-bold"><Trans>Geburtsdatum</Trans></span></label>
                             <input id={birthdateInputId} type="date" {...register('birthdate')} className="input input-bordered" />
                         </div>
                         <div className="form-control">
-                            <label className="label" htmlFor={uidInputId}><span className="label-text font-bold">U-ID (Umsatzsteuer-ID)</span></label>
+                            <label className="label" htmlFor={uidInputId}><span className="label-text font-bold"><Trans>U-ID (Umsatzsteuer-ID)</Trans></span></label>
                             <input id={uidInputId} type="text" {...register('uid')} className="input input-bordered" />
                         </div>
                         <div className="form-control md:col-span-2">
-                            <label className="label" htmlFor={streetInputId}><span className="label-text font-bold">Straße & Hausnummer</span></label>
+                            <label className="label" htmlFor={streetInputId}><span className="label-text font-bold"><Trans>Straße & Hausnummer</Trans></span></label>
                             <input id={streetInputId} type="text" {...register('street')} className="input input-bordered" />
                         </div>
                         <div
@@ -142,13 +143,13 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer: custom
                             aria-labelledby={locationGroupLabelId}
                         >
                             <div className="label">
-                                <span id={locationGroupLabelId} className="label-text font-bold">PLZ & Stadt</span>
+                                <span id={locationGroupLabelId} className="label-text font-bold"><Trans>PLZ & Stadt</Trans></span>
                             </div>
                             <div className="flex gap-2">
                                 <div className="w-1/3 md:w-32">
                                     <AutocompleteInput<LocationResult>
                                         id={zipInputId}
-                                        ariaLabel="PLZ"
+                                        ariaLabel={t`PLZ`}
                                         value={watchZip || ''}
                                         onChange={val => setValue('zip', val)}
                                         endpoint="/api/search/locations?type=city&q="
@@ -164,7 +165,7 @@ export default function CustomerModal({ isOpen, onClose, editingCustomer: custom
                                 <div className="flex-1">
                                     <AutocompleteInput<LocationResult>
                                         id={cityInputId}
-                                        ariaLabel="Stadt"
+                                        ariaLabel={t`Stadt`}
                                         value={watchCity || ''}
                                         onChange={val => setValue('city', val)}
                                         endpoint="/api/search/locations?type=city&q="

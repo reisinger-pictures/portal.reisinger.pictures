@@ -144,8 +144,8 @@ export default function ProfileSettingsCard() {
                     {isPhotographer && (
                         <div className="form-control">
                             <label className="label" htmlFor={ftpSlugInputId}>
-                                <span className="label-text font-bold">FTP Upload Ordner (Slug)</span>
-                                <span className="label-text-alt opacity-70">Der FTP-Login für deine Kamera. Kleinbuchstaben, Ziffern, - und _, 3 bis 32 Zeichen. Muss eindeutig sein.</span>
+                                <span className="label-text font-bold"><Trans>FTP Upload Ordner (Slug)</Trans></span>
+                                <span className="label-text-alt opacity-70"><Trans>Der FTP-Login für deine Kamera. Kleinbuchstaben, Ziffern, - und _, 3 bis 32 Zeichen. Muss eindeutig sein.</Trans></span>
                             </label>
                             <div className="join w-full">
                                 <span className="btn no-animation join-item bg-base-300 border-base-300 font-mono text-sm px-3 opacity-70 cursor-default">/</span>
@@ -164,7 +164,7 @@ export default function ProfileSettingsCard() {
                     <div className="form-control">
                         <label className="label" htmlFor={copyrightInputId}>
                             <span className="label-text font-bold"><Trans>Standard-Urheber (IPTC Copyright)</Trans></span>
-                            <span className="label-text-alt opacity-70">Dieser Wert wird in neue Bilder geschrieben, falls die Galerie Metadaten anwendet.</span>
+                            <span className="label-text-alt opacity-70"><Trans>Dieser Wert wird in neue Bilder geschrieben, falls die Galerie Metadaten anwendet.</Trans></span>
                         </label>
                         <input
                             id={copyrightInputId}

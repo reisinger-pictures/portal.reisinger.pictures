@@ -399,18 +399,31 @@ describe('check-i18n prose taxonomy (D-7)', () => {
 });
 
 describe('check-i18n runner', () => {
-  it('makes unlocalized-string findings fatal (no warn-only path)', () => {
+  it('keeps the tree fully localized and the runner green (no warn-only path)', () => {
     const script = resolve(process.cwd(), 'scripts/check-i18n.mjs');
-    const result = spawnSync(process.execPath, [script], { encoding: 'utf8' });
+    // `NODE_ENV` is scrubbed for the child because vitest sets `NODE_ENV=test`
+    // in its workers, and `lingui extract` — which the runner shells out to via
+    // `pnpm lingui:extract` — dies there with `TypeError: emitter.removeListener
+    // is not a function` before it writes a single msgid, on Node 26. That is
+    // reproducible without vitest at all (`NODE_ENV=test pnpm run lingui:extract`
+    // → exit 1, same trace; unset → exit 0), so it is a lingui/Node
+    // incompatibility, not an i18n finding. The spawn has to measure the i18n
+    // contract and not that unrelated toolchain crash.
+    const result = spawnSync(process.execPath, [script], {
+      encoding: 'utf8',
+      env: { ...process.env, NODE_ENV: undefined },
+    });
 
-    // D-7: unlocalized-string findings are always fatal. The checked-in source
-    // tree still carries them, so this pins the runner's exit contract rather
-    // than only the pure finder. If the backlog is ever driven to zero this
-    // precondition fails loudly and the runner must be re-checked, instead of
-    // the test passing for a different reason.
-    expect(findUnlocalizedStringsInTree().length).toBeGreaterThan(0);
-    expect(result.status, result.stderr).toBe(1);
-    expect(result.stderr).toContain('must be wrapped in a Lingui macro');
+    // D-7: unlocalized-string findings are always fatal — there is no warn-only
+    // path. The former `toBeGreaterThan(0)` precondition asserted the backlog
+    // and therefore had to be inverted once the tree reached zero; this is its
+    // clean-tree counterpart, and the stronger of the two contracts. The empty
+    // assertion is the tripwire: one newly introduced unlocalized string turns
+    // this red. The exit assertion is what keeps such a finding fatal rather
+    // than merely reported.
+    expect(findUnlocalizedStringsInTree().length).toBe(0);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('i18n check passed');
   });
 });
 

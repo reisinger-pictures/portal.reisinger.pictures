@@ -459,8 +459,10 @@ entscheiden".
   *Warum:* warn-only fault vor sich hin; die 212 standen seit der Regelerweiterung
   unverändert. Preis, bewusst gewählt: der Build ist rot, bis Bestand plus Regelarbeit
   (URL-Filter im JSX-Text-Pfad, die drei Fragment-Befunde, `PLZ`/`BIC`-Grenzfälle) auf 0
-  stehen — daneben läuft keine andere Frontend-Arbeit mit grünem Build. Die 212 bleiben
-  die Aufgabe, nur nicht mehr im Warnmodus.
+  stehen — daneben lief keine andere Frontend-Arbeit mit grünem Build. **Abgearbeitet:**
+  Regel −4, helper −27, Attribute −44, jsx-text-Bulk −137; Zähler 0, Build grün, jede Welle
+  implementiert und unabhängig verifiziert. Residuen im Board: Einzel-Token-Unterzählung per
+  Design, `NODE_ENV`-Fragilität, camelCase-`ariaLabel` als Folge-Regelarbeit.
 - **D-8 — `frontend/tests/e2e/admin/`:** **nach Domäne aufteilen**, analog zu den bereits sauber
   skalierten Verzeichnissen `client/`, `photographer/`, `crm/`, `delivery/`, `selection/`.
   *Warum:* 34 von 89 Specs (38 %) liegen flach in einem Verzeichnis, das Pricing, CRM-Dokumente,

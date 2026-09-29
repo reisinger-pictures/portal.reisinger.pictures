@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import {useEffect} from 'react';
 import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
@@ -78,16 +79,16 @@ export default function BillingDetailsCard() {
         <div className="card bg-base-200 border border-base-300">
             <div className="card-body">
                 <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
-                    <span className="iconify mdi--bank text-primary text-3xl"></span> Bankverbindung & Impressum
+                    <span className="iconify mdi--bank text-primary text-3xl"></span> <Trans>Bankverbindung & Impressum</Trans>
                 </h2>
                 <p className="text-sm opacity-70 mb-6">
-                    Diese Daten werden im Header und Footer deiner PDF-Rechnungen und Lieferscheine angezeigt.
+                    <Trans>Diese Daten werden im Header und Footer deiner PDF-Rechnungen und Lieferscheine angezeigt.</Trans>
                 </p>
 
                 <form onSubmit={handleSubmit(onSubmit)} noValidate>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold">Firmenname / Kontoinhaber</span></label>
+                            <label className="label"><span className="label-text font-bold"><Trans>Firmenname / Kontoinhaber</Trans></span></label>
                             <input type="text"
                                    className="input input-bordered"
                                    placeholder={t`Name des Inhabers`}
@@ -97,7 +98,7 @@ export default function BillingDetailsCard() {
                         </div>
 
                         <div className="form-control md:col-span-2">
-                            <label className="label"><span className="label-text font-bold">Straße & Hausnummer</span></label>
+                            <label className="label"><span className="label-text font-bold"><Trans>Straße & Hausnummer</Trans></span></label>
                             <input type="text"
                                    className="input input-bordered"
                                    placeholder={t`Musterstraße 1`}
@@ -137,7 +138,7 @@ export default function BillingDetailsCard() {
                         </div>
 
                         <div className="form-control">
-                            <label className="label"><span className="label-text font-bold">E-Mail für Rückfragen</span></label>
+                            <label className="label"><span className="label-text font-bold"><Trans>E-Mail für Rückfragen</Trans></span></label>
                             <input type="email"
                                    className="input input-bordered"
                                    placeholder="hello@reisinger.pictures"
@@ -147,7 +148,7 @@ export default function BillingDetailsCard() {
                         </div>
                     </div>
 
-                    <div className="divider">Bankdaten</div>
+                    <div className="divider"><Trans>Bankdaten</Trans></div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control">
@@ -175,10 +176,10 @@ export default function BillingDetailsCard() {
                                 disabled={isSubmitting || !canEdit}
                                 className="btn btn-primary px-8">
                             {isSubmitting ? <span className="loading loading-spinner loading-sm"></span> : null}
-                            Bankdaten speichern
+                            <Trans>Bankdaten speichern</Trans>
                         </button>
                         {!canEdit && (
-                            <span className="text-sm opacity-60">Nur Super-Admins können diese Daten bearbeiten.</span>
+                            <span className="text-sm opacity-60"><Trans>Nur Super-Admins können diese Daten bearbeiten.</Trans></span>
                         )}
                     </div>
                 </form>

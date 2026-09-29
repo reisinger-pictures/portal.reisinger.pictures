@@ -38,7 +38,10 @@ export default function UserTable({ users, searchTerm, onEdit }: UserTableProps)
                     </tr>
                 </thead>
                 <tbody>
-                    {filteredUsers?.map(u => (
+                    {filteredUsers?.map(u => {
+                        const groupCount = (u.gallery_groups || []).length;
+                        const galleryCount = (u.galleries || []).length;
+                        return (
                         <tr key={u.id}>
                             <td className="font-bold">{u.name}</td>
                             <td>{u.email}</td>
@@ -50,14 +53,15 @@ export default function UserTable({ users, searchTerm, onEdit }: UserTableProps)
                                 </div>
                             </td>
                             <td className="text-sm opacity-80">
-                                {(u.gallery_groups || []).length} Gruppen, {(u.galleries || []).length} Galerien
+                                <Trans>{groupCount} Gruppen, {galleryCount} Galerien</Trans>
                             </td>
                             <td>{u.can_purchase_upgrades ? <span className="badge badge-success badge-sm"><Trans>Ja</Trans></span> : <span className="text-sm opacity-50"><Trans>Nein</Trans></span>}</td>
                             <td>
                                 <button className="btn btn-xs btn-outline" onClick={() => onEdit(u)}><Trans>Bearbeiten</Trans></button>
                             </td>
                         </tr>
-                    ))}
+                        );
+                    })}
                     {filteredUsers?.length === 0 && (
                         <tr>
                             <td colSpan={6} className="text-center py-8 opacity-50">

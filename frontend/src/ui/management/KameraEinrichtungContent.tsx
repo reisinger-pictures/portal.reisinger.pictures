@@ -59,7 +59,7 @@ export default function KameraEinrichtungContent({connection, resetLimitPerHour}
         {step: '8', menu: 'FTP-Modus', value: <Trans>SFTP (empfohlen) oder FTPS</Trans>, emphasis: true},
         {step: '9', menu: 'Adressen-Einstellung', value: <code className="font-mono">{serverValue}</code>},
         {step: '9', menu: 'Portnummerneinstellung', value: <><code className="font-mono">{sftpValue}</code> / <code className="font-mono">{ftpsValue}</code></>},
-        {step: '10', menu: 'Benutzername, Kennwort (nur SFTP)', value: <><code className="font-mono">{userValue}</code> + das einmal angezeigte Passwort</>},
+        {step: '10', menu: 'Benutzername, Kennwort (nur SFTP)', value: <><code className="font-mono">{userValue}</code> <Trans>+ das einmal angezeigte Passwort</Trans></>},
         {step: '11', menu: 'Passiver Modus (nur FTP/FTPS)', value: <Trans>Aktivieren</Trans>, emphasis: true},
         {step: '13', menu: 'Anmeldekennwort (nur FTP/FTPS)', value: <Trans>das einmal angezeigte Passwort</Trans>},
         {step: '14', menu: 'Zielordner', value: targetFolder, emphasis: true},
@@ -68,7 +68,7 @@ export default function KameraEinrichtungContent({connection, resetLimitPerHour}
 
     const errorRows = [
         {
-            message: <><strong>Error 41</strong> — keine Verbindung zum FTP-Server</>,
+            message: <><strong>Error 41</strong> <Trans>— keine Verbindung zum FTP-Server</Trans></>,
             meaning: <Trans>TCP kommt nicht durch</Trans>,
             suspect: <Trans>Firewall für {ftpsValue} bzw. {sftpValue}; Passiver Modus auf Aktivieren</Trans>,
         },
@@ -78,7 +78,7 @@ export default function KameraEinrichtungContent({connection, resetLimitPerHour}
             suspect: <Trans>zuerst „Vertrauenswürdige Zielserver" auf Aktivieren</Trans>,
         },
         {
-            message: <><strong>Error 48</strong> — bleibt bestehen</>,
+            message: <><strong>Error 48</strong> <Trans>— bleibt bestehen</Trans></>,
             meaning: <Trans>die Kamera verlangt ein Stammzertifikat</Trans>,
             suspect: <Trans>siehe den Hinweis zum Stammzertifikat unten</Trans>,
         },

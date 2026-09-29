@@ -110,7 +110,7 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                         ) : (
                             <button className="btn btn-sm btn-outline btn-primary w-full"
                                     onClick={handleStartBatchMode}>
-                                <span className="iconify mdi--table-edit mr-1 text-lg"></span> Batch Edit
+                                <span className="iconify mdi--table-edit mr-1 text-lg"></span> <Trans>Batch Edit</Trans>
                             </button>
                         )}
                     </div>
@@ -134,11 +134,11 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                             <td>
                                 <div className="font-bold text-base-content">{p.name}</div>
                                 <div className="mt-1.5">
-                                    {p.type === 'item' && <span className="badge badge-info badge-xs">Leistung</span>}
+                                    {p.type === 'item' && <span className="badge badge-info badge-xs"><Trans>Leistung</Trans></span>}
                                     {p.type === 'discount_fixed' &&
-                                        <span className="badge badge-warning badge-xs">Rabatt (€)</span>}
+                                        <span className="badge badge-warning badge-xs"><Trans>Rabatt (€)</Trans></span>}
                                     {p.type === 'discount_percent' &&
-                                        <span className="badge badge-warning badge-xs">Rabatt (%)</span>}
+                                        <span className="badge badge-warning badge-xs"><Trans>Rabatt (%)</Trans></span>}
                                 </div>
                             </td>
                             <td>
@@ -222,11 +222,11 @@ export default function ProductBatchTable({title, products, onEdit, onDelete, on
                         <div className={!isBatchMode ? "pr-16" : ""}>
                             <div className="font-bold text-base leading-tight mb-2 text-base-content">{p.name}</div>
                             <div className="flex flex-wrap gap-1">
-                                {p.type === 'item' && <span className="badge badge-info badge-xs">Leistung</span>}
+                                {p.type === 'item' && <span className="badge badge-info badge-xs"><Trans>Leistung</Trans></span>}
                                 {p.type === 'discount_fixed' &&
-                                    <span className="badge badge-warning badge-xs">Rabatt (€)</span>}
+                                    <span className="badge badge-warning badge-xs"><Trans>Rabatt (€)</Trans></span>}
                                 {p.type === 'discount_percent' &&
-                                    <span className="badge badge-warning badge-xs">Rabatt (%)</span>}
+                                    <span className="badge badge-warning badge-xs"><Trans>Rabatt (%)</Trans></span>}
                             </div>
                         </div>
 

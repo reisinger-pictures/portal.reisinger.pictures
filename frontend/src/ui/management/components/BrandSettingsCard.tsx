@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useEffect } from 'react';
 import { useSWRConfig } from 'swr';
 import { useForm } from 'react-hook-form';
@@ -121,14 +122,14 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="pt-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="form-control md:col-span-2">
-                    <label className="label"><span className="label-text font-bold">Markenname</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Markenname</Trans></span></label>
                     <input type="text" className="input input-bordered" placeholder={t`Reisinger Pictures`}
                            disabled={!canEdit} required {...register('name')} />
                     {errors.name && <span className="text-error text-xs mt-1">{errors.name.message}</span>}
                 </div>
 
                 <div className="form-control md:col-span-2">
-                    <label className="label"><span className="label-text font-bold">Portal-Name</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Portal-Name</Trans></span></label>
                     <input type="text" className="input input-bordered" placeholder={t`Reisinger Foto Portal`}
                            disabled={!canEdit} required {...register('portal_name')} />
                     {errors.portal_name &&
@@ -136,7 +137,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 </div>
 
                 <div className="form-control">
-                    <label className="label"><span className="label-text font-bold">Absender-Name</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Absender-Name</Trans></span></label>
                     <input type="text" className="input input-bordered" placeholder={t`Reisinger Foto Portal`}
                            disabled={!canEdit} required {...register('from_name')} />
                     {errors.from_name && <span className="text-error text-xs mt-1">{errors.from_name.message}</span>}
@@ -159,7 +160,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 </div>
 
                 <div className="form-control md:col-span-2">
-                    <label className="label"><span className="label-text font-bold">Impressum-URL</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Impressum-URL</Trans></span></label>
                     <input type="url" className="input input-bordered" placeholder="https://reisinger.pictures/impressum/"
                            disabled={!canEdit} {...register('impressum_url')} />
                     {errors.impressum_url &&
@@ -167,7 +168,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 </div>
 
                 <div className="form-control md:col-span-2">
-                    <label className="label"><span className="label-text font-bold">Frontend-URL</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Frontend-URL</Trans></span></label>
                     <input type="url" className="input input-bordered" placeholder="https://portal.reisinger.pictures"
                            disabled={!canEdit} {...register('frontend_url')} />
                     {errors.frontend_url &&
@@ -175,7 +176,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 </div>
 
                 <div className="form-control">
-                    <label className="label"><span className="label-text font-bold">Primärfarbe (Hex)</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Primärfarbe (Hex)</Trans></span></label>
                     <input type="text" className="input input-bordered font-mono" placeholder="#1E5631"
                            aria-label={t`Primärfarbe (Hex)`} required
                            disabled={!canEdit} {...register('primary_color')} />
@@ -184,7 +185,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                 </div>
 
                 <div className="form-control">
-                    <label className="label"><span className="label-text font-bold">Sekundärfarbe (Hex)</span></label>
+                    <label className="label"><span className="label-text font-bold"><Trans>Sekundärfarbe (Hex)</Trans></span></label>
                     <input type="text" className="input input-bordered font-mono" placeholder="#A4B494"
                            aria-label={t`Sekundärfarbe (Hex)`} required
                            disabled={!canEdit} {...register('secondary_color')} />
@@ -196,7 +197,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                     <label className="label cursor-pointer justify-start gap-3">
                         <input type="checkbox" className="toggle toggle-primary" disabled={!canEdit}
                                {...register('features.orgs')} />
-                        <span className="label-text font-bold">Organisationen-Feature aktivieren</span>
+                        <span className="label-text font-bold"><Trans>Organisationen-Feature aktivieren</Trans></span>
                     </label>
                 </div>
             </div>
@@ -204,13 +205,13 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
             <div className="mt-6 border-t border-base-300 pt-6 flex items-center gap-4">
                 <button type="submit" disabled={isSubmitting || !canEdit} className="btn btn-primary px-8">
                     {isSubmitting && <span className="loading loading-spinner loading-sm"></span>}
-                    Speichern
+                    <Trans>Speichern</Trans>
                 </button>
                 <button type="button" disabled={isSubmitting || !canEdit} className="btn btn-ghost" onClick={onReset}>
-                    Auf Standard zurücksetzen
+                    <Trans>Auf Standard zurücksetzen</Trans>
                 </button>
                 {!canEdit && (
-                    <span className="text-sm opacity-60">Nur Super-Admins können diese Einstellungen bearbeiten.</span>
+                    <span className="text-sm opacity-60"><Trans>Nur Super-Admins können diese Einstellungen bearbeiten.</Trans></span>
                 )}
             </div>
         </form>
@@ -232,17 +233,16 @@ export default function BrandSettingsCard() {
         <div className="card bg-base-200 border border-base-300" data-testid="brand-settings-card">
             <div className="card-body">
                 <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
-                    <span className="iconify mdi--palette text-primary text-3xl"></span> Markeneinstellungen
+                    <span className="iconify mdi--palette text-primary text-3xl"></span> <Trans>Markeneinstellungen</Trans>
                 </h2>
                 <p className="text-sm opacity-70 mb-6">
-                    Überschreibe die konfigurierbaren Markeneinstellungen pro Marke. Leere oder zurückgesetzte Felder
-                    fallen auf den Konfigurations-Standard zurück.
+                    <Trans>Überschreibe die konfigurierbaren Markeneinstellungen pro Marke. Leere oder zurückgesetzte Felder fallen auf den Konfigurations-Standard zurück.</Trans>
                 </p>
 
                 {isLoading && <span className="loading loading-spinner loading-md"></span>}
                 {error && (
                     <div className="alert alert-error shadow-sm">
-                        <span>Markeneinstellungen konnten nicht geladen werden.</span>
+                        <span><Trans>Markeneinstellungen konnten nicht geladen werden.</Trans></span>
                     </div>
                 )}
 

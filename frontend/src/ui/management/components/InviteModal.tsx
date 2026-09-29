@@ -130,7 +130,7 @@ export default function InviteModal({galleryId, galleryType, onClose}: InviteMod
                         {linkType === 'personal' && (
                             <div className="form-control pl-8 border-l-2 border-primary ml-2 mb-2">
                                 <label className="label py-1"><span
-                                    className="label-text font-bold">Name des Gastes</span></label>
+                                    className="label-text font-bold"><Trans>Name des Gastes</Trans></span></label>
                                 <input type="text" value={name} onChange={e => setName(e.target.value)}
                                         placeholder={t`z.B. Oma Erna`}
                                        className="input input-bordered w-full"/>
@@ -145,8 +145,8 @@ export default function InviteModal({galleryId, galleryType, onClose}: InviteMod
                                            onChange={e => setCanEditMeta(e.target.checked)}/>
                                     <div>
                                         <span
-                                            className="label-text font-bold block">Gast darf Metadaten bearbeiten</span>
-                                        <span className="label-text-alt opacity-70 block mt-1">Ermöglicht dem Empfänger dieses Links das Ändern von IPTC Titeln und Beschreibungen.</span>
+                                            className="label-text font-bold block"><Trans>Gast darf Metadaten bearbeiten</Trans></span>
+                                        <span className="label-text-alt opacity-70 block mt-1"><Trans>Ermöglicht dem Empfänger dieses Links das Ändern von IPTC Titeln und Beschreibungen.</Trans></span>
                                     </div>
                                 </label>
                             </div>

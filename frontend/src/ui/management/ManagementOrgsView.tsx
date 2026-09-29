@@ -60,7 +60,11 @@ export default function ManagementOrgsView() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {orgs?.map(t => (
+                {orgs?.map(t => {
+                    const metaGalleryCount = t.gallery_groups_count || 0;
+                    const flatrateLevel = t.default_flatrate_level || 'keine';
+                    const invoiceFrequency = t.invoice_frequency === 'immediate' ? 'Einzel' : t.invoice_frequency === 'monthly' ? 'Monatlich' : 'Quartal';
+                    return (
                     <div key={t.id} className="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/orgs/${t.id}`)}>
                         <div className="card-body p-5">
                             <h2 className="card-title text-xl text-primary">{t.name}</h2>
@@ -68,15 +72,16 @@ export default function ManagementOrgsView() {
                             
                                 <div className="flex gap-4 mt-4 text-sm opacity-80">
                                     <div className="flex items-center gap-1"><span className="iconify mdi--account-group"></span> {t.users_count || 0} User</div>
-                                    <div className="flex items-center gap-1"><span className="iconify mdi--folder-multiple"></span> {t.gallery_groups_count || 0} Meta-Galerien</div>
+                                    <div className="flex items-center gap-1"><span className="iconify mdi--folder-multiple"></span> <Trans>{metaGalleryCount} Meta-Galerien</Trans></div>
                                 </div>
                                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs opacity-60">
-                                    <span>Flatrate: {t.default_flatrate_level || 'keine'}</span>
-                                    <span>Rechnung: {t.invoice_frequency === 'immediate' ? 'Einzel' : t.invoice_frequency === 'monthly' ? 'Monatlich' : 'Quartal'}</span>
+                                    <span><Trans>Flatrate: {flatrateLevel}</Trans></span>
+                                    <span><Trans>Rechnung: {invoiceFrequency}</Trans></span>
                                 </div>
                         </div>
                     </div>
-                ))}
+                    );
+                })}
                 {orgs?.length === 0 && (
                     <EmptyState icon="mdi--domain" title={t`Noch keine Organisationen angelegt.`} className="col-span-full py-12" />
                 )}
@@ -110,14 +115,14 @@ export default function ManagementOrgsView() {
                             <div className="form-control">
                                 <label className="label"><span className="label-text font-bold">Standard-Flatrate-Level</span></label>
                                 <select value={newDefaultFlatrateLevel} onChange={e => setNewDefaultFlatrateLevel(e.target.value as 'none' | 'web' | 'print' | 'original')} className="select select-bordered">
-                                    <option value="none">Keine Flatrate</option>
+                                    <option value="none"><Trans>Keine Flatrate</Trans></option>
                                     <option value="web">Web</option>
                                     <option value="print">Print</option>
                                     <option value="original">Original</option>
                                 </select>
                             </div>
                             <div className="form-control">
-                                <label className="label"><span className="label-text font-bold">Auto-Join Policy</span></label>
+                                <label className="label"><span className="label-text font-bold"><Trans>Auto-Join Policy</Trans></span></label>
                                 <select value={newAutoJoinPolicy} onChange={e => setNewAutoJoinPolicy(e.target.value as 'immediate' | 'requires_invite' | 'disabled')} className="select select-bordered">
                                 <option value="immediate"><Trans>Sofort (automatisch)</Trans></option>
                                 <option value="requires_invite"><Trans>Einladung erforderlich</Trans></option>

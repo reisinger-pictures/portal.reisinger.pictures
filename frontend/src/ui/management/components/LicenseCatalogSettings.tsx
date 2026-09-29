@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import { useLicenseCatalog, LicenseUseCase, LicenseModifier } from '../../../logic/useLicenseCatalog';
 import { useUI } from '../../components/UIContext';
@@ -88,7 +89,7 @@ function UseCaseRow({ uc, onSave, onDelete }: UseCaseRowProps) {
                     </td>
                     <td>
                         <span className="badge badge-sm badge-ghost uppercase font-bold block w-fit">{uc.flatrate_tier}</span>
-                        {uc.is_commercial && <div className="text-xs text-warning font-bold mt-1">Kommerziell</div>}
+                        {uc.is_commercial && <div className="text-xs text-warning font-bold mt-1"><Trans>Kommerziell</Trans></div>}
                     </td>
                     <td className="text-right font-mono font-bold text-base">{formatMoney(uc.base_price)}</td>
                 </>
@@ -109,7 +110,7 @@ function UseCaseRow({ uc, onSave, onDelete }: UseCaseRowProps) {
                         </select>
                         <label className="cursor-pointer flex items-center gap-3 h-12 px-3 rounded-box hover:bg-base-300/50 transition-colors">
                             <input type="checkbox" className="checkbox-primary checkbox" checked={!!data.is_commercial} onChange={e => setData({...data, is_commercial: e.target.checked})} />
-                            <span className="label-text text-xs font-bold">Kommerzielle Lizenz</span>
+                            <span className="label-text text-xs font-bold"><Trans>Kommerzielle Lizenz</Trans></span>
                         </label>
                     </td>
                     <td className="text-right">
@@ -176,8 +177,8 @@ function ModifierRow({ mod, onSave, onDelete }: ModifierRowProps) {
                     </td>
                     <td>
                         {mod.is_included_in_flatrate 
-                            ? <div className="text-sm font-bold opacity-70 flex items-center gap-1"><span className="iconify mdi--check text-primary"></span> Inkludiert</div>
-                            : <div className="text-sm opacity-50 flex items-center gap-1"><span className="iconify mdi--minus"></span> Kostenpflichtig</div>
+                            ? <div className="text-sm font-bold opacity-70 flex items-center gap-1"><span className="iconify mdi--check text-primary"></span> <Trans>Inkludiert</Trans></div>
+                            : <div className="text-sm opacity-50 flex items-center gap-1"><span className="iconify mdi--minus"></span> <Trans>Kostenpflichtig</Trans></div>
                         }
                     </td>
                     <td className="text-right font-mono font-bold text-base">+{Number(mod.percent_surcharge).toFixed(0)} %</td>
@@ -194,7 +195,7 @@ function ModifierRow({ mod, onSave, onDelete }: ModifierRowProps) {
                     <td>
                         <label className="cursor-pointer flex items-center gap-3 h-12 px-3 rounded-box hover:bg-base-300/50 transition-colors">
                             <input type="checkbox" className="checkbox-primary checkbox" checked={data.is_included_in_flatrate} onChange={e => setData({...data, is_included_in_flatrate: e.target.checked})} />
-                            <span className="label-text text-sm font-bold">In Flatrates inkludiert</span>
+                            <span className="label-text text-sm font-bold"><Trans>In Flatrates inkludiert</Trans></span>
                         </label>
                     </td>
                     <td className="text-right">
@@ -255,11 +256,10 @@ export default function LicenseCatalogSettings() {
         <div className="flex flex-col gap-8">
             <div>
                 <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
-                    <span className="iconify mdi--format-list-checks text-primary text-3xl"></span> Lizenz-Katalog (RSV Modell)
+                    <span className="iconify mdi--format-list-checks text-primary text-3xl"></span> <Trans>Lizenz-Katalog (RSV Modell)</Trans>
                 </h2>
                 <p className="text-sm opacity-70 max-w-3xl">
-                    Definiere die Grundhonorare und die modularen Aufschläge (Zuschläge), die deine Kunden im Checkout auswählen können.
-                    Alle Einträge werden den Kunden zur Auswahl angeboten.
+                    <Trans>Definiere die Grundhonorare und die modularen Aufschläge (Zuschläge), die deine Kunden im Checkout auswählen können. Alle Einträge werden den Kunden zur Auswahl angeboten.</Trans>
                 </p>
             </div>
 
@@ -268,16 +268,16 @@ export default function LicenseCatalogSettings() {
                     {/* Sektion 1: USE CASES */}
                     <div className="bg-base-100">
                         <h3 className="font-bold text-xl text-primary mb-4 flex items-center gap-2">
-                            <span className="iconify mdi--numeric-1-box-outline"></span> Grundhonorare
+                            <span className="iconify mdi--numeric-1-box-outline"></span> <Trans>Grundhonorare</Trans>
                         </h3>
                         <div className="overflow-x-auto rounded-box border border-base-300 mb-4 max-h-96 overflow-y-auto">
                             <table className="table table-zebra w-full">
                                 <thead className="bg-base-200 sticky top-0 z-10 shadow-sm">
                                     <tr>
-                                        <th className="w-3/10">Titel & Beschreibung</th>
-                                        <th className="w-1/5">Flatrate-Verknüpfung</th>
-                                        <th className="text-right w-1/5">Basispreis</th>
-                                        <th className="text-right w-36">Aktionen</th>
+                                        <th className="w-3/10"><Trans>Titel & Beschreibung</Trans></th>
+                                        <th className="w-1/5"><Trans>Flatrate-Verknüpfung</Trans></th>
+                                        <th className="text-right w-1/5"><Trans>Basispreis</Trans></th>
+                                        <th className="text-right w-36"><Trans>Aktionen</Trans></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -289,7 +289,7 @@ export default function LicenseCatalogSettings() {
                                             <td colSpan={4} className="py-10">
                                                 <div className="flex flex-col items-center gap-2 opacity-60">
                                                     <span className="iconify mdi--archive-off text-3xl"></span>
-                                                    <span className="text-sm font-medium">Noch keine Grundhonorare angelegt.</span>
+                                                    <span className="text-sm font-medium"><Trans>Noch keine Grundhonorare angelegt.</Trans></span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -301,15 +301,15 @@ export default function LicenseCatalogSettings() {
                         {/* Add New Use Case */}
                         <div className="bg-base-200/50 p-4 rounded-box border border-base-300 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                             <div className="form-control w-full">
-                                <label className="label py-1"><span className="label-text text-sm font-bold">Neuer Titel</span></label>
+                                <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Neuer Titel</Trans></span></label>
                                 <input type="text" placeholder={t`z.B. PR & Social Media`} value={newUc.name} onChange={e=>setNewUc({...newUc, name: e.target.value})} className="input input-bordered w-full" required />
                             </div>
                             <div className="form-control w-full">
-                                <label className="label py-1"><span className="label-text text-sm font-bold">Beschreibung</span></label>
+                                <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Beschreibung</Trans></span></label>
                                 <input type="text" placeholder={t`Details zur Lizenz...`} value={newUc.description} onChange={e=>setNewUc({...newUc, description: e.target.value})} className="input input-bordered w-full" />
                             </div>
                             <div className="form-control w-full">
-                                <label className="label py-1"><span className="label-text text-sm font-bold">Flatrate-Basis</span></label>
+                                <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Flatrate-Basis</Trans></span></label>
                                 <select value={newUc.flatrate_tier} onChange={e=>setNewUc({...newUc, flatrate_tier: e.target.value})} className="select select-bordered w-full" required>
                                     <option value="web">Web</option>
                                     <option value="print">Print</option>
@@ -320,7 +320,7 @@ export default function LicenseCatalogSettings() {
                                 <label className="label py-1"><span className="label-text text-sm font-bold">&zwnj;</span></label>
                                 <label className="h-12 flex items-center cursor-pointer px-3 gap-3 rounded-box hover:bg-base-300/50 transition-colors">
                                     <input type="checkbox" className="checkbox-primary checkbox" checked={newUc.is_commercial} onChange={e=>setNewUc({...newUc, is_commercial: e.target.checked})} />
-                                    <span className="label-text font-bold">Kommerzielle Lizenz</span>
+                                    <span className="label-text font-bold"><Trans>Kommerzielle Lizenz</Trans></span>
                                 </label>
                             </div>
                             <div className="form-control w-full">
@@ -332,7 +332,7 @@ export default function LicenseCatalogSettings() {
                             </div>
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">&zwnj;</span></label>
-                                <button onClick={handleAddUseCase} className="btn btn-primary w-full"><span className="iconify mdi--plus"></span> Hinzufügen</button>
+                                <button onClick={handleAddUseCase} className="btn btn-primary w-full"><span className="iconify mdi--plus"></span> <Trans>Hinzufügen</Trans></button>
                             </div>
                         </div>
                     </div>
@@ -340,16 +340,16 @@ export default function LicenseCatalogSettings() {
                     {/* Sektion 2: MODIFIERS */}
                     <div className="bg-base-100">
                         <h3 className="font-bold text-xl text-primary mb-4 flex items-center gap-2">
-                            <span className="iconify mdi--numeric-2-box-outline"></span> Zuschläge (Aufschläge in %)
+                            <span className="iconify mdi--numeric-2-box-outline"></span> <Trans>Zuschläge (Aufschläge in %)</Trans>
                         </h3>
                         <div className="overflow-x-auto rounded-box border border-base-300 mb-4 max-h-96 overflow-y-auto">
                             <table className="table table-zebra w-full">
                                 <thead className="bg-base-200 sticky top-0 z-10 shadow-sm">
                                     <tr>
-                                        <th className="w-2/5">Titel & Beschreibung</th>
-                                        <th className="w-1/5">Flatrate Verhalten</th>
-                                        <th className="text-right w-3/20">Aufschlag (%)</th>
-                                        <th className="text-right w-36">Aktionen</th>
+                                        <th className="w-2/5"><Trans>Titel & Beschreibung</Trans></th>
+                                        <th className="w-1/5"><Trans>Flatrate Verhalten</Trans></th>
+                                        <th className="text-right w-3/20"><Trans>Aufschlag (%)</Trans></th>
+                                        <th className="text-right w-36"><Trans>Aktionen</Trans></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -361,7 +361,7 @@ export default function LicenseCatalogSettings() {
                                             <td colSpan={4} className="py-10">
                                                 <div className="flex flex-col items-center gap-2 opacity-60">
                                                     <span className="iconify mdi--archive-off text-3xl"></span>
-                                                    <span className="text-sm font-medium">Noch keine Zuschläge angelegt.</span>
+                                                    <span className="text-sm font-medium"><Trans>Noch keine Zuschläge angelegt.</Trans></span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -373,22 +373,22 @@ export default function LicenseCatalogSettings() {
                         {/* Add New Modifier */}
                         <div className="bg-base-200/50 p-4 rounded-box border border-base-300 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                             <div className="form-control w-full">
-                                <label className="label py-1"><span className="label-text text-sm font-bold">Neuer Zuschlag</span></label>
+                                <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Neuer Zuschlag</Trans></span></label>
                                 <input type="text" placeholder={t`z.B. Titelseite`} value={newMod.name} onChange={e=>setNewMod({...newMod, name: e.target.value})} className="input input-bordered w-full" required />
                             </div>
                             <div className="form-control w-full">
-                                <label className="label py-1"><span className="label-text text-sm font-bold">Beschreibung</span></label>
+                                <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Beschreibung</Trans></span></label>
                                 <input type="text" placeholder={t`Details...`} value={newMod.description} onChange={e=>setNewMod({...newMod, description: e.target.value})} className="input input-bordered w-full" />
                             </div>
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">&zwnj;</span></label>
                                 <label className="h-12 flex items-center cursor-pointer px-3 gap-3 rounded-box hover:bg-base-300/50 transition-colors">
                                     <input type="checkbox" className="checkbox-primary checkbox" checked={newMod.is_included_in_flatrate} onChange={e=>setNewMod({...newMod, is_included_in_flatrate: e.target.checked})} />
-                                    <span className="label-text font-bold">In Flatrates inkludieren</span>
+                                    <span className="label-text font-bold"><Trans>In Flatrates inkludieren</Trans></span>
                                 </label>
                             </div>
                             <div className="form-control w-full">
-                                <label className="label py-1"><span className="label-text text-sm font-bold">Aufschlag</span></label>
+                                <label className="label py-1"><span className="label-text text-sm font-bold"><Trans>Aufschlag</Trans></span></label>
                                 <div className="join w-full">
                                     <input type="number" step="0.01" placeholder={t`z.B. 100`} value={newMod.percent_surcharge} onChange={e=>setNewMod({...newMod, percent_surcharge: e.target.value})} className="input input-bordered join-item w-full" required />
                                     <span className="join-badge">%</span>
@@ -396,7 +396,7 @@ export default function LicenseCatalogSettings() {
                             </div>
                             <div className="form-control w-full">
                                 <label className="label py-1"><span className="label-text text-sm font-bold">&zwnj;</span></label>
-                                <button onClick={handleAddModifier} className="btn btn-primary w-full"><span className="iconify mdi--plus"></span> Hinzufügen</button>
+                                <button onClick={handleAddModifier} className="btn btn-primary w-full"><span className="iconify mdi--plus"></span> <Trans>Hinzufügen</Trans></button>
                             </div>
                         </div>
                     </div>
