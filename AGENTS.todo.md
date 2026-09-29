@@ -5,13 +5,13 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **75 offene Positionen**
-> über 1674 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **71 offene Positionen**
+> über 1639 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **11**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **7**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
 >
@@ -515,12 +515,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Dokumentations-Wahrheit (kein Code, aber irreführend)
 
-- [ ] **Kanban-Flakiness — die Board-Angabe zur Ursache ist widerlegt, die echte
-  Ursache bleibt unbekannt.** Das Board schrieb sie Wartezeiten in
-  `frontend/tests/e2e/helpers/KanbanHelper.ts:135,143,196,231` zu. Das hält nicht:
-  Die Datei hat 209 Zeilen, `:196` ist leer, `:135` ist ein Assertion-Timeout, und
-  `:85` sagt ausdrücklich „There are no retries or fixed dwell delays". Welche
-  Ursache die Flakes tatsächlich haben, ist offen und nicht gemessen.
 - [~] wartet auf einen Durchgang nach der Board-Bereinigung vom 2026-09-27 — die Widersprüche lagen an `[x]`-Einträgen, die entfernt wurden. **DOC-4 / DOC-5 / DOC-11** — das Board widerspricht sich selbst: Positionen
   sind an einer Stelle `[x] abgeschlossen` und an anderer als `offen` /
   `in Arbeit` geführt. Betroffen: CR-DATA-018/CR-BE-018 (Z. 284/341 vs. 543/545),
@@ -674,31 +668,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   mehr drin (auf einer frischen DB wäre es `Max Mustermann` / `ATXX XXXX XXXX`),
   also gehen Auszahlungen an das richtige Konto. Ein kurzer Blick in die
   Systemeinstellungen genügt, um es abzuhaken.
-- [ ] **`wysiwyg-editor.spec.ts` — **lokal** fehlschlagend, in CI grün.** Gemessen am
-  2026-09-28, CI-Run `36389471967`: `wysiwyg-editor.spec.ts:19` **✓** und `:101` **✓**.
-  S1 hatte lokal einen Fehlschlag gemeldet (Zählung der Listenelemente 1 statt 2,
-  Tiptap-Listenbehandlung); in CI tritt er **nicht** auf. Der Eintrag war zunächst als
-  „reproduzierbar fehlend" notiert — das ist durch die Messung **widerlegt** und hiermit
-  korrigiert. Das letzte Anfassen liegt am **2026-09-26** (`069df63`), also vor der
-  Welle. **Befund, kein Task:** der Fehlschlag ist ein **Lokationsphänomen**, und die
-  Zero-Pre-existing-Failures-Policy ist hier nicht einschlägig, weil kein CI-Run rot ist.
-  **Nachgemessen 2026-09-28:** `npx playwright test tests/e2e/admin/documents/wysiwyg-editor.spec.ts`
-  → **4/4 grün**. Die Datei enthält **2 Testdefinitionen × 2 Projekte** (Desktop Chrome,
-  Mobile Chrome); `--list` zählt `Total: 4 tests in 1 file`. Die frühere Angabe
-  „18/18" in diesem Board war falsch und ist hiermit korrigiert. Keine Regression: das
-  letzte Anfassen von `WysiwygEditor.tsx` liegt am **2026-08-18** (`b84f87f`), und die
-  geprüfte Zählung (`ol li`) hat der Commit `069df63` nicht angefasst.
-  **Die latente Fragilität ist seit 2026-09-28 behoben.** Der Spec prüft jetzt zwischen
-  Toolbar-Klick und dem Tippen, dass der Listen-Befehl gegriffen hat — über die
-  `btn-neutral`-Klasse des Buttons, die aus `toolbarUi.orderedList` stammt, also aus
-  `ed.isActive('orderedList')` (`WysiwygEditor.tsx:231`, verwendet in `:303`). Das ist
-  der Zustand des Editors selbst und keine DOM-Sonde; `toHaveClass` wiederholt ohne
-  festen Wartezeit-Befehl. Beweis, dass es beißt: ohne den Klick meldet die neue Zeile
-  `Received string: "btn btn-sm btn-ghost"` — **vor** der `ol li`-Zählung, die vorher
-  allein „1 statt 2" hätte sagen müssen.
-  **Der Mechanismus des ursprünglichen Auftretens bleibt `unbelegt`.** Die Trennung ist
-  trotzdem echt: ein Fehlschlag in der `ol li`-Zählung bedeutet jetzt „der Befehl griff
-  und der Inhalt stimmt nicht", nicht mehr „der Befehl griff vielleicht nicht".
 - [ ] **Gegenprobe vor jedem Deploy, der `base_price` berührt:** Der Wert der
   `base_price`-Zeile ist **nicht** aus dem Repository ableitbar, weil `insertOrIgnore`
   (jetzt `upsert`) den Seederwert nur beim Anlegen der Zeile schreibt und eine bestehende
@@ -904,7 +873,6 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
 **Zusätzlich gestartete aktive Teilaufgaben:**
 **Read-only Implementierungs-Audit (2026-09-25; Testquellen vorhanden, Ausführung/Verifier offen):**
 - [~] wartet auf den Abschluss der A7-Subblöcke — R1–R7 sind verifiziert, übrig sind Operations-Evidenz und Product Decisions. **P1-A7 Audit-Split (2026-09-25):** P1-A6 bleibt separat verifiziert. A7 ist in aktive Bugs (malformed provider response, image byte/pixel budget, session-prefix/header validation, manual delete ordering, scheduled cleanup durability, unchecked temp deletion, quote mail-loss), Operations-Evidence (queue/mail/worker/scheduler), Product Decisions (Prompt-Injection, SMTP duplicate policy) und stale/fixed Source-Punkte aufgeteilt. Keine pauschale A7-Schließung.
-- [ ] **D-17 — Prompt-Injection-Policy und SMTP-Duplicate-Policy einzeln festlegen.**
 - [ ] manuell prüfen: in `https://github.com/orgs/reisinger-pictures/packages/container/package/portal-base` → Settings → Change visibility → **Public** (analog `portal-e2e`). Abnahme: anonymer Manifest-Fetch liefert **200** statt 401, bei unveränderten Digests (`portal-base:8.5@sha256:d762d47c…`). Der E2E-Job zieht sein Image auf Job-Ebene, ein Registry-Login kommt dort zu spät — es bleibt nur `public`. **GHCR-Pakete public schalten (Owner-Aktion, 2026-09-25):** `portal-base` und `portal-e2e` im Org-Namespace sind `private`. Der Namespace-Fix ist committed, aber **die Sichtbarkeit kann nicht per CLI geändert werden** — `PATCH /orgs/reisinger-pictures/packages/container/<pkg>` liefert mit Token-Scopes `read:packages,write:packages,admin:org` ein generisches `404 Not Found` ohne Docs-Anker, während `GET` das Paket liefert und ein nicht existierender Name `{"message":"Package not found."}` ergibt ⇒ die Update-Route fehlt für diesen Token, es liegt nicht an den Scopes.
   - **Manuell als Org-Admin:** `https://github.com/orgs/reisinger-pictures/packages/container/package/portal-base` → Settings → Change visibility → Public; analog `portal-e2e`.
   - **Abnahme:** anonymes Manifest-Fetch liefert `200` (aktuell `401`) **und** die gepinnten Digests bleiben unverändert — `portal-base:8.5@sha256:d762d47c…`, `portal-e2e@sha256:<neu nach Rebuild>`.
@@ -1340,9 +1308,6 @@ getrennt.
 - [ ] manuell prüfen: im Stripe-Dashboard getrennte Test-/Live-Keys bzw. RAKs, least privilege, Webhook-Signing-Secrets und Endpoint-Subscriptions für Success/Failed/Dispute/Refund prüfen; zusätzlich Radar-/Card-Testing-/High-Risk-Regeln, Review-Queue, False-Positive-Rollback und Alerts dokumentieren. Getrennte Test-/Live-Keys bzw. RAKs, least privilege, Webhook-Signing-Secrets und Endpoint-Subscription für Success/Failed/Dispute/Refund prüfen; **Stripe Dashboard/Radar**: Velocity-/Card-Testing-/High-Risk-Regeln, Review-Queue, False-Positive-Rollback und Alerts dokumentieren.
 - [ ] manuell prüfen: den 3DS-Strom live durchspielen: SCA, frictionless, challenge, failure, timeout, mobile und return. Radar darf die lokalen Limits nicht ersetzen; Payment-Method-Settings und Testkarten mitverifizieren. **3DS-Betriebscheckliste**: SCA/frictionless/challenge/failure/timeout/mobile/return testen; Radar nicht als Ersatz für lokale Limits verwenden, Payment-Method-Settings und Testkarten verifizieren.
 - [ ] Monitoring/Runbook für PI-Rate, Replays, User/IP-429, Failure-Velocity, Identity-Mismatch/Quarantäne, Cleanup, Account-Age-Rejections und Turnstile anlegen; Logs ohne PAN/CVC/Secret/Raw-Turnstile-Token.
-- [ ] **D-16 — technische Doku der Stripe-Identifikatoren vervollständigen; rechtlicher Teil bleibt benannte Lücke.**
-  Zweck, Legal Ground, konkrete Retention und Lösch-/Anonymisierungsregeln der Stripe-Identifikatoren — fachliche DPO-/Rechtsfreigabe. Datenschutzhinweise/ROPA/Prozessor-/DPA- und Cookie-Dokumentation für Stripe-Customer-/PI-IDs, IP(+Hash), Fingerprint, Failure-Codes und Turnstile finalisieren. `Privacy.tsx` enthält bereits einen technischen Teilabschnitt; Zweck/Legal-Ground, konkrete Retention, Lösch-/Anonymisierungsregeln und DPO-/Rechtsfreigabe sind noch nicht nachgewiesen.
-
 **Tests**
 
 - [ ] **E2E-Lücke Card-Testing** (Owner-Entscheidung 2026-09-28, aus der leeren
