@@ -5,13 +5,13 @@
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **77 offene Positionen**
-> über 1685 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> Entscheidungsdurchgang):** Dieses Board enthält **76 offene Positionen**
+> über 1679 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **13**
+> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **12**
 > sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
 > Präfix ohne Grund wäre schlechter als keiner.
 >
@@ -1464,12 +1464,6 @@ hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
   `AI_ENABLED=false` bei **leerem** `AI_API_KEY` — das Verhalten ist damit
   unbestimmt) und `PhotoHistoryModal` (Multipart-Feldnamen des Uploads
   unverifiziert). Beides wuerde einen Capture-Zyklus verbrennen.
-- [ ] **Abdeckungs-SOLL fuer die Dialoge:** der aktuelle Stand ist
-  `photographer-guide-dialog` plus die vier neuen Eintraege. Die Gallery-Familie
-  (8 Eintraege) haengt an **einem** Gallery-Seed in `seeds.ts`; der wird als
-  Referenzfall zuerst gebaut und verifiziert, bevor die uebrigen darauf
-  aufsetzen.
-
 ## Dialog-UI-Review 2026-09-27 — Auswertung aller 13 Dialog-Aufnahmen
 
 Vollauf `pnpm test:screenshots`: **44 passed / 0 failed (1,6 min)**, 13 Dialoge ×
