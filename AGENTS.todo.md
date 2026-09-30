@@ -77,19 +77,15 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       bestätigt es, sie ändert nichts.
 - [x] **D-15 — Altersnachweis: kein Löschpfad, unbegrenzte Aufbewahrung.** Keine Aktion, die
       technische Folge ist das Nicht-Bauen.
-- [ ] **D-1 — SFTPGo auf `user: "1002:82"` umstellen und deployen.** Compose-Datei ändern,
-      committen, pushen, **grünes CI für genau den gepushten Head abwarten** (erfüllt: Run `36540161681`, 11/11
-      Jobs success auf `58de577`), dann Recreate
-      Restart ≠ Recreate, und `sync.sh` migriert nicht). **Scope bestätigt (Owner): sftpgo-only** —
-      keine Backend-UID-Änderung; die Backend-Lücke (1000 kommt nach Recreate nicht mehr an
-      `2775`/`1002:webgroup`-Inboxen: kein `mkdir`/`unlink`, `@chmod` still) bleibt offene Frage
-      vor dem Recreate. **Zugang: weiter offen** — alle drei lokalen Keys denied; `id_rsa`
-      (Owner-Wahl) ist passphrase-gesperrt und damit ohne Interaktion unbenutzbar; Fingerprints
-      zum Abgleich geliefert. **Repo-Seite verifiziert** (Stanza-Test + Gegenproben, pint, compose
-      config). **Zwei neue Prüfpunkte vor dem Recreate:** (a) Named Volume `sftpgo_data`
-      (`/var/lib/sftpgo`) ist plausibel root-owned (Container lief als root) — nach Recreate muss
-      1002 dort schreiben können, sonst startet sftpgo nicht; (b) `tests/scripts/ftp-transport-test/`
-      bleibt absichtlich auf `1000:1000` (Standalone-Harness) und divergiert damit von Prod.
+- [x] **D-1 — SFTPGo `1002:82`, Backend `1000:82`, Deploy über den Portainer-Editor.**
+      Repo (`c0744a4`, CI 11/11) **und** Host sind durch: Compose-Update im Portainer-Editor am
+      2026-09-30, beide Container neu erzeugt (`1000:82` / `1002:82`, gemessen an `Config.User`),
+      `sync.sh` mit frischem `dist/`, getrennt davon `docker restart portal_backend`, V046 in Batch 23
+      mit Index `gallery_groups_brand_slug_unique`. **Die Kette brauchte den Gruppenweg, nicht die
+      UID** — `/home/webadmin` von `webadmin:webadmin`/`755` auf `webadmin:82`/`2775`, formgleich zu
+      `websites`; der Import-Pfad ist als UID 1000 gegengeprobt (`mkdir`, anlegen, `unlink` **OK**).
+      **Offen bleibt nur die Haltbarkeit:** `portal_backend` wird täglich ~09:20 CEST von außen neu
+      erzeugt, Auslöser nicht auffindbar — siehe die Board-Position darunter.
 - [x] **D-2 — `App\Support\FtpInboxDirectory::ensure()` auf beiden Pfaden, `2775`, Ordner vor
       Konto.** Slug-Schreibpfad **und** `provisionAndShow()` (sonst entsteht „Konto ohne Ordner"
       weiter über „Neues Kamera-Passwort"). Reihenfolge begründet: die SFTPGo-Admin-API hat kein
@@ -523,47 +519,15 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Braucht eine Entscheidung oder Betriebs-Evidenz (kein Code)
 
-- [ ] **D-1 — SFTPGo auf `user: "1002:82"` umstellen und nach grünem CI deployen.**
-  läuft SFTPGo als `1002:82` (Host-Konvention) oder bleibt `1000:1000` mit dokumentierter Ausnahme für genau dieses Verzeichnis? Vor dem Stack-Recreate zu entscheiden. **P1-I9 (P0) — Deployment-Drift: `portal_backend` läuft als root, das
-  versionierte Compose fordert `user: "1000:1000"`.** Verifiziert 2026-09-26.
-  **Befund:** `deployment/docker-compose.yml:58` deklariert
-  `user: "1000:1000"` für `backend`. Der laufende Container hat
-  `Config.User` = **leer**, `docker exec portal_backend id` →
-  `uid=0(root)`. Der Stack ist seit der `user:`-Zeile nie neu erstellt worden.
-  **Warum das dringend ist, nicht nur unsauber:** beim nächsten
-  `docker compose up -d` fällt der Backend **und** der neue `sftpgo`-Service
-  (`:299`, ebenfalls `user: "1000:1000"`) auf UID 1000. Alles, was heute
-  implizit über root funktioniert, bricht dann. Konkret verifiziert: mit
-  `2755` auf `ftp/<slug>` konnte UID 1000 **weder anlegen noch `unlink`en** —
-  und `FtpController::process()` macht genau das (`unlink($file)` nach dem
-  Import). Der ursprüngliche Vorschlag, das mit `2777` zu entschärfen, ist **durch zwei
-  Entscheidungen ersetzt**: D-1 nimmt SFTPGo auf `1002:82`, und D-2 setzt `2775` statt
-  2026-09-26), die Fehlerklasse bleibt aber: **jeder neue Pfad mit `2755` unter
-  `/home/webadmin/websites` bricht beim UID-Wechsel.**
-  **Zweite, verwandte Diskrepanz:** `sftpgo` läuft als `1000:1000`, der
-  Host-Pfad gehört `1002:webgroup`. Dateien, die der Dienst anlegt, werden
-  dadurch `1000`-owned statt `1002`. Funktional auffällig wird es nicht
-  (setgid ⇒ Gruppe erbt sich, Lesen/Löschen gelingt), aber es
-  mischt die Ownership-Modelle im Website-Baum — dieselbe Art Unordnung wie
-  der `r1`-Vorfall vom 2026-09-26, nur leiser. **Zu entscheiden:** läuft
-  SFTPGo als `1002:82`, oder bleibt `1000` und die Site-Konvention wird für
-  dieses eine Verzeichnis offiziell ausgenommen?
-  **Warum das CI-Gate nicht greift:** `tests/infrastructure/verify-image-nonroot.sh`
-  prüft `Config.User` des **Image-Artefakts** (abgefangen in der früheren
-  C-Historie), nicht den **effektiven Benutzer des laufenden Containers**. Ein
-  korrektes Image mit überschriebenem `user:` im Compose ist für dieses Gate
-  unsichtbar.
-  **Tests:** (a) PHPUnit/Shell-Test, der `Config.User` des laufenden Containers
-  gegen die `user:`-Deklaration im Compose stellt und bei Abweichung
-  fehlschlägt — als eigener Vertrag, nicht im Image-Test; (b) Test, dass jede
-  unter `/home/webadmin/websites` angelegte Inbox `2775` und `1002:webgroup`
-  **oder** die dokumentierte Ausnahme ist; (c) `verify-image-nonroot.sh` um
-  einen Hinweis ergänzen, dass es `user:`-Overrides im Compose **nicht**
-  abdeckt.
-  **Nicht im Scope:** die Reparatur selbst ist ein Deployment (Stack
-  recreated), kein Code. Vorher die UID-Fragen oben entscheiden, sonst wird der
-  Restart zum Ausfalltag.
-
+- [ ] wartet auf **Folgetag-Gegenprobe gegen den täglichen 09:20-CEST-Recreate.** `portal_backend`
+  wurde am 2026-09-29T07:19:32Z und 2026-09-30T07:20:05Z **von selbst** neu erzeugt, jeweils mit dem
+  alten Stand. Der Auslöser ist auf dem Host **nicht auffindbar**: keine Cron-Zeile, kein Timer, keine
+  Systemd-Unit, und im Zeitfenster (07:00–07:40Z) wurde keine Datei geschrieben — er kommt also von
+  außen (Portainer-Redeploy des Stacks oder ein externer Job). **Die Prüfung:** am Folgetag nach 09:20
+  CEST `docker inspect portal_backend --format "{{.Config.User}} {{.Created}}"` — steht dort weiter
+  `1000:82` und ein `Created` **nach** dem Deploy, ist der Stand stabil; steht wieder `1000:1000` mit
+  neuem `Created`, hat der Akteur den alten Stack-Stand überschrieben und der Deploy muss über Portainer
+  (nicht CLI) wiederholt werden. **Kein Raten:** die Entscheidung fällt am Messwert, nicht an der Vermutung.
 - [~] wartet auf einen echten Scheduler-Lauf (`app:import-locations`) plus einen Importer-Lauf. Kein Code offen. **P1-A5** — nur noch Live-Nachweis: ein echter Scheduler-Lauf
   (`app:import-locations`, wöchentlich mit `withoutOverlapping()->onOneServer()`)
   und ein Importer-Lauf. Kein Code offen.
