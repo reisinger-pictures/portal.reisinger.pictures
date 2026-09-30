@@ -343,10 +343,18 @@ führt keine Migration aus. Deshalb gilt:
 
 - **D-1 — SFTPGo läuft als `user: "1002:82"`**, Backend als `user: "1000:82"`.
   `deployment/docker-compose.yml` ist die entsprechende Datei (sftpgo `:469`, backend `:77`).
-  **Gemessen am 2026-09-29 auf dem Deploy-Host** (SSH via Keychain-Key): sftpgo läuft noch als
-  `1000:1000` (erzeugt 2026-09-27), backend als `1000:1000` (neu erzeugt 2026-09-29T07:19:32Z —
-  durch wen, ist offen); Portainer-Stack 23 ist auf dem Host weg (`/data/compose/23` fehlt),
-  die Container laufen verwaist. Der ftp-Baum steht bereits auf `1002:82` mit setgid
+  **Gemessen am 2026-09-30 auf dem Deploy-Host** (SSH via Keychain-Key): sftpgo läuft noch als
+  `1000:1000` (erzeugt 2026-09-27), backend als `1000:1000`; Prod-DB auf V045. **Portainer-Stack
+  23 existiert**, unter `/var/lib/docker/volumes/portainer_data/_data/compose/23/` (Compose vom
+  2026-09-28, echte `stack.env` mit 44 Werten) — der Stack ist also **nicht** weg und die Container
+  laufen **nicht** verwaist; `/data/compose/23` ist ein Altpfad, den nur noch die Labels von
+  `portal_sftpgo` referenzieren. **Der Stack-Stand unterscheidet sich vom Repo-Head um genau die
+  drei D-1-Zeilen** (`diff` ohne Kommentarzeilen: backend-`user`, GID-Guard, sftpgo-`user`), sonst
+  ist nichts nachzuziehen. **Offen:** `portal_backend` wird **zweimal in Folge von selbst neu
+  erzeugt** — 2026-09-29T07:19:32Z und 2026-09-30T07:20:05Z (09:19/09:20 CEST) — jeweils mit dem
+  alten Stand; der Auslöser ist auf dem Host **nicht** auffindbar (kein Cron/Timer/Systemd-Unit,
+  keine Datei im Zeitfenster geschrieben, also remote). Kein Blocker: der Deploy greift trotzdem,
+  sobald der Stack-File selbst aktualisiert ist. Der ftp-Baum steht bereits auf `1002:82` mit setgid
   (`/home/webadmin/websites/ftp` + `florian/`), das Volume `portal-reisinger-pictures_sftpgo_data`
   noch auf `1000:1000`, Prod-DB auf V045 (Repo: V046), `/` hat 215 GB frei (D-5 damit erledigt),
   `base_price`/`srp_base_price` stehen auf 8000 (Gegenprobe bestanden).
@@ -394,9 +402,10 @@ entscheiden".
   `deployment/docker-compose.yml` trägt beide Zeilen. *Warum:* mit `2775` auf `ftp/<slug>` kann ein
   Backend mit Gruppe `1000` **weder anlegen noch `unlink`en** — genau das macht der Import. Eine zweite
   UID im selben Baum zu mischen wäre dieselbe Unordnung wie der `r1`-Vorfall vom 2026-09-26, nur
-  leiser. **Stand 2026-09-29 (gemessen):** sftpgo läuft noch `1000:1000`, backend `1000:1000`;
-  Portainer-Stack 23 ist hostseitig weg — Deploy-Weg ist „Portainer neu" (Owner, interaktiv),
-  mit V046-Migration und `sftpgo_data`-Chown auf `1002:82` im selben Fenster.
+  **Stand 2026-09-30 (gemessen):** sftpgo läuft noch `1000:1000`, backend `1000:1000`, Prod-DB auf
+  V045; Stack 23 lebt im Portainer-Volume (nicht weg, nicht verwaist) und differiert vom Repo-Head
+  um genau die drei D-1-Zeilen — Deploy-Weg ist „Portainer neu" (Owner, interaktiv), mit
+  V046-Migration und `sftpgo_data`-Chown auf `1002:82` im selben Fenster.
   **Grenze:** `AGENTS.md` §13 bleibt bindend — `sync.sh` führt keine Migration aus, und
   `restart` ≠ `recreate`. Der Deploy dieser Änderung ist ein **Recreate**, kein Restart, und
   geschieht erst nach grünem CI.
