@@ -49,7 +49,7 @@
         "@tiptap/extension-underline": "~3.30.5",
         "@tiptap/react": "~3.30.5",
         "@tiptap/starter-kit": "~3.30.5",
-        "dompurify": "^3.4.14",
+        "dompurify": "^3.4.16",
         "photoswipe": "^5.4.4",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
