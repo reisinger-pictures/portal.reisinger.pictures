@@ -354,12 +354,19 @@ führt keine Migration aus. Deshalb gilt:
   erzeugt** — 2026-09-29T07:19:32Z und 2026-09-30T07:20:05Z (09:19/09:20 CEST) — jeweils mit dem
   alten Stand; der Auslöser ist auf dem Host **nicht** auffindbar (kein Cron/Timer/Systemd-Unit,
   keine Datei im Zeitfenster geschrieben, also remote). Kein Blocker: der Deploy greift trotzdem,
-  sobald der Stack-File selbst aktualisiert ist. Der ftp-Baum steht bereits auf `1002:82` mit setgid
-  (`/home/webadmin/websites/ftp` + `florian/`), das Volume `portal-reisinger-pictures_sftpgo_data`
-  noch auf `1000:1000`, Prod-DB auf V045 (Repo: V046), `/` hat 215 GB frei (D-5 damit erledigt),
-  `base_price`/`srp_base_price` stehen auf 8000 (Gegenprobe bestanden).
-  **Owner-Entscheidungen vom 2026-09-29 (interaktiv):** Deploy-Weg „Portainer neu" (Stack neu
-  anlegen, dann dort deployen); Backend `1000:82` (Gruppe 82 schließt die D-2-2775-Lücke für neu
+  sobald der Stack-File selbst aktualisiert ist. **Deploy ausgeführt am 2026-09-30** (Owner im
+  Portainer-Editor, Compose aus `c0744a4`): beide Container wurden neu erzeugt, ohne einen
+  „Recreate"-Haken — ein geändertes `user:` erzwingt das bei Compose ohnehin. Danach `sync.sh`
+  (GNU-rsync 3.5.1, mit `pnpm lint:fix && pnpm build` davor) **und getrennt davon**
+  `docker restart portal_backend`; V046 lief beim Restart in Batch 23, der Index
+  `gallery_groups_brand_slug_unique` ist gemessen vorhanden. Auch die beiden weiteren
+  Vor-Recreate-Punkte sind erledigt: das Volume `portal-reisinger-pictures_sftpgo_data` gehört jetzt
+  `1002:82` (sftpgo startete mit `restarts=9` und war nach dem Chown stabil), die ftp-Kette trägt
+  `webgroup` durchgehend. `base_price`/`srp_base_price` stehen unverändert auf 8000, API und Web
+  antworten HTTP 200, Backend `healthy` mit `restarts=0`. (`/` hatte 215 GB frei — D-5 damit erledigt.)
+  **Owner-Entscheidungen vom 2026-09-29 (interaktiv), ausgeführt am 2026-09-30:** Deploy-Weg war
+  „Portainer neu" und wurde als **Stack-23-Editor-Update** ausgeführt (ein Stack-Neuanlegen hätte
+  dasselbe erreicht, war aber nicht nötig); Backend `1000:82` (Gruppe 82 schließt die D-2-2775-Lücke für neu
   angelegte Slug-Verzeichnisse); V046 reitet mit (`migrate --force` + Seed-Policy im selben
   Fenster); `sftpgo_data` wird auf `1002:82` gechownt.
   **Diese Änderung ist ein Recreate, kein Restart** — siehe die Recreate-Regel oben. Deploy
@@ -426,6 +433,19 @@ entscheiden".
   und gewarnt in `tests/scripts/ftp-transport-test/verify.sh:563`. **Tragend ist die
   Gruppenvererbung, nicht das Welt-Schreibrecht:** ohne setgid landet ein Upload in der Gruppe des
   anlegenden Prozesses statt in `webgroup`, und der importierende Backend verliert den Zugriff.
+  **Die Kette ist eine Ebene höher zu schließen als gedacht (gemessen 2026-09-30):** `/home/webadmin`
+  gehörte `webadmin:webadmin` mit `755`; UID 1000 (www-data, GID 82) kommt dort weder hindurch
+  noch hinein, `mkdir` scheitert also schon am Zugang und nicht erst am Modus der Inbox. Der
+  Backend-Prozess sieht den Baum unter `/var/www/ftp` (Bind-Mount), nicht unter `/home/webadmin`.
+  **Der Hebel ist die Gruppe, nicht die UID:** `UID 1002` existiert auf dem Host gar nicht (kein
+  `passwd`-Eintrag), `webadmin` ist `UID 1001`, und der Baum trägt Rechte über `webgroup`
+  (**GID 82**) — Beweis ist `/home/webadmin/websites` = `drwxrwsr-x webadmin:webgroup` mit setgid
+  und gruppen-schreibbar. **Gemacht:** `/home/webadmin` von `webadmin:webadmin`/`755` auf
+  `webadmin:82`/`2775` gesetzt, damit formgleich mit `websites`. **Der zwischenzeitlich versuchte
+  `chown 1002:82` auf `/home/webadmin` war der falsche Hebel und ist zurückgenommen** (er erzeugte
+  eine nicht existierende UID und änderte den Modus nicht). **Gegenprobe als UID 1000 im laufenden
+  Backend-Prozess:** `mkdir` in `ftp/` **OK**, Inbox `2775` + setgid + `1000:82`, Datei anlegen
+  **OK**, `unlink` **OK** — der Schritt, der am 2026-09-26 an `2755` scheiterte.
   **Zwei Pfade, weil es zwei waren:** der Slug-Schreibpfad und `provisionAndShow()` (Weg
   „Neues Kamera-Passwort" bei einem `pending`-Konto). Beide rufen
   `App\Support\FtpInboxDirectory::ensure()`. **Reihenfolge: Ordner zuerst, Konto danach.** Die
