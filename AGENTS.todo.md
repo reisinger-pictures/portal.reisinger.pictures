@@ -80,6 +80,11 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 - [x] **D-23 — Doku-only Commits überspringen die Pipeline.** Filter in `ci.yml:17-21` (`paths` mit
       `!`-Rücknahme), Vorbedingung und Verifikation in `AGENTS.md` §14/D-23. Von Implementer und
       unabhängigem Verifier getrennt bestätigt; die dabei gefundene `automerge.yml`-Falle ist als
+      **Messfalle, die beim Verifizieren selbst Zeit kostete:** `gh run list --commit` nimmt eine
+      **vollständige** SHA. Mit einer Kurz-SHA liefert es *null* Runs — das liest sich als „CI lief
+      nie" und ist es nicht: `07b513c` hatte volle SHA Run `36747358962` (11/11 grün), mit Kurz-SHA
+      sah es nach einem stillen Ausfall des Filters aus. Immer `git rev-parse HEAD` oder die volle SHA.
+      Das ist dieselbe Klasse wie §5.8: erst die Messung prüfen, dann einen Defekt behaupten.
       Kommentar in `ci.yml` verankert. Die Restlücke (Prosa-Scan) steht als Position darunter.
 - [x] **D-1 — SFTPGo `1002:82`, Backend `1000:82`, Deploy über den Portainer-Editor.**
       Repo (`c0744a4`, CI 11/11) **und** Host sind durch: Compose-Update im Portainer-Editor am
