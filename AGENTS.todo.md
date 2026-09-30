@@ -77,6 +77,10 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
       bestätigt es, sie ändert nichts.
 - [x] **D-15 — Altersnachweis: kein Löschpfad, unbegrenzte Aufbewahrung.** Keine Aktion, die
       technische Folge ist das Nicht-Bauen.
+- [x] **D-23 — Doku-only Commits überspringen die Pipeline.** Filter in `ci.yml:17-21` (`paths` mit
+      `!`-Rücknahme), Vorbedingung und Verifikation in `AGENTS.md` §14/D-23. Von Implementer und
+      unabhängigem Verifier getrennt bestätigt; die dabei gefundene `automerge.yml`-Falle ist als
+      Kommentar in `ci.yml` verankert. Die Restlücke (Prosa-Scan) steht als Position darunter.
 - [x] **D-1 — SFTPGo `1002:82`, Backend `1000:82`, Deploy über den Portainer-Editor.**
       Repo (`c0744a4`, CI 11/11) **und** Host sind durch: Compose-Update im Portainer-Editor am
       2026-09-30, beide Container neu erzeugt (`1000:82` / `1002:82`, gemessen an `Config.User`),
@@ -518,6 +522,16 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   CR-CRM-008 (Z. 282/283/338 vs. 618), CR-DOC-001 (Z. 410, behauptet „V038").
 
 ### Braucht eine Entscheidung oder Betriebs-Evidenz (kein Code)
+
+- [ ] **D-23-Rest — `InfrastructureSupplyChainPolicyTest` auf Code statt Prosa umstellen.** Der
+  Filter lässt 80 von 113 Markdown-Dateien überspringen; eine neue veraltete `ghcr.io/`-Namespace in
+  einer davon fällt erst beim nächsten Code-Commit auf. **Der richtige Fix ist der Test, nicht der
+  Filter:** die Prüfung sollte die Dateien scannen, die tatsächlich ausgeliefert werden
+  (`deployment/docker-compose.yml`, `Dockerfile*`, `.github/workflows/*.yml`), und Prosa nicht als
+  Sicherheits-Gate missbrauchen. **Vorher messen:** der Test meldet 2820 Assertions und 112
+  gescannte `.md` — wie viele davon tragen einen Befund, der nicht auch im gescannten Code steht?
+  Erst diese Zahl entscheidet, ob der Aufwand trägt. Ohne sie ist die Lücke vertretbar (Doku-Drift
+  findet ein Review), mit ihr ist sie ein Befund.
 
 - [ ] wartet auf **Folgetag-Gegenprobe gegen den täglichen 09:20-CEST-Recreate.** `portal_backend`
   wurde am 2026-09-29T07:19:32Z und 2026-09-30T07:20:05Z **von selbst** neu erzeugt, jeweils mit dem

@@ -6,9 +6,34 @@ name: CI
 # E2E-/Aggregate-Gate wird deshalb explizit übersprungen; der Push-Lauf auf
 # demselben Head-SHA bleibt der autoritative Gate. `pull_request` deckt
 # normale Same-Repo-PRs weiterhin fail-closed ab.
+# Docs-only commits ran all 11 jobs (incl. 6 Playwright shards) on 3352977
+# (AGENTS.md + AGENTS.todo.md). `'**'` is the only positive pattern, so no code
+# change can ever be filtered out; the negations drop documentation only. The
+# trailing patterns re-include the docs the ghcr-namespace gate reads as input
+# on purpose (InfrastructureSupplyChainPolicyTest scans .md), keeping image-doc
+# drift gated. `main` has deliberately no branch protection (AGENTS.md D-3), so a
+# path-filtered run cannot strand a PR on a required check.
+# `automerge.yml` is the one consumer a filtered check breaks: it waits for
+# `'CI gate (push)'` with `fail-on-no-checks: true`, so a never-reporting check
+# stalls `should-merge` to its `timeout-minutes: 65` and fails closed.
+# Not reachable today: npm, composer and both docker ecosystems touch manifests,
+# never docs alone — so `dependabot.yml` alone holds that invariant, and a new
+# `.md`-producing ecosystem is what breaks it.
 on:
   push:
+    paths:
+      - '**'
+      - '!**/*.md'
+      - 'features/infrastructure/**'
+      - 'features/ai/**'
+      - 'features/e2e-test-strategy.md'
   pull_request:
+    paths:
+      - '**'
+      - '!**/*.md'
+      - 'features/infrastructure/**'
+      - 'features/ai/**'
+      - 'features/e2e-test-strategy.md'
 
 # Least privilege: CI only reads the repository. Secrets are passed directly to
 # the jobs that need them and are never printed, fingerprinted, or written to
