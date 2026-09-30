@@ -684,6 +684,34 @@ entscheiden".
   (`FtpCredentialException::couldNotCreateInboxDirectory()`); Gleichheit beider Pfade gepinnt durch
   `FtpSlugDirectoryProvisioningTest` (gegen HEAD gegenbelegt: `500 is identical to 503`). Kein
   `Retry-After` — passend zum bestehenden SFTPGo-503.
+
+- **D-23 — Doku-only Commits überspringen die Pipeline** (Owner, interaktiv 2026-09-30). Ein Push,
+  der nur Dokumentation ändert, muss nicht alle Jobs fahren. *Warum:* gemessen lief ein reiner
+  Doku-Commit (`3352977`, `AGENTS.md` + `AGENTS.todo.md`) durch alle 11 Jobs inklusive 6 Playwright-
+  Shards — der Lauf sagt nichts über die geänderten Dateien aus, er kostet nur Zeit.
+  **Die Vorbedingung entschied die Form und war nicht vorhersehbar:**
+  `InfrastructureSupplyChainPolicyTest::scannableFiles()`
+  (`backend/tests/Feature/InfrastructureSupplyChainPolicyTest.php:669-675`) nimmt `.md`
+  ausdrücklich in seine Endungs-Regex auf („Comments and documentation are scanned **on purpose**"),
+  und genau **5** getrackte Markdown-Dateien nennen `ghcr.io/` — ein Security-Gate liest Prosa.
+  Ein pauschales `paths-ignore: ['**/*.md']` hätte dieses Gate still abgeschaltet. Deshalb ist die
+  Umsetzung `paths` mit `!`-Rücknahme (`ci.yml:17-21`): `paths-ignore` ist rein.subtraktiv und kann
+  nichts zurückholen, `paths` schon. **`'**'` ist das einzige positive Muster** — damit ist
+  ausgeschlossen, dass ein Code-Commit übersprungen wird; die 1309 getrackten Nicht-Markdown-Dateien
+  werden zu 0 ignoriert. Re-Eingeschlossen bleiben `features/infrastructure/**`, `features/ai/**` und
+  `features/e2e-test-strategy.md` (33 Dateien). **Verifikation ohne Push:**
+  `git diff --name-only <a> <b>` gegen die Doku-Commits `7957393`/`3352977` (werden übersprungen) und
+  den Code-Commit `c0744a4` (läuft); Job-/Step-Bestand byte-gleich (5 Jobs, 49 Schritte).
+  **Die latente Falle, die ein unabhängiger Verifier fand:** `automerge.yml:98` wartet auf
+  `'CI gate (push)'` mit `fail-on-no-checks: true` und `timeout-minutes: 65` — ein gefilterter,
+  nie meldender Check lässt den Job bis zum Timeout hängen und dann fail-closed. Heute unerreichbar,
+  weil alle vier Dependabot-Ökosysteme Manifeste/Lockfiles anfassen, nie nur `.md`; die Invariante
+  hält allein an `dependabot.yml` und wird von nichts geprüft — steht als Kommentar in `ci.yml`.
+  **Bekannte Lücke, bewusst offen:** 80 der 113 Markdown-Dateien überspringen die Pipeline. Eine
+  neue veraltete `ghcr.io/`-Namespace in einer davon fällt erst beim nächsten Code-Commit auf. Kein
+  Deploy-Pfad ist betroffen (alles Ausgelieferte ist Nicht-Markdown). **Der eigentliche Fix dafür
+  gehört in den Test** (Code statt Prosa scannen), nicht in den Filter — als eigene Welle.
+
 ## TODO (UI-Review)
 
 UI-Review-Screenshot-Skill noch nicht angewendet (Playwright-Harness + Vision-Analyse). Referenz: ocg-price-tracker/tests/screenshots (ui-screenshots.spec.ts mit Section-Captures).
