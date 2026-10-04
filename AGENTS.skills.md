@@ -1,12 +1,12 @@
 # Skills-Marker
 
-agents-skills-consumed: aad25d145e92360b8ee7631151c1cdb6dae679eb
+agents-skills-consumed: 6629ad289f6685d58f900a023a8bfa6ab3ba70c4
 geprüft am: 2026-10-04
 
-> Stand: geprüft bis `aad25d14` (= HEAD des Skills-Repos zum Prüfzeitpunkt).
-> Der Working Tree des Skills-Repos enthält zusätzlich **uncommittete Änderungen**
-> (`agent-config`, `codegraph-project-setup`, `github-ci-filters`, Stand 2026-10-04);
-> deren Übernahme erfordert ein separates Marker-Advancement — dieser Marker deckt sie nicht ab.
+> Stand: geprüft bis `6629ad2` (= HEAD des Skills-Repos zum Prüfzeitpunkt, 2026-10-04).
+> Range `aad25d14..6629ad2`: `2969d5a` (Size-Trim + English-Pass über zwölf Skills,
+> neuer `node-deps`-Boundary-Absatz) plus `6629ad2` (README). Der Working Tree des
+> Skills-Repos ist sauber — keine uncommitteten Änderungen, kein separates Advancement offen.
 > Format und Ablauf: Skill `skills-marker` im Skills-Repo.
 
 ## Skill-Stand
@@ -29,11 +29,24 @@ geprüft am: 2026-10-04
 | `update-opencode-models` | nein | | Wie `model-updater`: Maschinen-Sache, kein Projekt-Zustand — trifft nicht zu |
 | `vision-agents` | nein | | Keine visuelle Prüfung in diesem Pass, kein Screenshot-Artefakt erzeugt — trifft nicht zu |
 
-## Offen aus dem Bereich `—..aad25d14`
+## Offen aus dem Bereich `aad25d14..6629ad2`
 
-_Kein Vor-Stand: neu angelegter Marker, keine Range — Vollprüfung aller 15 Skills aus
-`.agents/skills/` des Skills-Repos in der Tabelle oben. Dieser Abschnitt wird beim ersten
-`git pull` im Skills-Repo durch die Range `<aad25d14>..HEAD` ersetzt._
+_Range: `2969d5a` (Trim auf die Größen-Ziele + English-Pass über zwölf Skills, neuer
+`node-deps`-Boundary-Absatz) plus `6629ad2` (README). Jede geänderte Skill-Datei gegen
+dieses Projekt geprüft; wo nur gekürzt und übersetzt wurde, steht das dabei._
+
+- `agent-config` (226→194 Zeilen, Wortlaut nach `references/snippets.md`): Trim, keine Verhaltensänderung — Zeile bleibt `nein` (Maschinen-Setup).
+- `codegraph-project-setup` (±0 Zeilen, MCP-Klarstellung: CLI plus globaler MCP-Server): keine Verhaltensänderung — Zeile bleibt `ja`.
+- `github-ci-filters` (358→172 Zeilen, Begründung nach `references/notes.md`): Trim, keine Verhaltensänderung — Zeile bleibt `nein`.
+- `model-updater` (308→153 Zeilen, Details nach `references/notes.md`): Trim — Zeile bleibt `nein`.
+- `node-deps` (40→48 Zeilen, neuer Absatz „Boundary: manifests vs images"): **trifft zu** — benennt den `ARG`-Mechanismus der Board-Positionen 1+2; Notiz 2026-10-04 in `AGENTS.todo.md` bei Position 2, Positionen selbst unverändert. Zeile bleibt `ja`.
+- `skills-marker` (Drift-Check als Schritt 5.3, Konventionen als Zeilen in §4): Drift-Check ist Maschinen-Sache (globale `AGENTS.md`), berührt das Projekt nicht; Konventions-Beispiel passt zur hiesigen Lage (eigene Doku-Konvention, vgl. Tabellenzeile `ui-review`). Zeile stand bereits auf `ja` mit `AGENTS.skills.md` — kein Wechsel nötig.
+- `tailscale-serve` (251→191 Zeilen, Details nach `references/notes.md`): Trim — Zeile bleibt `nein`.
+- `ui-review` (±0 Zeilen, nur Projektnamen ausgeschrieben): keine Verhaltensänderung — Zeile bleibt `nein` (bewusste Projekt-Entscheidung).
+- `update-opencode-models` (Snapshot-Datierung 2026-10-02): keine Verhaltensänderung — Zeile bleibt `nein`.
+- `vision-agents` (110→108 Zeilen, Historie nach `references/notes.md`): Trim — Zeile bleibt `nein`.
+- Nicht in der Range, Referenzen nachgeprüft und aktuell: `docker-test-image` (`deployment/Dockerfile.e2e:30,69`, `.github/workflows/e2e-image.yml:41`), `ghcr-visibility` (`.github/workflows/ci.yml:43-51,335`); kein Verweis ins Registry-Material, das nach `ghcr-visibility` wanderte.
+- Kein Trim hat eine Pflicht gekostet: `github-ci-filters` (Precondition, `paths-ignore`-Asymmetrie, beide Trigger), `model-updater` (Hard Requirements, Variants-Verbot), `tailscale-serve` (Socket-Pfad, Secret), `agent-config` (§2a/§8, Drift) — alles noch da oder nach `references/` gewandert.
 
 ## Fortschreiben
 
