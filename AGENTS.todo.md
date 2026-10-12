@@ -554,6 +554,8 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   eine **Entscheidung zur SMTP-Duplikat-Policy**. Die Code-Subblöcke R1–R7 sind
   verifiziert geschlossen.
 
+- [~] wartet auf die Stripe-Test-Key-Rotation durch den Owner (blockiert alle 7 E2E-Shards, kein Code-Defekt). Befund vom 2026-10-12: CI-E2E fällt im Balance-Preflight mit `401 api-key-expired` (`STRIPE_SECRET` abgelaufen), bevor ein Test läuft — gemessen in `ci.yml:483-487`, Secret-Namen in `ci.yml:385-387` (`STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`). Behebung nur per Rotation im Stripe-Dashboard + GitHub Secrets (ein abgelaufener Key kann sich nicht selbst erneuern, Secrets sind write-only, der Stripe-Tunnel verwaltet keine Keys). Danach `gh run rerun --failed` + CI grün bewachen. Backend (Payout-Date-Bomb, `bca0316`) und Frontend sind bereits grün; der E2E-Rest ist damit der einzige offene CI-Punkt.
+
 ### Bewusst NICHT geändert
 
 
