@@ -101,22 +101,23 @@ export function FtpConnectionRows({rows}: {rows: FtpConnectionRow[]}) {
  * detail, and the photographer's only action is the same either way.
  *
  * The copy states the consequence and points at the guide, and deliberately
- * does **not** promise that setting up the account will succeed. The two
- * buttons are rendered outside this branch on the inbox card, so they are
- * visible here — but whether provisioning actually completes when the
- * deployment has not declared its FTP values is not something this component
- * can know, and an unverified promise is the same failure mode as the dead end
- * it replaces. The guide, by contrast, exists unconditionally and is useful
- * whether or not the account can be created yet.
+ * does **not** promise that setting up the account will succeed. Both actions
+ * are rendered on the inbox card itself, outside this component, so they exist
+ * whether or not the values do — but whether provisioning actually completes
+ * when the deployment has not declared its FTP values is not something this
+ * component can know, and an unverified promise is the same failure mode as the
+ * dead end it replaces. The guide, by contrast, exists unconditionally and is
+ * useful whether or not the account can be created yet.
  *
  * "Contact support" was the original dead end: nobody can fix a server
  * configuration from the outside, so the sentence sent the photographer
  * somewhere they could not act.
  *
  * Located by section heading, never by proximity. This component renders in
- * two places — the inbox card and, through FtpConnectionBlock, inside the
- * guide dialog — and only the inbox carries the buttons. "FTP Inbox" is a
- * heading that is on screen there, so the pointer stays true in both.
+ * two dialogs — the connection dialog on the inbox card and, through
+ * FtpConnectionBlock, the camera guide — and neither carries the buttons; they
+ * sit on the card, whose „FTP Inbox" heading stays on screen behind both, so
+ * the pointer stays true in both.
  */
 export function FtpConnectionUnconfigured() {
     return (

@@ -193,7 +193,7 @@ verschoben.
 
 Der Default ist die **richtige** Form für einen Dialog, der passt. Ein
 Default-Wechsel ist hier keine Verbreitung einer Verbesserung, sondern das
-Verschieben einer Grenze unter **alle 28 Dialoge**, die durch diese Shells
+Verschieben einer Grenze unter **alle 29 Dialoge**, die durch diese Shells
 rendern (§6), und das an einem Tag. Drei Gründe dagegen:
 
 - **Der Default ist für einen passenden Dialog korrekt.** Header, Body und
@@ -220,7 +220,7 @@ rendern (§6), und das an einem Tag. Drei Gründe dagegen:
   aufgefallen: als der Body zur Scrollregion wurde, beschrieb die auf der Box
   verbliebene Ausblendung ein Band, unter dem nichts mehr durchlief, und der
   Hinweis zeigte ins Leere. Der Fix hat Maske und Scrollport gemeinsam auf den
-  Body verschoben. Ein Default-Wechsel müsste diese Verschiebung für alle 28
+  Body verschoben. Ein Default-Wechsel müsste diese Verschiebung für alle 29
   Dialoge auf einmal leisten, statt sie pro Dialog zu entscheiden.
 
 Der Preis des Defaults wäre also eine sichtbare Änderung überall, um die
@@ -315,7 +315,7 @@ Antwort auf den Wrapper, den `ModelInviteDialog` sonst nur für
 sitzt auf der Box, die die Shell ohnehin rendert, und ohne Wert rendert die Box
 kein `data-testid` — die übrigen Dialoge bleiben byte-gleich.
 
-### 6.2 Gruppe A — über die Shells: 28
+### 6.2 Gruppe A — über die Shells: 29
 
 | # | Dialog | Shell | `scrollableBody` | Datei |
 |---|---|---|---|---|
@@ -343,13 +343,14 @@ kein `data-testid` — die übrigen Dialoge bleiben byte-gleich.
 | 22 | Nutzer bearbeiten | `ModalShell` | nein | `ui/management/components/UserPermissionsModal.tsx` |
 | 23 | Volume-Preset | `ModalDialogShell` | nein | `ui/management/components/VolumePresetSettingsCard.tsx` |
 | 24 | Kamera einrichten | `ModalShell` | ja | `ui/management/ManagementFtpInbox.tsx` |
-| 25 | Angebot kalkulieren & senden | `ModalShell` | nein | `ui/management/ManagementOrdersView.tsx` |
-| 26 | Nutzer in Organisation einladen | `ModalDialogShell` | nein | `ui/management/ManagementOrgDetailView.tsx` |
-| 27 | Organisation anlegen | `ModalDialogShell` | nein | `ui/management/ManagementOrgsView.tsx` |
-| 28 | Auftrag anlegen/bearbeiten | `ModalDialogShell` | nein | `ui/photographer/components/PhotoJobModal.tsx` |
+| 25 | Kamera-Verbindung | `ModalShell` | nein | `ui/management/ManagementFtpInbox.tsx` |
+| 26 | Angebot kalkulieren & senden | `ModalShell` | nein | `ui/management/ManagementOrdersView.tsx` |
+| 27 | Nutzer in Organisation einladen | `ModalDialogShell` | nein | `ui/management/ManagementOrgDetailView.tsx` |
+| 28 | Organisation anlegen | `ModalDialogShell` | nein | `ui/management/ManagementOrgsView.tsx` |
+| 29 | Auftrag anlegen/bearbeiten | `ModalDialogShell` | nein | `ui/photographer/components/PhotoJobModal.tsx` |
 
-15 über `ModalShell` direkt, 13 über `ModalDialogShell`. Davon **10** mit
-`scrollableBody` (Nr. 1, 5, 7, 11, 14, 15, 16, 19, 21, 24), 18 im
+16 über `ModalShell` direkt, 13 über `ModalDialogShell`. Davon **10** mit
+`scrollableBody` (Nr. 1, 5, 7, 11, 14, 15, 16, 19, 21, 24), 19 im
 Default-Layout. Keine handgerollte begrenzte Box mehr, siehe §6.3. Der Zähler
 ist aus der `ja`-Spalte dieser Tabelle reproduzierbar (Repo-Root):
 `grep -E '^\| [0-9]+ \|' features/tech/08-dialog-height-contract.md | grep -c '| ja |'`
@@ -392,13 +393,15 @@ gegen `HEAD` (`161dc9e`) nachgerechnet und geht auf:
 | Stand | über die Shells | eigenes `modal-box` | Summe |
 |---|---|---|---|
 | `HEAD` | 18 | 11 | 29 |
-| Arbeitsstand | 28 | 0 | 28 |
+| Arbeitsstand | 29 | 0 | 29 |
 
 Die 18 waren die Aufrufstellen von `ModalShell`/`ModalDialogShell` in `HEAD`,
-abzüglich des internen Aufrufs in `ModalDialogShell` selbst. Danach kamen zwei
-Veränderungen: die elf Dialoge aus §5 sind dazugekommen (+11), und
+abzüglich des internen Aufrufs in `ModalDialogShell` selbst. Danach kamen drei
+Veränderungen: die elf Dialoge aus §5 sind dazugekommen (+11),
 `frontend/src/ui/client/components/LicenseSelectorModal.tsx` wurde gelöscht,
-ohne Ersatz (−1) — der Pfad existiert nicht mehr. 18 + 11 − 1 = 28.
+ohne Ersatz (−1) — der Pfad existiert nicht mehr —, und der neue
+Kamera-Verbindung-Dialog in `ManagementFtpInbox.tsx` kam hinzu (+1).
+18 + 11 − 1 + 1 = 29.
 
 Wer diese Zahl künftig zitiert, muss sie gegen
 `grep -rnE '<Modal(Shell|DialogShell)' frontend/src` neu zählen. Die Liste oben

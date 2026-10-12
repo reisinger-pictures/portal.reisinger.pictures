@@ -124,6 +124,7 @@ export default function ManagementFtpInbox() {
     const [newPassword, setNewPassword] = useState<string | null>(null);
     const [passwordNotice, setPasswordNotice] = useState<string | null>(null);
     const [showGuide, setShowGuide] = useState(false);
+    const [showConnection, setShowConnection] = useState(false);
     const { showToast } = useUI();
 
     if (isLoading || !status) return <div className="p-4"><span className="loading loading-spinner"></span></div>;
@@ -205,20 +206,23 @@ export default function ManagementFtpInbox() {
 
                 <div className="divider my-2"><Trans>Kamera-Verbindung</Trans></div>
 
-                {connectionRows.length === 0 ? (
-                    <FtpConnectionUnconfigured />
-                ) : (
-                    <>
-                        <FtpConnectionRows rows={connectionRows} />
-                        <FtpsHint
-                            sftpPort={status.connection.sftp_port}
-                            ftpsPort={status.connection.ftps_port}
-                            tlsMode={status.connection.ftps_tls_mode}
-                        />
-                    </>
-                )}
-
-                <div className="mt-3">
+                {/* The connection values are reference material, not landing-page
+                    content: the photographer opens them when the camera asks for
+                    them, and the card stays scannable for the queue, the account
+                    and the target gallery. Both actions stay on the card — the
+                    unconfigured notice names „Anleitung öffnen" as the way to
+                    the guide, so that button has to be reachable without opening
+                    a dialog first. `flex-wrap` keeps the two long German labels
+                    from overflowing a phone (D-9). */}
+                <div className="flex flex-wrap gap-2 mt-3">
+                    <button
+                        type="button"
+                        onClick={() => setShowConnection(true)}
+                        data-testid="ftp-connection-button"
+                        className="btn btn-sm btn-outline"
+                    >
+                        <span className="iconify mdi--information-outline text-lg"></span> <Trans>Verbindungsinformationen anzeigen</Trans>
+                    </button>
                     <button
                         type="button"
                         onClick={() => setShowGuide(true)}
@@ -227,6 +231,37 @@ export default function ManagementFtpInbox() {
                         <span className="iconify mdi--book-open-variant text-lg"></span> <Trans>Anleitung öffnen</Trans>
                     </button>
                 </div>
+
+                {showConnection && (
+                    // Same data source and same branch as the inline block this
+                    // replaced — only the place changed. `testId` addresses the
+                    // box the shell owns (D-18). `maxWidth="2xl"` is the wide end
+                    // of the two-state width prop (D-13), and the value column
+                    // needs it: host, port range and path are single unbreakable
+                    // mono tokens. No `autoFocus` inside — a dialog that only
+                    // shows values starts on the shell's labelled close button
+                    // (D-12).
+                    <ModalShell
+                        title={<Trans>Kamera-Verbindung</Trans>}
+                        icon="mdi--server-network-outline"
+                        onClose={() => setShowConnection(false)}
+                        maxWidth="2xl"
+                        testId="ftp-connection-dialog"
+                    >
+                        {connectionRows.length === 0 ? (
+                            <FtpConnectionUnconfigured />
+                        ) : (
+                            <>
+                                <FtpConnectionRows rows={connectionRows} />
+                                <FtpsHint
+                                    sftpPort={status.connection.sftp_port}
+                                    ftpsPort={status.connection.ftps_port}
+                                    tlsMode={status.connection.ftps_tls_mode}
+                                />
+                            </>
+                        )}
+                    </ModalShell>
+                )}
 
                 {showGuide && (
                     // Largest available dialog with a scrollable body: the guide is
