@@ -11,6 +11,7 @@ use App\Models\PhotographerStatement;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\PayoutCalculationService;
+use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,12 @@ class PayoutNaturalKeyTest extends TestCase
     {
         parent::setUp();
         config(['scout.driver' => 'null']);
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_v040_installs_unique_indexes_for_pool_and_statement_natural_keys(): void
@@ -312,12 +319,23 @@ class PayoutNaturalKeyTest extends TestCase
             'gallery_id' => $gallery->id,
             'user_id' => $photographer->id,
         ]);
-        DownloadLog::create([
+        // created_at is not in DownloadLog::$fillable, so it cannot be passed to
+        // create() — Eloquent would silently drop it and stamp now() instead. The
+        // timestamp is pinned afterwards via the query builder, the same idiom
+        // PayoutCalculationServiceTest::logDownload() documents. Freezing now()
+        // ahead of the insert, and deliberately OUTSIDE the September window, keeps
+        // that pin load-bearing: if the timestamp ever falls back to now() again,
+        // the log leaves the window, no PhotographerStatement is produced, and this
+        // test fails loudly instead of passing by luck of the calendar date.
+        Carbon::setTestNow(Carbon::create(2026, 10, 5, 9, 0, 0));
+        $log = DownloadLog::create([
             'user_id' => User::factory()->create()->id,
             'gallery_id' => $gallery->id,
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
             'photo_count' => 1,
+        ]);
+        DownloadLog::query()->whereKey($log->getKey())->update([
             'created_at' => '2026-09-15 12:00:00',
         ]);
 
