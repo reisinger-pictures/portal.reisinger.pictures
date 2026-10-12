@@ -23,6 +23,13 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
  * No `page.goto` for navigation: the guide is reached by clicking the button in the
  * inbox card, which is also the user path that button exists for.
  *
+ * The connection values live behind a second button on the same card, and they
+ * are asserted through the same stub: the E2E stack's own environment declares
+ * host and the two ports but neither the passive range nor the TLS mode, so the
+ * stub is the only place where a *fully* declared connection exists. That is
+ * also where a hardcoded port in the component would be caught — a dialog that
+ * quotes values the server never sent fails here.
+ *
  * @feature:ftp
  */
 
@@ -86,10 +93,22 @@ test.describe('Kamera einrichten: Anleitung und Zugangsdaten', () => {
         const main = page.getByRole('main');
         const cameraSection = main.locator('.card').filter({ hasText: 'Kamera-Verbindung' });
         await expect(cameraSection.getByRole('button', { name: 'Anleitung öffnen' })).toBeVisible();
+        await expect(cameraSection.getByTestId('ftp-connection-button')).toBeVisible();
 
-        // The inbox card is the same data source; if it shows the stub, the
-        // response is really being used.
-        await expect(cameraSection.locator('td', { hasText: 'sftp.example.invalid' })).toBeVisible();
+        // The connection values are no longer inline on the card: they live
+        // behind the button, so nothing on the landing page could quote a port
+        // the server stopped listening on.
+        await expect(cameraSection.locator('table')).toHaveCount(0);
+        await expect(cameraSection.getByText('sftp.example.invalid')).toHaveCount(0);
+
+        // The dialog is the same data source; if it shows the stub, the response
+        // is really being used.
+        await cameraSection.getByTestId('ftp-connection-button').click();
+        const connectionDialog = page.getByRole('dialog', { name: 'Kamera-Verbindung' });
+        await expect(connectionDialog).toBeVisible();
+        await expect(connectionDialog.locator('td', { hasText: 'sftp.example.invalid' })).toBeVisible();
+        await connectionDialog.getByRole('button', { name: 'Schließen' }).click();
+        await expect(connectionDialog).toHaveCount(0);
 
         await cameraSection.getByRole('button', { name: 'Anleitung öffnen' }).click();
 
@@ -118,6 +137,57 @@ test.describe('Kamera einrichten: Anleitung und Zugangsdaten', () => {
         await expect(dialog).toHaveCount(0);
     });
 
+    test('opens every connection row in the dialog and closes it with Escape', { tag: ['@feature:ftp'] }, async ({ page, request }) => {
+        helper = new E2ESessionHelper(request);
+        const testUser = await helper.createIsolatedUser('photographer');
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        await stubStatus(page);
+        await auth.login(testUser.email, testUser.password);
+        await sidebar.navigateTo('Dashboard');
+
+        const main = page.getByRole('main');
+        const cameraSection = main.locator('.card').filter({ hasText: 'Kamera-Verbindung' });
+
+        // Nothing of the connection is inline before the click — that is the
+        // whole point of the move.
+        await expect(cameraSection.locator('table')).toHaveCount(0);
+
+        await cameraSection.getByTestId('ftp-connection-button').click();
+
+        const dialog = page.getByRole('dialog', { name: 'Kamera-Verbindung' });
+        await expect(dialog).toBeVisible();
+
+        // Every declared row, scoped by its label. The row-scoped assertions
+        // are what keep a hardcoded copy of these values in the component red.
+        const row = (label: string) => dialog.locator('tr').filter({ hasText: label });
+        for (const label of [
+            'Server',
+            'Benutzername',
+            'SFTP-Port',
+            'FTPS-Port',
+            'FTPS-Verschlüsselung',
+            'Passiver Bereich (Firewall)',
+            'Zielordner',
+        ]) {
+            await expect(row(label)).toHaveCount(1);
+        }
+        await expect(row('Server').locator('td').nth(1)).toHaveText('sftp.example.invalid');
+        await expect(row('Benutzername').locator('td').nth(1)).toHaveText('e2e-camera');
+        await expect(row('SFTP-Port').locator('td').nth(1)).toHaveText('2222');
+        await expect(row('FTPS-Port').locator('td').nth(1)).toHaveText('989');
+        await expect(row('FTPS-Verschlüsselung').locator('td').nth(1)).toHaveText('explicit');
+        await expect(row('Passiver Bereich (Firewall)').locator('td').nth(1)).toHaveText('50000–50100');
+        await expect(row('Zielordner').locator('td').nth(1)).toHaveText('/');
+
+        // Escape is the shell's contract (ModalShell), not this dialog's special
+        // case, and closing returns focus to the button that opened it.
+        await page.keyboard.press('Escape');
+        await expect(dialog).toHaveCount(0);
+        await expect(cameraSection.getByTestId('ftp-connection-button')).toBeFocused();
+    });
+
     test('warns instead of showing a value table when the server is not configured', { tag: ['@feature:ftp'] }, async ({ page, request }) => {
         helper = new E2ESessionHelper(request);
         const testUser = await helper.createIsolatedUser('photographer');
@@ -136,10 +206,14 @@ test.describe('Kamera einrichten: Anleitung und Zugangsdaten', () => {
         await sidebar.navigateTo('Dashboard');
 
         const cameraSection = page.getByRole('main').locator('.card').filter({ hasText: 'Kamera-Verbindung' });
-        await expect(cameraSection.getByText('Verbindungsdaten der Kamera nicht verfügbar')).toBeVisible();
-        // No half-filled table: an empty port cell is what a photographer pastes
-        // into a camera.
-        await expect(cameraSection.locator('table')).toHaveCount(0);
+
+        // The notice moved into the dialog together with the table — an empty
+        // port cell is what a photographer pastes into a camera, so the
+        // unconfigured state must not render a half-filled table either.
+        await cameraSection.getByTestId('ftp-connection-button').click();
+        const dialog = page.getByRole('dialog', { name: 'Kamera-Verbindung' });
+        await expect(dialog.getByText('Verbindungsdaten der Kamera nicht verfügbar')).toBeVisible();
+        await expect(dialog.locator('table')).toHaveCount(0);
     });
 
     test('requests credentials, shows the password once, and can dismiss it', { tag: ['@feature:ftp'] }, async ({ page, request }) => {

@@ -6738,6 +6738,10 @@ msgstr "Verbindung ok, aber 0 Bilder in der Warteschlange"
 msgid "Verbindungsdaten der Kamera nicht verfügbar"
 msgstr "Verbindungsdaten der Kamera nicht verfügbar"
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Verbindungsinformationen anzeigen"
+msgstr "Verbindungsinformationen anzeigen"
+
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Verbraucher haben bei Verträgen über digitale Inhalte und Fotoprodukte das folgende gesetzliche Widerrufsrecht."
 msgstr "Verbraucher haben bei Verträgen über digitale Inhalte und Fotoprodukte das folgende gesetzliche Widerrufsrecht."
