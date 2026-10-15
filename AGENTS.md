@@ -449,7 +449,10 @@ entscheiden".
   `App\Support\FtpInboxDirectory::ensure()`. **Reihenfolge: Ordner zuerst, Konto danach.** Die
   SFTPGo-Admin-API hat kein Rollback für einen angelegten User, also ist „Konto zuerst" die
   Reihenfolge, die den verbotenen Zustand erzeugen *kann*; „Ordner zuerst" hinterlässt im
-  Fehlerfall höchstens ein leeres Verzeichnis, das der nächste `ensure()` wiederverwendet.
+  Fehlerfall höchstens ein leeres Verzeichnis, das der nächste `ensure()` wiederverwendet. **Testdesign-Lehre dazu:** die Fehlersimulation ist
+bewusst `ENOENT` über einen nicht existierenden Elternpfad mit nicht-rekursivem `mkdir`, **nicht**
+`chmod` — CI fährt die Suite als **root**, dort wird ein `chmod`-Fixture ignoriert und der Test
+wäre aus dem falschen Grund grün.
 - **D-3 — Branch-Protection für `main`:** **bewusst nicht gesetzt.** *Warum:* Owner-Entscheidung.
   `GET /branches/main/protection` → `404 Branch not protected`; der `CI gate (push)` läuft grün,
   erzwingt sich aber selbst nicht. Trust-Frage an der Repo-/Org-Einstellung, keine Code-Aufgabe.
@@ -699,7 +702,10 @@ entscheiden".
   werden zu 0 ignoriert. Re-Eingeschlossen bleiben `features/infrastructure/**`, `features/ai/**` und
   `features/e2e-test-strategy.md` (33 Dateien). **Verifikation ohne Push:**
   `git diff --name-only <a> <b>` gegen die Doku-Commits `7957393`/`3352977` (werden übersprungen) und
-  den Code-Commit `c0744a4` (läuft); Job-/Step-Bestand byte-gleich (5 Jobs, 49 Schritte).
+  den Code-Commit `c0744a4` (läuft); Job-/Step-Bestand byte-gleich (5 Jobs, 49 Schritte). **Messfalle, die beim Verifizieren selbst Zeit
+kostete:** `gh run list --commit` nimmt eine **vollständige** SHA. Mit einer Kurz-SHA liefert es
+*null* Runs — das liest sich als „CI lief nie" und ist es nicht: `07b513c` hatte unter voller SHA
+Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA verwenden.
   **Die latente Falle, die ein unabhängiger Verifier fand:** `automerge.yml:98` wartet auf
   `'CI gate (push)'` mit `fail-on-no-checks: true` und `timeout-minutes: 65` — ein gefilterter,
   nie meldender Check lässt den Job bis zum Timeout hängen und dann fail-closed. Heute unerreichbar,

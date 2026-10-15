@@ -65,113 +65,24 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 
 ### Stand
 
-- [x] **D-3 — Branch-Protection für `main` bleibt aus.** Entscheidung ist die Entscheidung;
-      keine Aktion. Das fehlende Gate darf in keinem Audit als Befund aufgerollt werden.
-- [x] **D-4 — `.env.production` bleibt unverschlüsselt und unrotiert.** Keine Aktion, kein
-      Repo-Risiko. Steht als akzeptiertes Risiko in `AGENTS.md` §14/D-4.
-- [x] **D-5 — die Speicherwarnung gilt dem Deploy-Host.** Die Unterscheidung ist gemessen
-      (dev-Host 3 % / 477 GB frei, Deploy-Host 97 % / 12 GB frei) und in D-1 verlinkt.
-- [x] **D-14 — Escape und Backdrop lösen in `CouponFormDrawer` die Ungespeichert-Warnung aus.**
-      Das Verhalten ist bereits so (`CouponFormDrawer.tsx:210-213` beschreibt, dass die Shell
-      Kopf-Button, Backdrop, Escape und Abbrechen über einen Prop routet); die Entscheidung
-      bestätigt es, sie ändert nichts.
-- [x] **D-15 — Altersnachweis: kein Löschpfad, unbegrenzte Aufbewahrung.** Keine Aktion, die
-      technische Folge ist das Nicht-Bauen.
-- [x] **D-23 — Doku-only Commits überspringen die Pipeline.** Filter in `ci.yml:17-21` (`paths` mit
-      `!`-Rücknahme), Vorbedingung und Verifikation in `AGENTS.md` §14/D-23. Von Implementer und
-      unabhängigem Verifier getrennt bestätigt; die dabei gefundene `automerge.yml`-Falle ist als
-      **Messfalle, die beim Verifizieren selbst Zeit kostete:** `gh run list --commit` nimmt eine
-      **vollständige** SHA. Mit einer Kurz-SHA liefert es *null* Runs — das liest sich als „CI lief
-      nie" und ist es nicht: `07b513c` hatte volle SHA Run `36747358962` (11/11 grün), mit Kurz-SHA
-      sah es nach einem stillen Ausfall des Filters aus. Immer `git rev-parse HEAD` oder die volle SHA.
-      Das ist dieselbe Klasse wie §5.8: erst die Messung prüfen, dann einen Defekt behaupten.
-      Kommentar in `ci.yml` verankert. Die Restlücke (Prosa-Scan) steht als Position darunter.
-- [x] **D-1 — SFTPGo `1002:82`, Backend `1000:82`, Deploy über den Portainer-Editor.**
-      Repo (`c0744a4`, CI 11/11) **und** Host sind durch: Compose-Update im Portainer-Editor am
-      2026-09-30, beide Container neu erzeugt (`1000:82` / `1002:82`, gemessen an `Config.User`),
-      `sync.sh` mit frischem `dist/`, getrennt davon `docker restart portal_backend`, V046 in Batch 23
-      mit Index `gallery_groups_brand_slug_unique`. **Die Kette brauchte den Gruppenweg, nicht die
-      UID** — `/home/webadmin` von `webadmin:webadmin`/`755` auf `webadmin:82`/`2775`, formgleich zu
-      `websites`; der Import-Pfad ist als UID 1000 gegengeprobt (`mkdir`, anlegen, `unlink` **OK**).
-      **Offen bleibt nur die Haltbarkeit:** `portal_backend` wird täglich ~09:20 CEST von außen neu
-      erzeugt, Auslöser nicht auffindbar — siehe die Board-Position darunter.
-- [x] **D-2 — `App\Support\FtpInboxDirectory::ensure()` auf beiden Pfaden, `2775`, Ordner vor
-      Konto.** Slug-Schreibpfad **und** `provisionAndShow()` (sonst entsteht „Konto ohne Ordner"
-      weiter über „Neues Kamera-Passwort"). Reihenfolge begründet: die SFTPGo-Admin-API hat kein
-      Rollback für einen angelegten User, also erzeugt nur „Konto zuerst" den verbotenen Zustand;
-      „Ordner zuerst" hinterlässt höchstens ein leeres Verzeichnis, das `ensure()` wiederverwendet.
-      **Rechte `2775`, und die erste Fassung dieser Anweisung war falsch:** es stand `02755`,
-      beschrieben als `rwx/rws/r-x` — das ist `02775`. `02755` wäre Gruppe `r-s` **ohne**
-      Schreibrecht, und damit wäre `FtpController::process()` mit seinem `unlink($file)` gebrochen.
-      Der umsetzende Agent hat die Zahl nicht befolgt und `02775` gesetzt; vier unabhängige Belege
-      aus dem Repo stützen ihn (`deployment/docker-compose.yml:466`, D-1 im Board, und
-      `verify.sh:563` warnt genau bei `2755`). **Eine Zahl, die eine Funktion kaputtmacht, ist kein
-      Tippfehler, sondern ein Befund** — die Grenze steht jetzt beidseitig im Register.
-      **Nachweis:** `ProvisionFtpFoldersTest` zeigt, dass `--fix-permissions` ein bestehendes
-      `2777`-Verzeichnis **auf** `2775` verengt und das Welt-Schreibrecht entfernt — vorher hätte
-      der Repair-Lauf es auf dem Deploy-Host still ausgeweitet. Sechs Testdateien standen auf einem
-      festen `/var/www/ftp`, den es weder auf macOS noch in CI gibt; sie laufen jetzt über
-      `useTemporaryFtpInboxRoot()`. **Die Fehlersimulation ist bewusst `ENOENT` über einen
-      nicht existierenden Elternpfad mit nicht-rekursivem `mkdir`**, nicht `chmod` — CI fährt die
-      Suite als root, wo ein `chmod`-Fixture ignoriert wird und der Test aus dem falschen Grund
-      grün wäre.
-      **Entschieden (D-22, 2026-09-29): einheitlich 503.** Ein Grund, ein Status — Host-/Config-Fehler
-      wie ein fehlender Mount liest sich wie die SFTPGo-Unerreichbarkeit; 422 bleibt den
-      Portal-Voraussetzungen. Umgesetzt in beiden Pfaden, Gleichheit gepinnt.
-- [x] **D-6 — `API_THROTTLE_LIMIT` steht auf 1000 in `backend/.env.ci`**, mit deutschem
-      Kommentar im Block der übrigen Throttle-Werte; `backend/.env.example` kommentiert
-      englisch, dass 60 der Produktions-Sinnwert ist — jede Datei folgt ihrer eigenen
-      Kommentarsprache. **Bewacht von** `ApiThrottleLimitPolicyTest` (4 Tests): er liest die
-      Datei als Text, prüft die Begründung mit und die Beziehung `ci > example`; driften
-      beide auf densellen Wert, ist die Entscheidung still zurückgenommen. Ein Test auf
-      `config('app.throttle_api')` wäre grün, egal was die Datei enthält.
-      **Rot nachgewiesen:** `.env.ci` auf 60 → 2 failed; `.env.example` auf 1000 → 2 failed.
-      Gate danach grün: 2828 passed, 3 skipped, 0 failed (14457 Assertions).
-- [x] **D-7 — Regel umgesetzt, Bestand auf 0, Build grün.** Wellen: Flip (Exit 1), Regelarbeit −4, `helper-argument` −27, `jsx-attribute` −44, `jsx-text`-Bulk −137; je implementiert und unabhängig verifiziert (148 Dateien / 1396 Tests, `tsc`, ESLint, `pnpm build` Exit 0). Residuen, dokumentiert statt behoben: Einzel-Token-Unterzählung per Design (28 kurze Texte unter dem Netz, 5-mal deutsch) und `NODE_ENV=test`-Fragilität von `lingui extract` im Prebuild; Checker-Lücke camelCase `ariaLabel` als Folgearbeit unten.
-- [x] **D-8 — `admin/` nach Domäne aufgeteilt (34/34 in 11 Subdirs, verifiziert).** Reine Moves,
-  jede geänderte Zeile ein Import-Pfad (138/138, 0 nicht-Import); 83 defs, 162 Tests, Admin-Subtree
-  160+2, Smoke 62/62. Flakes: wysiwyg nicht reproduzierbar (4/4 grün, längst gefixt),
-  `database is locked` als prozessseitiger Zweitschreiber auf der lokalen SQLite-Datei
-    (`database.e2e.sqlite`; MariaDB 11.4 ist nur die CI-Schicht) vermessen (kein Seriell-Fix), Kanban
-  ohne Befund. Verifiziert.
-- [x] **D-9 — Sidebar-Portalname bricht um.** `whitespace-nowrap` → `min-w-0 break-words leading-tight`; E2E misst Geometrie (nicht `scrollWidth`-Idiom, das blind ist). Verifiziert.
-- [x] **D-10 — Dialoge rendern innerhalb von `<main>`.** `<GalleryModals>` in `DashboardLayout` versetzt; Harness unberührt; `DashboardLayout.test.tsx` treibt echte Opens, Nicht-Vakuum empirisch belegt. Verifiziert.
-- [x] **D-11 — benannte Höhe plus `bodyHead`, drei handge-rollte Dialoge mitmigriert.**
-      `ModalShellHeight = '80vh' | '90vh'` mit `BOUNDED_HEIGHT_CLASS` als **statischer**
-      Literal-Tabelle; ein interpoliertes `max-h-${height}` würde Tailwinds Content-Scan nicht
-      überleben, und genau das wäre Compliance, die im Bundle fehlt. `@utility max-h-80vh` /
-      `max-h-90vh` in `index.css`, und `max-h-80vh` kommt im gebauten CSS vor (geprüft in
-      `dist/assets/*.css`). **Ein Slot, kein zwei:** `bodyHead?: ReactNode` ohne separates
-      `pinned`-Flag, weil kein Aufrufer es bräuchte — ungenutztes Boolean-API wäre derselbe
-      Fehler, den D-11 abstellt. Migriert: `GalleryAccessModal`, `PhotographerTeamModal`,
-      `AIBatchEditModal`. **Nicht gestapelt:** die 80vh-Dialoge tragen ihr eigenes festes
-      `h-80vh`, kein `max-h-80vh` — sonst stünden zwei `max-h-*` nebeneinander.
-      Tests: 36 Shell-Unit-Tests, 15 Dialog-Verdrahtungstests, je einer pro Dialog neu
-      (`PhotographerTeamModal.test.tsx` ganz neu). Der Kopf wird geprüft, indem getestet wird,
-      dass er **nicht** im `.overflow-y-auto`-Bereich liegt.
-      **Offen bleibt die visuelle Prüfung** — siehe `manuell prüfen:` unten.
-- [x] **D-12 — React `autoFocus` gewinnt (in `95f0362` umgesetzt, in dieser Welle verifiziert).** Reihenfolge-Entscheidung im Trap + Rückkehr-Zielpunkt vor Mount; 5 Fälle gepinnt; gepinnter Test invertiert. Verifiziert.
-- [x] **D-13 — `maxWidth` auf `'2xl'` eingeschränkt (verifiziert, keine Änderung nötig).** Im Code vorgefunden und in der D-20-Welle verifiziert: `ModalShell.tsx` und `ModalDialogShell.tsx` tippen `maxWidth?: 'default' | '2xl'`, je mit Docblock; `tsc -b` verbietet `'lg'`/`'xl'` an der Aufrufstelle.
-- [x] **D-16 — technische Doku der Stripe-Identifikatoren vervollständigt (verifiziert).**
-  `Privacy.tsx` +6 technisch geerdete Absätze (Hash, Customer-Lifecycle, Gates, Webhook-
-  Telemetry, Session-Bindung, Turnstile-Nichtspeicherung); rechtlicher Teil bleibt benannte
-  Lücke mit Owner. Gepinnt durch `Privacy.test.tsx` (3/3) inkl. No-Retention/No-Artikel-Guard.
-  Verifiziert.
-- [x] **D-17 — beide Policies umgesetzt und verifiziert.** SMTP: erstens Token-Claim
-  (`ActivationTokenService::issue()`, 7 Tests), zweitens Scheduler-Transaktion (Claim vor
-  Enqueue, 3 Tests, gegenbelegt); full suite 2851 grün. Prompt-Injection: umbenannt in
-  `AIServiceUntrustedInputContractTest` + `AIDetectedCityLookupReadOnlyTest` (5 Tests).
-  Verifiziert.
-- [x] **D-18 — `testId` auf beiden Shells; `ModelInviteDialog` ohne Wrapper.** Bei HEAD war das
-      **halb umgesetzt, unter anderem Namen**: `boxTestId` auf `ModalShell`, seit `659a5a5`,
-      und `ModelInviteDialog` nutzte es bereits. D-18 hat den Namen auf `testId` vereinheitlicht
-      und `ModalDialogShell` ergänzt — ein Namens- und ein Abdeckungsbedarf, kein Neuschreiben.
-      `data-testid` landet auf der `.modal-box`, die 7 E2E-Referenzen (3 Assertions,
-      4 Locator-Ketten) scopen unverändert. **Die Zahl 8 im ursprünglichen Board-Eintrag war
-      falsch** und ist durch die gemessene ersetzt.
-- [x] **D-19 — Unit-Testdateien für beide Management-Views (in `d606780` umgesetzt, verifiziert).** 6 + 8 Verhaltenstests, keine Konformitäts-Assertions. Verifiziert.
-- [x] **D-20 — `ModalDialogShell` kennt kein `editing`; der Lösch-Button folgt aus `onDelete`.** Umgesetzt und verifiziert: Footer nur unter `onDelete` (Handler ist `onDelete` — ein Button ohne Handler ist strukturell unmöglich); `GalleryModal`/`GalleryGroupModal` nur bei existierendem Datensatz; toter Button in `VolumePresetSettingsCard` ersatzlos entfallen. 148 Dateien / 1388 Tests, Lint + Build grün.
-- [x] **D-21 — Domänen-`editing` lokal umbenannt (`snippet`/`product`/`customer`/`coupon`/ `project`/`photoJob`).** Externe Props und Aufrufer (`ManagementProjectsBoard.tsx:219`, `PhotographerProductionBoard.tsx:170`) unverändert; Konsequenz gepinnt durch `editingDeleteActionSemantics.test.tsx`. Verifiziert.
+Alle Entscheidungen D-1 bis D-26 sind getroffen. Soweit sie Code erforderten, sind sie **umgesetzt
+und verifiziert** — die Entscheidungen selbst samt Begründung stehen in `AGENTS.md` §14, die
+zurückgezogenen Varianten direkt darunter in „Verworfen".
+
+Dieses Protokoll führt **abgeschlossene** Positionen seit der Bereinigung vom 2026-10-15 nicht
+mehr. Ein `[x]`-Eintrag ist per Board-Hygiene (`AGENTS.md` §3) ein Signal für offene Arbeit und
+wird entfernt, nicht abgehakt: wer nach einem Befund sucht, fände sonst erledigte Arbeit und
+hielte sie für offen. Wer den Umsetzungsstand oder die Belege einer geschlossenen Position
+braucht, findet sie vollständig in `git log` — die Blöcke sind in der Historie erhalten.
+
+Bewusst offen bleiben nur die einzeln geführten Positionen weiter unten; sie tragen `[ ]` mit
+einem konkreten Auftrag oder `[~]` mit der Bedingung, auf die sie warten.
+
+**Zwei Lehren aus den geschlossenen Positionen**, die sonst nirgends stünden: die
+`gh run list --commit`-Messfalle (nur die **volle** SHA liefert Runs, eine Kurz-SHA liest sich als
+„CI lief nie") steht in `AGENTS.md` §14/D-23, die `ENOENT`-statt-`chmod`-Testdesign-Lehre (CI läuft
+als root, ein `chmod`-Fixture wird dort ignoriert) in §14/D-2.
+
 ### Verworfen — nicht erneut implementieren
 
 Zurückgezogen am 2026-09-28, ergänzt am 2026-10-15 (D-24, D-25). Der Owner hat jede dieser
@@ -861,13 +772,6 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
 **Zusätzlich gestartete aktive Teilaufgaben:**
 **Read-only Implementierungs-Audit (2026-09-25; Testquellen vorhanden, Ausführung/Verifier offen):**
 - [~] wartet auf den Abschluss der A7-Subblöcke — R1–R7 sind verifiziert, übrig sind Operations-Evidenz und Product Decisions. **P1-A7 Audit-Split (2026-09-25):** P1-A6 bleibt separat verifiziert. A7 ist in aktive Bugs (malformed provider response, image byte/pixel budget, session-prefix/header validation, manual delete ordering, scheduled cleanup durability, unchecked temp deletion, quote mail-loss), Operations-Evidence (queue/mail/worker/scheduler), Product Decisions (Prompt-Injection, SMTP duplicate policy) und stale/fixed Source-Punkte aufgeteilt. Keine pauschale A7-Schließung.
-- [ ] manuell prüfen: in `https://github.com/orgs/reisinger-pictures/packages/container/package/portal-base` → Settings → Change visibility → **Public** (analog `portal-e2e`). Abnahme: anonymer Manifest-Fetch liefert **200** statt 401, bei unveränderten Digests (`portal-base:8.5@sha256:d762d47c…`). Der E2E-Job zieht sein Image auf Job-Ebene, ein Registry-Login kommt dort zu spät — es bleibt nur `public`. **GHCR-Pakete public schalten (Owner-Aktion, 2026-09-25):** `portal-base` und `portal-e2e` im Org-Namespace sind `private`. Der Namespace-Fix ist committed, aber **die Sichtbarkeit kann nicht per CLI geändert werden** — `PATCH /orgs/reisinger-pictures/packages/container/<pkg>` liefert mit Token-Scopes `read:packages,write:packages,admin:org` ein generisches `404 Not Found` ohne Docs-Anker, während `GET` das Paket liefert und ein nicht existierender Name `{"message":"Package not found."}` ergibt ⇒ die Update-Route fehlt für diesen Token, es liegt nicht an den Scopes.
-  - **Manuell als Org-Admin:** `https://github.com/orgs/reisinger-pictures/packages/container/package/portal-base` → Settings → Change visibility → Public; analog `portal-e2e`.
-  - **Abnahme:** anonymes Manifest-Fetch liefert `200` (aktuell `401`) **und** die gepinnten Digests bleiben unverändert — `portal-base:8.5@sha256:d762d47c…`, `portal-e2e@sha256:<neu nach Rebuild>`.
-  - **Nicht blockierend:** beide Pakete sind mit `reisinger-pictures/portal.reisinger.pictures` verknüpft, die CI zieht sie mit ihrem `GITHUB_TOKEN`. Public erspart nur dem Deployment-Host Credentials. Vor `docker compose pull` also kein Showstopper.
-  - **⚠️ KORREKTUR 2026-09-25 — ist DOCH blockierend, für die gesamte CI:** Der obige Satz war falsch. Die CI hat **keinen** Registry-Login und läuft bewusst ohne `packages`-Scope; `ci.yml:17-24` dokumentiert das als Least-Privilege-Design („pulled anonymously from public GHCR“). Nach dem Namespace-Umstieg auf `reisinger-pictures/*` in `d7f3596` sind beide Pakete privat, damit bricht der Pull ab. Beleg aus CI-Lauf `36168928448` (Job `108183657407`, ~17 s, dann Abbruch): `Unable to find image … locally` + `docker: … /v2/reisinger-pictures/portal-base/manifests/sha256:d762d47c…: unauthorized` + `##[error]Process completed with exit code 125.` Die Steps „Prepare environment“, „Install dependencies“, „Generate app key“ und „Run PHPUnit“ fehlen im Log vollständig — PHPUnit startete nie.
-  - **Warum kein Login-Step als Alternative:** Der `backend`-Job zieht sein Image in einem Step, dort würde ein `docker/login-action` + `packages: read` helfen. Der `e2e`-Job nutzt aber `container:` auf **Job-Ebene** (`ci.yml:226`); dieses Image pullt der Runner, **bevor** der erste Step läuft. Ein Login kommt dort zu spät — es bleibt nur `public` oder eine strukturelle Umbau-Umstellung des E2E-Jobs.
-  - **Reihenfolge:** Pakete public schalten → neuer Push → E2E-Jobs müssen wieder laufen. Der Backend-Job ist erst danach verwertbar prüfbar. Vorher ist jeder weitere Push ein bekannter roter Lauf, deshalb ist der Namespace-Fix bewusst **noch nicht** erneut gepusht.
 **Checkout-Verifier-Blocker (Implementierung 2026-09-25; unabhängige Verifikation folgt):**
 - Immediate-Stripe-Replay verlangt jetzt eine explizite, passende aktive Brand; die Null-/Fingerprint-Legacy-Lookups wurden aus dem positiven Claim-Pfad entfernt. Regressionen für Null-Brand/PI-Exact-Key, Lock-Timeout und Unique-Constraint-Race sind deterministisch und ohne Sleeps umgesetzt.
 - Invoice-Mail nutzt den bestehenden `invoice_snapshots`-JSON-Vertrag als nicht ablaufenden Enqueue-Claim (`InvoiceSnapshot::MAIL_DISPATCH_KEY`) und eine transaktionale Queue-Claim-Schicht. Das ist ausdrücklich **at-most-once durable enqueue**, nicht exactly-once SMTP delivery. Queue-/Marker-Fehler vor dem Commit rollieren den Claim zurück und sind retrybar; Worker-/SMTP-Fehler können mehrfach versucht werden, ein terminaler Job bleibt in `failed_jobs` und verhindert eine automatische zweite Enqueue. Production mit nicht-transaktionaler Queue wird fail-closed abgewiesen. Keine V039+-Migration; der Marker wird aus öffentlichen Snapshot-Resources entfernt.
@@ -1253,22 +1157,6 @@ getrennt.
 
 ---
 
-- [ ] manuell prüfen: **V046 ausdeployen** — `gallery_groups.slug` wird von global
-  unique auf unique per `(brand, slug)` umgestellt (Migration
-  `V046__gallery_group_slug_unique_per_brand.php`, Frontier und Zustand ausschließlich
-  in `features/tech/07-architectural-decisions.md` AD-2). **Aus drei Gründen Handarbeit
-  und nicht automatisiert:** (1) `sync.sh` führt keine Migration aus (§13), der Deploy
-  überträgt nur Code; (2) die Migration ist **nie auf MySQL/MariaDB gelaufen** — lokal
-  war kein Server verfügbar, verifiziert wurden Index-Form, `up`, `down`, erneutes
-  Anwenden und beide Preflight-Fehler ausschließlich auf SQLite gegen eine befüllte
-  Kopie; (3) sie verändert die Eindeutigkeitsbedingung einer Live-Tabelle, und
-  `down()` verweigert das Zurückrollen, sobald zwei Marken einen Slug teilen — dieser
-  Zustand ist mit `UNIQUE(slug)` nicht darstellbar. **Vor dem Deploy:** `docker exec
-  portal_backend php artisan migrate:status` (Soll aktuell 45 `Ran`, 0 `Pending`, V046
-  `Pending`) und ein Backup, weil `up()` bei Kollisionen abweist statt aufzulösen.
-  **Danach:** `brand`-Spalte auf NULL prüfen — `(brand, slug)` erfasst NULL-Marken nicht,
-  und die alte globale Eindeutigkeit entfällt mit; die Migration lässt solche Zeilen
-  bewusst unangetastet.
 
 ## 🟡 OFFEN (Future) — pricing_strategy als Brand-Setting
 
@@ -1625,7 +1513,6 @@ gerissen und zur Entscheidung gemacht.
 - [ ] **Position 2 — Der Bump steht nicht allein (Dreiklang, eine Position):** `deployment/Dockerfile.e2e:30` trägt `ARG PLAYWRIGHT_VERSION=1.62.1`, ebd. `:69` installiert den Browser exakt dafür (`npx playwright@… install chromium`), und `.github/workflows/e2e-image.yml:41` extrahiert die Version aus `package.json` und übergibt sie als Build-Arg (auch als Image-Tag). Alle drei Stellen müssen gemeinsam bewegt werden — sonst läuft ein **grüner Job mit falschem Browser**.
   - *Notiz 2026-10-04 (Skills-Range `aad25d14..6629ad2`, Skill `node-deps`, neuer Absatz „Boundary: manifests vs images"):* benennt exakt diesen Mechanismus — eine Caret-Range, eingelesen in einen Build-Arg, ergibt die **Untergrenze der Range, nicht die aufgelöste Lockfile-Version**. Schärft die Position, ersetzt sie nicht: Der Range-Bump propagiert per `:41`-Extraktion (entfernt `^`) automatisch ins CI-Image, aber der `ARG`-Default in `:30` muss weiterhin von Hand mitbewegt werden (zählt nur für lokale Builds; CI übergibt via `build-args`). Über ein automatisches Nachziehen des `ARG`-Defaults sagt der Absatz nichts — der Dreiklang bleibt Handarbeit.
 - [ ] **Position 3 — Die E2E-Matrix ist das Muster, das Named Locks ersetzen:** `.github/workflows/ci.yml:374-380` definiert sieben Einträge — Desktop 1/3 (`:374`, `--workers=2`), **Desktop 2/3 (`:375`, `--workers=1`)**, Desktop 3/3 (`:376`, `--workers=2`), Mobile 1/3 (`:377`, `--workers=2`), **Mobile 2/3 (`:378`, `--workers=1`)**, Mobile 3/3 (`:379`, `--workers=2`) plus seriellen Eintrag (`:380`, `slug: kanban`, `--workers=1` mit `--grep` statt `--grep-invert` auf `projects-board|production-board|project-clear-fields|brand-settings|billing-details`). Budgets daneben: `frontend/playwright.config.ts:30-31` (`timeout: 120000`, `globalTimeout: 1500000`).
-- [ ] **Position 4 — GHCR-Blocker: Board-Annahme „private" ist stale, Blocker aufgelöst:** `gh api orgs/reisinger-pictures/packages?package_type=container` meldet am 2026-10-04 **`portal-base public` und `portal-e2e public`**; anonymer Token-Manifest-Fetch liefert für beide **HTTP 200**. (Direkter anonymer Fetch ohne Token-Antwort → 401 ist GHCR-Normalverhalten per Token-Exchange, kein Privatheits-Beleg.) Der bekannte Fehlermodus aus Skill `ghcr-visibility` (Job-level `container:` in `.github/workflows/ci.yml:335` pullt vor dem ersten Step, Login käme zu spät, Exit 125 ohne Steps im Log) greift damit nicht mehr — der nächste Push zeigt, ob Backend-/E2E-Jobs wieder ziehen.
 - [ ] **Position 5 — `cancel-in-progress` weiterhin konfiguriert:** `.github/workflows/ci.yml:54-56` (`concurrency: group … / cancel-in-progress: true`) **vernichtet den Log eines laufenden Laufs**, sobald gepusht wird. Beim Debuggen nicht währenddessen pushen; ein abgebrochener Log sieht aus wie ein nie gelaufener Job.
 
 ---
