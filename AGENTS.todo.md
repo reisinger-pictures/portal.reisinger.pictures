@@ -211,6 +211,8 @@ Varianten gesehen und verworfen; die geltende Regel steht in `AGENTS.md` §14.
 | D-17 | beide Policies bündeln, oder beide als akzeptiertes Risiko | zwei Systeme, zwei Reviewer; „bewusst offen" wäre begründungspflichtig |
 | D-24 | `frontend/.env.local` → `.env.development.local` umbenennen | strukturell robuster (kein zweiter Ablageort für den Live-Key) — der Owner hat die zusätzliche Datei `.env.production` gewählt |
 | D-25 | beide Live-Secrets rollen (Key per Zwischenablage übergeben, Endpunkt neu anlegen, damit sein `whsec` nie durch den Chat läuft) | Owner: der Provider fährt ZDR, also kein Aufbewahrungsrisiko; ein Roll wäre Zeremonie mit Ausfallfenster bis der neue Wert in Stack 23 steht |
+| D-26 | Prüfung 5 umgebungsabhängig machen — fehlender Webhook-Endpunkt = `warn` in local/testing, `fail` in production | eine Prüfung mit zwei Bedeutungen verliert die Eindeutigkeit von „rot heißt kaputt"; der Ist-Zustand ist auch lokal ein Befund, kein Sonderfall |
+| D-26 | den Webhook-Endpunkt im E2E per `page.route` mocken und so einen komplett grünen Zustand assertieren | der grüne Assert wäre dann ein Test der Darstellung statt der Verbindung; die D-24-Klasse (falscher Modus im Bundle) bliebe allein ungemockt geprüft. Der Zweig-Test gehört in PHPUnit, wo ein gefakter Client ihn deterministisch erzeugt |
 
 **Zurückgezogen heißt nicht vergessen:** Wenn jemand eine dieser Varianten erneut vorschlägt,
 ist die Frage nicht „ist das besser?", sondern „ist D-x überholt?" — und dann wird **D-x in
@@ -1696,7 +1698,7 @@ Die Betriebs-Fakten (drei Werte, Konto, Endpunkt-ID, vier Events, die drei Falle
 - [ ] **offen, bewusst:** ein Build-Gate, das einen Prod-Build mit `pk_test` fail-closed abbricht
   (analog `frontend/scripts/check-turnstile-build.mjs`). Ohne es schützt allein die Prüfzeile aus D-24.
 
-## 🔍 Stripe-Selbsttest im Super-Admin (Idee 2026-10-15, Umfang entschieden)
+## 🔍 Stripe-Selbsttest im Super-Admin (umgesetzt 2026-10-15)
 
 > Anlass: der Kontowechsel oben hat zwei Fehlerklassen gezeigt, die **von außen unsichtbar** sind —
 > ein `pk_test`-Bundle bei `sk_live`-Backend (D-24) und einen **abgelaufenen** Key
@@ -1708,6 +1710,16 @@ Die Betriebs-Fakten (drei Werte, Konto, Endpunkt-ID, vier Events, die drei Falle
 > Setting-Zeile. Vorbild ist der SMTP-Test: `POST /api/management/settings/test-email` →
 > `MailController::sendTest`, UI-Karte in `ManagementSettingsView.tsx`
 > (`data-testid="send-test-email"`), Tests in `MailTestControllerTest`.
+>
+> **D-26 (Owner, interaktiv 2026-10-15):** Prüfung 5 bleibt streng, und die E2E-Spec assertiert nur die
+> vier umgebungsdeterministischen Befunde. *Warum:* gemessen am 2026-10-15 hat der **Test**-Modus
+> **0** Webhook-Endpunkte —
+> `curl -sS -H "Authorization: Bearer $STRIPE_SECRET" 'https://api.stripe.com/v1/webhook_endpoints?limit=100'`
+> → `"data": []`. Prüfung 5 ist im E2E-Lauf also zwangsläufig rot, und das ist der gemessene
+> Ist-Zustand, kein Defekt; den Test-Modus-Endpunkt legt nur der lokale Tunnel ad hoc an. Der
+> Zweig-Test der Prüfung 5 (fehlend / `disabled` / unvollständige Events) liegt deshalb in PHPUnit,
+> wo ein gefakter Client ihn deterministisch erzeugt. Die zwei abgelehnten Auswege stehen in der
+> „Verworfen"-Tabelle.
 
 **Fünf Prüfungen, alle mit dem heutigen eingeschränkten Live-Key als machbar gemessen (HTTP 200):**
 
@@ -1731,18 +1743,23 @@ Render-Pfad (keine Stripe-Aufrufe beim Seitenaufbau). Fehlermeldungen aus 3–5 
 `more_permissions_required` benennt die fehlende Berechtigung selbst, das ist wertvoller als ein
 eigener Text.
 
-- [ ] Backend: `StripeKeyCheckController` + Route im Super-Admin-Block; Service mit **injizierbarem
-  Client** (das Stripe-SDK nutzt intern curl, ohne diese Naht ist kein deterministischer Test möglich
-  — Vorbilder: `CheckoutRiskService`, `StripePaymentService`).
-- [ ] Backend: Modus-Ableitung als reine Funktion (`pk_`/`sk_`/`rk_` × `_test_`/`_live_` → Modus).
-- [ ] Frontend: Karte in `ManagementSettingsView.tsx` neben der SMTP-Test-Karte; `data-testid` über
-  das Shell-Prop (D-18), kein Wrapper-`div`; Zustände ok/warn/fail auf Deutsch.
-- [ ] **Tests (PHPUnit Feature):** super_admin kann / non-super-admin 403 / Gast 401 — **plus je ein
-  Fall pro Befund** mit gefaktem Client: gemischtes Paar, Bundle-Modus-Abweichung, abgelaufener Key
-  (`api_key_expired`), fehlender/abwegiger Endpunkt, fehlende Berechtigung.
-- [ ] **Test (PHPUnit Unit):** die Modus-Ableitung, inkl. der Grenzfälle (fremdes Präfix, leerer Wert).
-- [ ] **Test (Playwright E2E, `@smoke` + `@feature:settings`):** Karte öffnen, „Stripe-Verbindung
-  testen", grüner Zustand gegen die echten CI-Test-Keys — der Netzwerkzugriff im E2E-Job ist belegt
-  (der Preflight ruft Stripe schon heute). Ein roter Fall ist ohne Env-Manipulation nicht sinnvoll
-  darstellbar.
+**Umgesetzt (2026-10-15).** Der dauerhafte Vertrag — Route, die fünf Befunde mit ihrer
+Statusbedeutung, die Antwortform, „kein Key-Material" — steht in
+`features/security/env-hardening.md` („Super-Admin Stripe-Selbsttest") und wird hier nicht
+wiederholt. Gepinnt durch `backend/tests/Unit/StripeKeyModeTest.php` (6 Tests, Grenzfälle der
+Modus-Ableitung), `backend/tests/Feature/StripeKeyCheckControllerTest.php` (23 Tests: Auth-Matrix
+inkl. Fotograf, je Befund ein Fall, alle drei Zweige der Prüfung 5, die drei Fehlerpfade des
+gefakten Clients und ein echter Redaktions-Test, in dem `sk_test_…` wirklich im Stripe-Fehlertext
+steht) sowie `frontend/tests/e2e/admin/settings/stripe-check.spec.ts` (`@smoke` + `@feature:settings`).
+Der Tunnel-Fallback des Webhook-Secrets lebt seit der Umsetzung in `App\Support\StripeWebhookSecret`,
+damit Ingress (`WebhookController::handleStripe`) und Diagnose (Prüfung 1) **eine** Regel lesen.
+
+- [ ] **CI-Preflight nachziehen** (Folge-Commit, bewusst nicht in den Selbsttest-Commit gemischt):
+  `.github/workflows/ci.yml` — der Schritt „Ensure Stripe test keys are configured" prüft **nur**
+  `secrets.STRIPE_SECRET != ''`, während seine Fehlermeldung **drei** Secrets nennt
+  (`STRIPE_SECRET`, `STRIPE_KEY`, `STRIPE_WEBHOOK_SECRET`). Seit dem Selbsttest hängt erstmals ein
+  E2E-Test an einem nicht-leeren `STRIPE_WEBHOOK_SECRET` (Prüfung 1 `local_key_mode`): fehlte es,
+  gäbe es genau **einen** roten `@smoke`-Test ohne erkennbare Ursache. Guard auf alle drei Namen
+  erweitern. Beleg: `gh secret list` → `STRIPE_WEBHOOK_SECRET` gesetzt am 2026-10-15T09:57:12Z;
+  der Fall ist heute **nicht** eingetreten, es geht um den künftigen.
 

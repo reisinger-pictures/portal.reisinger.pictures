@@ -8,6 +8,7 @@ use App\Services\DisputeMailDispatcher;
 use App\Services\PaymentIntentReconciliationService;
 use App\Services\StripePaymentService;
 use App\Support\ActorIdentity;
+use App\Support\StripeWebhookSecret;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -63,20 +64,12 @@ class WebhookController extends Controller
     {
         $payload = $request->getContent();
         $sigHeader = $request->header('Stripe-Signature');
-        $endpointSecret = config('services.stripe.webhook_secret');
 
-        // Local development fallback: read the live secret from the
-        // auto-tunneler's private file without ever logging its contents.
-        // This artifact only exists for local/tunnel workflows; it must never
-        // become an accepted signing secret on a production-like host with an
-        // unset env var.
-        $secretFile = storage_path('app/private/stripe_secret.txt');
-        if (empty($endpointSecret)
-            && app()->environment(['local', 'testing'])
-            && file_exists($secretFile)
-        ) {
-            $endpointSecret = trim(file_get_contents($secretFile));
-        }
+        // Configuration first, the local/tunnel artifact only as a
+        // local-gated fallback. The rule (including why the artifact must
+        // never sign on a production-like host) lives in one place; see
+        // App\Support\StripeWebhookSecret for the full rationale.
+        $endpointSecret = StripeWebhookSecret::resolve();
 
         // Accept comma-separated secrets for multi-domain infrastructure.
         $secrets = array_values(array_filter(array_map('trim', explode(',', (string) $endpointSecret))));

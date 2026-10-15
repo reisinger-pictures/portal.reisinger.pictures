@@ -40,6 +40,7 @@ use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\StatsController;
+use App\Http\Controllers\StripeKeyCheckController;
 use App\Http\Controllers\TextSnippetController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VolumePresetController;
@@ -252,6 +253,10 @@ Route::middleware(['auth:api', 'management'])->group(function () {
 
         // Super-Admin SMTP-Verbindungstest: sendet eine Test-Mail an die eigene Adresse.
         Route::post('/management/settings/test-email', [MailController::class, 'sendTest'])->name('api.management.settings.test-email');
+
+        // Super-Admin Stripe-Selbsttest: prüft lokalen Key-Modus, Frontend-Bundle-Modus,
+        // Balance, Konto-Freigaben und Webhook-Endpunkt (fünf stabile Befunde).
+        Route::post('/management/settings/stripe-check', [StripeKeyCheckController::class, 'check'])->name('api.management.settings.stripe-check');
     });
 
     Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo'])->name('api.management.settings.system');

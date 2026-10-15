@@ -117,6 +117,95 @@ Deshalb gilt für `backend/.env` und die GitHub-Secrets:
   „Validate Stripe API key (read + write)". Er schlägt beim ersten Lauf nach
   einer nicht weitergereichten Rotation fehl — laut, nicht still.
 
+## Super-Admin Stripe-Selbsttest `POST /api/management/settings/stripe-check`
+
+Dauerhafter SOLL-Zustand. Der Endpunkt bündelt fünf reine Diagnosen, mit denen ein
+Super-Admin die Stripe-Verdrahtung prüft, ohne Repo oder Host öffnen zu müssen. Er
+adressiert die D-24-Klasse (falscher Modus / fehlender `VITE_STRIPE_PUBLIC_KEY` im
+Bundle) als *sichtbaren Befund* statt als stillen Deploy-Fehler.
+
+**Route.** `backend/routes/api.php` — im `Route::middleware(['super_admin'])`-Block,
+direkt neben dem SMTP-Nachbarn mit dem Namen `api.management.settings.test-email`;
+eigener Name `api.management.settings.stripe-check`. Kette: äußerer
+`['auth:api', 'management']`-Group, dann `SuperAdminMiddleware`. Gast → **401**
+(`auth:api`), Nicht-Super-Admin → **403** (`SuperAdminMiddleware::handle` prüft
+`AuthorizationService::isSuperAdmin`), Fotograf → **403** (schon die
+`ManagementMiddleware`, denn `settings/stripe-check` ist nicht in ihrer
+Prefix-Allowlist).
+
+**Request.** `{"bundle_mode": "test"|"live"|null}`. `bundle_mode` ist
+`nullable|in:test,live`, inline validiert in `StripeKeyCheckController::check`.
+`null` oder fehlend ist **kein** 422, sondern der Befund der Prüfung 2 — genau die
+Fehlerklasse „kein `VITE_STRIPE_PUBLIC_KEY` im Bundle", die der Selbsttest sichtbar
+machen soll.
+
+**Response 200.** Immer `{"checks":[…]}`, stabile Reihenfolge, jedes Element
+`{"key","status","message"}` mit deutscher `message`. Außer Authentifizierung gibt
+es **keinen** Stripe-Fehlerpfad: selbst ein fehlgeschlagener Stripe-Aufruf — oder
+ein Client, der sich mit der konfigurierten Umgebung gar nicht erst bauen lässt —
+wird zur `fail`-Meldung. `status`: `ok` = geprüft und korrekt, `warn` = auffällig, aber
+nicht blockierend, `fail` = kaputt/inkonsistent.
+
+| # | `key` | Prüft | warum `warn` statt `fail` |
+|---|-------|-------|---------------------------|
+| 1 | `local_key_mode` | `STRIPE_KEY` und `STRIPE_SECRET` tragen denselben Modus, dieser entspricht dem Soll-Modus, `STRIPE_WEBHOOK_SECRET` ist gesetzt (Env oder — nur in `local`/`testing` — das Tunnel-Artefakt, beides über `App\Support\StripeWebhookSecret`). Rein lokal, kein Netz. | — (jeder Verstoß ist `fail`) |
+| 2 | `frontend_bundle_mode` | `bundle_mode` gleich dem Modus des Server-`STRIPE_KEY`; `null` heißt „Schlüssel fehlt im Bundle". Es wird nur der Modus verglichen, nie ein Key-Wert. | — |
+| 3 | `stripe_balance` | `$stripe->balance->retrieve()`, gültig und `livemode` gleich Soll-Modus. Ein Stripe-Code (z. B. `api_key_expired`, `more_permissions_required`) wird wörtlich durchgereicht, nicht verflacht. | — |
+| 4 | `stripe_account` | `$stripe->accounts->retrieve()`; sobald das Konto abrufbar ist, steht die `id` (`acct_…`) in der Meldung. | Nicht gesetzte `charges_enabled`/`payouts_enabled`/`details_submitted` sind `warn`, weil Zahlungen trotzdem gehen können. |
+| 5 | `stripe_webhook_endpoint` | `$stripe->webhookEndpoints->all(['limit' => 100])`; gesuchte URL wird **so** gebaut, wie die App sie sonst baut (`rtrim(BrandRegistry::frontendUrl(), '/').'/api/webhooks/stripe'`). Kein Endpunkt / nicht `enabled` → `fail`; `enabled`, aber die vier Events fehlen → `warn` (fehlende benannt). | Fehlende Events bremsen die Verarbeitung, blockieren aber keine Zahlung. |
+
+Die vier erforderlichen Webhook-Ereignisse: `payment_intent.succeeded`,
+`payment_intent.payment_failed`, `charge.dispute.created`, `charge.refunded`.
+
+**Soll-Modus aus APP_ENV.** `StripeKeyMode::fromEnvironment()` bildet
+`config('app.env')` ab: `production` → `live`, alles andere (`local`, `testing`, …)
+→ `test`. **Keine** zusätzliche Setting-Zeile, **kein** neues Env. Den Modus eines
+einzelnen Keys leitet `StripeKeyMode::fromKey()` rein aus dem Token direkt hinter
+dem Präfix ab (`pk`/`sk`/`rk` × `_test_`/`_live_`); ein `_test_`/`_live_` im
+Zufallsanteil zählt **nicht**, unbekanntes Präfix, leerer Wert oder `null` ergeben
+`null`. Beides sind reine Funktionen ohne `config()`-Zugriff — die Config liest der
+Aufrufer (`StripeKeyCheckService`), damit der Config-Cache nicht durch `env()`
+unterlaufen wird.
+
+**Kein Key-Material in der Antwort.** Niemals `sk_…`/`pk_…`/`rk_…`/`whsec_…`-Werte.
+Die Konto-ID (`acct_…`) und die Webhook-Endpunkt-ID (`we_…`) sind ausdrücklich
+erlaubt und gewollt — ein Admin soll sehen, *welches* Konto verdrahtet ist. Da
+Stripe einen fehlerhaften/abgelaufenen Key u. U. maskiert (`sk_test_…***`) im
+Fehlertext spiegelt, läuft jede übernommene Stripe-Fehlermeldung vor dem
+Rausschreiben durch `StripeKeyCheckService::describeStripeError()` →
+`redactSecrets()`, das Key-Fragmente auf `***entfernt***` reduziert.
+
+**Naht & Tests.** `StripeKeyCheckService::__construct(?StripeClient $stripe = null)`
+übernimmt 1:1 das Muster von `StripePaymentService`: ein injizierbarer
+`StripeClient`, damit die Tests über die `Stripe\ApiRequestor::setHttpClient()`-Naht
+ deterministisch faken (Helper `MocksStripeClient::mockStripeApi`) statt Netz zu
+rühren. Der Client wird **erst beim Bedarf** aufgelöst (je Netz-Prüfung, nicht im
+Konstruktor): mit fehlendem oder leerem `STRIPE_SECRET` wirft `new StripeClient(…)`
+selbst, und genau diese Fehlkonfiguration soll der Endpunkt diagnostizieren — sie
+wird deshalb wie jeder andere Stripe-Fehler zur `fail`-Meldung, nicht zum 500.
+Prüflogik lebt vollständig im Service, der Controller hält nur Validierung
+und Aufruf. Gepinnt: `StripeKeyModeTest` (Grenzfälle der Modus-Ableitung) und
+`StripeKeyCheckControllerTest` (super_admin 200 / normaler Admin 403 / Gast 401 /
+Fotograf 403, plus je ein Fall pro Befund inkl. `bundle_mode: null`, abgelaufener
+Key, fehlender/disabled/event-unvollständiger Endpunkt, Konto ohne
+`charges_enabled`, ein Stripe-Fehler auf dem Konto- und dem Endpunkt-Pfad sowie
+ein gar nicht baubarer Client; `assertNoSecretMaterial()` prüft jede Antwort auf
+fehlende `sk_`/`pk_`/`whsec_`-Werte).
+
+**Prüfung 5 bleibt in jedem Environment streng** — fehlender Endpunkt ist überall
+`fail`, nicht umgebungsabhängig. Der E2E-Lauf prüft deshalb nur die vier
+umgebungsdeterministischen Befunde (im Test-Modus existiert kein adressierbarer
+Live-Endpunkt); die Zweige der Prüfung 5 leben in PHPUnit
+(`StripeKeyCheckControllerTest`). Eine dieser vier, `local_key_mode`, hängt neben
+Env und Key-Modus zusätzlich an einem nicht-leeren `STRIPE_WEBHOOK_SECRET`:
+`scripts/e2e-up.sh` setzt dafür einen Dummy (`E2E_STRIPE_WEBHOOK_SECRET`), weil
+`backend/.env` den Wert bewusst leer lässt (Tunnel-Fallback) und ein kalter Lauf
+sonst rot wäre.
+
+**Verifikation** (aus `backend/`): `php artisan test --filter StripeKeyCheck` für
+den Feature-Test, `php artisan test --filter StripeKeyMode` für die pure
+Modus-Ableitung, `./vendor/bin/pint --test` für die Formatierung.
+
 ## File Encryption at Rest (2026-09-19)
 
 Sensible Model-Dateien (**Altersnachweis** + **Personen-Fotos**) werden

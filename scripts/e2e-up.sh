@@ -35,6 +35,14 @@ readonly E2E_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
 readonly E2E_TURNSTILE_SECRET="1x0000000000000000000000000000000AA"
 readonly E2E_TURNSTILE_USER_THRESHOLD=3
 readonly E2E_TURNSTILE_IP_THRESHOLD=1000
+# Stripe webhook signing secret for the isolated backend. backend/.env leaves
+# it empty on purpose (the local tunnel writes its own artifact instead), and
+# check 1 of the super-admin self-test (StripeKeyCheckService::checkLocalKeyMode)
+# reports an empty secret as `fail` — a cold E2E run would be red without this
+# value. A dummy is harmless here: no E2E spec posts to /api/webhooks/stripe
+# (the only hit when grepping frontend/tests/ is a comment in this very spec),
+# so the value is never used to verify a signature.
+readonly E2E_STRIPE_WEBHOOK_SECRET="whsec_e2e_dummy"
 readonly E2E_MEILISEARCH_HEALTH_URL="${E2E_MEILISEARCH_HEALTH_URL:-http://127.0.0.1:7701/health}"
 readonly E2E_MEILISEARCH_READY_TIMEOUT_SECONDS="${E2E_MEILISEARCH_READY_TIMEOUT_SECONDS:-60}"
 readonly E2E_MEILISEARCH_REQUEST_TIMEOUT_SECONDS="${E2E_MEILISEARCH_REQUEST_TIMEOUT_SECONDS:-2}"
@@ -185,6 +193,9 @@ set_env TURNSTILE_ALLOWED_HOSTNAMES "localhost"
 set_env TURNSTILE_USER_THRESHOLD_PER_HOUR "$E2E_TURNSTILE_USER_THRESHOLD"
 set_env TURNSTILE_IP_THRESHOLD_PER_HOUR "$E2E_TURNSTILE_IP_THRESHOLD"
 set_env TURNSTILE_ALLOW_DUMMY_TEST_KEYS "true"
+# See E2E_STRIPE_WEBHOOK_SECRET above: check 1 of the self-test needs a
+# non-empty secret, and the dummy is never used to sign or verify anything.
+set_env STRIPE_WEBHOOK_SECRET "$E2E_STRIPE_WEBHOOK_SECRET"
 set_env CI "true"
 
 # --- 3. E2E-SQLite-DB anlegen + migrieren + seeden --------------------------
