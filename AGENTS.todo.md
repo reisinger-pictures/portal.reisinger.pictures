@@ -1767,10 +1767,17 @@ und die D-24-Zeile auf dem Host → `pk_live_51UQksN0qxby…` **ohne** `pk_test`
 `backend/.env.e2e` trägt nach dem Lauf `STRIPE_WEBHOOK_SECRET=whsec_e2e_dummy`, der B1-Fix
 wirkt also im echten Pfad statt nur in der Beschreibung.
 
-- [ ] **manuell prüfen** (Owner, in Produktion): als Super-Admin die Einstellungsseite öffnen und
-  den Stripe-Selbsttest klicken. Erwartet: fünf Befunde, die ersten vier `ok`;
-  `stripe_webhook_endpoint` je nach Live-Endpunkt-Lage. Dabei ausdrücklich ansehen, dass
-  **kein** Key-Material in der Oberfläche erscheint.
+**Owner-Prüfung 2026-10-15 (Produktion, Live-Modus): alle fünf Befunde `ok`.** Der Restart war zu
+diesem Zeitpunkt bereits erfolgt (Container `healthy`, `/up` 200, Route 401). Die Prüfung
+bestätigt zusätzlich, was D-26 für den **Test**-Modus ausschließen musste: **Prüfung 5 ist im
+Live-Modus grün** — der Endpunkt ist vorhanden, `enabled` und mit allen vier erforderlichen
+Events abonniert, also genau der Zustand, den der Test-Modus nicht hergibt. Die Strenge der
+Prüfung ist damit belegt statt nur begründet: sie unterscheidet echte Lagen, statt
+umgebungsabhängig zu warnen. Bundel- und Backend-Modus stimmen überein (beide live), die
+Balance ist im erwarteten Modus abrufbar, das Konto ist vollständig freigeschaltet.
+*Quelle:* die fünf Befundtexte der Oberfläche (Owner, 2026-10-15). Konto- und Endpunkt-ID sind
+hier bewusst **nicht** zitiert — sie stehen im Befund der Oberfläche selbst.
+
 - [ ] **CI-Preflight nachziehen** (Folge-Commit, bewusst nicht in den Selbsttest-Commit gemischt):
   `.github/workflows/ci.yml` — der Schritt „Ensure Stripe test keys are configured" prüft **nur**
   `secrets.STRIPE_SECRET != ''`, während seine Fehlermeldung **drei** Secrets nennt
