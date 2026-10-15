@@ -556,8 +556,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   eine **Entscheidung zur SMTP-Duplikat-Policy**. Die Code-Subblöcke R1–R7 sind
   verifiziert geschlossen.
 
-- [~] wartet auf die Stripe-Test-Key-Rotation durch den Owner (blockiert alle 7 E2E-Shards, kein Code-Defekt). Befund vom 2026-10-12: CI-E2E fällt im Balance-Preflight mit `401 api-key-expired` (`STRIPE_SECRET` abgelaufen), bevor ein Test läuft — gemessen in `ci.yml:483-487`, Secret-Namen in `ci.yml:385-387` (`STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`). Behebung nur per Rotation im Stripe-Dashboard + GitHub Secrets (ein abgelaufener Key kann sich nicht selbst erneuern, Secrets sind write-only, der Stripe-Tunnel verwaltet keine Keys). Danach `gh run rerun --failed` + CI grün bewachen. Backend (Payout-Date-Bomb, `bca0316`) und Frontend sind bereits grün; der E2E-Rest ist damit der einzige offene CI-Punkt.
-
 ### Bewusst NICHT geändert
 
 
@@ -1633,10 +1631,10 @@ gerissen und zur Entscheidung gemacht.
 ## 🔑 STRIPE-KONTOWECHSEL (2026-10-15) — neues Konto, Keys, Vite-Vorrang
 
 > Anlass: neues Stripe-Konto. Der Wechsel tauscht den Key, an dem die rote E2E-Kette seit
-> 2026-10-12 scheitert (`401 api-key-expired` im Balance-Preflight, Board-Position „wartet auf die
-> Stripe-Test-Key-Rotation durch den Owner"). **Ob das die Kette schließt, ist nicht gemessen** —
-> der Nachweis steht unten als offene Position. Dauerhafte Regel zur Key-Ablage: `AGENTS.md`
-> §14/**D-24**.
+> 2026-10-12 scheitert (`401 api-key-expired` im Balance-Preflight). **Die Kette schließt sich —
+> gemessen: Run `38738659755` auf `d4fc972` ist `success`, 11/11 Jobs inkl. aller
+> 7 Playwright-Jobs (Mobile 1–3, Desktop 1–3, serial).** Dauerhafte Regel zur
+> Key-Ablage: `AGENTS.md` §14/**D-24**.
 
 **Zwei Befunde vor der Umstellung, je mit Befehl belegt** (sie haben den Zuschnitt bestimmt):
 
@@ -1673,6 +1671,10 @@ gerissen und zur Entscheidung gemacht.
   `sync.sh` (58 Dateien, 2,6 MB) ist die HTTP-Antwort byte-identisch mit dem lokalen `dist/index.html`
   (`defb9ae9c7ab73cd9ea3d4a56fe8dc7b`) und trägt `pk_live_51UQksN0…`. **Damit ist auch belegt, dass
   der rsync-Zielpfad der ausgelieferte Pfad ist** (md5 HTTP-Antwort == Datei am Ziel).
+- **E2E-Kette geschlossen** (2026-10-15): `gh run view 38738659755` → `success`, 11/11 Jobs
+  (Playwright: Mobile 1–3, Desktop 1–3, serial — 7 Jobs; plus Frontend, Backend,
+  `CI security contract`, `CI gate (push)` = 11 insgesamt).
+  Der Key-Tausch ist damit als Ursache **bestätigt**, nicht bloß adressiert.
 
 - **Test-Key ist jetzt der Standard-Key des Kontos, nicht der der CLI.** Das sind zwei verschiedene
   Werte (`sha256` `5ce6d2c3849b` vs. `949838090def`); nur der CLI-eigene trägt ein Ablaufdatum
@@ -1691,13 +1693,8 @@ Die Betriebs-Fakten (drei Werte, Konto, Endpunkt-ID, vier Events, die drei Falle
 
 **Offene Positionen:**
 
-- [~] wartet auf `gh run rerun --failed` und eine grüne E2E-Kette; danach ist die Board-Position
-  „wartet auf die Stripe-Test-Key-Rotation durch den Owner" erledigt und wird **entfernt**. Ohne Push entsteht kein neuer Lauf.
 - [ ] **offen, bewusst:** ein Build-Gate, das einen Prod-Build mit `pk_test` fail-closed abbricht
   (analog `frontend/scripts/check-turnstile-build.mjs`). Ohne es schützt allein die Prüfzeile aus D-24.
-- [ ] Repo-Änderungen noch uncommittet: `AGENTS.md` (§14/D-24, §14/D-25), `AGENTS.todo.md`,
-  `deployment/README.md`, `features/security/env-hardening.md`, `frontend/.env.example`,
-  `frontend/.env.local.example`.
 
 ## 🔍 Stripe-Selbsttest im Super-Admin (Idee 2026-10-15, Umfang entschieden)
 

@@ -99,8 +99,8 @@ Env-Variablen zu setzen. Tests verwenden `Config::set(...)` mit Mock-Werten.
 ab — nicht den Standard-Key des Kontos. Er trägt ein Ablaufdatum
 (`test_mode_key_expires_at`), und Stripe **erzwingt** es: der Vorgänger-Key
 antwortet nach seinem Datum mit `401 {"code":"api_key_expired"}`. Genau das hat
-die E2E-Kette ab 2026-10-12 rot gemacht (Board-Position „wartet auf die Stripe-Test-Key-Rotation
-durch den Owner") — die
+die E2E-Kette ab 2026-10-12 rot gemacht; seit dem 2026-10-15 ist sie grün
+(Run `38738659755`, 11/11 Jobs), der Key-Tausch als Ursache bestätigt. Die
 Ursache sah wie ein Testfehler aus, war aber ein abgelaufener Key.
 
 Deshalb gilt für `backend/.env` und die GitHub-Secrets:
