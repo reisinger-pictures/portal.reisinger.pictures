@@ -709,6 +709,34 @@ entscheiden".
   neue veraltete `ghcr.io/`-Namespace in einer davon fällt erst beim nächsten Code-Commit auf. Kein
   Deploy-Pfad ist betroffen (alles Ausgelieferte ist Nicht-Markdown). **Der eigentliche Fix dafür
   gehört in den Test** (Code statt Prosa scannen), nicht in den Filter — als eigene Welle.
+- **D-24 — Der Live-Publishable-Key liegt in `frontend/.env.production`, nicht in `frontend/.env`.**
+  `VITE_STRIPE_PUBLIC_KEY` wird beim `pnpm build` in das Bundle **eingebacken**. Vite lädt
+  `.env.local` in **allen** Modi — also auch im Prod-Build (`vite build` läuft als
+  mode=production) — und stellt es **über** `.env`. Der Live-Key gehört deshalb nach
+  `frontend/.env.production` (gitignored), der Test-Key bleibt in `.env.local`; `.env` trägt den
+  Test-Key als Default. **Kein Umbenennen von `.env.local`.** Prüfzeile nach jedem Build:
+  `grep -rho 'pk_live_[A-Za-z0-9]\{12\}' frontend/dist/assets | head -1`. *Warum:* **gemessen am
+  2026-10-15** — das Live-Bundle `assets/ClientCartView-3L6eh2lZ.js` und dasselbe Chunk im lokalen
+  `frontend/dist/` hatten identische `md5` (`67b769fd0dbc1c4f293410433d3d8f9d`) und trugen beide
+  `pk_test_51TJyXb0zjsh…`, während der Backend-Container `STRIPE_SECRET=sk_live_…` führte;
+  `ClientCartView.tsx:455` reicht den `client_secret` eines Live-PaymentIntent an `<Elements>`, das
+  aber mit einem Test-Modus-Stripe.js geladen war. Portainer und `.env.production` im Repo-Root
+  erreichen das Bundle **nicht** — sie versorgen ausschließlich den Backend-Container; das Bundle
+  entsteht *vor* dem Sync lokal. **Grenze, bewusst offen:** ein Build-Gate, das einen Prod-Build mit
+  `pk_test` fail-closed abbricht (analog `frontend/scripts/check-turnstile-build.mjs`), ist **nicht**
+  umgesetzt; fehlt `.env.production`, fällt der Build still auf den Test-Key zurück und die Prüfzeile
+  ist die einzige Kontrolle. *Verworfen (2026-10-15):* Umbenennen von `frontend/.env.local` →
+  `frontend/.env.development.local` (strukturell robuster, weil dann kein zweiter Ablageort für den
+  Live-Key existiert — der Owner hat stattdessen die zusätzliche Datei gewählt).
+
+- **D-25 — Die Live-Secrets bleiben ungerollt (ZDR des Providers)** (Owner, 2026-10-15).
+  `rk_live_…` und der `whsec_…` des Live-Endpunkts sind bei der Einrichtung über den Chat gegangen
+  und damit durch den Modell-Kontext. *Warum:* nach Owner-Angabe betreibt der Provider **Zero Data
+  Retention** — es gibt keine Aufbewahrung, aus der die Werte später austreten könnten. Ein Roll wäre
+  deshalb Zeremonie mit Ausfallfenster (bis der neue Wert in Stack 23 steht, schlagen Live-Zahlungen
+  fehl), kein Sicherheitsgewinn. **Bewusst getragen, nicht bestritten:** das Risiko existiert, es ist
+  nur entschieden — die Alternative (beide Werte rollen, neuen Key per Zwischenablage übergeben und
+  den Endpunkt neu anlegen, damit sein `whsec` nie durch den Chat läuft) ist damit **verworfen**.
 
 ## TODO (UI-Review)
 

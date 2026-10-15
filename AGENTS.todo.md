@@ -174,8 +174,8 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 - [x] **D-21 — Domänen-`editing` lokal umbenannt (`snippet`/`product`/`customer`/`coupon`/ `project`/`photoJob`).** Externe Props und Aufrufer (`ManagementProjectsBoard.tsx:219`, `PhotographerProductionBoard.tsx:170`) unverändert; Konsequenz gepinnt durch `editingDeleteActionSemantics.test.tsx`. Verifiziert.
 ### Verworfen — nicht erneut implementieren
 
-Zurückgezogen am 2026-09-28. Der Owner hat jede dieser Varianten gesehen und verworfen; die
-geltende Regel steht in `AGENTS.md` §14.
+Zurückgezogen am 2026-09-28, ergänzt am 2026-10-15 (D-24, D-25). Der Owner hat jede dieser
+Varianten gesehen und verworfen; die geltende Regel steht in `AGENTS.md` §14.
 
 | Zu | Verworfene Variante | Warum verworfen |
 |---|---|---|
@@ -209,6 +209,8 @@ geltende Regel steht in `AGENTS.md` §14.
 | D-19 | nur `ManagementOrgsView` testen, oder bewusst ungetestet lassen | die Detail-View bleibt die ungeschütztere; „bewusst" wäre eine Feststellung ohne Deckung |
 | D-16 | vollständig ausarbeiten, oder nach Kategorie trennen | der rechtliche Teil ist DPO-Freigabe und wird nicht erfunden |
 | D-17 | beide Policies bündeln, oder beide als akzeptiertes Risiko | zwei Systeme, zwei Reviewer; „bewusst offen" wäre begründungspflichtig |
+| D-24 | `frontend/.env.local` → `.env.development.local` umbenennen | strukturell robuster (kein zweiter Ablageort für den Live-Key) — der Owner hat die zusätzliche Datei `.env.production` gewählt |
+| D-25 | beide Live-Secrets rollen (Key per Zwischenablage übergeben, Endpunkt neu anlegen, damit sein `whsec` nie durch den Chat läuft) | Owner: der Provider fährt ZDR, also kein Aufbewahrungsrisiko; ein Roll wäre Zeremonie mit Ausfallfenster bis der neue Wert in Stack 23 steht |
 
 **Zurückgezogen heißt nicht vergessen:** Wenn jemand eine dieser Varianten erneut vorschlägt,
 ist die Frage nicht „ist das besser?", sondern „ist D-x überholt?" — und dann wird **D-x in
@@ -1625,3 +1627,125 @@ gerissen und zur Entscheidung gemacht.
 - [ ] **Position 3 — Die E2E-Matrix ist das Muster, das Named Locks ersetzen:** `.github/workflows/ci.yml:374-380` definiert sieben Einträge — Desktop 1/3 (`:374`, `--workers=2`), **Desktop 2/3 (`:375`, `--workers=1`)**, Desktop 3/3 (`:376`, `--workers=2`), Mobile 1/3 (`:377`, `--workers=2`), **Mobile 2/3 (`:378`, `--workers=1`)**, Mobile 3/3 (`:379`, `--workers=2`) plus seriellen Eintrag (`:380`, `slug: kanban`, `--workers=1` mit `--grep` statt `--grep-invert` auf `projects-board|production-board|project-clear-fields|brand-settings|billing-details`). Budgets daneben: `frontend/playwright.config.ts:30-31` (`timeout: 120000`, `globalTimeout: 1500000`).
 - [ ] **Position 4 — GHCR-Blocker: Board-Annahme „private" ist stale, Blocker aufgelöst:** `gh api orgs/reisinger-pictures/packages?package_type=container` meldet am 2026-10-04 **`portal-base public` und `portal-e2e public`**; anonymer Token-Manifest-Fetch liefert für beide **HTTP 200**. (Direkter anonymer Fetch ohne Token-Antwort → 401 ist GHCR-Normalverhalten per Token-Exchange, kein Privatheits-Beleg.) Der bekannte Fehlermodus aus Skill `ghcr-visibility` (Job-level `container:` in `.github/workflows/ci.yml:335` pullt vor dem ersten Step, Login käme zu spät, Exit 125 ohne Steps im Log) greift damit nicht mehr — der nächste Push zeigt, ob Backend-/E2E-Jobs wieder ziehen.
 - [ ] **Position 5 — `cancel-in-progress` weiterhin konfiguriert:** `.github/workflows/ci.yml:54-56` (`concurrency: group … / cancel-in-progress: true`) **vernichtet den Log eines laufenden Laufs**, sobald gepusht wird. Beim Debuggen nicht währenddessen pushen; ein abgebrochener Log sieht aus wie ein nie gelaufener Job.
+
+---
+
+## 🔑 STRIPE-KONTOWECHSEL (2026-10-15) — neues Konto, Keys, Vite-Vorrang
+
+> Anlass: neues Stripe-Konto. Der Wechsel tauscht den Key, an dem die rote E2E-Kette seit
+> 2026-10-12 scheitert (`401 api-key-expired` im Balance-Preflight, Board-Position „wartet auf die
+> Stripe-Test-Key-Rotation durch den Owner"). **Ob das die Kette schließt, ist nicht gemessen** —
+> der Nachweis steht unten als offene Position. Dauerhafte Regel zur Key-Ablage: `AGENTS.md`
+> §14/**D-24**.
+
+**Zwei Befunde vor der Umstellung, je mit Befehl belegt** (sie haben den Zuschnitt bestimmt):
+
+- **Der Kontowechsel braucht keine Datenmigration.** Gemessen in der Prod-DB, reproduzierbar mit
+  `docker exec portal_db sh -c 'mariadb -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -N -B -e "<SQL>"'`
+  und `<SQL> = SELECT (SELECT COUNT(*) FROM users), (SELECT COUNT(*) FROM users WHERE
+  stripe_customer_id IS NOT NULL AND stripe_customer_id <> ""), (SELECT COUNT(*) FROM orders);`
+  → `1  0  0` (gemessen 2026-10-15): `users_total = 1`, `users_mit_cus = 0`, `orders_total = 0`. Ohne diese Messung wäre der Wechsel ein
+  Checkout-Ausfall für jeden Bestandskunden gewesen: `StripeCustomerService.php:44` gibt einen
+  gespeicherten `cus_…` **blind** zurück — `if (is_string($lockedUser->stripe_customer_id) && $lockedUser->stripe_customer_id !== '')` → im neuen Konto existiert er nicht mehr, und
+  `paymentIntents->create(['customer' => …])` antwortet `No such customer`.
+- **Das Live-Bundle trug den Test-Key.** `md5` von `assets/ClientCartView-3L6eh2lZ.js` live und im
+  lokalen `frontend/dist/` identisch (`67b769fd0dbc1c4f293410433d3d8f9d`), beide mit
+  `pk_test_51TJyXb0zjsh…`, während der Backend-Container `STRIPE_SECRET=sk_live_…` führt. Ursache
+  (Vite-Env-Vorrang) und Entscheidung: D-24.
+
+**Umgestellt und gemessen (2026-10-15):**
+
+- **Lokale Envs auf dem neuen Konto** (`51UQksN0…`): `backend/.env` (`pk_test`/`sk_test`;
+  `STRIPE_WEBHOOK_SECRET` geleert, sonst blockiert der Wert den Tunnel-Fallback aus
+  `WebhookController.php:74`), `frontend/.env` + `.env.local` (`pk_test`), `frontend/.env.production`
+  **neu** (`pk_live`, D-24). CI-Preflight nachgestellt: `/v1/balance` 200, `payment_intents` create 200.
+- **CI-Secrets neu gesetzt** (`gh secret set`, 2026-10-15T09:57Z): `STRIPE_KEY`, `STRIPE_SECRET`,
+  `STRIPE_WEBHOOK_SECRET`, `VITE_STRIPE_PUBLIC_KEY`.
+- **Prod-Env im Container nachgewiesen, nicht angenommen:** `docker exec portal_backend printenv`
+  liefert für alle drei Werte denselben sha256 wie `.env.production` (`de208c971757` / `0d02aad55cb9` /
+  `9883869cb065`); Container recreated 2026-10-15T10:22:03Z.
+- **Live-Webhook** `we_1UQlhS0qxbyNaMESN5PNyhlM` → `…/api/webhooks/stripe`, `enabled`, genau die vier
+  Events. **Signaturpfad end-to-end belegt** mit selbst signierten Proben auf `charge.succeeded`
+  (Default-Zweig `WebhookController.php:200` — keine DB-Schreibung, keine Mail): neues `whsec` 200,
+  Zufallssignatur 400, altes `whsec` (sha `de59b9b54cee`) 400.
+- **Frontend-Sync nachgeholt:** der erste „done"-Stand lieferte weiter `ClientCartView-3L6eh2lZ.js`
+  mit `pk_test_51TJyXb0…` aus (`last-modified` 30.09.). Nach dem rsync der Frontend-Zeilen aus
+  `sync.sh` (58 Dateien, 2,6 MB) ist die HTTP-Antwort byte-identisch mit dem lokalen `dist/index.html`
+  (`defb9ae9c7ab73cd9ea3d4a56fe8dc7b`) und trägt `pk_live_51UQksN0…`. **Damit ist auch belegt, dass
+  der rsync-Zielpfad der ausgelieferte Pfad ist** (md5 HTTP-Antwort == Datei am Ziel).
+
+- **Test-Key ist jetzt der Standard-Key des Kontos, nicht der der CLI.** Das sind zwei verschiedene
+  Werte (`sha256` `5ce6d2c3849b` vs. `949838090def`); nur der CLI-eigene trägt ein Ablaufdatum
+  (2027-01-13) — der Dashboard-Key trägt laut UI keines. Getauscht in `backend/.env` und im
+  GitHub-Secret (`gh secret set STRIPE_SECRET`, 2026-10-15T10:30Z); Gegenprobe mit dem Wert **aus der
+  Datei**: `/v1/balance` 200 und `payment_intents` create 200. `pk_test` war in allen drei Quellen
+  derselbe Wert (`c9b329739363`) — dort war nichts zu tauschen, der CLI-Key ist nirgends mehr im
+  Einsatz (0 Treffer).
+
+**Entschieden, ohne technische Umsetzung:** **D-25** (`AGENTS.md` §14) — der Roll der beiden
+Live-Secrets ist abgelehnt; Begründung ist die Owner-Aussage „Provider fährt ZDR". Eine
+Implementierung dazu gibt es nicht — die verworfene Alternative steht in der Tabelle „Verworfen".
+
+Die Betriebs-Fakten (drei Werte, Konto, Endpunkt-ID, vier Events, die drei Fallen) stehen in
+`deployment/README.md`, Abschnitt „Stripe (Live)".
+
+**Offene Positionen:**
+
+- [~] wartet auf `gh run rerun --failed` und eine grüne E2E-Kette; danach ist die Board-Position
+  „wartet auf die Stripe-Test-Key-Rotation durch den Owner" erledigt und wird **entfernt**. Ohne Push entsteht kein neuer Lauf.
+- [ ] **offen, bewusst:** ein Build-Gate, das einen Prod-Build mit `pk_test` fail-closed abbricht
+  (analog `frontend/scripts/check-turnstile-build.mjs`). Ohne es schützt allein die Prüfzeile aus D-24.
+- [ ] Repo-Änderungen noch uncommittet: `AGENTS.md` (§14/D-24, §14/D-25), `AGENTS.todo.md`,
+  `deployment/README.md`, `features/security/env-hardening.md`, `frontend/.env.example`,
+  `frontend/.env.local.example`.
+
+## 🔍 Stripe-Selbsttest im Super-Admin (Idee 2026-10-15, Umfang entschieden)
+
+> Anlass: der Kontowechsel oben hat zwei Fehlerklassen gezeigt, die **von außen unsichtbar** sind —
+> ein `pk_test`-Bundle bei `sk_live`-Backend (D-24) und einen **abgelaufenen** Key
+> (`401 {"code":"api_key_expired"}`). Beide waren nur durch Messen zu finden, nicht durch Lesen der
+> Konfiguration. Der Selbsttest macht sie je zu einem Klick.
+>
+> **Entschieden (Owner, 2026-10-15):** read-only Prüfung **ohne Schreibprobe**; der Soll-Modus wird
+> **aus `APP_ENV`** abgeleitet (`production` → live, `local`/`testing` → test), keine zusätzliche
+> Setting-Zeile. Vorbild ist der SMTP-Test: `POST /api/management/settings/test-email` →
+> `MailController::sendTest`, UI-Karte in `ManagementSettingsView.tsx`
+> (`data-testid="send-test-email"`), Tests in `MailTestControllerTest`.
+
+**Fünf Prüfungen, alle mit dem heutigen eingeschränkten Live-Key als machbar gemessen (HTTP 200):**
+
+1. **Modus-Abgleich, rein lokal** — `STRIPE_KEY` und `STRIPE_SECRET` tragen denselben Modus
+   (`_test_`/`_live_`), `STRIPE_WEBHOOK_SECRET` ist nicht leer.
+2. **Das Frontend-Bundle** — der Kern, den nur der Browser sehen kann: die Einstellungsseite schickt
+   den Modus ihres eigenen `import.meta.env.VITE_STRIPE_PUBLIC_KEY` mit (**nur** `test`/`live`, nie den
+   Wert), das Backend vergleicht ihn mit dem Soll-Modus. Genau hier wäre D-24 aufgefallen.
+3. **`GET /v1/balance`** — Key gültig, `livemode` == Soll-Modus. Ein abgelaufener Key wird als
+   `api_key_expired` benannt statt zu „irgendwas geht nicht" zu verflachen.
+4. **`GET /v1/account`** — `charges_enabled`, `payouts_enabled`, `details_submitted` und die
+   **Konto-ID**: ein Admin sieht damit, *welches* Konto verdrahtet ist.
+5. **`GET /v1/webhook_endpoints`** — existiert ein Endpunkt mit unserer URL, ist er `enabled`, und
+   sind die vier Events abonniert (`payment_intent.succeeded`, `payment_intent.payment_failed`,
+   `charge.dispute.created`, `charge.refunded`)?
+
+**Vertrag:** `POST /api/management/settings/stripe-check` (POST wie der SMTP-Nachbar — ein GET könnte
+ein Proxy cachen), `super_admin` only, Antwort als Liste von Befunden
+`{key, status: ok|warn|fail, message}` **ohne** Key-Material. Läuft **nur auf Klick**, nicht im
+Render-Pfad (keine Stripe-Aufrufe beim Seitenaufbau). Fehlermeldungen aus 3–5 werden durchgereicht —
+`more_permissions_required` benennt die fehlende Berechtigung selbst, das ist wertvoller als ein
+eigener Text.
+
+- [ ] Backend: `StripeKeyCheckController` + Route im Super-Admin-Block; Service mit **injizierbarem
+  Client** (das Stripe-SDK nutzt intern curl, ohne diese Naht ist kein deterministischer Test möglich
+  — Vorbilder: `CheckoutRiskService`, `StripePaymentService`).
+- [ ] Backend: Modus-Ableitung als reine Funktion (`pk_`/`sk_`/`rk_` × `_test_`/`_live_` → Modus).
+- [ ] Frontend: Karte in `ManagementSettingsView.tsx` neben der SMTP-Test-Karte; `data-testid` über
+  das Shell-Prop (D-18), kein Wrapper-`div`; Zustände ok/warn/fail auf Deutsch.
+- [ ] **Tests (PHPUnit Feature):** super_admin kann / non-super-admin 403 / Gast 401 — **plus je ein
+  Fall pro Befund** mit gefaktem Client: gemischtes Paar, Bundle-Modus-Abweichung, abgelaufener Key
+  (`api_key_expired`), fehlender/abwegiger Endpunkt, fehlende Berechtigung.
+- [ ] **Test (PHPUnit Unit):** die Modus-Ableitung, inkl. der Grenzfälle (fremdes Präfix, leerer Wert).
+- [ ] **Test (Playwright E2E, `@smoke` + `@feature:settings`):** Karte öffnen, „Stripe-Verbindung
+  testen", grüner Zustand gegen die echten CI-Test-Keys — der Netzwerkzugriff im E2E-Job ist belegt
+  (der Preflight ruft Stripe schon heute). Ein roter Fall ist ohne Env-Manipulation nicht sinnvoll
+  darstellbar.
+
