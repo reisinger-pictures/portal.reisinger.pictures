@@ -1754,6 +1754,23 @@ steht) sowie `frontend/tests/e2e/admin/settings/stripe-check.spec.ts` (`@smoke` 
 Der Tunnel-Fallback des Webhook-Secrets lebt seit der Umsetzung in `App\Support\StripeWebhookSecret`,
 damit Ingress (`WebhookController::handleStripe`) und Diagnose (Prüfung 1) **eine** Regel lesen.
 
+**Deploy 2026-10-15, nach grünem CI auf `8bf8882`.** `./sync.sh` übertrug genau **sechs**
+Dateien — belegt mit `./sync.sh --dry-run --itemize-changes`: die vier neuen
+(`StripeKeyCheckController`, `StripeKeyCheckService`, `StripeKeyMode`, `StripeWebhookSecret`)
+und die zwei geänderten (`WebhookController.php`, `routes/api.php`); Tests nimmt
+`rsync-backend-exclude.txt` aus. Danach `docker restart portal_backend` — reiner Datei-Inhalt,
+kein Compose-Feld, also **kein Recreate** (§13), und **keine** Migration im Satz. Gegenproben:
+Container `Up (healthy)`, `/up` → 200, die neue Route als Gast → **401** (ein 404 hätte alten
+Code bedeutet), `stripe-check-button` im ausgelieferten `dist/assets/ProtectedDashboard-*.js`,
+und die D-24-Zeile auf dem Host → `pk_live_51UQksN0qxby…` **ohne** `pk_test`. Zuvor lokal über
+`scripts/e2e-up.sh` gefahren — CI übt dieses Skript **nie** aus: `2 passed`, und
+`backend/.env.e2e` trägt nach dem Lauf `STRIPE_WEBHOOK_SECRET=whsec_e2e_dummy`, der B1-Fix
+wirkt also im echten Pfad statt nur in der Beschreibung.
+
+- [ ] **manuell prüfen** (Owner, in Produktion): als Super-Admin die Einstellungsseite öffnen und
+  den Stripe-Selbsttest klicken. Erwartet: fünf Befunde, die ersten vier `ok`;
+  `stripe_webhook_endpoint` je nach Live-Endpunkt-Lage. Dabei ausdrücklich ansehen, dass
+  **kein** Key-Material in der Oberfläche erscheint.
 - [ ] **CI-Preflight nachziehen** (Folge-Commit, bewusst nicht in den Selbsttest-Commit gemischt):
   `.github/workflows/ci.yml` — der Schritt „Ensure Stripe test keys are configured" prüft **nur**
   `secrets.STRIPE_SECRET != ''`, während seine Fehlermeldung **drei** Secrets nennt
