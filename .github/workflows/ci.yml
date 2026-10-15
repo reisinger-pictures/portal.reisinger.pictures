@@ -44,10 +44,12 @@ on:
 # Images werden anonym gezogen, also OHNE `packages`-Scope und OHNE
 # docker-login (Least Privilege). Das ist technisch nicht umgehbar, weil das
 # E2E-Job-`container:`-Image vom Runner VOR dem ersten Step gepullt wird — ein
-# Login-Step im Job käme zu spät. Solange `portal-base`/`portal-e2e` im
-# Org-Namespace privat sind, bricht der Pull mit `unauthorized` ab (Exit 125)
-# und die betroffenen Jobs laufen nie. Der Org-Owner muss beide Pakete auf
-# `public` setzen; siehe AGENTS.todo.md.
+# Login-Step im Job käme zu spät. Stellt der Org-Owner eines der Pakete wieder
+# auf `private`, bricht der Pull mit `unauthorized` ab (Exit 125) und die
+# betroffenen Jobs laufen nie. Ist-Zustand, gemessen am 2026-10-15:
+# `gh api 'orgs/reisinger-pictures/packages?package_type=container'` meldet
+# `portal-base public` und `portal-e2e public` — die Bedingung ist erfüllt.
+# Kein Test bewacht sie, und die Sichtbarkeit ist jederzeit zurücksetzbar.
 permissions:
   contents: read
 
