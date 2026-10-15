@@ -59,6 +59,43 @@ solange eine Zielgalerie alles nimmt, deshalb steht sie im Compose mit Default
 importierbar. Ein Unterordner wie `/shoots/2026-09` muss **identisch** im UI und in der
 Kamera stehen, sonst schreibt die Kamera in einen Ordner, den der Import nie liest.
 
+### Stripe (Live) — drei Werte, die zusammenpassen müssen
+
+Der Backend-Container liest drei Stripe-Werte. Sie stehen in `.env.production`
+(lokal, gitignored) und müssen **genauso** in der Portainer-GUI stehen. Alle drei
+gehören zum Konto `acct_1UQksN0qxbyNaMES` (Umstellung am 2026-10-15):
+
+| Variable | Form | Herkunft |
+|---|---|---|
+| `STRIPE_KEY` | `pk_live_…` | Publishable Key — wird beim Build ins Frontend-Bundle gebacken |
+| `STRIPE_SECRET` | `rk_live_…` | eingeschränkter Live-Key (Least Privilege) |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…` | Signatur-Secret des Live-Endpunkts `we_1UQlhS0qxbyNaMESN5PNyhlM` |
+
+Der Endpunkt `we_1UQlhS0qxbyNaMESN5PNyhlM` zeigt auf
+`https://portal.reisinger.pictures/api/webhooks/stripe` und abonniert genau die
+vier Events, die `WebhookController::handleStripe` verarbeitet:
+`payment_intent.succeeded`, `payment_intent.payment_failed`,
+`charge.dispute.created`, `charge.refunded`.
+
+Gemessen am 2026-10-15 mit dem eingeschränkten Key (Testobjekte wieder entfernt):
+`paymentIntents->create`/`->cancel` und `customers->create`/`->delete` laufen —
+die gemessene Fläche ist also breiter als die genutzte. Serverseitig genutzt wird
+`stripe->paymentIntents->create`/`->retrieve`/`->cancel` und `stripe->customers->create`
+(`customers->delete` ruft `backend/app` nirgends auf).
+
+Drei Fallen, alle drei belegt:
+
+- **`pk_live` und `sk_live`/`rk_live` müssen zum selben Konto gehören.** Ein
+  gemischtes Paar fällt erst beim Bezahlen auf, nicht beim Start.
+- **Stripe gibt ein Signatur-Secret nur beim Anlegen aus.** `GET
+  /v1/webhook_endpoints` liefert es **nicht** zurück (gemessen) — danach ist es
+  nur im Dashboard sichtbar bzw. dort zu rollen.
+- **Keine öffentliche Key-API.** `GET /v1/api_keys` und `/v1/restricted_keys`
+  antworten **404**; Rechte und Rollen von Keys gibt es nur im Dashboard.
+
+Gegenprobe nach dem Deploy: im Dashboard beim Endpunkt **„Send test webhook"** →
+**HTTP 200** heißt Signatur stimmt, **400** heißt der `whsec` passt nicht.
+
 ### Einmalige Host-Voraussetzung: Fotospeicher
 
 Der Backend läuft als `1000:82`, der Fotospeicher gehörte `33:33` mit `755`.
@@ -176,6 +213,16 @@ Restore nie geprüft wurde, ist eine Vermutung.
 ## 4. Deploy
 
 ### Sync und der Container-Neustart (Pflicht)
+
+Das Frontend wird **vor** dem Sync gebaut, und der Build braucht den Live-Key
+in `frontend/.env.production` (nicht in `.env`, das von `.env.local` überstimmt
+wird — Herleitung in `features/security/env-hardening.md`, Abschnitt
+„Frontend"). Prüfzeile direkt nach dem Build:
+
+```bash
+cd frontend && pnpm lint:fix && pnpm build
+grep -rho 'pk_live_[A-Za-z0-9]\{12\}' dist/assets | head -1   # muss den Live-Key zeigen
+```
 
 `sync.sh` kopiert Code, nichts mehr. **Nach jedem Sync mit PHP-Änderungen
 muss `portal_backend` neu gestartet werden:**
@@ -401,7 +448,8 @@ Betrieb doch anders verhält als im Test.
 > weiterhin offen: „[ ] manuell prüfen: erstes Kamera-Foto über FTPS/SFTP
 > hochladen und prüfen, dass `FtpController::process()` es der Galerie zuordnet …
 > P1-M32 — echter Kamera-Test. Heute ausdrücklich offengelassen."
-> (`AGENTS.todo.md:1483`). Die Reihenfolge aus 7.12 wurde also nicht eingehalten,
+> (Board, Position „manuell prüfen: erstes Kamera-Foto … P1-M32 — echter Kamera-Test"). Die
+> Reihenfolge aus 7.12 wurde also nicht eingehalten,
 > und zwar außerhalb dieses Repos.
 >
 > Praktische Folge: Wer heute noch von einem Parallelbetrieb liest, liest einen

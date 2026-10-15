@@ -93,6 +93,30 @@ Register).
 `STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET` sind verpflichtend über
 Env-Variablen zu setzen. Tests verwenden `Config::set(...)` mit Mock-Werten.
 
+### Stripe-Test-Key: aus dem Dashboard, nicht aus der CLI (2026-10-15)
+
+`stripe login` legt in `~/.config/stripe/config.toml` einen **eigenen** Test-Key
+ab — nicht den Standard-Key des Kontos. Er trägt ein Ablaufdatum
+(`test_mode_key_expires_at`), und Stripe **erzwingt** es: der Vorgänger-Key
+antwortet nach seinem Datum mit `401 {"code":"api_key_expired"}`. Genau das hat
+die E2E-Kette ab 2026-10-12 rot gemacht (Board-Position „wartet auf die Stripe-Test-Key-Rotation
+durch den Owner") — die
+Ursache sah wie ein Testfehler aus, war aber ein abgelaufener Key.
+
+Deshalb gilt für `backend/.env` und die GitHub-Secrets:
+
+- **Test-Secret aus dem Dashboard** (Testmodus → API keys → Secret key). Er
+  trägt kein Ablaufdatum; gemessen sind CLI-Key und Dashboard-Key zwei
+  verschiedene Werte (`sha256` `949838090def` vs. `5ce6d2c3849b`).
+- **Der Publishable-Key ist in beiden Quellen derselbe** (`sha256`
+  `c9b329739363`) — pro Konto und Modus gibt es nur einen Standard-`pk_test`.
+  Hier ist die Herkunft also egal.
+- **Eine Rotation per CI ist nicht möglich:** Stripe hat keine Key-API
+  (`GET /v1/api_keys` und `/v1/restricted_keys` antworten **404**, gemessen);
+  Keys rollen ist reine Dashboard-Handarbeit. Das Netz ist der CI-Preflight
+  „Validate Stripe API key (read + write)". Er schlägt beim ersten Lauf nach
+  einer nicht weitergereichten Rotation fehl — laut, nicht still.
+
 ## File Encryption at Rest (2026-09-19)
 
 Sensible Model-Dateien (**Altersnachweis** + **Personen-Fotos**) werden
@@ -185,6 +209,36 @@ cd frontend
 cp .env.example .env           # oder: cp .env.local.example .env.local
 # VITE_STRIPE_PUBLIC_KEY eintragen
 pnpm install
+```
+
+**Welche Datei gewinnt — und warum das für den Deploy zählt.** Vite lädt
+`.env.local` in **allen** Modi, und `pnpm build` läuft als mode=production. Die
+Rangfolge, höchste zuerst — nachprüfbar in der installierten Quelle
+(`grep -n 'getEnvFilesForMode' frontend/node_modules/vite/dist/node/chunks/node.js`,
+Vite 8.2.2 liefert `[.env, .env.local, .env.<mode>, .env.<mode>.local]`; die
+Reihenfolge ist die Aussage, nicht die Zeilennummer):
+
+```
+.env.production.local  (gitignored)  ← optionaler lokaler Override; höchste Stufe
+.env.production        (gitignored)  ← der Live-Key gehört HIERHIN
+.env.local             (gitignored)  ← Dev-Override; schlägt `.env` in ALLEN Modi
+.env                   (gitignored)
+```
+
+`VITE_*` wird beim Build **eingebacken**; Portainer/`.env.production` im Repo-Root
+erreichen das Bundle also nie — die versorgen nur den Backend-Container. Ein
+Prod-Build braucht deshalb `frontend/.env.production` mit dem Live-Key. Ohne
+diese Datei trägt das Bundle den Test-Key aus `.env.local` (bzw. `.env`), und
+Stripe.js kann den `client_secret` eines Live-PaymentIntent nicht bestätigen.
+
+**Beleg (2026-10-15, gemessen):** `assets/ClientCartView-3L6eh2lZ.js` der
+Live-Seite und dasselbe Chunk im lokalen `frontend/dist/` hatten identische
+`md5` (`67b769fd0dbc1c4f293410433d3d8f9d`) und enthielten beide
+`pk_test_51TJyXb0zjsh…`, während der Backend-Container
+`STRIPE_SECRET=sk_live_…` führte. Prüfzeile nach jedem Build:
+
+```bash
+grep -rho 'pk_live_[A-Za-z0-9]\{12\}' frontend/dist/assets | head -1
 ```
 
 ## Verbleibendes Risiko (akzeptiert)
