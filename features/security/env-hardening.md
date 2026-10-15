@@ -189,8 +189,8 @@ und Aufruf. Gepinnt: `StripeKeyModeTest` (Grenzfälle der Modus-Ableitung) und
 Fotograf 403, plus je ein Fall pro Befund inkl. `bundle_mode: null`, abgelaufener
 Key, fehlender/disabled/event-unvollständiger Endpunkt, Konto ohne
 `charges_enabled`, ein Stripe-Fehler auf dem Konto- und dem Endpunkt-Pfad sowie
-ein gar nicht baubarer Client; `assertNoSecretMaterial()` prüft jede Antwort auf
-fehlende `sk_`/`pk_`/`whsec_`-Werte).
+ein gar nicht baubarer Client; `assertNoSecretMaterial()` prüft jede Befund-Antwort
+auf fehlende `sk_`/`pk_`/`whsec_`-Werte).
 
 **Prüfung 5 bleibt in jedem Environment streng** — fehlender Endpunkt ist überall
 `fail`, nicht umgebungsabhängig. Der E2E-Lauf prüft deshalb nur die vier

@@ -164,6 +164,7 @@ class StripeKeyCheckControllerTest extends TestCase
             $this->assertSame('fail', $check['status']);
             $this->assertStringContainsString('WEBHOOK_SECRET', $check['message']);
             $this->assertStringContainsString('nicht gesetzt', $check['message']);
+            $this->assertNoSecretMaterial($response);
         });
     }
 
@@ -188,6 +189,7 @@ class StripeKeyCheckControllerTest extends TestCase
             $this->assertStringContainsString('Tunnel-Artefakt', $check['message']);
             // The source is named, the value never is.
             $this->assertStringNotContainsString('whsec', $response->getContent());
+            $this->assertNoSecretMaterial($response);
         });
     }
 
@@ -251,6 +253,7 @@ class StripeKeyCheckControllerTest extends TestCase
         $check = $this->checkByKey($response, 'frontend_bundle_mode');
         $this->assertSame('fail', $check['status']);
         $this->assertStringContainsString('VITE_STRIPE_PUBLIC_KEY', $check['message']);
+        $this->assertNoSecretMaterial($response);
     }
 
     public function test_explicit_null_bundle_mode_is_a_finding_not_a_422(): void
@@ -263,6 +266,7 @@ class StripeKeyCheckControllerTest extends TestCase
         $response->assertStatus(200);
         $check = $this->checkByKey($response, 'frontend_bundle_mode');
         $this->assertSame('fail', $check['status']);
+        $this->assertNoSecretMaterial($response);
     }
 
     // --- Check 3: stripe_balance ------------------------------------------
@@ -292,6 +296,7 @@ class StripeKeyCheckControllerTest extends TestCase
         $check = $this->checkByKey($response, 'stripe_balance');
         $this->assertSame('fail', $check['status']);
         $this->assertStringContainsString('more_permissions_required', $check['message']);
+        $this->assertNoSecretMaterial($response);
     }
 
     /**
@@ -355,6 +360,7 @@ class StripeKeyCheckControllerTest extends TestCase
         $this->assertSame('fail', $check['status']);
         $this->assertStringContainsString('live', $check['message']);
         $this->assertStringContainsString('test', $check['message']);
+        $this->assertNoSecretMaterial($response);
     }
 
     // --- Check 4: stripe_account ------------------------------------------
@@ -371,6 +377,7 @@ class StripeKeyCheckControllerTest extends TestCase
         $this->assertSame('warn', $check['status']);
         $this->assertStringContainsString('charges_enabled', $check['message']);
         $this->assertStringContainsString('acct_', $check['message']);
+        $this->assertNoSecretMaterial($response);
     }
 
     /**
@@ -412,6 +419,7 @@ class StripeKeyCheckControllerTest extends TestCase
         $check = $this->checkByKey($response, 'stripe_webhook_endpoint');
         $this->assertSame('fail', $check['status']);
         $this->assertStringContainsString('Kein Webhook-Endpunkt', $check['message']);
+        $this->assertNoSecretMaterial($response);
     }
 
     public function test_disabled_webhook_endpoint_flags_as_fail(): void
@@ -425,6 +433,7 @@ class StripeKeyCheckControllerTest extends TestCase
         $check = $this->checkByKey($response, 'stripe_webhook_endpoint');
         $this->assertSame('fail', $check['status']);
         $this->assertStringContainsString('deaktiviert', $check['message']);
+        $this->assertNoSecretMaterial($response);
     }
 
     public function test_incomplete_webhook_events_warn_and_name_missing_event(): void
@@ -443,6 +452,7 @@ class StripeKeyCheckControllerTest extends TestCase
         $this->assertSame('warn', $check['status']);
         $this->assertStringContainsString('charge.refunded', $check['message']);
         $this->assertStringContainsString('we_', $check['message']);
+        $this->assertNoSecretMaterial($response);
     }
 
     /**
