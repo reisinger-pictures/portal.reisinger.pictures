@@ -504,6 +504,9 @@ export interface CheckoutResponse { success?: boolean; payment_pending?: boolean
 export interface RedeemInviteResponse { full_path?: string; message?: string; requires_mail_verification?: boolean; }
 export interface SendMailResponse { success: boolean; notified_count: number; }
 export interface TestEmailResponse { success: boolean; sent_to: string; }
+export type StripeCheckStatus = 'ok' | 'warn' | 'fail';
+export interface StripeCheckFinding { key: string; status: StripeCheckStatus; message: string; }
+export interface StripeCheckResponse { checks: StripeCheckFinding[]; }
 export interface GenerateInviteResponse { success: boolean; link: string; }
 export interface InviteData { id: string; name: string; token: string; }
 export interface RatingData { lr_uuid?: string; filename?: string; avg_rating?: number; all_comments?: string; thumb_url?: string; user_id?: string; name?: string; email?: string; rated_count?: number; }

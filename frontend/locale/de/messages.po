@@ -2757,6 +2757,10 @@ msgstr "Fehler beim Speichern einiger Einträge"
 msgid "Fehler beim Speichern."
 msgstr "Fehler beim Speichern."
 
+#: src/ui/management/ManagementSettingsView.tsx
+msgid "Fehler beim Stripe-Verbindungstest: {stripeError}"
+msgstr "Fehler beim Stripe-Verbindungstest: {stripeError}"
+
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Fehler beim Umschalten"
 msgstr "Fehler beim Umschalten"
@@ -5686,6 +5690,10 @@ msgstr "Prüfe, dass die Datei angekommen ist: die Anzahl unter „Bilder in der
 msgid "Prüfe…"
 msgstr "Prüfe…"
 
+#: src/ui/management/ManagementSettingsView.tsx
+msgid "Prüft die Stripe-Konfiguration (Schlüssel-Modus, Bundle-Modus, Balance, Konto und Webhook) direkt über die Stripe-API — nur bei explizitem Klick."
+msgstr "Prüft die Stripe-Konfiguration (Schlüssel-Modus, Bundle-Modus, Balance, Konto und Webhook) direkt über die Stripe-API — nur bei explizitem Klick."
+
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Qualität"
 msgstr "Qualität"
@@ -6298,6 +6306,10 @@ msgstr "Stripe ist der eingesetzte Zahlungsdienstleister und Zahlungsprozessor f
 msgid "Stripe konnte nicht geladen werden. Bitte versuche es erneut oder öffne die Rechnung als Ausweichoption."
 msgstr "Stripe konnte nicht geladen werden. Bitte versuche es erneut oder öffne die Rechnung als Ausweichoption."
 
+#: src/ui/management/ManagementSettingsView.tsx
+msgid "Stripe-Verbindungstest"
+msgstr "Stripe-Verbindungstest"
+
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Studentenrabatt (33%)"
 msgstr "Studentenrabatt (33%)"
@@ -6733,6 +6745,10 @@ msgstr "Verbindliche Unterzeichnung"
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Verbindung ok, aber 0 Bilder in der Warteschlange"
 msgstr "Verbindung ok, aber 0 Bilder in der Warteschlange"
+
+#: src/ui/management/ManagementSettingsView.tsx
+msgid "Verbindung testen"
+msgstr "Verbindung testen"
 
 #: src/ui/management/FtpConnectionRows.tsx
 msgid "Verbindungsdaten der Kamera nicht verfügbar"

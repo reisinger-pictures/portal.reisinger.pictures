@@ -738,6 +738,30 @@ entscheiden".
   nur entschieden — die Alternative (beide Werte rollen, neuen Key per Zwischenablage übergeben und
   den Endpunkt neu anlegen, damit sein `whsec` nie durch den Chat läuft) ist damit **verworfen**.
 
+- **D-26 — Der Stripe-Selbsttest: Prüfung 5 bleibt streng, der E2E prüft nur die vier
+  umgebungsdeterministischen Befunde** (Owner, interaktiv 2026-10-15; setzt den in
+  `AGENTS.todo.md` beschlossenen Umfang um). Der Super-Admin-Endpunkt
+  `POST /api/management/settings/stripe-check` liefert **immer fünf** Befunde. Die fünfte
+  (`stripe_webhook_endpoint`, geprüfte URL `BrandRegistry::frontendUrl()/api/webhooks/stripe`)
+  ist im E2E-Lauf **zwangsläufig rot** und wird dort deshalb nicht assertiert. *Warum:* gemessen
+  am 2026-10-15 gibt es im **Test**-Modus keinen Endpunkt —
+  `curl -sS -H "Authorization: Bearer $STRIPE_SECRET" 'https://api.stripe.com/v1/webhook_endpoints?limit=100'`
+  → `"data": []`. Den Test-Modus-Endpunkt legt nur der lokale Tunnel ad hoc an, der CI-Job hat
+  keinen, und im E2E-Lauf ist `frontendUrl()` ein `localhost`, auf das in Stripe nichts zeigt.
+  **Zwei verworfene Auswege, damit sie nicht erneut vorgeschlagen werden:** (a) die Prüfung
+  umgebungsabhängig zu machen (fehlend = `warn` in local/testing, `fail` in production) — eine
+  Prüfung mit zwei Bedeutungen verliert die Eindeutigkeit von „rot heißt kaputt"; (b) den Endpunkt
+  im E2E per `page.route` zu mocken — der grüne Assert wäre dann ein Test der Darstellung statt
+  der Verbindung, und die D-24-Klasse (falscher Modus im Bundle) bliebe allein ungemockt geprüft.
+  **Der Zweig-Test der Prüfung 5 liegt deshalb in PHPUnit**
+  (`backend/tests/Feature/StripeKeyCheckControllerTest.php`), wo ein gefakter Client
+  fehlend/disabled/unvollständige Events deterministisch erzeugt. Die vier übrigen Prüfungen
+  hängen nur an Env und Key-Modus und sind im E2E-Lauf deterministisch — am 2026-10-15 gemessen:
+  `livemode = False` (Soll-Modus `test`, abgeleitet aus `APP_ENV=local`) und `charges_enabled` /
+  `payouts_enabled` / `details_submitted` alle `true`. Den **Vertrag** (Route, die fünf `key`s,
+  Statusbedeutung, „nie Key-Material in der Antwort") hält `features/security/env-hardening.md`
+  als dauerhaften SOLL-Zustand; der Umsetzungsstand steht im Protokoll in `AGENTS.todo.md`.
+
 ## TODO (UI-Review)
 
 UI-Review-Screenshot-Skill noch nicht angewendet (Playwright-Harness + Vision-Analyse). Referenz: ocg-price-tracker/tests/screenshots (ui-screenshots.spec.ts mit Section-Captures).

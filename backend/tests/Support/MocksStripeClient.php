@@ -2,6 +2,7 @@
 
 namespace Tests\Support;
 
+use Closure;
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\ClientInterface;
 
@@ -40,5 +41,23 @@ trait MocksStripeClient
     protected function resetStripeHttpClient(): void
     {
         ApiRequestor::setHttpClient(null);
+    }
+
+    /**
+     * Install a URL-routing Stripe HTTP mock over the same
+     * ApiRequestor::setHttpClient() seam the rest of the suite uses. The handler
+     * receives the absolute Stripe URL and returns a `[body, status, headers]`
+     * tuple (`json_encode($body)` the body). Reset it in tearDown() with
+     * {@see resetStripeHttpClient()}.
+     */
+    protected function mockStripeApi(Closure $handler): void
+    {
+        $clientMock = $this->createMock(ClientInterface::class);
+        $clientMock->method('request')
+            ->willReturnCallback(function (string $method, string $absUrl, array $headers, array $params, bool $hasFile) use ($handler): array {
+                return $handler($absUrl);
+            });
+
+        ApiRequestor::setHttpClient($clientMock);
     }
 }
