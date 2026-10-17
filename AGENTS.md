@@ -119,7 +119,7 @@ The system and workflow are managed via a Main/Secondary Model architecture to p
   5. Bei visuellen Prüfungen (Layout, Screenshots, Bilder, Screenshots-Analyse) den **`vision`-Subagenten** nutzen.
   Diese Regel wurde am 2026-07-31 etabliert, am 2026-08-02 konkretisiert und darf nicht umgangen werden.
 
-**Build-/Verify-Flow:** pull → delegieren → verifizieren → committen → amend → push ist zentral in Skill `build-verify` (`~/dev/agents-skills/.agents/skills/build-verify/SKILL.md`; Always-on-Kernel `.agents/rules/build-verify.md`) definiert und gilt hier **unverändert**. Diese Datei hält nur die Repo-Spezifika (Kommandos, E2E-Tags, Screenshot-Pflicht, Modul-Abhängigkeiten, Sonderfälle) — die belegten Fehlermuster („Belegt am 2026-09-28") stehen als Traps in jenem Skill und werden hier nicht wiederholt.
+**Build-/Verify-Flow:** pull → delegieren → verifizieren → committen → amend → push ist zentral in Skill `build-verify` (`~/dev/agents-skills/.agents/skills/build-verify/SKILL.md`; Kernregel `.agents/rules/build-verify.md`) definiert und gilt hier **unverändert**. Diese Datei hält nur die Repo-Spezifika (Kommandos, E2E-Tags, Screenshot-Pflicht, Modul-Abhängigkeiten, Sonderfälle) — die belegten Fehlermuster („Belegt am 2026-09-28") stehen als Traps in jenem Skill und werden hier nicht wiederholt.
 
 
 ## 6. Testing & E2E (STRICT)
