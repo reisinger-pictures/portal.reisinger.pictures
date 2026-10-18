@@ -78,6 +78,36 @@ the stated prerequisites, not on a confirmed production exploit.
 
 ---
 
+### Automatischer FTP-Import (D-35, D-36) — offen
+
+Der Import verlangt heute einen manuellen Klick je Upload; Ziel ist Event-Auslösung plus
+Hintergrundkette in 20er-Batches (Entscheidungen in `AGENTS.md` §14 D-35/D-36). Die
+Batch-Semantik (maximal `ftp.import.max_files` je Lauf, Rest bleibt, kein Fehler) ist Teil der
+SEC-14-Umsetzung; alles darunter ist eigene Arbeit.
+
+- [ ] **SFTPGo-Regel idempotent provisionieren.** Aktion Typ `1` (HTTP) auf einen internen
+  Portal-Endpunkt, Regel für das Upload-Event, Secret im Stack-Env. Die Regel liegt im
+  SFTPGo-Datenprovider, nicht in der Compose-Datei — also ein versionierter Artisan-Befehl über
+  die Admin-API (`SftpGoClient`), nicht Handarbeit im Web-UI. **Test:** zweimaliges Provisionieren
+  erzeugt keine Dublette und keine zweite Aktion; ein geändertes Secret aktualisiert die Aktion.
+- [ ] **Interner Event-Endpunkt.** Nimmt `username` (= `ftp_slug`), Pfad und Event-Typ, prüft das
+  Secret, löst User und `current_ftp_gallery_id` auf und reiht den Batch-Job ein. Kein
+  JWT-Zugang, keine Wirkung ohne gültiges Secret. **Tests:** falsches/fehlendes Secret → 401,
+  unbekannter Slug → kein Job, fehlende Zielgalerie → Datei bleibt liegen und kein Job,
+  gültiger Fall → genau ein Job.
+- [ ] **Queue-Job `ImportFtpBatch`.** Importiert bis `ftp.import.max_files` Dateien und reiht sich
+  bei Resten selbst neu ein; die Kette endet bei leerer Inbox **und** nach wiederholtem
+  Fehlschlag (kein Endlos-Retry). Der bestehende per-User-Lock bleibt die Konkurrenzbremse.
+  **Tests:** 50 Dateien leeren die Inbox in drei Läufen; ein dauerhaft fehlschlagender Batch
+  beendet die Kette mit Fehlerprotokoll; paralleler Event-Lauf erzeugt keine Doppelimporte.
+- [ ] **Nachlauf beim Öffnen der FTP-Seite.** Einmalig beim Mount, kein `refreshInterval`, kein
+  Polling. **Test:** Seitenaufruf löst genau einen Nachlauf aus, ein zweiter Mount im selben
+  Zeitfenster keinen zweiten.
+- [ ] **Doku nachziehen.** `features/infrastructure/19-ftp-upload-pipeline.md` §1, §3 und §6 auf
+  Event-Trigger, Batch-Kette und Nachlauf umstellen; die drei Config-Keys mit ihren Defaults
+  nennen.
+
+---
 - [ ] **Dependabot: 1 offener Alert am Default-Branch** (war 10) — gemessen am 2026-10-18 mit `gh api repos/reisinger-pictures/portal.reisinger.pictures/dependabot/alerts?state=open&per_page=100 -q '.[] | [.security_advisory.severity, .dependency.package.name] | @tsv'` → **1 high (`braces`), 0 critical**. Patch-Stand je Paket (dieselbe Abfrage, `-q '.[] | [.security_advisory.severity, .dependency.package.name, .security_vulnerability.vulnerable_version_range, (.security_vulnerability.first_patched_version.identifier // "KEINE")] | @tsv'`): `undici` (6 Alerts — 1 high + 2 medium + 3 low; verwundbar `< 7.29.1`, installiert `7.29.0`), `source-map-js` (high, `< 1.2.2`, installiert `1.2.1`), `brace-expansion` (medium, `< 5.0.12`), `postcss-selector-parser` (medium, `< 7.1.6`), `braces` (high, `<= 3.0.3`, **`gepatcht-ab=KEINE`**). Dependency-CVEs, **nicht** Endpunkt-Autorisierung → eigener Durchgang (`node-deps`), **ausgeführt** (Ergebnis in den beiden Unterpunkten).
   - **Ergebnis der `node-deps`-Wellen (`85f102b` + die `undici`-Kopplung):** drei Pakete sind über `overrides` in `frontend/pnpm-workspace.yaml` gehoben (`source-map-js` 1.2.1 → 1.2.2, `brace-expansion` 5.0.9 → 5.0.12, `postcss-selector-parser` 6.0.10 → 7.1.6) — alle **transitiv** und dev/build-only (kein Treffer über alle 40 JS-Chunks, `pnpm why` weist jeden Pfad). `undici` brauchte am Ende **keinen** Override: die Kopplung wurde **gelöst** statt erzwungen — `jsdom@30.0.1` deklariert `^8.9.0` und löst selbst auf `8.12.2` auf, und **alle sechs** offenen `undici`-Advisories enden bei `< 7.29.1` (Range per API gemessen), 8.x liegt also außerhalb; der zwischenzeitliche erzwungene Downgrade auf 7.29.1 ist damit weg. `pnpm audit` 16 → 1, `pnpm audit --prod` 2 → 1, Vitest grün (1423; die 20 zusätzlichen Tests stammen aus der pk_test-Gate-Welle). **`braces` bleibt offen und ist als akzeptiertes Risiko dokumentiert (C8, `AGENTS.md` §8)** — kein Patch existiert, und der verwundbare Eingang wird von keiner der drei realen Aufrufstellen betreten. Beide Wellen unabhängig verifiziert (APPROVED; u. a. minimal-invasiver Lockfile-Diff, CSS byte-identisch trotz Major-Bump, JSDOM-Konstruktionsprobe unter 8.12.2). **Scan-Lag, kein Befund:** die Dependabot-API meldet weiter **10** Alerts, weil ihr letzter Scan vor `85f102b` lief; autoritativ für den lokalen Stand ist `pnpm audit` → **1**.
   - **Verlauf:** 17 → 15 (dompurify, PR #18) → 12 (`league/commonmark` ×2 + `laravel/framework`, PR #17/#16) → **10** (`tinypool` ×2 critical, PR #19) — alle vier über den Auto-Merge, **ohne Handarbeit**. **Der rote-PR-Blocker ist behoben (D-33):** die Security-PRs waren nie wegen ihres Codes rot, sondern weil GitHub die **Actions**-Secrets von jedem Dependabot-Lauf zurückhält — er liest ausschließlich den **Dependabot**-Store (für `push` **und** `pull_request`; nur `pull_request_target` erhält keine). Der Push-Lauf von PR #18 ist nach `@dependabot rebase` **11/11 grün** (`39130666484`) und wurde von `automerge.yml` gemergt (13:29:48Z, Merge-Kommit `e2d280b`).

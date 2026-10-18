@@ -968,6 +968,34 @@ Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA v
   regredieren:** wer den Nachweis auf „`main` ist grün" verkürzt, hat für Auto-Merge-Heads
   gar keinen Nachweis.
 
+- **D-35 — Der FTP-Import verarbeitet einen zu großen Posteingang in Batches, statt ihn abzulehnen**
+  (Owner, 2026-10-18). Liegen mehr Dateien in der Inbox als `ftp.import.max_files` (Default **20**)
+  erlaubt, verarbeitet ein Lauf die **ersten N** und lässt den Rest liegen; der Aufruf ist ein
+  **Erfolg**, und es wird **keine** Fehlermeldung gezeigt. Wiederholtes Auslösen leert die Inbox,
+  die Arbeit pro Lauf bleibt begrenzt. *Warum:* die Ablehnung des ganzen Laufs war eine Sackgasse —
+  ein normales Shooting hätte sie nur per SFTP-Aufräumen wieder verlassen, und die Karte zeigte
+  einen unbehandelten Reject statt eines Ergebnisses. *Grenze, die bleibt:* eine **einzelne** Datei
+  über `max_file_bytes` (Default 20 MiB) oder eine erste Datei über `max_batch_bytes`
+  (Default 100 MiB) scheitert weiterhin laut und mit Zahl, Limit und Ausweg — ein Batch ist eine
+  Arbeitsgrenze, keine Lizenz, unbegrenzt zu lesen. Die Batch-Auswahl nimmt Kandidaten in stabiler
+  Reihenfolge, bis `max_files` **oder** das Gesamtbudget erreicht ist; die drei Keys sind
+  `FTP_IMPORT_MAX_FILES`, `FTP_IMPORT_MAX_FILE_BYTES`, `FTP_IMPORT_MAX_BATCH_BYTES`.
+
+- **D-36 — Der FTP-Import wird event-getrieben und läuft im Hintergrund in 20er-Batches bis zur
+  leeren Inbox** (Owner, 2026-10-18). Auslöser ist ein Upload-Event aus SFTPGo (OSS 2.7 hat den
+  Event Manager: Aktions-Typ `1` = HTTP, Regeln über `/eventactions` und `/eventrules` der
+  Admin-API), das einen Queue-Job einreiht. Der Job importiert bis zu `ftp.import.max_files`
+  Dateien und **reiht sich selbst neu ein, solange Reste liegen** — die Verkettung endet, wenn
+  die Inbox leer ist oder ein Batch wiederholt scheitert. *Warum:* die bisherige Kette verlangte
+  einen manuellen Klick je Upload, und Ablehnung statt Batch war eine Sackgasse (D-35).
+  **Rückfallweg — bewusst so:** Events sind fire-and-forget, SFTPGo garantiert keine Zustellung.
+  Deshalb löst zusätzlich **das Öffnen der FTP-Seite einmalig einen Nachlauf** aus. Kein
+  Hintergrund-Polling, kein Sweep-Job, aber ein verlorenes Event heilt, sobald der Fotograf
+  hinsieht. *Grenzen, die bleiben:* ohne gesetzte Zielgalerie wird nicht automatisch importiert
+  (die Zuordnung ist eine bewusste Entscheidung des Fotografen, nicht geraten); die Regel liegt
+  im SFTPGo-Datenprovider und wird von einem versionierten Provisionierungsbefehl idempotent
+  gesetzt, nicht per Compose-Umgebungsvariable.
+
 ## TODO (UI-Review)
 
 UI-Review-Screenshot-Skill noch nicht angewendet (Playwright-Harness + Vision-Analyse). Referenz: ocg-price-tracker/tests/screenshots (ui-screenshots.spec.ts mit Section-Captures).
