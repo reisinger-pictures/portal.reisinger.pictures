@@ -396,16 +396,22 @@ Eintrag `15 ftp` in `dockge-project-map.txt` sind entfernt." — es gibt also
 weder ein Stop-Kommando für einen Stack, den man nicht mehr starten kann, noch
 einen Compose-Pfad, in dem man eines suchen könnte.
 
-> **Ein Zitat gekürzt, und zwar sichtbar:** in beiden Zitaten ist der
+> **Ein Zitat gekürzt, und zwar sichtbar:** an beiden Stellen ist der
 > Registry-Host `ghcr.io` vom Image-Namen getrennt (`reisi007/pureftp-2-users`).
-> Das ändert den Wortlaut der zitierten `MIGRATION.md` minimal, und es ist
-> trotzdem die einzige Änderung, die nötig war — der Wächter
+> Das ändert den Wortlaut der zitierten `MIGRATION.md` minimal — es bleibt
+> dabei, aber aus einem anderen Grund als ursprünglich: es ist eine **Konvention
+> dieses Repos**, keine Wirkung des Wächters. Der Wächter
 > `InfrastructureSupplyChainPolicyTest::test_container_image_references_use_the_owning_organization_namespace`
-> verbietet **jede** `ghcr.io`-Referenz auf eine andere als die eigene
-> Namespace im ganzen Repository, also auch in Prosa. Der Stack ist seit dem
-> 2026-09-27 gelöscht und sein Image archiviert; eine auflösbare Pull-Referenz
-> darauf zu nennen hat keinen operationellen Wert und würde den Wächter für einen
-> Verstoß entschärfen, den es nicht gibt. **Kein Stack, kein Deployment und kein
+> scannt seit dem 2026-10-18 nur noch die **ausgelieferten Artefakte**
+> (`containerArtifactFiles()`: die Compose-Dateien, `deployment/Dockerfile*` und
+> `.github/workflows/*.yml`). **Prosa ist bewusst kein Gate** — ein reiner
+> Doku-Push betritt die Pipeline gar nicht erst (D-23), ein Prosa-Scan könnte
+> dort also nichts erzwingen; diese Datei gehört nicht zur gescannten Menge und
+> dürfte die Referenz wörtlich führen, ohne dass etwas rot würde. Sie führt sie
+> trotzdem getrennt: **dieses Repo soll keine auflösbare Referenz auf ein fremdes
+> Image tragen** — in Artefakten erzwungen, in Prosa als Konvention. Der Stack
+> ist seit dem 2026-09-27 gelöscht und sein Image archiviert; eine Pull-Referenz
+> darauf hat keinen operationellen Wert. **Kein Stack, kein Deployment und kein
 > Workflow in diesem Repo konsumiert ein Image außerhalb der eigenen Namespace** —
 > das ist der eigentliche Befund, und den trifft der Wächter weiterhin.
 > *Wer diese Trennlinie braucht, schreibt den Registry-Host und den Namespace

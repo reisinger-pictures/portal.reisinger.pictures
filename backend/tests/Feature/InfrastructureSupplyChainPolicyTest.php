@@ -2,11 +2,8 @@
 
 namespace Tests\Feature;
 
-use DirectoryIterator;
-use SplFileInfo;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
-use UnexpectedValueException;
 
 class InfrastructureSupplyChainPolicyTest extends TestCase
 {
@@ -37,35 +34,11 @@ class InfrastructureSupplyChainPolicyTest extends TestCase
      * consumer must pin this namespace. The previously used personal `ghcr.io`
      * namespace silently froze the pinned digests on stale images: rebuilds only
      * ever reached the organisation path. The literal old path is deliberately
-     * not spelled out here, because this guard rejects *any* non-organisation
-     * `ghcr.io` reference — including in comments and documentation.
+     * not spelled out here: this guard rejects *any* non-organisation `ghcr.io`
+     * reference in a delivered artifact, so a literal copy would be a permanent
+     * trap for anyone who widens the scan again.
      */
     private const IMAGE_NAMESPACE = 'reisinger-pictures';
-
-    /**
-     * Directories that never contain tracked container-artifact references.
-     *
-     * @var list<string>
-     */
-    private const SCAN_EXCLUDED_DIRECTORIES = [
-        '.git',
-        'node_modules',
-        'vendor',
-        'dist',
-        // Runtime/test scratch: unreadable subtrees and never source of a pin.
-        'storage',
-        'bootstrap',
-        'test-results',
-        'playwright-report',
-    ];
-
-    /**
-     * `@var list<string>` Session-owned scratch file. It deliberately records
-     * historical artifact references, so it is not part of the policy scan.
-     */
-    private const SCAN_EXCLUDED_FILES = [
-        'AGENTS.todo.md',
-    ];
 
     /**
      * @var list<string>
@@ -164,13 +137,16 @@ class InfrastructureSupplyChainPolicyTest extends TestCase
      * Regression guard for the namespace drift: both image workflows publish
      * under the owning organisation, so a consumer that names any other
      * registry namespace pins a digest no rebuild can ever refresh.
+     *
+     * The scan is deliberately limited to the delivered container artifacts —
+     * see {@see containerArtifactFiles()} for why prose is not a security gate.
      */
     public function test_container_image_references_use_the_owning_organization_namespace(): void
     {
         $scannedFiles = 0;
         $references = [];
 
-        foreach ($this->scannableFiles() as $relativePath) {
+        foreach ($this->containerArtifactFiles() as $relativePath) {
             $contents = $this->read($relativePath);
             $scannedFiles++;
 
@@ -183,7 +159,11 @@ class InfrastructureSupplyChainPolicyTest extends TestCase
             }
         }
 
-        $this->assertGreaterThan(0, $scannedFiles, 'the namespace scan must cover the repository');
+        $this->assertGreaterThan(
+            0,
+            $scannedFiles,
+            'the namespace scan must cover the delivered container artifacts'
+        );
         $this->assertNotEmpty(
             $references,
             'the repository must still declare at least one ghcr.io image reference'
@@ -621,63 +601,48 @@ PHP;
     }
 
     /**
-     * Every tracked text file that may name a container artifact. Comments and
-     * documentation are scanned on purpose: a stale namespace in either is
-     * exactly what allowed this drift to go unnoticed.
+     * The delivered container artifacts: the files a container image reference
+     * is actually consumed from.
+     *
+     * Prose is deliberately not scanned. Until 2026-10-18 this method walked
+     * every tracked text file, Markdown included, on the theory that a stale
+     * namespace in documentation is what let the original drift go unnoticed
+     * (see IMAGE_NAMESPACE). The measurement that ended it: of the 139 scanned
+     * Markdown files, five name a `ghcr.io/<organisation>` image reference and
+     * **none** carries a finding this delivered set does not also carry — every
+     * prose mention already names the organisation namespace. Prose therefore
+     * had no finding to lose, while the walk made this gate depend on files CI
+     * does not even run for: a documentation-only push is filtered out of the
+     * pipeline (D-23), so a prose scan cannot be a gate at all. Documentation
+     * drift is a review concern, not a supply-chain one.
+     *
+     * `ghcr.io/<organisation>` is spelled without the trailing separator on
+     * purpose: with it, this docblock would match the very finding regex that
+     * the IMAGE_NAMESPACE note warns about.
+     *
+     * Shell scripts, env fixtures and PHP test assertions are out of scope for
+     * the same reason: they mention an image, they do not consume one.
+     *
+     * The list below is explicit rather than discovered — a conscious trade. A
+     * walk picks up a new compose file or Dockerfile by itself, but it was never
+     * complete either: it skipped whole trees and could not see an untracked
+     * pin, so its breadth was hoped for, not guaranteed. The explicit list is
+     * narrow but guaranteed. The consequence is named rather than hidden: a new
+     * delivered artifact has to be added here, and nothing reports one that was
+     * forgotten.
      *
      * @return list<string>
      */
-    private function scannableFiles(): array
+    private function containerArtifactFiles(): array
     {
-        $root = $this->projectPath();
-        $files = [];
-
-        // Explicit breadth-first walk. A recursive iterator combined with a
-        // filter callback does not reliably descend on every supported PHP
-        // version, and an unreadable directory must not abort the scan.
-        $queue = [$root];
-        while ($queue !== []) {
-            $directory = array_shift($queue);
-
-            try {
-                $entries = new DirectoryIterator($directory);
-            } catch (UnexpectedValueException) {
-                continue;
-            }
-
-            foreach ($entries as $entry) {
-                /** @var SplFileInfo $entry */
-                $name = $entry->getFilename();
-
-                if ($entry->isDot()) {
-                    continue;
-                }
-
-                if ($entry->isDir()) {
-                    if (! in_array($name, self::SCAN_EXCLUDED_DIRECTORIES, true)) {
-                        $queue[] = $entry->getPathname();
-                    }
-
-                    continue;
-                }
-
-                if (! $entry->isFile() || in_array($name, self::SCAN_EXCLUDED_FILES, true)) {
-                    continue;
-                }
-
-                // Binary or generated assets can never carry a reviewable pin.
-                if (! preg_match(
-                    '/\.(?:md|ya?ml|sh|php|ts|tsx|js|jsx|json|jsonc|xml|txt|conf|cfg|ini|env|ci|example|css|html|htaccess)$/i',
-                    $name
-                )
-                    && ! in_array($name, ['.env.ci', '.env.example', 'Dockerfile', 'Dockerfile.e2e', '.gitignore'], true)) {
-                    continue;
-                }
-
-                $path = $entry->getPathname();
-                $files[] = str_starts_with($path, $root.'/') ? substr($path, strlen($root) + 1) : $path;
-            }
-        }
+        $files = array_merge(
+            self::COMPOSE_FILES,
+            ['deployment/Dockerfile', 'deployment/Dockerfile.e2e'],
+            array_map(
+                static fn (string $path): string => '.github/workflows/'.basename($path),
+                $this->workflowFiles()
+            )
+        );
 
         sort($files);
 
