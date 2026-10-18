@@ -445,8 +445,17 @@ class AuthController extends Controller
             // reader (getAllowedGalleryIds) so the UI can only offer
             // assignments the server accepts. Null for every other actor.
             'org_scope' => $svc->isOrgAdmin($user) ? [
+                'org_id' => (string) $user->org_id,
                 'gallery_ids' => $svc->getOrgGalleryScope((string) $user->org_id),
+                // Broad group scope: what the organisation may manage
+                // (`OrgController::syncGroups`) and the set the reader derives
+                // member access from.
                 'gallery_group_ids' => $svc->getOrgGroupScope((string) $user->org_id),
+                // Narrower set of groups an org admin may newly grant to a
+                // user. `UserController::update` enforces exactly this set, so
+                // the user editor must offer no more than this — otherwise it
+                // presents groups the server answers with 403.
+                'assignable_gallery_group_ids' => $svc->getOrgAssignableGalleryGroupIds((string) $user->org_id),
             ] : null,
             'missing_watermark' => $missingWatermark,
             'ai_is_unconfigured' => app(AIService::class)->isUnconfigured(),

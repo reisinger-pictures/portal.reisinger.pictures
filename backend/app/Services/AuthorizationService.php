@@ -12,6 +12,7 @@ use App\Models\Org;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Support\GalleryGroupSubtree;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -219,6 +220,123 @@ class AuthorizationService
         }
 
         return array_values(array_unique($galleryIds));
+    }
+
+    /**
+     * The groups an org admin may newly assign directly to a user.
+     *
+     * Unlike org-derived gallery access, a direct user group grant includes
+     * every gallery type in the group's subtree. Exclude any group whose
+     * subtree contains a non-delivery gallery, and its ancestors, so this
+     * assignment path cannot expose selection galleries. Existing grants are
+     * handled separately by the writer and may be retained or removed.
+     *
+     * @return array<string>
+     */
+    public function getOrgAssignableGalleryGroupIds(Org|string $org): array
+    {
+        $orgModel = $org instanceof Org ? $org : Org::query()->find($org);
+        if (! $orgModel) {
+            return [];
+        }
+
+        $orgBrand = BrandRegistry::normalizeId($orgModel->brand);
+        if ($orgBrand === null) {
+            return [];
+        }
+
+        $groupIds = $this->getOrgGroupScope($orgModel);
+        if ($groupIds === []) {
+            return [];
+        }
+
+        $groups = GalleryGroup::query()
+            ->whereIn('id', $groupIds)
+            ->get(['id', 'parent_id', 'brand']);
+        $groupsById = $groups->keyBy(fn (GalleryGroup $group): string => (string) $group->id);
+
+        // The scope contains a pivot group and its descendants, not the
+        // ancestors above a pivot — but the brand walk below must still see
+        // those. Load the ancestor closure once so the walk resolves parents
+        // from memory instead of issuing one query per group and level.
+        $missingParentIds = $this->pendingParentIds($groups, $groupsById);
+        while ($missingParentIds !== []) {
+            $parents = GalleryGroup::query()
+                ->whereIn('id', $missingParentIds)
+                ->get(['id', 'parent_id', 'brand']);
+
+            foreach ($parents as $parent) {
+                $groupsById->put((string) $parent->id, $parent);
+            }
+
+            $missingParentIds = $this->pendingParentIds($parents, $groupsById);
+        }
+
+        $resolveGroup = fn (string $groupId): ?GalleryGroup => $groupsById->get($groupId);
+
+        $scopeGroupIds = $groups
+            ->map(fn (GalleryGroup $group): string => (string) $group->id)
+            ->all();
+
+        $unsafeGroupIds = Gallery::query()
+            ->whereIn('gallery_group_id', $scopeGroupIds)
+            ->where('type', '!=', 'delivery')
+            ->pluck('gallery_group_id')
+            ->map(fn ($id): string => (string) $id)
+            ->all();
+
+        foreach ($groups as $group) {
+            if (! BrandRegistry::galleryGroupTreeMatchesBrand($group, $orgBrand, $resolveGroup)) {
+                $unsafeGroupIds[] = (string) $group->id;
+            }
+        }
+
+        // A group is unsafe when any descendant has a selection gallery or a
+        // broken/foreign brand tree. Mark its ancestors too; a direct grant on
+        // an ancestor would carry the same broad subtree permission.
+        $blockedIds = [];
+        foreach (array_unique($unsafeGroupIds) as $unsafeGroupId) {
+            $currentId = (string) $unsafeGroupId;
+            $visited = [];
+
+            while ($currentId !== '' && ! isset($visited[$currentId]) && $groupsById->has($currentId)) {
+                $visited[$currentId] = true;
+                $blockedIds[$currentId] = true;
+                $parentId = $groupsById->get($currentId)->parent_id;
+                $currentId = $parentId === null ? '' : (string) $parentId;
+            }
+        }
+
+        // `$groupsById` also holds the ancestors loaded for the brand walk; the
+        // answer must stay restricted to the actual delegation scope.
+        return collect($scopeGroupIds)
+            ->reject(fn (string $groupId): bool => isset($blockedIds[$groupId]))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Parent ids that still have to be loaded into the lookup map.
+     *
+     * `getOrgGroupScope()` yields pivot groups and their descendants, so the
+     * ancestors above a pivot are missing. Resolving them in batches keeps the
+     * brand walk free of per-group queries while preserving the fail-closed
+     * behaviour of a missing parent (`null` ends the walk).
+     *
+     * @param  Collection<int, GalleryGroup>  $batch
+     * @param  Collection<string, GalleryGroup>  $known
+     * @return array<int, string>
+     */
+    private function pendingParentIds($batch, $known): array
+    {
+        return $batch
+            ->pluck('parent_id')
+            ->filter(fn ($parentId): bool => $parentId !== null && $parentId !== '')
+            ->map(fn ($parentId): string => (string) $parentId)
+            ->unique()
+            ->reject(fn (string $parentId): bool => $known->has($parentId))
+            ->values()
+            ->all();
     }
 
     /**

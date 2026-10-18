@@ -35,6 +35,24 @@ export interface GalleryTreeResponse {
     root_galleries: Gallery[];
 }
 
+interface OrgGalleryAssignmentOptionsResponse {
+    gallery_assignment_options?: GalleryTreeResponse;
+}
+
+/**
+ * Cache key for the org-scoped assignment-options projection.
+ *
+ * The raw organization detail lives under `/api/management/orgs/{id}` (see
+ * `useOrgs`). SWR deduplicates by the serialized key, so reusing that key here
+ * would let one hook read the other's payload: the raw `Org` has no `groups`,
+ * the projected tree has no `name`/`domain`/`users`. Both hooks do request the
+ * same endpoint, but their cache entries — and therefore their transforms —
+ * must never be shared. The key is deliberately namespaced rather than
+ * URL-shaped so it cannot be mistaken for the resource itself.
+ */
+const orgAssignmentOptionsKey = (orgId: string): string =>
+    `org-gallery-assignment-options:${orgId}`;
+
 export interface FlatGroup {
     id: string;
     name: string;
@@ -71,12 +89,29 @@ export interface GalleryMetadataOpts {
 }
 
 export function useProtectedGalleries() {
-    const {isAdmin, isPhotographer} = usePermissions();
-    const canFetch = isAdmin || isPhotographer;
+    const {isAdmin, isPhotographer, isOrgAdmin, orgScope} = usePermissions();
+    const canUseManagementTree = isAdmin || isPhotographer;
+    const isScopedOrgAdmin = isOrgAdmin && !canUseManagementTree;
+    const scopedOrgId = isScopedOrgAdmin ? (orgScope?.org_id ?? null) : null;
+    const key = isScopedOrgAdmin
+        ? (scopedOrgId ? orgAssignmentOptionsKey(scopedOrgId) : null)
+        : (canUseManagementTree ? '/api/management/galleries' : null);
+    const loadTree = async (): Promise<GalleryTreeResponse> => {
+        // The cache key above is not a request URL. The scoped projection is
+        // read from the organization detail endpoint, whose payload only this
+        // branch transforms; the key keeps it from ever receiving the raw
+        // `Org` object that `useOrgs` caches for the same endpoint.
+        if (scopedOrgId) {
+            const response = await fetcher<OrgGalleryAssignmentOptionsResponse>(`/api/management/orgs/${scopedOrgId}`);
+            return response.gallery_assignment_options ?? {groups: [], root_galleries: []};
+        }
+
+        return fetcher<GalleryTreeResponse>('/api/management/galleries');
+    };
 
     const {data, error, isLoading, mutate} = useSWR<GalleryTreeResponse>(
-        canFetch ? '/api/management/galleries' : null,
-        fetcher
+        key,
+        loadTree
     );
 
     const invalidateAll = async () => {
@@ -119,4 +154,14 @@ export function useProtectedGalleries() {
         tree: data, isLoading, isError: error, mutate,
         createGroup, createGallery, deleteGallery, updateGroup, deleteGroup, updateGallery
     };
+}
+
+/** Flatten all groups' direct galleries, including galleries below nested groups. */
+export function flattenTreeGalleries(tree: GalleryTreeResponse): Gallery[] {
+    const flattenGroups = (groups: GalleryGroup[]): Gallery[] => groups.flatMap(group => [
+        ...(group.galleries ?? []),
+        ...flattenGroups(group.children ?? []),
+    ]);
+
+    return [...flattenGroups(tree.groups), ...tree.root_galleries];
 }

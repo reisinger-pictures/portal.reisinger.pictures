@@ -9,7 +9,9 @@ use App\Models\Org;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuthorizationService;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -88,6 +90,53 @@ class OrgAdminDelegationBoundaryTest extends TestCase
     }
 
     /**
+     * Count the statements that touch `gallery_groups` while a callback runs.
+     *
+     * Used to pin that the assignable-group resolution does not fall back to
+     * one parent lookup per group and level.
+     */
+    private function countGroupQueries(callable $callback): int
+    {
+        $queries = 0;
+
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            if (str_contains($query->sql, '"gallery_groups"') || str_contains($query->sql, '`gallery_groups`')) {
+                $queries++;
+            }
+        });
+
+        $callback();
+
+        DB::getEventDispatcher()->forget(QueryExecuted::class);
+
+        return $queries;
+    }
+
+    /**
+     * An org whose scope is one pivot group plus `$childCount` safe children.
+     */
+    private function orgWithChildGroups(int $childCount): Org
+    {
+        $org = $this->org();
+        $pivot = GalleryGroup::factory()->create(['brand' => self::BRAND]);
+        $org->galleryGroups()->attach($pivot);
+
+        foreach (range(1, $childCount) as $ignored) {
+            $child = GalleryGroup::factory()->create([
+                'brand' => self::BRAND,
+                'parent_id' => $pivot->id,
+            ]);
+            $this->gallery([
+                'brand' => self::BRAND,
+                'gallery_group_id' => $child->id,
+                'type' => 'delivery',
+            ]);
+        }
+
+        return $org;
+    }
+
+    /**
      * Gallery fixtures must not be pushed to a live Meilisearch. The Searchable
      * trait would otherwise make every fixture write a network call, which is
      * not what these authorization tests are about.
@@ -156,7 +205,7 @@ class OrgAdminDelegationBoundaryTest extends TestCase
         $this->as($orgAdmin)
             ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => [$admin->id]])
             ->assertStatus(422)
-            ->assertJsonPath('error', 'Benutzer mit einer höheren Berechtigungsstufe können nicht hinzugefügt werden.');
+            ->assertJsonPath('error', 'Es dürfen nur Benutzer mit Rollen der eigenen Organisation hinzugefügt werden.');
 
         $this->assertDatabaseHas('users', ['id' => $admin->id, 'org_id' => null]);
     }
@@ -170,7 +219,7 @@ class OrgAdminDelegationBoundaryTest extends TestCase
         $this->as($orgAdmin)
             ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => []])
             ->assertStatus(422)
-            ->assertJsonPath('error', 'Benutzer mit einer höheren Berechtigungsstufe können nicht entfernt werden.');
+            ->assertJsonPath('error', 'Es dürfen nur Benutzer mit Rollen der eigenen Organisation entfernt werden.');
 
         $this->assertDatabaseHas('users', ['id' => $admin->id, 'org_id' => $org->id]);
     }
@@ -212,6 +261,95 @@ class OrgAdminDelegationBoundaryTest extends TestCase
             ->assertOk();
 
         $this->assertDatabaseHas('users', ['id' => $client->id, 'org_id' => null]);
+        $this->assertDatabaseHas('users', ['id' => $orgAdmin->id, 'org_id' => $org->id]);
+    }
+
+    public function test_org_admin_cannot_import_an_unassigned_photographer(): void
+    {
+        $org = $this->org();
+        $orgAdmin = $this->orgAdmin($org);
+        $photographer = $this->userIn(null, [UserRole::PHOTOGRAPHER]);
+
+        $this->as($orgAdmin)
+            ->putJson("/api/management/orgs/{$org->id}/users", [
+                'user_ids' => [$orgAdmin->id, $photographer->id],
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'Es dürfen nur Benutzer mit Rollen der eigenen Organisation hinzugefügt werden.');
+
+        $this->assertDatabaseHas('users', ['id' => $photographer->id, 'org_id' => null]);
+        $this->assertDatabaseHas('user_roles', [
+            'user_id' => $photographer->id,
+            'role_id' => $this->role(UserRole::PHOTOGRAPHER)->id,
+        ]);
+    }
+
+    public function test_org_admin_cannot_remove_an_existing_photographer(): void
+    {
+        $org = $this->org();
+        $orgAdmin = $this->orgAdmin($org);
+        $photographer = $this->userIn($org, [UserRole::PHOTOGRAPHER]);
+
+        $this->as($orgAdmin)
+            ->putJson("/api/management/orgs/{$org->id}/users", [
+                'user_ids' => [$orgAdmin->id],
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'Es dürfen nur Benutzer mit Rollen der eigenen Organisation entfernt werden.');
+
+        $this->assertDatabaseHas('users', ['id' => $photographer->id, 'org_id' => $org->id]);
+        $this->assertDatabaseHas('user_roles', [
+            'user_id' => $photographer->id,
+            'role_id' => $this->role(UserRole::PHOTOGRAPHER)->id,
+        ]);
+    }
+
+    public function test_org_admin_can_keep_an_existing_photographer_while_adding_a_client(): void
+    {
+        $org = $this->org();
+        $orgAdmin = $this->orgAdmin($org);
+        $photographer = $this->userIn($org, [UserRole::PHOTOGRAPHER]);
+        $client = $this->userIn(null, [UserRole::CLIENT]);
+
+        $this->as($orgAdmin)
+            ->putJson("/api/management/orgs/{$org->id}/users", [
+                'user_ids' => [$orgAdmin->id, $photographer->id, $client->id],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('users', ['id' => $photographer->id, 'org_id' => $org->id]);
+        $this->assertDatabaseHas('users', ['id' => $client->id, 'org_id' => $org->id]);
+        $this->assertDatabaseHas('user_roles', [
+            'user_id' => $photographer->id,
+            'role_id' => $this->role(UserRole::PHOTOGRAPHER)->id,
+        ]);
+    }
+
+    public function test_membership_authorization_is_revalidated_inside_the_transaction(): void
+    {
+        $org = $this->org();
+        $orgAdmin = $this->orgAdmin($org);
+        $client = $this->userIn(null, [UserRole::CLIENT]);
+        $transactionLevel = DB::transactionLevel();
+        $authorization = app(AuthorizationService::class);
+
+        $this->partialMock(AuthorizationService::class)
+            ->shouldReceive('highestRoleRank')
+            ->atLeast()
+            ->once()
+            ->andReturnUsing(function (User $user) use ($authorization, $transactionLevel): int {
+                $this->assertGreaterThan($transactionLevel, DB::transactionLevel());
+
+                return $authorization->highestRoleRank($user);
+            });
+
+        $this->as($orgAdmin)
+            ->putJson("/api/management/orgs/{$org->id}/users", [
+                'user_ids' => [$orgAdmin->id, $client->id],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('users', ['id' => $client->id, 'org_id' => $org->id]);
     }
 
     public function test_admin_can_still_move_a_user_out_of_another_org(): void
@@ -276,6 +414,37 @@ class OrgAdminDelegationBoundaryTest extends TestCase
         $this->assertNotContains($gallery->id, $this->readerIds($target));
     }
 
+    public function test_org_admin_cannot_assign_a_group_with_a_selection_gallery(): void
+    {
+        $org = $this->org();
+        $orgAdmin = $this->orgAdmin($org);
+        $target = $this->userIn($org, [UserRole::CLIENT]);
+        $group = GalleryGroup::factory()->create(['brand' => self::BRAND]);
+        $org->galleryGroups()->attach($group);
+        $child = GalleryGroup::factory()->create([
+            'brand' => self::BRAND,
+            'parent_id' => $group->id,
+        ]);
+        $selection = $this->gallery([
+            'brand' => self::BRAND,
+            'gallery_group_id' => $child->id,
+            'type' => 'selection',
+        ]);
+
+        $this->as($orgAdmin)
+            ->putJson("/api/management/users/{$target->id}", [
+                'gallery_group_ids' => [$group->id],
+            ])
+            ->assertForbidden()
+            ->assertJsonPath('error', 'Es dürfen nur Galerie-Gruppen der eigenen Organisation zugewiesen werden.');
+
+        $this->assertDatabaseMissing('user_gallery_groups', [
+            'user_id' => $target->id,
+            'gallery_group_id' => $group->id,
+        ]);
+        $this->assertNotContains($selection->id, $this->readerIds($target));
+    }
+
     public function test_org_admin_can_assign_galleries_inside_the_org_scope(): void
     {
         $org = $this->org();
@@ -314,6 +483,59 @@ class OrgAdminDelegationBoundaryTest extends TestCase
         $reader = $this->readerIds($target);
         $this->assertContains($direct->id, $reader);
         $this->assertContains($groupGallery->id, $reader);
+    }
+
+    public function test_org_admin_can_retain_and_remove_existing_out_of_scope_grants_during_an_unrelated_edit(): void
+    {
+        $org = $this->org();
+        $orgAdmin = $this->orgAdmin($org);
+        $target = $this->userIn($org, [UserRole::CLIENT]);
+        $legacyGroup = GalleryGroup::factory()->create(['brand' => self::BRAND]);
+        $legacyGallery = $this->gallery([
+            'brand' => self::BRAND,
+            'gallery_group_id' => $legacyGroup->id,
+            'type' => 'selection',
+        ]);
+        $target->galleryGroups()->attach($legacyGroup);
+        $target->galleries()->attach($legacyGallery);
+
+        // The modal carries the existing hidden ids through a full permission
+        // save. They are not new grants, so an unrelated metadata edit succeeds.
+        $this->as($orgAdmin)
+            ->putJson("/api/management/users/{$target->id}", [
+                'gallery_group_ids' => [$legacyGroup->id],
+                'gallery_ids' => [$legacyGallery->id],
+                'can_edit_metadata' => true,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('user_gallery_groups', [
+            'user_id' => $target->id,
+            'gallery_group_id' => $legacyGroup->id,
+        ]);
+        $this->assertDatabaseHas('user_galleries', [
+            'user_id' => $target->id,
+            'gallery_id' => $legacyGallery->id,
+        ]);
+        $this->assertDatabaseHas('users', ['id' => $target->id, 'can_edit_metadata' => 1]);
+
+        // The owner can still explicitly remove either legacy grant by omitting
+        // it from the submitted set; the same payload cannot create one anew.
+        $this->as($orgAdmin)
+            ->putJson("/api/management/users/{$target->id}", [
+                'gallery_group_ids' => [],
+                'gallery_ids' => [],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseMissing('user_gallery_groups', [
+            'user_id' => $target->id,
+            'gallery_group_id' => $legacyGroup->id,
+        ]);
+        $this->assertDatabaseMissing('user_galleries', [
+            'user_id' => $target->id,
+            'gallery_id' => $legacyGallery->id,
+        ]);
     }
 
     public function test_org_admin_cannot_attach_a_group_outside_the_org_scope(): void
@@ -581,8 +803,121 @@ class OrgAdminDelegationBoundaryTest extends TestCase
         $response = $this->as($orgAdmin)->getJson('/api/auth/me');
 
         $response->assertOk();
+        $this->assertSame($org->id, $response->json('org_scope.org_id'));
         $this->assertSame([$gallery->id], $response->json('org_scope.gallery_ids'));
         $this->assertSame([$group->id], $response->json('org_scope.gallery_group_ids'));
+        // A group with only delivery galleries is both in the broad scope and
+        // narrowly assignable. The two sets are separate fields because they
+        // diverge as soon as the subtree contains a selection gallery.
+        $this->assertSame([$group->id], $response->json('org_scope.assignable_gallery_group_ids'));
+    }
+
+    public function test_me_exposes_the_narrow_assignable_group_set_beside_the_broad_org_scope(): void
+    {
+        $org = $this->org();
+        $orgAdmin = $this->orgAdmin($org);
+
+        $safeGroup = GalleryGroup::factory()->create(['brand' => self::BRAND]);
+        $org->galleryGroups()->attach($safeGroup);
+
+        // A group whose subtree contains a selection gallery stays in the broad
+        // org scope (syncGroups, reader) but is not assignable to a user.
+        $broadOnly = GalleryGroup::factory()->create(['brand' => self::BRAND]);
+        $org->galleryGroups()->attach($broadOnly);
+        $selectionChild = GalleryGroup::factory()->create([
+            'brand' => self::BRAND,
+            'parent_id' => $broadOnly->id,
+        ]);
+        $this->gallery([
+            'brand' => self::BRAND,
+            'gallery_group_id' => $selectionChild->id,
+            'type' => 'selection',
+        ]);
+
+        $response = $this->as($orgAdmin)->getJson('/api/auth/me');
+
+        $response->assertOk();
+        $broad = $response->json('org_scope.gallery_group_ids');
+        sort($broad);
+        $expectedBroad = [$safeGroup->id, $broadOnly->id, $selectionChild->id];
+        sort($expectedBroad);
+
+        $this->assertSame($expectedBroad, $broad);
+        $this->assertSame([$safeGroup->id], $response->json('org_scope.assignable_gallery_group_ids'));
+    }
+
+    public function test_assignable_group_resolution_does_not_issue_queries_per_group(): void
+    {
+        $small = $this->orgWithChildGroups(3);
+        $large = $this->orgWithChildGroups(15);
+        $svc = app(AuthorizationService::class);
+
+        // Warm the brand/scope helpers so the measurement compares the same work.
+        $svc->getOrgAssignableGalleryGroupIds($small);
+        $svc->getOrgAssignableGalleryGroupIds($large);
+
+        $smallQueries = $this->countGroupQueries(fn () => $svc->getOrgAssignableGalleryGroupIds($small));
+        $largeQueries = $this->countGroupQueries(fn () => $svc->getOrgAssignableGalleryGroupIds($large));
+
+        $this->assertSame(
+            $smallQueries,
+            $largeQueries,
+            "Resolving 15 child groups ({$largeQueries}) must not cost more gallery_groups queries than 3 ({$smallQueries})."
+        );
+        $this->assertCount(4, $svc->getOrgAssignableGalleryGroupIds($small));
+        $this->assertCount(16, $svc->getOrgAssignableGalleryGroupIds($large));
+    }
+
+    public function test_org_admin_receives_only_delivery_gallery_and_safe_group_assignment_options(): void
+    {
+        $org = $this->org();
+        $orgAdmin = $this->orgAdmin($org);
+
+        $safeGroup = GalleryGroup::factory()->create(['brand' => self::BRAND]);
+        $org->galleryGroups()->attach($safeGroup);
+        $safeDelivery = $this->gallery([
+            'brand' => self::BRAND,
+            'gallery_group_id' => $safeGroup->id,
+            'type' => 'delivery',
+        ]);
+
+        $unsafeGroup = GalleryGroup::factory()->create(['brand' => self::BRAND]);
+        $org->galleryGroups()->attach($unsafeGroup);
+        $unsafeChild = GalleryGroup::factory()->create([
+            'brand' => self::BRAND,
+            'parent_id' => $unsafeGroup->id,
+        ]);
+        $selection = $this->gallery([
+            'brand' => self::BRAND,
+            'gallery_group_id' => $unsafeChild->id,
+            'type' => 'selection',
+        ]);
+
+        $directDelivery = $this->gallery(['brand' => self::BRAND, 'type' => 'delivery']);
+        $directDelivery->orgs()->attach($org);
+        $directSelection = $this->gallery(['brand' => self::BRAND, 'type' => 'selection']);
+        $directSelection->orgs()->attach($org);
+        $outsideGroup = GalleryGroup::factory()->create(['brand' => self::BRAND]);
+        $outsideGallery = $this->gallery([
+            'brand' => self::BRAND,
+            'gallery_group_id' => $outsideGroup->id,
+            'type' => 'delivery',
+        ]);
+
+        $response = $this->as($orgAdmin)->getJson("/api/management/orgs/{$org->id}");
+
+        $response->assertOk();
+        $options = $response->json('gallery_assignment_options');
+        $this->assertSame([$safeGroup->id], array_column($options['groups'], 'id'));
+        $this->assertSame([$safeDelivery->id], array_column($options['groups'][0]['galleries'], 'id'));
+        $this->assertSame([$directDelivery->id], array_column($options['root_galleries'], 'id'));
+        $this->assertNotContains($selection->id, array_column($options['root_galleries'], 'id'));
+        $this->assertNotContains($directSelection->id, array_column($options['root_galleries'], 'id'));
+        $this->assertNotContains($outsideGallery->id, array_column($options['root_galleries'], 'id'));
+
+        // The new scoped options are not permission to fetch the ordinary,
+        // broader gallery tree.
+        $this->as($orgAdmin)->getJson('/api/management/galleries')->assertForbidden();
     }
 
     public function test_me_has_no_org_scope_for_an_admin(): void

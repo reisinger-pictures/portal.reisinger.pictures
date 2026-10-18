@@ -456,8 +456,20 @@ export interface User {
  * the same code the authorization reader uses. `null` for every other actor.
  */
 export interface OrgScope {
+    /** Organization id used to request the server-filtered assignment options. */
+    org_id?: string;
+    /** Delivery galleries inside the org's delegation scope. */
     gallery_ids: string[];
+    /** Broad group scope: what the organisation may manage. */
     gallery_group_ids: string[];
+    /**
+     * Narrower set of groups an org admin may newly grant to a user. The server
+     * enforces exactly this set in `UserController::update`, so the user editor
+     * must offer no more than this. Optional because fixtures and older
+     * `/api/auth/me` payloads may predate the field; missing means "offer
+     * nothing", which fails closed.
+     */
+    assignable_gallery_group_ids?: string[];
 }
 
 /** Fields guaranteed by the `/api/auth/me` contract. */

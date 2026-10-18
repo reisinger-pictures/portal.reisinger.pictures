@@ -319,7 +319,14 @@ export default function ManagementOrgDetailView() {
     // contain an org gallery, so the delegation list is narrowed explicitly.
     // Fails closed: no server scope means no offered groups.
     const visibleGroups = isOrgAdmin
-        ? flatGroups.filter(group => orgScope?.gallery_group_ids.includes(group.id) ?? false)
+        ? [
+            ...flatGroups.filter(group => orgScope?.gallery_group_ids.includes(group.id) ?? false),
+            ...(orgScope
+                ? (org.gallery_groups ?? [])
+                    .filter(group => !flatGroups.some(flatGroup => flatGroup.id === group.id))
+                    .map(group => ({id: group.id, name: group.name, depth: 0, is_public: null}))
+                : []),
+        ]
         : flatGroups;
 
     return (

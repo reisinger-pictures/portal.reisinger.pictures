@@ -95,6 +95,7 @@ describe('shared dialog contract', () => {
             <UserPermissionsModal
                 user={user}
                 roles={[{ id: 'role-1', name: UserRole.ADMIN }]}
+                isOrgAdmin={false}
                 flatGroups={[]}
                 flatGalleries={[]}
                 onClose={onClose}

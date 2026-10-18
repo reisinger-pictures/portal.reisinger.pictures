@@ -430,6 +430,31 @@ describe('ManagementOrgDetailView', () => {
         expect(within(main).queryByRole('checkbox', { name: /Hochzeit/ })).not.toBeInTheDocument();
     });
 
+    it('keeps an already assigned group visible for removal when it is not a user-assignment option', () => {
+        mockOrgData({
+            org: {
+                ...org,
+                gallery_groups: [{ id: 'legacy-group', name: 'Legacy selection group', parent_id: null }],
+            },
+        });
+        vi.mocked(usePermissions).mockReturnValue({
+            ...basePermissions,
+            isAdmin: false,
+            isOrgAdmin: true,
+            orgScope: {
+                org_id: 'org-1',
+                gallery_ids: [],
+                gallery_group_ids: ['g1', 'legacy-group'],
+            },
+        });
+
+        renderView();
+        const main = screen.getByTestId('page-layout');
+
+        expect(within(main).getByRole('checkbox', { name: 'Legacy selection group' })).toBeChecked();
+        expect(within(main).getByRole('checkbox', { name: 'Print' })).toBeInTheDocument();
+    });
+
     it('keeps the full group list for an admin', () => {
         vi.mocked(usePermissions).mockReturnValue(basePermissions);
 
