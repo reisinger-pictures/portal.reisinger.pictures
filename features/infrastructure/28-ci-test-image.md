@@ -2,7 +2,7 @@
 
 **Status:** Implementiert (Dockerfile und Rebuild-Workflow vorhanden; der
 E2E-Job in `ci.yml` nutzt das Image). Die hier dokumentierte Tag-Referenz
-(`portal-e2e:1.62.1`, nie `latest`) ist eine Konfigurationsangabe, kein
+(`portal-e2e:1.64.1`, nie `latest`) ist eine Konfigurationsangabe, kein
 Nachweis, dass das veröffentlichte GHCR-Image frisch gebaut oder aktuell
 verfügbar ist. Das Alter des Artefakts hinter dem Tag wird maschinell geprüft
 (`tests/infrastructure/verify-image-freshness.sh`, INFRA-10); die
@@ -27,12 +27,15 @@ aktuellen Commits werden weiterhin im Job installiert.
    - die in `frontend/package.json#packageManager` festgelegte pnpm-Version
    - Playwright-Chromium inklusive apt-Abhängigkeiten unter
      `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`; die Version wird als
-     Build-Argument aus `frontend/package.json` extrahiert und muss mit
-     `@playwright/test`/Lockfile konsistent sein.
+     Build-Argument aus `frontend/package.json` extrahiert — genauer: als
+     **Untergrenze der Range** (`e2e-image.yml` entfernt nur das `^`), weshalb
+     sie mit der aufgelösten Lockfile-Version übereinstimmen muss. Die vier
+     Stellen, die die Zahl tragen, stehen unter „Versionsbindung — vier Stellen,
+     eine Zahl".
 2. **`.github/workflows/e2e-image.yml`** baut das Image bei Änderungen an
    `deployment/Dockerfile.e2e`, dem Workflow selbst oder
    `frontend/pnpm-lock.yaml` auf `main` sowie wöchentlich und manuell. Es
-   publiziert `:latest` und einen versionsgebundenen Tag (`portal-e2e:1.62.1`,
+   publiziert `:latest` und einen versionsgebundenen Tag (`portal-e2e:1.64.1`,
    aus `frontend/package.json`); `ci.yml` pinnt im `container:`-Feld genau
    diesen versionsgebundenen Tag, nie `latest`. Gepinnt wird nicht mehr über
    `@sha256`: ein Digest-Pin friert ein Image auf einen Build ein und brauchte
@@ -59,7 +62,7 @@ aktuellen Commits werden weiterhin im Job installiert.
    Reihenfolge bleibt Betreiber-Verantwortung. `workflow_dispatch` baut gegen
    den committeten Stand des Refs, nicht gegen den Working Tree.
 3. Der **`e2e`-Job in `ci.yml`** läuft im Test-Image
-   (`ghcr.io/reisinger-pictures/portal-e2e:1.62.1`, der in `ci.yml` gepinnte
+   (`ghcr.io/reisinger-pictures/portal-e2e:1.64.1`, der in `ci.yml` gepinnte
    versionsgebundene Tag):
    - `composer install` → `php artisan key:generate` →
      `php artisan migrate --force` → `php artisan db:seed --force` →
@@ -91,6 +94,65 @@ aktuellen Commits werden weiterhin im Job installiert.
      kurzzeitige Versionabweichung zwischen Playwright-Lockfile und Image. Es
      wird nicht mit `--with-deps` aufgerufen, weil die Systemabhängigkeiten im
      Image gebacken sind.
+
+## Versionsbindung — vier Stellen, eine Zahl
+
+Die Playwright-Version steht an **vier** Stellen in Code und CI, nicht an drei.
+Nur wenn alle vier dieselbe Zahl nennen, fährt der Runner denselben Browser, den
+das Image eingebacken hat:
+
+| Stelle | Rolle |
+|---|---|
+| `frontend/package.json`, `devDependencies."@playwright/test"` | die **Range** (`^1.64.1`) — kein Pin |
+| `deployment/Dockerfile.e2e`, `ARG PLAYWRIGHT_VERSION=1.64.1` | Default für **lokale** Builds; CI überschreibt ihn per `build-args` |
+| `.github/workflows/e2e-image.yml`, Extraktion aus `package.json` | bestimmt **Build-Argument und publizierten Tag** |
+| `.github/workflows/ci.yml`, `container.image` | der **Konsument** — der Teil, den man vergisst |
+
+**Die Regel, die den Wert bestimmt:** die Extraktion liest die **Untergrenze der
+Range**, nicht die aufgelöste Lockfile-Version — sie entfernt nur das `^`:
+
+```bash
+sed -n 's/.*"@playwright\/test"[[:space:]]*:[[:space:]]*"\^\{0,1\}\([0-9][0-9.]*\)".*/\1/p' frontend/package.json | head -n1
+# 1.64.1
+```
+
+Deshalb **muss die Untergrenze der Range gleich der aufgelösten Version sein**.
+Liegt sie darunter (etwa `^1.63.0`, was die Lock-Schwelle erfüllt), liefert die
+Extraktion die niedrigere Zahl, während `pnpm install` auf die höchste passende
+auflöst: das Image backt dann den älteren Chromium ein und wird unter der
+niedrigeren Zahl publiziert, während der Runner aus dem Lockfile die höhere
+Version fährt. Ein versionsgebundener Browser ist nicht „ungefähr richtig" —
+gemessen, Befehl daneben:
+
+```bash
+cd frontend && npx --yes playwright@1.62.1 install --dry-run chromium | grep -i 'playwright chromium'
+# Chrome for Testing 151.0.7922.34 (playwright chromium v1234)
+cd frontend && npx --yes playwright@1.64.1 install --dry-run chromium | grep -i 'playwright chromium'
+# Chrome for Testing 156.0.8078.4 (playwright chromium v1248)
+```
+
+Die Range-Untergrenze ist damit die einzige Zahl, die von Hand gewählt wird; sie
+liegt **auf** der aufgelösten Version, nicht darunter. `ARG`-Default und
+`ci.yml`-Pin sind ebenfalls Handarbeit und zählen nur für lokale Builds bzw. als
+Konsument. Ein Lockfile-only-Update (etwa `pnpm update`, oder ein Lockfile-Merge
+ohne Manifest-Änderung) verschiebt die aufgelöste Version, ohne die
+Range-Untergrenze mitzubewegen — dann backt das Image eine andere Zahl ein, als
+der Runner fährt.
+
+`tests/infrastructure/verify-image-freshness.sh` liest den konsumierten
+`portal-e2e`-Tag **ausschließlich aus `ci.yml`** (`resolve_pin`, fail-closed):
+bleibt der Pin zurück, prüft der Frische-Gate ein altes Artefakt, während der
+E2E-Job einen fremden Browser bootet.
+
+### Warum diese Version: Named Locks
+
+`lock:` existiert ab `@playwright/test >= 1.63.0` (Skill `playwright-parallel`);
+Voraussetzung ist `fullyParallel: true` (in `frontend/playwright.config.ts`
+gesetzt). Der Bump ist deshalb **Voraussetzung, nicht Kosmetik**: auf `1.62.1`
+wird ein deklariertes `lock:` **still ignoriert** — kein Fehler, kein Hinweis,
+die betroffenen Tests laufen weiter gleichzeitig. Ein Lock, das nichts tut, sieht
+aus wie eine Konfiguration und ist keine; die Fehlerklasse ist „deklariert und
+unwirksam", nicht „unbekannte Option".
 
 ## Aktuelle Shard-Strategie
 
@@ -131,7 +193,9 @@ und E2E-Strategie gemeinsam aktualisiert werden.
 - **Nur die Umgebung einbacken** — niemals App-Code, `node_modules/` oder
   `vendor/`. Tests laufen gegen den aktuellen Commit; Dependencies werden pro
   Commit installiert.
-- Die Browser-Version muss zu `@playwright/test` passen. Der
+- Die Browser-Version muss zu `@playwright/test` passen. Die vier Stellen, die
+  die Zahl tragen, und die Regel für die Range-Untergrenze stehen unter
+  „Versionsbindung — vier Stellen, eine Zahl". Der
   `frontend/pnpm-lock.yaml`-Trigger in `e2e-image.yml` erzwingt den
   Image-Rebuild bei Dependabot-Bumps.
 - Im Container-Modus werden Daten-Dienste über Service-Namen erreicht; die
@@ -148,7 +212,7 @@ Für eine kontrollierte Rückkehr auf einen Runner-Host kann der E2E-Job
 alternative Host-Semantik und den im Image enthaltenen Browser-cache nutzen:
 
 ```bash
-PORTAL_E2E_IMAGE='ghcr.io/reisinger-pictures/portal-e2e:1.62.1'  # Tag aus ci.yml `container.image`
+PORTAL_E2E_IMAGE='ghcr.io/reisinger-pictures/portal-e2e:1.64.1'  # Tag aus ci.yml `container.image`
 docker create --name pw-cache "$PORTAL_E2E_IMAGE"
 docker cp pw-cache:/ms-playwright "$HOME/ms-playwright"
 docker rm pw-cache

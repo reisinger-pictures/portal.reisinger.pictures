@@ -64,10 +64,21 @@ refreshes the artifact every consumer follows:
 - `portal-base`: `base-image.yml` republishes `8.5` (and `latest`). Production
   and the backend CI job pick the new build up on the next pull.
 - `portal-e2e`: `e2e-image.yml` republishes `portal-e2e:<playwright-version>`
-  (and `latest`). `ci.yml` pins that version tag (`1.62.1` today, from
-  `frontend/package.json`). When Playwright moves to a new minor and the old
-  version tag stops being rebuilt, the age gate fails and the consumer must move
-  to the new version tag in `ci.yml`.
+  (and `latest`), where the version is the **lower bound of the
+  `@playwright/test` range** in `frontend/package.json` — the extraction strips
+  the `^` and does not read the resolved lockfile version, so the range floor
+  must equal the resolved version. `ci.yml` pins that version tag (`1.64.1`
+  today); that consuming pin is a **fourth** place carrying the same number,
+  next to the range itself, the `ARG PLAYWRIGHT_VERSION` default in
+  `deployment/Dockerfile.e2e` and the extraction in `e2e-image.yml`. Because
+  this gate resolves the consumed tag from `ci.yml` **alone**, a pin left behind
+  makes the gate inspect an old artifact while the E2E job boots a foreign
+  browser (a version-bound Chromium is not "roughly right": the revision moves
+  with the Playwright version — measured in
+  `features/infrastructure/28-ci-test-image.md`, "Versionsbindung"). When
+  Playwright moves to a new minor and the old version tag stops being rebuilt,
+  the age gate fails and the consumer must move to the new version tag in
+  `ci.yml`.
 - Verify locally after a change (both need network access):
   `bash tests/infrastructure/verify-image-nonroot.sh` and
   `bash tests/infrastructure/verify-image-freshness.sh`.

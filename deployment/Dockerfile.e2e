@@ -27,7 +27,7 @@ RUN groupmod --gid "${RUNTIME_GID}" www-data \
     && usermod --uid "${RUNTIME_UID}" --gid "${RUNTIME_GID}" www-data
 
 # --- Build-Args (Workflow e2e-image.yml extrahiert Repo-Werte) -------------
-ARG PLAYWRIGHT_VERSION=1.62.1
+ARG PLAYWRIGHT_VERSION=1.64.1
 ARG NODE_VERSION=26.7.0
 ARG NODE_SHA256=982aa24dd8be4c889c6a8ab337ddff3b0896645b20f4239356e80552c16277ee
 ARG PNPM_VERSION=11.23.0
