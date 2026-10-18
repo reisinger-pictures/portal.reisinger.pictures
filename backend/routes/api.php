@@ -45,6 +45,7 @@ use App\Http\Controllers\TextSnippetController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VolumePresetController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Middleware\AtomicThrottleRequests;
 use App\Models\DownloadLog;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
@@ -132,7 +133,10 @@ Route::middleware('throttle:model-registration')->group(function () {
 
 Route::get('/contracts/join/{token}', [ContractJoinController::class, 'check'])->name('api.contracts.join.check');
 Route::post('/contracts/join/{token}', [ContractJoinController::class, 'join'])->name('api.contracts.join.join');
-Route::middleware('throttle:contract-content')
+// SEC-20261018-12: the per-token budget must hold under simultaneous requests,
+// so this route uses the count-first middleware instead of `throttle:contract-content`.
+// Every other `throttle:` route stays on the framework middleware unchanged.
+Route::middleware(AtomicThrottleRequests::class.':contract-content')
     ->get('/contracts/sign/{personalToken}', [ContractJoinController::class, 'contractContent'])
     ->name('api.contracts.sign.content');
 Route::post('/contracts/sign/{personalToken}', [ContractJoinController::class, 'sign'])->name('api.contracts.sign.sign');
