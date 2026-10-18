@@ -774,10 +774,20 @@ Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA v
   `ClientCartView.tsx:455` reicht den `client_secret` eines Live-PaymentIntent an `<Elements>`, das
   aber mit einem Test-Modus-Stripe.js geladen war. Portainer und `.env.production` im Repo-Root
   erreichen das Bundle **nicht** — sie versorgen ausschließlich den Backend-Container; das Bundle
-  entsteht *vor* dem Sync lokal. **Grenze, bewusst offen:** ein Build-Gate, das einen Prod-Build mit
-  `pk_test` fail-closed abbricht (analog `frontend/scripts/check-turnstile-build.mjs`), ist **nicht**
-  umgesetzt; fehlt `.env.production`, fällt der Build still auf den Test-Key zurück und die Prüfzeile
-  ist die einzige Kontrolle. *Verworfen (2026-10-15):* Umbenennen von `frontend/.env.local` →
+  entsteht *vor* dem Sync lokal. **Nachtrag 2026-10-18 — die Grenze ist geschlossen:** das Build-Gate
+  ist umgesetzt (`frontend/scripts/check-stripe-build.mjs`, verdrahtet als `postbuild`, also nicht
+  vergessbar). Es kennt **vier** Formen: (1) **deklarierter** Prod-Build (`.env.production`
+  existiert) → das Bundle **muss** `pk_live_` tragen und **darf kein** `pk_test_` tragen; (2)
+  **CI-Build** (`CI` gesetzt, nichts deklariert) → still, weil der Frontend-Job der CI absichtlich
+  ohne Live-Key baut; (3) **nicht deklarierter lokaler Build** → darf **kein** `pk_test_` tragen —
+  **genau die Klasse des Vorfalls vom 2026-10-15**, die ein an der Datei-Existenz hängendes Gate
+  durchgelassen hätte; (4) `STRIPE_TEST_BUILD=true` → erlaubt, laut gemeldet, und zusammen mit
+  `.env.production` ein Widerspruch → Fehlschlag. Die Erkennung ist `pk_live_[A-Za-z0-9]{12}`,
+  **nicht** das nackte Präfix: der zusätzliche Abgleich auf zwölf alphanumerische Zeichen
+  unterscheidet einen echten Key von Platzhaltern wie `pk_test_<your_stripe_publishable_key>`.
+  Die Meldung nennt **kein** Key-Material, nur den Modus-Prefix. **Bewusst nicht gemacht:** `dist/`
+  löschen — der Exit-Code ist das Gate (die dokumentierte Kette `pnpm lint:fix && pnpm build` bricht
+  ab) und die Meldung sagt „must not be deployed“; die Prüfzeile bleibt als zweite Kontrolle gültig. *Verworfen (2026-10-15):* Umbenennen von `frontend/.env.local` →
   `frontend/.env.development.local` (strukturell robuster, weil dann kein zweiter Ablageort für den
   Live-Key existiert — der Owner hat stattdessen die zusätzliche Datei gewählt).
 
