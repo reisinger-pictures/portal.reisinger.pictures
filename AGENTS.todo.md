@@ -123,6 +123,63 @@ SEC-14-Umsetzung; alles darunter ist eigene Arbeit.
   Fehlertabelle aufnehmen. N8: die Byte-Defaults (20 MiB / 100 MiB) sind nicht gepinnt, nur
   `max_files = 20`.
 
+### Neue offene Punkte aus den Wellen A–D und ihren Nachprüfungen (2026-10-18)
+
+Diese Punkte sind in den Freigaben als **nicht-blockierend** eingestuft worden. Sie sind hier,
+weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benannten Ort.
+
+- [ ] **Dasselbe Prüfen-dann-Zählen in allen übrigen Limiter-Pfaden (Entscheidung).**
+  SEC-12 hat den Limiter der Contract-Content-Route atomar gemacht (`add()` + `increment()`,
+  keine unbedingte Schreibung). Das Muster steckt weiter in zwei Formen: in **Routen mit
+  Laravels `throttle:`-Middleware** — aufzählbar mit
+  `grep -rno 'throttle:[a-zA-Z0-9,:]*' backend/routes/*.php backend/bootstrap/app.php`
+  (gemessen 2026-10-18: u. a. `throttle:api`, `throttle:ai`, `throttle:model`,
+  `throttle:coupon`, `throttle:contract`, `throttle:60,1`, `throttle:10,1`) — und in Zählern,
+  die **im Service** direkt über `RateLimiter::hit()` laufen (`CheckoutRiskService` für
+  `checkout`; `grep -rn 'RateLimiter::hit' backend/app`). Unter Gleichzeitigkeit ist dort
+  Überschuss möglich; für die Content-Route gemessen: 32–37 statt 30. **Entscheidung offen:**
+  global umstellen oder bewusst je Pfad. **Test:** der deterministische Middleware-Test aus
+  SEC-12 gilt nur für die umgestellte Route.
+- [ ] **`getOrgGroupScope` ist ungecacht und läuft mehrfach pro Request (Kosten).**
+  Gemessen in der Welle-A-Prüfung: zweimal pro `/api/auth/me` (breit plus schmale Auflösung)
+  und nochmals auf `GET /api/management/orgs/{id}`. Kein Korrektheitsproblem, aber `/me` liegt
+  auf jedem SPA-Load. **Test:** Query-Zahl für `/me` und den Org-Detail-Endpunkt pinnen, bevor
+  optimiert wird.
+- [ ] **Alt-Grants werden beim Lesen nicht neu validiert (Entscheidung).** Eine vor der
+  Autorisierungswelle entstandene Freigabe — oder eine Gruppe, in deren Subtree **nachträglich**
+  eine Selection-Galerie wandert — bleibt über `getAllowedGalleryIds()` bestehen. Neu vergeben
+  ist fail-closed. **Entscheidung offen:** beim Lesen re-validieren oder als bewusste Grenze
+  führen. **Test:** eine nachträglich unsichere Gruppe, die bereits zugewiesen ist.
+- [ ] **Lock-Reihenfolge in `OrgController::syncUsers` (Entscheidung).** Org → Akteur →
+  Mitglieder → sortierte Union: der Akteur liegt außerhalb der sortierten Sammelreihenfolge,
+  zwei Syncs über verschiedene Orgs mit gemeinsam verschobenem Nutzer können in einen
+  DB-Deadlock laufen (die Datenbank bricht einen ab, kein Schaden). **Entscheidung offen:**
+  Akteur in die sortierte Menge ziehen oder bewusst tragen. Ein SQLite-Test kann das nicht
+  beweisen — der Nachweis braucht zwei echte Verbindungen (siehe das SEC-12-Probe-Skript als
+  Muster).
+- [ ] **Der 500-ID-Schnitt im ZIP-Payload ist dokumentiert, aber nicht getestet.** Ein
+  `photo_ids`-Payload über 500 Einträge zählt nur die ersten 500; die übrigen erwirtschaften
+  still 0 Shares, ohne Doppelzählung. **Test:** ein Payload mit 501+ IDs.
+- [ ] **Kontaktbogen: kein sichtbares Signal beim Weglassen von Fotos (Entscheidung).** Ein
+  Foto, das an Byte-, Dimension-, Pixel- oder MIME-Prüfung scheitert, verschwindet ohne Hinweis
+  (heute nur über `count($photos)` gegen `photos()->count()` indirekt erschließbar). Ein Zähler
+  würde den Blade-Vertrag ändern. **Entscheidung offen.**
+- [ ] **`ext-gd` ist repo-weit undeklariert (Entscheidung).** `ImageProcessor` nutzt GD
+  voraussetzungslos, der Kontaktbogen macht es seit der Byte-Invariante zur harten Bedingung für
+  JPEG/PNG-Einbettung, `composer.json` deklariert nichts, CI baut mit `--ignore-platform-reqs`.
+  Als Umgebungsgrenze dokumentiert; **Entscheidung offen:** deklarieren oder dauerhaft als
+  Laufzeitvoraussetzung führen.
+- [ ] **Testhygiene: einseitiger Listener-Flush (pre-existing).** `FtpImportTest::tearDown()`
+  flusht `Photo::created`; die Gegenrichtung fehlt — `GalleryPhotoCleanupDurabilityTest`
+  registriert `Photo::deleting(fn => false)` und flusht nie. Unter
+  `--order-by=random`/`defects` leckt der Veto-Listener in andere Tests. **Test:** die
+  betroffene Klasse unter zufälliger Reihenfolge laufen lassen und den Flush ergänzen.
+- [ ] **Kontaktbogen: Weglass-Grund (c) ist ungepinnt.** Der MIME-Abgleich
+  (`$detectedMime !== $mime`) lässt ein Foto fail-closed aus, aber kein Test deckt den Fall mit
+  **nicht-leerem, abweichendem** `mime_type` ab — gepinnt sind nur Null-MIME, Dimension,
+  Byte-Cap und Undekodierbarkeit. **Test:** gespeichertes JPEG mit in der DB hinterlegtem
+  `image/png` ⇒ Foto wird ausgelassen, Decoder wird nicht aufgerufen.
+
 ---
 - [ ] **Dependabot: 1 offener Alert am Default-Branch** (war 10) — gemessen am 2026-10-18 mit `gh api repos/reisinger-pictures/portal.reisinger.pictures/dependabot/alerts?state=open&per_page=100 -q '.[] | [.security_advisory.severity, .dependency.package.name] | @tsv'` → **1 high (`braces`), 0 critical**. Patch-Stand je Paket (dieselbe Abfrage, `-q '.[] | [.security_advisory.severity, .dependency.package.name, .security_vulnerability.vulnerable_version_range, (.security_vulnerability.first_patched_version.identifier // "KEINE")] | @tsv'`): `undici` (6 Alerts — 1 high + 2 medium + 3 low; verwundbar `< 7.29.1`, installiert `7.29.0`), `source-map-js` (high, `< 1.2.2`, installiert `1.2.1`), `brace-expansion` (medium, `< 5.0.12`), `postcss-selector-parser` (medium, `< 7.1.6`), `braces` (high, `<= 3.0.3`, **`gepatcht-ab=KEINE`**). Dependency-CVEs, **nicht** Endpunkt-Autorisierung → eigener Durchgang (`node-deps`), **ausgeführt** (Ergebnis in den beiden Unterpunkten).
   - **Ergebnis der `node-deps`-Wellen (`85f102b` + die `undici`-Kopplung):** drei Pakete sind über `overrides` in `frontend/pnpm-workspace.yaml` gehoben (`source-map-js` 1.2.1 → 1.2.2, `brace-expansion` 5.0.9 → 5.0.12, `postcss-selector-parser` 6.0.10 → 7.1.6) — alle **transitiv** und dev/build-only (kein Treffer über alle 40 JS-Chunks, `pnpm why` weist jeden Pfad). `undici` brauchte am Ende **keinen** Override: die Kopplung wurde **gelöst** statt erzwungen — `jsdom@30.0.1` deklariert `^8.9.0` und löst selbst auf `8.12.2` auf, und **alle sechs** offenen `undici`-Advisories enden bei `< 7.29.1` (Range per API gemessen), 8.x liegt also außerhalb; der zwischenzeitliche erzwungene Downgrade auf 7.29.1 ist damit weg. `pnpm audit` 16 → 1, `pnpm audit --prod` 2 → 1, Vitest grün (1423; die 20 zusätzlichen Tests stammen aus der pk_test-Gate-Welle). **`braces` bleibt offen und ist als akzeptiertes Risiko dokumentiert (C8, `AGENTS.md` §8)** — kein Patch existiert, und der verwundbare Eingang wird von keiner der drei realen Aufrufstellen betreten. Beide Wellen unabhängig verifiziert (APPROVED; u. a. minimal-invasiver Lockfile-Diff, CSS byte-identisch trotz Major-Bump, JSDOM-Konstruktionsprobe unter 8.12.2). **Scan-Lag, kein Befund:** die Dependabot-API meldet weiter **10** Alerts, weil ihr letzter Scan vor `85f102b` lief; autoritativ für den lokalen Stand ist `pnpm audit` → **1**.
@@ -150,17 +207,19 @@ SEC-14-Umsetzung; alles darunter ist eigene Arbeit.
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **44 offene `[ ]`** und **45 wartende
-> `[~]`** über 1781 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (44), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1781). Aufteilung der 44: **16× `manuell prüfen:`** und **28×
-> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. Alle 45 `[~]` tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
+> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **53 offene `[ ]`** und **45 wartende
+> `[~]`** über 1837 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (53), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1837). Aufteilung der 53: **16× `manuell prüfen:`** und **37×
+> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. Die 37 enthalten die neun Punkte, die in
+> den Freigaben der Wellen A–D als nicht-blockierend eingestuft und deshalb hier festgehalten
+> wurden (siehe „Neue offene Punkte aus den Wellen A–D"). Alle 45 `[~]` tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
 > zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (89 = 44 offen + 45 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (98 = 53 offen + 45 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
