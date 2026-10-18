@@ -320,12 +320,15 @@ jobs:
     # ausgewählten Specs werden im Serial-Shard isoliert.
     name: E2E (Playwright) — ${{ matrix.name }}
     # Job-level `if` darf KEINEN secrets-Context lesen (offizielle Context
-    # availability: jobs.<job_id>.if -> github, needs, vars, inputs). Push runs
-    # (including Dependabot branches) are authoritative. Dependabot's
-    # pull_request event is intentionally skipped because its secret-dependent
-    # E2E environment is unavailable; its push run remains the sole E2E gate.
-    # Fork PRs are also skipped, while normal same-repository PRs stay enabled.
-    # The actual missing-secret check remains in the first step below.
+    # availability: jobs.<job_id>.if -> github, needs, vars, inputs). Secrets
+    # fuer Dependabot-ausgeloeste Runs kommen aus dem **Dependabot**-Secret-Store,
+    # nicht aus den Actions-Secrets — und nur beim `push`-Event: ein
+    # Dependabot-`pull_request`-Lauf erhaelt gar keine Secrets (GitHub-Restriktion,
+    # unabhaengig vom Store). Deshalb laeuft E2E auf dem Push-Lauf des
+    # Dependabot-Branches (dort greifen die Dependabot-Secrets) und der PR-seitige
+    # Lauf wird uebersprungen — er koennte die Umgebung gar nicht aufbauen.
+    # Fork-PRs bleiben ebenfalls uebersprungen, normale Same-Repo-PRs laufen.
+    # Der eigentliche Missing-Secret-Check bleibt im ersten Step unten.
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork == false)
     runs-on: ubuntu-latest
     # Gesamter E2E-Job laeuft im Test-Image portal-e2e (portal-base + Node/
@@ -685,7 +688,10 @@ jobs:
     name: CI gate (${{ github.event_name }})
     # Keep the fail-closed always() gate for push and normal PRs. The
     # Dependabot pull_request aggregate is intentionally skipped together with
-    # its secret-dependent E2E job; the push aggregate is authoritative.
+    # its E2E job: a Dependabot pull_request run receives no secrets at all, so
+    # that environment cannot be built. The push aggregate on the Dependabot
+    # branch is authoritative — a Dependabot push run reads the Dependabot
+    # secret store and runs the full E2E.
     if: ${{ always() && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]')) }}
     needs:
       - security-contract
