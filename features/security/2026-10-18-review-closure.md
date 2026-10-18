@@ -27,7 +27,7 @@ notes visible below instead of dropping them.
 | SEC-09 raster dimensions decoded without a pixel budget | P2 | open — follow-ups uncommitted | `8f322cc` + pending | `ModelFileImageBudgetTest`, `ImageProcessorHardeningTest` |
 | SEC-10 expired galleries expose photo metadata via context endpoint | P2 | open — follow-ups uncommitted | `8f322cc` + pending | `SearchPhotoContextVisibilityTest` |
 | SEC-11 cancelled unpaid orders retain coupon capacity | P2 | **closed** (verify APPROVED) | `ff8c46f` | `CancelStalePaymentIntentsCommandTest` |
-| SEC-12 contract content GET writes request-proportional audit rows | P2 | open — limiter fix under verification | `ff8c46f` + pending | `ContractContentHeartbeatMySqlTest`, `AtomicThrottleRequestsTest` |
+| SEC-12 contract content GET writes request-proportional audit rows | P2 | **closed** (verify round 2 APPROVED, measured) | `ff8c46f`, `27e46cf` | `ContractContentHeartbeatMySqlTest`, `AtomicThrottleRequestsTest` |
 | SEC-13 contract closure commits before recipient mail is enqueued | P2 | **closed** (verify APPROVED) | `ff8c46f` | `ContractCloseTest` |
 | SEC-14 FTP import buffers unbounded inbox files and batches | P2 | open — batches implemented, quarantine (D-37) in flight | pending | `FtpImportTest` |
 
@@ -85,4 +85,8 @@ Measured with `FtpImportTest`; the batch semantics are the owner decision D-35.
 * SEC-11/13: closure mail is durable for the production database queue; local/testing sync
   queues keep the after-commit callback, so the guarantee is production-scoped.
 * SEC-12: the frontend polls content every 5 seconds, i.e. 12 requests/minute against the
-  30/minute budget — a 2.5× margin.
+  30/minute budget — a 2.5× margin. The deterministic test pins the fix by reproducing the
+  framework's repair write (`add()` loses the race, the first `increment()` returns 1): the
+  middleware must not write there, and `RateLimiter::hit()` demonstrably does. `RateLimiter::for('checkout', …)`
+  is registered in `AppServiceProvider` but referenced nowhere — the checkout quota runs through
+  `RateLimiter::hit()` in `CheckoutRiskService`; dead registration, pre-existing.
