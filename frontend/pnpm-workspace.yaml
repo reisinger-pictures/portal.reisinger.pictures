@@ -10,7 +10,12 @@ overrides:
   # svgo: ^4.0.1, so 4.1.0 satisfies its own range — no forced resolution.
   svgo: 4.1.0
   postcss: 8.5.23
-  undici: 7.29.1
+  # undici is transitive via jsdom only (the Vitest test environment).
+  # jsdom@30.0.1 declares undici: ^8.9.0, so it resolves to 8.12.2 on its own —
+  # and every open undici advisory ends at < 7.29.1 (GHSA-w293-vg96-wgc3 high,
+  # GHSA-pmjh-fq2x-6v4x / GHSA-2jfj-6hjv-fm6j medium, GHSA-r53p-7pc4-xj5r /
+  # GHSA-2gqq-gqf2-x968 / GHSA-8436-99hf-9mmv low), so 8.x is outside all six
+  # ranges. No forced resolution is needed here — deliberately no override.
   # source-map-js is transitive via postcss, css-tree, magicast and
   # @tailwindcss/node; 1.2.1 sits inside the vulnerable range >= 1.0.0, < 1.2.2
   # of GHSA-68fv-2mgg-jv7q (high). Every consumer declares ^1.2.1 or ^1.0.1, so
