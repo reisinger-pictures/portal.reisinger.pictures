@@ -2,6 +2,11 @@
 
 ## Status: in progress (updated 2026-10-18)
 
+Last verified commit: `27e46cf`. Open at that point: SEC-08/09/10 (implementation and fix
+rounds uncommitted) and SEC-14 (batches, quarantine, event-driven import — one backend fix
+round and one frontend fix round still in flight, both uncommitted). Nothing below is a
+prediction; each row states the verification round that produced the verdict.
+
 This document is the durable record of what the 2026-10-18 source review found and what
 was done about it. The findings themselves, as originally written, are in `AGENTS.todo.md`
 (section "Architecture & Security Review — 2026-10-18") and in the commit that recorded them
@@ -23,13 +28,13 @@ notes visible below instead of dropping them.
 | SEC-05 inactive model records downloadable by ordinary admin | P1 | **closed** (verify APPROVED) | `996a02c` | `ModelSensitiveDownloadLifecycleTest` |
 | SEC-06 power-user delta ignores coupon and volume discounts | P1 | **closed** (verify round 3 APPROVED) | `996a02c`, `6433d04` | `PayoutCalculationServiceTest`, `CheckoutServiceTest`, `PayoutOrderFeeAllocationTest` |
 | SEC-07 repeated single downloads inflate the monthly pool | P1 | **closed** (verify round 3 APPROVED) | `996a02c`, `6433d04` | `PayoutCalculationServiceTest` |
-| SEC-08 uploader-controlled active-document Content-Type | P2 | open — follow-ups uncommitted | `8f322cc` + pending | `ImageUploadTest`, `FtpInboxLocalDiskTest` |
-| SEC-09 raster dimensions decoded without a pixel budget | P2 | open — follow-ups uncommitted | `8f322cc` + pending | `ModelFileImageBudgetTest`, `ImageProcessorHardeningTest` |
-| SEC-10 expired galleries expose photo metadata via context endpoint | P2 | open — follow-ups uncommitted | `8f322cc` + pending | `SearchPhotoContextVisibilityTest` |
+| SEC-08 uploader-controlled active-document Content-Type | P2 | open — implementation + fix rounds uncommitted | `8f322cc` + pending | `ImageUploadTest`, `FtpInboxLocalDiskTest` |
+| SEC-09 raster dimensions decoded without a pixel budget | P2 | open — implementation + fix rounds uncommitted | `8f322cc` + pending | `ModelFileImageBudgetTest`, `ImageProcessorHardeningTest` |
+| SEC-10 expired galleries expose photo metadata via context endpoint | P2 | open — implementation + fix rounds uncommitted | `8f322cc` + pending | `SearchPhotoContextVisibilityTest` |
 | SEC-11 cancelled unpaid orders retain coupon capacity | P2 | **closed** (verify APPROVED) | `ff8c46f` | `CancelStalePaymentIntentsCommandTest` |
 | SEC-12 contract content GET writes request-proportional audit rows | P2 | **closed** (verify round 2 APPROVED, measured) | `ff8c46f`, `27e46cf` | `ContractContentHeartbeatMySqlTest`, `AtomicThrottleRequestsTest` |
 | SEC-13 contract closure commits before recipient mail is enqueued | P2 | **closed** (verify APPROVED) | `ff8c46f` | `ContractCloseTest` |
-| SEC-14 FTP import buffers unbounded inbox files and batches | P2 | open — batches implemented, quarantine (D-37) in flight | pending | `FtpImportTest` |
+| SEC-14 FTP import buffers unbounded inbox files and batches | P2 | open — batches + quarantine implemented, backend fix rounds in flight | pending | `FtpImportTest`, `FtpQuarantineTest`, `FtpImportBatchTest` |
 
 ## Measured evidence (not assertions)
 
