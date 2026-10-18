@@ -68,6 +68,12 @@ class InvoiceSnapshot extends Model
     public const DISPUTE_MAIL_DISPATCH_KEY = '_dispute_mail_dispatch';
 
     /**
+     * Internal per-line collectible revenue used for photographer payout
+     * attribution. The public invoice representation must not expose it.
+     */
+    public const PAYOUT_PHOTO_REVENUE_KEY = '_payout_photo_revenue_cents';
+
+    /**
      * Source identity for an invoice created while closing a contract. The
      * existing JSON snapshot column is sufficient; no order or invoice schema
      * extension is required for contract-close idempotency.
@@ -119,7 +125,11 @@ class InvoiceSnapshot extends Model
     public function customerDetailsForPresentation(): array
     {
         $details = is_array($this->customer_details) ? $this->customer_details : [];
-        unset($details[self::MAIL_DISPATCH_KEY], $details[self::DISPUTE_MAIL_DISPATCH_KEY]);
+        unset(
+            $details[self::MAIL_DISPATCH_KEY],
+            $details[self::DISPUTE_MAIL_DISPATCH_KEY],
+            $details[self::PAYOUT_PHOTO_REVENUE_KEY],
+        );
 
         return $details;
     }

@@ -279,7 +279,7 @@ class CheckoutService
                 $totalNetCents = $pricingResult['totalCents'];
                 $couponDiscountCents = (int) ($pricingResult['discountCents'] ?? 0);
 
-                $lineItems = $this->buildLineItems($pricingResult, $request->items);
+                $lineItems = $this->buildLineItems($pricingResult, $request->items, $appliedCoupon);
                 $customConditions = null;
             }
 
@@ -968,7 +968,7 @@ class CheckoutService
         return $validCoupon;
     }
 
-    private function buildLineItems(array $pricingResult, array $requestItems): array
+    private function buildLineItems(array $pricingResult, array $requestItems, ?Coupon $coupon = null): array
     {
         $lineItems = [];
         $requestItemsById = collect($requestItems)->keyBy('photoId')->toArray();
@@ -1019,7 +1019,163 @@ class CheckoutService
             }
         }
 
+        return $this->attachPayoutPhotoRevenueAttribution($lineItems, $pricingResult, $coupon);
+    }
+
+    /**
+     * Freeze the effective per-photo amount collected after volume and coupon
+     * discounts. Aggregate invoice discount rows are presentation evidence, not
+     * sufficient payout attribution when a coupon targets only selected photos.
+     *
+     * @param  array<int, array<string, mixed>>  $lineItems
+     * @param  array<string, mixed>  $pricingResult
+     * @return array<int, array<string, mixed>>
+     */
+    private function attachPayoutPhotoRevenueAttribution(
+        array $lineItems,
+        array $pricingResult,
+        ?Coupon $coupon,
+    ): array {
+        $lineIndexesByPhotoId = [];
+        foreach ($lineItems as $lineIndex => &$lineItem) {
+            if (empty($lineItem['photoId']) || ! is_numeric($lineItem['price']) || ! empty($lineItem['isQuote'])) {
+                continue;
+            }
+
+            $photoId = (string) $lineItem['photoId'];
+            $priceCents = max(0, (int) $lineItem['price']);
+            $lineItem['_payout_net_cents'] = $priceCents;
+            $lineIndexesByPhotoId[$photoId][] = $lineIndex;
+        }
+        unset($lineItem);
+
+        if ($lineIndexesByPhotoId === []) {
+            return $lineItems;
+        }
+
+        // Volume pricing keeps invoice lines at base prices but exposes the
+        // actual effective item prices used for coupon math. Use those prices
+        // first; scope/generic strategies fall back to their photo line prices.
+        $eligibleCouponItems = [];
+        $pendingIndexes = $lineIndexesByPhotoId;
+        $pricedCouponItems = $pricingResult['coupon_items'] ?? null;
+        if (is_array($pricedCouponItems)) {
+            foreach ($pricedCouponItems as $couponItem) {
+                if (! is_array($couponItem)
+                    || ! isset($couponItem['itemId'], $couponItem['priceCents'])
+                    || ! is_numeric($couponItem['priceCents'])) {
+                    continue;
+                }
+
+                $photoId = (string) $couponItem['itemId'];
+                if (($pendingIndexes[$photoId] ?? []) === []) {
+                    continue;
+                }
+
+                $lineIndex = array_shift($pendingIndexes[$photoId]);
+                $priceCents = max(0, (int) $couponItem['priceCents']);
+                $lineItems[$lineIndex]['_payout_net_cents'] = $priceCents;
+                $eligibleCouponItems[] = [
+                    'line_index' => $lineIndex,
+                    'price_cents' => $priceCents,
+                ];
+            }
+        } else {
+            foreach ($lineIndexesByPhotoId as $indexes) {
+                foreach ($indexes as $lineIndex) {
+                    $eligibleCouponItems[] = [
+                        'line_index' => $lineIndex,
+                        'price_cents' => (int) $lineItems[$lineIndex]['_payout_net_cents'],
+                    ];
+                }
+            }
+        }
+
+        $discountCents = max(0, (int) ($pricingResult['discountCents'] ?? 0));
+        if ($discountCents === 0 || $eligibleCouponItems === []) {
+            return $lineItems;
+        }
+
+        $discountTargets = $eligibleCouponItems;
+        if ($coupon?->type === 'percentage' && $coupon->max_items !== null) {
+            $discountTargets = $this->cheapestCouponItems($eligibleCouponItems, (int) $coupon->max_items);
+        } elseif ($coupon?->type === 'photo_package') {
+            $payableItems = array_values(array_filter(
+                $eligibleCouponItems,
+                fn (array $item): bool => $item['price_cents'] > 0,
+            ));
+            $discountTargets = $this->cheapestCouponItems($payableItems, (int) $coupon->package_quantity);
+        }
+
+        // If a legacy strategy reports an aggregate discount but does not
+        // supply its coupon definition, distribute the aggregate across its
+        // eligible items rather than treating an unknown targeted discount as
+        // if every item retained its gross price.
+        if ($coupon === null) {
+            $discountTargets = $eligibleCouponItems;
+        }
+
+        $targetWeights = array_column($discountTargets, 'price_cents');
+        $discountAllocations = $this->allocateCentsProportionally(
+            min($discountCents, array_sum($targetWeights)),
+            $targetWeights,
+        );
+        foreach ($discountTargets as $targetIndex => $target) {
+            $lineIndex = $target['line_index'];
+            $lineItems[$lineIndex]['_payout_net_cents'] = max(
+                0,
+                (int) $lineItems[$lineIndex]['_payout_net_cents'] - ($discountAllocations[$targetIndex] ?? 0),
+            );
+        }
+
         return $lineItems;
+    }
+
+    /**
+     * @param  array<int, array{line_index:int, price_cents:int}>  $items
+     * @return array<int, array{line_index:int, price_cents:int}>
+     */
+    private function cheapestCouponItems(array $items, int $limit): array
+    {
+        if ($limit <= 0) {
+            return [];
+        }
+
+        usort($items, fn (array $left, array $right): int => ($left['price_cents'] <=> $right['price_cents'])
+            ?: ($left['line_index'] <=> $right['line_index']));
+
+        return array_slice($items, 0, $limit);
+    }
+
+    /**
+     * Allocate integer cents in proportion to item prices, carrying each
+     * cumulative floor forward so the allocations sum to the requested amount.
+     *
+     * @param  array<int, int>  $weights
+     * @return array<int, int>
+     */
+    private function allocateCentsProportionally(int $amount, array $weights): array
+    {
+        $totalWeight = array_sum($weights);
+        if ($amount <= 0 || $totalWeight <= 0) {
+            return array_fill(0, count($weights), 0);
+        }
+
+        $allocations = [];
+        $cumulativeWeight = 0;
+        $allocatedAmount = 0;
+        foreach ($weights as $weight) {
+            $cumulativeWeight += max(0, $weight);
+            $cumulativeAllocation = (int) bcdiv(
+                bcmul((string) $amount, (string) $cumulativeWeight, 0),
+                (string) $totalWeight,
+                0,
+            );
+            $allocations[] = $cumulativeAllocation - $allocatedAmount;
+            $allocatedAmount = $cumulativeAllocation;
+        }
+
+        return $allocations;
     }
 
     private function createOrder(
@@ -1553,11 +1709,25 @@ class CheckoutService
         $prefix = $isLieferschein ? 'L-' : 'P-';
         $invoiceNumber = InvoiceSequence::getNextInvoiceNumber($prefix);
 
+        $payoutPhotoRevenueCents = [];
+        foreach ($lineItems as $lineIndex => &$lineItem) {
+            if (! array_key_exists('_payout_net_cents', $lineItem)) {
+                continue;
+            }
+
+            $payoutPhotoRevenueCents[(string) $lineIndex] = max(0, (int) $lineItem['_payout_net_cents']);
+            unset($lineItem['_payout_net_cents']);
+        }
+        unset($lineItem);
+
         $customerDetails = [
             'name' => $request->billing_name, 'company' => $request->billing_company, 'street' => $request->billing_street,
             'zip' => $request->billing_zip, 'city' => $request->billing_city, 'email' => $user->email,
             'country' => 'Österreich', 'items' => $lineItems, 'quote_message' => $request->quote_message ?? null, 'terms' => [],
         ];
+        if ($payoutPhotoRevenueCents !== []) {
+            $customerDetails[InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY] = $payoutPhotoRevenueCents;
+        }
 
         // Freeze organization ownership at purchase time. Collective invoice
         // generation must not infer this from the user's later org_id value.

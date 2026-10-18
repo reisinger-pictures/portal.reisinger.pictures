@@ -29,15 +29,15 @@ class PayoutSystemTest extends TestCase
         $gallery2 = Gallery::factory()->create(['type' => 'delivery', 'is_free_download' => false]);
         $freeGallery = Gallery::factory()->create(['type' => 'delivery', 'is_free_download' => true]);
 
-        Photo::factory()->count(10)->create(['gallery_id' => $gallery1->id, 'user_id' => $photog1->id]);
+        $gallery1Photos = Photo::factory()->count(10)->create(['gallery_id' => $gallery1->id, 'user_id' => $photog1->id]);
         Photo::factory()->count(5)->create(['gallery_id' => $gallery2->id, 'user_id' => $photog2->id]);
         Photo::factory()->count(2)->create(['gallery_id' => $freeGallery->id, 'user_id' => $photog1->id]);
 
         $now = Carbon::now();
 
         // Gal1: 2 single images @ Web res (1 * 2 = 2 shares)
-        DownloadLog::create(['user_id' => $client->id, 'gallery_id' => $gallery1->id, 'item_type' => 'single_image', 'resolution_tier' => 'web', 'photo_count' => 1, 'created_at' => $now]);
-        DownloadLog::create(['user_id' => $client->id, 'gallery_id' => $gallery1->id, 'item_type' => 'single_image', 'resolution_tier' => 'web', 'photo_count' => 1, 'created_at' => $now]);
+        DownloadLog::create(['user_id' => $client->id, 'gallery_id' => $gallery1->id, 'item_type' => 'single_image', 'resolution_tier' => 'web', 'photo_count' => 1, 'payload' => ['photo_id' => $gallery1Photos[0]->id], 'created_at' => $now]);
+        DownloadLog::create(['user_id' => $client->id, 'gallery_id' => $gallery1->id, 'item_type' => 'single_image', 'resolution_tier' => 'web', 'photo_count' => 1, 'payload' => ['photo_id' => $gallery1Photos[1]->id], 'created_at' => $now]);
 
         // Gal2: FULL ZIP @ Original res (5 photos * 4 mult = 20 shares). Single image gets deduplicated by "Best Share" Zip.
         DownloadLog::create(['user_id' => $client->id, 'gallery_id' => $gallery2->id, 'item_type' => 'single_image', 'resolution_tier' => 'print', 'photo_count' => 1, 'created_at' => $now]);
