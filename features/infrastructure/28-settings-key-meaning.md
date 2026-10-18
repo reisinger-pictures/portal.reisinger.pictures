@@ -155,7 +155,8 @@ Nummer 3.
 > genannt — geprüft mit
 > `grep -rn 'calc_images_per_hour\|calc_outdoor_images_per_hour' features/`,
 > Ergebnis: keine Treffer. Zwei von neun Feldern der Antwort
-> `GET /api/settings/license-terms` waren damit an keiner Stelle beschrieben,
+> `GET /api/settings/license-terms` (seit D-27 `super_admin`-only) waren damit
+> an keiner Stelle beschrieben,
 > weder mit Einheit noch ohne. Sie sind hiermit erstmals benannt. Wer eine
 > Feldbeschreibung für sie schreibt, schreibt sie neu — es gibt nichts zu
 > übernehmen und nichts zu ergänzen.

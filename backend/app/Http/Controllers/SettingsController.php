@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreBrandSettingsRequest;
 use App\Jobs\InvalidateWatermarkCacheJob;
 use App\Models\Gallery;
+use App\Models\VolumePreset;
 use App\Services\BrandSettingsService;
 use App\Services\SettingResolver;
 use App\Services\VolumePresetService;
@@ -267,40 +268,17 @@ class SettingsController extends Controller
     }
 
     /**
-     * R-01 (security/naming): Lizenzbedingungen + Preisfaktoren — KEINE Bank-/Firmendaten.
-     * Öffentlich (Gallery-/License-Selector-/Calculator-Flows). Sensible Billing-/Impressum-Daten
-     * liegen bewusst im separaten, auth-geschützten Endpunkt getBillingDetails() (SRP-Trennung).
+     * Nur Super-Admin; enthält ALLE Preisparameter (calc_*, srp_*, mult_*,
+     * price_*, base_price) — NICHT öffentlich.
+     *
+     * The anonymous buy flow reads the deliberately minimized
+     * {@see getLicensePricing()}; this endpoint keeps the complete contract for
+     * the management UI (settings form, shooting calculator) whose caller is
+     * already gated to `super_admin`.
      */
     public function getLicenseTerms(Request $request, SettingResolver $resolver)
     {
-        $galleryId = $request->query('gallery_id');
-
-        $pricingStrategy = $resolver->get('pricing_strategy') ?? 'scope_licensing';
-        $gallery = null;
-
-        if ($galleryId !== null) {
-            $gallery = Gallery::find($galleryId);
-            if ($gallery !== null) {
-                $galleryBrand = BrandRegistry::normalizeId($gallery->brand);
-                $parentTreeMatches = $gallery->gallery_group_id === null
-                    || BrandRegistry::galleryGroupTreeMatchesCurrent($gallery->galleryGroup()->first());
-
-                // Keep the established legacy-null gallery fallback for the
-                // gallery's own brand, but never let a foreign/null parent
-                // influence this host's licensing terms or volume preset.
-                if (($galleryBrand !== null && ! BrandRegistry::resourceMatchesCurrent($galleryBrand))
-                    || ! $parentTreeMatches) {
-                    $gallery = null;
-                } else {
-                    $pricingStrategy = $gallery->effective_licensing_mode;
-                }
-            }
-        }
-
-        $presetService = app(VolumePresetService::class);
-        $preset = $pricingStrategy === 'volume_licensing'
-            ? $presetService->resolveForGallery($gallery)
-            : null;
+        [$pricingStrategy, $preset] = $this->resolveLicensePricingContext($request, $resolver);
 
         return response()->json([
             'editorial' => $resolver->get('term_editorial'),
@@ -337,20 +315,99 @@ class SettingsController extends Controller
             'srp_privacy_fee' => $this->moneyInCents($resolver, 'privacy_fee'),
             'srp_extra_image_fee' => $this->moneyInCents($resolver, 'extra_image_fee'),
             'pricing_strategy' => $pricingStrategy,
-            // Wire contract: `preset_id` is the `volume_presets.id` primary key
-            // and is serialised as a JSON *number*. The frontend treats it as an
-            // opaque identifier and only stringifies it for the `mode|preset`
-            // group key; stringifying it here would break the numeric contract
-            // documented in features/infrastructure/27-volume-licensing-presets.md.
-            'volume_pricing' => $preset !== null ? [
-                'preset_id' => (int) $preset->id,
-                'preset_name' => $preset->name,
-                'tiers' => $preset->tiers->map(fn ($tier) => [
-                    'min_quantity' => (int) $tier->min_quantity,
-                    'price_cents' => (int) $tier->price_cents,
-                ])->values(),
-            ] : null,
+            'volume_pricing' => $this->volumePricingPayload($preset),
         ]);
+    }
+
+    /**
+     * Öffentlich; bewusst minimiert auf Lizenz-Modus + Mengenrabatt-Staffel;
+     * enthält keine internen Preisparameter.
+     *
+     * Carries exactly `pricing_strategy` and `volume_pricing`. The effective
+     * mode is public by construction (`Gallery::effective_licensing_mode` is
+     * already resolved in the gallery tree the buy flow renders), and the tier
+     * table is the price *schedule* the client must display, not the internal
+     * `price_*`/`calc_*`/`mult_*` parameters behind it.
+     */
+    public function getLicensePricing(Request $request, SettingResolver $resolver)
+    {
+        [$pricingStrategy, $preset] = $this->resolveLicensePricingContext($request, $resolver);
+
+        return response()->json([
+            'pricing_strategy' => $pricingStrategy,
+            'volume_pricing' => $this->volumePricingPayload($preset),
+        ]);
+    }
+
+    /**
+     * Resolve the effective pricing strategy plus (in volume mode) the volume
+     * preset for the requesting gallery/brand.
+     *
+     * Shared by {@see getLicensePricing()} and {@see getLicenseTerms()} so the
+     * two endpoints can never resolve a gallery to a different mode, brand-guard
+     * or preset. The gallery lookup, brand guard and legacy-null fallback below
+     * are the semantics both must keep.
+     *
+     * @return array{0: string, 1: VolumePreset|null}
+     */
+    private function resolveLicensePricingContext(Request $request, SettingResolver $resolver): array
+    {
+        $galleryId = $request->query('gallery_id');
+
+        $pricingStrategy = $resolver->get('pricing_strategy') ?? 'scope_licensing';
+        $gallery = null;
+
+        if ($galleryId !== null) {
+            $gallery = Gallery::find($galleryId);
+            if ($gallery !== null) {
+                $galleryBrand = BrandRegistry::normalizeId($gallery->brand);
+                $parentTreeMatches = $gallery->gallery_group_id === null
+                    || BrandRegistry::galleryGroupTreeMatchesCurrent($gallery->galleryGroup()->first());
+
+                // Keep the established legacy-null gallery fallback for the
+                // gallery's own brand, but never let a foreign/null parent
+                // influence this host's licensing terms or volume preset.
+                if (($galleryBrand !== null && ! BrandRegistry::resourceMatchesCurrent($galleryBrand))
+                    || ! $parentTreeMatches) {
+                    $gallery = null;
+                } else {
+                    $pricingStrategy = $gallery->effective_licensing_mode;
+                }
+            }
+        }
+
+        $presetService = app(VolumePresetService::class);
+        $preset = $pricingStrategy === 'volume_licensing'
+            ? $presetService->resolveForGallery($gallery)
+            : null;
+
+        return [$pricingStrategy, $preset];
+    }
+
+    /**
+     * Project a resolved volume preset into the wire shape of `volume_pricing`.
+     *
+     * Wire contract: `preset_id` is the `volume_presets.id` primary key and is
+     * serialised as a JSON *number*. The frontend treats it as an opaque
+     * identifier and only stringifies it for the `mode|preset` group key;
+     * stringifying it here would break the numeric contract documented in
+     * features/infrastructure/27-volume-licensing-presets.md. `null` when the
+     * effective strategy is not `volume_licensing`.
+     */
+    private function volumePricingPayload(?VolumePreset $preset): ?array
+    {
+        if ($preset === null) {
+            return null;
+        }
+
+        return [
+            'preset_id' => (int) $preset->id,
+            'preset_name' => $preset->name,
+            'tiers' => $preset->tiers->map(fn ($tier) => [
+                'min_quantity' => (int) $tier->min_quantity,
+                'price_cents' => (int) $tier->price_cents,
+            ])->values(),
+        ];
     }
 
     /**

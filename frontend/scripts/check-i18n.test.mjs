@@ -447,6 +447,12 @@ describe('check-i18n prose taxonomy (D-7)', () => {
 });
 
 describe('check-i18n runner', () => {
+  // Explicit timeout for the two tests below: each spawns the real
+  // `scripts/check-i18n.mjs`, which shells out to `lingui extract`. Under the
+  // full-suite load that child takes 20 s+ (measured 21–23 s), far past vitest's
+  // 10 s default — the timeout is part of the measurement, so a slow extract can
+  // never masquerade as an i18n finding. The assertions still measure the i18n
+  // contract (exit code + "i18n check passed"), not the subprocess's speed.
   it('keeps the tree fully localized and the runner green (no warn-only path)', () => {
     const script = resolve(process.cwd(), 'scripts/check-i18n.mjs');
     // `NODE_ENV` is scrubbed for the child because vitest sets `NODE_ENV=test`
@@ -475,7 +481,8 @@ describe('check-i18n runner', () => {
     expect(findUnlocalizedStringsInTree().length).toBe(0);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain('i18n check passed');
-  });
+    // See the note above the first `it`: the child spawns `lingui extract`.
+  }, 60000);
 
   it('survives NODE_ENV=test because the gate cleans the extract environment', () => {
     // The defect was in the gate, not in the tests: the extract child inherited
@@ -498,6 +505,7 @@ describe('check-i18n runner', () => {
 
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain('i18n check passed');
-  });
+    // See the note above the first `it`: the child spawns `lingui extract`.
+  }, 60000);
 });
 

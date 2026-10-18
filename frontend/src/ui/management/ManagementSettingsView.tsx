@@ -106,7 +106,9 @@ export default function ManagementSettingsView() {
             {isSuperAdmin && <BrandSettingsCard/>}
             <WatermarkSettingsCard/>
 
-            <CalculatorSettingsCard/>
+            {/* `CalculatorSettingsCard` reads the full (super_admin-only)
+                license-terms payload — gate it like `BrandSettingsCard`. */}
+            {isSuperAdmin && <CalculatorSettingsCard/>}
 
             {isSuperAdmin && (
                 <div className="card bg-base-100 border border-base-300 shadow-sm">

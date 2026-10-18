@@ -122,9 +122,9 @@ class DatabaseSeederSettingsAuthorityTest extends TestCase
      * The failing CI save, reproduced as a backend test.
      *
      * Mirrors what `CalculatorSettingsCard` does on a real save: hydrate the
-     * form from the public licence-terms response (`/100` for the cent-valued
-     * `srp_*` fields), then submit (`Math.round(x * 100)`) together with the
-     * `calc_*` fields and the required `mult_*` multipliers.
+     * form from the (super-admin only) licence-terms response (`/100` for the
+     * cent-valued `srp_*` fields), then submit (`Math.round(x * 100)`) together
+     * with the `calc_*` fields and the required `mult_*` multipliers.
      *
      * With the defect present the seeded `base_price` is `35.00`, the card
      * submits `srp_base_price = 35`, and the `min:500` rule answers 422 —
@@ -134,7 +134,8 @@ class DatabaseSeederSettingsAuthorityTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        $terms = $this->getJson('/api/settings/license-terms');
+        $terms = $this->withHeaders(['Authorization' => 'Bearer '.$this->seededAdminToken()])
+            ->getJson('/api/settings/license-terms');
         $terms->assertOk();
 
         $payload = $this->calculatorCardPayload($terms->json());

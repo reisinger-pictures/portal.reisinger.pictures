@@ -126,7 +126,7 @@ test.describe('Volume-Licensing Presets Admin Workflow', () => {
         const main = page.getByRole('main');
         let termsRequest = page.waitForRequest(request => {
             const url = new URL(request.url());
-            return url.pathname === '/api/settings/license-terms'
+            return url.pathname === '/api/settings/license-pricing'
                 && url.searchParams.get('gallery_id') === volumeGalleryId;
         });
         const volumeGalleryLink = main.getByRole('link', {
@@ -145,7 +145,7 @@ test.describe('Volume-Licensing Presets Admin Workflow', () => {
 
         termsRequest = page.waitForRequest(request => {
             const url = new URL(request.url());
-            return url.pathname === '/api/settings/license-terms'
+            return url.pathname === '/api/settings/license-pricing'
                 && url.searchParams.get('gallery_id') === scopeGalleryId;
         });
         const scopeGalleryLink = main.getByRole('link', {

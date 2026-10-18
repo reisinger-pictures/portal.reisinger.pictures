@@ -2,17 +2,25 @@
 
 namespace Tests\Feature;
 
+use App\Enums\UserRole;
 use App\Http\Middleware\BrandContextMiddleware;
 use App\Models\Gallery;
+use App\Models\Role;
+use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Regression: the public license-terms endpoint must not leak the
+ * Regression: the publicly reachable license endpoint must not leak the
  * `effective_licensing_mode` (and therefore a volume preset) of a gallery
  * belonging to another brand.
+ *
+ * The buy flow now reads the minimized `/api/settings/license-pricing`; the
+ * full `/api/settings/license-terms` payload is super-admin only and is checked
+ * with a super-admin token alongside, so the brand guard is pinned on both
+ * routes.
  */
 class BrandScopingLicenseTermsTest extends TestCase
 {
@@ -38,7 +46,19 @@ class BrandScopingLicenseTermsTest extends TestCase
         ));
     }
 
-    public function test_license_terms_ignores_foreign_brand_gallery_mode(): void
+    private function superAdminToken(): string
+    {
+        // `null` is the explicit cross-brand Super-Admin actor
+        // (`App\Enums\Brand` docblock): this test sets the brand context to
+        // `srp`, so a brand-bound super admin would legitimately get 403
+        // (Brand Isolation) instead of exercising the route under test.
+        $user = User::factory()->create(['brand' => null]);
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+
+        return auth('api')->login($user);
+    }
+
+    public function test_license_pricing_ignores_foreign_brand_gallery_mode(): void
     {
         $this->setBrand('srp');
 
@@ -47,13 +67,22 @@ class BrandScopingLicenseTermsTest extends TestCase
             'licensing_mode' => 'volume_licensing',
         ]);
 
-        $response = $this->getJson('/api/settings/license-terms?gallery_id='.$foreignGallery->id);
+        $response = $this->getJson('/api/settings/license-pricing?gallery_id='.$foreignGallery->id);
 
         $response->assertOk();
         $response->assertJsonPath('pricing_strategy', 'scope_licensing');
+        // The foreign preset is not leaked either.
+        $response->assertJsonPath('volume_pricing', null);
+
+        // The full super-admin route keeps the same brand guard.
+        $this->withHeaders(['Authorization' => 'Bearer '.$this->superAdminToken()])
+            ->getJson('/api/settings/license-terms?gallery_id='.$foreignGallery->id)
+            ->assertOk()
+            ->assertJsonPath('pricing_strategy', 'scope_licensing')
+            ->assertJsonPath('volume_pricing', null);
     }
 
-    public function test_license_terms_honors_same_brand_gallery_mode(): void
+    public function test_license_pricing_honors_same_brand_gallery_mode(): void
     {
         $this->setBrand('srp');
 
@@ -62,9 +91,15 @@ class BrandScopingLicenseTermsTest extends TestCase
             'licensing_mode' => 'volume_licensing',
         ]);
 
-        $response = $this->getJson('/api/settings/license-terms?gallery_id='.$ownGallery->id);
+        $response = $this->getJson('/api/settings/license-pricing?gallery_id='.$ownGallery->id);
 
         $response->assertOk();
         $response->assertJsonPath('pricing_strategy', 'volume_licensing');
+
+        // The full super-admin route resolves the same gallery override.
+        $this->withHeaders(['Authorization' => 'Bearer '.$this->superAdminToken()])
+            ->getJson('/api/settings/license-terms?gallery_id='.$ownGallery->id)
+            ->assertOk()
+            ->assertJsonPath('pricing_strategy', 'volume_licensing');
     }
 }

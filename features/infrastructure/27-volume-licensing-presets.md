@@ -52,8 +52,11 @@ Frontend-Anzeige liest die effektiven Staffeln aus der API.
   - `GET/POST /api/management/settings/volume-presets`
   - `PUT/DELETE /api/management/settings/volume-presets/{id}`
   - `POST /api/management/settings/volume-presets/{id}/default`
-  - `GET /api/settings/license-terms` liefert `volume_pricing: {preset_id, preset_name, tiers[]}`
-    (Brand-Default, bzw. Gallery-Preset bei `?gallery_id=`).
+  - `GET /api/settings/license-pricing` (öffentlich, bewusst minimiert, D-28)
+    liefert `volume_pricing: {preset_id, preset_name, tiers[]}` (Brand-Default,
+    bzw. Gallery-Preset bei `?gallery_id=`) — daneben ausschliesslich
+    `pricing_strategy`. Die vollständigen Preisparameter liefert
+    `GET /api/settings/license-terms` (`auth:api` + `super_admin`, D-27).
 - **Gallery**: `GalleryRequest`/`StoreGalleryRequest` validieren `volume_preset_id`
   (`nullable|numeric|exists:volume_presets,id`); `GalleryService::assertPresetForBrand()` lehnt
   fremd-Brand-Presets mit 422 ab. `galleries.volume_preset_id` ist in `$visible`/`$fillable`.
@@ -66,7 +69,7 @@ Frontend-Anzeige liest die effektiven Staffeln aus der API.
 - **Gallery-Dialog** (`GalleryModal`): „Lizenzierungsmodus" (Brand-Standard/Scope/Volume) + bei
   Volume ein „Volume-Preset"-Dropdown (Brand-Standard oder konkretes Preset).
 - **Warenkorb-Anzeige**: `useVolumeLicensing` liest die effektiven Staffeln aus
-  `license-terms.volume_pricing` (Fallback `DEFAULT_VOLUME_PRICING` beim Laden). `VolumeTierResult`
+  `license-pricing.volume_pricing` (Fallback `DEFAULT_VOLUME_PRICING` beim Laden). `VolumeTierResult`
   nutzt `tierIndex`/`isMaxTier` statt hartcodierter 3 Staffeln; `VolumeLicensingCard`/
   `CartItemList` rendern die Staffeln dynamisch.
 

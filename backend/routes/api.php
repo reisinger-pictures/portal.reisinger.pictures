@@ -66,10 +66,15 @@ Route::middleware("throttle:$throttleLimit,1")->group(function () {
 Route::get('/ping', function () {
     return response()->json(['message' => 'API OK']);
 })->name('api.ping');
-// R-01 (naming): Lizenzbedingungen + Preisfaktoren — öffentlich, KEINE Bank-/Firmendaten
+// R-01 (naming): Brand-Konfiguration — öffentlich, KEINE Bank-/Firmendaten
 // (diese liegen in /settings/billing-details hinter auth:api).
 Route::get('/settings/brand-config', [SettingsController::class, 'getBrandConfig'])->name('api.settings.brand-config');
-Route::get('/settings/license-terms', [SettingsController::class, 'getLicenseTerms'])->name('api.settings.license-terms');
+// Öffentlicher, bewusst minimierter Preisanzeige-Endpunkt für den Kauf-Flow:
+// ausschliesslich Lizenz-Modus und Mengenrabatt-Staffel. Die vollständigen
+// Preisparameter liefert nur noch der super_admin-Endpunkt /settings/license-terms.
+Route::get('/settings/license-pricing', [SettingsController::class, 'getLicensePricing'])
+    ->middleware('throttle:api')
+    ->name('api.settings.license-pricing');
 Route::get('/settings/license-catalog', [LicenseCatalogController::class, 'index'])->name('api.settings.license-catalog');
 
 if (app()->environment('local', 'testing')) {
@@ -152,6 +157,12 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::put('/auth/profile', [AuthController::class, 'updateProfile'])->name('api.auth.profile');
     // R-01 (naming): Bankverbindung & Impressum — sensibel, nur authentifiziert.
     Route::get('/settings/billing-details', [SettingsController::class, 'getBillingDetails'])->name('api.settings.billing-details');
+    // R-01 (naming): vollständige Lizenz- und Preisparameter — NICHT öffentlich.
+    // Der anonyme Kauf-Flow liest ausschliesslich /settings/license-pricing (oben).
+    // Reihenfolge: `auth:api` (anonym → 401), dann `super_admin` (falsche Rolle → 403).
+    Route::get('/settings/license-terms', [SettingsController::class, 'getLicenseTerms'])
+        ->middleware('super_admin')
+        ->name('api.settings.license-terms');
     Route::post('/photos/{photoId}/rate', [GalleryFrontendController::class, 'rate'])->name('api.photos.rate');
     Route::post('/galleries/{id}/finish-rating', [MailController::class, 'finishRating'])->name('api.galleries.finish-rating');
 

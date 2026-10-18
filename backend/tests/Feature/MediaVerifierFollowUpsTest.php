@@ -242,7 +242,7 @@ class MediaVerifierFollowUpsTest extends TestCase
                 'licensing_mode' => 'volume_licensing',
             ]);
 
-            $this->getJson('/api/settings/license-terms?gallery_id='.$gallery->id)
+            $this->getJson('/api/settings/license-pricing?gallery_id='.$gallery->id)
                 ->assertOk()
                 ->assertJsonPath('pricing_strategy', 'scope_licensing')
                 ->assertJsonPath('volume_pricing', null);
@@ -255,7 +255,7 @@ class MediaVerifierFollowUpsTest extends TestCase
             'brand' => null,
             'licensing_mode' => 'volume_licensing',
         ]);
-        $this->getJson('/api/settings/license-terms?gallery_id='.$legacyGallery->id)
+        $this->getJson('/api/settings/license-pricing?gallery_id='.$legacyGallery->id)
             ->assertOk()
             ->assertJsonPath('pricing_strategy', 'volume_licensing');
     }

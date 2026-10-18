@@ -118,11 +118,11 @@ class MetaGalleryLicensingContractTest extends TestCase
         $this->assertSame($parent->id, $sources->get($scopeGallery->id)['gallery_group_id']);
         $this->assertSame($child->id, $sources->get($volumeGallery->id)['gallery_group_id']);
 
-        $this->getJson("/api/settings/license-terms?gallery_id={$scopeGallery->id}")
+        $this->getJson("/api/settings/license-pricing?gallery_id={$scopeGallery->id}")
             ->assertOk()
             ->assertJsonPath('pricing_strategy', 'scope_licensing')
             ->assertJsonPath('volume_pricing', null);
-        $this->getJson("/api/settings/license-terms?gallery_id={$volumeGallery->id}")
+        $this->getJson("/api/settings/license-pricing?gallery_id={$volumeGallery->id}")
             ->assertOk()
             ->assertJsonPath('pricing_strategy', 'volume_licensing')
             // Strict: the numeric `volume_presets.id` primary key, not a string.
@@ -132,7 +132,7 @@ class MetaGalleryLicensingContractTest extends TestCase
             ->assertJsonPath('volume_pricing.tiers.0.price_cents', 5000)
             ->assertJsonPath('volume_pricing.tiers.1.min_quantity', 2)
             ->assertJsonPath('volume_pricing.tiers.1.price_cents', 4000);
-        $this->getJson("/api/settings/license-terms?gallery_id={$emptyVolumeGallery->id}")
+        $this->getJson("/api/settings/license-pricing?gallery_id={$emptyVolumeGallery->id}")
             ->assertOk()
             ->assertJsonPath('pricing_strategy', 'volume_licensing')
             ->assertJsonPath('volume_pricing.preset_id', $emptyPreset->id, true)

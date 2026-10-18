@@ -10,6 +10,7 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\TestCase;
@@ -84,6 +85,16 @@ class ShootingCalculatorSettingsTest extends TestCase
         ], $overrides);
     }
 
+    /**
+     * The complete license-terms payload is super-admin only (`auth:api` → 401,
+     * `super_admin` → 403). Every read in this file authenticates accordingly.
+     */
+    private function getLicenseTermsJson(string $query = ''): TestResponse
+    {
+        return $this->withHeaders(['Authorization' => 'Bearer '.$this->superAdminToken()])
+            ->getJson('/api/settings/license-terms'.$query);
+    }
+
     // ------------------------------------------------------------------
     // GET /api/settings/license-terms — Defaults & gespeicherte Werte
     // ------------------------------------------------------------------
@@ -100,7 +111,7 @@ class ShootingCalculatorSettingsTest extends TestCase
      */
     public function test_get_license_terms_serves_money_as_cent_integers_and_everything_else_as_text(): void
     {
-        $response = $this->getJson('/api/settings/license-terms');
+        $response = $this->getLicenseTermsJson();
 
         $response->assertStatus(200)
             // Money: integer cents.
@@ -149,7 +160,7 @@ class ShootingCalculatorSettingsTest extends TestCase
     {
         Setting::query()->delete();
 
-        $response = $this->getJson('/api/settings/license-terms')->assertStatus(200);
+        $response = $this->getLicenseTermsJson()->assertStatus(200);
 
         $response->assertJsonPath('calc_base_price', null)
             ->assertJsonPath('calc_hourly_rate', null)
@@ -175,8 +186,8 @@ class ShootingCalculatorSettingsTest extends TestCase
             ]))
             ->assertStatus(200);
 
-        // Folge-GET liefert die gespeicherten Werte (license-terms ist öffentlich, s. R-01)
-        $this->getJson('/api/settings/license-terms')
+        // Folge-GET liefert die gespeicherten Werte (nur Super-Admin, s. R-01)
+        $this->getLicenseTermsJson()
             ->assertStatus(200)
             ->assertJsonPath('calc_base_price', 7500)
             ->assertJsonPath('calc_hourly_rate', 15000)
@@ -189,7 +200,7 @@ class ShootingCalculatorSettingsTest extends TestCase
     // im separaten, auth-geschützten Endpunkt /settings/billing-details.
     // ------------------------------------------------------------------
 
-    public function test_license_terms_is_public_and_omits_billing_data(): void
+    public function test_license_terms_requires_super_admin_and_omits_billing_data(): void
     {
         // Sensible Werte persistieren, damit ein Leak erkannt würde (nicht nur leere Defaults).
         // Settings werden brand-scoped gelesen (resolver scope nach brand='rp' im Default-B2B-Kontext),
@@ -201,8 +212,11 @@ class ShootingCalculatorSettingsTest extends TestCase
         Setting::updateOrCreate(['key' => 'mult_commercial', 'brand' => 'rp'], ['value' => '2.0']);
         Setting::updateOrCreate(['key' => 'calc_images_per_hour', 'brand' => 'rp'], ['value' => '6']);
 
-        // Vollständig anonymer Aufruf (kein Authorization-Header) — license-terms ist öffentlich.
-        $this->getJson('/api/settings/license-terms')
+        // Vollständig anonymer Aufruf (kein Authorization-Header) — der
+        // vollständige Preispayload ist super_admin-only, also 401 und kein Leak.
+        $this->getJson('/api/settings/license-terms')->assertStatus(401);
+
+        $this->getLicenseTermsJson()
             ->assertStatus(200)
             ->assertJsonMissingPath('bank_iban')
             ->assertJsonMissingPath('bank_bic')
@@ -212,7 +226,7 @@ class ShootingCalculatorSettingsTest extends TestCase
             ->assertJsonMissingPath('company_city')
             ->assertJsonMissingPath('company_country')
             ->assertJsonMissingPath('company_email')
-            // Regression-Guard: legitime öffentliche Felder bleiben verfügbar (Gallery-Flow).
+            // Regression-Guard: legitime Lizenz-/Preisfelder bleiben verfügbar.
             ->assertJsonStructure([
                 'editorial', 'commercial', '1_year', 'unlimited',
                 'mult_commercial', 'mult_unlimited', 'mult_international',
@@ -253,7 +267,7 @@ class ShootingCalculatorSettingsTest extends TestCase
             ->assertStatus(200)
             ->assertJson(['success' => true]);
 
-        $terms = $this->getJson('/api/settings/license-terms')->assertStatus(200);
+        $terms = $this->getLicenseTermsJson()->assertStatus(200);
 
         // What the card would render in the input, and what it would submit.
         // PHP's `/` returns an int when both operands are ints and divide
@@ -297,7 +311,7 @@ class ShootingCalculatorSettingsTest extends TestCase
         $this->assertSame('5000', Setting::where('key', 'calc_base_price')->value('value'));
         $this->assertSame('8000', Setting::where('key', 'calc_hourly_rate')->value('value'));
 
-        $this->getJson('/api/settings/license-terms')
+        $this->getLicenseTermsJson()
             ->assertStatus(200)
             ->assertJsonPath('calc_base_price', 5000)
             ->assertJsonPath('calc_hourly_rate', 8000);

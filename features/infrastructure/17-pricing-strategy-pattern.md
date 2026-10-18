@@ -85,8 +85,28 @@ runtime resolution.
 
 For volume mode, `VolumePresetService::resolveForGallery()` chooses the
 gallery's `volume_preset_id` when valid, otherwise the brand default preset.
-The public license-terms endpoint returns the effective tiers for a supplied
-`gallery_id`.
+
+### 3.2.1 Public pricing endpoint vs. full price parameters
+
+Two endpoints serve this resolution, split by what they may disclose
+(owner decisions D-27/D-28):
+
+- **`GET /api/settings/license-pricing` — public, deliberately minimized.** It
+  returns exactly `pricing_strategy` and `volume_pricing`
+  (`{preset_id, preset_name, tiers[]}`) for a supplied `gallery_id`. This is
+  what the buy flow (photo page, cart, gallery view) reads. The effective mode
+  is public by construction — `Gallery::effective_licensing_mode` is already
+  resolved in the gallery tree the buy flow renders — and the tier table is the
+  price *schedule* the client must display.
+- **`GET /api/settings/license-terms` — `auth:api` + `super_admin`.** It carries
+  every internal price parameter (`price_*`, `calc_*`, `srp_*`, `mult_*`,
+  `base_price`, licence texts). Only the management UI (settings form, shooting
+  calculator) reads it, and both callers are already super-admin gated.
+
+Both endpoints resolve the gallery through the same shared
+`SettingsController::resolveLicensePricingContext()` and project the preset
+through `SettingsController::volumePricingPayload()`, so a gallery cannot
+resolve to a different mode or preset depending on which endpoint is called.
 
 ### 3.3 Checkout grouping
 

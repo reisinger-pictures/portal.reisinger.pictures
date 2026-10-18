@@ -187,13 +187,13 @@ test.describe('Cart pricing and coupon integration', () => {
         await addFirstPhotoToCart(page, cartGallery.name);
         await sidebar.navigateToClientGalleries();
 
-        // Gate every license-terms response until the test releases it.
+        // Gate every license-pricing response until the test releases it.
         let releaseTerms: (() => void) | undefined;
         const termsGate = new Promise<void>(resolve => {
             releaseTerms = resolve;
         });
         let termsRequested = false;
-        await page.route('**/api/settings/license-terms**', async route => {
+        await page.route('**/api/settings/license-pricing**', async route => {
             termsRequested = true;
             await termsGate;
             await route.continue();
