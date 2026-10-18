@@ -451,6 +451,15 @@ export interface User {
     photographer_gallery_groups?: Array<{ id: string; name: string }>;
 }
 
+/**
+ * The delegation boundary of an organization admin, resolved server-side by
+ * the same code the authorization reader uses. `null` for every other actor.
+ */
+export interface OrgScope {
+    gallery_ids: string[];
+    gallery_group_ids: string[];
+}
+
 /** Fields guaranteed by the `/api/auth/me` contract. */
 export interface AuthMeUser extends User {
     guest_id: string | null;
@@ -467,6 +476,7 @@ export interface AuthMeUser extends User {
     transient_galleries: string[];
     transient_meta_galleries: string[];
     photographer_gallery_groups: Array<{ id: string; name: string }>;
+    org_scope?: OrgScope | null;
 }
 export interface TextSnippet { id: string; title: string; shortcut?: string | null; content_html: string; }
 export interface OrderItem { id?: string; order_id?: string; photo_id?: string; tier: string; price: number; use_case_id?: string; qty?: number; filename?: string; notes?: string; row_total?: number; type?: string; description?: string; calculated_percentage?: number | string; }

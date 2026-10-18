@@ -8,6 +8,7 @@ use App\Exceptions\GalleryGroupBudgetExceededException;
 use App\Models\Gallery;
 use App\Models\GalleryGroup;
 use App\Models\GalleryInvite;
+use App\Models\Org;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Support\GalleryGroupSubtree;
@@ -102,19 +103,12 @@ class AuthorizationService
             $galleryIds = array_unique(array_merge($galleryIds, $groupGalleryIds));
         }
 
-        // 3. Org Integration (pivot group assignments)
+        // 3. Org Integration (pivot galleries plus the org's group tree)
         if ($user->org_id) {
-            $orgGalleryIds = Gallery::whereHas('orgs', fn ($q) => $q->where('orgs.id', $user->org_id))->where('type', 'delivery')->pluck('id')->toArray();
-            $pivotGroupIds = DB::table('gallery_group_org')->where('org_id', $user->org_id)->pluck('gallery_group_id')->toArray();
-
-            $combinedGroupIds = $pivotGroupIds;
-            $allOrgGroupIds = $this->getSubGroupIds($combinedGroupIds);
-
-            if (! empty($allOrgGroupIds)) {
-                $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allOrgGroupIds)->where('type', 'delivery')->pluck('id')->toArray();
-                $orgGalleryIds = array_unique(array_merge($orgGalleryIds, $groupGalleryIds));
-            }
-            $galleryIds = array_unique(array_merge($galleryIds, $orgGalleryIds));
+            $galleryIds = array_unique(array_merge(
+                $galleryIds,
+                $this->getOrgGalleryScope($user->org_id),
+            ));
         }
 
         if (! empty($transientGalleryIds)) {
@@ -160,6 +154,71 @@ class AuthorizationService
         }
 
         return $galleryIds;
+    }
+
+    /**
+     * The gallery groups an organization may delegate: the groups attached to
+     * the org through `gallery_group_org` plus every descendant of those
+     * groups.
+     *
+     * This is the delegation boundary, not a second access model. It is the
+     * exact group set {@see getAllowedGalleryIds()} resolves for an org member
+     * (step 3, before that method applies its brand filter), so a writer cannot
+     * reach further than a reader in the same organization already can.
+     *
+     * @return array<string>
+     */
+    public function getOrgGroupScope(Org|string $org): array
+    {
+        $orgId = $org instanceof Org ? (string) $org->getKey() : $org;
+        if ($orgId === '') {
+            return [];
+        }
+
+        $pivotGroupIds = DB::table('gallery_group_org')
+            ->where('org_id', $orgId)
+            ->pluck('gallery_group_id')
+            ->all();
+
+        return $this->getSubGroupIds($pivotGroupIds);
+    }
+
+    /**
+     * The delivery galleries an organization may delegate: galleries directly
+     * attached to the org through `gallery_org`, plus delivery galleries whose
+     * `gallery_group_id` lies in {@see getOrgGroupScope()}.
+     *
+     * Delivery-only on purpose: that is the projection the reader has always
+     * applied to org integration. A selection gallery attached to an org is not
+     * part of the org's client-visible scope and must not become assignable
+     * through this helper. The reader's brand filter is applied after this
+     * block, not here.
+     *
+     * @return array<string>
+     */
+    public function getOrgGalleryScope(Org|string $org): array
+    {
+        $orgId = $org instanceof Org ? (string) $org->getKey() : $org;
+        if ($orgId === '') {
+            return [];
+        }
+
+        $galleryIds = Gallery::whereHas('orgs', fn ($q) => $q->where('orgs.id', $orgId))
+            ->where('type', 'delivery')
+            ->pluck('id')
+            ->all();
+
+        $groupIds = $this->getOrgGroupScope($orgId);
+        if ($groupIds !== []) {
+            $groupGalleryIds = Gallery::whereIn('gallery_group_id', $groupIds)
+                ->where('type', 'delivery')
+                ->pluck('id')
+                ->all();
+
+            $galleryIds = array_merge($galleryIds, $groupGalleryIds);
+        }
+
+        return array_values(array_unique($galleryIds));
     }
 
     /**
@@ -704,6 +763,55 @@ class AuthorizationService
     public function hasRole(User $user, string ...$roles): bool
     {
         return $user->roles()->whereIn('name', $roles)->exists();
+    }
+
+    /**
+     * The roles an organization administrator may grant or revoke.
+     *
+     * These are **not** "everything below org_admin on a ladder". They are the
+     * roles that describe a customer account *belonging to this organization*.
+     * `photographer`, `admin` and `super_admin` describe capabilities inside
+     * the studio instead; an org admin granting `photographer` would hand out
+     * camera access to a customer, which is a different authority, not a higher
+     * rung. The numeric rank below is therefore only a ceiling *inside* this
+     * domain (and the admin path), never the definition of the domain itself.
+     *
+     * @return array<string>
+     */
+    public function orgDelegableRoleNames(): array
+    {
+        return [
+            UserRole::CLIENT->value,
+            UserRole::POWER_USER->value,
+            UserRole::ORG_ADMIN->value,
+        ];
+    }
+
+    /**
+     * Privilege rank for a role name. Unknown roles rank highest so they are only
+     * assignable by a Super Admin (which skips the rank check entirely).
+     */
+    public function roleRank(string $roleName): int
+    {
+        return match ($roleName) {
+            UserRole::SUPER_ADMIN->value => 100,
+            UserRole::ADMIN->value => 80,
+            UserRole::ORG_ADMIN->value => 60,
+            UserRole::PHOTOGRAPHER->value => 50,
+            UserRole::POWER_USER->value => 40,
+            UserRole::CLIENT->value => 10,
+            default => PHP_INT_MAX,
+        };
+    }
+
+    /**
+     * Highest privilege rank across all roles of the given user.
+     */
+    public function highestRoleRank(User $user): int
+    {
+        return $user->roles->pluck('name')
+            ->map(fn ($name) => $this->roleRank($name))
+            ->max() ?? 0;
     }
 
     /**

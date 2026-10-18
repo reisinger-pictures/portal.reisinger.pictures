@@ -78,6 +78,11 @@ class ProfileUpdateScoutTest extends TestCase
     {
         $user1 = User::factory()->create(['ftp_slug' => 'florian']);
         $user2 = User::factory()->create(['ftp_slug' => 'max']);
+        // SEC-20261018-04: a slug change is a camera-account operation, so the
+        // actor must hold the photographer role (§7.16). The fixture now names
+        // the role instead of relying on "any authenticated account", which was
+        // the behaviour the finding removed.
+        $user2->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
         $token = auth('api')->login($user2);
 
         // 1. Conflict Test (422)
@@ -118,6 +123,9 @@ class ProfileUpdateScoutTest extends TestCase
     public function test_a_refused_slug_change_also_discards_the_name_change_from_the_same_request(): void
     {
         $user = User::factory()->create(['ftp_slug' => 'max', 'name' => 'Max']);
+        // The actor has to be a photographer to reach the provisioning branch
+        // this test refuses (SEC-20261018-04).
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
         $token = auth('api')->login($user);
 
         $this->configureSftpGo(['api_key' => null, 'admin_username' => null, 'admin_password' => null]);
