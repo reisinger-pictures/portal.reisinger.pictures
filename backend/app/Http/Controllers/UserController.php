@@ -63,6 +63,13 @@ class UserController extends Controller
             $query->where('name', '!=', UserRole::SUPER_ADMIN->value);
         }
 
+        // Do not advertise what the caller cannot assign. An org admin manages
+        // customer accounts, so the studio-capability roles (photographer,
+        // admin, super_admin) are not part of their vocabulary at all.
+        if ($user && ! $svc->isAdmin($user)) {
+            $query->whereIn('name', $svc->orgDelegableRoleNames());
+        }
+
         return $query->get();
     }
 
@@ -162,6 +169,19 @@ class UserController extends Controller
             return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
         }
 
+        // SEC-20261018-03: self-service role changes must not exist. This
+        // endpoint administers *other* people's accounts; the only actor who may
+        // change their own roles here is a Super Admin. An unchanged role set is
+        // not a change — a profile edit that re-submits the current selection
+        // keeps working.
+        if (! $svc->isSuperAdmin($currentUser)
+            && $currentUser->is($user)
+            && $request->has('role_ids')
+            && $this->roleSelectionChanged($request->input('role_ids', []), $user)
+        ) {
+            return response()->json(['error' => 'Die eigenen Rollen können nicht über die Benutzerverwaltung geändert werden.'], 403);
+        }
+
         $superAdminRole = Role::where('name', UserRole::SUPER_ADMIN->value)->first();
         $wantsSuperAdmin = $superAdminRole && in_array($superAdminRole->id, $request->role_ids ?? []);
 
@@ -169,17 +189,69 @@ class UserController extends Controller
             return response()->json(['error' => 'Nur Super Admins können die Super Admin Rolle verwalten.'], 403);
         }
 
-        // Privilege escalation guard: a non-super-admin may only assign roles at or
-        // below their own privilege level (covers self-escalation and cross-role
-        // escalation, e.g. an org_admin assigning `admin`).
+        // Privilege guard: a non-super-admin may only assign roles at or below
+        // their own privilege level. For a non-admin actor (org_admin) the org
+        // domain is narrower than "everything below me": client, power_user and
+        // org_admin describe *this customer account*, while photographer, admin
+        // and super_admin are different capabilities, not higher rungs (see
+        // AuthorizationService::orgDelegableRoleNames()). Roles outside the org
+        // domain that the target already holds are carried through unchanged —
+        // otherwise a metadata edit by an org admin would silently detach a
+        // photographer and revoke their camera account (§7.16).
         if (! $svc->isSuperAdmin($currentUser) && $request->has('role_ids')) {
-            $callerRank = $this->highestRoleRank($currentUser);
+            $callerRank = $svc->highestRoleRank($currentUser);
             $requestedRoleNames = Role::whereIn('id', $request->role_ids ?? [])->pluck('name')->all();
 
+            if (! $svc->isAdmin($currentUser)) {
+                $currentRoleNames = $user->roles()->pluck('name')->all();
+
+                foreach (array_unique(array_merge($currentRoleNames, $requestedRoleNames)) as $roleName) {
+                    if (in_array($roleName, $svc->orgDelegableRoleNames(), true)) {
+                        continue;
+                    }
+
+                    $heldBefore = in_array($roleName, $currentRoleNames, true);
+                    $heldAfter = in_array($roleName, $requestedRoleNames, true);
+                    if ($heldBefore !== $heldAfter) {
+                        return response()->json([
+                            'error' => 'Es dürfen nur die Rollen der eigenen Organisation (client, power_user, org_admin) vergeben werden.',
+                        ], 403);
+                    }
+                }
+
+                // Carried-through roles were not granted by this actor, so only
+                // newly granted roles still have to pass the rank ceiling.
+                $requestedRoleNames = array_values(array_diff($requestedRoleNames, $currentRoleNames));
+            }
+
             foreach ($requestedRoleNames as $requestedRoleName) {
-                if ($this->roleRank($requestedRoleName) > $callerRank) {
+                if ($svc->roleRank($requestedRoleName) > $callerRank) {
                     return response()->json(['error' => 'Es dürfen nur Rollen auf oder unterhalb der eigenen Berechtigungsstufe vergeben werden.'], 403);
                 }
+            }
+        }
+
+        // SEC-20261018-02: an org admin delegates within the organization's
+        // scope only. `getOrgGalleryScope()` is the same resolution the reader
+        // uses for org integration, so this cannot grant more than an org member
+        // can already reach.
+        if (! $svc->isAdmin($currentUser)) {
+            $actorOrgId = $currentUser->org_id;
+            $orgScope = [
+                'galleries' => $actorOrgId === null ? [] : $svc->getOrgGalleryScope($actorOrgId),
+                'groups' => $actorOrgId === null ? [] : $svc->getOrgGroupScope($actorOrgId),
+            ];
+
+            if ($request->has('gallery_ids')
+                && $this->outsideScope($request->input('gallery_ids', []), $orgScope['galleries'])
+            ) {
+                return response()->json(['error' => 'Es dürfen nur Galerien der eigenen Organisation zugewiesen werden.'], 403);
+            }
+
+            if ($request->has('gallery_group_ids')
+                && $this->outsideScope($request->input('gallery_group_ids', []), $orgScope['groups'])
+            ) {
+                return response()->json(['error' => 'Es dürfen nur Galerie-Gruppen der eigenen Organisation zugewiesen werden.'], 403);
             }
         }
 
@@ -244,30 +316,47 @@ class UserController extends Controller
     }
 
     /**
-     * Privilege rank for a role name. Unknown roles rank highest so they are only
-     * assignable by a Super Admin (which skips the rank check entirely).
+     * Whether an incoming `role_ids` selection differs from the target's
+     * current role set. Order and duplicates are irrelevant: `sync()` treats
+     * the list as a set.
+     *
+     * @param  array<int, string>  $requestedRoleIds
      */
-    private function roleRank(string $roleName): int
+    private function roleSelectionChanged(array $requestedRoleIds, User $user): bool
     {
-        return match ($roleName) {
-            UserRole::SUPER_ADMIN->value => 100,
-            UserRole::ADMIN->value => 80,
-            UserRole::ORG_ADMIN->value => 60,
-            UserRole::PHOTOGRAPHER->value => 50,
-            UserRole::POWER_USER->value => 40,
-            UserRole::CLIENT->value => 10,
-            default => PHP_INT_MAX,
-        };
+        $current = $user->roles()->pluck('roles.id')
+            ->map(fn ($id): string => (string) $id)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        $requested = collect($requestedRoleIds)
+            ->map(fn ($id): string => (string) $id)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        return $current !== $requested;
     }
 
     /**
-     * Highest privilege rank across all roles of the given user.
+     * Whether any requested id lies outside the actor's delegation scope.
+     *
+     * @param  array<int, string>  $requestedIds
+     * @param  array<int, string>  $scopeIds
      */
-    private function highestRoleRank(User $user): int
+    private function outsideScope(mixed $requestedIds, array $scopeIds): bool
     {
-        return $user->roles->pluck('name')
-            ->map(fn ($name) => $this->roleRank($name))
-            ->max() ?? 0;
+        if (! is_array($requestedIds) || $requestedIds === []) {
+            return false;
+        }
+
+        $requested = array_map(fn ($id): string => (string) $id, $requestedIds);
+        $scope = array_map(fn ($id): string => (string) $id, $scopeIds);
+
+        return array_diff($requested, $scope) !== [];
     }
 
     public function destroy($id)

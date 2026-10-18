@@ -73,6 +73,7 @@ const basePermissions: Permissions = {
     showCRM: true,
     showInvoicing: true,
     showPayouts: false,
+    orgScope: null,
 };
 
 const uiContext: UIContextType = {

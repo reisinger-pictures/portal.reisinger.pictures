@@ -1,4 +1,5 @@
 import { useAuth, type AuthMeUser } from './useAuth';
+import type { OrgScope } from '../api';
 
 export interface Permissions {
     isStaff: boolean;
@@ -15,6 +16,14 @@ export interface Permissions {
     showCRM: boolean;
     showInvoicing: boolean;
     showPayouts: boolean;
+    /**
+     * The server-resolved delegation boundary of an org admin, or `null` for
+     * every other actor. Use it to keep the UI from offering assignments the
+     * server rejects (SEC-20261018-02). Optional because most permission
+     * fixtures predate the field and only the org-admin views read it; the
+     * server remains the enforcement point.
+     */
+    orgScope?: OrgScope | null;
 }
 
 export function computePermissions(user: AuthMeUser | null | undefined): Permissions {
@@ -42,6 +51,7 @@ export function computePermissions(user: AuthMeUser | null | undefined): Permiss
         showCRM: canAccessB2BFeatures,
         showInvoicing: canAccessB2BFeatures,
         showPayouts: isSuperAdmin,
+        orgScope: user?.org_scope ?? null,
     };
 }
 

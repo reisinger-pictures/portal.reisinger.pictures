@@ -234,10 +234,29 @@ class AuthController extends Controller
         // Normalisierung und werden unten abgelehnt: aus einem getippten Login
         // darf nicht stillschweigend ein anderer werden. Das alte `max:255` ist
         // durch die Formatregel (max. 32 Zeichen) überflüssig.
-        if ($request->has('ftp_slug') && ! empty($request->input('ftp_slug'))) {
-            $request->merge([
-                'ftp_slug' => FtpSlug::normalize((string) $request->input('ftp_slug')),
-            ]);
+        $requestedSlug = $request->input('ftp_slug');
+        $normalizedSlug = is_string($requestedSlug) && $requestedSlug !== ''
+            ? FtpSlug::normalize($requestedSlug)
+            : $requestedSlug;
+
+        // SEC-20261018-04: only a photographer has a camera account (§7.16 —
+        // losing the role revokes it), so only a photographer may change the
+        // account name. Checked before validation and before the transaction:
+        // a rejected request must not create a directory or reach SFTPGo.
+        // Submitting the already-assigned slug is not a change — that path
+        // provisions nothing anyway and stays open to everyone.
+        if (is_string($normalizedSlug)
+            && $normalizedSlug !== ''
+            && $normalizedSlug !== $user->ftp_slug
+            && ! app(AuthorizationService::class)->isPhotographer($user)
+        ) {
+            return response()->json([
+                'error' => 'Der FTP-Login kann nur von Fotografen geändert werden.',
+            ], 403);
+        }
+
+        if (is_string($normalizedSlug) && $normalizedSlug !== '') {
+            $request->merge(['ftp_slug' => $normalizedSlug]);
         }
 
         $validated = $request->validate(
@@ -422,6 +441,13 @@ class AuthController extends Controller
             'is_power_user' => $svc->isPowerUser($user),
             'is_pending' => $svc->isPending($user),
             'roles' => $user->roles->pluck('name'),
+            // The org admin's delegation boundary, resolved exactly like the
+            // reader (getAllowedGalleryIds) so the UI can only offer
+            // assignments the server accepts. Null for every other actor.
+            'org_scope' => $svc->isOrgAdmin($user) ? [
+                'gallery_ids' => $svc->getOrgGalleryScope((string) $user->org_id),
+                'gallery_group_ids' => $svc->getOrgGroupScope((string) $user->org_id),
+            ] : null,
             'missing_watermark' => $missingWatermark,
             'ai_is_unconfigured' => app(AIService::class)->isUnconfigured(),
             'transient_galleries' => $svc->getActiveTransientGalleryIds($user),

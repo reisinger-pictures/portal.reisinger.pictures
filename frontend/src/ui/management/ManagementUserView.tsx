@@ -11,7 +11,7 @@ import UserTable from './components/UserTable';
 import { useUI } from '../components/UIContext';
 
 export default function ManagementUserView() {
-    const {isSuperAdmin, isAdmin} = usePermissions();
+    const {isSuperAdmin, isAdmin, isOrgAdmin, orgScope} = usePermissions();
     const {users, roles,  createUser, updateUser, } = useUsers();
     const {tree} = useProtectedGalleries();
     const { showToast } = useUI();
@@ -23,6 +23,18 @@ export default function ManagementUserView() {
 
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
     const flatGalleries = tree ? [...(tree.groups.flatMap(g => g.galleries || [])), ...(tree.root_galleries || [])] : [];
+
+    // SEC-20261018-02: an org admin may only assign galleries and groups that
+    // lie inside the organization's delegation scope — the server rejects the
+    // rest. The tree above is permission-filtered but includes the actor's
+    // personal grants, so the lists are narrowed explicitly. Fails closed: no
+    // server scope means no offered assignments.
+    const selectableGroups = isOrgAdmin
+        ? flatGroups.filter(group => orgScope?.gallery_group_ids.includes(group.id) ?? false)
+        : flatGroups;
+    const selectableGalleries = isOrgAdmin
+        ? flatGalleries.filter(gallery => orgScope?.gallery_ids.includes(gallery.id) ?? false)
+        : flatGalleries;
 
     const allowedRoles = isSuperAdmin
         ? roles
@@ -72,8 +84,8 @@ export default function ManagementUserView() {
                     key={editingUser.id}
                     user={editingUser}
                     roles={allowedRoles}
-                    flatGroups={flatGroups}
-                    flatGalleries={flatGalleries}
+                    flatGroups={selectableGroups}
+                    flatGalleries={selectableGalleries}
                     onClose={() => setEditingUser(null)}
                     onSave={handleSaveUser}
                 />

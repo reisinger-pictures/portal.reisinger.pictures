@@ -7,6 +7,7 @@ import {useUsers} from '../../logic/useUsers';
 import {FlatGroup} from '../../logic/useGalleries';
 import {flattenGroups} from '../../logic/utils';
 import {useProtectedGalleries} from '../../logic/useGalleries';
+import {usePermissions} from '../../logic/usePermissions';
 import {apiMutate} from '../../api';
 import {useUI} from '../components/UIContext';
 import ErrorMessage from '../components/ErrorMessage';
@@ -198,6 +199,7 @@ export default function ManagementOrgDetailView() {
     } = useOrgs(id);
     const {users} = useUsers();
     const {tree} = useProtectedGalleries();
+    const {isOrgAdmin, orgScope} = usePermissions();
 
     const [name, setName] = useState('');
     const [domain, setDomain] = useState('');
@@ -311,6 +313,15 @@ export default function ManagementOrgDetailView() {
 
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
 
+    // SEC-20261018-02: an org admin may only manage the groups the org already
+    // owns (the server rejects attaching an out-of-scope group). The tree is
+    // permission-filtered but still renders ancestors and groups that merely
+    // contain an org gallery, so the delegation list is narrowed explicitly.
+    // Fails closed: no server scope means no offered groups.
+    const visibleGroups = isOrgAdmin
+        ? flatGroups.filter(group => orgScope?.gallery_group_ids.includes(group.id) ?? false)
+        : flatGroups;
+
     return (
         <PageLayout currentView="orgs">
             <div className="p-6 md:p-10 max-w-6xl mx-auto w-full relative">
@@ -336,7 +347,7 @@ export default function ManagementOrgDetailView() {
                                          handleGenerateInvoice={handleGenerateInvoice}/>
                     </div>
                     <div className="lg:col-span-2">
-                        <OrgRelations users={users} flatGroups={flatGroups} selUsers={selUsers}
+                        <OrgRelations users={users} flatGroups={visibleGroups} selUsers={selUsers}
                                          setSelUsers={setSelUsers} selGroups={selGroups} setSelGroups={setSelGroups}
                                          handleSaveRelations={handleSaveRelations}
                                          setInviteModalOpen={setInviteModalOpen} toggleId={toggleId}/>

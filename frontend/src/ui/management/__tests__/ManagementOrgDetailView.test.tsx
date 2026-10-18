@@ -8,6 +8,7 @@ import { UIContext, type UIContextType } from '../../components/UIContext';
 import { apiMutate } from '../../../api';
 import { useOrgs, type Org } from '../../../logic/useOrgs';
 import { useUsers, type UserDetailed } from '../../../logic/useUsers';
+import { usePermissions, type Permissions } from '../../../logic/usePermissions';
 import { useProtectedGalleries, type GalleryTreeResponse } from '../../../logic/useGalleries';
 import ManagementOrgDetailView from '../ManagementOrgDetailView';
 
@@ -34,6 +35,11 @@ vi.mock('../../../logic/useUsers', async importOriginal => ({
 vi.mock('../../../logic/useGalleries', async importOriginal => ({
     ...(await importOriginal<typeof import('../../../logic/useGalleries')>()),
     useProtectedGalleries: vi.fn(),
+}));
+
+vi.mock('../../../logic/usePermissions', async importOriginal => ({
+    ...(await importOriginal<typeof import('../../../logic/usePermissions')>()),
+    usePermissions: vi.fn(),
 }));
 
 vi.mock('../../../api', async importOriginal => ({
@@ -113,6 +119,24 @@ const uiContext: UIContextType = {
 };
 
 const updateOrg = vi.fn().mockResolvedValue(undefined);
+
+const basePermissions: Permissions = {
+    isStaff: true,
+    isSuperAdmin: false,
+    isAdmin: true,
+    isPhotographer: false,
+    isOrgAdmin: false,
+    canEditMetadata: false,
+    isPowerUser: false,
+    canAccessB2BFeatures: true,
+    canAccessProjectsBoard: true,
+    canAccessProductionBoard: false,
+    showOrgsSection: true,
+    showCRM: true,
+    showInvoicing: true,
+    showPayouts: false,
+    orgScope: null,
+};
 
 function renderView() {
     return renderWithProviders(
@@ -207,6 +231,7 @@ describe('ManagementOrgDetailView', () => {
             deleteGroup: vi.fn().mockResolvedValue(undefined),
             deleteGallery: vi.fn().mockResolvedValue(undefined),
         });
+        vi.mocked(usePermissions).mockReturnValue(basePermissions);
         vi.mocked(apiMutate).mockResolvedValue(undefined);
     });
 
@@ -367,5 +392,51 @@ describe('ManagementOrgDetailView', () => {
         expect(emailInput.closest('form')).not.toHaveAttribute('novalidate');
 
         expect(within(dialog).queryByText(/\(optional\)/i)).not.toBeInTheDocument();
+    });
+
+    // SEC-20261018-02: the server rejects attaching a group outside the org's
+    // delegation scope. The view must not offer it in the first place — the
+    // permission-filtered tree still shows ancestors and groups that merely
+    // contain one org gallery.
+    it('offers an org admin only the groups inside the organisation scope', () => {
+        vi.mocked(usePermissions).mockReturnValue({
+            ...basePermissions,
+            isAdmin: false,
+            isOrgAdmin: true,
+            orgScope: { gallery_ids: [], gallery_group_ids: ['g1'] },
+        });
+
+        renderView();
+        const main = screen.getByTestId('page-layout');
+
+        // Checkbox names, not text: the label wraps the input and carries the
+        // same text, so `getByText` would match two nodes per group.
+        expect(within(main).getByRole('checkbox', { name: 'Print' })).toBeInTheDocument();
+        expect(within(main).queryByRole('checkbox', { name: /Hochzeit/ })).not.toBeInTheDocument();
+    });
+
+    it('fails closed for an org admin without a server-resolved scope', () => {
+        vi.mocked(usePermissions).mockReturnValue({
+            ...basePermissions,
+            isAdmin: false,
+            isOrgAdmin: true,
+            orgScope: null,
+        });
+
+        renderView();
+        const main = screen.getByTestId('page-layout');
+
+        expect(within(main).queryByRole('checkbox', { name: 'Print' })).not.toBeInTheDocument();
+        expect(within(main).queryByRole('checkbox', { name: /Hochzeit/ })).not.toBeInTheDocument();
+    });
+
+    it('keeps the full group list for an admin', () => {
+        vi.mocked(usePermissions).mockReturnValue(basePermissions);
+
+        renderView();
+        const main = screen.getByTestId('page-layout');
+
+        expect(within(main).getByRole('checkbox', { name: 'Print' })).toBeInTheDocument();
+        expect(within(main).getByRole('checkbox', { name: /Hochzeit/ })).toBeInTheDocument();
     });
 });

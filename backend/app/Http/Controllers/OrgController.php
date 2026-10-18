@@ -212,29 +212,71 @@ class OrgController extends Controller
         $newUserIds = $request->user_ids ?? [];
         $removedUserIds = array_diff($oldUserIds, $newUserIds);
 
-        // Set org_id on newly assigned users
-        User::whereIn('id', $newUserIds)->update(['org_id' => $id]);
+        // SEC-20261018-01: an org admin may only pull in users that are free or
+        // already members of *this* org, and may not add or remove anyone whose
+        // highest role outranks their own. Without this, an org admin could
+        // reassign a foreign user (or an admin) into the org and then edit or
+        // delete them through the org-scoped user endpoints. Admins and Super
+        // Admins keep the unrestricted behaviour.
+        if (! $svc->isAdmin($user)) {
+            $actorRank = $svc->highestRoleRank($user);
 
-        // Revoke organization-derived role + flatrate from removed users
-        if (! empty($removedUserIds)) {
-            $removedUsers = User::whereIn('id', $removedUserIds)->get();
-            foreach ($removedUsers as $removedUser) {
-                // Only revoke if the user's role matches the org's default role
-                if ($org->default_role_id && $removedUser->roles->contains($org->default_role_id)) {
-                    $removedUser->roles()->detach($org->default_role_id);
+            // Only users *entering* the org are checked against the rank
+            // ceiling. An admin already sitting in the org is neither imported
+            // nor detached by this request; rejecting the whole sync because
+            // they appear in the unchanged list would block every later edit.
+            $newlyAddedUserIds = array_diff($newUserIds, $oldUserIds);
+
+            foreach (User::with('roles')->whereIn('id', $newlyAddedUserIds)->get() as $incomingUser) {
+                if ($incomingUser->org_id !== null && $incomingUser->org_id !== $id) {
+                    return response()->json([
+                        'error' => 'Benutzer aus einer anderen Organisation können nicht übernommen werden.',
+                    ], 422);
                 }
-                // Reset flatrate to 'none' if it matches the org's default
-                if ($org->default_flatrate_level && $removedUser->flatrate_level === $org->default_flatrate_level) {
-                    $removedUser->flatrate_level = 'none';
+
+                if ($svc->highestRoleRank($incomingUser) > $actorRank) {
+                    return response()->json([
+                        'error' => 'Benutzer mit einer höheren Berechtigungsstufe können nicht hinzugefügt werden.',
+                    ], 422);
                 }
-                // Reset can_purchase_upgrades if it was inherited from org
-                if ($org->can_purchase_upgrades && $removedUser->can_purchase_upgrades) {
-                    $removedUser->can_purchase_upgrades = false;
+            }
+
+            foreach (User::with('roles')->whereIn('id', $removedUserIds)->get() as $removedUser) {
+                if ($svc->highestRoleRank($removedUser) > $actorRank) {
+                    return response()->json([
+                        'error' => 'Benutzer mit einer höheren Berechtigungsstufe können nicht entfernt werden.',
+                    ], 422);
                 }
-                $removedUser->org_id = null;
-                $removedUser->save();
             }
         }
+
+        // One transaction: a rejected or failing sync must never leave half of
+        // the members moved. The validations above are all read-only.
+        DB::transaction(function () use ($newUserIds, $removedUserIds, $id, $org): void {
+            // Set org_id on newly assigned users
+            User::whereIn('id', $newUserIds)->update(['org_id' => $id]);
+
+            // Revoke organization-derived role + flatrate from removed users
+            if (! empty($removedUserIds)) {
+                $removedUsers = User::whereIn('id', $removedUserIds)->get();
+                foreach ($removedUsers as $removedUser) {
+                    // Only revoke if the user's role matches the org's default role
+                    if ($org->default_role_id && $removedUser->roles->contains($org->default_role_id)) {
+                        $removedUser->roles()->detach($org->default_role_id);
+                    }
+                    // Reset flatrate to 'none' if it matches the org's default
+                    if ($org->default_flatrate_level && $removedUser->flatrate_level === $org->default_flatrate_level) {
+                        $removedUser->flatrate_level = 'none';
+                    }
+                    // Reset can_purchase_upgrades if it was inherited from org
+                    if ($org->can_purchase_upgrades && $removedUser->can_purchase_upgrades) {
+                        $removedUser->can_purchase_upgrades = false;
+                    }
+                    $removedUser->org_id = null;
+                    $removedUser->save();
+                }
+            }
+        });
 
         return response()->json(['success' => true]);
     }
@@ -273,6 +315,25 @@ class OrgController extends Controller
 
             if ($foreignGroups) {
                 return response()->json(['error' => 'Ein oder mehrere Galerie-Gruppen gehören zu einer anderen Marke und können dieser Organisation nicht zugewiesen werden.'], 422);
+            }
+        }
+
+        // SEC-20261018-02: an org admin may manage the groups the org already
+        // owns (attach a descendant, detach an assignment) but may not widen the
+        // org's scope with a group it never had. That is an admin decision,
+        // because widening the group scope widens every member's gallery access
+        // through getAllowedGalleryIds(). Admins keep today's behaviour.
+        if (! $svc->isAdmin($user)) {
+            $scope = array_map(
+                fn ($groupId): string => (string) $groupId,
+                $svc->getOrgGroupScope($org->id),
+            );
+            $requested = array_map(fn ($groupId): string => (string) $groupId, $groupIds);
+
+            if (array_diff($requested, $scope) !== []) {
+                return response()->json([
+                    'error' => 'Es dürfen nur Galerie-Gruppen zugewiesen werden, die bereits zur Organisation gehören.',
+                ], 403);
             }
         }
 
