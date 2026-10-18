@@ -3,14 +3,25 @@ packages:
 overrides:
   react-router: 7.18.2
   nanoid: 3.3.18
-  brace-expansion: 5.0.9
+  brace-expansion: 5.0.12
   # svgo is transitive via @iconify/tools <- @iconify/tailwind4 and was pinned
   # to 4.0.2, which falls inside the vulnerable range >= 4.0.0, < 4.1.0 of
   # GHSA-w27v-7q3p-w38r (high) and GHSA-4vpr-x523-8j87. @iconify/tools declares
   # svgo: ^4.0.1, so 4.1.0 satisfies its own range — no forced resolution.
   svgo: 4.1.0
   postcss: 8.5.23
-  undici: 7.29.0
+  undici: 7.29.1
+  # source-map-js is transitive via postcss, css-tree, magicast and
+  # @tailwindcss/node; 1.2.1 sits inside the vulnerable range >= 1.0.0, < 1.2.2
+  # of GHSA-68fv-2mgg-jv7q (high). Every consumer declares ^1.2.1 or ^1.0.1, so
+  # 1.2.2 satisfies their own ranges — no forced resolution.
+  source-map-js: 1.2.2
+  # postcss-selector-parser is transitive via @tailwindcss/typography, which
+  # pins it exactly to 6.0.10 — inside the vulnerable range < 7.1.6 of
+  # GHSA-rj75-hqrm-r3gf (medium). The fix exists only in 7.1.6+, so this
+  # override forces a major bump; the plugin's API usage is covered by the
+  # build, which emits the typography prose selectors.
+  postcss-selector-parser: 7.1.6
 allowBuilds:
   esbuild: true
 onlyBuiltDependencies:
