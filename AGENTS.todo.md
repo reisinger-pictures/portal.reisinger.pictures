@@ -187,6 +187,14 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   messen aber etwas anderes als sie behaupten. **Test:** den Mock-Pfad auf
   `'../../../logic/useGalleries'` korrigieren und prüfen, dass die Dateien danach noch grün
   sind (rot wäre der Beweis, dass der Mock vorher wirkungslos war).
+- [ ] **Quarantäne in der UI sichtbar machen (D-37 nennt „SFTP und Anzeige").**
+  `status()` liefert `quarantine_count` bereits additiv, aber `frontend/src/logic/useFtp.ts`
+  deklariert den Key nicht und die Karte zeigt ihn nicht. **Test:** Vitest, der die Zahl aus dem
+  Status in die Karte bringt, plus der Hinweis, wo die Dateien liegen (`{inbox}/_quarantine`).
+- [ ] **Playwright-E2E für Import und Nachlauf.** `frontend/tests/e2e/admin/ftp/ftp-inbox.spec.ts`
+  deckt nur Sichtbarkeit und Zielgalerie ab; Import-Button, Restmenge und der Nachlauf beim
+  Seitenaufruf sind ungetestet. **Test:** ein `@feature:ftp`-Spec, der einen Posteingang mit
+  Dateien öffnet, den Import auslöst und die Restmenge prüft.
 
 ---
 - [ ] **Dependabot: 1 offener Alert am Default-Branch** (war 10) — gemessen am 2026-10-18 mit `gh api repos/reisinger-pictures/portal.reisinger.pictures/dependabot/alerts?state=open&per_page=100 -q '.[] | [.security_advisory.severity, .dependency.package.name] | @tsv'` → **1 high (`braces`), 0 critical**. Patch-Stand je Paket (dieselbe Abfrage, `-q '.[] | [.security_advisory.severity, .dependency.package.name, .security_vulnerability.vulnerable_version_range, (.security_vulnerability.first_patched_version.identifier // "KEINE")] | @tsv'`): `undici` (6 Alerts — 1 high + 2 medium + 3 low; verwundbar `< 7.29.1`, installiert `7.29.0`), `source-map-js` (high, `< 1.2.2`, installiert `1.2.1`), `brace-expansion` (medium, `< 5.0.12`), `postcss-selector-parser` (medium, `< 7.1.6`), `braces` (high, `<= 3.0.3`, **`gepatcht-ab=KEINE`**). Dependency-CVEs, **nicht** Endpunkt-Autorisierung → eigener Durchgang (`node-deps`), **ausgeführt** (Ergebnis in den beiden Unterpunkten).
@@ -215,11 +223,11 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **54 offene `[ ]`** und **45 wartende
-> `[~]`** über 1847 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (54), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1847). Aufteilung der 54: **16× `manuell prüfen:`** und **38×
-> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. Die 38 enthalten die zehn Punkte, die in
+> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **56 offene `[ ]`** und **45 wartende
+> `[~]`** über 1855 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (56), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1855). Aufteilung der 56: **16× `manuell prüfen:`** und **40×
+> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. Die 40 enthalten die zwölf Punkte, die in
 > den Freigaben der Wellen A–D als nicht-blockierend eingestuft und deshalb hier festgehalten
 > wurden (siehe „Neue offene Punkte aus den Wellen A–D"). Alle 45 `[~]` tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
@@ -227,7 +235,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (99 = 54 offen + 45 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (101 = 56 offen + 45 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
