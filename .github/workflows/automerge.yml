@@ -54,7 +54,25 @@ jobs:
             // Minor/Patch-Gruppen sind per Konstruktion sicher (dependabot.yml
             // matcht dort nur update-types minor+patch) - auch wenn die
             // Update-Type-Erkennung bei gruppierten PRs leer bleibt.
-            const safeGroup = dependencyGroup === 'minor-and-patch';
+            // Dieses Gate stuetzt sich deshalb auf den GRUPPENNAMEN, nicht auf
+            // `update-type`. Bei Security-Updates ist `update-type` in der Regel
+            // leer (fetch-metadata#499), aber darauf ist kein Verlass: die
+            // Fixtures der Aktion tragen ihn zusammen mit `dependency-group`
+            // (src/dependabot/update_metadata.test.ts), und der Parser faellt auf
+            // calculateUpdateType() zurueck, sobald das Commit-Subjekt
+            // "Bumps X from A to B" lautet. Ein Security-PR darf also nicht
+            // ueber `update-type` durchrutschen - er kommt nur ueber den Namen
+            // herein, und der Name ist nur so sicher wie die Invariante in
+            // dependabot.yml: jeder Name in SAFE_GROUPS ist dort als Gruppe mit
+            // update-types [minor, patch] gepinnt. Diese Kopplung prueft
+            // tests/infrastructure/ci-security-contract.sh.
+            // Ein Major-Security-Fix liegt per update-types ausserhalb der
+            // Gruppe, kommt als einzelner PR an und passiert diesen Schritt
+            // nicht.
+            // Exakte Namen, kein Praefix-Vergleich: eine spaeter
+            // hinzugefuegte Gruppe schaltet den Auto-Merge nicht mit frei.
+            const SAFE_GROUPS = ['minor-and-patch', 'minor-and-patch-security'];
+            const safeGroup = SAFE_GROUPS.includes(dependencyGroup);
             const safeIndividual = ['version-update:semver-minor', 'version-update:semver-patch'].includes(updateType);
             // Docker-Images haben keine zuverlässige semver-Klassifikation
             // und werden bewusst NIE auto-gemergt

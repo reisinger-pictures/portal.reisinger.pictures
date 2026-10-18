@@ -8,6 +8,7 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 WORKFLOW_DIR="$ROOT_DIR/.github/workflows"
 AUTOMERGE_WORKFLOW="$WORKFLOW_DIR/automerge.yml"
 CI_WORKFLOW="$WORKFLOW_DIR/ci.yml"
+DEPENDABOT_CONFIG="$ROOT_DIR/.github/dependabot.yml"
 PLAYWRIGHT_CONFIG="$ROOT_DIR/frontend/playwright.config.ts"
 DOCKERFILE="$ROOT_DIR/deployment/Dockerfile"
 E2E_DOCKERFILE="$ROOT_DIR/deployment/Dockerfile.e2e"
@@ -168,8 +169,162 @@ turnstile_pair_violation() {
     return 1
 }
 
+# The auto-merge gate trusts a group NAME: automerge.yml merges every PR whose
+# Dependabot group is listed in `SAFE_GROUPS` without inspecting its update type,
+# because a grouped PR has no single one. That is only safe while each listed
+# name is also declared in dependabot.yml and pinned to minor+patch there.
+# Nothing else connects the two files: deleting `update-types` from one of those
+# groups would widen the gate to major bumps with no other signal, and the two
+# lists would still look consistent. The probes below read the names from the
+# workflow and the rules from the Dependabot config; the fixture block further
+# down proves they fail closed.
+
+# Prints the code lines of a workflow file: a line whose first non-space
+# characters open a `#` or `//` comment is dropped, every other line passes
+# through unchanged. Shell and GitHub-script comments share one file, so a probe
+# that parses the file as source has to drop both - otherwise a commented-out
+# copy of a declaration reads exactly like the real one. The key-fingerprint
+# scan below needs the same reduction, so this is the single implementation.
+workflow_code_lines() {
+    while IFS= read -r line; do
+        stripped="${line#"${line%%[![:space:]]*}"}"
+        [[ "$stripped" == \#* ]] && continue
+        [[ "$stripped" == //* ]] && continue
+        printf '%s\n' "$line"
+    done <"$1"
+}
+
+# Prints the group names the workflow whitelists, one per line. Comment lines
+# are dropped first, so a commented-out copy of the declaration cannot shadow
+# the real one, and the whole `const SAFE_GROUPS = [...]` declaration is read up
+# to its semicolon, so a list that is reformatted across several lines is not
+# silently truncated. Nothing is printed when the declaration is absent or
+# unparseable, which safe_group_violation treats as a violation.
+safe_group_names() {
+    workflow_code_lines "$1" \
+        | awk '
+            /const[[:space:]]+SAFE_GROUPS[[:space:]]*=/ { if (!done) { collecting = 1 } }
+            # The whole input is consumed instead of exiting at the semicolon:
+            # an early exit closes this reader while workflow_code_lines is still
+            # writing, which prints a broken-pipe error into the CI log.
+            collecting && !done { buffer = buffer " " $0 }
+            collecting && !done && /;/ { print buffer; done = 1 }
+        ' \
+        | grep -oE "'[^']+'" \
+        | tr -d "'" || true
+}
+
+# Returns 0 (printing every reason) when a whitelisted group name is not pinned
+# to minor+patch in the Dependabot config, and 1 with no output when all of them
+# are. Each occurrence of a name is checked on its own: the same group name may
+# be declared once per package ecosystem, and one of those declarations losing
+# its update-types is exactly the silent widening this guards against.
+safe_group_violation() {
+    local automerge="$1"
+    local dependabot="$2"
+    local names wanted report
+
+    names="$(safe_group_names "$automerge")"
+    if [[ -z "$names" ]]; then
+        printf '%s\n' "the auto-merge workflow declares no parseable SAFE_GROUPS list: $automerge"
+        return 0
+    fi
+    # Group identifiers cannot contain whitespace (dependabot.yml restricts them
+    # to letters, pipes, underscores and hyphens), so a space is a safe
+    # separator - and `awk -v` cannot carry a literal newline.
+    wanted="$(tr '\n' ' ' <<<"$names")"
+
+    report="$(
+        awk -v wanted="$wanted" -v config="$dependabot" '
+            function indent_count(line) { match(line, /^[[:space:]]*/); return RLENGTH }
+            function rtrim(s) { sub(/[[:space:]]+$/, "", s); return s }
+            function close_group() {
+                if (current != "" && (current in want)) {
+                    seen[current] = 1
+                    if (types == "") {
+                        print "auto-merge group " current ": declared without update-types in " config
+                    } else if (types !~ /minor/ || types !~ /patch/) {
+                        print "auto-merge group " current ": update-types does not pin both minor and patch in " config
+                    } else if (types ~ /major/) {
+                        print "auto-merge group " current ": update-types pins major in " config
+                    }
+                }
+                current = ""
+                types = ""
+                in_types = 0
+            }
+            BEGIN {
+                n = split(wanted, list, " ")
+                for (i = 1; i <= n; i++) { if (list[i] != "") want[list[i]] = 1 }
+            }
+            {
+                line = $0
+                stripped = line
+                sub(/^[[:space:]]*/, "", stripped)
+                if (stripped == "" || stripped ~ /^#/) next
+                ind = indent_count(line)
+
+                if (!in_groups) {
+                    if (rtrim(line) ~ /^[[:space:]]*groups:[[:space:]]*$/) {
+                        in_groups = 1
+                        groups_base = ind
+                        name_base = 0
+                    }
+                    next
+                }
+                if (ind <= groups_base) { close_group(); in_groups = 0; next }
+                # The first key below `groups:` fixes the indentation of the
+                # group names, so this does not assume a two-space step.
+                if (name_base == 0) {
+                    if (rtrim(line) ~ /:$/) {
+                        name_base = ind
+                        current = stripped
+                        sub(/:$/, "", current)
+                    }
+                    next
+                }
+                if (ind == name_base) {
+                    close_group()
+                    if (rtrim(line) ~ /:$/) {
+                        current = stripped
+                        sub(/:$/, "", current)
+                    }
+                    next
+                }
+                if (ind < name_base) { close_group(); next }
+                if (current == "") next
+                if (stripped ~ /^update-types:/) {
+                    in_types = 1
+                    types_base = ind
+                    types = types " " stripped
+                    next
+                }
+                if (in_types) {
+                    if (ind > types_base) { types = types " " stripped; next }
+                    in_types = 0
+                }
+            }
+            END {
+                close_group()
+                for (i = 1; i <= n; i++) {
+                    if (list[i] != "" && !(list[i] in seen)) {
+                        print "auto-merge group " list[i] ": not declared as a group in " config
+                    }
+                }
+            }
+        ' "$dependabot"
+    )"
+
+    if [[ -n "$report" ]]; then
+        printf '%s\n' "$report"
+        return 0
+    fi
+    return 1
+}
+
 require_file "$AUTOMERGE_WORKFLOW"
 require_file "$CI_WORKFLOW"
+require_file "$DEPENDABOT_CONFIG"
 require_file "$PLAYWRIGHT_CONFIG"
 require_file "$DOCKERFILE"
 require_file "$E2E_DOCKERFILE"
@@ -266,6 +421,17 @@ assert_contains "$AUTOMERGE_WORKFLOW" "            const dependencyGroup = proce
     'github-script must read dependency group from process.env'
 assert_contains "$AUTOMERGE_WORKFLOW" "  if: github.actor == 'dependabot[bot]'" \
     'automerge must retain the Dependabot actor gate'
+
+# 3b. The merge decision whitelists group NAMES, so the workflow and the
+# Dependabot config have to agree: every name in SAFE_GROUPS must exist in
+# dependabot.yml pinned to minor+patch. Nothing else connects the two files, and
+# a whitelisted group that loses its update-types would widen the gate to major
+# bumps while both files still look self-consistent. The probe reads the names
+# out of the workflow rather than from a copy of the list kept here, so renaming
+# or adding a whitelisted group cannot leave this check behind.
+if message="$(safe_group_violation "$AUTOMERGE_WORKFLOW" "$DEPENDABOT_CONFIG")"; then
+    fail "$message"
+fi
 
 wait_gate="$(
     awk '
@@ -649,15 +815,136 @@ if turnstile_pair_violation "$fixture_dir/turnstile-pair.config.ts" "$fixture_di
     fail 'the matching Turnstile fixture was rejected by the pairing probe'
 fi
 
+# The SAFE_GROUPS probe couples two files, so it needs fixtures on both sides:
+# a whitelisted name the Dependabot config does not pin, and a workflow that
+# stopped declaring the list. The clean and block-list fixtures must pass, or a
+# probe that rejects everything would look like coverage.
+cat > "$fixture_dir/safe-groups.yml" <<'YAML'
+name: fixture
+on: pull_request_target
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@0123456789012345678901234567890123456789
+        with:
+          script: |
+            const SAFE_GROUPS = ['minor-and-patch', 'minor-and-patch-security'];
+YAML
+cat > "$fixture_dir/safe-groups-absent.yml" <<'YAML'
+name: fixture
+on: pull_request_target
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+YAML
+# A commented-out copy of the declaration must not be read as if it were code:
+# the probe would then trust a whitelist that is not in effect and would accept
+# the real, wider one. The real list here names a group the Dependabot fixture
+# does not pin, so only the shadowing name being harmless can make this pass.
+cat > "$fixture_dir/safe-groups-shadowed.yml" <<'YAML'
+name: fixture
+on: pull_request_target
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@0123456789012345678901234567890123456789
+        with:
+          script: |
+            // const SAFE_GROUPS = ['minor-and-patch'];
+            const SAFE_GROUPS = ['minor-and-patch', 'risky-group'];
+YAML
+cat > "$fixture_dir/dependabot-clean.yml" <<'YAML'
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+      minor-and-patch-security:
+        applies-to: security-updates
+        update-types: ["minor", "patch"]
+YAML
+cat > "$fixture_dir/dependabot-block-list.yml" <<'YAML'
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+      minor-and-patch-security:
+        applies-to: security-updates
+        update-types:
+          - "minor"
+          - "patch"
+YAML
+cat > "$fixture_dir/dependabot-missing-group.yml" <<'YAML'
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+YAML
+cat > "$fixture_dir/dependabot-no-update-types.yml" <<'YAML'
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+      minor-and-patch-security:
+        applies-to: security-updates
+        patterns: ["*"]
+YAML
+cat > "$fixture_dir/dependabot-major.yml" <<'YAML'
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+      minor-and-patch-security:
+        applies-to: security-updates
+        update-types: ["minor", "patch", "major"]
+YAML
+if safe_group_violation "$fixture_dir/safe-groups.yml" "$fixture_dir/dependabot-clean.yml" >/dev/null; then
+    fail 'the pinned SAFE_GROUPS fixture was rejected by the auto-merge group probe'
+fi
+if safe_group_violation "$fixture_dir/safe-groups.yml" "$fixture_dir/dependabot-block-list.yml" >/dev/null; then
+    fail 'the block-list update-types fixture was rejected by the auto-merge group probe'
+fi
+for unpinned_fixture in dependabot-missing-group dependabot-no-update-types dependabot-major; do
+    if ! safe_group_violation "$fixture_dir/safe-groups.yml" "$fixture_dir/$unpinned_fixture.yml" >/dev/null; then
+        fail "the $unpinned_fixture fixture was not rejected by the auto-merge group probe"
+    fi
+done
+if ! safe_group_violation "$fixture_dir/safe-groups-absent.yml" "$fixture_dir/dependabot-clean.yml" >/dev/null; then
+    fail 'the absent SAFE_GROUPS fixture was not rejected by the auto-merge group probe'
+fi
+if ! safe_group_violation "$fixture_dir/safe-groups-shadowed.yml" "$fixture_dir/dependabot-clean.yml" >/dev/null; then
+    fail 'the shadowed SAFE_GROUPS fixture was not rejected by the auto-merge group probe'
+fi
+
 workflow_code="$TMP_ROOT/workflow-code"
 : >"$workflow_code"
 for workflow in "${workflow_files[@]}"; do
-    while IFS= read -r line; do
-        stripped="${line#"${line%%[![:space:]]*}"}"
-        [[ "$stripped" == \#* ]] && continue
-        [[ "$stripped" == //* ]] && continue
-        printf '%s\n' "$line" >>"$workflow_code"
-    done <"$workflow"
+    workflow_code_lines "$workflow" >>"$workflow_code"
 done
 if grep -Eiq '(^|[[:space:]])(md5sum|sha1sum|printenv|fingerprint|set[[:space:]]+-x)([[:space:]]|$)' "$workflow_code"; then
     fail 'CI contains a key-fingerprint/debug-logging command'
