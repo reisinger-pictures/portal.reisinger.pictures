@@ -121,6 +121,16 @@ SEC-14-Umsetzung; alles darunter ist eigene Arbeit.
 
 ### Neue offene Punkte aus den Wellen A–D und ihren Nachprüfungen (2026-10-18)
 
+- [~] **wartet auf die unabhängige Schlussprüfung.** Die Nachbesserungen zu SEC-08/09/10
+  (Modellfoto-Byte-Invariante, Kontaktbogen-Decode-Budget, MIME-/Budgetpfade) und die FTP-Wellen
+  zu SEC-14, D-36 und D-37 (Batch-Baustein `FtpInboxImporter`, Event-Endpunkt, `ImportFtpBatch`
+  mit begrenzter Kette, `ftp:provision-events`, Quarantäne, Nachlauf beim Seitenaufruf) liegen
+  **fertig, aber uncommittet** im Arbeitsbaum. Letzte Prüfrunden: Modellfotos `CHANGES REQUIRED`
+  (nur die Doku-Aussage (a)–(d), von mir korrigiert), D-36-Backend `CHANGES REQUIRED`
+  (`FTP_EVENT_URL`-Default, behoben mit Gegenprobe), D-36-Frontend `CHANGES REQUIRED`
+  (Dedupe-Fenster, behoben). **Kein Commit ohne diese Runde** — die Dateiliste steht in
+  `git status`, die Zuordnung Befund → Ausgang in `features/security/2026-10-18-review-closure.md`.
+
 Diese Punkte sind in den Freigaben als **nicht-blockierend** eingestuft worden. Sie sind hier,
 weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benannten Ort.
 
@@ -229,21 +239,21 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **48 offene `[ ]`** und **45 wartende
-> `[~]`** über 1861 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (48), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1861). Aufteilung der 48: **16× `manuell prüfen:`** und **32×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **48 offene `[ ]`** und **46 wartende
+> `[~]`** über 1873 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (48), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1873). Aufteilung der 48: **16× `manuell prüfen:`** und **32×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. Zehn der 14 Review-Befunde sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 32 enthalten weiterhin die vierzehn Punkte, die in den Freigaben der Wellen A–D als
 > nicht-blockierend eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte
-> aus den Wellen A–D"). Alle 45 `[~]` tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
+> aus den Wellen A–D"). Alle 46 `[~]` tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
 > zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (93 = 48 offen + 45 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (94 = 48 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
