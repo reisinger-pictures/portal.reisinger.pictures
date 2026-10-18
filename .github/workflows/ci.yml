@@ -3,7 +3,10 @@ name: CI
 # Push auf ALLE Branches (inkl. Dependabot-Branches wie
 # dependabot/npm_and_yarn/frontend/...). Ein Dependabot-ausgeloester Run — `push`
 # UND `pull_request` — erhaelt KEINE Actions-Secrets, sondern die
-# **Dependabot**-Secrets; nur `pull_request_target` bekommt gar keine. Der
+# **Dependabot**-Secrets; nur `pull_request_target` faellt heraus — und dort
+# auch nur, wenn der Base-Ref des PRs von Dependabot stammt. Bei einem
+# Dependabot-PR gegen main greift das nicht — deshalb kann `automerge.yml` mit
+# `secrets.GITHUB_TOKEN` mergen. Der
 # PR-seitige Lauf wird deshalb nicht wegen fehlender Secrets uebersprungen,
 # sondern bewusst: die siebenteilige E2E-Matrix soll pro Dependabot-PR einmal
 # statt zweimal laufen (Owner-Entscheidung 2026-10-18). Autoritativ ist der
@@ -327,8 +330,11 @@ jobs:
     # availability: jobs.<job_id>.if -> github, needs, vars, inputs). Secrets
     # fuer Dependabot-ausgeloeste Runs kommen aus dem **Dependabot**-Secret-Store,
     # nicht aus den Actions-Secrets — das gilt fuer `push` UND `pull_request`;
-    # nur `pull_request_target` erhaelt gar keine. Der PR-seitige Lauf wird
-    # deshalb nicht wegen fehlender Secrets uebersprungen, sondern bewusst: die
+    # `pull_request_target` faellt heraus — und dort auch nur, wenn der Base-Ref
+    # des PRs von Dependabot stammt; bei einem Dependabot-PR gegen main greift
+    # das nicht (`automerge.yml` mergt dort mit `secrets.GITHUB_TOKEN`). Der
+    # PR-seitige Lauf wird deshalb nicht wegen fehlender Secrets uebersprungen,
+    # sondern bewusst: die
     # siebenteilige E2E-Matrix soll pro Dependabot-PR einmal statt zweimal laufen
     # (Owner-Entscheidung 2026-10-18). Autoritativ ist der Push-Lauf auf dem
     # Dependabot-Branch (dort greifen die Dependabot-Secrets) — `automerge.yml`
@@ -696,7 +702,10 @@ jobs:
     # Dependabot pull_request aggregate is intentionally skipped together with
     # its E2E job — not because that run lacks secrets (a Dependabot
     # pull_request run reads the Dependabot secret store, exactly like its push
-    # run; only pull_request_target receives none), but to run the seven-part
+    # run; only pull_request_target is excluded, and only when the PR base ref
+    # was created by Dependabot — not the case for a Dependabot PR against main,
+    # which is why automerge.yml merges with secrets.GITHUB_TOKEN), but to run
+    # the seven-part
     # E2E matrix once per Dependabot PR instead of twice (Owner-Entscheidung
     # 2026-10-18). The push aggregate on the Dependabot branch is
     # authoritative — it reads the Dependabot secret store and runs the full

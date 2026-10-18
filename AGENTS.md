@@ -872,8 +872,11 @@ Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA v
   (#16–#20) standen rot, obwohl ihr Code in Ordnung war — ihre E2E-Jobs starben am Schritt
   `Ensure Stripe test keys are configured`. *Ursache (belegt, nicht vermutet):* GitHub hält
   **Actions**-Secrets von jedem Dependabot-ausgelösten Lauf zurück — für `push` **und**
-  `pull_request`; beide lesen ausschließlich den **Dependabot**-Store, nur
-  `pull_request_target` erhält keine. Quelle: GitHub-Doku „Dependabot on GitHub Actions" →
+  `pull_request`; beide lesen ausschließlich den **Dependabot**-Store. Einzige Ausnahme ist
+  `pull_request_target` — dort fehlen Secrets aber nur, wenn der Base-Ref des PRs von
+  Dependabot stammt; bei einem Dependabot-PR gegen `main` greift das **nicht**, und genau
+  deshalb kann `automerge.yml` (das auf `pull_request_target` läuft) mit
+  `secrets.GITHUB_TOKEN` mergen. Quelle: GitHub-Doku „Dependabot on GitHub Actions" →
   *Restrictions when Dependabot triggers events*: *„Secrets are populated from Dependabot
   secrets. GitHub Actions secrets are not available."* Der `ci.yml`-Kommentar behauptete
   dagegen, der Push-Lauf auf einem Dependabot-Branch sei „authoritative" — er konnte es nicht
@@ -895,7 +898,8 @@ Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA v
   ein kompromittiertes Paket-Postinstall könnte sie lesen. Es ist ausschließlich
   Stripe-**Test**-Material (`sk_test`/`pk_test`) — kein Live-Key und kein `whsec` des
   Live-Endpunkts (vgl. D-24, D-25). *Umgesetzt:* die Werte stammen aus `backend/.env.e2e`
-  (in den drei Stripe-Keys identisch mit `backend/.env`) bzw. `frontend/.env` für den
+  (in `STRIPE_SECRET` und `STRIPE_KEY` identisch mit `backend/.env`; `STRIPE_WEBHOOK_SECRET`
+  steht dort nur **leer** und kommt allein aus `.env.e2e`) bzw. `frontend/.env` für den
   Publishable-Key; die Quelle wurde per **Hash-Vergleich** der Werte bestimmt, nicht geraten —
   `.env.ci` trägt andere Test-Keys, und `.env.production` trägt die Live-Keys und wurde nicht
   angefasst. *Belegt:* nach `@dependabot rebase` auf PR #18 (neuer Head `7a9974f0`) ist der
@@ -911,7 +915,7 @@ Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA v
   `secrets.GITHUB_TOKEN`, und ein Push damit löst per GitHub-Regel **keine** Workflows aus.
   Belegt: `main` head `e2d280b` (Auto-Merge von PR #18) —
   `gh run list --commit e2d280bd8191704b0565e1e8a58287be54ca2453` zeigt ausschließlich
-  Dependabot-`dynamic`-Läufe; der jüngste CI-Lauf auf `main` ist `39128561357` für `7e05086`.
+  Dependabot-`dynamic`-Läufe und **keinen** CI-Lauf.
   *Entscheidung:* der Nachweis läuft über den **Baum**, nicht über den Commit — nach dem
   Rebase trägt der PR-Head denselben Baum wie der Squash-Merge auf `main` (für PR #18 gemessen:
   `git rev-parse 7a9974f0^{tree}` = `git rev-parse e2d280b^{tree}` =
