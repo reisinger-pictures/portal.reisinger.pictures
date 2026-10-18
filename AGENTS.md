@@ -831,6 +831,28 @@ Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA v
   Dieses Repo committet davon nichts; die dortige Änderung bleibt unversioniert, weil das
   Website-Repo unabhängige Owner-Arbeit trägt (eigener Commit/Verify dort).
 
+- **D-32 — `GET /api/settings/license-catalog` bleibt bewusst öffentlich, wird aber gedrosselt**
+  (Owner, 2026-10-18). *Frage:* derselbe anonyme Preiszugriff wie in D-27/D-28 — absichern oder
+  akzeptieren? *Entscheidung:* **öffentlich by design**, zusätzlich `->middleware('throttle:api')`
+  (analog `license-pricing`). *Warum:* der Endpunkt ist die **veröffentlichte Kunden-Preisliste**,
+  nicht eine interne Parameter-Auskunft. Er liefert je Nutzungsart `name`, `description`,
+  `base_price`, `flatrate_tier`, `is_commercial` und je Modifier `name`, `description`,
+  `percent_surcharge`, `is_included_in_flatrate` — die Felder, die der Client-Lizenz-Selector
+  rendert (`frontend/src/ui/client/components/LicenseSelectorCard.tsx`: `catalog.use_cases`,
+  `uc.flatrate_tier`, `m.percent_surcharge`) und die der Management-Editor
+  (`frontend/src/ui/management/components/LicenseCatalogSettings.tsx`, erreichbar über
+  `PricingSettingsTabs.tsx`) zusätzlich für `is_commercial`/`sort_order` liest; beide lesen
+  denselben öffentlichen Payload. Die Projektionen sind
+  `app/Http/Resources/LicenseUseCaseResource.php` und `app/Http/Resources/LicenseModifierResource.php`;
+  beide führen **keine** internen Parameter (`calc_*`, `srp_*`, `mult_*`, `price_*`). Das ist
+  dieselbe Klasse wie das bewusst öffentliche `volume_pricing` aus D-28: der Kunde muss den Preis
+  sehen, den er zahlen soll. Der Preis-Fall (Preisliste) unterscheidet sich vom Parameter-Fall
+  (D-27) dadurch, dass dort die **Rechenparameter** lagen, hier der **ausgezeichnete Endpreis**.
+  *Umgesetzt:* der Routeneintrag trägt `throttle:api`; gepinnt durch `LicenseTermsAccessTest`
+  (Route-Middleware über `app('router')`/`gatherMiddleware()`, anonymer 200 mit den Kundenfeldern
+  und `assertJsonMissingPath` für `calc_base_price`, `srp_base_price`, `mult_commercial`,
+  `price_web`). **Nicht regredieren:** wer die Route wieder ohne Throttle einträgt, bricht den Test.
+
 ## TODO (UI-Review)
 
 UI-Review-Screenshot-Skill noch nicht angewendet (Playwright-Harness + Vision-Analyse). Referenz: ocg-price-tracker/tests/screenshots (ui-screenshots.spec.ts mit Section-Captures).

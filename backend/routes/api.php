@@ -75,7 +75,13 @@ Route::get('/settings/brand-config', [SettingsController::class, 'getBrandConfig
 Route::get('/settings/license-pricing', [SettingsController::class, 'getLicensePricing'])
     ->middleware('throttle:api')
     ->name('api.settings.license-pricing');
-Route::get('/settings/license-catalog', [LicenseCatalogController::class, 'index'])->name('api.settings.license-catalog');
+// Öffentlich **by design** (D-32): das ist die veröffentlichte Kunden-Preisliste
+// (Nutzungsarten und Modifier), die der Client-Lizenz-Selector rendert. Die internen
+// Preisparameter (calc_*, srp_*, mult_*, price_*) liegen NICHT hier — sie liefert nur
+// der super_admin-Endpunkt /settings/license-terms. Gedrosselt wie /settings/license-pricing.
+Route::get('/settings/license-catalog', [LicenseCatalogController::class, 'index'])
+    ->middleware('throttle:api')
+    ->name('api.settings.license-catalog');
 
 if (app()->environment('local', 'testing')) {
     Route::delete('/test/cleanup-user/{id}', function ($id) {

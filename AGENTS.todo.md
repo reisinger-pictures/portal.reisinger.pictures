@@ -1,7 +1,5 @@
 # Task Board — Portal Reisinger Pictures
 
-- [ ] **Entscheidung offen: `GET /api/settings/license-catalog` bleibt anonym erreichbar** — liefert `base_price` je Nutzungsart und `percent_surcharge` je Modifier (Nebenbefund der Endpunkt-Review `3a498db`, unabhängig verifiziert als `medium`). Gleiche Klasse wie D-27/D-28 (interne Preisparameter), lag aber außerhalb des damaligen Auftrags. Zu entscheiden: analog absichern (bräuchte einen bewusst minimierten öffentlichen Lesepfad für den Lizenz-Selector) oder bewusst akzeptieren.
-
 - [ ] **Dependabot: 17 offene Vulnerabilities am Default-Branch** — GitHub-Meldung beim Push `9f45632`: 2 critical, 4 high, 5 moderate, 6 low. Dependency-CVEs, **nicht** Endpunkt-Autorisierung → eigener Durchgang (Skill `node-deps`), noch nicht triagiert; nicht als durch die Endpunkt-Review abgedeckt behandeln.
 
 - [ ] **Website-Import (`~/dev/reisinger.pictures`) gepatcht, aber unversioniert** — `packages/tools/scripts/import-portal-license-terms.ts` loggt sich als Super-Admin ein (`POST /api/auth/login`, Cookie `rp_jwt`) und ruft `/api/settings/license-terms`. Beleg: Aufruf ohne Env → klare Meldung, Exit 1, Snapshot unverändert. Offen: eigener Commit/Verify im Website-Repo (trägt unabhängige Owner-Arbeit, Pull blockiert). Richtung dauerhaft in `AGENTS.md` §14 D-31.
