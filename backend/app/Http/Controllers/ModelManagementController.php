@@ -190,6 +190,7 @@ class ModelManagementController extends Controller
         $profile = ModelProfile::query()
             ->forBrand($brand)
             ->findOrFail($id);
+        $this->authorizeSensitiveProfile($profile);
 
         if (! $profile->age_proof_path || ! $this->fileStore->exists($profile->age_proof_path)) {
             return response()->json(['error' => 'Kein Altersnachweis vorhanden.'], 404);
@@ -227,6 +228,7 @@ class ModelManagementController extends Controller
         $profile = ModelProfile::query()
             ->forBrand($brand)
             ->findOrFail($id);
+        $this->authorizeSensitiveProfile($profile);
 
         $pdf = $this->contactSheetService->render($profile, $variant);
 
@@ -250,6 +252,7 @@ class ModelManagementController extends Controller
         $brand = $this->adminBrand();
 
         $profile = ModelProfile::query()->forBrand($brand)->findOrFail($id);
+        $this->authorizeSensitiveProfile($profile);
         $photo = $this->resolvePhoto($profile, $photoId);
 
         $this->logDownload('photo', $profile, $photo);
@@ -364,13 +367,21 @@ class ModelManagementController extends Controller
     }
 
     /**
-     * Shared super-admin check for the lifecycle listing and DSGVO deletion.
+     * Shared super-admin check for lifecycle listing, sensitive downloads,
+     * and DSGVO deletion.
      */
     private function isSuperAdmin(): bool
     {
         $user = auth('api')->user();
 
         return $user !== null && app(AuthorizationService::class)->isSuperAdmin($user);
+    }
+
+    private function authorizeSensitiveProfile(ModelProfile $profile): void
+    {
+        if ($profile->lifecycleStatus() !== ModelProfile::LIFECYCLE_ACTIVE && ! $this->isSuperAdmin()) {
+            abort(response()->json(['error' => 'Keine Berechtigung.'], 403));
+        }
     }
 
     private function resolvePhoto(ModelProfile $profile, string $photoId, bool $requireFile = true): ModelPhoto
