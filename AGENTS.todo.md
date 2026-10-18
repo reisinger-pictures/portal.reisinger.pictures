@@ -179,6 +179,14 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   **nicht-leerem, abweichendem** `mime_type` ab — gepinnt sind nur Null-MIME, Dimension,
   Byte-Cap und Undekodierbarkeit. **Test:** gespeichertes JPEG mit in der DB hinterlegtem
   `image/png` ⇒ Foto wird ausgelassen, Decoder wird nicht aufgerufen.
+- [ ] **Zwei FTP-Inbox-Tests mocken ins Leere (Test-Qualität).**
+  `frontend/src/ui/management/__tests__/ManagementFtpInbox.connectionDialog.test.tsx` und
+  `.guideLayout.test.tsx` mocken `'../../logic/useGalleries'`; dieser Pfad löst auf
+  `src/ui/logic/useGalleries` auf, das **nicht existiert** — der Mock greift nicht, und in
+  beiden Dateien läuft der **echte** Hook (zieht u. a. `/api/auth/me`). Die Tests sind grün,
+  messen aber etwas anderes als sie behaupten. **Test:** den Mock-Pfad auf
+  `'../../../logic/useGalleries'` korrigieren und prüfen, dass die Dateien danach noch grün
+  sind (rot wäre der Beweis, dass der Mock vorher wirkungslos war).
 
 ---
 - [ ] **Dependabot: 1 offener Alert am Default-Branch** (war 10) — gemessen am 2026-10-18 mit `gh api repos/reisinger-pictures/portal.reisinger.pictures/dependabot/alerts?state=open&per_page=100 -q '.[] | [.security_advisory.severity, .dependency.package.name] | @tsv'` → **1 high (`braces`), 0 critical**. Patch-Stand je Paket (dieselbe Abfrage, `-q '.[] | [.security_advisory.severity, .dependency.package.name, .security_vulnerability.vulnerable_version_range, (.security_vulnerability.first_patched_version.identifier // "KEINE")] | @tsv'`): `undici` (6 Alerts — 1 high + 2 medium + 3 low; verwundbar `< 7.29.1`, installiert `7.29.0`), `source-map-js` (high, `< 1.2.2`, installiert `1.2.1`), `brace-expansion` (medium, `< 5.0.12`), `postcss-selector-parser` (medium, `< 7.1.6`), `braces` (high, `<= 3.0.3`, **`gepatcht-ab=KEINE`**). Dependency-CVEs, **nicht** Endpunkt-Autorisierung → eigener Durchgang (`node-deps`), **ausgeführt** (Ergebnis in den beiden Unterpunkten).
@@ -207,11 +215,11 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **53 offene `[ ]`** und **45 wartende
-> `[~]`** über 1837 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (53), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1837). Aufteilung der 53: **16× `manuell prüfen:`** und **37×
-> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. Die 37 enthalten die neun Punkte, die in
+> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **54 offene `[ ]`** und **45 wartende
+> `[~]`** über 1847 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (54), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1847). Aufteilung der 54: **16× `manuell prüfen:`** und **38×
+> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. Die 38 enthalten die zehn Punkte, die in
 > den Freigaben der Wellen A–D als nicht-blockierend eingestuft und deshalb hier festgehalten
 > wurden (siehe „Neue offene Punkte aus den Wellen A–D"). Alle 45 `[~]` tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
@@ -219,7 +227,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (98 = 53 offen + 45 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (99 = 54 offen + 45 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
