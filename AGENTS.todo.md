@@ -187,6 +187,11 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   messen aber etwas anderes als sie behaupten. **Test:** den Mock-Pfad auf
   `'../../../logic/useGalleries'` korrigieren und prüfen, dass die Dateien danach noch grün
   sind (rot wäre der Beweis, dass der Mock vorher wirkungslos war).
+- [ ] **Tote Limiter-Registrierung (pre-existing).** `RateLimiter::for('checkout', …)` steht in
+  `AppServiceProvider`, wird aber nirgends referenziert — kein Routen-Throttle, kein
+  Service-Aufruf; die Checkout-Quote läuft ausschließlich über `RateLimiter::hit()` in
+  `CheckoutRiskService`. **Test:** entfernen und belegen, dass kein Test und keine Route den
+  Namen nennt (`grep -rn "'checkout'" backend/app backend/routes backend/tests`).
 - [ ] **Quarantäne in der UI sichtbar machen (D-37 nennt „SFTP und Anzeige").**
   `status()` liefert `quarantine_count` bereits additiv, aber `frontend/src/logic/useFtp.ts`
   deklariert den Key nicht und die Karte zeigt ihn nicht. **Test:** Vitest, der die Zahl aus dem
@@ -223,11 +228,11 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **56 offene `[ ]`** und **45 wartende
-> `[~]`** über 1855 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (56), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1855). Aufteilung der 56: **16× `manuell prüfen:`** und **40×
-> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. Die 40 enthalten die zwölf Punkte, die in
+> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **57 offene `[ ]`** und **45 wartende
+> `[~]`** über 1860 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (57), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1860). Aufteilung der 57: **16× `manuell prüfen:`** und **41×
+> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. Die 41 enthalten die dreizehn Punkte, die in
 > den Freigaben der Wellen A–D als nicht-blockierend eingestuft und deshalb hier festgehalten
 > wurden (siehe „Neue offene Punkte aus den Wellen A–D"). Alle 45 `[~]` tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
@@ -235,7 +240,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (101 = 56 offen + 45 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (102 = 57 offen + 45 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
