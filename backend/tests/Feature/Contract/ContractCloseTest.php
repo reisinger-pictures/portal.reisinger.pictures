@@ -11,6 +11,7 @@ use App\Models\Order;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\ContractClosedMailDispatcher;
 use App\Services\ContractCloseService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Group;
+use RuntimeException;
 use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
 
@@ -162,7 +164,7 @@ class ContractCloseTest extends TestCase
 
     public function test_rolled_back_close_leaves_no_queued_closure_mail_and_retry_queues_once(): void
     {
-        Mail::fake();
+        $this->useIsolatedDatabaseQueue();
 
         $contract = Contract::factory()->create([
             'status' => 'active',
@@ -190,22 +192,22 @@ class ContractCloseTest extends TestCase
             }
 
             $triggered = true;
-            throw new \RuntimeException('simulated rollback after queueClosedMail');
+            throw new RuntimeException('simulated rollback after queueClosedMail');
         });
 
         try {
             app(ContractCloseService::class)->close($contract);
             $this->fail('Expected the simulated failure to abort the close transaction.');
-        } catch (\RuntimeException $exception) {
+        } catch (RuntimeException $exception) {
             $this->assertSame('simulated rollback after queueClosedMail', $exception->getMessage());
         } finally {
             Event::forget('eloquent.retrieved: '.ContractSigner::class);
         }
 
         $this->assertTrue($triggered);
-        // The mail is dispatched after commit, so a rolled-back attempt must
-        // leave no queued job behind.
-        Mail::assertNothingQueued();
+        // Queue insertion is part of the close transaction, so rollback removes
+        // the job even though it was inserted before the failure.
+        $this->assertDatabaseCount('jobs', 0);
         $this->assertDatabaseHas('contracts', [
             'id' => $contract->id,
             'status' => 'active',
@@ -216,7 +218,80 @@ class ContractCloseTest extends TestCase
         // The successful retry dispatches exactly once.
         $result = app(ContractCloseService::class)->close($contract);
         $this->assertSame(ContractCloseService::RESULT_CLOSED, $result['status']);
-        Mail::assertQueued(ContractClosedMail::class, 1);
+        $this->assertDatabaseCount('jobs', 1);
+    }
+
+    public function test_partial_recipient_enqueue_rolls_back_manual_close_and_retry_covers_every_recipient(): void
+    {
+        $this->useIsolatedDatabaseQueue();
+
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'billing_details' => [
+                'name' => 'Billing recipient',
+                'email' => 'billing-recipient@example.com',
+            ],
+        ]);
+        ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'email' => 'signer-recipient@example.com',
+            'status' => 'signed',
+        ]);
+
+        $failingDispatcher = new class extends ContractClosedMailDispatcher
+        {
+            public array $queuedRecipients = [];
+
+            protected function queueRecipient(Contract $contract, string $recipient): void
+            {
+                if ($this->queuedRecipients !== []) {
+                    throw new RuntimeException('simulated second-recipient queue failure');
+                }
+
+                $this->queuedRecipients[] = $recipient;
+                parent::queueRecipient($contract, $recipient);
+            }
+        };
+        $this->app->instance(ContractClosedMailDispatcher::class, $failingDispatcher);
+
+        try {
+            app(ContractCloseService::class)->close($contract);
+            $this->fail('Expected the partial recipient enqueue to roll back the close.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('simulated second-recipient queue failure', $exception->getMessage());
+        }
+
+        $this->assertSame(['signer-recipient@example.com'], $failingDispatcher->queuedRecipients);
+        $this->assertDatabaseHas('contracts', ['id' => $contract->id, 'status' => 'active']);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('invoice_snapshots', 0);
+        $this->assertDatabaseCount('jobs', 0);
+
+        $recordingDispatcher = new class extends ContractClosedMailDispatcher
+        {
+            public array $queuedRecipients = [];
+
+            protected function queueRecipient(Contract $contract, string $recipient): void
+            {
+                $this->queuedRecipients[] = $recipient;
+                parent::queueRecipient($contract, $recipient);
+            }
+        };
+        $this->app->instance(ContractClosedMailDispatcher::class, $recordingDispatcher);
+
+        $result = app(ContractCloseService::class)->close($contract);
+
+        $this->assertSame(ContractCloseService::RESULT_CLOSED, $result['status']);
+        $this->assertSame([
+            'signer-recipient@example.com',
+            'billing-recipient@example.com',
+        ], $recordingDispatcher->queuedRecipients);
+        $this->assertDatabaseHas('contracts', ['id' => $contract->id, 'status' => 'closed']);
+        $this->assertDatabaseCount('jobs', 2);
+
+        app(ContractCloseService::class)->close($contract);
+        $this->assertDatabaseCount('jobs', 2);
     }
 
     public function test_repeated_and_stale_close_callers_create_one_accounting_and_mail_path(): void
@@ -460,5 +535,13 @@ class ContractCloseTest extends TestCase
         $response->assertStatus(200);
 
         $this->assertDatabaseCount('orders', 0);
+    }
+
+    private function useIsolatedDatabaseQueue(): void
+    {
+        config()->set('queue.default', 'database');
+        config()->set('queue.connections.database.driver', 'database');
+        config()->set('queue.connections.database.connection', config('database.default'));
+        config()->set('queue.connections.database.after_commit', false);
     }
 }

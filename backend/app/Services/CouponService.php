@@ -317,4 +317,26 @@ class CouponService
             )->increment('used_count');
         }
     }
+
+    /**
+     * Release a reservation after its order wins a terminal cancellation
+     * transition. The caller must include this in the same transaction as its
+     * conditional order-state update so a repeated or losing cancellation
+     * cannot decrement either counter twice.
+     */
+    public function releaseUsage(Coupon $coupon, int|string|null $userId = null): void
+    {
+        DB::table('coupons')
+            ->where('id', $coupon->id)
+            ->where('used_count', '>', 0)
+            ->decrement('used_count');
+
+        if ($userId !== null) {
+            DB::table('coupon_user_usage')
+                ->where('coupon_id', $coupon->id)
+                ->where('user_id', $userId)
+                ->where('used_count', '>', 0)
+                ->decrement('used_count');
+        }
+    }
 }

@@ -6,11 +6,13 @@ use App\Enums\Brand;
 use App\Mail\ContractClosedMail;
 use App\Models\Contract;
 use App\Models\ContractSigner;
+use App\Services\ContractClosedMailDispatcher;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use RuntimeException;
 use Tests\TestCase;
 
 class ContractJoinTest extends TestCase
@@ -998,6 +1000,68 @@ class ContractJoinTest extends TestCase
         ]);
     }
 
+    public function test_contract_content_polling_is_bounded_per_token_without_truncating_allowed_content(): void
+    {
+        $contract = Contract::factory()->create([
+            'status' => 'active',
+            'terms_html' => '<p>Still available</p>',
+            'brand' => Brand::B2B,
+        ]);
+        $signer = ContractSigner::factory()->create([
+            'contract_id' => $contract->id,
+            'personal_token' => 'bounded-heartbeat-token',
+            'status' => 'joined',
+        ]);
+
+        for ($poll = 0; $poll < 30; $poll++) {
+            $this->getJson('/api/contracts/sign/bounded-heartbeat-token')
+                ->assertOk()
+                ->assertJsonPath('contract.terms_html', '<p>Still available</p>');
+        }
+
+        $this->getJson('/api/contracts/sign/bounded-heartbeat-token')->assertStatus(429);
+
+        $this->assertSame(30, DB::table('contract_audit_logs')
+            ->where('contract_signer_id', $signer->id)
+            ->where('action', 'heartbeat')
+            ->count());
+    }
+
+    public function test_terminal_signing_states_do_not_write_content_heartbeats(): void
+    {
+        $activeContract = Contract::factory()->create([
+            'status' => 'active',
+            'brand' => Brand::B2B,
+        ]);
+        $signedSigner = ContractSigner::factory()->create([
+            'contract_id' => $activeContract->id,
+            'personal_token' => 'already-signed-heartbeat',
+            'status' => 'signed',
+            'signed_at' => now(),
+        ]);
+        $closedContract = Contract::factory()->create([
+            'status' => 'closed',
+            'brand' => Brand::B2B,
+        ]);
+        $closedSigner = ContractSigner::factory()->create([
+            'contract_id' => $closedContract->id,
+            'personal_token' => 'closed-heartbeat',
+            'status' => 'joined',
+        ]);
+
+        $this->getJson('/api/contracts/sign/already-signed-heartbeat')->assertStatus(409);
+        $this->getJson('/api/contracts/sign/closed-heartbeat')->assertStatus(410);
+
+        $this->assertDatabaseMissing('contract_audit_logs', [
+            'contract_signer_id' => $signedSigner->id,
+            'action' => 'heartbeat',
+        ]);
+        $this->assertDatabaseMissing('contract_audit_logs', [
+            'contract_signer_id' => $closedSigner->id,
+            'action' => 'heartbeat',
+        ]);
+    }
+
     public function test_template_join_creates_instance_and_signer(): void
     {
         $template = Contract::factory()->create([
@@ -1410,6 +1474,98 @@ class ContractJoinTest extends TestCase
         Mail::assertQueued(ContractClosedMail::class, 1);
     }
 
+    public function test_partial_recipient_enqueue_rolls_back_template_signature_and_retries_all_recipients(): void
+    {
+        $this->useIsolatedDatabaseQueue();
+
+        $template = Contract::factory()->create([
+            'type' => 'template',
+            'status' => 'active',
+            'brand' => Brand::B2B,
+        ]);
+        $instance = Contract::factory()->create([
+            'type' => 'contract',
+            'template_id' => $template->id,
+            'status' => 'active',
+            'brand' => Brand::B2B,
+            'items' => [[
+                'type' => 'item',
+                'description' => 'Template closure',
+                'notes' => '',
+                'qty' => 1,
+                'price' => 10000,
+            ]],
+            'discounts' => [],
+            'billing_details' => [
+                'name' => 'Billing recipient',
+                'email' => 'template-billing@example.com',
+            ],
+        ]);
+        $signer = ContractSigner::factory()->create([
+            'contract_id' => $instance->id,
+            'personal_token' => 'template-partial-queue',
+            'email' => 'template-signer@example.com',
+            'status' => 'joined',
+        ]);
+
+        $queueDispatcher = new class extends ContractClosedMailDispatcher
+        {
+            public bool $failAfterFirstRecipient = true;
+
+            public array $queuedRecipients = [];
+
+            protected function queueRecipient(Contract $contract, string $recipient): void
+            {
+                if ($this->failAfterFirstRecipient && $this->queuedRecipients !== []) {
+                    throw new RuntimeException('simulated second-recipient queue failure');
+                }
+
+                $this->queuedRecipients[] = $recipient;
+                parent::queueRecipient($contract, $recipient);
+            }
+        };
+        $this->app->instance(ContractClosedMailDispatcher::class, $queueDispatcher);
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->postJson('/api/contracts/sign/template-partial-queue', [
+                'accept_contract' => true,
+                'content_version' => $instance->content_version,
+            ]);
+            $this->fail('Expected the partial recipient enqueue to roll back the template signature.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('simulated second-recipient queue failure', $exception->getMessage());
+        }
+
+        $this->withExceptionHandling();
+        $this->assertSame(['template-signer@example.com'], $queueDispatcher->queuedRecipients);
+        $this->assertDatabaseHas('contracts', ['id' => $instance->id, 'status' => 'active']);
+        $this->assertDatabaseHas('contract_signers', ['id' => $signer->id, 'status' => 'joined']);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('invoice_snapshots', 0);
+        $this->assertDatabaseCount('jobs', 0);
+
+        // The route caches its controller for this test's repeated requests,
+        // so switch the same injected dispatcher to its recovery mode.
+        $queueDispatcher->failAfterFirstRecipient = false;
+        $queueDispatcher->queuedRecipients = [];
+
+        $this->postJson('/api/contracts/sign/template-partial-queue', [
+            'accept_contract' => true,
+            'content_version' => $instance->content_version,
+        ])->assertOk();
+
+        $this->assertSame([
+            'template-signer@example.com',
+            'template-billing@example.com',
+        ], $queueDispatcher->queuedRecipients);
+        $this->assertDatabaseHas('contracts', ['id' => $instance->id, 'status' => 'closed']);
+        $this->assertDatabaseHas('contract_signers', ['id' => $signer->id, 'status' => 'signed']);
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertDatabaseCount('invoice_snapshots', 1);
+        $this->assertDatabaseCount('jobs', 2);
+    }
+
     public function test_standard_contract_sign_does_not_auto_close(): void
     {
         $contract = Contract::factory()->create([
@@ -1458,5 +1614,13 @@ class ContractJoinTest extends TestCase
                     $column => DB::raw('CURRENT_TIMESTAMP'),
                 ]);
         });
+    }
+
+    private function useIsolatedDatabaseQueue(): void
+    {
+        config()->set('queue.default', 'database');
+        config()->set('queue.connections.database.driver', 'database');
+        config()->set('queue.connections.database.connection', config('database.default'));
+        config()->set('queue.connections.database.after_commit', false);
     }
 }

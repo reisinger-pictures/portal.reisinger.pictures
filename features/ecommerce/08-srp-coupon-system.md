@@ -103,7 +103,7 @@ When `type = 'percentage'`, an optional `max_items` (unsigned integer) limits th
 - `max_uses_global` limits total redemptions across all users (NULL = unlimited).
 - `max_uses_per_account` limits redemptions **per user account** (NULL = unlimited). Tracked via `coupon_user_usage` table.
 - `expires_at` defines an expiry datetime.
-- `used_count` increments atomically on each successful application; `coupon_user_usage.used_count` increments per user.
+- Applying a coupon reserves capacity when its order is created: `coupons.used_count` and, for a registered user, `coupon_user_usage.used_count` increment in the checkout transaction. A verified terminal stale-PaymentIntent cancellation releases both reservations only when the order wins the conditional `pending_payment` → `cancelled` transition, in the same transaction. Repeated sweeps cannot release twice; retryable/recovered pending orders and successful payments retain their reservation.
 - **Coupon invalidation (active toggle):** Admins and photographers can deactivate coupons via `active = false`. A deactivated coupon is invalid until reactivated.
 - **Coupon deletion:** Super Admin and Admin (brand-bound) can delete any coupon unconditionally. Photographers may only delete their own coupons where `used_count = 0` (invoice integrity). The `used_count > 0` guard is skipped for any user with `is_admin` or `is_super_admin`.
 

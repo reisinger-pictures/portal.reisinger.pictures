@@ -11,7 +11,7 @@ Das System implementiert eine Einfache Elektronische Signatur (EES / SES) via Cl
 Da ein Vertrag mehrere Unterzeichner haben kann, wird der Audit-Trail pro Unterzeichner geführt.
 Die `contract_audit_logs` protokollieren:
 * **opened:** Unterzeichner öffnet den Link (erfasst IP-Adresse, User-Agent, Timestamp).
-* **heartbeat:** Aktives Lesen wird protokolliert.
+* **heartbeat:** Erfolgreiche Content-Abrufe während einer aktiven Signaturphase werden als Leseaktivität protokolliert; ein eigener per-personal-token Rate-Limiter begrenzt Polling und gedrosselte Requests erzeugen keinen Heartbeat.
 * **signed:** Unterzeichner stimmt zu (erfasst finale IP, User-Agent, Timestamp und gewählte Rollen).
 * **modified:** Vertrag wurde im `active`-Status durch Admin bearbeitet (kein Signer-Bezug, erfasst Admin-IP).
 
@@ -27,6 +27,7 @@ Verträge sind nicht mehr strikt 1:1, sondern 1:n (Vertrag zu Unterzeichnern).
 * Öffentliche Join-, Content- und Signaturpfade prüfen `status`, `expires_at` und `closes_at` anhand der Datenbankzeit. Create-/Sign-Transaktionen serialisieren den Contract-/Template-Zugriff per Row-Lock; Signaturen verwenden zusätzlich ein bedingtes Database-Time-Update.
 * Neue Template-Instanzen übernehmen die Deadline-Werte ihres Templates. Legacy-Instanzen mit `NULL`-Deadlines lösen ihre effektive Deadline dynamisch vom Template auf. Das Template ist dabei eine harte Obergrenze; bestehende Zeilen werden nicht per Mass-Update backfilled.
 * `POST /api/contracts/sign/{personalToken}/page-exit` ist Telemetrie, kein Signatur- oder Autorisierungs-Gate. Ein gültiger persönlicher Token mit verknüpftem Contract wird auch nach Close/Signatur akzeptiert; der Audit-Action-Wert ist `page_exit`. Ungültige Tokens liefern `404`.
+* `GET /api/contracts/sign/{personalToken}` behält den unveränderten Content-Payload bei und verwendet einen eigenen per-token Rate-Limiter. Die Grenze liegt oberhalb des regulären Frontend-Pollings; ein `429` wird vor dem Controller zurückgegeben und schreibt keinen Heartbeat. `page-exit` behält seinen separaten Route-Limiter.
 
 ### Join-Identität und V039-Dateninvariante
 
@@ -105,10 +106,10 @@ Bei Bearbeitung eines `active`-Vertrags wird zusätzlich ein `modified`-Audit-Lo
 
 ### Idempotent closure and concurrency
 
-* `ContractCloseService::close()` is the single lifecycle claim for manual and template-instance closure. It locks the contract row and performs the conditional `active` → `closed` update, accounting writes, and closure-mail enqueue in one database transaction. A retry or the loser of a concurrent close observes `closed` and performs no second order, invoice, or durable mail enqueue.
+* `ContractCloseService::close()` is the single lifecycle claim for manual and template-instance closure. It locks the contract row and performs the conditional `active` → `closed` update, accounting writes, and one database-queue insert per unique signer/billing recipient in the same database transaction. The queue uses the application database with `after_commit=false`; a partial enqueue failure rolls back the close, accounting, and every inserted recipient job, so the manual close or final-signature request can be retried. A retry or the loser of a concurrent close observes `closed` and performs no second order, invoice, or recipient enqueue.
 * Automatic closure of a template instance runs inside the same outer transaction as the final signature update. A close conflict therefore rolls back both the signature and the accounting claim; the public endpoint returns a generic retryable `409` without exposing database details.
 * A contract-created invoice records the source UUID in the existing `invoice_snapshots.customer_details.contract_id` JSON field. This is the durable source identity for accounting reconciliation; the contract row remains the lifecycle/idempotency authority. It is not a new order or invoice column, so no V039+ migration is required for this closure behavior.
-* With the production transactional database queue, the guarantee is at-most-once durable enqueue and accounting state, not exactly-once SMTP delivery. Queue-worker retries and terminal mail recovery remain separate operational concerns.
+* With the production transactional database queue, all intended recipient jobs are durably enqueued with the close, not via a bare after-commit callback. The guarantee is at-most-once durable enqueue and accounting state, not exactly-once SMTP delivery. Queue-worker retries and terminal mail recovery remain separate operational concerns.
 
 ## 7. Final PDF Compilation & Dispatch
 Erst wenn der Vertrag geschlossen wird (`status = closed`), wird das finale, unveränderliche PDF generiert:
