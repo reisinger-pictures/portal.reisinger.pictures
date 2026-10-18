@@ -344,6 +344,26 @@ führt keine Migration aus. Deshalb gilt:
   Frische zählt die Reihenfolge: **Commit-Zeitstempel des letzten
   Frontend-Commits gegen `mtime` von `dist/index.html`.** Ist das `dist/`
   jünger, ist der Bundle aktuell.
+- **Was diese Zeitstempel-Regel nicht beweist (belegt 2026-10-18).** Zwei Fallen bei genau
+  dieser Prüfung:
+  1. **Zeitzone.** `git log --format='%cI'` liefert in diesem Repo `…Z`, also **UTC** (die
+     Commits sind mit `+0000` verfasst), `stat` dagegen **Ortszeit** (CEST, +0200) — ein
+     direkter Zeichenketten-Vergleich liegt zwei Stunden daneben. Belegt: der letzte
+     Frontend-Commit `26119ca` ist `2026-10-18T13:52:01Z` = **15:52:01 CEST**, das `dist/`
+     war `2026-10-18T15:17:19` — also **älter** und damit richtig als stale erkannt; die naive
+     Lesart „13:52 gegen 15:17" hätte „frisch" ergeben. Umrechnen:
+     `date -r "$(git log -1 --format=%ct -- frontend/)"` gegen
+     `stat -f '%Sm' frontend/dist/index.html`.
+  2. **Ein jüngeres `dist/` sagt nichts über die Abhängigkeiten.** Die Regel vergleicht nur
+     Zeitstempel; ein Lockfile-Merge (Dependabot) ändert den Bundle-Inhalt, ohne den
+     Build-Code anzufassen. Belegt: `dompurify` 3.4.14 → 3.4.16 (über
+     `frontend/src/logic/sanitizeHtml.ts` liegt es im Bundle) — `pnpm list dompurify --depth 0`
+     zeigte vor dem Sync noch `dompurify@3.4.14`, erst `pnpm install --frozen-lockfile`
+     stellte `3.4.16` her. **Regel:** nach einem Lockfile-Merge gehört
+     `pnpm install --frozen-lockfile` **vor** den Build, und der Bundle-Hash ist danach die
+     Kontrolle — er **muss** sich ändern, wenn eine Laufzeit-Abhängigkeit sich geändert hat
+     (hier `index-Ks_hvW0G.js` → `index-BSWfi8tb.js`). Ein unveränderter Hash nach einem
+     Lockfile-Merge ist ein Warnsignal, kein Beweis.
 - **Migrationen laufen nicht mit.** `sync.sh` ist kein Deploy im Sinne von
   `migrate --force && db:seed --force`. Wer eine Migration braucht, macht
   sie bewusst und getrennt — und seedet danach, wie `backend/AGENTS.md`
