@@ -1,11 +1,15 @@
 name: CI
 
 # Push auf ALLE Branches (inkl. Dependabot-Branches wie
-# dependabot/npm_and_yarn/frontend/...): Dependabot-ausgelöste pull_request-Runs
-# erhalten KEINE Secrets und nur read-only GITHUB_TOKEN. Deren secret-dependent
-# E2E-/Aggregate-Gate wird deshalb explizit übersprungen; der Push-Lauf auf
-# demselben Head-SHA bleibt der autoritative Gate. `pull_request` deckt
-# normale Same-Repo-PRs weiterhin fail-closed ab.
+# dependabot/npm_and_yarn/frontend/...). Ein Dependabot-ausgeloester Run — `push`
+# UND `pull_request` — erhaelt KEINE Actions-Secrets, sondern die
+# **Dependabot**-Secrets; nur `pull_request_target` bekommt gar keine. Der
+# PR-seitige Lauf wird deshalb nicht wegen fehlender Secrets uebersprungen,
+# sondern bewusst: die siebenteilige E2E-Matrix soll pro Dependabot-PR einmal
+# statt zweimal laufen (Owner-Entscheidung 2026-10-18). Autoritativ ist der
+# Push-Lauf auf demselben Head-SHA — `automerge.yml` wartet exakt auf
+# `CI gate (push)`. `pull_request` deckt normale Same-Repo-PRs weiterhin
+# fail-closed ab.
 # Docs-only commits ran all 11 jobs (incl. 6 Playwright shards) on 3352977
 # (AGENTS.md + AGENTS.todo.md). `'**'` is the only positive pattern, so no code
 # change can ever be filtered out; the negations drop documentation only. The
@@ -322,13 +326,15 @@ jobs:
     # Job-level `if` darf KEINEN secrets-Context lesen (offizielle Context
     # availability: jobs.<job_id>.if -> github, needs, vars, inputs). Secrets
     # fuer Dependabot-ausgeloeste Runs kommen aus dem **Dependabot**-Secret-Store,
-    # nicht aus den Actions-Secrets — und nur beim `push`-Event: ein
-    # Dependabot-`pull_request`-Lauf erhaelt gar keine Secrets (GitHub-Restriktion,
-    # unabhaengig vom Store). Deshalb laeuft E2E auf dem Push-Lauf des
-    # Dependabot-Branches (dort greifen die Dependabot-Secrets) und der PR-seitige
-    # Lauf wird uebersprungen — er koennte die Umgebung gar nicht aufbauen.
-    # Fork-PRs bleiben ebenfalls uebersprungen, normale Same-Repo-PRs laufen.
-    # Der eigentliche Missing-Secret-Check bleibt im ersten Step unten.
+    # nicht aus den Actions-Secrets — das gilt fuer `push` UND `pull_request`;
+    # nur `pull_request_target` erhaelt gar keine. Der PR-seitige Lauf wird
+    # deshalb nicht wegen fehlender Secrets uebersprungen, sondern bewusst: die
+    # siebenteilige E2E-Matrix soll pro Dependabot-PR einmal statt zweimal laufen
+    # (Owner-Entscheidung 2026-10-18). Autoritativ ist der Push-Lauf auf dem
+    # Dependabot-Branch (dort greifen die Dependabot-Secrets) — `automerge.yml`
+    # wartet exakt auf `CI gate (push)`. Fork-PRs bleiben ebenfalls uebersprungen,
+    # normale Same-Repo-PRs laufen. Der eigentliche Missing-Secret-Check bleibt im
+    # ersten Step unten.
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork == false)
     runs-on: ubuntu-latest
     # Gesamter E2E-Job laeuft im Test-Image portal-e2e (portal-base + Node/
@@ -688,10 +694,13 @@ jobs:
     name: CI gate (${{ github.event_name }})
     # Keep the fail-closed always() gate for push and normal PRs. The
     # Dependabot pull_request aggregate is intentionally skipped together with
-    # its E2E job: a Dependabot pull_request run receives no secrets at all, so
-    # that environment cannot be built. The push aggregate on the Dependabot
-    # branch is authoritative — a Dependabot push run reads the Dependabot
-    # secret store and runs the full E2E.
+    # its E2E job — not because that run lacks secrets (a Dependabot
+    # pull_request run reads the Dependabot secret store, exactly like its push
+    # run; only pull_request_target receives none), but to run the seven-part
+    # E2E matrix once per Dependabot PR instead of twice (Owner-Entscheidung
+    # 2026-10-18). The push aggregate on the Dependabot branch is
+    # authoritative — it reads the Dependabot secret store and runs the full
+    # E2E, and `automerge.yml` waits for exactly `CI gate (push)`.
     if: ${{ always() && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]')) }}
     needs:
       - security-contract
