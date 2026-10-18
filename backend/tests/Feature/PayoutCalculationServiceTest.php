@@ -62,7 +62,7 @@ class PayoutCalculationServiceTest extends TestCase
     {
         $pool = PayoutPool::factory()->forMonth(6, 2026)->withNetPool(10000)->create();
         $gallery = Gallery::factory()->create();
-        Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
         $this->logDownload([
             'user_id' => null,
@@ -84,7 +84,7 @@ class PayoutCalculationServiceTest extends TestCase
     {
         $pool = PayoutPool::factory()->forMonth(6, 2026)->withNetPool(10000)->create();
         $gallery = Gallery::factory()->create(['is_free_download' => true]);
-        Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
         $this->logDownload([
             'user_id' => User::factory()->create()->id,
@@ -92,6 +92,7 @@ class PayoutCalculationServiceTest extends TestCase
             'item_type' => 'single_image',
             'resolution_tier' => 'original',
             'photo_count' => 1,
+            'payload' => ['photo_id' => $photo->id],
         ]);
 
         $this->service->calculatePoolShares($pool->fresh());
@@ -106,7 +107,7 @@ class PayoutCalculationServiceTest extends TestCase
         // Photo ohne user_id → galleryPhotographers->get($galleryId)?->user_id = null → skip.
         $pool = PayoutPool::factory()->forMonth(6, 2026)->withNetPool(10000)->create();
         $gallery = Gallery::factory()->create();
-        Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => null]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => null]);
 
         $this->logDownload([
             'user_id' => User::factory()->create()->id,
@@ -114,6 +115,7 @@ class PayoutCalculationServiceTest extends TestCase
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
             'photo_count' => 1,
+            'payload' => ['photo_id' => $photo->id],
         ]);
 
         $this->service->calculatePoolShares($pool->fresh());
@@ -132,7 +134,7 @@ class PayoutCalculationServiceTest extends TestCase
             ->create(['photographer_share_percent' => 50]);
         $gallery = Gallery::factory()->create();
         $photographer = User::factory()->create();
-        Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
 
         $this->logDownload([
             'user_id' => User::factory()->create()->id,
@@ -140,6 +142,7 @@ class PayoutCalculationServiceTest extends TestCase
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
             'photo_count' => 1,
+            'payload' => ['photo_id' => $photo->id],
             'created_at' => '2026-06-15 12:00:00',
         ]);
 
@@ -171,13 +174,14 @@ class PayoutCalculationServiceTest extends TestCase
         // 3 separate User-Gallery-Paare mit je 1 Single-Download web → 3 shares.
         for ($i = 0; $i < 3; $i++) {
             $g = Gallery::factory()->create();
-            Photo::factory()->create(['gallery_id' => $g->id, 'user_id' => $photographer->id]);
+            $photo = Photo::factory()->create(['gallery_id' => $g->id, 'user_id' => $photographer->id]);
             $this->logDownload([
                 'user_id' => User::factory()->create()->id,
                 'gallery_id' => $g->id,
                 'item_type' => 'single_image',
                 'resolution_tier' => 'web',
                 'photo_count' => 1,
+                'payload' => ['photo_id' => $photo->id],
                 'created_at' => '2026-06-15 12:00:00',
             ]);
         }
@@ -296,10 +300,113 @@ class PayoutCalculationServiceTest extends TestCase
         $this->assertSame(8, $pool->total_unique_downloads);
     }
 
+    public function test_calculate_pool_shares_count_only_zip_suppresses_explicit_singles_of_the_same_customer_and_gallery(): void
+    {
+        // A count-only archive has no per-photo identities, so its unknown
+        // contents may overlap any explicit single of the same customer +
+        // gallery. The archive position wins; the singles must not add shares.
+        // Removing the displacement rule in calculatePoolShares() turns this
+        // red (14.0000 shares instead of 12.0000).
+        $pool = PayoutPool::factory()
+            ->forMonth(7, 2026)
+            ->withNetPool(12000)
+            ->create(['photographer_share_percent' => 100]);
+        $gallery = Gallery::factory()->create();
+        $photographer = User::factory()->create();
+        $photos = collect(range(1, 4))
+            ->map(fn (): Photo => Photo::factory()->create([
+                'gallery_id' => $gallery->id,
+                'user_id' => $photographer->id,
+            ]));
+        $customer = User::factory()->create();
+
+        // One archive position: 3 photos × original (4) = 12 shares.
+        $this->logDownload([
+            'user_id' => $customer->id,
+            'gallery_id' => $gallery->id,
+            'item_type' => 'full_zip',
+            'resolution_tier' => 'original',
+            'photo_count' => 3,
+            'payload' => null,
+            'created_at' => '2026-07-10 12:00:00',
+        ]);
+        // Two identified singles of the same customer/gallery: +2 shares if the
+        // count-only archive is not treated as authoritative.
+        foreach ([$photos[0], $photos[1]] as $photo) {
+            $this->logDownload([
+                'user_id' => $customer->id,
+                'gallery_id' => $gallery->id,
+                'item_type' => 'single_image',
+                'resolution_tier' => 'web',
+                'photo_count' => 1,
+                'payload' => ['photo_id' => $photo->id],
+                'created_at' => '2026-07-10 12:01:00',
+            ]);
+        }
+
+        $this->service->calculatePoolShares($pool->fresh());
+
+        $pool->refresh();
+        $this->assertSame('12.0000', $pool->total_shares);
+        $this->assertSame(3, $pool->total_unique_downloads);
+        $this->assertSame(1000, $pool->value_per_share_cents);
+
+        $statement = PhotographerStatement::where('user_id', $photographer->id)->sole();
+        $this->assertSame('12.0000', $statement->total_shares_earned);
+        // 12 shares × 1000 cents per share × 100% = 12000 cents.
+        $this->assertSame(12000, $statement->pool_earnings_cents);
+    }
+
+    public function test_calculate_pool_shares_explicit_zip_does_not_suppress_a_single_from_the_same_gallery(): void
+    {
+        // The displacement rule applies only to count-only archives. An
+        // explicit ZIP reconciles through the customer/photo ledger instead,
+        // so a different photo downloaded as a single in the same gallery
+        // still counts. Repeated identities of the same photo are deduped —
+        // see test_calculate_pool_shares_mixed_zip_and_single_prefers_zip()
+        // and test_calculate_pool_shares_uses_best_tier_per_photo_across_
+        // gallery_zip_and_single().
+        $pool = PayoutPool::factory()
+            ->forMonth(7, 2026)
+            ->withNetPool(8000)
+            ->create(['photographer_share_percent' => 100]);
+        $gallery = Gallery::factory()->create();
+        $photographer = User::factory()->create();
+        $photoA = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
+        $photoB = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
+        $customer = User::factory()->create();
+
+        $this->logDownload([
+            'user_id' => $customer->id,
+            'gallery_id' => $gallery->id,
+            'item_type' => 'full_zip',
+            'resolution_tier' => 'web',
+            'photo_count' => 1,
+            'payload' => ['photo_ids' => [$photoA->id], 'gallery_ids' => [$gallery->id]],
+            'created_at' => '2026-07-10 12:00:00',
+        ]);
+        $this->logDownload([
+            'user_id' => $customer->id,
+            'gallery_id' => $gallery->id,
+            'item_type' => 'single_image',
+            'resolution_tier' => 'web',
+            'photo_count' => 1,
+            'payload' => ['photo_id' => $photoB->id],
+            'created_at' => '2026-07-10 12:01:00',
+        ]);
+
+        $this->service->calculatePoolShares($pool->fresh());
+
+        $pool->refresh();
+        $this->assertSame('2.0000', $pool->total_shares);
+        $this->assertSame(2, $pool->total_unique_downloads);
+        $this->assertSame(4000, $pool->value_per_share_cents);
+        $this->assertSame('2.0000', PhotographerStatement::where('user_id', $photographer->id)->sole()->total_shares_earned);
+    }
+
     public function test_calculate_pool_shares_mixed_zip_and_single_prefers_zip(): void
     {
-        // REVIEW: Bei Mix ZIP + Single im selben User-Gallery-Paar gewinnt der ZIP
-        // (finalPhotoCount = maxPhotoCount), die Single-Downloads werden ignoriert.
+        // Explicit ZIP and single identities reconcile in one customer/photo ledger.
         $pool = PayoutPool::factory()->forMonth(7, 2026)->withNetPool(10000)->create();
         $gallery = Gallery::factory()->create();
         $photographer = User::factory()->create();
@@ -307,7 +414,7 @@ class PayoutCalculationServiceTest extends TestCase
             ->map(fn (): Photo => Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]));
         $user = User::factory()->create();
 
-        // 1 ZIP photo_count=4 + 2 Single-Downloads → nur ZIP zählt: 4 Fotos.
+        // The ZIP already identifies all four photos; the repeated singles add nothing.
         $this->logDownload([
             'user_id' => $user->id, 'gallery_id' => $gallery->id,
             'item_type' => 'full_zip', 'resolution_tier' => 'web', 'photo_count' => 4,
@@ -333,7 +440,7 @@ class PayoutCalculationServiceTest extends TestCase
         $this->service->calculatePoolShares($pool->fresh());
 
         $pool->refresh();
-        // 4 (ZIP, max) * mult 1 (web) = 4 shares. Single-Downloads fallen weg.
+        // 4 unique photo IDs × mult 1 (web) = 4 shares.
         $this->assertSame('4.0000', $pool->total_shares);
         $this->assertSame(4, $pool->total_unique_downloads);
     }
@@ -413,18 +520,132 @@ class PayoutCalculationServiceTest extends TestCase
         $this->assertSame('1.0000', PhotographerStatement::where('user_id', $photographerB->id)->sole()->total_shares_earned);
     }
 
-    public function test_calculate_pool_shares_groups_by_user_gallery_pair(): void
+    public function test_calculate_pool_shares_uses_best_tier_per_photo_across_gallery_zip_and_single(): void
     {
-        // Zwei User in derselben Gallery → zwei Gruppen → beide zählen.
-        $pool = PayoutPool::factory()->forMonth(7, 2026)->withNetPool(20000)->create();
+        $pool = PayoutPool::factory()
+            ->forMonth(7, 2026)
+            ->withNetPool(500)
+            ->create(['photographer_share_percent' => 100]);
+        $gallery = Gallery::factory()->create();
+        $photographerA = User::factory()->create();
+        $photographerB = User::factory()->create();
+        $photoA = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographerA->id]);
+        $photoB = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographerB->id]);
+        $customer = User::factory()->create();
+
+        $this->logDownload([
+            'user_id' => $customer->id,
+            'gallery_id' => $gallery->id,
+            'item_type' => 'full_zip',
+            'resolution_tier' => 'web',
+            'photo_count' => 2,
+            'payload' => ['photo_ids' => [$photoA->id, $photoB->id], 'gallery_ids' => [$gallery->id]],
+            'created_at' => '2026-07-10 12:00:00',
+        ]);
+        $this->logDownload([
+            'user_id' => $customer->id,
+            'gallery_id' => $gallery->id,
+            'item_type' => 'single_image',
+            'resolution_tier' => 'original',
+            'photo_count' => 1,
+            'payload' => ['photo_id' => $photoA->id],
+            'created_at' => '2026-07-10 12:01:00',
+        ]);
+
+        $this->service->calculatePoolShares($pool->fresh());
+
+        $pool->refresh();
+        $this->assertSame('5.0000', $pool->total_shares);
+        $this->assertSame(2, $pool->total_unique_downloads);
+        $this->assertSame('4.0000', PhotographerStatement::where('user_id', $photographerA->id)->sole()->total_shares_earned);
+        $this->assertSame('1.0000', PhotographerStatement::where('user_id', $photographerB->id)->sole()->total_shares_earned);
+    }
+
+    public function test_calculate_pool_shares_deduplicates_mixed_gallery_zip_against_gallery_single(): void
+    {
+        $pool = PayoutPool::factory()
+            ->forMonth(7, 2026)
+            ->withNetPool(500)
+            ->create(['photographer_share_percent' => 100]);
+        $galleryA = Gallery::factory()->create();
+        $galleryB = Gallery::factory()->create();
+        $photographerA = User::factory()->create();
+        $photographerB = User::factory()->create();
+        $photoA = Photo::factory()->create(['gallery_id' => $galleryA->id, 'user_id' => $photographerA->id]);
+        $photoB = Photo::factory()->create(['gallery_id' => $galleryB->id, 'user_id' => $photographerB->id]);
+        $customer = User::factory()->create();
+
+        $this->logDownload([
+            'user_id' => $customer->id,
+            'gallery_id' => null,
+            'item_type' => 'full_zip',
+            'resolution_tier' => 'web',
+            'photo_count' => 2,
+            'payload' => [
+                'photo_ids' => [$photoA->id, $photoB->id],
+                'gallery_ids' => [$galleryA->id, $galleryB->id],
+            ],
+            'created_at' => '2026-07-10 12:00:00',
+        ]);
+        $this->logDownload([
+            'user_id' => $customer->id,
+            'gallery_id' => $galleryA->id,
+            'item_type' => 'single_image',
+            'resolution_tier' => 'original',
+            'photo_count' => 1,
+            'payload' => ['photo_id' => $photoA->id],
+            'created_at' => '2026-07-10 12:01:00',
+        ]);
+
+        $this->service->calculatePoolShares($pool->fresh());
+
+        $pool->refresh();
+        $this->assertSame('5.0000', $pool->total_shares);
+        $this->assertSame(2, $pool->total_unique_downloads);
+        $this->assertSame('4.0000', PhotographerStatement::where('user_id', $photographerA->id)->sole()->total_shares_earned);
+        $this->assertSame('1.0000', PhotographerStatement::where('user_id', $photographerB->id)->sole()->total_shares_earned);
+    }
+
+    public function test_calculate_pool_shares_suppresses_unidentified_legacy_single_rows(): void
+    {
+        $pool = PayoutPool::factory()->forMonth(7, 2026)->withNetPool(10000)->create();
         $gallery = Gallery::factory()->create();
         $photographer = User::factory()->create();
         Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
+        $customer = User::factory()->create();
+
+        foreach (['web', 'original'] as $tier) {
+            $this->logDownload([
+                'user_id' => $customer->id,
+                'gallery_id' => $gallery->id,
+                'item_type' => 'single_image',
+                'resolution_tier' => $tier,
+                'photo_count' => 1,
+                'payload' => null,
+                'created_at' => '2026-07-10 12:00:00',
+            ]);
+        }
+
+        $this->service->calculatePoolShares($pool->fresh());
+
+        $this->assertSame('0.0000', $pool->fresh()->total_shares);
+        $this->assertSame(0, $pool->fresh()->total_unique_downloads);
+        $this->assertSame(0, PhotographerStatement::query()->where('month', 7)->count());
+    }
+
+    public function test_calculate_pool_shares_groups_by_user_gallery_pair(): void
+    {
+        // Two customers downloading the same explicit photo count separately.
+        $pool = PayoutPool::factory()->forMonth(7, 2026)->withNetPool(20000)->create();
+        $gallery = Gallery::factory()->create();
+        $photographer = User::factory()->create();
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
 
         foreach ([User::factory()->create(), User::factory()->create()] as $user) {
             $this->logDownload([
                 'user_id' => $user->id, 'gallery_id' => $gallery->id,
                 'item_type' => 'single_image', 'resolution_tier' => 'web', 'photo_count' => 1,
+                'payload' => ['photo_id' => $photo->id],
                 'created_at' => '2026-07-10 12:00:00',
             ]);
         }
@@ -440,11 +661,12 @@ class PayoutCalculationServiceTest extends TestCase
         $pool = PayoutPool::factory()->forMonth(7, 2026)->withNetPool(0)->create();
         $gallery = Gallery::factory()->create();
         $photographer = User::factory()->create();
-        Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
 
         $this->logDownload([
             'user_id' => User::factory()->create()->id, 'gallery_id' => $gallery->id,
             'item_type' => 'single_image', 'resolution_tier' => 'web', 'photo_count' => 1,
+            'payload' => ['photo_id' => $photo->id],
             'created_at' => '2026-07-10 12:00:00',
         ]);
 
@@ -479,11 +701,12 @@ class PayoutCalculationServiceTest extends TestCase
         $pool = PayoutPool::factory()->forMonth(6, 2026)->withNetPool(10000)->create();
         $gallery = Gallery::factory()->create();
         $photographer = User::factory()->create();
-        Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
 
         $this->logDownload([
             'user_id' => User::factory()->create()->id, 'gallery_id' => $gallery->id,
             'item_type' => 'single_image', 'resolution_tier' => 'web', 'photo_count' => 1,
+            'payload' => ['photo_id' => $photo->id],
             'created_at' => '2026-05-15 12:00:00', // Mai, außerhalb des Juni-Pools
         ]);
 
@@ -500,11 +723,12 @@ class PayoutCalculationServiceTest extends TestCase
             ->create(['photographer_share_percent' => 100]);
         $gallery = Gallery::factory()->create();
         $photographer = User::factory()->create();
-        Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
 
         $this->logDownload([
             'user_id' => User::factory()->create()->id, 'gallery_id' => $gallery->id,
             'item_type' => 'single_image', 'resolution_tier' => 'web', 'photo_count' => 1,
+            'payload' => ['photo_id' => $photo->id],
             'created_at' => '2026-06-15 12:00:00',
         ]);
 
@@ -534,10 +758,11 @@ class PayoutCalculationServiceTest extends TestCase
         ]);
 
         $gallery = Gallery::factory()->create();
-        Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographer->id]);
         $this->logDownload([
             'user_id' => User::factory()->create()->id, 'gallery_id' => $gallery->id,
             'item_type' => 'single_image', 'resolution_tier' => 'web', 'photo_count' => 1,
+            'payload' => ['photo_id' => $photo->id],
             'created_at' => '2026-06-15 12:00:00',
         ]);
 

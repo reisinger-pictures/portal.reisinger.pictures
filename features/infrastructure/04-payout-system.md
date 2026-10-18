@@ -14,8 +14,8 @@ The system remunerates photographers based on actual usage (downloads) by end cu
 * **Isolated Flatrate Pools:** Each sold flat-rate category (e.g., "Basic Package", "Premium Package") forms a completely isolated money pool per month.
 * **Weighted Shares:** Within a pool, revenues are *not* split 1:1 by the number of downloads. Instead, each download generates "shares" based on its value (e.g., resolution/license). 
   * *Example:* A "Web/Editorial" download generates 1 share. A "High-Res/Commercial" download generates 4 shares (multipliers are derived from `PricingFactor` / `LicenseUseCase`).
-* **Unique Downloads & Deduplication:** One image per end customer and calendar month counts a maximum of **1x**.
-  * *The "Best Share" Rule:* If a customer downloads the same image multiple times under different conditions (e.g., 1x ZIP Web-Res, 1x single High-Res), only the download with the **highest share value** is used for billing.
+* **Unique Downloads & Deduplication:** One identified image per end customer and pool month counts a maximum of **1x**.
+  * *The "Best Share" Rule:* Single-image, gallery-ZIP, and mixed-gallery order-ZIP logs contribute to one ledger keyed by customer + photo + pool month. If a customer downloads the same identified image several times under different conditions (e.g., 1x ZIP Web-Res, 1x single High-Res), only that photo's **highest share value** is used. The ZIP tier does not raise other photos in the same archive, and a ZIP/single overlap does not count the photo twice.
 * **Exclusion of Free Downloads:** Downloads from galleries where `is_free_download = true` are strictly ignored and generate **0 shares**.
 * **Power-User Surcharge (Delta Logic):** If a flat-rate customer pays an explicit surcharge for a download, this net delta (after Stripe fees) is distributed *directly* to the photographer, independently of the share pool.
 * **Sleeper Customers:** Flat-rate revenues from customers without downloads remain 100% with the platform.
@@ -36,7 +36,7 @@ The system remunerates photographers based on actual usage (downloads) by end cu
 * `gross_amount_cents`, `stripe_fee_cents`, `net_pool_cents` (Integer)
 * `photographer_share_percent` (Integer)
 * `total_unique_downloads` (Integer - Statistical)
-* `total_shares` (Decimal 8,2)
+* `total_shares` (Decimal 12,4 — see §1.1, `V011__payout_system.php:21`)
 * `value_per_share_cents` (Integer)
 
 ### 2.2 `photographer_statements`
@@ -44,7 +44,7 @@ The system remunerates photographers based on actual usage (downloads) by end cu
 * `user_id` (UUID, Foreign)
 * `sequence_number` (String)
 * `month`, `year` (Integer)
-* `total_shares_earned` (Decimal 8,2)
+* `total_shares_earned` (Decimal 12,4 — see §1.1, `V011__payout_system.php:32`)
 * `pool_earnings_cents` (Integer)
 * `delta_surcharge_earnings_cents` (Integer)
 * `earned_amount_cents` (Integer)
@@ -135,3 +135,83 @@ Existing legacy rows are not rewritten or deleted. A stored positive legacy
 count (including the historical `1` fallback) remains readable and is used by
 payout attribution; malformed non-positive legacy values are ignored by the
 read-side calculation guard rather than converted into a payout.
+
+### 3.3 Explicit photo ledger and conservative legacy boundary
+
+`PayoutCalculationService::calculatePoolShares()` builds one in-memory ledger
+keyed by customer + photo for the pool month. A **single_image** row supplies
+`payload.photo_id`; a **full_zip** row supplies `payload.photo_ids`. Both feed
+the same ledger, so explicit identities are resolved once regardless of whether
+they arrived through a single download, a gallery archive, or a mixed-gallery
+order archive. A higher tier replaces only that photo's lower multiplier; it
+never promotes every photo in a ZIP. Photo ownership is read from the identified
+`Photo.user_id`, and free-download galleries are excluded before a photo enters
+the ledger. A mixed-gallery ZIP whose `payload.gallery_ids` constraint is
+malformed or contains no IDs contributes nothing; it never falls back to
+"every photo in every archive".
+
+The unconditional customer/photo/month uniqueness applies only where a photo
+identity exists. Two legacy shapes are deliberately different:
+
+- **Legacy single-image rows without `payload.photo_id` contribute zero shares.**
+  They cannot be deduplicated, so counting each row would violate the monthly
+  uniqueness rule. This is an intentional compatibility change: historical
+  single rows remain in the audit table but no longer generate payout shares.
+- **A legacy count-only full-ZIP row still generates one archive contribution**
+  per customer + gallery: the largest stored `photo_count` and the best ZIP tier
+  are used, and shares are split by the current ownership of that gallery's
+  photos. Because the archive contents are unknown, such a row takes precedence
+  over explicit photo identities from the same customer + gallery instead of
+  adding to them. Monthly uniqueness is **not** asserted for that legacy shape.
+
+A mixed-gallery ZIP without a gallery and without photo IDs contributes
+nothing: it cannot be assigned to any gallery's ownership, so it must not be
+counted as if its contents were known. An explicit mixed-gallery payload is
+authoritative and participates in the same customer + photo ledger.
+
+**Boundary: at most the first 500 payload values per row are read.**
+`explicitPhotoIds()` cuts the payload through `array_slice($values, 0, 500)` —
+command, from the repository root: `grep -n 'array_slice($values, 0, 500)' backend/app/Services/PayoutCalculationService.php`
+→ `329: foreach (array_slice($values, 0, 500) as $photoId) {`. Deduplication
+happens after the cut, so repeated IDs inside those 500 consume slots too. A
+`photo_ids` payload with more than 500 entries is therefore **silently
+truncated**: the remaining photos keep no identity and earn 0 shares for that
+row. The truncation creates no second position and double-pays nothing — the row
+still enters the customer/photo ledger exactly once — but the under-count is
+silent, and the cut applies per row, not per month. No row ever earns shares for
+an identity it did not carry.
+
+### 3.4 Photo-level collectible revenue for surcharge attribution
+
+New checkout snapshots persist an internal
+`customer_details._payout_photo_revenue_cents` map from invoice line index to the
+photo's collectible revenue after volume pricing and coupon discounting. The
+volume strategy supplies effective per-photo prices; percentage `max_items` and
+`photo_package` coupons mark the same cheapest eligible items that
+`CouponService::applyCoupon()` discounts, and the aggregate discount is then
+allocated across exactly those items with cumulative-floor rounding. Fixed and
+whole-cart percentage coupons apply across all eligible photo lines. The map is
+stripped by `InvoiceSnapshot::customerDetailsForPresentation()` and therefore
+never appears in the customer-facing invoice representation.
+
+`calculatePowerUserDelta()` uses this map when present. The order-level Stripe
+fee is first apportioned to the photo-backed portion of `total_net`, then split
+across those photo revenues; only the remaining net, after that fee, receives
+the photographer share. This makes photographer attribution follow actual coupon
+coverage: a coupon for one photo does not reduce every photographer's revenue,
+and shares and revenue cannot exceed the collectible amount.
+
+Snapshots **without** the map cannot reveal which photos a targeted coupon
+covered. "Without" is not a historical-only category: a collective invoice
+snapshot is still created today with only `items` in its `customer_details`
+(`InvoiceService::generateCollectiveInvoice()` → `'items' => $allItems`,
+`InvoiceService.php:140`, no `_payout_photo_revenue_cents` key), and such an
+order can be switched to `paid` afterwards (`OrderController::updateStatus()`,
+`OrderController.php:63` → `'status' => 'required|string|in:…paid…'`), which is
+the state `calculatePowerUserDelta()` reads. Those snapshots use a conservative
+fallback: the aggregate itemized
+discount is spread proportionally across photo gross prices, capped by both the
+snapshot's `total_net` and its recorded discounts. That fallback cannot overpay
+the collected amount, but it may attribute revenue to a different photographer
+than the original coupon intended; the historical coverage is not presented as
+known.

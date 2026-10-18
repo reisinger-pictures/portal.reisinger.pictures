@@ -279,7 +279,7 @@ class PayoutNaturalKeyTest extends TestCase
             ->create(['photographer_share_percent' => 100]);
         $gallery = Gallery::factory()->create();
         $photographer = User::factory()->create();
-        Photo::factory()->create([
+        $photo = Photo::factory()->create([
             'gallery_id' => $gallery->id,
             'user_id' => $photographer->id,
         ]);
@@ -298,6 +298,7 @@ class PayoutNaturalKeyTest extends TestCase
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
             'photo_count' => 1,
+            'payload' => ['photo_id' => $photo->id],
         ]);
         DownloadLog::query()->whereKey($log->getKey())->update([
             'created_at' => '2026-11-15 12:00:00',
@@ -324,7 +325,7 @@ class PayoutNaturalKeyTest extends TestCase
 
         $photographer = User::factory()->create();
         $gallery = Gallery::factory()->create();
-        Photo::factory()->create([
+        $photo = Photo::factory()->create([
             'gallery_id' => $gallery->id,
             'user_id' => $photographer->id,
         ]);
@@ -343,6 +344,7 @@ class PayoutNaturalKeyTest extends TestCase
             'item_type' => 'single_image',
             'resolution_tier' => 'web',
             'photo_count' => 1,
+            'payload' => ['photo_id' => $photo->id],
         ]);
         DownloadLog::query()->whereKey($log->getKey())->update([
             'created_at' => '2026-09-15 12:00:00',

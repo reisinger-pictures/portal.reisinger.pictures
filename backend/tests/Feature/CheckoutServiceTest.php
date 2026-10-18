@@ -13,12 +13,15 @@ use App\Models\LicenseUseCase;
 use App\Models\Order;
 use App\Models\Org;
 use App\Models\Photo;
+use App\Models\PhotographerStatement;
 use App\Models\Setting;
 use App\Models\User;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Services\CheckoutService;
+use App\Services\PayoutCalculationService;
 use App\Services\PurchaseService;
 use App\Services\StripePaymentService;
+use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -598,6 +601,276 @@ class CheckoutServiceTest extends TestCase
         }
     }
 
+    public function test_targeted_coupon_revenue_is_attributed_only_to_the_covered_photo(): void
+    {
+        BrandRegistry::set(Brand::B2B);
+
+        try {
+            $coupon = Coupon::factory()->create([
+                'code' => 'ONEPHOTO50',
+                'type' => 'percentage',
+                'value' => 50,
+                'max_items' => 1,
+                'brand' => Brand::B2B->value,
+                'active' => true,
+            ]);
+            $gallery = Gallery::factory()->create(['is_public' => true]);
+            $photographerA = User::factory()->create();
+            $photographerB = User::factory()->create();
+            $photoA = Photo::factory()->create([
+                'gallery_id' => $gallery->id,
+                'user_id' => $photographerA->id,
+            ]);
+            $photoB = Photo::factory()->create([
+                'gallery_id' => $gallery->id,
+                'user_id' => $photographerB->id,
+            ]);
+            $customer = User::factory()->create();
+
+            $strategy = $this->createStub(PricingStrategy::class);
+            $strategy->method('supportsCoupons')->willReturn(true);
+            $strategy->method('calculateCart')->willReturn([
+                'items' => [
+                    ['itemId' => $photoA->id, 'priceCents' => 1001, 'tier' => 'web', 'useCaseName' => 'Web', 'modifierNames' => []],
+                    ['itemId' => $photoB->id, 'priceCents' => 1001, 'tier' => 'web', 'useCaseName' => 'Web', 'modifierNames' => []],
+                ],
+                'totalCents' => 1501,
+                'discountCents' => 501,
+                'couponId' => $coupon->id,
+                'couponType' => $coupon->type,
+            ]);
+            $this->service = new CheckoutService($strategy);
+
+            $response = $this->service->processCheckout(
+                $this->makeRequest(
+                    [
+                        ['photoId' => $photoA->id, 'tier' => 'web'],
+                        ['photoId' => $photoB->id, 'tier' => 'web'],
+                    ],
+                    ['coupon_code' => $coupon->code],
+                ),
+                $customer,
+                'invoice',
+            );
+
+            $this->assertSame(200, $response->status());
+            $order = Order::sole();
+            $snapshot = InvoiceSnapshot::sole();
+            $payoutRevenue = $snapshot->customer_details[InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY];
+            // The equal-price tie is resolved in invoice-line order. The
+            // percentage rounds 1001 * 50% to 501 cents, all against photo A.
+            $this->assertSame([500, 1001], array_values($payoutRevenue));
+            $this->assertSame(1501, array_sum($payoutRevenue));
+            $this->assertArrayNotHasKey(
+                InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY,
+                $snapshot->customerDetailsForPresentation(),
+            );
+
+            $order->forceFill([
+                'status' => 'paid',
+                'stripe_fee_cents' => 0,
+                'created_at' => '2026-06-10 12:00:00',
+            ])->save();
+            app(PayoutCalculationService::class)->calculatePowerUserDelta(6, 2026);
+
+            $this->assertSame(250, PhotographerStatement::where('user_id', $photographerA->id)->sole()->delta_surcharge_earnings_cents);
+            $this->assertSame(500, PhotographerStatement::where('user_id', $photographerB->id)->sole()->delta_surcharge_earnings_cents);
+        } finally {
+            BrandRegistry::reset();
+        }
+    }
+
+    public function test_volume_tier_and_targeted_coupon_are_attributed_to_their_effective_photo_revenue(): void
+    {
+        BrandRegistry::set(Brand::B2B);
+
+        try {
+            $presets = app(VolumePresetService::class);
+            $preset = $presets->ensureDefaultPresetForBrand(Brand::B2B);
+            $presets->update($preset, 'Standard', [
+                ['min_quantity' => 0, 'price_cents' => 1000],
+                ['min_quantity' => 2, 'price_cents' => 800],
+            ]);
+            $coupon = Coupon::factory()->create([
+                'code' => 'VOLUME_ONE50',
+                'type' => 'percentage',
+                'value' => 50,
+                'max_items' => 1,
+                'brand' => Brand::B2B->value,
+                'active' => true,
+            ]);
+            $gallery = Gallery::factory()->create([
+                'is_public' => true,
+                'licensing_mode' => 'volume_licensing',
+                'volume_preset_id' => $preset->id,
+            ]);
+            $photographerA = User::factory()->create();
+            $photographerB = User::factory()->create();
+            $photoA = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographerA->id]);
+            $photoB = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photographerB->id]);
+            $customer = User::factory()->create();
+
+            $response = $this->service->processCheckout(
+                $this->makeRequest(
+                    [
+                        ['photoId' => $photoA->id, 'tier' => 'original'],
+                        ['photoId' => $photoB->id, 'tier' => 'original'],
+                    ],
+                    ['coupon_code' => $coupon->code],
+                ),
+                $customer,
+                'invoice',
+            );
+
+            $this->assertSame(200, $response->status());
+            $this->assertSame(1200, Order::sole()->total_amount);
+            $metadata = InvoiceSnapshot::sole()->customer_details[InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY];
+            // 2 × 800 effective volume price, less the 400-cent max_items
+            // coupon on the first (equal-price) photo.
+            $this->assertSame([400, 800], array_values($metadata));
+            $this->assertSame(1200, array_sum($metadata));
+        } finally {
+            BrandRegistry::reset();
+        }
+    }
+
+    public function test_photo_package_coupon_attributes_the_same_effective_photo_lines_it_discounts(): void
+    {
+        BrandRegistry::set(Brand::B2B);
+
+        try {
+            // Two volume groups with different effective prices: the package
+            // must target the two cheapest payable lines, and the persisted
+            // payout map must carry exactly that split.
+            $presets = app(VolumePresetService::class);
+            $standard = $presets->ensureDefaultPresetForBrand(Brand::B2B);
+            $presets->update($standard, 'Standard', [
+                ['min_quantity' => 0, 'price_cents' => 1000],
+            ]);
+            $premium = $presets->create('Premium', [
+                ['min_quantity' => 0, 'price_cents' => 800],
+            ]);
+
+            $coupon = Coupon::factory()->photoPackage(2, 1000)->create([
+                'code' => 'PACKAGE_TWO',
+                'brand' => Brand::B2B->value,
+                'active' => true,
+            ]);
+            $galleryStandard = Gallery::factory()->create([
+                'is_public' => true,
+                'licensing_mode' => 'volume_licensing',
+                'volume_preset_id' => $standard->id,
+            ]);
+            $galleryPremium = Gallery::factory()->create([
+                'is_public' => true,
+                'licensing_mode' => 'volume_licensing',
+                'volume_preset_id' => $premium->id,
+            ]);
+            $photographer = User::factory()->create();
+            $photoA = Photo::factory()->create(['gallery_id' => $galleryStandard->id, 'user_id' => $photographer->id]);
+            $photoB = Photo::factory()->create(['gallery_id' => $galleryPremium->id, 'user_id' => $photographer->id]);
+            $photoC = Photo::factory()->create(['gallery_id' => $galleryPremium->id, 'user_id' => $photographer->id]);
+            $customer = User::factory()->create();
+
+            $response = $this->service->processCheckout(
+                $this->makeRequest(
+                    [
+                        ['photoId' => $photoA->id, 'tier' => 'original'],
+                        ['photoId' => $photoB->id, 'tier' => 'original'],
+                        ['photoId' => $photoC->id, 'tier' => 'original'],
+                    ],
+                    ['coupon_code' => $coupon->code],
+                ),
+                $customer,
+                'invoice',
+            );
+
+            $this->assertSame(200, $response->status());
+            $order = Order::sole();
+            // 1000 + 800 + 800 = 2600; the package covers both 800-cent lines
+            // for 1000 cents instead of 1600 → 600 cents discount.
+            $this->assertSame(600, $order->coupon_discount_cents);
+            $this->assertSame(2000, $order->total_amount);
+
+            $snapshot = InvoiceSnapshot::sole();
+            $payoutRevenue = $snapshot->customer_details[InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY];
+            $this->assertSame([1000, 500, 500], array_values($payoutRevenue));
+            $this->assertSame(2000, array_sum($payoutRevenue));
+            $this->assertSame((int) $snapshot->total_net, array_sum($payoutRevenue));
+        } finally {
+            BrandRegistry::reset();
+        }
+    }
+
+    public function test_photo_package_coupon_skips_zero_price_lines_when_choosing_package_items(): void
+    {
+        BrandRegistry::set(Brand::B2B);
+
+        try {
+            // A zero-cent volume tier is a shipped state: the preset endpoint
+            // validates `tiers.*.price_cents` with `min:0`. Such a line is
+            // eligible for coupon math but not payable, so the package must
+            // never be applied to it (that would swallow the discount).
+            $presets = app(VolumePresetService::class);
+            $paid = $presets->create('Paid', [
+                ['min_quantity' => 0, 'price_cents' => 1000],
+            ]);
+            $free = $presets->create('Free', [
+                ['min_quantity' => 0, 'price_cents' => 0],
+            ]);
+            $coupon = Coupon::factory()->photoPackage(1, 500)->create([
+                'code' => 'PACKAGE_ONE',
+                'brand' => Brand::B2B->value,
+                'active' => true,
+            ]);
+            $galleryFree = Gallery::factory()->create([
+                'is_public' => true,
+                'licensing_mode' => 'volume_licensing',
+                'volume_preset_id' => $free->id,
+            ]);
+            $galleryPaid = Gallery::factory()->create([
+                'is_public' => true,
+                'licensing_mode' => 'volume_licensing',
+                'volume_preset_id' => $paid->id,
+            ]);
+            $photographer = User::factory()->create();
+            $freePhoto = Photo::factory()->create(['gallery_id' => $galleryFree->id, 'user_id' => $photographer->id]);
+            $photoA = Photo::factory()->create(['gallery_id' => $galleryPaid->id, 'user_id' => $photographer->id]);
+            $photoB = Photo::factory()->create(['gallery_id' => $galleryPaid->id, 'user_id' => $photographer->id]);
+            $customer = User::factory()->create();
+
+            $response = $this->service->processCheckout(
+                $this->makeRequest(
+                    [
+                        ['photoId' => $freePhoto->id, 'tier' => 'original'],
+                        ['photoId' => $photoA->id, 'tier' => 'original'],
+                        ['photoId' => $photoB->id, 'tier' => 'original'],
+                    ],
+                    ['coupon_code' => $coupon->code],
+                ),
+                $customer,
+                'invoice',
+            );
+
+            $this->assertSame(200, $response->status());
+            $order = Order::sole();
+            // 0 + 1000 + 1000 = 2000; the package covers one payable 1000-cent
+            // photo for 500 cents → 500 cents discount.
+            $this->assertSame(500, $order->coupon_discount_cents);
+            $this->assertSame(1500, $order->total_amount);
+
+            $snapshot = InvoiceSnapshot::sole();
+            $payoutRevenue = $snapshot->customer_details[InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY];
+            // The discount lands on the first payable line; the zero-price line
+            // keeps zero instead of receiving and swallowing the package.
+            $this->assertSame([0, 500, 1000], array_values($payoutRevenue));
+            $this->assertSame(1500, array_sum($payoutRevenue));
+            $this->assertSame((int) $snapshot->total_net, array_sum($payoutRevenue));
+        } finally {
+            BrandRegistry::reset();
+        }
+    }
+
     // ------------------------------------------------------------------
     // 16. 100%-Coupon -> Warenkorb auf 0 -> kostenlose, settled Order
     //     (kein Stripe-Call), Download freigeschaltet.
@@ -623,8 +896,8 @@ class CheckoutServiceTest extends TestCase
             $strategy = $this->createStub(PricingStrategy::class);
             $strategy->method('calculateCart')->willReturn([
                 'items' => [
-                    ['itemId' => $photo1->id, 'priceCents' => 0, 'tier' => 'original', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
-                    ['itemId' => $photo2->id, 'priceCents' => 0, 'tier' => 'original', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
+                    ['itemId' => $photo1->id, 'priceCents' => 3000, 'tier' => 'original', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
+                    ['itemId' => $photo2->id, 'priceCents' => 3000, 'tier' => 'original', 'useCaseName' => 'SRP Lizenz', 'modifierNames' => []],
                 ],
                 'totalCents' => 0,
                 'discountCents' => 6000,
@@ -660,12 +933,19 @@ class CheckoutServiceTest extends TestCase
             $this->assertSame('paid', $order->status);
             $this->assertNull($order->stripe_payment_intent_id);
             $this->assertSame(1, InvoiceSnapshot::count());
+            $this->assertSame(
+                [0, 0],
+                array_values(InvoiceSnapshot::first()->customer_details[InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY]),
+            );
 
             Mail::assertQueued(InvoiceMail::class);
 
             $purchaseService = app(PurchaseService::class);
             $this->assertTrue($purchaseService->isOrderDownloadEligible($order));
             $this->assertTrue($purchaseService->hasPurchasedPhoto($user, $photo1->id, 'original'));
+
+            app(PayoutCalculationService::class)->calculatePowerUserDelta((int) now()->month, (int) now()->year);
+            $this->assertSame(0, PhotographerStatement::count());
         } finally {
             BrandRegistry::reset();
         }

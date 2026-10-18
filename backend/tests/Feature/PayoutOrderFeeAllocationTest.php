@@ -192,6 +192,81 @@ class PayoutOrderFeeAllocationTest extends TestCase
         $this->assertSame(350, $stmtB->delta_surcharge_earnings_cents);
     }
 
+    public function test_explicit_photo_revenue_drives_fee_allocation_instead_of_gross_lines(): void
+    {
+        $photographerA = User::factory()->create();
+        $photographerB = User::factory()->create();
+        $photoA = Photo::factory()->create(['user_id' => $photographerA->id]);
+        $photoB = Photo::factory()->create(['user_id' => $photographerB->id]);
+        $order = Order::factory()->paid()->create([
+            'stripe_fee_cents' => 150,
+            'created_at' => '2026-06-10 12:00:00',
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'customer_details' => [
+                'items' => [
+                    ['photoId' => $photoA->id, 'price' => 1000, 'tier' => 'web'],
+                    ['photoId' => $photoB->id, 'price' => 1000, 'tier' => 'web'],
+                    [
+                        'type' => 'discount_coupon',
+                        'price' => -500,
+                        'qty' => 1,
+                        'row_total' => -500,
+                    ],
+                ],
+                InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY => ['0' => 500, '1' => 1000],
+            ],
+            'total_net' => 1500,
+            'total_gross' => 1500,
+            'tax_rate' => null,
+        ]);
+
+        $this->service->calculatePowerUserDelta(6, 2026);
+
+        // The order fee is 150 * (500/1500) = 50 for A and 100 for B.
+        // A: (500 - 50) * 50% = 225; B: (1000 - 100) * 50% = 450.
+        $this->assertSame(225, PhotographerStatement::where('user_id', $photographerA->id)->sole()->delta_surcharge_earnings_cents);
+        $this->assertSame(450, PhotographerStatement::where('user_id', $photographerB->id)->sole()->delta_surcharge_earnings_cents);
+    }
+
+    public function test_payout_map_above_total_net_falls_back_to_proportional_allocation(): void
+    {
+        $photographerA = User::factory()->create();
+        $photographerB = User::factory()->create();
+        $photoA = Photo::factory()->create(['user_id' => $photographerA->id]);
+        $photoB = Photo::factory()->create(['user_id' => $photographerB->id]);
+        $order = Order::factory()->paid()->create([
+            'stripe_fee_cents' => 0,
+            'created_at' => '2026-06-10 12:00:00',
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'customer_details' => [
+                'items' => [
+                    ['photoId' => $photoA->id, 'price' => 1000, 'tier' => 'web'],
+                    ['photoId' => $photoB->id, 'price' => 1000, 'tier' => 'web'],
+                ],
+                // Deliberately inconsistent map: 900 + 900 = 1800 > 1500.
+                // The per-line values are individually plausible (≤ line price),
+                // so only the sum guard catches this snapshot.
+                InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY => ['0' => 900, '1' => 900],
+            ],
+            'total_net' => 1500,
+            'total_gross' => 1500,
+            'tax_rate' => null,
+        ]);
+
+        $this->service->calculatePowerUserDelta(6, 2026);
+
+        // Fallback: the recorded 1500 collected cents are split proportionally
+        // over the 1000/1000 gross lines → 750 each → 375 each at 50%.
+        // Trusting the map would pay 900 each → 450 each and exceed the
+        // collectible amount.
+        $this->assertSame(375, PhotographerStatement::where('user_id', $photographerA->id)->sole()->delta_surcharge_earnings_cents);
+        $this->assertSame(375, PhotographerStatement::where('user_id', $photographerB->id)->sole()->delta_surcharge_earnings_cents);
+    }
+
     public function test_fee_rounding_never_allocates_more_than_each_line_revenue(): void
     {
         $photographers = User::factory()->count(3)->create();
