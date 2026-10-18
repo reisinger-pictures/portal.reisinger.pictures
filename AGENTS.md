@@ -730,6 +730,9 @@ wäre aus dem falschen Grund grün.
   (`backend/tests/Feature/InfrastructureSupplyChainPolicyTest.php:669-675`) nimmt `.md`
   ausdrücklich in seine Endungs-Regex auf („Comments and documentation are scanned **on purpose**"),
   und genau **5** getrackte Markdown-Dateien nennen `ghcr.io/` — ein Security-Gate liest Prosa.
+  **Überholt am 2026-10-18:** genau dieses `scannableFiles()` ist ersetzt (siehe den Absatz
+  „Ehemals bekannte Lücke" weiter unten) — der Test scannt seither nur die ausgelieferten
+  Artefakte. Die Zeilen bleiben als Begründung der damaligen Filter-Form stehen.
   Ein pauschales `paths-ignore: ['**/*.md']` hätte dieses Gate still abgeschaltet. Deshalb ist die
   Umsetzung `paths` mit `!`-Rücknahme (`ci.yml:17-21`): `paths-ignore` ist rein.subtraktiv und kann
   nichts zurückholen, `paths` schon. **`'**'` ist das einzige positive Muster** — damit ist
@@ -746,10 +749,17 @@ Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA v
   nie meldender Check lässt den Job bis zum Timeout hängen und dann fail-closed. Heute unerreichbar,
   weil alle vier Dependabot-Ökosysteme Manifeste/Lockfiles anfassen, nie nur `.md`; die Invariante
   hält allein an `dependabot.yml` und wird von nichts geprüft — steht als Kommentar in `ci.yml`.
-  **Bekannte Lücke, bewusst offen:** 80 der 113 Markdown-Dateien überspringen die Pipeline. Eine
-  neue veraltete `ghcr.io/`-Namespace in einer davon fällt erst beim nächsten Code-Commit auf. Kein
-  Deploy-Pfad ist betroffen (alles Ausgelieferte ist Nicht-Markdown). **Der eigentliche Fix dafür
-  gehört in den Test** (Code statt Prosa scannen), nicht in den Filter — als eigene Welle.
+  **Ehemals bekannte Lücke, am 2026-10-18 geschlossen (Welle 2):** damals übersprangen 80 der 113
+  getrackten Markdown-Dateien die Pipeline, und der Test scannte sie mit — ein Prosa-Scan kann dort
+  kein Gate sein. Der Fix lag, wie hier vorhergesagt, **im Test**, nicht im Filter: **vorher
+  gemessen** — von den 139 gescannten Markdown-Dateien trägt **keine** einen Befund, den der Scan
+  der ausgelieferten Artefakte nicht auch fände (**0**; die „5 getrackten Markdown-Dateien mit
+  `ghcr.io/`" sind bestätigt, alle im Org-Namespace) — und seither scannt
+  `containerArtifactFiles()`: die drei Compose-Dateien, `deployment/Dockerfile*` und
+  `.github/workflows/*.yml` (10 Dateien). Der Test fiel damit von 3069 auf 204 Assertions, **ohne**
+  eine Prüfung zu verlieren; der Gegenbeleg wurde in beide Richtungen geführt (rot im ausgelieferten
+  Artefakt, grün in Prosa — die bewusste Grenze). Die bewusst eingegangene Gegenseite ist benannt:
+  die Liste ist **explizit** statt gesucht, ein neu hinzugefügtes Artefakt muss eingetragen werden.
 - **D-24 — Der Live-Publishable-Key liegt in `frontend/.env.production`, nicht in `frontend/.env`.**
   `VITE_STRIPE_PUBLIC_KEY` wird beim `pnpm build` in das Bundle **eingebacken**. Vite lädt
   `.env.local` in **allen** Modi — also auch im Prod-Build (`vite build` läuft als
