@@ -871,28 +871,57 @@ Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA v
   nicht aus den Actions-Secrets** (Owner, 2026-10-18). *Frage:* die fünf Security-PRs
   (#16–#20) standen rot, obwohl ihr Code in Ordnung war — ihre E2E-Jobs starben am Schritt
   `Ensure Stripe test keys are configured`. *Ursache (belegt, nicht vermutet):* GitHub hält
-  **Actions**-Secrets von jedem Dependabot-ausgelösten Lauf zurück, auch beim `push`-Event.
-  Der `ci.yml`-Kommentar behauptete dagegen, der Push-Lauf auf einem Dependabot-Branch sei
-  „authoritative" — er konnte es nicht sein, weil auch er secretlos lief: PR #18, Push-Lauf
-  `36747501376` → **alle sechs E2E-Shards rot**, während `Frontend`, `Backend` und
-  `CI security contract` grün waren. *Entscheidung:* die vier benötigten Namen
-  (`STRIPE_SECRET`, `STRIPE_KEY`, `STRIPE_WEBHOOK_SECRET`, `VITE_STRIPE_PUBLIC_KEY`)
-  zusätzlich im **Dependabot**-Store hinterlegen. Die CI-Bedingung bleibt **unverändert**:
-  der Dependabot-`pull_request`-Lauf bleibt übersprungen, denn er erhält per Konstruktion gar
-  keine Secrets — aus welchem Store auch immer. *Verworfen:* den Dependabot-Actor von den
-  E2E-Jobs auszuschließen und erst den Merge-Commit auf `main` validieren zu lassen — das
-  verschiebt die Prüfung **hinter** den Merge eines Security-Bumps. *Preis, bewusst getragen:*
+  **Actions**-Secrets von jedem Dependabot-ausgelösten Lauf zurück — für `push` **und**
+  `pull_request`; beide lesen ausschließlich den **Dependabot**-Store, nur
+  `pull_request_target` erhält keine. Quelle: GitHub-Doku „Dependabot on GitHub Actions" →
+  *Restrictions when Dependabot triggers events*: *„Secrets are populated from Dependabot
+  secrets. GitHub Actions secrets are not available."* Der `ci.yml`-Kommentar behauptete
+  dagegen, der Push-Lauf auf einem Dependabot-Branch sei „authoritative" — er konnte es nicht
+  sein, weil auch er secretlos lief: PR #18, Push-Lauf `36747501376` → **alle sieben E2E-Jobs
+  rot** (sechs Shards **plus** `E2E (Playwright) — serial (isolated suites)`), während
+  `Frontend`, `Backend` und `CI security contract` grün waren. *Entscheidung:* die vier
+  benötigten Namen (`STRIPE_SECRET`, `STRIPE_KEY`, `STRIPE_WEBHOOK_SECRET`,
+  `VITE_STRIPE_PUBLIC_KEY`) zusätzlich im **Dependabot**-Store hinterlegen. Die CI-Bedingung
+  bleibt **unverändert**, aber aus einem **anderen Grund als in der ersten Fassung dieses
+  Eintrags:** der Dependabot-`pull_request`-Lauf wird **nicht** wegen fehlender Secrets
+  übersprungen — er bekäme die Dependabot-Secrets —, sondern damit die siebenteilige
+  E2E-Matrix pro Dependabot-PR **einmal** statt zweimal läuft (Owner-Entscheidung 2026-10-18:
+  „einmal pro Dependabot-PR reicht"). Autoritativ ist der Push-Lauf auf dem Dependabot-Branch;
+  auf genau ihn wartet `automerge.yml:98` (`check-name: 'CI gate (push)'`). *Verworfen:* den
+  Dependabot-Actor von den E2E-Jobs auszuschließen und erst den Merge-Commit auf `main`
+  validieren zu lassen — das verschiebt die Prüfung **hinter** den Merge eines Security-Bumps
+  (und ein solcher Merge-Lauf existiert ohnehin nicht, siehe D-34). *Preis, bewusst getragen:*
   der ausgecheckte PR-Code (die neue Dependency) läuft in einem Lauf, der diese Secrets sieht;
   ein kompromittiertes Paket-Postinstall könnte sie lesen. Es ist ausschließlich
   Stripe-**Test**-Material (`sk_test`/`pk_test`) — kein Live-Key und kein `whsec` des
   Live-Endpunkts (vgl. D-24, D-25). *Umgesetzt:* die Werte stammen aus `backend/.env.e2e`
-  (identisch mit `backend/.env`) bzw. `frontend/.env` für den Publishable-Key; die Quelle wurde
-  per **Hash-Vergleich** der Werte bestimmt, nicht geraten — `.env.ci` trägt andere Test-Keys,
-  und `.env.production` trägt die Live-Keys und wurde nicht angefasst. *Belegt:* nach
-  `@dependabot rebase` auf PR #18 (neuer Head `7a9974f0`) ist der Dependabot-**Push**-Lauf
-  `39130666484` **11/11 grün**, inklusive aller sechs E2E-Shards und `CI gate (push)`.
-  **Nicht regredieren:** wer die vier Dependabot-Secrets löscht, macht jeden Dependabot-PR
-  wieder rot; die `ci.yml`-Kommentare nennen den Mechanismus deshalb explizit.
+  (in den drei Stripe-Keys identisch mit `backend/.env`) bzw. `frontend/.env` für den
+  Publishable-Key; die Quelle wurde per **Hash-Vergleich** der Werte bestimmt, nicht geraten —
+  `.env.ci` trägt andere Test-Keys, und `.env.production` trägt die Live-Keys und wurde nicht
+  angefasst. *Belegt:* nach `@dependabot rebase` auf PR #18 (neuer Head `7a9974f0`) ist der
+  Dependabot-**Push**-Lauf `39130666484` **11/11 grün**, inklusive aller sieben E2E-Jobs und
+  `CI gate (push)`. **Nicht regredieren:** wer die vier Dependabot-Secrets löscht, macht jeden
+  Dependabot-PR wieder rot; die `ci.yml`-Kommentare nennen den Mechanismus deshalb explizit.
+  Die **erste** Fassung dieses Eintrags und der Kommentar aus `7e05086` nannten für den
+  `pull_request`-Skip den falschen Grund („erhält gar keine Secrets"); beide sind korrigiert.
+- **D-34 — Für einen Auto-Merge-Head auf `main` zählt der grüne Push-Lauf des
+  Dependabot-Branches als Deploy-Nachweis** (Owner, 2026-10-18). *Warum überhaupt:* die
+  Deploy-Vorbedingung aus §13/D-1 („grüner CI für genau den gepushten Head") ist für einen
+  Auto-Merge-Head wörtlich **nicht erfüllbar**. `automerge.yml:115-124` mergt mit
+  `secrets.GITHUB_TOKEN`, und ein Push damit löst per GitHub-Regel **keine** Workflows aus.
+  Belegt: `main` head `e2d280b` (Auto-Merge von PR #18) —
+  `gh run list --commit e2d280bd8191704b0565e1e8a58287be54ca2453` zeigt ausschließlich
+  Dependabot-`dynamic`-Läufe; der jüngste CI-Lauf auf `main` ist `39128561357` für `7e05086`.
+  *Entscheidung:* der Nachweis läuft über den **Baum**, nicht über den Commit — nach dem
+  Rebase trägt der PR-Head denselben Baum wie der Squash-Merge auf `main` (für PR #18 gemessen:
+  `git rev-parse 7a9974f0^{tree}` = `git rev-parse e2d280b^{tree}` =
+  `97a9b54c38ab1ef7f39dc075e81b3363de61f363`). Ein grüner Push-Lauf dieses Baums (11/11) ist
+  damit der Deploy-Nachweis. *Verworfen:* den Merge mit einem PAT statt `GITHUB_TOKEN`
+  auszulösen — das erzeugte zwar einen `main`-Lauf, kostete aber einen zweiten vollen
+  CI-Durchgang je Bump und liefe D-33 direkt zuwider. *Grenze:* gilt **nur** für
+  Auto-Merge-Heads; für einen von Hand gepushten Head bleibt §13 wörtlich. **Nicht
+  regredieren:** wer den Nachweis auf „`main` ist grün" verkürzt, hat für Auto-Merge-Heads
+  gar keinen Nachweis.
 
 ## TODO (UI-Review)
 
