@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\ImageProcessor;
+use App\Services\PhotoProcessingService;
 use Illuminate\Support\Facades\Log;
 use Mockery;
 use Tests\TestCase;
@@ -18,6 +19,43 @@ use Tests\TestCase;
  */
 class ImageProcessorHardeningTest extends TestCase
 {
+    public function test_supported_raster_formats_remain_valid(): void
+    {
+        if (! function_exists('imagecreatetruecolor')
+            || ! function_exists('imagejpeg')
+            || ! function_exists('imagepng')) {
+            $this->markTestSkipped('GD JPEG/PNG encoders are required for raster-format coverage.');
+        }
+
+        $directory = $this->makeTempDirectory();
+        $image = imagecreatetruecolor(8, 8);
+        $color = imagecolorallocate($image, 20, 40, 60);
+        imagefill($image, 0, 0, $color);
+
+        try {
+            $paths = [
+                $directory.'/sample.jpg' => 'image/jpeg',
+                $directory.'/sample.png' => 'image/png',
+            ];
+            imagejpeg($image, $directory.'/sample.jpg', 80);
+            imagepng($image, $directory.'/sample.png');
+
+            if (function_exists('imagewebp')) {
+                $paths[$directory.'/sample.webp'] = 'image/webp';
+                imagewebp($image, $directory.'/sample.webp');
+            }
+
+            $processor = new ImageProcessor;
+            foreach ($paths as $path => $expectedMime) {
+                $this->assertSame($expectedMime, $processor->detectMimeType($path));
+                $this->assertTrue($processor->isValidImageFile($path));
+            }
+        } finally {
+            imagedestroy($image);
+            $this->deleteTempDirectory($directory);
+        }
+    }
+
     public function test_generate_thumbnail_fails_closed_when_gd_cannot_allocate_the_resized_image(): void
     {
         if (! function_exists('imagecreatetruecolor') || ! function_exists('imagejpeg')) {
@@ -89,6 +127,64 @@ class ImageProcessorHardeningTest extends TestCase
         }
     }
 
+    public function test_oversized_side_dimension_is_rejected_before_gd_decode(): void
+    {
+        $directory = $this->makeTempDirectory();
+        $source = $directory.'/oversized.png';
+        $dest = $directory.'/thumbnail.webp';
+
+        try {
+            $this->writePngHeader($source, PhotoProcessingService::MAX_IMAGE_DIMENSION + 1, 1);
+            $processor = $this->processorWithDecodeSpy();
+
+            $this->assertFalse($processor->generateThumbnail($source, $dest, 800));
+            $this->assertSame(0, $processor->decodeCalls);
+        } finally {
+            $this->deleteTempDirectory($directory);
+        }
+    }
+
+    public function test_oversized_total_pixels_are_rejected_before_gd_decode(): void
+    {
+        $directory = $this->makeTempDirectory();
+        $source = $directory.'/oversized.png';
+        $dest = $directory.'/thumbnail.webp';
+
+        try {
+            $this->writePngHeader($source, 10_000, 4_001);
+            $processor = $this->processorWithDecodeSpy();
+
+            $this->assertFalse($processor->generateThumbnail($source, $dest, 800));
+            $this->assertSame(0, $processor->decodeCalls);
+        } finally {
+            $this->deleteTempDirectory($directory);
+        }
+    }
+
+    public function test_oversized_source_bytes_are_rejected_before_gd_decode(): void
+    {
+        $directory = $this->makeTempDirectory();
+        $source = $directory.'/oversized.png';
+        $dest = $directory.'/thumbnail.webp';
+        $handle = fopen($source, 'wb');
+        $this->assertIsResource($handle);
+
+        try {
+            fwrite($handle, $this->pngHeader(1, 1));
+            $this->assertTrue(ftruncate($handle, PhotoProcessingService::MAX_IMAGE_BYTES + 1));
+            fclose($handle);
+            $processor = $this->processorWithDecodeSpy();
+
+            $this->assertFalse($processor->generateThumbnail($source, $dest, 800));
+            $this->assertSame(0, $processor->decodeCalls);
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            $this->deleteTempDirectory($directory);
+        }
+    }
+
     private function processorWithFailedTrueColor(bool $unlinkFails = false): ImageProcessor
     {
         return new class($unlinkFails) extends ImageProcessor
@@ -109,6 +205,35 @@ class ImageProcessorHardeningTest extends TestCase
                 return parent::unlinkPath($path);
             }
         };
+    }
+
+    private function processorWithDecodeSpy(): ImageProcessor
+    {
+        return new class extends ImageProcessor
+        {
+            public int $decodeCalls = 0;
+
+            protected function decodeImage(string $path, string $mime): \GdImage|false
+            {
+                $this->decodeCalls++;
+
+                return false;
+            }
+        };
+    }
+
+    private function writePngHeader(string $path, int $width, int $height): void
+    {
+        file_put_contents($path, $this->pngHeader($width, $height));
+    }
+
+    private function pngHeader(int $width, int $height): string
+    {
+        return "\x89PNG\r\n\x1a\n"
+            .pack('N', 13)
+            .'IHDR'
+            .pack('NNCCCCC', $width, $height, 8, 2, 0, 0, 0)
+            .pack('N', 0);
     }
 
     private function writeJpeg(string $path, int $width, int $height): void

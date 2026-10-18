@@ -151,6 +151,11 @@ class FileDeliveryController extends Controller
             return response()->json(['error' => 'Datei nicht gefunden'], 404);
         }
 
+        $contentType = $this->imageProcessor->detectMimeType($path);
+        if ($contentType === null) {
+            return response()->json(['error' => 'Ungültiges Bildformat'], 404);
+        }
+
         // Processing is complete. Re-run the complete delivery authorization
         // before updating access bookkeeping or exposing a file/proxy header.
         $currentMediaAuthorization = $this->authorizeMediaDelivery(
@@ -176,7 +181,7 @@ class FileDeliveryController extends Controller
         }
 
         $headers = [
-            'Content-Type' => $currentPhoto->mime_type ?? mime_content_type($path),
+            'Content-Type' => $contentType,
             'Cache-Control' => 'private, max-age=31536000, immutable',
         ];
 

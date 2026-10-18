@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\File\UploadedFile as SymfonyUploadedFile;
 use Tests\TestCase;
 
 class ImageUploadTest extends TestCase
@@ -94,6 +95,34 @@ class ImageUploadTest extends TestCase
             ]);
 
         $response->assertStatus(422);
+    }
+
+    public function test_client_mime_spoof_does_not_change_persisted_image_type(): void
+    {
+        $photographer = $this->createPhotographerUser();
+        $gallery = $this->createDeliveryGallery();
+        $photographer->galleries()->attach($gallery);
+        $baseFile = new SymfonyUploadedFile(
+            base_path('tests/Fixtures/sample.jpg'),
+            'spoofed.jpg',
+            'text/html',
+            UPLOAD_ERR_OK,
+            true,
+        );
+        $file = UploadedFile::createFromBase($baseFile, true);
+
+        $response = $this->actingAs($photographer, 'api')
+            ->postJson('/api/management/upload', [
+                'gallery_id' => $gallery->id,
+                'lr_uuid' => 'uuid-client-mime-spoof',
+                'file' => $file,
+            ]);
+
+        $response->assertOk();
+        $photo = Photo::findOrFail($response->json('photo_id'));
+        $this->assertSame('image/jpeg', $photo->mime_type);
+        $this->assertSame('jpg', pathinfo($photo->filename, PATHINFO_EXTENSION));
+        Storage::disk('photos')->assertExists($gallery->id.'/'.$photo->filename);
     }
 
     public function test_missing_file_returns_422(): void

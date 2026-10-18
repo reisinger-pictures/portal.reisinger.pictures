@@ -8,6 +8,70 @@ use Symfony\Component\Process\Process;
 
 class PhotoProcessingService
 {
+    public const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+
+    public const MAX_IMAGE_DIMENSION = 15_000;
+
+    public const MAX_IMAGE_PIXELS = 40_000_000;
+
+    /**
+     * Detect and preflight a raster image using its on-disk contents, never
+     * the upload's client-provided MIME header.
+     *
+     * @return array{width:int, height:int, mime_type:string}|null
+     */
+    public static function inspectRasterImage(string $path, int $maxBytes = self::MAX_IMAGE_BYTES): ?array
+    {
+        if (! is_file($path) || $maxBytes < 1) {
+            return null;
+        }
+
+        $bytes = @filesize($path);
+        if (! is_int($bytes) || $bytes < 1 || $bytes > $maxBytes) {
+            return null;
+        }
+
+        $image = @getimagesize($path);
+        if (! is_array($image)) {
+            return null;
+        }
+
+        $mime = $image['mime'] ?? null;
+        if (! is_string($mime) || ! in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+            return null;
+        }
+
+        $detectedMime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
+        if ($detectedMime !== $mime) {
+            return null;
+        }
+
+        $width = (int) ($image[0] ?? 0);
+        $height = (int) ($image[1] ?? 0);
+        if (! self::isWithinImageBudget($bytes, $width, $height, $maxBytes)) {
+            return null;
+        }
+
+        return [
+            'width' => $width,
+            'height' => $height,
+            'mime_type' => $mime,
+        ];
+    }
+
+    public static function isWithinImageBudget(int $bytes, int $width, int $height, int $maxBytes = self::MAX_IMAGE_BYTES): bool
+    {
+        if ($bytes < 1 || $bytes > $maxBytes
+            || $width < 1 || $height < 1
+            || $width > self::MAX_IMAGE_DIMENSION
+            || $height > self::MAX_IMAGE_DIMENSION) {
+            return false;
+        }
+
+        // Division keeps the check safe even for dimensions near PHP_INT_MAX.
+        return $width <= intdiv(self::MAX_IMAGE_PIXELS, $height);
+    }
+
     /**
      * Extrahiert Metadaten via ExifTool und wendet Galerie-Vorgaben an.
      * Hinweis: Thumbnail-Generierung wurde hier entfernt, da diese nun
