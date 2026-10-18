@@ -27,7 +27,117 @@ Verträge sind nicht mehr strikt 1:1, sondern 1:n (Vertrag zu Unterzeichnern).
 * Öffentliche Join-, Content- und Signaturpfade prüfen `status`, `expires_at` und `closes_at` anhand der Datenbankzeit. Create-/Sign-Transaktionen serialisieren den Contract-/Template-Zugriff per Row-Lock; Signaturen verwenden zusätzlich ein bedingtes Database-Time-Update.
 * Neue Template-Instanzen übernehmen die Deadline-Werte ihres Templates. Legacy-Instanzen mit `NULL`-Deadlines lösen ihre effektive Deadline dynamisch vom Template auf. Das Template ist dabei eine harte Obergrenze; bestehende Zeilen werden nicht per Mass-Update backfilled.
 * `POST /api/contracts/sign/{personalToken}/page-exit` ist Telemetrie, kein Signatur- oder Autorisierungs-Gate. Ein gültiger persönlicher Token mit verknüpftem Contract wird auch nach Close/Signatur akzeptiert; der Audit-Action-Wert ist `page_exit`. Ungültige Tokens liefern `404`.
-* `GET /api/contracts/sign/{personalToken}` behält den unveränderten Content-Payload bei und verwendet einen eigenen per-token Rate-Limiter. Die Grenze liegt oberhalb des regulären Frontend-Pollings; ein `429` wird vor dem Controller zurückgegeben und schreibt keinen Heartbeat. `page-exit` behält seinen separaten Route-Limiter.
+* `GET /api/contracts/sign/{personalToken}` behält den unveränderten Content-Payload bei und verwendet einen eigenen per-token Rate-Limiter. Die Grenze liegt oberhalb des regulären Frontend-Pollings; ein `429` wird vor dem Controller zurückgegeben und schreibt keinen Heartbeat (Belege: Abschnitt „Contract-Content-Limiter" unten). `page-exit` behält seinen separaten Route-Limiter.
+
+### Contract-Content-Limiter: gemessene Grenze (2026-10-18)
+
+Der Limiter steht als `RateLimiter::for('contract-content', ...)` in `app/Providers/AppServiceProvider.php` und erlaubt **30 Abrufe pro Minute und Personal-Token** (`Limit::perMinute(30)->by(hash('sha256', personalToken))`). Das Frontend pollt alle 5 Sekunden, also **12/min** — nominell Faktor **2,5**. Die Content-Route ist mit `App\Http\Middleware\AtomicThrottleRequests:contract-content` gedrosselt; `page-exit` bleibt bei seinem separaten `throttle:60,1`.
+
+Gemessen gegen **MariaDB 11.4.13-MariaDB-ubu2404** in einem Wegwerf-Container, 40 gleichzeitig hinter einem Start-Gate freigegebene HTTP-Clients, 40 PHP-Server-Worker, `CACHE_STORE=database` (derselbe MariaDB-Server wie die Heartbeat-Zeilen). Reproduktionsbefehl — er druckt Version, Histogramm, Heartbeat-Zahl, Latenzen, Lock-Waits und Log-Scan und räumt Container, Volume und Temp-Dateien auf; Exit **2** = Überschreitung, **1** = Harness-/Nutzungs-/Verfügbarkeitsfehler, **0** = Grenze gehalten:
+
+```bash
+cd backend && DOCKER_BIN="$HOME/.rd/bin/docker" ./tests/scripts/contract-content-mariadb-probe.sh
+```
+
+Das Skript prüft vor dem Burst als Harness-Vorbedingung, dass die Content-Route die Middleware trägt; eine zurückgenommene Route würde sonst als Limiter-Defekt gemeldet.
+
+**Befund, behoben am 2026-10-18.** Vor dem Fix hielt die 30er-Grenze unter Gleichzeitigkeit nicht — vier Läufe schrieben 32–37 Heartbeats, also 2–7 über dem Budget:
+
+| Lauf | HTTP 200 | HTTP 429 | Heartbeat-Zeilen | InnoDB Row-Lock-Waits | Deadlocks | p50 / p95 / max |
+|---|---|---|---|---|---|---|
+| 1 | 36 | 4 | 36 | 65 | 0 | 202 / 310 / 353 ms |
+| 2 | 32 | 8 | 32 | 54 | 0 | 133 / 299 / 310 ms |
+| 3 | 33 | 7 | 33 | 55 | 0 | 144 / 211 / 225 ms |
+| 4 | 37 | 3 | 37 | 69 | 0 | 181 / 325 / 351 ms |
+
+In allen vier Läufen: **keine 5xx**, `Max_used_connections` stieg von 2 auf 27–34, das MariaDB-Laufzeitlog hatte **0 Zeilen**, und weder App-Log noch MariaDB-Log enthielten `SQLSTATE`, Lock-Timeout-, Deadlock- oder InnoDB-Fehler. Der Timeout-Zähler `Innodb_row_lock_timeouts` existiert in MariaDB 11.4 nicht; die 54–69 Row-Lock-Waits sind die erwartete Serialisierung auf der Contract-Zeile, keine Fehler. Eine Gegenprobe mit demselben Befehl lieferte 35 × 200, 5 × 429 und **35** Heartbeats.
+
+**Ursache 1 — Prüfen-dann-Zählen.** `ThrottleRequests::handleRequest()` fragt `tooManyAttempts()` und ruft erst danach `RateLimiter::hit()`; zwischen Lesen und Inkrementieren können mehrere Worker denselben Wert `< 30` sehen. Die Überschreitung ist durch die Zahl gleichzeitig laufender Requests begrenzt (hier ≤ 7), nicht durch die Requestzahl (40) und nicht unbegrenzt.
+
+**Ursache 2 — eine unbedingte Reparatur-Schreibung im Zähler selbst.** Der Umbau auf „erst zählen, dann entscheiden" zeigte in einem Lauf derselben Reihe weiterhin Überschuss (32 × 200, 8 × 429). `RateLimiter::increment()` endet mit `put($key, $amount, $decay)`, sobald ein Worker, der das `add()`-Rennen verloren hat, den Zähler von 0 auf 1 hebt. Diese Schreibung ist unbedingt: landet sie nach den Inkrementen anderer Worker, setzt sie den Zähler zurück und öffnet das Budget erneut. Die Zählung dieses Laufs passt genau zu einem Rücksprung von 3 auf 1 — 3 Anfragen davor plus 29 nachfolgende Inkremente ≤ 30 = 32 zugelassene, 8 abgelehnte. Der Lauf ist nicht getract; die Zuordnung ist aus den Zählern hergeleitet, nicht direkt beobachtet.
+
+**Zählweise nach dem Fix.** Die Middleware ruft `RateLimiter::hit()` nicht auf. Sie erzeugt den Fensterzähler mit `add($key, 1, $decay)` (atomar, genau ein Request gewinnt) und zählt mit `increment($key)` (atomarer Read-Modify-Write, liefert den neuen Wert; auf dem `database`-Store in einer Transaktion mit Row-Lock). Beide Primitive haben keine unbedingte Schreibung, der Zähler wächst innerhalb eines Fensters also nur. `Retry-After` kommt weiter aus `RateLimiter::availableIn()` über den `:timer`-Schlüssel, den der Fenster-Erzeuger schreibt; abgelehnt wird vor dem Controller.
+
+**Nach dem Fix, vier Läufe vom 2026-10-18 mit genau dem Befehl oben:**
+
+| Lauf | HTTP 200 | HTTP 429 | Heartbeat-Zeilen | InnoDB Row-Lock-Waits | Deadlocks | p50 / p95 / max | Exit |
+|---|---|---|---|---|---|---|---|
+| 1 | 30 | 10 | 30 | 54 | 0 | 211 / 380 / 386 ms | 0 |
+| 2 | 30 | 10 | 30 | 59 | 0 | 312 / 432 / 456 ms | 0 |
+| 3 | 30 | 10 | 30 | 60 | 0 | 192 / 400 / 424 ms | 0 |
+| 4 | 30 | 10 | 30 | 50 | 0 | 151 / 311 / 319 ms | 0 |
+
+In allen vier Läufen zusätzlich: `Max_used_connections` 2 → 23–35, `Innodb_deadlocks` 0, MariaDB-Laufzeitlog **0 Zeilen**, Log-Scan auf beiden Seiten `none`, kein Statuscode außerhalb 200/429, und `Precondition verified: the content route carries App\Http\Middleware\AtomicThrottleRequests:contract-content.`
+
+Rohausgabe Lauf 1 (vollständig):
+
+```text
+PHP 8.5.11 erfuellt ^8.5 (>= 8.5.0), auto_prepend_file leer.
+Starting disposable MariaDB container: contract-content-mariadb-a78924171a0c (mariadb:11.4)
+MariaDB server version: 11.4.13-MariaDB-ubu2404
+Probe database endpoint: 127.0.0.1:32793/contract_content_probe (container only)
+Simultaneous requests: 40; PHP server workers: 40
+Expected named limiter budget from AppServiceProvider: 30 per minute per personal token
+Cache store: database (same MariaDB; matches the production default in config/cache.php)
+Disposable database migrated and seeded: php artisan migrate:fresh --seed --force
+Precondition verified: the content route carries App\Http\Middleware\AtomicThrottleRequests:contract-content.
+Burst wall time: 0.738s for 40 simultaneously gated requests
+HTTP status histogram:
+200 30
+429 10
+Latency ms: min=47.4 p50=210.5 p95=379.9 max=386.2 mean=235.6 n=40
+Heartbeat audit rows: 30 (limiter budget: 30/minute/token; requests: 40)
+MariaDB app connections observed: peak=34; active SQL peak=29
+MariaDB Max_used_connections: before=2 after=35 (server-side peak since start)
+MariaDB Connections total delta: 53 new client connections during the probe window
+InnoDB row-lock waits delta: 54
+InnoDB deadlocks delta: 0
+InnoDB row-lock timeout counter: unavailable from this MariaDB build
+MariaDB connection monitor samples (app connections, active SQL):
+0	0
+0	0
+0	0
+34	29
+0	0
+sampled max=34 active-max=29
+MariaDB runtime log lines during probe: 0
+Application/server error scan (SQLSTATE, lock timeout, deadlock, InnoDB, 5xx exception):
+none
+MariaDB error scan (lock timeout, deadlock, InnoDB error; runtime lines only):
+none
+Limiter verdict: strict bound held (30 heartbeat rows, limit 30/minute, 10 requests throttled).
+Probe completed: 30 HTTP 200, 10 HTTP 429, 30 heartbeat rows, at least two simultaneously active MariaDB app connections, no matching database/application errors.
+Cleanup verified: container contract-content-mariadb-a78924171a0c is absent.
+Cleanup verified: volume abfbe7bf6c06aeba1379ac4bc0129a777c71e5635253cbf0d18958bdde2d793c is absent.
+Cleanup verified: temporary files are absent.
+```
+
+Ein früherer Beleg („Zählerwerte exakt 1…40, jeder genau einmal") stützte sich auf einen temporären Trace, der **nicht im Baum geblieben ist**. Ohne reproduzierbares Artefakt ist die Zahl entfernt. Die Monotonie des Zählers ist stattdessen deterministisch gepinnt: der Rennsituationstest unten belegt, dass die Middleware den Zähler in genau dem Zustand nicht unbedingt überschreibt, in dem `RateLimiter::hit()` es täte — ein Rücksprung, der die Monotonie bräche, ist damit ausgeschlossen.
+
+**Deterministische Belege ohne Parallelität** (SQLite `:memory:`):
+
+```bash
+cd backend && php artisan test --filter AtomicThrottleRequestsTest
+cd backend && php artisan test --filter ContractContentHeartbeatMySqlTest
+```
+
+- `AtomicThrottleRequestsTest`: ein Zähler auf der Grenze wird abgelehnt, **bevor** der Handler läuft; die Route trägt die Middleware und nicht mehr `throttle:contract-content`; eine unzählbare Anfrage wird abgelehnt statt zugelassen; ein 429 schreibt keinen Heartbeat. Der Zähler wird nie unbedingt überschrieben, in **zwei** Stufen: ein sequenzieller Lauf mit Gegenbeispiel (`RateLimiter::hit()` schreibt dort unbedingt), und ein Test, der die Rennsituation selbst nachstellt — ein Store meldet das `add()`-Rennen verloren (`add()` → `false`) und liefert beim ersten `increment()` `1`, also genau den Zustand, den `RateLimiter::hit()` mit einem unbedingten `put()` repariert; die Middleware zählt in diesem Zustand korrekt und führt **kein** `put` aus. Gegen die alte Fassung („erst `hit()`, dann entscheiden") wird genau dieser Test rot — belegt am 2026-10-18 durch temporäres Zurücksetzen von `countAttempt()` auf `hit()`.
+- `ContractContentHeartbeatMySqlTest` ist **neu** in dieser Änderung (nicht „unverändert") und läuft ausschließlich sequenziell gegen echtes MySQL/MariaDB: 30×200, der 31. als 429, exakt 30 Heartbeat-Zeilen; auf dem SQLite-Default überspringt er sich selbst (`1 skipped`).
+
+**Reichweite der Aussage „ein 429 schreibt keinen Heartbeat".** Belegt ist zweierlei, nicht mehr: (1) deterministisch — nach 30×200 und einem 429 bleiben genau 30 Heartbeat-Zeilen, der Controller läuft für den abgelehnten Request also nicht; (2) in der Parallel-Messung ist die Heartbeat-Zahl in allen vier Läufen gleich der Zahl der 200er. (2) allein belegt **nicht**, dass jeder einzelne 429 ohne Heartbeat blieb — es zeigt, dass keine zusätzlichen Heartbeats entstanden.
+
+**Bewusst nicht angefasst.** Die übrigen Limiter tragen weiter die Prüfen-dann-Zählen-Reihenfolge des Frameworks. Sie haben zwei verschiedene Formen, und nur die erste steht in `routes/`:
+
+* **Routen-Middleware** — was ein `throttle:`-Argument wirklich auf einer Route ist. Reproduktion: `grep -rno 'throttle:[a-zA-Z0-9,:]*' backend/routes/*.php backend/bootstrap/app.php` (gemessen 2026-10-18 u. a. `throttle:api`, `throttle:ai` aus `ai-generate`, `throttle:model` aus `model-registration`, `throttle:coupon` aus `coupon-validate`, `throttle:contract` nur aus dem Kommentar zur Content-Route, `throttle:60,1`, `throttle:10,1`). Benannte Limiter auf Routen sind `api`, `ai-generate`, `coupon-validate` und `model-registration`; die übrigen sind positionale Formen (Auth/Invites, Downloads, Stripe-Webhook, `page-exit`). **`throttle:api` liegt nicht auf „allen API-Routen"**, sondern nur an einzelnen Routen in `routes/api.php`; `bootstrap/app.php` setzt gar keine `api`-Throttle.
+* **Service-Zähler** — Zähler, die **nicht** als Routen-Middleware existieren, sondern im Service über `RateLimiter::hit()` laufen. Reproduktion: `grep -rn 'RateLimiter::hit' backend/app` (u. a. die drei Checkout-Quota-Buckets in `CheckoutRiskService::assertCheckoutQuotaAllowed`, dazu die Checkout-Fehlerzähler und der FTP-Reset-Zähler in `FtpCredentialService`). **`throttle:checkout` liegt auf keiner Route** — `tests/Feature/CheckoutRateLimitTest.php:51,53` assertiert ausdrücklich seine Abwesenheit (`assertNotContains('throttle:checkout', …)`).
+
+Dort kann die Grenze unter Gleichzeitigkeit weiterhin um die Zahl gleichzeitig laufender Requests überschritten werden; eine globale Umstellung wäre eine eigene Entscheidung. Ebenfalls unangetastet: `withoutOverlapping` (die Middleware hält keinen Lock um die Controller-Arbeit).
+
+**Offene Grenzen der neuen Middleware.** Exakt ist sie nur auf Cache-Stores mit atomarem `increment`: Produktions-Default `database` (gemessen), Redis/Memcached. Der `file`-Store (Dev-Fallback ohne `CACHE_STORE`) zählt per Read-Modify-Write und ist nicht prozessübergreifend atomar. Dazu drei benannte, heute unerreichte Grenzen:
+
+* **`Retry-After: 0` bei halbem Fenster.** Zähler und `:timer` sind zwei Schlüssel. Stirbt der Prozess zwischen `add($key)` und `add($key.':timer')`, existiert der Zähler ohne Timer; überlebt ein Alt-Timer seinen Zähler, ist es umgekehrt. In beiden Fällen liefert `RateLimiter::availableIn()` über `max(0, get(':timer') − now)` den Wert 0, und `ThrottleRequests::buildException()` setzt daraus `Retry-After: 0`. Die **Grenze bleibt korrekt** — die Ablehnungsentscheidung liest den Timer nie, sie vergleicht nur den Zähler mit `maxAttempts` —, aber der Header nennt dann 0 Sekunden statt der Restfensterdauer.
+* **Stille Abhängigkeit von `config('cache.limiter')`.** Gezählt wird im injizierten `Repository` (Default-Store); `availableIn()` und `attempts()` — und damit `Retry-After` und `X-RateLimit-Remaining` — laufen im Store des `RateLimiter`-Singletons, den `Illuminate\Cache\CacheServiceProvider::register()` aus `config('cache.limiter')` baut. Solange `cache.limiter` ungesetzt bleibt (heute der Fall), ist es derselbe Store. Setzt jemand später `'limiter' => …`, zählt die Middleware weiter korrekt im Default-Store, aber die beiden Header lesen einen anderen Zähler.
+* **Multi-Limit und `->after()`.** Die Middleware zählt vorab für jedes Limit. Ein `Limit::…->after()`-Limit zählt im Framework nur passende Antworten; hier ist der Request bis zur Controller-Rückgabe bereits gezählt, ein zweiter gleichzeitiger Request kann deshalb vor dem Controller abgelehnt werden, obwohl das `after()`-Limit ihn nachträglich gar nicht gezählt hätte (der Refund greift erst danach). Zusätzlich ist `RateLimiter::decrement()` kein reines Dekrement: es ruft `increment($key, $decay, −1)`, legt einen fehlenden Zähler per `add($key, 0, …)` an und kann ihn auf `−1` setzen. Heute unerreicht, weil **kein** benannter Limiter `->after()` nutzt (`grep -rn '\->after(' backend/app backend/routes` trifft nur Validator-`after()` in Requests/Controllern, kein `Limit::…->after()`).
 
 ### Join-Identität und V039-Dateninvariante
 

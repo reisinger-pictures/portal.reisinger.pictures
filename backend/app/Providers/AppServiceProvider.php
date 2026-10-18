@@ -182,7 +182,9 @@ class AppServiceProvider extends ServiceProvider
 
         // The signing page polls its content endpoint every few seconds. Bound
         // heartbeat writes by personal token without forcing legitimate polling
-        // over a short interval to abandon a valid signing session.
+        // over a short interval to abandon a valid signing session. Consumed by
+        // App\Http\Middleware\AtomicThrottleRequests on the content route, which
+        // counts before it decides (SEC-20261018-12).
         RateLimiter::for('contract-content', fn (Request $request) => Limit::perMinute(30)->by(
             hash('sha256', (string) $request->route('personalToken'))
         ));
