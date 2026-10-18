@@ -101,8 +101,9 @@ SEC-14-Umsetzung; alles darunter ist eigene Arbeit.
   **Tests:** 50 Dateien leeren die Inbox in drei Läufen; ein dauerhaft fehlschlagender Batch
   beendet die Kette mit Fehlerprotokoll; paralleler Event-Lauf erzeugt keine Doppelimporte.
 - [ ] **Nachlauf beim Öffnen der FTP-Seite.** Einmalig beim Mount, kein `refreshInterval`, kein
-  Polling. **Test:** Seitenaufruf löst genau einen Nachlauf aus, ein zweiter Mount im selben
-  Zeitfenster keinen zweiten.
+  Polling. **Test:** Seitenaufruf löst genau einen Nachlauf aus; ein **zweiter Mount
+  entscheidet erneut** (der Guard ist pro Mount, nicht pro Cache-Eintrag), und das muss
+  unter dem **Produktions**-`dedupingInterval` (2 s) gelten, nicht nur bei `0`.
 - [ ] **Doku nachziehen.** `features/infrastructure/19-ftp-upload-pipeline.md` §1, §3 und §6 auf
   Event-Trigger, Batch-Kette und Nachlauf umstellen; die drei Config-Keys mit ihren Defaults
   nennen.
