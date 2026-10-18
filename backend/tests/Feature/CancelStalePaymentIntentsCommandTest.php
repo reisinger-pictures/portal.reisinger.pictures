@@ -3,12 +3,15 @@
 namespace Tests\Feature;
 
 use App\Mail\InvoiceMail;
+use App\Models\Coupon;
+use App\Models\CouponUserUsage;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\StripePaymentService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
@@ -64,8 +67,15 @@ class CancelStalePaymentIntentsCommandTest extends TestCase
     {
         Mail::fake();
         $user = User::factory()->create();
+        $coupon = Coupon::factory()->create(['used_count' => 1]);
+        CouponUserUsage::query()->create([
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 1,
+        ]);
         $order = Order::factory()->create([
             'user_id' => $user->id,
+            'coupon_id' => $coupon->id,
             'status' => 'pending_payment',
             'total_amount' => 1000,
             'stripe_payment_intent_id' => 'pi_succeeded_reconcile',
@@ -99,11 +109,119 @@ class CancelStalePaymentIntentsCommandTest extends TestCase
             'payment_intent_generation' => 4,
         ]);
         Mail::assertQueued(InvoiceMail::class, 1);
+        $this->assertSame(1, $coupon->fresh()->used_count);
+        $this->assertDatabaseHas('coupon_user_usage', [
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 1,
+        ]);
+    }
+
+    public function test_verified_terminal_cancellation_releases_coupon_reservation_once(): void
+    {
+        $user = User::factory()->create();
+        $coupon = Coupon::factory()->create(['used_count' => 2]);
+        CouponUserUsage::query()->create([
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 2,
+        ]);
+        $order = $this->staleOrder('pi_coupon_cancelled');
+        $order->update([
+            'user_id' => $user->id,
+            'coupon_id' => $coupon->id,
+        ]);
+
+        $stripePayment = $this->createMock(StripePaymentService::class);
+        $stripePayment->expects($this->once())
+            ->method('retrievePaymentIntent')
+            ->with('pi_coupon_cancelled')
+            ->willReturn($this->paymentIntent('pi_coupon_cancelled', 'requires_action', $order));
+        $stripePayment->expects($this->once())
+            ->method('cancelPaymentIntent')
+            ->with('pi_coupon_cancelled')
+            ->willReturn(['id' => 'pi_coupon_cancelled', 'status' => 'canceled']);
+        $this->app->instance(StripePaymentService::class, $stripePayment);
+
+        $this->artisan('stripe:cancel-stale-payment-intents')->assertExitCode(0);
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'cancelled']);
+        $this->assertSame(1, $coupon->fresh()->used_count);
+        $this->assertDatabaseHas('coupon_user_usage', [
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 1,
+        ]);
+
+        // The terminal order is absent from the next sweep, so its reservation
+        // cannot be released a second time.
+        $this->artisan('stripe:cancel-stale-payment-intents')->assertExitCode(0);
+        $this->assertSame(1, $coupon->fresh()->used_count);
+        $this->assertDatabaseHas('coupon_user_usage', [
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 1,
+        ]);
+    }
+
+    public function test_payment_success_racing_local_cancellation_keeps_coupon_reservation(): void
+    {
+        $user = User::factory()->create();
+        $coupon = Coupon::factory()->create(['used_count' => 1]);
+        CouponUserUsage::query()->create([
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 1,
+        ]);
+        $order = $this->staleOrder('pi_coupon_race');
+        $order->update([
+            'user_id' => $user->id,
+            'coupon_id' => $coupon->id,
+        ]);
+
+        $stripePayment = $this->createMock(StripePaymentService::class);
+        $stripePayment->expects($this->once())
+            ->method('retrievePaymentIntent')
+            ->with('pi_coupon_race')
+            ->willReturn($this->paymentIntent('pi_coupon_race', 'requires_action', $order));
+        $stripePayment->expects($this->once())
+            ->method('cancelPaymentIntent')
+            ->willReturnCallback(function (string $paymentIntentId) use ($order): array {
+                // Simulate a concurrent success reconciliation winning the
+                // local state transition before this cancellation CAS.
+                DB::table('orders')
+                    ->where('id', $order->getKey())
+                    ->update(['status' => 'paid']);
+
+                return ['id' => $paymentIntentId, 'status' => 'canceled'];
+            });
+        $this->app->instance(StripePaymentService::class, $stripePayment);
+
+        $this->artisan('stripe:cancel-stale-payment-intents')->assertExitCode(0);
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'paid']);
+        $this->assertSame(1, $coupon->fresh()->used_count);
+        $this->assertDatabaseHas('coupon_user_usage', [
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 1,
+        ]);
     }
 
     public function test_old_order_row_does_not_cancel_a_fresh_replacement_intent(): void
     {
+        $user = User::factory()->create();
+        $coupon = Coupon::factory()->create(['used_count' => 1]);
+        CouponUserUsage::query()->create([
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 1,
+        ]);
         $order = $this->staleOrder('pi_fresh_replacement');
+        $order->update([
+            'user_id' => $user->id,
+            'coupon_id' => $coupon->id,
+        ]);
         $stripePayment = $this->createMock(StripePaymentService::class);
         $stripePayment->expects($this->once())
             ->method('retrievePaymentIntent')
@@ -120,6 +238,12 @@ class CancelStalePaymentIntentsCommandTest extends TestCase
         $this->artisan('stripe:cancel-stale-payment-intents')->assertExitCode(0);
 
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'pending_payment']);
+        $this->assertSame(1, $coupon->fresh()->used_count);
+        $this->assertDatabaseHas('coupon_user_usage', [
+            'coupon_id' => $coupon->id,
+            'user_id' => $user->id,
+            'used_count' => 1,
+        ]);
     }
 
     public function test_failure_is_logged_without_exception_message_or_client_secret(): void

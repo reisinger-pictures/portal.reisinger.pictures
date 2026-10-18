@@ -180,6 +180,13 @@ class AppServiceProvider extends ServiceProvider
                 : $request->ip()
         ));
 
+        // The signing page polls its content endpoint every few seconds. Bound
+        // heartbeat writes by personal token without forcing legitimate polling
+        // over a short interval to abandon a valid signing session.
+        RateLimiter::for('contract-content', fn (Request $request) => Limit::perMinute(30)->by(
+            hash('sha256', (string) $request->route('personalToken'))
+        ));
+
         // Dedicated bucket for the public model-registration endpoints. A named
         // limiter gets its own cache key (md5(name.key)) instead of sharing the
         // positional `sha1(domain|ip)` key with the auth routes — otherwise a

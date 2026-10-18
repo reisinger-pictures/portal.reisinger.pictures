@@ -132,7 +132,9 @@ Route::middleware('throttle:model-registration')->group(function () {
 
 Route::get('/contracts/join/{token}', [ContractJoinController::class, 'check'])->name('api.contracts.join.check');
 Route::post('/contracts/join/{token}', [ContractJoinController::class, 'join'])->name('api.contracts.join.join');
-Route::get('/contracts/sign/{personalToken}', [ContractJoinController::class, 'contractContent'])->name('api.contracts.sign.content');
+Route::middleware('throttle:contract-content')
+    ->get('/contracts/sign/{personalToken}', [ContractJoinController::class, 'contractContent'])
+    ->name('api.contracts.sign.content');
 Route::post('/contracts/sign/{personalToken}', [ContractJoinController::class, 'sign'])->name('api.contracts.sign.sign');
 Route::middleware('throttle:60,1')->post('/contracts/sign/{personalToken}/page-exit', [ContractJoinController::class, 'pageExit'])->name('api.contracts.sign.page-exit');
 Route::middleware("throttle:$throttleLimit,1")->post('/invites/redeem', [InviteController::class, 'redeem'])->name('api.invites.redeem');

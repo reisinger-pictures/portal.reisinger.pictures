@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Exceptions\ContractCloseConflictException;
-use App\Mail\ContractClosedMail;
 use App\Models\Contract;
 use App\Models\InvoiceSequence;
 use App\Models\InvoiceSnapshot;
@@ -14,7 +13,6 @@ use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\DeadlockException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class ContractCloseService
@@ -29,6 +27,7 @@ class ContractCloseService
 
     public function __construct(
         private ContractPricingService $contractPricingService,
+        private ContractClosedMailDispatcher $closedMailDispatcher,
     ) {}
 
     /**
@@ -59,8 +58,8 @@ class ContractCloseService
      * Close a contract and perform all accounting/mail side effects in one
      * transaction. The contract row is the durable close claim: only the
      * active -> closed conditional transition may create the order, invoice,
-     * or queued closure mail. A retry observes the committed closed state and
-     * returns without repeating any side effect.
+     * or transactional queue rows for closure mail. A failed recipient enqueue
+     * rolls the whole transition back; a retry can safely perform it again.
      *
      * @return array{status: 'closed'|'already_closed'|'not_active'|'conflict', contract: Contract}
      */
@@ -242,15 +241,13 @@ class ContractCloseService
 
         $recipients = array_values(array_unique(array_filter($recipients)));
 
-        // Dispatch only after the close transaction commits. The database queue
-        // connection also sets after_commit, but the sync/local driver would
-        // otherwise send inline and survive a rolled-back attempt (then send a
-        // second time on the retry).
-        DB::afterCommit(function () use ($recipients, $contract): void {
-            foreach ($recipients as $recipient) {
-                Mail::to($recipient)->queue(new ContractClosedMail($contract));
-            }
-        });
+        // The production database queue writes rows before commit so a process
+        // crash cannot lose the only dispatch callback after closure/accounting
+        // has committed. Its after_commit=false setting keeps each insert in
+        // this transaction; partial recipient failure rolls all inserts and the
+        // close/accounting transition back together. Local sync mail is deferred
+        // until commit by the dispatcher.
+        $this->closedMailDispatcher->queueRecipients($contract, $recipients);
     }
 
     private function isRetryableDatabaseConflict(Throwable $exception): bool

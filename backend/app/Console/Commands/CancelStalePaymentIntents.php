@@ -2,11 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Coupon;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\CouponService;
 use App\Services\PaymentIntentReconciliationService;
 use App\Services\StripePaymentService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Stripe\PaymentIntent;
 use Throwable;
@@ -27,6 +30,7 @@ class CancelStalePaymentIntents extends Command
     public function handle(
         StripePaymentService $stripePayment,
         PaymentIntentReconciliationService $paymentReconciliation,
+        CouponService $couponService,
     ): int {
         $hoursOption = $this->option('hours');
         $hours = $hoursOption === null
@@ -66,7 +70,7 @@ class CancelStalePaymentIntents extends Command
             ->get();
 
         foreach ($orders as $order) {
-            $this->processOrder($order, $stripePayment, $paymentReconciliation, $counters, $cutoffTimestamp);
+            $this->processOrder($order, $stripePayment, $paymentReconciliation, $couponService, $counters, $cutoffTimestamp);
         }
 
         $this->info(sprintf(
@@ -88,6 +92,7 @@ class CancelStalePaymentIntents extends Command
         Order $candidate,
         StripePaymentService $stripePayment,
         PaymentIntentReconciliationService $paymentReconciliation,
+        CouponService $couponService,
         array &$counters,
         int $cutoffTimestamp,
     ): void {
@@ -183,7 +188,7 @@ class CancelStalePaymentIntents extends Command
             }
 
             if ($status === PaymentIntent::STATUS_CANCELED) {
-                $this->markOrderCancelled($order, $paymentIntentId, $generation, $counters);
+                $this->markOrderCancelled($order, $paymentIntentId, $generation, $couponService, $counters);
 
                 return;
             }
@@ -208,7 +213,7 @@ class CancelStalePaymentIntents extends Command
                 return;
             }
 
-            $this->markOrderCancelled($order, $paymentIntentId, $generation, $counters);
+            $this->markOrderCancelled($order, $paymentIntentId, $generation, $couponService, $counters);
         } catch (Throwable $exception) {
             Log::warning('stripe.stale_payment_intent.failed', [
                 'order_id' => (string) $order->getKey(),
@@ -383,14 +388,26 @@ class CancelStalePaymentIntents extends Command
         Order $order,
         string $paymentIntentId,
         int $generation,
+        CouponService $couponService,
         array &$counters,
     ): void {
-        $updated = Order::query()
-            ->whereKey($order->getKey())
-            ->where('status', 'pending_payment')
-            ->where('stripe_payment_intent_id', $paymentIntentId)
-            ->where('payment_intent_generation', $generation)
-            ->update(['status' => 'cancelled']);
+        $updated = DB::transaction(function () use ($order, $paymentIntentId, $generation, $couponService): int {
+            $updated = Order::query()
+                ->whereKey($order->getKey())
+                ->where('status', 'pending_payment')
+                ->where('stripe_payment_intent_id', $paymentIntentId)
+                ->where('payment_intent_generation', $generation)
+                ->update(['status' => 'cancelled']);
+
+            if ($updated === 1 && $order->coupon_id !== null) {
+                $coupon = Coupon::query()->find($order->coupon_id);
+                if ($coupon !== null) {
+                    $couponService->releaseUsage($coupon, $order->user_id);
+                }
+            }
+
+            return $updated;
+        });
 
         if ($updated === 0) {
             $counters['skipped']++;
