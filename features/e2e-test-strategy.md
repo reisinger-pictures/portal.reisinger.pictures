@@ -133,10 +133,16 @@ matrix database runs the same explicit, offline location-fixture seeder and Scou
 import before the backend server starts.
 
 The E2E job runs in the tag-pinned `ghcr.io/reisinger-pictures/portal-e2e`
-image (the concrete version tag `1.62.1` is maintained in `ci.yml`; the job
+image (the concrete version tag `1.64.1` is maintained in `ci.yml`; the job
 never pulls `latest`) and installs the current application dependencies on the
-mounted workspace. The image supplies the environment and browser; it never
-supplies application code, `node_modules`, or `vendor`. The namespace is the
+mounted workspace. That tag is the lower bound of the `@playwright/test` range
+in `frontend/package.json` (`e2e-image.yml` strips the `^` and does not read the
+resolved lockfile version), so the range floor must equal the resolved version;
+`ci.yml` carries the same number as the consuming pin. Four places carry it, not
+three — the rule and its evidence are in
+`infrastructure/28-ci-test-image.md`. The image supplies the environment and
+browser; it never supplies application code, `node_modules`, or `vendor`. The
+namespace is the
 GitHub org that owns this repository, which is also where `e2e-image.yml`
 publishes. This records the configured tag only; it does not assert that the
 published GHCR image has been freshly rebuilt or is currently available. A tag
