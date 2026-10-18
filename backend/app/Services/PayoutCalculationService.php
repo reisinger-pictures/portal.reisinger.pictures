@@ -103,11 +103,19 @@ class PayoutCalculationService
             ->keyBy('id');
         $photosById = $photos->keyBy('id');
         $photosByGallery = $photos->groupBy(fn ($photo): string => (string) $photo->gallery_id);
+        $explicitSingleDownloads = [];
 
-        // A mixed-gallery order ZIP has no single gallery_id. Its explicit
-        // photo payload is reconciled independently; legacy ownerless rows are
+        // Mixed-gallery ZIPs have no single gallery_id, so reconcile their
+        // explicit photo payload independently. Explicit single-photo rows
+        // still deduplicate by customer/photo; legacy ownerless rows are
         // intentionally skipped rather than assigned to an arbitrary owner.
         foreach ($logs->filter(fn ($log): bool => $log->gallery_id === null && $this->hasExplicitPhotoPayload($log)) as $log) {
+            if ($log->item_type !== 'full_zip') {
+                $this->recordExplicitSingleDownload($log, $photosById, $galleries, null, $explicitSingleDownloads);
+
+                continue;
+            }
+
             $attribution = $this->calculateExplicitMixedLog($log, $photosById, $galleries);
             $totalDownloads += $attribution['downloads'];
             foreach ($attribution['shares'] as $photographerId => $shares) {
@@ -179,46 +187,56 @@ class PayoutCalculationService
                 $logShares = bcmul((string) $attributedPhotoCount, (string) $maxMultiplier, 4);
                 $attributedShares = $this->allocateSharesByPhotoOwnership($ownerPhotoCounts, $logShares);
             } else {
+                $hasExplicitSinglePayload = false;
+                $legacySingleLogs = [];
+
                 foreach ($galleryLogs as $log) {
                     if ($log->item_type === 'full_zip') {
                         continue;
                     }
 
-                    $ownerPhotoCounts = $this->resolveExplicitPhotographerCounts(
+                    $hasExplicitPhotoIdentity = $this->recordExplicitSingleDownload(
                         $log,
                         $photosById,
+                        $galleries,
                         $galleryId,
-                        false
+                        $explicitSingleDownloads,
                     );
+                    if (! $hasExplicitPhotoIdentity) {
+                        $legacySingleLogs[] = $log;
+                    }
 
-                    if ($ownerPhotoCounts === null) {
+                    $hasExplicitSinglePayload = $hasExplicitSinglePayload
+                        || $hasExplicitPhotoIdentity;
+                }
+
+                // Historical single-image rows have no photo identity and
+                // cannot be deduplicated. Keep their conservative legacy
+                // attribution only when this customer/gallery group has no
+                // identity-bearing rows that they might duplicate.
+                if (! $hasExplicitSinglePayload) {
+                    foreach ($legacySingleLogs as $log) {
                         $galleryPhotographerIds = $galleryPhotos
                             ->pluck('user_id')
                             ->filter()
                             ->unique()
                             ->values();
 
-                        // A single image can be attributed safely when every
-                        // possible owner in the gallery is the same person.
+                        // A legacy single image can be attributed safely when
+                        // every possible owner in the gallery is one person.
                         if ($galleryPhotographerIds->count() !== 1) {
                             continue;
                         }
 
-                        $ownerPhotoCounts = [(string) $galleryPhotographerIds->first() => 1];
+                        $photoCount = (int) $log->photo_count;
+                        $photographerId = (string) $galleryPhotographerIds->first();
+                        $attributedShares[$photographerId] = bcadd(
+                            $attributedShares[$photographerId] ?? '0.0000',
+                            (string) ($photoCount * $maxMultiplier),
+                            4
+                        );
+                        $attributedPhotoCount += $photoCount;
                     }
-
-                    if (count($ownerPhotoCounts) !== 1) {
-                        continue;
-                    }
-
-                    $photoCount = (int) $log->photo_count;
-                    $photographerId = (string) array_key_first($ownerPhotoCounts);
-                    $attributedShares[$photographerId] = bcadd(
-                        $attributedShares[$photographerId] ?? '0.0000',
-                        (string) ($photoCount * $maxMultiplier),
-                        4
-                    );
-                    $attributedPhotoCount += $photoCount;
                 }
             }
 
@@ -235,6 +253,18 @@ class PayoutCalculationService
                     4
                 );
             }
+        }
+
+        foreach ($explicitSingleDownloads as $download) {
+            $photographerId = $download['photographer_id'];
+            $shares = (string) $download['multiplier'];
+            $totalDownloads++;
+            $totalShares = bcadd($totalShares, $shares, 4);
+            $photographerEarnings[$photographerId] = bcadd(
+                $photographerEarnings[$photographerId] ?? '0.0000',
+                $shares,
+                4,
+            );
         }
 
         // Persist the aggregate under the same row lock used by the pool
@@ -470,6 +500,57 @@ class PayoutCalculationService
     }
 
     /**
+     * Record the best known single-photo resolution for one customer/photo
+     * pair. Returns true when the row carries an explicit photo identity, even
+     * when that identity is invalid, so it cannot fall back to an ambiguous
+     * legacy count.
+     *
+     * @param  array<string, array{photographer_id: string, multiplier: int}>  $downloads
+     */
+    private function recordExplicitSingleDownload(
+        DownloadLog $log,
+        $photosById,
+        $galleries,
+        ?string $requiredGalleryId,
+        array &$downloads,
+    ): bool {
+        $photoIds = $this->explicitPhotoIds($log, false);
+        if ($photoIds === null) {
+            return false;
+        }
+
+        $multiplier = $this->getShareMultiplier($log->resolution_tier);
+        foreach ($photoIds as $photoId) {
+            $photo = $photosById->get($photoId);
+            if (! $photo || ! $photo->user_id) {
+                continue;
+            }
+
+            $galleryId = (string) $photo->gallery_id;
+            if ($requiredGalleryId !== null && $galleryId !== $requiredGalleryId) {
+                continue;
+            }
+
+            $gallery = $galleries->get($galleryId);
+            if (! $gallery || $gallery->effective_is_free_download) {
+                continue;
+            }
+
+            // A customer/photo pair contributes once per pool month, at the
+            // best resolution downloaded for that photo.
+            $identity = (string) $log->user_id.'|'.$photoId;
+            if (! isset($downloads[$identity]) || $multiplier > $downloads[$identity]['multiplier']) {
+                $downloads[$identity] = [
+                    'photographer_id' => (string) $photo->user_id,
+                    'multiplier' => $multiplier,
+                ];
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Split a ZIP's shares according to the number of downloaded photos owned
      * by each photographer. The final owner receives the rounding remainder so
      * the attributed shares always add up to the pool contribution exactly.
@@ -649,9 +730,13 @@ class PayoutCalculationService
             if (! $snapshot) {
                 continue;
             }
-            $items = $snapshot->customer_details['items'] ?? [];
+            $customerDetails = $snapshot->customer_details;
+            $items = is_array($customerDetails) ? ($customerDetails['items'] ?? []) : [];
+            if (! is_array($items)) {
+                continue;
+            }
             foreach ($items as $item) {
-                if (isset($item['photoId'])) {
+                if (is_array($item) && isset($item['photoId'])) {
                     $photoIds[] = $item['photoId'];
                 }
             }
@@ -667,48 +752,101 @@ class PayoutCalculationService
                 continue;
             }
 
-            $items = $snapshot->customer_details['items'] ?? [];
+            $customerDetails = $snapshot->customer_details;
+            $items = is_array($customerDetails) ? ($customerDetails['items'] ?? []) : [];
+            if (! is_array($items)) {
+                continue;
+            }
 
-            // Resolve all eligible line items first so the order-level Stripe fee can be
-            // deducted once for the whole order (not once per item). Items without a
-            // resolvable photographer/photo are ignored for the delta payout.
-            $eligibleItems = [];
-            $totalEligiblePrice = 0;
+            // Invoice line items retain their pre-discount photo prices and
+            // record coupons/volume discounts as negative `row_total` lines.
+            // Allocate the discounted snapshot net across all photo lines
+            // proportionally before filtering by photographer ownership. This
+            // is conservative for legacy/malformed snapshots and cannot assign
+            // revenue that was not actually collected (or assign an unowned
+            // line's amount to an eligible photographer).
+            $photoItems = [];
+            $totalPhotoGross = 0;
+            $discountCents = 0;
             foreach ($items as $item) {
-                if (! isset($item['photoId']) || ! isset($item['price']) || $item['price'] <= 0) {
+                if (! is_array($item)) {
                     continue;
                 }
 
-                $photo = $photos->get($item['photoId']);
-                if (! $photo || ! $photo->user_id) {
+                $type = $item['type'] ?? null;
+                if (is_string($type) && str_starts_with($type, 'discount_')) {
+                    $rowTotal = $item['row_total'] ?? null;
+                    if (is_numeric($rowTotal) && (int) $rowTotal < 0) {
+                        $discountCents += abs((int) $rowTotal);
+                    }
+
+                    continue;
+                }
+
+                if (! isset($item['photoId'], $item['price']) || ! is_numeric($item['price'])) {
                     continue;
                 }
 
                 $priceCents = (int) $item['price'];
-                $eligibleItems[] = ['user_id' => $photo->user_id, 'price' => $priceCents];
-                $totalEligiblePrice += $priceCents;
+                if ($priceCents <= 0) {
+                    continue;
+                }
+
+                $photo = $photos->get((string) $item['photoId']);
+                $photoItems[] = [
+                    'user_id' => $photo?->user_id,
+                    'price' => $priceCents,
+                ];
+                $totalPhotoGross += $priceCents;
             }
 
-            if ($totalEligiblePrice <= 0) {
+            if ($totalPhotoGross <= 0) {
+                continue;
+            }
+
+            $snapshotNet = max(0, (int) ($snapshot->total_net ?? 0));
+            $discountedPhotoRevenue = max(0, $totalPhotoGross - min($discountCents, $totalPhotoGross));
+            $allocablePhotoRevenue = min($snapshotNet, $discountedPhotoRevenue);
+            if ($allocablePhotoRevenue <= 0) {
+                continue;
+            }
+
+            $photoRevenue = $this->allocateCentsProportionally(
+                $allocablePhotoRevenue,
+                array_column($photoItems, 'price'),
+            );
+
+            // Items without a resolvable photographer still participate in
+            // discount allocation, but their revenue is never reassigned.
+            $eligibleItems = [];
+            $totalEligibleRevenue = 0;
+            foreach ($photoItems as $index => $item) {
+                if (! $item['user_id'] || ($photoRevenue[$index] ?? 0) <= 0) {
+                    continue;
+                }
+
+                $netRevenue = $photoRevenue[$index];
+                $eligibleItems[] = ['user_id' => $item['user_id'], 'price' => $netRevenue];
+                $totalEligibleRevenue += $netRevenue;
+            }
+
+            if ($totalEligibleRevenue <= 0) {
                 continue;
             }
 
             // Nutze die exakte Gebühr aus der Datenbank (Fallback auf Prozentrechnung).
             // Die Gebühr fällt pro Bestellung an und wird hier einmalig proportional
             // auf die Positionen verteilt — niemals je Position voll abgezogen.
-            $feeCents = $order->stripe_fee_cents ?? (int) round($totalEligiblePrice * $stripeFeePercent);
-            $allocatedFee = 0;
-            $lastIndex = count($eligibleItems) - 1;
+            $feeCents = max(0, (int) ($order->stripe_fee_cents
+                ?? round($totalEligibleRevenue * max(0, (float) $stripeFeePercent))));
+            $feeCents = min($feeCents, $totalEligibleRevenue);
+            $itemFees = $this->allocateCentsProportionally(
+                $feeCents,
+                array_column($eligibleItems, 'price'),
+            );
 
             foreach ($eligibleItems as $index => $item) {
-                // Der letzte Posten bekommt den Rundungsrest, damit die Summe exakt
-                // der Bestellgebühr entspricht.
-                $itemFee = $index === $lastIndex
-                    ? $feeCents - $allocatedFee
-                    : (int) round($feeCents * $item['price'] / $totalEligiblePrice);
-                $allocatedFee += $itemFee;
-
-                $netCents = $item['price'] - $itemFee;
+                $netCents = max(0, $item['price'] - ($itemFees[$index] ?? 0));
 
                 // Fotografen-Anteil: 50% vom Netto-Aufpreis (exakt ueber bcmath)
                 $photogShareCents = (int) bcmul((string) $netCents, '0.50', 0);
@@ -721,6 +859,38 @@ class PayoutCalculationService
                 );
             }
         }
+    }
+
+    /**
+     * Allocate an integer cent amount in proportion to integer weights. A
+     * cumulative floor distributes every cent exactly once without producing
+     * a negative remainder on the final line.
+     *
+     * @param  array<int, int>  $weights
+     * @return array<int, int>
+     */
+    private function allocateCentsProportionally(int $amount, array $weights): array
+    {
+        $totalWeight = array_sum($weights);
+        if ($amount <= 0 || $totalWeight <= 0) {
+            return array_fill(0, count($weights), 0);
+        }
+
+        $allocations = [];
+        $cumulativeWeight = 0;
+        $allocatedAmount = 0;
+        foreach ($weights as $weight) {
+            $cumulativeWeight += max(0, $weight);
+            $cumulativeAllocation = (int) bcdiv(
+                bcmul((string) $amount, (string) $cumulativeWeight, 0),
+                (string) $totalWeight,
+                0,
+            );
+            $allocations[] = $cumulativeAllocation - $allocatedAmount;
+            $allocatedAmount = $cumulativeAllocation;
+        }
+
+        return $allocations;
     }
 
     public function finalizeStatements(int $month, int $year)

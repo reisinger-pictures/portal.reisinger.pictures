@@ -84,4 +84,144 @@ class PayoutOrderFeeAllocationTest extends TestCase
         $this->assertSame(450, $stmtA->delta_surcharge_earnings_cents);
         $this->assertSame(900, $stmtB->delta_surcharge_earnings_cents);
     }
+
+    public function test_fully_discounted_paid_order_does_not_create_photographer_delta(): void
+    {
+        $photographer = User::factory()->create();
+        $photo = Photo::factory()->create(['user_id' => $photographer->id]);
+        $order = Order::factory()->paid()->create([
+            'stripe_fee_cents' => 0,
+            'created_at' => '2026-06-10 12:00:00',
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'customer_details' => [
+                'items' => [
+                    ['photoId' => $photo->id, 'price' => 1000, 'tier' => 'web'],
+                    [
+                        'type' => 'discount_coupon',
+                        'price' => -1000,
+                        'qty' => 1,
+                        'row_total' => -1000,
+                    ],
+                ],
+            ],
+            'total_net' => 0,
+            'total_gross' => 0,
+            'tax_rate' => null,
+        ]);
+
+        $this->service->calculatePowerUserDelta(6, 2026);
+
+        $this->assertSame(0, PhotographerStatement::where('user_id', $photographer->id)->count());
+    }
+
+    public function test_partial_coupon_discount_and_order_fee_are_allocated_before_photographer_share(): void
+    {
+        $photographerA = User::factory()->create();
+        $photographerB = User::factory()->create();
+        $photoA = Photo::factory()->create(['user_id' => $photographerA->id]);
+        $photoB = Photo::factory()->create(['user_id' => $photographerB->id]);
+        $order = Order::factory()->paid()->create([
+            'stripe_fee_cents' => 300,
+            'created_at' => '2026-06-10 12:00:00',
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'customer_details' => [
+                'items' => [
+                    ['photoId' => $photoA->id, 'price' => 1000, 'tier' => 'web'],
+                    ['photoId' => $photoB->id, 'price' => 2000, 'tier' => 'print'],
+                    [
+                        'type' => 'discount_coupon',
+                        'price' => -300,
+                        'qty' => 1,
+                        'row_total' => -300,
+                    ],
+                ],
+            ],
+            'total_net' => 2700,
+            'total_gross' => 2700,
+            'tax_rate' => null,
+        ]);
+
+        $this->service->calculatePowerUserDelta(6, 2026);
+
+        $stmtA = PhotographerStatement::where('user_id', $photographerA->id)->sole();
+        $stmtB = PhotographerStatement::where('user_id', $photographerB->id)->sole();
+        // Net photo revenue is allocated 900/1800 after the 300-cent coupon;
+        // the 300-cent Stripe fee is then allocated 100/200.
+        $this->assertSame(400, $stmtA->delta_surcharge_earnings_cents);
+        $this->assertSame(800, $stmtB->delta_surcharge_earnings_cents);
+    }
+
+    public function test_volume_tier_discount_is_excluded_from_photographer_delta(): void
+    {
+        $photographerA = User::factory()->create();
+        $photographerB = User::factory()->create();
+        $photoA = Photo::factory()->create(['user_id' => $photographerA->id]);
+        $photoB = Photo::factory()->create(['user_id' => $photographerB->id]);
+        $order = Order::factory()->paid()->create([
+            'stripe_fee_cents' => 0,
+            'created_at' => '2026-06-10 12:00:00',
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'customer_details' => [
+                'items' => [
+                    ['photoId' => $photoA->id, 'price' => 1000, 'tier' => 'original'],
+                    ['photoId' => $photoB->id, 'price' => 1000, 'tier' => 'original'],
+                    [
+                        'type' => 'discount_fixed',
+                        'price' => -300,
+                        'qty' => 2,
+                        'row_total' => -600,
+                    ],
+                ],
+            ],
+            'total_net' => 1400,
+            'total_gross' => 1400,
+            'tax_rate' => null,
+        ]);
+
+        $this->service->calculatePowerUserDelta(6, 2026);
+
+        $stmtA = PhotographerStatement::where('user_id', $photographerA->id)->sole();
+        $stmtB = PhotographerStatement::where('user_id', $photographerB->id)->sole();
+        $this->assertSame(350, $stmtA->delta_surcharge_earnings_cents);
+        $this->assertSame(350, $stmtB->delta_surcharge_earnings_cents);
+    }
+
+    public function test_fee_rounding_never_allocates_more_than_each_line_revenue(): void
+    {
+        $photographers = User::factory()->count(3)->create();
+        $photos = $photographers->map(fn (User $photographer): Photo => Photo::factory()->create([
+            'user_id' => $photographer->id,
+        ]));
+        $order = Order::factory()->paid()->create([
+            'stripe_fee_cents' => 1,
+            'created_at' => '2026-06-10 12:00:00',
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'customer_details' => [
+                'items' => $photos->map(fn (Photo $photo): array => [
+                    'photoId' => $photo->id,
+                    'price' => 1000,
+                    'tier' => 'web',
+                ])->all(),
+            ],
+            'total_net' => 3000,
+            'total_gross' => 3000,
+            'tax_rate' => null,
+        ]);
+
+        $this->service->calculatePowerUserDelta(6, 2026);
+
+        $deltas = $photographers->map(
+            fn (User $photographer): int => PhotographerStatement::where('user_id', $photographer->id)->sole()->delta_surcharge_earnings_cents,
+        )->sort()->values()->all();
+        $this->assertSame([499, 500, 500], $deltas);
+        $this->assertLessThanOrEqual(1499, array_sum($deltas));
+    }
 }
