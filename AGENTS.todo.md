@@ -1,5 +1,7 @@
 # Task Board — Portal Reisinger Pictures
 
+- [ ] **Flex calculator psychological rounding** — Commissioned by owner 2026-10-18: round the final Flex sum using the existing psychological rounding rule, with an explicit euro/cent boundary. Keep configured inputs and invoice line totals consistent; do not alter live settings, old invoices, Standard pricing or publication terms. Write Vitest regressions (including live base 80 EUR -> 79 EUR, setup 130 -> 129 and privacy 280 -> 279), update the pricing feature specification, run frontend lint/build and required relevant smoke checks, then obtain independent verification. Local review only: no push or deployment. **(Ready for Review)**
+
 > Stand: 2026-09-27. Architekturentscheidungen in `features/`.
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
@@ -1673,4 +1675,3 @@ hier bewusst **nicht** zitiert — sie stehen im Befund der Oberfläche selbst.
   gäbe es genau **einen** roten `@smoke`-Test ohne erkennbare Ursache. Guard auf alle drei Namen
   erweitern. Beleg: `gh secret list` → `STRIPE_WEBHOOK_SECRET` gesetzt am 2026-10-15T09:57:12Z;
   der Fall ist heute **nicht** eingetreten, es geht um den künftigen.
-

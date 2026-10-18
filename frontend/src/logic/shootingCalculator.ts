@@ -72,6 +72,10 @@ export interface ShootingPriceInput {
  * and returns euros. Every caller states which one it holds — `ShootingCalculatorModal`
  * divides the studio result by {@link CENTS_PER_EURO} for display and for the
  * invoice line, and passes the flex result through unchanged.
+ *
+ * Both calculators apply the same {@link roundToPsychologicalValue} to their
+ * final sum (owner decision 2026-10-18); they only differ in the unit they
+ * speak when they enter and leave that shared rule.
  */
 export interface ShootingPriceResult {
     packagePrice: number;
@@ -196,7 +200,8 @@ export interface B2CFlexInput {
     // because the licence-terms API types its money fields as JSON integers
     // while hand-written callers and cached payloads still hand over text.
     // The amounts are **euros** here: the caller divides the API's cents by
-    // CENTS_PER_EURO before passing them in, and the result is euros too.
+    // CENTS_PER_EURO before passing them in, and the result is euros too —
+    // psychologically rounded on the final sum, like the studio calculator.
     srp_base_price?: string | number;
     srp_setup_fee?: string | number;
     srp_privacy_fee?: string | number;
@@ -221,7 +226,15 @@ export function calculateB2CFlexPrice(input: B2CFlexInput): ShootingPriceResult 
         privacyFee = privacyBase;
     }
 
-    const total = basePrice + setupFee + extraImagesFee + privacyFee;
+    // The flex calculator reads and returns **euros**, while the shared
+    // psychological rounding works in **cents** — the one explicit boundary of
+    // this function, and the reason the conversion is written out on both
+    // sides of the call instead of a bare `100` (owner decision 2026-10-18).
+    // The sum is rounded as a whole, never component by component: rounding
+    // each line would move every line by up to 1 € and shift the total a
+    // second time. See features/ecommerce/07-psychological-pricing.md.
+    const rawTotalEuros = basePrice + setupFee + extraImagesFee + privacyFee;
+    const total = roundToPsychologicalValue(rawTotalEuros * CENTS_PER_EURO) / CENTS_PER_EURO;
 
     return {
         packagePrice: total,
