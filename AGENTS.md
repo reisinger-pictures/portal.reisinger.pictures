@@ -176,7 +176,7 @@ The Security Risk Register (accepted risks, resolved C1–C7) is in §8 below an
 
 ## 8. Security Risk Register (Accepted Risks)
 
-Bewusst akzeptierte Risiken aus dem Security-Audit (2026-07-11). **Nicht regredieren** — falls der jeweilige Guard entfernt wird, sofort fixen:
+Bewusst akzeptierte Risiken aus dem Security-Audit (2026-07-11) und aus der Dependabot-Triage (2026-10-18). **Nicht regredieren** — falls der jeweilige Guard entfernt wird, sofort fixen:
 
 - **[C1] ✅ RESOLVED (2026-07-21)** — `JWT_SECRET`-Fallback in `backend/config/jwt.php:18` rotiert. Deployment-Guard in `deployment/docker-compose.yml` auf generische Leerwert-Prüfung umgestellt (keine hartcodierten Secrets mehr).
 - **[C2] ✅ RESOLVED (2026-07-21)** — `APP_KEY`-Fallback in `backend/config/app.php:110` rotiert. Gleiche Maßnahme wie C1.
@@ -185,6 +185,7 @@ Bewusst akzeptierte Risiken aus dem Security-Audit (2026-07-11). **Nicht regredi
 - **[C4] ✅ RESOLVED (2026-07-21)** — `frontend/.env` (pk_live) und `frontend/.env.local` (pk_test) untracked; `!.env`/`!.env.local`-Negationen aus `frontend/.gitignore` entfernt. Nur `.env.example`/`.env.local.example` (mit Platzhaltern) committed.
 - **[C5-history] ✅ RESOLVED (2026-07-21)** — Git-History mit `git-filter-repo` bereinigt (1. Durchlauf): alle 3 Stripe-Secrets (`pk_live`, `pk_test`, `sk_test`) in allen 133 Commits durch `*_REDACTED`-Platzhalter ersetzt. Force-Push zu GitHub, Reflog expired, GC mit `--prune=now`. Backup: `portal-backup-20260721-133753.bundle`.
 - **[C5b-history] ✅ RESOLVED (2026-07-21)** — 2. `git-filter-repo`-Durchlauf: `backend/.env.local` aus History entfernt, APP_KEY-JWT_SECRET-Fallbacks und `SuperSecret123!` durch `*_REDACTED` ersetzt. Force-Push erforderlich. Backup: `portal-backup-20260721-155854.bundle`. Siehe `features/security/env-hardening.md`.
+- **[C8] ⚠️ AKZEPTIERT (2026-10-18)** — `braces@3.0.3` (dev, high) bleibt offen, **kein Patch existiert**: `first_patched_version` ist leer, und `micromatch@4.0.8` (Latest) deklariert weiter `braces: ^3.0.3` — es gibt keinen Upstream-Pfad. **Warum das tragbar ist, dreifach belegt:** (1) dev-only — `pnpm why braces` nennt nur `micromatch ← @lingui/cli` (via `@lingui/vite-plugin`) und `eslint-plugin-lingui`; (2) die Eingaben sind repo-kontrolliert (Globs aus `lingui.config.ts`); (3) **der verwundbare Eingang wird nie betreten** — `micromatch` reicht nur in `parse()`, `braces()` und `braceExpand()` an `braces` durch, und alle drei realen Aufrufstellen laufen über die picomatch-Pfade: `@lingui/cli/dist/api/catalog/getCatalogs.js` → `micromatch.capture`, `@lingui/cli/dist/lingui-extract.js` → `micromatch.any`, `eslint-plugin-lingui/lib/rules/no-unlocalized-strings.js` → `micromatch.matcher`. **Verworfen:** Override auf einen Fork/Commit (zöge ungeprüften Fremdcode in die Lint-/Build-Kette) und „Alert offen lassen“ (würde die Analyse in jeder Welle neu aufrollen). **Nicht regredieren:** wer eine `micromatch`-Aufrufstelle auf `braces()`/`braceExpand()`/`parse()` umstellt, macht dieses akzeptierte Risiko wieder lebendig. Gemessen: `pnpm audit` → 1 (nur `braces`), `pnpm audit --prod` → 1; die übrigen neun Alerts sind mit `85f102b` geschlossen.
 
 Offene Security-/Infra-TODOs (P1-I1–P1-I8) siehe `AGENTS.todo.md`; P2-T5 ist als reine Dokumentationskorrektur abgeschlossen. Die früheren M-/L-Kennungen sind keine aktuellen Task-IDs mehr.
 
