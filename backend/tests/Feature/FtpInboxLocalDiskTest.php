@@ -123,6 +123,20 @@ class FtpInboxLocalDiskTest extends TestCase
         $this->assertFalse(Storage::disk('ftp_inbox')->exists($sourcePath));
     }
 
+    public function test_non_image_jpg_is_rejected_before_photo_storage_and_kept_in_the_inbox(): void
+    {
+        [$user, $sourcePath] = $this->createImportContext();
+        Storage::disk('ftp_inbox')->put($sourcePath, '<!doctype html><title>not an image</title>');
+
+        $this->processAs($user)
+            ->assertStatus(422)
+            ->assertJsonStructure(['error']);
+
+        $this->assertDatabaseCount('photos', 0);
+        $this->assertSame([], Storage::disk('photos')->allFiles());
+        $this->assertTrue(Storage::disk('ftp_inbox')->exists($sourcePath));
+    }
+
     public function test_the_import_path_in_the_controller_contains_no_transfer_driver_reference(): void
     {
         $source = file_get_contents((new \ReflectionClass(FtpController::class))->getFileName());

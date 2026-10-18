@@ -11,7 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Symfony\Component\Process\Process;
 
 class ImageController extends Controller
 {
@@ -45,24 +44,18 @@ class ImageController extends Controller
 
         $file = $request->file('file');
 
-        // Exiftool on Windows can't always read PHP temp files directly (file locking).
-        // Copy to a stable path before invoking exiftool.
-        $mimeCheckPath = tempnam(sys_get_temp_dir(), 'mimecheck_').'.'.$file->getClientOriginalExtension();
-        copy($file->getRealPath() ?: $file->getPathname(), $mimeCheckPath);
-        $process = new Process(['exiftool', '-MIMEType', '-S', $mimeCheckPath]);
-        $process->run();
-        unlink($mimeCheckPath);
-        if (! $process->isSuccessful() || ! str_contains($process->getOutput(), 'image/')) {
+        $imageInfo = PhotoProcessingService::inspectRasterImage($file->getPathname());
+        if ($imageInfo === null || $imageInfo['mime_type'] !== 'image/jpeg') {
             return response()->json(['error' => 'Die hochgeladene Datei ist kein gültiges oder lesbares Bild.'], 422);
         }
 
         // Originalnamen merken für IPTC Title Fallback
         $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $extension = strtolower($file->extension());
-        if ($extension === 'jpeg') {
-            $extension = 'jpg';
-        }
-        $mimeType = $file->getClientMimeType();
+        $extension = match ($imageInfo['mime_type']) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+        };
 
         $targetDir = (string) $gallery->id;
         $thumbsDir = $targetDir.'/_thumbs';
@@ -71,7 +64,7 @@ class ImageController extends Controller
 
         // Heavy Lifting (ExifTool CLI) VOR der DB-Transaktion ausführen, um Deadlocks zu vermeiden!
         $meta = $this->photoService->processImage($file->getPathname(), '', $gallery);
-        $meta['mime_type'] = $mimeType;
+        $meta['mime_type'] = $imageInfo['mime_type'];
         if (empty($meta['title'])) {
             $meta['title'] = $originalName;
         }

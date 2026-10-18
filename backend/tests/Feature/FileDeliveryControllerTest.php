@@ -417,7 +417,8 @@ class FileDeliveryControllerTest extends TestCase
 
         $this->actingAs($user, 'api')
             ->get('/api/media/'.$gallery->slug.'/_thumbs/800/'.$photo->id.'.webp')
-            ->assertStatus(200);
+            ->assertStatus(200)
+            ->assertHeader('Content-Type', 'image/webp');
     }
 
     public function test_thumbnail_generation_failure_logs_the_photo_context(): void
@@ -502,7 +503,9 @@ class FileDeliveryControllerTest extends TestCase
         $user->galleries()->attach($gallery);
         $photo = Photo::factory()->create([
             'gallery_id' => $gallery->id,
-            'mime_type' => 'image/jpeg',
+            // Persisted metadata may come from an older or hostile upload; the
+            // response type must be derived from the actual stored bytes.
+            'mime_type' => 'text/html',
         ]);
         Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, $this->fixtureContent);
 
@@ -577,7 +580,8 @@ class FileDeliveryControllerTest extends TestCase
 
         $response = $this->actingAs($user, 'api')
             ->get('/api/media/'.$gallery->slug.'/watermarked/'.$photo->id.'.jpg')
-            ->assertStatus(200);
+            ->assertStatus(200)
+            ->assertHeader('Content-Type', 'image/jpeg');
 
         $delivered = file_get_contents($response->getFile()->getPathname());
         $this->assertNotSame($this->fixtureContent, $delivered);
@@ -628,7 +632,8 @@ class FileDeliveryControllerTest extends TestCase
 
         $this->actingAs($user, 'api')
             ->get('/api/media/'.$gallery->slug.'/watermarked/_thumbs/800/'.$photo->id.'.webp')
-            ->assertStatus(200);
+            ->assertStatus(200)
+            ->assertHeader('Content-Type', 'image/webp');
     }
 
     // ---------------------------------------------------------------

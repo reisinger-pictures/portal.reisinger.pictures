@@ -6,6 +6,7 @@ use Ercsctt\FileEncryption\Facades\FileEncrypter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
@@ -28,6 +29,8 @@ class ModelFileStore
 {
     public const DISK = 'local';
 
+    private const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
     private const STRIPPABLE_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
 
     /**
@@ -37,13 +40,41 @@ class ModelFileStore
      */
     public function storeUpload(string $directory, UploadedFile $file): array
     {
-        $mime = $file->getMimeType() ?: 'application/octet-stream';
-        $sourcePath = $file->getRealPath();
-        $contents = (string) file_get_contents($sourcePath);
+        $sourcePath = $file->getRealPath() ?: $file->getPathname();
+        $bytes = @filesize($sourcePath);
+        if (! is_int($bytes) || $bytes < 1 || $bytes > self::MAX_UPLOAD_BYTES) {
+            throw ValidationException::withMessages([
+                'file' => 'Die hochgeladene Modelldatei überschreitet die erlaubte Dateigröße.',
+            ]);
+        }
+
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($sourcePath);
+        if (! is_string($mime)) {
+            throw ValidationException::withMessages([
+                'file' => 'Der Typ der hochgeladenen Modelldatei konnte nicht erkannt werden.',
+            ]);
+        }
+
+        if (in_array($mime, self::STRIPPABLE_MIMES, true)) {
+            if (PhotoProcessingService::inspectRasterImage($sourcePath, self::MAX_UPLOAD_BYTES) === null) {
+                throw ValidationException::withMessages([
+                    'file' => 'Das hochgeladene Bild ist ungültig oder überschreitet das erlaubte Bildbudget.',
+                ]);
+            }
+        } elseif ($mime !== 'application/pdf') {
+            throw ValidationException::withMessages([
+                'file' => 'Dieser Dateityp wird nicht unterstützt.',
+            ]);
+        }
+
+        $contents = file_get_contents($sourcePath);
+        if (! is_string($contents)) {
+            throw new RuntimeException('The uploaded model file could not be read.');
+        }
 
         [$sanitized, $mime] = $this->stripImageMetadata($contents, $mime);
 
-        $extension = $this->extensionFor($mime, $file->extension());
+        $extension = $this->extensionFor($mime);
         $path = $this->buildPath($directory, $extension);
         $disk = Storage::disk(self::DISK);
         $disk->makeDirectory(dirname($path));
@@ -227,14 +258,16 @@ class ModelFileStore
         return trim($directory, '/').'/'.$name;
     }
 
-    private function extensionFor(string $mime, ?string $fallback): string
+    private function extensionFor(string $mime): string
     {
         return match ($mime) {
             'image/jpeg' => 'jpg',
             'image/png' => 'png',
             'image/webp' => 'webp',
             'application/pdf' => 'pdf',
-            default => $fallback ?: 'bin',
+            default => throw ValidationException::withMessages([
+                'file' => 'Dieser Dateityp wird nicht unterstützt.',
+            ]),
         };
     }
 
@@ -256,7 +289,7 @@ class ModelFileStore
         }
 
         try {
-            $image = @imagecreatefromstring($contents);
+            $image = $this->decodeImage($contents);
             if ($image === false) {
                 return [$contents, $mime];
             }
@@ -278,5 +311,10 @@ class ModelFileStore
         } catch (\Throwable) {
             return [$contents, $mime];
         }
+    }
+
+    protected function decodeImage(string $contents): \GdImage|false
+    {
+        return @imagecreatefromstring($contents);
     }
 }

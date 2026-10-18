@@ -25,17 +25,12 @@ class ImageProcessor
      */
     public function isValidImageFile(string $path): bool
     {
-        if (! is_file($path)) {
-            return false;
-        }
+        return $this->detectMimeType($path) !== null;
+    }
 
-        $info = @getimagesize($path);
-
-        return is_array($info) && in_array($info['mime'] ?? null, [
-            'image/jpeg',
-            'image/png',
-            'image/webp',
-        ], true);
+    public function detectMimeType(string $path): ?string
+    {
+        return PhotoProcessingService::inspectRasterImage($path)['mime_type'] ?? null;
     }
 
     /**
@@ -49,13 +44,13 @@ class ImageProcessor
             return false;
         }
 
-        $info = @getimagesize($sourcePath);
-        if (! is_array($info)) {
+        $info = PhotoProcessingService::inspectRasterImage($sourcePath);
+        if ($info === null) {
             return false;
         }
 
-        $width = (int) ($info[0] ?? 0);
-        $height = (int) ($info[1] ?? 0);
+        $width = $info['width'];
+        $height = $info['height'];
         if ($maxWidth !== null && $maxWidth > 0 && $width > $maxWidth) {
             $height = max(1, (int) ($height * ($maxWidth / $width)));
             $width = $maxWidth;
@@ -348,7 +343,7 @@ class ImageProcessor
                 return false;
             }
 
-            $wm = @imagecreatefrompng($wmPath);
+            $wm = $this->decodeImage($wmPath, 'image/png');
             if (! $wm) {
                 $this->removeFailedOutput($destPath, $sourcePath);
 
@@ -465,13 +460,13 @@ class ImageProcessor
             return null;
         }
 
-        $info = @getimagesize($sourcePath);
-        if (! is_array($info)) {
+        $info = PhotoProcessingService::inspectRasterImage($sourcePath);
+        if ($info === null) {
             return null;
         }
 
-        $width = (int) ($info[0] ?? 0);
-        $height = (int) ($info[1] ?? 0);
+        $width = $info['width'];
+        $height = $info['height'];
         if ($maxWidth !== null && $maxWidth > 0 && $width > $maxWidth) {
             $height = max(1, (int) ($height * ($maxWidth / $width)));
             $width = $maxWidth;
@@ -628,7 +623,12 @@ class ImageProcessor
                 continue;
             }
 
-            $watermark = @imagecreatefrompng($path);
+            $imageInfo = PhotoProcessingService::inspectRasterImage($path);
+            if ($imageInfo === null || $imageInfo['mime_type'] !== 'image/png') {
+                return null;
+            }
+
+            $watermark = $this->decodeImage($path, 'image/png');
             if (! $watermark) {
                 // A present-but-corrupt preferred asset must not silently fall
                 // through to an unwatermarked output.
@@ -698,23 +698,12 @@ class ImageProcessor
 
     private function loadGdImage($path)
     {
-        $info = @getimagesize($path);
-        if (! $info) {
+        $info = PhotoProcessingService::inspectRasterImage($path);
+        if ($info === null) {
             return null;
         }
-        $mime = $info['mime'];
-        $img = null;
-        switch ($mime) {
-            case 'image/jpeg':
-                $img = @imagecreatefromjpeg($path);
-                break;
-            case 'image/png':
-                $img = @imagecreatefrompng($path);
-                break;
-            case 'image/webp':
-                $img = @imagecreatefromwebp($path);
-                break;
-        }
+        $mime = $info['mime_type'];
+        $img = $this->decodeImage($path, $mime);
         if ($img && function_exists('exif_read_data') && $mime === 'image/jpeg') {
             $exif = @exif_read_data($path);
             if ($exif && isset($exif['Orientation'])) {
@@ -757,5 +746,15 @@ class ImageProcessor
         }
 
         return $img;
+    }
+
+    protected function decodeImage(string $path, string $mime): \GdImage|false
+    {
+        return match ($mime) {
+            'image/jpeg' => function_exists('imagecreatefromjpeg') ? @imagecreatefromjpeg($path) : false,
+            'image/png' => function_exists('imagecreatefrompng') ? @imagecreatefrompng($path) : false,
+            'image/webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($path) : false,
+            default => false,
+        };
     }
 }

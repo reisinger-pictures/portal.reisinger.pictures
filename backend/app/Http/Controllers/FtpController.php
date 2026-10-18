@@ -230,10 +230,19 @@ class FtpController extends Controller
             }
 
             $originalName = pathinfo($file, PATHINFO_FILENAME);
-            $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            if ($extension === 'jpeg') {
-                $extension = 'jpg';
+
+            $imageInfo = PhotoProcessingService::inspectRasterImage($file);
+            if ($imageInfo === null) {
+                return response()->json([
+                    'error' => 'Die FTP-Datei ist kein gültiges oder unterstütztes Bild.',
+                ], 422);
             }
+
+            $extension = match ($imageInfo['mime_type']) {
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/webp' => 'webp',
+            };
 
             // Dateinamen IMMER aus UUID generieren!
             $photoId = (string) Str::uuid();
@@ -260,6 +269,7 @@ class FtpController extends Controller
             }
 
             $meta = $this->photoService->processImage($targetPath, $thumbPath, $gallery);
+            $meta['mime_type'] = $imageInfo['mime_type'];
             if (empty($meta['title'])) {
                 $meta['title'] = $originalName; // Dateiname als Titel retten
             }

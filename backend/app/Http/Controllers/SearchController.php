@@ -9,8 +9,10 @@ use App\Models\GalleryGroup;
 use App\Models\Location;
 use App\Models\Photo;
 use App\Services\AuthorizationService;
+use App\Services\MediaVisibilityService;
 use App\Support\BrandRegistry;
 use App\Support\GalleryGroupSubtree;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class SearchController extends Controller
@@ -226,15 +228,25 @@ class SearchController extends Controller
 
     public function photoContext($id)
     {
-        $photo = Photo::with('gallery')->findOrFail($id);
-        if (! $photo->gallery || ! BrandRegistry::galleryTreeMatchesCurrent($photo->gallery)) {
+        $visibility = app(MediaVisibilityService::class);
+        $photo = $visibility->currentPhoto((string) $id);
+        if (! $photo instanceof Photo || ! $photo->gallery) {
             abort(404);
         }
-        if ($photo->effective_is_hidden) {
+        if (! BrandRegistry::galleryTreeMatchesCurrent($photo->gallery)
+            || ! $visibility->photoIsVisible($photo)
+            || $photo->effective_is_hidden) {
             abort(404);
         }
+
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
+        $canManage = $user && $svc->canManageGallery($user, (string) $photo->gallery_id);
+        if ($photo->gallery->expires_at
+            && Carbon::parse($photo->gallery->expires_at)->isPast()
+            && ! $canManage) {
+            abort(403);
+        }
 
         if (! $photo->gallery->effective_is_public) {
             if (! $user || ! $svc->canAccessGallery($user, $photo->gallery_id)) {

@@ -147,9 +147,9 @@ class ModelPhotoPrimaryPromotionTest extends TestCase
             'persons' => [[
                 'answers' => $this->answers(),
                 'create_account' => false,
-                'age_proof' => UploadedFile::fake()->create('new-proof.jpg', 10, 'image/jpeg'),
+                'age_proof' => UploadedFile::fake()->image('new-proof.jpg', 800, 600),
                 'photos' => [[
-                    'file' => UploadedFile::fake()->create('new-internal.jpg', 10, 'image/jpeg'),
+                    'file' => UploadedFile::fake()->image('new-internal.jpg', 800, 600),
                     'visibility' => ModelPhoto::VISIBILITY_INTERNAL,
                 ]],
             ]],
