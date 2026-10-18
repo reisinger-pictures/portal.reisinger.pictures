@@ -996,6 +996,22 @@ Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA v
   im SFTPGo-Datenprovider und wird von einem versionierten Provisionierungsbefehl idempotent
   gesetzt, nicht per Compose-Umgebungsvariable.
 
+- **D-37 — Dauerhaft nicht importierbare Inbox-Dateien wandern in einen Quarantäne-Unterordner**
+  (Owner, 2026-10-18). Eine Datei, die der Import nicht verarbeiten kann — größer als
+  `ftp.import.max_file_bytes`, undekodierbar, leer oder abgeschnitten — blockiert heute die
+  gesamte Inbox: die Auswahl bricht ab (413, `processed = 0`) oder die Import-Schleife bricht ab
+  (422), die Datei wird nie entfernt und wandert durch die `readdir`-Reihenfolge an den Anfang,
+  ab dann importiert **jeder** weitere Aufruf nichts mehr. Das widerspricht D-35 wörtlich
+  („wiederholtes Auslösen leert die Inbox") und lässt den Fotografen ohne Werkzeug in der
+  Oberfläche zurück — die Inbox hat keine Löschfunktion, der Ausweg wäre SFTP. *Entscheidung:*
+  Nach einer festgelegten Zahl erfolgloser Versuche verschiebt der Import die Datei in einen
+  Quarantäne-Unterordner neben der Inbox (gleicher Baum, gleiche Ownership-Regeln wie D-2), und
+  die Inbox leert sich garantiert. *Warum nicht überspringen:* eine liegen bleibende, immer
+  wieder übersprungene Datei ist derselbe Zustand wie heute, nur ohne Fehlermeldung — sichtbar
+  falsch statt sichtbar blockiert. *Grenzen:* der Quarantäne-Ordner ist für den Fotografen
+  auffindbar (SFTP und Anzeige), Dateien werden **nie** gelöscht, und die Versuchszahl ist
+  konfigurierbar.
+
 ## TODO (UI-Review)
 
 UI-Review-Screenshot-Skill noch nicht angewendet (Playwright-Harness + Vision-Analyse). Referenz: ocg-price-tracker/tests/screenshots (ui-screenshots.spec.ts mit Section-Captures).

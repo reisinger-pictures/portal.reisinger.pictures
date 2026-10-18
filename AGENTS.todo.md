@@ -106,6 +106,22 @@ SEC-14-Umsetzung; alles darunter ist eigene Arbeit.
 - [ ] **Doku nachziehen.** `features/infrastructure/19-ftp-upload-pipeline.md` §1, §3 und §6 auf
   Event-Trigger, Batch-Kette und Nachlauf umstellen; die drei Config-Keys mit ihren Defaults
   nennen.
+- [ ] **Quarantäne für nicht importierbare Dateien (D-37).** Nach konfigurierbarer Versuchszahl
+  verschiebt der Import eine Datei, die er nicht verarbeiten kann (zu groß, undekodierbar, leer),
+  in einen Quarantäne-Unterordner neben der Inbox; Dateien werden nie gelöscht, der Ordner ist
+  für den Fotografen auffindbar. **Tests:** eine übergroße Datei und eine undekodierbare Datei
+  blockieren die Inbox nicht mehr, wiederholte Läufe leeren sie, die Quarantäne-Datei bleibt
+  erhalten, Ownership/Modus folgen D-2, und der Zähler in `status()` weist den Rest korrekt aus.
+- [ ] **Offene Punkte aus der SEC-14-Nachprüfung (Runde 2).** N2/N3: Fehlertabelle und
+  `runImport()`-Docblock verschweigen, dass ein Nichtbild an Position k die davor liegenden
+  Dateien bereits geschrieben hat und dass ein Abbruch die **ganze** Auswahl trifft. N4: die
+  Stat-Cache-**Reihenfolge** ist nicht gepinnt (wer `clearstatcache` entfernt, bleibt grün) —
+  Testnaht so bauen, dass die Reihenfolge selbst rot wird. N5: bei 413/422 lädt das Frontend
+  `/status` nicht nach, der Zähler bleibt veraltet. N6: `handleProcess` hat keinen Test
+  (Vitest oder Playwright, DoD §2). N7: das `filesize`-Race in der Auswahl liefert 422 und
+  widerspricht der „verschwunden = unverändert"-Regel — entweder angleichen oder in die
+  Fehlertabelle aufnehmen. N8: die Byte-Defaults (20 MiB / 100 MiB) sind nicht gepinnt, nur
+  `max_files = 20`.
 
 ---
 - [ ] **Dependabot: 1 offener Alert am Default-Branch** (war 10) — gemessen am 2026-10-18 mit `gh api repos/reisinger-pictures/portal.reisinger.pictures/dependabot/alerts?state=open&per_page=100 -q '.[] | [.security_advisory.severity, .dependency.package.name] | @tsv'` → **1 high (`braces`), 0 critical**. Patch-Stand je Paket (dieselbe Abfrage, `-q '.[] | [.security_advisory.severity, .dependency.package.name, .security_vulnerability.vulnerable_version_range, (.security_vulnerability.first_patched_version.identifier // "KEINE")] | @tsv'`): `undici` (6 Alerts — 1 high + 2 medium + 3 low; verwundbar `< 7.29.1`, installiert `7.29.0`), `source-map-js` (high, `< 1.2.2`, installiert `1.2.1`), `brace-expansion` (medium, `< 5.0.12`), `postcss-selector-parser` (medium, `< 7.1.6`), `braces` (high, `<= 3.0.3`, **`gepatcht-ab=KEINE`**). Dependency-CVEs, **nicht** Endpunkt-Autorisierung → eigener Durchgang (`node-deps`), **ausgeführt** (Ergebnis in den beiden Unterpunkten).
