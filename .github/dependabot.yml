@@ -20,6 +20,28 @@ updates:
         applies-to: version-updates
         patterns:
           - "@tiptap/*"
+      # Security-Updates sind ein eigener Kanal: sie kommen von
+      # Dependabot-Alerts statt vom Schedule. Ohne Gruppe erzeugt jeder Alert
+      # einen eigenen PR und damit einen eigenen vollen CI-Lauf.
+      # `update-types: [minor, patch]` ist der Sicherheitsvertrag dieser Gruppe
+      # und der Grund, warum `automerge.yml` sie per Namen freischalten darf:
+      # ein Major-Security-Fix faellt per update-types aus der Gruppe, kommt als
+      # einzelner PR und wird dort nicht automergt.
+      # Auf `update-type` als Merkmal ist dabei kein Verlass: bei
+      # Security-Updates ist er in der Regel leer - ein Maintainer der Aktion
+      # sagt in fetch-metadata#499, er werde "at the moment" nicht mitgeliefert
+      # - aber das ist keine Zusicherung. Die Fixtures der Aktion tragen ihn
+      # sehr wohl zusammen mit `dependency-group`
+      # (src/dependabot/update_metadata.test.ts), und der Parser faellt auf
+      # calculateUpdateType() zurueck, sobald das Commit-Subjekt
+      # "Bumps X from A to B" lautet. Tragend ist deshalb der Gruppenname
+      # zusammen mit der update-types-Invariante; sie wird von
+      # tests/infrastructure/ci-security-contract.sh gegen `automerge.yml`
+      # geprueft.
+      minor-and-patch-security:
+        applies-to: security-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: composer
     directory: "/backend"
     schedule: {interval: "daily"}
@@ -28,6 +50,13 @@ updates:
     groups:
       minor-and-patch:
         applies-to: version-updates
+        update-types: ["minor", "patch"]
+      # Dieselbe Bündelung fuer Security-Updates, siehe die Begründung bei der
+      # npm-Gruppe oben: der Name ist der Sicherheitsvertrag, den
+      # `automerge.yml` freischaltet.
+      minor-and-patch-security:
+        applies-to: security-updates
+        patterns: ["*"]
         update-types: ["minor", "patch"]
   - package-ecosystem: docker
     directory: "/deployment"
