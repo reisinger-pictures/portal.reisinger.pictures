@@ -88,8 +88,8 @@ gallery's `volume_preset_id` when valid, otherwise the brand default preset.
 
 ### 3.2.1 Public pricing endpoint vs. full price parameters
 
-Two endpoints serve this resolution, split by what they may disclose
-(owner decisions D-27/D-28):
+Three endpoints serve this resolution, split by what they may disclose
+(owner decisions D-27/D-28/D-32):
 
 - **`GET /api/settings/license-pricing` — public, deliberately minimized.** It
   returns exactly `pricing_strategy` and `volume_pricing`
@@ -102,11 +102,30 @@ Two endpoints serve this resolution, split by what they may disclose
   every internal price parameter (`price_*`, `calc_*`, `srp_*`, `mult_*`,
   `base_price`, licence texts). Only the management UI (settings form, shooting
   calculator) reads it, and both callers are already super-admin gated.
+- **`GET /api/settings/license-catalog` — public by design, throttled**
+  (`throttle:api`, owner decision D-32). It is the *published customer price
+  list*, not an internal parameter look-up: it projects `license_use_cases`
+  (`name`, `description`, `base_price`, `flatrate_tier`, `is_commercial`) and
+  `license_modifiers` (`name`, `description`, `percent_surcharge`,
+  `is_included_in_flatrate`) through `LicenseUseCaseResource` /
+  `LicenseModifierResource`. Those two resources carry no internal parameter.
+  Two consumers read it through `useLicenseCatalog()`: the client license
+  selector (`frontend/src/ui/client/components/LicenseSelectorCard.tsx` —
+  `catalog.use_cases`, `uc.flatrate_tier`, `m.percent_surcharge`) and the
+  management editor
+  (`frontend/src/ui/management/components/LicenseCatalogSettings.tsx`, reachable
+  via `PricingSettingsTabs.tsx`, which also renders `is_commercial` and
+  `sort_order`). Both read the same public payload, so the management path
+  discloses nothing extra. This is the same class as the
+  deliberately public `volume_pricing` from D-28 — the customer must see the
+  price they are asked to pay — in contrast to D-27, where the *calculation*
+  parameters live.
 
-Both endpoints resolve the gallery through the same shared
-`SettingsController::resolveLicensePricingContext()` and project the preset
-through `SettingsController::volumePricingPayload()`, so a gallery cannot
-resolve to a different mode or preset depending on which endpoint is called.
+The two *pricing* endpoints (`license-pricing`, `license-terms`) resolve the
+gallery through the same shared `SettingsController::resolveLicensePricingContext()`
+and project the preset through `SettingsController::volumePricingPayload()`, so a
+gallery cannot resolve to a different mode or preset depending on which of them is
+called. `license-catalog` does not resolve a gallery at all.
 
 ### 3.3 Checkout grouping
 

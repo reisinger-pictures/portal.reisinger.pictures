@@ -4,16 +4,19 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Models\Gallery;
+use App\Models\LicenseModifier;
+use App\Models\LicenseUseCase;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\VolumePresetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 /**
- * Access contract of the two license endpoints after the access split
- * (owner decisions D-27/D-28):
+ * Access contract of the license endpoints after the access split
+ * (owner decisions D-27/D-28/D-32):
  *
  * - `GET /api/settings/license-terms` carries the complete price parameter set
  *   and is therefore `auth:api` + `super_admin` (anonymous → 401, wrong role →
@@ -21,6 +24,10 @@ use Tests\TestCase;
  * - `GET /api/settings/license-pricing` is the deliberately minimized public
  *   endpoint for the buy flow: `pricing_strategy` + `volume_pricing` only, and
  *   nothing else.
+ * - `GET /api/settings/license-catalog` stays public by design (D-32): it is the
+ *   published customer price list (use cases + modifiers) the client license
+ *   selector renders. It carries no internal price parameter and is throttled
+ *   like `license-pricing`.
  */
 class LicenseTermsAccessTest extends TestCase
 {
@@ -108,6 +115,46 @@ class LicenseTermsAccessTest extends TestCase
         $this->assertSame(['pricing_strategy', 'volume_pricing'], array_keys($response->json()));
 
         foreach (self::INTERNAL_PRICE_KEYS as $key) {
+            $response->assertJsonMissingPath($key);
+        }
+    }
+
+    public function test_public_license_catalog_is_throttled_like_the_pricing_endpoint(): void
+    {
+        // The catalog is public by design (D-32); the throttle is the only
+        // access guard, so it is pinned on the route object rather than by
+        // shelling out to `route:list`.
+        $route = Route::getRoutes()->getByName('api.settings.license-catalog');
+        $this->assertNotNull($route, 'Route api.settings.license-catalog ist nicht registriert.');
+        $this->assertContains('throttle:api', $route->gatherMiddleware());
+    }
+
+    public function test_public_license_catalog_is_anonymous_200_with_the_customer_price_list(): void
+    {
+        LicenseUseCase::factory()->create([
+            'name' => 'Web & Social Media',
+            'base_price' => 4500,
+            'flatrate_tier' => 'web',
+            'brand' => 'rp',
+        ]);
+        LicenseModifier::factory()->create([
+            'name' => 'Weltweite Nutzungsrechte',
+            'percent_surcharge' => 100.0,
+            'brand' => 'rp',
+        ]);
+
+        $response = $this->getJson('/api/settings/license-catalog')->assertOk();
+
+        // The customer-facing fields the client selector reads are present …
+        $response->assertJsonStructure([
+            'use_cases' => [['name', 'base_price', 'flatrate_tier', 'is_commercial']],
+            'modifiers' => [['percent_surcharge', 'is_included_in_flatrate']],
+        ]);
+        $response->assertJsonFragment(['name' => 'Web & Social Media', 'base_price' => 4500]);
+        $response->assertJsonFragment(['name' => 'Weltweite Nutzungsrechte']);
+
+        // … and the internal price parameters stay off this endpoint.
+        foreach (['calc_base_price', 'srp_base_price', 'mult_commercial', 'price_web'] as $key) {
             $response->assertJsonMissingPath($key);
         }
     }
