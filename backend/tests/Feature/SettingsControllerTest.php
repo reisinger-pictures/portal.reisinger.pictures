@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -49,6 +50,17 @@ class SettingsControllerTest extends TestCase
     }
 
     /**
+     * The complete license-terms payload (every price parameter) is no longer
+     * public: the route sits behind `auth:api` + `super_admin`. Every read in
+     * this file therefore authenticates as a super admin.
+     */
+    private function getLicenseTermsJson(string $query = ''): TestResponse
+    {
+        return $this->withHeaders(['Authorization' => 'Bearer '.$this->superAdminToken()])
+            ->getJson('/api/settings/license-terms'.$query);
+    }
+
+    /**
      * Minimum payload `updateLicenseTerms()` accepts — the three `mult_*`
      * multipliers are `required` there. Mirrors the contract the shooting
      * calculator's own partial saves rely on.
@@ -71,14 +83,29 @@ class SettingsControllerTest extends TestCase
         return Setting::where('key', $key)->where('brand', $brand)->value('value');
     }
 
-    public function test_get_license_terms_is_public(): void
+    /**
+     * The full payload (every internal price parameter) is not public: the
+     * route sits behind `auth:api` + `super_admin`. Anonymous is 401, a
+     * client/admin is 403, and only a super admin reads it.
+     */
+    public function test_get_license_terms_requires_super_admin(): void
     {
         Setting::updateOrCreate(
             ['key' => 'base_price', 'brand' => 'rp'],
             ['value' => '500']
         );
 
-        $this->getJson('/api/settings/license-terms')
+        $this->getJson('/api/settings/license-terms')->assertStatus(401);
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$this->clientToken()])
+            ->getJson('/api/settings/license-terms')
+            ->assertStatus(403);
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$this->adminToken()])
+            ->getJson('/api/settings/license-terms')
+            ->assertStatus(403);
+
+        $this->getLicenseTermsJson()
             ->assertStatus(200)
             ->assertJsonStructure([
                 'editorial', 'commercial', 'base_price', 'mult_commercial',
@@ -90,7 +117,7 @@ class SettingsControllerTest extends TestCase
     {
         Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
 
-        $this->getJson('/api/settings/license-terms')
+        $this->getLicenseTermsJson()
             ->assertStatus(200)
             ->assertJsonPath('pricing_strategy', 'volume_licensing')
             ->assertJsonPath('volume_pricing.preset_name', 'Standard')
@@ -112,7 +139,7 @@ class SettingsControllerTest extends TestCase
             'volume_preset_id' => $custom->id,
         ]);
 
-        $this->getJson('/api/settings/license-terms?gallery_id='.$gallery->id)
+        $this->getLicenseTermsJson('?gallery_id='.$gallery->id)
             ->assertStatus(200)
             // Strict: `preset_id` is the numeric `volume_presets.id` primary key,
             // never a string. The frontend's opaque preset key relies on it.
@@ -130,7 +157,7 @@ class SettingsControllerTest extends TestCase
     {
         Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'volume_licensing']);
 
-        $response = $this->getJson('/api/settings/license-terms')->assertStatus(200);
+        $response = $this->getLicenseTermsJson()->assertStatus(200);
         $volumePricing = $response->json('volume_pricing');
 
         $this->assertIsArray($volumePricing);
@@ -159,7 +186,7 @@ class SettingsControllerTest extends TestCase
             'volume_preset_id' => $custom->id,
         ]);
 
-        $volumePricing = $this->getJson('/api/settings/license-terms?gallery_id='.$gallery->id)
+        $volumePricing = $this->getLicenseTermsJson('?gallery_id='.$gallery->id)
             ->assertStatus(200)
             ->assertJsonPath('volume_pricing.preset_name', 'Custom Type')
             ->json('volume_pricing');
@@ -173,7 +200,7 @@ class SettingsControllerTest extends TestCase
     {
         Setting::updateOrCreate(['key' => 'pricing_strategy', 'brand' => 'rp'], ['value' => 'scope_licensing']);
 
-        $this->getJson('/api/settings/license-terms')
+        $this->getLicenseTermsJson()
             ->assertStatus(200)
             ->assertJsonPath('pricing_strategy', 'scope_licensing')
             ->assertJsonPath('volume_pricing', null);
@@ -336,9 +363,9 @@ class SettingsControllerTest extends TestCase
         $this->assertDatabaseHas('settings', ['key' => 'price_print', 'brand' => 'rp', 'value' => '24901']);
         $this->assertDatabaseHas('settings', ['key' => 'price_original', 'brand' => 'rp', 'value' => '89999']);
 
-        // Read leg: the public endpoint returns the same cents, as JSON
+        // Read leg: the full endpoint returns the same cents, as JSON
         // integers (owner decision 2026-09-27: the API types its money).
-        $terms = $this->getJson('/api/settings/license-terms')->assertStatus(200);
+        $terms = $this->getLicenseTermsJson()->assertStatus(200);
         $this->assertSame(12345, $terms->json('price_web'));
         $this->assertSame(24901, $terms->json('price_print'));
         $this->assertSame(89999, $terms->json('price_original'));
@@ -369,7 +396,7 @@ class SettingsControllerTest extends TestCase
         Setting::updateOrCreate(['key' => 'price_print', 'brand' => 'rp'], ['value' => '14500']);
         Setting::updateOrCreate(['key' => 'price_original', 'brand' => 'rp'], ['value' => '45000']);
 
-        $terms = $this->getJson('/api/settings/license-terms')
+        $terms = $this->getLicenseTermsJson()
             ->assertStatus(200)
             ->assertJsonStructure(['price_web', 'price_print', 'price_original'])
             ->assertJsonPath('price_web', 7500)
@@ -403,7 +430,7 @@ class SettingsControllerTest extends TestCase
 
         $this->assertDatabaseHas('settings', ['key' => 'calc_base_price', 'brand' => 'rp', 'value' => '7500']);
 
-        $this->getJson('/api/settings/license-terms')
+        $this->getLicenseTermsJson()
             ->assertStatus(200)
             ->assertJsonPath('price_web', null)
             ->assertJsonPath('price_print', null)
@@ -574,7 +601,7 @@ class SettingsControllerTest extends TestCase
         // integer, so the response member is the stored cents as a number, not
         // the stored text.
         $this->assertSame(1, Setting::where('key', 'base_price')->where('brand', 'rp')->count());
-        $terms = $this->getJson('/api/settings/license-terms')->assertStatus(200);
+        $terms = $this->getLicenseTermsJson()->assertStatus(200);
         $this->assertSame((int) $viaLegacyName, $terms->json('base_price'));
         $this->assertSame((int) $viaLegacyName, $terms->json('srp_base_price'));
     }

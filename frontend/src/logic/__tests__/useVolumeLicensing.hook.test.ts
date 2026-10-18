@@ -2,7 +2,7 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {renderHook} from '@testing-library/react';
 import useSWR from 'swr';
 import type {CartItem} from '../CartContext';
-import {useLicenseTerms} from '../useLicenseTerms';
+import {useLicensePricing} from '../useLicenseTerms';
 import {useGalleryLicensing, useVolumeLicensing} from '../useVolumeLicensing';
 
 vi.mock('swr', () => ({
@@ -14,7 +14,9 @@ vi.mock('../../api', () => ({
 }));
 
 vi.mock('../useLicenseTerms', () => ({
-    useLicenseTerms: vi.fn(),
+    // The hooks read the public, minimized pricing endpoint now.
+    useLicensePricing: vi.fn(),
+    LICENSE_PRICING_URL: '/api/settings/license-pricing',
 }));
 
 const cartItems: CartItem[] = [
@@ -37,10 +39,10 @@ function mockGalleryTerms(data: unknown, isLoading = false) {
 describe('useVolumeLicensing gallery context', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(useLicenseTerms).mockReturnValue({
-            terms: {pricing_strategy: 'scope_licensing'},
+        vi.mocked(useLicensePricing).mockReturnValue({
+            pricing: {pricing_strategy: 'scope_licensing'},
             isLoading: false,
-            updateTerms: vi.fn(),
+            mutate: vi.fn(),
         });
     });
 
@@ -80,15 +82,15 @@ describe('useVolumeLicensing gallery context', () => {
             '__cart_license_terms__:%5B%22cart-gallery%22%2C%22displayed-gallery%22%5D',
         );
         expect(vi.mocked(useSWR).mock.calls.map(([key]) => key)).not.toContain(
-            '/api/settings/license-terms?gallery_id=cart-gallery',
+            '/api/settings/license-pricing?gallery_id=cart-gallery',
         );
     });
 
     it('honors a gallery scope override when the brand default is volume', () => {
-        vi.mocked(useLicenseTerms).mockReturnValue({
-            terms: {pricing_strategy: 'volume_licensing'},
+        vi.mocked(useLicensePricing).mockReturnValue({
+            pricing: {pricing_strategy: 'volume_licensing'},
             isLoading: false,
-            updateTerms: vi.fn(),
+            mutate: vi.fn(),
         });
         mockGalleryTerms({
             'cart-gallery': {
@@ -156,7 +158,7 @@ describe('useVolumeLicensing gallery context', () => {
 
         expect(result.current.pricePerItemCents).toBe(4100);
         expect(vi.mocked(useSWR).mock.calls.every(
-            ([key]) => key === '/api/settings/license-terms?gallery_id=cart-gallery',
+            ([key]) => key === '/api/settings/license-pricing?gallery_id=cart-gallery',
         )).toBe(true);
     });
 
@@ -265,10 +267,10 @@ describe('useVolumeLicensing gallery context', () => {
     });
 
     it('does not use the brand default for a child gallery whose terms are missing', () => {
-        vi.mocked(useLicenseTerms).mockReturnValue({
-            terms: {pricing_strategy: 'volume_licensing'},
+        vi.mocked(useLicensePricing).mockReturnValue({
+            pricing: {pricing_strategy: 'volume_licensing'},
             isLoading: false,
-            updateTerms: vi.fn(),
+            mutate: vi.fn(),
         });
         mockGalleryTerms({
             'gallery-a': {
@@ -290,10 +292,10 @@ describe('useVolumeLicensing gallery context', () => {
     // FE-1 regression: while a gallery's own terms are unresolved, the brand
     // default must not be presented as the gallery's price or licensing map.
     it('flags loading and fabricates no price while the displayed gallery is unresolved', () => {
-        vi.mocked(useLicenseTerms).mockReturnValue({
-            terms: {pricing_strategy: 'volume_licensing'},
+        vi.mocked(useLicensePricing).mockReturnValue({
+            pricing: {pricing_strategy: 'volume_licensing'},
             isLoading: false,
-            updateTerms: vi.fn(),
+            mutate: vi.fn(),
         });
         mockGalleryTerms(undefined, true);
 
@@ -308,10 +310,10 @@ describe('useVolumeLicensing gallery context', () => {
     });
 
     it('never reinterprets a settled partial map as brand terms', () => {
-        vi.mocked(useLicenseTerms).mockReturnValue({
-            terms: {pricing_strategy: 'volume_licensing'},
+        vi.mocked(useLicensePricing).mockReturnValue({
+            pricing: {pricing_strategy: 'volume_licensing'},
             isLoading: false,
-            updateTerms: vi.fn(),
+            mutate: vi.fn(),
         });
         mockGalleryTerms({
             'cart-gallery': {

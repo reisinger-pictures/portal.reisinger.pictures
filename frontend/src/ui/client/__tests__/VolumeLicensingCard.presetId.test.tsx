@@ -5,17 +5,20 @@ import useSWR from 'swr';
 import type {Photo} from '../../../logic/useGallery';
 import type {CartItem} from '../../../logic/CartContext';
 import {useCart} from '../../../logic/CartContext';
-import {useLicenseTerms} from '../../../logic/useLicenseTerms';
+import {useLicensePricing} from '../../../logic/useLicenseTerms';
 import {useUI} from '../../components/UIContext';
 import VolumeLicensingCard from '../components/VolumeLicensingCard';
 import {renderWithProviders} from '../../../test-setup';
 
 // The real `useVolumeLicensing` runs here: only the two data sources it reads
-// (SWR + the shared license-terms hook) are stubbed, so the card is rendered
-// from an actual `/api/settings/license-terms` response shape.
+// (SWR + the shared license-pricing hook) are stubbed, so the card is rendered
+// from an actual `/api/settings/license-pricing` response shape.
 vi.mock('swr', () => ({default: vi.fn()}));
 vi.mock('../../../api', () => ({fetcher: vi.fn(), apiMutate: vi.fn()}));
-vi.mock('../../../logic/useLicenseTerms', () => ({useLicenseTerms: vi.fn()}));
+vi.mock('../../../logic/useLicenseTerms', () => ({
+    useLicensePricing: vi.fn(),
+    LICENSE_PRICING_URL: '/api/settings/license-pricing',
+}));
 vi.mock('../../../logic/CartContext', () => ({useCart: vi.fn()}));
 vi.mock('../../components/UIContext', () => ({useUI: vi.fn()}));
 
@@ -73,10 +76,10 @@ describe('VolumeLicensingCard with a real volume-licensing payload', () => {
             itemCount: items.length,
         } as never);
         vi.mocked(useUI).mockReturnValue({showToast, confirm: vi.fn()} as never);
-        vi.mocked(useLicenseTerms).mockReturnValue({
-            terms: {pricing_strategy: 'scope_licensing'},
+        vi.mocked(useLicensePricing).mockReturnValue({
+            pricing: {pricing_strategy: 'scope_licensing'},
             isLoading: false,
-            updateTerms: vi.fn(),
+            mutate: vi.fn(),
         });
     });
 

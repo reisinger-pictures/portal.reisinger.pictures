@@ -79,6 +79,11 @@ export interface LicenseTermsPayload {
  */
 export const LICENSE_TERMS_LOADING_TIMEOUT_MS = 3000;
 
+/**
+ * Full license-terms endpoint. Super-admin only: it carries every internal
+ * price parameter (`price_*`, `calc_*`, `srp_*`, `mult_*`, `base_price`) and is
+ * therefore no longer public.
+ */
 export function useLicenseTerms() {
     const {data, isLoading, mutate} = useSWR<LicenseTerms>('/api/settings/license-terms', fetcher, {
         revalidateOnFocus: false,
@@ -94,9 +99,39 @@ export function useLicenseTerms() {
 }
 
 /**
+ * Public, deliberately minimized pricing endpoint for the buy flow.
+ *
+ * The full `/api/settings/license-terms` payload is super-admin only, so the
+ * client/photo pages no longer read it. This one serves exactly what they need:
+ * the effective licensing mode and the volume-discount tier table — no internal
+ * price parameters.
+ */
+export const LICENSE_PRICING_URL = '/api/settings/license-pricing';
+
+/**
+ * Shape of {@link LICENSE_PRICING_URL}. `volume_pricing` stays `unknown` on
+ * purpose: consumers must validate it through `parseEffectiveLicenseTerms()`
+ * from `useVolumeLicensing` rather than trusting a blind cast.
+ */
+export interface LicensePricing {
+    pricing_strategy?: string;
+    volume_pricing?: unknown;
+}
+
+export function useLicensePricing() {
+    const {data, isLoading, mutate} = useSWR<LicensePricing>(LICENSE_PRICING_URL, fetcher, {
+        revalidateOnFocus: false,
+        loadingTimeout: LICENSE_TERMS_LOADING_TIMEOUT_MS,
+    });
+
+    return {pricing: data, isLoading, mutate};
+}
+
+/**
  * R-01 (naming/SRP): Bankverbindung & Impressum — nur Lizenztexte-unabhängige, sensible Felder
  * (IBAN, BIC, Empfänger, Firmenadresse, company_email). Authentifiziert (GET hinter auth:api).
- * Lizenztexte + Preisfaktoren liefert useLicenseTerms() (public-safe).
+ * Lizenztexte + Preisfaktoren liefert useLicenseTerms() (super_admin-only);
+ * der öffentliche Kauf-Flow liest useLicensePricing().
  */
 export interface BillingDetails {
     bank_holder: string;

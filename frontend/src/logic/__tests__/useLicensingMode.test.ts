@@ -12,13 +12,16 @@ vi.mock('../../api', () => ({
 }));
 
 vi.mock('../useLicenseTerms', () => ({
-    useLicenseTerms: vi.fn(),
+    // The hook now reads the public, minimized pricing endpoint instead of the
+    // full (super-admin only) license-terms payload.
+    useLicensePricing: vi.fn(),
+    LICENSE_PRICING_URL: '/api/settings/license-pricing',
     // The hook reads this budget to bound how long a hung request may hold the
     // UI in its unresolved state, so the mock has to expose it too.
     LICENSE_TERMS_LOADING_TIMEOUT_MS: 3000,
 }));
 
-import { useLicenseTerms } from '../useLicenseTerms';
+import { useLicensePricing } from '../useLicenseTerms';
 
 describe('useLicensingMode', () => {
     beforeEach(() => {
@@ -26,10 +29,10 @@ describe('useLicensingMode', () => {
     });
 
     it('returns scope_licensing when no galleryId and pricing_strategy is scope_licensing', () => {
-        vi.mocked(useLicenseTerms).mockReturnValue({
-            terms: { pricing_strategy: 'scope_licensing' },
+        vi.mocked(useLicensePricing).mockReturnValue({
+            pricing: { pricing_strategy: 'scope_licensing' },
             isLoading: false,
-            updateTerms: vi.fn(),
+            mutate: vi.fn(),
         });
         vi.mocked(useSWR).mockReturnValue({
             data: undefined,
@@ -44,10 +47,10 @@ describe('useLicensingMode', () => {
     });
 
     it('returns volume_licensing from pricing_strategy when no galleryId', () => {
-        vi.mocked(useLicenseTerms).mockReturnValue({
-            terms: { pricing_strategy: 'volume_licensing' },
+        vi.mocked(useLicensePricing).mockReturnValue({
+            pricing: { pricing_strategy: 'volume_licensing' },
             isLoading: false,
-            updateTerms: vi.fn(),
+            mutate: vi.fn(),
         });
         vi.mocked(useSWR).mockReturnValue({
             data: undefined,
@@ -62,10 +65,10 @@ describe('useLicensingMode', () => {
     });
 
     it('falls back to scope_licensing when terms not loaded', () => {
-        vi.mocked(useLicenseTerms).mockReturnValue({
-            terms: undefined,
+        vi.mocked(useLicensePricing).mockReturnValue({
+            pricing: undefined,
             isLoading: true,
-            updateTerms: vi.fn(),
+            mutate: vi.fn(),
         });
         vi.mocked(useSWR).mockReturnValue({
             data: undefined,
@@ -80,10 +83,10 @@ describe('useLicensingMode', () => {
     });
 
     it('uses gallery-specific endpoint result over global terms when galleryId is provided', () => {
-        vi.mocked(useLicenseTerms).mockReturnValue({
-            terms: { pricing_strategy: 'scope_licensing' },
+        vi.mocked(useLicensePricing).mockReturnValue({
+            pricing: { pricing_strategy: 'scope_licensing' },
             isLoading: false,
-            updateTerms: vi.fn(),
+            mutate: vi.fn(),
         });
         vi.mocked(useSWR).mockReturnValue({
             data: { pricing_strategy: 'volume_licensing' },
@@ -98,10 +101,10 @@ describe('useLicensingMode', () => {
     });
 
     it('falls back to global terms when gallery terms not loaded', () => {
-        vi.mocked(useLicenseTerms).mockReturnValue({
-            terms: { pricing_strategy: 'scope_licensing' },
+        vi.mocked(useLicensePricing).mockReturnValue({
+            pricing: { pricing_strategy: 'scope_licensing' },
             isLoading: false,
-            updateTerms: vi.fn(),
+            mutate: vi.fn(),
         });
         vi.mocked(useSWR).mockReturnValue({
             data: undefined,
@@ -133,10 +136,10 @@ describe('useLicensingModeStatus', () => {
         mutate: vi.fn(),
     } as never);
 
-    const brandTerms = (pricing_strategy: string, isLoading = false) => vi.mocked(useLicenseTerms).mockReturnValue({
-        terms: { pricing_strategy },
+    const brandTerms = (pricing_strategy: string, isLoading = false) => vi.mocked(useLicensePricing).mockReturnValue({
+        pricing: { pricing_strategy },
         isLoading,
-        updateTerms: vi.fn(),
+        mutate: vi.fn(),
     });
 
     beforeEach(() => {
@@ -206,12 +209,12 @@ describe('useLicensingModeStatus', () => {
         expect(vi.mocked(useSWR).mock.calls[0][0]).toBeNull();
     });
 
-    it('requests the gallery-scoped terms endpoint for a gallery', () => {
+    it('requests the gallery-scoped license-pricing endpoint for a gallery', () => {
         brandTerms('scope_licensing');
         swr(undefined, false);
 
         renderHook(() => useLicensingModeStatus('g1'));
 
-        expect(vi.mocked(useSWR).mock.calls[0][0]).toBe('/api/settings/license-terms?gallery_id=g1');
+        expect(vi.mocked(useSWR).mock.calls[0][0]).toBe('/api/settings/license-pricing?gallery_id=g1');
     });
 });

@@ -1,6 +1,6 @@
 import useSWR from 'swr';
 import {fetcher} from '../api';
-import {LICENSE_TERMS_LOADING_TIMEOUT_MS, useLicenseTerms} from './useLicenseTerms';
+import {LICENSE_PRICING_URL, LICENSE_TERMS_LOADING_TIMEOUT_MS, useLicensePricing} from './useLicenseTerms';
 
 export type LicensingMode = 'scope_licensing' | 'volume_licensing';
 
@@ -18,8 +18,8 @@ export interface LicensingModeStatus {
 
 /**
  * Determine the active licensing mode together with its resolution status from
- * the backend `pricing_strategy` setting (delivered via
- * /api/settings/license-terms).
+ * the backend `pricing_strategy` setting (delivered via the public,
+ * minimized /api/settings/license-pricing).
  *
  * When a `galleryId` is provided, the backend resolves the effective mode
  * considering the gallery's `licensing_mode` override (if any). The brand terms
@@ -28,8 +28,8 @@ export interface LicensingModeStatus {
  * brand default — callers must not render a gallery-specific map then.
  */
 export function useLicensingModeStatus(galleryId?: string): LicensingModeStatus {
-    const { terms, isLoading: globalTermsLoading } = useLicenseTerms();
-    const galleryKey = galleryId ? `/api/settings/license-terms?gallery_id=${galleryId}` : null;
+    const { pricing, isLoading: globalTermsLoading } = useLicensePricing();
+    const galleryKey = galleryId ? `${LICENSE_PRICING_URL}?gallery_id=${galleryId}` : null;
     const { data: galleryTerms, isLoading: galleryTermsLoading } = useSWR<{ pricing_strategy?: string }>(
         galleryKey,
         fetcher,
@@ -44,7 +44,7 @@ export function useLicensingModeStatus(galleryId?: string): LicensingModeStatus 
     );
 
     const hasGalleryTerms = galleryTerms !== undefined && galleryTerms !== null;
-    const effectiveTerms = galleryId && hasGalleryTerms ? galleryTerms : terms;
+    const effectiveTerms = galleryId && hasGalleryTerms ? galleryTerms : pricing;
 
     return {
         mode: effectiveTerms?.pricing_strategy === 'volume_licensing'

@@ -768,6 +768,69 @@ Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA v
   Statusbedeutung, „nie Key-Material in der Antwort") hält `features/security/env-hardening.md`
   als dauerhaften SOLL-Zustand; der Umsetzungsstand steht im Protokoll in `AGENTS.todo.md`.
 
+- **D-27 — Der vollständige Lizenz-/Preis-Payload ist `super_admin`, nicht öffentlich.**
+  `GET /api/settings/license-terms` lag bis hier **ausserhalb jeder Middleware-Gruppe** in
+  `backend/routes/api.php` und antwortete anonym mit HTTP 200 — inklusive `base_price`,
+  `calc_*`, `srp_*`, `price_*` und der `mult_*`-Faktoren. *Warum:* der Endpunkt ist eine
+  interne Preisparameter-Auskunft; nur das Management (Settings-Formular, Shooting-Rechner)
+  liest ihn, und beide Aufrufer sind ohnehin super-admin-gegated. **Umgesetzt:** die Route
+  steht jetzt in der Gruppe `Route::middleware(['auth:api', 'throttle:api'])` und trägt
+  zusätzlich `->middleware('super_admin')`; die Reihenfolge ist Teil der Entscheidung —
+  `auth:api` beantwortet anonym mit 401, `super_admin` eine falsche Rolle mit 403.
+  **Belegt** über `php artisan route:list --path=settings`:
+  `GET|HEAD api/settings/license-terms => api, auth:api, throttle:api, super_admin`.
+  Gepinnt durch `LicenseTermsAccessTest` (anonym 401, Client 403, Admin 403, Super-Admin 200)
+  und die umbenannte `SettingsControllerTest::test_get_license_terms_requires_super_admin`.
+- **D-28 — Öffentlich bleibt nur ein bewusst minimierter Preisanzeige-Endpunkt:
+  `GET /api/settings/license-pricing`.** Er liefert **ausschliesslich** `pricing_strategy`
+  und `volume_pricing` (`{preset_id, preset_name, tiers[]}`). *Warum:* der Client-/Kauf-Flow
+  und die öffentliche Foto-Detailseite brauchen den Lizenz-Modus und die
+  Mengenrabatt-Staffel, um einen Preis anzuzeigen — mehr nicht. Der Modus ist über
+  `Gallery::effective_licensing_mode` ohnehin öffentlich (er steht im Galerie-Baum, den der
+  Kauf-Flow rendert), und die Staffel ist der Preis-**Plan**, den der Kunde sehen muss; die
+  internen Parameter (`price_*`, `calc_*`, `srp_*`, `mult_*`, `base_price`) bleiben
+  nicht-öffentlich. **Beide Endpunkte teilen sich die Auflösung**
+  (`SettingsController::resolveLicensePricingContext()`) **und die Projektion**
+  (`SettingsController::volumePricingPayload()`), damit eine Galerie nicht je nach Endpunkt
+  auf einen anderen Modus oder ein anderes Preset auflöst. **Gepinnt durch**
+  `LicenseTermsAccessTest`: anonym 200, exakt die zwei Top-Level-Keys (über `array_keys`,
+  nicht über `assertJsonStructure` — das tolerierte einen dritten), `assertJsonMissingPath`
+  für die internen Parameter, und derselbe `pricing_strategy`/`volume_pricing` über beide
+  Endpunkte für dieselbe Galerie. **Verworfen:** die Voll-Route öffentlich zu lassen und nur
+  Felder abzuschneiden — dann hinge die Nicht-Öffentlichkeit an einer Feldliste statt an der
+  Route.
+- **D-29 — `filesystems.disks.local.serve = false`.** Laravel registriert für einen
+  servierenden `local`-Disk die Route `GET|PUT /storage/{path}` — ohne Authentifizierung und
+  mit `storage/app/private` als Root, also u. a. mit `stripe_secret.txt`. *Warum:* eine
+  Dateiauslieferungs-Route ohne Auth auf einem Verzeichnis mit Secrets ist genau die
+  Fehlerklasse, die das Security Risk Register nicht als akzeptiert führt. **Umgesetzt:**
+  `'serve' => false` in `backend/config/filesystems.php`. **Belegt** über
+  `php artisan route:list`: die Zahl der Routen mit `storage` im URI ist **0**. *Grenze:*
+  die legitime Auslieferung läuft über `FileDeliveryController`
+  (`api/media/{slug}/{filename}`, auth-gated) — die entfernte Route war kein Auslieferungspfad.
+- **D-30 — Die Management-Konsumenten des Voll-Payloads sind im UI super-admin-gegated.**
+  `CalculatorSettingsCard` (Settings-Formular) liest `useLicenseTerms()` und wird jetzt in
+  `ManagementSettingsView` mit `{isSuperAdmin && …}` gekapselt — analog `BrandSettingsCard`.
+  `ShootingCalculatorModal` ist bereits gegated: es wird nur aus
+  `ManagementManualInvoiceView` gerendert, und dort steht
+  `if (!isSuperAdmin) return …` als früher Return. *Warum:* der Endpunkt ist seit D-27
+  super-admin-only; ein Management-View, der das Kärtchen für Nicht-Super-Admins rendert,
+  würde einen 403 in der Oberfläche sichtbar machen. **Verifiziert, nicht geändert:**
+  `ManagementManualInvoiceView.tsx` → `if (!isSuperAdmin) return <div …><ErrorMessage …/>`;
+  `ShootingCalculatorModal` hat genau eine Aufrufstelle (in jener View).
+- **D-31 — Der Website-Import läuft künftig über ein Login-JWT (Super-Admin).** Er wird
+  **nicht** in diesem Repo angefasst: die importierende Website ist ein separates Repository
+  und wird separat geplant. *Warum:* dieselbe Ursache (anonymer Preiszugriff) hat dort einen
+  zweiten Verbraucher, aber einen anderen Besitzer und einen anderen Deploy-Pfad; ein
+  Repo-übergreifender Schnitt in derselben Welle wäre nicht verifizierbar. **Umgesetzt ist er
+  dennoch — im Website-Repo, nicht hier:** `~/dev/reisinger.pictures`,
+  `packages/tools/scripts/import-portal-license-terms.ts` loggt sich per `POST /api/auth/login`
+  als Super-Admin ein und reicht das httpOnly-Cookie `rp_jwt` an `/api/settings/license-terms`
+  weiter (Zugangsdaten aus `PORTAL_ADMIN_EMAIL`/`PORTAL_ADMIN_PASSWORD`, nie im Repo). Belegt:
+  der Aufruf ohne Env bricht mit klarer Meldung und Exit 1 ab, der Snapshot bleibt unverändert.
+  Dieses Repo committet davon nichts; die dortige Änderung bleibt unversioniert, weil das
+  Website-Repo unabhängige Owner-Arbeit trägt (eigener Commit/Verify dort).
+
 ## TODO (UI-Review)
 
 UI-Review-Screenshot-Skill noch nicht angewendet (Playwright-Harness + Vision-Analyse). Referenz: ocg-price-tracker/tests/screenshots (ui-screenshots.spec.ts mit Section-Captures).

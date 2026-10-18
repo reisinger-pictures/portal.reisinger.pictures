@@ -18,7 +18,7 @@ import {
     VolumeLicensingResult,
     VolumeTierConfig,
 } from './CartContext';
-import {useLicenseTerms} from './useLicenseTerms';
+import {LICENSE_PRICING_URL, useLicensePricing} from './useLicenseTerms';
 import {formatEuroWhole} from './formatCurrency';
 
 // ---------------------------------------------------------------------------
@@ -30,20 +30,20 @@ export interface VolumePricingConfig {
     tiers: VolumeTierConfig[];
 }
 
-/** One tier of a volume preset as delivered by the license-terms endpoint. */
+/** One tier of a volume preset as delivered by the license-pricing endpoint. */
 export interface VolumePricingTierPayload {
     min_quantity: number;
     price_cents: number;
 }
 
 /**
- * Backend shape of `volume_pricing` inside `/api/settings/license-terms`.
+ * Backend shape of `volume_pricing` inside `/api/settings/license-pricing`.
  *
  * Contract: `preset_id` is the `volume_presets.id` primary key — a
  * `foreignId()`/bigint that the API serialises as a JSON **number**
- * (`SettingsController::getLicenseTerms()`). It is deliberately *not* a string:
- * the frontend never sends it back, it is only stringified into the opaque
- * `mode|preset` group key that mirrors
+ * (`SettingsController::volumePricingPayload()`). It is deliberately *not* a
+ * string: the frontend never sends it back, it is only stringified into the
+ * opaque `mode|preset` group key that mirrors
  * `CheckoutService::groupItemsByLicensingMode()`.
  *
  * All three fields are always present once `volume_pricing` is not `null`; the
@@ -74,7 +74,7 @@ export const DEFAULT_VOLUME_PRICING: VolumePricingConfig = {
 export const DEFAULT_PRESET_KEY = 'default';
 
 /**
- * The fields returned by the public license-terms endpoint, after
+ * The fields returned by the public license-pricing endpoint, after
  * {@link parseEffectiveLicenseTerms} validated the response. Both members are
  * always present; a missing or malformed response is normalised to `null` here
  * instead of being trusted.
@@ -257,7 +257,7 @@ export function parseVolumePricing(value: unknown): VolumePricingPayload | null 
 }
 
 /**
- * Validate an untrusted license-terms response. Returns `null` for anything
+ * Validate an untrusted license-pricing response. Returns `null` for anything
  * that is not an object so callers can keep using their own safe default.
  */
 export function parseEffectiveLicenseTerms(value: unknown): EffectiveLicenseTerms | null {
@@ -277,7 +277,7 @@ export function presetKeyFromId(presetId: number | null | undefined): string {
 }
 
 /**
- * Resolve the effective mode and preset from a license-terms response.
+ * Resolve the effective mode and preset from a license-pricing response.
  * A missing/loading response intentionally falls back to scope licensing,
  * which is the server's safe default.
  */
@@ -557,7 +557,7 @@ const fetchCartLicenseTerms = async (key: string): Promise<unknown> => {
     const galleryIds = parseGalleryIds(key);
     const entries = await Promise.all(galleryIds.map(async (galleryId) => {
         const terms = await fetcher<unknown>(
-            `/api/settings/license-terms?gallery_id=${encodeURIComponent(galleryId)}`,
+            `${LICENSE_PRICING_URL}?gallery_id=${encodeURIComponent(galleryId)}`,
         );
         return [galleryId, terms] as const;
     }));
@@ -585,7 +585,7 @@ interface ResolvedGalleryLicenseTerms {
  * composite fetcher which performs the per-gallery requests concurrently.
  */
 function useResolvedGalleryLicenseTerms(galleryIds: string[]): ResolvedGalleryLicenseTerms {
-    const {terms, isLoading: globalTermsLoading} = useLicenseTerms();
+    const {pricing, isLoading: globalTermsLoading} = useLicensePricing();
     const uniqueGalleryIds = Array.from(new Set(
         galleryIds.filter(id => typeof id === 'string' && id.length > 0),
     )).sort();
@@ -593,13 +593,14 @@ function useResolvedGalleryLicenseTerms(galleryIds: string[]): ResolvedGalleryLi
     const termsKey = usesCompositeTerms
         ? cartTermsKey(uniqueGalleryIds)
         : uniqueGalleryIds.length === 1
-            ? `/api/settings/license-terms?gallery_id=${encodeURIComponent(uniqueGalleryIds[0])}`
+            ? `${LICENSE_PRICING_URL}?gallery_id=${encodeURIComponent(uniqueGalleryIds[0])}`
             : null;
     const {data, isLoading} = useSWR<unknown>(termsKey, fetchCartLicenseTerms, {revalidateOnFocus: false});
 
-    // `LicenseTerms` only describes the scalar setting values; `volume_pricing`
-    // is an object, so the brand terms are validated before they are used.
-    const globalTerms = parseEffectiveLicenseTerms(terms);
+    // `LicensePricing` only describes the two members the minimized endpoint
+    // serves; `volume_pricing` is an object, so the brand terms are validated
+    // before they are used.
+    const globalTerms = parseEffectiveLicenseTerms(pricing);
     const galleryTermsMap = usesCompositeTerms
         ? asTermsMap(data, uniqueGalleryIds)
         : null;

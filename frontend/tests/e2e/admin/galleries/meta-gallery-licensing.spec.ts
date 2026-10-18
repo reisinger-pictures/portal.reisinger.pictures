@@ -120,7 +120,7 @@ test.describe('Meta-gallery child licensing', () => {
         const termsRequests: string[] = [];
         page.on('request', requestEvent => {
             const url = new URL(requestEvent.url());
-            if (url.pathname === '/api/settings/license-terms' && url.searchParams.has('gallery_id')) {
+            if (url.pathname === '/api/settings/license-pricing' && url.searchParams.has('gallery_id')) {
                 termsRequests.push(url.searchParams.get('gallery_id') ?? '');
             }
         });
