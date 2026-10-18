@@ -27,31 +27,24 @@
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
-> Entscheidungen liegen in `AGENTS.md` §14, ihr Umsetzungsstand im Protokoll ganz oben.
-> Die letzte offene Entscheidung war D-12 (Initial-Fokus) und ist am selben Tag entschieden
-> worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
-> entstanden ist — nicht, dass eine vergessene offen blieb.
+> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **30 offene `[ ]`** und **45 wartende
+> `[~]`** über 1677 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (30), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1677). Aufteilung der 30: **16× `manuell prüfen:`**, **1×
+> `Entscheidung offen:`** (die Dependabot-Bündelung — eine **neue** Frage im Sinne des Absatzes
+> darüber) und **13× gewöhnliche Arbeit**. Alle 45 `[~]` tragen ein `wartet auf`. Der Vergleich
+> zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
+> hinzu, andere wurden entfernt.
 >
-> **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
-> Entscheidungen liegen in `AGENTS.md` §14, ihr Umsetzungsstand im Protokoll ganz oben.
-> Die letzte offene Entscheidung war D-12 (Initial-Fokus) und ist am selben Tag entschieden
-> worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
-> entstanden ist — nicht, dass eine vergessene offen blieb.
->
-> **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
-> Entscheidungen liegen in `AGENTS.md` §14, ihr Umsetzungsstand im Protokoll ganz oben.
-> Die letzte offene Entscheidung war D-12 (Initial-Fokus) und ist am selben Tag entschieden
-> worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
-> entstanden ist — nicht, dass eine vergessene offen blieb.
->
-> **Gemessen, nicht geschätzt** (die Zahlen oben sind aus `grep -cE
-> '^[[:space:]]*[-*]?[[:space:]]*\[\[[x ~]\]]' AGENTS.todo.md` abgeleitet, **ohne** den
-> Entscheidungs-Protokoll am Dateianfang, dessen Checkboxen eine andere Bedeutung
-> haben — siehe dort). **Nicht** mitgezählt wird das Entscheidungs-Protokoll: seine
-> `0`-Zeilen bedeuten „die Entscheidung ist in Kraft", nicht „die Arbeit ist fertig".
-> Die Positionen liegen in **11 von 22 `##`-Abschnitten**
-> mit offenen Positionen. Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
+> **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (75 = 30 offen + 45 wartend
+> + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
+> die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
+> am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
+> **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
+> Die Positionen liegen in **21 von 24 `##`-Abschnitten**
+> (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
+> `grep -c '^## ' AGENTS.todo.md`). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
 > Wer hier eine Position sucht, nutzt `grep -n '^- \['
 > AGENTS.todo.md` und nicht die Reihenfolge im Dokument.
@@ -1142,11 +1135,6 @@ getrennt.
 ### P1 — AI / Mail / Jobs / Console — 🟡 OFFENE FOLLOW-UPS (Live-Nachweis + Policy-Entscheidung)
 
 - [~] wartet auf den Live-Scheduler-/Importnachweis; der Code ist verifiziert. **P1-A5 (MEDIUM; historischer Befund, Verifikation offen)** `import-locations` lief im früheren Boot-Flow über HTTP mit `truncate()`. Im aktuellen Working Tree ruft `deployment/docker-compose.yml` den Import beim Boot nicht mehr auf; `routes/console.php` plant ihn wöchentlich und der Command nutzt einen Lock/transactionalen Refresh. Live-Scheduler-/Importnachweis bleibt offen.
-
-### P1 — Infra / CI / Deploy — 🟡 OFFEN: Deploy-Regel für Auto-Merge-Heads
-
-- [ ] **Ein Merge-Kommit auf `main` hat keinen CI-Lauf** (Befund 2026-10-18). `automerge.yml:115-124` mergt mit `secrets.GITHUB_TOKEN`; Pushes damit triggern per GitHub-Regel **keine** Workflows. Belegt: `main` head `e2d280b` (Auto-Merge von PR #18) — `gh run list --commit e2d280bd8191704b0565e1e8a58287be54ca2453` zeigt ausschließlich Dependabot-`dynamic`-Läufe und **keinen** CI-Lauf. **Folge:** die Deploy-Vorbedingung „grüner CI für genau den gepushten Head" (§13, D-1) ist für einen Auto-Merge-Head wörtlich nicht erfüllbar; die Validierung liegt dann auf dem Push-Lauf des PR-Branches (`7a9974f0`, `39130666484`, 11/11 grün), der nach dem Rebase denselben Baum trägt. **Entscheidung (D-34, Owner 2026-10-18):** der grüne Push-Lauf des PR-Branches zählt als Deploy-Nachweis für einen Auto-Merge-Head — über den **Baum**, nicht über den Commit (`git rev-parse 7a9974f0^{tree}` = `git rev-parse e2d280b^{tree}` = `97a9b54c38ab1ef7f39dc075e81b3363de61f363`). Ein PAT statt `GITHUB_TOKEN` ist **verworfen**: er erzeugte zwar den `main`-Lauf, kostete aber einen zweiten vollen CI-Durchgang je Bump — genau das, was D-33 vermeidet.
-  - **P1-I3 ist damit abgeschlossen** — und zwar über die **Live**-Durchsetzung, nicht mehr nur statisch: `automerge.yml` hat PR #18 selbst gemergt (Auto-Merge-Lauf `39130668143`, EXIT 0, Merge 13:29:48Z, `Determine whether to merge` lief durch und die Folge-Schritte liefen **nicht** `skipped` (`success`) — das belegt den Rückgabewert `true`; die Schritt-Ausgaben selbst gibt die API nicht heraus). Die statische Seite (Gate wartet auf den exakten `CI gate (push)`, `allowed-conclusions: success`, `fail-on-no-checks`, `checks-discovery-timeout: 2100`, `timeout-minutes: 65`) ist unverändert grün; die zweite Hälfte des alten Eintrags (Branch-Protection für `main`) ist per **D-3** bewusst nicht gesetzt und damit keine offene Aufgabe mehr. **Nebenbefund zur Sicherheit:** die gruppierte `minor-and-patch`-Regel in `.github/dependabot.yml` gilt nur für `applies-to: version-updates` — Security-Updates kommen **ungruppiert** einzeln an und sind nur merge-fähig, solange `fetch-metadata` Minor/Patch meldet (bei PR #18 der Fall).
 
 ### P1 — Modelle / Services / Data-Integrity — ✅ überwiegend FIXED (M3/M12 teilw.)
 
