@@ -299,6 +299,21 @@ führt keine Migration aus. Deshalb gilt:
   die 28 autoritativen `settings`-Keys des Seeders — die 28 Keys sind in
   `backend/AGENTS.md` (Database Setup Policy) aufgeführt. **Solange der Container nicht
   neu erzeugt ist, gilt die alte Fassung weiter**, siehe die nächste Regel.
+  **Zweiter, ebenso harter Grund (gemessen 2026-10-18): `bootstrap/cache/` ist vom Sync
+  ausgenommen.** Auf dem Host liegen dort `config.php` und `routes-v7.php` (Beleg:
+  `ls -la /home/webadmin/websites/api-portal.reisinger.pictures/bootstrap/cache/`), und
+  `rsync-backend-exclude.txt` führt die Zeile `bootstrap/cache/`. Ein `./sync.sh`
+  aktualisiert sie also **nicht**: ohne Neustart bliebe eine neue Route unbekannt (404) und
+  eine geänderte `config/`-Datei wirkungslos. Der Neustart behebt beides, weil der
+  Container-`Cmd` bei jedem Start `php artisan cache:clear` → `php artisan optimize` →
+  `php artisan migrate --force` → `php artisan app:seed-if-fresh` → `php artisan admin:update`
+  ausführt (Beleg: `docker inspect portal_backend --format '{{.Config.Cmd}}'`). Die Reihenfolge
+  Sync → Neustart ist damit nicht nur eine Opcache-Regel, sondern die Bedingung dafür, dass
+  Route- und Config-Cache überhaupt den neuen Stand sehen. **Gegenprobe nach dem Neustart:**
+  `docker exec portal_backend php artisan route:list | grep -c <neue-route>`. Gemessen nach dem
+  D-27/D-32-Deploy am 2026-10-18: `grep -ci storage` → **0** (D-29 greift), die neue
+  `license-pricing` antwortet mit **200**, und `license-terms` antwortet auf einen
+  JSON-Request (den einzigen, den die App sendet) mit **401** statt vorher 200.
 - **Neustart ≠ Recreate (STRICT, 2026-09-28).** `docker restart portal_backend`
   startet einen **bestehenden** Container mit der Konfiguration, mit der er
   **erzeugt** wurde. Änderungen an `command:`, `entrypoint:`, `environment:` oder
