@@ -150,18 +150,17 @@ SEC-14-Umsetzung; alles darunter ist eigene Arbeit.
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **42 offene `[ ]`** und **45 wartende
-> `[~]`** über 1738 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (42), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1738). Aufteilung der 42: **16× `manuell prüfen:`** und **26×
-> gewöhnliche Arbeit** (davon **14** neue Security-/Architecture-Review-Findings) — **0× `Entscheidung offen:`**, nachdem die Dependabot-Bündelung am selben
-> Tag umgesetzt wurde. Alle 45 `[~]` tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
+> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **44 offene `[ ]`** und **45 wartende
+> `[~]`** über 1781 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (44), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1781). Aufteilung der 44: **16× `manuell prüfen:`** und **28×
+> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. Alle 45 `[~]` tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
 > zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (87 = 42 offen + 45 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (89 = 44 offen + 45 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
@@ -1615,14 +1614,12 @@ gerissen und zur Entscheidung gemacht.
 ## 📌 SKILLS-STAND (2026-10-04) — Doku-Pass, keine Umsetzung
 
 > Erster `AGENTS.skills.md`-Marker (`aad25d14`, 15 Skills: 6× angewendet, 9× nicht zutreffend).
-> **Nichts hier ist umgesetzt.** Die folgenden fünf Positionen sind Befund-Protokoll, kein Arbeitsauftrag
+> **Nichts hier ist umgesetzt.** Die folgenden Positionen sind Befund-Protokoll, kein Arbeitsauftrag
 > (Board-Regel: Log, kein Auftrag). Jede Zahl ist an `Datei:Zeile` zitierbar und wurde vor dem Schreiben verifiziert.
+> **Update 2026-10-18:** die drei Playwright-Positionen (Named-Locks-Schwelle, Dreiklang, Matrix) sind
+> **committet** (`e1ed87a`) und entfernt — die Position 5 (`cancel-in-progress`) blieb bewusst stehen,
+> sie ist eine Betriebs-Notiz, keine Aufgabe.
 
-- [ ] **Position 1 — Playwright unterhalb der Named-Locks-Schwelle:** `frontend/package.json:71` deklariert `"@playwright/test": "^1.62.1"`, aufgelöst `1.62.1` (`frontend/pnpm-lock.yaml:767`, `playwright-core`/`playwright` ebd. `:2456,2461`). Named Locks (`lock:`) erfordern **≥ 1.63.0** (Skill `playwright-parallel`). Per Skill `node-deps` ist das eine **Range-Änderung plus Lockfile-Update via pnpm**, nie ein Pin.
-- [ ] **Position 2 — Der Bump steht nicht allein (Dreiklang, eine Position):** `deployment/Dockerfile.e2e:30` trägt `ARG PLAYWRIGHT_VERSION=1.62.1`, ebd. `:69` installiert den Browser exakt dafür (`npx playwright@… install chromium`), und `.github/workflows/e2e-image.yml:41` extrahiert die Version aus `package.json` und übergibt sie als Build-Arg (auch als Image-Tag). Alle drei Stellen müssen gemeinsam bewegt werden — sonst läuft ein **grüner Job mit falschem Browser**.
-  - *Notiz 2026-10-04 (Skills-Range `aad25d14..6629ad2`, Skill `node-deps`, neuer Absatz „Boundary: manifests vs images"):* benennt exakt diesen Mechanismus — eine Caret-Range, eingelesen in einen Build-Arg, ergibt die **Untergrenze der Range, nicht die aufgelöste Lockfile-Version**. Schärft die Position, ersetzt sie nicht: Der Range-Bump propagiert per `:41`-Extraktion (entfernt `^`) automatisch ins CI-Image, aber der `ARG`-Default in `:30` muss weiterhin von Hand mitbewegt werden (zählt nur für lokale Builds; CI übergibt via `build-args`). Über ein automatisches Nachziehen des `ARG`-Defaults sagt der Absatz nichts — der Dreiklang bleibt Handarbeit.
-- [ ] **Position 3 — Die E2E-Matrix ist das Muster, das Named Locks ersetzen:** `.github/workflows/ci.yml:374-380` definiert sieben Einträge — Desktop 1/3 (`:374`, `--workers=2`), **Desktop 2/3 (`:375`, `--workers=1`)**, Desktop 3/3 (`:376`, `--workers=2`), Mobile 1/3 (`:377`, `--workers=2`), **Mobile 2/3 (`:378`, `--workers=1`)**, Mobile 3/3 (`:379`, `--workers=2`) plus seriellen Eintrag (`:380`, `slug: kanban`, `--workers=1` mit `--grep` statt `--grep-invert` auf `projects-board|production-board|project-clear-fields|brand-settings|billing-details`). Budgets daneben: `frontend/playwright.config.ts:30-31` (`timeout: 120000`, `globalTimeout: 1500000`).
-- [ ] **Position 5 — `cancel-in-progress` weiterhin konfiguriert:** `.github/workflows/ci.yml:54-56` (`concurrency: group … / cancel-in-progress: true`) **vernichtet den Log eines laufenden Laufs**, sobald gepusht wird. Beim Debuggen nicht währenddessen pushen; ein abgebrochener Log sieht aus wie ein nie gelaufener Job.
 
 ---
 
@@ -1691,8 +1688,7 @@ Die Betriebs-Fakten (drei Werte, Konto, Endpunkt-ID, vier Events, die drei Falle
 
 **Offene Positionen:**
 
-- [ ] **offen, bewusst:** ein Build-Gate, das einen Prod-Build mit `pk_test` fail-closed abbricht
-  (analog `frontend/scripts/check-turnstile-build.mjs`). Ohne es schützt allein die Prüfzeile aus D-24.
+*(keine — die pk_test-Gate-Position ist mit `ea07783` erledigt und entfernt)*
 
 ## 🔍 Stripe-Selbsttest im Super-Admin (umgesetzt 2026-10-15)
 
