@@ -26,17 +26,18 @@
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **29 offene `[ ]`** und **45 wartende
-> `[~]`** über 1669 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (29), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1669). Aufteilung der 29: **16× `manuell prüfen:`** und **13×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **28 offene `[ ]`** und **45 wartende
+> `[~]`** über 1660 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (28), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1660). Aufteilung der 28: **16× `manuell prüfen:`** und **12×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**, nachdem die Dependabot-Bündelung am selben
-> Tag umgesetzt wurde. Alle 45 `[~]` tragen ein `wartet auf`. Der Vergleich zum 2026-09-28-Stand
-> (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen hinzu, andere wurden
-> entfernt.
+> Tag umgesetzt wurde. Alle 45 `[~]` tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
+> Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
+> zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
+> hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (75 = 30 offen + 45 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (73 = 28 offen + 45 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
@@ -440,16 +441,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   CR-CRM-008 (Z. 282/283/338 vs. 618), CR-DOC-001 (Z. 410, behauptet „V038").
 
 ### Braucht eine Entscheidung oder Betriebs-Evidenz (kein Code)
-
-- [ ] **D-23-Rest — `InfrastructureSupplyChainPolicyTest` auf Code statt Prosa umstellen.** Der
-  Filter lässt 80 von 113 Markdown-Dateien überspringen; eine neue veraltete `ghcr.io/`-Namespace in
-  einer davon fällt erst beim nächsten Code-Commit auf. **Der richtige Fix ist der Test, nicht der
-  Filter:** die Prüfung sollte die Dateien scannen, die tatsächlich ausgeliefert werden
-  (`deployment/docker-compose.yml`, `Dockerfile*`, `.github/workflows/*.yml`), und Prosa nicht als
-  Sicherheits-Gate missbrauchen. **Vorher messen:** der Test meldet 2820 Assertions und 112
-  gescannte `.md` — wie viele davon tragen einen Befund, der nicht auch im gescannten Code steht?
-  Erst diese Zahl entscheidet, ob der Aufwand trägt. Ohne sie ist die Lücke vertretbar (Doku-Drift
-  findet ein Review), mit ihr ist sie ein Befund.
 
 - [ ] wartet auf **Folgetag-Gegenprobe gegen den täglichen 09:20-CEST-Recreate.** `portal_backend`
   wurde am 2026-09-29T07:19:32Z und 2026-09-30T07:20:05Z **von selbst** neu erzeugt, jeweils mit dem
