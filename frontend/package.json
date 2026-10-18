@@ -11,6 +11,7 @@
         "dev": "vite",
         "prebuild": "node scripts/check-turnstile-build.mjs && tsc -b && node scripts/check-i18n.mjs",
         "build": "vite build",
+        "postbuild": "node scripts/check-stripe-build.mjs",
         "preview": "vite preview",
         "lint": "eslint . --max-warnings 0",
         "lint:fix": "eslint . --fix --max-warnings 0",
