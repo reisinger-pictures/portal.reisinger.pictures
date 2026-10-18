@@ -239,19 +239,31 @@ class UserController extends Controller
             $actorOrgId = $currentUser->org_id;
             $orgScope = [
                 'galleries' => $actorOrgId === null ? [] : $svc->getOrgGalleryScope($actorOrgId),
-                'groups' => $actorOrgId === null ? [] : $svc->getOrgGroupScope($actorOrgId),
+                'groups' => $actorOrgId === null ? [] : $svc->getOrgAssignableGalleryGroupIds($actorOrgId),
             ];
 
-            if ($request->has('gallery_ids')
-                && $this->outsideScope($request->input('gallery_ids', []), $orgScope['galleries'])
-            ) {
-                return response()->json(['error' => 'Es dürfen nur Galerien der eigenen Organisation zugewiesen werden.'], 403);
+            if ($request->has('gallery_ids')) {
+                $existingGalleryIds = $user->galleries()
+                    ->pluck('galleries.id')
+                    ->map(fn ($galleryId): string => (string) $galleryId)
+                    ->all();
+                $newGalleryIds = $this->newlyRequestedIds($request->input('gallery_ids', []), $existingGalleryIds);
+
+                if ($this->outsideScope($newGalleryIds, $orgScope['galleries'])) {
+                    return response()->json(['error' => 'Es dürfen nur Galerien der eigenen Organisation zugewiesen werden.'], 403);
+                }
             }
 
-            if ($request->has('gallery_group_ids')
-                && $this->outsideScope($request->input('gallery_group_ids', []), $orgScope['groups'])
-            ) {
-                return response()->json(['error' => 'Es dürfen nur Galerie-Gruppen der eigenen Organisation zugewiesen werden.'], 403);
+            if ($request->has('gallery_group_ids')) {
+                $existingGalleryGroupIds = $user->galleryGroups()
+                    ->pluck('gallery_groups.id')
+                    ->map(fn ($groupId): string => (string) $groupId)
+                    ->all();
+                $newGalleryGroupIds = $this->newlyRequestedIds($request->input('gallery_group_ids', []), $existingGalleryGroupIds);
+
+                if ($this->outsideScope($newGalleryGroupIds, $orgScope['groups'])) {
+                    return response()->json(['error' => 'Es dürfen nur Galerie-Gruppen der eigenen Organisation zugewiesen werden.'], 403);
+                }
             }
         }
 
@@ -357,6 +369,23 @@ class UserController extends Controller
         $scope = array_map(fn ($id): string => (string) $id, $scopeIds);
 
         return array_diff($requested, $scope) !== [];
+    }
+
+    /**
+     * Existing out-of-scope grants may be carried through a full edit payload,
+     * but a newly submitted id must still be inside the actor's delegation
+     * scope. Omitting an existing id from the submitted list removes it.
+     *
+     * @param  array<int, string>  $requestedIds
+     * @param  array<int, string>  $existingIds
+     * @return array<int, string>
+     */
+    private function newlyRequestedIds(array $requestedIds, array $existingIds): array
+    {
+        $requested = array_map(fn ($id): string => (string) $id, $requestedIds);
+        $existing = array_map(fn ($id): string => (string) $id, $existingIds);
+
+        return array_values(array_diff($requested, $existing));
     }
 
     public function destroy($id)

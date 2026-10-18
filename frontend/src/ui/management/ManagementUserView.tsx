@@ -3,7 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import { useState } from 'react';
 import {UserDetailed, useUsers, UserRole} from '../../logic/useUsers';
 import {flattenGroups} from '../../logic/utils';
-import {useProtectedGalleries} from '../../logic/useGalleries';
+import {flattenTreeGalleries, useProtectedGalleries} from '../../logic/useGalleries';
 import {usePermissions} from '../../logic/usePermissions';
 import UserPermissionsModal from './components/UserPermissionsModal';
 import CreateUserModal from './components/CreateUserModal';
@@ -16,21 +16,27 @@ export default function ManagementUserView() {
     const {tree} = useProtectedGalleries();
     const { showToast } = useUI();
 
-    
     const [editingUser, setEditingUser] = useState<UserDetailed | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     const flatGroups = tree ? flattenGroups(tree.groups) : [];
-    const flatGalleries = tree ? [...(tree.groups.flatMap(g => g.galleries || [])), ...(tree.root_galleries || [])] : [];
+    const flatGalleries = tree ? flattenTreeGalleries(tree) : [];
 
     // SEC-20261018-02: an org admin may only assign galleries and groups that
     // lie inside the organization's delegation scope — the server rejects the
     // rest. The tree above is permission-filtered but includes the actor's
     // personal grants, so the lists are narrowed explicitly. Fails closed: no
     // server scope means no offered assignments.
+    //
+    // Groups are narrowed with `assignable_gallery_group_ids`, not the broad
+    // `gallery_group_ids`: `UserController::update` checks the narrow set, and a
+    // photographer who is also an org admin still receives the broad management
+    // tree above. Filtering with the broad set would offer groups the server
+    // answers with 403.
+    const assignableGroupIds = orgScope?.assignable_gallery_group_ids;
     const selectableGroups = isOrgAdmin
-        ? flatGroups.filter(group => orgScope?.gallery_group_ids.includes(group.id) ?? false)
+        ? flatGroups.filter(group => assignableGroupIds?.includes(group.id) ?? false)
         : flatGroups;
     const selectableGalleries = isOrgAdmin
         ? flatGalleries.filter(gallery => orgScope?.gallery_ids.includes(gallery.id) ?? false)
@@ -84,6 +90,7 @@ export default function ManagementUserView() {
                     key={editingUser.id}
                     user={editingUser}
                     roles={allowedRoles}
+                    isOrgAdmin={isOrgAdmin}
                     flatGroups={selectableGroups}
                     flatGalleries={selectableGalleries}
                     onClose={() => setEditingUser(null)}

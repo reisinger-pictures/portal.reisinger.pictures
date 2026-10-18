@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { renderWithProviders } from '../../../test-setup';
@@ -46,13 +46,13 @@ const target: UserDetailed = {
     galleries: [],
 };
 
-function gallery(id: string, name: string): Gallery {
+function gallery(id: string, name: string, type: Gallery['type'] = 'delivery'): Gallery {
     return {
         id,
         name,
         slug: id,
         full_path: name,
-        type: 'delivery',
+        type,
         is_live: false,
         is_public: false,
     };
@@ -149,7 +149,7 @@ describe('ManagementUserView delegation boundary', () => {
             ...basePermissions,
             isAdmin: false,
             isOrgAdmin: true,
-            orgScope: { gallery_ids: ['ga1'], gallery_group_ids: ['g1'] },
+            orgScope: { gallery_ids: ['ga1'], gallery_group_ids: ['g1'], assignable_gallery_group_ids: ['g1'] },
         });
 
         const eventUser = userEvent.setup();
@@ -162,6 +162,32 @@ describe('ManagementUserView delegation boundary', () => {
         expect(within(dialog).queryByRole('checkbox', { name: 'Hochzeit' })).not.toBeInTheDocument();
         expect(within(dialog).queryByRole('checkbox', { name: 'Delivery B' })).not.toBeInTheDocument();
         expect(within(dialog).queryByRole('checkbox', { name: 'Root C' })).not.toBeInTheDocument();
+    });
+
+    it('offers a photographer who is also an org admin only the narrow assignable groups', async () => {
+        // A photographer receives the broad management tree. The server still
+        // checks the narrow assignable set for an org admin, so the broad
+        // `gallery_group_ids` must not be used here — `g2` is inside the broad
+        // scope but outside the assignable one.
+        vi.mocked(usePermissions).mockReturnValue({
+            ...basePermissions,
+            isAdmin: false,
+            isPhotographer: true,
+            isOrgAdmin: true,
+            orgScope: {
+                org_id: 'org-1',
+                gallery_ids: ['ga1'],
+                gallery_group_ids: ['g1', 'g2'],
+                assignable_gallery_group_ids: ['g1'],
+            },
+        });
+
+        const eventUser = userEvent.setup();
+        renderView();
+        const dialog = await openEditor(eventUser);
+
+        expect(within(dialog).getByRole('checkbox', { name: 'Print' })).toBeInTheDocument();
+        expect(within(dialog).queryByRole('checkbox', { name: 'Hochzeit' })).not.toBeInTheDocument();
     });
 
     it('fails closed for an org admin without a server-resolved scope', async () => {
@@ -179,6 +205,80 @@ describe('ManagementUserView delegation boundary', () => {
         expect(within(dialog).queryByRole('checkbox', { name: 'Print' })).not.toBeInTheDocument();
         expect(within(dialog).queryByRole('checkbox', { name: 'Delivery A' })).not.toBeInTheDocument();
         expect(within(dialog).queryByRole('checkbox', { name: 'Root C' })).not.toBeInTheDocument();
+    });
+
+    it('preserves existing out-of-scope grants on save and lets the admin remove them', async () => {
+        const updateUser = vi.fn().mockResolvedValue(undefined);
+        const legacyTarget: UserDetailed = {
+            ...target,
+            brand: 'rp',
+            gallery_groups: [{ id: 'legacy-group', name: 'Legacy group', parent_id: null }],
+            galleries: [gallery('legacy-selection', 'Legacy selection', 'selection')],
+        };
+        vi.mocked(useUsers).mockReturnValue({
+            users: [legacyTarget],
+            roles: [{ id: 'role-client', name: UserRole.CLIENT }],
+            createUser: vi.fn().mockResolvedValue(undefined),
+            updateUser,
+            deleteUser: vi.fn().mockResolvedValue(undefined),
+        });
+        vi.mocked(usePermissions).mockReturnValue({
+            ...basePermissions,
+            isAdmin: false,
+            isOrgAdmin: true,
+            orgScope: { org_id: 'org-1', gallery_ids: ['ga1'], gallery_group_ids: ['g1'], assignable_gallery_group_ids: ['g1'] },
+        });
+
+        const eventUser = userEvent.setup();
+        renderView();
+
+        let dialog = await openEditor(eventUser);
+        const legacyGroup = within(dialog).getByRole('checkbox', {
+            name: 'Legacy group (bestehende Freigabe)',
+        });
+        const legacyGallery = within(dialog).getByRole('checkbox', {
+            name: 'Legacy selection (bestehende Freigabe)',
+        });
+        expect(legacyGroup).toBeChecked();
+        expect(legacyGallery).toBeChecked();
+
+        await eventUser.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+        await waitFor(() => {
+            expect(updateUser).toHaveBeenNthCalledWith(
+                1,
+                'user-1',
+                [],
+                ['legacy-group'],
+                ['legacy-selection'],
+                false,
+                'none',
+                'rp',
+                false,
+            );
+        });
+
+        dialog = await openEditor(eventUser);
+        await eventUser.click(within(dialog).getByRole('checkbox', {
+            name: 'Legacy group (bestehende Freigabe)',
+        }));
+        await eventUser.click(within(dialog).getByRole('checkbox', {
+            name: 'Legacy selection (bestehende Freigabe)',
+        }));
+        await eventUser.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+        await waitFor(() => {
+            expect(updateUser).toHaveBeenNthCalledWith(
+                2,
+                'user-1',
+                [],
+                [],
+                [],
+                false,
+                'none',
+                'rp',
+                false,
+            );
+        });
     });
 
     it('keeps the full assignment lists for an admin', async () => {

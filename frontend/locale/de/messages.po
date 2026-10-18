@@ -41,6 +41,10 @@ msgstr "„Verzeichnisstruktur\" steht auf Kamera statt Standard"
 msgid "({photoCount} Bilder)"
 msgstr "({photoCount} Bilder)"
 
+#: src/ui/management/components/UserPermissionsModal.tsx
+msgid "(bestehende Freigabe)"
+msgstr "(bestehende Freigabe)"
+
 #: src/ui/client/components/CartItemList.tsx
 msgid "(Preis auf Anfrage)"
 msgstr "(Preis auf Anfrage)"
@@ -1160,6 +1164,10 @@ msgstr "Bestätigen"
 msgid "Beste Übereinstimmung"
 msgstr "Beste Übereinstimmung"
 
+#: src/ui/management/components/UserPermissionsModal.tsx
+msgid "Bestehende Freigaben außerhalb des verfügbaren Bereichs bleiben erhalten. Abwählen, um sie zu entfernen."
+msgstr "Bestehende Freigaben außerhalb des verfügbaren Bereichs bleiben erhalten. Abwählen, um sie zu entfernen."
+
 #: src/ui/management/components/InviteModal.tsx
 msgid "Bestehende Links"
 msgstr "Bestehende Links"
@@ -1818,6 +1826,10 @@ msgstr "Der FTPS-Verschlüsselungsmodus"
 #: src/ui/management/components/InviteModal.tsx
 msgid "Der Gast wird direkt ohne Anmeldung durchgewunken."
 msgstr "Der Gast wird direkt ohne Anmeldung durchgewunken."
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Der Import konnte nicht abgeschlossen werden."
+msgstr "Der Import konnte nicht abgeschlossen werden."
 
 #: src/ui/management/components/ModelDetailModal.tsx
 msgid "Der Link wird sofort ungültig und kann nicht mehr verwendet werden."

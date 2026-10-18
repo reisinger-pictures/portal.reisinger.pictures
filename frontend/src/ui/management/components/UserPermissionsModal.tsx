@@ -8,6 +8,7 @@ import ModalShell from '../../components/ModalShell';
 interface UserPermissionsModalProps {
     user: UserDetailed;
     roles?: Role[];
+    isOrgAdmin: boolean;
     flatGroups: FlatGroup[];
     flatGalleries: Gallery[];
     onClose: () => void;
@@ -19,6 +20,7 @@ const SUPER_ADMIN_ROLE_NAME = UserRole.SUPER_ADMIN;
 export default function UserPermissionsModal({
                                                  user,
                                                  roles,
+                                                 isOrgAdmin,
                                                  flatGroups,
                                                  flatGalleries,
                                                  onClose,
@@ -33,6 +35,15 @@ export default function UserPermissionsModal({
     const [brand, setBrand] = useState<string | null>(user.brand ?? null);
     const [canPurchaseUpgrades, setCanPurchaseUpgrades] = useState<boolean>(user.can_purchase_upgrades ?? false);
     const [isSaving, setIsSaving] = useState(false);
+
+    const selectableGroupIds = new Set(flatGroups.map(group => group.id));
+    const selectableGalleryIds = new Set(flatGalleries.map(gallery => gallery.id));
+    const legacyGroups = isOrgAdmin
+        ? user.gallery_groups.filter(group => !selectableGroupIds.has(group.id))
+        : [];
+    const legacyGalleries = isOrgAdmin
+        ? user.galleries.filter(gallery => !selectableGalleryIds.has(gallery.id))
+        : [];
 
     const selectedRoleNames = (roles ?? [])
         .filter(r => selRoles.includes(r.id))
@@ -182,6 +193,21 @@ export default function UserPermissionsModal({
                                 <span className="label-text">{'- '.repeat(g.depth)}{g.name}</span>
                             </label>
                         ))}
+                        {legacyGroups.length > 0 && (
+                            <div className="mt-3 border-t border-base-300 pt-3">
+                                <p role="alert" className="alert alert-info mb-2 py-2 text-sm">
+                                    <Trans>Bestehende Freigaben außerhalb des verfügbaren Bereichs bleiben erhalten. Abwählen, um sie zu entfernen.</Trans>
+                                </p>
+                                {legacyGroups.map(group => (
+                                    <label key={group.id} className="label cursor-pointer justify-start gap-3 p-2 rounded hover:bg-base-200 transition-colors">
+                                        <input type="checkbox" checked={selGroups.includes(group.id)}
+                                               onChange={() => toggleItem(selGroups, setSelGroups, group.id)}
+                                               className="checkbox shrink-0"/>
+                                        <span className="label-text">{group.name} <span className="opacity-70"><Trans>(bestehende Freigabe)</Trans></span></span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div className="border border-base-300 rounded-box p-4 h-64 overflow-y-auto">
                         <h4 className="font-bold mb-2 sticky top-0 bg-base-100 z-10"><Trans>Galerien</Trans></h4>
@@ -193,6 +219,21 @@ export default function UserPermissionsModal({
                                 <span className="label-text truncate" title={g.name}>{g.name}</span>
                             </label>
                         ))}
+                        {legacyGalleries.length > 0 && (
+                            <div className="mt-3 border-t border-base-300 pt-3">
+                                <p role="alert" className="alert alert-info mb-2 py-2 text-sm">
+                                    <Trans>Bestehende Freigaben außerhalb des verfügbaren Bereichs bleiben erhalten. Abwählen, um sie zu entfernen.</Trans>
+                                </p>
+                                {legacyGalleries.map(gallery => (
+                                    <label key={gallery.id} className="label cursor-pointer justify-start gap-3 p-2 rounded hover:bg-base-200 transition-colors">
+                                        <input type="checkbox" checked={selGalleries.includes(gallery.id)}
+                                               onChange={() => toggleItem(selGalleries, setSelGalleries, gallery.id)}
+                                               className="checkbox shrink-0"/>
+                                        <span className="label-text truncate" title={gallery.name}>{gallery.name} <span className="opacity-70"><Trans>(bestehende Freigabe)</Trans></span></span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
         </ModalShell>

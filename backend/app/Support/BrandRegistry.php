@@ -145,8 +145,14 @@ class BrandRegistry
      * brand-bound management user must not be able to manage a group whose
      * parent is foreign or brand-less.  Missing parents and cycles fail closed
      * so a legacy/corrupt tree cannot widen access.
+     *
+     * `$resolveGroup` exists for callers that already loaded the ancestor
+     * closure (e.g. `AuthorizationService::getOrgAssignableGalleryGroupIds()`):
+     * they pass a map-backed resolver so the walk does not issue one query per
+     * group and level. It must return the same row `GalleryGroup::find()` would
+     * (or `null`), and the default keeps the original behaviour.
      */
-    public static function galleryGroupTreeMatchesBrand(?GalleryGroup $group, mixed $expectedBrand): bool
+    public static function galleryGroupTreeMatchesBrand(?GalleryGroup $group, mixed $expectedBrand, ?callable $resolveGroup = null): bool
     {
         if (! $group instanceof GalleryGroup || ! self::resourceMatchesBrand($group->brand, $expectedBrand)) {
             return false;
@@ -181,7 +187,7 @@ class BrandRegistry
                 return true;
             }
 
-            $current = GalleryGroup::find($parentId);
+            $current = $resolveGroup !== null ? $resolveGroup((string) $parentId) : GalleryGroup::find($parentId);
         }
 
         return false;
