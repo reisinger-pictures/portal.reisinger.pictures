@@ -852,6 +852,32 @@ Run `36747358962` (11/11 grün). Immer `git rev-parse HEAD` oder die volle SHA v
   (Route-Middleware über `app('router')`/`gatherMiddleware()`, anonymer 200 mit den Kundenfeldern
   und `assertJsonMissingPath` für `calc_base_price`, `srp_base_price`, `mult_commercial`,
   `price_web`). **Nicht regredieren:** wer die Route wieder ohne Throttle einträgt, bricht den Test.
+- **D-33 — Dependabot-Läufe holen die Stripe-Test-Secrets aus dem **Dependabot**-Secret-Store,
+  nicht aus den Actions-Secrets** (Owner, 2026-10-18). *Frage:* die fünf Security-PRs
+  (#16–#20) standen rot, obwohl ihr Code in Ordnung war — ihre E2E-Jobs starben am Schritt
+  `Ensure Stripe test keys are configured`. *Ursache (belegt, nicht vermutet):* GitHub hält
+  **Actions**-Secrets von jedem Dependabot-ausgelösten Lauf zurück, auch beim `push`-Event.
+  Der `ci.yml`-Kommentar behauptete dagegen, der Push-Lauf auf einem Dependabot-Branch sei
+  „authoritative" — er konnte es nicht sein, weil auch er secretlos lief: PR #18, Push-Lauf
+  `36747501376` → **alle sechs E2E-Shards rot**, während `Frontend`, `Backend` und
+  `CI security contract` grün waren. *Entscheidung:* die vier benötigten Namen
+  (`STRIPE_SECRET`, `STRIPE_KEY`, `STRIPE_WEBHOOK_SECRET`, `VITE_STRIPE_PUBLIC_KEY`)
+  zusätzlich im **Dependabot**-Store hinterlegen. Die CI-Bedingung bleibt **unverändert**:
+  der Dependabot-`pull_request`-Lauf bleibt übersprungen, denn er erhält per Konstruktion gar
+  keine Secrets — aus welchem Store auch immer. *Verworfen:* den Dependabot-Actor von den
+  E2E-Jobs auszuschließen und erst den Merge-Commit auf `main` validieren zu lassen — das
+  verschiebt die Prüfung **hinter** den Merge eines Security-Bumps. *Preis, bewusst getragen:*
+  der ausgecheckte PR-Code (die neue Dependency) läuft in einem Lauf, der diese Secrets sieht;
+  ein kompromittiertes Paket-Postinstall könnte sie lesen. Es ist ausschließlich
+  Stripe-**Test**-Material (`sk_test`/`pk_test`) — kein Live-Key und kein `whsec` des
+  Live-Endpunkts (vgl. D-24, D-25). *Umgesetzt:* die Werte stammen aus `backend/.env.e2e`
+  (identisch mit `backend/.env`) bzw. `frontend/.env` für den Publishable-Key; die Quelle wurde
+  per **Hash-Vergleich** der Werte bestimmt, nicht geraten — `.env.ci` trägt andere Test-Keys,
+  und `.env.production` trägt die Live-Keys und wurde nicht angefasst. *Belegt:* nach
+  `@dependabot rebase` auf PR #18 (neuer Head `7a9974f0`) ist der Dependabot-**Push**-Lauf
+  `39130666484` **11/11 grün**, inklusive aller sechs E2E-Shards und `CI gate (push)`.
+  **Nicht regredieren:** wer die vier Dependabot-Secrets löscht, macht jeden Dependabot-PR
+  wieder rot; die `ci.yml`-Kommentare nennen den Mechanismus deshalb explizit.
 
 ## TODO (UI-Review)
 
