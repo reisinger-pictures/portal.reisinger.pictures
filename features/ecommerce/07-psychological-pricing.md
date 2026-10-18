@@ -127,3 +127,43 @@ Zwischenrechnung: `timePrice = 1,5 h × 80 = 120`, `imagesPrice = (80/6) × 15 =
 Ergebnis einer Multiplikation — deshalb ist der 50-%-Abschlag um einen Euro
 kleiner als die Hälfte. Das ist die Invariante dieses Dokuments, und sie
 überlebt die Umstellung auf Cent nur, wenn die Skala vollständig skaliert wird.
+
+## `calculateB2CFlexPrice` — the same rounding, at the euro boundary
+
+> **Added 2026-10-18 (owner decision).** Before this the Flex calculator returned its raw
+> euro sum unrounded, so 80 € stayed 80 € while the studio calculator next to it already
+> produced …9 endings. Both calculators now apply the **same** `roundToPsychologicalValue`
+> to their final sum; they differ only in the unit they speak when they enter and leave it.
+
+**Unit contract.** `calculateB2CFlexPrice()` reads and returns **euros**. The API serves
+cents, so `ShootingCalculatorModal` divides each `srp_*` value by `CENTS_PER_EURO` before
+the call and passes the returned euros through to the invoice line unchanged. The shared
+rounding helper works in **cents**, so that one call carries the conversion explicitly on
+both sides — `roundToPsychologicalValue(rawTotalEuros * CENTS_PER_EURO) / CENTS_PER_EURO` —
+and neither side uses a bare `100`.
+
+**Final sum only, never component by component.** Base price, setup fee, extra images and
+privacy fee are summed first and rounded once. Rounding the components first would move
+every line by up to 1 € and yield a second, different total: for the live parameters
+`80 + 50 + 15 + 200 = 345` → **345 €**, while component-wise rounding gives
+`79 + 49 + 15 + 199 = 342` €.
+
+**Output shape.** Flex has no discount tier, so `packagePrice` and `finalPrice` carry the
+same rounded amount and `discountAbsolute` is `0`.
+
+**Live parameters (owner settings 2026-10-18, stored in cents).** Reproduce with
+`calculateB2CFlexPrice({srp_base_price: 80, srp_setup_fee: 50, srp_privacy_fee: 200,
+srp_extra_image_fee: 15, …})` after dividing the settings cents (`8000/5000/20000/1500`) by
+`CENTS_PER_EURO`:
+
+| Selection (euro in)        | raw | rounded (out) |
+|----------------------------|----:|--------------:|
+| base only                  |  80 |            79 |
+| indoor/flash setup         | 130 |           129 |
+| nude + privacy, no setup   | 280 |           279 |
+| nude + privacy + setup     | 330 |           329 |
+
+The configured values themselves are untouched — the base stays `8000` cents in the
+settings; only the calculator's **output** is rounded. `shootingCalculator.test.ts` measures
+the function against a verbatim copy of the pre-fix (unrounded) pipeline, so the change is
+pinned rather than re-stated.

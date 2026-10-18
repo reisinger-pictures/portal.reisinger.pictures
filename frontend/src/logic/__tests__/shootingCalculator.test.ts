@@ -386,12 +386,17 @@ describe('calculateB2CFlexPrice', () => {
         expect(calculateB2CFlexPrice({ type: 'portrait', setup: 'outdoor', extraImages: 0, isFullyPrivate: false })).toEqual({ packagePrice: 149, finalPrice: 149, discountAbsolute: 0 });
     });
     it('calculates couple indoor correctly', () => {
-        expect(calculateB2CFlexPrice({ type: 'couple', setup: 'indoor', extraImages: 5, isFullyPrivate: false })).toEqual({ packagePrice: 274, finalPrice: 274, discountAbsolute: 0 });
+        // 149 + 50 setup + 5 × 15 = 274 → psychological rounding → 275 (was 274
+        // while the flex sum was returned raw; the rounding is the new intent,
+        // see features/ecommerce/07-psychological-pricing.md).
+        expect(calculateB2CFlexPrice({ type: 'couple', setup: 'indoor', extraImages: 5, isFullyPrivate: false })).toEqual({ packagePrice: 275, finalPrice: 275, discountAbsolute: 0 });
     });
     it('calculates nude outdoor private correctly', () => {
+        // 149 + 200 privacy = 349 → a …0-ending multiple of 10 € → 349.
         expect(calculateB2CFlexPrice({ type: 'nude', setup: 'outdoor', extraImages: 0, isFullyPrivate: true })).toEqual({ packagePrice: 349, finalPrice: 349, discountAbsolute: 0 });
     });
     it('calculates nude indoor private correctly', () => {
+        // 149 + 50 + 10 × 15 + 200 = 549 → a …0-ending multiple of 10 € → 549.
         expect(calculateB2CFlexPrice({ type: 'nude', setup: 'indoor', extraImages: 10, isFullyPrivate: true })).toEqual({ packagePrice: 549, finalPrice: 549, discountAbsolute: 0 });
     });
     /**
@@ -399,10 +404,132 @@ describe('calculateB2CFlexPrice', () => {
      * in euros. Pinned in both directions so a reader cannot assume it divides:
      * the modal is the one that turns the API's cents into the euros this
      * function takes (`ShootingCalculatorModal`, `srp_base_price:` branch).
+     * The euro reading is now psychologically rounded, so 14 900 read as euros
+     * is 14 899 € — read as cents it would be 149 €.
      */
     it('takes euros, not the API cents — the caller does the division', () => {
         const base = {type: 'portrait', setup: 'outdoor', extraImages: 0, isFullyPrivate: false} as const;
         expect(calculateB2CFlexPrice({...base, srp_base_price: 14900 / CENTS_PER_EURO})).toEqual({packagePrice: 149, finalPrice: 149, discountAbsolute: 0});
-        expect(calculateB2CFlexPrice({...base, srp_base_price: 14900})).toEqual({packagePrice: 14900, finalPrice: 14900, discountAbsolute: 0});
+        expect(calculateB2CFlexPrice({...base, srp_base_price: 14900})).toEqual({packagePrice: 14899, finalPrice: 14899, discountAbsolute: 0});
+    });
+});
+
+/**
+ * The pre-fix flex pipeline, verbatim: the raw euro sum, no rounding.
+ *
+ * Kept as an independent copy for the same reason as
+ * `roundToPsychologicalValueInEuros` above — it is the *before* the regression
+ * tests below are measured against, and it makes the size of the change
+ * explicit instead of leaving it in a comment. It is deliberately not the
+ * production path any more.
+ */
+function flexPriceInEurosUnrounded(input: {
+    type: 'portrait' | 'couple' | 'nude';
+    setup: 'outdoor' | 'outdoor_flash' | 'indoor';
+    extraImages: number;
+    isFullyPrivate: boolean;
+    srp_base_price?: number;
+    srp_setup_fee?: number;
+    srp_privacy_fee?: number;
+    srp_extra_image_fee?: number;
+}): number {
+    const basePrice = input.srp_base_price ?? 149;
+    const setupCost = input.srp_setup_fee ?? 50;
+    const extraImageCost = input.srp_extra_image_fee ?? 15;
+    const privacyBase = input.srp_privacy_fee ?? 200;
+
+    const setupFee = input.setup === 'outdoor_flash' || input.setup === 'indoor' ? setupCost : 0;
+    const extraImagesFee = input.extraImages * extraImageCost;
+    const privacyFee = input.type === 'nude' && input.isFullyPrivate ? privacyBase : 0;
+
+    return basePrice + setupFee + extraImagesFee + privacyFee;
+}
+
+/**
+ * The owner's live parameters (2026-10-18), in euros exactly as
+ * `ShootingCalculatorModal` hands them over after dividing the API cents by
+ * `CENTS_PER_EURO` (`srp_base_price: 8000`, `srp_setup_fee: 5000`,
+ * `srp_privacy_fee: 20000`, `srp_extra_image_fee: 1500`).
+ */
+const liveFlexParams = {
+    srp_base_price: 80,
+    srp_setup_fee: 50,
+    srp_privacy_fee: 200,
+    srp_extra_image_fee: 15,
+} as const;
+
+describe('calculateB2CFlexPrice rounds the final sum psychologically', () => {
+    /**
+     * The regression proper: these four sums are the owner's live settings and
+     * they all returned their raw euro amount before the fix. Every expectation
+     * below fails on the pre-fix implementation — that is the point of the
+     * block, not a restatement of the new code.
+     */
+    it.each<[string, {type: 'portrait' | 'couple' | 'nude'; setup: 'outdoor' | 'outdoor_flash' | 'indoor'; extraImages: number; isFullyPrivate: boolean}, number, number]>([
+        ['base only (80 → 79)', {type: 'portrait', setup: 'outdoor', extraImages: 0, isFullyPrivate: false}, 80, 79],
+        ['indoor setup (80 + 50 = 130 → 129)', {type: 'portrait', setup: 'indoor', extraImages: 0, isFullyPrivate: false}, 130, 129],
+        ['nude + privacy, no setup (80 + 200 = 280 → 279)', {type: 'nude', setup: 'outdoor', extraImages: 0, isFullyPrivate: true}, 280, 279],
+        ['nude + privacy + indoor setup (80 + 50 + 200 = 330 → 329)', {type: 'nude', setup: 'indoor', extraImages: 0, isFullyPrivate: true}, 330, 329],
+    ])('rounds %s', (_name, selection, rawEuros, roundedEuros) => {
+        const result = calculateB2CFlexPrice({...selection, ...liveFlexParams});
+
+        expect(flexPriceInEurosUnrounded({...selection, ...liveFlexParams})).toBe(rawEuros);
+        expect(result).toEqual({packagePrice: roundedEuros, finalPrice: roundedEuros, discountAbsolute: 0});
+    });
+
+    it('rounds the sum, never the components', () => {
+        // base 80 + indoor setup 50 + 1 extra image 15 + privacy 200 = 345.
+        // Rounding each component first would give 79 + 49 + 15 + 199 = 342 —
+        // a second, different price. Sum-only rounding is the contract.
+        const selection = {type: 'nude', setup: 'indoor', extraImages: 1, isFullyPrivate: true} as const;
+        const result = calculateB2CFlexPrice({...selection, ...liveFlexParams});
+
+        expect(result).toEqual({packagePrice: 345, finalPrice: 345, discountAbsolute: 0});
+        expect(result.packagePrice).not.toBe(342);
+    });
+
+    it('rounds 1 extra image (80 + 15 = 95) to itself — already on the 5 € grid', () => {
+        const selection = {type: 'portrait', setup: 'outdoor', extraImages: 1, isFullyPrivate: false} as const;
+
+        expect(calculateB2CFlexPrice({...selection, ...liveFlexParams})).toEqual({packagePrice: 95, finalPrice: 95, discountAbsolute: 0});
+    });
+
+    it('uses the 5 € grid and the …9 ending below 1000 €', () => {
+        const selection = {type: 'portrait', setup: 'outdoor', extraImages: 0, isFullyPrivate: false} as const;
+
+        // 81 → nearest 5 € is 80 → …0 → 79.
+        expect(calculateB2CFlexPrice({...selection, srp_base_price: 81}).packagePrice).toBe(79);
+        // 83 → nearest 5 € is 85 → not a …0 multiple → 85.
+        expect(calculateB2CFlexPrice({...selection, srp_base_price: 83}).packagePrice).toBe(85);
+        // 149 (coded default) is already a …0-ending multiple of 10 € → 149.
+        expect(calculateB2CFlexPrice(selection).packagePrice).toBe(149);
+    });
+
+    it('uses the 50 € grid at/above 1000 €', () => {
+        const selection = {type: 'portrait', setup: 'outdoor', extraImages: 0, isFullyPrivate: false} as const;
+
+        // 1002 → nearest 50 € is 1000 → clean multiple → 999. The result sits
+        // below the threshold because the …9 deduction is the last step; the
+        // same boundary behaviour the studio calculator has.
+        expect(calculateB2CFlexPrice({...selection, srp_base_price: 1002}).packagePrice).toBe(999);
+    });
+
+    it('reports the same amount as packagePrice and finalPrice, with no discount', () => {
+        const result = calculateB2CFlexPrice({type: 'nude', setup: 'indoor', extraImages: 3, isFullyPrivate: true, ...liveFlexParams});
+
+        expect(result.finalPrice).toBe(result.packagePrice);
+        expect(result.discountAbsolute).toBe(0);
+    });
+
+    it('reads its money inputs as euros, not as the API cents', () => {
+        const selection = {type: 'portrait', setup: 'outdoor', extraImages: 0, isFullyPrivate: false} as const;
+
+        // The modal divides by CENTS_PER_EURO before calling: 8000 cents → 80 €.
+        expect(calculateB2CFlexPrice({...selection, srp_base_price: 8000 / CENTS_PER_EURO}).packagePrice).toBe(79);
+        // The same amount passed unscaled is read as 8 000 € and rounded on the
+        // 50 € grid — a four-digit price, not 79 €. This is what proves the
+        // unit direction the modal is responsible for.
+        expect(calculateB2CFlexPrice({...selection, srp_base_price: 8000}).packagePrice).toBe(7999);
+        expect(roundToPsychologicalValue(8000 * CENTS_PER_EURO) / CENTS_PER_EURO).toBe(7999);
     });
 });
