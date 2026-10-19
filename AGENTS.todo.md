@@ -22,7 +22,7 @@ integrity and architectural trust boundaries. Findings must identify an entry po
 attacker prerequisites, the insufficient boundary, impact and a future regression
 test. A final documentation consistency review used GPT-6 Luna (`openai/gpt-6-luna#xhigh`).
 Static evidence is not labeled as a successful runtime exploit. Previously accepted
-owner decisions in `AGENTS.md` remain in force.
+owner decisions in `features/owner-decisions.md` remain in force.
 
 **Priority for this review's `SEC-20261018-*` IDs:** P0 = critical compromise requiring
 immediate containment; P1 = high-impact actionable security or financial-integrity
@@ -76,7 +76,7 @@ the stated prerequisites, not on a confirmed production exploit.
 ### Automatischer FTP-Import (D-35, D-36) — offen
 
 Der Import verlangt heute einen manuellen Klick je Upload; Ziel ist Event-Auslösung plus
-Hintergrundkette in 20er-Batches (Entscheidungen in `AGENTS.md` §14 D-35/D-36). Die
+Hintergrundkette in 20er-Batches (Entscheidungen in `features/owner-decisions.md` D-35/D-36). Die
 Batch-Semantik (maximal `ftp.import.max_files` je Lauf, Rest bleibt, kein Fehler) ist Teil der
 SEC-14-Umsetzung; alles darunter ist eigene Arbeit.
 
@@ -214,7 +214,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 
 ---
 - [ ] **Dependabot: 1 offener Alert am Default-Branch** (war 10) — gemessen am 2026-10-18 mit `gh api repos/reisinger-pictures/portal.reisinger.pictures/dependabot/alerts?state=open&per_page=100 -q '.[] | [.security_advisory.severity, .dependency.package.name] | @tsv'` → **1 high (`braces`), 0 critical**. Patch-Stand je Paket (dieselbe Abfrage, `-q '.[] | [.security_advisory.severity, .dependency.package.name, .security_vulnerability.vulnerable_version_range, (.security_vulnerability.first_patched_version.identifier // "KEINE")] | @tsv'`): `undici` (6 Alerts — 1 high + 2 medium + 3 low; verwundbar `< 7.29.1`, installiert `7.29.0`), `source-map-js` (high, `< 1.2.2`, installiert `1.2.1`), `brace-expansion` (medium, `< 5.0.12`), `postcss-selector-parser` (medium, `< 7.1.6`), `braces` (high, `<= 3.0.3`, **`gepatcht-ab=KEINE`**). Dependency-CVEs, **nicht** Endpunkt-Autorisierung → eigener Durchgang (`node-deps`), **ausgeführt** (Ergebnis in den beiden Unterpunkten).
-  - **Ergebnis der `node-deps`-Wellen (`85f102b` + die `undici`-Kopplung):** drei Pakete sind über `overrides` in `frontend/pnpm-workspace.yaml` gehoben (`source-map-js` 1.2.1 → 1.2.2, `brace-expansion` 5.0.9 → 5.0.12, `postcss-selector-parser` 6.0.10 → 7.1.6) — alle **transitiv** und dev/build-only (kein Treffer über alle 40 JS-Chunks, `pnpm why` weist jeden Pfad). `undici` brauchte am Ende **keinen** Override: die Kopplung wurde **gelöst** statt erzwungen — `jsdom@30.0.1` deklariert `^8.9.0` und löst selbst auf `8.12.2` auf, und **alle sechs** offenen `undici`-Advisories enden bei `< 7.29.1` (Range per API gemessen), 8.x liegt also außerhalb; der zwischenzeitliche erzwungene Downgrade auf 7.29.1 ist damit weg. `pnpm audit` 16 → 1, `pnpm audit --prod` 2 → 1, Vitest grün (1423; die 20 zusätzlichen Tests stammen aus der pk_test-Gate-Welle). **`braces` bleibt offen und ist als akzeptiertes Risiko dokumentiert (C8, `AGENTS.md` §8)** — kein Patch existiert, und der verwundbare Eingang wird von keiner der drei realen Aufrufstellen betreten. Beide Wellen unabhängig verifiziert (APPROVED; u. a. minimal-invasiver Lockfile-Diff, CSS byte-identisch trotz Major-Bump, JSDOM-Konstruktionsprobe unter 8.12.2). **Scan-Lag, kein Befund:** die Dependabot-API meldet weiter **10** Alerts, weil ihr letzter Scan vor `85f102b` lief; autoritativ für den lokalen Stand ist `pnpm audit` → **1**.
+   - **Ergebnis der `node-deps`-Wellen (`85f102b` + die `undici`-Kopplung):** drei Pakete sind über `overrides` in `frontend/pnpm-workspace.yaml` gehoben (`source-map-js` 1.2.1 → 1.2.2, `brace-expansion` 5.0.9 → 5.0.12, `postcss-selector-parser` 6.0.10 → 7.1.6) — alle **transitiv** und dev/build-only (kein Treffer über alle 40 JS-Chunks, `pnpm why` weist jeden Pfad). `undici` brauchte am Ende **keinen** Override: die Kopplung wurde **gelöst** statt erzwungen — `jsdom@30.0.1` deklariert `^8.9.0` und löst selbst auf `8.12.2` auf, und **alle sechs** offenen `undici`-Advisories enden bei `< 7.29.1` (Range per API gemessen), 8.x liegt also außerhalb; der zwischenzeitliche erzwungene Downgrade auf 7.29.1 ist damit weg. `pnpm audit` 16 → 1, `pnpm audit --prod` 2 → 1, Vitest grün (1423; die 20 zusätzlichen Tests stammen aus der pk_test-Gate-Welle). **`braces` bleibt offen und ist als akzeptiertes Risiko dokumentiert (C8, `features/security/accepted-risks.md`)** — kein Patch existiert, und der verwundbare Eingang wird von keiner der drei realen Aufrufstellen betreten. Beide Wellen unabhängig verifiziert (APPROVED; u. a. minimal-invasiver Lockfile-Diff, CSS byte-identisch trotz Major-Bump, JSDOM-Konstruktionsprobe unter 8.12.2). **Scan-Lag, kein Befund:** die Dependabot-API meldet weiter **10** Alerts, weil ihr letzter Scan vor `85f102b` lief; autoritativ für den lokalen Stand ist `pnpm audit` → **1**.
   - **Verlauf:** 17 → 15 (dompurify, PR #18) → 12 (`league/commonmark` ×2 + `laravel/framework`, PR #17/#16) → **10** (`tinypool` ×2 critical, PR #19) — alle vier über den Auto-Merge, **ohne Handarbeit**. **Der rote-PR-Blocker ist behoben (D-33):** die Security-PRs waren nie wegen ihres Codes rot, sondern weil GitHub die **Actions**-Secrets von jedem Dependabot-Lauf zurückhält — er liest ausschließlich den **Dependabot**-Store (für `push` **und** `pull_request`; nur `pull_request_target` erhält keine). Der Push-Lauf von PR #18 ist nach `@dependabot rebase` **11/11 grün** (`39130666484`) und wurde von `automerge.yml` gemergt (13:29:48Z, Merge-Kommit `e2d280b`).
   - **Der manuelle Rest — Owner-Entscheidung 2026-10-18: eigene `node-deps`-Welle, nicht nebenbei — ausgeführt, Ergebnis im Unterpunkt darüber.** `undici` (6 Alerts), `source-map-js`, `brace-expansion`, `postcss-selector-parser`, `braces`. Für `source-map-js` hat Dependabot seinen PR #20 am 2026-10-18 selbst geschlossen („Looks like source-map-js is no longer updatable, so this is no longer needed"), obwohl der Alert **offen** ist und `frontend/pnpm-lock.yaml:2701` → `source-map-js@1.2.1:` den verwundbaren Stand weiter pinnt. **Sonderfall `braces`:** `first_patched_version` ist leer — es gibt **keine** gefixte Version, der Fall braucht Entfernen/Override statt Bump. Alle übrigen sind Ein-Patch-Sprünge (`undici` 7.29.0 → 7.29.1, `source-map-js` 1.2.1 → 1.2.2, `brace-expansion` → 5.0.12, `postcss-selector-parser` → 7.1.6), aber **transitiv** — deshalb erst Triage (dev-only vs. Produktion), dann `pnpm.overrides`.
 
@@ -225,7 +225,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
 > Entscheidungsdurchgang):** Dieses Board enthält **69 offene Positionen**
 > über 1627 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
-> abgehakt (`AGENTS.md` §3 Board-Hygiene). Jede offene Position trägt einen der drei
+> abgehakt (`AGENTS.md` §4 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
 > **0× `Entscheidung offen:`** (der Owner muss entscheiden),
@@ -234,7 +234,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Präfix ohne Grund wäre schlechter als keiner.
 >
 > **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
-> Entscheidungen liegen in `AGENTS.md` §14, ihr Umsetzungsstand im Protokoll ganz oben.
+> Entscheidungen liegen in `features/owner-decisions.md`, ihr Umsetzungsstand im Protokoll ganz oben.
 > Die letzte offene Entscheidung war D-12 (Initial-Fokus) und ist am selben Tag entschieden
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
@@ -265,13 +265,20 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Wer hier eine Position sucht, nutzt `grep -n '^- \['
 > AGENTS.todo.md` und nicht die Reihenfolge im Dokument.
 
+## ⏳ Backend Offen — nicht implementierte Vorschläge
+
+- [ ] **PHP-Group-Strategy (vorgeschlagen, nicht implementiert).** Smoke-Tests mit `@group=smoke`
+  taggen und bei Feature-Arbeit nur die Feature-Suite fahren:
+  `php artisan test --testsuite=Feature --parallel`. Vorher die Testsuiten in `phpunit.xml`
+  prüfen. Die Parallel-/SQLite-`:memory:`-Regeln selbst stehen in `backend/AGENTS.md`.
+
 ## 🗳 Entscheidungs-Protokoll (Owner, 2026-09-28)
 
-**Was gilt, steht in `AGENTS.md` §14 (D-1 bis D-17).** Dieser Abschnitt sagt nur, **ob es schon
+**Was gilt, steht in `features/owner-decisions.md` (D-1 bis D-37).** Diese Datei sagt nur, **ob es schon
 gilt** — und hält fest, welche Ansätze zurückgezogen wurden, damit sie nicht erneut
 implementiert werden.
 
-**Zur Form — und warum dieses Board doch `[x]` enthält:** §3 Board-Hygiene verbietet `[x]` für
+**Zur Form — und warum dieses Board doch `[x]` enthält:** §4 Board-Hygiene verbietet `[x]` für
 **Arbeitspositionen**, weil ein abgehakter Eintrag wie eine offene aussieht. Das gilt hier nicht:
 eine Entscheidung ist eine Aussage, keine Aufgabe, und ihr Zustand ist genau zweiwertig. Ein
 `[x]` bedeutet hier **„die Entscheidung ist in Kraft"**, ein `[ ]` **„die Entscheidung steht, ist
@@ -281,11 +288,11 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 ### Stand
 
 Alle Entscheidungen D-1 bis D-26 sind getroffen. Soweit sie Code erforderten, sind sie **umgesetzt
-und verifiziert** — die Entscheidungen selbst samt Begründung stehen in `AGENTS.md` §14, die
+und verifiziert** — die Entscheidungen stehen in `features/owner-decisions.md`, die
 zurückgezogenen Varianten direkt darunter in „Verworfen".
 
 Dieses Protokoll führt **abgeschlossene** Positionen seit der Bereinigung vom 2026-10-15 nicht
-mehr. Ein `[x]`-Eintrag ist per Board-Hygiene (`AGENTS.md` §3) ein Signal für offene Arbeit und
+mehr. Ein `[x]`-Eintrag ist per Board-Hygiene (`AGENTS.md` §4) ein Signal für offene Arbeit und
 wird entfernt, nicht abgehakt: wer nach einem Befund sucht, fände sonst erledigte Arbeit und
 hielte sie für offen. Wer den Umsetzungsstand oder die Belege einer geschlossenen Position
 braucht, findet sie vollständig in `git log` — die Blöcke sind in der Historie erhalten.
@@ -295,13 +302,14 @@ einem konkreten Auftrag oder `[~]` mit der Bedingung, auf die sie warten.
 
 **Zwei Lehren aus den geschlossenen Positionen**, die sonst nirgends stünden: die
 `gh run list --commit`-Messfalle (nur die **volle** SHA liefert Runs, eine Kurz-SHA liest sich als
-„CI lief nie") steht in `AGENTS.md` §14/D-23, die `ENOENT`-statt-`chmod`-Testdesign-Lehre (CI läuft
-als root, ein `chmod`-Fixture wird dort ignoriert) in §14/D-2.
+„CI lief nie") und die `ENOENT`-statt-`chmod`-Testdesign-Lehre (CI läuft als root, ein
+`chmod`-Fixture wird dort ignoriert) sind historische Erkenntnisse aus D-23 und D-2; die aktuellen
+Entscheidungen stehen in `features/owner-decisions.md`.
 
 ### Verworfen — nicht erneut implementieren
 
 Zurückgezogen am 2026-09-28, ergänzt am 2026-10-15 (D-24, D-25). Der Owner hat jede dieser
-Varianten gesehen und verworfen; die geltende Regel steht in `AGENTS.md` §14.
+Varianten gesehen und verworfen; die geltenden Entscheidungen stehen in `features/owner-decisions.md`.
 
 | Zu | Verworfene Variante | Warum verworfen |
 |---|---|---|
@@ -342,7 +350,7 @@ Varianten gesehen und verworfen; die geltende Regel steht in `AGENTS.md` §14.
 
 **Zurückgezogen heißt nicht vergessen:** Wenn jemand eine dieser Varianten erneut vorschlägt,
 ist die Frage nicht „ist das besser?", sondern „ist D-x überholt?" — und dann wird **D-x in
-`AGENTS.md` §14 ersetzt**, nicht ergänzt.
+`features/owner-decisions.md` ersetzt**, nicht ergänzt.
 
 ---
 
@@ -1249,8 +1257,8 @@ getrennt.
   offene Teil dieser Position: reproduzieren und entscheiden, ob der Workaround
   entfallen kann. Der E2E-Backend ist ein single-threaded `php artisan serve`, also
   erzeugen parallele Worker für sich allein keine DB-Konkurrenz; der wahrscheinlichere
-  Auslöser ist ein zweiter Prozess auf der geteilten Datei (die in `AGENTS.md` §5.7
-  beschriebene `migrate`-Kollision), den die Konfiguration nicht sicher macht.
+  Auslöser ist vermutlich ein zweiter Prozess auf der geteilten Datei; eine
+  `migrate`-Kollision ist jedoch nicht belegt und bleibt eine Hypothese.
 - Hinweis (Setup): lokale `backend/.env` braucht `MODEL_REGISTRATION_THROTTLE_LIMIT=1000` (Parität zu `.env.ci`), sonst 429-Flakes im E2E-Grep-Lauf. `.env` ist gitignored.
 
 **Future (nur TODO, nicht umsetzen)**
@@ -1678,7 +1686,7 @@ gerissen und zur Entscheidung gemacht.
   — bestätigt, keine Änderung (`CouponFormDrawer.tsx:210-213` beschreibt, dass die Shell
   Kopf-Button, Backdrop, Escape und Abbrechen über einen Prop routet). Der Nutzer wird den
   Verlust des getippten Texts spüren; das ist der bewusst gewählte Preis, kein Versehen. Steht
-  als D-14 in `AGENTS.md` §14.
+  als D-14 in `features/owner-decisions.md`.
 - [~] wartet auf eine Live-Reproduktion im Lastbereich 15–22 und einen positiven Beleg für die 6-von-8-Schieflage auf Mobile; die mobile Hälfte hat bisher keinen Mobile-spezifischen Defekt ergeben. **Was der Agent nicht klaeren konnte, offen gesagt:** (a) Er konnte die
   Fehler **nicht reproduzieren**; er hat den Bereich zwischen „gesaettigte Box"
   (Last 15, 22/22 gruen) und den gemeldeten Lasten 186–334 eingegrenzt, diesen
@@ -1722,7 +1730,7 @@ gerissen und zur Entscheidung gemacht.
 > 2026-10-12 scheitert (`401 api-key-expired` im Balance-Preflight). **Die Kette schließt sich —
 > gemessen: Run `38738659755` auf `d4fc972` ist `success`, 11/11 Jobs inkl. aller
 > 7 Playwright-Jobs (Mobile 1–3, Desktop 1–3, serial).** Dauerhafte Regel zur
-> Key-Ablage: `AGENTS.md` §14/**D-24**.
+> Key-Ablage: `features/owner-decisions.md`/**D-24**.
 
 **Zwei Befunde vor der Umstellung, je mit Befehl belegt** (sie haben den Zuschnitt bestimmt):
 
@@ -1772,7 +1780,7 @@ gerissen und zur Entscheidung gemacht.
   derselbe Wert (`c9b329739363`) — dort war nichts zu tauschen, der CLI-Key ist nirgends mehr im
   Einsatz (0 Treffer).
 
-**Entschieden, ohne technische Umsetzung:** **D-25** (`AGENTS.md` §14) — der Roll der beiden
+**Entschieden, ohne technische Umsetzung:** **D-25** (`features/owner-decisions.md`) — der Roll der beiden
 Live-Secrets ist abgelehnt; Begründung ist die Owner-Aussage „Provider fährt ZDR". Eine
 Implementierung dazu gibt es nicht — die verworfene Alternative steht in der Tabelle „Verworfen".
 
