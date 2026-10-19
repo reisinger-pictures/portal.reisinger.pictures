@@ -90,18 +90,6 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   15 Galerien = **35** Statements / **30** Lookups (Wachstum exakt 2 × 12). Der Test pinnt
   einen **bekannten Kostenpunkt, kein Ziel** — er wird bei einer gesammelten Auflösung der
   Kette rot. **offen:** die Kette gesammelt auflösen.
-- [ ] **Der jwt-auth `Factory` sammelt Claims innerhalb eines Tests (Testartefakt).**
-  `RatingUniquenessTest::test_registered_users_and_guests_have_isolated_rating_rows` war
-  grün, obwohl der registrierte Client seine Berechtigung **nur** über den geleakten
-  Gast-Claim bekam: die Claims-Sammlung des jwt-auth `Factory` **akkumuliert** (make() fügt
-  hinzu statt zu ersetzen), und der Decode läuft über dieselbe Sammlung. **Korrektur der
-  Board-Prämisse:** die App wird pro Test neu gebaut, der Singleton ist also **innerhalb**
-  eines Tests frisch — die Sammlung läuft nicht über Tests hinweg, sondern vom Gast-Token
-  zum späteren User-Request **im selben Test** (betroffen: `RatingUniquenessTest`,
-  `MagicLinkAuthTest`). **Stand 2026-10-19:** behoben — `Tests\TestCase::resetJwtClaimState()`
-  setzt den Claim-Zustand pro Test zurück, der registrierte Client bekommt den Invite-Claim
-  explizit, und ein **begleitender Test** beweist, dass ein absichtlich geleakter Gast-Claim
-  den User-Token bricht. **offen:** keins.
 - [ ] **Der Benachrichtigungs-Opt-in legt eine Zuweisung an (pre-existing).**
   `NotificationController::toggleGalleryOptIn()` schreibt mit `updateOrInsert()` eine Zeile in
   `user_galleries` — dieselbe Tabelle, die die Client-Zuweisung trägt. Für eine **Selection**-
@@ -111,8 +99,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   Galerie weiterhin heraus, nachdem die Org-Zugehörigkeit entfernt wurde. Ein Opt-in ist keine
   Zuweisung; die saubere Form wäre eine eigene Abo-Tabelle (Schema-Entscheidung). **Test:**
   ein Opt-in auf eine Delivery-Galerie darf die Zuweisung nicht verändern.
-- [ ] **Zwei-Verbindungs-Nachweis für D-40 steht aus (manuell prüfen).**
-  Das Probe-Skript `backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh` liegt vor
+- [ ] manuell prüfen: **Zwei-Verbindungs-Nachweis für D-40 steht aus.**  Das Probe-Skript `backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh` liegt vor
   (zwei Orgs, deren Akteure gegenseitig Mitglieder sind, gleichzeitige Syncs, InnoDB-
   Deadlock-Delta). **Der Lauf steht aus:** das Skript braucht einen Docker-Host mit
   `mariadb:11.4` — hier ist der Docker-Daemon nicht erreichbar, und das SEC-12-Skript
@@ -167,24 +154,24 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-19):** **36 offene `[ ]`** und **45 wartende
-> `[~]`** über 1838 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (36), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1838). Aufteilung der 36: **22× `manuell prüfen:`** und **14×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-19):** **34 offene `[ ]`** und **46 wartende
+> `[~]`** über 1825 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (34), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1825). Aufteilung der 34: **23× `manuell prüfen:`** und **11×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 14 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 11 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
-> A–D") sowie die seitdem aufgedeckten Reste (zwei Query-Zähl-Kosten, das jwt-auth-Claims-
-> Artefakt, die Zwei-Verbindungs-Messung, die umgekehrte Sperrreihenfolge von `destroy()`,
-> die Opt-in-Zeile) und die manuellen Prüfpunkte des Deploys vom 2026-10-19. Alle 45 `[~]`
+> A–D") sowie die seitdem aufgedeckten Reste (die zwei Query-Zähl-Kosten mit gepinnter
+> Basislinie, die Zwei-Verbindungs-Messung, die User-Zeilen-Sperrreihenfolge von `destroy()`,
+> die Opt-in-Zeile) und die manuellen Prüfpunkte des Deploys vom 2026-10-19. Alle 46 `[~]`
 > tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
 > zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (94 = 48 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (80 = 34 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
@@ -632,7 +619,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Braucht eine Entscheidung oder Betriebs-Evidenz (kein Code)
 
-- [ ] wartet auf **Folgetag-Gegenprobe gegen den täglichen 09:20-CEST-Recreate.** `portal_backend`
+- [~] wartet auf **Folgetag-Gegenprobe gegen den täglichen 09:20-CEST-Recreate.** `portal_backend`
   wurde am 2026-09-29T07:19:32Z und 2026-09-30T07:20:05Z **von selbst** neu erzeugt, jeweils mit dem
   alten Stand. Der Auslöser ist auf dem Host **nicht auffindbar**: keine Cron-Zeile, kein Timer, keine
   Systemd-Unit, und im Zeitfenster (07:00–07:40Z) wurde keine Datei geschrieben — er kommt also von
