@@ -52,6 +52,7 @@ class SystemMiscTest extends TestCase
         $response = $this->get('/api/media/'.$gallery->slug.'/'.$photo->id.'.jpg');
         $response->assertStatus(200);
         $response->assertHeader('X-Sendfile');
+        $this->assertEquals('', $response->getContent()); // Body muss bei Proxy-Offloading leer sein
 
         Config::set('services.proxy_delivery_header', null); // Cleanup
     }
