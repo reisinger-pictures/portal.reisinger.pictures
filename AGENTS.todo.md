@@ -56,125 +56,68 @@ current source review is not a penetration-test completeness or absence-of-bugs 
 
 ### Prioritized findings — source review only
 
-**Von den 14 Befunden dieser Prüfung sind zehn umgesetzt und unabhängig verifiziert**
-(SEC-01..07, SEC-11, SEC-12, SEC-13); sie stehen als Zuordnung Befund → Commit → Test in
+**Alle 14 Befunde dieser Prüfung sind umgesetzt und unabhängig verifiziert.** Sie stehen als
+Zuordnung Befund → Commit → Test in
 [`features/security/2026-10-18-review-closure.md`](features/security/2026-10-18-review-closure.md)
 und sind deshalb hier entfernt (Board-Regel: geschlossene Einträge wandern ins Git bzw. nach
 `features/`, nicht in eine Liste, die bei der nächsten Bereinigung verschwindet).
-**Unten stehen nur die noch offenen Befunde.** Die Formulierung ist der ursprüngliche
-Review-Text, kein Statusbericht — der jeweilige Stand steht im Abschlussdokument.
 P0: none established by this source review. Priority is based on reachable impact and
 the stated prerequisites, not on a confirmed production exploit.
 
-- [ ] **SEC-20261018-08 (P2) — Image ingestion can return attacker-influenced active-document Content-Type.** `ImageController::upload()` requires an authenticated photographer, validates image bytes/ExifTool, but persists `$file->getClientMimeType()` as `Photo.mime_type`; `FileDeliveryController::serve()` uses that value as the original-media `Content-Type`. For the FTP variant, camera credentials can place a file in the inbox, but an authenticated photographer must separately invoke `POST /api/management/ftp/process`; the import does not set MIME and can persist a non-image `.jpg` when image probing yields no dimensions, allowing `mime_content_type()` fallback at delivery. A suitable polyglot could therefore be returned as `text/html`; same-origin script execution depends on actual production CSP, which was not inspected. **Future PHPUnit regression:** set multipart MIME to `text/html` for a valid JPEG and assert persisted/served MIME is server-derived and image-only; assert FTP rejects non-image `.jpg` before persistence. Add a benign local browser marker test only after obtaining the actual edge CSP. No production XSS execution is claimed.
-- [ ] **SEC-20261018-09 (P2) — Attacker-controlled raster dimensions are decoded without a pixel budget.** Model registration/profile raster uploads have byte/MIME limits but no decoded-pixel limit; `ModelFileStore::storeUpload()` decodes them immediately in `stripImageMetadata()` via `imagecreatefromstring()`, so a holder of a valid registration/profile bearer token can trigger large GD allocation during upload. Separately, gallery upload permits dimensions up to 15,000×15,000 and FTP ingestion has no dimension limit, but neither path invokes GD during ingestion: the large source is decoded later when a media-thumbnail request reaches `ImageProcessor::loadGdImage()`. Triggering FTP import requires an authenticated photographer, not only camera credentials. Exact container capacity/outage threshold is unknown. **Future PHPUnit regression:** use bounded synthetic headers and an injected decoder seam; assert over-budget images reject before decoder invocation in registration/profile and before media thumbnail generation for gallery/FTP images. Do not test by exhausting shared memory.
-- [ ] **SEC-20261018-10 (P2) — Expired galleries still expose photo metadata through the context endpoint.** `GET /api/photos/{id}/context` in `SearchController::photoContext()` enforces brand tree, hidden state and private-gallery access, then serializes `PhotoResource` and breadcrumbs without checking `expires_at`. Other primary gallery/media paths deny expired access to non-managers. Impact: current photo metadata and group/gallery names remain available after gallery expiry; no image-byte bypass is claimed. **Future PHPUnit regression:** expired public/private gallery as anonymous, granted client and manager; assert context denial to non-managers while preserving intended manager access. Related CR-BE-007/CR-MEDIA-006 do not record this expiry-specific projection.
-- [ ] **SEC-20261018-14 (P2) — FTP import buffers unbounded inbox files and batches.** A camera-account holder can upload large/many files to the inbox, but camera credentials alone do not invoke processing: `FtpController::process()` requires an authenticated photographer, who must call `POST /api/management/ftp/process`. `FtpController::runImport()` globs the full inbox and `file_get_contents()` each file into PHP memory before copying to permanent photo storage. No transport file-size/count/quota or aggregate import budget was identified. The per-user import lock limits concurrency, not bytes/work; host-disk exhaustion and exact process impact depend on deployment limits. **Future PHPUnit/integration regression:** enforce configurable low test budgets and assert rejection before full read/copy, bound batch work, and remove orphan destinations on injected processing/DB failure; verify quotas only against disposable SFTPGo with a tiny quota.
-
 ---
 
-### Automatischer FTP-Import (D-35, D-36) — offen
-
-Der Import verlangt heute einen manuellen Klick je Upload; Ziel ist Event-Auslösung plus
-Hintergrundkette in 20er-Batches (Entscheidungen in `features/owner-decisions.md` D-35/D-36). Die
-Batch-Semantik (maximal `ftp.import.max_files` je Lauf, Rest bleibt, kein Fehler) ist Teil der
-SEC-14-Umsetzung; alles darunter ist eigene Arbeit.
-
-- [ ] **SFTPGo-Regel idempotent provisionieren.** Aktion Typ `1` (HTTP) auf einen internen
-  Portal-Endpunkt, Regel für das Upload-Event, Secret im Stack-Env. Die Regel liegt im
-  SFTPGo-Datenprovider, nicht in der Compose-Datei — also ein versionierter Artisan-Befehl über
-  die Admin-API (`SftpGoClient`), nicht Handarbeit im Web-UI. **Test:** zweimaliges Provisionieren
-  erzeugt keine Dublette und keine zweite Aktion; ein geändertes Secret aktualisiert die Aktion.
-- [ ] **Interner Event-Endpunkt.** Nimmt `username` (= `ftp_slug`), Pfad und Event-Typ, prüft das
-  Secret, löst User und `current_ftp_gallery_id` auf und reiht den Batch-Job ein. Kein
-  JWT-Zugang, keine Wirkung ohne gültiges Secret. **Tests:** falsches/fehlendes Secret → 401,
-  unbekannter Slug → kein Job, fehlende Zielgalerie → Datei bleibt liegen und kein Job,
-  gültiger Fall → genau ein Job.
-- [ ] **Queue-Job `ImportFtpBatch`.** Importiert bis `ftp.import.max_files` Dateien und reiht sich
-  bei Resten selbst neu ein; die Kette endet bei leerer Inbox **und** nach wiederholtem
-  Fehlschlag (kein Endlos-Retry). Der bestehende per-User-Lock bleibt die Konkurrenzbremse.
-  **Tests:** 50 Dateien leeren die Inbox in drei Läufen; ein dauerhaft fehlschlagender Batch
-  beendet die Kette mit Fehlerprotokoll; paralleler Event-Lauf erzeugt keine Doppelimporte.
-- [ ] **Nachlauf beim Öffnen der FTP-Seite.** Einmalig beim Mount, kein `refreshInterval`, kein
-  Polling. **Test:** Seitenaufruf löst genau einen Nachlauf aus; ein **zweiter Mount
-  entscheidet erneut** (der Guard ist pro Mount, nicht pro Cache-Eintrag), und das muss
-  unter dem **Produktions**-`dedupingInterval` (2 s) gelten, nicht nur bei `0`.
-- [ ] **Doku nachziehen.** `features/infrastructure/19-ftp-upload-pipeline.md` §1, §3 und §6 auf
-  Event-Trigger, Batch-Kette und Nachlauf umstellen; die drei Config-Keys mit ihren Defaults
-  nennen.
-- [ ] **Quarantäne für nicht importierbare Dateien (D-37).** Nach konfigurierbarer Versuchszahl
-  verschiebt der Import eine Datei, die er nicht verarbeiten kann (zu groß, undekodierbar, leer),
-  in einen Quarantäne-Unterordner neben der Inbox; Dateien werden nie gelöscht, der Ordner ist
-  für den Fotografen auffindbar. **Tests:** eine übergroße Datei und eine undekodierbare Datei
-  blockieren die Inbox nicht mehr, wiederholte Läufe leeren sie, die Quarantäne-Datei bleibt
-  erhalten, Ownership/Modus folgen D-2, und der Zähler in `status()` weist den Rest korrekt aus.
-- [ ] **Offene Punkte aus der SEC-14-Nachprüfung (Runde 2).** N2/N3: Fehlertabelle und
-  `runImport()`-Docblock verschweigen, dass ein Nichtbild an Position k die davor liegenden
-  Dateien bereits geschrieben hat und dass ein Abbruch die **ganze** Auswahl trifft. N4: die
-  Stat-Cache-**Reihenfolge** ist nicht gepinnt (wer `clearstatcache` entfernt, bleibt grün) —
-  Testnaht so bauen, dass die Reihenfolge selbst rot wird. N5: bei 413/422 lädt das Frontend
-  `/status` nicht nach, der Zähler bleibt veraltet. N6: `handleProcess` hat keinen Test
-  (Vitest oder Playwright, DoD §2). N7: das `filesize`-Race in der Auswahl liefert 422 und
-  widerspricht der „verschwunden = unverändert"-Regel — entweder angleichen oder in die
-  Fehlertabelle aufnehmen. N8: die Byte-Defaults (20 MiB / 100 MiB) sind nicht gepinnt, nur
-  `max_files = 20`.
-
 ### Neue offene Punkte aus den Wellen A–D und ihren Nachprüfungen (2026-10-18)
-
-- [~] **wartet auf die unabhängige Schlussprüfung.** Die Nachbesserungen zu SEC-08/09/10
-  (Modellfoto-Byte-Invariante, Kontaktbogen-Decode-Budget, MIME-/Budgetpfade) und die FTP-Wellen
-  zu SEC-14, D-36 und D-37 (Batch-Baustein `FtpInboxImporter`, Event-Endpunkt, `ImportFtpBatch`
-  mit begrenzter Kette, `ftp:provision-events`, Quarantäne, Nachlauf beim Seitenaufruf) liegen
-  **fertig, aber uncommittet** im Arbeitsbaum. Letzte Prüfrunden: Modellfotos `CHANGES REQUIRED`
-  (nur die Doku-Aussage (a)–(d), von mir korrigiert), D-36-Backend `CHANGES REQUIRED`
-  (`FTP_EVENT_URL`-Default, behoben mit Gegenprobe), D-36-Frontend `CHANGES REQUIRED`
-  (Dedupe-Fenster, behoben). **Kein Commit ohne diese Runde** — die Dateiliste steht in
-  `git status`, die Zuordnung Befund → Ausgang in `features/security/2026-10-18-review-closure.md`.
 
 Diese Punkte sind in den Freigaben als **nicht-blockierend** eingestuft worden. Sie sind hier,
 weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benannten Ort.
 
-- [ ] **Dasselbe Prüfen-dann-Zählen in den übrigen Limiter-Pfaden (D-38).**
-  SEC-12 hat den Limiter der Contract-Content-Route atomar gemacht (`add()` + `increment()`,
-  keine unbedingte Schreibung). Das Muster steckt weiter in zwei Formen: in **Routen mit
-  Laravels `throttle:`-Middleware** — aufzählbar mit
-  `grep -rno 'throttle:[a-zA-Z0-9,:]*' backend/routes/*.php backend/bootstrap/app.php`
-  (gemessen 2026-10-18: u. a. `throttle:api`, `throttle:ai`, `throttle:model`,
-  `throttle:coupon`, `throttle:contract`, `throttle:60,1`, `throttle:10,1`) — und in Zählern,
-  die **im Service** direkt über `RateLimiter::hit()` laufen (`CheckoutRiskService` für
-  `checkout`; `grep -rn 'RateLimiter::hit' backend/app`). Unter Gleichzeitigkeit ist dort
-  Überschuss möglich; für die Content-Route gemessen: 32–37 statt 30. **Entschieden (D-38):**
-  nicht repo-weit umstellen, sondern nur die priorisierten sicherheits- und abrechnungsrelevanten
-  Pfade; der Rest bleibt als dokumentierte Grenze stehen. **Test:** je umgestellter Pfad ein
-  deterministischer Nebenläufigkeitstest in der Form des SEC-12-Tests.
 - [ ] **`getOrgGroupScope` ist ungecacht und läuft mehrfach pro Request (Kosten).**
   Gemessen in der Welle-A-Prüfung: zweimal pro `/api/auth/me` (breit plus schmale Auflösung)
   und nochmals auf `GET /api/management/orgs/{id}`. Kein Korrektheitsproblem, aber `/me` liegt
   auf jedem SPA-Load. **Test:** Query-Zahl für `/me` und den Org-Detail-Endpunkt pinnen, bevor
   optimiert wird.
-- [ ] **Alt-Grants werden beim Lesen nicht neu validiert (D-39).** Eine vor der
-  Autorisierungswelle entstandene Freigabe — oder eine Gruppe, in deren Subtree **nachträglich**
-  eine Selection-Galerie wandert — bleibt über `getAllowedGalleryIds()` bestehen. Neu vergeben
-  ist fail-closed. **Entschieden (D-39):** beim Lesen re-validieren; eine nachträglich unsichere
-  Zuweisung verliert den Zugriff (fail-closed). **Test:** eine nachträglich unsichere Gruppe, die
-  bereits zugewiesen ist.
-- [ ] **Lock-Reihenfolge in `OrgController::syncUsers` (D-40).** Org → Akteur →
-  Mitglieder → sortierte Union: der Akteur liegt außerhalb der sortierten Sammelreihenfolge,
-  zwei Syncs über verschiedene Orgs mit gemeinsam verschobenem Nutzer können in einen
-  DB-Deadlock laufen (die Datenbank bricht einen ab, kein Schaden). **Entschieden (D-40):**
-  Org-, Akteur- und Mitgliederzeilen in **einer** sortierten Lock-Menge sperren. Ein SQLite-Test
-  kann das nicht beweisen — der Nachweis braucht zwei echte Verbindungen (siehe das
-  SEC-12-Probe-Skript als Muster).
-- [ ] **Kontaktbogen: kein sichtbares Signal beim Weglassen von Fotos (D-41).** Ein
-  Foto, das an Byte-, Dimension-, Pixel- oder MIME-Prüfung scheitert, verschwindet ohne Hinweis
-  (heute nur über `count($photos)` gegen `photos()->count()` indirekt erschließbar). Ein Zähler
-  würde den Blade-Vertrag ändern. **Entschieden (D-41):** der Kontaktbogen nennt, wie viele Fotos
-  er ausgelassen hat und warum; der Zähler gehört in den PDF-Vertrag.
-- [ ] **Tote Limiter-Registrierung (pre-existing).** `RateLimiter::for('checkout', …)` steht in
-  `AppServiceProvider`, wird aber nirgends referenziert — kein Routen-Throttle, kein
-  Service-Aufruf; die Checkout-Quote läuft ausschließlich über `RateLimiter::hit()` in
-  `CheckoutRiskService`. **Test:** entfernen und belegen, dass kein Test und keine Route den
-  Namen nennt (`grep -rn "'checkout'" backend/app backend/routes backend/tests`).
+- [ ] **Der Brand-Filter löst die Gruppenkette pro Galerie auf (Kosten).**
+  In `AuthorizationService::getAllowedGalleryIds()` löst der Brand-Filter die Gruppenkette
+  **je Galerie** mit `GalleryGroup::find()` auf — gemessen 2 Lookups pro Galerie (6 bei 3
+  Galerien, 30 bei 15). Das ist ein **Vorbestand**, den D-39 nicht verändert hat und nicht
+  verschärft; der Board-Eintrag oben (zweimal pro `/api/auth/me`) ist davon getrennt zu
+  zählen. **Test:** Query-Zahl des Lesers pinnen, bevor die Kette gesammelt aufgelöst wird.
+- [ ] **Der jwt-auth `Factory` sammelt Claims über Tests hinweg (Testartefakt).**
+  `RatingUniquenessTest::test_registered_users_and_guests_have_isolated_rating_rows` bleibt
+  grün, obwohl er eine Selection-Galerie **direkt** zuweist — der jwt-auth `Factory` ist ein
+  Container-Singleton, dessen Claims-Sammlung über die Tests hinweg **akkumuliert**: die
+  `transient_galleries` eines Gast-Tokens landen in der Payload des späteren User-Requests.
+  Vorbestand, unabhängig von D-39, aber der Test beweist damit nicht, was er behauptet.
+  **Test:** Claims pro Request zurücksetzen (eigener Guard je Test) und den Fall erneut
+  messen.
+- [ ] **Der Benachrichtigungs-Opt-in legt eine Zuweisung an (pre-existing).**
+  `NotificationController::toggleGalleryOptIn()` schreibt mit `updateOrInsert()` eine Zeile in
+  `user_galleries` — dieselbe Tabelle, die die Client-Zuweisung trägt. Für eine **Selection**-
+  Galerie gewährt die Zeile **nichts** (D-39 filtert sie aus dem Leser), für eine
+  **Delivery**-Galerie wird sie vom Leser aber **als Zuweisung gewertet** — und sie überlebt die
+  Org-Zugehörigkeit, die sie gerechtfertigt hat: gemessen gibt `getAllowedGalleryIds()` die
+  Galerie weiterhin heraus, nachdem die Org-Zugehörigkeit entfernt wurde. Ein Opt-in ist keine
+  Zuweisung; die saubere Form wäre eine eigene Abo-Tabelle (Schema-Entscheidung). **Test:**
+  ein Opt-in auf eine Delivery-Galerie darf die Zuweisung nicht verändern.
+- [ ] **Zwei-Verbindungs-Nachweis für D-40 steht aus (manuell prüfen).**
+  Das Probe-Skript `backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh` liegt vor
+  (zwei Orgs, deren Akteure gegenseitig Mitglieder sind, gleichzeitige Syncs, InnoDB-
+  Deadlock-Delta). **Der Lauf steht aus:** das Skript braucht einen Docker-Host mit
+  `mariadb:11.4` — hier ist der Docker-Daemon nicht erreichbar, und das SEC-12-Skript
+  läuft aus demselben Grund nicht in CI. **manuell prüfen:** auf einem Host mit Docker
+  ausführen; mit dem alten Lock-Stand (`git show <vor-D-40>:backend/app/Http/Controllers/
+  OrgController.php`) muss das Skript ein **nicht-null** Deadlock-Delta melden, mit dem
+  neuen Stand **null**.
+- [ ] **`OrgController::destroy()` sperrt in der umgekehrten Reihenfolge (pre-existing).**
+  `destroy()` (`:146-159`) aktualisiert zuerst die Mitgliederzeilen und löscht danach die
+  Org-Zeile — also **users → orgs**, während `syncUsers()` **orgs → users** sperrt. Ein Sync
+  über Org X und ein `destroy()` über Org X können deshalb weiterhin einen Zyklus bilden
+  (der Sync hält die Org-Zeile und wartet auf ein Mitglied, das `destroy` hält und auf die
+  Org-Zeile wartet). **Vorbestand** — HEAD sperrt die Org-Zeile in `syncUsers` ebenfalls
+  zuerst —, D-40 führt ihn also nicht ein, aber die D-40-Begründung („die Org-Sperre kann
+  keinen Zyklus mit einer User-Sperre bilden") gilt nur für sync-gegen-sync. **Test:**
+  dieselbe Zwei-Verbindungs-Messung wie das D-40-Probe-Skript, mit `destroy()` statt des
+  zweiten Syncs; oder `destroy()` sperrt die Org-Zeile zuerst.
 - [ ] **Mailpit lokal unerreichbar (Umgebung).** Der Container `accriditation_mailpit` mappt
   `127.0.0.1:1025->1025/tcp`, nimmt aber keine Verbindung an (`socket.connect` → refused). Im
   vollen Backend-Lauf scheitern dadurch **63** Mail-Tests mit `TransportException`; gegen ein
