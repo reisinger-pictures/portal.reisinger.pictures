@@ -171,7 +171,7 @@ export default function ManagementGalleryView() {
                 <EmailComposerModal isOpen={isMailModalOpen} onClose={() => setIsMailModalOpen(false)} galleryId={gallery.id} />
                 {isInviteModalOpen && <InviteModal galleryId={gallery.id} galleryType={gallery.type} onClose={() => setIsInviteModalOpen(false)}/>}
                 <RatingStatusModal galleryId={gallery.id} isOpen={showRatingsModal} onClose={() => setShowRatingsModal(false)} />
-                <GalleryAccessModal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} galleryId={gallery.id} galleryName={gallery.name} />
+                <GalleryAccessModal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} galleryId={gallery.id} galleryName={gallery.name} galleryType={gallery.type} />
                 <PhotographerTeamModal isOpen={isPhotographerTeamModalOpen} onClose={() => setIsPhotographerTeamModalOpen(false)} item={gallery} isGroup={false} onUpdateState={() => mutate()} />
                 <GalleryMetadataDefaultsModal isOpen={isMetadataModalOpen} onClose={() => setIsMetadataModalOpen(false)} gallery={gallery} onUpdate={async (...args) => { await updateGallery(...args); mutate(); }} />
                 {isAIBatchModalOpen && <AIBatchEditModal isOpen={isAIBatchModalOpen} onClose={() => setIsAIBatchModalOpen(false)} photos={photos} galleryId={gallery.id} />}

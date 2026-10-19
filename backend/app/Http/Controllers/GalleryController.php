@@ -22,6 +22,7 @@ use App\Services\GalleryService;
 use App\Services\GalleryTreeService;
 use App\Services\RatingService;
 use App\Support\BrandRegistry;
+use App\Support\DirectGalleryGrant;
 use App\Support\GalleryGroupSubtree;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -379,6 +380,25 @@ class GalleryController extends Controller
         }
 
         if ($validated['action'] === 'attach') {
+            // D-43: a direct gallery assignment carries delivery galleries
+            // only. `user_galleries` is the client grant table; a selection
+            // gallery is a private rating surface that reaches a client
+            // through an invite, not through a direct grant. The read path
+            // (D-39) voids such a grant, so accepting it here would be a
+            // silent no-op for the admin.
+            //
+            // An already granted gallery is not re-judged: the attach is
+            // idempotent, and an existing (legacy) row must not turn an
+            // unrelated re-sync into an error. A detach is always allowed —
+            // removing a grant must never be blocked.
+            $alreadyGranted = $targetUser->galleries()
+                ->where('galleries.id', $gallery->id)
+                ->exists();
+
+            if (! $alreadyGranted && ! DirectGalleryGrant::allowsType($gallery->type)) {
+                return response()->json(['error' => DirectGalleryGrant::REJECTION_MESSAGE], 403);
+            }
+
             $targetUser->galleries()->syncWithoutDetaching([$id]);
         } else {
             $targetUser->galleries()->detach($id);

@@ -21,11 +21,16 @@ interface UserAccess {
 export interface GalleryAccessModalProps {
     galleryId: string;
     galleryName: string;
+    /**
+     * The gallery type decides whether a *client* assignment may be offered at
+     * all (D-43). A selection gallery is never a direct client assignment.
+     */
+    galleryType: 'selection' | 'delivery';
     isOpen: boolean;
     onClose: () => void;
 }
 
-export default function GalleryAccessModal({galleryId, galleryName, isOpen, onClose}: GalleryAccessModalProps) {
+export default function GalleryAccessModal({galleryId, galleryName, galleryType, isOpen, onClose}: GalleryAccessModalProps) {
     const {data: response, isLoading, mutate} = useSWR<{data: UserAccess[]} | UserAccess[]>('/api/management/users', fetcher);
     const {showToast} = useUI();
     const [search, setSearch] = useState('');
@@ -35,6 +40,15 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
 
     if (!isOpen) return null;
     if (isLoading) return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>;
+
+    // D-43: a direct client assignment carries delivery galleries only — the
+    // API refuses a selection gallery, so the dialog must not offer what the
+    // API refuses. A selection gallery reaches a client through an invite; its
+    // photographer access lives in its own dialog and is untouched here.
+    //
+    // Removing an existing (legacy) grant stays possible: the API never
+    // blocks a removal.
+    const canAssignClient = galleryType !== 'selection';
 
     // Wir filtern Super-Admins raus, da die ohnehin alles sehen.
     const filteredUsers = users?.filter(u =>
@@ -76,6 +90,12 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
                 <>
                     <p className="text-sm opacity-70 mb-4"><Trans>Galerie:</Trans> <strong>{galleryName}</strong></p>
 
+                    {!canAssignClient && (
+                        <p className="text-sm opacity-70 mb-2">
+                            <Trans>Auswahlgalerien werden nicht direkt zugewiesen. Kunden erreichen sie über einen Einladungslink, Fotografen über den eigenen Zugriffsdialog.</Trans>
+                        </p>
+                    )}
+
                     <input
                         type="text"
                         placeholder={t`Nutzer suchen...`}
@@ -108,6 +128,11 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
                     <div className="flex flex-col gap-1">
                         {filteredUsers?.map(u => {
                             const hasAccess = u.galleries.some(g => g.id === galleryId);
+                            // A selection gallery is not offered as a client
+                            // assignment (D-43), so such a row carries no action
+                            // at all. A row that already holds a (legacy) grant
+                            // keeps its removal.
+                            const canAct = hasAccess || canAssignClient;
                             return (
                                 // Name and action share one line, the email sits
                                 // below it: an action centred against the whole
@@ -118,14 +143,16 @@ export default function GalleryAccessModal({galleryId, galleryName, isOpen, onCl
                                      className="p-2 hover:bg-base-200 rounded">
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="font-bold min-w-0 break-words">{u.name}</div>
-                                        <button
-                                            className={`btn btn-sm w-28 shrink-0 ${hasAccess ? 'btn-error btn-outline' : 'btn-primary'}`}
-                                            onClick={() => toggleAccess(u.id, hasAccess)}
-                                            disabled={processingId === u.id}
-                                        >
-                                            {processingId === u.id ? <span
-                                                className="loading loading-spinner"></span> : (hasAccess ? <Trans>Entfernen</Trans> : <Trans>Hinzufügen</Trans>)}
-                                        </button>
+                                        {canAct && (
+                                            <button
+                                                className={`btn btn-sm w-28 shrink-0 ${hasAccess ? 'btn-error btn-outline' : 'btn-primary'}`}
+                                                onClick={() => toggleAccess(u.id, hasAccess)}
+                                                disabled={processingId === u.id}
+                                            >
+                                                {processingId === u.id ? <span
+                                                    className="loading loading-spinner"></span> : (hasAccess ? <Trans>Entfernen</Trans> : <Trans>Hinzufügen</Trans>)}
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="text-sm opacity-70 break-words mt-1">{u.email}</div>
                                 </div>
