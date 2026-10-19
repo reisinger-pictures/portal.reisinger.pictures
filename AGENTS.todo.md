@@ -134,7 +134,7 @@ SEC-14-Umsetzung; alles darunter ist eigene Arbeit.
 Diese Punkte sind in den Freigaben als **nicht-blockierend** eingestuft worden. Sie sind hier,
 weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benannten Ort.
 
-- [ ] **Dasselbe Prüfen-dann-Zählen in allen übrigen Limiter-Pfaden (Entscheidung).**
+- [ ] **Dasselbe Prüfen-dann-Zählen in den übrigen Limiter-Pfaden (D-38).**
   SEC-12 hat den Limiter der Contract-Content-Route atomar gemacht (`add()` + `increment()`,
   keine unbedingte Schreibung). Das Muster steckt weiter in zwei Formen: in **Routen mit
   Laravels `throttle:`-Middleware** — aufzählbar mit
@@ -143,38 +143,42 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   `throttle:coupon`, `throttle:contract`, `throttle:60,1`, `throttle:10,1`) — und in Zählern,
   die **im Service** direkt über `RateLimiter::hit()` laufen (`CheckoutRiskService` für
   `checkout`; `grep -rn 'RateLimiter::hit' backend/app`). Unter Gleichzeitigkeit ist dort
-  Überschuss möglich; für die Content-Route gemessen: 32–37 statt 30. **Entscheidung offen:**
-  global umstellen oder bewusst je Pfad. **Test:** der deterministische Middleware-Test aus
-  SEC-12 gilt nur für die umgestellte Route.
+  Überschuss möglich; für die Content-Route gemessen: 32–37 statt 30. **Entschieden (D-38):**
+  nicht repo-weit umstellen, sondern nur die priorisierten sicherheits- und abrechnungsrelevanten
+  Pfade; der Rest bleibt als dokumentierte Grenze stehen. **Test:** je umgestellter Pfad ein
+  deterministischer Nebenläufigkeitstest in der Form des SEC-12-Tests.
 - [ ] **`getOrgGroupScope` ist ungecacht und läuft mehrfach pro Request (Kosten).**
   Gemessen in der Welle-A-Prüfung: zweimal pro `/api/auth/me` (breit plus schmale Auflösung)
   und nochmals auf `GET /api/management/orgs/{id}`. Kein Korrektheitsproblem, aber `/me` liegt
   auf jedem SPA-Load. **Test:** Query-Zahl für `/me` und den Org-Detail-Endpunkt pinnen, bevor
   optimiert wird.
-- [ ] **Alt-Grants werden beim Lesen nicht neu validiert (Entscheidung).** Eine vor der
+- [ ] **Alt-Grants werden beim Lesen nicht neu validiert (D-39).** Eine vor der
   Autorisierungswelle entstandene Freigabe — oder eine Gruppe, in deren Subtree **nachträglich**
   eine Selection-Galerie wandert — bleibt über `getAllowedGalleryIds()` bestehen. Neu vergeben
-  ist fail-closed. **Entscheidung offen:** beim Lesen re-validieren oder als bewusste Grenze
-  führen. **Test:** eine nachträglich unsichere Gruppe, die bereits zugewiesen ist.
-- [ ] **Lock-Reihenfolge in `OrgController::syncUsers` (Entscheidung).** Org → Akteur →
+  ist fail-closed. **Entschieden (D-39):** beim Lesen re-validieren; eine nachträglich unsichere
+  Zuweisung verliert den Zugriff (fail-closed). **Test:** eine nachträglich unsichere Gruppe, die
+  bereits zugewiesen ist.
+- [ ] **Lock-Reihenfolge in `OrgController::syncUsers` (D-40).** Org → Akteur →
   Mitglieder → sortierte Union: der Akteur liegt außerhalb der sortierten Sammelreihenfolge,
   zwei Syncs über verschiedene Orgs mit gemeinsam verschobenem Nutzer können in einen
-  DB-Deadlock laufen (die Datenbank bricht einen ab, kein Schaden). **Entscheidung offen:**
-  Akteur in die sortierte Menge ziehen oder bewusst tragen. Ein SQLite-Test kann das nicht
-  beweisen — der Nachweis braucht zwei echte Verbindungen (siehe das SEC-12-Probe-Skript als
-  Muster).
+  DB-Deadlock laufen (die Datenbank bricht einen ab, kein Schaden). **Entschieden (D-40):**
+  Org-, Akteur- und Mitgliederzeilen in **einer** sortierten Lock-Menge sperren. Ein SQLite-Test
+  kann das nicht beweisen — der Nachweis braucht zwei echte Verbindungen (siehe das
+  SEC-12-Probe-Skript als Muster).
 - [ ] **Der 500-ID-Schnitt im ZIP-Payload ist dokumentiert, aber nicht getestet.** Ein
   `photo_ids`-Payload über 500 Einträge zählt nur die ersten 500; die übrigen erwirtschaften
   still 0 Shares, ohne Doppelzählung. **Test:** ein Payload mit 501+ IDs.
-- [ ] **Kontaktbogen: kein sichtbares Signal beim Weglassen von Fotos (Entscheidung).** Ein
+- [ ] **Kontaktbogen: kein sichtbares Signal beim Weglassen von Fotos (D-41).** Ein
   Foto, das an Byte-, Dimension-, Pixel- oder MIME-Prüfung scheitert, verschwindet ohne Hinweis
   (heute nur über `count($photos)` gegen `photos()->count()` indirekt erschließbar). Ein Zähler
-  würde den Blade-Vertrag ändern. **Entscheidung offen.**
-- [ ] **`ext-gd` ist repo-weit undeklariert (Entscheidung).** `ImageProcessor` nutzt GD
+  würde den Blade-Vertrag ändern. **Entschieden (D-41):** der Kontaktbogen nennt, wie viele Fotos
+  er ausgelassen hat und warum; der Zähler gehört in den PDF-Vertrag.
+- [ ] **`ext-gd` ist repo-weit undeklariert (D-42).** `ImageProcessor` nutzt GD
   voraussetzungslos, der Kontaktbogen macht es seit der Byte-Invariante zur harten Bedingung für
   JPEG/PNG-Einbettung, `composer.json` deklariert nichts, CI baut mit `--ignore-platform-reqs`.
-  Als Umgebungsgrenze dokumentiert; **Entscheidung offen:** deklarieren oder dauerhaft als
-  Laufzeitvoraussetzung führen.
+  **Entschieden (D-42):** `ext-gd` wird in `composer.json` als Plattformvoraussetzung
+  deklariert; das Verhalten der Installationen ohne GD wird zur Folge dieser Deklaration, nicht
+  mehr zur stillen Umgebungsgrenze.
 - [ ] **Testhygiene: einseitiger Listener-Flush (pre-existing).** `FtpImportTest::tearDown()`
   flusht `Photo::created`; die Gegenrichtung fehlt — `GalleryPhotoCleanupDurabilityTest`
   registriert `Photo::deleting(fn => false)` und flusht nie. Unter
