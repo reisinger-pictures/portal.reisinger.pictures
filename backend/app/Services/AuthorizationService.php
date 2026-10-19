@@ -92,12 +92,33 @@ class AuthorizationService
         // was issued must not remain an effective grant.
         $transientGalleryIds = $this->getActiveTransientGalleryIds($user);
 
-        // 1. Direct assignments
-        $galleryIds = $user->galleries()->pluck('galleries.id')->toArray();
+        // 1. Direct assignments. The gallery type travels with the id: the
+        // read-time re-validation below needs it, and reading it here keeps
+        // the direct-grant path at a single query.
+        $directGrants = $user->galleries()->get(['galleries.id', 'galleries.type']);
+        $directGalleryIds = $directGrants
+            ->map(fn (Gallery $gallery): string => (string) $gallery->id)
+            ->all();
 
         // 2. Group assignments (recursive)
         $groupIds = $user->galleryGroups()->pluck('gallery_groups.id')->toArray();
         $allGroupIds = $this->getSubGroupIds($groupIds);
+
+        // D-39: a persistent client grant is re-validated against the current
+        // selection/subtree safety when it is read, not only when it is
+        // granted. A grant that became unsafe after it was issued is
+        // fail-closed and hands out nothing.
+        //
+        // The paths that are not client grants keep their behaviour: the
+        // transient invite above, the org scope below, the photographer
+        // surface below and the cross-brand Super-Admin, whose management
+        // access never depends on a client grant.
+        if (! $this->isTrustedCrossBrandActor($user)) {
+            $directGalleryIds = $this->safeDirectGalleryIds($directGrants);
+            $allGroupIds = $this->safeGrantedGroupIds($groupIds, $allGroupIds, $actorBrand);
+        }
+
+        $galleryIds = $directGalleryIds;
 
         if (! empty($allGroupIds)) {
             $groupGalleryIds = Gallery::whereIn('gallery_group_id', $allGroupIds)->pluck('id')->toArray();
@@ -250,50 +271,78 @@ class AuthorizationService
             return [];
         }
 
-        $groups = GalleryGroup::query()
-            ->whereIn('id', $groupIds)
-            ->get(['id', 'parent_id', 'brand']);
-        $groupsById = $groups->keyBy(fn (GalleryGroup $group): string => (string) $group->id);
+        $groupsById = $this->galleryGroupRows($groupIds);
+        $scopeGroupIds = $groupsById->keys()->all();
 
         // The scope contains a pivot group and its descendants, not the
         // ancestors above a pivot — but the brand walk below must still see
         // those. Load the ancestor closure once so the walk resolves parents
         // from memory instead of issuing one query per group and level.
-        $missingParentIds = $this->pendingParentIds($groups, $groupsById);
-        while ($missingParentIds !== []) {
-            $parents = GalleryGroup::query()
-                ->whereIn('id', $missingParentIds)
-                ->get(['id', 'parent_id', 'brand']);
+        $groupsById = $this->withAncestorClosure($groupsById);
 
-            foreach ($parents as $parent) {
-                $groupsById->put((string) $parent->id, $parent);
-            }
+        $blockedGroupIds = $this->blockedGalleryGroupIds($groupsById, $scopeGroupIds, $orgBrand);
 
-            $missingParentIds = $this->pendingParentIds($parents, $groupsById);
+        // `$groupsById` also holds the ancestors loaded for the brand walk; the
+        // answer must stay restricted to the actual delegation scope.
+        return collect($scopeGroupIds)
+            ->reject(fn (string $groupId): bool => in_array($groupId, $blockedGroupIds, true))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The gallery groups that must not be handed out through a persistent
+     * client grant.
+     *
+     * A group is unsafe when it directly holds a non-delivery (selection)
+     * gallery, or when its brand tree does not match the expected brand. The
+     * ancestors of an unsafe group are unsafe as well: a grant on an ancestor
+     * carries the same broad subtree permission and would hand out the very
+     * selection gallery the unsafe descendant holds.
+     *
+     * This is the single computation behind both the new-grant rule
+     * ({@see getOrgAssignableGalleryGroupIds()}) and the read-time
+     * re-validation of an already issued grant (D-39). The writer and the
+     * reader therefore cannot drift apart.
+     *
+     * @param  Collection<string, GalleryGroup>  $groupsById  the loaded group rows
+     * @param  array<string>  $groupIds  the groups under consideration
+     * @param  mixed  $expectedBrand  the brand the group tree must match; `null` skips the brand walk
+     * @return array<string> the blocked group ids
+     */
+    private function blockedGalleryGroupIds(Collection $groupsById, array $groupIds, mixed $expectedBrand = null): array
+    {
+        if ($groupIds === []) {
+            return [];
         }
 
         $resolveGroup = fn (string $groupId): ?GalleryGroup => $groupsById->get($groupId);
 
-        $scopeGroupIds = $groups
-            ->map(fn (GalleryGroup $group): string => (string) $group->id)
-            ->all();
-
+        // A group that directly holds a non-delivery (selection) gallery is
+        // unsafe: a grant on that group would hand out that gallery.
         $unsafeGroupIds = Gallery::query()
-            ->whereIn('gallery_group_id', $scopeGroupIds)
+            ->whereIn('gallery_group_id', $groupIds)
             ->where('type', '!=', 'delivery')
             ->pluck('gallery_group_id')
             ->map(fn ($id): string => (string) $id)
             ->all();
 
-        foreach ($groups as $group) {
-            if (! BrandRegistry::galleryGroupTreeMatchesBrand($group, $orgBrand, $resolveGroup)) {
-                $unsafeGroupIds[] = (string) $group->id;
+        if ($expectedBrand !== null) {
+            $considered = array_flip($groupIds);
+
+            foreach ($groupsById as $groupId => $group) {
+                if (! isset($considered[(string) $groupId])) {
+                    continue;
+                }
+
+                if (! BrandRegistry::galleryGroupTreeMatchesBrand($group, $expectedBrand, $resolveGroup)) {
+                    $unsafeGroupIds[] = (string) $groupId;
+                }
             }
         }
 
-        // A group is unsafe when any descendant has a selection gallery or a
-        // broken/foreign brand tree. Mark its ancestors too; a direct grant on
-        // an ancestor would carry the same broad subtree permission.
+        // A group is unsafe when a descendant is unsafe: a grant on an
+        // ancestor would carry the same broad subtree permission.
         $blockedIds = [];
         foreach (array_unique($unsafeGroupIds) as $unsafeGroupId) {
             $currentId = (string) $unsafeGroupId;
@@ -307,12 +356,163 @@ class AuthorizationService
             }
         }
 
-        // `$groupsById` also holds the ancestors loaded for the brand walk; the
-        // answer must stay restricted to the actual delegation scope.
-        return collect($scopeGroupIds)
-            ->reject(fn (string $groupId): bool => isset($blockedIds[$groupId]))
+        return array_values(array_intersect(array_keys($blockedIds), $groupIds));
+    }
+
+    /**
+     * The directly granted galleries a persistent client grant may hand out.
+     *
+     * A selection gallery is a private rating surface. It is reached through
+     * an invite (transient grant) or through a photographer's own surface,
+     * never through a persistent client grant — not even through a grant that
+     * was issued before the gallery became a selection gallery (D-39).
+     *
+     * The rule is the same one the group rule applies: only a delivery
+     * gallery travels through a client grant. A gallery without a type counts
+     * as delivery, exactly like the `type != 'delivery'` predicate of the
+     * group rule (SQL never matches a NULL type).
+     *
+     * @param  Collection<int, Gallery>  $directGrants
+     * @return array<string>
+     */
+    private function safeDirectGalleryIds(Collection $directGrants): array
+    {
+        return $directGrants
+            ->reject(fn (Gallery $gallery): bool => $gallery->type !== null && $gallery->type !== 'delivery')
+            ->map(fn (Gallery $gallery): string => (string) $gallery->id)
             ->values()
             ->all();
+    }
+
+    /**
+     * The granted groups whose subtree a persistent client grant may hand out.
+     *
+     * A group grant resolves the whole subtree of the granted group. When that
+     * subtree holds a selection gallery, the grant carries the very gallery a
+     * client grant must never hand out — so the whole grant is fail-closed,
+     * exactly like the new-grant path refuses such a group. The same holds for
+     * a grant on an ancestor of that unsafe group: it carries the same broad
+     * subtree permission.
+     *
+     * @param  array<string>  $grantedGroupIds  the directly granted groups
+     * @param  array<string>  $allGroupIds  the granted groups and their descendants
+     * @param  string|null  $actorBrand  the brand the group tree must match
+     * @return array<string> the groups that may still be handed out
+     */
+    private function safeGrantedGroupIds(array $grantedGroupIds, array $allGroupIds, ?string $actorBrand): array
+    {
+        if ($grantedGroupIds === [] || $allGroupIds === []) {
+            return $allGroupIds;
+        }
+
+        $groupsById = $this->withAncestorClosure($this->galleryGroupRows($allGroupIds));
+
+        $blockedGroupIds = $this->blockedGalleryGroupIds($groupsById, $allGroupIds, $actorBrand);
+
+        // Only a granted group carries a grant. A blocked descendant always
+        // blocks its granted ancestor as well, because the ancestor walk of
+        // the shared computation marks every ancestor of an unsafe group.
+        $blockedRoots = array_values(array_intersect($blockedGroupIds, $grantedGroupIds));
+        if ($blockedRoots === []) {
+            return $allGroupIds;
+        }
+
+        $droppedGroupIds = $this->descendantGroupIds($blockedRoots, $groupsById);
+
+        return array_values(array_diff($allGroupIds, $droppedGroupIds));
+    }
+
+    /**
+     * The group rows (id, parent_id, brand) for the given groups, keyed by id.
+     *
+     * @param  array<string>  $groupIds
+     * @return Collection<string, GalleryGroup>
+     */
+    private function galleryGroupRows(array $groupIds): Collection
+    {
+        if ($groupIds === []) {
+            return new Collection;
+        }
+
+        return GalleryGroup::query()
+            ->whereIn('id', $groupIds)
+            ->get(['id', 'parent_id', 'brand'])
+            ->keyBy(fn (GalleryGroup $group): string => (string) $group->id);
+    }
+
+    /**
+     * Extend the group map with the ancestor closure above the loaded groups.
+     *
+     * The loaded groups are a pivot group and its descendants, not the
+     * ancestors above the pivot — but the brand walk must still see those.
+     * Resolving them in batches keeps the walk free of per-group queries
+     * while preserving the fail-closed behaviour of a missing parent (`null`
+     * ends the walk).
+     *
+     * @param  Collection<string, GalleryGroup>  $groupsById
+     * @return Collection<string, GalleryGroup>
+     */
+    private function withAncestorClosure(Collection $groupsById): Collection
+    {
+        $missingParentIds = $this->pendingParentIds($groupsById, $groupsById);
+        while ($missingParentIds !== []) {
+            $parents = GalleryGroup::query()
+                ->whereIn('id', $missingParentIds)
+                ->get(['id', 'parent_id', 'brand']);
+
+            foreach ($parents as $parent) {
+                $groupsById->put((string) $parent->id, $parent);
+            }
+
+            $missingParentIds = $this->pendingParentIds($parents, $groupsById);
+        }
+
+        return $groupsById;
+    }
+
+    /**
+     * The descendants of the given groups, resolved from the loaded rows.
+     *
+     * The walk is bounded by the loaded rows and cycle-safe: a group id is
+     * visited at most once.
+     *
+     * @param  array<string>  $rootIds
+     * @param  Collection<string, GalleryGroup>  $groupsById
+     * @return array<string>
+     */
+    private function descendantGroupIds(array $rootIds, Collection $groupsById): array
+    {
+        if ($rootIds === []) {
+            return [];
+        }
+
+        $childrenByParent = [];
+        foreach ($groupsById as $groupId => $group) {
+            $parentId = $group->parent_id;
+            if ($parentId === null || $parentId === '') {
+                continue;
+            }
+
+            $childrenByParent[(string) $parentId][] = (string) $groupId;
+        }
+
+        $collected = [];
+        $stack = array_values($rootIds);
+
+        while ($stack !== []) {
+            $currentId = array_pop($stack);
+            if (isset($collected[$currentId])) {
+                continue;
+            }
+
+            $collected[$currentId] = true;
+
+            foreach ($childrenByParent[$currentId] ?? [] as $childId) {
+                $stack[] = $childId;
+            }
+        }
+
+        return array_keys($collected);
     }
 
     /**

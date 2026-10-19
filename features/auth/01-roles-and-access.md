@@ -34,6 +34,16 @@ Roles are strictly separated.
 ## 4. IDOR Protection
 - Every controller method accessing a specific resource (e.g., a photo or a gallery) MUST verify that the authenticated user's ID (or transient claim) is linked to that resource via the `getAllowedGalleryIds()` logic.
 
+## 5. Read-time re-validation of persistent grants (D-39)
+- A persistent client grant (`user_galleries`, `user_gallery_groups`) is **re-validated on every read**, not only when it is granted. A grant that became unsafe after it was issued is fail-closed and hands out nothing.
+- **Direct grants:** a selection gallery never travels through a persistent client grant. Only a delivery gallery does.
+- **Group grants:** a group grant resolves the whole subtree of the granted group. When that subtree holds a selection gallery, the grant is refused as a whole — the delivery galleries of that subtree are handed out neither. The same holds for a grant on an *ancestor* of that unsafe group: it carries the same broad subtree permission.
+- The group rule is the same one the new-grant path applies (`getOrgAssignableGalleryGroupIds()`), so a group grant that could not have been issued cannot survive on disk. Both paths share one computation. The direct-assignment writers are narrowed to delivery galleries by D-43, so a direct grant that could not have been issued does not survive either.
+- **Paths that are not client grants keep their behaviour:** the transient invite claim (the way a client legitimately reaches a selection gallery to rate it), the photographer surface (`photographer_galleries`, `photographer_gallery_groups`, the unrestricted gallery list), the organization scope (a delivery-only projection) and the cross-brand Super-Admin, whose management access never depends on a client grant.
+- The exemption is narrow: only a **cross-brand** Super-Admin (persisted, brand `null`, Super-Admin) is exempt. A brand-bound admin or a brand-bound Super-Admin is bound by the re-validation, so a legacy selection assignment of such an actor no longer appears in `getAllowedGalleryIds()`.
+- **Consequence for a brand-bound admin:** the client-facing gallery view of a legacy selection assignment disappears (`GET /api/galleries/{slug}` → 403) while the management surface (`canManageGallery()`) stays. An actor without such an assignment already got that refusal before the re-validation, so it removes an inconsistency rather than opening a gap.
+- The reserved-null-brand checks are applied **before** the re-validation (early returns); the brand scoping filter is applied after it and is unaffected by it.
+
 ## Related
 - [Magic Links & Invites](../auth/02-magic-links.md) � transient access for guests overriding role model
 - [Roles & Access Management (Single Org)](../auth/03-roles-and-rbac.md) � enterprise RBAC evolution of the role system

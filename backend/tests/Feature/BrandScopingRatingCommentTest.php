@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Gallery;
+use App\Models\GalleryInvite;
 use App\Models\Photo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 use Tests\TestCase;
 
 /**
@@ -19,9 +21,25 @@ class BrandScopingRatingCommentTest extends TestCase
     private function tokenForGallery(Gallery $gallery): string
     {
         $user = User::factory()->create(['brand' => 'rp']);
-        $user->galleries()->attach($gallery->id);
 
-        return auth('api')->login($user);
+        // A client reaches a selection gallery through an invite. A persistent
+        // client grant of a selection gallery is fail-closed (D-39), so the
+        // invite provenance is the access this test needs.
+        $invite = GalleryInvite::create([
+            'gallery_id' => $gallery->id,
+            'token' => 'brand-scoping-rating-comment-'.uniqid(),
+        ]);
+
+        return JWTAuth::claims([
+            'transient_galleries' => [$gallery->id],
+            'transient_invites' => [
+                (string) $invite->id => [
+                    'gallery_ids' => [(string) $gallery->id],
+                    'meta_gallery_ids' => [],
+                ],
+            ],
+            'transient_invite_ids' => [(string) $invite->id],
+        ])->fromUser($user);
     }
 
     public function test_comment_longer_than_max_is_rejected(): void

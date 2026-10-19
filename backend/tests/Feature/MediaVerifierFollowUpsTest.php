@@ -484,7 +484,7 @@ class MediaVerifierFollowUpsTest extends TestCase
         $this->assertDatabaseCount('orders', 0);
     }
 
-    public function test_cr_crm_010_selection_gallery_cannot_be_downloaded_by_flat_rate_or_exposed_in_sitemaps(): void
+    public function test_cr_crm_010_selection_gallery_cannot_be_downloaded_by_an_invited_guest_or_exposed_in_sitemaps(): void
     {
         $this->withoutMiddleware(ThrottleRequests::class);
 
@@ -505,12 +505,10 @@ class MediaVerifierFollowUpsTest extends TestCase
             file_get_contents(base_path('tests/Fixtures/sample.jpg')),
         );
 
-        $user = User::factory()->create([
-            'brand' => Brand::B2B,
-            'flatrate_level' => 'original',
-        ]);
-        $user->galleries()->attach($gallery);
-        $token = auth('api')->login($user);
+        // The client in the selection gallery: an invited guest, which is the
+        // path a selection gallery is actually reached through. A persistent
+        // client grant of a selection gallery is fail-closed (D-39).
+        $token = $this->selectionGuestToken($gallery);
 
         $this->withToken($token)
             ->getJson('/api/photos/'.$photo->id.'/download?tier=original')
@@ -546,7 +544,10 @@ class MediaVerifierFollowUpsTest extends TestCase
             'brand' => Brand::B2B,
             'flatrate_level' => 'original',
         ]);
-        $user->galleries()->attach($gallery);
+        // The client in the selection gallery: an invited guest, which is the
+        // path a selection gallery is actually reached through. A persistent
+        // client grant of a selection gallery is fail-closed (D-39).
+        $guestToken = $this->selectionGuestToken($gallery);
 
         $disk = Storage::disk('photos');
         $sourceRelative = $gallery->id.'/'.$photo->filename;
@@ -557,7 +558,7 @@ class MediaVerifierFollowUpsTest extends TestCase
         $staleHash = hash_file('sha256', $disk->path($staleRelative));
         $this->assertIsString($staleHash);
 
-        $this->actingAs($user, 'api')
+        $this->withToken($guestToken)
             ->getJson('/api/galleries/'.$gallery->id.'/download-zip?tier=original')
             ->assertForbidden();
         $this->assertSame($staleHash, hash_file('sha256', $disk->path($staleRelative)));
@@ -621,11 +622,10 @@ class MediaVerifierFollowUpsTest extends TestCase
             'is_free_download' => true,
         ]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
-        $user = User::factory()->create([
-            'brand' => Brand::B2B,
-            'flatrate_level' => 'original',
-        ]);
-        $user->galleries()->attach($gallery);
+        // The client in the selection gallery: an invited guest, which is the
+        // path a selection gallery is actually reached through. A persistent
+        // client grant of a selection gallery is fail-closed (D-39).
+        $guestToken = $this->selectionGuestToken($gallery);
 
         $disk = Storage::disk('photos');
         $sourceRelative = $gallery->id.'/'.$photo->filename;
@@ -637,11 +637,11 @@ class MediaVerifierFollowUpsTest extends TestCase
         $this->assertTrue($processor->scaleImage($sourcePath, $staleThumbPath, 2000));
         $this->assertFalse($processor->isSafeWatermarkedOutput($sourcePath, $staleThumbPath, 'selection'));
 
-        $this->actingAs($user, 'api')
+        $this->withToken($guestToken)
             ->get('/api/media/'.$gallery->id.'/'.$photo->id.'.jpg')
             ->assertForbidden();
 
-        $preview = $this->actingAs($user, 'api')
+        $preview = $this->withToken($guestToken)
             ->get('/api/media/'.$gallery->id.'/watermarked/_thumbs/2000/'.$photo->id.'.webp')
             ->assertOk();
         $this->assertNotFalse(getimagesize($preview->getFile()->getPathname()));
@@ -704,6 +704,40 @@ class MediaVerifierFollowUpsTest extends TestCase
                     'meta_gallery_ids' => [],
                 ],
             ],
+        ])->make();
+
+        return app(JWTAuth::class)->encode($payload)->get();
+    }
+
+    /**
+     * A guest token whose invite provenance owns the target gallery.
+     *
+     * A client reaches a selection gallery through an invite. A persistent
+     * client grant of a selection gallery is fail-closed (D-39), so the invite
+     * provenance is the access these tests need — otherwise a "forbidden"
+     * assertion would pass for the wrong reason (no access at all instead of
+     * the selection-specific rule).
+     */
+    private function selectionGuestToken(Gallery $gallery): string
+    {
+        $guestId = (string) Str::uuid();
+        $invite = GalleryInvite::create([
+            'gallery_id' => $gallery->id,
+            'token' => 'media-verifier-selection-'.Str::random(12),
+        ]);
+        $payload = app(Factory::class)->customClaims([
+            'sub' => 'guest_'.$guestId,
+            'guest_id' => $guestId,
+            'guest_name' => 'Selection Guest',
+            'guest_invite_id' => $invite->id,
+            'transient_galleries' => [$gallery->id],
+            'transient_invites' => [
+                (string) $invite->id => [
+                    'gallery_ids' => [(string) $gallery->id],
+                    'meta_gallery_ids' => [],
+                ],
+            ],
+            'transient_invite_ids' => [(string) $invite->id],
         ])->make();
 
         return app(JWTAuth::class)->encode($payload)->get();

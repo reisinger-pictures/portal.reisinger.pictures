@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\Brand;
 use App\Models\Gallery;
+use App\Models\GalleryInvite;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\Photo;
@@ -177,10 +178,24 @@ class PublicMediaBrandIsolationTest extends TestCase
             'is_public' => false,
         ]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
-        $user->galleries()->attach($gallery);
-        $token = auth('api')->login($user);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+        // A client reaches a selection gallery through an invite. A persistent
+        // client grant of a selection gallery is fail-closed (D-39), so the
+        // invite provenance is the access this test needs.
+        $invite = GalleryInvite::create([
+            'gallery_id' => $gallery->id,
+            'token' => 'public-media-brand-rating-'.uniqid(),
+        ]);
+        $user->transient_galleries = [$gallery->id];
+        $user->transient_invites = [
+            (string) $invite->id => [
+                'gallery_ids' => [(string) $gallery->id],
+                'meta_gallery_ids' => [],
+            ],
+        ];
+        $user->transient_invite_ids = [(string) $invite->id];
+
+        $this->actingAs($user, 'api')
             ->postJson('/api/photos/'.$photo->id.'/rate', ['rating' => 5])
             ->assertOk();
 
