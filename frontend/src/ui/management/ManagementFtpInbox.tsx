@@ -283,6 +283,16 @@ export default function ManagementFtpInbox() {
         }
     };
 
+    const quarantineCount = status.quarantine_count;
+    const uploadPath = status.connection.path;
+    const inboxPath = uploadPath === null || uploadPath === '/'
+        ? status.ftp_folder
+        : `${status.ftp_folder}${uploadPath}`;
+    const quarantinePath = `${inboxPath}/_quarantine`;
+    const quarantineTitle = quarantineCount === 1
+        ? t`1 Datei liegt im Quarantäne-Ordner`
+        : t`${quarantineCount} Dateien liegen im Quarantäne-Ordner`;
+
     return (
         <div className="card bg-base-200 border border-base-300 mb-8">
             <div className="card-body">
@@ -305,6 +315,20 @@ export default function ManagementFtpInbox() {
                         </p>
                     </div>
                 </div>
+
+                {quarantineCount > 0 && (
+                    <div className="alert alert-warning shadow-sm mt-2" role="alert">
+                        <span className="iconify mdi--alert-outline text-xl" aria-hidden="true"></span>
+                        <div>
+                            <h3 className="font-bold">{quarantineTitle}</h3>
+                            <p className="text-sm">
+                                <Trans>Per SFTP findest du die Dateien hier:</Trans>{' '}
+                                <code className="break-all">{quarantinePath}</code>.{' '}
+                                <Trans>Sie bleiben erhalten und werden nicht gelöscht.</Trans>
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 <div className="divider my-2"><Trans>Kamera-Verbindung</Trans></div>
 

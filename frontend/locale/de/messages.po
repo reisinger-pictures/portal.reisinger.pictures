@@ -193,6 +193,10 @@ msgstr "{pricePerItemStr} € pro Bild (Tier {tierNum})"
 msgid "{progress}% abgeschlossen"
 msgstr "{progress}% abgeschlossen"
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "{quarantineCount} Dateien liegen im Quarantäne-Ordner"
+msgstr "{quarantineCount} Dateien liegen im Quarantäne-Ordner"
+
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "{ratedCount} von {totalGalleryPhotos} Bildern"
 msgstr "{ratedCount} von {totalGalleryPhotos} Bildern"
@@ -248,6 +252,10 @@ msgstr "< 50€ (Rollover)"
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "< 50€ (Übertrag ins nächste Monat)"
 msgstr "< 50€ (Übertrag ins nächste Monat)"
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "1 Datei liegt im Quarantäne-Ordner"
+msgstr "1 Datei liegt im Quarantäne-Ordner"
 
 #: src/ui/client/components/LicenseSelectorModal.tsx
 #~ msgid "1 Jahr (x1)"
@@ -5376,6 +5384,10 @@ msgstr "Payouts & Abrechnung"
 msgid "PDF Generieren"
 msgstr "PDF Generieren"
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Per SFTP findest du die Dateien hier:"
+msgstr "Per SFTP findest du die Dateien hier:"
+
 #: src/ui/ModelRegistrationView.tsx
 msgid "Person"
 msgstr "Person"
@@ -6057,6 +6069,10 @@ msgstr "Sichtbarkeit (Deckkraft)"
 #: src/ui/components/GalleryGroupModal.tsx
 msgid "Sichtbarkeits-Vorgabe"
 msgstr "Sichtbarkeits-Vorgabe"
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Sie bleiben erhalten und werden nicht gelöscht."
+msgstr "Sie bleiben erhalten und werden nicht gelöscht."
 
 #: src/ui/Privacy.tsx
 msgid "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten."

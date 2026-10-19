@@ -48,6 +48,7 @@ const CONNECTION = {
 const statusPayload = (overrides: Record<string, unknown> = {}) => ({
     ftp_folder: '/e2e-camera',
     file_count: 0,
+    quarantine_count: 0,
     current_target_gallery: null,
     ftp_account_status: 'pending',
     ftp_provisioned_at: null,
