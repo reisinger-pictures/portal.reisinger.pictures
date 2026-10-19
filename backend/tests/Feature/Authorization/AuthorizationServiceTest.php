@@ -11,8 +11,10 @@ use App\Models\Org;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuthorizationService;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class AuthorizationServiceTest extends TestCase
@@ -844,5 +846,283 @@ class AuthorizationServiceTest extends TestCase
         $gallery = Gallery::factory()->create();
 
         $this->assertFalse($this->service->canManageGallery($user, $gallery->id));
+    }
+
+    // ──────────────────────────────────────────────
+    //  D-39: read-time re-validation of existing grants
+    //
+    //  A persistent client grant is re-validated against the current
+    //  selection/subtree safety when it is read, not only when it is
+    //  granted. A grant that became unsafe after it was issued is
+    //  fail-closed and hands out nothing.
+    // ──────────────────────────────────────────────
+
+    public function test_a_legacy_direct_grant_of_a_selection_gallery_is_not_handed_out(): void
+    {
+        $selection = Gallery::factory()->create(['type' => 'selection']);
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+
+        // The grant predates the authorization wave and is still in the pivot.
+        $user->galleries()->attach($selection->id);
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertNotContains($selection->id, $ids);
+        $this->assertFalse($this->service->canAccessGallery($user, $selection->id));
+    }
+
+    public function test_a_legacy_direct_grant_of_a_delivery_gallery_still_works(): void
+    {
+        $delivery = Gallery::factory()->create(['type' => 'delivery']);
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->galleries()->attach($delivery->id);
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertContains($delivery->id, $ids);
+        $this->assertTrue($this->service->canAccessGallery($user, $delivery->id));
+    }
+
+    public function test_a_legacy_group_grant_whose_subtree_gained_a_selection_gallery_hands_out_nothing(): void
+    {
+        $group = GalleryGroup::factory()->create();
+        $delivery = Gallery::factory()->create([
+            'gallery_group_id' => $group->id,
+            'type' => 'delivery',
+        ]);
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->galleryGroups()->attach($group->id);
+
+        // Before the selection gallery moves into the subtree, the grant works.
+        $this->assertContains($delivery->id, $this->service->getAllowedGalleryIds($user));
+
+        // The selection gallery is moved into the granted subtree afterwards.
+        $child = GalleryGroup::factory()->create(['parent_id' => $group->id]);
+        Gallery::factory()->create(['gallery_group_id' => $child->id, 'type' => 'selection']);
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertNotContains($delivery->id, $ids);
+        $this->assertFalse($this->service->canAccessGallery($user, $delivery->id));
+    }
+
+    public function test_a_legacy_group_grant_on_an_ancestor_of_the_unsafe_group_hands_out_nothing(): void
+    {
+        $root = GalleryGroup::factory()->create();
+        $child = GalleryGroup::factory()->create(['parent_id' => $root->id]);
+        $delivery = Gallery::factory()->create([
+            'gallery_group_id' => $child->id,
+            'type' => 'delivery',
+        ]);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->galleryGroups()->attach($root->id);
+
+        // The unsafe group is a grandchild of the granted group: the grant on
+        // the ancestor carries the same broad subtree permission.
+        $unsafe = GalleryGroup::factory()->create(['parent_id' => $child->id]);
+        Gallery::factory()->create(['gallery_group_id' => $unsafe->id, 'type' => 'selection']);
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertNotContains($delivery->id, $ids);
+        $this->assertFalse($this->service->canAccessGallery($user, $delivery->id));
+    }
+
+    public function test_a_group_grant_on_a_safe_group_still_works_next_to_an_unsafe_one(): void
+    {
+        $safeGroup = GalleryGroup::factory()->create();
+        $safeGallery = Gallery::factory()->create([
+            'gallery_group_id' => $safeGroup->id,
+            'type' => 'delivery',
+        ]);
+
+        $unsafeGroup = GalleryGroup::factory()->create();
+        $unsafeGallery = Gallery::factory()->create([
+            'gallery_group_id' => $unsafeGroup->id,
+            'type' => 'delivery',
+        ]);
+        $unsafeChild = GalleryGroup::factory()->create(['parent_id' => $unsafeGroup->id]);
+        Gallery::factory()->create(['gallery_group_id' => $unsafeChild->id, 'type' => 'selection']);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->galleryGroups()->attach([$safeGroup->id, $unsafeGroup->id]);
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertContains($safeGallery->id, $ids);
+        $this->assertNotContains($unsafeGallery->id, $ids);
+    }
+
+    public function test_the_transient_invite_path_still_yields_the_selection_gallery(): void
+    {
+        $gallery = Gallery::factory()->create(['type' => 'selection']);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $gallery->id,
+            'token' => 'd39-transient-'.uniqid(),
+        ]);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->guest_id = 'guest-d39-transient';
+        $user->transient_galleries = [$gallery->id];
+        $user->transient_invites = [
+            (string) $invite->id => [
+                'gallery_ids' => [(string) $gallery->id],
+                'meta_gallery_ids' => [],
+            ],
+        ];
+        $user->transient_invite_ids = [(string) $invite->id];
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertContains($gallery->id, $ids);
+    }
+
+    public function test_the_photographer_paths_still_yield_the_selection_gallery(): void
+    {
+        // The cached unrestricted list, the direct photographer grant and the
+        // photographer group grant are the three ways a photographer reaches
+        // their own selection surface.
+        $unrestricted = Gallery::factory()->create(['type' => 'selection']);
+        $restricted = Gallery::factory()->create([
+            'type' => 'selection',
+            'restricted_photographers' => true,
+        ]);
+        $group = GalleryGroup::factory()->create();
+        $grouped = Gallery::factory()->create([
+            'gallery_group_id' => $group->id,
+            'type' => 'selection',
+            'restricted_photographers' => true,
+        ]);
+
+        $user = $this->createPhotographer();
+        $user->photographerGalleries()->attach($restricted->id);
+        $user->photographerGalleryGroups()->attach($group->id);
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        $this->assertContains($unrestricted->id, $ids);
+        $this->assertContains($restricted->id, $ids);
+        $this->assertContains($grouped->id, $ids);
+    }
+
+    public function test_the_org_scope_keeps_its_delivery_galleries_next_to_a_selection_gallery(): void
+    {
+        $org = Org::factory()->create();
+        $group = GalleryGroup::factory()->create();
+        $org->galleryGroups()->attach($group->id);
+
+        $delivery = Gallery::factory()->create([
+            'gallery_group_id' => $group->id,
+            'type' => 'delivery',
+        ]);
+        $selection = Gallery::factory()->create([
+            'gallery_group_id' => $group->id,
+            'type' => 'selection',
+        ]);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->org_id = $org->id;
+        $user->save();
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        // The org scope is a delivery-only projection, so it never hands out
+        // the selection gallery and needs no group re-validation of its own.
+        $this->assertContains($delivery->id, $ids);
+        $this->assertNotContains($selection->id, $ids);
+    }
+
+    public function test_the_cross_brand_super_admin_path_keeps_its_client_grants(): void
+    {
+        $selection = Gallery::factory()->create(['type' => 'selection']);
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $this->assignRole($user, UserRole::SUPER_ADMIN);
+        $user->galleries()->attach($selection->id);
+
+        $ids = $this->service->getAllowedGalleryIds($user);
+
+        // A cross-brand Super-Admin is not a client grant holder: its
+        // management access does not depend on a client grant at all, so the
+        // read-time re-validation must not change that path.
+        $this->assertContains($selection->id, $ids);
+    }
+
+    public function test_the_read_time_revalidation_does_not_issue_queries_per_granted_group(): void
+    {
+        $small = $this->clientWithGroupSubtree(3);
+        $large = $this->clientWithGroupSubtree(15);
+
+        // Warm the helpers so the measurement compares the same work.
+        $this->service->getAllowedGalleryIds($small->fresh());
+        $this->service->getAllowedGalleryIds($large->fresh());
+
+        $smallQueries = $this->countSetBasedGroupQueries(
+            fn (): array => $this->service->getAllowedGalleryIds($small->fresh())
+        );
+        $largeQueries = $this->countSetBasedGroupQueries(
+            fn (): array => $this->service->getAllowedGalleryIds($large->fresh())
+        );
+
+        $this->assertSame(
+            $smallQueries,
+            $largeQueries,
+            "Re-validating 15 granted child groups ({$largeQueries}) must not cost more set-based gallery_groups queries than 3 ({$smallQueries})."
+        );
+    }
+
+    /**
+     * A client with one granted root group and `$childCount` child groups.
+     */
+    private function clientWithGroupSubtree(int $childCount): User
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+
+        $root = GalleryGroup::factory()->create();
+        $user->galleryGroups()->attach($root->id);
+
+        for ($i = 0; $i < $childCount; $i++) {
+            $child = GalleryGroup::factory()->create(['parent_id' => $root->id]);
+            Gallery::factory()->create([
+                'gallery_group_id' => $child->id,
+                'type' => 'delivery',
+            ]);
+        }
+
+        return $user;
+    }
+
+    /**
+     * Count the set-based statements that touch `gallery_groups` while a
+     * callback runs.
+     *
+     * The per-gallery `... where "gallery_groups"."id" = ? limit 1` lookups are
+     * excluded on purpose: they come from the brand filter at the end of
+     * `getAllowedGalleryIds()`, where `BrandRegistry::galleryTreeMatchesBrand()`
+     * resolves the group chain of every single gallery row by row. That
+     * pre-existing per-gallery walk is a separate cost item; the read-time
+     * re-validation itself has to stay set-based.
+     */
+    private function countSetBasedGroupQueries(callable $callback): int
+    {
+        $queries = 0;
+
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            if (! str_contains($query->sql, '"gallery_groups"') && ! str_contains($query->sql, '`gallery_groups`')) {
+                return;
+            }
+
+            if (str_contains($query->sql, 'limit 1')) {
+                return;
+            }
+
+            $queries++;
+        });
+
+        $callback();
+
+        DB::getEventDispatcher()->forget(QueryExecuted::class);
+
+        return $queries;
     }
 }
