@@ -12,6 +12,7 @@ use App\Models\PhotographerStatement;
 use App\Models\User;
 use App\Services\PayoutCalculationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -52,6 +53,25 @@ class PayoutCalculationServiceTest extends TestCase
         }
 
         return $log;
+    }
+
+    /**
+     * Identities that resolve to no photo row.
+     *
+     * The payout service only attributes a share to a photo that exists, so an
+     * unknown identity is inert. That keeps a payload with more than 500
+     * entries testable without creating 500 photo rows.
+     *
+     * @return array<int, string>
+     */
+    private function syntheticPhotoIds(int $count): array
+    {
+        $ids = [];
+        for ($index = 0; $index < $count; $index++) {
+            $ids[] = (string) Str::uuid();
+        }
+
+        return $ids;
     }
 
     // ============================================================
@@ -559,6 +579,124 @@ class PayoutCalculationServiceTest extends TestCase
         $this->assertSame(2, $pool->total_unique_downloads);
         $this->assertSame('4.0000', PhotographerStatement::where('user_id', $photographerA->id)->sole()->total_shares_earned);
         $this->assertSame('1.0000', PhotographerStatement::where('user_id', $photographerB->id)->sole()->total_shares_earned);
+    }
+
+    public function test_calculate_pool_shares_ignores_photo_ids_behind_the_five_hundredth_of_a_zip_payload(): void
+    {
+        // A stored ZIP payload may carry more than 500 photo identities, but
+        // only the first 500 are read. The identities behind that cut earn
+        // nothing — silently, but without a double count: the identity inside
+        // the cut is still worth exactly one share.
+        //
+        // Regression proof: dropping the `array_slice($values, 0, 500)` in
+        // PayoutCalculationService::explicitPhotoIds() lets the 501st identity
+        // through. The pool then holds 2.0000 shares instead of 1.0000 and 2
+        // unique downloads instead of 1, and the second photographer owns a
+        // statement with 1.0000 shares.
+        $pool = PayoutPool::factory()
+            ->forMonth(7, 2026)
+            ->withNetPool(8000)
+            ->create(['photographer_share_percent' => 100]);
+        $gallery = Gallery::factory()->create();
+        $photographerInside = User::factory()->create();
+        $photographerOutside = User::factory()->create();
+        $photoInside = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'user_id' => $photographerInside->id,
+        ]);
+        $photoOutside = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'user_id' => $photographerOutside->id,
+        ]);
+        $customer = User::factory()->create();
+
+        // 502 identities: the first 500 are the ones the service may use, the
+        // 501st is the photo of the second photographer, the 502nd is one more
+        // unknown identity.
+        $photoIds = array_merge(
+            [$photoInside->id],
+            $this->syntheticPhotoIds(499),
+            [$photoOutside->id],
+            $this->syntheticPhotoIds(1),
+        );
+        $this->assertCount(502, $photoIds);
+        $this->assertSame($photoOutside->id, $photoIds[500]);
+
+        $this->logDownload([
+            'user_id' => $customer->id, 'gallery_id' => $gallery->id,
+            'item_type' => 'full_zip', 'resolution_tier' => 'web', 'photo_count' => 502,
+            'payload' => ['photo_ids' => $photoIds, 'gallery_ids' => [$gallery->id]],
+            'created_at' => '2026-07-10 12:00:00',
+        ]);
+
+        $this->service->calculatePoolShares($pool->fresh());
+
+        $pool->refresh();
+        $this->assertSame('1.0000', $pool->total_shares);
+        $this->assertSame(1, $pool->total_unique_downloads);
+        $this->assertSame('1.0000', PhotographerStatement::where('user_id', $photographerInside->id)->sole()->total_shares_earned);
+        $this->assertSame(
+            0,
+            PhotographerStatement::where('user_id', $photographerOutside->id)->count(),
+            'The identity behind the 500-entry cut must not earn a share.',
+        );
+    }
+
+    public function test_calculate_pool_shares_deduplicates_repeated_photo_ids_inside_the_capped_zip_payload(): void
+    {
+        // The 500-entry cut must not turn the payload into a double count: the
+        // photo that appears three times in the archive payload and once more
+        // as a single download is worth exactly one share position — its best
+        // tier.
+        //
+        // Regression proof, both verified by a single-line change in
+        // PayoutCalculationService::recordExplicitLogDownloads():
+        //   - `if (! isset($downloads[$identity]) || $multiplier > ...)`
+        //     reduced to `if (! isset($downloads[$identity]))` drops the
+        //     best-tier rule: the archive keeps its weaker `web` tier and the
+        //     pool holds 1.0000 instead of 4.0000 shares.
+        //   - a ledger key that is unique per occurrence
+        //     (`$customerId.'|'.$photoId.'|'.count($downloads)`) adds the
+        //     archive's share and the single download's share up instead of
+        //     collapsing them: the pool holds 5.0000 instead of 4.0000 shares.
+        $pool = PayoutPool::factory()
+            ->forMonth(7, 2026)
+            ->withNetPool(8000)
+            ->create(['photographer_share_percent' => 100]);
+        $gallery = Gallery::factory()->create();
+        $photographer = User::factory()->create();
+        $photo = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'user_id' => $photographer->id,
+        ]);
+        $customer = User::factory()->create();
+
+        // Exactly 500 identities, so the whole payload is inside the cut.
+        $photoIds = array_merge(
+            [$photo->id, $photo->id, $photo->id],
+            $this->syntheticPhotoIds(497),
+        );
+        $this->assertCount(500, $photoIds);
+
+        $this->logDownload([
+            'user_id' => $customer->id, 'gallery_id' => $gallery->id,
+            'item_type' => 'full_zip', 'resolution_tier' => 'web', 'photo_count' => 3,
+            'payload' => ['photo_ids' => $photoIds, 'gallery_ids' => [$gallery->id]],
+            'created_at' => '2026-07-10 12:00:00',
+        ]);
+        $this->logDownload([
+            'user_id' => $customer->id, 'gallery_id' => $gallery->id,
+            'item_type' => 'single_image', 'resolution_tier' => 'original', 'photo_count' => 1,
+            'payload' => ['photo_id' => $photo->id],
+            'created_at' => '2026-07-10 12:01:00',
+        ]);
+
+        $this->service->calculatePoolShares($pool->fresh());
+
+        $pool->refresh();
+        $this->assertSame('4.0000', $pool->total_shares);
+        $this->assertSame(1, $pool->total_unique_downloads);
+        $this->assertSame('4.0000', PhotographerStatement::where('user_id', $photographer->id)->sole()->total_shares_earned);
     }
 
     public function test_calculate_pool_shares_deduplicates_mixed_gallery_zip_against_gallery_single(): void
