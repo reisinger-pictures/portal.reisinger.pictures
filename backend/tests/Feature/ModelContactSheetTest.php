@@ -336,6 +336,30 @@ class ModelContactSheetTest extends TestCase
         $this->assertStoredPhotoRejectedBeforeDecoder($bytes, 'legacy-above-budget.png', 'image/png');
     }
 
+    public function test_stored_mime_mismatch_is_omitted_before_contact_sheet_decode(): void
+    {
+        // The DB column claims PNG, the stored bytes are a valid JPEG. The
+        // contact sheet trusts neither side alone: `inspectRasterImage()`
+        // requires the detected MIME to match the stored one, so a mismatch
+        // (a tampered or half-migrated row) is omitted fail-closed — before
+        // the GD decoder ever sees the bytes.
+        $bytes = $this->jpegBytes();
+        $this->assertSame('image/jpeg', (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes));
+        $this->assertSame(120, getimagesizefromstring($bytes)[0]);
+
+        $profile = $this->profile();
+        $this->addRawPhoto($profile, 'mime-mismatch.jpg', $bytes, 'image/png');
+
+        $service = $this->sheetWithDecodeSpy();
+        $pdf = $service->render($profile, ModelContactSheetService::VARIANT_INTERNAL);
+
+        // Zero decoder calls: the photo was dropped by the pre-decode check.
+        $this->assertSame(0, $service->decodeCalls);
+        $this->assertStringNotContainsString('mime-mismatch.jpg', $pdf);
+        // The sheet itself still renders — only the unusable photo is missing.
+        $this->assertStringContainsString('Model Contact Sheet', $pdf);
+    }
+
     public function test_contact_sheet_byte_cap_is_the_persistable_image_budget_not_the_upload_gate(): void
     {
         // A stored photo may legally be larger than the 10 MiB *source* gate:

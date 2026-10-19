@@ -67,14 +67,18 @@ GET /api/management/models/{id}/contact-sheet?variant=internal|external
   backend/app/Services/PhotoProcessingService.php`), (c) die aus den Bytes
   gelesene MIME nicht mit der in der DB gespeicherten `mime_type`
   übereinstimmt (`inspectRasterImage()` prüft `$detectedMime !== $mime`), oder
-  (d) die Bytes gar kein dekodierbares JPEG/PNG/WebP sind. **(a)–(d) waren an
-  HEAD alle vier noch einbettbar** — die frühere Fassung dieses Absatzes nannte
-  nur (b) und (c) und war damit zu eng: `git show HEAD:backend/app/Services/ModelContactSheetService.php`
-  zeigt an HEAD weder einen Byte-Cap noch `isWithinImageBudget()` noch den
-  MIME-Abgleich noch eine Decode-Bedingung, und `imageDataUri()` reichte
-  JPEG/PNG ohne Decode sowie ein undekodierbares WebP als rohe Data-URI durch
-  (ebd. die Zeile `return 'data:'.$mime.';base64,'…`). Neu sind also alle vier
-  Gründe. Kein Fallback auf ungeprüfte Bytes.
+  (d) die Bytes gar kein dekodierbares JPEG/PNG/WebP sind. **(a)–(d) waren vor
+  dieser Änderung alle vier noch einbettbar** — die frühere Fassung dieses
+  Absatzes nannte nur (b) und (c) und war damit zu eng:
+  `git show 29afe5b25787dd9a86e24565b25b17ba999b0e88:backend/app/Services/ModelContactSheetService.php`
+  zeigt an diesem fest verankerten Commit weder einen Byte-Cap noch
+  `isWithinImageBudget()` noch den MIME-Abgleich noch eine Decode-Bedingung,
+  und `imageDataUri()` reichte JPEG/PNG ohne Decode sowie ein undekodierbares
+  WebP als rohe Data-URI durch (ebd. die Zeile `return 'data:'.$mime.';base64,'…`).
+  Der Commit ist bewusst fest genannt und **nicht** `HEAD`: `HEAD` wandert mit
+  jedem Merge und würde die Aussage später widerlegen (nach dem Merge dieses
+  Features zeigt `git show HEAD:…` den neuen, geprüften Stand). Neu sind also
+  alle vier Gründe. Kein Fallback auf ungeprüfte Bytes.
 - **Legacy-Bestand:** Dateien, die vor diesen Grenzen gespeichert wurden,
   werden fail-closed ausgelassen (kein Fallback auf ungeprüfte Bytes). Es gibt
   dafür **kein sichtbares Signal im PDF** — der Blade-Contract kennt keinen

@@ -962,6 +962,110 @@ export function makeRegistrationValues(catalog: ModelRegistrationCheck): Registr
     };
 }
 
+/**
+ * The exact set of field paths the registration form renders an inline error
+ * for.
+ *
+ * A server 422 carries Laravel's `{errors: {key: [msg]}}` payload. A key
+ * without a renderer lands in `errors.<key>` where no field reads it, so the
+ * message would silently disappear. The set is therefore derived from the
+ * *active* catalogue plus the *submitted* values instead of a key pattern:
+ *
+ *  - the person questions the form actually renders (person scope, not
+ *    `file`-typed, not the age proof, and visible per `isQuestionVisible`),
+ *  - the age proof of a person whose age-proof question is visible,
+ *  - the photo upload of every person (always rendered, shows its own error),
+ *  - the act answers — but only when the act block is rendered, i.e. for a
+ *    multi-person act.
+ *
+ * Everything else has no renderer and must surface in the general error area:
+ * the file store's bare `file` key, `manager_index`, `create_account`,
+ * unknown question keys, hidden (conditionally invisible) questions and the
+ * act answers of a single-person act.
+ */
+export function renderedErrorPaths(
+    catalog: ModelRegistrationCheck,
+    values: RegistrationFormValues,
+): Set<string> {
+    const paths = new Set<string>();
+    const personList = personQuestions(catalog);
+    const personCount = values.persons.length;
+    const managerIndex = typeof values.manager_index === 'number' ? values.manager_index : 0;
+
+    values.persons.forEach((person, index) => {
+        const answers = person.answers ?? {};
+        const visibility: VisibilityContext = {
+            categories: catalog.categories,
+            isManager: index === managerIndex,
+            personCount,
+        };
+
+        for (const question of personList) {
+            // The age proof has its own file input; every other file-typed
+            // question has no renderer at all.
+            if (question.type === 'file' || question.key === AGE_PROOF_KEY) continue;
+            if (!isQuestionVisible(question, answers, visibility)) continue;
+            paths.add(`persons.${index}.answers.${question.key}`);
+        }
+
+        const ageProofQuestion = personList.find(question => question.key === AGE_PROOF_KEY);
+        if (ageProofQuestion && isQuestionVisible(ageProofQuestion, answers, visibility)) {
+            paths.add(`persons.${index}.age_proof`);
+        }
+
+        // The photo upload is rendered for every person and shows its own error.
+        paths.add(`persons.${index}.photos`);
+    });
+
+    // The act block is only rendered for a multi-person act.
+    if (personCount > 1) {
+        for (const question of actQuestions(catalog)) {
+            paths.add(`act_answers.${question.key}`);
+        }
+    }
+
+    return paths;
+}
+
+/**
+ * Server key prefixes that differ between the wire format and the form field
+ * paths: the act answers travel as `act[answers][key]`.
+ */
+const SERVER_ERROR_KEY_PREFIX: Array<[string, string]> = [
+    ['act.answers.', 'act_answers.'],
+];
+
+/** Map a wire key to the form field path it belongs to. */
+function mapServerErrorKey(key: string): string {
+    for (const [from, to] of SERVER_ERROR_KEY_PREFIX) {
+        if (key.startsWith(from)) return to + key.slice(from.length);
+    }
+    return key;
+}
+
+/**
+ * Resolve a server error key to the field path that renders it, or `null` when
+ * no renderer exists (the message then belongs into the general error area).
+ *
+ * Laravel's wildcard validation emits indexed keys for array values
+ * (`persons.0.answers.preferred_contact.0`). The form renders the *parent*
+ * field, so an indexed key maps to its parent — but only when the parent is
+ * rendered. An indexed key of an unknown or hidden question stays unmapped.
+ */
+export function resolveServerErrorPath(key: string, renderedPaths: Set<string>): string | null {
+    const mapped = mapServerErrorKey(key);
+    if (renderedPaths.has(mapped)) return mapped;
+
+    const parts = mapped.split('.');
+    const last = parts[parts.length - 1];
+    if (parts.length > 1 && last !== undefined && /^\d+$/.test(last)) {
+        const parent = parts.slice(0, -1).join('.');
+        if (renderedPaths.has(parent)) return parent;
+    }
+
+    return null;
+}
+
 function appendAnswer(formData: FormData, prefix: string, key: string, value: unknown): void {
     if (value === undefined || value === null) return;
     if (Array.isArray(value)) {

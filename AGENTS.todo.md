@@ -184,11 +184,6 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   registriert `Photo::deleting(fn => false)` und flusht nie. Unter
   `--order-by=random`/`defects` leckt der Veto-Listener in andere Tests. **Test:** die
   betroffene Klasse unter zufälliger Reihenfolge laufen lassen und den Flush ergänzen.
-- [ ] **Kontaktbogen: Weglass-Grund (c) ist ungepinnt.** Der MIME-Abgleich
-  (`$detectedMime !== $mime`) lässt ein Foto fail-closed aus, aber kein Test deckt den Fall mit
-  **nicht-leerem, abweichendem** `mime_type` ab — gepinnt sind nur Null-MIME, Dimension,
-  Byte-Cap und Undekodierbarkeit. **Test:** gespeichertes JPEG mit in der DB hinterlegtem
-  `image/png` ⇒ Foto wird ausgelassen, Decoder wird nicht aufgerufen.
 - [ ] **Tote Limiter-Registrierung (pre-existing).** `RateLimiter::for('checkout', …)` steht in
   `AppServiceProvider`, wird aber nirgends referenziert — kein Routen-Throttle, kein
   Service-Aufruf; die Checkout-Quote läuft ausschließlich über `RateLimiter::hit()` in

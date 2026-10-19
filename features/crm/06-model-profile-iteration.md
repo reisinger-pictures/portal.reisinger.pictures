@@ -182,7 +182,8 @@ Die Foto-Funktion ist **umgesetzt** und Teil des aktuellen Single-v1-Contracts.
   Altersnachweis akzeptiert zusätzlich PDF; Fotos nicht.
 - **Zwei Byte-Grenzen, nicht eine:** das 10-MB-Gate prüft die **Quelldatei**
   (`ModelFileStore::MAX_UPLOAD_BYTES`); die **gespeicherten** Bytes nach dem
-  GD-Re-Encode (EXIF-Strip, `imagejpeg(..., 90)`) prüft
+  GD-Re-Encode (EXIF-Strip, `imagejpeg(..., 90)` für JPEG, `imagepng()` /
+  `imagewebp()` für PNG/WebP) prüft
   `ModelFileStore::maxStoredUploadBytes()` gegen
   `PhotoProcessingService::MAX_IMAGE_BYTES` (20 MiB = `20 * 1024 * 1024`;
   `grep -n 'MAX_IMAGE_BYTES ='
@@ -411,7 +412,21 @@ Belegbarer Ist-Zustand und SOLL für die neue Foto-Funktion.
 - **Kein** `public`-Storage; keine direkt aufrufbare URL.
 - Download ausschließlich über `ModelManagementController::ageProof`
   (`management`-Middleware + Gate `isAdmin`, brand-gescoped).
-- Validierung beim Upload: Datei/MIME + max. 10 MB (Submit-Regeln).
+- **Zwei Byte-Grenzen, nicht eine:** das 10-MB-Gate prüft die **Quelldatei**
+  (`ModelFileStore::MAX_UPLOAD_BYTES = 10 * 1024 * 1024`); die **gespeicherten**
+  Bytes nach dem GD-Re-Encode (EXIF-Strip; `imagejpeg(..., 90)` für JPEG,
+  `imagepng()` / `imagewebp()` für PNG/WebP) prüft
+  `ModelFileStore::maxStoredUploadBytes()` gegen
+  `PhotoProcessingService::MAX_IMAGE_BYTES` (20 MiB = `20 * 1024 * 1024`).
+  Der Re-Encode kann eine hochkomprimierte Quelle um ein Mehrfaches aufblähen
+  (Faktor je nach Encoder/Format verschieden); dieselben Zahlen und Belege
+  stehen in §2.4.
+- **User-visible 422:** eine legale Quelldatei **unter** 10 MB kann abgelehnt
+  werden, wenn ihr Re-Encode die 20 MiB reißt. Der Server antwortet mit
+  **422** und dem nackten Feld-Key `file`; der Text nennt die
+  EXIF-Bereinigung als Ursache und muss im Registrierungs- wie im
+  Owner-Update-Formular sichtbar ankommen (Registrierung: allgemeiner
+  Fehlerbereich; Owner: Toast).
 - Orphan-Cleanup bei Transaktions-Rollback und bei Ersetzen des alten Proofs.
 
 ### 5.2 Ist-Zustand Personen-Fotos

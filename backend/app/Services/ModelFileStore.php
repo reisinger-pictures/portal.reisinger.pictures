@@ -30,8 +30,9 @@ use RuntimeException;
  *    hochlädt (vor dem Decode geprüft).
  *  - {@see self::maxStoredUploadBytes()} begrenzt die **gespeicherten Bytes**
  *    nach dem Re-Encode. Das ist die eigentliche Invariante für ein
- *    Modellfoto: der Re-Encode schreibt `imagejpeg(..., 90)` und kann eine
- *    kleinere, hochkomprimierte Quelle um ein Mehrfaches aufblähen.
+ *    Modellfoto: der Re-Encode schreibt `imagejpeg(..., 90)` (JPEG) bzw.
+ *    `imagepng()` / `imagewebp()` (PNG/WebP) und kann eine kleinere,
+ *    hochkomprimierte Quelle um ein Mehrfaches aufblähen.
  */
 class ModelFileStore
 {
@@ -89,11 +90,16 @@ class ModelFileStore
         [$sanitized, $mime] = $this->stripImageMetadata($contents, $mime);
 
         // The source gate above bounds the upload, not what the re-encode
-        // produces: imagejpeg(..., 90) can inflate a highly compressed source
-        // by roughly 5x. Bound the bytes that are actually persisted too —
-        // otherwise a legal upload lands on disk above the budget the contact
-        // sheet decodes against and is silently omitted there. Rejecting here
-        // keeps "stored" and "embeddable in the contact sheet" the same set.
+        // produces: the re-encode can inflate a highly compressed source by a
+        // multiple. Measured for the test fixture (JPEG path
+        // `imagejpeg(..., 90)`): 14,336 → 39,393 bytes, ~2.75x. The factor
+        // depends on the encoder and the source format — the PNG and WebP
+        // paths (`imagepng()` / `imagewebp()`) re-encode differently and
+        // inflate by their own factor — so it is not a constant. Bound the
+        // bytes that are actually persisted too — otherwise a legal upload
+        // lands on disk above the budget the contact sheet decodes against
+        // and is silently omitted there. Rejecting here keeps "stored" and
+        // "embeddable in the contact sheet" the same set.
         // (The AI path is not a consumer of persisted model photos: it reads
         // the gallery disk via AIService::generateMetadata(Photo).)
         //
