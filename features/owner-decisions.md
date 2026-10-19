@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-42. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-44. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -184,3 +184,11 @@ The contact sheet states how many photos it omitted and why (byte, dimension, pi
 ### D-42: `ext-gd` is a declared platform requirement
 
 Declare `ext-gd` in `composer.json` instead of keeping it an undocumented runtime assumption: the contact sheet depends on it for JPEG/PNG embedding, and the image processor uses it unconditionally. See [contact sheet export](crm/07-model-contact-sheet-export.md).
+
+### D-43: The direct gallery assignment offers delivery galleries only
+
+A direct gallery assignment to a user (`gallery_ids` on the user update) may only carry delivery galleries — the same rule the org-admin path already enforces through the org scope. A newly requested non-delivery gallery is rejected by the API and is not offered in the management UI. An already assigned gallery is not silently revoked by an unrelated save; it stays visible until it is removed. A selection gallery reaches a client through an invite, not through a direct assignment.
+
+### D-44: A re-resolved actor keeps its validated transient claims
+
+When the media delivery and the photo download re-resolve a registered actor from the database, they carry the transient claims of the request onto the re-resolved actor. The guest branch already does this; the registered branch dropped them and denied a client who had redeemed an invite access to the media of their selection gallery.
