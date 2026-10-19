@@ -111,6 +111,12 @@ class MagicLinkAuthTest extends TestCase
             ->assertOk()
             ->assertJsonPath('full_path', $gallery->full_path);
 
+        // The guest redeem above issued a guest token, and the jwt-auth
+        // `Factory` is a container singleton whose claims collection
+        // accumulates. The registered user token must therefore start from a
+        // clean claim state, or it would carry the guest's `guest_id` and
+        // `transient_galleries` claims.
+        $this->resetJwtClaimState();
         $userToken = JWTAuth::fromUser($user);
         $registered = $this->withHeaders(['Authorization' => "Bearer $userToken"])
             ->postJson('/api/invites/redeem', [

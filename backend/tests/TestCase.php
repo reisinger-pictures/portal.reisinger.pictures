@@ -8,6 +8,9 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PHPOpenSourceSaver\JWTAuth\Factory;
+use PHPOpenSourceSaver\JWTAuth\JWT;
+use PHPOpenSourceSaver\JWTAuth\JWTAuth;
 use RuntimeException;
 
 abstract class TestCase extends BaseTestCase
@@ -16,9 +19,37 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        $this->resetJwtClaimState();
+
         if (! app()->bound('brand.context')) {
             BrandRegistry::set(Brand::B2B);
         }
+    }
+
+    /**
+     * Reset the jwt-auth claim state of the current test.
+     *
+     * The jwt-auth `Factory` is a container singleton whose claims collection
+     * *accumulates*: `make()` adds the new claims to the existing collection
+     * instead of replacing it, and `Manager::decode()` merges the whole
+     * collection into the payload it decodes. A guest token issued in a test
+     * therefore leaves its `guest_id`, `guest_invite_id` and
+     * `transient_galleries` claims in that collection, and every token that
+     * is built or decoded afterwards *in the same test* inherits them. The
+     * inline custom claims of the `JWT`/`JWTAuth` singletons survive in the
+     * same way until the next `claims()` call.
+     *
+     * A fresh application per test empties the collection again, so the leak
+     * does not cross a test boundary — but it does cross every token and
+     * every request inside one test. The reset makes the invariant explicit
+     * and keeps it true if the application is ever reused.
+     */
+    protected function resetJwtClaimState(): void
+    {
+        app(Factory::class)->emptyClaims();
+        app(Factory::class)->customClaims([]);
+        app(JWT::class)->claims([]);
+        app(JWTAuth::class)->claims([]);
     }
 
     /**
