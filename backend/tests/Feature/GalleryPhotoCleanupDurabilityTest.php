@@ -31,6 +31,42 @@ use Tests\TestCase;
  * Regression coverage for the DB/filesystem boundary of public gallery and
  * photo deletion. The encrypted model-file path has separate coverage in the
  * CRM cleanup tests and is intentionally not reused here.
+ *
+ * Model event listeners are not shared between tests on this framework
+ * version (Laravel 13.30.0), so the leak the board item describes does not
+ * occur here:
+ *
+ * - `Model::registerModelEvent()` binds a listener to `static::$dispatcher`.
+ * - `InteractsWithTestCaseLifecycle::setUpTheTestEnvironment()` installs a
+ *   new dispatcher for every test via
+ *   `Model::setEventDispatcher($this->app['events'])`, and
+ *   `tearDownTheTestEnvironment()` flushes the application afterwards — so
+ *   the dispatcher a test binds its listeners to is not the dispatcher of the
+ *   next test.
+ * - `DatabaseServiceProvider::register()` calls `Model::clearBootedModels()`,
+ *   so `Gallery::booted()` re-registers the application's own hooks on the
+ *   new dispatcher of every test.
+ *
+ * A `Photo::deleting` / `Gallery::deleting` veto is therefore unreachable
+ * from any other test.
+ *
+ * Non-reproduction of the leak, measured on this checkout: deleting the
+ * `tearDown()` override of this class leaves it green — 17/17 in every run of
+ *
+ *     SCOUT_DRIVER=null php artisan test --filter GalleryPhotoCleanupDurabilityTest \
+ *         --order-by=random --random-order-seed={1,2,3,5,8,13,21,34,55,89,144,233,377,610,987}
+ *     SCOUT_DRIVER=null php artisan test --filter GalleryPhotoCleanupDurabilityTest --order-by=reverse
+ *
+ * and green in combination with the classes that delete photos and galleries
+ * (`GalleryPhotoScoutCleanupTest`, `PhotoUploadTest`, `GalleryUpdateDeleteTest`
+ * — 34/34 for every seed of `--random-order-seed={1,7,42,2026}`).
+ *
+ * The `tearDown()` flush is therefore defence in depth, not the repair of an
+ * observable leak. It closes the asymmetry with the sibling class
+ * `FtpImportTest`, which already flushes the `created` direction, and it
+ * makes this class's cleanup explicit. It is not covered by an assertion and
+ * cannot be: a veto registered by one test is unreachable from another one,
+ * because every test gets its own dispatcher.
  */
 class GalleryPhotoCleanupDurabilityTest extends TestCase
 {
@@ -55,6 +91,53 @@ class GalleryPhotoCleanupDurabilityTest extends TestCase
         ]);
     }
 
+    protected function tearDown(): void
+    {
+        // Give the model event listeners of this class back explicitly. The
+        // vetoes are bound to the event dispatcher of the test that registers
+        // them, and Laravel installs a new dispatcher for every test, so they
+        // cannot outlive their test here (see the class docblock). The flush
+        // is defence in depth and mirrors the flush that FtpImportTest
+        // already performs for the `created` direction.
+        $this->flushPhotoAndGalleryEventListeners();
+
+        parent::tearDown();
+    }
+
+    /**
+     * Remove every eloquent event listener of `Photo` and `Gallery`.
+     *
+     * `Model::flushEventListeners()` does not only forget the listeners this
+     * class registered: it forgets *all* eloquent listeners of the model,
+     * including the application's own `Gallery::booted()` `saving`/`saved`/
+     * `deleted` hooks and Scout's `SearchableObserver` hooks for `Photo`.
+     * Calling it in the tearDown only affects the current test, because the
+     * application is flushed right afterwards and the next test runs on a new
+     * event dispatcher. Calling it inside a test body disables those
+     * application hooks for the rest of that test.
+     */
+    private function flushPhotoAndGalleryEventListeners(): void
+    {
+        Photo::flushEventListeners();
+        Gallery::flushEventListeners();
+    }
+
+    /**
+     * Block the deletion of every photo for the rest of the current test.
+     */
+    private function vetoPhotoDeletion(): void
+    {
+        Photo::deleting(static fn (): bool => false);
+    }
+
+    /**
+     * Block the deletion of every gallery for the rest of the current test.
+     */
+    private function vetoGalleryDeletion(): void
+    {
+        Gallery::deleting(static fn (): bool => false);
+    }
+
     public function test_manual_gallery_delete_commits_before_folder_cleanup_and_rolls_back_on_db_failure(): void
     {
         Queue::fake();
@@ -63,7 +146,7 @@ class GalleryPhotoCleanupDurabilityTest extends TestCase
         Storage::disk('photos')->makeDirectory($galleryId);
         Storage::disk('photos')->put("{$galleryId}/original.jpg", 'image');
 
-        Gallery::deleting(static fn (): bool => false);
+        $this->vetoGalleryDeletion();
 
         $this->actingAs($this->admin(), 'api')
             ->deleteJson("/api/management/galleries/{$galleryId}")
@@ -163,7 +246,7 @@ class GalleryPhotoCleanupDurabilityTest extends TestCase
         $path = "{$gallery->id}/{$filename}";
         Storage::disk('photos')->put($path, 'image');
 
-        Photo::deleting(static fn (): bool => false);
+        $this->vetoPhotoDeletion();
 
         $this->actingAs($this->admin(), 'api')
             ->deleteJson("/api/photos/{$photo->id}")
@@ -173,6 +256,65 @@ class GalleryPhotoCleanupDurabilityTest extends TestCase
         Storage::disk('photos')->assertExists($path);
         $this->assertDatabaseCount('jobs', 0);
         Queue::assertNotPushed(DeletePhotoFilesJob::class);
+    }
+
+    /**
+     * A registered veto is gone once the model event listeners are flushed.
+     *
+     * The veto blocks the deletion while it is registered, and the deletion
+     * succeeds again after `flushPhotoAndGalleryEventListeners()`. That
+     * cleanup is the mechanism this test pins.
+     *
+     * The flush removes the application's own `Gallery::booted()` hooks and
+     * Scout's hooks for `Photo` for the rest of this test as well. No
+     * assertion below depends on them: the gallery and the photo are created
+     * before the flush, and the assertions only look at the veto's effect on
+     * the deletion.
+     *
+     * Regression proof: dropping the `flushPhotoAndGalleryEventListeners()`
+     * call from the test body leaves the veto registered, and the
+     * `assertTrue($laterPhoto->delete())` fails with
+     * "Failed asserting that false is true".
+     *
+     * What this test does not cover: the `tearDown()` of this class. A veto
+     * registered by one test is unreachable from another one — Laravel
+     * installs a new event dispatcher for every test — so no cross-test
+     * assertion can observe what the tearDown removed. The tearDown is
+     * defence in depth; the class docblock records the non-reproduction of
+     * the leak the board item describes.
+     */
+    public function test_a_registered_deletion_veto_does_not_survive_an_explicit_model_listener_cleanup(): void
+    {
+        $gallery = Gallery::factory()->create();
+        $photo = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+        ]);
+
+        $this->vetoPhotoDeletion();
+        $this->vetoGalleryDeletion();
+
+        $this->assertFalse(
+            $photo->delete(),
+            'The registered veto must block the deletion while it is registered.',
+        );
+        $this->assertFalse(
+            $gallery->delete(),
+            'The registered veto must block the deletion while it is registered.',
+        );
+        $this->assertDatabaseHas('photos', ['id' => $photo->id]);
+        $this->assertDatabaseHas('galleries', ['id' => $gallery->id]);
+
+        // The cleanup that the tearDown of this class performs as well.
+        $this->flushPhotoAndGalleryEventListeners();
+
+        $laterPhoto = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+        ]);
+        $this->assertTrue(
+            $laterPhoto->delete(),
+            'The veto must not survive the model listener cleanup.',
+        );
+        $this->assertDatabaseMissing('photos', ['id' => $laterPhoto->id]);
     }
 
     public function test_manual_photo_delete_uses_a_distinct_durable_operation_after_commit(): void
@@ -488,7 +630,7 @@ class GalleryPhotoCleanupDurabilityTest extends TestCase
         $gallery = Gallery::factory()->create(['expires_at' => now()->subMonths(4)]);
         $galleryId = (string) $gallery->getKey();
         Storage::disk('photos')->put("{$galleryId}/original.jpg", 'image');
-        Gallery::deleting(static fn (): bool => false);
+        $this->vetoGalleryDeletion();
 
         $this->artisan('app:cleanup-galleries')
             ->assertExitCode(1);

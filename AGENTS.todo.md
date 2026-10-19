@@ -165,19 +165,11 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   Org-, Akteur- und Mitgliederzeilen in **einer** sortierten Lock-Menge sperren. Ein SQLite-Test
   kann das nicht beweisen — der Nachweis braucht zwei echte Verbindungen (siehe das
   SEC-12-Probe-Skript als Muster).
-- [ ] **Der 500-ID-Schnitt im ZIP-Payload ist dokumentiert, aber nicht getestet.** Ein
-  `photo_ids`-Payload über 500 Einträge zählt nur die ersten 500; die übrigen erwirtschaften
-  still 0 Shares, ohne Doppelzählung. **Test:** ein Payload mit 501+ IDs.
 - [ ] **Kontaktbogen: kein sichtbares Signal beim Weglassen von Fotos (D-41).** Ein
   Foto, das an Byte-, Dimension-, Pixel- oder MIME-Prüfung scheitert, verschwindet ohne Hinweis
   (heute nur über `count($photos)` gegen `photos()->count()` indirekt erschließbar). Ein Zähler
   würde den Blade-Vertrag ändern. **Entschieden (D-41):** der Kontaktbogen nennt, wie viele Fotos
   er ausgelassen hat und warum; der Zähler gehört in den PDF-Vertrag.
-- [ ] **Testhygiene: einseitiger Listener-Flush (pre-existing).** `FtpImportTest::tearDown()`
-  flusht `Photo::created`; die Gegenrichtung fehlt — `GalleryPhotoCleanupDurabilityTest`
-  registriert `Photo::deleting(fn => false)` und flusht nie. Unter
-  `--order-by=random`/`defects` leckt der Veto-Listener in andere Tests. **Test:** die
-  betroffene Klasse unter zufälliger Reihenfolge laufen lassen und den Flush ergänzen.
 - [ ] **Tote Limiter-Registrierung (pre-existing).** `RateLimiter::for('checkout', …)` steht in
   `AppServiceProvider`, wird aber nirgends referenziert — kein Routen-Throttle, kein
   Service-Aufruf; die Checkout-Quote läuft ausschließlich über `RateLimiter::hit()` in

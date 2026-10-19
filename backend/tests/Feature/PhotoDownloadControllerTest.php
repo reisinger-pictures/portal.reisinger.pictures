@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\PhotoDownloadController;
 use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\Photo;
 use App\Models\User;
+use App\Services\ImageProcessor;
+use App\Services\MediaVisibilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
@@ -192,6 +195,78 @@ class PhotoDownloadControllerTest extends TestCase
             ->assertJson(['error' => 'Der ZIP-Download enthält keine Bilder.']);
 
         $this->assertDatabaseCount('download_logs', 0);
+    }
+
+    /**
+     * The audit payload of a large archive is bounded, the count is not.
+     *
+     * `PhotoDownloadController::MAX_AUDIT_IDS` caps the diagnostic identifier
+     * list at 500 entries so that a huge archive cannot turn the JSON column
+     * into a data dump. The prepared count stays truthful: it is the number of
+     * distinct photos that were actually prepared, and it is what the payout
+     * calculation and the archive itself are based on.
+     *
+     * Regression proof: dropping the `count($bounded) >= self::MAX_AUDIT_IDS`
+     * break in `PhotoDownloadController::boundedAuditIds()` stores all 501
+     * identities, and the `assertCount(500, ...)` on `payload.photo_ids`
+     * fails with "Failed asserting that actual size 501 matches expected size
+     * 500". The count assertions stay green either way — `payload.photo_count`
+     * and the `photo_count` column hold 501 with and without the cap — which
+     * is the point of the contract.
+     */
+    public function test_gallery_zip_audit_payload_caps_photo_ids_and_keeps_the_full_photo_count(): void
+    {
+        // The search index is not part of the contract under test, and 501
+        // indexed photos would turn this test into a Meilisearch load test.
+        config(['scout.driver' => 'null']);
+
+        $gallery = Gallery::factory()->create([
+            'type' => 'delivery',
+            'is_public' => true,
+            'is_free_download' => true,
+            'slug' => 'large-zip',
+        ]);
+        $photographer = User::factory()->create();
+        $content = (string) file_get_contents(base_path('tests/Fixtures/sample.jpg'));
+
+        // One more photo than the audit payload may carry.
+        foreach (range(1, 501) as $index) {
+            $photo = Photo::factory()->create([
+                'gallery_id' => $gallery->id,
+                'user_id' => $photographer->id,
+                'title' => 'Archive photo '.$index,
+                'description' => 'Archive photo '.$index,
+            ]);
+            Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, $content);
+        }
+
+        // Preparing an archive writes the metadata of every single file
+        // through exiftool, which would dominate the runtime of this test.
+        // The audit payload is derived from the prepared file list, not from
+        // the metadata, so the metadata write is the only part that is
+        // skipped.
+        $this->app->instance(PhotoDownloadController::class, new ArchiveAuditPhotoDownloadController(
+            app(ImageProcessor::class),
+            app(MediaVisibilityService::class),
+        ));
+
+        $this->get("/api/galleries/{$gallery->id}/download-zip")
+            ->assertStatus(200);
+
+        $log = DownloadLog::sole();
+
+        // The archive is prepared in the gallery's photo order, so the stored
+        // identities are the first 500 of exactly that order.
+        $preparedPhotoIds = $gallery->photos()->pluck('id')->all();
+        $this->assertCount(501, $preparedPhotoIds);
+
+        $this->assertCount(500, $log->payload['photo_ids']);
+        $this->assertSame(array_slice($preparedPhotoIds, 0, 500), $log->payload['photo_ids']);
+
+        // The count is the number of prepared files, not the number of
+        // identities the payload could carry.
+        $this->assertSame(501, $log->payload['photo_count']);
+        $this->assertSame(501, $log->photo_count);
     }
 
     public function test_user_cannot_download_private_photo_from_unauthorized_gallery()
@@ -503,5 +578,23 @@ class PhotoDownloadControllerTest extends TestCase
         $this->assertArrayHasKey(0, $decoded, "ExifTool lieferte kein Metadaten-Objekt [{$context}].");
 
         return $decoded[0];
+    }
+}
+
+/**
+ * Prepares an archive without writing the metadata of every single file.
+ *
+ * The metadata injection runs `exiftool` once per prepared file, which would
+ * take minutes for an archive of 501 files. The audit payload under test is
+ * derived from the prepared file list — the photo and gallery identities and
+ * their count — and not from the metadata, so only the metadata write is
+ * skipped here. Every other boundary of the archive preparation stays the
+ * production one.
+ */
+class ArchiveAuditPhotoDownloadController extends PhotoDownloadController
+{
+    protected function injectMetadata($sourcePath, $photo, $userName, $customConditions = null)
+    {
+        return $sourcePath;
     }
 }
