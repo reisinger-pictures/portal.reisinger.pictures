@@ -299,9 +299,10 @@ class FtpImportBatchTest extends TestCase
 
     public function test_an_upload_event_during_a_rejected_import_is_handed_off_and_keeps_the_rejection_visible(): void
     {
-        [$user] = $this->importContext();
+        [$user, $sourcePath] = $this->importContext();
         $latePath = $user->ftp_slug.'/z-arrived-during-rejected-import.jpg';
         $badPath = $user->ftp_slug.'/b-unprocessable.jpg';
+        Storage::disk('ftp_inbox')->delete($sourcePath);
         Storage::disk('ftp_inbox')->put($badPath, '<!doctype html><title>not an image</title>');
         $eventDispatched = false;
 
@@ -314,33 +315,36 @@ class FtpImportBatchTest extends TestCase
         ]);
 
         $photoService = $this->createMock(PhotoProcessingService::class);
-        $photoService->expects($this->exactly(2))
+        $photoService->expects($this->once())
             ->method('processImage')
-            ->willReturnCallback(function () use ($user, $latePath, &$eventDispatched): array {
-                if (! $eventDispatched) {
-                    $eventDispatched = true;
-                    Storage::disk('ftp_inbox')->put($latePath, $this->sampleImageContents());
+            ->willReturn(['width' => 1, 'height' => 1, 'title' => 'source']);
 
-                    // The event runs under the sync driver while the active
-                    // import still owns the lock, then returns Locked.
-                    (new ImportFtpBatch($user->id, uploadEvent: true))->handle(app(FtpInboxImporter::class));
-                }
+        $onOpenSource = function (string $path) use ($user, $badPath, $latePath, &$eventDispatched): void {
+            if ($eventDispatched || basename($path) !== basename($badPath)) {
+                return;
+            }
 
-                return ['width' => 1, 'height' => 1, 'title' => 'source'];
-            });
+            $eventDispatched = true;
+            Storage::disk('ftp_inbox')->put($latePath, $this->sampleImageContents());
 
-        $importer = new RecordingFtpInboxImporter($photoService);
+            // The event runs while staging the sole initial file, before image
+            // decoding can reject it, and loses the lock held by this import.
+            (new ImportFtpBatch($user->id, uploadEvent: true))->handle(app(FtpInboxImporter::class));
+        };
+
+        $importer = new RecordingFtpInboxImporter($photoService, $onOpenSource);
         $this->app->instance(PhotoProcessingService::class, $photoService);
         $this->app->instance(FtpInboxImporter::class, $importer);
         Log::spy();
 
         ImportFtpBatch::dispatch($user->id);
 
-        // The active run imports the original photo, then rejects the bad file.
-        // Its event handoff runs one follow-up, which quarantines that file and
+        // The active run rejects the sole initial bad file. Its event handoff
+        // runs one follow-up, which quarantines that file and
         // imports the newly arrived photo exactly once.
-        $this->assertSame([0, 1, 1], $importer->runs);
-        $this->assertDatabaseCount('photos', 2);
+        $this->assertTrue($eventDispatched);
+        $this->assertSame([0, 0, 1], $importer->runs);
+        $this->assertDatabaseCount('photos', 1);
         $this->assertSame([], Storage::disk('ftp_inbox')->files($user->ftp_slug));
         $this->assertCount(
             1,
@@ -354,13 +358,18 @@ class FtpImportBatchTest extends TestCase
                 && ($context['status'] ?? null) === 'source_unprocessable'
                 && ($context['error'] ?? null) === 'Die FTP-Datei ist kein gültiges oder unterstütztes Bild.')
             ->once();
+        Log::shouldHaveReceived('warning')
+            ->withArgs(static fn (mixed $message): bool => is_string($message)
+                && str_contains($message, 'hält die Sperre'))
+            ->once();
     }
 
     public function test_a_rejected_upload_event_handoff_queues_follow_up_under_an_async_driver(): void
     {
-        [$user] = $this->importContext();
+        [$user, $sourcePath] = $this->importContext();
         $latePath = $user->ftp_slug.'/z-arrived-during-async-rejected-import.jpg';
         $badPath = $user->ftp_slug.'/b-unprocessable.jpg';
+        Storage::disk('ftp_inbox')->delete($sourcePath);
         Storage::disk('ftp_inbox')->put($badPath, '<!doctype html><title>not an image</title>');
         $eventDispatched = false;
 
@@ -374,24 +383,25 @@ class FtpImportBatchTest extends TestCase
         Queue::fake();
 
         $photoService = $this->createMock(PhotoProcessingService::class);
-        $photoService->expects($this->exactly(2))
+        $photoService->expects($this->once())
             ->method('processImage')
-            ->willReturnCallback(function () use ($user, $latePath, &$eventDispatched): array {
-                if (! $eventDispatched) {
-                    $eventDispatched = true;
-                    Storage::disk('ftp_inbox')->put($latePath, $this->sampleImageContents());
+            ->willReturn(['width' => 1, 'height' => 1, 'title' => 'source']);
 
-                    // Deterministically model an async event worker starting
-                    // while the active job holds the lock. The event marks its
-                    // generation, loses the lock, and the rejected active run
-                    // must queue a post-unlock follow-up.
-                    (new ImportFtpBatch($user->id, uploadEvent: true))->handle(app(FtpInboxImporter::class));
-                }
+        $onOpenSource = function (string $path) use ($user, $badPath, $latePath, &$eventDispatched): void {
+            if ($eventDispatched || basename($path) !== basename($badPath)) {
+                return;
+            }
 
-                return ['width' => 1, 'height' => 1, 'title' => 'source'];
-            });
+            $eventDispatched = true;
+            Storage::disk('ftp_inbox')->put($latePath, $this->sampleImageContents());
 
-        $importer = new RecordingFtpInboxImporter($photoService);
+            // Model an async event worker while the active job holds the lock.
+            // It marks its generation, loses the lock, and the rejected active
+            // run must queue a post-unlock follow-up.
+            (new ImportFtpBatch($user->id, uploadEvent: true))->handle(app(FtpInboxImporter::class));
+        };
+
+        $importer = new RecordingFtpInboxImporter($photoService, $onOpenSource);
         $this->app->instance(PhotoProcessingService::class, $photoService);
         $this->app->instance(FtpInboxImporter::class, $importer);
         Log::spy();
@@ -402,17 +412,18 @@ class FtpImportBatchTest extends TestCase
         $followUp = Queue::pushed(ImportFtpBatch::class)->first();
         $this->assertInstanceOf(ImportFtpBatch::class, $followUp);
         $this->assertSame(2, $followUp->batchNumber);
-        $this->assertSame([0, 1], $importer->runs);
-        $this->assertDatabaseCount('photos', 1);
+        $this->assertTrue($eventDispatched);
+        $this->assertSame([0, 0], $importer->runs);
+        $this->assertDatabaseCount('photos', 0);
         $this->assertTrue(Storage::disk('ftp_inbox')->exists($latePath));
 
         // The queue worker runs the handoff only after the active job released
         // its lock; it quarantines the repeatedly rejected source and imports
-        // the event's new file without duplicating the first photo.
+        // the event's new file without importing it more than once.
         $followUp->handle($importer);
 
-        $this->assertSame([0, 1, 1], $importer->runs);
-        $this->assertDatabaseCount('photos', 2);
+        $this->assertSame([0, 0, 1], $importer->runs);
+        $this->assertDatabaseCount('photos', 1);
         $this->assertSame([], Storage::disk('ftp_inbox')->files($user->ftp_slug));
         $this->assertCount(
             1,
@@ -425,6 +436,10 @@ class FtpImportBatchTest extends TestCase
                 && is_array($context)
                 && ($context['status'] ?? null) === 'source_unprocessable'
                 && ($context['error'] ?? null) === 'Die FTP-Datei ist kein gültiges oder unterstütztes Bild.')
+            ->once();
+        Log::shouldHaveReceived('warning')
+            ->withArgs(static fn (mixed $message): bool => is_string($message)
+                && str_contains($message, 'hält die Sperre'))
             ->once();
     }
 
@@ -666,9 +681,23 @@ class RecordingFtpInboxImporter extends FtpInboxImporter
     /** @var list<int> */
     public array $runs = [];
 
+    public function __construct(
+        PhotoProcessingService $photoService,
+        private readonly ?\Closure $onOpenSource = null,
+    ) {
+        parent::__construct($photoService);
+    }
+
     public function importBatch(User $user, ?callable $openSource = null, ?callable $statSource = null): FtpImportResult
     {
         $before = Photo::query()->count();
+        $openSource ??= fn (string $path) => $this->openSource($path);
+        $openSource = function (string $path) use ($openSource) {
+            $this->onOpenSource?->__invoke($path);
+
+            return $openSource($path);
+        };
+
         $result = parent::importBatch($user, $openSource, $statSource);
         $this->runs[] = Photo::query()->count() - $before;
 
