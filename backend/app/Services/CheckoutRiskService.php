@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\User;
+use App\Support\AtomicRateCounter;
 use App\Support\CheckoutKey;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
@@ -14,7 +15,21 @@ class CheckoutRiskService
 {
     private const ATTEMPT_WINDOW_SECONDS = 3600;
 
-    public function __construct(private readonly TurnstileService $turnstile) {}
+    /**
+     * The count reported for a window whose counter could not be determined.
+     * It is over every limit, so an unknown count fails closed: the request
+     * is charged against the budget and the challenge is required.
+     */
+    private const UNKNOWN_COUNT = PHP_INT_MAX;
+
+    private ?AtomicRateCounter $counter;
+
+    public function __construct(
+        private readonly TurnstileService $turnstile,
+        ?AtomicRateCounter $counter = null,
+    ) {
+        $this->counter = $counter;
+    }
 
     /**
      * Apply the dedicated checkout quota only after the request has been
@@ -30,10 +45,12 @@ class CheckoutRiskService
 
         // Count every classified attempt against every bucket before checking
         // any one of them, so changing IP cannot bypass the user bucket and
-        // changing user cannot bypass the IP buckets.
-        $userAttempts = (int) RateLimiter::hit($userKey, 3600);
-        $ipHourAttempts = (int) RateLimiter::hit($ipHourKey, 3600);
-        $ipDayAttempts = (int) RateLimiter::hit($ipDayKey, 86400);
+        // changing user cannot bypass the IP buckets. The count-first
+        // primitive counts before it decides and never writes the counter
+        // blindly (SEC-20261018-12, D-38).
+        $userAttempts = $this->countAttempts($userKey, 3600);
+        $ipHourAttempts = $this->countAttempts($ipHourKey, 3600);
+        $ipDayAttempts = $this->countAttempts($ipDayKey, 86400);
 
         $userLimit = max(1, (int) config('app.checkout_throttle_user_per_hour', 5));
         $ipHourLimit = max(1, (int) config('app.checkout_throttle_ip_per_hour', 10));
@@ -67,11 +84,11 @@ class CheckoutRiskService
 
         try {
             $window = $this->failureWindowSeconds();
-            RateLimiter::hit(CheckoutKey::user($user, 'checkout-failure'), $window);
+            $this->countBestEffort(CheckoutKey::user($user, 'checkout-failure'), $window);
 
             $customerIp = trim((string) ($order->ip_address ?? ''));
             if ($customerIp !== '') {
-                RateLimiter::hit(CheckoutKey::ip($customerIp, 'checkout-failure'), $window);
+                $this->countBestEffort(CheckoutKey::ip($customerIp, 'checkout-failure'), $window);
             }
         } catch (\Throwable $exception) {
             Log::warning('Checkout failure velocity counter unavailable', [
@@ -97,11 +114,11 @@ class CheckoutRiskService
             return;
         }
 
-        $userAttempts = RateLimiter::hit(
+        $userAttempts = $this->countAttempts(
             $this->userAttemptKey($user),
             self::ATTEMPT_WINDOW_SECONDS
         );
-        $ipAttempts = RateLimiter::hit(
+        $ipAttempts = $this->countAttempts(
             $this->ipAttemptKey($request),
             self::ATTEMPT_WINDOW_SECONDS
         );
@@ -136,6 +153,36 @@ class CheckoutRiskService
     private function ipAttemptKey(Request $request): string
     {
         return CheckoutKey::ip($request->ip(), 'checkout-risk-attempt');
+    }
+
+    /**
+     * Count one attempt against a window and return the number of counted
+     * attempts. A window whose counter could not be determined is reported as
+     * the worst case, so an unknown count fails closed instead of widening
+     * the budget.
+     */
+    private function countAttempts(string $key, int $decaySeconds): int
+    {
+        $count = $this->counter()->count($key, $decaySeconds);
+
+        return $count === AtomicRateCounter::UNCOUNTABLE ? self::UNKNOWN_COUNT : $count;
+    }
+
+    /**
+     * Count a failure-velocity attempt. The counter is best-effort: an
+     * uncountable window must not turn a recorded payment failure into an
+     * error, so it is reported like a cache failure.
+     */
+    private function countBestEffort(string $key, int $decaySeconds): void
+    {
+        if ($this->counter()->count($key, $decaySeconds) === AtomicRateCounter::UNCOUNTABLE) {
+            throw new \RuntimeException('The checkout failure velocity counter could not be counted.');
+        }
+    }
+
+    private function counter(): AtomicRateCounter
+    {
+        return $this->counter ??= app(AtomicRateCounter::class);
     }
 
     private function hasHighFailureVelocity(Request $request, User $user): bool

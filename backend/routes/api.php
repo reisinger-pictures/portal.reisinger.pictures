@@ -110,7 +110,10 @@ if (app()->environment('local', 'testing')) {
 
 }
 
-Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe'])->name('api.webhooks.stripe')->middleware('throttle:10,1');
+// D-38: the webhook ingress is a security-relevant path, so it counts before
+// it decides (SEC-20261018-12). The budget and the key are unchanged; only
+// the counting primitive is the count-first one.
+Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe'])->name('api.webhooks.stripe')->middleware(AtomicThrottleRequests::class.':10,1');
 
 // D-36: SFTPGo posts one filesystem event per uploaded file here; the endpoint
 // resolves the account and enqueues the background import. Deliberately outside
@@ -207,7 +210,8 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/ai/generate-metadata-text', [AIController::class, 'generateMetadataText'])->middleware('throttle:ai-generate')->name('api.ai.generate-metadata-text');
 
     // Coupon validation (public, auth-required)
-    Route::post('/coupons/validate', [CouponCheckoutController::class, 'validateCoupon'])->name('api.coupons.validate')->middleware('throttle:coupon-validate');
+    // D-38: billing-relevant path, counts before it decides (SEC-20261018-12).
+    Route::post('/coupons/validate', [CouponCheckoutController::class, 'validateCoupon'])->name('api.coupons.validate')->middleware(AtomicThrottleRequests::class.':coupon-validate');
 });
 
 Route::middleware(['auth:api', 'management'])->group(function () {
