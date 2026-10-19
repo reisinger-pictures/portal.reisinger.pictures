@@ -151,15 +151,18 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-18):** **48 offene `[ ]`** und **46 wartende
-> `[~]`** über 1873 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (48), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1873). Aufteilung der 48: **16× `manuell prüfen:`** und **32×
-> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. Zehn der 14 Review-Befunde sind
+> **Struktur-Hinweis, fortgeschrieben (2026-10-19):** **36 offene `[ ]`** und **45 wartende
+> `[~]`** über 1822 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (36), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1822). Aufteilung der 36: **22× `manuell prüfen:`** und **14×
+> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 32 enthalten weiterhin die vierzehn Punkte, die in den Freigaben der Wellen A–D als
-> nicht-blockierend eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte
-> aus den Wellen A–D"). Alle 46 `[~]` tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
+> die 14 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
+> A–D") sowie die seitdem aufgedeckten Reste (zwei Query-Zähl-Kosten, das jwt-auth-Claims-
+> Artefakt, die Zwei-Verbindungs-Messung, die umgekehrte Sperrreihenfolge von `destroy()`,
+> die Opt-in-Zeile) und die manuellen Prüfpunkte des Deploys vom 2026-10-19. Alle 45 `[~]`
+> tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
 > zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
 > hinzu, andere wurden entfernt.
@@ -170,7 +173,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
 > **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **21 von 25 `##`-Abschnitten**
+> Die Positionen liegen in **20 von 27 `##`-Abschnitten**
 > (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
 > `grep -c '^## ' AGENTS.todo.md`). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
@@ -265,6 +268,41 @@ ist die Frage nicht „ist das besser?", sondern „ist D-x überholt?" — und 
 `features/owner-decisions.md` ersetzt**, nicht ergänzt.
 
 ---
+
+## 🚀 PRODUKTIONS-DEPLOY 2026-10-19 (`64fa9be`) — Neustart ausstehend
+
+Deploy ausgeführt: `./sync.sh` (43 Backend-Dateien, 58 Frontend-Assets) gegen den grünen
+Head `64fa9be` (CI `39291191094`, alle 11 Jobs grün). **Maschinell verifiziert:** die neuen
+Dateien liegen auf dem Host (`app/Support/AtomicRateCounter.php`, `app/Support/
+DirectGalleryGrant.php`, `config/ftp.php`, `app/Jobs/ImportFtpBatch.php`), `ext-gd` ist im
+Produktionscontainer geladen (PHP 8.5.11), das Frontend liefert das neue Bundle
+(`assets/index-Ce94b7M7.js`, HTTP 200), die alten Hash-Assets sind gelöscht, `portal.
+reisinger.pictures/up` antwortet 200. `tests/`, `vendor/` und `storage/` sind per
+`rsync-backend-exclude.txt` ausgenommen, `features/` wird nicht übertragen.
+
+**Offen — manuell durch den Owner (Neustart + Gegnproben):**
+
+- [ ] manuell prüfen: `docker restart portal_backend` — **steht aus.** Ohne Neustart läuft
+  im PHP-Prozess der alte Code; `bootstrap/cache/` und der OPcache-Zustand müssen den neuen
+  Stand laden (§13). Erst danach sind die Gegenproben sinnvoll.
+- [ ] manuell prüfen: Gegenprobe nach dem Neustart — `https://portal.reisinger.pictures/up`
+  → 200, dann je einen Request, der das geänderte Verhalten auslöst:
+  `POST /api/coupons/validate` (Coupon-Budget, 10/min), `POST /api/webhooks/stripe`
+  (10/min, Positionsform), ein Checkout-Versuch (Quota-Buckets) und ein
+  `/api/management/ftp/status` (neue Inbox-Spalten).
+- [ ] manuell prüfen: Kontaktbogen als PDF öffnen — der Auslassungs-Hinweis („N Fotos
+  ausgelassen: …") muss im PDF stehen, wenn ein Foto durch Byte-, Größen-, Pixel- oder
+  MIME-Prüfung fällt (D-41), in **beiden** Varianten.
+- [ ] manuell prüfen: Zugriffs-Dialog einer Auswahl-Galerie öffnen — die Client-Zuweisung
+  wird nicht mehr angeboten; erzwungenes Speichern liefert die Meldung „Es dürfen nur
+  Liefergalerien direkt zugewiesen werden." (D-43). Die Fotograf-Zuweisung bleibt
+  möglich.
+- [ ] manuell prüfen: eingeladener, **registrierter** Client öffnet eine Auswahl-Galerie —
+  die Medien-Auslieferung muss jetzt funktionieren (D-44); ein widerrufener Invite muss
+  weiterhin 403 liefern.
+- [ ] manuell prüfen: `OrgController::syncUsers` (Org-Benutzer synchronisieren) läuft ohne
+  Fehler durch; ein Mitglied, das zur Laufzeit per Invite-Rücklösung hinzukommt, wird **nicht**
+  mehr abgehängt (D-40, siehe die offene Zwei-Verbindungs-Messung).
 
 ## 🚀 PRODUKTIONS-DEPLOY 2026-09-27 (`002e9eb`) — manuell prüfen
 
