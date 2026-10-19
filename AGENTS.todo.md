@@ -173,12 +173,6 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   (heute nur über `count($photos)` gegen `photos()->count()` indirekt erschließbar). Ein Zähler
   würde den Blade-Vertrag ändern. **Entschieden (D-41):** der Kontaktbogen nennt, wie viele Fotos
   er ausgelassen hat und warum; der Zähler gehört in den PDF-Vertrag.
-- [ ] **`ext-gd` ist repo-weit undeklariert (D-42).** `ImageProcessor` nutzt GD
-  voraussetzungslos, der Kontaktbogen macht es seit der Byte-Invariante zur harten Bedingung für
-  JPEG/PNG-Einbettung, `composer.json` deklariert nichts, CI baut mit `--ignore-platform-reqs`.
-  **Entschieden (D-42):** `ext-gd` wird in `composer.json` als Plattformvoraussetzung
-  deklariert; das Verhalten der Installationen ohne GD wird zur Folge dieser Deklaration, nicht
-  mehr zur stillen Umgebungsgrenze.
 - [ ] **Testhygiene: einseitiger Listener-Flush (pre-existing).** `FtpImportTest::tearDown()`
   flusht `Photo::created`; die Gegenrichtung fehlt — `GalleryPhotoCleanupDurabilityTest`
   registriert `Photo::deleting(fn => false)` und flusht nie. Unter

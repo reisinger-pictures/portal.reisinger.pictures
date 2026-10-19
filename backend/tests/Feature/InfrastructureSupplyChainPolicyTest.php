@@ -64,6 +64,26 @@ class InfrastructureSupplyChainPolicyTest extends TestCase
         'STRIPE_WEBHOOK_SECRET',
     ];
 
+    /**
+     * The PHP extensions the backend cannot run without, declared as Composer
+     * platform requirements.
+     *
+     * `ext-gd` is used unconditionally by `ImageProcessor` (thumbnails,
+     * scaling, watermarks) and, since the model-photo hardening, by the
+     * contact sheet export for JPEG/PNG embedding. `ext-zip` backs the
+     * location import (`app:import-locations`).
+     *
+     * An undeclared extension is an undocumented runtime assumption: nothing
+     * checks it, and the first sign of it is a fatal error inside a
+     * production job. See owner decision D-42.
+     *
+     * @var list<string>
+     */
+    private const REQUIRED_PLATFORM_EXTENSIONS = [
+        'ext-gd',
+        'ext-zip',
+    ];
+
     public function test_github_actions_are_pinned_to_full_commit_shas(): void
     {
         $actionCount = 0;
@@ -648,6 +668,85 @@ PHP;
                     .'the per-IP bucket, so the production default would fail a parallel run'
             );
         }
+    }
+
+    /**
+     * Owner decision D-42: `ext-gd` is a declared platform requirement, not
+     * an undocumented runtime assumption.
+     *
+     * The declaration is what makes a plain `composer install` fail fast on
+     * a host without GD. The CI and production install paths pass
+     * `--ignore-platform-reqs`, so the guard cannot break them, and the base
+     * image builds GD explicitly (`deployment/Dockerfile`).
+     */
+    public function test_required_php_extensions_are_declared_as_platform_requirements(): void
+    {
+        $composer = $this->composerJson();
+
+        $this->assertArrayHasKey(
+            'require',
+            $composer,
+            'backend/composer.json must declare a require block'
+        );
+
+        foreach (self::REQUIRED_PLATFORM_EXTENSIONS as $extension) {
+            $this->assertArrayHasKey(
+                $extension,
+                $composer['require'],
+                "backend/composer.json must declare {$extension} as a platform requirement"
+            );
+        }
+    }
+
+    /**
+     * The lock file has to mirror the declared platform requirements.
+     *
+     * A stale lock only makes Composer warn ("the lock file is not up to date
+     * with the latest changes in composer.json") and continue — but the
+     * platform verification that D-42 relies on then runs against the old
+     * platform block, so a newly declared extension is not checked at install
+     * time any more. A mirrored lock keeps that check honest.
+     */
+    public function test_composer_lock_mirrors_the_declared_platform_requirements(): void
+    {
+        $composer = $this->composerJson();
+        $lock = json_decode($this->read('backend/composer.lock'), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertIsArray($lock, 'backend/composer.lock must decode to an object');
+        $this->assertArrayHasKey(
+            'platform',
+            $lock,
+            'backend/composer.lock must carry a platform block'
+        );
+
+        $declared = array_filter(
+            $composer['require'],
+            static fn (string $name): bool => $name === 'php'
+                || str_starts_with($name, 'ext-')
+                || str_starts_with($name, 'lib-'),
+            ARRAY_FILTER_USE_KEY
+        );
+
+        $this->assertEqualsCanonicalizing(
+            $declared,
+            $lock['platform'],
+            'backend/composer.lock must mirror the platform requirements of backend/composer.json; '
+                .'refresh it with "composer update --lock --no-scripts --no-install"'
+        );
+    }
+
+    /**
+     * The decoded root `composer.json`.
+     *
+     * @return array<string, mixed>
+     */
+    private function composerJson(): array
+    {
+        $composer = json_decode($this->read('backend/composer.json'), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertIsArray($composer, 'backend/composer.json must decode to an object');
+
+        return $composer;
     }
 
     /**
