@@ -175,7 +175,7 @@ Re-validate existing gallery grants against the current selection-gallery and su
 
 ### D-40: One sorted lock set in `OrgController::syncUsers`
 
-Lock the org row, the actor row, and the member rows in one sorted set, so that two concurrent syncs moving the same user cannot deadlock each other. The proof needs two real database connections; a SQLite-only test cannot establish it.
+Lock the org row, the actor row, and the member rows in one sorted set, so that two concurrent syncs moving the same user cannot deadlock each other. The org row lock serialises syncs of one org, not every write to `users.org_id`: the member set is read unlocked before the single lock query, so a member that a non-sync writer adds in that window (invite redemption, org-admin user creation, registration/auto-join) is no longer detached by that sync — it is not written at all, so none of its roles, flatrate or upgrade rights are revoked by the sync. The proof needs two real database connections; a SQLite-only test cannot establish it.
 
 ### D-41: The contact sheet reports omitted photos
 
