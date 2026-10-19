@@ -19,7 +19,10 @@ class SystemMiscTest extends TestCase
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true, 'is_free_download' => true]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
-        Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, 'dummy content');
+        Storage::disk('photos')->put(
+            $gallery->id.'/'.$photo->filename,
+            file_get_contents(base_path('tests/Fixtures/sample.jpg')),
+        );
 
         // Simuliere Caddy Proxy Konfiguration
         Config::set('services.proxy_delivery_header', 'X-Accel-Redirect');
@@ -38,7 +41,10 @@ class SystemMiscTest extends TestCase
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => true, 'is_free_download' => true]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
-        Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, 'dummy content');
+        Storage::disk('photos')->put(
+            $gallery->id.'/'.$photo->filename,
+            file_get_contents(base_path('tests/Fixtures/sample.jpg')),
+        );
 
         // Simuliere Apache mod_xsendfile Konfiguration
         Config::set('services.proxy_delivery_header', 'X-Sendfile');
