@@ -178,14 +178,62 @@ class OrgController extends Controller
         )));
 
         return DB::transaction(function () use ($svc, $authenticatedUserId, $id, $newUserIds) {
-            // Every sync for this org takes the destination lock first. Read the
-            // actor, current members and submitted users only after entering the
-            // transaction, and lock each row before checking current state.
+            // D-40: every sync for this org takes the destination lock first.
+            // The org row is locked before any user row, so the table order is
+            // orgs -> users for every sync, and between two syncs the org lock
+            // cannot close a cycle with a user lock. The one exception is
+            // destroy(): it updates the member rows first and takes the org
+            // row's lock only at the delete, i.e. the inverse order, so a
+            // destroy of the same org can still form a cycle with a sync of
+            // that org (open item, see AGENTS.todo.md).
             $org = Org::query()->whereKey($id)->lockForUpdate()->firstOrFail();
-            $user = User::query()
+
+            // The current membership is read inside the org lock, so it is
+            // stable against other *syncs* of this org: such a sync would have
+            // to take the same org row first. It is NOT stable against every
+            // writer of `users.org_id` — none of OrgInviteController::redeem(),
+            // UserController::store(), AuthController::register() and
+            // AuthController::resetPassword() (membership added) or
+            // OrgController::destroy() (membership removed) takes this org row
+            // lock. This read decides the *membership* — who is detached — not
+            // the lock set: a member added after it is not detached by this
+            // sync, and if it is submitted in `user_ids` as well it enters the
+            // lock set through the requested ids, but a requested member is
+            // never in the removed set either.
+            $currentMemberIds = User::query()
+                ->where('org_id', $id)
+                ->orderBy('id')
+                ->pluck('id')
+                ->map(fn ($memberId): string => (string) $memberId)
+                ->all();
+
+            // D-40: the actor, the current members and the incoming members are
+            // locked in ONE ascending query. A single primary-key range scan
+            // takes the rows in ascending id order, so every transaction locks
+            // the same rows in the same order. The actor is part of that set
+            // instead of being locked on its own: a separately locked actor
+            // breaks the order and lets two syncs over different orgs — whose
+            // actors are members of each other's org — wait for each other.
+            $lockIds = array_values(array_unique(array_merge(
+                $authenticatedUserId === null ? [] : [(string) $authenticatedUserId],
+                $currentMemberIds,
+                $newUserIds,
+            )));
+            sort($lockIds);
+
+            $lockedUsers = User::query()
                 ->with('roles')
+                ->whereIn('id', $lockIds)
+                ->orderBy('id')
                 ->lockForUpdate()
-                ->find($authenticatedUserId);
+                ->get()
+                ->keyBy(fn (User $member): string => (string) $member->id);
+
+            // The authorization decision is taken on the locked actor row: the
+            // roles used here come from the locked row, not from a stale read.
+            $user = $authenticatedUserId === null
+                ? null
+                : $lockedUsers->get((string) $authenticatedUserId);
 
             if (! $user || (! $svc->isAdmin($user) && ! ($svc->isOrgAdmin($user) && (string) $user->org_id === (string) $id))) {
                 return response()->json(['error' => 'Forbidden'], 403);
@@ -202,25 +250,16 @@ class OrgController extends Controller
                 $newUserIds = array_values(array_unique($newUserIds));
             }
 
-            $currentMembers = User::query()
-                ->where('org_id', $id)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-            $oldUserIds = $currentMembers
-                ->map(fn (User $member): string => (string) $member->id)
+            // The membership decision is taken on the locked rows, so a member
+            // whose row changed in the meantime is judged on its locked state
+            // and is never detached twice. The membership itself comes from the
+            // read above, so a member added after that read is not detached by
+            // this sync — it is in the lock set only if it was requested.
+            $oldUserIds = $lockedUsers
+                ->filter(fn (User $member): bool => (string) $member->org_id === (string) $id)
+                ->keys()
                 ->all();
             $removedUserIds = array_values(array_diff($oldUserIds, $newUserIds));
-            $lockedUserIds = array_values(array_unique(array_merge($oldUserIds, $newUserIds)));
-            sort($lockedUserIds);
-
-            $lockedUsers = User::query()
-                ->with('roles')
-                ->whereIn('id', $lockedUserIds)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get()
-                ->keyBy(fn (User $member): string => (string) $member->id);
 
             foreach ($newUserIds as $newUserId) {
                 if (! $lockedUsers->has($newUserId)) {
