@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Factory;
 use PHPOpenSourceSaver\JWTAuth\JWTAuth;
+use PHPOpenSourceSaver\JWTAuth\Payload;
+use PHPUnit\Framework\AssertionFailedError;
 use Tests\TestCase;
 
 /**
@@ -342,6 +344,26 @@ class RatingUniquenessTest extends TestCase
         ]);
     }
 
+    /**
+     * A registered user and a transient guest must end up with two separate
+     * rating rows.
+     *
+     * The guest token is issued FIRST on purpose — it is the claim set that
+     * could leak into the registered user's request.
+     *
+     * The jwt-auth `Factory` is a container singleton whose claims collection
+     * accumulates, and `Manager::decode()` merges the whole collection into
+     * the decoded payload. A guest token that was issued before a request
+     * therefore puts its `guest_id` and its `transient_galleries` grant into
+     * the payload of that request. This test would then pass for the wrong
+     * reason: a selection gallery is never handed out through a persistent
+     * client grant (D-39), so the registered user's rating would only be
+     * authorised by the *guest's* leaked transient grant.
+     *
+     * Both requests therefore run with an explicit claim set of their own:
+     * the registered client gets the invite grant it redeemed, the guest gets
+     * its own guest claim set, and no request inherits a foreign claim.
+     */
     public function test_registered_users_and_guests_have_isolated_rating_rows(): void
     {
         $gallery = Gallery::factory()->create([
@@ -351,37 +373,77 @@ class RatingUniquenessTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $user = User::factory()->create(['brand' => 'rp']);
         $user->galleries()->attach($gallery);
-        $userToken = app(JWTAuth::class)->fromUser($user);
         $invite = GalleryInvite::create([
             'gallery_id' => $gallery->id,
             'token' => 'rating-'.Str::uuid(),
             'name' => 'Rating Guest',
         ]);
         $guestId = (string) Str::uuid();
+
+        // Issued first: the guest claims are the ones that could leak.
         $guestToken = $this->guestToken($guestId, $gallery->id, $invite->id);
 
-        $this->withHeader('Authorization', 'Bearer '.$userToken)
-            ->postJson("/api/photos/{$photo->id}/rate", [
-                'rating' => 5,
-                'comment' => 'User rating',
-            ])
-            ->assertOk();
-        $this->withHeader('Authorization', 'Bearer '.$userToken)
-            ->postJson("/api/photos/{$photo->id}/rate", [
-                'rating' => 4,
-                'comment' => 'Updated user rating',
-            ])
-            ->assertOk();
+        // The registered client holds the invite grant explicitly. This is
+        // the claim set the invite redemption issues for a registered client,
+        // and the only legitimate way into a selection gallery.
+        $userToken = $this->userToken($user, [
+            'transient_galleries' => [$gallery->id],
+            'transient_invites' => [
+                (string) $invite->id => [
+                    'gallery_id' => (string) $gallery->id,
+                    'can_edit_metadata' => false,
+                ],
+            ],
+            'transient_invite_ids' => [(string) $invite->id],
+        ]);
 
-        Auth::forgetGuards();
-        Auth::guard('api')->setToken($guestToken);
-        $this->assertNotNull(Auth::guard('api')->user());
-        $this->withHeader('Authorization', 'Bearer '.$guestToken)
-            ->postJson("/api/photos/{$photo->id}/rate", [
-                'rating' => 1,
-                'comment' => 'Guest rating',
-            ])
-            ->assertOk();
+        $this->withCleanClaims($userToken, function () use ($userToken, $photo): void {
+            $this->withHeader('Authorization', 'Bearer '.$userToken)
+                ->postJson("/api/photos/{$photo->id}/rate", [
+                    'rating' => 5,
+                    'comment' => 'User rating',
+                ])
+                ->assertOk();
+
+            $this->withHeader('Authorization', 'Bearer '.$userToken)
+                ->postJson("/api/photos/{$photo->id}/rate", [
+                    'rating' => 4,
+                    'comment' => 'Updated user rating',
+                ])
+                ->assertOk();
+        });
+
+        // The registered user's request must have been authenticated as the
+        // registered user and with its own claim set — a guest claim that
+        // leaked into it would authorise the request and hide the leak.
+        $this->assertGuestClaimsAbsent(
+            Auth::guard('api')->payload(),
+            'The registered user request'
+        );
+        $this->assertSame(
+            (string) $user->id,
+            (string) Auth::guard('api')->user()->getKey(),
+            'The registered user request must be authenticated as the registered user.'
+        );
+
+        $this->withCleanClaims($guestToken, function () use ($guestToken, $photo): void {
+            $this->withHeader('Authorization', 'Bearer '.$guestToken)
+                ->postJson("/api/photos/{$photo->id}/rate", [
+                    'rating' => 1,
+                    'comment' => 'Guest rating',
+                ])
+                ->assertOk();
+        });
+
+        $this->assertSame(
+            $guestId,
+            Auth::guard('api')->user()->guest_id,
+            'The guest request must be authenticated as the guest.'
+        );
+        $this->assertNull(
+            Auth::guard('api')->user()->getKey(),
+            'The guest request must not be authenticated as a registered user.'
+        );
 
         $this->assertDatabaseCount('ratings', 2);
         $this->assertDatabaseHas('ratings', [
@@ -402,17 +464,128 @@ class RatingUniquenessTest extends TestCase
         ]);
     }
 
+    /**
+     * The isolation check of the test above must have teeth.
+     *
+     * This reproduces the leak on purpose: a guest token is issued first and
+     * the registered user token is built without a claim reset, so the guest
+     * claims end up in the registered user's token. The check must reject
+     * that token. Without this companion the green isolation test would only
+     * prove that the leak happens to be harmless today, and a silent
+     * regression of the claim reset would go unnoticed.
+     */
+    public function test_a_leaked_guest_claim_breaks_the_registered_user_token(): void
+    {
+        $gallery = Gallery::factory()->create([
+            'type' => 'selection',
+            'is_public' => true,
+        ]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $gallery->id,
+            'token' => 'rating-'.Str::uuid(),
+            'name' => 'Rating Guest',
+        ]);
+        $guestId = (string) Str::uuid();
+        $user = User::factory()->create(['brand' => 'rp']);
+
+        // The guest token leaves its claims in the shared claims collection.
+        $this->guestToken($guestId, $gallery->id, $invite->id);
+
+        // The registered user token is built on purpose WITHOUT the claim
+        // reset, so the collection leaks the guest claims into the token.
+        $leakedPayload = app(Factory::class)->customClaims([
+            'sub' => (string) $user->getKey(),
+            'transient_galleries' => [$gallery->id],
+        ])->make();
+        $leakedToken = app(JWTAuth::class)->encode($leakedPayload)->get();
+
+        $this->assertTrue(
+            $leakedPayload->hasKey('guest_id'),
+            'The leak must be reproducible: the guest claim has to reach the registered user token.'
+        );
+        $this->assertSame($guestId, $leakedPayload->get('guest_id'));
+
+        // The very assertion the isolation test makes has to reject this token.
+        $this->expectException(AssertionFailedError::class);
+        $this->assertGuestClaimsAbsent($leakedPayload, 'The registered user request');
+    }
+
+    /**
+     * A guest token that starts from a clean claim collection.
+     *
+     * `make(true)` empties the collection first: the guest token must not
+     * inherit anything that was issued before it.
+     */
     private function guestToken(string $guestId, string $galleryId, string $inviteId): string
     {
-        $factory = app(Factory::class);
-        $payload = $factory->customClaims([
+        $payload = app(Factory::class)->customClaims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Rating Guest',
             'guest_invite_id' => $inviteId,
             'transient_galleries' => [$galleryId],
-        ])->make();
+        ])->make(true);
 
         return app(JWTAuth::class)->encode($payload)->get();
+    }
+
+    /**
+     * A registered user token with an explicit claim set.
+     *
+     * `make(true)` empties the claims collection first, so the token carries
+     * exactly the claims of this request and nothing that was issued before.
+     *
+     * @param  array<string, mixed>  $claims
+     */
+    private function userToken(User $user, array $claims = []): string
+    {
+        $payload = app(Factory::class)->customClaims(array_merge([
+            'sub' => (string) $user->getKey(),
+        ], $claims))->make(true);
+
+        return app(JWTAuth::class)->encode($payload)->get();
+    }
+
+    /**
+     * Run a request with a clean jwt-auth claim state.
+     *
+     * `Manager::decode()` merges the whole claims collection of the shared
+     * `Factory` singleton into the decoded payload, and the guard keeps the
+     * last token of the process. Both have to be reset, otherwise the request
+     * runs with the claims of a foreign token.
+     */
+    private function withCleanClaims(string $token, callable $callback): void
+    {
+        $this->resetJwtClaimState();
+
+        Auth::forgetGuards();
+        Auth::guard('api')->setToken($token);
+
+        $callback();
+    }
+
+    /**
+     * Assert that a payload carries no guest identity.
+     *
+     * @param  Payload  $payload
+     */
+    private function assertGuestClaimsAbsent($payload, string $context): void
+    {
+        $guestClaims = [
+            'guest_id',
+            'guest_name',
+            'guest_invite_id',
+        ];
+
+        $leaked = array_values(array_filter(
+            $guestClaims,
+            fn (string $claim): bool => $payload->hasKey($claim)
+        ));
+
+        $this->assertSame(
+            [],
+            $leaked,
+            $context.' must not be authenticated with a guest identity, but carries: '.implode(', ', $leaked).'.'
+        );
     }
 }
