@@ -191,4 +191,4 @@ A direct gallery assignment to a user (`gallery_ids` on the user update) may onl
 
 ### D-44: A re-resolved actor keeps its validated transient claims
 
-When the media delivery and the photo download re-resolve a registered actor from the database, they carry the transient claims of the request onto the re-resolved actor. The guest branch already does this; the registered branch dropped them and denied a client who had redeemed an invite access to the media of their selection gallery.
+When the media delivery and the photo download re-resolve a registered actor from the database, they carry the transient claims of the request onto the re-resolved actor. The guest branch already does this; the registered branch dropped them and denied a client who had redeemed an invite access to the media of their selection gallery. The carried claims are the ones the request's token was validated with, and the authorization layer re-validates them against the live invite state; a token that carries gallery claims without invite provenance (issued before the provenance existed) is carried as it is, like every other controller that uses the request's actor directly.

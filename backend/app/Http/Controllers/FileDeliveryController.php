@@ -293,7 +293,17 @@ class FileDeliveryController extends Controller
             return $actor;
         }
 
-        return User::query()->find($registeredId);
+        $current = User::query()->find($registeredId);
+        if (! $current instanceof User) {
+            return null;
+        }
+
+        // D-44: the re-resolved actor must keep the transient claims of the
+        // request. Without them a registered client who redeemed an invite
+        // loses the grant and is refused the media of their own gallery.
+        ActorIdentity::carryTransientClaims($actor, $current);
+
+        return $current;
     }
 
     private function ensureWatermarkedFile(
