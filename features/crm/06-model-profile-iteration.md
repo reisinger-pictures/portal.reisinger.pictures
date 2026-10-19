@@ -176,8 +176,34 @@ Die Foto-Funktion ist **umgesetzt** und Teil des aktuellen Single-v1-Contracts.
 - **Anzahl:** maximal 5 Fotos pro Person, **server-autoritativ** (der 6.
   Upload wird mit 422 und klarem Feld-Key `persons.<i>.photos` abgelehnt);
   clientseitig wird das Hinzufügen nach 5 gesperrt.
-- **Typen/Größe:** `jpg/jpeg/png/webp`, jeweils maximal 10 MB. Der Altersnachweis
-  akzeptiert zusätzlich PDF; Fotos nicht.
+- **Typen/Größe:** `jpg/jpeg/png/webp`, jeweils maximal 10 MB
+  (`ModelFileStore::MAX_UPLOAD_BYTES = 10 * 1024 * 1024`;
+  `grep -n 'MAX_UPLOAD_BYTES =' backend/app/Services/ModelFileStore.php`). Der
+  Altersnachweis akzeptiert zusätzlich PDF; Fotos nicht.
+- **Zwei Byte-Grenzen, nicht eine:** das 10-MB-Gate prüft die **Quelldatei**
+  (`ModelFileStore::MAX_UPLOAD_BYTES`); die **gespeicherten** Bytes nach dem
+  GD-Re-Encode (EXIF-Strip, `imagejpeg(..., 90)`) prüft
+  `ModelFileStore::maxStoredUploadBytes()` gegen
+  `PhotoProcessingService::MAX_IMAGE_BYTES` (20 MiB = `20 * 1024 * 1024`;
+  `grep -n 'MAX_IMAGE_BYTES ='
+  backend/app/Services/PhotoProcessingService.php`). Der Re-Encode kann eine
+  hochkomprimierte Quelle um ein Mehrfaches aufblähen; ohne diese zweite Grenze
+  läge ein legaler Upload über dem Budget, das der Raster-Decode des
+  Kontaktbogens annimmt (`ModelContactSheetService::inspectRasterImage()` →
+  `PhotoProcessingService::isWithinImageBudget()`), und würde dort später
+  fail-closed ausgelassen.
+- **Bewusste Folge der zweiten Grenze:** sie ist **keine** reine Obergrenze für
+  die Quelle. Eine legale Upload-Datei **unter** 10 MB kann mit **422**
+  abgelehnt werden, wenn ihr Re-Encode die 20 MiB reißt. Der Servertext nennt
+  die EXIF-Bereinigung als Ursache
+  (`grep -n 'nach der EXIF-Bereinigung' backend/app/Services/ModelFileStore.php`)
+  und muss im Registrierungs- wie im Owner-Update-Formular sichtbar ankommen
+  (Registrierung: allgemeiner Fehlerbereich; Owner: Toast).
+- **Kein KI-Verbraucher:** der KI-Pfad ist **nicht** an diese Grenze gekoppelt.
+  `AIService::generateMetadata(Photo $photo)` liest die **Galerie**-Disk, keine
+  persistierten Modellfotos; `AIService::MAX_IMAGE_BYTES` ist ein eigenes
+  Literal. Die Übereinstimmung beider Zahlen ist heute zufällig und in
+  `ModelFileImageBudgetTest` als Koinzidenz gepinnt, nicht als Vertrag.
 - **Sichtbarkeit je Foto:** `public` oder `internal`. Default = **`internal`**
   (Privacy-first); `public` erfordert eine explizite Umschaltung und ist von
   einer Foto-/Veröffentlichungs-Einwilligung gedeckt (§2.9).

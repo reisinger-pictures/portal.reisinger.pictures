@@ -24,11 +24,25 @@ use RuntimeException;
  * Zusätzlich werden Bild-Metadaten (EXIF/GPS) per GD-Re-Encoding entfernt —
  * sofern GD verfügbar ist; ansonsten bleibt die Datei unverändert (aber
  * weiterhin verschlüsselt).
+ *
+ * Zwei getrennte Grenzen, bewusst nicht dieselbe Zahl:
+ *  - {@see self::MAX_UPLOAD_BYTES} begrenzt die **Quelldatei**, die ein Client
+ *    hochlädt (vor dem Decode geprüft).
+ *  - {@see self::maxStoredUploadBytes()} begrenzt die **gespeicherten Bytes**
+ *    nach dem Re-Encode. Das ist die eigentliche Invariante für ein
+ *    Modellfoto: der Re-Encode schreibt `imagejpeg(..., 90)` und kann eine
+ *    kleinere, hochkomprimierte Quelle um ein Mehrfaches aufblähen.
  */
 class ModelFileStore
 {
     public const DISK = 'local';
 
+    /**
+     * Byte-Gate für die **Quelldatei** eines Uploads.
+     *
+     * Diese Zahl begrenzt nicht, was gespeichert werden darf — siehe
+     * {@see self::maxStoredUploadBytes()} für die Grenze nach dem Re-Encode.
+     */
     private const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
     private const STRIPPABLE_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -74,6 +88,24 @@ class ModelFileStore
 
         [$sanitized, $mime] = $this->stripImageMetadata($contents, $mime);
 
+        // The source gate above bounds the upload, not what the re-encode
+        // produces: imagejpeg(..., 90) can inflate a highly compressed source
+        // by roughly 5x. Bound the bytes that are actually persisted too —
+        // otherwise a legal upload lands on disk above the budget the contact
+        // sheet decodes against and is silently omitted there. Rejecting here
+        // keeps "stored" and "embeddable in the contact sheet" the same set.
+        // (The AI path is not a consumer of persisted model photos: it reads
+        // the gallery disk via AIService::generateMetadata(Photo).)
+        //
+        // A PDF or a raster that was not re-encoded falls through unchanged, so
+        // it can never exceed the (smaller) source gate it already passed above.
+        $storedBytes = strlen($sanitized);
+        if ($storedBytes > $this->maxStoredUploadBytes()) {
+            throw ValidationException::withMessages([
+                'file' => 'Das Bild überschreitet nach der EXIF-Bereinigung die erlaubte Dateigröße. Bitte eine kleinere Datei hochladen.',
+            ]);
+        }
+
         $extension = $this->extensionFor($mime);
         $path = $this->buildPath($directory, $extension);
         $disk = Storage::disk(self::DISK);
@@ -87,7 +119,33 @@ class ModelFileStore
             $this->putEncrypted($path, $sanitized);
         }
 
-        return ['path' => $path, 'mime' => $mime, 'size' => strlen($sanitized)];
+        return ['path' => $path, 'mime' => $mime, 'size' => $storedBytes];
+    }
+
+    /**
+     * Obergrenze für die **gespeicherten** Bytes eines Uploads — die echte
+     * Invariante für ein abgelegtes Modellfoto, geprüft nach dem GD-Re-Encode.
+     *
+     * Sie ist absichtlich {@see PhotoProcessingService::MAX_IMAGE_BYTES}: genau
+     * dieses Budget nimmt der Kontaktbogen beim Decode an
+     * ({@see ModelContactSheetService::inspectRasterImage()} →
+     * {@see PhotoProcessingService::isWithinImageBudget()}). Eine eigene,
+     * größere Zahl hier würde Dateien speichern, die der Kontaktbogen danach
+     * fail-closed auslässt.
+     *
+     * `AIService::MAX_IMAGE_BYTES` ist ein **eigenes, bewusst ungekoppeltes**
+     * Literal: der KI-Pfad liest die Galerie-Disk, nicht persistierte
+     * Modellfotos, und ist kein Verbraucher dieser Grenze. Dass beide Zahlen
+     * heute denselben Wert tragen, ist Zufall, keine Zusage — gepinnt in
+     * `ModelFileImageBudgetTest`.
+     *
+     * `protected`, damit der Feature-Test das Gate mit einem kleinen Budget
+     * prüfen kann, statt 20 MiB im Test zu allokieren; die Produktion nutzt
+     * immer die Konstante.
+     */
+    protected function maxStoredUploadBytes(): int
+    {
+        return PhotoProcessingService::MAX_IMAGE_BYTES;
     }
 
     /**

@@ -257,6 +257,34 @@ describe('RegistrationForm person state', () => {
         expect(await screen.findByTestId('model-photos-error')).toHaveTextContent('Maximal 5 Fotos pro Person.');
     });
 
+    it('surfaces a file-level 422 (stored-byte gate) that maps to no rendered field', async () => {
+        const user = userEvent.setup();
+        // ModelFileStore::storeUpload() rejects with a bare `file` key. No
+        // field in this form renders `file`, so without the general-error path
+        // the user would only see "Bitte prüfe die markierten Felder." with no
+        // marked field and no server text.
+        const apiError = new Error('Unprocessable') as Error & { status: number; info: unknown };
+        apiError.status = 422;
+        apiError.info = {
+            errors: {
+                file: ['Das Bild überschreitet nach der EXIF-Bereinigung die erlaubte Dateigröße. Bitte eine kleinere Datei hochladen.'],
+            },
+        };
+        submit.mockRejectedValueOnce(apiError);
+
+        renderForm({ submit });
+
+        await user.type(screen.getByLabelText('Vorname'), 'Maria');
+        await user.type(screen.getByLabelText('E-Mail'), 'maria@example.com');
+        await user.click(screen.getByLabelText('DSGVO'));
+        await user.click(screen.getByLabelText('Alle Personen einverstanden'));
+        await user.click(screen.getByRole('button', { name: /registrierung absenden/i }));
+
+        expect(await screen.findByText(
+            'Das Bild überschreitet nach der EXIF-Bereinigung die erlaubte Dateigröße. Bitte eine kleinere Datei hochladen.',
+        )).toBeInTheDocument();
+    });
+
     it.each([409, 410, 404])('routes a fatal submit %i to the error page instead of an inline form error', async (status) => {
         const user = userEvent.setup();
         const onFatalError = vi.fn();
