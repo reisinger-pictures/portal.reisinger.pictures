@@ -1,4 +1,4 @@
-import { test, expect, type Response } from '@playwright/test';
+import { test, expect, type Page, type Request, type Response } from '@playwright/test';
 import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
@@ -19,6 +19,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isFtpStatusRead(response: Response): boolean {
     const url = new URL(response.url());
     return url.pathname === '/api/management/ftp/status' && response.request().method() === 'GET';
+}
+
+/**
+ * The import request the card must not start on its own.
+ *
+ * This is the network-side twin of the phase list below: the list records
+ * the mocked requests, this predicate watches the network for a request that
+ * would have to appear in a window in which no import is allowed.
+ */
+function isFtpProcessRequest(request: Request): boolean {
+    const url = new URL(request.url());
+    return url.pathname === '/api/management/ftp/process' && request.method() === 'POST';
+}
+
+/**
+ * The window in which an unwanted import would have to show up.
+ *
+ * `waitForRequest` only sees requests that START after the call, so the window
+ * has to open after the state it watches for has settled — otherwise a request
+ * that was already in flight would be invisible to it. The rejection on
+ * timeout is the proof that nothing happened; it is caught here and turned
+ * into `true`, because an unhandled rejection would fail the test for the
+ * wrong reason.
+ */
+async function noImportRequestWithin(page: Page, windowMs = 1000): Promise<boolean> {
+    const request = await page.waitForRequest(isFtpProcessRequest, { timeout: windowMs }).catch(() => null);
+    return request === null;
 }
 
 /**
@@ -156,22 +183,45 @@ test.describe('G1: FTP Inbox Feature', () => {
         await page.reload();
         await sidebar.navigateTo('Dashboard');
 
-        const ftpCard = page.locator('main').locator('.card').filter({ hasText: 'FTP Inbox' });
-        const select = ftpCard.locator('select');
-        await expect(select).toBeVisible();
+        // The card is addressed by what it renders, not by a CSS class: the
+        // heading names it, the queue counter belongs to it, and the target
+        // controls are the only combobox and the only "Setzen" button on the
+        // Dashboard. (The structure view with its own select lives on another
+        // route, so the combobox below is unambiguous.)
+        const main = page.getByRole('main');
+        await expect(main.getByRole('heading', { name: 'FTP Inbox' })).toBeVisible();
+        await expect(main.getByTestId('ftp-queue-count')).toBeVisible();
 
-        const optionValue = await select.locator('option').filter({ hasText: galleryName }).getAttribute('value');
-        await select.selectOption(optionValue!);
+        const targetSelect = main.getByRole('combobox');
+        await expect(targetSelect).toBeVisible();
 
-        const setzenBtn = ftpCard.getByRole('button', { name: 'Setzen' });
+        const galleryOption = targetSelect.getByRole('option', { name: new RegExp(galleryName) });
+        await expect(galleryOption).toHaveCount(1);
+        const optionValue = await galleryOption.getAttribute('value');
+        if (optionValue === null) throw new Error('The FTP target gallery option has no value.');
+        await targetSelect.selectOption(optionValue);
+
+        const setzenBtn = main.getByRole('button', { name: 'Setzen' });
         await expect(setzenBtn).toBeEnabled();
         await setzenBtn.click();
 
-        await expect(ftpCard.locator('text=' + galleryName).first()).toBeVisible({ timeout: 5000 });
+        // The target is set: the select is replaced by the target box, and the
+        // box offers the button that clears the assignment. The button carries
+        // its name in the `title` attribute, which is where its accessible name
+        // comes from — the icon inside it has no text.
+        const clearTargetBtn = main.getByRole('button', { name: 'Zuordnung aufheben' });
+        await expect(clearTargetBtn).toBeVisible({ timeout: 5000 });
+        await expect(main.getByRole('combobox')).toHaveCount(0);
 
-        await ftpCard.locator('button[title="Zuordnung aufheben"]').click();
+        // The gallery name is read from that box and not from the whole
+        // Dashboard: the personal feed below the card lists the same gallery
+        // as a card of its own, and an unscoped name would match both.
+        const targetBox = clearTargetBtn.locator('xpath=..');
+        await expect(targetBox.getByText(galleryName, { exact: true })).toBeVisible({ timeout: 5000 });
 
-        await expect(ftpCard.locator('select')).toBeVisible({ timeout: 5000 });
+        await clearTargetBtn.click();
+
+        await expect(main.getByRole('combobox')).toBeVisible({ timeout: 5000 });
     });
 
     test('FTP Inbox imports one bounded batch manually and catches up once on the next mount', { tag: ['@feature:admin:ftp'] }, async ({ page, request }) => {
@@ -233,10 +283,23 @@ test.describe('G1: FTP Inbox Feature', () => {
         await auth.login(testUser.email, testUser.password);
         const firstStatusResponse = await firstStatusRead;
         expect(firstStatusResponse.ok()).toBe(true);
+
+        const main = page.getByRole('main');
+        const queueCount = main.getByTestId('ftp-queue-count');
+
         // The first mount of the card: an empty inbox and no target gallery.
-        // The catch-up run must stay silent (D-36) — without a
-        // photographer-selected target gallery the destination is an undecided
-        // question, and an empty inbox has nothing to catch up on.
+        // The catch-up run must stay silent (D-36) — an empty inbox has
+        // nothing to catch up on. This mount cannot tell the two reasons
+        // apart; the mount under test below does, with a non-empty inbox and
+        // still no target gallery.
+        //
+        // The decision of this mount is made right after the read that the
+        // queue count comes from — the effect runs on that render — and the
+        // gallery is created afterwards, which takes several user
+        // interactions. The window below is what keeps the test open long
+        // enough for a request to actually start.
+        await expect(queueCount).toHaveText('0');
+        expect(await noImportRequestWithin(page)).toBe(true);
         expect(importPhases).toEqual([]);
 
         await sidebar.openNewGalleryModal();
@@ -247,6 +310,14 @@ test.describe('G1: FTP Inbox Feature', () => {
         if (!galleryId) throw new Error('The FTP target gallery was not created.');
         helper.trackGallery(galleryId);
 
+        // From here on the inbox is not empty: the queue belongs to the mock,
+        // so every following status read reports three files. The mount under
+        // test therefore sees a NON-EMPTY inbox while the target gallery is
+        // still unset — the combination D-36 forbids an automatic import for.
+        // (The card is not mounted on the route of the gallery list, so no
+        // status read happens between here and the mount below.)
+        simulatedQueueCount = 3;
+
         // A fresh document, so the gallery tree is rebuilt from the server and
         // the card mounts with a read of its own.
         await page.reload();
@@ -256,26 +327,26 @@ test.describe('G1: FTP Inbox Feature', () => {
         const mountStatusResponse = await mountStatusRead;
         expect(mountStatusResponse.ok()).toBe(true);
 
-        const main = page.getByRole('main');
         await expect(main.getByRole('heading', { name: 'FTP Inbox' })).toBeVisible();
-
-        const queueCount = main.getByTestId('ftp-queue-count');
-        await expect(queueCount).toHaveText('0');
+        await expect(queueCount).toHaveText('3');
 
         const targetSelect = main.getByRole('combobox');
         await expect(targetSelect).toBeVisible();
         await expect(targetSelect).toHaveValue('');
 
-        // The mount under test: an empty inbox and still no target gallery.
-        // The import list is the proof that the catch-up run stayed silent —
-        // and it is only a proof because the process route was registered
-        // before this mount. The navigation above is what makes the check
-        // meaningful for the *previous* mount as well: it is a user
-        // interaction, so it happens after the effect of that mount's status
-        // read had its chance to run.
+        // The mount under test: a non-empty inbox and still no target gallery.
+        //
+        // The order is what makes the check meaningful. This mount reads the
+        // status when the card mounts; the decision effect runs after that
+        // read has settled, which is the very render the queue count above
+        // comes from. The observation window then keeps the test open long
+        // enough for an effect that decides to import to actually start its
+        // request — the snapshot of the phase list alone would miss a request
+        // that is still in flight.
+        expect(await noImportRequestWithin(page)).toBe(true);
+        // The phase list is the second half of the proof: it also holds a
+        // request that was already on its way when the window opened.
         expect(importPhases).toEqual([]);
-
-        simulatedQueueCount = 3;
 
         const galleryOption = main.getByRole('option', { name: new RegExp(galleryName) });
         await expect(galleryOption).toHaveCount(1);
@@ -288,26 +359,26 @@ test.describe('G1: FTP Inbox Feature', () => {
         const targetStatusResponse = await targetStatusRead;
         expect(targetStatusResponse.ok()).toBe(true);
 
-        await expect(main.getByText(galleryName, { exact: true })).toBeVisible();
+        // The target is set — and the card says so without naming the
+        // gallery: the select is replaced by the target box, and the import
+        // button is enabled, which needs a target gallery AND a non-empty
+        // inbox. (The gallery name itself is asserted in the target-selection
+        // test above, scoped to the box that shows it.)
         await expect(main.getByRole('combobox')).toHaveCount(0);
+        const importButton = main.getByRole('button', { name: 'Bilder Importieren' });
+        await expect(importButton).toBeEnabled();
         await expect(queueCount).toHaveText('3');
 
-        // The queue holds three files and a target gallery is set — the state
-        // the catch-up run of D-36 acts on. On THIS mount it must not: the
-        // one-shot decision of this mount was already spent on the empty inbox
-        // above, and only a later mount may decide again.
-        //
-        // The check is anchored in the round trip above and proved by the
-        // manual import below: the catch-up run can only be triggered by a
-        // status this mount read, and the manual import is asserted to be the
-        // FIRST import request of the whole test. A run that slipped in
-        // therefore cannot pass unnoticed — it would show up as an extra entry
-        // in the import list and as a queue of 0 instead of 1.
+        // Setting the target on THIS mount must not start the catch-up run
+        // either: the one-shot decision of this mount was already spent on the
+        // read above, which had no target gallery. Only a later mount may
+        // decide again.
+        expect(await noImportRequestWithin(page)).toBe(true);
         expect(importPhases).toEqual([]);
 
         importPhase = 'manual';
         const importStatusRead = page.waitForResponse(isFtpStatusRead);
-        await main.getByRole('button', { name: 'Bilder Importieren' }).click();
+        await importButton.click();
         const importStatusResponse = await importStatusRead;
         expect(importStatusResponse.ok()).toBe(true);
 
@@ -321,7 +392,10 @@ test.describe('G1: FTP Inbox Feature', () => {
         importPhase = 'after-manual';
 
         await sidebar.navigateTo('Galerien & Ordner');
+        const catchUpStatusRead = page.waitForResponse(isFtpStatusRead);
         await sidebar.navigateTo('Dashboard');
+        const catchUpStatusResponse = await catchUpStatusRead;
+        expect(catchUpStatusResponse.ok()).toBe(true);
 
         // The next mount reads the status again and finds one file with a
         // target gallery set: the catch-up run of D-36 starts exactly one
