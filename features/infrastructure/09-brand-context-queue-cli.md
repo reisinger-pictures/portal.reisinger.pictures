@@ -25,8 +25,8 @@ Konstantenschlüssel `BrandRegistry::CONTAINER_KEY = 'brand.context'`, gesetzt v
 
 ### 2.1 Queue::before()-Reset (AppServiceProvider)
 
-`backend/app/Providers/AppServiceProvider.php:211-217` registriert einen `Queue::before()`-Callback
-(`:211` → `Queue::before(function () {`, `:212` → `BrandRegistry::reset();`):
+`backend/app/Providers/AppServiceProvider.php:230-236` registriert einen `Queue::before()`-Callback
+(`:230` → `Queue::before(function () {`, `:231` → `BrandRegistry::reset();`):
 
 ```php
 Queue::before(function () {
@@ -35,7 +35,7 @@ Queue::before(function () {
 });
 ```
 
-`:213-216` ergänzt `BrandRegistry::clearCache()`, damit eine im vorherigen Job
+`:232-235` ergänzt `BrandRegistry::clearCache()`, damit eine im vorherigen Job
 geschriebene Brand-Settings-Overlay-Änderung im nächsten Job frisch gelesen wird.
 
 Dieser Callback feuert **vor jedem** Queue-Job im Worker und setzt den Brand auf `null` zurück.
@@ -44,8 +44,8 @@ persistierten Daten rekonstruieren (via `BrandRegistry::resolveFromOrder()`).
 
 ### 2.2 BrandRegistry::reset()-Methode
 
-`backend/app/Support/BrandRegistry.php:282-285` — formale Reset-Methode
-(`:282` → `public static function reset(): void`):
+`backend/app/Support/BrandRegistry.php:288-291` — formale Reset-Methode
+(`:288` → `public static function reset(): void`):
 
 ```php
 public static function reset(): void

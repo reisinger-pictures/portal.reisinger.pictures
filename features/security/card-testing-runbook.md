@@ -46,8 +46,8 @@ signal that does not exist.
 
 | Property | Value | Evidence |
 |---|---|---|
-| Log channel (production) | `stderr` | `deployment/docker-compose.yml:146` → `- LOG_CHANNEL=stderr` |
-| Docker log driver | `json-file`, `max-size: "10m"`, **no `max-file`** | `deployment/docker-compose.yml:87-90` (backend service): `driver: "json-file"` / `options:` / `max-size: "10m"` |
+| Log channel (production) | `stderr` | `deployment/docker-compose.yml:151` → `- LOG_CHANNEL=stderr` |
+| Docker log driver | `json-file`, `max-size: "10m"`, **no `max-file`** | `deployment/docker-compose.yml:93-95` (backend service): `driver: "json-file"` / `options:` / `max-size: "10m"` |
 
 Consequence for the operator: `docker logs` gives you the recent tail only.
 Anything that must survive longer than the rotation needs to be scraped into a
@@ -62,8 +62,9 @@ docker logs portal_backend --since 24h 2>&1 | tail -n 50
 
 ### 1.2 The cache table is the primary handle for every limiter
 
-All checkout limiter and failure-velocity state is `RateLimiter` state in the
-configured cache store, which in production is the **database** store:
+All checkout limiter and failure-velocity state is cache state in the
+configured cache store, keyed and read exactly like `RateLimiter` state, which
+in production is the **database** store:
 
 - `backend/config/cache.php:20` → `'default' => env('CACHE_STORE', env('APP_ENV') === 'production' ? 'database' : 'file'),`
 - `backend/config/cache.php:47` → `'table' => env('DB_CACHE_TABLE', 'cache'),`
@@ -141,8 +142,8 @@ All SQL in this runbook filters on that list rather than on a bare string.
 `CheckoutRiskService` signals a denial by throwing a response exception and
 returns; it writes no log line:
 
-- `backend/app/Services/CheckoutRiskService.php:167-174` → `private function rejectQuota(string $key): never` … `'Retry-After' => (string) max(1, RateLimiter::availableIn($key)),` … `429`
-- `backend/app/Services/CheckoutRiskService.php:176-182` → `private function rejectMissingToken(): never` … `'turnstile_required' => true,` … `403`
+- `backend/app/Services/CheckoutRiskService.php:214-221` → `private function rejectQuota(string $key): never` … `'Retry-After' => (string) max(1, RateLimiter::availableIn($key)),` … `429`
+- `backend/app/Services/CheckoutRiskService.php:223-229` → `private function rejectMissingToken(): never` … `'turnstile_required' => true,` … `403`
 - `backend/app/Services/TurnstileService.php:188-194` → `private function rejectInvalidToken(): never` … `403`
 - `backend/app/Services/TurnstileService.php:196-201` → `private function rejectUnavailable(): never` … `503`
 - `backend/app/Console/Commands` is not involved; likewise
@@ -173,7 +174,7 @@ rather than pretending otherwise.
 
 **Where it is emitted.** There is no application log line for a *successful*
 PaymentIntent creation. The durable emit is the conditional write of the PI id
-onto the order — `backend/app/Services/CheckoutService.php:1321-1323`:
+onto the order — `backend/app/Services/CheckoutService.php:1477-1479`:
 
 ```php
 $updated = $query->update([
@@ -200,7 +201,7 @@ exact intent timestamps are ever required, the column has to be added — that i
 an application change, deliberately not made here.
 
 Failed creates *are* logged, at
-`backend/app/Services/CheckoutService.php:1332-1335`:
+`backend/app/Services/CheckoutService.php:1488-1491`:
 
 ```php
 Log::error('Stripe payment failed for order {order_id}', [
@@ -209,7 +210,7 @@ Log::error('Stripe payment failed for order {order_id}', [
 ]);
 ```
 
-followed by a `502` at `:1348` → `return response()->json(['error' => 'Die Zahlung konnte nicht verarbeitet werden. Bitte versuche es später erneut.'], 502);`
+followed by a `502` at `:1504` → `return response()->json(['error' => 'Die Zahlung konnte nicht verarbeitet werden. Bitte versuche es später erneut.'], 502);`
 
 **Code-enforced bound.** A single user may not exceed 5 classified immediate
 checkouts per hour and a single IP not 10 per hour / 30 per day
@@ -221,7 +222,7 @@ checkouts per hour and a single IP not 10 per hour / 30 per day
 'checkout_throttle_ip_per_day' => (int) env('CHECKOUT_THROTTLE_IP_PER_DAY', 30),
 ```
 
-enforced in `backend/app/Services/CheckoutRiskService.php:38-50`. Note the
+enforced in `backend/app/Services/CheckoutRiskService.php:40-67`. Note the
 comparison is strictly greater-than, so denial starts on attempt **6** per user
 per hour (`if ($userAttempts > $userLimit) {`), **11** per IP per hour and
 **31** per IP per day.
@@ -298,8 +299,8 @@ and resolved to `auto-{fingerprint}` when absent (`:53`). The replay lookup
 runs **before** the quota, which is why replays do not consume budget —
 `backend/app/Services/CheckoutService.php:330-333`:
 `if ($replayResponse !== null) { … return $replayResponse; }` and the docblock
-`backend/app/Services/CheckoutRiskService.php:21-23`:
-`* Exact idempotent replays return before this method and therefore do not consume the PI-attempt budget`.
+`backend/app/Services/CheckoutRiskService.php:36-38`:
+`* idempotent replays return before this method and therefore do not` … `* consume the PI-attempt budget; the API throttle remains independent.`
 
 **Where rejections are emitted** (a *successful* replay is silent — see §4):
 
@@ -368,7 +369,7 @@ part of the identity check (see S5).
 ### S3 — User/IP 429
 
 **Where it is emitted.** Exactly one enforcement point,
-`backend/app/Services/CheckoutRiskService.php:42-50`:
+`backend/app/Services/CheckoutRiskService.php:59-67`:
 
 ```php
 if ($userAttempts > $userLimit) {
@@ -377,32 +378,52 @@ if ($userAttempts > $userLimit) {
 if ($ipHourAttempts > $ipHourLimit) {
     $this->rejectQuota($ipHourKey);
 }
+if ($ipDayAttempts > $ipDayLimit) {
+    $this->rejectQuota($ipDayKey);
+}
 ```
 
-with the three buckets hit at `:34-36` (`RateLimiter::hit($userKey, 3600);` /
-`RateLimiter::hit($ipHourKey, 3600);` / `RateLimiter::hit($ipDayKey, 86400);`).
-Every classified attempt is counted against **all three** buckets before any of
-them is checked — the intent is stated at `CheckoutRiskService.php:31-33`:
-`// Count every classified attempt against every bucket before checking any one of them, so changing IP cannot bypass the user bucket and changing user cannot bypass the IP buckets.`
+with the three buckets counted at `:51-53`
+(`$userAttempts = $this->countAttempts($userKey, 3600);` /
+`$ipHourAttempts = $this->countAttempts($ipHourKey, 3600);` /
+`$ipDayAttempts = $this->countAttempts($ipDayKey, 86400);`). The count runs
+through the shared count-first primitive
+(`backend/app/Support/AtomicRateCounter.php:53-75` →
+`public function count(string $key, int $decaySeconds): int`), so a bucket is
+incremented **before** it is compared. Every classified attempt is counted
+against **all three** buckets before any of them is checked — the intent is
+stated at `CheckoutRiskService.php:46-48`:
+
+```php
+// Count every classified attempt against every bucket before checking
+// any one of them, so changing IP cannot bypass the user bucket and
+// changing user cannot bypass the IP buckets.
+```
+
+A counter that could not be determined is reported as the worst case, not as
+zero: the request is charged against the budget and the quota denial is raised
+(`CheckoutRiskService.php:164-169` →
+`return $count === AtomicRateCounter::UNCOUNTABLE ? self::UNKNOWN_COUNT : $count;`,
+with `UNKNOWN_COUNT = PHP_INT_MAX` at `:23`).
 
 The response is `429` with `Retry-After`
-(`CheckoutRiskService.php:169-173`, body
+(`CheckoutRiskService.php:214-221`, body
 `'error' => 'Checkout ist vorübergehend ausgelastet. Bitte versuche es später erneut.',`).
 
 **Two distinct 429 sources on the same endpoint — do not confuse them.**
 
 | Source | Body | Headers | Where |
 |---|---|---|---|
-| Checkout quota (this signal) | `{"error":"Checkout ist vorübergehend ausgelastet. …"}` | `Retry-After` only | `CheckoutRiskService.php:169-173` |
-| Route middleware `throttle:api` | Laravel standard rate-limit message | `X-RateLimit-Limit` / `X-RateLimit-Remaining` | `backend/routes/api.php:147` → `Route::middleware(['auth:api', 'throttle:api'])->group(function () {`, limit at `backend/app/Providers/AppServiceProvider.php:157` → `RateLimiter::for('api', fn (Request $request) => Limit::perMinute(config('app.throttle_api', 120))->by(`, header list at `vendor/…/ThrottleRequests.php:308-309` → `'X-RateLimit-Limit' => $maxAttempts,` |
+| Checkout quota (this signal) | `{"error":"Checkout ist vorübergehend ausgelastet. …"}` | `Retry-After` only | `CheckoutRiskService.php:214-221` |
+| Route middleware `throttle:api` | Laravel standard rate-limit message | `X-RateLimit-Limit` / `X-RateLimit-Remaining` | `backend/routes/api.php:177` → `Route::middleware(['auth:api', 'throttle:api'])->group(function () {`, limit at `backend/app/Providers/AppServiceProvider.php:157` → `RateLimiter::for('api', fn (Request $request) => Limit::perMinute(config('app.throttle_api', 120))->by(`, header list at `backend/vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php:308-309` → `'X-RateLimit-Limit' => $maxAttempts,` |
 
 The discriminator is the `X-RateLimit-Limit` header: present ⇒ middleware,
 absent ⇒ checkout quota. The checkout route is inside the auth+throttle group at
-`backend/routes/api.php:163` →
+`backend/routes/api.php:199` →
 `Route::post('/orders/checkout', [CheckoutController::class, 'checkout'])->name('api.orders.checkout');`
 
 **There is a third, currently unused, limiter.** A named `checkout` limiter *is*
-registered — `backend/app/Providers/AppServiceProvider.php:163` →
+registered — `backend/app/Providers/AppServiceProvider.php:173` →
 `RateLimiter::for('checkout', function (Request $request): array {` — but no
 route applies it. That is pinned by a test, not by convention:
 `backend/tests/Feature/CheckoutRateLimitTest.php:51` →
@@ -436,10 +457,14 @@ lower bound for "someone is near a 429", not an invented threshold. Read
 `attempts` against the three limits: `> 5` user, `> 10` ip-hour, `> 31` ip-day
 means that bucket is *already denying*.
 
-`:timer` rows are excluded because `RateLimiter::hit()` stores the counter and
-its window in two rows (`Illuminate\Cache\RateLimiter::hit` →
-`return $this->increment($key, $decaySeconds);`,
-`vendor/laravel/framework/src/Illuminate/Cache/RateLimiter.php:148-151`).
+`:timer` rows are excluded because the counter and its window live in two rows:
+the count-first primitive writes the `:timer` companion itself
+(`backend/app/Support/AtomicRateCounter.php:57-60` →
+`$this->cache->add($cleanKey.':timer', $this->availableAt($decaySeconds), $decaySeconds);`),
+and the framework limiter does the same through
+`Illuminate\Cache\RateLimiter::hit` →
+`return $this->increment($key, $decaySeconds);`
+(`backend/vendor/laravel/framework/src/Illuminate/Cache/RateLimiter.php:148-151`).
 
 **Reproducing command — the boundary, without touching production.** The
 enforced values and the exact first-denied attempt are pinned by tests:
@@ -451,7 +476,7 @@ cd backend && php artisan test --filter=CheckoutRateLimitTest
 `backend/tests/Feature/CheckoutRateLimitTest.php:100-114`
 (`test_checkout_user_hour_quota_returns_429_after_limit`) sets the user limit to
 2 and asserts the **third** call is denied — which is the `> $userLimit`
-comparison at `CheckoutRiskService.php:42` in test form.
+comparison at `CheckoutRiskService.php:59` in test form.
 
 **Operator action.**
 1. A single user at `> 5` attempts/hour with `paid` orders: growth or a retry
@@ -473,7 +498,7 @@ comparison at `CheckoutRiskService.php:42` in test form.
 **Where it is emitted.** Two places, and only after a fully verified failure.
 
 The durable per-order telemetry is written in the locked transaction,
-`backend/app/Http/Controllers/WebhookController.php:398-405`:
+`backend/app/Http/Controllers/WebhookController.php:391-398`:
 
 ```php
 $currentCount = max(0, (int) $lockedOrder->payment_failure_count);
@@ -489,15 +514,15 @@ $lockedOrder->update([
 (`255` is the saturation ceiling; `min(255, $currentCount + 1)`. The column is
 `unsignedSmallInteger` per `V036__card_testing_defenses.php:53-57`.)
 
-The log line for one accepted failure is `WebhookController.php:414`:
+The log line for one accepted failure is `WebhookController.php:407`:
 `Log::warning('Stripe Webhook: card payment attempt failed', $context);`
-and the context fields are built at `WebhookController.php:587-597`:
+and the context fields are built at `WebhookController.php:587-589`:
 `'error_type' => $errorType,` / `'error_code' => $errorCode,` / `'decline_code' => $declineCode,`
 — sanitized and capped at 64 chars by `sanitizeFailureCode()`
-(`WebhookController.php:600-615`, `substr($candidate, 0, 64)`).
+(`WebhookController.php:593-608`, `substr($candidate, 0, 64)`).
 
 The rate-limit half is fed **after** the transaction succeeds,
-`WebhookController.php:410-413`:
+`WebhookController.php:403-406`:
 
 ```php
 if ($updatedOrder !== null) {
@@ -506,13 +531,13 @@ if ($updatedOrder !== null) {
     $this->checkoutRisk->recordVerifiedPaymentFailure($updatedOrder);
 ```
 
-and hits two buckets in `backend/app/Services/CheckoutRiskService.php:70` and
-`:74` → `RateLimiter::hit(CheckoutKey::user($user, 'checkout-failure'), $window);` /
-`RateLimiter::hit(CheckoutKey::ip($customerIp, 'checkout-failure'), $window);`
+and counts two buckets in `backend/app/Services/CheckoutRiskService.php:87` and
+`:91` → `$this->countBestEffort(CheckoutKey::user($user, 'checkout-failure'), $window);` /
+`$this->countBestEffort(CheckoutKey::ip($customerIp, 'checkout-failure'), $window);`
 
 **Code-enforced bounds.** At **3** failures per user or **5** per IP inside the
 window, the *next* checkout requires Turnstile
-(`backend/app/Services/CheckoutRiskService.php:144-152`):
+(`backend/app/Services/CheckoutRiskService.php:191-192`):
 
 ```php
 $userThreshold = max(1, (int) config('app.turnstile_failure_user_threshold_per_hour', 3));
@@ -524,7 +549,7 @@ Config at `backend/config/app.php:152-154`:
 `'turnstile_failure_ip_threshold_per_hour' => max(1, (int) env('TURNSTILE_FAILURE_IP_THRESHOLD_PER_HOUR', 5)),` /
 `'turnstile_failure_window_seconds' => max(60, (int) env('TURNSTILE_FAILURE_WINDOW_SECONDS', 3600)),`
 
-The window is `max(60, …)` (`CheckoutRiskService.php:162-165`), so the
+The window is `max(60, …)` (`CheckoutRiskService.php:209-212`), so the
 **effective minimum window is 60 s** and the default is 3600 s. Read the
 `expiration` column before assuming an hour.
 
@@ -591,7 +616,7 @@ docker logs portal_backend --since 24h 2>&1 \
    (`card-testing-protection.md` § "Stripe-side configuration").
 2. One user with `payment_failure_count` far above the 255 saturation → a
    single card-testing loop against one account; the counter stops growing at
-   255 (`WebhookController.php:399`), so treat `= 255` as "saturated, count is a
+   255 (`WebhookController.php:392`), so treat `= 255` as "saturated, count is a
    lower bound", never as an exact total.
 3. One dominant `last_payment_decline_code` across many users → a shared card /
    BIN list. Hand the code distribution to Radar; do not add it to application
@@ -600,9 +625,10 @@ docker logs portal_backend --since 24h 2>&1 \
 4. Velocity counters rising while the log line count does not → the durable
    counter and the cache counter have diverged. Check the two warning lines
    below before assuming a bug.
-5. Two counters exist and both mean "the counter could not be written/read":
-   - `backend/app/Services/CheckoutRiskService.php:77` → `Log::warning('Checkout failure velocity counter unavailable', [`
-   - `backend/app/Services/CheckoutRiskService.php:154` → `Log::warning('Checkout failure velocity lookup unavailable', [`
+5. Two counters exist and both mean "the counter could not be written/read" —
+   an exception in the cache store, or a count that could not be determined:
+   - `backend/app/Services/CheckoutRiskService.php:94` → `Log::warning('Checkout failure velocity counter unavailable', [`
+   - `backend/app/Services/CheckoutRiskService.php:201` → `Log::warning('Checkout failure velocity lookup unavailable', [`
    Any occurrence means the velocity gate is **failing open** — the checkout
    proceeds without the challenge it should have required. That is an incident,
    not a warning: check the cache store first (§1.2).
@@ -622,7 +648,7 @@ The word appears only in documentation (`card-testing-protection.md` § 2.3 and
 § 6). So the runbook signal is **the log line plus its `reason`**, and it is
 transient — see §4.
 
-**Where it is emitted — success path.** `backend/app/Http/Controllers/WebhookController.php:253-262`:
+**Where it is emitted — success path.** `backend/app/Http/Controllers/WebhookController.php:246-256`:
 
 ```php
 $mismatch = $this->paymentReconciliation->identityMismatch($order, $paymentIntent, true);
@@ -639,10 +665,10 @@ if ($mismatch !== null) {
 ```
 
 A success event that passes identity but is refused for another reason lands in
-`WebhookController.php:316-320`:
+`WebhookController.php:309-312`:
 `Log::warning('Stripe Webhook: success transition was not applied', [ … 'reason' => $reason,`
 
-**Where it is emitted — failure path.** `WebhookController.php:348-355`:
+**Where it is emitted — failure path.** `WebhookController.php:341-346`:
 
 ```php
 $mismatch = $this->paymentReconciliation->identityMismatch($order, $paymentIntent, false);
@@ -653,7 +679,7 @@ if ($mismatch !== null) {
     ]);
 ```
 
-Note the third call, inside the locked transaction, at `WebhookController.php:383`:
+Note the third call, inside the locked transaction, at `WebhookController.php:376`:
 `|| $this->paymentReconciliation->identityMismatch($lockedOrder, $paymentIntent, false) !== null) {`
 — identity is re-checked under the row lock, so a race cannot slip a mismatch
 into the counters.
@@ -676,7 +702,7 @@ into the counters.
 | `currency_mismatch` | `:243` | `return 'currency_mismatch';` |
 | `underpaid` | `:249` | `return 'underpaid';` |
 | `customer_mismatch` | `:254` | `return 'customer_mismatch';` |
-| `order_not_pending` | `:73` / `:285` | `return ['status' => 'ignored', 'reason' => 'order_not_pending'];` |
+| `order_not_pending` | `:47` / `:73` | `return ['status' => 'ignored', 'reason' => 'order_not_pending'];` |
 
 Two reasons deserve operator attention beyond the rest:
 
@@ -693,12 +719,12 @@ Two reasons deserve operator attention beyond the rest:
   is being crossed — investigate the customer-mapping path, do not just count.
 
 **The two dedupe/claim TTLs that bound this signal.**
-`backend/app/Http/Controllers/WebhookController.php:34` →
+`backend/app/Http/Controllers/WebhookController.php:35` →
 `private const WEBHOOK_EVENT_CLAIM_TTL_SECONDS = 120;`
-`:36` → `private const WEBHOOK_EVENT_DEDUPE_TTL_DAYS = 7;`
-applied at `:512` → `Cache::put($key, 'processed', now()->addDays(self::WEBHOOK_EVENT_DEDUPE_TTL_DAYS));`
-and `:38` → `private const WEBHOOK_MISSING_ID_COALESCE_SECONDS = 300;`
-used at `:561-563` to collapse a repeated failure without an event id
+`:37` → `private const WEBHOOK_EVENT_DEDUPE_TTL_DAYS = 7;`
+applied at `:505` → `Cache::put($key, 'processed', now()->addDays(self::WEBHOOK_EVENT_DEDUPE_TTL_DAYS));`
+and `:39` → `private const WEBHOOK_MISSING_ID_COALESCE_SECONDS = 300;`
+used at `:554-556` to collapse a repeated failure without an event id
 (`$lastFailureAt->greaterThanOrEqualTo(now()->subSeconds(self::WEBHOOK_MISSING_ID_COALESCE_SECONDS)) && (string) $order->last_payment_decline_code === (string) $declineCode`).
 
 **Reproducing command — mismatch rate by reason, last 24 h:**
@@ -740,11 +766,11 @@ docker logs portal_backend --since 24h 2>&1 \
   | wc -l
 ```
 
-Emitted at `WebhookController.php:94` and `:103`. A non-zero count with a
+Emitted at `WebhookController.php:87` and `:96`. A non-zero count with a
 matching count of zero legitimate events is a forged-delivery attempt; a non-zero
 count **during** a legitimate deploy is a webhook-secret rotation overlap — the
 ingress accepts comma-separated secrets for that
-(`WebhookController.php:82` → `$secrets = array_values(array_filter(array_map('trim', explode(',', (string) $endpointSecret))));`).
+(`WebhookController.php:75` → `$secrets = array_values(array_filter(array_map('trim', explode(',', (string) $endpointSecret))));`).
 
 **Operator action.**
 1. **Any** `underpaid` → money incident. Confirm the order is not `paid`, confirm
@@ -761,19 +787,19 @@ ingress accepts comma-separated secrets for that
    state next.
 5. Signature rejections in volume → rotate the webhook secret and review
    `configured_secrets_count` in the log context
-   (`WebhookController.php:105`). Never paste a signing secret into a ticket.
+   (`WebhookController.php:98`). Never paste a signing secret into a ticket.
 
 **Event-claim health — this signal depends on it.** Four warning lines indicate
 the dedupe/claim machinery is degraded, and each one is a *replay* risk:
 
-- `WebhookController.php:434` → `Log::warning('Stripe Webhook: event claim failed', [`
-- `WebhookController.php:457` → `Log::warning('Stripe Webhook: event processing failed', [`
-- `WebhookController.php:469` → `Log::warning('Stripe Webhook: retryable response claim release failed', [`
-- `WebhookController.php:474` → `Log::warning('Stripe Webhook: retryable response left event claim open', [`
-- `WebhookController.php:486` → `Log::warning('Stripe Webhook: event completion cache failed', [`
+- `WebhookController.php:427` → `Log::warning('Stripe Webhook: event claim failed', [`
+- `WebhookController.php:450` → `Log::warning('Stripe Webhook: event processing failed', [`
+- `WebhookController.php:462` → `Log::warning('Stripe Webhook: retryable response claim release failed', [`
+- `WebhookController.php:467` → `Log::warning('Stripe Webhook: retryable response left event claim open', [`
+- `WebhookController.php:479` → `Log::warning('Stripe Webhook: event completion cache failed', [`
 
 The design caveat is stated in the controller docblock
-(`WebhookController.php:24-30`): `The app-cache event claim is a defense-in-depth
+(`WebhookController.php:25-28`): `The app-cache event claim is a defense-in-depth
 short-circuit that requires a shared cache store … a per-container cache degrades
 it to at-least-once processing, which the durable guards absorb.`
 Verify the store is shared before trusting any replay conclusion:
@@ -792,24 +818,24 @@ replay telemetry is understated.
 `backend/routes/console.php:33`:
 `Schedule::command('stripe:cancel-stale-payment-intents')->hourly()->withoutOverlapping()->onOneServer();`
 and its signature is
-`backend/app/Console/Commands/CancelStalePaymentIntents.php:16`:
+`backend/app/Console/Commands/CancelStalePaymentIntents.php:19`:
 `protected $signature = 'stripe:cancel-stale-payment-intents {--hours= : Override the configured stale age in hours} {--limit=500 : Maximum number of pending orders to inspect}';`
 
 **Code-enforced bounds.**
-- Stale age: `CancelStalePaymentIntents.php:32-34` →
+- Stale age: `CancelStalePaymentIntents.php:36-38` →
   `$hours = $hoursOption === null ? (int) config('app.stripe.stale_payment_intent_hours', 2) : (int) $hoursOption;`
   config at `backend/config/app.php:137` (quoted in S5); a value `< 1` is
-  rejected at `:36` → `if ($hours < 1) {`
-- Selection window: `:57` → `$cutoff = now()->subHours($hours);` with
-  `:60-66` selecting `status = 'pending_payment' AND created_at <= $cutoff`, ordered and
+  rejected at `:40` → `if ($hours < 1) {`
+- Selection window: `:61` → `$cutoff = now()->subHours($hours);` with
+  `:64-70` selecting `status = 'pending_payment' AND created_at <= $cutoff`, ordered and
   capped by `--limit=500`.
-- Only these remote states are cancelled, `CancelStalePaymentIntents.php:20-25`:
+- Only these remote states are cancelled, `CancelStalePaymentIntents.php:23-28`:
   `private const CANCELABLE_STATUSES = [ PaymentIntent::STATUS_REQUIRES_PAYMENT_METHOD, PaymentIntent::STATUS_REQUIRES_CONFIRMATION, PaymentIntent::STATUS_REQUIRES_ACTION, PaymentIntent::STATUS_REQUIRES_CAPTURE, ];`
-  A remote success is reconciled **before** the age gate (`:142-143`).
-- The one summary line, `CancelStalePaymentIntents.php:72-79`, whose format
-  string is at `:73`:
+  A remote success is reconciled **before** the age gate (`:147-148`).
+- The one summary line, `CancelStalePaymentIntents.php:76-83`, whose format
+  string is at `:77`:
   `'Stale PaymentIntent sweep complete: %d cancelled, %d reconciled, %d skipped, %d missing PI, %d failed.',`
-  The command exits non-zero when `failed > 0` (`:81` →
+  The command exits non-zero when `failed > 0` (`:85` →
   `return $counters['failed'] > 0 ? self::FAILURE : self::SUCCESS;`) — so a
   failing sweep is visible to the scheduler, not only in the log.
 
@@ -817,17 +843,17 @@ and its signature is
 
 | Level | Line | Message |
 |---|---|---|
-| info | `:99` | `stripe.stale_payment_intent.missing_payment_intent` |
-| info | `:115` | `stripe.stale_payment_intent.identity_changed_before_remote_work` |
-| warning | `:127` | `stripe.stale_payment_intent.remote_identity_mismatch` |
-| info | `:146` | `stripe.stale_payment_intent.succeeded_reconciled` |
-| warning | `:153` | `stripe.stale_payment_intent.succeeded_reconciliation_retryable` |
-| warning | `:161` | `stripe.stale_payment_intent.succeeded_identity_mismatch` |
-| info | `:176` | `stripe.stale_payment_intent.fresh_or_unknown_age` |
-| warning | `:200` | `stripe.stale_payment_intent.unexpected_cancel_status` |
-| warning | `:213` | `stripe.stale_payment_intent.failed` |
-| info | `:397` | `stripe.stale_payment_intent.identity_changed_before_local_update` |
-| info | `:407` | `stripe.stale_payment_intent.cancelled` |
+| info | `:104` | `stripe.stale_payment_intent.missing_payment_intent` |
+| info | `:120` | `stripe.stale_payment_intent.identity_changed_before_remote_work` |
+| warning | `:132` | `stripe.stale_payment_intent.remote_identity_mismatch` |
+| info | `:151` | `stripe.stale_payment_intent.succeeded_reconciled` |
+| warning | `:158` | `stripe.stale_payment_intent.succeeded_reconciliation_retryable` |
+| warning | `:166` | `stripe.stale_payment_intent.succeeded_identity_mismatch` |
+| info | `:181` | `stripe.stale_payment_intent.fresh_or_unknown_age` |
+| warning | `:205` | `stripe.stale_payment_intent.unexpected_cancel_status` |
+| warning | `:218` | `stripe.stale_payment_intent.failed` |
+| info | `:414` | `stripe.stale_payment_intent.identity_changed_before_local_update` |
+| info | `:424` | `stripe.stale_payment_intent.cancelled` |
 
 **Reproducing command — the summary line for every scheduled run, last 24 h:**
 
@@ -968,15 +994,15 @@ returns; the only observable traces are the counter keys and the HTTP response.
   `backend/app/Services/TurnstileService.php:31-40` (`isEnabled()` returns
   `false`), which makes `CheckoutRiskService::assertImmediateStripeAllowed`
   return before touching any counter
-  (`backend/app/Services/CheckoutRiskService.php:96-98`:
-  `if (! $this->turnstile->isEnabled()) { return; }`). **If Turnstile is
+  (`backend/app/Services/CheckoutRiskService.php:113-115`:
+  `if (! $this->turnstile->isEnabled()) {` … `return;` … `}`). **If Turnstile is
   unconfigured, there is no per-attempt signal at all** — verify it is enabled
   before interpreting S8:
   ```bash
   docker exec portal_backend php artisan tinker --execute="var_export(\App\Services\TurnstileService::class); echo (new \App\Services\TurnstileService())->isEnabled() ? 'enabled' : 'disabled', PHP_EOL;"
   ```
 - The challenge becomes mandatory at user attempt 3 / IP attempt 5
-  (`CheckoutRiskService.php:109-118`), or immediately on the failure-velocity
+  (`CheckoutRiskService.php:131-135`), or immediately on the failure-velocity
   condition of S4:
   ```php
   if ($userAttempts < $userThreshold
@@ -985,6 +1011,13 @@ returns; the only observable traces are the counter keys and the HTTP response.
       return;
   }
   ```
+- The attempt counters are counted **before** they are compared
+  (`CheckoutRiskService.php:117-124` →
+  `$userAttempts = $this->countAttempts(`), and a counter that could not be
+  determined is reported as the worst case
+  (`CheckoutRiskService.php:164-169` →
+  `return $count === AtomicRateCounter::UNCOUNTABLE ? self::UNKNOWN_COUNT : $count;`).
+  The challenge is therefore **required** in that case, not skipped.
 - Token bounds: `backend/app/Services/TurnstileService.php:16` →
   `private const MAX_TOKEN_LENGTH = 2048;` and `:18` → `private const CDATA_MAX_LENGTH = 32;`,
   bound server-side to `action = checkout` (`:14` → `private const ACTION = 'checkout';`)
@@ -1110,14 +1143,14 @@ that difference is stated, not hidden.
    moved and did not) is what the S5 residue query surfaces. Anything claiming a
    quarantine *list* would be describing something the code does not do.
 5. **Webhook replays across containers.** The claim store must be shared
-   (`WebhookController.php:24-30` docblock). Whether it *is* shared is one
+   (`WebhookController.php:25-28` docblock). Whether it *is* shared is one
    `tinker` command (§S5) — but a **per-container** store makes duplicate
    deliveries invisible to the cache while the durable guards absorb them, so
    the replay count under that configuration is not a real count. There is no
    instrumentation that distinguishes "no replay happened" from "replay happened
    and was absorbed by the row lock".
 6. **Historic reconstruction of any log signal.** `max-size: "10m"` with no
-   `max-file` (`deployment/docker-compose.yml:87-90`) means rotation is
+   `max-file` (`deployment/docker-compose.yml:93-95`) means rotation is
    size-based and single-generation. Once a line has rotated out it is gone;
    S1, S4, S5, S6 and S8 have no durable substitute. This is the strongest
    argument for shipping log output to a durable sink before relying on any
@@ -1149,15 +1182,15 @@ Non-negotiable when following this runbook:
   survives only if it is not re-introduced downstream.
 - **Never** export `orders.ip_address` in bulk. It is the evidence snapshot
   (`card-testing-protection.md` § 10) and the trust anchor for the failure-velocity
-  IP bucket (`CheckoutRiskService.php:72-74` → `$customerIp = trim((string) ($order->ip_address ?? ''));`).
+  IP bucket (`CheckoutRiskService.php:89` → `$customerIp = trim((string) ($order->ip_address ?? ''));`).
   Run the aggregate queries in place; take single IPs into an investigation only.
 - **Prefer the cache digests over raw identifiers** when a query is only asking
   "which namespace is hot" — the digests are enough for that and reveal nothing.
 - The failure telemetry the app *does* keep is deliberately coarse and bounded —
-  `payment_failure_count` saturating at 255 (`WebhookController.php:399`) and
+  `payment_failure_count` saturating at 255 (`WebhookController.php:392`) and
   `last_payment_decline_code` capped at 64 characters
-  (`WebhookController.php:610` → `return substr($candidate, 0, 64);`), with no
-  raw Stripe error bodies (`sanitizeFailureCode`, `WebhookController.php:600-615`).
+  (`WebhookController.php:603` → `return substr($candidate, 0, 64);`), with no
+  raw Stripe error bodies (`sanitizeFailureCode`, `WebhookController.php:593-608`).
   Do not add columns that widen this.
 
 ---
