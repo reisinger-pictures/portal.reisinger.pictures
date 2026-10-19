@@ -119,17 +119,21 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   läuft aus demselben Grund nicht in CI. **manuell prüfen:** auf einem Host mit Docker
   ausführen; mit dem alten Lock-Stand (`git show <vor-D-40>:backend/app/Http/Controllers/
   OrgController.php`) muss das Skript ein **nicht-null** Deadlock-Delta melden, mit dem
-  neuen Stand **null**.
-- [ ] **`OrgController::destroy()` sperrt in der umgekehrten Reihenfolge (pre-existing).**
-  `destroy()` (`:146-159`) aktualisiert zuerst die Mitgliederzeilen und löscht danach die
-  Org-Zeile — also **users → orgs**, während `syncUsers()` **orgs → users** sperrt. Ein Sync
-  über Org X und ein `destroy()` über Org X können deshalb weiterhin einen Zyklus bilden
-  (der Sync hält die Org-Zeile und wartet auf ein Mitglied, das `destroy` hält und auf die
-  Org-Zeile wartet). **Vorbestand** — HEAD sperrt die Org-Zeile in `syncUsers` ebenfalls
-  zuerst —, D-40 führt ihn also nicht ein, aber die D-40-Begründung („die Org-Sperre kann
-  keinen Zyklus mit einer User-Sperre bilden") gilt nur für sync-gegen-sync. **Test:**
-  dieselbe Zwei-Verbindungs-Messung wie das D-40-Probe-Skript, mit `destroy()` statt des
-  zweiten Syncs; oder `destroy()` sperrt die Org-Zeile zuerst.
+  neuen Stand **null**. **Zweitmessung offen:** dieselbe Messung für `destroy()` statt des
+  zweiten Syncs — die Org-Zeile wird dort inzwischen ebenfalls zuerst gesperrt
+  (`OrgDestroyLockOrderTest` pinnt die Reihenfolge deterministisch), die Zwei-Verbindungs-
+  Evidenz fehlt aber.
+- [ ] **`destroy()` sperrt seine Mitgliederzeilen einzeln und ohne `ORDER BY` (Rest).**
+  Nach der Korrektur der Org-Sperrreihenfolge (`destroy()` sperrt die Org-Zeile jetzt zuerst,
+  wie `syncUsers()`) bleibt eine Lücke auf **User-Zeilen**-Ebene: `destroy()` sperrt seine
+  Mitglieder einzeln in der Reihenfolge, in der der Plan sie zurückgibt
+  (`where org_id = ?` **ohne** `ORDER BY`), während `syncUsers()` die ganze Menge in **einer**
+  aufsteigenden Anweisung sperrt. Ein `destroy()` über Org A und ein `syncUsers()` über Org B,
+  dessen Menge **zwei** Mitglieder von A enthält, können deshalb noch auf User-Zeilen-Ebene
+  in einen Zyklus geraten. **Vorbestand**, von D-40 und der destroy-Korrektur nicht
+  eingeführt. **Test:** `order by id` in der Mitgliederabfrage von `destroy()` — dann stimmen
+  die Reihenfolgen beider Pfade überein; mit einem Test, der die Sperrreihenfolge des
+  destroys pinnt (Muster `OrgDestroyLockOrderTest`).
 - [ ] **Mailpit lokal unerreichbar (Umgebung).** Der Container `accriditation_mailpit` mappt
   `127.0.0.1:1025->1025/tcp`, nimmt aber keine Verbindung an (`socket.connect` → refused). Im
   vollen Backend-Lauf scheitern dadurch **63** Mail-Tests mit `TransportException`; gegen ein
@@ -164,9 +168,9 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
 > **Struktur-Hinweis, fortgeschrieben (2026-10-19):** **36 offene `[ ]`** und **45 wartende
-> `[~]`** über 1834 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> `[~]`** über 1838 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
 > (36), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1834). Aufteilung der 36: **22× `manuell prüfen:`** und **14×
+> `wc -l < AGENTS.todo.md` (1838). Aufteilung der 36: **22× `manuell prüfen:`** und **14×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 14 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
