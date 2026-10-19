@@ -189,14 +189,6 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   **nicht-leerem, abweichendem** `mime_type` ab — gepinnt sind nur Null-MIME, Dimension,
   Byte-Cap und Undekodierbarkeit. **Test:** gespeichertes JPEG mit in der DB hinterlegtem
   `image/png` ⇒ Foto wird ausgelassen, Decoder wird nicht aufgerufen.
-- [ ] **Zwei FTP-Inbox-Tests mocken ins Leere (Test-Qualität).**
-  `frontend/src/ui/management/__tests__/ManagementFtpInbox.connectionDialog.test.tsx` und
-  `.guideLayout.test.tsx` mocken `'../../logic/useGalleries'`; dieser Pfad löst auf
-  `src/ui/logic/useGalleries` auf, das **nicht existiert** — der Mock greift nicht, und in
-  beiden Dateien läuft der **echte** Hook (zieht u. a. `/api/auth/me`). Die Tests sind grün,
-  messen aber etwas anderes als sie behaupten. **Test:** den Mock-Pfad auf
-  `'../../../logic/useGalleries'` korrigieren und prüfen, dass die Dateien danach noch grün
-  sind (rot wäre der Beweis, dass der Mock vorher wirkungslos war).
 - [ ] **Tote Limiter-Registrierung (pre-existing).** `RateLimiter::for('checkout', …)` steht in
   `AppServiceProvider`, wird aber nirgends referenziert — kein Routen-Throttle, kein
   Service-Aufruf; die Checkout-Quote läuft ausschließlich über `RateLimiter::hit()` in
@@ -207,14 +199,6 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   vollen Backend-Lauf scheitern dadurch **63** Mail-Tests mit `TransportException`; gegen ein
   temporäres Mailpit auf anderen Ports läuft die Suite grün (3051 passed). **manuell prüfen:**
   Container neu starten bzw. Port prüfen, danach den vollen Lauf ohne Port-Override wiederholen.
-- [ ] **Quarantäne in der UI sichtbar machen (D-37 nennt „SFTP und Anzeige").**
-  `status()` liefert `quarantine_count` bereits additiv, aber `frontend/src/logic/useFtp.ts`
-  deklariert den Key nicht und die Karte zeigt ihn nicht. **Test:** Vitest, der die Zahl aus dem
-  Status in die Karte bringt, plus der Hinweis, wo die Dateien liegen (`{inbox}/_quarantine`).
-- [ ] **Playwright-E2E für Import und Nachlauf.** `frontend/tests/e2e/admin/ftp/ftp-inbox.spec.ts`
-  deckt nur Sichtbarkeit und Zielgalerie ab; Import-Button, Restmenge und der Nachlauf beim
-  Seitenaufruf sind ungetestet. **Test:** ein `@feature:ftp`-Spec, der einen Posteingang mit
-  Dateien öffnet, den Import auslöst und die Restmenge prüft.
 
 ---
 - [ ] **Dependabot: 1 offener Alert am Default-Branch** (war 10) — gemessen am 2026-10-18 mit `gh api repos/reisinger-pictures/portal.reisinger.pictures/dependabot/alerts?state=open&per_page=100 -q '.[] | [.security_advisory.severity, .dependency.package.name] | @tsv'` → **1 high (`braces`), 0 critical**. Patch-Stand je Paket (dieselbe Abfrage, `-q '.[] | [.security_advisory.severity, .dependency.package.name, .security_vulnerability.vulnerable_version_range, (.security_vulnerability.first_patched_version.identifier // "KEINE")] | @tsv'`): `undici` (6 Alerts — 1 high + 2 medium + 3 low; verwundbar `< 7.29.1`, installiert `7.29.0`), `source-map-js` (high, `< 1.2.2`, installiert `1.2.1`), `brace-expansion` (medium, `< 5.0.12`), `postcss-selector-parser` (medium, `< 7.1.6`), `braces` (high, `<= 3.0.3`, **`gepatcht-ab=KEINE`**). Dependency-CVEs, **nicht** Endpunkt-Autorisierung → eigener Durchgang (`node-deps`), **ausgeführt** (Ergebnis in den beiden Unterpunkten).
