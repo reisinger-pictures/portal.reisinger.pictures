@@ -140,6 +140,14 @@ class OrgController extends Controller
         }
 
         DB::transaction(function () use ($org) {
+            // D-40: the org row is locked first — the same row, in the same
+            // order syncUsers() takes it. The table order is therefore
+            // orgs -> users in this path too, so a destroy and a sync of the
+            // same org cannot hold the org row and a member row in opposite
+            // orders. The locked read is the lock itself: the write set still
+            // comes from the org this request authorized.
+            Org::query()->whereKey($org->getKey())->lockForUpdate()->first();
+
             $userIds = $org->users()->pluck('users.id');
 
             $users = User::whereIn('id', $userIds)->get();
@@ -181,22 +189,21 @@ class OrgController extends Controller
             // D-40: every sync for this org takes the destination lock first.
             // The org row is locked before any user row, so the table order is
             // orgs -> users for every sync, and between two syncs the org lock
-            // cannot close a cycle with a user lock. The one exception is
-            // destroy(): it updates the member rows first and takes the org
-            // row's lock only at the delete, i.e. the inverse order, so a
-            // destroy of the same org can still form a cycle with a sync of
-            // that org (open item, see AGENTS.todo.md).
+            // cannot close a cycle with a user lock. destroy() takes the same
+            // org row lock in the same order, so a destroy and a sync of one
+            // org cannot hold the org row and a member row in opposite orders
+            // either.
             $org = Org::query()->whereKey($id)->lockForUpdate()->firstOrFail();
 
             // The current membership is read inside the org lock, so it is
-            // stable against other *syncs* of this org: such a sync would have
-            // to take the same org row first. It is NOT stable against every
-            // writer of `users.org_id` — none of OrgInviteController::redeem(),
+            // stable against other *syncs* of this org and against the
+            // *destroy* of this org: such a writer would have to take the same
+            // org row first. It is NOT stable against every writer of
+            // `users.org_id` — none of OrgInviteController::redeem(),
             // UserController::store(), AuthController::register() and
-            // AuthController::resetPassword() (membership added) or
-            // OrgController::destroy() (membership removed) takes this org row
-            // lock. This read decides the *membership* — who is detached — not
-            // the lock set: a member added after it is not detached by this
+            // AuthController::resetPassword() (membership added) takes this org
+            // row lock. This read decides the *membership* — who is detached —
+            // not the lock set: a member added after it is not detached by this
             // sync, and if it is submitted in `user_ids` as well it enters the
             // lock set through the requested ids, but a requested member is
             // never in the removed set either.
