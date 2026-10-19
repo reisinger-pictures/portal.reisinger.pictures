@@ -52,6 +52,7 @@ const GALLERY: FtpTargetGallery = {
 const baseStatus: FtpStatus = {
     ftp_folder: 'upload',
     file_count: 3,
+    quarantine_count: 0,
     current_target_gallery: GALLERY,
     ftp_account_status: 'active',
     ftp_provisioned_at: '2026-01-01T00:00:00Z',

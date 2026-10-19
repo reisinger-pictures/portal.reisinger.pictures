@@ -22,6 +22,7 @@ import {useFtp, type FtpStatus, type ResetCredentialsResponse} from '../useFtp';
 const BASE_STATUS: FtpStatus = {
     ftp_folder: '/florian',
     file_count: 0,
+    quarantine_count: 0,
     current_target_gallery: null,
     ftp_account_status: 'pending',
     ftp_provisioned_at: null,

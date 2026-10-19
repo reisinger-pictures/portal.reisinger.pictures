@@ -30,6 +30,7 @@ export type FtpAccountStatus = 'pending' | 'active' | 'revoked' | 'error';
 export interface FtpStatus {
     ftp_folder: string;
     file_count: number;
+    quarantine_count: number;
     current_target_gallery: FtpTargetGallery | null;
     /**
      * `null` is not part of the contract — the column is NOT NULL with a default —

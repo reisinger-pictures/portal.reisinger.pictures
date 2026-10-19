@@ -20,6 +20,7 @@ vi.mock('../../components/UIContext', () => ({
 const status: FtpStatus = {
     ftp_folder: 'upload',
     file_count: 2,
+    quarantine_count: 0,
     current_target_gallery: null,
     ftp_account_status: 'active',
     ftp_provisioned_at: '2026-01-01T00:00:00Z',
