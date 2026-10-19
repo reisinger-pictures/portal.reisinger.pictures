@@ -191,7 +191,7 @@ Ankerregel wie oben: Stand `82e8d17`.)
    `CalculatorSettingsCard.tsx:47` schickt `calc_base_price` unverändert
    (Euro); dieselbe Datei schickt in `:52` `srp_base_price` als
    `Math.round(x * 100)` (Cent). Beides geht an denselben Endpunkt
-   (`backend/routes/api.php:213`), beide Felder stehen in derselben Antwort
+   (`backend/routes/api.php:250`), beide Felder stehen in derselben Antwort
    (`:71`), und **nichts im Repository konnte dem widersprechen** — weder ein
    Schema, noch ein Vertrag, noch ein Test. Der Divisor an Zeile 52 *war* die
    Definition der Einheit, und eine Definition, die nur an einer Stelle im Code
