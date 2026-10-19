@@ -74,22 +74,34 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 - [ ] **`getOrgGroupScope` ist ungecacht und läuft mehrfach pro Request (Kosten).**
   Gemessen in der Welle-A-Prüfung: zweimal pro `/api/auth/me` (breit plus schmale Auflösung)
   und nochmals auf `GET /api/management/orgs/{id}`. Kein Korrektheitsproblem, aber `/me` liegt
-  auf jedem SPA-Load. **Test:** Query-Zahl für `/me` und den Org-Detail-Endpunkt pinnen, bevor
-  optimiert wird.
+  auf jedem SPA-Load. **Stand 2026-10-19:** die Basislinie ist gepinnt
+  (`OrgScopeQueryBaselineTest`): `/api/auth/me` = **30** Statements mit **3** Scope-Reads
+  (der dritte kommt aus `getOrgAssignableGalleryGroupIds()`), `GET /api/management/orgs/{id}` =
+  **29** Statements mit **2** Scope-Reads. Der Test pinnt die **gemessene Basislinie, kein
+  Ziel** — er wird bei einer bewussten Optimierung rot und muss im selben Change
+  mitgezogen werden. **offen:** die Optimierung selbst (Cache oder eine Auflösung).
 - [ ] **Der Brand-Filter löst die Gruppenkette pro Galerie auf (Kosten).**
   In `AuthorizationService::getAllowedGalleryIds()` löst der Brand-Filter die Gruppenkette
   **je Galerie** mit `GalleryGroup::find()` auf — gemessen 2 Lookups pro Galerie (6 bei 3
   Galerien, 30 bei 15). Das ist ein **Vorbestand**, den D-39 nicht verändert hat und nicht
   verschärft; der Board-Eintrag oben (zweimal pro `/api/auth/me`) ist davon getrennt zu
-  zählen. **Test:** Query-Zahl des Lesers pinnen, bevor die Kette gesammelt aufgelöst wird.
-- [ ] **Der jwt-auth `Factory` sammelt Claims über Tests hinweg (Testartefakt).**
-  `RatingUniquenessTest::test_registered_users_and_guests_have_isolated_rating_rows` bleibt
-  grün, obwohl er eine Selection-Galerie **direkt** zuweist — der jwt-auth `Factory` ist ein
-  Container-Singleton, dessen Claims-Sammlung über die Tests hinweg **akkumuliert**: die
-  `transient_galleries` eines Gast-Tokens landen in der Payload des späteren User-Requests.
-  Vorbestand, unabhängig von D-39, aber der Test beweist damit nicht, was er behauptet.
-  **Test:** Claims pro Request zurücksetzen (eigener Guard je Test) und den Fall erneut
-  messen.
+  zählen. **Stand 2026-10-19:** die Basislinie ist gepinnt
+  (`BrandFilterChainQueryBaselineTest`): 3 Galerien = **11** Statements / **6** Lookups,
+  15 Galerien = **35** Statements / **30** Lookups (Wachstum exakt 2 × 12). Der Test pinnt
+  einen **bekannten Kostenpunkt, kein Ziel** — er wird bei einer gesammelten Auflösung der
+  Kette rot. **offen:** die Kette gesammelt auflösen.
+- [ ] **Der jwt-auth `Factory` sammelt Claims innerhalb eines Tests (Testartefakt).**
+  `RatingUniquenessTest::test_registered_users_and_guests_have_isolated_rating_rows` war
+  grün, obwohl der registrierte Client seine Berechtigung **nur** über den geleakten
+  Gast-Claim bekam: die Claims-Sammlung des jwt-auth `Factory` **akkumuliert** (make() fügt
+  hinzu statt zu ersetzen), und der Decode läuft über dieselbe Sammlung. **Korrektur der
+  Board-Prämisse:** die App wird pro Test neu gebaut, der Singleton ist also **innerhalb**
+  eines Tests frisch — die Sammlung läuft nicht über Tests hinweg, sondern vom Gast-Token
+  zum späteren User-Request **im selben Test** (betroffen: `RatingUniquenessTest`,
+  `MagicLinkAuthTest`). **Stand 2026-10-19:** behoben — `Tests\TestCase::resetJwtClaimState()`
+  setzt den Claim-Zustand pro Test zurück, der registrierte Client bekommt den Invite-Claim
+  explizit, und ein **begleitender Test** beweist, dass ein absichtlich geleakter Gast-Claim
+  den User-Token bricht. **offen:** keins.
 - [ ] **Der Benachrichtigungs-Opt-in legt eine Zuweisung an (pre-existing).**
   `NotificationController::toggleGalleryOptIn()` schreibt mit `updateOrInsert()` eine Zeile in
   `user_galleries` — dieselbe Tabelle, die die Client-Zuweisung trägt. Für eine **Selection**-
@@ -152,9 +164,9 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
 > **Struktur-Hinweis, fortgeschrieben (2026-10-19):** **36 offene `[ ]`** und **45 wartende
-> `[~]`** über 1822 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> `[~]`** über 1834 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
 > (36), `grep -c '^- \[~\]' AGENTS.todo.md` (45), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1822). Aufteilung der 36: **22× `manuell prüfen:`** und **14×
+> `wc -l < AGENTS.todo.md` (1834). Aufteilung der 36: **22× `manuell prüfen:`** und **14×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 14 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
