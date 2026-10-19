@@ -38,9 +38,19 @@ export default function ManagementUserView() {
     const selectableGroups = isOrgAdmin
         ? flatGroups.filter(group => assignableGroupIds?.includes(group.id) ?? false)
         : flatGroups;
+    // D-43: a direct gallery assignment carries delivery galleries only. A
+    // selection gallery is a private rating surface and reaches a client
+    // through an invite, not through a direct grant — the API rejects a newly
+    // requested non-delivery id. The org-admin branch is already delivery-only
+    // through the server-resolved scope; the studio branch is narrowed here so
+    // the editor does not offer what the API refuses.
+    //
+    // A gallery that is already assigned to the edited user stays visible and
+    // selected (see `UserPermissionsModal`), so an unrelated save neither
+    // revokes a legacy grant nor is blocked by it.
     const selectableGalleries = isOrgAdmin
         ? flatGalleries.filter(gallery => orgScope?.gallery_ids.includes(gallery.id) ?? false)
-        : flatGalleries;
+        : flatGalleries.filter(gallery => gallery.type === 'delivery');
 
     const allowedRoles = isSuperAdmin
         ? roles

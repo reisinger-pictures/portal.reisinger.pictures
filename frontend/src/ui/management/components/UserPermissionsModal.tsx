@@ -41,9 +41,11 @@ export default function UserPermissionsModal({
     const legacyGroups = isOrgAdmin
         ? user.gallery_groups.filter(group => !selectableGroupIds.has(group.id))
         : [];
-    const legacyGalleries = isOrgAdmin
-        ? user.galleries.filter(gallery => !selectableGalleryIds.has(gallery.id))
-        : [];
+    // D-43: the offered gallery list carries delivery galleries only. A grant
+    // that is already assigned but outside that list (a legacy selection
+    // gallery) stays visible and selected, so an unrelated save does not
+    // revoke it. Unchecking it removes the grant deliberately.
+    const legacyGalleries = user.galleries.filter(gallery => !selectableGalleryIds.has(gallery.id));
 
     const selectedRoleNames = (roles ?? [])
         .filter(r => selRoles.includes(r.id))

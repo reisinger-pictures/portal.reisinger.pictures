@@ -76,6 +76,28 @@ const tree: GalleryTreeResponse = {
     root_galleries: [gallery('ga3', 'Root C')],
 };
 
+// D-43: a direct gallery assignment carries delivery galleries only. A
+// selection gallery is a private rating surface and reaches a client through
+// an invite, not through a direct assignment — the API refuses a newly
+// requested non-delivery id, so the editor must not offer one.
+const treeWithSelection: GalleryTreeResponse = {
+    groups: [
+        {
+            id: 'g1',
+            name: 'Print',
+            parent_id: null,
+            galleries: [gallery('ga1', 'Delivery A')],
+        },
+        {
+            id: 'g3',
+            name: 'Auswahl',
+            parent_id: null,
+            galleries: [gallery('ga4', 'Selection A', 'selection')],
+        },
+    ],
+    root_galleries: [gallery('ga3', 'Root C')],
+};
+
 const basePermissions: Permissions = {
     isStaff: true,
     isSuperAdmin: false,
@@ -291,5 +313,89 @@ describe('ManagementUserView delegation boundary', () => {
         expect(within(dialog).getByRole('checkbox', { name: 'Delivery A' })).toBeInTheDocument();
         expect(within(dialog).getByRole('checkbox', { name: 'Delivery B' })).toBeInTheDocument();
         expect(within(dialog).getByRole('checkbox', { name: 'Root C' })).toBeInTheDocument();
+    });
+});
+
+describe('ManagementUserView direct gallery assignment (D-43)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+
+        vi.mocked(useUsers).mockReturnValue({
+            users: [target],
+            roles: [{ id: 'role-client', name: UserRole.CLIENT }],
+            createUser: vi.fn().mockResolvedValue(undefined),
+            updateUser: vi.fn().mockResolvedValue(undefined),
+            deleteUser: vi.fn().mockResolvedValue(undefined),
+        });
+
+        vi.mocked(useProtectedGalleries).mockReturnValue({
+            tree: treeWithSelection,
+            isLoading: false,
+            isError: undefined,
+            mutate: vi.fn().mockResolvedValue(undefined),
+            createGroup: vi.fn().mockResolvedValue(undefined),
+            createGallery: vi.fn().mockResolvedValue(undefined),
+            updateGroup: vi.fn().mockResolvedValue(undefined),
+            updateGallery: vi.fn().mockResolvedValue(undefined),
+            deleteGroup: vi.fn().mockResolvedValue(undefined),
+            deleteGallery: vi.fn().mockResolvedValue(undefined),
+        });
+
+        // A studio administrator: an admin without an organization. The
+        // org-admin branch of the offer is not involved here.
+        vi.mocked(usePermissions).mockReturnValue(basePermissions);
+    });
+
+    it('offers a studio admin delivery galleries only', async () => {
+        const eventUser = userEvent.setup();
+        renderView();
+        const dialog = await openEditor(eventUser);
+
+        expect(within(dialog).getByRole('checkbox', { name: 'Delivery A' })).toBeInTheDocument();
+        expect(within(dialog).getByRole('checkbox', { name: 'Root C' })).toBeInTheDocument();
+
+        // The selection gallery is not offered: the API refuses a newly
+        // requested non-delivery id, so offering it would produce an error the
+        // admin cannot act on.
+        expect(within(dialog).queryByRole('checkbox', { name: /Selection A/ })).not.toBeInTheDocument();
+    });
+
+    it('keeps an already assigned selection gallery visible, selected and assigned', async () => {
+        const updateUser = vi.fn().mockResolvedValue(undefined);
+        const legacyTarget: UserDetailed = {
+            ...target,
+            galleries: [gallery('ga4', 'Selection A', 'selection')],
+        };
+        vi.mocked(useUsers).mockReturnValue({
+            users: [legacyTarget],
+            roles: [{ id: 'role-client', name: UserRole.CLIENT }],
+            createUser: vi.fn().mockResolvedValue(undefined),
+            updateUser,
+            deleteUser: vi.fn().mockResolvedValue(undefined),
+        });
+
+        const eventUser = userEvent.setup();
+        renderView();
+        const dialog = await openEditor(eventUser);
+
+        // The legacy grant stays visible and selected, so an unrelated save
+        // neither hides it nor revokes it.
+        const legacyGallery = within(dialog).getByRole('checkbox', { name: /Selection A/ });
+        expect(legacyGallery).toBeChecked();
+
+        await eventUser.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+        await waitFor(() => {
+            expect(updateUser).toHaveBeenNthCalledWith(
+                1,
+                'user-1',
+                [],
+                [],
+                ['ga4'],
+                false,
+                'none',
+                null,
+                false,
+            );
+        });
     });
 });

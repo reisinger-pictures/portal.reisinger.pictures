@@ -28,11 +28,12 @@ function setup() {
     })) as never);
 }
 
-function renderModal() {
+function renderModal(galleryType: 'selection' | 'delivery' = 'delivery') {
     return renderWithProviders(
         <GalleryAccessModal
             galleryId="g1"
             galleryName="UI Review Galerie"
+            galleryType={galleryType}
             isOpen
             onClose={vi.fn()}
         />,
@@ -93,5 +94,21 @@ describe('GalleryAccessModal user list affordances', () => {
         expect(scroller).not.toContainElement(screen.getByPlaceholderText('Nutzer suchen...'));
         expect(scroller).not.toContainElement(screen.getByText('3 Nutzer'));
         expect(scroller).toContainElement(screen.getByText('prohaska.jalon@example.org'));
+    });
+
+    // D-43: a direct client assignment carries delivery galleries only. The
+    // API refuses a selection gallery, so the dialog must not offer what the
+    // API refuses — the admin would otherwise only learn the rule from a 403
+    // toast after the click. A row that already holds a legacy grant keeps
+    // its removal, because the API never blocks a removal.
+    it('offers the client assignment for a delivery gallery only', () => {
+        const delivery = renderModal('delivery');
+        expect(screen.getAllByRole('button', { name: 'Hinzufügen' }).length).toBeGreaterThan(0);
+        delivery.unmount();
+
+        renderModal('selection');
+        expect(screen.queryAllByRole('button', { name: 'Hinzufügen' })).toHaveLength(0);
+        // The legacy grant of u1 is still removable.
+        expect(screen.getByRole('button', { name: 'Entfernen' })).toBeInTheDocument();
     });
 });

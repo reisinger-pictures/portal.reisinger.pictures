@@ -8,6 +8,7 @@ use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Mail\ActivateAccountMail;
+use App\Models\Gallery;
 use App\Models\Org;
 use App\Models\Role;
 use App\Models\User;
@@ -15,6 +16,7 @@ use App\Services\ActivationTokenService;
 use App\Services\AuthorizationService;
 use App\Services\FtpCredentialService;
 use App\Support\BrandRegistry;
+use App\Support\DirectGalleryGrant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -267,6 +269,29 @@ class UserController extends Controller
             }
         }
 
+        // D-43: a direct gallery assignment carries delivery galleries only. A
+        // selection gallery reaches a client through an invite, not through a
+        // direct grant — the org scope above already enforces exactly that for
+        // an org admin, but an actor without an org (a studio admin) had no
+        // scope check at all, so any gallery id could be written into
+        // `user_galleries` and produced a grant that the read path (D-39)
+        // silently voided. The write path now fails closed like the reader.
+        //
+        // Only newly requested ids are checked: an existing legacy assignment
+        // neither turns an unrelated save into an error nor is silently
+        // revoked. It stays assigned until it is removed deliberately.
+        if ($request->has('gallery_ids')) {
+            $existingGalleryIds = $user->galleries()
+                ->pluck('galleries.id')
+                ->map(fn ($galleryId): string => (string) $galleryId)
+                ->all();
+            $newGalleryIds = $this->newlyRequestedIds($request->input('gallery_ids', []), $existingGalleryIds);
+
+            if ($this->containsNonDeliveryGallery($newGalleryIds)) {
+                return response()->json(['error' => DirectGalleryGrant::REJECTION_MESSAGE], 403);
+            }
+        }
+
         $validated = $request->validated();
         $roleIds = $request->input('role_ids');
         $selectedRoleNames = $request->has('role_ids')
@@ -386,6 +411,39 @@ class UserController extends Controller
         $existing = array_map(fn ($id): string => (string) $id, $existingIds);
 
         return array_values(array_diff($requested, $existing));
+    }
+
+    /**
+     * Whether any of the given gallery ids is not a delivery gallery.
+     *
+     * D-43: `user_galleries` is the client grant table. A direct assignment
+     * may only carry delivery galleries; a selection gallery is a private
+     * rating surface that reaches a client through an invite. The reachable
+     * rejection is therefore a `selection` gallery: `galleries.type` is
+     * `enum('selection','delivery') NOT NULL DEFAULT 'delivery'` and always
+     * carries a type, and an id that does not exist is already refused with
+     * 422 by the request validation (`UpdateUserRequest`:
+     * `gallery_ids.* => exists:galleries,id`). The rule itself lives in
+     * {@see DirectGalleryGrant}, which the other writer of the client grant
+     * table shares.
+     *
+     * @param  array<int, string>  $galleryIds
+     */
+    private function containsNonDeliveryGallery(array $galleryIds): bool
+    {
+        if ($galleryIds === []) {
+            return false;
+        }
+
+        $types = Gallery::whereIn('id', $galleryIds)->pluck('type')->all();
+
+        foreach ($types as $type) {
+            if (! DirectGalleryGrant::allowsType($type)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function destroy($id)
