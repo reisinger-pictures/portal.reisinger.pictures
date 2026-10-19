@@ -83,19 +83,21 @@ GET /api/management/models/{id}/contact-sheet?variant=internal|external
   werden fail-closed ausgelassen (kein Fallback auf ungeprüfte Bytes). Es gibt
   dafür **kein sichtbares Signal im PDF** — der Blade-Contract kennt keinen
   Zähler für ausgelassene Fotos; bewusst nicht in dieser Änderung.
-- **GD als akzeptierte Umgebungsgrenze (nicht in `composer.json` deklariert):**
+- **GD als deklarierte Plattformvoraussetzung (D-42):**
   `imageDataUri()` gibt `null` zurück, wenn `imagecreatefromstring()` fehlt
   (und für WebP zusätzlich `imagejpeg()`), und JPEG/PNG werden nur **nach**
   einem erfolgreichen GD-Decode als Data-URI weitergereicht. Ohne GD ließe der
   Kontaktbogen damit **alle** Fotos stillschweigend aus. Die Prod- und
   E2E-Images bringen GD mit (`grep -n 'gd' deployment/Dockerfile`;
-  `deployment/Dockerfile.e2e` baut auf demselben `portal-base:8.5`). Eine
-  `ext-gd`-Deklaration in `backend/composer.json` wurde **bewusst nicht**
-  ergänzt: die gesamte Galerie-Pipeline (`app/Services/ImageProcessor.php`)
-  nutzt GD bereits voraussetzungslos, die Runtime-Annahme ist also älter als
-  dieses Feature; die Deklaration würde eine Plattform-Anforderung neu
-  einführen, die CI (`composer install --ignore-platform-reqs`) und Prod-Image
-  ohnehin erfüllen, und dafür `composer.lock` (content-hash) anfassen.
+  `deployment/Dockerfile.e2e` baut auf demselben `portal-base:8.5`).
+  `backend/composer.json` deklariert `ext-gd` deshalb als
+  Plattformvoraussetzung (`"ext-gd": "*"`, neben `ext-zip`): die
+  Gallery-Pipeline (`app/Services/ImageProcessor.php`) nutzt GD bereits
+  voraussetzungslos, und eine Installation ohne GD scheitert jetzt sofort
+  statt zur Laufzeit. CI und Prod installieren mit
+  `--ignore-platform-reqs`, die Deklaration greift dort also nicht in den
+  Installationsweg ein — sie dokumentiert die Voraussetzung und macht sie für
+  normale `composer install`-Läufe überprüfbar.
 - `MAX_PHOTOS = 12` für beide Varianten (Speicher-Limit; interne „alle Fotos"-Zusage endet hier).
 - `whereNotNull('invited_by')` in `notifyInviter()` wirkungslos (Spalte NOT NULL) — defensiv, kein Funktionsproblem.
 - `Mail::queue()` nach Commit: Queue-/Transport-Fehler bei `sync`-Queue → 500 trotz gespeichertem Profil (konsistent mit bestehendem Deferred-Mail-Flow).

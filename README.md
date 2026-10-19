@@ -47,7 +47,10 @@ beiden Docker-Run-Configs automatisch gestartet. Starte ihn bei Bedarf mit
    beschreibbarer Local-Dev-Pfad; `/var/www/photos` bleibt ausschließlich der
    Container-/Deployment-Pfad in `backend/.env.ci` und der Produktions-Compose.
 2. Installiere die Backend-Abhängigkeiten bei einem frischen Checkout mit
-   `composer install` im Verzeichnis `backend`. `composer setup` ist nur ein
+   `composer install` im Verzeichnis `backend`. Der Host braucht dafür neben
+   PHP 8.5+ die Erweiterungen `ext-gd` und `ext-zip` — beide sind in
+   `backend/composer.json` als Plattformvoraussetzung deklariert, ein
+   `composer install` bricht ohne sie mit exit 2 ab. `composer setup` ist nur ein
    Automationsschritt: Es kopiert eine fehlende `.env` nicht interaktiv, erzeugt
    keine Admin-Zugangsdaten und ruft anschließend `migrate --force --seed` auf.
    Mit leerem `ADMIN_PASSWORD` schlägt dieser Flow am Seeder fehl.
