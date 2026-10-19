@@ -38,7 +38,9 @@ import {
     modelWillingnessOptions,
     normalizeAnswersForForm,
     questionOptionLabel,
+    renderedErrorPaths,
     requiresAgeProof,
+    resolveServerErrorPath,
     scaleOptionLabel,
     sections,
     selectedCategories,
@@ -686,5 +688,82 @@ describe('manager transfer', () => {
         expect(init.method).toBe('POST');
         expect(init.body).toBe(JSON.stringify({ act_id: 'act-1', new_manager_customer_id: 'customer-member' }));
         vi.unstubAllGlobals();
+    });
+});
+
+/**
+ * The set of field paths the form renders an inline error for. It replaces a
+ * key pattern: a server key without a renderer would lose its message.
+ */
+describe('renderedErrorPaths & resolveServerErrorPath', () => {
+    const twoPersonValues = validValues({
+        persons: [
+            validValues().persons[0],
+            person({
+                first_name: 'Anna',
+                email: 'anna@example.com',
+                preferred_contact: [],
+                experience_bikini: 'keine',
+                consent_privacy: true,
+                consent_all_persons: false,
+            }),
+        ],
+        manager_index: 0,
+    });
+
+    it('covers the rendered person fields, the age proof and the photo upload', () => {
+        const paths = renderedErrorPaths(catalog, validValues());
+
+        expect(paths).toContain('persons.0.answers.first_name');
+        expect(paths).toContain('persons.0.answers.preferred_contact');
+        expect(paths).toContain('persons.0.age_proof');
+        expect(paths).toContain('persons.0.photos');
+    });
+
+    it('omits the act answers while the act block is not rendered', () => {
+        // A single-person act renders no act block, so an act answer has no
+        // renderer and its message belongs into the general error area.
+        expect(renderedErrorPaths(catalog, validValues())).not.toContain('act_answers.act_notes');
+        expect(renderedErrorPaths(catalog, twoPersonValues)).toContain('act_answers.act_notes');
+    });
+
+    it('covers a conditionally visible question only for the person that sees it', () => {
+        const paths = renderedErrorPaths(catalog, twoPersonValues);
+
+        // `consent_all_persons` needs `is_manager` — person 0 is the manager.
+        expect(paths).toContain('persons.0.answers.consent_all_persons');
+        expect(paths).not.toContain('persons.1.answers.consent_all_persons');
+    });
+
+    it('maps a rendered key to itself and an indexed key to its rendered parent', () => {
+        const paths = renderedErrorPaths(catalog, validValues());
+
+        expect(resolveServerErrorPath('persons.0.answers.first_name', paths)).toBe('persons.0.answers.first_name');
+        // Laravel's wildcard validation emits the index; the form renders the
+        // parent field.
+        expect(resolveServerErrorPath('persons.0.answers.preferred_contact.0', paths))
+            .toBe('persons.0.answers.preferred_contact');
+    });
+
+    it('maps the act answer wire key to the form path', () => {
+        const paths = renderedErrorPaths(catalog, twoPersonValues);
+
+        expect(resolveServerErrorPath('act.answers.act_notes', paths)).toBe('act_answers.act_notes');
+        // Without the act block there is no renderer.
+        expect(resolveServerErrorPath('act.answers.act_notes', renderedErrorPaths(catalog, validValues()))).toBeNull();
+    });
+
+    it('leaves keys without a renderer unmapped', () => {
+        const paths = renderedErrorPaths(catalog, twoPersonValues);
+
+        // The file store's bare key, the form-level fields without an error
+        // display, unknown questions and hidden questions.
+        expect(resolveServerErrorPath('file', paths)).toBeNull();
+        expect(resolveServerErrorPath('manager_index', paths)).toBeNull();
+        expect(resolveServerErrorPath('persons.0.create_account', paths)).toBeNull();
+        expect(resolveServerErrorPath('persons.0.answers.unknown_question', paths)).toBeNull();
+        expect(resolveServerErrorPath('persons.1.answers.consent_all_persons', paths)).toBeNull();
+        // An indexed key of a question that is not rendered stays unmapped.
+        expect(resolveServerErrorPath('persons.0.answers.unknown_question.0', paths)).toBeNull();
     });
 });

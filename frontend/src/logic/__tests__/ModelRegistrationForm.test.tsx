@@ -25,6 +25,7 @@ const catalog: ModelRegistrationCheck = {
                 { key: 'email', label: 'E-Mail', type: 'email', required: true, scope: 'person' },
                 { key: 'birthdate', label: 'Geburtsdatum', type: 'date', required: false, scope: 'person' },
                 { key: 'experience_bikini', label: 'Erfahrung: Bikini', type: 'select', required: false, scope: 'person', options: ['keine', 'Anfänger'] },
+                { key: 'preferred_contact', label: 'Bevorzugter Kontaktweg', type: 'multiselect', required: false, scope: 'person', options: ['E-Mail', 'Telefon'] },
             ],
         },
         einwilligungen: {
@@ -280,9 +281,114 @@ describe('RegistrationForm person state', () => {
         await user.click(screen.getByLabelText('Alle Personen einverstanden'));
         await user.click(screen.getByRole('button', { name: /registrierung absenden/i }));
 
-        expect(await screen.findByText(
+        const generalError = await screen.findByTestId('model-registration-general-error');
+        expect(generalError).toHaveTextContent(
             'Das Bild überschreitet nach der EXIF-Bereinigung die erlaubte Dateigröße. Bitte eine kleinere Datei hochladen.',
-        )).toBeInTheDocument();
+        );
+        // No field was marked, so the generic hint would point nowhere.
+        expect(generalError).not.toHaveTextContent('Bitte prüfe die markierten Felder.');
+    });
+
+    it('maps an indexed multiselect error to the rendered parent field', async () => {
+        const user = userEvent.setup();
+        // Laravel's wildcard validation emits indexed keys for array values.
+        // The form renders the parent field, so the error must not be lost
+        // under `...preferred_contact.0`.
+        const apiError = new Error('Unprocessable') as Error & { status: number; info: unknown };
+        apiError.status = 422;
+        apiError.info = { errors: { 'persons.0.answers.preferred_contact.0': ['Bitte mindestens eine Option wählen.'] } };
+        submit.mockRejectedValueOnce(apiError);
+
+        renderForm({ submit });
+
+        await user.type(screen.getByLabelText('Vorname'), 'Maria');
+        await user.type(screen.getByLabelText('E-Mail'), 'maria@example.com');
+        await user.click(screen.getByLabelText('DSGVO'));
+        await user.click(screen.getByLabelText('Alle Personen einverstanden'));
+        await user.click(screen.getByRole('button', { name: /registrierung absenden/i }));
+
+        expect(await screen.findByText('Bitte mindestens eine Option wählen.')).toBeInTheDocument();
+        // The error is marked inline, so the general area keeps the hint.
+        expect(await screen.findByText('Bitte prüfe die markierten Felder.')).toBeInTheDocument();
+    });
+
+    it('surfaces an unknown or not-rendered question path in the general error area', async () => {
+        const user = userEvent.setup();
+        // `unknown_question` is not part of the catalogue and `age_proof` is
+        // only rendered once a protected category is selected — neither path
+        // has a renderer, so both messages belong into the general area.
+        const apiError = new Error('Unprocessable') as Error & { status: number; info: unknown };
+        apiError.status = 422;
+        apiError.info = {
+            errors: {
+                'persons.0.answers.unknown_question': ['Dieses Feld gibt es nicht.'],
+                'persons.0.age_proof': ['Der Altersnachweis ist ungültig.'],
+            },
+        };
+        submit.mockRejectedValueOnce(apiError);
+
+        renderForm({ submit });
+
+        await user.type(screen.getByLabelText('Vorname'), 'Maria');
+        await user.type(screen.getByLabelText('E-Mail'), 'maria@example.com');
+        await user.click(screen.getByLabelText('DSGVO'));
+        await user.click(screen.getByLabelText('Alle Personen einverstanden'));
+        await user.click(screen.getByRole('button', { name: /registrierung absenden/i }));
+
+        const generalError = await screen.findByTestId('model-registration-general-error');
+        expect(generalError).toHaveTextContent('Dieses Feld gibt es nicht.');
+        expect(generalError).toHaveTextContent('Der Altersnachweis ist ungültig.');
+    });
+
+    it('keeps the generic hint next to an unmapped server message in a mixed 422', async () => {
+        const user = userEvent.setup();
+        // Mixed: one error has a renderer, one has none. The hint for the
+        // marked field and the unmapped server message must both survive.
+        const apiError = new Error('Unprocessable') as Error & { status: number; info: unknown };
+        apiError.status = 422;
+        apiError.info = {
+            errors: {
+                'persons.0.answers.first_name': ['Der Vorname ist ungültig.'],
+                file: ['Das Bild ist zu groß.'],
+            },
+        };
+        submit.mockRejectedValueOnce(apiError);
+
+        renderForm({ submit });
+
+        await user.type(screen.getByLabelText('Vorname'), 'Maria');
+        await user.type(screen.getByLabelText('E-Mail'), 'maria@example.com');
+        await user.click(screen.getByLabelText('DSGVO'));
+        await user.click(screen.getByLabelText('Alle Personen einverstanden'));
+        await user.click(screen.getByRole('button', { name: /registrierung absenden/i }));
+
+        // The field-bound error stays inline.
+        expect(await screen.findByText('Der Vorname ist ungültig.')).toBeInTheDocument();
+        const generalError = await screen.findByTestId('model-registration-general-error');
+        expect(generalError).toHaveTextContent('Das Bild ist zu groß.');
+        expect(generalError).toHaveTextContent('Bitte prüfe die markierten Felder.');
+    });
+
+    it('falls back to the generic hint when a 422 carries an empty errors object', async () => {
+        const user = userEvent.setup();
+        // A malformed 422 (`errors: {}`) carries neither a mappable field nor
+        // a server message. Without a fallback the form would be cleared
+        // without any feedback, which reads like a successful submit.
+        const apiError = new Error('Unprocessable') as Error & { status: number; info: unknown };
+        apiError.status = 422;
+        apiError.info = { errors: {} };
+        submit.mockRejectedValueOnce(apiError);
+
+        renderForm({ submit });
+
+        await user.type(screen.getByLabelText('Vorname'), 'Maria');
+        await user.type(screen.getByLabelText('E-Mail'), 'maria@example.com');
+        await user.click(screen.getByLabelText('DSGVO'));
+        await user.click(screen.getByLabelText('Alle Personen einverstanden'));
+        await user.click(screen.getByRole('button', { name: /registrierung absenden/i }));
+
+        const generalError = await screen.findByTestId('model-registration-general-error');
+        expect(generalError).toHaveTextContent('Bitte prüfe die markierten Felder.');
     });
 
     it.each([409, 410, 404])('routes a fatal submit %i to the error page instead of an inline form error', async (status) => {

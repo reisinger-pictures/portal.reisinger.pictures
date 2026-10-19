@@ -24,6 +24,8 @@ import {
     modelWillingnessLabel,
     personQuestions,
     questionOptionLabel,
+    renderedErrorPaths,
+    resolveServerErrorPath,
     scaleOptionLabel,
     sections,
     willingnessBadgeClass,
@@ -37,26 +39,6 @@ import {
     type RegistrationFormValues,
     type VisibilityContext,
 } from '../logic/modelRegistration';
-
-const SERVER_ERROR_MAP_PREFIX: Array<[string, string]> = [
-    ['act.answers.', 'act_answers.'],
-];
-
-function mapServerErrorKey(key: string): string {
-    for (const [from, to] of SERVER_ERROR_MAP_PREFIX) {
-        if (key.startsWith(from)) return to + key.slice(from.length);
-    }
-    return key;
-}
-
-/**
- * Server error keys the registration form renders an inline error for. Anything
- * else has no renderer: a `setError()` on such a key lands in `errors.<key>`
- * where no field reads it, so the message would silently disappear. The file
- * store rejects with a bare `file` key (`ModelFileStore::storeUpload()`), which
- * matches no field path here — it must surface in the general error area.
- */
-const RENDERED_ERROR_KEY = /^(?:persons\.\d+\.(?:answers\..+|age_proof|photos)|act_answers\..+)$/;
 
 /**
  * A 422 from the backend carries Laravel's `{errors: {key: [msg]}}` payload.
@@ -746,23 +728,39 @@ export function RegistrationForm({ catalog, submit, onSubmitted, onFatalError }:
 
             const validationErrors = extractValidationErrors(error);
             if (validationErrors) {
-                // Field-bound keys keep their inline error. Keys no renderer
-                // reads (e.g. the file store's bare `file`) would otherwise be
-                // invisible, so their server text surfaces in the general error
-                // area instead of a bare "check the fields" hint.
+                // Only the paths the form actually renders may carry an inline
+                // error. Everything else (the file store's bare `file` key,
+                // `manager_index`, `create_account`, unknown or hidden
+                // question keys, act answers of a single-person act) has no
+                // renderer, so its server text surfaces in the general error
+                // area instead of disappearing unnoticed.
+                const renderedPaths = renderedErrorPaths(catalog, values);
                 const unmappedMessages: string[] = [];
+                let inlineCount = 0;
                 for (const [key, messages] of Object.entries(validationErrors)) {
                     const message = messages[0] ?? t`Ungültiger Wert.`;
-                    const mapped = mapServerErrorKey(key);
-                    if (RENDERED_ERROR_KEY.test(mapped)) {
-                        setError(mapped as FieldPath<RegistrationFormValues>, { type: 'server', message });
+                    const path = resolveServerErrorPath(key, renderedPaths);
+                    if (path) {
+                        inlineCount += 1;
+                        setError(path as FieldPath<RegistrationFormValues>, { type: 'server', message });
                     } else {
                         unmappedMessages.push(message);
                     }
                 }
-                setSubmitError(unmappedMessages.length > 0
-                    ? unmappedMessages.join(' ')
-                    : t`Bitte prüfe die markierten Felder.`);
+                // The generic hint points at the marked fields, so it is kept
+                // whenever at least one error was mapped inline — a mixed 422
+                // shows both the hint and the unmapped server message.
+                const parts: string[] = [...unmappedMessages];
+                if (inlineCount > 0) parts.push(t`Bitte prüfe die markierten Felder.`);
+                if (parts.length === 0) {
+                    // A 422 with an empty or malformed `errors` object carries
+                    // neither a mappable field nor a server message. Clearing
+                    // the form without any feedback would look like a
+                    // successful submit, so a generic hint keeps the failure
+                    // visible.
+                    parts.push(t`Bitte prüfe die markierten Felder.`);
+                }
+                setSubmitError(parts.join(' '));
                 return;
             }
             setSubmitError(errorMessage(error, t`Fehler beim Absenden.`));
@@ -771,7 +769,11 @@ export function RegistrationForm({ catalog, submit, onSubmitted, onFatalError }:
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-            {submitError && <ErrorMessage message={submitError} />}
+            {submitError && (
+                <div data-testid="model-registration-general-error">
+                    <ErrorMessage message={submitError} />
+                </div>
+            )}
 
             <div className="card bg-base-100 border border-primary/30 shadow-sm" data-testid="act-size-entry">
                 <div className="card-body gap-3">

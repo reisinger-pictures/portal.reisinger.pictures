@@ -8,6 +8,7 @@ use App\Services\PhotoProcessingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\File\UploadedFile as SymfonyUploadedFile;
 use Tests\TestCase;
@@ -102,9 +103,10 @@ class ModelFileImageBudgetTest extends TestCase
         // The gate is `strlen($sanitized) > maxStoredUploadBytes()`; a small
         // injected budget exercises exactly that comparison through the real
         // decode → imagejpeg(..., 90) → strlen path, without a 20 MiB fixture.
-        // Measured on PHP 8.5/GD with the fixture below: source (q40) ~14 KiB,
-        // re-encode (q90) ~39 KiB — the 20 KiB budget sits between them with
-        // margin in both directions.
+        // Measured on PHP 8.5.11 / GD 2.3.3 with the fixture below: source
+        // (q40) 14,336 bytes, re-encode (q90) 39,393 bytes — the 20 KiB budget
+        // sits between them with margin in both directions. The sizes are
+        // re-derivable from the same fixture code (see `noiseJpeg()`).
         $budget = 20 * 1024;
         $store = new class($budget) extends ModelFileStore
         {
@@ -125,15 +127,25 @@ class ModelFileImageBudgetTest extends TestCase
         $this->assertGreaterThan($budget, strlen($encoded));
 
         $file = UploadedFile::fake()->createWithContent('portrait.jpg', $source);
+        $directory = $this->uniqueStoreDirectory();
 
         try {
-            $store->storeUpload('model-photos/test', $file);
+            $store->storeUpload($directory, $file);
             $this->fail('Expected the re-encoded size to be rejected by the stored-byte budget.');
         } catch (ValidationException $exception) {
             $this->assertArrayHasKey('file', $exception->errors());
         }
 
         // Rejected before any encrypted or plaintext byte reached the disk.
+        // Two scopes, both asserted:
+        //  - this test's own directory is empty — the precise claim, the
+        //    place the upload would have landed,
+        //  - the whole fake disk is empty — the stronger claim that nothing
+        //    was persisted at all.
+        // The global scope is safe because `Storage::fake('local')` in
+        // setUp() empties the fake root, so no foreign file can survive into
+        // this test.
+        $this->assertSame([], Storage::disk('local')->allFiles($directory));
         $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
@@ -163,8 +175,10 @@ class ModelFileImageBudgetTest extends TestCase
 
     private function assertRejectedBeforeDecode(ModelFileStore $store, UploadedFile $file): void
     {
+        $directory = $this->uniqueStoreDirectory();
+
         try {
-            $store->storeUpload('model-photos/test', $file);
+            $store->storeUpload($directory, $file);
             $this->fail('Expected the image to be rejected by its pre-decode budget.');
         } catch (ValidationException $exception) {
             // Rejected before the decoder and before encrypted persistence.
@@ -172,7 +186,25 @@ class ModelFileImageBudgetTest extends TestCase
         }
 
         $this->assertSame(0, $store->decodeCalls);
+        // Rejected before the decoder and before encrypted persistence. Both
+        // scopes are asserted: the test's own directory is empty (the precise
+        // claim) and the whole fake disk is empty (the stronger claim). The
+        // global scope is safe because `Storage::fake('local')` in setUp()
+        // empties the fake root, so no foreign file can survive into this
+        // test.
+        $this->assertSame([], Storage::disk('local')->allFiles($directory));
         $this->assertSame([], Storage::disk('local')->allFiles());
+    }
+
+    /**
+     * A store directory no other test writes to, so the "nothing was
+     * persisted" assertion names the exact place the upload would have
+     * landed. The global assertion next to it additionally proves that the
+     * whole fake disk stayed clean.
+     */
+    private function uniqueStoreDirectory(): string
+    {
+        return 'model-photos/'.Str::random(24);
     }
 
     private function storeWithDecodeSpy(): ModelFileStore
@@ -201,7 +233,12 @@ class ModelFileImageBudgetTest extends TestCase
 
     /**
      * Deterministic high-frequency raster: poorly compressible at low quality,
-     * so the quality-90 re-encode inside storeUpload() inflates it by ~5x.
+     * so the quality-90 re-encode inside storeUpload() inflates it.
+     * Measured on PHP 8.5.11 / GD 2.3.3 with this exact fixture:
+     * 14,336 bytes (q40) → 39,393 bytes (q90), i.e. ~2.75x.
+     * The factor belongs to this encoder/format pair and is no constant: the
+     * PNG and WebP paths take a different re-encode (`imagepng()` /
+     * `imagewebp()`) and inflate by their own factor.
      * Deterministic (no RNG) so the measured sizes in the tests are stable.
      */
     private function noiseJpeg(int $width, int $height, int $quality): string

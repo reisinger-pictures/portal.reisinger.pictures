@@ -17,6 +17,13 @@ interface PersonData {
     withAgeProof: boolean;
 }
 
+/**
+ * Server text of the file-level 422 (`ModelFileStore::storeUpload()` rejects
+ * with a bare `file` key). The message is user-visible and must reach the
+ * general error area of the registration form.
+ */
+const FILE_LEVEL_ERROR_MESSAGE = 'Das Bild überschreitet nach der EXIF-Bereinigung die erlaubte Dateigröße. Bitte eine kleinere Datei hochladen.';
+
 function personBlock(page: Page, index: number) {
     return page.locator('main').getByTestId(`model-person-${index}`);
 }
@@ -135,6 +142,84 @@ test.describe('Model-Registrierung (öffentlicher Flow)', () => {
 
         // 6. Cleanup: Die im öffentlichen Flow erzeugten CRM-Customers entfernen
         // (beide Personen teilen den `unique`-Suffix in der E-Mail).
+        const modelsRes = await request.get('/api/management/models?q=' + encodeURIComponent(unique), {
+            headers: { 'Accept': 'application/json', 'Cookie': helper.getAdminToken() },
+        });
+        const createdModels = await modelsRes.json() as Array<{ customer_id: string }>;
+        for (const model of createdModels) {
+            await helper.deleteModelCustomer(model.customer_id);
+        }
+    });
+
+    test('Datei-Level-422 zeigt die Server-Meldung im allgemeinen Fehlerbereich und erlaubt einen Retry', { tag: ['@feature:model-registration'] }, async ({ page, request }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        const unique = Math.random().toString(36).substring(2, 10);
+
+        // 1. Admin legt eine Einladung nur mit Label an → kopierbarer Magic Link.
+        await auth.login(adminUser.email, adminUser.password);
+        await sidebar.navigateTo('Models');
+        await expect(page.locator('main').getByRole('heading', { name: 'Models', exact: true })).toBeVisible({ timeout: 15000 });
+        await page.getByTestId('model-invite-open').click();
+
+        await page.getByLabel('Name / Notiz').fill(`Dateigroesse ${unique}`);
+        await page.getByTestId('model-invite-dialog').getByRole('button', { name: 'Einladung erstellen' }).click();
+        await expect(page.locator('.toast')).toContainText('Einladung wurde angelegt');
+
+        const link = await page.getByTestId('model-invite-link').inputValue();
+        expect(link).toContain('/model-registrierung/');
+
+        await auth.logout();
+
+        // 2. Gast öffnet den Magic Link (externe Einladung) und füllt die Person.
+        await page.goto(link);
+        await expect(page.locator('main').getByRole('heading', { name: 'Model-Registrierung' })).toBeVisible({ timeout: 15000 });
+
+        await fillPerson(page, 0, {
+            firstName: 'Maria',
+            lastName: 'Muster',
+            birthdate: '1995-05-05',
+            email: `maria-datei-${unique}@example.com`,
+            phone: '+43 660 1234567',
+            city: 'Linz',
+            experienceIndex: '3',
+            withAgeProof: true,
+        });
+
+        // 3. Der Submit wird mit einem Datei-Level-422 beantwortet. `file` hat im
+        //    Formular keinen Renderer (der Store antwortet mit einem nackten
+        //    `file`-Key), deshalb muss der Servertext im allgemeinen
+        //    Fehlerbereich landen — sonst sieht die Person nur einen leeren
+        //    Hinweis ohne markiertes Feld.
+        await page.route('**/api/model-registration/**', async route => {
+            if (route.request().method() !== 'POST') {
+                await route.fallback();
+                return;
+            }
+            await route.fulfill({
+                status: 422,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    message: FILE_LEVEL_ERROR_MESSAGE,
+                    errors: { file: [FILE_LEVEL_ERROR_MESSAGE] },
+                }),
+            });
+        });
+
+        await page.getByRole('button', { name: 'Registrierung absenden' }).click();
+
+        const generalError = page.locator('main').getByTestId('model-registration-general-error');
+        await expect(generalError).toContainText(FILE_LEVEL_ERROR_MESSAGE, { timeout: 15000 });
+        // Das Formular bleibt nutzbar: der Fehler steht außerhalb der Felder.
+        await expect(page.locator('main').getByRole('button', { name: 'Registrierung absenden' })).toBeVisible();
+
+        // 4. Mock entfernen und erneut absenden → die Registrierung läuft durch.
+        await page.unroute('**/api/model-registration/**');
+        await page.getByRole('button', { name: 'Registrierung absenden' }).click();
+        await expect(page.locator('main').getByRole('heading', { name: 'Registrierung erfolgreich' })).toBeVisible({ timeout: 20000 });
+
+        // 5. Cleanup: die im öffentlichen Flow erzeugte CRM-Customer entfernen.
         const modelsRes = await request.get('/api/management/models?q=' + encodeURIComponent(unique), {
             headers: { 'Accept': 'application/json', 'Cookie': helper.getAdminToken() },
         });
