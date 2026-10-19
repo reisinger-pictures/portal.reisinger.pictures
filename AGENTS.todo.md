@@ -1870,12 +1870,3 @@ umgebungsabhängig zu warnen. Bundel- und Backend-Modus stimmen überein (beide 
 Balance ist im erwarteten Modus abrufbar, das Konto ist vollständig freigeschaltet.
 *Quelle:* die fünf Befundtexte der Oberfläche (Owner, 2026-10-15). Konto- und Endpunkt-ID sind
 hier bewusst **nicht** zitiert — sie stehen im Befund der Oberfläche selbst.
-
-- [ ] **CI-Preflight nachziehen** (Folge-Commit, bewusst nicht in den Selbsttest-Commit gemischt):
-  `.github/workflows/ci.yml` — der Schritt „Ensure Stripe test keys are configured" prüft **nur**
-  `secrets.STRIPE_SECRET != ''`, während seine Fehlermeldung **drei** Secrets nennt
-  (`STRIPE_SECRET`, `STRIPE_KEY`, `STRIPE_WEBHOOK_SECRET`). Seit dem Selbsttest hängt erstmals ein
-  E2E-Test an einem nicht-leeren `STRIPE_WEBHOOK_SECRET` (Prüfung 1 `local_key_mode`): fehlte es,
-  gäbe es genau **einen** roten `@smoke`-Test ohne erkennbare Ursache. Guard auf alle drei Namen
-  erweitern. Beleg: `gh secret list` → `STRIPE_WEBHOOK_SECRET` gesetzt am 2026-10-15T09:57:12Z;
-  der Fall ist heute **nicht** eingetreten, es geht um den künftigen.
