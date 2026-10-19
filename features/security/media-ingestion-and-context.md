@@ -2,7 +2,7 @@
 
 ## Raster image validation
 
-`PhotoProcessingService::inspectRasterImage()` is the shared server-side content check for gallery uploads and FTP imports. It accepts only JPEG, PNG, and WebP content when the image header, detected file MIME, byte budget, dimensions, and total-pixel budget agree. Upload-provided MIME headers are not persisted. `ImageController` and `FtpController` store the detected type and choose the stored extension from that type; an invalid FTP image is rejected before it is copied to the photo disk, and its inbox copy remains available for correction.
+`PhotoProcessingService::inspectRasterImage()` is the shared server-side content check for gallery uploads and FTP imports. It accepts only JPEG, PNG, and WebP content when the image header, detected file MIME, byte budget, dimensions, and total-pixel budget agree. Upload-provided MIME headers are not persisted. `ImageController` and `FtpInboxImporter` store the detected type and choose the stored extension from that type; an invalid FTP image is rejected before it is copied to the photo disk, and its inbox copy remains available for correction.
 
 `ModelFileStore::storeUpload()` accepts raster images and PDFs. Raster files pass the same pre-decode image budget before GD metadata stripping. PDFs remain encrypted as PDFs and never enter a raster decoder. Unsupported file types are rejected.
 
