@@ -192,11 +192,140 @@ class SftpGoClient
     }
 
     /**
+     * The event action with this name, or null when it does not exist yet.
+     *
+     * Contract verified against `openapi/openapi.yaml` v2.7.6: `GET
+     * /api/v2/eventactions/{name}` answers 200 with a `BaseEventAction` and 404
+     * when the name is unknown — the same shape as `/users/{username}`, so the
+     * idempotent provisioning path reads first and then decides between POST and
+     * PUT. Without the read, a second run would add a second action and a second
+     * rule (409 at best, a duplicate rule at worst).
+     */
+    public function findEventAction(string $name): ?array
+    {
+        $response = $this->call(
+            'event_action_find',
+            $name,
+            fn (PendingRequest $request) => $request->get($this->eventActionPath($name)),
+            allowNotFound: true,
+        );
+
+        if ($response->status() === 404) {
+            return null;
+        }
+
+        return $this->assertJsonObject($response, $name);
+    }
+
+    /**
+     * Adds an event action. Returns the object as SFTPGo rendered it.
+     *
+     * The stored `http_config.headers` may come back masked: SFTPGo hides
+     * confidential data unless `confidential_data=1` is requested. Nothing here
+     * depends on reading the secret back — the provisioning command always writes
+     * the full object, which is also what makes a rotated secret take effect.
+     */
+    public function createEventAction(array $action): array
+    {
+        $name = $this->requireName($action);
+
+        $response = $this->call('event_action_create', $name, fn (PendingRequest $request) => $request->post(
+            $this->eventActionsPath(),
+            $action,
+        ));
+
+        return $this->assertJsonObject($response, $name);
+    }
+
+    /**
+     * Replaces an event action.
+     *
+     * `PUT /api/v2/eventactions/{name}` takes the full `BaseEventAction`, so the
+     * command builds the complete object rather than a patch. That is deliberate:
+     * the endpoint has no partial update, and a "send only what changed" call
+     * would silently clear the endpoint URL or the headers.
+     */
+    public function updateEventAction(string $name, array $action): void
+    {
+        $this->call('event_action_update', $name, fn (PendingRequest $request) => $request->put(
+            $this->eventActionPath($name),
+            $action,
+        ));
+    }
+
+    /** The event rule with this name, or null when it does not exist yet. */
+    public function findEventRule(string $name): ?array
+    {
+        $response = $this->call(
+            'event_rule_find',
+            $name,
+            fn (PendingRequest $request) => $request->get($this->eventRulePath($name)),
+            allowNotFound: true,
+        );
+
+        if ($response->status() === 404) {
+            return null;
+        }
+
+        return $this->assertJsonObject($response, $name);
+    }
+
+    /**
+     * Adds an event rule. The body is an `EventRuleMinimal`: the action is
+     * referenced by name, not by id, so the rule can be written in the same run
+     * that created the action.
+     */
+    public function createEventRule(array $rule): array
+    {
+        $name = $this->requireName($rule);
+
+        $response = $this->call('event_rule_create', $name, fn (PendingRequest $request) => $request->post(
+            $this->eventRulesPath(),
+            $rule,
+        ));
+
+        return $this->assertJsonObject($response, $name);
+    }
+
+    /** Replaces an event rule (full `EventRuleMinimal`, same reasoning as the action). */
+    public function updateEventRule(string $name, array $rule): void
+    {
+        $this->call('event_rule_update', $name, fn (PendingRequest $request) => $request->put(
+            $this->eventRulePath($name),
+            $rule,
+        ));
+    }
+
+    /**
+     * The object name is the path segment and the log label.
+     *
+     * It is part of the payload the caller builds, so an absent one is a
+     * programming error here rather than a request the service would reject with
+     * a 400 that reads like a transport problem.
+     */
+    private function requireName(array $payload): string
+    {
+        $name = $payload['name'] ?? null;
+
+        if (! is_string($name) || $name === '') {
+            throw SftpGoException::invalidRequest('event', 'Der Name der Event-Aktion bzw. -Regel fehlt.');
+        }
+
+        return $name;
+    }
+
+    /**
      * Runs one Admin API call: one log record, one exception type, no retries.
+     *
+     * `$allowNotFound` is for the idempotent provisioning path: "the object does
+     * not exist yet" is the normal first-run state there, not a failure, and
+     * turning it into an exception would make a create look like an error. It
+     * does not swallow the status — the caller still inspects it — and it does
+     * not downgrade a 404 for anything else.
      *
      * @param  Closure(PendingRequest): Response  $call
      */
-    private function call(string $operation, string $username, Closure $call): Response
+    private function call(string $operation, string $username, Closure $call, bool $allowNotFound = false): Response
     {
         $startedAt = microtime(true);
 
@@ -210,9 +339,11 @@ class SftpGoClient
             throw SftpGoException::unreachable($username, $exception);
         }
 
-        $this->logCall($operation, $username, $response, $startedAt);
+        $expectedAbsent = $allowNotFound && $response->status() === 404;
 
-        if ($response->failed()) {
+        $this->logCall($operation, $username, $response, $startedAt, $expectedAbsent);
+
+        if ($response->failed() && ! $expectedAbsent) {
             throw SftpGoException::fromStatus($username, $response->status());
         }
 
@@ -280,6 +411,26 @@ class SftpGoClient
         return $this->usersPath().'/'.rawurlencode($username);
     }
 
+    private function eventActionsPath(): string
+    {
+        return $this->baseUrl().'/api/v2/eventactions';
+    }
+
+    private function eventActionPath(string $name): string
+    {
+        return $this->eventActionsPath().'/'.rawurlencode($name);
+    }
+
+    private function eventRulesPath(): string
+    {
+        return $this->baseUrl().'/api/v2/eventrules';
+    }
+
+    private function eventRulePath(string $name): string
+    {
+        return $this->eventRulesPath().'/'.rawurlencode($name);
+    }
+
     /**
      * JWT fallback. Cached per instance: the container resolves this class per
      * request, so a queue worker re-authenticates on its own once the token
@@ -343,7 +494,7 @@ class SftpGoClient
      * body *length*. Never the body, never a header, never a password — the
      * request body of `provisionUser` is the camera password.
      */
-    private function logCall(string $operation, string $account, ?Response $response, float $startedAt): void
+    private function logCall(string $operation, string $account, ?Response $response, float $startedAt, bool $expectedAbsent = false): void
     {
         $status = $response?->status();
         $context = [
@@ -353,6 +504,15 @@ class SftpGoClient
             'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
             'body_length' => $response === null ? null : strlen((string) $response->body()),
         ];
+
+        if ($expectedAbsent) {
+            // The documented "not there yet" of an idempotent provisioning run.
+            // Logged at info level on purpose: an error line for the normal
+            // first run is how a log stops being read.
+            Log::info('SFTPGo Admin-API Aufruf: Objekt existiert nicht', $context);
+
+            return;
+        }
 
         if ($status === null || $status >= 400) {
             Log::error('SFTPGo Admin-API Aufruf fehlgeschlagen', $context);

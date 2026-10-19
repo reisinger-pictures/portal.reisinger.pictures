@@ -13,11 +13,12 @@ use Illuminate\Http\Request;
  * Camera credential endpoint (P1-M33).
  *
  * A separate controller from `FtpController` on purpose. That one is the import
- * pipeline, and feature doc 7.8 fixes its shape: `getInboxPath()`,
- * `setTarget()`, `status()` and `process()` stay as they are, with no SFTPGo
- * contact in the read or import path. The reset is the opposite of that — it is
- * nothing but an SFTPGo write — so putting it in `FtpController` would have made
- * the class do two unrelated jobs and given the import path a reason to change.
+ * pipeline, and feature doc 7.8 fixes its shape: `setTarget()`, `status()` and
+ * `process()` stay as they are, with no SFTPGo contact in the read or import path
+ * (the import itself now lives in `FtpInboxImporter`, D-36). The reset is the
+ * opposite of that — it is nothing but an SFTPGo write — so putting it in
+ * `FtpController` would have made the class do two unrelated jobs and given the
+ * import path a reason to change.
  */
 class FtpCredentialController extends Controller
 {

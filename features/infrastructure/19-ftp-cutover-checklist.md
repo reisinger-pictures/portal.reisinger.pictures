@@ -15,7 +15,7 @@
       Restore funktioniert
 - [ ] **SFTPGo-Ordner auf dem Host:** `ftp/<slug>` mit `1002:webgroup` und
       `2775` (setgid, Gruppe schreibbar, **Welt nicht schreibbar**) — neue Dateien
-      erben die Gruppe. **Geändert 2026-09-28, siehe `AGENTS.md` §14/D-2:** vorher
+      erben die Gruppe. **Geändert 2026-09-28, D-2 (FTP inbox directory provisioning):** vorher
       stand hier `2777`. **Nicht** `2755` — damit kann UID 1000 weder anlegen noch
       `unlink`en, und `FtpController::process()` macht genau das. Kein gemeinsamer
       `r1`-User mehr; jeder User bekommt sein eigenes Home. Ab D-2 legt das Portal

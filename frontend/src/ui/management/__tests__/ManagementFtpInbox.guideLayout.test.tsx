@@ -9,7 +9,7 @@ vi.mock('../../../logic/useFtp', () => ({
     useFtp: vi.fn(),
 }));
 
-vi.mock('../../logic/useGalleries', () => ({
+vi.mock('../../../logic/useGalleries', () => ({
     useProtectedGalleries: () => ({ tree: undefined }),
 }));
 
@@ -69,6 +69,8 @@ describe('ManagementFtpInbox camera guide layout', () => {
         vi.mocked(useFtp).mockReturnValue({
             status,
             isLoading: false,
+            error: undefined,
+            readSettled: true,
             setTargetGallery: vi.fn(),
             processInbox: vi.fn(),
             resetCredentials: vi.fn(),

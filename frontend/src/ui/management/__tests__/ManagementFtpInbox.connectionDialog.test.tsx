@@ -9,7 +9,7 @@ vi.mock('../../../logic/useFtp', () => ({
     useFtp: vi.fn(),
 }));
 
-vi.mock('../../logic/useGalleries', () => ({
+vi.mock('../../../logic/useGalleries', () => ({
     useProtectedGalleries: () => ({ tree: undefined }),
 }));
 
@@ -42,6 +42,8 @@ function mockStatus(overrides: Partial<FtpStatus> = {}) {
     vi.mocked(useFtp).mockReturnValue({
         status: { ...status, ...overrides },
         isLoading: false,
+        error: undefined,
+        readSettled: true,
         setTargetGallery: vi.fn(),
         processInbox: vi.fn(),
         resetCredentials: vi.fn(),

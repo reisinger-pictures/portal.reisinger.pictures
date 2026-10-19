@@ -60,16 +60,32 @@ const jsonResponse = (data: unknown, status = 200) => new Response(
     {status, headers: {'Content-Type': 'application/json'}},
 );
 
-const renderFtp = () => {
+const renderFtp = (cache = new Map()) => {
     // `createElement` rather than JSX: this file is a `.ts` module, and the test
-    // only needs a context provider, not a component tree.
+    // only needs a context provider, not a component tree. No `dedupingInterval`
+    // override: the hook reads for itself on mount, so the production default is
+    // what the tests should exercise.
     const wrapper = ({children}: {children: ReactNode}) => createElement(
         SWRConfig,
-        {value: {provider: () => new Map(), dedupingInterval: 0}},
+        {value: {provider: () => cache}},
         children,
     );
 
     return renderHook(() => useFtp(), {wrapper});
+};
+
+const STATUS_KEY = '/api/management/ftp/status';
+
+/**
+ * The state SWR writes when a request settles: `isValidating: false` and
+ * `isLoading: false` alongside the data. A test that seeds the cache with this
+ * shape reproduces the warm-cache remount — the state the singleton holds on the
+ * next mount, not a synthetic shortcut.
+ */
+const warmCacheWith = (status: FtpStatus) => {
+    const cache = new Map();
+    cache.set(STATUS_KEY, {data: status, error: undefined, isValidating: false, isLoading: false});
+    return cache;
 };
 
 describe('useFtp', () => {
@@ -127,7 +143,7 @@ describe('useFtp', () => {
         expect(result.current.status?.ftp_provisioned_at).toBe('2026-09-26T10:11:12.000000Z');
     });
 
-    it('refetches the status after an import so the queue count and the account state stay truthful', async () => {
+    it('hands the processed count back and leaves the reload to the caller', async () => {
         const fetchMock = vi.fn().mockImplementation((url: string) => {
             if (url.endsWith('/process')) {
                 return Promise.resolve(jsonResponse({success: true, processed: 2}));
@@ -146,9 +162,75 @@ describe('useFtp', () => {
         });
 
         expect(processed).toBe(2);
-        // The refetch is what keeps the provisioning fields in step too: a reset
-        // or a provisioning done elsewhere has to appear without a page reload.
-        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+
+        // The import itself reads the status exactly once (the initial load) and
+        // no more: reloading the queue is the caller's next step, and doing it
+        // here as well would make every import read `/status` twice for a single
+        // visible change (see the hook's `processInbox` docblock).
+        const statusReads = () => fetchMock.mock.calls.filter(([url]) => !String(url).endsWith('/process')).length;
+        expect(statusReads()).toBe(1);
+
+        // …and the exposed `mutate` is that reload: it has to actually refetch,
+        // otherwise a caller that processes and reloads would show a stale queue.
+        await act(async () => {
+            await result.current.mutate();
+        });
+        await waitFor(() => expect(statusReads()).toBe(2));
+    });
+});
+
+/**
+ * The mount read (B1). `useFtp` reads once for itself on mount and reports when
+ * that read has settled, together with its error — the freshness signal the FTP
+ * inbox's one-shot catch-up run needs. The SWR cache is a module-wide singleton,
+ * so a remount renders the cached status with `isLoading === false` and
+ * `isValidating === false` *before* any read for that mount has even started;
+ * neither flag separates a leftover cache value from a freshly read one.
+ * `readSettled`/`error` do: the former turns true only once this mount's
+ * explicit `mutate()` has settled, the latter is set when it failed.
+ */
+describe('useFtp mount read', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('reads for itself on mount, even when the cache already holds a value', async () => {
+        const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse({...BASE_STATUS, file_count: 3})));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp(warmCacheWith({...BASE_STATUS, file_count: 0}));
+
+        // The cached value is on screen immediately…
+        expect(result.current.status?.file_count).toBe(0);
+        // …but this mount has not settled a read of its own yet.
+        expect(result.current.readSettled).toBe(false);
+
+        await waitFor(() => expect(result.current.readSettled).toBe(true));
+        // The value the decision is based on is the freshly read one, not the cache.
+        expect(result.current.status?.file_count).toBe(3);
+        // Exactly one read: SWR's own mount revalidation is off, so this is the
+        // explicit `mutate()` and nothing else.
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('settles with an error when the mount read fails, without inventing a value', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockImplementation(
+            () => Promise.resolve(jsonResponse({error: 'Der FTP-Dienst ist nicht erreichbar.'}, 500)),
+        ));
+
+        const {result} = renderFtp(warmCacheWith({...BASE_STATUS, file_count: 0}));
+
+        await waitFor(() => expect(result.current.readSettled).toBe(true));
+
+        // The read settled, but it failed: `error` is set and the leftover cache
+        // value must not read as confirmed. This is what keeps the catch-up from
+        // spending its single attempt on a value the read could not vouch for.
+        expect(result.current.error).toBeDefined();
+        expect(result.current.status?.file_count).toBe(0);
     });
 });
 
