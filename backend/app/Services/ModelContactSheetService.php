@@ -34,6 +34,12 @@ use InvalidArgumentException;
  * Bilder werden entschlüsselt ({@see ModelFileStore::getDecrypted}) und als
  * Data-URI in die Blade-View eingebettet: DomPDF macht keine externen
  * Requests, und es entsteht keine dauerhafte Klartext-Ablage auf Disk.
+ * Gespeicherte Fotos, die das Budget für persistierte Modellfotos
+ * überschreiten oder sich nicht decodieren lassen, werden wie andere
+ * unbrauchbare Fotos ausgelassen. Die Garantie lautet **keine ungeprüften
+ * Bytes**: jedes eingebettete Foto hat die Byte-/MIME-/Dimensions-Vorprüfung
+ * und einen erfolgreichen GD-Decode hinter sich. Sie lautet nicht „keine
+ * Rohbytes" — JPEG/PNG werden danach unverändert weitergereicht.
  *
  * Labels/Codes kommen ausschließlich aus {@see ModelQuestionnaire} — die
  * Farb-/Label-Logik wird nicht dupliziert, sondern über die dort zentral
@@ -316,14 +322,18 @@ class ModelContactSheetService
             return null;
         }
 
-        $dataUri = $this->imageDataUri($contents, $photo->mime_type);
+        $size = $this->inspectRasterImage($contents, $photo->mime_type);
+        if ($size === null) {
+            return null;
+        }
+
+        $dataUri = $this->imageDataUri($contents, $size['mime_type']);
         if ($dataUri === null) {
             return null;
         }
 
-        $size = @getimagesizefromstring($contents) ?: null;
         [$maxWidth, $maxHeight] = $isPrimary ? [520, 360] : [250, 190];
-        [$width, $height] = $this->fit((int) ($size[0] ?? 0), (int) ($size[1] ?? 0), $maxWidth, $maxHeight);
+        [$width, $height] = $this->fit($size['width'], $size['height'], $maxWidth, $maxHeight);
 
         return [
             'dataUri' => $dataUri,
@@ -338,28 +348,97 @@ class ModelContactSheetService
     }
 
     /**
+     * Prüft die entschlüsselten Bytes, bevor ein Raster-Decoder sie sieht.
+     *
+     * Die Obergrenze ist {@see PhotoProcessingService::MAX_IMAGE_BYTES} — und
+     * zwar, weil genau diese Grenze {@see ModelFileStore::storeUpload()} nach
+     * dem GD-Re-Encode für das durchsetzt, was überhaupt persistiert werden
+     * darf. Der Kontaktbogen spiegelt damit keine zweite Zahl (und schon gar
+     * nicht das 10-MiB-Gate der **Quelldatei**), sondern liest dieselbe
+     * Invariante: ein konform gespeichertes Foto kann hier nie am Byte-Cap
+     * scheitern, auch wenn der Re-Encode die Upload-Datei legal aufbläht.
+     *
+     * Legacy: Dateien, die vor dieser Grenze gespeichert wurden, können
+     * größer sein. Sie werden fail-closed ausgelassen (kein Fallback auf
+     * ungeprüfte Bytes), nicht nachträglich verkleinert.
+     *
+     * @return array{width: int, height: int, mime_type: string}|null
+     */
+    private function inspectRasterImage(string $contents, ?string $mime): ?array
+    {
+        $maxBytes = PhotoProcessingService::MAX_IMAGE_BYTES;
+        $bytes = strlen($contents);
+        if ($bytes < 1 || $bytes > $maxBytes) {
+            return null;
+        }
+
+        $image = @getimagesizefromstring($contents);
+        if (! is_array($image)) {
+            return null;
+        }
+
+        $imageMime = $image['mime'] ?? null;
+        $detectedMime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($contents);
+        if (! is_string($imageMime) || ! is_string($detectedMime)
+            || $imageMime !== $detectedMime
+            || ! in_array($detectedMime, ['image/jpeg', 'image/png', 'image/webp'], true)
+            || ($mime !== null && $detectedMime !== $mime)) {
+            return null;
+        }
+
+        $width = (int) ($image[0] ?? 0);
+        $height = (int) ($image[1] ?? 0);
+        if (! PhotoProcessingService::isWithinImageBudget($bytes, $width, $height, $maxBytes)) {
+            return null;
+        }
+
+        return ['width' => $width, 'height' => $height, 'mime_type' => $detectedMime];
+    }
+
+    /**
      * Baut eine Data-URI. WebP wird über GD nach JPEG normalisiert, damit
      * das PDF nicht an einem fehlenden DomPDF/Imagick-Codec scheitert.
+     *
+     * Gibt `null` zurück, wenn GD die Bytes nicht decodieren kann; der
+     * Aufrufer lässt das Foto dann aus. Die Garantie ist „keine ungeprüften
+     * Bytes": JPEG/PNG werden nach erfolgreichem Decode roh weitergereicht
+     * (DomPDF erwartet den Original-Container), aber der Decode ist die
+     * Bedingung dafür. Ein Fallback **ohne** Decode würde genau die Dateien
+     * einbetten, die die Vorprüfung abweisen soll.
      */
-    private function imageDataUri(string $contents, ?string $mime): ?string
+    protected function imageDataUri(string $contents, ?string $mime): ?string
     {
         $mime = $mime ?: 'image/jpeg';
 
-        if ($mime === 'image/webp' && function_exists('imagecreatefromstring') && function_exists('imagejpeg')) {
-            $image = @imagecreatefromstring($contents);
-            if ($image !== false) {
-                ob_start();
-                $ok = imagejpeg($image, null, 88);
-                $jpeg = (string) ob_get_clean();
-                imagedestroy($image);
-
-                if ($ok && $jpeg !== '') {
-                    return 'data:image/jpeg;base64,'.base64_encode($jpeg);
-                }
-            }
+        if (! function_exists('imagecreatefromstring')
+            || ($mime === 'image/webp' && ! function_exists('imagejpeg'))) {
+            return null;
         }
 
+        $image = $this->decodeRaster($contents);
+        if ($image === false) {
+            // Invalid stored images follow the existing omit-unusable-photo policy;
+            // never pass bytes that GD could not decode through to DomPDF.
+            return null;
+        }
+
+        if ($mime === 'image/webp') {
+            ob_start();
+            $ok = @imagejpeg($image, null, 88);
+            $jpeg = (string) ob_get_clean();
+            imagedestroy($image);
+
+            return $ok && $jpeg !== '' ? 'data:image/jpeg;base64,'.base64_encode($jpeg) : null;
+        }
+
+        imagedestroy($image);
+
         return 'data:'.$mime.';base64,'.base64_encode($contents);
+    }
+
+    protected function decodeRaster(string $contents): \GdImage|false
+    {
+        return @imagecreatefromstring($contents);
     }
 
     /**

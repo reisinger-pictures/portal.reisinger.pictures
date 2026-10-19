@@ -50,6 +50,15 @@ function mapServerErrorKey(key: string): string {
 }
 
 /**
+ * Server error keys the registration form renders an inline error for. Anything
+ * else has no renderer: a `setError()` on such a key lands in `errors.<key>`
+ * where no field reads it, so the message would silently disappear. The file
+ * store rejects with a bare `file` key (`ModelFileStore::storeUpload()`), which
+ * matches no field path here — it must surface in the general error area.
+ */
+const RENDERED_ERROR_KEY = /^(?:persons\.\d+\.(?:answers\..+|age_proof|photos)|act_answers\..+)$/;
+
+/**
  * A 422 from the backend carries Laravel's `{errors: {key: [msg]}}` payload.
  * `ApiError` is an interface (not a class), so detect it structurally.
  */
@@ -737,13 +746,23 @@ export function RegistrationForm({ catalog, submit, onSubmitted, onFatalError }:
 
             const validationErrors = extractValidationErrors(error);
             if (validationErrors) {
+                // Field-bound keys keep their inline error. Keys no renderer
+                // reads (e.g. the file store's bare `file`) would otherwise be
+                // invisible, so their server text surfaces in the general error
+                // area instead of a bare "check the fields" hint.
+                const unmappedMessages: string[] = [];
                 for (const [key, messages] of Object.entries(validationErrors)) {
-                    setError(mapServerErrorKey(key) as FieldPath<RegistrationFormValues>, {
-                        type: 'server',
-                        message: messages[0] ?? t`Ungültiger Wert.`,
-                    });
+                    const message = messages[0] ?? t`Ungültiger Wert.`;
+                    const mapped = mapServerErrorKey(key);
+                    if (RENDERED_ERROR_KEY.test(mapped)) {
+                        setError(mapped as FieldPath<RegistrationFormValues>, { type: 'server', message });
+                    } else {
+                        unmappedMessages.push(message);
+                    }
                 }
-                setSubmitError(t`Bitte prüfe die markierten Felder.`);
+                setSubmitError(unmappedMessages.length > 0
+                    ? unmappedMessages.join(' ')
+                    : t`Bitte prüfe die markierten Felder.`);
                 return;
             }
             setSubmitError(errorMessage(error, t`Fehler beim Absenden.`));
