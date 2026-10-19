@@ -111,6 +111,11 @@ class PhotoDownloadController extends Controller
             abort(401, 'Unauthorized access to this gallery.');
         }
 
+        // D-44: the re-resolved actor must keep the transient claims of the
+        // request. Without them a registered client who redeemed an invite
+        // loses the grant and is refused the media of their own gallery.
+        ActorIdentity::carryTransientClaims($actor, $current);
+
         return $current;
     }
 

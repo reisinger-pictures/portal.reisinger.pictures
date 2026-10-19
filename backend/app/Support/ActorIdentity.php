@@ -121,6 +121,31 @@ final class ActorIdentity
             ->where('guest_id', $guestId);
     }
 
+    /**
+     * Carry the transient claims of the request's actor onto a re-resolved
+     * actor.
+     *
+     * The transient claims — the invite provenance and the gallery grants it
+     * carries — live on the actor instance of the request, not in the
+     * database: the signed token carries them and the provider validates
+     * them before it fills the runtime properties. A controller that
+     * re-resolves the registered actor from the database would otherwise drop
+     * them silently and deny an actor that the provider already validated
+     * for this request.
+     *
+     * The claims are copied verbatim: they are neither derived, widened nor
+     * read from the database. They are the provenance of the request, and the
+     * authorization layer re-validates them against the live invite state
+     * (revocation, expiry), so the copy is not a new authorization.
+     */
+    public static function carryTransientClaims(User $actor, User $resolved): void
+    {
+        $resolved->transient_galleries = $actor->transient_galleries;
+        $resolved->transient_meta_galleries = $actor->transient_meta_galleries;
+        $resolved->transient_invites = $actor->transient_invites;
+        $resolved->transient_invite_ids = $actor->transient_invite_ids;
+    }
+
     public static function ownsOrder(Order $order, ?User $actor): bool
     {
         $registeredId = self::registeredId($actor);
