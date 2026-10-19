@@ -34,6 +34,9 @@
         .vis-internal { color: #b45309; }
 
         .answer-section { page-break-inside: avoid; }
+        .omission-note { margin-top: 10px; padding: 6px 9px; border: 1px solid #d9d9d9; background-color: #f7f7f7; font-size: 10px; color: #555; }
+        .omission-note .omission-title { font-weight: bold; color: {{ $primaryColor }}; }
+        .omission-note ul { margin: 3px 0 0; padding-left: 16px; }
         .footer { margin-top: 22px; border-top: 1px solid #ddd; padding-top: 6px; font-size: 9px; color: #888; text-align: center; }
 
         .watermark { position: fixed; transform: rotate(-38deg); font-size: 32px; font-weight: bold; color: #ededed; letter-spacing: 2px; white-space: nowrap; }
@@ -112,6 +115,25 @@
             @endforeach
         </table>
     @endif
+@endif
+
+@if(($omissions['total'] ?? 0) > 0)
+    {{-- D-41: Ausgelassene Fotos werden benannt (Anzahl + Grund), nicht stillschweigend verworfen.
+         Der Hinweis enthält nur Zählwerte und Grundbezeichnungen — keine PII.
+         Die zwei Kategorien (gescheiterte Prüfung / Foto-Limit) bleiben getrennt. --}}
+    <div class="omission-note">
+        <span class="omission-title">{{ $omissions['title'] }}: {{ $omissions['total'] }}</span>
+        <ul>
+            @if($omissions['checkTotal'] > 0)
+                @foreach($omissions['checkLines'] as $line)
+                    <li>{{ $line }}</li>
+                @endforeach
+            @endif
+            @if($omissions['limitTotal'] > 0)
+                <li>{{ $omissions['limitLine'] }}</li>
+            @endif
+        </ul>
+    </div>
 @endif
 
 @if($isExternal)

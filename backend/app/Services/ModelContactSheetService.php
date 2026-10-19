@@ -41,9 +41,21 @@ use InvalidArgumentException;
  * und einen erfolgreichen GD-Decode hinter sich. Sie lautet nicht „keine
  * Rohbytes" — JPEG/PNG werden danach unverändert weitergereicht.
  *
+ * Ausgelassene Fotos werden **nicht stillschweigend** verworfen (D-41): der
+ * Kontaktbogen nennt die Anzahl und den Grund der Auslassung
+ * ({@see self::OMISSION_PRECEDENCE}). Zwei Kategorien bleiben getrennt:
+ * Fotos, die an einer Prüfung gescheitert sind (Byte-Limit, nicht
+ * dekodierbar, MIME-Prüfung, Größen-/Pixel-Limit, fehlende Datei), und
+ * Fotos, die nie Kandidaten waren, weil {@see self::MAX_PHOTOS} das
+ * Speicher-Limit gesetzt hat. Der Hinweis enthält ausschließlich Zählwerte
+ * und Grundbezeichnungen — keine Dateinamen, keine Kunden-Daten, keine
+ * Foto-Kennungen (PII-frei, auch in der externen Variante).
+ *
  * Labels/Codes kommen ausschließlich aus {@see ModelQuestionnaire} — die
  * Farb-/Label-Logik wird nicht dupliziert, sondern über die dort zentral
  * definierten `EXPERIENCE_LABELS`/`WILLINGNESS_LABELS`/Kategorien aufgelöst.
+ * Die Labels der Auslassungsgründe gehören nicht dazu: sie haben keinen
+ * Katalog und stehen in {@see self::OMISSION_LABELS}.
  */
 class ModelContactSheetService
 {
@@ -62,6 +74,62 @@ class ModelContactSheetService
      */
     public const MAX_PHOTOS = 12;
 
+    /**
+     * Gründe, warum ein Foto nicht im Kontaktbogen landet (D-41).
+     *
+     * Jedes ausgelassene Foto wird **genau einmal** gezählt — unter seinem
+     * primären Grund. Die Reihenfolge in {@see self::OMISSION_PRECEDENCE}
+     * bestimmt diesen primären Grund, wenn mehrere Gründe zutreffen.
+     */
+    public const OMISSION_UNAVAILABLE = 'unavailable';
+
+    public const OMISSION_BYTE = 'byte';
+
+    public const OMISSION_DECODE = 'decode';
+
+    public const OMISSION_MIME = 'mime';
+
+    public const OMISSION_DIMENSIONS = 'dimensions';
+
+    /**
+     * Präzedenz des primären Grundes (erster Treffer gewinnt):
+     *
+     *  1. `unavailable` — die Datei fehlt im Store bzw. der Inhalt ist leer.
+     *  2. `byte` — die Bytes überschreiten `PhotoProcessingService::MAX_IMAGE_BYTES`.
+     *  3. `decode` — die Bytes sind kein parsebares Raster (JPEG/PNG/WebP).
+     *  4. `mime` — die erkannte MIME weicht von der gespeicherten
+     *     `mime_type` ab (oder ist kein unterstützter Typ).
+     *  5. `dimensions` — Kantenlänge bzw. Pixelzahl verletzen das Bild-Budget.
+     *
+     * `byte` steht vorn, weil der Byte-Cap die erste Prüfung der Pipeline
+     * ist; `decode` steht vor `mime`, weil ein nicht parsebares Raster die
+     * MIME-Abweichung erst verursacht (der MIME-Befund wäre dann eine
+     * Folge, keine eigenständige Ursache).
+     */
+    public const OMISSION_PRECEDENCE = [
+        self::OMISSION_UNAVAILABLE,
+        self::OMISSION_BYTE,
+        self::OMISSION_DECODE,
+        self::OMISSION_MIME,
+        self::OMISSION_DIMENSIONS,
+    ];
+
+    /**
+     * Anzeige-Labels der Auslassungsgründe (deutsch, PII-frei).
+     */
+    public const OMISSION_LABELS = [
+        self::OMISSION_UNAVAILABLE => 'Datei nicht verfügbar',
+        self::OMISSION_BYTE => 'Byte-Limit',
+        self::OMISSION_DECODE => 'nicht dekodierbar',
+        self::OMISSION_MIME => 'MIME-Prüfung',
+        self::OMISSION_DIMENSIONS => 'Größen-/Pixel-Limit',
+    ];
+
+    /**
+     * Überschrift des Auslassungs-Hinweises im PDF.
+     */
+    public const OMISSION_NOTE_TITLE = 'Nicht enthaltene Fotos';
+
     public function __construct(
         private readonly ModelFileStore $fileStore,
         private readonly ModelQuestionnaire $questionnaire,
@@ -77,6 +145,7 @@ class ModelContactSheetService
 
         $external = $variant === self::VARIANT_EXTERNAL;
         $brand = $this->brandConfig($profile);
+        $selection = $this->selectPhotos($profile, $external);
 
         $data = array_merge([
             'variant' => $variant,
@@ -87,7 +156,8 @@ class ModelContactSheetService
             'secondaryColor' => $brand->secondaryColor,
             'logoDataUri' => $this->logoDataUri($brand),
             'watermarkText' => $external ? $brand->name : null,
-            'photos' => $this->photos($profile, $external),
+            'photos' => $selection['photos'],
+            'omissions' => $selection['omissions'],
         ], $external ? $this->externalData($profile) : $this->internalData($profile));
 
         // `compress => 0`: Die Bilddaten liegen bereits komprimiert als
@@ -273,23 +343,51 @@ class ModelContactSheetService
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * Wählt die Fotos aus und zählt die Auslassungen (D-41).
+     *
+     * Zwei getrennte Kategorien:
+     *  - **Prüfung**: Fotos, die Kandidaten waren, aber eine Prüfung nicht
+     *    bestanden haben (Byte-Limit, Decode, MIME, Größe, fehlende Datei).
+     *  - **Limit**: Fotos, die wegen {@see self::MAX_PHOTOS} nie Kandidat
+     *    waren. Sie sind ausdrücklich **keine** fehlgeschlagene Prüfung und
+     *    werden nie gegen die Prüfungsgründe gezählt.
+     *
+     * @return array{
+     *     photos: array<int, array<string, mixed>>,
+     *     omissions: array{
+     *         total: int,
+     *         checkTotal: int,
+     *         limitTotal: int,
+     *         title: string,
+     *         checkLines: array<int, string>,
+     *         limitLine: string|null
+     *     }
+     * }
      */
-    private function photos(ModelProfile $profile, bool $external): array
+    private function selectPhotos(ModelProfile $profile, bool $external): array
     {
         $primaryId = $profile->photos->firstWhere('is_primary', true)?->id;
 
-        $photos = $profile->photos
-            ->when($external, fn ($collection) => $collection->where('visibility', ModelPhoto::VISIBILITY_PUBLIC))
-            ->take(self::MAX_PHOTOS)
-            ->values();
+        $candidates = $profile->photos
+            ->when($external, fn ($collection) => $collection->where('visibility', ModelPhoto::VISIBILITY_PUBLIC));
+
+        // Fotos hinter dem Speicher-Limit waren nie Kandidaten: sie zählen
+        // als Limit-Auslassung, nicht als gescheiterte Prüfung.
+        $limitOmitted = max(0, $candidates->count() - self::MAX_PHOTOS);
+        $photos = $candidates->take(self::MAX_PHOTOS)->values();
 
         $resolved = [];
+        $reasonCounts = [];
         foreach ($photos as $photo) {
             $embedded = $this->embedPhoto($photo, $photo->id === $primaryId, $external);
-            if ($embedded !== null) {
-                $resolved[] = $embedded;
+            if ($embedded['photo'] !== null) {
+                $resolved[] = $embedded['photo'];
+
+                continue;
             }
+
+            $reason = (string) $embedded['reason'];
+            $reasonCounts[$reason] = ($reasonCounts[$reason] ?? 0) + 1;
         }
 
         // Hauptbild zuerst, damit die View es ohne erneute Suche rendern kann.
@@ -303,48 +401,125 @@ class ModelContactSheetService
             }
         }
 
-        return $resolved;
+        return [
+            'photos' => $resolved,
+            'omissions' => $this->omissionNote($reasonCounts, $limitOmitted),
+        ];
+    }
+
+    /**
+     * Baut den sichtbaren Auslassungs-Hinweis (D-41).
+     *
+     * Der Hinweis nennt ausschließlich Anzahl und Grund — keine Dateinamen,
+     * keine Kunden-Daten, keine Foto-Kennungen. Jedes ausgelassene Foto
+     * erscheint genau einmal: eine gescheiterte Prüfung zählt in
+     * `checkTotal` (mit einer Zeile je Grund in `checkLines`), das Foto-Limit
+     * in `limitTotal` (mit eigener Zeile `limitLine`). Beide Kategorien
+     * bleiben getrennt — die View rendert sie als getrennte Listenpunkte.
+     *
+     * @param  array<string, int>  $reasonCounts
+     * @return array{
+     *     total: int,
+     *     checkTotal: int,
+     *     limitTotal: int,
+     *     title: string,
+     *     checkLines: array<int, string>,
+     *     limitLine: string|null
+     * }
+     */
+    private function omissionNote(array $reasonCounts, int $limitOmitted): array
+    {
+        $checkLines = [];
+        foreach (self::OMISSION_PRECEDENCE as $reason) {
+            $count = $reasonCounts[$reason] ?? 0;
+            if ($count > 0) {
+                $checkLines[] = $this->omissionLine($count, self::OMISSION_LABELS[$reason]);
+            }
+        }
+
+        $checkTotal = array_sum($reasonCounts);
+        $limitLine = $limitOmitted > 0
+            ? $this->omissionLine($limitOmitted, 'Foto-Limit (max. '.self::MAX_PHOTOS.')')
+            : null;
+
+        return [
+            'total' => $checkTotal + $limitOmitted,
+            'checkTotal' => $checkTotal,
+            'limitTotal' => $limitOmitted,
+            'title' => self::OMISSION_NOTE_TITLE,
+            'checkLines' => $checkLines,
+            'limitLine' => $limitLine,
+        ];
+    }
+
+    private function omissionLine(int $count, string $label): string
+    {
+        return $count.' '.($count === 1 ? 'Foto' : 'Fotos').' ausgelassen: '.$label;
     }
 
     /**
      * Entschlüsselt ein Foto und baut eine Data-URI inkl. Anzeigemaßen.
      *
-     * @return array<string, mixed>|null
+     * @return array{photo: array<string, mixed>|null, reason: string|null}
      */
-    private function embedPhoto(ModelPhoto $photo, bool $isPrimary, bool $external): ?array
+    private function embedPhoto(ModelPhoto $photo, bool $isPrimary, bool $external): array
     {
         if (! $photo->path || ! $this->fileStore->exists($photo->path)) {
-            return null;
+            return ['photo' => null, 'reason' => self::OMISSION_UNAVAILABLE];
         }
 
         $contents = $this->fileStore->getDecrypted($photo->path);
         if ($contents === '') {
-            return null;
+            return ['photo' => null, 'reason' => self::OMISSION_UNAVAILABLE];
         }
 
-        $size = $this->inspectRasterImage($contents, $photo->mime_type);
-        if ($size === null) {
-            return null;
+        $inspection = $this->inspectRasterImage($contents, $photo->mime_type);
+        if ($inspection['reasons'] !== []) {
+            return ['photo' => null, 'reason' => $this->primaryReason($inspection['reasons'])];
         }
 
+        $size = $inspection['size'];
         $dataUri = $this->imageDataUri($contents, $size['mime_type']);
         if ($dataUri === null) {
-            return null;
+            return ['photo' => null, 'reason' => self::OMISSION_DECODE];
         }
 
         [$maxWidth, $maxHeight] = $isPrimary ? [520, 360] : [250, 190];
         [$width, $height] = $this->fit($size['width'], $size['height'], $maxWidth, $maxHeight);
 
         return [
-            'dataUri' => $dataUri,
-            // Intern bleibt der Originalname; extern wird die Caption in
-            // `photos()` generisch ersetzt (kein PII-Leak über Dateinamen).
-            'caption' => $external ? null : ($photo->original_name ?: basename($photo->path)),
-            'visibility' => $photo->visibility,
-            'isPrimary' => $isPrimary,
-            'width' => $width,
-            'height' => $height,
+            'photo' => [
+                'dataUri' => $dataUri,
+                // Intern bleibt der Originalname; extern wird die Caption in
+                // `selectPhotos()` generisch ersetzt (kein PII-Leak über Dateinamen).
+                'caption' => $external ? null : ($photo->original_name ?: basename($photo->path)),
+                'visibility' => $photo->visibility,
+                'isPrimary' => $isPrimary,
+                'width' => $width,
+                'height' => $height,
+            ],
+            'reason' => null,
         ];
+    }
+
+    /**
+     * Bestimmt den primären Auslassungsgrund (D-41).
+     *
+     * Ein Foto kann mehrere Gründe haben (z. B. nicht parsebares Raster und
+     * abweichende MIME). Es zählt genau einmal — unter dem ersten Grund aus
+     * {@see self::OMISSION_PRECEDENCE}.
+     *
+     * @param  array<int, string>  $reasons
+     */
+    private function primaryReason(array $reasons): string
+    {
+        foreach (self::OMISSION_PRECEDENCE as $candidate) {
+            if (in_array($candidate, $reasons, true)) {
+                return $candidate;
+            }
+        }
+
+        return $reasons[0] ?? self::OMISSION_UNAVAILABLE;
     }
 
     /**
@@ -362,37 +537,89 @@ class ModelContactSheetService
      * größer sein. Sie werden fail-closed ausgelassen (kein Fallback auf
      * ungeprüfte Bytes), nicht nachträglich verkleinert.
      *
-     * @return array{width: int, height: int, mime_type: string}|null
+     * Der **Byte-Cap steht vorn und bricht sofort ab** (Prüf-Reihenfolge wie
+     * vor D-41): über-cap Bytes werden weder geparst noch von GD berührt und
+     * tragen genau **einen** Grund — `byte`. Damit entfallen der Header-Parse
+     * auf 20 MiB und der sekundäre `dimensions`-Grund, den das Budget
+     * (`PhotoProcessingService::isWithinImageBudget()` prüft den Byte-Cap
+     * ebenfalls) sonst zusätzlich liefern würde.
+     *
+     * Alle übrigen Gründe werden ermittelt, damit der Hinweis den primären
+     * Grund nennen kann (D-41). Die Einbettungsentscheidung ändert sich
+     * dadurch nicht: die Prüfung erfolgt weiterhin **vor** dem Decoder —
+     * Bytes, die eine Prüfung nicht bestehen, erreichen GD nie.
+     *
+     * Die Methode ist `protected`, damit Tests den **Grundsatz** (nicht nur
+     * dessen Darstellung im PDF) prüfen können: der Rückgabewert nennt alle
+     * zutreffenden Gründe, der PDF-Contract zeigt davon nur den primären.
+     *
+     * @return array{size: array{width: int, height: int, mime_type: string}|null, reasons: array<int, string>}
      */
-    private function inspectRasterImage(string $contents, ?string $mime): ?array
+    protected function inspectRasterImage(string $contents, ?string $mime): array
     {
         $maxBytes = PhotoProcessingService::MAX_IMAGE_BYTES;
         $bytes = strlen($contents);
+
+        // Erste Prüfung der Pipeline: der Byte-Cap bricht sofort ab — kein
+        // Header-Parse auf über-cap Bytes, und genau ein Grund am Foto.
         if ($bytes < 1 || $bytes > $maxBytes) {
-            return null;
+            return ['size' => null, 'reasons' => [self::OMISSION_BYTE]];
         }
 
-        $image = @getimagesizefromstring($contents);
-        if (! is_array($image)) {
-            return null;
+        $reasons = [];
+
+        $image = $this->readImageSize($contents);
+        $imageMime = is_array($image) ? ($image['mime'] ?? null) : null;
+        if (! is_string($imageMime)) {
+            // Kein parsebares Raster: die Bytes sind weder JPEG/PNG/WebP noch
+            // liefern sie Maße. Der Decoder wird dafür nicht aufgerufen.
+            $reasons[] = self::OMISSION_DECODE;
         }
 
-        $imageMime = $image['mime'] ?? null;
+        $imageSize = is_array($image) ? $image : null;
         $detectedMime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($contents);
         if (! is_string($imageMime) || ! is_string($detectedMime)
             || $imageMime !== $detectedMime
             || ! in_array($detectedMime, ['image/jpeg', 'image/png', 'image/webp'], true)
             || ($mime !== null && $detectedMime !== $mime)) {
-            return null;
+            $reasons[] = self::OMISSION_MIME;
         }
 
-        $width = (int) ($image[0] ?? 0);
-        $height = (int) ($image[1] ?? 0);
-        if (! PhotoProcessingService::isWithinImageBudget($bytes, $width, $height, $maxBytes)) {
-            return null;
+        $width = 0;
+        $height = 0;
+        if (is_array($imageSize)) {
+            $width = (int) ($imageSize[0] ?? 0);
+            $height = (int) ($imageSize[1] ?? 0);
+            // Der Byte-Cap ist bereits geprüft (siehe oben); der Budget-Check
+            // entscheidet hier nur noch über Kantenlänge und Pixelzahl.
+            if (! PhotoProcessingService::isWithinImageBudget($bytes, $width, $height, $maxBytes)) {
+                $reasons[] = self::OMISSION_DIMENSIONS;
+            }
         }
 
-        return ['width' => $width, 'height' => $height, 'mime_type' => $detectedMime];
+        if ($reasons !== []) {
+            return ['size' => null, 'reasons' => $reasons];
+        }
+
+        return [
+            'size' => ['width' => $width, 'height' => $height, 'mime_type' => (string) $detectedMime],
+            'reasons' => [],
+        ];
+    }
+
+    /**
+     * Liest Maße und Typ aus den Bytes (Header-Parse, kein Decode).
+     *
+     * Als `protected`-Methode extrahiert, damit Tests zählen können, ob der
+     * Header-Parse überhaupt stattfand: der Byte-Cap in
+     * {@see self::inspectRasterImage()} bricht **vor** diesem Aufruf ab
+     * (D-41/L-4) — über-cap Bytes werden nicht geparst.
+     *
+     * @return array<int|string, mixed>|false
+     */
+    protected function readImageSize(string $contents): array|false
+    {
+        return @getimagesizefromstring($contents);
     }
 
     /**

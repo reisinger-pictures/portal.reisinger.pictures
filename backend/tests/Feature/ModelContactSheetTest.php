@@ -100,6 +100,7 @@ class ModelContactSheetTest extends TestCase
         string $visibility,
         bool $primary = false,
         ?string $mimeType = 'image/png',
+        ?int $position = null,
     ): ModelPhoto {
         $path = 'model-photos/'.$profile->id.'/'.$name;
         $bytes = $this->imageBytes();
@@ -114,7 +115,7 @@ class ModelContactSheetTest extends TestCase
             'size_bytes' => strlen($bytes),
             'visibility' => $visibility,
             'is_primary' => $primary,
-            'position' => $primary ? 0 : 1,
+            'position' => $position ?? ($primary ? 0 : 1),
         ]);
     }
 
@@ -475,6 +476,343 @@ class ModelContactSheetTest extends TestCase
         $this->assertStringNotContainsString('WEBPVP8', $pdf);
     }
 
+    /**
+     * D-41: Der Kontaktbogen nennt Anzahl und Grund der ausgelassenen Fotos.
+     *
+     * Regression: ohne den Zähler fällt die Assertion
+     * `Nicht enthaltene Fotos: 1` — das Foto verschwindet wieder lautlos.
+     */
+    public function test_contact_sheet_states_how_many_photos_were_omitted_and_why(): void
+    {
+        $admin = $this->userWithRole(UserRole::ADMIN);
+        $profile = $this->profile();
+
+        // Gespeichert sind JPEG-Bytes, die DB-Spalte behauptet `image/png`:
+        // die MIME-Prüfung schlägt fehl (fail-closed, vor dem Decoder).
+        $this->addRawPhoto($profile, 'mime-mismatch.jpg', $this->jpegBytes(), 'image/png');
+
+        $internal = $this->actingAs($admin, 'api')
+            ->get("/api/management/models/{$profile->id}/contact-sheet?variant=internal")
+            ->assertOk()
+            ->streamedContent();
+
+        $external = $this->actingAs($admin, 'api')
+            ->get("/api/management/models/{$profile->id}/contact-sheet?variant=external")
+            ->assertOk()
+            ->streamedContent();
+
+        foreach (['internal' => $internal, 'external' => $external] as $variant => $pdf) {
+            $text = $this->pdfText($pdf);
+
+            // Beide Varianten nennen die Auslassung sichtbar: Anzahl + Grund.
+            $this->assertStringContainsString('Nicht enthaltene Fotos: 1', $text, $variant);
+            $this->assertStringContainsString('1 Foto ausgelassen: MIME-Prüfung', $text, $variant);
+
+            // Der Hinweis bleibt PII-frei: keine Dateinamen, keine Kennungen.
+            $this->assertStringNotContainsString('mime-mismatch.jpg', $text, $variant);
+        }
+    }
+
+    /**
+     * Regression: ohne den Hinweis bricht `Nicht enthaltene Fotos` — ein
+     * vollständig eingebetteter Bogen darf keine Auslassung melden.
+     */
+    public function test_contact_sheet_without_omissions_shows_no_omission_note(): void
+    {
+        $admin = $this->userWithRole(UserRole::ADMIN);
+        $profile = $this->profile();
+        $this->addPhoto($profile, self::PUBLIC_PHOTO, ModelPhoto::VISIBILITY_PUBLIC, true);
+
+        $pdf = $this->actingAs($admin, 'api')
+            ->get("/api/management/models/{$profile->id}/contact-sheet?variant=internal")
+            ->assertOk()
+            ->streamedContent();
+
+        $text = $this->pdfText($pdf);
+
+        // Das Foto ist eingebettet — es gibt nichts auszulassen, also weder
+        // eine Hinweiszeile noch eine Leermeldung ("0 Fotos").
+        $this->assertStringContainsString(self::PUBLIC_PHOTO, $text);
+        $this->assertStringNotContainsString('Nicht enthaltene Fotos', $text);
+        $this->assertStringNotContainsString('ausgelassen', $text);
+    }
+
+    /**
+     * Regression: ohne getrennte Zähler bricht `2 Fotos ausgelassen:
+     * Foto-Limit (max. 12)` — die Limit-Auslassung ginge in der
+     * Prüfungs-Auslassung auf (oder umgekehrt).
+     */
+    public function test_contact_sheet_separates_the_photo_limit_from_failed_checks(): void
+    {
+        $admin = $this->userWithRole(UserRole::ADMIN);
+        $profile = $this->profile();
+
+        // 12 Kandidaten (Position 1..12): 11 einbettbar, 1 mit MIME-Fehler.
+        for ($position = 1; $position <= 11; $position++) {
+            $this->addPhoto(
+                $profile,
+                sprintf('Kandidat-%02d.png', $position),
+                ModelPhoto::VISIBILITY_PUBLIC,
+                $position === 1,
+                'image/png',
+                $position,
+            );
+        }
+        $this->addRawPhoto($profile, 'pruef-fehler.jpg', $this->jpegBytes(), 'image/png', 12, false);
+
+        // 2 weitere Fotos liegen hinter dem Foto-Limit (Position 13/14).
+        $this->addPhoto($profile, 'Limit-13.png', ModelPhoto::VISIBILITY_PUBLIC, false, 'image/png', 13);
+        $this->addPhoto($profile, 'Limit-14.png', ModelPhoto::VISIBILITY_PUBLIC, false, 'image/png', 14);
+
+        $pdf = $this->actingAs($admin, 'api')
+            ->get("/api/management/models/{$profile->id}/contact-sheet?variant=internal")
+            ->assertOk()
+            ->streamedContent();
+
+        $text = $this->pdfText($pdf);
+
+        // Gesamt: 1 (Prüfung) + 2 (Limit) = 3 ausgelassene Fotos.
+        $this->assertStringContainsString('Nicht enthaltene Fotos: 3', $text);
+
+        // Zwei getrennte Kategorien, jede mit eigener Anzahl.
+        $this->assertStringContainsString('1 Foto ausgelassen: MIME-Prüfung', $text);
+        $this->assertStringContainsString('2 Fotos ausgelassen: Foto-Limit (max. 12)', $text);
+        $this->assertStringNotContainsString('3 Fotos ausgelassen', $text);
+
+        // Das Limit bleibt unverändert: die Fotos dahinter fehlen, die
+        // Kandidaten davor sind drin.
+        $this->assertStringContainsString('Kandidat-11.png', $text);
+        $this->assertStringNotContainsString('Limit-13.png', $text);
+        $this->assertStringNotContainsString('Limit-14.png', $text);
+        $this->assertStringNotContainsString('pruef-fehler.jpg', $text);
+    }
+
+    /**
+     * Regression: ohne die Präzedenz-/Einmal-Zählung bricht `1 Foto
+     * ausgelassen: nicht dekodierbar` — das Foto würde doppelt (zweimal
+     * `ausgelassen`) oder mit dem falschen Grund gezählt.
+     */
+    public function test_contact_sheet_counts_a_photo_with_two_failed_checks_only_once(): void
+    {
+        $profile = $this->profile();
+
+        // Weder ein parsebares Raster (kein JPEG/PNG/WebP) noch der in der DB
+        // gespeicherte Typ `image/png`: zwei Gründe für dasselbe Foto.
+        $this->addRawPhoto($profile, 'doppelter-grund.png', 'kein bild', 'image/png');
+
+        $service = $this->sheetWithDecodeSpy();
+        $pdf = $service->render($profile, ModelContactSheetService::VARIANT_INTERNAL);
+
+        // Die Vorprüfung bleibt fail-closed: der Decoder sieht die Bytes nicht.
+        $this->assertSame(0, $service->decodeCalls);
+
+        $text = $this->pdfText($pdf);
+
+        // Ein Foto, zwei Gründe → genau einmal gezählt, primärer Grund
+        // "nicht dekodierbar" (Präzedenz: decode vor mime).
+        $this->assertStringContainsString('Nicht enthaltene Fotos: 1', $text);
+        $this->assertStringContainsString('1 Foto ausgelassen: nicht dekodierbar', $text);
+        $this->assertStringNotContainsString('2 Fotos ausgelassen', $text);
+        $this->assertStringNotContainsString('MIME-Prüfung', $text);
+    }
+
+    /**
+     * Regression: ohne den Hinweis bricht `1 Foto ausgelassen: Datei nicht
+     * verfügbar` — ein Foto ohne Datei im Store verschwände lautlos.
+     */
+    public function test_contact_sheet_reports_a_missing_stored_file_as_omitted(): void
+    {
+        $admin = $this->userWithRole(UserRole::ADMIN);
+        $profile = $this->profile();
+
+        // DB-Zeile ohne Datei im Store.
+        ModelPhoto::create([
+            'customer_id' => $profile->customer_id,
+            'model_profile_id' => $profile->id,
+            'path' => 'model-photos/'.$profile->id.'/fehlt.png',
+            'original_name' => 'fehlt.png',
+            'mime_type' => 'image/png',
+            'size_bytes' => 10,
+            'visibility' => ModelPhoto::VISIBILITY_PUBLIC,
+            'is_primary' => true,
+            'position' => 0,
+        ]);
+
+        $pdf = $this->actingAs($admin, 'api')
+            ->get("/api/management/models/{$profile->id}/contact-sheet?variant=internal")
+            ->assertOk()
+            ->streamedContent();
+
+        $text = $this->pdfText($pdf);
+
+        $this->assertStringContainsString('Nicht enthaltene Fotos: 1', $text);
+        $this->assertStringContainsString('1 Foto ausgelassen: Datei nicht verfügbar', $text);
+    }
+
+    /**
+     * Regression: ohne den Hinweis bricht `1 Foto ausgelassen: nicht
+     * dekodierbar` — der Decoder-Fehler bliebe unerwähnt.
+     */
+    public function test_contact_sheet_reports_undecodable_bytes_as_omitted(): void
+    {
+        $profile = $this->profile();
+
+        // Header parsebar, Daten defekt: erst der Decoder sieht den Schaden.
+        $truncated = substr($this->imageBytes(), 0, 40);
+        $this->assertFalse(@imagecreatefromstring($truncated));
+
+        $this->addRawPhoto($profile, 'truncated.png', $truncated, 'image/png');
+
+        $pdf = (new ModelContactSheetService(app(ModelFileStore::class), app(ModelQuestionnaire::class)))
+            ->render($profile, ModelContactSheetService::VARIANT_INTERNAL);
+
+        $text = $this->pdfText($pdf);
+
+        $this->assertStringContainsString('Nicht enthaltene Fotos: 1', $text);
+        $this->assertStringContainsString('1 Foto ausgelassen: nicht dekodierbar', $text);
+    }
+
+    /**
+     * Regression: ohne den Byte-Cap-Abbruch bricht `1 Foto ausgelassen:
+     * Byte-Limit` — über-cap Bytes wären falsch etikettiert (oder würden
+     * zusätzlich einen zweiten Grund aus dem Budget tragen).
+     */
+    public function test_contact_sheet_reports_the_byte_limit_as_omitted(): void
+    {
+        $profile = $this->profile();
+
+        // Legacy-Datei über dem persistierbaren Budget (20 MiB + 1).
+        $bytes = str_pad($this->imageBytes(), PhotoProcessingService::MAX_IMAGE_BYTES + 1, "\0");
+        $this->assertGreaterThan(PhotoProcessingService::MAX_IMAGE_BYTES, strlen($bytes));
+
+        $this->addRawPhoto($profile, 'legacy-ueber-budget.png', $bytes, 'image/png');
+
+        $service = $this->sheetWithDecodeSpy();
+        $pdf = $service->render($profile, ModelContactSheetService::VARIANT_INTERNAL);
+
+        // Der Decoder sieht die Bytes nicht.
+        $this->assertSame(0, $service->decodeCalls);
+
+        $text = $this->pdfText($pdf);
+
+        $this->assertStringContainsString('Nicht enthaltene Fotos: 1', $text);
+        $this->assertStringContainsString('1 Foto ausgelassen: Byte-Limit', $text);
+
+        // Der Byte-Cap bricht als erste Prüfung ab: über-cap Bytes tragen
+        // genau **einen** Grund. Kein sekundäres `dimensions` aus dem
+        // Budget (das den Byte-Cap ebenfalls prüft) und kein `mime`.
+        $this->assertStringNotContainsString('Größen-/Pixel-Limit', $text);
+        $this->assertStringNotContainsString('MIME-Prüfung', $text);
+    }
+
+    /**
+     * Regression: ohne die Budget-Prüfung bricht `2 Fotos ausgelassen:
+     * Größen-/Pixel-Limit` — zu große Fotos wären stillschweigend
+     * verschwunden bzw. falsch etikettiert.
+     */
+    public function test_contact_sheet_reports_the_dimension_budget_as_omitted(): void
+    {
+        $profile = $this->profile();
+
+        // Kante über `MAX_IMAGE_DIMENSION` (WebP-Header, wie im Decoder-Test).
+        $this->addRawPhoto(
+            $profile,
+            'zu-breit.webp',
+            $this->webpHeader(PhotoProcessingService::MAX_IMAGE_DIMENSION + 1, 1),
+            'image/webp',
+        );
+
+        // Pixelzahl über `MAX_IMAGE_PIXELS` (Kantenlängen innerhalb des Limits).
+        $this->addRawPhoto($profile, 'zu-viele-pixel.png', $this->pngHeader(15000, 15000), 'image/png');
+
+        $service = $this->sheetWithDecodeSpy();
+        $pdf = $service->render($profile, ModelContactSheetService::VARIANT_INTERNAL);
+
+        // Beide scheitern vor dem Decoder.
+        $this->assertSame(0, $service->decodeCalls);
+
+        $text = $this->pdfText($pdf);
+
+        $this->assertStringContainsString('Nicht enthaltene Fotos: 2', $text);
+        $this->assertStringContainsString('2 Fotos ausgelassen: Größen-/Pixel-Limit', $text);
+
+        // Beide Fotos tragen genau denselben, benannten Grund.
+        $this->assertStringNotContainsString('Byte-Limit', $text);
+        $this->assertStringNotContainsString('MIME-Prüfung', $text);
+        $this->assertStringNotContainsString('nicht dekodierbar', $text);
+    }
+
+    /**
+     * PNG-Header mit den angegebenen Maßen (ohne Bilddaten).
+     *
+     * `getimagesizefromstring()` liest daraus Maße und MIME — genug, um das
+     * Größen-/Pixel-Budget zu prüfen, ohne ein echtes Bild zu erzeugen.
+     */
+    private function pngHeader(int $width, int $height): string
+    {
+        $ihdr = pack('N', $width).pack('N', $height)."\x08\x02\x00\x00\x00";
+        $chunk = pack('N', 13).'IHDR'.$ihdr.pack('N', crc32('IHDR'.$ihdr));
+
+        return "\x89PNG\r\n\x1a\n".$chunk;
+    }
+
+    /**
+     * Sichtbarer Text des unkomprimierten Content-Streams.
+     *
+     * DomPDF schreibt mit Core-Fonts in Windows-1252 (Umlaute sind dort
+     * Einzelbytes) und escaped Klammern als `\(`. Deshalb wird das Dokument
+     * einmal nach UTF-8 dekodiert und der Text aus den Text-Operatoren
+     * (`[(…)] TJ`) extrahiert.
+     */
+    private function pdfText(string $pdf): string
+    {
+        $decoded = (string) iconv('CP1252', 'UTF-8//IGNORE', $pdf);
+
+        $parts = [];
+        if (preg_match_all('/\[([^\]]*)\]\s*TJ/', $decoded, $arrays) === 0) {
+            return $decoded;
+        }
+
+        foreach ($arrays[1] as $array) {
+            if (preg_match_all('/\(((?:\\\\.|[^\\\\()])*)\)/', $array, $strings) === 0) {
+                continue;
+            }
+
+            foreach ($strings[1] as $string) {
+                $parts[] = $this->unescapePdfString($string);
+            }
+        }
+
+        return implode(' ', $parts);
+    }
+
+    private function unescapePdfString(string $value): string
+    {
+        return preg_replace_callback(
+            '/\\\\([nrtbf()\\\\]|[0-7]{1,3})/',
+            static function (array $match): string {
+                $escape = $match[1];
+
+                if (ctype_digit($escape)) {
+                    return chr((int) octdec($escape));
+                }
+
+                return match ($escape) {
+                    'n' => "\n",
+                    'r' => "\r",
+                    't' => "\t",
+                    'b' => "\x08",
+                    'f' => "\x0C",
+                    '(' => '(',
+                    ')' => ')',
+                    '\\' => '\\',
+                    default => $escape,
+                };
+            },
+            $value
+        ) ?? $value;
+    }
+
     private function assertStoredPhotoRejectedBeforeDecoder(string $bytes, string $name, string $mime): void
     {
         $profile = $this->profile();
@@ -485,6 +823,85 @@ class ModelContactSheetTest extends TestCase
 
         $this->assertSame(0, $service->decodeCalls);
         $this->assertStringNotContainsString($name, $pdf);
+    }
+
+    /**
+     * Regression: der Byte-Cap ist die **erste** Prüfung und bricht sofort
+     * ab — über-cap Bytes tragen genau **einen** Grund (`byte`) und werden
+     * weder geparst noch von GD berührt.
+     *
+     * Die Eigenschaft wird am internen Grundsatz gepinnt, nicht an der
+     * Darstellung: der PDF-Contract zeigt ohnehin nur den *primären* Grund
+     * eines Fotos, ein sekundärer Grund wäre dort nicht sichtbar.
+     */
+    public function test_over_cap_photo_carries_exactly_the_byte_reason(): void
+    {
+        $service = $this->sheetWithInspectionSpy();
+
+        $bytes = str_pad($this->imageBytes(), PhotoProcessingService::MAX_IMAGE_BYTES + 1, "\0");
+        $this->assertGreaterThan(PhotoProcessingService::MAX_IMAGE_BYTES, strlen($bytes));
+
+        $reasons = $service->reasonsFor($bytes, 'image/png');
+
+        // Genau ein Grund: der Byte-Cap. Kein sekundäres `dimensions` (das
+        // Budget `isWithinImageBudget()` prüft den Byte-Cap ebenfalls) und
+        // kein `mime`.
+        $this->assertSame([ModelContactSheetService::OMISSION_BYTE], $reasons);
+
+        // Und der Abbruch passiert **vor** dem Header-Parse: über-cap Bytes
+        // werden weder geparst noch von GD berührt.
+        $this->assertSame(0, $service->parseCalls);
+        $this->assertSame(0, $service->decodeCalls);
+    }
+
+    /**
+     * Regression: ohne den Sichtbarkeits-Filter **vor** der Zählung bricht
+     * `assertStringNotContainsString('Nicht enthaltene Fotos', $external)` —
+     * der Kunde würde die Existenz eines internen Fotos erfahren.
+     */
+    public function test_external_sheet_neither_counts_nor_mentions_internal_photos(): void
+    {
+        $admin = $this->userWithRole(UserRole::ADMIN);
+        $profile = $this->profile();
+
+        // Ein öffentliches Foto (Kandidat) und ein internes Foto, das an der
+        // MIME-Prüfung scheitert (JPEG-Bytes, DB behauptet `image/png`).
+        $this->addPhoto($profile, self::PUBLIC_PHOTO, ModelPhoto::VISIBILITY_PUBLIC, true);
+        $this->addRawPhoto(
+            $profile,
+            'intern-mismatch.jpg',
+            $this->jpegBytes(),
+            'image/png',
+            2,
+            false,
+            ModelPhoto::VISIBILITY_INTERNAL,
+        );
+
+        $internal = $this->actingAs($admin, 'api')
+            ->get("/api/management/models/{$profile->id}/contact-sheet?variant=internal")
+            ->assertOk()
+            ->streamedContent();
+
+        $external = $this->actingAs($admin, 'api')
+            ->get("/api/management/models/{$profile->id}/contact-sheet?variant=external")
+            ->assertOk()
+            ->streamedContent();
+
+        // Intern wird die Auslassung gemeldet.
+        $internalText = $this->pdfText($internal);
+        $this->assertStringContainsString('Nicht enthaltene Fotos: 1', $internalText);
+        $this->assertStringContainsString('1 Foto ausgelassen: MIME-Prüfung', $internalText);
+
+        // Extern: das interne Foto ist weder gezählt noch erwähnt — weder als
+        // Auslassung noch als Caption oder Dateiname.
+        $externalText = $this->pdfText($external);
+        $this->assertStringNotContainsString('Nicht enthaltene Fotos', $externalText);
+        $this->assertStringNotContainsString('ausgelassen', $externalText);
+        $this->assertStringNotContainsString('intern-mismatch.jpg', $externalText);
+        $this->assertStringNotContainsString('Intern (nicht', $externalText);
+
+        // Das öffentliche Foto ist regulär enthalten.
+        $this->assertStringContainsString('Foto 1', $externalText);
     }
 
     /**
@@ -507,8 +924,55 @@ class ModelContactSheetTest extends TestCase
         };
     }
 
-    private function addRawPhoto(ModelProfile $profile, string $name, string $bytes, string $mime): ModelPhoto
+    /**
+     * Sheet service with an observable inspection seam.
+     *
+     * `reasonsFor()` exposes the internal reason set of the pre-check (D-41),
+     * `parseCalls` counts header parses and `decodeCalls` counts decoder
+     * calls. Together they pin the *order* of the checks, not just the
+     * rendered primary reason.
+     */
+    private function sheetWithInspectionSpy(): object
     {
+        return new class(app(ModelFileStore::class), app(ModelQuestionnaire::class)) extends ModelContactSheetService
+        {
+            public int $parseCalls = 0;
+
+            public int $decodeCalls = 0;
+
+            /**
+             * @return array<int, string>
+             */
+            public function reasonsFor(string $contents, ?string $mime): array
+            {
+                return $this->inspectRasterImage($contents, $mime)['reasons'];
+            }
+
+            protected function readImageSize(string $contents): array|false
+            {
+                $this->parseCalls++;
+
+                return parent::readImageSize($contents);
+            }
+
+            protected function decodeRaster(string $contents): \GdImage|false
+            {
+                $this->decodeCalls++;
+
+                return false;
+            }
+        };
+    }
+
+    private function addRawPhoto(
+        ModelProfile $profile,
+        string $name,
+        string $bytes,
+        string $mime,
+        ?int $position = null,
+        bool $primary = true,
+        string $visibility = ModelPhoto::VISIBILITY_PUBLIC,
+    ): ModelPhoto {
         $path = 'model-photos/'.$profile->id.'/'.$name;
         app(ModelFileStore::class)->putEncrypted($path, $bytes);
 
@@ -519,9 +983,9 @@ class ModelContactSheetTest extends TestCase
             'original_name' => $name,
             'mime_type' => $mime,
             'size_bytes' => strlen($bytes),
-            'visibility' => ModelPhoto::VISIBILITY_PUBLIC,
-            'is_primary' => true,
-            'position' => 0,
+            'visibility' => $visibility,
+            'is_primary' => $primary,
+            'position' => $position ?? ($primary ? 0 : 1),
         ]);
     }
 
