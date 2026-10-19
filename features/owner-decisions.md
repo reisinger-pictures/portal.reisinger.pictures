@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-37. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-42. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -162,3 +162,25 @@ An SFTPGo upload event enqueues background import work; each job processes a bou
 ### D-37: Quarantine of unimportable files
 
 After a configurable number of failed attempts, move a permanently unimportable file to a discoverable quarantine subdirectory. Keep it visible through SFTP and the UI; never delete it. See [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md).
+
+## Rate limiting, access grants, and runtime requirements
+
+### D-38: Prioritized atomic rate limiting
+
+Do not convert every framework `throttle:` route and every direct `RateLimiter::hit()` counter to the atomic check-then-count pattern in one sweep. Convert the prioritized security- and billing-relevant paths only; the remaining counters keep the framework behaviour as a documented limit. Every converted path carries its own deterministic concurrency test, in the shape the contract-content route already has. See [review closure](security/2026-10-18-review-closure.md).
+
+### D-39: Re-validate existing gallery grants on read
+
+Re-validate existing gallery grants against the current selection-gallery and subtree safety when they are read, not only when they are granted. A grant that became unsafe after it was issued is fail-closed and loses access; newly granted access keeps the existing fail-closed check.
+
+### D-40: One sorted lock set in `OrgController::syncUsers`
+
+Lock the org row, the actor row, and the member rows in one sorted set, so that two concurrent syncs moving the same user cannot deadlock each other. The proof needs two real database connections; a SQLite-only test cannot establish it.
+
+### D-41: The contact sheet reports omitted photos
+
+The contact sheet states how many photos it omitted and why (byte, dimension, pixel, or MIME check) instead of dropping them silently. The counter belongs to the PDF contract. See [contact sheet export](crm/07-model-contact-sheet-export.md).
+
+### D-42: `ext-gd` is a declared platform requirement
+
+Declare `ext-gd` in `composer.json` instead of keeping it an undocumented runtime assumption: the contact sheet depends on it for JPEG/PNG embedding, and the image processor uses it unconditionally. See [contact sheet export](crm/07-model-contact-sheet-export.md).
