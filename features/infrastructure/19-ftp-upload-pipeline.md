@@ -10,12 +10,29 @@
 ```
 Photographer uploads JPG files via FTP
   → Files land in ftp_inbox/{user_slug}/
-  → Photographer sets target gallery via API
-  → Photographer triggers process() via API
-  → Files are moved to photos/{gallery_id}/, metadata extracted
-  → FTP inbox files are deleted
+  → Photographer sets target gallery via API (once, before the shooting)
+  → SFTPGo posts one upload event per file to the internal endpoint (D-36)
+  → The endpoint enqueues ImportFtpBatch, which imports one batch and
+    re-enqueues itself while the inbox still holds work (§3.5)
+  → Files are moved to photos/{gallery_id}/ in batches, metadata extracted
+  → FTP inbox files are deleted; unimportable files move to `_quarantine` (§3.6)
   → Photos are available immediately (thumbnails are lazy-generated on first request)
 ```
+
+A run moves at most `ftp.import.max_files` files (default 20). More files in the
+inbox are not an error: the remainder stays for the next run (§3.3, §6).
+
+There are three triggers, and all of them call the same
+`FtpInboxImporter::importBatch()`:
+
+| Trigger | Who | What it does |
+|---|---|---|
+| SFTPGo upload event | `FtpEventController` → `ImportFtpBatch` | drains the inbox in a bounded chain of batches (§3.4, §3.5) |
+| The photographer's button | `POST /api/management/ftp/process` | imports exactly one batch (§3.3) |
+| Opening the FTP page | the frontend's one-shot catch-up run (D-36) | one batch, because SFTPGo events are fire-and-forget and a lost event must heal |
+
+The event layer does not change the batch, budget or error semantics — it is a
+second entry point into the same code (§3.3).
 
 ## 2. File Structure on FTP Server
 
@@ -38,8 +55,11 @@ Two storage disks are involved:
 - **Transport:** externer Dienst, bis 2026-09-26 `pure-ftpd`, Ziel ist
   **SFTPGo** (Abschnitt 7.1). Auf diesem Pfad ändert sich für die Disks
   nichts.
-- Details zu Transport und Provisioning: **Abschnitt 7**. Dort ist auch
-  festgehalten, dass `FtpController` und `FtpImportTest` unverändert bleiben.
+- Details zu Transport und Provisioning: **Abschnitt 7**. Der Transportwechsel
+  lässt die Disks unberührt; **korrigiert 2026-10-18:** die dort früher
+  festgehaltene Zusage „`FtpController` und `FtpImportTest` bleiben unverändert"
+  gilt für den Transportwechsel, nicht mehr für den Import selbst — D-36 hat den
+  Import in `FtpInboxImporter` herausgezogen (§3.5, §7.8).
 
 ### 2.2 Photo Storage (`photos` disk)
 
@@ -92,15 +112,71 @@ Triggers the import pipeline.
 2. `current_ftp_gallery_id` must be set — otherwise 400.
 3. Defense-in-depth: `current_ftp_gallery_id` must be in `getAllowedGalleryIds()` — otherwise 403.
 
-**Processing loop:**
-1. Enumerate all `*.{jpg,jpeg,JPG,JPEG}` files in the user's inbox.
-2. For each file:
-   - Strip original filename, keep original base name as metadata fallback.
-   - **Rename to UUID:** Generate `Str::uuid()` — the original filename is only preserved as `photo.title` (if no better title is extracted).
-   - Copy file to `photos/{gallery_id}/{uuid}.{ext}`.
-   - **Delete** original from inbox (files are moved, not copied — after successful copy the inbox copy is unlinked).
-   - Generate thumbnail metadata path (`_thumbs/md5({filename}1024).webp`) — but actual thumbnail generation is **lazy** (see §3.3.1).
-3. `PhotoProcessingService::processImage()` extracts metadata via ExifTool and applies gallery defaults.
+**Batch selection (D-35).** The inbox is scanned with a
+`readdir()` walk in directory order — it materialises no `glob()` name array and
+stops at the batch boundary. The first `ftp.import.max_files` candidates that
+still fit the byte budget form the batch; the walk stops at the file that would
+exceed `ftp.import.max_batch_bytes`, and everything from there on stays untouched.
+More files than the limit is **not** an error: the run imports the batch and
+answers `{success: true, processed: N}`. Repeated calls drain the inbox.
+
+| Limit | Config key | Default | Where the number is defined |
+|---|---|---|---|
+| Files per run | `FTP_IMPORT_MAX_FILES` | 20 | `grep -n 'DEFAULT_MAX_FILES' backend/app/Services/FtpInboxImporter.php` |
+| Bytes per file | `FTP_IMPORT_MAX_FILE_BYTES` | 20 MiB (`20971520`) | `grep -n 'DEFAULT_MAX_FILE_BYTES' backend/app/Services/FtpInboxImporter.php` |
+| Bytes per run | `FTP_IMPORT_MAX_BATCH_BYTES` | 100 MiB (`104857600`) | `grep -n 'DEFAULT_MAX_BATCH_BYTES' backend/app/Services/FtpInboxImporter.php` |
+
+The reader is `FtpInboxImporter::importLimits()`; the pin for the numbers
+themselves is `backend/tests/Feature/FtpImportDefaultsTest.php`, which asserts the
+resolved limits for every shape of unusable value (`null`, `''`, `'   '`,
+`'not-a-number'`, `0`, `'0'`, `-1`, `0.5`) — a behavioural test alone cannot tell
+20 MiB from 1 GiB.
+
+An empty, non-numeric or non-positive env value falls back to the documented
+default. The old `(int) env(...)` cast turned an empty value into 0, which the
+controller then rescued to 1 — so an empty variable silently shrank every run to
+a single file instead of restoring the default.
+
+**Staging loop — no DB write before the whole batch is staged.** Each selected
+file gets a fresh `filesize()` check **before** it is opened (§3.3.2 explains the
+stat-cache order), then it is copied in 64 KiB chunks into a `tmpfile()` that may
+not grow past `min(max_file_bytes, remaining batch budget)`. Reading is
+hard-bounded at `limit + 1` bytes, so a source that grows after the size check
+becomes a 413 instead of an unbounded read. If the staged byte count differs from
+the selected size, or the source changes during staging, the run aborts before
+any photo is written. Only once every file of the batch is staged does the import
+loop start.
+
+**The atomicity ends with staging, and that is worth stating exactly.** The
+import loop below validates each staged stream *inside* the loop, so a rejection
+there — a non-image, a source that grew during image processing, a failed storage
+write — ends the run with the photos before it already written and unlinked. The
+earlier claim in this document that "a failure during staging or validation
+cannot leave a partially imported batch behind" was wrong for the validation
+half; what is true is: **staging is atomic, validation is per file.** That is
+also why D-37 quarantines a permanently unimportable file instead of leaving it
+at the head of the walk (§3.6).
+
+**Import loop (per staged file):**
+- Validate the staged stream with `PhotoProcessingService::inspectRasterImage()`
+  (type and decode-budget check); a non-image is 422.
+- Strip original filename, keep original base name as metadata fallback.
+- **Rename to UUID:** Generate `Str::uuid()` — the original filename is only preserved as `photo.title` (if no better title is extracted).
+- Copy the staged stream to `photos/{gallery_id}/{uuid}.{ext}`.
+- `PhotoProcessingService::processImage()` extracts metadata via ExifTool and applies gallery defaults.
+- Persist the `Photo` row in a transaction, then re-check the source: a source
+  that grew is rolled back together with its files, a source that vanished counts
+  as unchanged and keeps the row (§6).
+- **Delete** original from inbox (files are moved, not copied — after the
+  successful import the inbox copy is unlinked).
+- Generate thumbnail metadata path (`_thumbs/md5({filename}1024).webp`) — but actual thumbnail generation is **lazy** (see §3.3.1).
+
+**Trigger.** `process()` is the synchronous entry point: the photographer starts
+it from the inbox card, and it imports exactly one batch. The same selection and
+import path is what the background chain of D-36 runs — `ImportFtpBatch` calls
+`FtpInboxImporter::importBatch()` (§3.5), so the batch, budget and error
+semantics cannot differ between the two entry points. The HTTP entry point owns
+only the mapping from the run's outcome to a status code (§3.3.3).
 
 **Photo database record:**
 - `id`: UUID
@@ -116,24 +192,40 @@ Thumbnails are NOT generated during FTP import. The old thumbnail generation in 
 
 #### 3.3.2 Concurrency Guard
 
-`process()` is a read → copy → Photo row → unlink sequence over a directory the
-FTP server writes into at the same time. Two runs can each hold their own
-`glob()` snapshot of the same file; without a guard the loser of the unlink race
+`process()` is a read → stage → Photo row → unlink sequence over a directory the
+FTP server writes into at the same time. Two runs can each take their own
+directory snapshot of the same file; without a guard the loser of the unlink race
 would still have produced a second `Photo` row and a second stored file under a
 different UUID. The pipeline is therefore serialized per photographer.
 
 - **Lock:** `Cache::lock('ftp-process:{user_id}', 300)`, acquired **only** once
-  the inbox actually holds images, and **non-blocking**. A second call is
+  `selectImportBatch()` found work, and **non-blocking**. The batch is selected
+  before the lock is taken, so an empty inbox costs no lock. A second call is
   refused with **409** plus a German error message and a `Retry-After` header —
   it is never queued, merged, or silently served. The lock is released in a
   `finally`, so a failed import frees it immediately.
+- **409 has exactly one meaning here:** the lock. A source that changed under the
+  run is **422** (§6), so a client can tell "another run is active" (retry after
+  `Retry-After`) from "your upload is still writing" (no header).
 - **Key:** the user id, which is a globally unique UUID. The inbox folder is
   user-level too, so this is the narrowest key that still covers exactly the
   files a run can touch. No brand component: the `Brand` enum has a single case
   and the folder namespace is deliberately not brand-scoped yet (§7.11).
-- **Per file:** the `glob()` snapshot is re-checked with `file_exists()` at the
-  top of each loop iteration. A file that a competing run claimed in between is
-  skipped, not imported a second time.
+- **Per file:** the selected path is re-checked before staging and again before
+  the unlink. A file that a competing run claimed in between is skipped, not
+  imported a second time.
+- **Stat-cache order (fixed 2026-10-18):** every existence and size check calls
+  `clearstatcache(true, $path)` **before** `is_file()`. The previous order let
+  `is_file()` answer from a stat cached earlier while the following `filesize()`
+  read freshly, so an externally removed source looked "changed". On the
+  post-commit check that deleted an already committed photo plus its stored file
+  and thumbnail. A vanished source now counts as unchanged. A file that is
+  **present** but whose fresh size cannot be read is not vanished — there is
+  something to move — so it counts one attempt and is quarantined after
+  `ftp.import.quarantine_after_attempts` (§3.6); before the threshold it is
+  skipped so the run continues. The order is pinned by `FtpStatCacheOrderTest`,
+  which also reads the helper's body so removing the `clearstatcache()` call
+  itself is red.
 
 **What the lock is not.** It is not a lock across a system boundary: the
 FTP/SFTP server takes no protocol-level lock, so a file a camera is still
@@ -145,6 +237,211 @@ TTL loses the guard, and a PHP fatal releases the lock only when the TTL
 expires. The TTL is therefore set far above a realistic import, because the
 failure mode of a too-short TTL is a duplicated photo, while a too-long TTL only
 delays a retry.
+
+#### 3.3.3 HTTP status mapping
+
+The run reports an `FtpImportStatus` (`app/Enums/FtpImportStatus.php`); the
+controller is the only place that turns it into a status code. `match` on the
+enum is exhaustive, so a new outcome becomes a compile-time error in both mappers
+rather than a silently unhandled case.
+
+| Status | HTTP | Body | Meaning |
+|---|---|---|---|
+| `imported`, `empty` | 200 | `{success: true, processed: N, quarantined: M}` | `processed` counts written photos, `quarantined` files moved aside by D-37 |
+| `not_photographer`, `target_not_allowed` | 403 | `{error}` | the account may not import into this gallery |
+| `no_target`, `gallery_missing` | 400 | `{error}` | no usable target gallery |
+| `unreadable_inbox` | 500 | `{error}` | the inbox exists but cannot be opened |
+| `limit_exceeded` | 413 | `{error}` | a file above its budget; the message names size, limit and variable |
+| `source_changed`, `source_unprocessable` | 422 | `{error}` | the camera is still writing, or the file is not a decodable image |
+| `locked` | 409 | `{error}` + `Retry-After` | another run of this account is active |
+
+`gallery_missing` is new with D-36 and closes a loose end §6 used to carry as
+"error may occur": a `current_ftp_gallery_id` pointing at a deleted gallery was a
+`TypeError` (HTTP 500) deep in the import loop and is now a named 400. No test
+covered the old shape.
+
+### 3.4 The upload event endpoint (D-36)
+
+`POST /api/internal/ftp/upload-event` (`FtpEventController::handleUpload`,
+route name `api.internal.ftp.upload-event`).
+
+SFTPGo's event manager calls this after each upload. It is not a user-facing API:
+
+- **No `auth:api`, no `management` middleware, no session.** The caller is a
+  service in the same compose network and holds no portal credential. The shared
+  secret in `FTP_EVENT_SECRET`, sent in the `X-FTP-Event-Secret` header, is the
+  entire authentication, compared with `hash_equals()` so the comparison does not
+  leak the secret's prefix by timing.
+- **Fail closed.** With no configured secret (or a missing header name) every
+  request answers **401** — an unconfigured portal must not accept events it
+  cannot authenticate. The `hash_equals('', '')` trap is covered by a test.
+- **No throttle.** An ordinary shooting is one event per file, so dozens of
+  events within a second are normal traffic. A limiter sized for humans would
+  drop exactly the events the feature exists for. The endpoint is cheap by
+  construction — it resolves one row and enqueues one job, it never touches the
+  inbox — so the secret is what keeps strangers out and the queue is what bounds
+  a burst. Pinned by `FtpEventEndpointTest::test_the_event_endpoint_is_not_throttled`
+  against the **fully resolved** route middleware (`Router::gatherRouteMiddleware()`,
+  which expands the `api` group), not `Route::gatherMiddleware()`, which returns
+  the group name and would stay green if a `throttleApi()` were added to the group.
+
+Payload: the fields the endpoint reads are `username` (= `users.ftp_slug`, §7.2)
+and `action`. Everything else SFTPGo sends (path, size, protocol, session) is
+ignored on purpose — the inbox path is derived from the account, not from the
+event, so a mis-configured camera subfolder cannot make the portal read a
+different directory than the one the manual trigger reads.
+
+SFTPGo sends **no** body of its own (`internal/common/eventmanager.go`,
+`getHTTPRuleActionBody`): an action without `body` and without `parts` posts an
+empty request. The provisioned action therefore carries the body
+(`ProvisionFtpEvents::UPLOAD_EVENT_BODY`, §7.18) that names `username` and
+`action` through SFTPGo's own placeholders, and
+`FtpEventEndpointTest::test_the_provisioned_event_body_reaches_the_endpoint_and_enqueues_a_job`
+sends that exact rendered body to the endpoint.
+
+| Case | HTTP | Body | Job? |
+|---|---|---|---|
+| secret missing, wrong, or not configured | 401 | `{accepted: false, reason: "unauthorized"\|"not_configured"}` | no |
+| `username` missing/not a string | 422 | `{accepted: false, reason: "malformed"}` | no |
+| `action` is not `upload`/`first-upload` | 200 | `{accepted: false, reason: "ignored_event"}` | no |
+| unknown slug | 200 | `{accepted: false, reason: "unknown_account"}` | no |
+| no target gallery | 200 | `{accepted: false, reason: "no_target_gallery"}` | no |
+| valid upload event | 200 | `{accepted: true, dispatched: true}` | exactly one |
+
+**Why the "no effect" cases are 200 and not 404.** SFTPGo treats a non-2xx
+response as a *failed action*: it logs an error per event and can disable an
+action that keeps failing. Both cases are ordinary states of the portal — the
+account was deleted, or the photographer has not chosen a gallery yet — and
+neither is a fault of the event. Answering 404/422 would fill the provider's log
+with portal-side states and could cost the rule its enabled status, which would
+silently stop every *valid* event too. The body names the reason, so the cases
+stay distinguishable.
+
+**No target gallery means no import, and the files stay** (§3.3 pre-flight). That
+is deliberate: assigning a gallery is the photographer's decision, and guessing
+one would file a shooting into the wrong delivery.
+
+### 3.5 The background chain (`ImportFtpBatch`)
+
+`app/Jobs/ImportFtpBatch.php` imports one batch and re-enqueues itself while the
+inbox still holds work. The payload is `(userId, batchNumber, failedBatches)`:
+the first is who, the second is the 1-based position in the chain, the third is
+how many runs of this chain already threw. All three travel in the payload, so a
+worker restart does not lose the bound.
+
+**Termination conditions.** A self-re-enqueueing job is an unbounded loop unless
+every exit is named. The exits are:
+
+| Condition | What happens |
+|---|---|
+| Empty result (no inbox, no importable file) | chain ends, `info` log |
+| Rejected batch (413/422/unreadable/held lock/no target/gallery missing) | chain ends, `warning` log — re-enqueueing would select the very same files again |
+| Remainder reported but nothing imported **and** nothing quarantined | chain ends, `warning` log — the next run would repeat the same nothing; the explicit concurrent-upload handoff below is the sole exception |
+| `batchNumber >= ftp.import.chain_max_batches` | chain ends with work left, `warning` log |
+| A thrown failure and `failedBatches + 1 >= ftp.import.chain_max_failures` | chain ends, `error` log |
+| Account deleted between event and run | chain ends, `info` log |
+
+For an ordinary remainder, "progress" is deliberately
+`imported > 0 || quarantined > 0`. Counting a failed attempt against a file is
+**not** progress: a run that only incremented an attempt counter imported
+nothing, and D-36 requires that such a batch does not re-enqueue itself. A
+*rejected* file is therefore never retried by the chain — the next event or page
+open starts a fresh chain, which is also what advances the quarantine counter
+(§3.6). An explicit concurrent-upload handoff is separate from file progress and
+allows one bounded follow-up batch even when the active run imported nothing.
+
+| Config key | Default | Where the number is defined |
+|---|---|---|
+| `FTP_IMPORT_MAX_CHAIN_BATCHES` | 25 (= 500 files at 20 per batch) | `grep -n 'DEFAULT_CHAIN_MAX_BATCHES' backend/app/Services/FtpInboxImporter.php` |
+| `FTP_IMPORT_MAX_CHAIN_FAILURES` | 3 | `grep -n 'DEFAULT_CHAIN_MAX_FAILURES' backend/app/Services/FtpInboxImporter.php` |
+
+**One lock, and it lives in the importer.**
+
+`Cache::lock('ftp-process:{user_id}')` inside `FtpInboxImporter` (§3.3.2, P1-M28,
+unchanged): the serialization of the read → copy → Photo row → unlink sequence
+itself, which also covers the manual HTTP trigger. The job holds no
+`WithoutOverlapping` middleware of its own: the chain's exit on a lost lock is
+`locked` and is logged by name, so nothing ends silently.
+
+**An upload event racing an active import is handed off, not lost.** The event job
+records a per-account generation before selecting files or attempting the import
+lock. An importer snapshots that generation before its directory walk and checks
+it again after releasing the lock. A changed generation on an otherwise completed
+run requests one follow-up batch: `ImportFtpBatch` continues under the same
+`chain_max_batches` bound, while the manual HTTP caller starts that bounded chain
+only after its lock is released. If the event starts after unlock, its own job
+imports it normally. The generation is retained to avoid a check/clear race, and
+the marker is written under a per-account cache lock. This works with both the
+inline `sync` queue and asynchronous workers without a queue middleware lock or
+an unbounded retry chain. Pinned by
+`FtpImportBatchTest::test_an_upload_event_during_a_locked_import_is_handed_off_without_double_importing`
+and `FtpImportBatchTest::test_a_manual_import_hands_a_concurrent_upload_event_to_the_background_chain`.
+
+**Why the job middleware was removed (fixed 2026-10-18).** An earlier revision
+guarded the job with `WithoutOverlapping('ftp-import:{user_id}')->dontRelease()`.
+Under `QUEUE_CONNECTION=sync` (the `.env`, `.env.ci`, `.env.e2e` and `.env.example`
+default, and the phpunit default) the job's self-dispatch runs **inline while the
+job still holds its own middleware lock**; the inner job cannot acquire it and
+`dontRelease()` drops it without running `handle()`, without a log line and
+without a released job. The chain stopped after one batch with the files still in
+the inbox, while the outside saw a success. It is invisible in production
+(exactly one worker) and immediate locally, in CI and in the E2E stack, and a
+second worker reproduces it in production too. The importer's lock alone is
+sufficient: the loser of the race gets `locked`, which the job logs
+(`FtpImportBatchTest::test_a_held_import_lock_stops_the_job_visibly`), and the
+sync drain is pinned by
+`FtpImportBatchTest::test_the_chain_drains_the_inbox_under_the_sync_queue`
+(50 files in three inline batches).
+
+### 3.6 Quarantine for unimportable uploads (D-37)
+
+**The rule in one sentence:** a file the import cannot process — above
+`ftp.import.max_file_bytes`, not a decodable image, empty, truncated, or without
+a readable size — is moved into the inbox's `_quarantine` subfolder after
+`ftp.import.quarantine_after_attempts` failed attempts, so the inbox is
+guaranteed to drain.
+
+Why it exists: the walk reads in directory order and stops at the first file
+above the per-file budget (413) or at a file that is not a decodable image (422).
+A file that is never removed therefore sits at the head of that order and
+`processed` stays 0 for every later run — which contradicts D-35's "repeated
+triggering drains the inbox" and leaves the photographer without a tool in the UI
+(the inbox has no delete function; the way out would be SFTP).
+
+| Property | Behaviour |
+|---|---|
+| Attempts that count | oversized (per-file budget), not a decodable image, a file that is **present but whose size cannot be read** |
+| Attempts that do **not** count | a source that changed while it was read (the documented "the camera is still writing, retry" case — moving a file that is still being written would quarantine a healthy upload), a **vanished** file (`is_file()` already false — there is nothing to move), a misconfigured whole-run budget, a held lock |
+| Counter | `Cache` key `ftp-import-attempts:{user_id}:sha1({path})`, TTL 24 h (`grep -n 'ATTEMPT_TTL_HOURS' backend/app/Services/FtpInboxImporter.php`) — the HTTP path and the chain share it, so three clicks and three events are six attempts; a per-key cache lock serializes read/increment/write and refreshes the sliding TTL, and lock/read/write failures throw instead of silently losing an attempt |
+| Where the folder is | `{inbox}/_quarantine` — inside the photographer's SFTP home (findable at all), in the same tree, created with `FtpInboxDirectory::MODE` (`2775`+setgid, D-2) by the same non-root process |
+| Deletion | **never.** The file is the photographer's original upload; it is moved, not removed |
+| Name collisions | the target is **reserved atomically** (`fopen(..., 'x')`) before the `rename()`, so two runs cannot make the second overwrite the first; a repeated camera file name (`IMG_0001.JPG`) gets a `Ymd-His-` prefix, and a same-second collision a `uniqid()` fallback — two quarantined files of one shooting both survive. Pinned by `FtpQuarantineTest::test_a_second_quarantine_of_the_same_name_does_not_overwrite_the_first` |
+| The run continues | a quarantine does **not** abort the batch; the run imports the remaining files |
+| Not collected again | the walk skips `_quarantine` by name, so a later run neither imports nor re-quarantines its contents. Pinned by `FtpQuarantineTest::test_a_quarantined_file_is_not_picked_up_by_a_later_run` |
+| Before the threshold | an oversized file keeps the documented **413**; a present-but-size-unreadable file is **skipped** so the run continues (SEC-14 contract). Either way the attempt is counted and the next trigger advances the file toward the quarantine |
+
+| Config key | Default | Where the number is defined |
+|---|---|---|
+| `FTP_IMPORT_QUARANTINE_AFTER_ATTEMPTS` | 3 | `grep -n 'DEFAULT_QUARANTINE_AFTER_ATTEMPTS' backend/app/Services/FtpInboxImporter.php` |
+
+Three attempts tolerate a transient read error before a file leaves the inbox; a
+deterministic defect reaches the quarantine on the third trigger. Setting the
+value to `1` quarantines on the first failure, which drains a shooting in a single
+run.
+
+**Visible in the status payload.** `GET /api/management/ftp/status` reports
+`quarantine_count` next to `file_count`. The two are separate because they mean
+different things — "waiting for the import" and "already tried, needs a human" —
+and a single counter would let a quarantined upload read as "nothing arrived".
+Additive: the six pre-existing fields and the `connection` block are unchanged.
+The folder is not counted as an inbox file (the walk skips it by name, and a
+directory carries no image extension).
+
+**Boundary of that visibility:** the count is in the **API payload**, not yet in
+the management UI — no frontend component reads `quarantine_count` today, so a
+quarantined upload is discoverable over SFTP and in the status JSON, but not yet
+surfaced as a UI element. The UI is a separate, tracked piece of work; this
+document does not claim it exists.
 
 ## 4. Brand Isolation
 
@@ -167,14 +464,27 @@ Gallery assignment is purely explicit via `setTarget()`:
 
 | Scenario | Behavior |
 |---|---|
-| Inbox directory missing | `process()` returns `{processed: 0}` — no error |
-| No image files in inbox | Returns `{processed: 0}` |
+| Inbox directory missing | `process()` returns `{success: true, processed: 0}` — no error |
+| No image files in inbox | Returns `{success: true, processed: 0}` |
+| More files than `ftp.import.max_files` | **Not an error (D-35).** The first batch is imported, the rest stays for the next run; HTTP 200 with `processed` = imported count |
+| Next file would exceed `ftp.import.max_batch_bytes` | The batch ends before that file; it and everything after it stay for the next run (HTTP 200) |
+| A single file is larger than `ftp.import.max_file_bytes` | **413**, and the run imports **nothing at all**: the walk stops before that file, so the files behind it in directory order wait as well. The message names the file size, the limit and `FTP_IMPORT_MAX_FILE_BYTES` as the way out. After `ftp.import.quarantine_after_attempts` such runs the file moves to `_quarantine` and the run continues with the rest (§3.6) |
+| The first selected file alone is larger than `ftp.import.max_batch_bytes` | **413**; the message names the size, the budget and `FTP_IMPORT_MAX_BATCH_BYTES`. Not a quarantine reason: it is a misconfiguration (`max_batch_bytes` below `max_file_bytes`), and moving files aside would hide it |
+| A file grows past its budget while it is copied | **413** — the file that was verified is not the file that would be imported |
+| A staged file is not a decodable image (empty, truncated, wrong type) | **422** `Die FTP-Datei ist kein gültiges oder unterstütztes Bild.` The files imported **before** it in this batch stay imported and unlinked; the offender stays in the inbox, so the same 422 repeats on every later run until D-37 quarantines it (§3.6) |
+| `filesize()` fails while `is_file()` still reports the file (stat-cache race) | The file is **present**, so there is something to move: it counts one attempt and is quarantined after `ftp.import.quarantine_after_attempts` (§3.6). Before the threshold it is **skipped**, not rejected, and the run continues with the next candidate — until D-36 this was a 422 `Die FTP-Datei konnte nicht geprüft werden.` that aborted the whole run — the same situation had two different answers in two places (N7). A file that `is_file()` already reports as absent is the vanished case and is skipped without counting |
+| Source changed during staging or image processing | **422**, no `Retry-After`; the pre-commit case persists nothing, the post-commit case removes the row and its files again |
+| Source vanished during the import | Counts as unchanged: the staged snapshot is persisted, the row is kept, and there is nothing to unlink |
+| Post-commit rollback cannot delete the row | The exception propagates (HTTP 500) and the destination files are **not** removed: the surviving row still references them. Deliberate — see `runImport()` |
 | File copy fails | Exception propagates → `process()` returns HTTP 500. Transaction per file (not wrapped in global transaction) — already-copied files remain imported. |
 | Metadata extraction fails | `PhotoProcessingService` falls back to gallery defaults. The photo is still created. |
 | Storage disk full | PHP file operations throw — HTTP 500. Admin must free space. |
-| Concurrent process calls | Guarded per photographer — see §3.3.2. A second call is refused with 409 and imports nothing. Not a cross-boundary lock: the FTP server keeps writing into the same directory, and the guard's reach is only the configured cache store. |
-| File vanishes between the `glob()` snapshot and its loop iteration | Skipped, not imported — a competing run already claimed it (§3.3.2). |
-| Gallery deleted between setTarget and process | `Gallery::find()` returns null in process() loop — error may occur. Current code uses `Gallery::find()` after the check. |
+| Concurrent process calls | Guarded per photographer — see §3.3.2. HTTP **409 with `Retry-After`** (the only meaning of 409 on this route) and imports nothing. Not a cross-boundary lock: the FTP server keeps writing into the same directory, and the guard's reach is only the configured cache store. |
+| Inbox directory exists but cannot be opened | `status()` and `process()` answer HTTP 500 with `Der FTP-Posteingang konnte nicht gelesen werden.` — a named error instead of the old `count(false)` `TypeError` on a polled endpoint. |
+| Gallery deleted between setTarget and process | Named **400** `Die Ziel-Galerie existiert nicht mehr.` (`gallery_missing`). Until D-36 this was a `TypeError` → HTTP 500 from `$gallery->id` in the import loop; the gallery is now resolved before the walk |
+| A file the import cannot process at all | After `ftp.import.quarantine_after_attempts` failed attempts it is moved to `{inbox}/_quarantine` and the run continues; the file is never deleted (§3.6) |
+| SFTPGo upload event, unknown slug or no target gallery | HTTP **200** with `{accepted: false, reason: …}` and **no** job. Deliberate: a non-2xx is a failed action for SFTPGo and would fill its log with portal-side states (§3.4) |
+| The background chain | Ends on an empty result, on a rejected batch, on a run without progress, at `ftp.import.chain_max_batches`, and after `ftp.import.chain_max_failures` thrown attempts — every exit is named in §3.5. It never retries a rejected file |
 | Brand isolation violation | 403 response — the user is informed before any import occurs. |
 
 ## 7. Account Provisioning & Transport (SFTPGo)
@@ -622,12 +932,22 @@ die Spur und schwächt **nichts** an der Zurechenbarkeit.
 SFTPGo schreibt auf **denselben** Host-Pfad `/home/webadmin/websites/ftp`.
 Bind-Mount `-> /var/www/ftp` und Disk `ftp_inbox` als `driver=local` bleiben.
 
-- **`FtpController` wird nicht angefasst** — `getInboxPath()`, `setTarget()`,
-  die `status()`-Struktur und `process()` bleiben. **Präzisierung 2026-09-26
-  (P1-M26):** `status()` liefert zusätzlich die drei Kontofelder aus 7.4.
-  Additiv — die bestehende Struktur und der Import-Pfad bleiben unberührt, und
-  der Lesepfad bekommt **keinen** SFTPGo-Kontakt. `FtpImportTest` und
-  `FtpInboxLocalDiskTest` bleiben unverändert grün.
+- **`FtpController` bleibt im Transportwechsel unangetastet** — `setTarget()`,
+  die `status()`-Struktur und der HTTP-Vertrag von `process()` bleiben.
+  **Präzisierung 2026-09-26 (P1-M26):** `status()` liefert zusätzlich die drei
+  Kontofelder aus 7.4. Additiv — die bestehende Struktur und der Import-Pfad
+  bleiben unberührt, und der Lesepfad bekommt **keinen** SFTPGo-Kontakt.
+  **Überholt am 2026-10-18 (D-36):** Die Aussage „`FtpController` wird nicht
+  angefasst" beschrieb den Transportwechsel. Der Import selbst ist seither in
+  `FtpInboxImporter` herausgezogen, weil HTTP-Trigger und Hintergrund-Kette
+  denselben Code benutzen müssen (§3.5); `FtpController` hält nur noch den
+  HTTP-Vertrag und reicht seine Test-Nähte als Callables hinein. Die
+  Disk-Aussage dieses Abschnitts ist **unverändert gültig**, und ihr Wächter
+  wurde mitgezogen: `FtpInboxLocalDiskTest::test_the_import_path_contains_no_transfer_driver_reference`
+  liest jetzt `FtpController`, `FtpInboxImporter` und `ImportFtpBatch` als
+  Quelltext — der Import-Pfad liegt nicht mehr in der Datei, die der Test früher
+  allein scannte. `FtpImportTest` und `FtpInboxLocalDiskTest` bleiben unverändert
+  grün (SEC-14).
 - **Kein** `Storage::disk('sftp')` für den Import: Netzwerk-Roundtrip nach
   localhost pro Datei **plus** ein Credential im Portal für den eigenen Host.
 - **Getestete Version:** `drakkan/sftpgo:latest` war am 2026-09-26
@@ -688,7 +1008,7 @@ Aus dem Vorfall vom 2026-09-26, verbindlich für jeden Prozess, der auf
   Prozess mit Schreibbedarf entweder Eigentümer oder in `webgroup` ist.
 - SFTPGo legt virtuelle Ordner **nicht** an (Doku: *"you have to create the
   folder on disk yourself"*). **Das Portal legt `ftp/<slug>` deshalb selbst an**
-  (D-2, `AGENTS.md` §14): `App\Support\FtpInboxDirectory::ensure()` läuft im
+  (D-2): `App\Support\FtpInboxDirectory::ensure()` läuft im
   Slug-Schreibpfad **vor** dem Speichern. Schlägt die Anlage fehl, wird der Slug
   **nicht** gespeichert und die Antwort nennt Pfad und Grund (fehlender Mount,
   read-only, fehlende Rechte). Der Zustand „Slug gesetzt, Ordner fehlt" kann so
@@ -1162,5 +1482,177 @@ Kamera vom konfigurierten Wert ab, landet der Upload in einem Verzeichnis, das
 der Import nie liest. Das Verzeichnis ist der einzige Fehler, der wie ein
 **leerer Posteingang** aussieht und nicht wie ein Fehler — deshalb steht der
 Hinweis sowohl im Deployment-Runbook als auch auf der Einrichtungsseite im UI.
-Der Import ist nicht rekursiv (`glob(...)`), also bleibt auch Canons
+Der Import ist nicht rekursiv (begrenzter `readdir()`-Scan ohne Unterordner),
+also bleibt auch Canons
 „Verzeichnisstruktur" der zweite Weg in denselben stillen Fehlermodus.
+
+**Eine Ausnahme von „nicht rekursiv", die keine ist:** der Quarantäne-Ordner
+`{inbox}/_quarantine` liegt im selben Verzeichnis wie die Uploads (§3.6). Der
+Scan überspringt ihn nach Namen und weil ein Verzeichnis keine Bild-Endung
+trägt — er liest ihn also nicht rekursiv, er ignoriert ihn. Wer die
+Endungs-Prüfung entfernt, macht aus der Quarantäne eine zweite Inbox.
+
+### 7.18 Provisionierung der Upload-Event-Regel (D-36)
+
+Die Regel liegt im **SFTPGo-Datenprovider**, nicht in der Compose-Datei: sie ist
+Anwendungszustand, der einen Redeploy überleben und ohne Stack-Recreate
+änderbar sein muss. Eine Compose-Umgebungsvariable könnte sie nicht ausdrücken
+(SFTPGo 2.6+ liest seine Konfiguration aus dem Provider), und Handarbeit im
+Web-UI ist nicht reproduzierbar. Deshalb ein versionierter, idempotenter Befehl
+über die Admin-API — derselbe Weg wie `ftp:provision-folders` für die
+Inbox-Verzeichnisse.
+
+```bash
+cd backend
+php artisan ftp:provision-events
+php artisan ftp:provision-events --dry-run   # kontaktiert SFTPGo nicht, zeigt Ziel-URL und Regel
+```
+
+**Benutzte Admin-Endpunkte** (`openapi/openapi.yaml` v2.7.6, nicht geraten):
+
+| Zweck | Aufruf |
+|---|---|
+| Aktion lesen | `GET /api/v2/eventactions/{name}` → 200 `BaseEventAction`, 404 wenn unbekannt |
+| Aktion anlegen | `POST /api/v2/eventactions` (Body `BaseEventAction`, `type: 1` = HTTP) |
+| Aktion ersetzen | `PUT /api/v2/eventactions/{name}` (vollständiges Objekt, kein Teil-Update) |
+| Regel lesen | `GET /api/v2/eventrules/{name}` → 200 `EventRule`, 404 wenn unbekannt |
+| Regel anlegen | `POST /api/v2/eventrules` (Body `EventRuleMinimal`) |
+| Regel ersetzen | `PUT /api/v2/eventrules/{name}` (vollständiges Objekt) |
+
+Geschrieben wird: eine Aktion vom Typ `1` (HTTP) mit `POST` auf
+`FTP_EVENT_URL`, dem Secret im `X-FTP-Event-Secret`-Header, `timeout: 10`,
+`Content-Type: application/json` und einem JSON-Rumpf, und eine Regel mit
+Trigger `1` (Filesystem-Event), `conditions.fs_events = ["upload"]`, Status
+`enabled`, gebunden an diese Aktion.
+
+**Die drei Felder, die SFTPGo sonst ablehnt oder verwirft (fixiert 2026-10-18).**
+
+- **`timeout` ist Pflicht.** SFTPGo validiert `1 <= timeout <= 180`
+  (`internal/dataprovider/eventrule.go`, `EventActionHTTPConfig::isTimeoutNotValid`,
+  gerufen aus `validate()` bei `POST /eventactions` **und**
+  `PUT /eventactions/{name}`). Das Feld ist `json:"timeout,omitempty"`, ein
+  weggelassenes Feld schreibt also `0` — die Admin-API antwortet **400**, und die
+  Aktion lässt sich gar nicht anlegen. Vorher stand kein `timeout` im Payload;
+  der Befehl hätte gegen eine echte SFTPGo-2.7.6-Instanz nie eine Aktion
+  erzeugt.
+- **Ohne `body` kommt ein leerer POST an.** SFTPGo hat **keinen** Default-Rumpf
+  und keine Default-Query-Parameter (`internal/common/eventmanager.go`,
+  `getHTTPRuleActionBody`: nur `Body` oder `Parts`, sonst `nil`). Der Endpunkt
+  liest ausschließlich aus dem Rumpf (`FtpEventController::handleUpload`), also
+  wäre `username = null` → **422 `malformed`** → kein Job, und für SFTPGo eine
+  *failed action*. Der Rumpf ist deshalb `UPLOAD_EVENT_BODY`.
+- **`Content-Type: application/json` steuert die Maskierung.** SFTPGo
+  JSON-escaped die eingesetzten Platzhalter nur, wenn die Aktions-Header einen
+  JSON-Content-Type nennen (`EventActionHTTPConfig::HasJSONBody()`); ohne den
+  Header würde ein Anführungszeichen im Pfad den Rumpf zerlegen.
+
+**Die Platzhalter sind SFTPGos eigene, nicht geraten.** Quelle:
+`internal/common/eventmanager.go`, `getStringReplacements()` (v2.7.6). Für ein
+Filesystem-Event ist `{{.Name}}` der Account (`EventParams.Name` ist der
+Benutzername der Verbindung, `internal/common/actions.go`), `{{.Event}}` die
+Operation (`upload` / `first-upload`), `{{.VirtualPath}}` der Dateipfad und
+`{{.FileSize}}` die Bytezahl. Der provisionierte Rumpf lautet
+(`ProvisionFtpEvents::UPLOAD_EVENT_BODY`):
+
+```json
+{"action":"{{.Event}}","username":"{{.Name}}","fs_path":"{{.VirtualPath}}","file_size":"{{.FileSize}}"}
+```
+
+`FtpEventEndpointTest::test_the_provisioned_action_reaches_the_endpoint_and_enqueues_a_job`
+nimmt **denselben** Payload, den `ftp:provision-events` schreibt
+(`ProvisionFtpEvents::actionPayload()`), liest Endpunkt, Header und Rumpf daraus
+und schickt ihn — nur die Platzhalter wie SFTPGo ersetzt — an den Endpunkt: er
+muss einen Job ergeben. Damit ist die provisionierte Form selbst geprüft, nicht
+zwei Konstanten nebeneinander. `ProvisionFtpEventsTest` pinnt zusätzlich
+`timeout` im gültigen Bereich, den Rumpf mit den vier Platzhaltern, den
+`Content-Type` und den URL-Default; fehlt eines davon, werden beide Tests rot.
+
+- **Idempotenz:** beide Objekte werden zuerst gelesen. Gefunden → `PUT`,
+  fehlend → `POST`. Ein zweiter Lauf erzeugt deshalb **eine** Aktion und **eine**
+  Regel, und ein geändertes Secret oder eine geänderte URL wird über das
+  bestehende Objekt geschrieben. Der Leseschritt ist genau der Grund: ein
+  blindes `POST` antwortet beim zweiten Lauf mit 409 und ließe das **alte**
+  Secret stehen, während es einen Fehler meldet.
+- **Reihenfolge:** Aktion zuerst, dann die Regel — SFTPGo validiert, dass die
+  Aktion einer Regel existiert. Scheitert der Regelschreibvorgang danach, sagt
+  der Befehl das ausdrücklich („die Aktion existiert, die Regel fehlt") statt
+  Fertigstellung zu behaupten. Der so entstehende Halbzustand ändert nichts am
+  laufenden System: ohne Regel wird kein Event zugestellt, und der nächste Lauf
+  repariert ihn.
+- **Fehlerform:** fehlende URL oder fehlendes Secret, oder ein nicht
+  konfiguriertes/nicht erreichbares SFTPGo → Exit-Code 1 mit benanntem Grund und
+  **ohne** Schreibvorgang (`Http::assertNothingSent()` in
+  `ProvisionFtpEventsTest`).
+
+| Config-Key | Default | Wo der Default steht |
+|---|---|---|
+| `FTP_EVENT_URL` | `APP_URL` + `/api/internal/ftp/upload-event`; leer/Leerraum → Default, aber nur bei absoluter `http(s)`-`APP_URL`; ein gesetzter Wert ohne `http(s)` → Befehl bricht ab | `grep -n "FTP_EVENT_URL" backend/config/ftp.php` |
+| `FTP_EVENT_SECRET` | **kein Default.** Leer heißt: der Endpunkt lehnt jedes Event mit 401 ab, und der Befehl bricht ab | `grep -n "'secret'" backend/config/ftp.php` |
+| Header-Name | `X-FTP-Event-Secret` (kein Env-Key: er ist der Vertrag zwischen Endpunkt und Befehl) | `grep -n "secret_header" backend/config/ftp.php` |
+| Aktions-/Regelname | `portal-ftp-upload` / `portal-ftp-upload-rule` | `grep -n "action_name" backend/config/ftp.php` |
+
+`FTP_EVENT_URL` hat als Default die eigene öffentliche URL plus Endpunkt-Pfad,
+weil das die einzige Adresse ist, die SFTPGo in jeder Deployment-Variante
+erreicht (In-Network-Servicenamen unterscheiden sich je Compose-Revision).
+
+**Leer heißt nicht „gesetzt" (fixiert 2026-10-18).** Die Compose-Datei
+publiziert die Variable **immer** (`FTP_EVENT_URL=${FTP_EVENT_URL:-}`), in
+Portainer ohne Wert also als **Leerstring** — und Laravels `env()` liefert bei
+vorhandener-leerer Variable den Leerstring statt des Defaults. Fehlend, leer und
+reiner Leerraum werden deshalb in `config/ftp.php` auf denselben Fall abgebildet.
+Der Default entsteht nur, wenn `APP_URL` selbst absolut mit `http://`/`https://`
+beginnt — genau die Prüfung, die SFTPGo anwendet
+(`EventActionHTTPConfig.validate()`, `util.IsStringPrefixInSlice`,
+case-sensitiv); eine relative `APP_URL` ergibt `null`, und der Befehl nennt den
+fehlenden Wert, statt eine Aktion zu schreiben, die SFTPGo mit **400** ablehnt.
+Dasselbe Schema prüft der Befehl auch für einen **gesetzten** `FTP_EVENT_URL`
+vor dem Request.
+
+`FTP_EVENT_SECRET` hat **keinen** Default: ein leerer Wert muss den Endpunkt
+fail-closed machen, nicht Events ohne Authentifizierung annehmen.
+
+### 7.18.1 Ausrollen der Event-Regel (Deploy-Seite)
+
+Die Regel liegt im SFTPGo-Datenprovider und wird deshalb **nicht** vom
+Container-Entrypoint geschrieben, sondern einmalig (idempotent wiederholbar) per
+Befehl. Zwei Dinge gehören dazu:
+
+1. **Die zwei Variablen im Backend-Service** von `deployment/docker-compose.yml`
+   (neben `FTP_STORAGE_PATH`):
+
+   ```yaml
+   - FTP_EVENT_URL=${FTP_EVENT_URL:-}
+   - FTP_EVENT_SECRET=${FTP_EVENT_SECRET:-}
+   ```
+
+   `FTP_EVENT_SECRET` ist ein Secret und gehört in die Portainer-Stack-Env, nie
+   ins Repo (dieselbe Klasse wie C1–C4). `FTP_EVENT_URL` darf leer bleiben — der
+   Default aus `config/ftp.php` (`APP_URL` + Endpunkt-Pfad) greift.
+2. **Der Provisionierungsschritt**, ausgeführt **nach** dem Start des
+   Backend-Containers, weil er die Admin-API erreichen muss:
+
+   ```bash
+   docker compose exec backend php artisan ftp:provision-events
+   ```
+
+   Ohne diesen Schritt antwortet der Endpunkt auf jedes Event **401**
+   (fail-closed, korrekt), und es wird nichts automatisch importiert — das ist
+   kein Fehler des Codes, sondern ein unvollständiger Deploy.
+
+**Eine Compose-Änderung ist ein Recreate, kein Restart (AGENTS.md §13).** Die
+zwei neuen `environment:`-Zeilen werden von `docker restart` **nicht**
+übernommen — sie sind zum Erzeugungszeitpunkt in den Container gebacken. Nach der
+Änderung muss der Stack neu erzeugt werden (Portainer-Stack-Editor-Update), erst
+danach greifen die Variablen. `sync.sh` allein reicht dafür nicht.
+
+**Grenze — keine Live-Verifikation gegen eine laufende SFTPGo-Instanz.** Die
+Payload-Form (Platzhalter, `timeout`, `body`, `Content-Type`) ist an der Quelle
+gelesen — `openapi/openapi.yaml` v2.7.6, `internal/common/eventmanager.go`,
+`internal/common/actions.go`, `internal/dataprovider/eventrule.go` — und durch
+Tests gepinnt, aber **nie** gegen eine laufende SFTPGo-Instanz ausgeführt. §7.6
+verlangt dieselbe Live-Prüfung für den User-Pfad; genau das Fehlen dieser Prüfung
+ist der Grund, aus dem die drei fehlenden Felder bis zum 2026-10-18 überlebt
+haben. Nach dem ersten echten Deploy gehört deshalb eine Gegenprobe dazu:
+`php artisan ftp:provision-events` muss mit Exit 0 enden, und ein echter
+Kamera-Upload muss einen Job auslösen (Backend-Log:
+`FTP-Import-Kette abgeschlossen.`).

@@ -12,6 +12,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\FileDeliveryController;
 use App\Http\Controllers\FtpController;
 use App\Http\Controllers\FtpCredentialController;
+use App\Http\Controllers\FtpEventController;
 use App\Http\Controllers\GalleryController;
 use App\Http\Controllers\GalleryFrontendController;
 use App\Http\Controllers\ImageController;
@@ -110,6 +111,14 @@ if (app()->environment('local', 'testing')) {
 }
 
 Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe'])->name('api.webhooks.stripe')->middleware('throttle:10,1');
+
+// D-36: SFTPGo posts one filesystem event per uploaded file here; the endpoint
+// resolves the account and enqueues the background import. Deliberately outside
+// `throttle:api`: an ordinary shooting is a burst of dozens of events within a
+// second, so a limiter sized for humans would drop exactly the events the feature
+// exists for. It is secret-gated instead (FTP_EVENT_SECRET, 401 otherwise) and
+// does no heavy work — it never touches the inbox, it only enqueues a job.
+Route::post('/internal/ftp/upload-event', [FtpEventController::class, 'handleUpload'])->name('api.internal.ftp.upload-event');
 
 Route::get('/sitemap-galleries.xml', [SitemapController::class, 'galleries'])->name('api.sitemap.galleries');
 Route::get('/sitemap-images.xml', [SitemapController::class, 'images'])->name('api.sitemap.images');

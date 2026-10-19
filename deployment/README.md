@@ -96,6 +96,45 @@ Drei Fallen, alle drei belegt:
 Gegenprobe nach dem Deploy: im Dashboard beim Endpunkt **„Send test webhook"** →
 **HTTP 200** heißt Signatur stimmt, **400** heißt der `whsec` passt nicht.
 
+### FTP-Upload-Events (D-36) — zwei Werte und ein Provisionierungsschritt
+
+Der automatische FTP-Import wird von einem SFTPGo-**Filesystem-Event** ausgelöst:
+nach jedem Upload POSTet SFTPGo an den internen Endpunkt des Portals. Dafür
+braucht der Backend-Container zwei Variablen (im Compose bereits verdrahtet):
+
+```bash
+FTP_EVENT_SECRET=<generiertes Secret>   # Pflicht
+FTP_EVENT_URL=                          # optional; Default = APP_URL + /api/internal/ftp/upload-event
+```
+
+`FTP_EVENT_SECRET` gehört in die Portainer-GUI, nie ins Repo (Klasse C1–C4).
+`FTP_EVENT_URL` darf leer bleiben.
+
+**Einmalig nach dem Deploy** — die Regel liegt im SFTPGo-Datenprovider und wird
+nicht vom Entrypoint geschrieben:
+
+```bash
+docker compose exec backend php artisan ftp:provision-events
+```
+
+Ohne diesen Schritt weist der Endpunkt jedes Event mit **401** ab (fail-closed,
+korrekt) und es wird nichts automatisch importiert. Der Befehl ist idempotent —
+ein zweiter Lauf aktualisiert dieselbe Aktion und Regel. Gegenprobe:
+
+```bash
+docker compose exec backend php artisan ftp:provision-events --dry-run
+docker compose logs backend | grep -i 'FTP-Import-Kette'
+```
+
+> **Diese Compose-Änderung ist ein Recreate, kein Restart.** `docker restart
+> portal_backend` übernimmt neue `environment:`-Zeilen **nicht** — sie sind zum
+> Erzeugungszeitpunkt in den Container gebacken (`AGENTS.md` §13). Erst ein
+> Stack-Recreate (Portainer-Editor-Update) macht die Variablen wirksam.
+>
+> **Grenze:** die Event-Regel wurde nie gegen eine laufende SFTPGo-Instanz
+> verifiziert (Payload-Form nur an der Quelle gelesen und getestet). Der erste
+> echte Upload nach dem Deploy ist die Gegenprobe.
+
 ### Einmalige Host-Voraussetzung: Fotospeicher
 
 Der Backend läuft als `1000:82`, der Fotospeicher gehörte `33:33` mit `755`.

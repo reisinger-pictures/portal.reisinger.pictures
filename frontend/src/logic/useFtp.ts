@@ -1,6 +1,14 @@
+import {useEffect, useRef, useState} from 'react';
 import useSWR from 'swr';
 import {apiMutate, fetcher} from '../api';
 import {FtpConnection} from './ftpConnection';
+
+/**
+ * The single status key, shared by the hook and the mount read below. Extracted
+ * because the read and the `useSWR` call must address the same cache entry;
+ * two string literals could drift apart without any compiler noticing.
+ */
+const STATUS_KEY = '/api/management/ftp/status';
 
 export interface FtpTargetGallery {
     id: string;
@@ -72,17 +80,74 @@ export interface ResetCredentialsResponse {
 }
 
 export function useFtp() {
-    const {data: status, isLoading, mutate} = useSWR<FtpStatus>('/api/management/ftp/status', fetcher);
+    /**
+     * The status, read by this mount for itself.
+     *
+     * SWR's automatic mount revalidation cannot be relied on here: it is skipped
+     * inside `dedupingInterval` (default 2000 ms) and skipped again while a
+     * previous instance's request for the same key is still in flight. In both
+     * cases the cache is served and `onSuccess` never fires for *this* mount —
+     * which is exactly the state the FTP inbox's one-shot catch-up run (D-36)
+     * must not decide on, because the value after every import is
+     * `file_count: 0`, the same reading a stale entry shows.
+     *
+     * So the mount reads once for itself instead (below), and SWR's own mount
+     * read is switched off to keep that to exactly one `GET /status`. An
+     * explicit `mutate()` revalidation ignores the dedupe window, so the value
+     * this mount decides on is always freshly read.
+     */
+    const {data: status, isLoading, error, mutate} = useSWR<FtpStatus>(
+        STATUS_KEY,
+        fetcher,
+        {revalidateOnMount: false},
+    );
+
+    /**
+     * `true` once the read this mount started has *settled* — succeeded or
+     * failed; `error` is what separates the two.
+     *
+     * `readStarted` (a ref, so StrictMode's setup → cleanup → setup finds it
+     * already set) makes "once per mount" literal. It is not the same signal as
+     * `isLoading`/`isValidating`: with a warm cache the first render already
+     * shows a complete value with both flags `false`, *before* this read has
+     * even started, so neither flag separates a leftover cache value from a
+     * freshly read one.
+     */
+    const [readSettled, setReadSettled] = useState(false);
+    const readStarted = useRef(false);
+    useEffect(() => {
+        if (readStarted.current) return;
+        readStarted.current = true;
+        void (async () => {
+            try {
+                await mutate();
+            } catch {
+                // A failed read is reported through `error`; this catch only
+                // keeps the rejection from escaping the fire-and-forget read.
+            } finally {
+                setReadSettled(true);
+            }
+        })();
+    }, [mutate]);
 
     const setTargetGallery = async (gallery_id: string | null) => {
         await apiMutate('/api/management/ftp/target', 'POST', {gallery_id});
         await mutate();
     };
 
+    /**
+     * Import one batch and hand the result back.
+     *
+     * The status is deliberately **not** refetched here. Reloading the queue is
+     * the caller's next step (`await processInbox(); await mutate();`), and
+     * keeping it at the call site is what holds an import to exactly one
+     * `GET /status`: the page triggers this from two places — the manual button
+     * and the one-shot catch-up run on mount (D-36) — and both must show the
+     * same remaining quantity after the same number of reads. A reload in here
+     * as well would read the status twice for one visible change.
+     */
     const processInbox = async () => {
-        const data = await apiMutate<ProcessInboxResponse>('/api/management/ftp/process', 'POST');
-        await mutate();
-        return data;
+        return apiMutate<ProcessInboxResponse>('/api/management/ftp/process', 'POST');
     };
 
     /**
@@ -108,5 +173,5 @@ export function useFtp() {
         return data;
     };
 
-    return {status, isLoading, setTargetGallery, processInbox, resetCredentials};
+    return {status, isLoading, error, readSettled, setTargetGallery, processInbox, resetCredentials, mutate};
 }

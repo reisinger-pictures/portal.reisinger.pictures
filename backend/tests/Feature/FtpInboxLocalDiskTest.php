@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Enums\Brand;
 use App\Enums\UserRole;
 use App\Http\Controllers\FtpController;
+use App\Jobs\ImportFtpBatch;
 use App\Models\Gallery;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\FtpInboxImporter;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Filesystem\FilesystemManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -137,21 +139,33 @@ class FtpInboxLocalDiskTest extends TestCase
         $this->assertTrue(Storage::disk('ftp_inbox')->exists($sourcePath));
     }
 
-    public function test_the_import_path_in_the_controller_contains_no_transfer_driver_reference(): void
+    public function test_the_import_path_contains_no_transfer_driver_reference(): void
     {
-        $source = file_get_contents((new \ReflectionClass(FtpController::class))->getFileName());
-        $this->assertIsString($source);
-        $this->assertNotFalse($source);
+        // The import moved into FtpInboxImporter (D-36) so the HTTP trigger and
+        // the background chain share one implementation. The source scan follows
+        // it: scanning only the controller would leave the guard covering a file
+        // that no longer contains the import path.
+        $sources = [
+            FtpController::class => (new \ReflectionClass(FtpController::class))->getFileName(),
+            FtpInboxImporter::class => (new \ReflectionClass(FtpInboxImporter::class))->getFileName(),
+            ImportFtpBatch::class => (new \ReflectionClass(ImportFtpBatch::class))->getFileName(),
+        ];
 
-        // Covers the branches this suite does not execute, such as an error
-        // recovery path or a future getInboxPath() swap, which the behavioural
-        // disk spy above would never reach.
-        $this->assertStringNotContainsString("disk('sftp'", $source);
-        $this->assertStringNotContainsString('disk("sftp"', $source);
-        $this->assertStringNotContainsString("disk('ftp'", $source);
-        $this->assertStringNotContainsString('sftp://', $source);
-        $this->assertStringNotContainsString('ftp://', $source);
-        $this->assertStringNotContainsString('Flysystem\PhpSftp', $source);
+        foreach ($sources as $class => $file) {
+            $source = file_get_contents($file);
+            $this->assertIsString($source);
+            $this->assertNotFalse($source);
+
+            // Covers the branches this suite does not execute, such as an error
+            // recovery path or a future inbox-path swap, which the behavioural
+            // disk spy above would never reach.
+            $this->assertStringNotContainsString("disk('sftp'", $source, $class);
+            $this->assertStringNotContainsString('disk("sftp"', $source, $class);
+            $this->assertStringNotContainsString("disk('ftp'", $source, $class);
+            $this->assertStringNotContainsString('sftp://', $source, $class);
+            $this->assertStringNotContainsString('ftp://', $source, $class);
+            $this->assertStringNotContainsString('Flysystem\PhpSftp', $source, $class);
+        }
     }
 
     /**

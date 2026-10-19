@@ -2,51 +2,61 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\FtpImportStatus;
 use App\Http\Resources\GalleryResource;
-use App\Models\Gallery;
-use App\Models\Photo;
+use App\Jobs\ImportFtpBatch;
 use App\Services\AuthorizationService;
 use App\Services\FtpCredentialService;
+use App\Services\FtpInboxImporter;
 use App\Services\PhotoProcessingService;
 use App\Values\FtpConnectionDetails;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
+/**
+ * The photographer-facing FTP inbox: state, target gallery, import trigger.
+ *
+ * The import itself no longer lives here. It is `FtpInboxImporter`, because the
+ * HTTP trigger and the background chain of D-36 (`ImportFtpBatch`) must run the
+ * same budgets, the same staging and the same cleanup — two copies would drift,
+ * and the drift would only be visible as a photo that survived a failure.
+ *
+ * What stays here is the HTTP contract: the status payload, the target setter,
+ * and the mapping from an `FtpImportStatus` to a status code and a German
+ * message. The protected seams below (`countInboxImages()`, `statSource()`,
+ * `openImportSourceStream()`) are handed to the importer as callables, so the
+ * SEC-14 suite can still drive the real code path from a subclass of this
+ * controller instead of a re-implementation (see `FtpImportTest`).
+ */
 class FtpController extends Controller
 {
     /**
-     * Lifetime of the per-photographer import lock, in seconds.
+     * Built lazily, from the same `PhotoProcessingService` instance the
+     * container injected here.
      *
-     * This is a hard ceiling, not a lease renewal: the guard is lost once it
-     * expires. It is therefore set far above a realistic import (ExifTool per
-     * file, one file copy and one DB transaction each), because the failure
-     * mode of a too-short TTL is a duplicated photo, while the failure mode of a
-     * too-long TTL is only that a photographer who hit a PHP fatal waits for
-     * the lock to expire instead of retrying immediately.
+     * Resolving the importer through the container instead would be a second
+     * resolution of `PhotoProcessingService`: in the tests the mock is bound in
+     * the container, so both paths happen to agree — but only one of them is
+     * guaranteed to, and the import must use the service this controller was
+     * built with.
      */
-    private const IMPORT_LOCK_TTL_SECONDS = 300;
-
-    /**
-     * Cache-lock name for one photographer's import run.
-     *
-     * Keyed by the user id, which is a globally unique UUID: the inbox folder is
-     * user-level too, so this is the narrowest key that still covers exactly the
-     * files the run can touch. A brand component would add nothing while the
-     * Brand enum has a single case, and the folder namespace is deliberately not
-     * brand-scoped yet (features/infrastructure/19-ftp-upload-pipeline.md §7.11).
-     */
-    public static function importLockName(string $userId): string
-    {
-        return 'ftp-process:'.$userId;
-    }
+    private ?FtpInboxImporter $importer = null;
 
     public function __construct(
         private readonly PhotoProcessingService $photoService,
     ) {}
+
+    /**
+     * Cache-lock name for one photographer's import run (P1-M28).
+     *
+     * Kept on the controller because it is part of the observable contract: the
+     * SEC-14 suite acquires this exact lock to simulate a competing run, and the
+     * key is what makes the guard per photographer. The implementation lives
+     * with the import in `FtpInboxImporter`.
+     */
+    public static function importLockName(string $userId): string
+    {
+        return FtpInboxImporter::importLockName($userId);
+    }
 
     /**
      * The photographer's view of their own FTP state.
@@ -70,16 +80,34 @@ class FtpController extends Controller
      * `$visible` (they are system state, not part of the user payload), so they
      * are read here as attributes and added to this response explicitly. The
      * response is the contract the frontend reads; the user payload is not.
+     *
+     * `quarantine_count` is additive (D-37): it is the number of files the
+     * import moved aside because it could not process them. It is a separate
+     * field rather than part of `file_count` because the two mean different
+     * things — "waiting to be imported" and "already tried, needs a human" — and
+     * a photographer who sees only `file_count` would read a quarantined
+     * upload as "nothing arrived".
      */
     public function status()
     {
         $user = auth('api')->user();
-        $inboxPath = $this->getInboxPath($user);
+        $inboxPath = $this->importer()->inboxPath($user);
 
         $fileCount = 0;
         if (is_dir($inboxPath)) {
-            $files = glob($inboxPath.'/*.{jpg,jpeg,JPG,JPEG}', GLOB_BRACE);
-            $fileCount = count($files);
+            $fileCount = $this->countInboxImages($inboxPath);
+
+            // A directory that exists but cannot be opened is a host/permission
+            // fault, not an empty inbox. Reporting 0 would make a broken mount
+            // look like "nothing uploaded", and `count()` on the old `glob()`
+            // result turned the same fault into a TypeError — a 500 with no
+            // usable message. The endpoint is polled, so it answers with a
+            // named error instead.
+            if ($fileCount === null) {
+                return response()->json([
+                    'error' => 'Der FTP-Posteingang konnte nicht gelesen werden.',
+                ], 500);
+            }
         }
 
         $user->load('currentFtpGallery');
@@ -87,6 +115,7 @@ class FtpController extends Controller
         return response()->json([
             'ftp_folder' => '/'.($user->ftp_slug ?? $user->id),
             'file_count' => $fileCount,
+            'quarantine_count' => $this->importer()->quarantineCount($inboxPath),
             'current_target_gallery' => $user->currentFtpGallery ? new GalleryResource($user->currentFtpGallery) : null,
             'ftp_account_status' => $user->ftp_account_status,
             'ftp_provisioned_at' => $user->ftp_provisioned_at,
@@ -131,190 +160,122 @@ class FtpController extends Controller
     }
 
     /**
-     * Triggers the FTP import for the calling photographer.
+     * Triggers one FTP import run for the calling photographer.
      *
-     * Concurrency guard (P1-M28). The pipeline is read → copy → Photo row →
-     * unlink over a directory the FTP server writes into at the same time. Two
-     * runs can each take their own `glob()` snapshot of the same file, and the
-     * loser of the unlink race would still have produced a second Photo row and
-     * a second stored file under a different UUID. The "single-user access"
-     * assumption in
-     * features/infrastructure/19-ftp-upload-pipeline.md §6 stopped holding once
-     * several photographers import in parallel, so it is replaced by a
-     * per-photographer cache lock.
+     * This is the synchronous entry point: the photographer starts it from the
+     * inbox card, and it imports exactly one batch (D-35). The same run is what
+     * `ImportFtpBatch` performs in the background after an SFTPGo upload event
+     * (D-36) — both call `FtpInboxImporter::importBatch()`.
      *
-     * What it protects: the whole read → copy → metadata → Photo row → unlink
-     * sequence of one photographer, for as long as this deployment's cache store
-     * is shared. A competing call is answered with 409 and imports nothing.
+     * The HTTP contract this method owns:
      *
-     * What it does NOT protect — deliberately not claimed:
-     * - It is not a lock across a system boundary. The FTP/SFTP server writes
-     *   into the same directory and takes no protocol-level lock, so a file a
-     *   camera is still writing can be read half-finished. Keeping uploads and
-     *   imports apart is the photographer's workflow, not this guard's job.
-     * - It is not global. Its reach is exactly the reach of the configured cache
-     *   store. A deployment that gives every node its own file cache degrades it
-     *   to a per-node best effort.
-     * - It is not a renewed lease, see IMPORT_LOCK_TTL_SECONDS. A run that
-     *   outlives the TTL loses the guard; a PHP fatal releases it only when the
-     *   TTL expires.
-     * - It does not merge or queue requests. The rejected call does no work at
-     *   all; the photographer sees "an import is already running" and retries.
+     * - **200** `{success, processed, quarantined}`. `processed` is the number of
+     *   photos written; a batch limit is not an error, the remainder waits for
+     *   the next run (D-35). `quarantined` counts files that were moved aside by
+     *   D-37 after repeated failure — additive, and the reason the response can
+     *   report a successful run that also had to give up on a file.
+     * - **413** when a single file is above `ftp.import.max_file_bytes` (until
+     *   D-37 quarantines it) or a first file is above the whole-run budget. Both
+     *   abort the run before any file is opened: the message names the size, the
+     *   limit and the variable to raise.
+     * - **422** when a source changed while it was read, or a staged file is not
+     *   a decodable image. The first is the documented "the camera is still
+     *   writing" case and carries no `Retry-After`.
+     * - **409** with `Retry-After` when another run of this account holds the
+     *   lock. 409 has exactly this one meaning here, so a client can tell
+     *   "another run is active" (retry after `Retry-After`) from "your upload is
+     *   still writing" (422, no header).
+     *
+     * What the lock does NOT protect is documented in full in
+     * `features/infrastructure/19-ftp-upload-pipeline.md` §3.3.2: it is not a
+     * lock across a system boundary, its reach is the configured cache store,
+     * and it is not a renewed lease.
      */
     public function process(Request $request)
     {
         $user = auth('api')->user();
-        $svc = app(AuthorizationService::class);
-        if (! $svc->isPhotographer($user)) {
-            return response()->json(['error' => 'Nur Fotografen dürfen den FTP-Import anstoßen.'], 403);
-        }
-        if (! $user->current_ftp_gallery_id) {
-            return response()->json(['error' => 'Keine Ziel-Galerie ausgewählt.'], 400);
+        $result = $this->importer()->importBatch(
+            $user,
+            openSource: fn (string $path) => $this->openImportSourceStream($path),
+            statSource: fn (string $path) => $this->statSource($path),
+        );
+
+        if ($result->eventHandoff) {
+            // The manual request owned the lock when the upload event arrived.
+            // Hand it to the bounded background chain only after importBatch()
+            // has released the lock; dispatching earlier would recurse into a
+            // competing job that can only return Locked.
+            ImportFtpBatch::dispatch($user->id);
         }
 
-        $allowedIds = $user->getAllowedGalleryIds();
-        if (! in_array($user->current_ftp_gallery_id, $allowedIds)) {
-            return response()->json(['error' => 'Die Ziel-Galerie gehört nicht zu deiner Marke.'], 403);
-        }
-
-        $gallery = Gallery::find($user->current_ftp_gallery_id);
-        $inboxPath = $this->getInboxPath($user);
-
-        if (! is_dir($inboxPath)) {
-            return response()->json(['success' => true, 'processed' => 0]);
-        }
-
-        $imageFiles = glob($inboxPath.'/*.{jpg,jpeg,JPG,JPEG}', GLOB_BRACE);
-        if (empty($imageFiles)) {
-            return response()->json(['success' => true, 'processed' => 0]);
-        }
-
-        // Acquired only once there is work to do, so an idle photographer never
-        // blocks their own next import. Non-blocking on purpose: a second run
-        // must be told that it is too early instead of silently waiting and then
-        // racing the first one through the very same files.
-        $lock = Cache::lock(self::importLockName($user->id), self::IMPORT_LOCK_TTL_SECONDS);
-        if (! $lock->get()) {
-            return response()->json([
-                'error' => 'Ein Import läuft bereits. Bitte warte, bis er abgeschlossen ist.',
-            ], 409, ['Retry-After' => (string) self::IMPORT_LOCK_TTL_SECONDS]);
-        }
-
-        try {
-            return $this->runImport($user, $gallery, $imageFiles);
-        } finally {
-            $lock->release();
-        }
+        return match ($result->status) {
+            FtpImportStatus::Imported, FtpImportStatus::Empty => response()->json([
+                'success' => true,
+                'processed' => $result->imported,
+                'quarantined' => $result->quarantined,
+            ]),
+            FtpImportStatus::NotPhotographer,
+            FtpImportStatus::TargetNotAllowed => response()->json(['error' => $result->error], 403),
+            FtpImportStatus::NoTarget,
+            FtpImportStatus::GalleryMissing => response()->json(['error' => $result->error], 400),
+            FtpImportStatus::UnreadableInbox => response()->json(['error' => $result->error], 500),
+            FtpImportStatus::LimitExceeded => response()->json(['error' => $result->error], 413),
+            FtpImportStatus::SourceChanged,
+            FtpImportStatus::SourceUnprocessable => response()->json(['error' => $result->error], 422),
+            FtpImportStatus::Locked => response()->json(
+                ['error' => $result->error],
+                409,
+                ['Retry-After' => (string) FtpInboxImporter::IMPORT_LOCK_TTL_SECONDS],
+            ),
+        };
     }
 
     /**
-     * Imports the given inbox files into the target gallery.
+     * Count the inbox image files, delegating to the importer.
      *
-     * The caller must hold the import lock of `process()`. The sequence per file
-     * is read → copy to the photo disk → Photo row in a transaction → unlink the
-     * inbox copy, so a failure leaves the source file in place for the next run
-     * (features/infrastructure/19-ftp-upload-pipeline.md §6).
+     * Protected so a test can simulate a directory that exists but cannot be
+     * opened: the suite runs as root in CI, where a `chmod` fixture is ignored
+     * and would make the test green for the wrong reason.
      *
-     * @param  list<string>  $imageFiles
+     * @return int|null Null when the directory exists but cannot be opened.
      */
-    private function runImport($user, Gallery $gallery, array $imageFiles): JsonResponse
+    protected function countInboxImages(string $inboxPath): ?int
     {
-        $processedCount = 0;
-
-        foreach ($imageFiles as $file) {
-            // `glob()` is a snapshot taken before this loop. A file that vanished
-            // in between was already claimed by a competing run, so it is
-            // skipped instead of imported a second time under a new UUID.
-            if (! file_exists($file)) {
-                continue;
-            }
-
-            $originalName = pathinfo($file, PATHINFO_FILENAME);
-
-            $imageInfo = PhotoProcessingService::inspectRasterImage($file);
-            if ($imageInfo === null) {
-                return response()->json([
-                    'error' => 'Die FTP-Datei ist kein gültiges oder unterstütztes Bild.',
-                ], 422);
-            }
-
-            $extension = match ($imageInfo['mime_type']) {
-                'image/jpeg' => 'jpg',
-                'image/png' => 'png',
-                'image/webp' => 'webp',
-            };
-
-            // Dateinamen IMMER aus UUID generieren!
-            $photoId = (string) Str::uuid();
-            $filename = $photoId.'.'.$extension;
-
-            $targetDir = (string) $gallery->id;
-            $targetRelativePath = $targetDir.'/'.$filename;
-            $thumbsDir = $targetDir.'/_thumbs';
-
-            $contents = file_get_contents($file);
-            if ($contents === false) {
-                throw new \RuntimeException('FTP-Quelldatei konnte nicht gelesen werden.');
-            }
-
-            if (! Storage::disk('photos')->put($targetRelativePath, $contents)) {
-                throw new \RuntimeException('Foto konnte nicht in den Photo-Speicher geschrieben werden.');
-            }
-
-            $targetPath = Storage::disk('photos')->path($targetRelativePath);
-            $thumbPath = Storage::disk('photos')->path($thumbsDir.'/'.md5($filename.'1024').'.webp');
-
-            if (! is_dir(dirname($thumbPath))) {
-                mkdir(dirname($thumbPath), 0755, true);
-            }
-
-            $meta = $this->photoService->processImage($targetPath, $thumbPath, $gallery);
-            $meta['mime_type'] = $imageInfo['mime_type'];
-            if (empty($meta['title'])) {
-                $meta['title'] = $originalName; // Dateiname als Titel retten
-            }
-
-            DB::transaction(function () use ($gallery, $meta, $photoId, $user) {
-                // `id` is not fillable (it is the stored file name), and
-                // `captured_at` is EXIF-derived rather than client input — both
-                // are written deliberately by the explicit creation API.
-                Photo::createWithId(
-                    array_merge([
-                        'gallery_id' => $gallery->id,
-                        'lr_uuid' => 'ftp-'.uniqid(),
-                        'user_id' => $user->id,
-                    ], $meta),
-                    $photoId,
-                );
-            });
-
-            if (file_exists($file) && ! unlink($file)) {
-                throw new \RuntimeException('FTP-Quelldatei konnte nicht gelöscht werden.');
-            }
-
-            $processedCount++;
-        }
-
-        return response()->json(['success' => true, 'processed' => $processedCount]);
+        return $this->importer()->countInboxImages($inboxPath);
     }
 
-    private function getInboxPath($user)
+    /**
+     * The seam through which the import opens a source file.
+     *
+     * A subclass can make a source grow at the exact moment it is read, which is
+     * the only way to reach the bounded-read rejection without a race against a
+     * real camera.
+     *
+     * @return resource|false
+     */
+    protected function openImportSourceStream(string $path)
     {
-        $folder = $user->ftp_slug ?? $user->id;
-        $root = Storage::disk('ftp_inbox')->path((string) $folder);
+        return $this->importer()->openSource($path);
+    }
 
-        // Der Zielordner aus den Verbindungsdaten ist der Unterordner, den die
-        // Kamera beschreibt. '/' bedeutet das Konto-Wurzelverzeichnis selbst.
-        // Ohne diesen Zusatz importierte das Portal nichts mehr, sobald ein
-        // Zielordner konfiguriert ist: die Kamera laedt dann in einen Ordner,
-        // den der Import nie liest — und das saehe wie ein leerer Posteingang
-        // aus, nicht wie ein Fehler.
-        $uploadPath = FtpConnectionDetails::resolvedUploadPath();
+    /**
+     * Fresh existence and size probe for one source file.
+     *
+     * A subclass can hand in the exact symptom of PHP's stale stat cache
+     * (`present` true, `size` false) without depending on OS-level cache
+     * behaviour, which is not reproducible on every host. The *order* inside the
+     * importer (cache invalidation before the probe) is pinned separately by
+     * `FtpStatCacheOrderTest`.
+     *
+     * @return array{present: bool, size: int|false}
+     */
+    protected function statSource(string $path): array
+    {
+        return $this->importer()->statSource($path);
+    }
 
-        if ($uploadPath === FtpConnectionDetails::UPLOAD_PATH) {
-            return $root;
-        }
-
-        return $root.$uploadPath;
+    private function importer(): FtpInboxImporter
+    {
+        return $this->importer ??= new FtpInboxImporter($this->photoService);
     }
 }

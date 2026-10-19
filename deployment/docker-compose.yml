@@ -201,6 +201,18 @@ services:
       - TURNSTILE_FAILURE_IP_THRESHOLD_PER_HOUR=${TURNSTILE_FAILURE_IP_THRESHOLD_PER_HOUR:-5}
       - TURNSTILE_FAILURE_WINDOW_SECONDS=${TURNSTILE_FAILURE_WINDOW_SECONDS:-3600}
       - FTP_STORAGE_PATH=/var/www/ftp
+      # FTP-Upload-Events (D-36). SFTPGo POSTet je hochgeladener Datei ein
+      # Filesystem-Event an den internen Endpunkt; der Import laeuft dann ohne
+      # Klick. FTP_EVENT_URL darf leer bleiben (Default: APP_URL +
+      # /api/internal/ftp/upload-event). FTP_EVENT_SECRET hat bewusst keinen
+      # Default: ein leerer Wert laesst den Endpunkt jedes Event mit 401
+      # abweisen (fail closed) und den Provisionierungsbefehl abbrechen. Die
+      # Regel selbst liegt im SFTPGo-Datenprovider und wird einmalig per
+      # `php artisan ftp:provision-events` geschrieben (deployment/README.md,
+      # 19-ftp-upload-pipeline.md 7.18.1). Das Secret gehoert in die
+      # Portainer-Stack-Env, nie ins Repo (Klasse C1-C4).
+      - FTP_EVENT_URL=${FTP_EVENT_URL:-}
+      - FTP_EVENT_SECRET=${FTP_EVENT_SECRET:-}
       - STRIPE_KEY=${STRIPE_KEY}
       - STRIPE_SECRET=${STRIPE_SECRET}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
