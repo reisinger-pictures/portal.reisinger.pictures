@@ -2,8 +2,7 @@
 
 Module-scoped doc for the Lightroom plugin in `admin.lrplugin/`. This is a **separate module**
 from `frontend/` and `backend/`: it is plain Lua running inside Lightroom Classic (SDK 8.0) and
-talks to the portal REST API over `LrHttp`. See the module `AGENTS.md` files in `frontend/` and
-`backend/` for their own rules.
+talks to the portal REST API over `LrHttp`.
 
 ## Scope
 

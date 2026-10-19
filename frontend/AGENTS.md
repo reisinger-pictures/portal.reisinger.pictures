@@ -2,7 +2,7 @@
 
 Module-scoped operating guidelines for the React frontend in `frontend/`.
 
-Global rules (Definition of Done, AI workflow & TODO management, E2E tag policy, agent roles, security risk register, IntelliJ run-config conventions) live in the repo root `AGENTS.md` and apply here as well. This file only covers what is specific to the frontend module.
+Global rules (Definition of Done, AI workflow & TODO management, E2E tag policy, agent roles, security risk register, IntelliJ run-config conventions) live in the repo root [`AGENTS.md`](../AGENTS.md) and apply here as well. This file only covers what is specific to the frontend module.
 
 ## Stack
 
@@ -18,23 +18,20 @@ React Compiler is enabled in `vite.config.ts` via `reactCompilerPreset` passed t
 babel({presets: [reactCompilerPreset(), linguiTransformerBabelPreset()]})
 ```
 
-Because the compiler performs automatic memoization:
-
-- `useMemo`, `useCallback`, `React.memo`, and `forwardRef` are **antipatterns — do not use them**.
-- Write plain functions/values and let the compiler memoize.
-- Effects whose deps no longer contain a manual callback may re-run more often — that is intended compiler behavior. Do not add `useCallback` back.
-- The compiler bails safely (leaves code uncompiled) on unsupported constructs: try/catch around value blocks, throw inside try/catch, try/finally, mutation of module-scope variables, ref access during render. Keep such logic in module-level helper functions (or in effect bodies) so components/hooks stay compilable and their values stay memoized (stable identities for context providers and hooks are important for effect deps).
+- `useMemo`, `useCallback`, `React.memo`, and `forwardRef` are **antipatterns — do not use them**; write plain functions/values and let the compiler memoize.
+- Effects whose deps no longer contain a manual callback may re-run more often — that is intended. Do not add `useCallback` back.
+- The compiler bails safely on unsupported constructs (try/catch around value blocks, throw inside try/catch, try/finally, mutation of module-scope variables, ref access during render). Keep such logic in module-level helper functions or effect bodies so components/hooks stay compilable.
 - If a genuinely problematic infinite loop appears, restructure minimally (e.g. the ref-delegation pattern: sync a `useRef` with the unstable function, use the ref inside the effect).
 
 ## Commands
 
-Frontend Unit tests (pnpm, NICHT npm):
+Frontend Unit tests (pnpm, NOT npm):
 
 ```bash
 cd frontend && pnpm run test:run
 ```
 
-Frontend Lint + Build (pnpm, NICHT npm; `build` runs `tsc -b && node scripts/check-i18n.mjs` via prebuild, then `vite build`):
+Frontend Lint + Build (pnpm, NOT npm; `build` runs `tsc -b && node scripts/check-i18n.mjs` via prebuild, then `vite build`):
 
 ```bash
 cd frontend && pnpm lint:fix && pnpm build
@@ -42,73 +39,41 @@ cd frontend && pnpm lint:fix && pnpm build
 
 E2E (Playwright):
 
-- Full suite, nur vor Deployment: `cd frontend && npx playwright test`
-- Nur @smoke, nach jedem Code-Change: `cd frontend && npx playwright test --grep @smoke`
-- Nur spezifisches Feature, z. B. checkout: `cd frontend && npx playwright test --grep @feature:checkout`
-- Nur fehlgeschlagene wiederholen: `cd frontend && npx playwright test --last-failed`
+- Full suite, only before deployment: `cd frontend && npx playwright test`
+- Only @smoke, after every code change: `cd frontend && npx playwright test --grep @smoke`
+- Only a specific feature, e.g. checkout: `cd frontend && npx playwright test --grep @feature:checkout`
+- Only re-run failed tests: `cd frontend && npx playwright test --last-failed`
 
-**Die Server startet Playwright selbst.** `playwright.config.ts` deklariert ein `webServer`-Array
-(Backend über `bash scripts/e2e-up.sh` auf Port 8001, Frontend über `pnpm dev` auf 4321 mit
-`VITE_API_PROXY=http://127.0.0.1:8001`) und **wartet** auf beide. `scripts/e2e-up.sh` macht dabei
-den vollständigen Aufbau — Services, `.env.e2e`, `migrate:fresh --seed`, Fixtures, Scout-Index —
-bevor es per `exec` zu `artisan serve` wird; ein Kaltstart liefert also eine **vorbereitete** DB,
-keine leere. `reuseExistingServer` ist true: läuft `e2e-up.sh` bereits von Hand, wird es
-wiederverwendet. **Unter CI ist der Block nicht gesetzt** — der Workflow startet dort sein eigenes
-Backend auf **8000** und sein eigenes Vite auf 4321, und ein zweiter Starter würde sich mit ihnen
-anlegen.
+Playwright starts the servers itself: `playwright.config.ts` declares a `webServer` array (backend via `bash scripts/e2e-up.sh` on port 8001, frontend via `pnpm dev` on 4321 with `VITE_API_PROXY=http://127.0.0.1:8001`) and waits for both. `scripts/e2e-up.sh` performs the full setup (services, `.env.e2e`, `migrate:fresh --seed`, fixtures, Scout index). `reuseExistingServer` is true.
 
-**Warum das nachträglich kam.** Am 2026-09-28 waren nach einem PHP-Problem 18 Smoke-Specs mit
-`net::ERR_CONNECTION_REFUSED` rot — 18 Specs, die nicht defekt waren, sondern keinen Server
-fanden. Jeder Fehlschlag sah gleich aus und keiner sagte warum; die Zahl skaliert mit der Suite,
-die Ursache bleibt eine. Ein toter Server muss **eine** Diagnose ergeben, nicht eine pro Spec.
+- **Under CI the block is not set**: the workflow starts its own backend on 8000 and its own Vite on 4321.
+- Without `VITE_API_PROXY` the Vite proxy points at `https://portal.test` and needs Valet/Herd.
 
-**Ohne `VITE_API_PROXY` zeigt der Vite-Proxy auf `https://portal.test`** (`vite.config.ts`), und
-das braucht Valet/Herd. Auf dieser Maschine ist Herd nicht installiert, der Default ist ein toter
-Host. Deshalb setzt der `webServer`-Eintrag die Variable ausdrücklich.
+Every new E2E test requires at least one functional tag (`@smoke`, `@regression`, or `@feature:<name>`); `@mobile` is only an additional device tag and does not replace a functional tag.
 
-Jeder neue E2E-Test benötigt mindestens einen funktionalen Tag (`@smoke`,
-`@regression` oder `@feature:<name>`); `@mobile` ist nur ein zusätzlicher
-Device-Tag und ersetzt keinen funktionalen Tag.
+E2E workflow:
 
-E2E Workflow:
-
-1. Nach jedem Code-Change: `pnpm test:e2e:smoke`
-2. Feature-spezifisch: `npx playwright test --grep @feature:<name>`
-3. Nur vor Deployment: `npx playwright test` (full suite)
-4. Flaky Tests in AGENTS.todo.md dokumentieren mit:
-   - Datei + Testname
-   - Fehlerursache (wenn bekannt)
-   - `flaky` tag im Commit/PR
-
-Bug-Fixing: Einen fokussierten Fehlschlag mit `npx playwright test --last-failed` wiederholen. Pro fehlschlagendem Test sind maximal drei Fix-Versuche erlaubt; nach dem dritten erfolglosen Versuch die Ursachenanalyse an den Benutzer zurückgeben und nicht weiterloopen.
+1. After every code change: `pnpm test:e2e:smoke`
+2. Feature-specific: `npx playwright test --grep @feature:<name>`
+3. Only before deployment: `npx playwright test` (full suite)
+4. Document flaky tests in `AGENTS.todo.md` with file + test name, cause (if known), and a `flaky` tag in the commit/PR.
+5. Reproduce a focused failure with `npx playwright test --last-failed`; at most three fix attempts per failing test, then return the root-cause analysis instead of continuing a retry loop.
 
 E2E Timeout Policy (STRICT):
 
-- Vor jeder Session die aktuelle Minimallaufzeit messen: `npx playwright test`
-- Timeout auf das Doppelte setzen (z. B. 7 min gemessen → 15 min Timeout)
-- Diese Regel und die Laufzeit in AGENTS.todo.md dokumentieren
-- Bei Änderungen an E2E-Tests neu messen und aktualisieren
-- **Explizite Ausnahme (User-Entscheidung, 2026-09-25):** Die gemessene
-  langsamste parallele CI-Baseline beträgt 17m09s (Run `36035927250`; der
-  serielle Lauf benötigte 6m51s). Der ausdrücklich freigegebene
-  `globalTimeout` bleibt deshalb **25 Minuten (`1500000` ms)**; das wäre
-  bewusst **keine** Verdopplung der 17m09s (34m18s), sondern ein begrenzter
-  Sicherheits-Cap mit 7m51s Puffer zum gemessenen Maximum. Der
-  Per-Test-Timeout bleibt **120s (`120000` ms)**. Diese Ausnahme darf nicht
-  stillschweigend geändert werden; nach E2E-Änderungen braucht es eine neue
-  Messung und eine explizite User-Freigabe. Die Herleitung und der fehlende
-  lokale Playwright-Nachweis stehen auditable in `AGENTS.todo.md`.
+- Before each session measure the current minimum runtime (`npx playwright test`) and set the timeout to twice the measured value; document the rule and the runtime in `AGENTS.todo.md`. Re-measure after E2E changes.
+- The approved exception stands: `globalTimeout` is **25 minutes (`1500000` ms)** and the per-test timeout is **120 s (`120000` ms)**. Do not change it silently; any change needs a new measurement and explicit owner approval. Contract and derivation: [`features/e2e-test-strategy.md`](../features/e2e-test-strategy.md).
 
 ## STRICT Frontend Rules
 
 ### useEffect & Derived State Policy (STRICT)
-Forbid the use of `useEffect` for side effects triggered by user events (e.g. creating object URLs). Handlers MUST perform these actions. Forbid the use of `useState` for values that can be derived during rendering.
+`useEffect` for side effects triggered by user events (e.g. creating object URLs) is forbidden; handlers MUST perform these actions. `useState` for values that can be derived during rendering is forbidden.
 
 ### Tailwind JIT Policy (STRICT)
 Dynamische String-Konkatenation für Tailwind-Klassen (z.B. `btn-${color}`) ist **strikt verboten**, da der JIT-Compiler diese beim Build-Prozess übersieht und restlos entfernt (Purge). Klassen müssen immer vollständig und statisch ausgeschrieben werden (z.B. per explizitem Mapping-Objekt oder Ternary-Operator).
 
 ### Tailwind-Only Policy (STRICT)
-Das `style`-Attribut ist **strikt verboten** – mit Ausnahme von dynamischen Werten, die sich zur Laufzeit ändern (z. B. berechnete Breiten/Höhen aus Benutzereingaben, animierte Werte). Statische Layout-Werte (insb. vh/vw/dvh/dvw-basierte Größen) MÜSSEN via Tailwind-Klassen gelöst werden. Werte in eckigen Klammern (JIT-Bracket-Syntax wie `w-[30%]`, `text-[10px]`, `max-w-[200px]`) bleiben ebenfalls **strikt verboten** — außer bei Iconify-Icons. Tailwind 4 bietet native Fraktionen (`w-3/10`, `w-1/5`), Spacing-Werte (`max-w-xs`, `text-xs`, `h-80`) und `dvh`-Utilities (`h-dvh`, `max-h-dvh`). Reichen diese nicht aus, ist eine Erweiterung der Tailwind-Konfiguration (z. B. via `@utility` in `index.css`) dem Inline-Style vorzuziehen.
+Das `style`-Attribut ist **strikt verboten** – mit Ausnahme von dynamischen Werten, die sich zur Laufzeit ändern (z. B. berechnete Breiten/Höhen aus Benutzereingaben, animierte Werte). Statische Layout-Werte (insb. vh/vw/dvh/dvw-basierte Größen) MÜSSEN via Tailwind-Klassen gelöst werden. Werte in eckigen Klammern (JIT-Bracket-Syntax wie `w-[30%]`, `text-[10px]`, `max-w-[200px]`) sind ebenfalls **strikt verboten** — außer bei Iconify-Icons. Tailwind 4 bietet native Fraktionen (`w-3/10`, `w-1/5`), Spacing-Werte (`max-w-xs`, `text-xs`, `h-80`) und `dvh`-Utilities (`h-dvh`, `max-h-dvh`). Reichen diese nicht aus, ist eine Erweiterung der Tailwind-Konfiguration (z. B. via `@utility` in `index.css`) dem Inline-Style vorzuziehen.
 
 ### Validation (Zod) Policy (STRICT)
 * Alle `react-hook-form` Implementierungen MÜSSEN `@hookform/resolvers/zod` nutzen.
@@ -121,12 +86,13 @@ The use of `eslint-disable`, `@ts-ignore`, or `any` is **strictly forbidden**. A
 Agenten MÜSSEN Playwright-Locators über Landmarks (`main`, `aside`, `footer`) scopen, um Eindeutigkeit sicherzustellen und Abhängigkeiten von rein visuellen CSS-Klassen zu minimieren.
 
 ### No `page.goto` for SPA Navigation (STRICT)
-`page.goto()` ist ein Anti-Pattern und darf nicht für SPA-Navigation verwendet werden. Ausnahmen:   
-* Externe Links (Invite, Magic-Link, Setup-Link)   
-* Initialer Seitenaufruf bei Gästen (`/`)   
-* Route-Guard-Tests (direkter URL-Zugriff testen)   
-* Brand-Isolation-Tests (Cross-Domain-Navigation)   
-* Stripe-Redirect-Simulation (return_url nach Zahlung)   
+`page.goto()` ist ein Anti-Pattern und darf nicht für SPA-Navigation verwendet werden. Ausnahmen:
+* Externe Links (Invite, Magic-Link, Setup-Link)
+* Initialer Seitenaufruf bei Gästen (`/`)
+* Route-Guard-Tests (direkter URL-Zugriff testen)
+* Brand-Isolation-Tests (Cross-Domain-Navigation)
+* Stripe-Redirect-Simulation (return_url nach Zahlung)
+
 Navigation MUSS via `sidebar.navigateTo()`, Klicks im UI oder API-Aufrufe erfolgen. localStorage-Injektion + page.goto('/cart') ist verboten — Cart-Items MÜSSEN via API hinzugefügt werden.
 
 ### localStorage Injection (STRICT ANTI-PATTERN)
@@ -137,10 +103,8 @@ Daten via `page.evaluate()` oder `addInitScript` in `localStorage` zu injizieren
 * `(Optional)` oder `(optional)` in Labels ist **strikt verboten**. Optionale Felder werden schlicht ohne Zusatz gekennzeichnet.
 * Die CSS-Regel in `index.css` (`.form-control:has(input[required], select[required], textarea[required]) .label-text::after`) ist der zentrale Mechanismus und darf nicht umgangen werden.
 
-### Lingui / i18n — No Module-Scope `t` (STRICT, Regression 2026-08-12)
+### Lingui / i18n — No Module-Scope `t` (STRICT)
 Das `t`-Makro MUSS innerhalb von Funktions- oder Render-Bodies aufgerufen werden. **Auf Modulebene ist es strikt verboten** (z. B. `const schema = z.object({ ... t\`...\` ... })`, `const msg = t\`...\``).
-
-Grund: Im **Produktions-Bundle** (rolldown) werden statisch importierte Shell-Chunks vor dem `i18n.activate("de")` in `I18nProvider.tsx` evaluiert. Ein module-scope `t` crasht dort mit `Lingui: Attempted to call a translation function without setting a locale` und die Seite bleibt leer (blank). Im Dev-Server (native ESM) tritt der Fehler NICHT auf — reproduzierbar nur via `pnpm build` + `pnpm preview`.
 
 Regel bei Schemas in Shell-Komponenten (statisch von `App`/`PageLayout`/`DashboardLayout` erreichbar):
 - Schema als **Factory-Funktion** anlegen und im Component-Body aufrufen:
@@ -149,4 +113,4 @@ Regel bei Schemas in Shell-Komponenten (statisch von `App`/`PageLayout`/`Dashboa
   type LoginFormValues = z.infer<ReturnType<typeof createLoginSchema>>;
   // im Component: const loginSchema = createLoginSchema();
   ```
-- Verifikation: `pnpm build` + `pnpm preview` (Port 4173) laden und im Konsole-Tab prüfen, dass kein Lingui-pageerror auftritt (siehe `AGENTS.todo.md`, Bug-Analyse 2026-08-12).
+- Verifikation: `pnpm build` + `pnpm preview` (Port 4173) laden und im Konsole-Tab prüfen, dass kein Lingui-pageerror auftritt.

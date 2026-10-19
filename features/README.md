@@ -2,6 +2,11 @@
 
 This directory serves as the single source of truth for all technical concepts, architectural decisions, and feature specifications of the Reisinger Foto Portal.
 
+## Cross-cutting decisions
+
+* [Owner decisions](owner-decisions.md) - Current normative owner decisions D-1 through D-37.
+* [Accepted security risks](security/accepted-risks.md) - Current accepted dependency/security risks.
+
 ## Directory Index
 
 ### 🤖 AI / Metadata Generation
