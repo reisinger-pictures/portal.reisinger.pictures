@@ -49,6 +49,21 @@ class InfrastructureSupplyChainPolicyTest extends TestCase
         'docker-compose.test.yml',
     ];
 
+    /**
+     * The Stripe test secrets the E2E job injects and the preflight has to
+     * guard.
+     *
+     * All three are read during an E2E run: the secret key by the balance
+     * probe, the publishable key by the Vite build (`VITE_STRIPE_PUBLIC_KEY`
+     * falls back to `STRIPE_KEY`, so guarding `STRIPE_KEY` covers it) and the
+     * webhook secret by the Stripe self-test (`local_key_mode`).
+     */
+    private const E2E_STRIPE_TEST_SECRETS = [
+        'STRIPE_KEY',
+        'STRIPE_SECRET',
+        'STRIPE_WEBHOOK_SECRET',
+    ];
+
     public function test_github_actions_are_pinned_to_full_commit_shas(): void
     {
         $actionCount = 0;
@@ -340,6 +355,88 @@ class InfrastructureSupplyChainPolicyTest extends TestCase
         $this->assertStringContainsString('sha256sum -c --strict -', $dockerfile);
     }
 
+    /**
+     * Regression guard for the Stripe preflight of the E2E job.
+     *
+     * The step used to test only `secrets.STRIPE_SECRET != ''` while its own
+     * error message named three secrets. A missing publishable key or webhook
+     * secret therefore passed the preflight and surfaced later as a single red
+     * smoke test with no visible cause.
+     *
+     * The gate is verified by evaluating the step's own condition: the
+     * contract is the behaviour — one missing secret fails the step — not the
+     * spelling of the shell expression.
+     */
+    public function test_e2e_stripe_preflight_requires_every_injected_test_secret(): void
+    {
+        $step = $this->ciStep('e2e', 'Ensure Stripe test keys are configured');
+
+        $declared = $this->stripePresenceBooleans($step);
+
+        $this->assertCount(
+            count(self::E2E_STRIPE_TEST_SECRETS),
+            $declared,
+            'the preflight must declare exactly one presence boolean per Stripe test secret, found: '
+                .implode(', ', array_keys($declared))
+        );
+
+        foreach (self::E2E_STRIPE_TEST_SECRETS as $secret) {
+            $this->assertArrayHasKey(
+                $secret.'_SET',
+                $declared,
+                "the preflight must expose the presence of {$secret} as a boolean; "
+                    .'a missing secret must not pass the gate'
+            );
+            $this->assertSame(
+                $secret,
+                $declared[$secret.'_SET'],
+                "{$secret}_SET must be bound to secrets.{$secret}"
+            );
+        }
+
+        // The job injects exactly these three Stripe secrets. A new one that
+        // the preflight does not guard would reopen the same blind spot.
+        $this->assertEqualsCanonicalizing(
+            self::E2E_STRIPE_TEST_SECRETS,
+            $this->stripeSecretsReferencedByJob($this->ciJob('e2e')),
+            'every Stripe secret the e2e job injects must be guarded by the preflight'
+        );
+
+        $run = $this->stepRunBlock($step);
+
+        $this->assertStringContainsString(
+            'exit 1',
+            $run,
+            'the preflight must end the step with a non-zero exit code, otherwise a missing secret does not fail the job'
+        );
+
+        $condition = $this->shellCondition($step);
+
+        foreach ($this->presenceCombinations() as $combination) {
+            $process = new Process(
+                ['bash', '-c', 'if '.$condition.'; then exit 1; fi'],
+                $this->projectPath(),
+                $combination
+            );
+            $process->run();
+
+            $missing = array_keys(array_filter(
+                $combination,
+                static fn (string $value): bool => $value !== 'true'
+            ));
+
+            $this->assertSame(
+                $missing === [] ? 0 : 1,
+                $process->getExitCode(),
+                'the preflight must fail closed: with '.implode(', ', array_map(
+                    static fn (string $name, string $value): string => $name.'='.$value,
+                    array_keys($combination),
+                    $combination
+                )).' the step must '.($missing === [] ? 'pass' : 'fail')
+            );
+        }
+    }
+
     public function test_photo_storage_path_configuration_is_absolute_and_fail_closed(): void
     {
         $config = $this->read('backend/config/filesystems.php');
@@ -586,6 +683,118 @@ PHP;
         $this->assertNotEmpty(trim($matches[1]), "the {$name} job must not be empty");
 
         return $matches[1];
+    }
+
+    /**
+     * Raw YAML of a single step of a CI job. Steps sit at six-space
+     * indentation under `steps:`, so the next step on that level — or the
+     * next job key — closes the block, without needing a YAML parser.
+     */
+    private function ciStep(string $jobName, string $stepName): string
+    {
+        $job = $this->ciJob($jobName);
+        $pattern = '/^      - name: '.preg_quote($stepName, '/').'[ \t]*$(.*?)(?=^      - |^  [\w-]+:[ \t]*$|\z)/ms';
+        $matched = preg_match($pattern, $job, $matches);
+
+        $this->assertSame(1, $matched, "the {$jobName} job must define a step named \"{$stepName}\"");
+        $this->assertNotEmpty(trim($matches[1]), "the \"{$stepName}\" step must not be empty");
+
+        return $matches[1];
+    }
+
+    /**
+     * The presence booleans a step declares, mapped to the secret each one
+     * is bound to. Only the boolean may reach the shell — a secret value
+     * would end up in the job log.
+     *
+     * @return array<string, string>
+     */
+    private function stripePresenceBooleans(string $step): array
+    {
+        $matched = preg_match_all(
+            '/^\s+([A-Z_]+_SET): \$\{\{ secrets\.([A-Z_]+) != \'\' \}\}$/m',
+            $step,
+            $matches,
+            PREG_SET_ORDER
+        );
+
+        $this->assertNotFalse($matched, 'the preflight must expose the secret presence as booleans');
+
+        $declared = [];
+        foreach ($matches as $match) {
+            $declared[$match[1]] = $match[2];
+        }
+
+        return $declared;
+    }
+
+    /**
+     * The Stripe secrets a job injects, taken from the workflow itself so the
+     * preflight cannot drift away from what the job actually consumes.
+     *
+     * @return list<string>
+     */
+    private function stripeSecretsReferencedByJob(string $job): array
+    {
+        preg_match_all('/secrets\.(STRIPE_[A-Z_]+)/', $job, $matches);
+
+        $secrets = array_values(array_unique($matches[1]));
+        sort($secrets);
+
+        return $secrets;
+    }
+
+    /**
+     * Every combination of the three presence booleans, as the environment
+     * the preflight would see.
+     *
+     * @return list<array<string, string>>
+     */
+    private function presenceCombinations(): array
+    {
+        $combinations = [[]];
+
+        foreach (self::E2E_STRIPE_TEST_SECRETS as $secret) {
+            $expanded = [];
+            foreach ($combinations as $combination) {
+                foreach (['true', 'false'] as $value) {
+                    $expanded[] = $combination + [$secret.'_SET' => $value];
+                }
+            }
+            $combinations = $expanded;
+        }
+
+        return $combinations;
+    }
+
+    /**
+     * The shell body of a step, taken from its `run: |` block.
+     */
+    private function stepRunBlock(string $step): string
+    {
+        $matched = preg_match('/^\s*run:\s*\|[^\n]*\n(.*)$/ms', $step, $matches);
+
+        $this->assertSame(1, $matched, 'the step must carry a run block');
+
+        return $matches[1];
+    }
+
+    /**
+     * The condition of a step's `if` statement, normalized to one line.
+     *
+     * The condition decides whether the step fails, so the test evaluates it
+     * instead of pinning the exact spelling of the shell expression.
+     */
+    private function shellCondition(string $step): string
+    {
+        $run = $this->stepRunBlock($step);
+        $matched = preg_match('/\bif\s+(.+?);\s*then\b/s', $run, $matches);
+
+        $this->assertSame(1, $matched, 'the step must guard its failure with an if/then condition');
+
+        $condition = preg_replace('/\\\s*\n\s*/', ' ', $matches[1]) ?? $matches[1];
+
+        return trim((string) preg_replace('/\s+/', ' ', $condition));
     }
 
     /**

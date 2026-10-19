@@ -482,10 +482,20 @@ jobs:
         run: |
           timeout 60s bash -c 'until curl -sf http://sftpgo:8080/healthz > /dev/null; do sleep 1; done'
       - name: Ensure Stripe test keys are configured
+        # Fail closed on all three Stripe test secrets the job injects
+        # (job env above). The booleans carry presence only, so no secret
+        # value can reach the log. A missing STRIPE_KEY (publishable) or
+        # STRIPE_WEBHOOK_SECRET used to pass this preflight and fail later
+        # without a cause: the publishable key feeds the Vite build (the
+        # VITE_STRIPE_PUBLIC_KEY secret falls back to STRIPE_KEY), the
+        # webhook secret feeds the Stripe self-test, and only the secret key
+        # was used by the balance probe that follows.
         env:
           STRIPE_SECRET_SET: ${{ secrets.STRIPE_SECRET != '' }}
+          STRIPE_KEY_SET: ${{ secrets.STRIPE_KEY != '' }}
+          STRIPE_WEBHOOK_SECRET_SET: ${{ secrets.STRIPE_WEBHOOK_SECRET != '' }}
         run: |
-          if [ "$STRIPE_SECRET_SET" != "true" ]; then
+          if [ "$STRIPE_SECRET_SET" != "true" ] || [ "$STRIPE_KEY_SET" != "true" ] || [ "$STRIPE_WEBHOOK_SECRET_SET" != "true" ]; then
             echo "::error::STRIPE_SECRET (sk_test) / STRIPE_KEY (pk_test) / STRIPE_WEBHOOK_SECRET Secrets sind nicht konfiguriert - E2E kann nicht laufen."
             exit 1
           fi
