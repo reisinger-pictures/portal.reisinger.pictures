@@ -160,6 +160,16 @@ class AppServiceProvider extends ServiceProvider
                 : $request->ip()
         ));
 
+        // Not a dead registration: no route carries `throttle:checkout` — the
+        // checkout quota is enforced in `CheckoutRiskService::assertCheckoutQuotaAllowed()`,
+        // which counts the same three buckets itself. This limiter is the
+        // *declaration* of those bounds: the test
+        // `tests/Feature/CheckoutRateLimitTest.php` reads
+        // `RateLimiter::limiter('checkout')` and pins that the user/hour,
+        // IP/hour and IP/day bounds map onto the same config keys
+        // (`app.checkout_throttle_*`) and the same `CheckoutKey` key shape the
+        // service uses. Removing this registration would silently drop that
+        // declared contract.
         RateLimiter::for('checkout', function (Request $request): array {
             $user = $request->user('api');
             $ip = $request->ip();
