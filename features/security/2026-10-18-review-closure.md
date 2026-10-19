@@ -109,13 +109,17 @@ Measured with `FtpImportTest`; the batch semantics are the owner decision D-35.
   instead of deadlocking. The former order (org → actor → members → sorted union) locked the
   actor outside the sorted set and could form that cycle; the database breaks one transaction,
   no corruption. The two-connection proof runs against a disposable MariaDB
-  (`backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh`, CI-only). **The trade-off:** the org
-  row lock serialises *syncs* of one org, not every write to `users.org_id` — none of
+  (`backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh`, CI-only). `OrgController::destroy()`
+  takes the same org row lock first, so the order is **org → users** in that path as well and a
+  destroy cannot close a cycle with a sync of the same org. That order is pinned by
+  `OrgDestroyLockOrderTest`; the two-connection measurement of the destroy path is still open (it
+  needs a host with Docker). **The trade-off:** the org row lock serialises the *syncs* and the
+  *destroy* of one org, not every write to `users.org_id` — none of
   `OrgInviteController::redeem()`, `UserController::store()`,
-  `AuthController::register()`/`resetPassword()` (membership added) or `OrgController::destroy()`
-  (membership removed) takes it. The member set has to be known before the single lock query, so
-  it is now read **unlocked** (a consistent read) and the membership decision is taken on the
-  locked rows. The set is therefore read *earlier* in the transaction than the old
+  `AuthController::register()`/`resetPassword()` (membership added) takes it. The member set has to
+  be known before the single lock query, so it is now read **unlocked** (a consistent read) and the
+  membership decision is taken on the locked rows. The set is therefore read *earlier* in the
+  transaction than the old
   `SELECT … FOR UPDATE` on `org_id` was, and that old read was a current read that saw the latest
   committed state. A member that a non-sync writer adds in the new window — between the unlocked
   read and the lock statement — is **no longer detached** by that sync, while before it was. The
