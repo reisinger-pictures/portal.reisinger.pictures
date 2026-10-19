@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\AtomicRateCounter;
 use Closure;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Contracts\Cache\Repository;
@@ -47,9 +48,16 @@ use Symfony\Component\HttpFoundation\Response;
  * `throttle:` route keeps the framework behaviour (including both races above)
  * until it is migrated on purpose. No controller work is wrapped in a lock, so
  * queue `withoutOverlapping` semantics are untouched.
+ *
+ * Owner decision D-38 keeps that conversion bounded: the counting primitive
+ * lives in `App\Support\AtomicRateCounter` and is shared with the checkout
+ * quota and the Turnstile attempt counters, while the remaining `throttle:`
+ * routes stay on the framework middleware as a documented limit.
  */
 class AtomicThrottleRequests extends ThrottleRequests
 {
+    private ?AtomicRateCounter $counter = null;
+
     public function __construct(RateLimiter $limiter, protected Repository $cache)
     {
         parent::__construct($limiter);
@@ -114,24 +122,23 @@ class AtomicThrottleRequests extends ThrottleRequests
      */
     protected function countAttempt(object $limit): int
     {
-        $key = $this->limiter->cleanRateLimiterKey($limit->key);
+        $hits = $this->counter()->count($limit->key, $limit->decaySeconds);
 
-        if ($this->cache->add($key, 1, $limit->decaySeconds)) {
-            // This request opened the window. The timer only feeds
-            // `Retry-After`; the counter's own expiry is the window.
-            $this->cache->add($key.':timer', $this->availableAt($limit->decaySeconds), $limit->decaySeconds);
-
-            return 1;
-        }
-
-        $hits = $this->cache->increment($key);
-
-        if ($hits === false) {
+        if ($hits === AtomicRateCounter::UNCOUNTABLE) {
             // The counter row vanished between the two calls. Admitting the
             // request uncounted would widen the window, so refuse it instead.
             return $limit->maxAttempts + 1;
         }
 
-        return (int) $hits;
+        return $hits;
+    }
+
+    /**
+     * The shared count-first primitive. The same unit backs the checkout
+     * quota and the Turnstile attempt counters (owner decision D-38).
+     */
+    private function counter(): AtomicRateCounter
+    {
+        return $this->counter ??= new AtomicRateCounter($this->cache, $this->limiter);
     }
 }
