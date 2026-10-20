@@ -9,12 +9,14 @@ geprüft am: 2026-10-19
 > (`laravel`, `react-i18n`, `security-review`, `web-audit`, `update-models`), 3 entfernte
 > (`model-updater`, `update-opencode-models`, `vision-agents`), 12 geänderte und 1
 > Pfadumbenennung (`models` → `update-models`).
-> **Der Working Tree des Skills-Repos ist nicht sauber:** uncommittete Änderungen an
-> `update-models/SKILL.md` und `update-models/references/registry.md` (maschinenweit, ohne
-> Projektbezug). Sie gehören zu keinem Commit und sind deshalb **nicht** Teil der geprüften
-> Range.
+> **Der Working Tree des Skills-Repos war zum Prüfzeitpunkt nicht sauber:** uncommittete
+> Änderungen an `update-models/SKILL.md` und `update-models/references/registry.md`
+> (maschinenweit, ohne Projektbezug). Sie gehörten zu keinem Commit und waren deshalb **nicht**
+> Teil der geprüften Range; sie sind inzwischen als `219171c` committet und werden vom nächsten
+> Fortschreiben abgedeckt.
 > Geprüft gegen **HEAD `344604e`** dieses Repos (der Stand war gegenüber dem Prüfbeginn
-> 78 Commits hinter `origin/main` — vor der Prüfung gezogen).
+> 78 Commits hinter `origin/main` — vor der Prüfung gezogen); die Anker sind am 2026-10-20
+> gegen den inzwischen aktuellen HEAD `ce1e242` nachgezogen.
 > Format und Ablauf: Skill `skills-marker` im Skills-Repo.
 
 ## Skill-Stand
@@ -35,7 +37,7 @@ geprüft am: 2026-10-19
 | `security-review` | ja | `features/security/2026-10-18-review-closure.md` (14 Befunde SEC-01…SEC-14, alle geschlossen und unabhängig verifiziert, jeder mit Regressionstest), `features/security/accepted-risks.md` | — |
 | `skills-marker` | ja | `AGENTS.skills.md` (diese Datei) | — |
 | `tailscale-serve` | nein | | Kein Dev-Server-Expose im Projekt definiert — trifft nicht zu |
-| `ui-review` | ja | `frontend/tests/screenshots/` (`ui-review.config.ts` Z. 9-10 — Routen-Manifest, zitiert „ui-review skill references/harness.md §5"; dazu `harness.ts`, `ui-screenshots.spec.ts`, `seeds.ts`), `AGENTS.todo.md` §„UI-Review 2026-09-26" | Die Rollenänderung derselben Range trifft `AGENTS.md` Z. 44 (verlangt den abgeschafften `vision`-Subagenten) → Board „SKILLS-STAND", Position 7 |
+| `ui-review` | ja | `frontend/tests/screenshots/` (`ui-review.config.ts` Z. 9-10 — Routen-Manifest, zitiert „ui-review skill references/harness.md §5"; dazu `harness.ts`, `ui-screenshots.spec.ts`, `seeds.ts`), `AGENTS.todo.md` §„UI-Review 2026-09-26" | Die Rollenänderung derselben Range traf `AGENTS.md` §6 (verlangte den abgeschafften `vision`-Subagenten); am 2026-10-19 umgestellt auf den verbleibenden Weg — die Board-Position 7 ist geschlossen und aus dem Board entfernt (Beleg im Commit) |
 | `update-models` | nein | | Modell-Auswahl ist Maschinen-/Account-Sache; das Projekt definiert keine Modelle — trifft nicht zu (ersetzt die früheren Skills `model-updater` + `update-opencode-models`) |
 | `web-audit` | nein | | Kein Live-Site-Audit (Crawl → Bild-Download → Vision-Fan-out → False-Positive-Gate → ZIP-Archiv) im Projekt definiert; die Sitemaps (`backend/routes/api.php:126-127`) sind Produkt-Feature — trifft nicht zu |
 
@@ -67,11 +69,11 @@ Entscheidung steht je Zeile. Der Bereich umfasst auch die Regeldatei
 - `playwright-parallel` — **ja.** Description gekürzt; Matrix-Muster und Worker-Zahl stehen unverändert.
 - `skills-marker` — **ja.** Die Range verlangt stabile Referenzen (Abschnitt/Überschrift/Suchstring statt reiner Zeilennummer) und das Re-Verifizieren **aller** Anker beim Fortschreiben — beides ist in diesem Durchgang angewendet.
 - `tailscale-serve` — **nein.** Description gekürzt; im Projekt ist kein Dev-Server-Expose definiert.
-- `ui-review` — **ja** (bisher `nein`). Das Projekt hat ein eigenes Screenshot-Harness mit Routen-Manifest (`frontend/tests/screenshots/ui-review.config.ts`), das im Kommentar ausdrücklich „ui-review skill references/harness.md §5" zitiert, und hat die Schleife am 2026-09-26 angewendet. Die Eskalationsregel der Range („hard calls: re-read the image yourself") ist die projektseitige Folge aus dem `vision-agents`-Entfernen und trifft `AGENTS.md` Z. 44 → **Board Position 7**.
+- `ui-review` — **ja** (bisher `nein`). Das Projekt hat ein eigenes Screenshot-Harness mit Routen-Manifest (`frontend/tests/screenshots/ui-review.config.ts`), das im Kommentar ausdrücklich „ui-review skill references/harness.md §5" zitiert, und hat die Schleife am 2026-09-26 angewendet. Die Eskalationsregel der Range („hard calls: re-read the image yourself") ist die projektseitige Folge aus dem `vision-agents`-Entfernen und traf `AGENTS.md` §6 → **Board-Position 7** (am 2026-10-19 geschlossen und aus dem Board entfernt: §6 nennt jetzt „visual review is done by the agent itself (method and checklist: the `ui-review` skill) — every configured model is vision-capable, so there is no vision subagent in the loop").
 
 **Entfernt bzw. umbenannt**
 
-- `vision-agents` — **entfernt in `dccdd40`** („single default model, drop custom vision subagent"). Der eigene Vision-Subagent ist gestrichen, die globale Config führt nur `plan`/`general`/`build`/`explore`. Die Zeile verschwindet mit diesem Fortschreiben; die offene Frage — ob das Projekt den Inhalt selbst braucht — ist als **Board Position 7** beantwortet (ja: `AGENTS.md` Z. 44 nennt den Subagenten noch).
+- `vision-agents` — **entfernt in `dccdd40`** („single default model, drop custom vision subagent"). Der eigene Vision-Subagent ist gestrichen, die globale Config führt nur `plan`/`general`/`build`/`explore`. Die Zeile verschwindet mit diesem Fortschreiben; die offene Frage — ob das Projekt den Inhalt selbst braucht — ist als **Board-Position 7** beantwortet (ja: `AGENTS.md` §6 nannte den Subagenten; am 2026-10-19 auf „visual review is done by the agent itself (method and checklist: the `ui-review` skill) — every configured model is vision-capable, so there is no vision subagent in the loop" umgestellt, Position danach geschlossen und aus dem Board entfernt).
 - `model-updater` — **entfernt in `1c51237`** (mit `update-opencode-models` in `models` zusammengeführt).
 - `update-opencode-models` — **entfernt in `1c51237`** (mit `model-updater` in `models` zusammengeführt).
 - `models` — **neu in `1a096ba`, umbenannt in `update-models` (`fc28ea3`)**; der Slash-Command `/update-models` kam dazu. Die Netto-Wirkung ist eine Zeile: `update-models`, weiterhin maschinenweit → **nein**.
@@ -84,7 +86,7 @@ Entscheidung steht je Zeile. Der Bereich umfasst auch die Regeldatei
 
 Alle Belege der Tabelle gegen den aktuellen Stand gelesen — **5 von 9 Zeilenanker-Gruppen waren falsch**, zwei aus demselben Grund (die Zieldatei war gewachsen), drei aus einem zweiten (das Root-`AGENTS.md` ist am 2026-10-18/19 auf 104 Zeilen umgebaut und **englisch** geworden — die Abschnittsnummern haben sich verschoben, D-4 liegt jetzt in `features/owner-decisions.md`):
 
-- `ui-review` — `AGENTS.md:714-715` zeigte auf die D-23-Lücke („80 der 113 Markdown-Dateien"), nicht auf den UI-Review-Hinweis. **Korrigiert** auf `AGENTS.md` §6 (Z. 44) für die Rollenfrage und `frontend/tests/screenshots/` für die Anwendung.
+- `ui-review` — `AGENTS.md:714-715` zeigte auf die D-23-Lücke („80 der 113 Markdown-Dateien"), nicht auf den UI-Review-Hinweis. **Korrigiert** auf `AGENTS.md` §6 für die Rollenfrage und `frontend/tests/screenshots/` für die Anwendung.
 - `permissions` — `AGENTS.md:457-461` überlappte D-3 statt D-4 zu benennen. **Korrigiert** auf `features/owner-decisions.md` §D-4 (Z. 19).
 - `ghcr-visibility` — `.github/workflows/ci.yml:335` war eine Kommentarzeile; das `container:`-Image steht jetzt in Z. 358. **Korrigiert**.
 - `playwright-parallel` — `frontend/playwright.config.ts:30-31` belegte die *Budgets* (`timeout`, `globalTimeout`), nicht die Worker-Zahl; die Matrix liegt in `ci.yml` jetzt in Z. 391-397, nicht 374-380. **Korrigiert** auf `fullyParallel`/`workers` (Z. 19/22) und die Matrix (Z. 391-397).

@@ -165,24 +165,25 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **37 offene `[ ]`** und **46 wartende
-> `[~]`** über 1842 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (37), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1842). Aufteilung der 37: **23× `manuell prüfen:`** und **14×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **36 offene `[ ]`** und **46 wartende
+> `[~]`** über 1853 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (36), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1853). Aufteilung der 36: **23× `manuell prüfen:`** und **13×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 14 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 13 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
-> A–D") sowie die seitdem aufgedeckten Reste (die zwei Query-Zähl-Kosten mit gepinnter
-> Basislinie, die Zwei-Verbindungs-Messung, die User-Zeilen-Sperrreihenfolge von `destroy()`,
-> die Opt-in-Zeile) und die manuellen Prüfpunkte des Deploys vom 2026-10-19. Alle 46 `[~]`
+> A–D") — darunter die seitdem aufgedeckten Reste (die zwei Query-Zähl-Kosten mit gepinnter
+> Basislinie, die User-Zeilen-Sperrreihenfolge von `destroy()`, die Opt-in-Zeile). Die
+> **manuell prüfen:**-Punkte — darunter die Zwei-Verbindungs-Messung und die manuellen
+> Prüfpunkte des Deploys vom 2026-10-19 — stehen in den 23, nicht unter den 13. Alle 46 `[~]`
 > tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
 > zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (83 = 37 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (82 = 36 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
@@ -445,9 +446,12 @@ prüfen, dann anfassen:
 > **Aufgelöst am 2026-09-28:** Die letzte offene Doppelnennung ist beseitigt —
 > `FE-8` stand in der Übersicht als *erledigt* und im Arbeitsplan als offener
 > Brocken; der Arbeitsplan führt es nicht mehr als offene Arbeit, und die
-> Übersichtszeile trägt den nachgemessenen Stand (28/28):
+> Übersichtszeile trägt den nachgemessenen Stand (28/28 Nutzungsdateien):
 > `grep -rnE '<(ModalShell|ModalDialogShell)' frontend/src | grep -v __tests__ | grep -v ModalDialogShell.tsx | awk -F: '{print $1}' | sort -u | wc -l`
-> gibt **28** aus (die globale Bestätigung `UIProvider.tsx` zählt mit).
+> gibt **29** aus — die 28 Nutzungsdateien (inkl. der globalen Bestätigung `UIProvider.tsx`)
+> plus `ModalShell.tsx` selbst: seit `7cc5046` matcht dort die Typ-Annotation
+> `Record<ModalShellHeight, string>` auf das Suchmuster, nicht ein JSX-Gebrauch. Die
+> Migrations-Zahl 28/28 bleibt gültig; wer 29 zählt, hat die Shell-Datei selbst mitgezählt.
 
 ---
 
@@ -710,13 +714,16 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 - [~] wartet auf den CSP-Policy-Text an lesbarer Stelle im Repo. **E2E ist strukturell
   blind für CSP-Verstöße — und lässt sich das nicht vollständig remedieren.**
-  Befund aus der Wasserzeichen-Reparatur: `playwright.config.ts` hat **keinen**
-  `webServer`-Block (`grep -n webServer frontend/playwright.config.ts` → kein Treffer),
+  Befund aus der Wasserzeichen-Reparatur: `playwright.config.ts` setzt **unter CI
+  keinen** `webServer` (`grep -n webServer frontend/playwright.config.ts` → 2 Treffer,
+  Z. 57 `webServer: isCi ? undefined : […]` — unter CI also `undefined`),
   der E2E-Server ist ein separat gestarteter `pnpm dev` auf 4321
-  (`scripts/e2e-up.sh:200` → `log "Frontend (separat): … pnpm dev"`), und
-  `vite.config.ts:43-55` setzt im `server`-Block **keinen** `headers`-Schlüssel
+  (CI: `.github/workflows/ci.yml:633` `pnpm dev > /tmp/vite.log 2>&1 &`; lokal druckt
+  `scripts/e2e-up.sh:221` nur die Startanweisung `log "Frontend (separat): … pnpm dev"`),
+  und
+  `frontend/vite.config.ts:43-55` setzt im `server`-Block **keinen** `headers`-Schlüssel
   (`grep -n headers frontend/vite.config.ts` → kein Treffer). Die Suite läuft also
-  **ohne jeden CSP-Header** — `tests/e2e/admin/settings/watermark.spec.ts:37` →
+  **ohne jeden CSP-Header** — `frontend/tests/e2e/admin/settings/watermark.spec.ts:37` →
   `const preview = page.locator('main img[alt="Watermark Preview"]')` ist seit Juni
   grün, während in Produktion jedes Rendern fehlschlug. **Warum trotzdem kein Header
   nachziehen:** Die Produktions-CSP steht in **keinem File dieses Repositories**; sie
@@ -1679,18 +1686,22 @@ gerissen und zur Entscheidung gemacht.
 ## 📌 SKILLS-STAND (2026-10-19) — Marker auf `787670a` fortgeschrieben
 
 > `AGENTS.skills.md` steht jetzt auf `787670a` (Skills-Repo-HEAD vom 2026-10-19), geprüft am
-> 2026-10-19; 17 Skills, **12× angewendet, 5× nicht zutreffend**. **Nichts hier ist umgesetzt.**
+> 2026-10-19; 17 Skills, **12× angewendet, 5× nicht zutreffend**. **Von dem, was hier steht, ist
+> nichts umgesetzt** — Position 7 ist am 2026-10-19 umgesetzt und deshalb **aus diesem Board
+> entfernt** (siehe „Historie der Nummern" unten; der Beleg steht im Commit).
 > Die Positionen sind Befund-Protokoll, kein Arbeitsauftrag (Board-Regel: Log, kein Auftrag).
 > Jede Zahl ist an `Datei:Zeile` zitierbar und wurde vor dem Schreiben verifiziert.
 > **Historie der Nummern in diesem Abschnitt:** Position 1–3 (Named-Locks-Schwelle, Dreiklang,
 > Matrix) sind am 2026-10-18 **committet** (`e1ed87a`, Playwright-Bump auf 1.64.1) und
 > entfernt; Position 4 (GHCR-Blocker) war am 2026-10-15 geschlossen und entfernt; Position 5
 > (`cancel-in-progress`) ist als Betriebs-Notiz in die Session-Handover-Liste gewandert
-> (`AGENTS.todo.md:916`). Position 6 und 7 sind neu aus dem Marker-Fortschreiben vom 2026-10-19.
+> (`AGENTS.todo.md:934`). Position 6 und 7 sind neu aus dem Marker-Fortschreiben vom 2026-10-19;
+> Position 7 (`AGENTS.md` §6 verlangte den abgeschafften `vision`-Subagenten) ist am selben Tag
+> **geschlossen und entfernt** — die Regelzeile in `AGENTS.md` §6 nennt jetzt den verbleibenden
+> Weg (das Modell liest die Bilder selbst). **Position 6 ist damit der einzige offene Eintrag
+> in diesem Abschnitt.**
 
 - [ ] **Position 6 — Die Lockfile-Regel des Test-Images ist nicht umgesetzt (Browser-Version aus dem Manifest statt aus dem Lockfile):** Der Skill `docker-test-image` hat als Core-Regel, dass die Playwright-Browserversion aus dem **Lockfile** kommt; „version from manifest instead of lockfile" ist dort als Failure-Mode 5 geführt („Job green, browser version questionable"). Das Projekt liest sie aber aus dem Manifest: `.github/workflows/e2e-image.yml:41` extrahiert `"@playwright/test": "^1.64.1"` aus `frontend/package.json` → `1.64.1`, also die **Untergrenze der Range**, nicht die aufgelöste Lockfile-Version. **Heute unkritisch, weil beide Stände identisch sind** (`frontend/package.json:72` = `^1.64.1`, `frontend/pnpm-lock.yaml:768` = `@playwright/test@1.64.1`) — **aus Prinzip ist es das nicht:** Dependabot (npm, `/frontend`, **täglich**, `.github/dependabot.yml:3-5`, `minor-and-patch` gruppiert) aktualisiert bei einer Version **innerhalb** der deklarierten Range **nur das Lockfile**. Das ist hier keine Vermutung, sondern **gemessen**: von sechs offenen Dependabot-Branches für `/frontend` ändern **vier ausschließlich `frontend/pnpm-lock.yaml`** (`baseline-browser-mapping-2.11.25`, `browserslist-4.29.0`, `source-map-js-1.2.2`, `tinypool-2.2.0`; belegt über `git diff --name-only main...origin/dependabot/npm_and_yarn/frontend/<branch>`), nur zwei zusätzlich `frontend/package.json`. Ein solcher Lockfile-only-Bump trifft `frontend/pnpm-lock.yaml` in `paths` (`e2e-image.yml:20`) → der Rebuild läuft, extrahiert aber wieder `1.64.1` und backt **dieselbe** Browserversion neu ein (`deployment/Dockerfile.e2e:30` ARG, `:69-70` Install), unter demselben Tag `portal-e2e:1.64.1`, den der E2E-Job zieht (`.github/workflows/ci.yml:358`). **Der E2E-Lauf bleibt grün**, weil `ci.yml:622-629` („Verify Playwright browsers (fallback install)") die abweichende Browserversion pro Lauf nachlädt — **damit ist die Zusage des Test-Images still aufgehoben** („kein Browser-Download pro Run", `deployment/Dockerfile.e2e:12-16`), ohne dass irgendwo ein Fehler erscheint; die Frische-Prüfung (`tests/infrastructure/verify-image-freshness.sh`) meldet das Image sogar als frisch, obwohl die Browserversion nicht zum Lockfile passt. **Befehl:** `grep -n 'PLAYWRIGHT_VERSION=' .github/workflows/e2e-image.yml` → liest `frontend/package.json`. **Fix-Richtung (nicht ausgeführt):** die aufgelöste Version aus `frontend/pnpm-lock.yaml` ziehen bzw. `pnpm exec playwright --version` im Workflow auswerten, statt die Range-Untergrenze zu nehmen. **Hinweis:** der Bump auf 1.64.1 (`e1ed87a`) hat alle vier gekoppelten Stellen (Manifest, Lockfile, Dockerfile-ARG, Image-Tag im CI) gemeinsam bewegt — die Kopplung ist also beherrscht, **die Quelle der Versionsangabe bleibt die falsche**.
-- [ ] **Position 7 — `AGENTS.md` §6 verlangt einen Subagenten, den es nicht mehr gibt:** §6 (Agent-Rollen) schreibt vor: „…Delegate code, tests, templates, and component work to a `general` implementer; **use `vision` for visual review**." Das Skills-Repo hat den eigenen Vision-Subagenten mit `dccdd40` („single default model, drop custom vision subagent") **entfernt**: der Skill `vision-agents` ist gelöscht, und die globale `~/.config/opencode/opencode.jsonc` führt nur noch `plan`, `general`, `build`, `explore` — **kein `vision`, kein `vision-creative`**. Die Skills `ui-review` und `codegraph-project-setup` haben ihre Eskalationsregel entsprechend umgeschrieben: harte visuelle Fälle **selbst neu lesen**, nicht an einen Subagenten geben, nicht raten. Das Projekt hat den Screenshot-Teil inzwischen selbst (`frontend/tests/screenshots/`), die Regelzeile zeigt aber auf einen Agenten, den es nicht gibt. **Belege:** `grep -rn 'vision' AGENTS.md` → `AGENTS.md:44`; `grep -n 'vision' ~/.config/opencode/opencode.jsonc` → kein Treffer (der Kommentar dort nennt die Entfernung von `vision-creative`). **Fix-Richtung (nicht ausgeführt):** den Satz auf „selbst neu lesen, nicht raten" umschreiben.
-
 
 ---
 
