@@ -35,9 +35,11 @@ use Tests\TestCase;
  * after that read — such a member is not in the lock set and is therefore not
  * detached by that sync. The trade-off and its bound are recorded in
  * `features/security/2026-10-18-review-closure.md`; none of
- * `OrgInviteController::redeem()`, `UserController::store()`,
- * `AuthController::register()`/`resetPassword()` or `OrgController::destroy()`
- * takes the org row lock, so they change a membership without it.
+ * `OrgInviteController::redeem()`, `UserController::store()` or
+ * `AuthController::register()`/`resetPassword()` takes the org row lock, so
+ * they change a membership without it. `OrgController::destroy()` is not one
+ * of them: since it locks the org row first (D-40 follow-up), it takes the
+ * same org row lock as this sync and changes a membership under it.
  *
  * The deadlock itself needs two independent database connections; see
  * `tests/scripts/org-sync-deadlock-mariadb-probe.sh` (CI-only, it needs

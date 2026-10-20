@@ -113,7 +113,13 @@ Measured with `FtpImportTest`; the batch semantics are the owner decision D-35.
   takes the same org row lock first, so the order is **org → users** in that path as well and a
   destroy cannot close a cycle with a sync of the same org. That order is pinned by
   `OrgDestroyLockOrderTest`; the two-connection measurement of the destroy path is still open (it
-  needs a host with Docker). **The trade-off:** the org row lock serialises the *syncs* and the
+  needs a host with Docker). The destroy takes its member rows in the **same ascending id order**
+  as the sync — the member plan and the member load are both ordered — so both paths take the
+  same rows in the same sequence. The order is not the same *shape*: the destroy still locks its
+  members one statement at a time and writes a member's `user_roles` pivot row **before** that
+  member's `users` row, while the sync takes **all** of its `users` locks before any pivot write.
+  That residual is disclosed in the test's docblock; the test proves the order, not the absence
+  of a cycle. **The trade-off:** the org row lock serialises the *syncs* and the
   *destroy* of one org, not every write to `users.org_id` — none of
   `OrgInviteController::redeem()`, `UserController::store()`,
   `AuthController::register()`/`resetPassword()` (membership added) takes it. The member set has to
