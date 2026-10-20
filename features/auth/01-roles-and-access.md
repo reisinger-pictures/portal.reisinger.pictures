@@ -44,6 +44,48 @@ Roles are strictly separated.
 - **Consequence for a brand-bound admin:** the client-facing gallery view of a legacy selection assignment disappears (`GET /api/galleries/{slug}` → 403) while the management surface (`canManageGallery()`) stays. An actor without such an assignment already got that refusal before the re-validation, so it removes an inconsistency rather than opening a gap.
 - The reserved-null-brand checks are applied **before** the re-validation (early returns); the brand scoping filter is applied after it and is unaffected by it.
 
+## 6. The read path: resolve once, do not cache
+
+The read path (`AuthorizationService::getAllowedGalleryIds()`) is on every request of the SPA
+(`/api/auth/me` runs on each load). It resolves two things that used to be resolved repeatedly
+per gallery and per request. Both changes are **performance only** — the access decision itself
+is unchanged, and a test proves it (the set-based filter and the per-gallery walk must select the
+same galleries). Measured: the brand filter goes from **35** statements and **30** chain lookups
+to **7** and **2** for 15 galleries (and from 11/6 to 7/2 for 3), `/api/auth/me` from **30**
+statements with **3** scope reads to **22** with **1**, the org detail endpoint from 29/2 to
+25/1. The pinned baselines carry the numbers.
+
+- **The brand filter resolves the group chain set-based.** The complete tree of every candidate
+  gallery is loaded at once (the candidate groups plus their ancestor closure) and the brand
+  decision is taken in memory. The number of statements depends on the **depth** of the group
+  tree, not on the number of galleries. The two paths are pinned against each other: an
+  equivalence test computes the set the **per-gallery** walk produces and requires the
+  set-based filter to select exactly the same galleries — including the edge cases (a gallery
+  without a group, a gallery whose group row is missing, a null brand somewhere in the chain, a
+  foreign-brand ancestor, a chain deeper than the depth limit). A change that lets the two
+  diverge turns that test red.
+- **The org group scope is resolved once per request.** `getOrgGroupScope()` reads the
+  `gallery_group_org` pivot and walks the subtree; it is memoized per org id **inside the
+  request**. The memo lives in a `scoped` container store, so the invalidation reaches every
+  instance of the service — a directly constructed service cannot hold a stale scope either.
+  The store is flushed with the other scoped instances: by Laravel before every queue job, and
+  in the HTTP path by this deployment's request model (a fresh application instance per request
+  under php-fpm). A long-lived worker that reuses one application instance would have to flush
+  the scoped instances itself.
+- **The memo is dropped by every write that can revoke a delegation.** A write to the
+  `gallery_group_org` pivot or to the `gallery_groups` tree invalidates the memo. The
+  invalidation is wired on the database connection **and** on the query event, so that neither a
+  forgotten dispatcher listener (the query-counting test helpers remove those) nor a replaced
+  connection can leave a stale scope behind.
+- **There is deliberately no cache across requests.** A cached scope would hand out a delegation
+  that was revoked in the meantime — a detached group, a changed tree, a moved gallery. That is
+  a fail-open, so the service stays stateless across requests and only the repeated resolution
+  *within* one request is removed.
+
+The baselines are pinned in `OrgScopeQueryBaselineTest` and `BrandFilterChainQueryBaselineTest`.
+They pin a **measured** state, not a target: a deliberate change of the cost is expected to turn
+them red and to update them in the same change.
+
 ## Related
 - [Magic Links & Invites](../auth/02-magic-links.md) � transient access for guests overriding role model
 - [Roles & Access Management (Single Org)](../auth/03-roles-and-rbac.md) � enterprise RBAC evolution of the role system

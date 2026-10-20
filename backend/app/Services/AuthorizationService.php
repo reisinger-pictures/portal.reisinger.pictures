@@ -12,6 +12,7 @@ use App\Models\Org;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Support\GalleryGroupSubtree;
+use ArrayObject;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -165,18 +166,137 @@ class AuthorizationService
         if ($actorBrand !== null) {
             // The gallery's own brand is not enough for a brand-bound actor:
             // legacy rows can be attached to a foreign or null-brand parent.
-            // Resolve the complete tree in one shared BrandRegistry helper.
-            $galleryIds = Gallery::whereIn('id', $galleryIds)
-                ->where('brand', $actorBrand)
-                ->get()
-                ->filter(fn (Gallery $gallery): bool => BrandRegistry::galleryTreeMatchesBrand($gallery, $actorBrand))
-                ->pluck('id')
-                ->values()
-                ->all();
+            // The complete tree of every candidate is resolved set-based.
+            $galleryIds = $this->filterGalleriesByBrandTree($galleryIds, $actorBrand);
         }
 
         return $galleryIds;
     }
+
+    /**
+     * The candidate galleries whose complete group tree matches the brand.
+     *
+     * The brand decision is taken in memory. The candidate groups and their
+     * ancestors are loaded set-based (one statement for the candidate groups
+     * plus one per ancestor level above them) and the brand walk then reads
+     * the parents from that map instead of issuing one `GalleryGroup::find()`
+     * per level *and* per gallery. The number of statements therefore
+     * depends on the depth of the group tree, not on the number of galleries.
+     *
+     * The rules are BrandRegistry's own — see the comment in the closure
+     * below. The *composition* is local: this filter decides which of
+     * BrandRegistry's rules applies to which case, while the rules themselves
+     * are shared with the other callers of
+     * {@see BrandRegistry::galleryTreeMatchesBrand()}. A change to a rule
+     * therefore moves both paths. A change to the *call site* inside
+     * `BrandRegistry::galleryTreeMatchesBrand()` can still let the two paths
+     * diverge — the equivalence probe in `BrandFilterChainQueryBaselineTest`
+     * is what detects such a divergence, it does not prevent it.
+     *
+     * The trade-off of the set-based resolution, measured against the
+     * per-gallery walk it replaced:
+     *
+     * - the set-based resolution issues one statement for the candidate
+     *   groups plus one per ancestor level above them,
+     * - the per-gallery walk issued one `GalleryGroup::find()` for the
+     *   gallery's own group plus at most `GalleryGroupSubtree::MAX_DEPTH`
+     *   ancestor finds *per gallery*.
+     *
+     * So the set-based resolution wins whenever the number of galleries
+     * outweighs the depth of the tree (a 15-level chain wins from two
+     * galleries onwards, a 100-level chain only from nine), and it loses on a
+     * pathologically deep tree with few galleries: a 15-level chain costs 15
+     * group statements against 12 for the per-gallery walk with one gallery
+     * (20 against 17 statements in total), a 100-level chain costs 100
+     * against 12. The *decisions* are identical in every case: the brand walk
+     * is bounded by `GalleryGroupSubtree::MAX_DEPTH` and fails closed above
+     * it, while the *loading* of the ancestor closure is not bounded — it
+     * walks to the root of the tree. The depth budget of the decision is
+     * therefore pinned by the shared helper (see
+     * `GalleryTreeDepthHardeningTest`), the cost of loading a deep tree is
+     * not.
+     *
+     * @param  array<string>  $galleryIds
+     * @return array<string>
+     */
+    private function filterGalleriesByBrandTree(array $galleryIds, string $actorBrand): array
+    {
+        $candidates = Gallery::whereIn('id', $galleryIds)
+            ->where('brand', $actorBrand)
+            ->get();
+
+        if ($candidates->isEmpty()) {
+            return [];
+        }
+
+        $groupIds = $candidates
+            ->map(fn (Gallery $gallery): mixed => $gallery->gallery_group_id)
+            ->filter(fn ($groupId): bool => $groupId !== null && $groupId !== '')
+            ->map(fn ($groupId): string => (string) $groupId)
+            ->unique()
+            ->values()
+            ->all();
+
+        $groupsById = $this->withAncestorClosure($this->galleryGroupRows($groupIds));
+        $resolveGroup = fn (string $groupId): ?GalleryGroup => $groupsById->get($groupId);
+
+        return $candidates
+            ->filter(function (Gallery $gallery) use ($actorBrand, $resolveGroup): bool {
+                // Every gallery-level rule is BrandRegistry's own; only the
+                // composition — which rule applies to which case — is local.
+                // A change to a rule therefore moves this filter and the
+                // other callers of `BrandRegistry::galleryTreeMatchesBrand()`
+                // together:
+                //
+                // - the own-brand match is `resourceMatchesBrand()`, the very
+                //   function `galleryTreeMatchesBrand()` uses for it;
+                // - the "no group" rule is `galleryTreeMatchesBrand()` itself:
+                //   a gallery without a group never reaches a group lookup, so
+                //   the delegation costs no statement;
+                // - the "missing group" rule is
+                //   `galleryGroupTreeMatchesBrand(null, …)`, the very call
+                //   `galleryTreeMatchesBrand()` makes for a group that does
+                //   not exist;
+                // - the group tree is `galleryGroupTreeMatchesBrand()` with
+                //   the resolver hook, so the walk is the shared one.
+                //
+                // A change to the call site *inside*
+                // `BrandRegistry::galleryTreeMatchesBrand()` can still make
+                // the two paths diverge; the equivalence probe detects that.
+                if (! BrandRegistry::resourceMatchesBrand($gallery->brand, $actorBrand)) {
+                    return false;
+                }
+
+                $groupId = $gallery->gallery_group_id;
+
+                if ($groupId === null || $groupId === '') {
+                    return BrandRegistry::galleryTreeMatchesBrand($gallery, $actorBrand);
+                }
+
+                $group = $resolveGroup((string) $groupId);
+
+                if (! $group instanceof GalleryGroup) {
+                    return BrandRegistry::galleryGroupTreeMatchesBrand(null, $actorBrand);
+                }
+
+                return BrandRegistry::galleryGroupTreeMatchesBrand($group, $actorBrand, $resolveGroup);
+            })
+            ->pluck('id')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The container key of the request-scoped memo of the org group scopes.
+     *
+     * The memo lives in the container and not in the service instance: the
+     * invalidation ({@see invalidateOrgGroupScope()}) has to reach *every*
+     * service instance, including one that was constructed directly
+     * (`new AuthorizationService`) and therefore is not the container's
+     * shared instance. A service that held the memo itself would keep a
+     * stale scope after a write, because the guard cannot reach it.
+     */
+    public const ORG_GROUP_SCOPE_STORE = 'authorization.org_group_scope';
 
     /**
      * The gallery groups an organization may delegate: the groups attached to
@@ -188,6 +308,11 @@ class AuthorizationService
      * (step 3, before that method applies its brand filter), so a writer cannot
      * reach further than a reader in the same organization already can.
      *
+     * The scope is resolved once per request and memoized per org id. A write
+     * that changes the pivot or the group tree drops the memo again (see
+     * {@see invalidateOrgGroupScope()}), so no write path can read a scope
+     * that was revoked in the same request.
+     *
      * @return array<string>
      */
     public function getOrgGroupScope(Org|string $org): array
@@ -197,12 +322,127 @@ class AuthorizationService
             return [];
         }
 
+        $memoKey = (string) $orgId;
+        $store = $this->orgGroupScopeStore();
+
+        if (isset($store[$memoKey])) {
+            return $store[$memoKey];
+        }
+
+        return $store[$memoKey] = $this->resolveOrgGroupScope($orgId);
+    }
+
+    /**
+     * The org group scopes resolved in the current request, keyed by org id.
+     *
+     * The scope is derived from the `gallery_group_org` pivot and from the
+     * group tree. Both are read-only inputs of the authorization decision, so
+     * resolving them twice inside one request produces the same answer twice.
+     *
+     * The memo lives in a request-scoped container store
+     * ({@see self::ORG_GROUP_SCOPE_STORE}) and not in the service instance:
+     * the invalidation has to reach every service instance, including one
+     * that was constructed directly. The store is a scoped binding, so it is
+     * dropped with the other scoped instances — before every queue job
+     * (`QueueServiceProvider` → `forgetScopedInstances()`) and, for HTTP, by
+     * the fresh application instance that php-fpm builds per request. A
+     * long-lived worker that reuses one application instance across requests
+     * (Octane or a comparable SAPI) would keep the memo and would have to
+     * flush the scoped instances itself.
+     *
+     * There is deliberately no cross-request cache: a cached scope would hand
+     * out a delegation that was revoked in the meantime (a detached group, a
+     * changed tree, a moved gallery) — a fail-open. Only the repeated
+     * resolution *within* one request is removed.
+     *
+     * @return ArrayObject<string, array<string>>
+     */
+    private function orgGroupScopeStore(): ArrayObject
+    {
+        return app(self::ORG_GROUP_SCOPE_STORE);
+    }
+
+    /**
+     * Resolve the org group scope from the database, without the memo.
+     */
+    private function resolveOrgGroupScope(Org|string $org): array
+    {
         $pivotGroupIds = DB::table('gallery_group_org')
-            ->where('org_id', $orgId)
+            ->where('org_id', $org)
             ->pluck('gallery_group_id')
             ->all();
 
         return $this->getSubGroupIds($pivotGroupIds);
+    }
+
+    /**
+     * Drop the memoized org group scope.
+     *
+     * The memo of {@see getOrgGroupScope()} is only valid while the pivot and
+     * the group tree stay unchanged. Every write path that touches one of
+     * them must call this method, otherwise a later read in the same request
+     * would answer with a scope that was revoked in the meantime.
+     *
+     * The application wires this up centrally: the guard in
+     * `AppServiceProvider` drops the memo for every statement that writes to
+     * the `gallery_group_org` pivot or to the `gallery_groups` tree — the
+     * mutation points themselves (`OrgController::syncGroups()`,
+     * `GalleryService::storeGroup()/updateGroup()`) therefore cannot forget
+     * the invalidation. This method stays public so that a write path can
+     * also invalidate explicitly.
+     *
+     * The memo is dropped for every service instance, not only for the
+     * container's shared one: it lives in the shared store.
+     *
+     * @param  string|null  $orgId  the org to forget, or `null` for every org
+     */
+    public function invalidateOrgGroupScope(?string $orgId = null): void
+    {
+        $store = $this->orgGroupScopeStore();
+
+        if ($orgId === null) {
+            $store->exchangeArray([]);
+
+            return;
+        }
+
+        unset($store[$orgId]);
+    }
+
+    /**
+     * Whether a statement can change the org group scope.
+     *
+     * The scope is derived from the `gallery_group_org` pivot and from the
+     * group tree, so a write to either of them can revoke a delegation. Only
+     * writes count: the reads of the scope itself must not drop the memo.
+     *
+     * @param  string  $sql  the executed statement
+     */
+    public static function mutatesOrgGroupScope(string $sql): bool
+    {
+        // Case-insensitive pre-filter for the two tables that carry the scope.
+        // `stripos()` matches without allocating a lower-cased copy of every
+        // statement the application runs.
+        if (stripos($sql, 'gallery_group') === false) {
+            return false;
+        }
+
+        $sql = strtolower(ltrim($sql));
+
+        $isWrite = str_starts_with($sql, 'insert ')
+            || str_starts_with($sql, 'update ')
+            || str_starts_with($sql, 'delete ')
+            || str_starts_with($sql, 'replace ')
+            || str_starts_with($sql, 'truncate ')
+            || str_starts_with($sql, 'drop ');
+
+        if (! $isWrite) {
+            return false;
+        }
+
+        // `user_gallery_groups` (the user/group grant pivot) is deliberately
+        // not part of this: it does not change what an org may delegate.
+        return preg_match('/\bgallery_groups\b|\bgallery_group_org\b/', $sql) === 1;
     }
 
     /**
