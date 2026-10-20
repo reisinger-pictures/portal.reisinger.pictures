@@ -328,7 +328,10 @@ Host, `migrate:status` zeigt V047 als **Pending** — der Neustart führt die Mi
   Auswahl löscht alle Kandidaten, echte Zuweisungen eingeschlossen.** Deshalb nur
   gezielt: `--only=<user_id>:<gallery_id> --apply` (wiederholbar, oder
   `--only-ids=<datei>`) für die einzeln geprüften Zeilen. Eine ausgewählte Zeile, die
-  kein Kandidat mehr ist, wird **nicht** gelöscht, sondern gemeldet.
+  kein Kandidat mehr ist, wird **nicht** gelöscht, sondern gemeldet; eine Auswahl, die
+  **gar nichts** trifft (Tippfehler in der Galerie-ID), wird als `unmatched` gemeldet und
+  beendet den Lauf mit **Exit-Code 1** — nur eine Datenbank **ohne** jede markierte Zeile
+  bleibt grün (Exit 0, „nichts zu reparieren").
 - [ ] manuell prüfen: Gegnproben nach dem Neustart — die **neuen** Verhaltensweisen: `GET
   /api/auth/me` (Antwortzeit und Inhalt unverändert, der Lesepfad löst den Org-Scope jetzt
   einmal auf und die Ahnen-Kette der Brand-Prüfung nur so tief, wie die gemeinsame Prüfung

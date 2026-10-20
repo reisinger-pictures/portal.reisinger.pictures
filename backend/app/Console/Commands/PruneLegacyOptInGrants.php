@@ -49,6 +49,15 @@ use Illuminate\Support\Facades\DB;
  *   because the list can be verified as a whole, but the per-row selection is
  *   the safer path.
  *
+ * A selected pair that matches **no** flagged row is reported as well: it is
+ * listed with the verdict `unmatched`, warned about individually, counted in
+ * the summary, and it makes the run end with a non-zero exit code. A silent
+ * no-match is the worst outcome of an operator tool: a typo in a gallery id
+ * would look like a successful repair of a row that still exists. The one
+ * exception is a database that holds **no** flagged row at all: there is
+ * nothing to repair there, so the run stays green instead of making a script
+ * that selects rows against a clean database look like a failure.
+ *
  * The transient claims of a user (an active invite) are runtime state of the
  * request and are not visible from the database. The verdict therefore speaks
  * about the *persistent* grant paths only.
@@ -71,6 +80,8 @@ class PruneLegacyOptInGrants extends Command
 
     private const VERDICT_ORPHANED = 'orphaned';
 
+    private const VERDICT_UNMATCHED = 'unmatched';
+
     public function handle(): int
     {
         $limit = (int) $this->option('limit');
@@ -85,6 +96,12 @@ class PruneLegacyOptInGrants extends Command
 
         if ($total === 0) {
             $this->info('No row in [user_galleries] carries the opt-in flag. Nothing to repair.');
+
+            // The selection may still name rows that do not exist. It is
+            // reported, but it does not fail the run: there is nothing to
+            // repair, so the operator's intent is already fulfilled.
+            $unmatched = $this->resolveSelection(collect(), $selected)['unmatched'];
+            $this->reportUnmatched($unmatched);
 
             return self::SUCCESS;
         }
@@ -104,8 +121,11 @@ class PruneLegacyOptInGrants extends Command
 
         // A selected row is always inspected, even when it lies behind the
         // limit. The operator named it explicitly; the limit must not silently
-        // skip it.
-        $inspected = $this->withSelectedRows($rows, $selected);
+        // skip it. A selected pair that matches no flagged row at all is
+        // reported as `unmatched`.
+        $resolution = $this->resolveSelection($rows, $selected);
+        $inspected = $resolution['inspected'];
+        $unmatched = $resolution['unmatched'];
 
         $this->info(sprintf(
             '%d flagged row(s) in [user_galleries]; inspecting %d of them.',
@@ -125,6 +145,9 @@ class PruneLegacyOptInGrants extends Command
         $findings = [];
         foreach ($inspected as $row) {
             $findings[] = $this->classify($row, $selected, $selected === []);
+        }
+        foreach ($unmatched as $pair => $reason) {
+            $findings[] = $this->unmatchedFinding($pair, $reason);
         }
 
         if ($findings === []) {
@@ -152,13 +175,16 @@ class PruneLegacyOptInGrants extends Command
         ));
 
         $this->line(sprintf(
-            'redundant: %d, inert: %d, candidate: %d, orphaned: %d, selected: %d',
+            'redundant: %d, inert: %d, candidate: %d, orphaned: %d, unmatched: %d, selected: %d',
             $this->countVerdict($findings, self::VERDICT_REDUNDANT),
             $this->countVerdict($findings, self::VERDICT_INERT),
             count($candidates),
             $this->countVerdict($findings, self::VERDICT_ORPHANED),
+            count($unmatched),
             count(array_filter($findings, fn (array $finding): bool => $finding['selected'])),
         ));
+
+        $this->reportUnmatched($unmatched);
 
         if (! $apply) {
             $this->info('Dry run: nothing was deleted.');
@@ -170,7 +196,7 @@ class PruneLegacyOptInGrants extends Command
                 ));
             }
 
-            return self::SUCCESS;
+            return $unmatched === [] ? self::SUCCESS : self::FAILURE;
         }
 
         // A truncated list with a blanket `--apply` would delete only the
@@ -234,7 +260,43 @@ class PruneLegacyOptInGrants extends Command
             ));
         }
 
-        return self::SUCCESS;
+        // The selected candidates were deleted, but the selection was not fully
+        // satisfiable: the run reports that with a non-zero exit code.
+        return $unmatched === [] ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * Report the selected pairs that matched no flagged row.
+     *
+     * @param  array<string, string>  $unmatched
+     */
+    private function reportUnmatched(array $unmatched): void
+    {
+        foreach ($unmatched as $pair => $reason) {
+            $this->warn(sprintf('Selected pair [%s] matched no flagged row: %s', $pair, $reason));
+        }
+    }
+
+    /**
+     * A selected pair that matched no flagged row.
+     *
+     * @return array<string, mixed>
+     */
+    private function unmatchedFinding(string $pair, string $reason): array
+    {
+        [$userId, $galleryId] = explode(':', $pair, 2);
+
+        return $this->finding(
+            $userId,
+            $galleryId,
+            $userId,
+            $galleryId,
+            'unknown',
+            self::VERDICT_UNMATCHED,
+            true,
+            'nothing to delete',
+            $reason,
+        );
     }
 
     /**
@@ -431,30 +493,28 @@ class PruneLegacyOptInGrants extends Command
     }
 
     /**
-     * The scanned rows plus the selected rows that the limit left out.
+     * The inspected rows and the selected pairs that matched no flagged row.
+     *
+     * A selected pair that lies behind the `--limit` is still inspected: the
+     * operator named it explicitly, the limit must not silently skip it. A
+     * selected pair that matches no flagged row at all is reported as
+     * unmatched — it is never silently dropped.
      *
      * @param  array<string, true>  $selected
-     * @return Collection<int, object>
+     * @return array{inspected: Collection<int, object>, unmatched: array<string, string>}
      */
-    private function withSelectedRows(Collection $rows, array $selected): Collection
+    private function resolveSelection(Collection $rows, array $selected): array
     {
         $inspected = collect($rows);
         $seen = $inspected
             ->map(fn (object $row): string => (string) $row->user_id.':'.(string) $row->gallery_id)
             ->all();
 
-        $missing = array_diff(array_keys($selected), $seen);
-        if ($missing === []) {
-            return $inspected;
-        }
+        $unmatched = [];
 
-        $pairs = [];
-        foreach ($missing as $pair) {
+        foreach (array_diff(array_keys($selected), $seen) as $pair) {
             [$userId, $galleryId] = explode(':', $pair, 2);
-            $pairs[] = [$userId, $galleryId];
-        }
 
-        foreach ($pairs as [$userId, $galleryId]) {
             $row = DB::table('user_galleries')
                 ->where('user_id', $userId)
                 ->where('gallery_id', $galleryId)
@@ -463,10 +523,38 @@ class PruneLegacyOptInGrants extends Command
 
             if ($row !== null) {
                 $inspected->push($row);
+
+                continue;
             }
+
+            $unmatched[$pair] = $this->unmatchedReason($userId, $galleryId);
         }
 
-        return $inspected->sortBy(fn (object $row): string => (string) $row->user_id.':'.(string) $row->gallery_id)->values();
+        return [
+            'inspected' => $inspected
+                ->sortBy(fn (object $row): string => (string) $row->user_id.':'.(string) $row->gallery_id)
+                ->values(),
+            'unmatched' => $unmatched,
+        ];
+    }
+
+    /**
+     * Why a selected pair matched no flagged row.
+     *
+     * The two cases are told apart: a pivot row that exists but carries no
+     * opt-in flag is a row that needs no repair; a pair without any pivot row
+     * is most likely a typo in the id.
+     */
+    private function unmatchedReason(string $userId, string $galleryId): string
+    {
+        $exists = DB::table('user_galleries')
+            ->where('user_id', $userId)
+            ->where('gallery_id', $galleryId)
+            ->exists();
+
+        return $exists
+            ? 'A pivot row exists for this pair, but it carries no opt-in flag — there is nothing to repair.'
+            : 'There is no pivot row for this pair at all — check the user and the gallery id.';
     }
 
     /**
