@@ -169,10 +169,10 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **28 offene `[ ]`** und **46 wartende
-> `[~]`** über 1849 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **28 offene `[ ]`** und **46 wartende
+> `[~]`** über 1874 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
 > (28), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1849). Aufteilung der 28: **9× `manuell prüfen:`** und **19×
+> `wc -l < AGENTS.todo.md` (1874). Aufteilung der 28: **9× `manuell prüfen:`** und **19×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 19 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
@@ -201,7 +201,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
 > **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **20 von 28 `##`-Abschnitten**
+> Die Positionen liegen in **20 von 29 `##`-Abschnitten**
 > (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
 > `grep -c '^## ' AGENTS.todo.md`). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
@@ -297,7 +297,49 @@ ist die Frage nicht „ist das besser?", sondern „ist D-x überholt?" — und 
 
 ---
 
-## 🚀 PRODUKTIONS-DEPLOY 2026-10-20 (`64b8ae2`) — Neustart ausstehend
+## 🚀 PRODUKTIONS-DEPLOY 2026-10-21 (`a65e9d7`) — Neustart ausstehend
+
+Dritter Deploy: `./sync.sh` gegen den grünen Head `a65e9d7` (CI `39503917134`, alle 11 Jobs
+grün). **Übertragen:** neun inhaltlich geänderte Backend-Dateien — die Abo-Tabelle mit
+Migration V047 (`GalleryNotificationSubscription`, `PruneLegacyOptInGrants`,
+`NotificationController`, `MailController`, `GalleryFrontendController`, `User`) und der
+Ahnen-Ketten-Bound in `AuthorizationService` — sowie ein neu gebautes Frontend-Bundle
+(`assets/index-DF75gXdS.js`; der Build-Zeitstempel in `frontend/vite.config.ts:10` macht jedes
+Bundle eindeutig, obwohl die Frontend-Quellen unverändert sind — geändert hat sich nur ein
+Kommentar im Screenshot-Seed). **Maschinell verifiziert:** die neuen Dateien liegen auf dem
+Host, `migrate:status` zeigt V047 als **Pending** — der Neustart führt die Migration aus.
+
+- [ ] manuell prüfen: **`docker restart portal_backend`** — **steht aus.** Der Neustart führt
+  die Migration **selbst** aus: der Entrypoint startet mit
+  `php artisan migrate --force && php artisan app:seed-if-fresh && php artisan admin:update`
+  (`deployment/docker-compose.yml:309`), legt also `gallery_notification_subscriptions` an und
+  füllt sie aus den `user_galleries`-Zeilen mit `wants_notifications = 1` (Pivot-Zeilen werden
+  **nicht** gelöscht). **Kein `db:seed --force`** — V047 fügt keine Settings-Schlüssel hinzu,
+  und der Seeder überschreibt in der Produktion seine autoritativen Werte. Nach dem Neustart
+  prüfen: `docker exec portal_backend php artisan migrate:status` → V047 `Ran`, und
+  `https://portal.reisinger.pictures/up` → 200.
+- [ ] manuell prüfen: **Reparaturliste lesen, dann Zeile für Zeile entscheiden** —
+  `docker exec portal_backend php artisan notifications:prune-legacy-opt-in-grants`
+  (Trockenlauf, löscht nichts) listet **jede** markierte Zeile mit ihrem Verdikt
+  (`redundant` / `inert` / `candidate` / `orphaned`). **Achtung:** eine `candidate`-Zeile
+  ist **kein** Beweis für eine reine Opt-in-Zeile — das Flag kann nicht unterscheiden
+  zwischen „durch das Opt-in entstanden" und „echte Zuweisung, die zusätzlich abonniert
+  wurde und deren sonstige Begründigung inzwischen entzogen wurde". **`--apply` ohne
+  Auswahl löscht alle Kandidaten, echte Zuweisungen eingeschlossen.** Deshalb nur
+  gezielt: `--only=<user_id>:<gallery_id> --apply` (wiederholbar, oder
+  `--only-ids=<datei>`) für die einzeln geprüften Zeilen. Eine ausgewählte Zeile, die
+  kein Kandidat mehr ist, wird **nicht** gelöscht, sondern gemeldet.
+- [ ] manuell prüfen: Gegnproben nach dem Neustart — die **neuen** Verhaltensweisen: `GET
+  /api/auth/me` (Antwortzeit und Inhalt unverändert, der Lesepfad löst den Org-Scope jetzt
+  einmal auf und die Ahnen-Kette der Brand-Prüfung nur so tief, wie die gemeinsame Prüfung
+  reicht), ein Org-Benutzer-Sync und ein Org-Löschen (die aufsteigende Sperrreihenfolge),
+  sowie ein Login als Client und als Fotograf (die Brand-Filter-Entscheidung muss identisch
+  bleiben — die Äquivalenzprobe deckt die Randfälle ab, der Live-Blick deckt den Rest).
+  **Neu aus D-45:** in einer Galerie den Benachrichtigungs-Opt-in **setzen und wieder
+  löschen** — das muss gehen, ohne eine Zuweisung zu erzeugen; im „E-Mail senden"-Dialog muss
+  `notified_count` stimmen.
+
+## 🚀 PRODUKTIONS-DEPLOY 2026-10-20 (`64b8ae2`) — abgeschlossen
 
 Zweiter Deploy desselben Tages: `./sync.sh` gegen den grünen Head `64b8ae2` (CI `39470617556`,
 alle 11 Jobs grün). **Übertragen:** drei Backend-Dateien (`OrgController` — aufsteigende
@@ -314,30 +356,6 @@ Altersnachweise, `stripe_secret.txt`, `watermark.svg`).
 Dateien lagen seit 19:56:40 auf dem Host — der laufende Prozess hat den neuen Stand geladen.
 `portal.reisinger.pictures/up` → 200, `/api/auth/me` ohne Token → 401,
 `POST /api/internal/ftp/upload-event` ohne Secret → 401.
-
-- [ ] manuell prüfen: **Migration V047 auf dem Host ausführen** — `sync.sh` kopiert nur
-  Dateien und führt **keine** Migration aus (§13). Nach dem Sync:
-  `docker exec portal_backend php artisan migrate --force`. V047 legt die Tabelle
-  `gallery_notification_subscriptions` an und füllt sie aus den
-  `user_galleries`-Zeilen mit `wants_notifications = 1` (Pivot-Zeilen werden **nicht**
-  gelöscht). **Kein `db:seed --force`** — V047 fügt keine Settings-Schlüssel hinzu und
-  der Seeder überschreibt in der Produktion seine autoritativen Werte.
-- [ ] manuell prüfen: **Reparaturliste lesen, dann Zeile für Zeile entscheiden** —
-  `docker exec portal_backend php artisan notifications:prune-legacy-opt-in-grants`
-  (Trockenlauf, löscht nichts) listet **jede** markierte Zeile mit ihrem Verdikt
-  (`redundant` / `inert` / `candidate` / `orphaned`). **Achtung:** eine `candidate`-Zeile
-  ist **kein** Beweis für eine reine Opt-in-Zeile — das Flag kann nicht unterscheiden
-  zwischen „durch das Opt-in entstanden" und „echte Zuweisung, die zusätzlich abonniert
-  wurde und deren sonstige Begründigung inzwischen entzogen wurde". **`--apply` ohne
-  Auswahl löscht alle Kandidaten, echte Zuweisungen eingeschlossen.** Deshalb nur
-  gezielt: `--only=<user_id>:<gallery_id> --apply` (wiederholbar, oder
-  `--only-ids=<datei>`) für die einzeln geprüften Zeilen. Eine ausgewählte Zeile, die
-  kein Kandidat mehr ist, wird **nicht** gelöscht, sondern gemeldet.
-- [ ] manuell prüfen: Gegnproben nach dem Neustart — die **neuen** Verhaltensweisen: `GET
-  /api/auth/me` (Antwortzeit und Inhalt unverändert, der Lesepfad löst den Org-Scope jetzt
-  einmal auf), ein Org-Benutzer-Sync und ein Org-Löschen (die aufsteigende Sperrreihenfolge),
-  sowie ein Login als Client und als Fotograf (die Brand-Filter-Entscheidung muss identisch
-  bleiben — die Äquivalenzprobe deckt die Randfälle ab, der Live-Blick deckt den Rest).
 
 ## 🚀 PRODUKTIONS-DEPLOY 2026-10-19 (`64fa9be`) — abgeschlossen
 
