@@ -148,9 +148,25 @@ class OrgController extends Controller
             // comes from the org this request authorized.
             Org::query()->whereKey($org->getKey())->lockForUpdate()->first();
 
-            $userIds = $org->users()->pluck('users.id');
+            // D-40 (follow-up): the member rows are locked in ascending id
+            // order — the same order syncUsers() takes them.
+            //
+            // The two reads have two different jobs. The plan read orders the
+            // id list (`in (...)`), but that order alone does not decide the
+            // lock order. The load read orders the rows the loop below
+            // iterates over, and the write of a member row is what takes its
+            // exclusive row lock — so the load's order IS the lock order.
+            //
+            // Residual: the two paths agree on the order of the `users` rows,
+            // but not on their shape. This destroy still locks its members
+            // one statement at a time (one write per member) while
+            // syncUsers() locks them in one range scan. And because the pivot
+            // row of a member is written before that member's user row, this
+            // path touches `user_roles` before `users`, while the sync takes
+            // all of its `users` locks before any pivot write.
+            $userIds = $org->users()->orderBy('users.id')->pluck('users.id');
 
-            $users = User::whereIn('id', $userIds)->get();
+            $users = User::whereIn('id', $userIds)->orderBy('id')->get();
             foreach ($users as $user) {
                 if ($org->default_role_id && $user->roles->contains($org->default_role_id)) {
                     $user->roles()->detach($org->default_role_id);
