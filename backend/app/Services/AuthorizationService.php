@@ -178,7 +178,8 @@ class AuthorizationService
      *
      * The brand decision is taken in memory. The candidate groups and their
      * ancestors are loaded set-based (one statement for the candidate groups
-     * plus one per ancestor level above them) and the brand walk then reads
+     * plus one per ancestor level above them, bounded by
+     * `GalleryGroupSubtree::MAX_DEPTH` levels) and the brand walk then reads
      * the parents from that map instead of issuing one `GalleryGroup::find()`
      * per level *and* per gallery. The number of statements therefore
      * depends on the depth of the group tree, not on the number of galleries.
@@ -191,30 +192,41 @@ class AuthorizationService
      * therefore moves both paths. A change to the *call site* inside
      * `BrandRegistry::galleryTreeMatchesBrand()` can still let the two paths
      * diverge — the equivalence probe in `BrandFilterChainQueryBaselineTest`
-     * is what detects such a divergence, it does not prevent it.
+     * is what detects such a divergence; with its deep fixture it pins the
+     * depth bound of the closure as well.
      *
      * The trade-off of the set-based resolution, measured against the
-     * per-gallery walk it replaced:
+     * per-gallery walk it replaced. For a chain of `N` groups (the gallery's
+     * own group plus `N - 1` ancestors) and `G` galleries in the deepest
+     * group, the number of group-chain lookups is:
      *
-     * - the set-based resolution issues one statement for the candidate
-     *   groups plus one per ancestor level above them,
-     * - the per-gallery walk issued one `GalleryGroup::find()` for the
-     *   gallery's own group plus at most `GalleryGroupSubtree::MAX_DEPTH`
-     *   ancestor finds *per gallery*.
+     * - the set-based resolution: one statement for the candidate groups
+     *   plus one per ancestor level above them, bounded by
+     *   `GalleryGroupSubtree::MAX_DEPTH` levels — `1 + min(N - 1, 10)`
+     *   lookups, independent of `G`;
+     * - the per-gallery walk: one `GalleryGroup::find()` for the gallery's
+     *   own group plus at most `GalleryGroupSubtree::MAX_DEPTH + 1` ancestor
+     *   finds *per gallery* — `G * min(N, 12)` lookups.
      *
-     * So the set-based resolution wins whenever the number of galleries
-     * outweighs the depth of the tree (a 15-level chain wins from two
-     * galleries onwards, a 100-level chain only from nine), and it loses on a
-     * pathologically deep tree with few galleries: a 15-level chain costs 15
-     * group statements against 12 for the per-gallery walk with one gallery
-     * (20 against 17 statements in total), a 100-level chain costs 100
-     * against 12. The *decisions* are identical in every case: the brand walk
-     * is bounded by `GalleryGroupSubtree::MAX_DEPTH` and fails closed above
-     * it, while the *loading* of the ancestor closure is not bounded — it
-     * walks to the root of the tree. The depth budget of the decision is
-     * therefore pinned by the shared helper (see
+     * So the set-based resolution never costs more lookups than the
+     * per-gallery walk and wins from the second gallery onwards; for a chain
+     * that is deeper than the walk's own budget it wins already with a single
+     * gallery: a chain of 15 groups costs 11 group-chain lookups against 12
+     * (16 against 17 statements in total for the whole reader), a chain of
+     * 100 groups 11 against 12. The unbounded variant was the exception: it
+     * cost one lookup per ancestor level up to the root of the tree, so a
+     * chain of 15 groups cost 15 lookups (20 statements in total) and a chain
+     * of 100 groups 100 — more than the per-gallery walk with a single
+     * gallery.
+     *
+     * The *decisions* are identical in every case: the brand walk is bounded
+     * by `GalleryGroupSubtree::MAX_DEPTH` and fails closed above it, and the
+     * closure is bounded by the very same depth — the walk can never look
+     * further up than the closure reaches, so the bound changes no answer.
+     * The depth budget of the decision is pinned by the shared helper (see
      * `GalleryTreeDepthHardeningTest`), the cost of loading a deep tree is
-     * not.
+     * pinned by the equivalence probe (see
+     * `BrandFilterChainQueryBaselineTest`).
      *
      * @param  array<string>  $galleryIds
      * @return array<string>
@@ -237,7 +249,15 @@ class AuthorizationService
             ->values()
             ->all();
 
-        $groupsById = $this->withAncestorClosure($this->galleryGroupRows($groupIds));
+        // The closure is bounded by the same depth the brand walk reaches: the
+        // walk inspects the group it starts at and at most
+        // `GalleryGroupSubtree::MAX_DEPTH` ancestors above it and fails closed
+        // beyond that, so a deeper closure would load rows no decision can
+        // reach. A chain deeper than the bound still fails closed.
+        $groupsById = $this->withAncestorClosure(
+            $this->galleryGroupRows($groupIds),
+            GalleryGroupSubtree::MAX_DEPTH,
+        );
         $resolveGroup = fn (string $groupId): ?GalleryGroup => $groupsById->get($groupId);
 
         return $candidates
@@ -689,13 +709,40 @@ class AuthorizationService
      * while preserving the fail-closed behaviour of a missing parent (`null`
      * ends the walk).
      *
+     * `$maxAncestorLevels` bounds how many levels above the loaded groups are
+     * resolved; `null` resolves the chain up to the root of the tree. The
+     * bound is not a truncation of an answer: the brand walk
+     * ({@see BrandRegistry::galleryGroupTreeMatchesBrand()}) inspects the
+     * group it starts at and at most `GalleryGroupSubtree::MAX_DEPTH`
+     * ancestors above it and fails closed as soon as one more ancestor
+     * exists. A closure bounded by that depth therefore carries every row
+     * the walk can reach, and a chain that is deeper than the bound still
+     * fails closed — the walk meets a parent the closure did not resolve
+     * (`null` ends the walk) or its own depth budget, and both paths decide
+     * the same.
+     *
+     * The grant paths ({@see safeGrantedGroupIds()} and
+     * {@see getOrgAssignableGalleryGroupIds()}) keep the unbounded closure,
+     * so their loaded map — and with it the ancestor marking and the brand
+     * walk — stays exactly as it was. A bound there would change the map
+     * those paths reason over: the marking inside the scope is unaffected
+     * (the scope is loaded directly), so the effect of a bound can only be
+     * fail-closed at best, never a fail-open.
+     *
      * @param  Collection<string, GalleryGroup>  $groupsById
+     * @param  int|null  $maxAncestorLevels  the number of levels above the loaded groups to resolve; `null` resolves up to the root
      * @return Collection<string, GalleryGroup>
      */
-    private function withAncestorClosure(Collection $groupsById): Collection
+    private function withAncestorClosure(Collection $groupsById, ?int $maxAncestorLevels = null): Collection
     {
+        $level = 0;
         $missingParentIds = $this->pendingParentIds($groupsById, $groupsById);
+
         while ($missingParentIds !== []) {
+            if ($maxAncestorLevels !== null && $level >= $maxAncestorLevels) {
+                break;
+            }
+
             $parents = GalleryGroup::query()
                 ->whereIn('id', $missingParentIds)
                 ->get(['id', 'parent_id', 'brand']);
@@ -705,6 +752,7 @@ class AuthorizationService
             }
 
             $missingParentIds = $this->pendingParentIds($parents, $groupsById);
+            $level++;
         }
 
         return $groupsById;
