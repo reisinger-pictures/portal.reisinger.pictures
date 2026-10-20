@@ -322,10 +322,17 @@ Dateien lagen seit 19:56:40 auf dem Host — der laufende Prozess hat den neuen 
   `user_galleries`-Zeilen mit `wants_notifications = 1` (Pivot-Zeilen werden **nicht**
   gelöscht). **Kein `db:seed --force`** — V047 fügt keine Settings-Schlüssel hinzu und
   der Seeder überschreibt in der Produktion seine autoritativen Werte.
-- [ ] manuell prüfen: **Reparaturliste lesen, dann entscheiden** —
+- [ ] manuell prüfen: **Reparaturliste lesen, dann Zeile für Zeile entscheiden** —
   `docker exec portal_backend php artisan notifications:prune-legacy-opt-in-grants`
-  (Trockenlauf, löscht nichts) → prüfen → erst dann `--apply` für die Zeilen, die
-  wirklich nur Opt-ins waren.
+  (Trockenlauf, löscht nichts) listet **jede** markierte Zeile mit ihrem Verdikt
+  (`redundant` / `inert` / `candidate` / `orphaned`). **Achtung:** eine `candidate`-Zeile
+  ist **kein** Beweis für eine reine Opt-in-Zeile — das Flag kann nicht unterscheiden
+  zwischen „durch das Opt-in entstanden" und „echte Zuweisung, die zusätzlich abonniert
+  wurde und deren sonstige Begründigung inzwischen entzogen wurde". **`--apply` ohne
+  Auswahl löscht alle Kandidaten, echte Zuweisungen eingeschlossen.** Deshalb nur
+  gezielt: `--only=<user_id>:<gallery_id> --apply` (wiederholbar, oder
+  `--only-ids=<datei>`) für die einzeln geprüften Zeilen. Eine ausgewählte Zeile, die
+  kein Kandidat mehr ist, wird **nicht** gelöscht, sondern gemeldet.
 - [ ] manuell prüfen: Gegnproben nach dem Neustart — die **neuen** Verhaltensweisen: `GET
   /api/auth/me` (Antwortzeit und Inhalt unverändert, der Lesepfad löst den Org-Scope jetzt
   einmal auf), ein Org-Benutzer-Sync und ein Org-Löschen (die aufsteigende Sperrreihenfolge),
