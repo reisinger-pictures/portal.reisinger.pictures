@@ -136,17 +136,21 @@ class ModelFileImageBudgetTest extends TestCase
             $this->assertArrayHasKey('file', $exception->errors());
         }
 
-        // Rejected before any encrypted or plaintext byte reached the disk.
-        // Two scopes, both asserted:
-        //  - this test's own directory is empty — the precise claim, the
-        //    place the upload would have landed,
-        //  - the whole fake disk is empty — the stronger claim that nothing
-        //    was persisted at all.
-        // The global scope is safe because `Storage::fake('local')` in
-        // setUp() empties the fake root, so no foreign file can survive into
-        // this test.
+        // The upload was rejected, and it persisted nothing into its target
+        // directory: no encrypted file and no `.plain-<hex>` temporary file.
+        // The directory is the exact place the upload would have landed —
+        // `ModelFileStore::buildPath()` puts the file at
+        // `<directory>/<random>.<ext>`, and `putEncrypted()` writes its
+        // plaintext temporary file into the same directory, so both are
+        // covered by this scope.
+        //
+        // The scope is deliberately not the whole fake disk. The fake root
+        // (`storage/framework/testing/disks/local`) is shared by every PHP
+        // process that fakes this disk — only `--parallel` gives each worker
+        // its own root — and `Storage::fake('local')` empties it on every
+        // setUp(). A disk-wide assertion therefore also sees files this test
+        // never wrote and fails the run for a file this test never persisted.
         $this->assertSame([], Storage::disk('local')->allFiles($directory));
-        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
     public function test_stored_size_is_the_encoded_size_and_within_the_shared_budget(): void
@@ -181,26 +185,26 @@ class ModelFileImageBudgetTest extends TestCase
             $store->storeUpload($directory, $file);
             $this->fail('Expected the image to be rejected by its pre-decode budget.');
         } catch (ValidationException $exception) {
-            // Rejected before the decoder and before encrypted persistence.
+            // Rejected before the decoder and before the store writes anything.
             $this->assertArrayHasKey('file', $exception->errors());
         }
 
         $this->assertSame(0, $store->decodeCalls);
-        // Rejected before the decoder and before encrypted persistence. Both
-        // scopes are asserted: the test's own directory is empty (the precise
-        // claim) and the whole fake disk is empty (the stronger claim). The
-        // global scope is safe because `Storage::fake('local')` in setUp()
-        // empties the fake root, so no foreign file can survive into this
-        // test.
+        // Rejected before the decoder, and this upload persisted nothing into
+        // its target directory: no encrypted file and no `.plain-<hex>`
+        // temporary file. The fake disk root is shared by every process that
+        // fakes this disk, so a disk-wide assertion would also see foreign
+        // files and fail the run for a file this test never persisted; see
+        // `test_re_encoded_bytes_above_the_stored_budget_are_rejected_before_persisting()`.
         $this->assertSame([], Storage::disk('local')->allFiles($directory));
-        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
     /**
      * A store directory no other test writes to, so the "nothing was
-     * persisted" assertion names the exact place the upload would have
-     * landed. The global assertion next to it additionally proves that the
-     * whole fake disk stayed clean.
+     * persisted into it" assertion names the exact place the upload would
+     * have landed. The scope is that directory, not the whole fake disk: the
+     * fake root is shared by every process that fakes the `local` disk, so a
+     * disk-wide assertion would fail for files this test never wrote.
      */
     private function uniqueStoreDirectory(): string
     {
