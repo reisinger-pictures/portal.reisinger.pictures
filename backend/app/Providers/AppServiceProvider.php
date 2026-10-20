@@ -19,9 +19,13 @@ use App\Support\BrandRegistry;
 use App\Support\CheckoutKey;
 use App\Support\UuidDatabaseFailedJobProvider;
 use App\Support\UuidDatabaseQueueConnector;
+use ArrayObject;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
@@ -101,6 +105,80 @@ class AppServiceProvider extends ServiceProvider
                 ),
                 default => new ScopeLicensingStrategy,
             };
+        });
+
+        // One authorization service instance per request (and per queue job).
+        //
+        // The service itself is stateless; the request-scoped memo of the org
+        // group scope lives in the store below. The shared instance is still
+        // worth having: it keeps `app(AuthorizationService::class)` from
+        // building a new object for every call.
+        $this->app->scoped(AuthorizationService::class, fn (): AuthorizationService => new AuthorizationService);
+
+        // The request-scoped memo of the org group scopes.
+        //
+        // The memo lives in the container and not in the service instance, so
+        // that the invalidation reaches *every* service instance — including
+        // one that was constructed directly (`new AuthorizationService`) and
+        // therefore is not the container's shared instance. A service that
+        // held the memo itself would keep a stale scope after a write.
+        //
+        // The lifetime of a scoped binding is the lifetime of the scoped
+        // instances: Laravel flushes them before every queue job
+        // (`QueueServiceProvider` → `forgetScopedInstances()`); for HTTP the
+        // reset comes from the deployment's request model — php-fpm builds a
+        // fresh application instance per request
+        // (`deployment/backend-supervisor.sh` → `php-fpm -F`) and the
+        // scheduler is a fresh process every minute. A long-lived worker that
+        // reuses one application instance across requests (Octane or a
+        // comparable SAPI) would keep the memo and would have to flush the
+        // scoped instances itself.
+        $this->app->scoped(
+            AuthorizationService::ORG_GROUP_SCOPE_STORE,
+            fn (): ArrayObject => new ArrayObject,
+        );
+
+        // A write to the `gallery_group_org` pivot or to the `gallery_groups`
+        // tree revokes delegations. The memoized org group scope must not
+        // survive such a write, otherwise a later read in the same request
+        // would answer with a scope that was just revoked.
+        //
+        // The invalidation is wired centrally instead of at every mutation
+        // point (`OrgController::syncGroups()`,
+        // `GalleryService::storeGroup()/updateGroup()`), so a write path
+        // cannot forget it.
+        //
+        // The guard listens on two hooks, because each one covers the failure
+        // mode of the other:
+        //
+        // - the connection hook survives the query-counting test helpers,
+        //   which remove the `QueryExecuted` listeners from the event
+        //   dispatcher (`DB::getEventDispatcher()->forget(...)`),
+        // - the dispatcher listener survives a `DB::purge()`, which replaces
+        //   the Connection object and with it the connection's own callbacks.
+        //
+        // The connection hook is registered on the default connection only —
+        // the scope queries run on it. The dispatcher listener sees the
+        // statements of every connection, so a model on a non-default
+        // connection would be covered as well. No model sets a non-default
+        // connection today.
+        //
+        // Neither hook opens a database connection: the connection only
+        // connects on its first query.
+        DB::beforeExecuting(function (string $query): void {
+            if (! AuthorizationService::mutatesOrgGroupScope($query)) {
+                return;
+            }
+
+            app(AuthorizationService::class)->invalidateOrgGroupScope();
+        });
+
+        Event::listen(QueryExecuted::class, function (QueryExecuted $query): void {
+            if (! AuthorizationService::mutatesOrgGroupScope($query->sql)) {
+                return;
+            }
+
+            app(AuthorizationService::class)->invalidateOrgGroupScope();
         });
     }
 
