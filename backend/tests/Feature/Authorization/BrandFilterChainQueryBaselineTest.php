@@ -8,6 +8,7 @@ use App\Models\GalleryGroup;
 use App\Models\User;
 use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
+use App\Support\GalleryGroupSubtree;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,15 @@ use Tests\TestCase;
  * parallel workers. The statements are counted with `DB::listen()` — the
  * mechanism this repository already uses for query-count assertions (see
  * `AuthorizationServiceTest` and `OrgAdminDelegationBoundaryTest`).
+ *
+ * The probe also pins the depth bound of the ancestor closure. The closure
+ * is loaded at most `GalleryGroupSubtree::MAX_DEPTH` levels above the
+ * candidate groups — the very reach of the shared brand walk, which inspects
+ * the group it starts at and at most `MAX_DEPTH` ancestors above it and fails
+ * closed beyond that. The deep fixture of this test carries a chain at that
+ * limit (it still passes) and a chain beyond it (it fails closed), and the
+ * measured number of lookups for the deep chain pins the bound: without it
+ * the closure walks to the root of the tree and needs one lookup per level.
  */
 class BrandFilterChainQueryBaselineTest extends TestCase
 {
@@ -67,6 +77,30 @@ class BrandFilterChainQueryBaselineTest extends TestCase
      * galleries.
      */
     private const STATEMENTS_FOR_FIFTEEN_GALLERIES = 7;
+
+    /**
+     * The number of groups in a chain that sits exactly at the shared depth
+     * limit. The brand walk inspects the group of the gallery and at most
+     * `GalleryGroupSubtree::MAX_DEPTH` ancestors above it, so such a chain
+     * still passes — and the closure must still carry every one of them.
+     */
+    private const AT_LIMIT_CHAIN_GROUPS = GalleryGroupSubtree::MAX_DEPTH + 1;
+
+    /**
+     * The number of groups in a chain that is deeper than the shared depth
+     * limit. Such a chain fails closed in both paths — the brand walk refuses
+     * it, and the closure is not allowed to walk past the limit to find out
+     * otherwise.
+     */
+    private const DEEP_CHAIN_GROUPS = GalleryGroupSubtree::MAX_DEPTH + 3;
+
+    /**
+     * The measured number of group-chain lookups of the brand filter for a
+     * gallery in the deep chain: one statement for the candidate group plus
+     * one per ancestor level, bounded by `GalleryGroupSubtree::MAX_DEPTH`
+     * levels.
+     */
+    private const LOOKUPS_FOR_DEEP_CHAIN = GalleryGroupSubtree::MAX_DEPTH + 1;
 
     /**
      * The brand filter resolves the group chain set-based.
@@ -147,7 +181,9 @@ class BrandFilterChainQueryBaselineTest extends TestCase
      * - a gallery whose parent group has no brand (fails closed),
      * - a gallery under a foreign-brand ancestor (fails closed),
      * - a gallery in a three-level chain (passes),
-     * - a gallery whose own brand differs (fails closed).
+     * - a gallery whose own brand differs (fails closed),
+     * - a gallery in a chain at the shared depth limit (passes),
+     * - a gallery in a chain beyond the shared depth limit (fails closed).
      */
     public function test_the_set_based_brand_filter_selects_the_same_galleries_as_the_per_gallery_walk(): void
     {
@@ -163,12 +199,80 @@ class BrandFilterChainQueryBaselineTest extends TestCase
         );
 
         $this->assertSame(
-            $this->sorted([$fixture['without_group'], $fixture['three_level_chain']]),
+            $this->sorted([
+                $fixture['without_group'],
+                $fixture['three_level_chain'],
+                $fixture['at_limit_chain'],
+            ]),
             $this->sorted($setBased),
-            'Only the gallery without a group and the gallery in the three-level chain may pass the brand '
-            .'filter of the fixture: every other fixture row carries a missing, brand-less or foreign brand '
-            .'in its tree.'
+            'Only the gallery without a group, the gallery in the three-level chain and the gallery in the '
+            .'chain at the depth limit may pass the brand filter of the fixture: every other fixture row '
+            .'carries a missing, brand-less or foreign brand in its tree, or sits in a chain beyond the '
+            .'depth limit.'
         );
+    }
+
+    /**
+     * The brand filter bounds the ancestor closure at the shared depth limit.
+     *
+     * The closure is loaded at most `GalleryGroupSubtree::MAX_DEPTH` levels
+     * above the candidate groups — the very reach of the brand walk, which
+     * inspects the group it starts at and at most `MAX_DEPTH` ancestors above
+     * it and fails closed beyond that. A chain deeper than the limit must
+     * therefore still fail closed, and the closure must not load the
+     * ancestors above the limit: the pinned number of lookups turns red when
+     * the bound is removed, because the closure then walks to the root of the
+     * tree and needs one lookup per level.
+     */
+    public function test_the_brand_filter_bounds_the_ancestor_closure_at_the_shared_depth_limit(): void
+    {
+        $fixture = $this->deepChainFixture();
+
+        $perGallery = $this->perGalleryBrandFilter($fixture['gallery_ids'], Brand::B2B->value);
+        $setBased = app(AuthorizationService::class)->getAllowedGalleryIds($fixture['user']);
+
+        $this->assertSame(
+            $this->sorted($perGallery),
+            $this->sorted($setBased),
+            'A chain beyond the shared depth limit must fail closed in both paths.'
+        );
+
+        $this->assertSame(
+            [],
+            $this->sorted($setBased),
+            'The gallery in the deep chain must not pass the brand filter: the brand walk fails closed above '
+            .'the shared depth limit.'
+        );
+
+        $this->assertSame(
+            self::LOOKUPS_FOR_DEEP_CHAIN,
+            $this->countChainLookups($this->countStatements($fixture['user'])),
+            'The ancestor closure must be bounded by the shared depth limit: the brand filter must not load '
+            .'the ancestors above it. A growing number of lookups means the closure walks to the root of the '
+            .'tree again.'
+        );
+    }
+
+    /**
+     * A reader with one gallery in a chain that is deeper than the shared
+     * depth limit.
+     *
+     * @return array{user: User, gallery_ids: array<int, string>}
+     */
+    private function deepChainFixture(): array
+    {
+        $gallery = $this->gallery([
+            'brand' => Brand::B2B,
+            'gallery_group_id' => $this->groupChain(self::DEEP_CHAIN_GROUPS)->id,
+        ]);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $user->galleries()->attach($gallery->id);
+
+        return [
+            'user' => $user,
+            'gallery_ids' => [(string) $gallery->id],
+        ];
     }
 
     /**
@@ -276,7 +380,9 @@ class BrandFilterChainQueryBaselineTest extends TestCase
      *     null_brand_parent: string,
      *     foreign_ancestor: string,
      *     three_level_chain: string,
-     *     own_brand_differs: string
+     *     own_brand_differs: string,
+     *     at_limit_chain: string,
+     *     beyond_limit_chain: string
      * }
      */
     private function brandFilterFixture(): array
@@ -332,6 +438,22 @@ class BrandFilterChainQueryBaselineTest extends TestCase
             'gallery_group_id' => $root->id,
         ]);
 
+        // 7. A gallery in a chain that sits exactly at the shared depth
+        //    limit: the brand walk still reaches the root of that chain, so
+        //    the gallery passes.
+        $atLimit = $this->gallery([
+            'brand' => Brand::B2B,
+            'gallery_group_id' => $this->groupChain(self::AT_LIMIT_CHAIN_GROUPS)->id,
+        ]);
+
+        // 8. A gallery in a chain that is deeper than the shared depth
+        //    limit: the brand walk fails closed above the limit, so the
+        //    gallery never passes.
+        $beyondLimit = $this->gallery([
+            'brand' => Brand::B2B,
+            'gallery_group_id' => $this->groupChain(self::DEEP_CHAIN_GROUPS)->id,
+        ]);
+
         $galleries = [
             $withoutGroup,
             $missingGroup,
@@ -339,6 +461,8 @@ class BrandFilterChainQueryBaselineTest extends TestCase
             $underForeignAncestor,
             $threeLevelChain,
             $ownBrandDiffers,
+            $atLimit,
+            $beyondLimit,
         ];
 
         $user = User::factory()->create(['brand' => Brand::B2B]);
@@ -355,7 +479,30 @@ class BrandFilterChainQueryBaselineTest extends TestCase
             'foreign_ancestor' => (string) $underForeignAncestor->id,
             'three_level_chain' => (string) $threeLevelChain->id,
             'own_brand_differs' => (string) $ownBrandDiffers->id,
+            'at_limit_chain' => (string) $atLimit->id,
+            'beyond_limit_chain' => (string) $beyondLimit->id,
         ];
+    }
+
+    /**
+     * A chain of gallery groups that all carry the brand, the deepest group
+     * last.
+     *
+     * The chain is built from the root downwards, so the returned group is
+     * the deepest one and the chain holds `$groupCount` groups in total.
+     */
+    private function groupChain(int $groupCount): GalleryGroup
+    {
+        $deepest = GalleryGroup::factory()->create(['brand' => Brand::B2B, 'parent_id' => null]);
+
+        for ($level = 1; $level < $groupCount; $level++) {
+            $deepest = GalleryGroup::factory()->create([
+                'brand' => Brand::B2B,
+                'parent_id' => $deepest->id,
+            ]);
+        }
+
+        return $deepest;
     }
 
     /**
