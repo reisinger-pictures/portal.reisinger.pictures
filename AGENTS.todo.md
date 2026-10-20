@@ -181,10 +181,10 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **32 offene `[ ]`** und **46 wartende
-> `[~]`** über 1854 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (32), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1854). Aufteilung der 32: **17× `manuell prüfen:`** und **15×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **33 offene `[ ]`** und **46 wartende
+> `[~]`** über 1879 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (33), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1879). Aufteilung der 33: **18× `manuell prüfen:`** und **15×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 15 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
@@ -192,7 +192,8 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > A–D") sowie die seitdem aufgedeckten Reste (die Zwei-Verbindungs-Messung, die Restform der
 > User-Zeilen-Sperrreihenfolge von `destroy()`, der Verwaltungs-Pfad
 > `canManageGalleryGroup()`, die Opt-in-Zeile, die drei Reste der Fake-Disk-Kopplung in den
-> Modellfoto-Tests) und die manuellen Prüfpunkte des Deploys vom 2026-10-19. Die beiden
+> Modellfoto-Tests) und die manuellen Prüfpunkte der beiden Deploys vom 2026-10-19 und
+> 2026-10-20. Die beiden
 > Query-Zähl-Kosten sind geschlossen: die Basislinien sind gepinnt und der Lesepfad löst den
 > Brand-Filter gesammelt und den Org-Scope **einmal pro Request** auf — ein Cache über
 > Requests hinweg ist bewusst **nicht** umgesetzt, weil er eine gerade widerrufene Delegation
@@ -203,7 +204,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (78 = 32 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (79 = 33 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
@@ -304,7 +305,31 @@ ist die Frage nicht „ist das besser?", sondern „ist D-x überholt?" — und 
 
 ---
 
-## 🚀 PRODUKTIONS-DEPLOY 2026-10-19 (`64fa9be`) — Neustart ausstehend
+## 🚀 PRODUKTIONS-DEPLOY 2026-10-20 (`64b8ae2`) — Neustart ausstehend
+
+Zweiter Deploy desselben Tages: `./sync.sh` gegen den grünen Head `64b8ae2` (CI `39470617556`,
+alle 11 Jobs grün). **Übertragen:** drei Backend-Dateien (`OrgController` — aufsteigende
+Mitgliedersperre, `AppServiceProvider` — Bindung + Guard, `AuthorizationService` — set-basierter
+Brand-Filter + Scope-Memo) und ein neu gebautes Frontend-Bundle (`assets/index-g_hP4jz6.js`, 42
+Assets; der Build-Zeitstempel in `frontend/vite.config.ts:10` macht jedes Bundle eindeutig, auch
+bei identischen Quellen — deshalb der Asset-Tausch trotz unveränderter Frontend-Quellen).
+**Maschinell verifiziert:** aufsteigende `orderBy` im Destroy (`:167`, `:169`) und beide Guard-
+Hooks auf dem Host, `BrandRegistry.php` byte-identisch (`md5 1ccba57…`), `portal.reisinger.
+pictures/up` → 200, das neue Bundle wird ausgeliefert, `storage/app/private` unversehrt (93
+Altersnachweise, `stripe_secret.txt`, `watermark.svg`).
+
+**Neustart erfolgt 2026-10-20:** der Container startete um 20:16:29 lokal, die synchronisierten
+Dateien lagen seit 19:56:40 auf dem Host — der laufende Prozess hat den neuen Stand geladen.
+`portal.reisinger.pictures/up` → 200, `/api/auth/me` ohne Token → 401,
+`POST /api/internal/ftp/upload-event` ohne Secret → 401.
+
+- [ ] manuell prüfen: Gegnproben nach dem Neustart — die **neuen** Verhaltensweisen: `GET
+  /api/auth/me` (Antwortzeit und Inhalt unverändert, der Lesepfad löst den Org-Scope jetzt
+  einmal auf), ein Org-Benutzer-Sync und ein Org-Löschen (die aufsteigende Sperrreihenfolge),
+  sowie ein Login als Client und als Fotograf (die Brand-Filter-Entscheidung muss identisch
+  bleiben — die Äquivalenzprobe deckt die Randfälle ab, der Live-Blick deckt den Rest).
+
+## 🚀 PRODUKTIONS-DEPLOY 2026-10-19 (`64fa9be`) — abgeschlossen
 
 Deploy ausgeführt: `./sync.sh` (43 Backend-Dateien, 58 Frontend-Assets) gegen den grünen
 Head `64fa9be` (CI `39291191094`, alle 11 Jobs grün). **Maschinell verifiziert:** die neuen
