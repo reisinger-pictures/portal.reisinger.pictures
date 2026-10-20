@@ -121,6 +121,17 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   eingeführt. **Test:** `order by id` in der Mitgliederabfrage von `destroy()` — dann stimmen
   die Reihenfolgen beider Pfade überein; mit einem Test, der die Sperrreihenfolge des
   destroys pinnt (Muster `OrgDestroyLockOrderTest`).
+- [ ] **Der Modellfoto-Budget-Test prüft gegen die global geteilte Fake-Disk-Root (Testhygiene).**
+  `backend/tests/Feature/ModelFileImageBudgetTest.php:149,196` behauptet mit
+  `assertSame([], Storage::disk('local')->allFiles())`, dass **keine** Datei geschrieben wurde.
+  `Storage::fake('local')` leert aber die **prozessweit geteilte** Fake-Root
+  (`backend/tests/Support/Storage.php:112` leert sie in `setUp()`), nicht ein Test-eigenes
+  Verzeichnis. Zwei **gleichzeitig** laufende Suites im selben Prozess können sich deshalb
+  gegenseitig Dateien wegschneiden — beim Verifier der Modellfoto-Budgets trat genau so ein
+  **Fehlalarm** auf. Sequenzielle Läufe und `--parallel` (eigene Root je Worker) sind sicher.
+  **Vorbestand**, nicht durch die Budget-Arbeit eingeführt. **Test:** statt der globalen
+  Liste nur das **eigene** Verzeichnis des Tests prüfen (z. B. ein Unterordner pro Test), dann
+  ist die Aussage unabhängig von anderen Tests.
 - [ ] **Mailpit lokal unerreichbar (Umgebung).** Der Container `accriditation_mailpit` mappt
   `127.0.0.1:1025->1025/tcp`, nimmt aber keine Verbindung an (`socket.connect` → refused). Im
   vollen Backend-Lauf scheitern dadurch **63** Mail-Tests mit `TransportException`; gegen ein
@@ -154,13 +165,13 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-19):** **34 offene `[ ]`** und **46 wartende
-> `[~]`** über 1825 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (34), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1825). Aufteilung der 34: **23× `manuell prüfen:`** und **11×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **37 offene `[ ]`** und **46 wartende
+> `[~]`** über 1842 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (37), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1842). Aufteilung der 37: **23× `manuell prüfen:`** und **14×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 11 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 14 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
 > A–D") sowie die seitdem aufgedeckten Reste (die zwei Query-Zähl-Kosten mit gepinnter
 > Basislinie, die Zwei-Verbindungs-Messung, die User-Zeilen-Sperrreihenfolge von `destroy()`,
@@ -171,12 +182,12 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (80 = 34 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (83 = 37 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
 > **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **20 von 27 `##`-Abschnitten**
+> Die Positionen liegen in **21 von 27 `##`-Abschnitten**
 > (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
 > `grep -c '^## ' AGENTS.todo.md`). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
