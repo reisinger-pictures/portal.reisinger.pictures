@@ -71,15 +71,15 @@ the stated prerequisites, not on a confirmed production exploit.
 Diese Punkte sind in den Freigaben als **nicht-blockierend** eingestuft worden. Sie sind hier,
 weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benannten Ort.
 
-- [ ] **Der Benachrichtigungs-Opt-in legt eine Zuweisung an (pre-existing).**
-  `NotificationController::toggleGalleryOptIn()` schreibt mit `updateOrInsert()` eine Zeile in
-  `user_galleries` — dieselbe Tabelle, die die Client-Zuweisung trägt. Für eine **Selection**-
-  Galerie gewährt die Zeile **nichts** (D-39 filtert sie aus dem Leser), für eine
-  **Delivery**-Galerie wird sie vom Leser aber **als Zuweisung gewertet** — und sie überlebt die
-  Org-Zugehörigkeit, die sie gerechtfertigt hat: gemessen gibt `getAllowedGalleryIds()` die
-  Galerie weiterhin heraus, nachdem die Org-Zugehörigkeit entfernt wurde. Ein Opt-in ist keine
-  Zuweisung; die saubere Form wäre eine eigene Abo-Tabelle (Schema-Entscheidung). **Test:**
-  ein Opt-in auf eine Delivery-Galerie darf die Zuweisung nicht verändern.
+- [ ] **Der Gruppen-Opt-in legt eine Gruppen-Zuweisung an (D-45, dieselbe Bauart).**
+  Der Benachrichtigungs-Opt-in einer **Gruppe** (`user_gallery_groups`) trifft dieselbe
+  Bauart wie der Galerie-Opt-in: die Zeile landet in der Pivot, die die Gruppen-Zuweisung
+  trägt, und der Leser wertet sie als Zuweisung. Mit V047 ist nur der **Galerie**-Opt-in
+  in eine eigene Tabelle gewandert; der Gruppen-Pfad ist **unverändert** und damit
+  weiterhin ein Fall derselben Fehlerklasse. **Entschieden ist das nicht** — der Owner
+  muss entscheiden, ob der Gruppen-Opt-in ebenfalls in eine eigene Tabelle wandert oder
+  ob der Leser den Fall abweichend behandelt. **Test:** ein Gruppen-Opt-in darf keine
+  Gruppen-Zuweisung erzeugen (analog zur Galerie-Regression aus D-45).
 - [ ] manuell prüfen: **Zwei-Verbindungs-Nachweis für D-40 steht aus.**  Das Probe-Skript `backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh` liegt vor
   (zwei Orgs, deren Akteure gegenseitig Mitglieder sind, gleichzeitige Syncs, InnoDB-
   Deadlock-Delta). **Der Lauf steht aus:** das Skript braucht einen Docker-Host mit
@@ -112,18 +112,6 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   **keine gepinnte Basislinie**. **Test:** zuerst eine Basislinie pinnen (Muster
   `BrandFilterChainQueryBaselineTest`), dann die Galerie-Liste des Teilbaums einmal laden und
   die rollenabhängigen Prüfen aus der Schleife heben.
-- [ ] **Der Brand-Filter lädt die Ahnen-Kette ohne Tiefen-Budget (Rest, geprüfte Option).**
-  Die set-basierte Auflösung lädt die Ahnen-Kette **bis zur Wurzel**, während der alte
-  Je-Galerie-Walk durch `GalleryGroupSubtree::MAX_DEPTH` (11) begrenzt war. Die **Entscheidung**
-  bleibt in beiden Pfaden gleich (fail-closed oberhalb der Grenze; für die Tiefen 10, 11, 12, 15
-  und 100 gemessen identisch), aber das **Laden** ist unbeschränkt: 15 Gruppen = 15 Statements
-  gegen 12 (20 gegen 17 gesamt), 100 Gruppen = 100 gegen 12. **Geprüfte Option, nicht
-  ausgeführt:** ein optionales `$maxAncestorLevels` auf `withAncestorClosure()`, gerufen mit
-  `GalleryGroupSubtree::MAX_DEPTH` — entscheidungsneutral über dieselben Tiefen, beide Basislinien
-  bleiben grün, und die tiefen Kosten fallen von 15 auf 11 (bzw. 100 auf 11) Statements; damit
-  wäre der set-basierte Pfad **in jedem** Fall billiger als der alte. **Test:** die
-  Äquivalenzprobe braucht dafür ein tiefes Fixture — deshalb wurde die Option in der reinen
-  Text-Runde nicht mitgenommen.
 - [ ] **Der Modellfoto-Budget-Test schreibt und liest dieselbe Datei zurück (Rest der
   Fake-Disk-Kopplung).** Die Disk-Prüfung wurde auf das **eigene** Verzeichnis des Tests
   umgestellt (`model-photos/<random>`), aber die beiden Methoden, die eine Datei
@@ -181,35 +169,39 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **33 offene `[ ]`** und **46 wartende
-> `[~]`** über 1879 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (33), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1879). Aufteilung der 33: **18× `manuell prüfen:`** und **15×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **28 offene `[ ]`** und **46 wartende
+> `[~]`** über 1849 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (28), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1849). Aufteilung der 28: **9× `manuell prüfen:`** und **19×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 15 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 19 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
 > A–D") sowie die seitdem aufgedeckten Reste (die Zwei-Verbindungs-Messung, die Restform der
 > User-Zeilen-Sperrreihenfolge von `destroy()`, der Verwaltungs-Pfad
-> `canManageGalleryGroup()`, die Opt-in-Zeile, die drei Reste der Fake-Disk-Kopplung in den
-> Modellfoto-Tests) und die manuellen Prüfpunkte der beiden Deploys vom 2026-10-19 und
-> 2026-10-20. Die beiden
+> `canManageGalleryGroup()`, der **Gruppen**-Opt-in als Dublette zum Galerie-Opt-in, die
+> Dialog-Befunde, die das Audit vom 2026-10-20 aus Code statt vom Gerät beantwortet hat) und
+> die manuellen Prüfpunkte der Deploys. Die beiden
 > Query-Zähl-Kosten sind geschlossen: die Basislinien sind gepinnt und der Lesepfad löst den
 > Brand-Filter gesammelt und den Org-Scope **einmal pro Request** auf — ein Cache über
 > Requests hinweg ist bewusst **nicht** umgesetzt, weil er eine gerade widerrufene Delegation
-> ausliefern würde (`features/auth/01-roles-and-access.md` §6). Alle 46 `[~]`
+> ausliefern würde (`features/auth/01-roles-and-access.md` §6). Die **Aktualitätsprüfung vom
+> 2026-10-20** hat 16 alte Owner-Positionen durchgesehen: 11 davon sind erledigt,
+> maschinell abgedeckt oder überholt und deshalb aus der Liste gegangen; die restlichen sind
+> mit korrigiertem Wortlaut und dem richtigen Werkzeug (Firewalld statt ufw, `ROOT.PEM` statt
+> `cert.pem`, authentifiziert statt anonym lesen) stehen geblieben. Alle 46 `[~]`
 > tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
 > zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (79 = 33 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (74 = 28 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
 > **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **20 von 27 `##`-Abschnitten**
+> Die Positionen liegen in **20 von 28 `##`-Abschnitten**
 > (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
 > `grep -c '^## ' AGENTS.todo.md`). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
@@ -323,6 +315,17 @@ Dateien lagen seit 19:56:40 auf dem Host — der laufende Prozess hat den neuen 
 `portal.reisinger.pictures/up` → 200, `/api/auth/me` ohne Token → 401,
 `POST /api/internal/ftp/upload-event` ohne Secret → 401.
 
+- [ ] manuell prüfen: **Migration V047 auf dem Host ausführen** — `sync.sh` kopiert nur
+  Dateien und führt **keine** Migration aus (§13). Nach dem Sync:
+  `docker exec portal_backend php artisan migrate --force`. V047 legt die Tabelle
+  `gallery_notification_subscriptions` an und füllt sie aus den
+  `user_galleries`-Zeilen mit `wants_notifications = 1` (Pivot-Zeilen werden **nicht**
+  gelöscht). **Kein `db:seed --force`** — V047 fügt keine Settings-Schlüssel hinzu und
+  der Seeder überschreibt in der Produktion seine autoritativen Werte.
+- [ ] manuell prüfen: **Reparaturliste lesen, dann entscheiden** —
+  `docker exec portal_backend php artisan notifications:prune-legacy-opt-in-grants`
+  (Trockenlauf, löscht nichts) → prüfen → erst dann `--apply` für die Zeilen, die
+  wirklich nur Opt-ins waren.
 - [ ] manuell prüfen: Gegnproben nach dem Neustart — die **neuen** Verhaltensweisen: `GET
   /api/auth/me` (Antwortzeit und Inhalt unverändert, der Lesepfad löst den Org-Scope jetzt
   einmal auf), ein Org-Benutzer-Sync und ein Org-Löschen (die aufsteigende Sperrreihenfolge),
@@ -353,47 +356,43 @@ Prozess vorhanden (OPcache/Compiler-Zustand nach Neustart), Frontend-Bundle-Hash
 unverändert gegenüber dem vorigen Deploy, Homepage **200**.
 **Noch manuell durch den Owner zu prüfen** (nicht automatisierbar, kein Test deckt sie):
 
-- [ ] manuell prüfen: FTP-Inbox im Browser — anmelden, Fotografen-Dashboard
-  (`/management/ftp`), den Kamera-Status prüfen: Konto-Status, Zielordner-Pfad und
-  der Inhalt der Inbox-Tabelle müssen dem tatsächlichen SFTPGo-Account auf dem Host
-  entsprechen. Worauf es ankommt: **kein** 500er auf `GET /api/management/ftp/status`
-  und der angezeigte `ftp_folder` muss der Name sein, den die Kamera als Ziel bekommt.
-  **Erst die Migration prüfen, dann den Browser:** `sync.sh` führt keine Migration aus
-  (§13), und `FtpController::status()` liest eine Spalte aus V041. Steht V041 auf dem
-  Host auf `pending`, ist der 500er erklärt und der Browser-Test gegenstandslos —
-  siehe den Eintrag „`GET /api/management/ftp/status` liefert 500, wenn die Spalte fehlt".
-- [ ] manuell prüfen: Lizenz-Dialog auf Escape und Backdrop-Klick — Coupon-Formular
-  (`CouponFormDrawer`) im Warenkorb öffnen, ein Feld ändern, dann **Escape** drücken
-  und danach über den **Backdrop** schließen. Beide Wege müssen jetzt die
-  Ungespeichert-Warnung auslösen — vorher taten das nur „Schließen" und „Abbrechen",
-  und getippte Eingabe konnte still verworfen werden. Worauf es ankommt: beide
-  Abbruchwege fragen nach, keiner verwirft mehr.
-- [ ] manuell prüfen: **Dialoghöhen und gepinnter Kopf per Screenshot** — `pnpm
-  test:screenshots:grep "screenshot (gallery-access-dialog|gallery-photographer-team-dialog)"`,
-  Ergebnis unter `frontend/test-results/ui-screenshots/filled/`. Prüfen: (a) Kopf und Suchfeld
-  stehen fest, während die Liste scrollt, (b) der Rahmen um die Liste scrollt **mit** dem Inhalt
-  und nicht weg, (c) auf Mobile verdeckt der untere Fade die letzte Zeile nicht unerreichbar.
-  **Warum offen:** der umsetzende Agent meldete 8 Captures mit konkreten Befunden, im Baum lag
-  danach **keine einzige PNG** — `SCREENSHOT_OUTPUT_DIR` ist `test-results/ui-screenshots`
-  (`tests/screenshots/harness.ts:17`) und der Ordner war leer. Kein Beweis gegen die Beobachtung,
-  `test-results/` ist gitignored und wird von jedem Lauf geleert — aber auch **kein Beleg
-  dafür**. Höhen- und Slot-Aussage sind derzeit nur durch Unit-Tests gedeckt, nicht durch ein
-  Bild. **`AIBatchEditModal` ist gar nicht abgedeckt:** keine Manifest-Route, und die gesäten
-  Galerien haben keine Fotos, im Harness also nicht aufrufbar.
-- [ ] manuell prüfen: **Softtastatur auf einem echten Mobilgerät** — nach D-12 wandert der
-  Fokus bei 23 von 28 Dialogen in ein Eingabefeld, und auf Touch öffnet sich damit sofort die
-  Tastatur. **Kein Test im Repo misst das**, und ohne Gerät ist es nicht messbar. Einen
-  Formular-Dialog auf dem Telefon öffnen und prüfen: verdeckt die Tastatur den Inhalt oder den
-  Bestätigen-Knopf? Ist das ein Fehler oder ein Gewinn? Auf Desktop entfällt der Effekt ganz,
-  weil es dort keine Softtastatur gibt — deshalb zählt nur das Gerät.
-- [ ] manuell prüfen: Tastatur-Fokusreihenfolge in den elf migrierten Dialogen —
-  die elf Dialoge der Welle nacheinander per Tastatur öffnen (Tab / Shift-Tab) und
-  prüfen, dass der Fokus **in der Dialog-Box bleibt**. Wo genau er landet, hängt nach D-12
-  davon ab, ob der Dialog ein `autoFocus`-Element auszeichnet: **mit** `autoFocus` dort,
-  **ohne** auf dem beschrifteten Schließen-Element — auf keinen Fall auf dem
-  Seiten-Hintergrund oder in der Adressleiste. **Nach dem Schließen gehört der Fokus auf den
-  Auslöser**; das ist der Teil, den D-12 ausdrücklich mit repariert. **Kein Test deckt die Reihenfolge ab** — `DialogAccessibilityContract.test.tsx`
-  prüft Namen, `aria-modal` und Escape, nicht die Tab-Reihenfolge.
+- [ ] **Der Backdrop-Klick des Lizenz-/Coupon-Formulars ist ungetestet (Testlücke).**
+  `CouponFormDrawer.tsx:158-162` (`handleClose` → `confirm`, wenn `isDirty`) wird für
+  Kopf-Button, Backdrop, Escape und `onCancel` genutzt — getestet ist bisher **nur** Escape,
+  und nur für ein **unverändertes** Formular (`DialogAccessibilityContract.test.tsx:189-204`).
+  **Test:** ein verändertes Formular → Klick auf `.modal-backdrop` → `confirm` wird
+  aufgerufen. (Nebenbefund: das Formular liegt **nicht** im Warenkorb, sondern unter
+  `/admin-coupons`; der Warenkorb nutzt `CouponInput`.)
+- [ ] **Dialoghöhen und gepinnter Kopf per Screenshot (Agent-Task, nicht Owner-Task).**
+  `pnpm test:screenshots:grep "screenshot (gallery-access-dialog|gallery-photographer-team-dialog)"`
+  erzeugt die PNGs unter `frontend/tests/screenshots/` (das Ausgabeverzeichnis `test-results/`
+  ist gitignored — die PNGs werden nie committet, der alte Blocker „keine PNG im Baum" war
+  gegenstandslos). **Test:** `GalleryAccessModal` nutzt `bodyHead` + `height="80vh"` + ein
+  `sticky bottom-0`-Fade — der Zielzustand ist im Code vorhanden; offen ist die **Sichtprüfung**
+  (an den Owner oder die `ui-review`-Skill übergeben).
+- [ ] **`max-h-90vh` deckt die Tastatur auf dem Mobilgerät nicht (Code-Befund).**
+  `ModalShell.tsx:180-183, 215` begrenzt die Höhe mit `vh`, nicht mit `dvh` — eine offene
+  Tastatur verdeckt den Footer. **Test/Fix:** `max-h-90dvh` statt `max-h-90vh`; die
+  Geräte-Frage („Softtastatur") ist damit beantwortet.
+- [ ] **Das `€` steht im Preis-Editor neben dem Feld statt als Suffix (Code-Befund).**
+  `VolumePresetSettingsCard.tsx:159, 207` rendert das Währungszeichen als Flex-Sibling
+  neben dem Eingabefeld, nicht als Suffix im Feld. **Test:** Suffix im Feld; die
+  Snapshot-Aufnahme `frontend/tests/screenshots/` deckt die Darstellung ab.
+- [ ] **Die Tap-Targets der Rechen-Checkboxen sind ungemessen (PlaywrightViewport).**
+  `ShootingCalculatorModal.tsx:174, 206, 213, 220` nutzt `checkbox` mit 17 px Kantenlänge —
+  die Trefferfläche ist damit kleiner als die üblichen 44 px. **Messbar ohne Gerät:**
+  `getBoundingClientRect()` der Checkbox gegen ihr Label im Playwright-Viewport.
+- [ ] manuell prüfen: **FTP-Karte im Browser** — anmelden, Verwaltungs-Dashboard
+  (`/management`, Ansicht „Struktur" — **kein** `/management/ftp`: diese Route gibt es nicht).
+  Die Inbox-Tabelle gibt es nicht mehr; die Karte zeigt `ftp_folder`, Warteschlangen- und
+  Quarantäne-Zähler samt Pfad (`ManagementFtpInbox.tsx:286-331`). **Worauf es ankommt:**
+  das Konto steht auf `active`, das SFTPGo-Heimverzeichnis entspricht `ftp_folder`
+  (`FtpController.php:116`), `_quarantine` existiert auf dem Host
+  (`FtpInboxImporter.php:135`) — und ein Upload **ohne** Button importiert (D-36-Ereigniskette).
+  **Die Hälfte „kein 500er auf `GET /api/management/ftp/status`" ist am 2026-10-19 bestätigt**
+  und erledigt. **Vorher maschinell:** `php artisan ftp:provision-events --dry-run` — die
+  D-36-Ereignisregel wurde **nie gegen ein laufendes SFTPGo** verifiziert
+  (`deployment/README.md:134-136`).
 
 ---
 
@@ -770,28 +769,28 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   gemessen und **korrekt**: `bank_holder` = `Florian Reisinger`, `bank_iban` =
   `DE96100110012179986174`, `bank_bic` = `NTSBDEB1XXX`, `company_*` = Linz,
   `Robert-Stolz-Straße 8`, 4020, Österreich, `admin@example.com`. Alle acht decken
-  sich mit `DatabaseSeeder.php:174-181` und damit mit Ihren echten Daten. **Was
-  sich nicht belegen lässt:** ob die Werte schon vor dem Seed so standen — ich habe
-  sie vorher nicht erfasst. Falls der Seed etwas überschrieben hat, dann etwas auf
-  denselben Wert. **Worauf es ankommt:** es steht keine Platzhalter-Bankverbindung
-  mehr drin (auf einer frischen DB wäre es `Max Mustermann` / `ATXX XXXX XXXX`),
-  also gehen Auszahlungen an das richtige Konto. Ein kurzer Blick in die
-  Systemeinstellungen genügt, um es abzuhaken.
-- [ ] **Gegenprobe vor jedem Deploy, der `base_price` berührt:** Der Wert der
-  `base_price`-Zeile ist **nicht** aus dem Repository ableitbar, weil `insertOrIgnore`
-  (jetzt `upsert`) den Seederwert nur beim Anlegen der Zeile schreibt und eine bestehende
-  Zeile unangetastet lässt. Am **2026-09-28** auf Produktion gemessen: `base_price = 8000`,
-  `price_web = 7500`, `price_print = 14500`, `price_original = 45000` — also plausibel, und
-  `min:500` greift nicht. **Damit ist der Auslöser des CI-Fehlers an
-  `package-calculator-config.spec.ts` auf frischen Datenbanken begrenzt** (dort stand
-  `35.00`, 35 Cent, weil `V004:131` die Zeile vorbelegt). Produktion war nie betroffen,
-  weil dort über die Oberfläche gesetzte Werte stehen. **Vor dem nächsten Deploy aber
-  erneut messen**, und zwar lesend über die öffentliche Route
-  `GET https://portal.reisinger.pictures/api/settings/license-terms` (liefert
-  `base_price` und `srp_base_price`) — steigt die Antwort mit 301 auf
-  `reisinger.pictures`, ist die falsche Domain erwischt: `APP_URL` ist
-  `portal.reisinger.pictures`. Steht der Wert unter 500, ist es ein Datenwert und kein
-  Code-Fehler.
+  sich mit `DatabaseSeeder.php:212-219` (der alte Anker `:174-181` ist verschoben) und
+  damit mit Ihren echten Daten. **Das echte Risiko steht in keiner Board-Zeile:** der
+  Seeder benutzt `upsert` (`:235`), ein manuelles `db:seed --force` **überschreibt** also
+  in der Produktion gesetzte Werte — die Board-Zeile behauptete das Gegenteil. Das ist
+  der Grund, warum `db:seed --force` in der Produktion nie blind laufen darf
+  (`backend/AGENTS.md`, „Database Setup Policy"). **Worauf es ankommt:** es steht keine
+  Platzhalter-Bankverbindung drin (auf einer frischen DB wäre es `Max Mustermann` /
+  `ATXX XXXX XXXX`), also gehen Auszahlungen an das richtige Konto. Ein kurzer Blick in
+  die Systemeinstellungen genügt.
+- [ ] **Gegenprobe vor jedem Deploy, der `base_price` berührt:** **Der im Board
+  genannte Lesebefehl funktioniert nicht mehr** — `GET /api/settings/license-terms` liegt
+  hinter `auth:api` **und** `super_admin` (`backend/routes/api.php:187-189`), ein
+  anonymer `curl` liefert **401** statt des Wertes. **Lesbar** mit einem
+  Super-Admin-Token oder per `php artisan tinker` auf der `settings`-Zeile. Die
+  Seeder-Werte (`base_price` = `8000`, `price_web` = `7500`, `price_print` = `14500`,
+  `price_original` = `45000`, `DatabaseSeeder.php:208`) sind mit `upsert` **ableitbar** —
+  die frühere Aussage „nicht aus dem Repository ableitbar" war falsch. Am **2026-09-28**
+  auf Produktion gemessen und plausibel, `min:500` greift nicht. **Damit ist der Auslöser
+  des CI-Fehlers an `package-calculator-config.spec.ts` auf frischen Datenbanken begrenzt**
+  (dort stand `35.00`, 35 Cent, weil `V004:131` die Zeile vorbelegt); Produktion war
+  nie betroffen, weil dort über die Oberfläche gesetzte Werte standen. **Vor dem nächsten
+  Deploy erneut messen — authentifiziert.**
 
 ### Abweichungen bei der Umsetzung (2026-09-26) — zwei Audits, nicht blind übernommen
 
@@ -1387,8 +1386,6 @@ getrennt.
 **Architektur & Backend**
 **Frontend / Stripe.js**
 **Betrieb, Stripe Dashboard & Privacy**
-- [ ] manuell prüfen: im Stripe-Dashboard getrennte Test-/Live-Keys bzw. RAKs, least privilege, Webhook-Signing-Secrets und Endpoint-Subscriptions für Success/Failed/Dispute/Refund prüfen; zusätzlich Radar-/Card-Testing-/High-Risk-Regeln, Review-Queue, False-Positive-Rollback und Alerts dokumentieren. Getrennte Test-/Live-Keys bzw. RAKs, least privilege, Webhook-Signing-Secrets und Endpoint-Subscription für Success/Failed/Dispute/Refund prüfen; **Stripe Dashboard/Radar**: Velocity-/Card-Testing-/High-Risk-Regeln, Review-Queue, False-Positive-Rollback und Alerts dokumentieren.
-- [ ] manuell prüfen: den 3DS-Strom live durchspielen: SCA, frictionless, challenge, failure, timeout, mobile und return. Radar darf die lokalen Limits nicht ersetzen; Payment-Method-Settings und Testkarten mitverifizieren. **3DS-Betriebscheckliste**: SCA/frictionless/challenge/failure/timeout/mobile/return testen; Radar nicht als Ersatz für lokale Limits verwenden, Payment-Method-Settings und Testkarten verifizieren.
 **Tests**
 
 ## Produktionsdeploy SFTPGo — Vorfall vom 2026-09-26 (abgeschlossen)
@@ -1399,11 +1396,20 @@ alle mit Regressionstest:
 
 **Weiterhin offen (bewusst):**
 
-- [ ] manuell prüfen: erstes Kamera-Foto über FTPS/SFTP hochladen und prüfen, dass `FtpController::process()` es der Galerie zuordnet. Der Integrationstest P1-M38 beweist die Server-Seite, **nicht** die Kamera. **P1-M32 — echter Kamera-Test.** Heute ausdrücklich offengelassen. Der
-  Integrationstest P1-M38 beweist die Server-Seite, nicht die Kamera.
-- [ ] manuell prüfen: die Firewall-Regeln 2222, 989 und 50000-50100 auf dem Host setzen (8080 bleibt zu). Ohne sie erreicht die Kamera SFTPGo nicht. **Firewall 2222/989/50000-50100** ist weiterhin Handarbeit und noch
-  nicht gesetzt. Ohne diese Ports erreicht die Kamera SFTPGo nicht; 8080
-  bleibt zu.
+- [ ] manuell prüfen: **erstes Kamera-Foto über FTPS/SFTP hochladen** und prüfen,
+  dass es **ohne** Button in der Zielgalerie landet — der Import läuft über die
+  D-36-Ereigniskette (`FtpInboxImporter::importBatch()`, `FtpController.php:194`; die
+  alte Nennung `FtpController::process()` ist überholt, `runImport()` ist heute privat).
+  Drei Auslöser gibt es: das SFTPGo-Ereignis, der Ketten-Nachlauf und der Button.
+  **Vorher maschinell:** `php artisan ftp:provision-events --dry-run` — die Ereignisregel
+  wurde nie gegen ein laufendes SFTPGo verifiziert. **FTPS-Fallback:** das Zertifikat
+  liegt als `/var/lib/sftpgo/ftps/cert.pem` im Container, muss aber auf die Speicherkarte
+  als **`ROOT.PEM`** kopiert werden — Canon importiert nur `ROOT.CER` / `ROOT.CRT` /
+  `ROOT.PEM` und überspringt `cert.pem` still (`deployment/kamera-einrichtung.md:157-168`).
+  **Firewall-Gegenprobe (10 Sekunden, kein Owner-Task):**
+  `firewall-cmd --zone=public --list-ports` — 989/tcp, 2222/tcp und 50000-50100/tcp sind
+  seit dem 2026-09-27 gesetzt (`deployment/README.md:187-193`), 8080 bleibt zu; der Host
+  nutzt **firewalld**, nicht `ufw`.
 - [ ] manuell prüfen: `AI_API_KEY` und `ADMIN_PASSWORD` im Portal-/Host-Secret-Store rotieren — beide sind beim Auslesen der aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen. **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen
   der aufgelösten Compose-Datei im Klartext durch das Terminal gelaufen.
 - [~] wartet auf einen authentifizierten Aufruf. **Die bisher angegebene Ursache ist
@@ -1436,21 +1442,6 @@ alle mit Regressionstest:
   E2E-Stack braucht einen erreichbaren SFTPGo oder einen Fake. Harness-Referenz:
   `tests/scripts/ftp-transport-test/`. *In Arbeit.*
 
-- [ ] manuell prüfen: Zertifikat `cert.pem` aus dem Container auf die Speicherkarte kopieren und in der Kamera „Zielserver vertrauen → Aktivieren" setzen (Canon Error 48, cam.start.canon UG-06_Network_0230). **P1-M32 — echter Kamera-Test.** Weiterhin der einzige offene
-  Schrittpunkt. Zusätzlich zur Upload-Prüfung: das Zertifikat
-  (`/var/lib/sftpgo/ftps/cert.pem` im Container) muss als `.CER`/`.CRT`/`.PEM`
-  auf die Speicherkarte, und in der Kamera „Zielserver vertrauen → Aktivieren"
-  (sonst Error 48, cam.start.canon UG-06_Network_0230).
-- [ ] manuell prüfen: denselben Zertifikatsschritt am Gerät ausführen: `docker cp` aus `/var/lib/sftpgo/ftps/cert.pem` in den Container, dann „Zielserver vertrauen → Aktivieren". Ein GUI-Download ist dafür nicht nötig. **Zertifikat auf die Speicherkarte der Kamera — operativer Testschritt,
-  kein Produktziel.** Canon verlangt die Datei plus „Zielserver vertrauen →
-  Aktivieren", sonst Error 48. Sie liegt im Container unter
-  `/var/lib/sftpgo/ftps/cert.pem` und wird für den Test auf die Karte kopiert
-  (`docker cp` oder Portainer-Dateiverwaltung). **Kein GUI-Download nötig:** der
-  Import in eine Galerie ist das Ziel und existiert — `FtpController::process()`
-  → `runImport()`, abgesichert durch `FtpImportTest` (10 Tests) mit der
-  Reihenfolgegarantie „Inbox-Datei wird erst nach Storage- **und** DB-Erfolg
-  gelöscht" plus `FtpProcessConcurrencyTest` (9 Tests). Ein Download wäre
-  Bequemlichkeit, keine Lücke.
 - [ ] manuell prüfen: Dublette — dieselbe Rotation wie oben; einmal ausführen und **beide** Einträge schließen. **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen der
   aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen.
 
@@ -1516,15 +1507,6 @@ Produktionsfehler verkauft worden waere.
 | `volume-preset`: `€` ist Flex-Geschwister statt Feld-Suffix, Input dadurch schief | low | gemeldet |
 | `mm/dd/yyyy` im nativen Datumsfeld | medium | **WIDERLEGT — Harness-Artefakt**, siehe unten |
 
-- [ ] manuell prüfen: am echten Gerät nachsehen: scrollen die Dialoge überhaupt (macOS überlagert Scrollbars, im Snapshot nicht sichtbar), ist `€` als Suffix gemeint, und wie groß sind die Tap-Targets der Kalkulator-Checkboxen? Davon hängt ab, ob die harten Schnitte UX-Bruch oder Snapshot-Artefakt sind. **Ungeprueft geblieben** (ausdruecklich als `unsicher` gemeldet, nicht
-  uebernommen): ob die Dialoge ueberhaupt scrollen (macOS ueberlagert
-  Scrollbars, im Snapshot nicht sichtbar) — davon haengt ab, ob die harten
-  Schnitte UX-Bruch oder Snapshot-Artefakt sind; ob `€` als Suffix gemeint ist;
-  Tap-Target-Groessen der Kalkulator-Checkboxen (Zeilenhoehe vs. 17-px-Kasten);
-  die ISO-Darstellung `1995-05-05` neben `27.09.2026` im selben Dialog — im
-  Dialog-Component nicht auffindbar, `Geburtsdatum` liegt in
-  `CustomerModal.tsx:117` und `ManagementContractView.tsx:494` als natives
-  Date-Input, die Quelle des gerenderten Werts blieb offen.
 
 **Umsetzung 2026-09-27 (alle gegen frische Aufnahmen verifiziert):**
 - [~] wartet auf eine andere Spaltenlogik (`table-layout: fixed` mit `word-break` auf dem Wert). `break-all` verschiebt nur die Bruchstelle und ist damit keine Lösung. **Nicht behoben, ehrlich als offen gefuehrt: Mid-Token-Bruch in der
@@ -1665,18 +1647,6 @@ gerissen und zur Entscheidung gemacht.
   `selectByLabel` zuvor `Delivery (Downloads)` erfolgreich gewaehlt hatte — das
   deutet auf eine spaete asynchrone Re-Renderung, die das Formular zuruecksetzt.
   Der Agent hat das nicht verfolgt und **nicht als Befund ausgegeben**.
-- [ ] manuell prüfen: auf der Host-Box nachsehen, ob `~/dev/LuminaRust/target/debug/deps/kittest_snapshots` noch respawnt — jede Lastzahl dieser Sitzung ist nur mit diesem Hintergrund lesbar. Die E2E-Serialisierung hinter `php artisan serve` (kein `PHP_CLI_SERVER_WORKERS`) ist eine Notiz, kein Task. **Zwei Umgebungsbefunde, die die Messungen dieser Sitzung erklaeren:**
-  - **Fremder Prozess auf der Box:** `target/debug/deps/kittest_snapshots` aus
-    `~/dev/LuminaRust` respawnte mehrfach bei **1678–1709 % CPU** auf 18 Kernen
-    und trieb die Last auf **186–334**. Die frueher notierten „Last 36,9" sind
-    mit hoher Wahrscheinlichkeit dieselbe Art externer Kontamination und
-    ueberhaupt nicht diesem Repository zuzuschreiben. **Jede Lastzahl dieser
-    Sitzung ist vor diesem Hintergrund zu lesen.**
-  - **Der E2E-Backend laeuft als `php artisan serve` mit ungesetztem
-    `PHP_CLI_SERVER_WORKERS`**, also **einzelgängig** und hinter 8 Playwright-
-    Workern serialisiert. Das ist der Verstaerker, der externe Last in
-    E2E-Latenz uebersetzt. Nicht geaendert (out of scope), aber die
-    Grundursache, warum hier Testbudgets echten Spielraum brauchen.
 ## Dialog-UI-Befunde aus derselben Welle (2026-09-27) — sechs Produktfragen, keine Implementierungsdetails
 
 - ~~D-14~~ **`CouponFormDrawer`: Escape und Backdrop lösen die Ungespeichert-Warnung bereits aus**
