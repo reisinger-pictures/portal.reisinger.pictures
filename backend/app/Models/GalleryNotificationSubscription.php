@@ -1,0 +1,87 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * A gallery notification subscription.
+ *
+ * A subscription is not a grant: it says "this user wants to be informed about
+ * this gallery", nothing more. It therefore lives in its own table
+ * (`gallery_notification_subscriptions`, V047) and not in `user_galleries`, the
+ * pivot that carries the client grant — see the owner decision of 2026-10-20
+ * (D-45 / AD-9) and features/infrastructure/02-email-system.md §2.1.
+ *
+ * The row *is* the subscription: there is no flag column. A row exists exactly
+ * while the subscription exists.
+ *
+ * @property int $id
+ * @property string $user_id
+ * @property string $gallery_id
+ */
+class GalleryNotificationSubscription extends Model
+{
+    public const TABLE = 'gallery_notification_subscriptions';
+
+    protected $table = self::TABLE;
+
+    protected $fillable = [
+        'user_id',
+        'gallery_id',
+    ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function gallery(): BelongsTo
+    {
+        return $this->belongsTo(Gallery::class);
+    }
+
+    /**
+     * Subscribe a user to a gallery.
+     *
+     * The write is a single atomic upsert against the unique index over
+     * `(user_id, gallery_id)`. A check-then-insert (`firstOrNew()->save()`)
+     * would raise a unique constraint violation — an HTTP 500 — when two
+     * requests of the same user race each other between the SELECT and the
+     * INSERT. The upsert cannot lose that race: the database resolves the
+     * conflict itself and updates `updated_at`.
+     *
+     * `created_at` is not part of the update list, so a re-subscription keeps
+     * the moment of the first subscription.
+     */
+    public static function subscribe(string $userId, string $galleryId): void
+    {
+        $now = now();
+
+        DB::table(self::TABLE)->upsert(
+            [[
+                'user_id' => $userId,
+                'gallery_id' => $galleryId,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]],
+            ['user_id', 'gallery_id'],
+            ['updated_at'],
+        );
+    }
+
+    /**
+     * Revoke the subscription of a user for a gallery.
+     *
+     * @return int the number of removed rows (0 or 1)
+     */
+    public static function unsubscribe(string $userId, string $galleryId): int
+    {
+        return DB::table(self::TABLE)
+            ->where('user_id', $userId)
+            ->where('gallery_id', $galleryId)
+            ->delete();
+    }
+}

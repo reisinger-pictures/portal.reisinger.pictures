@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-44. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-45. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -192,3 +192,7 @@ A direct gallery assignment to a user (`gallery_ids` on the user update) may onl
 ### D-44: A re-resolved actor keeps its validated transient claims
 
 When the media delivery and the photo download re-resolve a registered actor from the database, they carry the transient claims of the request onto the re-resolved actor. The guest branch already does this; the registered branch dropped them and denied a client who had redeemed an invite access to the media of their selection gallery. The carried claims are the ones the request's token was validated with, and the authorization layer re-validates them against the live invite state; a token that carries gallery claims without invite provenance (issued before the provenance existed) is carried as it is, like every other controller that uses the request's actor directly.
+
+### D-45: The gallery notification subscription has its own table
+
+A gallery notification opt-in is a subscription, never a grant. It lives in its own table (`gallery_notification_subscriptions`) and no longer writes into `user_galleries`, the pivot that carries the client grant. A subscription must not create access and must not keep a gallery reachable after the membership that justified it was revoked. The legacy rows that carried the opt-in flag are ambiguous — the flag cannot separate an opt-in-only row from a real grant that was additionally subscribed to — so the migration moves the subscription state and does not delete pivot rows; the remainder stays a documented residual that the owner clears deliberately with `notifications:prune-legacy-opt-in-grants`. That command lists every flagged row with its verdict and deletes nothing in its dry run. `--apply` deletes **all** candidate rows unless the operator selects them: `--only=<user_id>:<gallery_id>` (repeatable) or `--only-ids=<file>` restricts the deletion to the verified rows, and a selected row that is no longer a candidate is reported and kept. A candidate is not proof of an opt-in-only row — the same shape is produced by a real grant that was additionally subscribed to — so every candidate must be verified individually or repaired by hand before it is removed. The group opt-in pivot `user_gallery_groups` carries the same structural defect and is not covered by this decision. See [email system & notifications](infrastructure/02-email-system.md), [IDOR protection](auth/01-roles-and-access.md) and [AD-9](tech/07-architectural-decisions.md).

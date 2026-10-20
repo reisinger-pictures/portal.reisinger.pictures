@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Models\Gallery;
+use App\Models\GalleryNotificationSubscription;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -53,7 +54,15 @@ class MailControllerAuthorizationTest extends TestCase
 
         $client = User::factory()->create(['email' => 'optin@example.com', 'brand' => 'rp']);
         $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
-        $client->galleries()->attach($gallery->id, ['wants_notifications' => true]);
+        // The client is a subscriber of the gallery. The subscription lives in
+        // its own table (owner decision 2026-10-20, D-45 / AD-9); the pivot
+        // `user_galleries` carries the grant that lets the client see the
+        // gallery at all.
+        $client->galleries()->attach($gallery->id);
+        GalleryNotificationSubscription::create([
+            'user_id' => $client->id,
+            'gallery_id' => $gallery->id,
+        ]);
 
         $token = auth('api')->login($photographer);
 
