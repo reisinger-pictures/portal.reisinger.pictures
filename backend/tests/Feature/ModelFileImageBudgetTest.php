@@ -144,12 +144,12 @@ class ModelFileImageBudgetTest extends TestCase
         // plaintext temporary file into the same directory, so both are
         // covered by this scope.
         //
-        // The scope is deliberately not the whole fake disk. The fake root
-        // (`storage/framework/testing/disks/local`) is shared by every PHP
-        // process that fakes this disk — only `--parallel` gives each worker
-        // its own root — and `Storage::fake('local')` empties it on every
-        // setUp(). A disk-wide assertion therefore also sees files this test
-        // never wrote and fails the run for a file this test never persisted.
+        // The scope is deliberately not the whole fake disk, even though the
+        // fake root is per test now
+        // (`storage/framework/testing/disks/local_test_<token>`, see
+        // `Tests\TestCase::isolateFakedDiskRoots()`): naming the target
+        // directory pins the claim to the exact place the upload would have
+        // landed instead of "somewhere on this test's disk".
         $this->assertSame([], Storage::disk('local')->allFiles($directory));
     }
 
@@ -192,9 +192,9 @@ class ModelFileImageBudgetTest extends TestCase
         $this->assertSame(0, $store->decodeCalls);
         // Rejected before the decoder, and this upload persisted nothing into
         // its target directory: no encrypted file and no `.plain-<hex>`
-        // temporary file. The fake disk root is shared by every process that
-        // fakes this disk, so a disk-wide assertion would also see foreign
-        // files and fail the run for a file this test never persisted; see
+        // temporary file. The scope is the target directory rather than the
+        // whole fake disk, so the assertion names the exact place the upload
+        // would have landed; see
         // `test_re_encoded_bytes_above_the_stored_budget_are_rejected_before_persisting()`.
         $this->assertSame([], Storage::disk('local')->allFiles($directory));
     }
@@ -203,8 +203,10 @@ class ModelFileImageBudgetTest extends TestCase
      * A store directory no other test writes to, so the "nothing was
      * persisted into it" assertion names the exact place the upload would
      * have landed. The scope is that directory, not the whole fake disk: the
-     * fake root is shared by every process that fakes the `local` disk, so a
-     * disk-wide assertion would fail for files this test never wrote.
+     * fake root is per test (`storage/framework/testing/disks/local_test_<token>`,
+     * see `Tests\TestCase::isolateFakedDiskRoots()`), so a disk-wide assertion
+     * would stay green — but it would not say *where* the upload would have
+     * landed.
      */
     private function uniqueStoreDirectory(): string
     {

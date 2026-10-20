@@ -6,6 +6,7 @@ use App\Enums\Brand;
 use App\Support\BrandRegistry;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\ParallelTesting;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Factory;
@@ -15,14 +16,124 @@ use RuntimeException;
 
 abstract class TestCase extends BaseTestCase
 {
+    /**
+     * The token that gives the faked disk roots of this test a unique name.
+     */
+    private ?string $fakedDiskToken = null;
+
+    /**
+     * The disks whose faked roots are removed when this test ends.
+     *
+     * @var list<string>
+     */
+    private array $fakedDiskNames = [];
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->isolateFakedDiskRoots();
 
         $this->resetJwtClaimState();
 
         if (! app()->bound('brand.context')) {
             BrandRegistry::set(Brand::B2B);
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        $this->restoreParallelTestingToken();
+
+        parent::tearDown();
+    }
+
+    /**
+     * Give every faked disk of this test its own root directory.
+     *
+     * `Storage::fake()` roots a disk at a fixed, process-independent path
+     * (`storage/framework/testing/disks/<disk>`) and *empties* that directory
+     * on every call. Two PHP processes that fake the same disk therefore
+     * share one directory: the `cleanDirectory()` of one process deletes the
+     * files of the other, and a disk-wide assertion sees files the test
+     * never wrote. The failure is not hypothetical — a foreign file
+     * (`model-age-proofs/foreign/file1.bin`) made
+     * `ModelRegistrationTest::test_failed_age_proof_metadata_write_removes_uploaded_file`
+     * fail in 8 of 10 concurrent runs.
+     *
+     * Laravel's own answer to this is the parallel-testing token: it suffixes
+     * the fake root with `_<token>`. That token identifies a *worker
+     * process*, so two independent runs in the same checkout still share the
+     * root. A per-test token makes the root unique per test and per process
+     * at the same time, so a disk assertion can only ever see the files of
+     * its own test.
+     *
+     * The token is installed *after* `parent::setUp()`, because the framework
+     * resolves the token while it boots the test environment (compiled view
+     * path, cache prefix, test database). Those must stay stable for the
+     * whole worker process — only `Storage::fake()` needs the per-test value.
+     */
+    private function isolateFakedDiskRoots(): void
+    {
+        $token = (string) Str::uuid();
+        $this->fakedDiskToken = $token;
+
+        // The disk list is read before the test runs: a test may replace the
+        // whole `filesystems.disks` configuration, and the cleanup must still
+        // know every root that was faked.
+        $this->fakedDiskNames = array_keys((array) config('filesystems.disks'));
+
+        ParallelTesting::resolveTokenUsing(static fn (): string => $token);
+
+        // The configuration and the faked disk must name the same directory:
+        // code that reads the disk root from the configuration has to see the
+        // per-test root, not the process-wide one.
+        config(['filesystems.disks.local.root' => $this->fakedDiskRoot('local')]);
+
+        $this->beforeApplicationDestroyed(function () use ($token): void {
+            $this->removeFakedDiskRoots($token);
+        });
+    }
+
+    /**
+     * Hand the parallel-testing token back to the framework.
+     *
+     * The framework resolves the token for the compiled view path, the cache
+     * prefix and the test database. Those are resolved while the test
+     * environment boots and while it is torn down, so the per-test token must
+     * not be active there.
+     */
+    private function restoreParallelTestingToken(): void
+    {
+        ParallelTesting::resolveTokenUsing(null);
+
+        $this->fakedDiskToken = null;
+    }
+
+    /**
+     * The root directory a faked disk of this test uses.
+     */
+    protected function fakedDiskRoot(string $disk): string
+    {
+        return storage_path('framework/testing/disks/'.$disk.'_test_'.$this->fakedDiskToken);
+    }
+
+    /**
+     * Remove the faked disk roots of this test.
+     *
+     * Without this the roots would pile up in `storage/framework/testing/disks`
+     * — one directory per test — and fill the disk.
+     */
+    private function removeFakedDiskRoots(string $token): void
+    {
+        $filesystem = new Filesystem;
+
+        foreach ($this->fakedDiskNames as $disk) {
+            $root = storage_path('framework/testing/disks/'.$disk.'_test_'.$token);
+
+            if ($filesystem->isDirectory($root)) {
+                $filesystem->deleteDirectory($root);
+            }
         }
     }
 
