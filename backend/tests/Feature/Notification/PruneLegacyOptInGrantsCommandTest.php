@@ -230,6 +230,85 @@ class PruneLegacyOptInGrantsCommandTest extends TestCase
         $this->assertStringContainsString('Invalid --only value', Artisan::output());
     }
 
+    public function test_a_selected_pair_that_matches_no_flagged_row_is_reported_and_fails(): void
+    {
+        // A typo in the gallery id must not look like a successful repair.
+        [$client, $gallery] = $this->candidateRow();
+        $typo = (string) Str::uuid();
+
+        $this->assertSame(1, Artisan::call(sprintf(
+            'notifications:prune-legacy-opt-in-grants --only=%s:%s',
+            $client->id,
+            $typo,
+        )));
+
+        $output = Artisan::output();
+        $this->assertStringContainsString('unmatched', $output);
+        $this->assertStringContainsString('matched no flagged row', $output);
+        $this->assertStringContainsString('There is no pivot row for this pair at all', $output);
+        $this->assertStringContainsString('unmatched: 1', $output);
+
+        // Nothing was deleted.
+        $this->assertDatabaseHas('user_galleries', [
+            'user_id' => $client->id,
+            'gallery_id' => $gallery->id,
+            'wants_notifications' => 1,
+        ]);
+    }
+
+    public function test_a_selected_pair_with_a_pivot_row_without_the_opt_in_flag_is_reported(): void
+    {
+        // The pivot row exists, but it carries no opt-in flag: there is nothing
+        // to repair. The selection is still reported, and it is told apart from
+        // a pair that was inspected and kept.
+        $client = User::factory()->create();
+        $gallery = Gallery::factory()->create(['type' => 'delivery']);
+        DB::table('user_galleries')->insert([
+            'user_id' => $client->id,
+            'gallery_id' => $gallery->id,
+            'wants_notifications' => 0,
+        ]);
+
+        // A second, flagged row: the database has something to repair, so the
+        // unmatched selection is a failure and not a no-op.
+        $this->candidateRow();
+
+        $this->assertSame(1, Artisan::call(sprintf(
+            'notifications:prune-legacy-opt-in-grants --only=%s:%s',
+            $client->id,
+            $gallery->id,
+        )));
+
+        $output = Artisan::output();
+        $this->assertStringContainsString('unmatched', $output);
+        $this->assertStringContainsString('it carries no opt-in flag', $output);
+        $this->assertStringContainsString('unmatched: 1', $output);
+        $this->assertDatabaseHas('user_galleries', [
+            'user_id' => $client->id,
+            'gallery_id' => $gallery->id,
+            'wants_notifications' => 0,
+        ]);
+    }
+
+    public function test_a_selection_against_a_database_without_opt_in_rows_stays_green(): void
+    {
+        // The trade-off of the non-zero exit code: a database that holds no
+        // flagged row needs no repair, so the run stays green instead of making
+        // a script that selects rows look like a failure.
+        $client = User::factory()->create();
+        $gallery = Gallery::factory()->create(['type' => 'delivery']);
+
+        $this->assertSame(0, Artisan::call(sprintf(
+            'notifications:prune-legacy-opt-in-grants --only=%s:%s --apply',
+            $client->id,
+            $gallery->id,
+        )));
+
+        $output = Artisan::output();
+        $this->assertStringContainsString('Nothing to repair', $output);
+        $this->assertStringContainsString('matched no flagged row', $output);
+    }
+
     public function test_the_command_does_nothing_without_a_flagged_row(): void
     {
         $this->assertSame(0, Artisan::call('notifications:prune-legacy-opt-in-grants --apply'));
