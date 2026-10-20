@@ -165,10 +165,10 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **36 offene `[ ]`** und **46 wartende
-> `[~]`** über 1853 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (36), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1853). Aufteilung der 36: **23× `manuell prüfen:`** und **13×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **30 offene `[ ]`** und **46 wartende
+> `[~]`** über 1822 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (30), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1822). Aufteilung der 30: **17× `manuell prüfen:`** und **13×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 13 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
@@ -183,12 +183,12 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (82 = 36 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (76 = 30 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
 > **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **21 von 27 `##`-Abschnitten**
+> Die Positionen liegen in **20 von 27 `##`-Abschnitten**
 > (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
 > `grep -c '^## ' AGENTS.todo.md`). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
@@ -295,29 +295,10 @@ Produktionscontainer geladen (PHP 8.5.11), das Frontend liefert das neue Bundle
 reisinger.pictures/up` antwortet 200. `tests/`, `vendor/` und `storage/` sind per
 `rsync-backend-exclude.txt` ausgenommen, `features/` wird nicht übertragen.
 
-**Offen — manuell durch den Owner (Neustart + Gegnproben):**
-
-- [ ] manuell prüfen: `docker restart portal_backend` — **steht aus.** Ohne Neustart läuft
-  im PHP-Prozess der alte Code; `bootstrap/cache/` und der OPcache-Zustand müssen den neuen
-  Stand laden (§13). Erst danach sind die Gegenproben sinnvoll.
-- [ ] manuell prüfen: Gegenprobe nach dem Neustart — `https://portal.reisinger.pictures/up`
-  → 200, dann je einen Request, der das geänderte Verhalten auslöst:
-  `POST /api/coupons/validate` (Coupon-Budget, 10/min), `POST /api/webhooks/stripe`
-  (10/min, Positionsform), ein Checkout-Versuch (Quota-Buckets) und ein
-  `/api/management/ftp/status` (neue Inbox-Spalten).
-- [ ] manuell prüfen: Kontaktbogen als PDF öffnen — der Auslassungs-Hinweis („N Fotos
-  ausgelassen: …") muss im PDF stehen, wenn ein Foto durch Byte-, Größen-, Pixel- oder
-  MIME-Prüfung fällt (D-41), in **beiden** Varianten.
-- [ ] manuell prüfen: Zugriffs-Dialog einer Auswahl-Galerie öffnen — die Client-Zuweisung
-  wird nicht mehr angeboten; erzwungenes Speichern liefert die Meldung „Es dürfen nur
-  Liefergalerien direkt zugewiesen werden." (D-43). Die Fotograf-Zuweisung bleibt
-  möglich.
-- [ ] manuell prüfen: eingeladener, **registrierter** Client öffnet eine Auswahl-Galerie —
-  die Medien-Auslieferung muss jetzt funktionieren (D-44); ein widerrufener Invite muss
-  weiterhin 403 liefern.
-- [ ] manuell prüfen: `OrgController::syncUsers` (Org-Benutzer synchronisieren) läuft ohne
-  Fehler durch; ein Mitglied, das zur Laufzeit per Invite-Rücklösung hinzukommt, wird **nicht**
-  mehr abgehängt (D-40, siehe die offene Zwei-Verbindungs-Messung).
+**Abgeschlossen:** Neustart (`docker restart portal_backend`) vom Owner ausgeführt und die sechs
+Gegenproben bestätigt (Kontaktbogen-Hinweis, Zugriffs-Dialog, registrierter Invite-Client,
+Org-Sync, Coupon-/Webhook-/Checkout-Limiter, FTP-Status) — 2026-10-19. Die Position ist damit
+geschlossen und wandert ins Git.
 
 ## 🚀 PRODUKTIONS-DEPLOY 2026-09-27 (`002e9eb`) — manuell prüfen
 

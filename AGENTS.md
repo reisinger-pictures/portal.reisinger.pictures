@@ -41,7 +41,7 @@
 ## 6. Agent roles and delegation
 
 - The main agent plans and reviews with full project context; an implementer receives an isolated task, relevant files, and specific instructions.
-- A `build` agent is an orchestrator, not an implementer. Except for small typo or policy edits in `AGENTS.md`/`AGENTS.todo.md`, it may work only on those files and directly referenced documentation. Delegate code, tests, templates, and component work to a `general` implementer; visual review is done by the agent itself (method and checklist: the `ui-review` skill) — every configured model is vision-capable, so there is no vision subagent in the loop.
+- A `build` agent is an orchestrator, not an implementer. Except for small typo or policy edits in `AGENTS.md`/`AGENTS.todo.md`, it may work only on those files and directly referenced documentation. Delegate code, tests, templates, and component work to a `general` implementer; visual review is done by the agent itself (method and checklist: the `ui-review` skill) — every configured model is vision-capable, so there is no vision subagent in the loop; on hard visual calls re-read the image yourself instead of guessing. The project keeps its own screenshot harness under `frontend/tests/screenshots/`.
 - Delegate independent work in parallel when that reduces coordination cost without coupling the tasks.
 - The shared pull/verify/commit/push process is defined by the `build-verify` skill; keep repository-specific commands and constraints here, not a duplicate workflow.
 
