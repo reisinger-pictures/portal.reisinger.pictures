@@ -15,10 +15,93 @@ status: active
 
 - **Strikte Geschäftslogik (Client-Only):** Allgemeine E-Mail-Benachrichtigungen zu Galerien werden **ausschließlich** an Kunden versendet. Diese Regel ist strikt und das System ist nicht dafür vorgesehen, Fotografen über diesen Weg Updates zu schicken.
 - **Skalierbares UI-Design (Component Reuse):** Obwohl logisch nur Kunden benachrichtigt werden, sollen UI-Komponenten (wie Opt-In-Toggles) so generisch und rollenunabhängig wie möglich gebaut werden. Das Ziel ist es, "ganz andere UIs" für verschiedene Rollen zu vermeiden. Bestehende Komponenten sollen stattdessen leicht für andere Rollen oder zukünftige Features "upgegradet" werden können.
-- **Standardmäßig Deaktiviert:** Kunden und zugewiesene Benutzer erhalten nicht automatisch E-Mails über Galerie-Updates. Das Feld `wants_notifications` in den Pivot-Tabellen `user_galleries` und `user_gallery_groups` steht standardmäßig auf `false`.
+- **Standardmäßig Deaktiviert:** Kunden und zugewiesene Benutzer erhalten nicht automatisch E-Mails über Galerie-Updates. Das Galerie-Abonnement hat **keine Flag-Spalte**: die Zeile in `gallery_notification_subscriptions` *ist* das Abonnement, und sie existiert nur, solange der Benutzer abonniert hat (siehe 2.1). Beim Gruppen-Abonnement steht das Flag weiterhin im Pivot `user_gallery_groups`.
 - **Lokaler Toggle:** Kunden können in der jeweiligen Galerieansicht (`DeliveryView` / `SelectionView`) Benachrichtigungen gezielt aktivieren.
 - **Zentrale Verwaltung:** Über die zentrale Ansicht "Benachrichtigungen" (`/notifications`) können Nutzer ihre Abonnements für alle zugewiesenen Meta-Galerien (Gruppen) und Einzel-Galerien zentral verwalten.
-- **Filterung beim Versand:** Der `MailController` filtert beim manuellen oder automatischen Versand strikt nach Nutzern, deren `wants_notifications` Flag auf `true` gesetzt ist.
+- **Filterung beim Versand:** Der `MailController` filtert beim manuellen oder automatischen Versand strikt nach Nutzern, die das Abonnement aktiviert haben.
+
+### 2.1 Das Galerie-Abonnement hat eine eigene Tabelle (Owner-Entscheidung 2026-10-20)
+
+**Problem (gemessen).** `NotificationController::toggleGalleryOptIn()` schrieb das Abonnement in `user_galleries` — dieselbe Pivot-Tabelle, die den Mandanten-Grant trägt (`AuthorizationService::getAllowedGalleryIds()`, Schritt 1 „direct assignments"). Ein Abonnement erzeugte damit einen Grant:
+
+- bei einer **Auswahl**-Galerie gewährt die Zeile nichts (D-39 filtert Nicht-Delivery-Galerien aus dem Reader heraus),
+- bei einer **Delivery**-Galerie wird die Zeile als Grant gewertet — und sie **überlebt die Org-Mitgliedschaft**, die das Abonnement gerechtfertigt hat.
+
+Messung auf dem unveränderten Stand (`backend/tests/Feature/Notification/GalleryNotificationSubscriptionTest.php`): die beiden Regressionstests waren vor der Änderung rot — das Opt-in legte eine `user_galleries`-Zeile an, und `getAllowedGalleryIds()` lieferte die Galerie weiterhin, nachdem `users.org_id` geleert war.
+
+**Entscheidung.** Das Galerie-Abonnement bekommt eine eigene Tabelle `gallery_notification_subscriptions`. Die Alternative — ein Opt-in-Marker in derselben Grant-Pivot — ist verworfen: die Pivot enthielte die Zeilen weiter, und jeder künftige Reader von `user_galleries` müsste wissen, welche Zeilen Grants sind. Ein Abonnement ist keine Berechtigung.
+
+**Schema (V047).**
+
+| Spalte | Typ | Regel |
+|---|---|---|
+| `id` | bigint, PK | Surrogatschlüssel |
+| `user_id` | uuid, FK → `users.id` | `cascadeOnDelete` — eine Abonnementzeile ohne Konto wäre unzugehörig |
+| `gallery_id` | uuid, FK → `galleries.id` | `cascadeOnDelete` — mit der Galerie verfällt das Abonnement |
+| `created_at`, `updated_at` | timestamp | |
+
+**Indizes.**
+- `gallery_notification_subscriptions_user_gallery_unique` — **unique** über `(user_id, gallery_id)`. Das ist der natürliche Schlüssel: ein Benutzer hat pro Galerie höchstens ein Abonnement.
+- `gallery_notification_subscriptions_gallery_id_index` — über `(gallery_id)`. Das ist die Abfrage, die der Mailversand stellt („wer ist für diese Galerie abonniert?“). Die Unique-Index auf `(user_id, gallery_id)` beantwortet die Gegenrichtung („welche Galerien hat dieser Benutzer abonniert?“).
+
+**Backfill.** Jede Zeile in `user_galleries` mit `wants_notifications = 1` wird zu genau einer Zeile in `gallery_notification_subscriptions` (`user_id`, `gallery_id` übernommen, Zeitstempel = Migrationszeitpunkt). Es geht **kein** Abonnement verloren. Die Pivot-Zeilen selbst werden **nicht** angefasst: weder gelöscht noch umgeflaggt.
+
+**Rollback.** `down()` lässt ausschließlich die neue Tabelle fallen. Weil `up()` die Pivot-Zeilen nicht verändert, trägt das Legacy-Flag das Abonnement nach dem Rollback unverändert weiter. Was der Rollback verliert, sind Abonnements, die **nach** der Migration geschrieben wurden — das ist die dokumentierte Kostenlage dieses Features.
+
+**Legacy-Spalte.** `user_galleries.wants_notifications` ist nach der Migration eine Legacy-Spalte: die Anwendung liest und schreibt sie nicht mehr. Die Grant-Relation `User::galleries()` lädt sie nicht einmal mehr aus (`withPivot('wants_notifications')` ist entfernt); die Migration und das Reparatur-Kommando lesen die Spalte direkt aus der Tabelle. Sie bleibt in der Datenbank, weil die Reparaturliste sie als Merkmal braucht; ein späterer Rollout kann sie fallen lassen, nachdem die Reparaturliste abgearbeitet ist.
+
+**IDOR-Ausnahme (eng, dokumentiert).** `toggleGalleryOptIn()` prüft die Verknüpfung des Aufrufers mit der Galerie über `canAccessGallery()`, wenn ein Abonnement **angelegt** wird. Beim **Widerrufen** genügt die eigene Abonnementzeile des Aufrufers als Nachweis: der Endpunkt ändert nur diese Zeile und gewährt nichts. Grund: ein Abonnement überlebt den Zugang, der es gerechtfertigt hat, und der Aufrufer muss das Übrige widerrufen können. Die Ausnahme ist in [Roles & Access Management](../auth/01-roles-and-access.md) §4 festgehalten. Sie weitet keinen Zugriff auf — der Anlege-Zweig bleibt vollständig geschützt und antwortet ohne verifizierte Verknüpfung mit `403`.
+
+**Namens-Offenlegung in der Einstellungs-Ansicht.** `/api/notifications/preferences` listet auch ein Abonnement ohne Grant, damit es widerrufbar bleibt. Der **Name** einer Galerie, die der Aufrufer nicht mehr erreichen kann, wird dabei **nicht** offengelegt: der Eintrag trägt stattdessen den Platzhalter `Nicht zugängliche Galerie`; die ID bleibt erhalten, weil sie zum Widerrufen nötig ist. Maßgeblich ist der aktuelle Erreichbarkeitsbefund des Grant-Readers (`getAllowedGalleryIds()`) — nur eine dort enthaltene Galerie wird namentlich genannt. Dieselbe Regel gilt für die direkt zugewiesenen Galerien der Liste: ein Legacy-Grant einer fremden Marke wird dadurch ebenfalls nicht mehr benannt. Offengelegt bleiben die ID und der Galerietyp (`delivery`/`selection`) — mehr braucht der Anzeigezustand nicht.
+
+**Die Legacy-Mehrdeutigkeit (bleibt offen — mit dokumentiertem Residual).** Jede `user_galleries`-Zeile mit `wants_notifications = 1` ist mehrdeutig:
+
+1. eine **reine Opt-in-Zeile** — die Zeile entstand durch das Opt-in selbst und wirkt heute als Grant (der Defekt), oder
+2. ein **echter Grant**, der zusätzlich abonniert wurde.
+
+Das Flag allein trennt die beiden Fälle nicht: die Pivot führt keinen Zeitstempel, keine Provenienz und keine zweite Spalte, die „Zeile aus dem Grant-Pfad“ von „Zeile aus dem Opt-in-Pfad“ unterscheidet. Der Grant-Pfad legt die Zeile mit demselben Default an (`wants_notifications = 0`), den das Opt-in danach auf `1` dreht.
+
+Daraus folgt verbindlich:
+
+- Die Migration **löscht keine Pivot-Zeile**. Ein echter Grant darf nicht versehentlich entzogen werden.
+- Die Migration **übernimmt den Abonnement-Zustand** für jede Zeile mit Opt-in in die neue Tabelle.
+- Die **reinen Opt-in-Zeilen, die weiterhin als Grant wirken**, kann die Migration nicht auflösen. Eine belastbare Regel gibt es nicht: „die Galerie gehört zu keinem legitimen Grant-Set dieses Benutzers“ ist nicht berechenbar, weil die untersuchte Zeile *selbst* der direkte Grant ist und jeder andere Grant-Pfad (Gruppen-Grant, Org-Mitgliedschaft, Fotografen-Oberfläche, transiente Einladung) inzwischen zurückgezogen sein kann — die Pivot-Zeile trägt dann zu Recht den Zugang. Ein Reader, der die geflaggten Zeilen stillschweigend ignorierte, würde echte Grants ohne Audit-Trail und ohne Prüfung des Owners entziehen.
+- Der **Grant-Reader braucht daher keine Änderung**: für neue Zeilen ist das Opt-in gar nicht mehr im Grant-Pfad, für die Legacy-Zeilen bleibt der Zustand bis zur Reparatur durch den Owner bestehen.
+
+**Residual mit prüfbarem Kommando (Variante b).** Der Rest wird nicht stillschweigend bereinigt, sondern über ein Kommando mit Dry-Run als Standard sichtbar gemacht und danach bewusst ausgeführt:
+
+```bash
+# Dry-Run: listet jede geflaggte Zeile mit ihrer Einstufung und löscht nichts
+php artisan notifications:prune-legacy-opt-in-grants
+php artisan notifications:prune-legacy-opt-in-grants --only=<user_id>:<gallery_id> [--only=<user_id>:<gallery_id> …]
+
+# Löscht ausschließlich die ausgewählten Zeilen, die zugleich `candidate` sind
+php artisan notifications:prune-legacy-opt-in-grants --only=<user_id>:<gallery_id> --apply
+
+# Löscht ALLE `candidate`-Zeilen — auch die echten Grants unter ihnen
+php artisan notifications:prune-legacy-opt-in-grants --apply
+```
+
+Das Kommando klassifiziert jede geflaggte Pivot-Zeile über den **eigenen** Grant-Reader (`AuthorizationService::getAllowedGalleryIds()`), einmal mit und einmal ohne die Zeile:
+
+| Klasse | Bedeutung | Behandlung |
+|---|---|---|
+| `redundant` | Die Galerie ist auch ohne die Zeile erreichbar — ein anderer Grant-Pfad trägt den Zugang. | **behalten**, nur gemeldet |
+| `inert` | Die Zeile gewährt auch mit sich selbst nichts (Auswahl-Galerie nach D-39, Marken-Mismatch, …). | **behalten**, nur gemeldet |
+| `orphaned` | Der User- oder der Galerie-Datensatz existiert nicht mehr. | **behalten**, nur gemeldet und mitgezählt |
+| `candidate` | Die Zeile ist die **einzige** aktuelle Begründung für den Zugang zu einer Delivery-Galerie. | **vorgeschlagen**; gelöscht mit `--apply` — ohne Auswahl **alle** Kandidaten, mit Auswahl **nur** die ausgewählten |
+
+**Was `candidate` bedeutet — und was nicht.** `candidate` heißt: *die Zeile ist heute die einzige Begründung für den Zugang*. Das Flag `wants_notifications` **kann nicht** unterscheiden, ob die Zeile durch das Opt-in entstanden ist (der Defekt) oder ob sie ein echter, direkt erteilter Grant ist, der zusätzlich abonniert wurde und dessen sonstige Begründigung inzwischen entzogen wurde. Beide Fälle erzeugen dieselbe Form. Eine `candidate`-Zeile ist deshalb **kein** Beweis für eine reine Opt-in-Zeile: sie muss **einzeln geprüft** — oder von Hand repariert — werden, bevor sie entfernt wird.
+
+**Das Auswählen einzelner Zeilen.** `--only=<user_id>:<gallery_id>` (wiederholbar) oder `--only-ids=<datei>` (eine Zeile `user_id:gallery_id` pro Dateizeile) beschränkt die Aktion auf genau diese Zeilen. `--apply` löscht **ausschließlich** die ausgewählten Zeilen, die zugleich `candidate` sind. Eine ausgewählte Zeile, die **nicht** `candidate` ist, wird **nicht** gelöscht, sondern als solche gemeldet. Eine `candidate`-Zeile, die **nicht** ausgewählt wurde, bleibt ebenfalls stehen — sie wird nur gemeldet.
+
+**`--apply` ohne Auswahl.** Das Kommando löscht dann **alle** `candidate`-Zeilen — und damit auch die echten Grants unter ihnen. Das ist ein grobes Werkzeug; es existiert für den Fall, dass die gesamte Liste geprüft wurde. Der sichere Weg ist die zeilenweise Auswahl.
+
+**`--limit`.** Die Vorgabe begrenzt die Zahl der geprüften Zeilen (Standard 1000, `0` = keine Grenze). Wurde die Liste gekürzt, verweigert `--apply` **ohne** Auswahl die Löschung (Exit-Code 1, nichts gelöscht) — eine gekürzte Liste, die aussieht wie eine vollständige, wäre gefährlicher als ein Fehler. Mit Auswahl sind die ausgewählten Zeilen immer vollständig geprüft (sie liegen nie hinter dem Limit), dann darf `--apply` laufen.
+
+Der Dry-Run nennt für jede Zeile Benutzer, Galerie, Galerietyp, Einstufung, Auswahl und Begründung, damit der Owner die Liste lesen und entscheiden kann. Ohne `--apply` wird nichts gelöscht.
+
+**Nicht Teil dieser Entscheidung.** Die Gruppen-Opt-in-Pivot `user_gallery_groups` trägt denselben strukturellen Fehler: ein Gruppen-Opt-in (`toggleGroupOptIn()`) erzeugt einen **Gruppen-Grant**, und der Gruppen-Grant umfasst den ganzen Subtree. Diese Entscheidung deckt nur das Galerie-Abonnement ab; für die Gruppen-Pivot ist eine eigene Owner-Entscheidung offen.
 
 ## 3. Custom Messages & Preview
 - Für manuelle E-Mails (z. B. der "E-Mail senden" Action-Button im Fotografen-Dashboard) existiert ein Modal, in dem der Fotograf eine individuelle HTML-Nachricht verfassen kann.

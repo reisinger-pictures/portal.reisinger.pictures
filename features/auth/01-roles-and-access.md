@@ -33,6 +33,7 @@ Roles are strictly separated.
 
 ## 4. IDOR Protection
 - Every controller method accessing a specific resource (e.g., a photo or a gallery) MUST verify that the authenticated user's ID (or transient claim) is linked to that resource via the `getAllowedGalleryIds()` logic.
+- **Narrow exception — revoking one's own notification subscription (D-45, 2026-10-20).** `NotificationController::toggleGalleryOptIn()` verifies the link through `canAccessGallery()` (which resolves `getAllowedGalleryIds()`) whenever a subscription is **created**. When a subscription is **revoked**, the verification is satisfied by the caller's own subscription row instead: the endpoint touches only that row of the caller and grants nothing — it removes a state, never adds one. The exception exists because a subscription outlives the access that justified it (the membership that justified the subscription can be revoked), and the caller must be able to revoke what is left. It does not widen any access: the subscribe branch stays fully guarded and answers `403` without a verified link, and the revoke branch never reads or writes a resource of another user.
 
 ## 5. Read-time re-validation of persistent grants (D-39)
 - A persistent client grant (`user_galleries`, `user_gallery_groups`) is **re-validated on every read**, not only when it is granted. A grant that became unsafe after it was issued is fail-closed and hands out nothing.

@@ -351,20 +351,22 @@ export async function seedSelectionGallery(request: APIRequestContext): Promise<
  * (ManagementGalleryActions.tsx:47) but disables it unless `canSendMail`, and
  * `ManagementGalleryView` computes that as `(notified_count || 0) > 0`
  * (ManagementGalleryView.tsx:89). `notified_count` is the number of
- * `user_galleries` rows for that gallery with `wants_notifications = true`
- * (GalleryFrontendController::show, GalleryFrontendController.php:124) — a
- * gallery with no recipient therefore renders a disabled button and the
- * manifest's `click` step would sit in Playwright's actionability wait until
- * the test times out, with a timeout as the only symptom.
+ * `gallery_notification_subscriptions` rows for that gallery
+ * (GalleryFrontendController::show) — the subscription has its own table since
+ * the owner decision of 2026-10-20 (D-45), because a subscription must never be
+ * a client grant — so a gallery with no recipient therefore renders a disabled
+ * button and the manifest's `click` step would sit in Playwright's
+ * actionability wait until the test times out, with a timeout as the only
+ * symptom.
  *
  * The recipient is produced by `E2ESessionHelper::createIsolatedUser` with
  * `assignGalleryId` + `wantsNotifications`, which runs the whole chain: create a
  * `client` user, assign it the gallery, then POST
  * `/api/galleries/:id/opt-in` with `{ wants_notifications: true }`
- * (E2ESessionHelper.ts:182-187). Both options are required together — the
- * opt-in endpoint is IDOR-guarded by `canAccessGallery()`
- * (NotificationController.php:63), so the user needs the gallery assignment
- * before the opt-in can be stored.
+ * (frontend/tests/e2e/helpers/E2ESessionHelper.ts:410-412). Both options are
+ * required together — the opt-in endpoint is IDOR-guarded by
+ * `canAccessGallery()` (NotificationController.php), so the user needs the
+ * gallery assignment before the opt-in can be stored.
  *
  * The gallery itself is the CACHED one from `seedGallery` on purpose: this
  * seed adds a recipient, not a second gallery, so the dialog entries keep

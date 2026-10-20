@@ -121,8 +121,11 @@ class GalleryFrontendController extends Controller
             'breadcrumbs' => $breadcrumbs,
             'downloads_count' => DownloadLog::where('gallery_id', $gallery->id)->count(),
             // ✨ FIX: Notified Count für den "E-Mail senden" Button im Management
-            'notified_count' => DB::table('user_galleries')->where('gallery_id', $gallery->id)->where('wants_notifications', true)->count(),
-            'wants_notifications' => $user ? (bool) DB::table('user_galleries')->where('gallery_id', $gallery->id)->where('user_id', $user->id)->value('wants_notifications') : false,
+            // Die Abonnenten stehen in der eigenen Tabelle (Owner-Entscheidung
+            // 2026-10-20, D-45 / AD-9); der Grant-Pivot `user_galleries` wird
+            // hier nicht mehr gelesen.
+            'notified_count' => DB::table('gallery_notification_subscriptions')->where('gallery_id', $gallery->id)->count(),
+            'wants_notifications' => $user ? DB::table('gallery_notification_subscriptions')->where('gallery_id', $gallery->id)->where('user_id', $user->id)->exists() : false,
             'photos' => $photos->items() ? collect($photos->items())->map(fn ($p) => new PhotoResource($p))->values() : [],
             'current_page' => $photos->currentPage(),
             'last_page' => $photos->lastPage(),

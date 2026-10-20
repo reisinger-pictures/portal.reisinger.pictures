@@ -28,7 +28,19 @@ class NotificationOptInTest extends TestCase
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/galleries/{$gallery->id}/opt-in", ['wants_notifications' => true]);
         $response->assertStatus(200);
-        $this->assertDatabaseHas('user_galleries', ['user_id' => $client->id, 'gallery_id' => $gallery->id, 'wants_notifications' => 1]);
+
+        // Das Abonnement liegt in der eigenen Tabelle. Der Grant-Pivot
+        // `user_galleries` darf nicht beschrieben werden — dort würde das
+        // Abonnement zu einem Grant (Owner-Entscheidung 2026-10-20, D-45).
+        $this->assertDatabaseHas('gallery_notification_subscriptions', [
+            'user_id' => $client->id,
+            'gallery_id' => $gallery->id,
+        ]);
+        $this->assertDatabaseMissing('user_galleries', [
+            'user_id' => $client->id,
+            'gallery_id' => $gallery->id,
+            'wants_notifications' => 1,
+        ]);
 
         // 2. Mail Controller Test (Sollte den User nun inkludieren)
         $admin = User::factory()->create();
@@ -47,6 +59,40 @@ class NotificationOptInTest extends TestCase
         Artisan::call('queue:work', ['--stop-when-empty' => true]);
 
         $this->assertMailpitSentTo('optin@test.com');
+    }
+
+    public function test_client_can_revoke_the_opt_in_again()
+    {
+        $client = User::factory()->create(['email' => 'optout@test.com']);
+        $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
+        $gallery = Gallery::factory()->create();
+        $client->galleries()->attach($gallery);
+
+        $token = auth('api')->login($client);
+        $headers = ['Authorization' => "Bearer $token"];
+
+        $this->withHeaders($headers)
+            ->postJson("/api/galleries/{$gallery->id}/opt-in", ['wants_notifications' => true])
+            ->assertStatus(200);
+        $this->assertDatabaseHas('gallery_notification_subscriptions', [
+            'user_id' => $client->id,
+            'gallery_id' => $gallery->id,
+        ]);
+
+        $this->withHeaders($headers)
+            ->postJson("/api/galleries/{$gallery->id}/opt-in", ['wants_notifications' => false])
+            ->assertStatus(200);
+        $this->assertDatabaseMissing('gallery_notification_subscriptions', [
+            'user_id' => $client->id,
+            'gallery_id' => $gallery->id,
+        ]);
+
+        // Der Grant-Pivot bleibt unverändert: das Opt-in hat ihn weder
+        // geschrieben noch verändert.
+        $this->assertDatabaseHas('user_galleries', [
+            'user_id' => $client->id,
+            'gallery_id' => $gallery->id,
+        ]);
     }
 
     public function test_user_cannot_opt_in_to_gallery_they_cannot_access(): void

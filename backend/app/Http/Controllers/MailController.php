@@ -32,7 +32,11 @@ class MailController extends Controller
             return response()->json(['error' => 'Keine Berechtigung, diese Galerie zu verwalten.'], 403);
         }
 
-        $userIds = DB::table('user_galleries')->where('gallery_id', $gallery->id)->where('wants_notifications', true)->pluck('user_id')->toArray();
+        // The recipients are the subscribers of this gallery. The subscription
+        // lives in its own table (owner decision 2026-10-20, D-45 / AD-9); the
+        // row in `user_galleries` carries the client grant and is not read
+        // here.
+        $userIds = DB::table('gallery_notification_subscriptions')->where('gallery_id', $gallery->id)->pluck('user_id')->toArray();
         $groupIds = [];
         $currentGroup = $gallery->galleryGroup;
         // AUTH-5: cycle-safe and depth-bounded ancestor walk.
@@ -106,13 +110,17 @@ class MailController extends Controller
         }
 
         // Strikte Logik: Wir informieren NUR Fotografen/Admins, die explizit dieser Galerie
-        // zugewiesen sind UND Benachrichtigungen (wants_notifications = true) aktiviert haben.
+        // zugewiesen sind UND diese Galerie abonniert haben.
+        // Die Zuweisung ist der Grant-Pivot `user_galleries`, das Abonnement die eigene
+        // Tabelle `gallery_notification_subscriptions` (Owner-Entscheidung 2026-10-20).
         $notifiedUsers = User::whereHas('roles', function ($q) {
             $q->whereIn('name', [UserRole::PHOTOGRAPHER->value, UserRole::ADMIN->value]);
         })
             ->whereHas('galleries', function ($q) use ($gallery) {
-                $q->where('galleries.id', $gallery->id)
-                    ->where('user_galleries.wants_notifications', true);
+                $q->where('galleries.id', $gallery->id);
+            })
+            ->whereHas('galleryNotificationSubscriptions', function ($q) use ($gallery) {
+                $q->where('gallery_id', $gallery->id);
             })
             ->get();
 

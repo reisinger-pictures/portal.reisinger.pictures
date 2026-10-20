@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -151,9 +152,34 @@ class User extends Authenticatable implements JWTSubject
         return $this->belongsToMany(GalleryGroup::class, 'user_gallery_groups')->withPivot('wants_notifications');
     }
 
+    /**
+     * The galleries that are directly assigned to this user.
+     *
+     * This is the client grant pivot. Its `wants_notifications` column is a
+     * legacy column: the notification subscription has its own table
+     * (`gallery_notification_subscriptions`, V047) since the owner decision of
+     * 2026-10-20 (D-45 / AD-9), and the application neither reads nor writes
+     * that column for galleries. It is therefore not selected here; the repair
+     * command reads it from the table directly.
+     */
     public function galleries()
     {
-        return $this->belongsToMany(Gallery::class, 'user_galleries')->withPivot('wants_notifications');
+        return $this->belongsToMany(Gallery::class, 'user_galleries');
+    }
+
+    /**
+     * The gallery notification subscriptions of this user.
+     *
+     * A subscription is not a grant. It lives in its own table
+     * (`gallery_notification_subscriptions`, V047), because writing the opt-in
+     * into `user_galleries` turned every subscription into a client grant — see
+     * the owner decision of 2026-10-20 (D-45 / AD-9).
+     *
+     * @return HasMany<GalleryNotificationSubscription, $this>
+     */
+    public function galleryNotificationSubscriptions()
+    {
+        return $this->hasMany(GalleryNotificationSubscription::class);
     }
 
     public function photographerGalleries()
