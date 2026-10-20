@@ -71,25 +71,6 @@ the stated prerequisites, not on a confirmed production exploit.
 Diese Punkte sind in den Freigaben als **nicht-blockierend** eingestuft worden. Sie sind hier,
 weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benannten Ort.
 
-- [ ] **`getOrgGroupScope` ist ungecacht und läuft mehrfach pro Request (Kosten).**
-  Gemessen in der Welle-A-Prüfung: zweimal pro `/api/auth/me` (breit plus schmale Auflösung)
-  und nochmals auf `GET /api/management/orgs/{id}`. Kein Korrektheitsproblem, aber `/me` liegt
-  auf jedem SPA-Load. **Stand 2026-10-19:** die Basislinie ist gepinnt
-  (`OrgScopeQueryBaselineTest`): `/api/auth/me` = **30** Statements mit **3** Scope-Reads
-  (der dritte kommt aus `getOrgAssignableGalleryGroupIds()`), `GET /api/management/orgs/{id}` =
-  **29** Statements mit **2** Scope-Reads. Der Test pinnt die **gemessene Basislinie, kein
-  Ziel** — er wird bei einer bewussten Optimierung rot und muss im selben Change
-  mitgezogen werden. **offen:** die Optimierung selbst (Cache oder eine Auflösung).
-- [ ] **Der Brand-Filter löst die Gruppenkette pro Galerie auf (Kosten).**
-  In `AuthorizationService::getAllowedGalleryIds()` löst der Brand-Filter die Gruppenkette
-  **je Galerie** mit `GalleryGroup::find()` auf — gemessen 2 Lookups pro Galerie (6 bei 3
-  Galerien, 30 bei 15). Das ist ein **Vorbestand**, den D-39 nicht verändert hat und nicht
-  verschärft; der Board-Eintrag oben (zweimal pro `/api/auth/me`) ist davon getrennt zu
-  zählen. **Stand 2026-10-19:** die Basislinie ist gepinnt
-  (`BrandFilterChainQueryBaselineTest`): 3 Galerien = **11** Statements / **6** Lookups,
-  15 Galerien = **35** Statements / **30** Lookups (Wachstum exakt 2 × 12). Der Test pinnt
-  einen **bekannten Kostenpunkt, kein Ziel** — er wird bei einer gesammelten Auflösung der
-  Kette rot. **offen:** die Kette gesammelt auflösen.
 - [ ] **Der Benachrichtigungs-Opt-in legt eine Zuweisung an (pre-existing).**
   `NotificationController::toggleGalleryOptIn()` schreibt mit `updateOrInsert()` eine Zeile in
   `user_galleries` — dieselbe Tabelle, die die Client-Zuweisung trägt. Für eine **Selection**-
@@ -110,28 +91,63 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   zweiten Syncs — die Org-Zeile wird dort inzwischen ebenfalls zuerst gesperrt
   (`OrgDestroyLockOrderTest` pinnt die Reihenfolge deterministisch), die Zwei-Verbindungs-
   Evidenz fehlt aber.
-- [ ] **`destroy()` sperrt seine Mitgliederzeilen einzeln und ohne `ORDER BY` (Rest).**
-  Nach der Korrektur der Org-Sperrreihenfolge (`destroy()` sperrt die Org-Zeile jetzt zuerst,
-  wie `syncUsers()`) bleibt eine Lücke auf **User-Zeilen**-Ebene: `destroy()` sperrt seine
-  Mitglieder einzeln in der Reihenfolge, in der der Plan sie zurückgibt
-  (`where org_id = ?` **ohne** `ORDER BY`), während `syncUsers()` die ganze Menge in **einer**
-  aufsteigenden Anweisung sperrt. Ein `destroy()` über Org A und ein `syncUsers()` über Org B,
-  dessen Menge **zwei** Mitglieder von A enthält, können deshalb noch auf User-Zeilen-Ebene
-  in einen Zyklus geraten. **Vorbestand**, von D-40 und der destroy-Korrektur nicht
-  eingeführt. **Test:** `order by id` in der Mitgliederabfrage von `destroy()` — dann stimmen
-  die Reihenfolgen beider Pfade überein; mit einem Test, der die Sperrreihenfolge des
-  destroys pinnt (Muster `OrgDestroyLockOrderTest`).
-- [ ] **Der Modellfoto-Budget-Test prüft gegen die global geteilte Fake-Disk-Root (Testhygiene).**
-  `backend/tests/Feature/ModelFileImageBudgetTest.php:149,196` behauptet mit
-  `assertSame([], Storage::disk('local')->allFiles())`, dass **keine** Datei geschrieben wurde.
-  `Storage::fake('local')` leert aber die **prozessweit geteilte** Fake-Root
-  (`backend/tests/Support/Storage.php:112` leert sie in `setUp()`), nicht ein Test-eigenes
-  Verzeichnis. Zwei **gleichzeitig** laufende Suites im selben Prozess können sich deshalb
-  gegenseitig Dateien wegschneiden — beim Verifier der Modellfoto-Budgets trat genau so ein
-  **Fehlalarm** auf. Sequenzielle Läufe und `--parallel` (eigene Root je Worker) sind sicher.
-  **Vorbestand**, nicht durch die Budget-Arbeit eingeführt. **Test:** statt der globalen
-  Liste nur das **eigene** Verzeichnis des Tests prüfen (z. B. ein Unterordner pro Test), dann
-  ist die Aussage unabhängig von anderen Tests.
+- [ ] **`destroy()` sperrt seine Mitgliederzeilen einzeln statt in einem Bereichsscan (Rest).**
+  Die **Reihenfolge** ist geschlossen: der Destroy plant und lädt seine Mitglieder aufsteigend
+  nach `users.id` — dieselbe Reihenfolge wie `syncUsers()` — und `OrgDestroyLockOrderTest` pinnt
+  sie (die Org-Sperre bleibt die erste Aussage der Transaktion). Offen bleibt die **Form**:
+  der Destroy sperrt seine Mitglieder **je einzelne Aussage** (ein Write pro Mitglied), während
+  der Sync sie in **einem** Bereichsscan sperrt; und der Destroy schreibt die Pivot-Zeile
+  eines Mitglieds (`user_roles`) **vor** der `users`-Zeile dieses Mitglieds, während der Sync
+  **alle** `users`-Sperren **vor** jedem Pivot-Write nimmt. Beides steht so im Code-Kommentar
+  und im Test-Docblock. **Vorbestand**, von D-40 und der destroy-Korrektur nicht eingeführt.
+  **Test:** die Zwei-Verbindungs-Messung des D-40-Probe-Skripts, mit `destroy()` statt des
+  zweiten Syncs — nur sie beurteilt die Restform; der deterministische Test deckt die
+  Reihenfolge ab, nicht die Zyklusfreiheit.
+- [ ] **`canManageGalleryGroup()` löst die Gruppenkette je Galerie auf (Rest aus der
+  Lesepfad-Optimierung).** `AuthorizationService::canManageGalleryGroup()` (`:1533`) prüft
+  die Galerie eines **Verwaltungs**-Pfads über `BrandRegistry::galleryGroupTreeMatchesBrand()`
+  **ohne** set-basierten Resolver — je Ebene ein `GalleryGroup::find()`. Das ist **kein**
+  gemessener Lesepfad (die Aufrufer sind `GalleryController:91/445`, `GroupRequest:44`,
+  `GalleryService:459` — eine Gruppe je Aufruf, kein Lesepfad über viele Galerien), hat aber
+  **keine gepinnte Basislinie**. **Test:** zuerst eine Basislinie pinnen (Muster
+  `BrandFilterChainQueryBaselineTest`), dann die Galerie-Liste des Teilbaums einmal laden und
+  die rollenabhängigen Prüfen aus der Schleife heben.
+- [ ] **Der Brand-Filter lädt die Ahnen-Kette ohne Tiefen-Budget (Rest, geprüfte Option).**
+  Die set-basierte Auflösung lädt die Ahnen-Kette **bis zur Wurzel**, während der alte
+  Je-Galerie-Walk durch `GalleryGroupSubtree::MAX_DEPTH` (11) begrenzt war. Die **Entscheidung**
+  bleibt in beiden Pfaden gleich (fail-closed oberhalb der Grenze; für die Tiefen 10, 11, 12, 15
+  und 100 gemessen identisch), aber das **Laden** ist unbeschränkt: 15 Gruppen = 15 Statements
+  gegen 12 (20 gegen 17 gesamt), 100 Gruppen = 100 gegen 12. **Geprüfte Option, nicht
+  ausgeführt:** ein optionales `$maxAncestorLevels` auf `withAncestorClosure()`, gerufen mit
+  `GalleryGroupSubtree::MAX_DEPTH` — entscheidungsneutral über dieselben Tiefen, beide Basislinien
+  bleiben grün, und die tiefen Kosten fallen von 15 auf 11 (bzw. 100 auf 11) Statements; damit
+  wäre der set-basierte Pfad **in jedem** Fall billiger als der alte. **Test:** die
+  Äquivalenzprobe braucht dafür ein tiefes Fixture — deshalb wurde die Option in der reinen
+  Text-Runde nicht mitgenommen.
+- [ ] **Der Modellfoto-Budget-Test schreibt und liest dieselbe Datei zurück (Rest der
+  Fake-Disk-Kopplung).** Die Disk-Prüfung wurde auf das **eigene** Verzeichnis des Tests
+  umgestellt (`model-photos/<random>`), aber die beiden Methoden, die eine Datei
+  **schreiben und wieder einlesen**, rennen weiterhin mit dem `cleanDirectory()` eines
+  **nebenbei laufenden PHP-Prozesses**: gemessen `RuntimeException: Model-Datei nicht
+  gefunden` und `EncryptException: Source file does not exist`. **Fix:** pro Test eine eigene
+  Disk-Root (`Tests\TestCase::useTemporaryStorageDisk()`, im Repo 27× für die `photos`-Disk
+  genutzt) statt der prozessweit geteilten `local`-Disk.
+- [ ] **Der Modellfoto-Budget-Test schreibt auf feste Pfade der geteilten Root (Spiegelbild).**
+  Die Suite legt ihre Dateien unter `model-age-proofs/test` und `model-photos/test` ab — feste
+  Pfade auf der geteilten Root. Ihre Rückstände können eine **fremde** Suite treffen:
+  `ModelRegistrationTest.php:428` behauptet `assertSame([], allFiles('model-age-proofs'))` und
+  würde bei einem solchen Rückstand genau so scheitern, wie der Budget-Test vor der Korrektur
+  scheiterte. Der Mechanismus ist bewiesen, die Wahrscheinlichkeit gering (in 26 nebenläufigen
+  Läufen nicht ausgelöst). **Test:** eigene Unterverzeichnisse je Testlauf, wie beim
+  Budget-Test jetzt.
+- [ ] **Weitere Tests prüfen gegen die geteilte Fake-Disk-Root (latent).** Dieselbe Kopplung
+  steckt noch in `ModelFileEncryptionTest.php:142` (`allFiles('model-photos')`),
+  `ModelRegistrationTest.php:428`, `ModelProfileAccessTest.php:390` sowie im FTP-Bereich auf
+  der `photos`-Disk: `FtpImportTest.php` mit **13** disk-weiten Zusicherungen (Z. 154, 180, 200,
+  249, 295, 325, 352, 369, 404, 443, 465, 485, 512), `FtpInboxLocalDiskTest.php:138` und
+  `FtpProcessConcurrencyTest.php:255` (ohne `useTemporaryStorageDisk`). Bisher latent — 9
+  nebenläufige Iterationen ohne Fehlschlag —, aber dieselbe Fehlerklasse. **Test:** dieselbe
+  Umstellung wie im Budget-Test.
 - [ ] **Mailpit lokal unerreichbar (Umgebung).** Der Container `accriditation_mailpit` mappt
   `127.0.0.1:1025->1025/tcp`, nimmt aber keine Verbindung an (`socket.connect` → refused). Im
   vollen Backend-Lauf scheitern dadurch **63** Mail-Tests mit `TransportException`; gegen ein
@@ -165,25 +181,29 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **30 offene `[ ]`** und **46 wartende
-> `[~]`** über 1822 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (30), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1822). Aufteilung der 30: **17× `manuell prüfen:`** und **13×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-20):** **32 offene `[ ]`** und **46 wartende
+> `[~]`** über 1854 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (32), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1854). Aufteilung der 32: **17× `manuell prüfen:`** und **15×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 13 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 15 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
-> A–D") — darunter die seitdem aufgedeckten Reste (die zwei Query-Zähl-Kosten mit gepinnter
-> Basislinie, die User-Zeilen-Sperrreihenfolge von `destroy()`, die Opt-in-Zeile). Die
-> **manuell prüfen:**-Punkte — darunter die Zwei-Verbindungs-Messung und die manuellen
-> Prüfpunkte des Deploys vom 2026-10-19 — stehen in den 23, nicht unter den 13. Alle 46 `[~]`
+> A–D") sowie die seitdem aufgedeckten Reste (die Zwei-Verbindungs-Messung, die Restform der
+> User-Zeilen-Sperrreihenfolge von `destroy()`, der Verwaltungs-Pfad
+> `canManageGalleryGroup()`, die Opt-in-Zeile, die drei Reste der Fake-Disk-Kopplung in den
+> Modellfoto-Tests) und die manuellen Prüfpunkte des Deploys vom 2026-10-19. Die beiden
+> Query-Zähl-Kosten sind geschlossen: die Basislinien sind gepinnt und der Lesepfad löst den
+> Brand-Filter gesammelt und den Org-Scope **einmal pro Request** auf — ein Cache über
+> Requests hinweg ist bewusst **nicht** umgesetzt, weil er eine gerade widerrufene Delegation
+> ausliefern würde (`features/auth/01-roles-and-access.md` §6). Alle 46 `[~]`
 > tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
 > zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (76 = 30 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (78 = 32 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
