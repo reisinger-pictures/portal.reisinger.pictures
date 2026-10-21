@@ -42,6 +42,7 @@ php -r 'echo PHP_VERSION, PHP_EOL;'
 - `RefreshDatabase` migrates the in-memory DB fresh at each PHPUnit process start, so parallel runs are isolated by nature.
 - The full suite runs in ONE subagent (once), for reproducibility. Scoped runs without worker-DB setup: `php artisan test --filter <TestClass>`.
 - The four `sqlite` tuning keys in `config/database.php` (`busy_timeout`, `journal_mode`, `synchronous`, `transaction_mode`, each overridable via `DB_*`) affect file-backed DBs only; on `:memory:` they are no-ops. The actual fix against `database is locked` is `transaction_mode=IMMEDIATE`. Pinned by `tests/Unit/Support/SqliteConnectionTuningTest.php`.
+- The local **Playwright** run needs no `--workers=1`: measured on 2026-10-21, a full local run with 8 workers and no retries produced **0** `database is locked` in 237 executed tests over 25 minutes. The local full suite is still **not** a gate — it runs all 442 tests against one database inside the 25-minute global timeout, while the CI shards it into six jobs, each with its own database. The CI is the gate; a local run is a quick check of one area.
 
 ## Backend Test Groups — Smoke and Feature Runs
 
