@@ -112,30 +112,6 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   **keine gepinnte Basislinie**. **Test:** zuerst eine Basislinie pinnen (Muster
   `BrandFilterChainQueryBaselineTest`), dann die Galerie-Liste des Teilbaums einmal laden und
   die rollenabhängigen Prüfen aus der Schleife heben.
-- [ ] **Der Modellfoto-Budget-Test schreibt und liest dieselbe Datei zurück (Rest der
-  Fake-Disk-Kopplung).** Die Disk-Prüfung wurde auf das **eigene** Verzeichnis des Tests
-  umgestellt (`model-photos/<random>`), aber die beiden Methoden, die eine Datei
-  **schreiben und wieder einlesen**, rennen weiterhin mit dem `cleanDirectory()` eines
-  **nebenbei laufenden PHP-Prozesses**: gemessen `RuntimeException: Model-Datei nicht
-  gefunden` und `EncryptException: Source file does not exist`. **Fix:** pro Test eine eigene
-  Disk-Root (`Tests\TestCase::useTemporaryStorageDisk()`, im Repo 27× für die `photos`-Disk
-  genutzt) statt der prozessweit geteilten `local`-Disk.
-- [ ] **Der Modellfoto-Budget-Test schreibt auf feste Pfade der geteilten Root (Spiegelbild).**
-  Die Suite legt ihre Dateien unter `model-age-proofs/test` und `model-photos/test` ab — feste
-  Pfade auf der geteilten Root. Ihre Rückstände können eine **fremde** Suite treffen:
-  `ModelRegistrationTest.php:428` behauptet `assertSame([], allFiles('model-age-proofs'))` und
-  würde bei einem solchen Rückstand genau so scheitern, wie der Budget-Test vor der Korrektur
-  scheiterte. Der Mechanismus ist bewiesen, die Wahrscheinlichkeit gering (in 26 nebenläufigen
-  Läufen nicht ausgelöst). **Test:** eigene Unterverzeichnisse je Testlauf, wie beim
-  Budget-Test jetzt.
-- [ ] **Weitere Tests prüfen gegen die geteilte Fake-Disk-Root (latent).** Dieselbe Kopplung
-  steckt noch in `ModelFileEncryptionTest.php:142` (`allFiles('model-photos')`),
-  `ModelRegistrationTest.php:428`, `ModelProfileAccessTest.php:390` sowie im FTP-Bereich auf
-  der `photos`-Disk: `FtpImportTest.php` mit **13** disk-weiten Zusicherungen (Z. 154, 180, 200,
-  249, 295, 325, 352, 369, 404, 443, 465, 485, 512), `FtpInboxLocalDiskTest.php:138` und
-  `FtpProcessConcurrencyTest.php:255` (ohne `useTemporaryStorageDisk`). Bisher latent — 9
-  nebenläufige Iterationen ohne Fehlschlag —, aber dieselbe Fehlerklasse. **Test:** dieselbe
-  Umstellung wie im Budget-Test.
 - [ ] **Mailpit lokal unerreichbar (Umgebung).** Der Container `accriditation_mailpit` mappt
   `127.0.0.1:1025->1025/tcp`, nimmt aber keine Verbindung an (`socket.connect` → refused). Im
   vollen Backend-Lauf scheitern dadurch **63** Mail-Tests mit `TransportException`; gegen ein
@@ -169,13 +145,13 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **28 offene `[ ]`** und **46 wartende
-> `[~]`** über 1874 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (28), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1874). Aufteilung der 28: **9× `manuell prüfen:`** und **19×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **21 offene `[ ]`** und **46 wartende
+> `[~]`** über 1838 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (21), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1838). Aufteilung der 21: **9× `manuell prüfen:`** und **12×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 19 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 12 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
 > A–D") sowie die seitdem aufgedeckten Reste (die Zwei-Verbindungs-Messung, die Restform der
 > User-Zeilen-Sperrreihenfolge von `destroy()`, der Verwaltungs-Pfad
@@ -196,7 +172,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (74 = 28 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (67 = 21 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
@@ -384,32 +360,17 @@ Prozess vorhanden (OPcache/Compiler-Zustand nach Neustart), Frontend-Bundle-Hash
 unverändert gegenüber dem vorigen Deploy, Homepage **200**.
 **Noch manuell durch den Owner zu prüfen** (nicht automatisierbar, kein Test deckt sie):
 
-- [ ] **Der Backdrop-Klick des Lizenz-/Coupon-Formulars ist ungetestet (Testlücke).**
-  `CouponFormDrawer.tsx:158-162` (`handleClose` → `confirm`, wenn `isDirty`) wird für
-  Kopf-Button, Backdrop, Escape und `onCancel` genutzt — getestet ist bisher **nur** Escape,
-  und nur für ein **unverändertes** Formular (`DialogAccessibilityContract.test.tsx:189-204`).
-  **Test:** ein verändertes Formular → Klick auf `.modal-backdrop` → `confirm` wird
-  aufgerufen. (Nebenbefund: das Formular liegt **nicht** im Warenkorb, sondern unter
-  `/admin-coupons`; der Warenkorb nutzt `CouponInput`.)
 - [ ] **Dialoghöhen und gepinnter Kopf per Screenshot (Agent-Task, nicht Owner-Task).**
   `pnpm test:screenshots:grep "screenshot (gallery-access-dialog|gallery-photographer-team-dialog)"`
   erzeugt die PNGs unter `frontend/tests/screenshots/` (das Ausgabeverzeichnis `test-results/`
   ist gitignored — die PNGs werden nie committet, der alte Blocker „keine PNG im Baum" war
-  gegenstandslos). **Test:** `GalleryAccessModal` nutzt `bodyHead` + `height="80vh"` + ein
-  `sticky bottom-0`-Fade — der Zielzustand ist im Code vorhanden; offen ist die **Sichtprüfung**
-  (an den Owner oder die `ui-review`-Skill übergeben).
-- [ ] **`max-h-90vh` deckt die Tastatur auf dem Mobilgerät nicht (Code-Befund).**
-  `ModalShell.tsx:180-183, 215` begrenzt die Höhe mit `vh`, nicht mit `dvh` — eine offene
-  Tastatur verdeckt den Footer. **Test/Fix:** `max-h-90dvh` statt `max-h-90vh`; die
-  Geräte-Frage („Softtastatur") ist damit beantwortet.
-- [ ] **Das `€` steht im Preis-Editor neben dem Feld statt als Suffix (Code-Befund).**
-  `VolumePresetSettingsCard.tsx:159, 207` rendert das Währungszeichen als Flex-Sibling
-  neben dem Eingabefeld, nicht als Suffix im Feld. **Test:** Suffix im Feld; die
-  Snapshot-Aufnahme `frontend/tests/screenshots/` deckt die Darstellung ab.
-- [ ] **Die Tap-Targets der Rechen-Checkboxen sind ungemessen (PlaywrightViewport).**
-  `ShootingCalculatorModal.tsx:174, 206, 213, 220` nutzt `checkbox` mit 17 px Kantenlänge —
-  die Trefferfläche ist damit kleiner als die üblichen 44 px. **Messbar ohne Gerät:**
-  `getBoundingClientRect()` der Checkbox gegen ihr Label im Playwright-Viewport.
+  gegenstandslos). **Was die Sichtprüfung jetzt umfasst:** die Cap folgt dem
+  dynamischen Viewport (`max-h-80vh max-h-80dvh!`), der Kopf ist gepinnt (`bodyHead`), der
+  Footer liegt über einem `sticky bottom-0`-Fade. **Lokal nicht ausführbar:** die Harness
+  braucht den Vite-Dev-Server **und** die API (Seed über `E2ESessionHelper`) — ohne das
+  Backend-Container läuft sie nicht; die CI lädt die PNGs bewusst nicht hoch
+  (`.github/workflows/ci.yml:48`: Screenshots können Cookies enthalten). Der Schritt ist
+  damit an eine Umgebung mit Backend gebunden.
 - [ ] manuell prüfen: **FTP-Karte im Browser** — anmelden, Verwaltungs-Dashboard
   (`/management`, Ansicht „Struktur" — **kein** `/management/ftp`: diese Route gibt es nicht).
   Die Inbox-Tabelle gibt es nicht mehr; die Karte zeigt `ftp_folder`, Warteschlangen- und
