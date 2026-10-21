@@ -132,7 +132,12 @@ return [
     ],
 
     'stripe' => [
-        'checkout_enabled' => filter_var(env('STRIPE_CHECKOUT_ENABLED', true), FILTER_VALIDATE_BOOL),
+        // FILTER_NULL_ON_FAILURE keeps an unparseable value distinguishable from
+        // a deliberate `false`: `STRIPE_CHECKOUT_ENABLED=flase` must not be
+        // coerced into `false` without a trace. The kill switch treats every
+        // non-boolean as invalid, fails closed and logs it
+        // (StripeCheckoutKillSwitch::enabled()).
+        'checkout_enabled' => filter_var(env('STRIPE_CHECKOUT_ENABLED', true), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE),
         'customers_enabled' => filter_var(env('STRIPE_CUSTOMERS_ENABLED', true), FILTER_VALIDATE_BOOL),
         'stale_payment_intent_hours' => max(1, (int) env('STRIPE_STALE_PAYMENT_INTENT_HOURS', 2)),
         'checkout_new_account_hours' => max(0, (int) env('STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS', 24)),
