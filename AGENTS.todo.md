@@ -71,15 +71,6 @@ the stated prerequisites, not on a confirmed production exploit.
 Diese Punkte sind in den Freigaben als **nicht-blockierend** eingestuft worden. Sie sind hier,
 weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benannten Ort.
 
-- [ ] **Der Gruppen-Opt-in legt eine Gruppen-Zuweisung an (D-45, dieselbe Bauart).**
-  Der Benachrichtigungs-Opt-in einer **Gruppe** (`user_gallery_groups`) trifft dieselbe
-  Bauart wie der Galerie-Opt-in: die Zeile landet in der Pivot, die die Gruppen-Zuweisung
-  trägt, und der Leser wertet sie als Zuweisung. Mit V047 ist nur der **Galerie**-Opt-in
-  in eine eigene Tabelle gewandert; der Gruppen-Pfad ist **unverändert** und damit
-  weiterhin ein Fall derselben Fehlerklasse. **Entschieden ist das nicht** — der Owner
-  muss entscheiden, ob der Gruppen-Opt-in ebenfalls in eine eigene Tabelle wandert oder
-  ob der Leser den Fall abweichend behandelt. **Test:** ein Gruppen-Opt-in darf keine
-  Gruppen-Zuweisung erzeugen (analog zur Galerie-Regression aus D-45).
 - [ ] manuell prüfen: **Zwei-Verbindungs-Nachweis für D-40 steht aus.**  Das Probe-Skript `backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh` liegt vor
   (zwei Orgs, deren Akteure gegenseitig Mitglieder sind, gleichzeitige Syncs, InnoDB-
   Deadlock-Delta). **Der Lauf steht aus:** das Skript braucht einen Docker-Host mit
@@ -103,15 +94,6 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   **Test:** die Zwei-Verbindungs-Messung des D-40-Probe-Skripts, mit `destroy()` statt des
   zweiten Syncs — nur sie beurteilt die Restform; der deterministische Test deckt die
   Reihenfolge ab, nicht die Zyklusfreiheit.
-- [ ] **`canManageGalleryGroup()` löst die Gruppenkette je Galerie auf (Rest aus der
-  Lesepfad-Optimierung).** `AuthorizationService::canManageGalleryGroup()` (`:1533`) prüft
-  die Galerie eines **Verwaltungs**-Pfads über `BrandRegistry::galleryGroupTreeMatchesBrand()`
-  **ohne** set-basierten Resolver — je Ebene ein `GalleryGroup::find()`. Das ist **kein**
-  gemessener Lesepfad (die Aufrufer sind `GalleryController:91/445`, `GroupRequest:44`,
-  `GalleryService:459` — eine Gruppe je Aufruf, kein Lesepfad über viele Galerien), hat aber
-  **keine gepinnte Basislinie**. **Test:** zuerst eine Basislinie pinnen (Muster
-  `BrandFilterChainQueryBaselineTest`), dann die Galerie-Liste des Teilbaums einmal laden und
-  die rollenabhängigen Prüfen aus der Schleife heben.
 - [ ] **Mailpit lokal unerreichbar (Umgebung).** Der Container `accriditation_mailpit` mappt
   `127.0.0.1:1025->1025/tcp`, nimmt aber keine Verbindung an (`socket.connect` → refused). Im
   vollen Backend-Lauf scheitern dadurch **63** Mail-Tests mit `TransportException`; gegen ein
@@ -145,17 +127,16 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **21 offene `[ ]`** und **46 wartende
-> `[~]`** über 1838 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (21), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1838). Aufteilung der 21: **9× `manuell prüfen:`** und **12×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **17 offene `[ ]`** und **46 wartende
+> `[~]`** über 1816 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (17), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1816). Aufteilung der 17: **8× `manuell prüfen:`** und **9×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 12 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 9 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
 > A–D") sowie die seitdem aufgedeckten Reste (die Zwei-Verbindungs-Messung, die Restform der
-> User-Zeilen-Sperrreihenfolge von `destroy()`, der Verwaltungs-Pfad
-> `canManageGalleryGroup()`, der **Gruppen**-Opt-in als Dublette zum Galerie-Opt-in, die
+> User-Zeilen-Sperrreihenfolge von `destroy()`, die
 > Dialog-Befunde, die das Audit vom 2026-10-20 aus Code statt vom Gerät beantwortet hat) und
 > die manuellen Prüfpunkte der Deploys. Die beiden
 > Query-Zähl-Kosten sind geschlossen: die Basislinien sind gepinnt und der Lesepfad löst den
@@ -172,12 +153,12 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (67 = 21 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (63 = 17 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
 > **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **20 von 29 `##`-Abschnitten**
+> Die Positionen liegen in **19 von 29 `##`-Abschnitten**
 > (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
 > `grep -c '^## ' AGENTS.todo.md`). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
@@ -193,7 +174,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 
 ## 🗳 Entscheidungs-Protokoll (Owner, 2026-09-28)
 
-**Was gilt, steht in `features/owner-decisions.md` (D-1 bis D-37).** Diese Datei sagt nur, **ob es schon
+**Was gilt, steht in `features/owner-decisions.md` (D-1 bis D-46).** Diese Datei sagt nur, **ob es schon
 gilt** — und hält fest, welche Ansätze zurückgezogen wurden, damit sie nicht erneut
 implementiert werden.
 
@@ -206,7 +187,7 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 
 ### Stand
 
-Alle Entscheidungen D-1 bis D-26 sind getroffen. Soweit sie Code erforderten, sind sie **umgesetzt
+Alle Entscheidungen D-1 bis D-46 sind getroffen. Soweit sie Code erforderten, sind sie **umgesetzt
 und verifiziert** — die Entscheidungen stehen in `features/owner-decisions.md`, die
 zurückgezogenen Varianten direkt darunter in „Verworfen".
 
@@ -1431,8 +1412,6 @@ alle mit Regressionstest:
   E2E-Stack braucht einen erreichbaren SFTPGo oder einen Fake. Harness-Referenz:
   `tests/scripts/ftp-transport-test/`. *In Arbeit.*
 
-- [ ] manuell prüfen: Dublette — dieselbe Rotation wie oben; einmal ausführen und **beide** Einträge schließen. **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen der
-  aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen.
 
 ## UI-Review 2026-09-26 — Screenshot-Verifikation der neuen Oberflaechen
 
@@ -1686,7 +1665,6 @@ gerissen und zur Entscheidung gemacht.
 > Weg (das Modell liest die Bilder selbst). **Position 6 ist damit der einzige offene Eintrag
 > in diesem Abschnitt.**
 
-- [ ] **Position 6 — Die Lockfile-Regel des Test-Images ist nicht umgesetzt (Browser-Version aus dem Manifest statt aus dem Lockfile):** Der Skill `docker-test-image` hat als Core-Regel, dass die Playwright-Browserversion aus dem **Lockfile** kommt; „version from manifest instead of lockfile" ist dort als Failure-Mode 5 geführt („Job green, browser version questionable"). Das Projekt liest sie aber aus dem Manifest: `.github/workflows/e2e-image.yml:41` extrahiert `"@playwright/test": "^1.64.1"` aus `frontend/package.json` → `1.64.1`, also die **Untergrenze der Range**, nicht die aufgelöste Lockfile-Version. **Heute unkritisch, weil beide Stände identisch sind** (`frontend/package.json:72` = `^1.64.1`, `frontend/pnpm-lock.yaml:768` = `@playwright/test@1.64.1`) — **aus Prinzip ist es das nicht:** Dependabot (npm, `/frontend`, **täglich**, `.github/dependabot.yml:3-5`, `minor-and-patch` gruppiert) aktualisiert bei einer Version **innerhalb** der deklarierten Range **nur das Lockfile**. Das ist hier keine Vermutung, sondern **gemessen**: von sechs offenen Dependabot-Branches für `/frontend` ändern **vier ausschließlich `frontend/pnpm-lock.yaml`** (`baseline-browser-mapping-2.11.25`, `browserslist-4.29.0`, `source-map-js-1.2.2`, `tinypool-2.2.0`; belegt über `git diff --name-only main...origin/dependabot/npm_and_yarn/frontend/<branch>`), nur zwei zusätzlich `frontend/package.json`. Ein solcher Lockfile-only-Bump trifft `frontend/pnpm-lock.yaml` in `paths` (`e2e-image.yml:20`) → der Rebuild läuft, extrahiert aber wieder `1.64.1` und backt **dieselbe** Browserversion neu ein (`deployment/Dockerfile.e2e:30` ARG, `:69-70` Install), unter demselben Tag `portal-e2e:1.64.1`, den der E2E-Job zieht (`.github/workflows/ci.yml:358`). **Der E2E-Lauf bleibt grün**, weil `ci.yml:622-629` („Verify Playwright browsers (fallback install)") die abweichende Browserversion pro Lauf nachlädt — **damit ist die Zusage des Test-Images still aufgehoben** („kein Browser-Download pro Run", `deployment/Dockerfile.e2e:12-16`), ohne dass irgendwo ein Fehler erscheint; die Frische-Prüfung (`tests/infrastructure/verify-image-freshness.sh`) meldet das Image sogar als frisch, obwohl die Browserversion nicht zum Lockfile passt. **Befehl:** `grep -n 'PLAYWRIGHT_VERSION=' .github/workflows/e2e-image.yml` → liest `frontend/package.json`. **Fix-Richtung (nicht ausgeführt):** die aufgelöste Version aus `frontend/pnpm-lock.yaml` ziehen bzw. `pnpm exec playwright --version` im Workflow auswerten, statt die Range-Untergrenze zu nehmen. **Hinweis:** der Bump auf 1.64.1 (`e1ed87a`) hat alle vier gekoppelten Stellen (Manifest, Lockfile, Dockerfile-ARG, Image-Tag im CI) gemeinsam bewegt — die Kopplung ist also beherrscht, **die Quelle der Versionsangabe bleibt die falsche**.
 
 ---
 
