@@ -66,6 +66,37 @@ statements with **3** scope reads to **22** with **1**, the org detail endpoint 
   without a group, a gallery whose group row is missing, a null brand somewhere in the chain, a
   foreign-brand ancestor, a chain deeper than the depth limit). A change that lets the two
   diverge turns that test red.
+- **The management path resolves the group chain set-based too.** `canManageGalleryGroup()`
+  (the rename/delete path, the access sync, the group request) resolved the chain of the
+  group and of **every gallery of its subtree** per gallery: one `GalleryGroup::find()` per
+  level, plus one `Gallery::find()` per gallery. The subtree's groups and their ancestor
+  closure are now loaded **once**, the gallery list is loaded **once**, and the role
+  decisions (super-admin, admin, photographer) are taken **before** the loop — they are
+  actor-scoped, not gallery-scoped. What stays in the loop is genuinely per gallery: the
+  gallery's own brand, the chain of *its* group (read from the loaded map, no statement),
+  its own restriction rule and its own assignment. Measured: a subtree with one restricted
+  gallery 18 → 10 statements, a gallery in a nested group 20 → 10, a three-gallery subtree
+  40 → 12. The number of statements no longer grows with the **group-chain lookups** of
+  the subtree — the chain of a gallery is no longer resolved per gallery. The **total**
+  still grows with the number of galleries, by one statement per restricted gallery (the
+  personal-assignment check) and one per gallery whose own restriction is inherited (the
+  model's group load). Measured, own restriction: 1 gallery 10, 3 galleries 12, 10
+  galleries 19 statements (before: 18, 40, 117).
+  **Scope:** this is **not** a read path — the callers are `GalleryController:91/445`,
+  `GroupRequest:44`, `GalleryService:459`, one group per call. The gain is **0–10
+  statements per call** (≈8–10 in the typical restricted-gallery case) and grows with the
+  subtree (98 statements for ten galleries) — measured, not a target. It applies only to a
+  photographer who holds no personal assignment to the **target** group and whose subtree
+  holds galleries: the loop over the subtree is skipped only for a photographer who holds
+  the target group itself — an assignment to an ancestor or a descendant does not skip it.
+  What the baseline actually buys is the proof that the **group-chain lookups** no longer
+  scale with the subtree, and that the decisions of the per-gallery walk are reproduced.
+  **The remaining per-gallery cost** is (a) the personal-assignment check
+  (`photographer_galleries`), one statement per restricted gallery, and (b) the gallery's
+  own restriction rule (`Gallery::effective_restricted_photographers`), which reads the
+  gallery's group and its parent chain per gallery (1 + the group's depth) when the
+  gallery's own flag is null. (b) belongs to the model, not to the brand chain, and was
+  deliberately not reimplemented here.
 - **The org group scope is resolved once per request.** `getOrgGroupScope()` reads the
   `gallery_group_org` pivot and walks the subtree; it is memoized per org id **inside the
   request**. The memo lives in a `scoped` container store, so the invalidation reaches every
@@ -84,9 +115,17 @@ statements with **3** scope reads to **22** with **1**, the org detail endpoint 
   a fail-open, so the service stays stateless across requests and only the repeated resolution
   *within* one request is removed.
 
-The baselines are pinned in `OrgScopeQueryBaselineTest` and `BrandFilterChainQueryBaselineTest`.
-They pin a **measured** state, not a target: a deliberate change of the cost is expected to turn
-them red and to update them in the same change.
+The baselines are pinned in `OrgScopeQueryBaselineTest`, `BrandFilterChainQueryBaselineTest`
+and `GalleryGroupManageQueryBaselineTest`. They pin a **measured** state, not a target: a
+deliberate change of the cost is expected to turn them red and to update them in the same
+change. The management baseline pins the **decisions** of its fixture cases against a
+reproduction of the per-gallery walk *and* the statement count per case, so an optimisation
+that changes an access decision and one that only changes the cost are distinguishable.
+It pins the four rules of the loop that a mutation could silently drop — the gallery's own
+brand, the unrestricted gallery, the photographer's group subtree in both directions, and
+the chain of the gallery's own group (the last one an access-widening mutation that no
+other test in the repository caught) — and the measured scaling pairs
+(1 gallery 18 → 10, 3 galleries 40 → 12, 10 galleries 117 → 19).
 
 ## Related
 - [Magic Links & Invites](../auth/02-magic-links.md) � transient access for guests overriding role model
