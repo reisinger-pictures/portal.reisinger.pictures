@@ -35,6 +35,16 @@ Roles are strictly separated.
 - Every controller method accessing a specific resource (e.g., a photo or a gallery) MUST verify that the authenticated user's ID (or transient claim) is linked to that resource via the `getAllowedGalleryIds()` logic.
 - **Narrow exception — the caller's own notification subscription (D-45, 2026-10-20).** `NotificationController::toggleGalleryOptIn()` verifies the link through `canAccessGallery()` (which resolves `getAllowedGalleryIds()`) whenever a request would **create** a subscription row: without a verified link that request is refused with `403`. A request for a gallery the caller is **already subscribed to** is answered from the caller's own subscription row instead — it touches only that row of the caller and grants nothing: it either removes the row (a revoke) or refreshes its `updated_at` (a repeated subscribe). It never creates a row that does not exist and never grants access. The exception exists because a subscription outlives the access that justified it (the membership that justified the subscription can be revoked), and the caller must be able to revoke what is left. It does not widen any access: the creation of a subscription row stays fully guarded, and the row of another user is never read or written.
 - **Narrow exception — the caller's own group notification subscription (D-46, 2026-10-21).** `NotificationController::toggleGroupOptIn()` verifies the link through the group membership (`user_gallery_groups`) whenever a request would **create** a subscription row: without a verified membership that request is refused with `403` — unchanged from before the decision. A request for a group the caller is **already subscribed to** is answered from the caller's own subscription row instead — it touches only that row of the caller and grants nothing: it either removes the row (a revoke) or refreshes its `updated_at` (a repeated subscribe). It never creates a row that does not exist and never grants access, and the row of another user is never read or written. The exception exists for the same reason as for the gallery subscription: the subscription outlives the membership that justified it, and the caller must be able to revoke what is left.
+- **The two subscription contracts are pinned end-to-end.** Since 2026-10-21 the
+  Playwright specs walk the real client flow and prove both halves of D-45 and
+  D-46: an opt-in **never** keeps the gallery or the group reachable after the
+  membership that justified it is revoked, and the subscription **outlives**
+  that membership, stays visible (with the name redacted) and can be revoked
+  again. `frontend/tests/e2e/client/notification-subscription.spec.ts`; the
+  subscriber count of the „E-Mail senden" dialog is pinned in
+  `frontend/tests/e2e/admin/galleries/gallery-notified-count.spec.ts`. The
+  revert-to-red proof is in the commit that introduced them: with the
+  pre-D-45/D-46 write path the specs fail, with the current path they pass.
 
 ## 5. Read-time re-validation of persistent grants (D-39)
 - A persistent client grant (`user_galleries`, `user_gallery_groups`) is **re-validated on every read**, not only when it is granted. A grant that became unsafe after it was issued is fail-closed and hands out nothing.
