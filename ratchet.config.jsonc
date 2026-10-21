@@ -1,0 +1,26 @@
+// The gates of this repository: the security findings of the 2026-10-18
+// source review, counted by the registry.
+//
+// The engine owns the baseline, the direction and the monotonicity; the
+// registry owns the findings.  The prose document
+// (`features/security/2026-10-18-review-closure.md`) stays the human record;
+// this file is its machine-readable view.
+[
+  {
+    "name": "portal",
+    "rules": {
+      "open-security-findings": {
+        "class": "a security finding that is still open",
+        "incident": "SEC-01: org admins reassign foreign users — closed in 488a17f and 5e4c615 (verify round 3 APPROVED)",
+        "unit": "findings",
+        "direction": "ceiling",
+        "description": "the counted scope is the registry `ratchet.findings.json` — the machine-readable view of the 2026-10-18 architecture and security review. The levels that count are the canonical `critical` (P1) and `high` (P2); the statuses that count are `open` and `in-progress`. `accepted` and `wontfix` do not count but stay visible — a decision is not a deletion. The count is 0 today: all 14 findings of the review are closed, and a new open finding moves the count above the baseline",
+        "count": {
+          "registry": "ratchet.findings.json",
+          "severities": ["critical", "high"],
+          "statuses": ["open", "in-progress"]
+        }
+      }
+    }
+  }
+]

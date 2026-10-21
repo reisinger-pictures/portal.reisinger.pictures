@@ -13,7 +13,7 @@ name: CI
 # Push-Lauf auf demselben Head-SHA — `automerge.yml` wartet exakt auf
 # `CI gate (push)`. `pull_request` deckt normale Same-Repo-PRs weiterhin
 # fail-closed ab.
-# Docs-only commits ran all 11 jobs (incl. 6 Playwright shards) on 3352977
+# Docs-only commits ran all 12 jobs (incl. 6 Playwright shards) on 3352977
 # (AGENTS.md + AGENTS.todo.md). `'**'` is the only positive pattern, so no code
 # change can ever be filtered out; the negations drop documentation only. The
 # trailing patterns re-include the docs the ghcr-namespace gate reads as input
@@ -33,6 +33,7 @@ on:
       - '!**/*.md'
       - 'features/infrastructure/**'
       - 'features/ai/**'
+      - 'features/security/**'
       - 'features/e2e-test-strategy.md'
   pull_request:
     paths:
@@ -40,6 +41,7 @@ on:
       - '!**/*.md'
       - 'features/infrastructure/**'
       - 'features/ai/**'
+      - 'features/security/**'
       - 'features/e2e-test-strategy.md'
 
 # Least privilege: CI only reads the repository. Secrets are passed directly to
@@ -144,6 +146,26 @@ jobs:
       # registry (a stale artifact must fail, a fresh one must pass).
       - name: Verify the image pin freshness gate
         run: bash tests/infrastructure/image-pin-freshness-regression.sh
+
+  ratchet:
+    # The gates of this repository: the security findings of the 2026-10-18
+    # review are counted against a baseline that may only fall. The count is 0
+    # today (all 14 findings are closed) — the gate says so, and a new open
+    # finding turns it red.
+    name: Ratchet gates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # The action installs the released binary and verifies its SHA-256
+      # against the checksums of the release. It is pinned to a commit SHA:
+      # this repository's supply-chain contract allows no moving tag, and the
+      # moving `v1` tag of the action is a convenience for repositories
+      # without such a contract.
+      - uses: all-the-rest/ratchet-cli@bedc915967faaced135aec231d5d9b056abdc981
+        with:
+          mode: validate
 
   backend:
     name: Backend (PHPUnit)
@@ -735,6 +757,7 @@ jobs:
     if: ${{ always() && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]')) }}
     needs:
       - security-contract
+      - ratchet
       - backend
       - frontend
       - e2e
@@ -743,12 +766,14 @@ jobs:
       - name: Require every CI dependency to succeed
         env:
           SECURITY_CONTRACT_RESULT: ${{ needs.security-contract.result }}
+          RATCHET_RESULT: ${{ needs.ratchet.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
         run: |
           set -euo pipefail
           [[ "$SECURITY_CONTRACT_RESULT" == "success" ]]
+          [[ "$RATCHET_RESULT" == "success" ]]
           [[ "$BACKEND_RESULT" == "success" ]]
           [[ "$FRONTEND_RESULT" == "success" ]]
           [[ "$E2E_RESULT" == "success" ]]
