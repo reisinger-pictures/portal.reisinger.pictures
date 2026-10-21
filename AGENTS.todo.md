@@ -109,13 +109,13 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **13 offene `[ ]`** und **46 wartende
-> `[~]`** über 1811 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (13), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1811). Aufteilung der 13: **7× `manuell prüfen:`** und **6×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **12 offene `[ ]`** und **46 wartende
+> `[~]`** über 1800 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (12), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1800). Aufteilung der 12: **7× `manuell prüfen:`** und **5×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 6 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 5 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
 > A–D") sowie die seitdem aufgedeckten Reste (die Zwei-Verbindungs-Messung, die Restform der
 > Dialog-Befunde, die das Audit vom 2026-10-20 aus Code statt vom Gerät beantwortet hat) und
@@ -134,7 +134,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (59 = 13 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (58 = 12 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
@@ -336,17 +336,6 @@ Prozess vorhanden (OPcache/Compiler-Zustand nach Neustart), Frontend-Bundle-Hash
 unverändert gegenüber dem vorigen Deploy, Homepage **200**.
 **Noch manuell durch den Owner zu prüfen** (nicht automatisierbar, kein Test deckt sie):
 
-- [ ] **Dialoghöhen und gepinnter Kopf per Screenshot (Agent-Task, nicht Owner-Task).**
-  `pnpm test:screenshots:grep "screenshot (gallery-access-dialog|gallery-photographer-team-dialog)"`
-  erzeugt die PNGs unter `frontend/tests/screenshots/` (das Ausgabeverzeichnis `test-results/`
-  ist gitignored — die PNGs werden nie committet, der alte Blocker „keine PNG im Baum" war
-  gegenstandslos). **Was die Sichtprüfung jetzt umfasst:** die Cap folgt dem
-  dynamischen Viewport (`max-h-80vh max-h-80dvh!`), der Kopf ist gepinnt (`bodyHead`), der
-  Footer liegt über einem `sticky bottom-0`-Fade. **Lokal nicht ausführbar:** die Harness
-  braucht den Vite-Dev-Server **und** die API (Seed über `E2ESessionHelper`) — ohne das
-  Backend-Container läuft sie nicht; die CI lädt die PNGs bewusst nicht hoch
-  (`.github/workflows/ci.yml:48`: Screenshots können Cookies enthalten). Der Schritt ist
-  damit an eine Umgebung mit Backend gebunden.
 - [ ] manuell prüfen: **FTP-Karte im Browser** — anmelden, Verwaltungs-Dashboard
   (`/management`, Ansicht „Struktur" — **kein** `/management/ftp`: diese Route gibt es nicht).
   Die Inbox-Tabelle gibt es nicht mehr; die Karte zeigt `ftp_folder`, Warteschlangen- und
