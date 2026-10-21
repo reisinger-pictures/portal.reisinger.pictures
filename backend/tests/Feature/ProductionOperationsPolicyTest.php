@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Order;
 use App\Services\InvoiceMailDispatcher;
 use App\Support\ProductionOperationsPolicy;
+use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
@@ -159,6 +160,30 @@ class ProductionOperationsPolicyTest extends TestCase
             $this->artisan('ops:validate-production')
                 ->expectsOutput('DB_QUEUE_CONNECTION must equal DB_CONNECTION for transactional queue writes.')
                 ->assertExitCode(1);
+        } finally {
+            app()->detectEnvironment(static fn (): string => $originalEnvironment);
+        }
+    }
+
+    public function test_policy_command_prints_the_effective_checkout_limits(): void
+    {
+        $originalEnvironment = app()->environment();
+        app()->detectEnvironment(static fn (): string => 'production');
+        $this->applyValidProductionConfig();
+        app('mail.manager')->forgetMailers();
+
+        try {
+            // Artisan::call + output, because expectsOutputToContain matches per
+            // write: the limits are one JSON line in one write.
+            $exitCode = Artisan::call('ops:validate-production');
+            $output = Artisan::output();
+
+            $this->assertSame(0, $exitCode, $output);
+            $this->assertStringContainsString('Effective checkout limits:', $output);
+            $this->assertStringContainsString('"user_per_hour":5', $output);
+            $this->assertStringContainsString('"ip_per_hour":10', $output);
+            $this->assertStringContainsString('"ip_per_day":30', $output);
+            $this->assertStringContainsString('"new_account_hours":24', $output);
         } finally {
             app()->detectEnvironment(static fn (): string => $originalEnvironment);
         }
