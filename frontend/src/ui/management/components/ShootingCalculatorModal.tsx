@@ -16,6 +16,35 @@ interface ShootingCalculatorModalProps {
     onAddPackage: (item: InvoiceItem, discount: InvoiceDiscount | null) => void;
 }
 
+/**
+ * A calculator checkbox with a 44 px tap target around it.
+ *
+ * daisyUI's checkbox is 24 px across (`--size: calc(var(--size-selector) * 6)`,
+ * measured in the built bundle), and 24 px is well below the 44 px a finger
+ * needs to hit a control reliably. The visible box stays 24 px — the *target*
+ * grows around it.
+ *
+ * The wrapper is 44 px wide and tall and centred on the box, and the negative
+ * margin takes back exactly the space the wrapper adds (10 px on each side:
+ * (44 − 24) / 2). So neither the checkbox nor the text next to it moves a
+ * pixel; only the area that answers a tap grows.
+ *
+ * The wrapper sits inside the `label`, and a label activates the control it
+ * wraps — so the whole 44 px answers the tap, not only the 24 px box.
+ */
+function CalculatorCheckbox({checked, onChange}: {checked: boolean; onChange: (checked: boolean) => void}) {
+    return (
+        <span className="inline-flex size-11 shrink-0 items-center justify-center -m-2.5">
+            <input
+                type="checkbox"
+                className="checkbox checkbox-primary shrink-0"
+                checked={checked}
+                onChange={e => onChange(e.target.checked)}
+            />
+        </span>
+    );
+}
+
 export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}: ShootingCalculatorModalProps) {
     const {terms} = useLicenseTerms();
 
@@ -171,8 +200,7 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                             {srpType === 'nude' && (
                                 <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                                     <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
-                                        <input type="checkbox" className="checkbox checkbox-primary shrink-0"
-                                               checked={srpPrivate} onChange={e => setSrpPrivate(e.target.checked)}/>
+                                        <CalculatorCheckbox checked={srpPrivate} onChange={setSrpPrivate}/>
                                         <div>
                                             <span className="label-text font-bold block"><Trans>Online-Verbot (Privacy Fee)</Trans></span>
                                             <span className="label-text-alt opacity-70 block mt-1 leading-tight text-wrap"><Trans>Absolutes Veröffentlichungsverbot (+200€)</Trans></span>
@@ -203,22 +231,19 @@ export default function ShootingCalculatorModal({isOpen, onClose, onAddPackage}:
                             </div>
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                                 <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
-                                    <input type="checkbox" className="checkbox checkbox-primary shrink-0"
-                                           checked={calcIsOutdoor} onChange={e => setCalcIsOutdoor(e.target.checked)}/>
+                                    <CalculatorCheckbox checked={calcIsOutdoor} onChange={setCalcIsOutdoor}/>
                                     <span className="label-text font-bold"><Trans>Outdoor-Shooting (Bilder/Std.: {outdoorImagesPerHour})</Trans></span>
                                 </label>
                             </div>
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                                 <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
-                                    <input type="checkbox" className="checkbox checkbox-primary shrink-0"
-                                           checked={calcIsFlatrate} onChange={e => setCalcIsFlatrate(e.target.checked)}/>
+                                    <CalculatorCheckbox checked={calcIsFlatrate} onChange={setCalcIsFlatrate}/>
                                     <span className="label-text font-bold"><Trans>Reportage-Paket (+{reportageSurchargePercent}% Aufschlag)</Trans></span>
                                 </label>
                             </div>
                             <div className="form-control bg-base-100 p-3 rounded-box border border-base-300 shadow-sm">
                                 <label className="cursor-pointer label justify-start gap-4 m-0 rounded-box hover:bg-base-300/50 transition-colors">
-                                    <input type="checkbox" className="checkbox checkbox-primary shrink-0"
-                                           checked={calcIsReorder} onChange={e => setCalcIsReorder(e.target.checked)}/>
+                                    <CalculatorCheckbox checked={calcIsReorder} onChange={setCalcIsReorder}/>
                                     <span className="label-text font-bold"><Trans>Nachbestellung (keine Setup-Gebühr)</Trans></span>
                                 </label>
                             </div>

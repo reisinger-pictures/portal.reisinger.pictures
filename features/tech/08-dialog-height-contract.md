@@ -2,7 +2,7 @@
 
 > **Status:** Soll-Zustand.
 > Domain: `tech`
-> Stand: 2026-09-28
+> Stand: 2026-10-21
 > Betrifft: `frontend/src/ui/components/ModalShell.tsx`,
 > `frontend/src/ui/components/ModalDialogShell.tsx`.
 
@@ -28,6 +28,21 @@ Das ist kein Anwendungsfehler, sondern eine Eigenschaft des Containers: wer
 sichtbaren Footer. Wer das nicht bemerkt, baut den Defekt in jedes Formular mit
 viel Inhalt ein.
 
+**Die Cap des Containers seit 2026-10-21 (Ergänzung).** `vh` misst den
+Viewport **ohne** die On-Screen-Tastatur; `dvh` misst ihn **mit**. Das Repo
+überschreibt daisyUIs Cap deshalb in `frontend/src/index.css`
+(`@layer utilities`): `.modal-box` bekommt `max-height: 100vh` als
+**Fallback** und `max-height: 100dvh` **innerhalb** eines
+`@supports (height: 100dvh)`-Blocks. Zwei Formen sind nötig, beide gemessen
+(Minifier `lightningcss`, Vite 8): **zwei Deklarationen in einer Regel** verliert
+der Minifier die `vh`-Deklaration, und **zwei Regeln mit demselben Selektor**
+verschmilzt er wieder — nur der `@supports`-Guard hält die Fallback-Deklaration
+im Bundle. `:where()` gibt der Cap **Spezifität 0**, damit die Utilities der
+App sie überstimmen können (im bounded Modus greift die benannte Höhe der
+Shell, §2.1). Die Cap gilt für **jeden** Dialog der App: alle `<dialog>`e
+rendert `ModalShell`. Im Default-Layout ist die wirksame Cap `100dvh`, im
+bounded Modus die benannte Höhe der Shell (`80dvh`/`90dvh`).
+
 ## 2. Der Vertrag: `scrollableBody`, opt-in
 
 `ModalShell` bekommt eine **opt-in**-Prop `scrollableBody` (Default `false`).
@@ -36,7 +51,7 @@ Scrollregion und hält den Footer darunter fest:
 
 | Element | Klasse | Aufgabe |
 |---|---|---|
-| `.modal-box` | `max-h-80vh`/`max-h-90vh` (über `height`) `flex flex-col` | begrenzt die Höhe, wird Flex-Column |
+| `.modal-box` | `max-h-80vh max-h-80dvh!`/`max-h-90vh max-h-90dvh!` (über `height`) `flex flex-col` | begrenzt die Höhe, wird Flex-Column |
 | Head-Wrapper (`bodyHead`) | `shrink-0` | hält den Kopf außerhalb der Scrollregion |
 | Body-Wrapper | `flex-1 min-h-0 overflow-y-auto pr-2` | scrollt den Inhalt, nicht den Footer |
 | Footer-Wrapper | `shrink-0` | verhindert, dass der Footer weggedrückt wird |
@@ -94,12 +109,21 @@ freien Wert gibt es nicht. Deklariert ist sie in `ModalShell.tsx` als
 
 | Wert | Klasse |
 |---|---|
-| `'80vh'` | `max-h-80vh` |
-| `'90vh'` (Default) | `max-h-90vh` |
+| `'80vh'` | `max-h-80vh max-h-80dvh!` |
+| `'90vh'` (Default) | `max-h-90vh max-h-90dvh!` |
 
-Beide Klassen sind `@utility`-Definitionen in `frontend/src/index.css`
-(`@utility max-h-80vh` → `max-height: 80vh`, `@utility max-h-90vh` →
-`max-height: 90vh`). Die Benennung ist keine Formsache: eine interpolierte
+Jeder Wert trägt **zwei** `@utility`-Definitionen in
+`frontend/src/index.css` (`max-h-80vh` → `max-height: 80vh`,
+`max-h-80dvh` → `max-height: 80dvh`, `max-h-90vh` → `max-height: 90vh`,
+`max-h-90dvh` → `max-height: 90dvh`), jede in ihrer **eigenen** Regel. Die
+`vh`-Regel ist der Fallback für Browser ohne `dvh`, die `dvh`-Regel die Cap, die
+greift. Die getrennten Regeln sind bei vier verschiedenen Klassen der Normalfall
+— der Minifier-Zwang (zwei Deklarationen in **einer** Regel → die `vh`-
+Deklaration fällt) betrifft die `.modal-box`-Cap, siehe §1. Die `dvh`-Klasse
+trägt Tailwinds Important-Modifier (`!`), weil beide Regeln dieselbe
+Spezifität haben und Tailwind `max-h-90dvh` **vor** `max-h-90vh` emittiert: ohne
+`!` gewinnt die statische Cap (gemessen im Browser: `90vh + 90dvh` → 540 px auf
+600 px Viewport, `90vh + 90dvh!` → 456 px). Die Benennung ist keine Formsache: eine interpolierte
 Klasse (`` `max-h-${value}` ``) sieht wie eine Lösung aus und verschwindet im
 Produktions-Bundle, weil Tailwinds Content-Scan sie nicht als Literal findet.
 Die Prop wirkt nur im begrenzten Modus; ohne `scrollableBody` wird sie
@@ -110,7 +134,11 @@ Der Anlass war ein Stapel: `GalleryAccessModal` und `PhotographerTeamModal`
 trugen `max-h-80vh` per `boxClassName`, der Opt-in fügt aber seine eigene
 `max-h-90vh` hinzu. Bei zwei Regeln gleicher Spezifität entscheidet die
 Reihenfolge im Stylesheet, nicht die Absicht des Aufrufers. Mit
-`height="80vh"` emittiert die Shell genau **eine** `max-h-*`-Klasse.
+`height="80vh"` emittiert die Shell genau **zwei** `max-h-*`-Klassen:
+`max-h-80vh` (Fallback) und `max-h-80dvh!` (die Cap, die greift). Der
+Important-Modifier macht den Gewinner zur **Absicht des Aufrufers** statt zur
+Reihenfolge im Stylesheet — ein `max-h-*` aus `boxClassName` kann die Cap der
+Shell nicht mehr überstimmen.
 
 ### 2.2 Der Kopf-Slot — `bodyHead`
 
@@ -159,7 +187,7 @@ Scroll-Container hat einen festen Rand, unter dem der Inhalt beim Scrollen
 durchläuft. Auf einer nicht scrollenden Box, die den Body nur umschließt, läuft
 nichts unter dieser Grenze durch: die Ausblendung maskiert dort **nichts**, und
 der Schnitt bleibt sichtbar. Im bounded Modus ist die Box
-(`max-h-90vh flex flex-col`) genau so ein umschließender Rahmen; die
+(`max-h-90vh max-h-90dvh! flex flex-col`) genau so ein umschließender Rahmen; die
 Scrollregion ist der Body (`flex-1 min-h-0 overflow-y-auto`, §2). Deshalb
 wandert `scroll-fade-bottom` mit dem Scrollport auf den Body — zusammen mit dem
 `pb-10`/`pb-8`, das den Inhalt von dem 2rem breiten Maskenband freihält.

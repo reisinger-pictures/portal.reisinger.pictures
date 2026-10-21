@@ -4,6 +4,9 @@ import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../../test-setup';
 import ModalShell from '../ModalShell';
+// The stylesheet as text: the dynamic cap is a CSS property, and a test that
+// reads the rule is the only way to see it (see the test below).
+import indexCss from '../../../index.css?raw';
 
 /**
  * The dialog accessibility contract lives in exactly one place, so it is
@@ -83,6 +86,28 @@ describe('ModalShell', () => {
         const { onClose } = renderShell();
 
         fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * The backdrop is the fourth close path next to the header button, Escape
+     * and the cancel event — and the only one a pointer reaches without
+     * touching the dialog itself.
+     *
+     * It is pinned here because the shell owns it: the shell routes the
+     * backdrop to the same `onClose` the other three use, so a caller that
+     * asks for confirmation before closing gets it on the backdrop too. A
+     * use-case test (the coupon form discards unsaved input) lives with that
+     * dialog; this is the contract underneath it.
+     */
+    it('closes on a backdrop click', () => {
+        const { onClose } = renderShell();
+
+        const backdrop = document.querySelector('.modal-backdrop') as HTMLElement;
+        expect(backdrop).not.toBeNull();
+
+        fireEvent.click(backdrop);
 
         expect(onClose).toHaveBeenCalledTimes(1);
     });
@@ -457,18 +482,86 @@ describe('ModalShell', () => {
      * added the shell's `max-h-90vh` alongside it, and stylesheet order — not
      * intent — would pick the winner. The named value is what removes that
      * decision from the caller.
+     *
+     * Each height is emitted twice: once in `vh` and once in `dvh`. The
+     * static cap is the fallback for a browser that does not know `dvh`, the
+     * dynamic one is the cap that survives an open soft keyboard. Both belong
+     * to the same height — the caller still picks one, and the shell still
+     * emits no height of its own.
      */
     it('applies exactly one named max-height class in the bounded layout', () => {
         const eighty = renderShell({ scrollableBody: true, height: '80vh' });
         let box = screen.getByRole('dialog').firstElementChild as HTMLElement;
         expect(box).toHaveClass('max-h-80vh', 'flex', 'flex-col');
+        expect(box).toHaveClass('max-h-80dvh!');
         expect(box).not.toHaveClass('max-h-90vh');
+        expect(box).not.toHaveClass('max-h-90dvh!');
         eighty.unmount();
 
         renderShell({ scrollableBody: true });
         box = screen.getByRole('dialog').firstElementChild as HTMLElement;
         expect(box).toHaveClass('max-h-90vh', 'flex', 'flex-col');
+        expect(box).toHaveClass('max-h-90dvh!');
         expect(box).not.toHaveClass('max-h-80vh');
+        expect(box).not.toHaveClass('max-h-80dvh!');
+    });
+
+    /**
+     * The dynamic cap itself.
+     *
+     * `vh` is the *large* viewport: the height with the soft keyboard taken
+     * out of the picture. A dialog capped with it is taller than the screen
+     * once the keyboard is up, and the footer — the row the user has to reach —
+     * sits below the keyboard. `dvh` is the viewport as it is right now.
+     *
+     * Neither a unit test nor an E2E test can observe the difference: jsdom
+     * has no layout, and in a desktop browser `dvh` and `vh` are the same
+     * number. What is observable is the stylesheet, so the stylesheet is what
+     * is pinned here — the two caps, their order, and the rule that keeps the
+     * dynamic one ahead of the static one in the cascade.
+     */
+    it('caps the dialog against the dynamic viewport height, with the static one as fallback', () => {
+        const css = indexCss;
+
+        for (const height of ['80', '90']) {
+            const rule = css.match(new RegExp(`@utility max-h-${height}vh \\{([^}]*)\\}`))?.[1] ?? '';
+            // The static cap: the fallback for a browser that does not know
+            // `dvh`.
+            expect(rule).toContain(`max-height: ${height}vh;`);
+            // The dynamic cap: its own rule, so the minifier cannot collapse
+            // the two into one and take the fallback with it.
+            expect(css).toContain(`@utility max-h-${height}dvh {`);
+            expect(css).toMatch(new RegExp(`@utility max-h-${height}dvh \\{\\s*max-height: ${height}dvh;`));
+        }
+
+        // The default layout caps the box against daisyUI's own `.modal-box`
+        // rule; the same keyboard, the same defect.
+        //
+        // Two rules, in this order: the `vh` cap is the fallback for a browser
+        // that does not know `dvh`, the `dvh` cap applies where the unit is
+        // understood. Two rules and not two declarations in one, because the
+        // minifier keeps the *last* declaration of a rule and would drop the
+        // `vh` one with it (measured with the project's lightningcss 1.33.0:
+        // `.a{max-height:100vh;max-height:100dvh}` minifies to
+        // `.a{max-height:100dvh}` — the fallback would never ship).
+        //
+        // `:where()` is what makes this a *default* rather than a lock: the
+        // rule gets no specificity, so the app's own utilities win over it —
+        // the shell's `max-h-90vh`/`max-h-90dvh!` decide the height of a
+        // bounded dialog. Without it, this rule would win on stylesheet order
+        // (the hand-written `utilities` block comes after the utilities
+        // Tailwind generates) and the bounded dialog would be capped at
+        // `100dvh` instead of `90dvh`.
+        const fallback = /:where\(\.modal-box\) \{\s*max-height: 100vh;\s*\}/.exec(css);
+        const dynamic =
+            /@supports \(height: 100dvh\) \{\s*:where\(\.modal-box\) \{\s*max-height: 100dvh !important;\s*\}\s*\}/.exec(
+                css,
+            );
+        expect(fallback).not.toBeNull();
+        expect(dynamic).not.toBeNull();
+        // The fallback first, the dynamic cap last: where `dvh` is
+        // understood, the dynamic cap is the one that applies.
+        expect(fallback!.index).toBeLessThan(dynamic!.index);
     });
 
     it('ignores the height without the opt-in', () => {

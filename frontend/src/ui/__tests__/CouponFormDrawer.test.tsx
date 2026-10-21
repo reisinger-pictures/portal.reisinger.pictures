@@ -343,4 +343,70 @@ describe('CouponFormDrawer', () => {
 
         expect(onClose).toHaveBeenCalledTimes(1);
     });
+
+    /**
+     * The backdrop close path of the management coupon form.
+     *
+     * `handleClose` is the drawer's one close path: the header button, the
+     * backdrop, Escape and the cancel button all route through it, so a
+     * changed form asks before it is discarded. The backdrop is the path a
+     * pointer takes by accident — a click next to the dialog — and it is the
+     * one that used to drop typed input without a word. Only Escape was
+     * covered before, and only for an untouched form.
+     */
+    it('asks before it discards a changed form when the backdrop is clicked', async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+
+        // Typing marks the form dirty; from here on the close path has to ask.
+        await user.type(screen.getByPlaceholderText('z.B. SOMMER2026'), 'ABANDON');
+
+        const backdrop = document.querySelector('.modal-backdrop') as HTMLElement;
+        expect(backdrop).not.toBeNull();
+        await user.click(backdrop);
+
+        await waitFor(() => {
+            expect(mockUIContext.confirm).toHaveBeenCalledTimes(1);
+        });
+        expect(mockUIContext.confirm).toHaveBeenCalledWith(
+            expect.objectContaining({ confirmText: 'Verwerfen' }),
+        );
+        // The warning comes first, the close second — the form is only dropped
+        // after the user confirmed the loss.
+        await waitFor(() => {
+            expect(onClose).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('closes an unchanged form on a backdrop click without asking', async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+
+        const backdrop = document.querySelector('.modal-backdrop') as HTMLElement;
+        expect(backdrop).not.toBeNull();
+        await user.click(backdrop);
+
+        // Nothing was typed, so there is nothing to warn about: the drawer
+        // closes straight away.
+        expect(mockUIContext.confirm).not.toHaveBeenCalled();
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the form open when the discard warning is declined', async () => {
+        const user = userEvent.setup();
+        vi.mocked(mockUIContext.confirm).mockResolvedValueOnce(false);
+        renderDrawer();
+
+        await user.type(screen.getByPlaceholderText('z.B. SOMMER2026'), 'KEEP');
+
+        const backdrop = document.querySelector('.modal-backdrop') as HTMLElement;
+        await user.click(backdrop);
+
+        await waitFor(() => {
+            expect(mockUIContext.confirm).toHaveBeenCalledTimes(1);
+        });
+        // A declined warning must not close the drawer — that is the whole
+        // point of asking.
+        expect(onClose).not.toHaveBeenCalled();
+    });
 });
