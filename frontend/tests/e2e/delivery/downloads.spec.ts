@@ -7,6 +7,7 @@ import {SidebarHelper} from '../helpers/SidebarHelper';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 import {FormHelper} from '../helpers/FormHelper';
+import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
 
 const watermarkAsset = readFileSync(path.resolve(process.cwd(), 'public/brands/rp/logo-email-64.png'));
 
@@ -165,64 +166,76 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
         const galleryName = await setupGalleryAndAssign(page, request, 'print');
         const auth = new AuthHelper(page);
 
-        await auth.login(clientUser.email, clientUser.password);
-        await page.locator('main').locator('.card').filter({hasText: galleryName}).first().click();
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.login(clientUser.email, clientUser.password);
+            await page.locator('main').locator('.card').filter({hasText: galleryName}).first().click();
 
-        // Requirement: Sicherstellen, dass das Bild für den Kunden korrekt geladen und angezeigt wird
-        const image = page.locator('a.pswp-item img').first();
-        await expect(image).toBeVisible({timeout: 15000});
-        await image.scrollIntoViewIfNeeded();
+            // Requirement: Sicherstellen, dass das Bild für den Kunden korrekt geladen und angezeigt wird
+            const image = page.locator('a.pswp-item img').first();
+            await expect(image).toBeVisible({timeout: 15000});
+            await image.scrollIntoViewIfNeeded();
 
-        await page.getByRole('button', {name: 'Bild öffnen'}).first().click();
-        await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible({timeout: 10000});
+            await page.getByRole('button', {name: 'Bild öffnen'}).first().click();
+            await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible({timeout: 10000});
 
-        // Werbung/Kampagne erfordert Original -> Der Kunde hat aber nur Print
-        // Da es ein normaler Kunde ist, darf er keine Upsells kaufen, daher ist die Option versteckt.
-        await expect(page.locator('label').filter({hasText: 'Werbung / Kampagne'})).toBeHidden({timeout: 10000});
+            // Werbung/Kampagne erfordert Original -> Der Kunde hat aber nur Print
+            // Da es ein normaler Kunde ist, darf er keine Upsells kaufen, daher ist die Option versteckt.
+            await expect(page.locator('label').filter({hasText: 'Werbung / Kampagne'})).toBeHidden({timeout: 10000});
 
-        const cartButton = page.getByRole('button', {name: /In den Warenkorb/i});
-        await expect(cartButton).toBeHidden();
+            const cartButton = page.getByRole('button', {name: /In den Warenkorb/i});
+            await expect(cartButton).toBeHidden();
+        });
     });
 
     test('Test 3: Single Download executes successfully when covered by flatrate', { tag: ['@feature:delivery:download'] }, async ({page, request}) => {
         const galleryName = await setupGalleryAndAssign(page, request, 'original');
         const auth = new AuthHelper(page);
 
-        await auth.login(clientUser.email, clientUser.password);
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.login(clientUser.email, clientUser.password);
 
-        // Verify flatrate_level is applied in the frontend
-        await expect(async () => {
-            const meRes = await page.request.get('/api/auth/me', { headers: { 'Accept': 'application/json' } });
-            const userData = await meRes.json();
-            expect(userData.flatrate_level).toBe('original');
-        }).toPass({ timeout: 10000 });
+            // Verify flatrate_level is applied in the frontend
+            await expect(async () => {
+                const meRes = await page.request.get('/api/auth/me', { headers: { 'Accept': 'application/json' } });
+                const userData = await meRes.json();
+                expect(userData.flatrate_level).toBe('original');
+            }).toPass({ timeout: 10000 });
 
-        await page.locator('main').locator('.card').filter({hasText: galleryName}).first().click();
+            await page.locator('main').locator('.card').filter({hasText: galleryName}).first().click();
 
-        // Requirement: Sicherstellen, dass das Bild für den Kunden korrekt geladen und angezeigt wird
-        const image = page.locator('a.pswp-item img').first();
-        await expect(image).toBeVisible({timeout: 15000});
-        await image.scrollIntoViewIfNeeded();
+            // Requirement: Sicherstellen, dass das Bild für den Kunden korrekt geladen und angezeigt wird
+            const image = page.locator('a.pswp-item img').first();
+            await expect(image).toBeVisible({timeout: 15000});
+            await image.scrollIntoViewIfNeeded();
 
-        await page.getByRole('button', {name: 'Bild öffnen'}).first().click();
-        await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible({timeout: 10000});
+            await page.getByRole('button', {name: 'Bild öffnen'}).first().click();
+            await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible({timeout: 10000});
 
-        const werbungLabel = page.getByText(/Werbung.*Kampagne|Kampagne.*Werbung/).first();
-        await expect(werbungLabel).toBeVisible({timeout: 10000});
-        await werbungLabel.click();
+            const werbungLabel = page.getByText(/Werbung.*Kampagne|Kampagne.*Werbung/).first();
+            await expect(werbungLabel).toBeVisible({timeout: 10000});
+            await werbungLabel.click();
 
-        const downloadLink = page.getByRole('link', {name: 'Download', exact: true}).first();
-        await expect(downloadLink).toBeVisible();
+            const downloadLink = page.getByRole('link', {name: 'Download', exact: true}).first();
+            await expect(downloadLink).toBeVisible();
 
-        // target="_blank" entfernen, damit der Download zuverlässig gefangen wird
-        await downloadLink.evaluate(node => node.removeAttribute('target'));
+            // target="_blank" entfernen, damit der Download zuverlässig gefangen wird
+            await downloadLink.evaluate(node => node.removeAttribute('target'));
 
-        const [download] = await Promise.all([
-            page.waitForEvent('download', {timeout: 30000}),
-            downloadLink.click()
-        ]);
+            const [download] = await Promise.all([
+                page.waitForEvent('download', {timeout: 30000}),
+                downloadLink.click()
+            ]);
 
-        expect(download.suggestedFilename()).toMatch(/\.jpg$/i);
+            expect(download.suggestedFilename()).toMatch(/\.jpg$/i);
+        });
     });
 
     test('Test 4: Admin and Photographer see the Admin Download button in PhotoDetailView', { tag: ['@feature:delivery:download'] }, async ({page, request}) => {

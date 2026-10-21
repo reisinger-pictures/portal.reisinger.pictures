@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Setting;
 use App\Support\BrandRegistry;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
@@ -37,6 +38,7 @@ class BrandSettingsService
         'from_name',
         'accounting_email',
         'features.orgs',
+        'pricing_strategy',
     ];
 
     private const KEY_PREFIX = 'brand_config.';
@@ -105,16 +107,23 @@ class BrandSettingsService
      */
     public function overridesFor(string $brand): array
     {
-        // Tolerate a missing table (fresh :memory: test DBs without
-        // RefreshDatabase, pre-migration states): no overrides then.
-        if (! Schema::hasTable('settings')) {
-            return [];
-        }
+        try {
+            $rows = Setting::query()
+                ->where('brand', $brand)
+                ->where('key', 'like', self::KEY_PREFIX.'%')
+                ->get(['key', 'value']);
+        } catch (QueryException $exception) {
+            // Tolerate a missing table (fresh :memory: test DBs without
+            // RefreshDatabase, pre-migration states): no overrides then. The
+            // existence is checked only here and not before the read: the
+            // check costs a query, and this read runs on every pricing
+            // resolution — a hot path where the table always exists.
+            if (! Schema::hasTable('settings')) {
+                return [];
+            }
 
-        $rows = Setting::query()
-            ->where('brand', $brand)
-            ->where('key', 'like', self::KEY_PREFIX.'%')
-            ->get(['key', 'value']);
+            throw $exception;
+        }
 
         $overrides = [];
         foreach ($rows as $row) {

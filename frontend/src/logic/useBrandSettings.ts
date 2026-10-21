@@ -1,6 +1,16 @@
 import useSWR from 'swr';
 import { apiMutate, fetcher } from '../api';
+import { t } from '@lingui/core/macro';
 import { z } from 'zod';
+
+/**
+ * The pricing modes the backend accepts (see `PricingStrategyResolver::MODES`).
+ * The empty string is the form value for "no brand overlay".
+ */
+export const PRICING_STRATEGY_MODES = ['scope_licensing', 'volume_licensing'] as const;
+
+/** One of the known pricing modes. */
+export type PricingStrategyMode = typeof PRICING_STRATEGY_MODES[number];
 
 /** Effective/config values for a single brand (nested `features` object). */
 export interface BrandSettingFields {
@@ -14,7 +24,12 @@ export interface BrandSettingFields {
     from_name: string | null;
     accounting_email: string | null;
     features: { orgs: boolean };
+    /** The resolved pricing mode of the brand (never null in `effective`). */
+    pricing_strategy: PricingStrategyMode | null;
 }
+
+/** Where the effective pricing mode comes from. */
+export type BrandPricingStrategySource = 'overlay' | 'setting' | 'default';
 
 export interface BrandSetting {
     id: string;
@@ -22,6 +37,7 @@ export interface BrandSetting {
     defaults: BrandSettingFields;
     overrides: Record<string, unknown>;
     effective: BrandSettingFields;
+    pricing_strategy_source: BrandPricingStrategySource;
 }
 
 /** Partial PUT payload. `null` resets a single field back to its config default. */
@@ -36,6 +52,8 @@ export interface BrandSettingsPayload {
     from_name?: string | null;
     accounting_email?: string | null;
     features?: { orgs?: boolean | null } | null;
+    /** `null` drops the brand overlay; a mode string sets it. */
+    pricing_strategy?: PricingStrategyMode | null;
 }
 
 const hexColorRegex = /^#[0-9a-fA-F]{6}$/;
@@ -58,7 +76,23 @@ export const createBrandSettingsSchema = () =>
         primary_color: z.string().regex(hexColorRegex, 'Hex-Farbwert erforderlich (z. B. #1E5631)'),
         secondary_color: z.string().regex(hexColorRegex, 'Hex-Farbwert erforderlich (z. B. #1E5631)'),
         features: z.object({ orgs: z.boolean() }),
+        pricing_strategy: z.string().refine(
+            (value) => value === '' || PRICING_STRATEGY_MODES.includes(value as typeof PRICING_STRATEGY_MODES[number]),
+            t`Ungültige Preisstrategie.`,
+        ),
     });
+
+/**
+ * Narrow a form value to a known pricing mode.
+ *
+ * The zod schema is the gate: it only admits the known modes, so an unknown
+ * value never reaches the payload. The empty selection ("no brand overlay")
+ * and an unknown value both narrow to `null` — the backend drops the overlay
+ * row and the settings row governs again.
+ */
+export function toPricingStrategyMode(value: string): PricingStrategyMode | null {
+    return PRICING_STRATEGY_MODES.find((mode) => mode === value) ?? null;
+}
 
 export type BrandSettingsFormValues = z.infer<ReturnType<typeof createBrandSettingsSchema>>;
 

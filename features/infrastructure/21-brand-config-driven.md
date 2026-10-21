@@ -57,11 +57,20 @@ and keep the mandatory seed step after every migration path.
 
 ## Pricing Strategy Resolution (Brand Context)
 
-The brand-config-driven architecture interacts with the Pricing Strategy Pattern (`features/infrastructure/17-pricing-strategy-pattern.md`) via the brand-scoped `pricing_strategy` DB setting. The config feature flag is documentation/metadata only; the actual runtime strategy binding reads the DB setting in `AppServiceProvider::register()`. Gallery-level `licensing_mode` and `volume_preset_id` can override the brand default at checkout:
+The brand-config-driven architecture interacts with the Pricing Strategy Pattern (`features/infrastructure/17-pricing-strategy-pattern.md`) via the brand-scoped `pricing_strategy` DB setting. The config feature flag is documentation/metadata only; the actual runtime strategy binding reads the DB setting in `AppServiceProvider::register()`. Gallery-level `licensing_mode` and `volume_preset_id` can override the brand default at checkout.
+
+The brand default is resolved by a single choke point, `app/Services/PricingStrategyResolver.php` — the only place that queries the settings table for that key. For a given brand:
 
 ```
-settings.pricing_strategy (brand='rp') → AppServiceProvider → PricingStrategy binding
+brand_config.pricing_strategy (brand overlay)      ← strongest source (super-admin edit)
+  → settings.pricing_strategy (brand row)
+    → settings.pricing_strategy (brand='rp' row)   ← brand fallback, mirrors SettingResolver::get()
+      → scope_licensing                             ← built-in default
 ```
+
+A stored value outside `scope_licensing` / `volume_licensing` is ignored and the resolution falls through to the next source. `Gallery::effective_licensing_mode`, the public pricing endpoint (`SettingsController::resolveLicensePricingContext()`), the runtime `PricingStrategy` binding and the admin UI all read through the resolver, so they can never disagree.
+
+The brand overlay is written through the F3 brand-settings endpoint (`brand_config.pricing_strategy` in the existing `settings` table) and is editable in the admin UI — the "Preisstrategie" select of the brand-settings card. `config/brands.php` carries **no** pricing-strategy default: `defaults.pricing_strategy` is always `null` and the effective mode is resolved as shown above. See `22-brand-settings-overlay.md` and `17-pricing-strategy-pattern.md` §3.1.
 
 The `VolumeLicensingStrategy` (formerly "SRP" volume pricing) is now a
 **generic** volume-licensing mode usable by any configured brand, not
@@ -91,8 +100,8 @@ F3 adds an **admin-UI for per-brand settings overrides** — deliberately **not*
 | Routes | `backend/routes/api.php:260-261` — `GET /api/management/brand-settings` (auth:api, all management roles) and `PUT /api/management/brand-settings/{brand}` (`super_admin` middleware). |
 | Merge | `BrandRegistry::buildFromArray()` overlays DB overrides onto the config default before constructing `BrandConfig`. Merge precedence: **DB override > config default**; config-only keys (theme, logos, hostnames, `is_active`) are never touched. |
 | Frontend hook | `frontend/src/logic/useBrandSettings.ts` — SWR `GET`, `updateBrandSettings(brand, payload)` → `PUT`. Zod schema + partial-nullable `BrandSettingsPayload`. |
-| Frontend UI | `frontend/src/ui/management/components/BrandSettingsCard.tsx` — per-brand editor (RHF + zod, explicit "Speichern" button, "Auf Standard zurücksetzen" → `null` overrides), rendered **only for super_admins** inside `ManagementSettingsView.tsx` (`{isSuperAdmin && <BrandSettingsCard/>}`). |
-| Tests | `backend/tests/Feature/BrandSettingsControllerTest.php` (auth 401/403/200, 422 validation, null-reset, merge-precedence, no cross-brand leak), `frontend/src/ui/__tests__/useBrandSettings.test.ts`, `frontend/tests/e2e/admin/settings/brand-settings.spec.ts` (`@feature:admin:brand-settings`). |
+| Frontend UI | `frontend/src/ui/management/components/BrandSettingsCard.tsx` — per-brand editor (RHF + zod, explicit "Speichern" button, "Auf Standard zurücksetzen" → `null` overrides), rendered **only for super_admins** inside `ManagementSettingsView.tsx` (`{isSuperAdmin && <BrandSettingsCard/>}`). The "Preisstrategie" select edits the brand overlay of the pricing mode; the form carries the **overlay** value, the effective mode and its source are shown as a hint. |
+| Tests | `backend/tests/Feature/BrandSettingsControllerTest.php` (auth 401/403/200, 422 validation, null-reset, merge-precedence, no cross-brand leak), `frontend/src/logic/__tests__/useBrandSettings.test.ts`, `frontend/tests/e2e/admin/settings/brand-settings.spec.ts` (`@feature:admin:brand-settings`). |
 
 ### Migration note
 
@@ -100,7 +109,7 @@ F3 adds an **admin-UI for per-brand settings overrides** — deliberately **not*
 
 ### API endpoints
 
-- `GET /api/management/brand-settings` → `{ brands: [{ id, editable_fields, defaults, overrides, effective }] }` for every configured brand.
+- `GET /api/management/brand-settings` → `{ brands: [{ id, editable_fields, defaults, overrides, effective, pricing_strategy_source }] }` for every configured brand.
 - `PUT /api/management/brand-settings/{brand}` → partial payload (`{ field: value | null }`); `null` resets that field to its config default. Returns `{ success, effective }`. Super-admin only.
 
 See `22-brand-settings-overlay.md` for the full SOLL contract (overridable whitelist, merge precedence, API shape, components).

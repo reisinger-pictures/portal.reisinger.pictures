@@ -7,12 +7,12 @@ use App\Contracts\PricingStrategy;
 use App\Enums\UserRole;
 use App\Mail\Transports\GmailRestTransport;
 use App\Models\Customer;
-use App\Models\Setting;
 use App\Observers\CustomerObserver;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Services\AuthorizationService;
 use App\Services\CouponService;
+use App\Services\PricingStrategyResolver;
 use App\Services\VolumePresetService;
 use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
@@ -93,12 +93,16 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->bind(PricingStrategy::class, function ($app) {
-            $strategy = Setting::where('key', 'pricing_strategy')
-                ->where('brand', BrandRegistry::currentOrDefault())
-                ->value('value') ?? 'scope_licensing';
+            // The context resolution is the resolver's own: `resolve()` without
+            // an argument normalises the active brand exactly like the public
+            // endpoint (`SettingsController::resolveLicensePricingContext()`).
+            // Passing `BrandRegistry::currentOrDefault()->value` here would let
+            // the two call sites disagree: that helper falls back to the enum's
+            // B2B brand for a context whose id is outside `App\Enums\Brand`.
+            $strategy = $app->make(PricingStrategyResolver::class)->resolve();
 
             return match ($strategy) {
-                'volume_licensing' => new VolumeLicensingStrategy(
+                PricingStrategyResolver::VOLUME_LICENSING => new VolumeLicensingStrategy(
                     $app->make(VolumePresetService::class)
                         ->resolveDefaultForBrand(BrandRegistry::currentOrDefault()),
                     $app->make(CouponService::class)

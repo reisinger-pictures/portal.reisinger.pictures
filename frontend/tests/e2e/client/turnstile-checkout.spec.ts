@@ -3,6 +3,7 @@ import {AuthHelper} from '../helpers/AuthHelper';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {FormHelper} from '../helpers/FormHelper';
 import {GalleryHelper} from '../helpers/GalleryHelper';
+import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {SidebarHelper} from '../helpers/SidebarHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
@@ -107,95 +108,101 @@ test.describe('Risk-triggered Turnstile checkout', () => {
         expect(useCase).toBeDefined();
         if (!useCase) throw new Error('Turnstile E2E license catalog has no paid use case.');
 
-        await auth.logout();
-        await auth.login(buyer.email, buyer.password);
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.logout();
+            await auth.login(buyer.email, buyer.password);
 
-        const checkoutPayload = {
-            items: [{
-                photoId: photo.id,
-                tier: useCase.flatrate_tier,
-                useCaseId: useCase.id,
-                modifierIds: []
-            }],
-            quote_token: null,
-            billing_name: 'Turnstile E2E',
-            billing_company: '',
-            billing_street: 'Teststraße 42',
-            billing_zip: '1010',
-            billing_city: 'Wien',
-            payment_method: 'stripe',
-            quote_message: '',
-            withdrawal_waived: true,
-            coupon_code: null
-        };
-        // Each priming request must be a distinct server fingerprint. Otherwise
-        // same-fingerprint recovery returns the pending order before risk runs.
-        for (let attempt = 1; attempt <= 2; attempt += 1) {
-            const response = await page.request.post('/api/orders/checkout', {
-                data: {...checkoutPayload, billing_name: `Turnstile Prime ${attempt}`},
-                headers: {
-                    Accept: 'application/json',
-                    'Idempotency-Key': crypto.randomUUID()
-                }
+            const checkoutPayload = {
+                items: [{
+                    photoId: photo.id,
+                    tier: useCase.flatrate_tier,
+                    useCaseId: useCase.id,
+                    modifierIds: []
+                }],
+                quote_token: null,
+                billing_name: 'Turnstile E2E',
+                billing_company: '',
+                billing_street: 'Teststraße 42',
+                billing_zip: '1010',
+                billing_city: 'Wien',
+                payment_method: 'stripe',
+                quote_message: '',
+                withdrawal_waived: true,
+                coupon_code: null
+            };
+            // Each priming request must be a distinct server fingerprint. Otherwise
+            // same-fingerprint recovery returns the pending order before risk runs.
+            for (let attempt = 1; attempt <= 2; attempt += 1) {
+                const response = await page.request.post('/api/orders/checkout', {
+                    data: {...checkoutPayload, billing_name: `Turnstile Prime ${attempt}`},
+                    headers: {
+                        Accept: 'application/json',
+                        'Idempotency-Key': crypto.randomUUID()
+                    }
+                });
+                expect(response.status(), await response.text()).toBe(200);
+            }
+
+            const main = page.getByRole('main');
+            await main.getByText(galleryName, {exact: true}).first().click();
+            await main.getByRole('button', {name: 'Bild öffnen'}).first().click();
+            await main.getByRole('button', {name: 'In den Warenkorb'}).click();
+            await sidebar.navigateTo('Warenkorb');
+            // "Turnstile E2E" is intentionally distinct from both priming names,
+            // making this the third paid fingerprint and therefore risk attempt.
+            await form.fillCheckoutForm({
+                name: 'Turnstile E2E',
+                street: 'Teststraße 42',
+                zip: '1010',
+                city: 'Wien',
+                acceptAgb: true,
+                waiveWithdrawal: true
             });
-            expect(response.status(), await response.text()).toBe(200);
-        }
 
-        const main = page.getByRole('main');
-        await main.getByText(galleryName, {exact: true}).first().click();
-        await main.getByRole('button', {name: 'Bild öffnen'}).first().click();
-        await main.getByRole('button', {name: 'In den Warenkorb'}).click();
-        await sidebar.navigateTo('Warenkorb');
-        // "Turnstile E2E" is intentionally distinct from both priming names,
-        // making this the third paid fingerprint and therefore risk attempt.
-        await form.fillCheckoutForm({
-            name: 'Turnstile E2E',
-            street: 'Teststraße 42',
-            zip: '1010',
-            city: 'Wien',
-            acceptAgb: true,
-            waiveWithdrawal: true
+            const initialRequestPromise = page.waitForRequest(request => (
+                request.url().includes('/api/orders/checkout') && request.method() === 'POST'
+            ));
+            const initialResponsePromise = page.waitForResponse(response => (
+                response.url().includes('/api/orders/checkout') && response.request().method() === 'POST'
+            ));
+            const checkoutButton = main.getByRole('button', {name: 'Zahlungspflichtig bestellen'});
+            await checkoutButton.click();
+
+            const [initialRequest, initialResponse] = await Promise.all([
+                initialRequestPromise,
+                initialResponsePromise
+            ]);
+            expect(initialResponse.status()).toBe(403);
+            expect(await initialResponse.json()).toEqual(expect.objectContaining({turnstile_required: true}));
+            await expect(main.getByRole('heading', {name: 'Sicherheitsprüfung'})).toBeVisible({timeout: 15000});
+            const turnstileSection = main.getByRole('region', {name: 'Sicherheitsprüfung'});
+            const turnstileStatus = turnstileSection.getByRole('status');
+            await expect(turnstileStatus).toBeVisible({timeout: 15000});
+            await expect(turnstileStatus).toHaveText(TURNSTILE_TEST_STATUS);
+            await expect(checkoutButton).toBeEnabled({timeout: 15000});
+
+            const verifiedRequestPromise = page.waitForRequest(request => (
+                request.url().includes('/api/orders/checkout') && request.method() === 'POST'
+            ));
+            const verifiedResponsePromise = page.waitForResponse(response => (
+                response.url().includes('/api/orders/checkout') && response.request().method() === 'POST'
+            ));
+            await checkoutButton.click();
+
+            const [verifiedRequest, verifiedResponse] = await Promise.all([
+                verifiedRequestPromise,
+                verifiedResponsePromise
+            ]);
+            expect(verifiedResponse.status(), await verifiedResponse.text()).toBe(200);
+            expect(verifiedRequest.headers()['idempotency-key']).toBe(initialRequest.headers()['idempotency-key']);
+            const verifiedPayload = verifiedRequest.postDataJSON() as Record<string, unknown>;
+            expect(verifiedPayload.turnstile_token).toBe(TURNSTILE_TEST_TOKEN);
+            await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({timeout: 15000});
+            await expect(main.getByRole('heading', {name: 'Sicherheitsprüfung'})).toHaveCount(0);
         });
-
-        const initialRequestPromise = page.waitForRequest(request => (
-            request.url().includes('/api/orders/checkout') && request.method() === 'POST'
-        ));
-        const initialResponsePromise = page.waitForResponse(response => (
-            response.url().includes('/api/orders/checkout') && response.request().method() === 'POST'
-        ));
-        const checkoutButton = main.getByRole('button', {name: 'Zahlungspflichtig bestellen'});
-        await checkoutButton.click();
-
-        const [initialRequest, initialResponse] = await Promise.all([
-            initialRequestPromise,
-            initialResponsePromise
-        ]);
-        expect(initialResponse.status()).toBe(403);
-        expect(await initialResponse.json()).toEqual(expect.objectContaining({turnstile_required: true}));
-        await expect(main.getByRole('heading', {name: 'Sicherheitsprüfung'})).toBeVisible({timeout: 15000});
-        const turnstileSection = main.getByRole('region', {name: 'Sicherheitsprüfung'});
-        const turnstileStatus = turnstileSection.getByRole('status');
-        await expect(turnstileStatus).toBeVisible({timeout: 15000});
-        await expect(turnstileStatus).toHaveText(TURNSTILE_TEST_STATUS);
-        await expect(checkoutButton).toBeEnabled({timeout: 15000});
-
-        const verifiedRequestPromise = page.waitForRequest(request => (
-            request.url().includes('/api/orders/checkout') && request.method() === 'POST'
-        ));
-        const verifiedResponsePromise = page.waitForResponse(response => (
-            response.url().includes('/api/orders/checkout') && response.request().method() === 'POST'
-        ));
-        await checkoutButton.click();
-
-        const [verifiedRequest, verifiedResponse] = await Promise.all([
-            verifiedRequestPromise,
-            verifiedResponsePromise
-        ]);
-        expect(verifiedResponse.status(), await verifiedResponse.text()).toBe(200);
-        expect(verifiedRequest.headers()['idempotency-key']).toBe(initialRequest.headers()['idempotency-key']);
-        const verifiedPayload = verifiedRequest.postDataJSON() as Record<string, unknown>;
-        expect(verifiedPayload.turnstile_token).toBe(TURNSTILE_TEST_TOKEN);
-        await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({timeout: 15000});
-        await expect(main.getByRole('heading', {name: 'Sicherheitsprüfung'})).toHaveCount(0);
     });
 });

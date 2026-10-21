@@ -12,7 +12,6 @@ use App\Models\LicenseModifier;
 use App\Models\LicenseUseCase;
 use App\Models\Order;
 use App\Models\Photo;
-use App\Models\Setting;
 use App\Models\User;
 use App\Models\VolumePreset;
 use App\Pricing\ScopeLicensingStrategy;
@@ -729,30 +728,33 @@ class CheckoutService
     private function groupItemsByLicensingMode(array $strategyItems): array
     {
         $groups = [];
+        $brandId = BrandRegistry::currentIdOrNull() ?? BrandRegistry::currentOrDefault()->value;
+
+        // The compatibility fallback only applies while the brand has stored NO
+        // strategy at all: an overlay row, a settings row — or a settings row
+        // with an invalid value — is a stored configuration and therefore wins
+        // over a manually injected strategy.
         $injectedVolumeFallback = $this->strategy instanceof VolumeLicensingStrategy
-            && ! Setting::query()
-                ->where('key', 'pricing_strategy')
-                ->where('brand', BrandRegistry::currentIdOrNull() ?? BrandRegistry::currentOrDefault()->value)
-                ->exists();
+            && ! app(PricingStrategyResolver::class)->hasStoredStrategy($brandId);
 
         foreach ($strategyItems as $item) {
             $gallery = Gallery::find($item['gallery_id']);
-            $mode = $gallery ? $gallery->effective_licensing_mode : 'scope_licensing';
+            $mode = $gallery ? $gallery->effective_licensing_mode : PricingStrategyResolver::SCOPE_LICENSING;
 
             // A manually injected volume strategy remains the fallback for
             // legacy callers that have not yet created the brand setting. An
-            // explicit gallery override, or an existing brand setting, always
-            // wins over that compatibility fallback.
-            if ($mode === 'scope_licensing'
+            // explicit gallery override, an existing brand setting or a brand
+            // overlay always wins over that compatibility fallback.
+            if ($mode === PricingStrategyResolver::SCOPE_LICENSING
                 && $gallery?->licensing_mode === null
                 && $injectedVolumeFallback) {
-                $mode = 'volume_licensing';
+                $mode = PricingStrategyResolver::VOLUME_LICENSING;
             }
 
             // Resolve a null gallery override to the concrete brand-default ID
             // so it shares the retroactive tier with a gallery that explicitly
             // selects that same default preset.
-            $presetKey = $mode === 'volume_licensing'
+            $presetKey = $mode === PricingStrategyResolver::VOLUME_LICENSING
                 ? app(VolumePresetService::class)->resolveForGallery($gallery)->id
                 : 'default';
             $groups[$mode.'|'.$presetKey][] = $item;

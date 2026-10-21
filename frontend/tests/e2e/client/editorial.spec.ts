@@ -1,6 +1,7 @@
 import {expect, test} from '@playwright/test';
 import {AuthHelper} from '../helpers/AuthHelper';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
+import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
 import {FormHelper} from '../helpers/FormHelper';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
@@ -63,15 +64,21 @@ test.describe('Editorial Only UI & Checkout Constraints', () => {
 
         await auth.logout();
 
-        await auth.login(clientUser.email, clientUser.password);
-        await page.locator('main').getByText(galleryName).first().click();
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.login(clientUser.email, clientUser.password);
+            await page.locator('main').getByText(galleryName).first().click();
 
-        const image = page.locator('a.pswp-item img').first();
-        await expect(image).toBeVisible({timeout: 15000});
+            const image = page.locator('a.pswp-item img').first();
+            await expect(image).toBeVisible({timeout: 15000});
 
-        await page.getByRole('button', {name: 'Bild öffnen'}).first().click();
+            await page.getByRole('button', {name: 'Bild öffnen'}).first().click();
 
-        await expect(page.locator('label').filter({hasText: 'Werbung / Kampagne'})).toBeHidden();
-        await expect(page.locator('label').filter({hasText: 'Tageszeitungen / Zeitschriften'})).toBeVisible();
+            await expect(page.locator('label').filter({hasText: 'Werbung / Kampagne'})).toBeHidden();
+            await expect(page.locator('label').filter({hasText: 'Tageszeitungen / Zeitschriften'})).toBeVisible();
+        });
     });
 });

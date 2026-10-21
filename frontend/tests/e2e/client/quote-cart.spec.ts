@@ -4,6 +4,7 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { FormHelper } from '../helpers/FormHelper';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
+import { PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock } from '../helpers/GlobalSettingsLock';
 import { UploadHelper } from '../helpers/UploadHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
@@ -66,28 +67,34 @@ test.describe('Custom Quotes Full Workflow', () => {
         await auth.logout();
 
         // --- 2. CLIENT: Fragt Angebot an ---
-        await auth.login(clientUser.email, clientUser.password);
-        await page.locator('main').getByText(galleryName).first().click();
-        await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.login(clientUser.email, clientUser.password);
+            await page.locator('main').getByText(galleryName).first().click();
+            await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
         
-        await page.fill('textarea[placeholder*="Z.B. Exklusivrecht erforderlich"]', 'Exklusiv für Kampagne.');
-        await page.getByRole('button', { name: 'Als Angebot anfragen' }).click();
-        await expect(page.locator('.toast')).toContainText('Angebot zum Warenkorb hinzugefügt');
+            await page.fill('textarea[placeholder*="Z.B. Exklusivrecht erforderlich"]', 'Exklusiv für Kampagne.');
+            await page.getByRole('button', { name: 'Als Angebot anfragen' }).click();
+            await expect(page.locator('.toast')).toContainText('Angebot zum Warenkorb hinzugefügt');
 
-        await sidebar.navigateTo('Warenkorb');
-        await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('--- €');
+            await sidebar.navigateTo('Warenkorb');
+            await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('--- €');
         
-        await form.fillCheckoutForm({
-            name: 'Client Quote Tester',
-            street: 'Client Street 1',
-            zip: '1010',
-            city: 'Wien',
-            acceptAgb: true
+            await form.fillCheckoutForm({
+                name: 'Client Quote Tester',
+                street: 'Client Street 1',
+                zip: '1010',
+                city: 'Wien',
+                acceptAgb: true
+            });
+            await page.fill('textarea[name="quote_message"]', 'Das ist die globale Nachricht.');
+
+            await page.getByRole('button', { name: 'Unverbindlich anfragen' }).click();
+            await expect(page.locator('.toast')).toContainText('Angebot erfolgreich angefragt!');
         });
-        await page.fill('textarea[name="quote_message"]', 'Das ist die globale Nachricht.');
-
-        await page.getByRole('button', { name: 'Unverbindlich anfragen' }).click();
-        await expect(page.locator('.toast')).toContainText('Angebot erfolgreich angefragt!');
         await auth.logout();
 
         // --- 3. ADMIN: Kalkuliert & sendet Mail ---

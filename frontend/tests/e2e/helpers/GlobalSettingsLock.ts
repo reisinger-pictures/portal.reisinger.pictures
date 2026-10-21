@@ -45,13 +45,39 @@ import path from 'node:path';
  * ## Naming
  *
  * Always use {@link SHOOTING_CALCULATOR_SETTINGS_LOCK} for the calculator
- * settings. Both the spec that writes them and the spec that reads them must
+ * settings and {@link PRICING_STRATEGY_SETTINGS_LOCK} for the brand pricing
+ * strategy. Both the spec that writes them and the spec that reads them must
  * import the constant — a hand-typed lock name in one spec would silently
  * disable the isolation and reintroduce exactly the race this prevents.
  */
 
 /** Canonical name of the shooting-calculator settings lock. Import it, never retype it. */
 export const SHOOTING_CALCULATOR_SETTINGS_LOCK = 'shooting-calculator-settings';
+
+/**
+ * Canonical name of the brand pricing-strategy lock.
+ *
+ * The brand's pricing strategy is a singleton in the same sense as the
+ * calculator settings: one brand, one `settings` row (or one brand overlay),
+ * every worker on the box writes the same row. A spec that switches the brand
+ * to volume licensing therefore changes what every other worker's buy flow
+ * resolves.
+ *
+ * Both sides take this lock: the spec that writes the mode, and every spec
+ * whose gallery carries no own `licensing_mode` and therefore resolves the
+ * brand default while it prices or checks out. A reader that does not take
+ * the lock can observe the writer's mode — and the same cart object would be
+ * priced differently depending on which worker served the request.
+ *
+ * **What the lock does not cover:** the *server-side* price calculation of a
+ * checkout happens in the checkout request, and three specs end their critical
+ * section after "into the cart" — the checkout request itself then runs
+ * without the lock. Those specs pin a status and an order id, never an amount,
+ * so a mode flip changes the height of the price, not the outcome of the
+ * assertion. A spec that pinned an amount would have to hold the lock until
+ * the order exists.
+ */
+export const PRICING_STRATEGY_SETTINGS_LOCK = 'pricing-strategy-settings';
 
 const OWNER_FILE = 'owner.json';
 
