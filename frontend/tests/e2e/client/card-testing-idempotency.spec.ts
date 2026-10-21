@@ -1,5 +1,6 @@
 import {expect, test} from '@playwright/test';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
+import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
 import {
     fillPaidCheckoutForm,
     openPaidCartCheckout,
@@ -62,7 +63,13 @@ test.describe('Card-testing checkout identity', () => {
     test('a retry after a page reload reuses the pending order instead of opening a second one', {
         tag: ['@regression', '@feature:client:checkout', '@feature:card-testing']
     }, async ({page}) => {
-        await openPaidCartCheckout(page, helper, photographer, buyer);
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await openPaidCartCheckout(page, helper, photographer, buyer);
+        });
         const main = page.getByRole('main');
         const checkoutButton = main.getByRole('button', {name: 'Zahlungspflichtig bestellen'});
 
@@ -117,7 +124,13 @@ test.describe('Card-testing checkout identity', () => {
     }, async ({page}) => {
         const CHANGED_NAME = 'Card Testing E2E Geändert';
 
-        await openPaidCartCheckout(page, helper, photographer, buyer);
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await openPaidCartCheckout(page, helper, photographer, buyer);
+        });
         const main = page.getByRole('main');
         const checkoutButton = main.getByRole('button', {name: 'Zahlungspflichtig bestellen'});
 

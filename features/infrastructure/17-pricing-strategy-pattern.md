@@ -19,7 +19,8 @@ The runtime brand is currently `rp` only. Names such as `srp_*` in settings,
 request payloads, comments, or older documents are compatibility/history labels;
 they do not describe a second live brand or a second current pricing model.
 
-The brand-level default is the `pricing_strategy` setting. A gallery can
+The brand-level default is the `pricing_strategy` setting, optionally overridden
+per brand by the `brand_config.pricing_strategy` overlay (see §3.1). A gallery can
 override that mode with `galleries.licensing_mode`, and a volume gallery can
 select a concrete `galleries.volume_preset_id` (or `null` for the brand default).
 These columns and the preset tables are part of V025/V029 and are live contracts,
@@ -69,19 +70,43 @@ that delegates to the injected strategy for a single item. Checkout itself uses
 
 ### 3.1 Brand default
 
-`AppServiceProvider::register()` binds the default `PricingStrategy` by reading
-the brand-scoped `pricing_strategy` setting. The default fallback is
-`scope_licensing`; the value `volume_licensing` selects the volume strategy.
-The config feature flag is descriptive only; the database setting controls the
-runtime resolution.
+The brand default is resolved by a single choke point,
+`App\Services\PricingStrategyResolver` (`app/Services/PricingStrategyResolver.php`).
+It is the only place that queries the settings table for the `pricing_strategy`
+key; every consumer reads through it, so the public endpoint, the gallery mode
+and the runtime strategy binding can never disagree.
+
+For a given brand the effective mode is resolved in this order:
+
+1. **Brand overlay** — `brand_config.pricing_strategy`, the per-brand DB
+   override written through the brand-settings admin UI (F3 pattern, see
+   [`22-brand-settings-overlay.md`](22-brand-settings-overlay.md)). It is the
+   strongest source: a super-admin set it deliberately for that brand.
+2. **Settings row** — the brand-scoped `pricing_strategy` setting row.
+3. **`rp` row as brand fallback** — the same row of the canonical B2B brand, for
+   every brand that is not `rp` itself (mirrors `SettingResolver::get()`).
+4. **Default** — `scope_licensing`.
+
+A stored value that is not `scope_licensing` or `volume_licensing` is ignored and
+the resolution falls through to the next source — an unknown value must never
+leak into the mode, because every consumer treats the mode as a closed set.
+
+`AppServiceProvider::register()` binds the default `PricingStrategy` from
+`PricingStrategyResolver::resolve()`; the value `volume_licensing` selects the
+volume strategy. The config feature flag is descriptive only; the database
+setting (and its brand overlay) controls the runtime resolution.
 
 ### 3.2 Gallery overrides
 
 `Gallery::effective_licensing_mode` is resolved in this order:
 
 1. `galleries.licensing_mode`, when set (`scope_licensing` or `volume_licensing`).
-2. The gallery-brand `pricing_strategy` setting.
-3. `scope_licensing` when no setting exists.
+2. The brand default of the **gallery's own brand**, resolved by
+   `PricingStrategyResolver` (§3.1). The gallery's brand wins over the active
+   request brand, so the mode is correct even when the gallery is rendered
+   while another brand is the active context; a legacy gallery with a null
+   `brand` falls back to the active brand.
+3. `scope_licensing` when nothing is configured.
 
 For volume mode, `VolumePresetService::resolveForGallery()` chooses the
 gallery's `volume_preset_id` when valid, otherwise the brand default preset.
@@ -172,9 +197,14 @@ configuration path. New writes use the V029 `volume_presets` and
 `volume_preset_tiers` tables, with gallery assignment through
 `galleries.volume_preset_id`.
 
-A per-brand `pricing_strategy` editor is not part of the current brand-settings
-overlay whitelist. Exposing that setting in the admin UI remains a future task;
-until then, the DB setting and gallery fields are the authoritative controls.
+The per-brand pricing strategy is editable in the admin UI: the "Preisstrategie"
+select of the brand-settings card (super-admin only) writes the brand overlay
+`brand_config.pricing_strategy` through
+`PUT /api/management/brand-settings/{brand}`. The select carries the **overlay**
+value, not the effective mode — an admin who never touches it creates no
+overlay, and the settings row stays authoritative. The effective mode and its
+source are shown as a read-only hint. Full contract:
+[`22-brand-settings-overlay.md`](22-brand-settings-overlay.md).
 
 ## 6. Decision history
 
@@ -191,6 +221,10 @@ until then, the DB setting and gallery fields are the authoritative controls.
    mode. The backend strategy capability remains explicit as described in §4.
 5. **2026-08-13:** V029 introduced configurable, arbitrary-tier volume presets;
    see [`27-volume-licensing-presets.md`](27-volume-licensing-presets.md).
+6. **2026-10-21:** The brand pricing strategy became editable per brand. The
+   brand-settings overlay (`brand_config.pricing_strategy`) is the strongest
+   source of the brand default, and `PricingStrategyResolver` is the single
+   resolution point (§3.1).
 
 ## 7. Related documents
 

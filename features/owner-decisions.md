@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-46. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-47. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -148,6 +148,10 @@ Store the required Stripe **test-mode** values (`STRIPE_SECRET`, `STRIPE_KEY`, `
 ### D-34: CI evidence for auto-merged Dependabot heads
 
 For an auto-merged Dependabot commit, accept the green Dependabot-branch push run only when its tree matches the merged `main` tree. This exception applies only to auto-merge heads; a manually pushed head still requires green CI for that exact head.
+
+### D-47: The brand overlay wins over the settings row for the pricing strategy
+
+The per-brand pricing strategy is written through the brand-settings overlay (`brand_config.pricing_strategy`) and is resolved in exactly one place (`App\Services\PricingStrategyResolver`): brand overlay → the brand's own `settings.pricing_strategy` row → the canonical `rp` row → `scope_licensing`. The overlay is a delta over the config, and `pricing_strategy` deliberately has **no** config default — the settings row stays the authoritative fallback for a brand without an overlay, so the editor cannot silently take a brand's pricing mode away. A stored value that is neither `scope_licensing` nor `volume_licensing` is **ignored** and the resolution continues with the next source: the mode is a closed set everywhere it is consumed, and an unknown value must never reach a strategy binding or a gallery mode. Every direct read of the setting goes through the resolver — the gallery mode, the `PricingStrategy` binding, the checkout grouping and the public pricing endpoint read the same value, so they cannot disagree. The editor shows the mode that is in force **and where it comes from** (overlay, settings row or default) and carries the *overlay* value in the form, never the effective one: hydrating the form with the effective value would create an overlay for a mode that is merely in force. The gallery's own `licensing_mode` still wins over the brand default. See [pricing strategy](infrastructure/17-pricing-strategy-pattern.md) and [brand settings overlay](infrastructure/22-brand-settings-overlay.md).
 
 ## FTP import
 

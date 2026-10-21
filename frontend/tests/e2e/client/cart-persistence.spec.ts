@@ -2,6 +2,7 @@ import {test, expect} from '@playwright/test';
 import {AuthHelper} from '../helpers/AuthHelper';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {GalleryHelper} from '../helpers/GalleryHelper';
+import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
 import {SidebarHelper} from '../helpers/SidebarHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 
@@ -69,77 +70,83 @@ test.describe('Cart Persistence', () => {
             : null;
         if (!quoteToken) throw new Error('Quote link did not contain a token');
 
-        await auth.login(testUser.email, testUser.password);
-        await sidebar.navigateTo('Warenkorb');
-        await page.evaluate((token) => {
-            const url = new URL(window.location.href);
-            url.searchParams.set('quote_token', token);
-            window.history.pushState({}, '', url.toString());
-            window.dispatchEvent(new PopStateEvent('popstate'));
-        }, quoteToken);
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.login(testUser.email, testUser.password);
+            await sidebar.navigateTo('Warenkorb');
+            await page.evaluate((token) => {
+                const url = new URL(window.location.href);
+                url.searchParams.set('quote_token', token);
+                window.history.pushState({}, '', url.toString());
+                window.dispatchEvent(new PopStateEvent('popstate'));
+            }, quoteToken);
 
-        await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.');
-        await expect(page.getByRole('main').getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
-        await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1.500,00 €');
+            await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.');
+            await expect(page.getByRole('main').getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
+            await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1.500,00 €');
 
-        // Provider-State bleibt beim SPA-Navigieren erhalten.
-        await sidebar.navigateTo('Einkäufe & Anfragen');
-        await expect(page).toHaveURL(/.*\/orders/);
-        await sidebar.navigateTo('Warenkorb');
-        await expect(page.getByRole('main').getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
-        await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1.500,00 €');
+            // Provider-State bleibt beim SPA-Navigieren erhalten.
+            await sidebar.navigateTo('Einkäufe & Anfragen');
+            await expect(page).toHaveURL(/.*\/orders/);
+            await sidebar.navigateTo('Warenkorb');
+            await expect(page.getByRole('main').getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
+            await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1.500,00 €');
 
-        // Vollständiger Reload: Der URL-Token ist bereinigt, der persistierte
-        // Cart-Context muss Token und Originalpreise trotzdem wiederherstellen.
-        await page.reload();
-        await expect(page).toHaveURL(/\/cart$/);
-        const main = page.getByRole('main');
-        await expect(main.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible();
-        await expect(main.getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
-        await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1.500,00 €');
+            // Vollständiger Reload: Der URL-Token ist bereinigt, der persistierte
+            // Cart-Context muss Token und Originalpreise trotzdem wiederherstellen.
+            await page.reload();
+            await expect(page).toHaveURL(/\/cart$/);
+            const main = page.getByRole('main');
+            await expect(main.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible();
+            await expect(main.getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
+            await expect(page.getByRole('main').getByTestId('cart-total')).toHaveText('1.500,00 €');
 
-        await expect(main.getByLabel('Vor- & Nachname')).toHaveAttribute('required');
-        await expect(main.getByRole('checkbox', {name: /allgemeinen geschäftsbedingungen/i})).toHaveAttribute('required');
-        await main.getByRole('radio', {name: 'Kauf auf Rechnung'}).check();
-        await main.getByLabel('Vor- & Nachname').fill('Reload Quote Buyer');
-        await main.getByLabel('Straße & Hausnummer').fill('Reloadstraße 1');
-        await main.getByLabel('PLZ').fill('1010');
-        // The bare label also matches the withdrawal consent checkbox.
-        const cityInput = main.getByRole('textbox', {name: 'Ort *', exact: true});
-        await expect(cityInput).toHaveCount(1);
-        await cityInput.fill('Wien');
-        await main.getByRole('checkbox', {name: /allgemeinen geschäftsbedingungen/i}).check();
-        await main.getByRole('checkbox', {name: /widerrufsrecht/i}).check();
+            await expect(main.getByLabel('Vor- & Nachname')).toHaveAttribute('required');
+            await expect(main.getByRole('checkbox', {name: /allgemeinen geschäftsbedingungen/i})).toHaveAttribute('required');
+            await main.getByRole('radio', {name: 'Kauf auf Rechnung'}).check();
+            await main.getByLabel('Vor- & Nachname').fill('Reload Quote Buyer');
+            await main.getByLabel('Straße & Hausnummer').fill('Reloadstraße 1');
+            await main.getByLabel('PLZ').fill('1010');
+            // The bare label also matches the withdrawal consent checkbox.
+            const cityInput = main.getByRole('textbox', {name: 'Ort *', exact: true});
+            await expect(cityInput).toHaveCount(1);
+            await cityInput.fill('Wien');
+            await main.getByRole('checkbox', {name: /allgemeinen geschäftsbedingungen/i}).check();
+            await main.getByRole('checkbox', {name: /widerrufsrecht/i}).check();
 
-        const checkoutRequestPromise = page.waitForRequest(req => {
-            const url = new URL(req.url());
-            return url.pathname === '/api/orders/checkout' && req.method() === 'POST';
+            const checkoutRequestPromise = page.waitForRequest(req => {
+                const url = new URL(req.url());
+                return url.pathname === '/api/orders/checkout' && req.method() === 'POST';
+            });
+            const checkoutResponsePromise = page.waitForResponse(response => {
+                const url = new URL(response.url());
+                return url.pathname === '/api/orders/checkout' && response.request().method() === 'POST';
+            });
+            await main.getByRole('button', {name: 'Zahlungspflichtig bestellen'}).click();
+            const [checkoutRequest, checkoutResponse] = await Promise.all([
+                checkoutRequestPromise,
+                checkoutResponsePromise,
+            ]);
+            const checkoutPayload = checkoutRequest.postDataJSON() as CheckoutPayload;
+            expect(checkoutPayload.quote_token).toBe(quoteToken);
+            expect(checkoutPayload.payment_method).toBe('invoice');
+            expect(checkoutPayload.items).toHaveLength(2);
+            expect(checkoutPayload.items?.map(item => item.price)).toEqual([75000, 75000]);
+
+            expect(checkoutResponse.ok()).toBeTruthy();
+            const checkoutData = await checkoutResponse.json() as {success?: boolean; order_id?: string};
+            expect(checkoutData).toMatchObject({success: true});
+            if (!checkoutData.order_id) throw new Error('Checkout response did not contain an order id');
+            const orderResponse = await page.request.get(`/api/orders/${checkoutData.order_id}`, {
+                headers: {Accept: 'application/json'},
+            });
+            expect(orderResponse.ok(), await orderResponse.text()).toBeTruthy();
+            const order = await orderResponse.json() as {status?: string; order_id?: string};
+            expect(order).toMatchObject({order_id: checkoutData.order_id, status: 'invoice_created'});
+            await expect(page).toHaveURL(/\/orders/);
         });
-        const checkoutResponsePromise = page.waitForResponse(response => {
-            const url = new URL(response.url());
-            return url.pathname === '/api/orders/checkout' && response.request().method() === 'POST';
-        });
-        await main.getByRole('button', {name: 'Zahlungspflichtig bestellen'}).click();
-        const [checkoutRequest, checkoutResponse] = await Promise.all([
-            checkoutRequestPromise,
-            checkoutResponsePromise,
-        ]);
-        const checkoutPayload = checkoutRequest.postDataJSON() as CheckoutPayload;
-        expect(checkoutPayload.quote_token).toBe(quoteToken);
-        expect(checkoutPayload.payment_method).toBe('invoice');
-        expect(checkoutPayload.items).toHaveLength(2);
-        expect(checkoutPayload.items?.map(item => item.price)).toEqual([75000, 75000]);
-
-        expect(checkoutResponse.ok()).toBeTruthy();
-        const checkoutData = await checkoutResponse.json() as {success?: boolean; order_id?: string};
-        expect(checkoutData).toMatchObject({success: true});
-        if (!checkoutData.order_id) throw new Error('Checkout response did not contain an order id');
-        const orderResponse = await page.request.get(`/api/orders/${checkoutData.order_id}`, {
-            headers: {Accept: 'application/json'},
-        });
-        expect(orderResponse.ok(), await orderResponse.text()).toBeTruthy();
-        const order = await orderResponse.json() as {status?: string; order_id?: string};
-        expect(order).toMatchObject({order_id: checkoutData.order_id, status: 'invoice_created'});
-        await expect(page).toHaveURL(/\/orders/);
     });
 });

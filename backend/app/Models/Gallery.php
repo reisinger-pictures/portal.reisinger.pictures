@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\AsBrand;
 use App\Services\GalleryTreeService;
+use App\Services\PricingStrategyResolver;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -79,11 +80,9 @@ class Gallery extends Model
 
         // Prefer the gallery's own brand so the mode is correct even when the
         // gallery is rendered while another brand is the active context.
-        $brand = $this->brand ?? BrandRegistry::currentOrDefault();
+        $brand = BrandRegistry::normalizeId($this->brand) ?? BrandRegistry::currentOrDefault()->value;
 
-        return Setting::where('key', 'pricing_strategy')
-            ->where('brand', $brand)
-            ->value('value') ?? 'scope_licensing';
+        return app(PricingStrategyResolver::class)->resolve($brand);
     }
 
     /**

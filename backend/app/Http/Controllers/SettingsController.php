@@ -7,6 +7,7 @@ use App\Jobs\InvalidateWatermarkCacheJob;
 use App\Models\Gallery;
 use App\Models\VolumePreset;
 use App\Services\BrandSettingsService;
+use App\Services\PricingStrategyResolver;
 use App\Services\SettingResolver;
 use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
@@ -209,7 +210,7 @@ class SettingsController extends Controller
      */
     public function getLicenseTerms(Request $request, SettingResolver $resolver)
     {
-        [$pricingStrategy, $preset] = $this->resolveLicensePricingContext($request, $resolver);
+        [$pricingStrategy, $preset] = $this->resolveLicensePricingContext($request);
 
         return response()->json([
             'editorial' => $resolver->get('term_editorial'),
@@ -260,9 +261,9 @@ class SettingsController extends Controller
      * table is the price *schedule* the client must display, not the internal
      * `price_*`/`calc_*`/`mult_*` parameters behind it.
      */
-    public function getLicensePricing(Request $request, SettingResolver $resolver)
+    public function getLicensePricing(Request $request)
     {
-        [$pricingStrategy, $preset] = $this->resolveLicensePricingContext($request, $resolver);
+        [$pricingStrategy, $preset] = $this->resolveLicensePricingContext($request);
 
         return response()->json([
             'pricing_strategy' => $pricingStrategy,
@@ -279,13 +280,17 @@ class SettingsController extends Controller
      * or preset. The gallery lookup, brand guard and legacy-null fallback below
      * are the semantics both must keep.
      *
+     * The brand default itself comes from `PricingStrategyResolver` (brand
+     * overlay → settings row → B2B fallback → default), so the endpoint and
+     * the runtime strategy binding can never disagree.
+     *
      * @return array{0: string, 1: VolumePreset|null}
      */
-    private function resolveLicensePricingContext(Request $request, SettingResolver $resolver): array
+    private function resolveLicensePricingContext(Request $request): array
     {
         $galleryId = $request->query('gallery_id');
 
-        $pricingStrategy = $resolver->get('pricing_strategy') ?? 'scope_licensing';
+        $pricingStrategy = app(PricingStrategyResolver::class)->resolve();
         $gallery = null;
 
         if ($galleryId !== null) {
@@ -308,7 +313,7 @@ class SettingsController extends Controller
         }
 
         $presetService = app(VolumePresetService::class);
-        $preset = $pricingStrategy === 'volume_licensing'
+        $preset = $pricingStrategy === PricingStrategyResolver::VOLUME_LICENSING
             ? $presetService->resolveForGallery($gallery)
             : null;
 
@@ -451,6 +456,7 @@ class SettingsController extends Controller
     public function getBrandSettings()
     {
         $service = app(BrandSettingsService::class);
+        $resolver = app(PricingStrategyResolver::class);
         $brandIds = array_keys(config('brands', []));
 
         $brands = [];
@@ -461,6 +467,9 @@ class SettingsController extends Controller
                 'defaults' => $this->defaultFieldsForBrand($id),
                 'overrides' => $service->overridesFor($id),
                 'effective' => $this->effectiveFieldsForBrand($id),
+                // Which source produced `effective.pricing_strategy`: the
+                // brand overlay, the settings row or the built-in default.
+                'pricing_strategy_source' => $resolver->source($id),
             ];
         }
 
@@ -525,6 +534,7 @@ class SettingsController extends Controller
             'from_name' => $config->fromName,
             'accounting_email' => $config->accountingEmail,
             'features' => $config->features,
+            'pricing_strategy' => app(PricingStrategyResolver::class)->effectiveForBrand($brandId),
         ];
     }
 
@@ -546,6 +556,16 @@ class SettingsController extends Controller
             'from_name' => $data['from_name'] ?? null,
             'accounting_email' => $data['accounting_email'] ?? null,
             'features' => $data['features'] ?? [],
+            // The config default, not the overlay: `buildFromArray()` uses this
+            // value as the *starting* value of the merged `BrandConfig`, and
+            // the DB overlay (`brand_config.pricing_strategy`) overwrites it
+            // afterwards. The config key is therefore no fallback of the
+            // resolution itself — `PricingStrategyResolver` consults overlay →
+            // settings row → `rp` fallback → built-in default, and never this
+            // value. Reading it here keeps the readout truthful: a brand whose
+            // config carries a `pricing_strategy` shows that value as its
+            // default instead of a hardcoded `null` that contradicts it.
+            'pricing_strategy' => $data['pricing_strategy'] ?? null,
         ];
     }
 }

@@ -58,8 +58,12 @@ the dedicated `BrandSettingsService` path, not this resolver.
 - License terms and billing settings use `get()`/`set()`.
 - Volume-preset defaults use the `VolumePresetService`; legacy `srp_*` keys are
   read only when a preset is first materialized.
-- `AppServiceProvider` reads the brand-scoped `pricing_strategy` setting to bind
-  the default `PricingStrategy`.
+- `AppServiceProvider` binds the default `PricingStrategy` through
+  `PricingStrategyResolver`, the single resolution point for the brand-scoped
+  `pricing_strategy` (brand overlay → brand settings row → `rp` fallback →
+  default). The binding resolves the same brand context as the public
+  pricing endpoint; see
+  [`17-pricing-strategy-pattern.md`](17-pricing-strategy-pattern.md) §3.1.
 - `Gallery::effective_licensing_mode` and the checkout grouping layer apply the
   gallery-level mode/preset overrides described in
   [`17-pricing-strategy-pattern.md`](17-pricing-strategy-pattern.md).

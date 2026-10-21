@@ -6,6 +6,7 @@ import { ModalHelper } from '../helpers/ModalHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 import { FormHelper } from '../helpers/FormHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
+import { PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock } from '../helpers/GlobalSettingsLock';
 
 test.describe('E-Commerce & Checkout Workflow', () => {
     let helper: E2ESessionHelper;
@@ -83,50 +84,56 @@ test.describe('E-Commerce & Checkout Workflow', () => {
         await auth.logout();
 
         // 3. Flow P: Flatrate User Bypass (Sofort Download)
-        await auth.login(flatrateUser.email, flatrateUser.password);
-        await page.locator('main').getByText(galleryName).first().click();
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.login(flatrateUser.email, flatrateUser.password);
+            await page.locator('main').getByText(galleryName).first().click();
         
-        // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
-        await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
+            // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
+            await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+            await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
         
-        // Da er "Print" als Flatrate hat, muss der "Jetzt herunterladen" Button für "Print" sichtbar sein, ohne Cart-Prozess!
-        await expect(page.locator('label').filter({ hasText: 'Tageszeitungen / Zeitschriften' })).toContainText('Inklusive');
-        await expect(page.getByRole('link', { name: 'Download' })).toBeVisible();
-        await auth.logout();
+            // Da er "Print" als Flatrate hat, muss der "Jetzt herunterladen" Button für "Print" sichtbar sein, ohne Cart-Prozess!
+            await expect(page.locator('label').filter({ hasText: 'Tageszeitungen / Zeitschriften' })).toContainText('Inklusive');
+            await expect(page.getByRole('link', { name: 'Download' })).toBeVisible();
+            await auth.logout();
 
-        // 4. Flow Q, AG, AJ: Power User Cart, Upselling und Checkout
-        await auth.login(powerUser.email, powerUser.password);
-        await page.locator('main').getByText(galleryName).first().click();
+            // 4. Flow Q, AG, AJ: Power User Cart, Upselling und Checkout
+            await auth.login(powerUser.email, powerUser.password);
+            await page.locator('main').getByText(galleryName).first().click();
         
-        // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
-        await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
+            // Requirement: Bild-Sichtbarkeit vor Interaktion prüfen
+            await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+            await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
         
-        // Web-Auflösung in den Warenkorb legen
-        await page.locator('label').filter({ hasText: 'Web & Social Media' }).click();
-        await page.getByRole('button', { name: 'In den Warenkorb' }).click();
-        await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
+            // Web-Auflösung in den Warenkorb legen
+            await page.locator('label').filter({ hasText: 'Web & Social Media' }).click();
+            await page.getByRole('button', { name: 'In den Warenkorb' }).click();
+            await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
 
-        // Zum Warenkorb gehen
-        await sidebar.navigateTo('Warenkorb');
-        await expect(page).toHaveURL(/.*\/cart/);
+            // Zum Warenkorb gehen
+            await sidebar.navigateTo('Warenkorb');
+            await expect(page).toHaveURL(/.*\/cart/);
 
-        // Lizenzen im Warenkorb sind Read-Only (V010 RSV), daher entfaellt das Upselling hier.
+            // Lizenzen im Warenkorb sind Read-Only (V010 RSV), daher entfaellt das Upselling hier.
         
-        // Flow Q: Checkout Formular
-        await form.fillCheckoutForm({
-            name: 'E2E Shop Tester',
-            street: 'Teststraße 1',
-            zip: '1234',
-            city: 'Teststadt',
-            acceptAgb: true,
-            waiveWithdrawal: true
+            // Flow Q: Checkout Formular
+            await form.fillCheckoutForm({
+                name: 'E2E Shop Tester',
+                street: 'Teststraße 1',
+                zip: '1234',
+                city: 'Teststadt',
+                acceptAgb: true,
+                waiveWithdrawal: true
+            });
+        
+            await page.locator('input[name="payment_method"][value="invoice"]').click();
+            await page.getByRole('button', { name: 'Zahlungspflichtig bestellen' }).click();
+            await expect(page.locator('.toast')).toContainText('Bestellung erfolgreich!');
         });
-        
-        await page.locator('input[name="payment_method"][value="invoice"]').click();
-        await page.getByRole('button', { name: 'Zahlungspflichtig bestellen' }).click();
-        await expect(page.locator('.toast')).toContainText('Bestellung erfolgreich!');
         await expect(page).toHaveURL(/.*\/orders/);
         
         // Flow AH: Order ZIP Download

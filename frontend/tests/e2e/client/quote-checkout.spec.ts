@@ -4,6 +4,7 @@ import { CreditCardHelper } from '../helpers/CreditCardHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { FormHelper } from '../helpers/FormHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
+import { PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock } from '../helpers/GlobalSettingsLock';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { StripeHelper } from '../helpers/StripeHelper';
@@ -92,19 +93,25 @@ test.describe('Quote Checkout Workflow', () => {
         expect(quoteToken).toBeTruthy();
 
         // --- 3. Buyer öffnet Link + sieht Festpreis ---
-        await auth.login(buyerUser.email, buyerUser.password);
-        await sidebar.navigateTo('Warenkorb');
-        await page.evaluate((t) => {
-            const url = new URL(window.location.href);
-            url.searchParams.set('quote_token', t);
-            window.history.pushState({}, '', url.toString());
-            window.dispatchEvent(new PopStateEvent('popstate'));
-        }, quoteToken);
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.login(buyerUser.email, buyerUser.password);
+            await sidebar.navigateTo('Warenkorb');
+            await page.evaluate((t) => {
+                const url = new URL(window.location.href);
+                url.searchParams.set('quote_token', t);
+                window.history.pushState({}, '', url.toString());
+                window.dispatchEvent(new PopStateEvent('popstate'));
+            }, quoteToken);
 
-        // Warte auf Toast + korrekten Preis
-        await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.', { timeout: 10000 });
-        const totalAmount = page.locator('.text-3xl.font-mono.text-primary');
-        await expect(totalAmount).toHaveText('1.500,00 €');
+            // Warte auf Toast + korrekten Preis
+            await expect(page.locator('.toast')).toContainText('Angebot aus Link wiederhergestellt.', { timeout: 10000 });
+            const totalAmount = page.locator('.text-3xl.font-mono.text-primary');
+            await expect(totalAmount).toHaveText('1.500,00 €');
+        });
 
         // --- 4. Checkout-Formular ausfüllen ---
         await form.fillCheckoutForm({

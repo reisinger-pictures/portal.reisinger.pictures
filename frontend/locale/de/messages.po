@@ -547,6 +547,10 @@ msgstr "Aktionen"
 msgid "Aktiv"
 msgstr "Aktiv"
 
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Aktiv: {strategyModeLabel} ({strategySourceLabel})"
+msgstr "Aktiv: {strategyModeLabel} ({strategySourceLabel})"
+
 #: src/ui/management/KameraEinrichtungContent.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Aktivieren"
@@ -580,6 +584,10 @@ msgstr "Alle Auflösungen"
 #: src/ui/management/ManagementStructureView.tsx
 msgid "Alle ausklappen"
 msgstr "Alle ausklappen"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Alle auswählen"
+msgstr "Alle auswählen"
 
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Alle Bilder einer Bestellung werden zum Einheitspreis der erreichten Staffel abgerechnet (retroaktiv)."
@@ -907,6 +915,10 @@ msgstr "Auswahl abschließen"
 #: src/ui/client/SelectionView.tsx
 msgid "Auswahl abschließen?"
 msgstr "Auswahl abschließen?"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Auswahl aufheben"
+msgstr "Auswahl aufheben"
 
 #: src/ui/management/components/GalleryAccessModal.tsx
 msgid "Auswahlgalerien werden nicht direkt zugewiesen. Kunden erreichen sie über einen Einladungslink, Fotografen über den eigenen Zugriffsdialog."
@@ -1473,6 +1485,10 @@ msgstr "Boudoir"
 msgid "Brand-Logo konnte nicht geladen werden."
 msgstr "Brand-Logo konnte nicht geladen werden."
 
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Brand-Overlay"
+msgstr "Brand-Overlay"
+
 #: src/ui/components/GalleryModal.tsx
 msgid "Brand-Standard"
 msgstr "Brand-Standard"
@@ -1532,7 +1548,13 @@ msgstr "Contact Sheet (extern)"
 msgid "Contact Sheet (intern)"
 msgstr "Contact Sheet (intern)"
 
+#: src/ui/ModelContactSheetShareView.tsx
+msgid "Contact Sheet herunterladen"
+msgstr "Contact Sheet herunterladen"
+
 #: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/ManagementModelsView.tsx
+#: src/ui/ModelContactSheetShareView.tsx
 msgid "Contact Sheet wurde heruntergeladen."
 msgstr "Contact Sheet wurde heruntergeladen."
 
@@ -1691,6 +1713,10 @@ msgstr "Dauer (Min.)"
 #~ msgid "Dauer: Unbegrenzt"
 #~ msgstr "Dauer: Unbegrenzt"
 
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "DB-Einstellung"
+msgstr "DB-Einstellung"
+
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "DE"
 msgstr "DE"
@@ -1731,6 +1757,10 @@ msgstr "Dein Account"
 #: src/ui/management/components/WatermarkSettingsCard.tsx
 msgid "Dein aktuelles Marken-Logo (<0>{svgUrl}</0>) wird automatisch als Basis für das Wasserzeichen verwendet."
 msgstr "Dein aktuelles Marken-Logo (<0>{svgUrl}</0>) wird automatisch als Basis für das Wasserzeichen verwendet."
+
+#: src/ui/ModelContactSheetShareView.tsx
+msgid "Dein Contact Sheet ist bereit"
+msgstr "Dein Contact Sheet ist bereit"
 
 #: src/ui/management/components/WatermarkSettingsCard.tsx
 msgid "Dein Logo wird als Wasserzeichen zentriert über das Originalbild gelegt. Die Größe passt sich dynamisch an (1/3 der Bildbreite). Bei Auswahl-Galerien wird die Deckkraft automatisch reduziert, um die Bildbeurteilung nicht zu stören."
@@ -1842,6 +1872,10 @@ msgstr "Der Gast wird direkt ohne Anmeldung durchgewunken."
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Der Import konnte nicht abgeschlossen werden."
 msgstr "Der Import konnte nicht abgeschlossen werden."
+
+#: src/ui/ModelContactSheetShareView.tsx
+msgid "Der Link ist gültig bis"
+msgstr "Der Link ist gültig bis"
 
 #: src/ui/management/components/ModelDetailModal.tsx
 msgid "Der Link wird sofort ungültig und kann nicht mehr verwendet werden."
@@ -2102,6 +2136,10 @@ msgstr "Dieser Bereich ist aktuell für <0>alle Fotografen</0> freigegeben. Du m
 #: src/ui/OrgInviteView.tsx
 msgid "Dieser Einladungslink ist ungültig oder abgelaufen."
 msgstr "Dieser Einladungslink ist ungültig oder abgelaufen."
+
+#: src/ui/ModelContactSheetShareView.tsx
+msgid "Dieser Link ist ungültig oder abgelaufen."
+msgstr "Dieser Link ist ungültig oder abgelaufen."
 
 #: src/ui/ModelProfileAccessView.tsx
 msgid "Dieser Profil-Link ist ungültig oder abgelaufen."
@@ -2454,6 +2492,14 @@ msgstr "Erfolgreich generiert!"
 msgid "Erfolgreich registriert"
 msgstr "Erfolgreich registriert"
 
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Ergebnis als Contact Sheet (extern)"
+msgstr "Ergebnis als Contact Sheet (extern)"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Ergebnis als Contact Sheet (intern)"
+msgstr "Ergebnis als Contact Sheet (intern)"
+
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Erlaubt dem User das Ändern von Bildbeschreibungen."
 msgstr "Erlaubt dem User das Ändern von Bildbeschreibungen."
@@ -2541,6 +2587,20 @@ msgstr "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Ers
 msgid "Exportiert"
 msgstr "Exportiert"
 
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Extern-Link"
+msgstr "Extern-Link"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Extern-Link erstellen"
+msgstr "Extern-Link erstellen"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Extern-Link wurde erstellt."
+msgstr "Extern-Link wurde erstellt."
+
 #: src/ui/management/components/CalculatorSettingsCard.tsx
 msgid "Extra-Bild"
 msgstr "Extra-Bild"
@@ -2603,8 +2663,14 @@ msgid "Fehler beim Erstellen der Einladung."
 msgstr "Fehler beim Erstellen der Einladung."
 
 #: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/ManagementModelsView.tsx
 msgid "Fehler beim Erstellen des Contact Sheets."
 msgstr "Fehler beim Erstellen des Contact Sheets."
+
+#: src/ui/management/components/ModelDetailModal.tsx
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Fehler beim Erstellen des Extern-Links."
+msgstr "Fehler beim Erstellen des Extern-Links."
 
 #: src/ui/management/components/ModelDetailModal.tsx
 msgid "Fehler beim Erstellen des Profil-Links."
@@ -3291,6 +3357,10 @@ msgstr "Gültig bis"
 msgid "Gültig bis {validUntil}"
 msgstr "Gültig bis {validUntil}"
 
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Gültig bis:"
+msgstr "Gültig bis:"
+
 #: src/ui/components/Sidebar.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Gutscheincode"
@@ -3361,6 +3431,10 @@ msgstr "Hauptverzeichnis (Ohne Ordner)"
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Hier findest du alle deine lizenzierten Bilder und die dazugehörigen Rechnungen."
 msgstr "Hier findest du alle deine lizenzierten Bilder und die dazugehörigen Rechnungen."
+
+#: src/ui/ModelContactSheetShareView.tsx
+msgid "Hier kannst du das Contact Sheet als PDF herunterladen. Bitte halte den Link geheim — jeder mit dem Link kann die Datei herunterladen."
+msgstr "Hier kannst du das Contact Sheet als PDF herunterladen. Bitte halte den Link geheim — jeder mit dem Link kann die Datei herunterladen."
 
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Hier werden die ursprünglichen Metadaten gespeichert, <0>bevor</0> ein Kunde eine Änderung vorgenommen hat."
@@ -3928,6 +4002,7 @@ msgstr "Konkret bedeutet dies für Bestellungen in diesem Portal: Wenn Sie beim 
 #: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/ManagementContractView.tsx
+#: src/ui/management/ManagementModelsView.tsx
 msgid "Konnte Link nicht kopieren."
 msgstr "Konnte Link nicht kopieren."
 
@@ -3947,6 +4022,7 @@ msgstr "Konto einrichten"
 #: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/ManagementContractView.tsx
+#: src/ui/management/ManagementModelsView.tsx
 msgid "Kopieren"
 msgstr "Kopieren"
 
@@ -4174,6 +4250,7 @@ msgstr "Link kopieren"
 #: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/ManagementContractView.tsx
+#: src/ui/management/ManagementModelsView.tsx
 msgid "Link wurde kopiert."
 msgstr "Link wurde kopiert."
 
@@ -4360,6 +4437,10 @@ msgstr "Maximal {MAX_PERSONS_PER_REGISTRATION} Personen pro Registrierung."
 msgid "Maximal 10 Personen pro Registrierung."
 msgstr "Maximal 10 Personen pro Registrierung."
 
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Maximal 25 Models pro Contact Sheet."
+msgstr "Maximal 25 Models pro Contact Sheet."
+
 #: src/logic/modelRegistration.ts
 msgid "Maximal 5 Fotos pro Person."
 msgstr "Maximal 5 Fotos pro Person."
@@ -4454,6 +4535,10 @@ msgstr "Meldung"
 #: src/ui/management/components/invoice/InvoiceItemsTable.tsx
 msgid "Menge"
 msgstr "Menge"
+
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Mengen-Lizenzierung"
+msgstr "Mengen-Lizenzierung"
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "Mengenrabatt"
@@ -4622,6 +4707,14 @@ msgstr "Möchtest du dieses Bild wirklich endgültig löschen?"
 msgid "Model"
 msgstr "Model"
 
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Model ausgewählt"
+msgstr "Model ausgewählt"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Model für den Contact Sheet auswählen"
+msgstr "Model für den Contact Sheet auswählen"
+
 #: src/ui/ModelRegistrationView.tsx
 msgid "Model-Registrierung"
 msgstr "Model-Registrierung"
@@ -4630,6 +4723,10 @@ msgstr "Model-Registrierung"
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Models"
 msgstr "Models"
+
+#: src/ui/management/ManagementModelsView.tsx
+msgid "Models ausgewählt"
+msgstr "Models ausgewählt"
 
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Models für Kategorie"
@@ -4968,6 +5065,10 @@ msgstr "nicht konfiguriert"
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Nicht verfügbar"
 msgstr "Nicht verfügbar"
+
+#: src/ui/management/components/ModelDetailModal.tsx
+msgid "Noch kein Extern-Link erstellt."
+msgstr "Noch kein Extern-Link erstellt."
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Noch keine Bestellungen im System."
@@ -5516,6 +5617,10 @@ msgstr "Preise nach Untergalerie"
 msgid "Preisgruppe {galleryNames}"
 msgstr "Preisgruppe {galleryNames}"
 
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Preisstrategie"
+msgstr "Preisstrategie"
+
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Preisstruktur (retroaktiv)"
 msgstr "Preisstruktur (retroaktiv)"
@@ -5957,6 +6062,7 @@ msgid "Scope-Lizenz"
 msgstr "Scope-Lizenz"
 
 #: src/ui/components/GalleryModal.tsx
+#: src/ui/management/components/BrandSettingsCard.tsx
 msgid "Scope-Lizenzierung"
 msgstr "Scope-Lizenzierung"
 
@@ -6216,10 +6322,15 @@ msgstr "Stammverzeichnis"
 msgid "Stammzertifikat: Dateiname muss ROOT.CER, ROOT.CRT oder ROOT.PEM sein"
 msgstr "Stammzertifikat: Dateiname muss ROOT.CER, ROOT.CRT oder ROOT.PEM sein"
 
+#: src/ui/management/components/BrandSettingsCard.tsx
 #: src/ui/management/components/ManualDocumentHeader.tsx
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Standard"
 msgstr "Standard"
+
+#: src/ui/management/components/BrandSettingsCard.tsx
+msgid "Standard (DB-Einstellung)"
+msgstr "Standard (DB-Einstellung)"
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "Standard Lizenz"
@@ -6671,6 +6782,10 @@ msgstr "Ungültige E-Mail-Adresse"
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "Ungültige IBAN (AT/DE)"
 msgstr "Ungültige IBAN (AT/DE)"
+
+#: src/logic/useBrandSettings.ts
+msgid "Ungültige Preisstrategie."
+msgstr "Ungültige Preisstrategie."
 
 #: src/ui/ResetPassword.tsx
 msgid "Ungültiger Link. Token oder E-Mail fehlen."

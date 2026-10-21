@@ -1,12 +1,13 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSWRConfig } from 'swr';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
     useBrandSettings,
     createBrandSettingsSchema,
+    toPricingStrategyMode,
     type BrandSetting,
     type BrandSettingsFormValues,
     type BrandSettingsPayload,
@@ -14,7 +15,25 @@ import {
 import { usePermissions } from '../../../logic/usePermissions';
 import { useUI } from '../../components/UIContext';
 
-function effectiveToFormValues(effective: BrandSetting['effective']): BrandSettingsFormValues {
+/**
+ * The persisted brand overlay for the pricing strategy — NOT the effective
+ * mode. The form carries the override (`''` = none), because the effective
+ * mode may come from the settings row: hydrating the form with it would
+ * create an overlay for the mode that is merely in force.
+ */
+function overlayPricingStrategy(brand: BrandSetting): string {
+    const value = brand.overrides.pricing_strategy;
+
+    return typeof value === 'string' ? value : '';
+}
+
+/**
+ * The form values of one brand: the effective values for every plain field,
+ * the persisted overlay for the pricing strategy.
+ */
+function brandToFormValues(brand: BrandSetting): BrandSettingsFormValues {
+    const effective = brand.effective;
+
     return {
         name: effective.name ?? '',
         portal_name: effective.portal_name ?? '',
@@ -26,6 +45,7 @@ function effectiveToFormValues(effective: BrandSetting['effective']): BrandSetti
         primary_color: effective.primary_color ?? '#1E5631',
         secondary_color: effective.secondary_color ?? '#A4B494',
         features: { orgs: effective.features?.orgs ?? false },
+        pricing_strategy: overlayPricingStrategy(brand),
     };
 }
 
@@ -46,6 +66,21 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
 
     const schema = createBrandSettingsSchema();
     const accountingEmailId = `brand-settings-${brand.id}-accounting-email`;
+    const pricingStrategyId = `brand-settings-${brand.id}-pricing-strategy`;
+
+    // The overlay value drives the form; the effective mode is only shown as a
+    // hint, so the admin sees what is in force without it becoming editable.
+    const effectiveStrategy = brand.effective.pricing_strategy;
+    const strategySource = brand.pricing_strategy_source;
+
+    const strategyModeLabel = effectiveStrategy === 'volume_licensing'
+        ? t`Mengen-Lizenzierung`
+        : t`Scope-Lizenzierung`;
+    const strategySourceLabel = strategySource === 'overlay'
+        ? t`Brand-Overlay`
+        : strategySource === 'setting'
+            ? t`DB-Einstellung`
+            : t`Standard`;
 
     const {
         register,
@@ -54,15 +89,30 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
         formState: { isSubmitting, errors, isDirty, dirtyFields },
     } = useForm<BrandSettingsFormValues>({
         resolver: zodResolver(schema),
-        defaultValues: effectiveToFormValues(brand.effective),
+        defaultValues: brandToFormValues(brand),
     });
+
+    // The brand snapshot the form was hydrated from. The hydration below only
+    // rewrites the form when a *new* snapshot arrives — a local reset ("Auf
+    // Standard zurücksetzen") writes the form itself, and the still-stale prop
+    // must not undo it.
+    const hydratedFrom = useRef(brand);
 
     // Hydrate the form once the remote data arrives (load → reset, not derived state).
     useEffect(() => {
-        if (!isDirty && brand.effective) {
-            reset(effectiveToFormValues(brand.effective));
+        if (isDirty || !brand.effective) {
+            // Never overwrite what the admin is editing.
+            return;
         }
-    }, [brand.effective, isDirty, reset]);
+
+        if (hydratedFrom.current === brand) {
+            // Nothing new to hydrate.
+            return;
+        }
+
+        hydratedFrom.current = brand;
+        reset(brandToFormValues(brand));
+    }, [brand, isDirty, reset]);
 
     const onSubmit = async (data: BrandSettingsFormValues) => {
         const payload: BrandSettingsPayload = {};
@@ -76,6 +126,11 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
         if (dirtyFields.primary_color) payload.primary_color = data.primary_color;
         if (dirtyFields.secondary_color) payload.secondary_color = data.secondary_color;
         if (dirtyFields.features?.orgs) payload.features = { orgs: data.features.orgs };
+        if (dirtyFields.pricing_strategy) {
+            // An empty selection means "no brand overlay" — the backend drops
+            // the override row and the settings row governs again.
+            payload.pricing_strategy = toPricingStrategyMode(data.pricing_strategy);
+        }
 
         try {
             await updateBrandSettings(brand.id, payload);
@@ -104,6 +159,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
             primary_color: null,
             secondary_color: null,
             features: { orgs: null },
+            pricing_strategy: null,
         };
         try {
             await updateBrandSettings(brand.id, payload);
@@ -112,6 +168,13 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
             } catch {
                 // The reset succeeded; the public cache can retry on the next load.
             }
+            // Hydrate the form from the reset state and clear the dirty state.
+            // Without it the select would keep showing the deleted overlay while
+            // the hint reports the mode that is now in force, and a later save of
+            // another field would re-send `pricing_strategy` and re-create the
+            // overlay row. The `brand` prop is still the pre-reset snapshot at
+            // this moment, so the pricing strategy is cleared explicitly.
+            reset({ ...brandToFormValues(brand), pricing_strategy: '' });
             showToast('success', t`Markeneinstellungen auf Standard zurückgesetzt.`);
         } catch {
             showToast('error', t`Fehler beim Zurücksetzen der Markeneinstellungen.`);
@@ -199,6 +262,23 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
                                {...register('features.orgs')} />
                         <span className="label-text font-bold"><Trans>Organisationen-Feature aktivieren</Trans></span>
                     </label>
+                </div>
+
+                <div className="form-control md:col-span-2">
+                    <label className="label" htmlFor={pricingStrategyId}>
+                        <span className="label-text font-bold"><Trans>Preisstrategie</Trans></span>
+                    </label>
+                    <select id={pricingStrategyId} className="select select-bordered" disabled={!canEdit}
+                            {...register('pricing_strategy')}>
+                        <option value=""><Trans>Standard (DB-Einstellung)</Trans></option>
+                        <option value="scope_licensing"><Trans>Scope-Lizenzierung</Trans></option>
+                        <option value="volume_licensing"><Trans>Mengen-Lizenzierung</Trans></option>
+                    </select>
+                    <span className="text-xs opacity-70 mt-1">
+                        <Trans>Aktiv: {strategyModeLabel} ({strategySourceLabel})</Trans>
+                    </span>
+                    {errors.pricing_strategy &&
+                        <span className="text-error text-xs mt-1">{errors.pricing_strategy.message}</span>}
                 </div>
             </div>
 

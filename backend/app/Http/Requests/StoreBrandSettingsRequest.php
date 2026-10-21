@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\AuthorizationService;
+use App\Services\PricingStrategyResolver;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -56,6 +57,11 @@ class StoreBrandSettingsRequest extends FormRequest
             'from_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'accounting_email' => ['sometimes', 'nullable', 'email'],
             'features.orgs' => ['sometimes', 'nullable', 'boolean'],
+            'pricing_strategy' => [
+                'sometimes',
+                'nullable',
+                Rule::in([PricingStrategyResolver::SCOPE_LICENSING, PricingStrategyResolver::VOLUME_LICENSING]),
+            ],
         ];
     }
 }

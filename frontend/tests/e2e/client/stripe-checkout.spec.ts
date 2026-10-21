@@ -3,6 +3,7 @@ import {AuthHelper} from '../helpers/AuthHelper';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {CreditCardHelper} from '../helpers/CreditCardHelper';
 import {FormHelper} from '../helpers/FormHelper';
+import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {SidebarHelper} from '../helpers/SidebarHelper';
 import {StripeHelper} from '../helpers/StripeHelper';
@@ -61,22 +62,28 @@ test.describe('Stripe Checkout Workflow', () => {
         await auth.logout();
 
         // 2. Kunde loggt sich ein und geht in die Galerie
-        await auth.login(buyerUser.email, buyerUser.password);
-        await page.locator('main').getByText(galleryName).first().click();
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.login(buyerUser.email, buyerUser.password);
+            await page.locator('main').getByText(galleryName).first().click();
 
-        const photoEl = page.locator('.pswp-item').first();
-        await expect(photoEl).toBeVisible();
+            const photoEl = page.locator('.pswp-item').first();
+            await expect(photoEl).toBeVisible();
 
-        // 3. Lizenzen wählen
-        await page.getByRole('button', {name: 'Bild öffnen'}).first().click();
+            // 3. Lizenzen wählen
+            await page.getByRole('button', {name: 'Bild öffnen'}).first().click();
 
-        // Das neue UI wählt automatisch die erste Kategorie aus. Wir klicken nur noch auf "In den Warenkorb".
-        await page.getByRole('button', {name: 'In den Warenkorb'}).click();
-        await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
+            // Das neue UI wählt automatisch die erste Kategorie aus. Wir klicken nur noch auf "In den Warenkorb".
+            await page.getByRole('button', {name: 'In den Warenkorb'}).click();
+            await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
 
-        // 4. Checkout
-        await sidebar.navigateTo('Warenkorb');
-        await expect(page.locator('h1:has-text("Dein Warenkorb")')).toBeVisible();
+            // 4. Checkout
+            await sidebar.navigateTo('Warenkorb');
+            await expect(page.locator('h1:has-text("Dein Warenkorb")')).toBeVisible();
+        });
 
         await form.fillCheckoutForm({
             name: 'E2E Stripe Tester',

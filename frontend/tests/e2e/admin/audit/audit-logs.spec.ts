@@ -4,6 +4,7 @@ import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
 import { UploadHelper } from '../../helpers/UploadHelper';
 import { FormHelper } from '../../helpers/FormHelper';
+import { PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock } from '../../helpers/GlobalSettingsLock';
 import { ModalHelper } from '../../helpers/ModalHelper';
 
 test.describe('Audit Logs (Download Logs)', () => {
@@ -57,16 +58,22 @@ test.describe('Audit Logs (Download Logs)', () => {
         });
 
         await auth.logout();
-        await auth.login(clientUser.email, clientUser.password);
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.login(clientUser.email, clientUser.password);
 
-        await page.locator('main').locator('.card').filter({ hasText: galleryName }).first().click();
+            await page.locator('main').locator('.card').filter({ hasText: galleryName }).first().click();
 
-        const image = page.locator('a.pswp-item img').first();
-        await expect(image).toBeVisible({ timeout: 15000 });
-        await image.scrollIntoViewIfNeeded();
+            const image = page.locator('a.pswp-item img').first();
+            await expect(image).toBeVisible({ timeout: 15000 });
+            await image.scrollIntoViewIfNeeded();
 
-        await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
-        await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible();
+            await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
+            await expect(page.locator('h4:has-text("Lizenz wählen")')).toBeVisible();
+        });
 
         const downloadLink = page.getByRole('link', { name: 'Download', exact: true }).first();
         await expect(downloadLink).toBeVisible();

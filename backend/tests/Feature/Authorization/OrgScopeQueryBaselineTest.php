@@ -64,8 +64,22 @@ class OrgScopeQueryBaselineTest extends TestCase
     /**
      * The measured number of database statements of
      * `GET /api/management/orgs/{id}`.
+     *
+     * 26 (was 25): the brand's pricing-strategy overlay is read from the
+     * `settings` table on every resolution, so a write is effective in every
+     * php-fpm worker immediately and not only in the writing one (the
+     * process-local `BrandRegistry` memo would have hidden it from all other
+     * workers). The endpoint resolves the mode once, and that read is the one
+     * additional statement.
+     *
+     * The cost is **per resolution**, not per request: a listing that
+     * resolves the mode for every gallery (e.g. the public search with up to
+     * 50 galleries) pays one additional statement per gallery. A request-scoped
+     * memo would remove that multiplier, but it would have to be invalidated on
+     * write — and a memo that is read stale in another worker is exactly the
+     * defect this read path avoids.
      */
-    private const ORG_DETAIL_STATEMENTS = 25;
+    private const ORG_DETAIL_STATEMENTS = 26;
 
     /**
      * The measured number of `getOrgGroupScope()` reads inside

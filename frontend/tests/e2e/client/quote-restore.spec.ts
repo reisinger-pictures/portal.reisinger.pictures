@@ -2,6 +2,7 @@ import {test, expect} from '@playwright/test';
 import {AuthHelper} from '../helpers/AuthHelper';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {GalleryHelper} from '../helpers/GalleryHelper';
+import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
 import {SidebarHelper} from '../helpers/SidebarHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 
@@ -60,20 +61,26 @@ test.describe('Quote Cart Restore Workflow', () => {
         const quoteToken = quoteData.link?.split('quote_token=')[1];
         expect(quoteToken).toBeTruthy();
 
-        await auth.login(testUser.email, testUser.password);
-        await sidebar.navigateTo('Warenkorb');
-        await page.evaluate((token) => {
-            const url = new URL(window.location.href);
-            url.searchParams.set('quote_token', token as string);
-            window.history.pushState({}, '', url.toString());
-            window.dispatchEvent(new PopStateEvent('popstate'));
-        }, quoteToken);
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.login(testUser.email, testUser.password);
+            await sidebar.navigateTo('Warenkorb');
+            await page.evaluate((token) => {
+                const url = new URL(window.location.href);
+                url.searchParams.set('quote_token', token as string);
+                window.history.pushState({}, '', url.toString());
+                window.dispatchEvent(new PopStateEvent('popstate'));
+            }, quoteToken);
 
-        const toast = page.locator('.toast');
-        await expect(toast).toBeVisible();
-        await expect(toast).toContainText('Angebot aus Link wiederhergestellt.');
-        await expect(page.getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
-        await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('1.500,00 €');
+            const toast = page.locator('.toast');
+            await expect(toast).toBeVisible();
+            await expect(toast).toContainText('Angebot aus Link wiederhergestellt.');
+            await expect(page.getByRole('button', {name: 'Entfernen'})).toHaveCount(2);
+            await expect(page.locator('.text-3xl.font-mono.text-primary')).toHaveText('1.500,00 €');
+        });
         await expect(page).toHaveURL(/.*\/cart$/);
     });
 });

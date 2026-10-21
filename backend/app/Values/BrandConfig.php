@@ -22,6 +22,12 @@ readonly class BrandConfig
         public ?string $accountingEmail = null,
         public string $primaryColor = '#1E5631',
         public string $secondaryColor = '#A4B494',
+        /**
+         * The brand's pricing strategy, or null when the brand carries no
+         * explicit one (the config has no default for it — the effective mode
+         * is resolved by `PricingStrategyResolver`).
+         */
+        public ?string $pricingStrategy = null,
     ) {}
 
     public function prefix(): string

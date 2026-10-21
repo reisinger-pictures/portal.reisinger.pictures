@@ -6,6 +6,7 @@ import { ModalHelper } from '../../helpers/ModalHelper';
 import { FormHelper } from '../../helpers/FormHelper';
 import { UploadHelper } from '../../helpers/UploadHelper';
 import { GalleryHelper } from '../../helpers/GalleryHelper';
+import { PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock } from '../../helpers/GlobalSettingsLock';
 
 test.describe('Order Status Management (G7)', () => {
     let helper: E2ESessionHelper;
@@ -51,30 +52,36 @@ test.describe('Order Status Management (G7)', () => {
 
         await auth.logout();
 
-        await auth.login(powerUser.email, powerUser.password);
-        await page.locator('main').getByText(galleryName).first().click();
+        // The gallery carries no own `licensing_mode`, so the brand default decides
+        // how it is priced (scope licence vs. volume tier). The brand-settings spec
+        // writes that mode, so this spec takes the same lock and cannot observe a
+        // foreign one.
+        await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
+            await auth.login(powerUser.email, powerUser.password);
+            await page.locator('main').getByText(galleryName).first().click();
 
-        await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
-        await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
+            await expect(page.locator('a.pswp-item img').first()).toBeVisible({ timeout: 15000 });
+            await page.getByRole('button', { name: 'Bild öffnen' }).first().click();
 
-        await page.locator('label').filter({ hasText: 'Web & Social Media' }).click();
-        await page.getByRole('button', { name: 'In den Warenkorb' }).click();
-        await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
+            await page.locator('label').filter({ hasText: 'Web & Social Media' }).click();
+            await page.getByRole('button', { name: 'In den Warenkorb' }).click();
+            await expect(page.locator('.toast')).toContainText('In den Warenkorb gelegt');
 
-        await sidebar.navigateTo('Warenkorb');
+            await sidebar.navigateTo('Warenkorb');
 
-        await form.fillCheckoutForm({
-            name: 'Order Status Tester',
-            street: 'Teststr. 1',
-            zip: '1010',
-            city: 'Wien',
-            acceptAgb: true,
-            waiveWithdrawal: true,
+            await form.fillCheckoutForm({
+                name: 'Order Status Tester',
+                street: 'Teststr. 1',
+                zip: '1010',
+                city: 'Wien',
+                acceptAgb: true,
+                waiveWithdrawal: true,
+            });
+
+            await page.locator('input[name="payment_method"][value="invoice"]').click();
+            await page.getByRole('button', { name: 'Zahlungspflichtig bestellen' }).click();
+            await expect(page.locator('.toast')).toContainText('Bestellung erfolgreich!');
         });
-
-        await page.locator('input[name="payment_method"][value="invoice"]').click();
-        await page.getByRole('button', { name: 'Zahlungspflichtig bestellen' }).click();
-        await expect(page.locator('.toast')).toContainText('Bestellung erfolgreich!');
         await auth.logout();
 
         await auth.login(adminUser.email, adminUser.password);

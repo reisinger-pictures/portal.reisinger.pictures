@@ -8,6 +8,8 @@ const e2eBrandSettings = {
     accounting_email: 'brand-settings-e2e@example.com',
     primary_color: '#123456',
     secondary_color: '#654321',
+    // No brand overlay for the pricing strategy: the settings row governs.
+    pricing_strategy: null,
 } as const;
 
 /**
@@ -226,6 +228,7 @@ export class E2ESessionHelper {
             accounting_email: null,
             primary_color: null,
             secondary_color: null,
+            pricing_strategy: null,
         });
     }
 

@@ -361,6 +361,7 @@ class BrandRegistry
             accountingEmail: $merged['accounting_email'] ?? null,
             primaryColor: $merged['primary_color'] ?? '#1E5631',
             secondaryColor: $merged['secondary_color'] ?? '#A4B494',
+            pricingStrategy: $merged['pricing_strategy'] ?? null,
         );
     }
 
