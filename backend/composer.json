@@ -69,6 +69,11 @@
             "@php artisan config:clear --ansi",
             "@php artisan test --parallel --testsuite=Feature"
         ],
+        "test:mariadb": [
+            "@php artisan config:clear --ansi",
+            "@php -r 'if (! in_array((string) getenv(\"DB_CONNECTION\"), [\"mariadb\", \"mysql\"], true)) { fwrite(STDERR, \"test:mariadb needs DB_CONNECTION=mariadb (or mysql) plus DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME and DB_PASSWORD. Without a real MariaDB the contract signer identity tests only skip.\"); exit(1); }'",
+            "@php artisan test --filter='ContractSignerIdentityRaceTest|ContractSignerIdentityTest'"
+        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
