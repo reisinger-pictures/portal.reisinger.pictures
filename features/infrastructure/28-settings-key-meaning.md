@@ -313,3 +313,41 @@ Settings-Keys, die er deklariert, autoritativ (siehe
 prüft der Aufruf mit `--expect=base_price=14900`, ob der Wert unverändert ist;
 eine absichtliche Preisanpassung wird mit einem neuen `--expect` sichtbar, ein
 versehentliches Überschreiben nicht.
+
+## Der Vergleich mit dem Seeder ist ein Befehl
+
+`backend/AGENTS.md` verlangt vor einem `db:seed` in der Produktion den Nachweis,
+ob die betroffenen Werte abweichen: der Seeder ist für die Keys, die er
+deklariert, autoritativ und schreibt sie per `upsert` auf `(key, brand)`. Der
+Nachweis war bisher eine Leseübung — und damit die Stelle, an der ein Seed
+übersehene Werte zerstört.
+
+**`php artisan ops:check-seeded-settings`** (auf dem Host
+`./scripts/check-seeded-settings.sh`) vergleicht die Werte des Seeders mit den
+gespeicherten und nennt jeden Key, den ein Seed überschreiben würde. Die
+verglichenen Werte sind **derselbe Constant**, den der Seeder schreibt
+(`DatabaseSeeder::AUTHORITATIVE_SETTINGS`) — keine zweite Liste, die driften
+könnte und dann die falschen Unterschiede nennen würde. Exit 1 bedeutet: es
+gibt mindestens eine Abweichung. Ob geseedet wird, entscheidet der Mensch; der
+Befehl macht die Folgen vorher sichtbar.
+
+**Gemessen in der Produktion am 2026-10-21** (read-only): sieben der acht
+Bank- und Firmendaten sind die des Seeders — `bank_holder` = `Florian
+Reisinger`, `bank_iban` = `DE96100110012179986174`, `bank_bic` = `NTSBDEB1XXX`,
+`company_street` = `Robert-Stolz-Straße 8`, `company_zip` = `4020`,
+`company_city` = `Linz`, `company_country` = `Österreich`.
+
+**Eine Abweichung ist gewollt und deshalb gefährlich:** `company_email` steht in
+der Produktion auf `florian@reisinger.pictures`, der Seeder schreibt
+`admin@example.com`. Ein `db:seed --force` — und `app:seed-if-fresh`, das
+denselben Seeder ruft — würde die reale Adresse durch die Platzhalteradresse
+ersetzen. Der Seeder ist für diesen Key autoritativ, also ist die Abweichung
+genau die Sorte von Wert, die der Vergleich nennen muss.
+
+Auf einer **frischen** Datenbank trägt dieselbe Zeile die Platzhalter aus der
+Migration (`bank_holder` = `Max Mustermann`, `bank_iban` = `ATXX XXXX XXXX XXXX
+XXXX`, `bank_bic` = `XXXXXX`) — dort ist ein Seed die Korrektur, nicht die
+Gefahr. Die Werte der Migration sind in
+[`backend/AGENTS.md`](../../backend/AGENTS.md) („Database Setup Policy")
+beschrieben; die Liste der autoritativen Keys und ihre Felder in diesem
+Dokument.
