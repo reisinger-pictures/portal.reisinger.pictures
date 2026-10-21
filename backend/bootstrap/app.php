@@ -41,9 +41,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // kein Route-Lookup, `AuthenticationException` wird überhaupt erst geworfen.
         $middleware->redirectGuestsTo(null);
 
-        // The API is only reachable through Caddy: the FastCGI port is not
-        // published to the host, and Caddy sets `X-Forwarded-For` from the
-        // real peer while ignoring the header a client sends.
+        // The FastCGI port is not published to the host, so the legitimate
+        // writer of `X-Forwarded-For` is Caddy, which sets the header from the
+        // real peer and ignores the one a client sends.
+        //
+        // The boundary this rule draws: the DIRECT PEER is trusted. Every
+        // container that can open the FastCGI port — the backend sits on the
+        // shared external network `webret` next to the other stacks, and on
+        // `portal_internal` — can therefore set the header itself. That is a
+        // deliberate trade: pinning the proxy to one address would break every
+        // recreate of the Caddy container, and the only thing a container in
+        // these networks could gain is a falsified client address (no
+        // authentication, no data access).
         //
         // Without trusting the proxy, every request arrives from the proxy's
         // container address (measured in production: 172.18.0.3 for every
