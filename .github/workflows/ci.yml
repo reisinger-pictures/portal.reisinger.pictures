@@ -306,6 +306,190 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+  backend-mariadb:
+    # The contract signer identity invariant can only be PROVEN against a real
+    # MariaDB server, and the SQLite test database cannot prove it:
+    #  * ContractSignerIdentityRaceTest needs two independent writer
+    #    connections against one database. SQLite :memory: has exactly one
+    #    connection, so the race cannot happen there.
+    #  * ContractSignerIdentityTest's trigger regression needs a database or
+    #    server collation that differs from utf8mb4_unicode_ci; the default
+    #    MariaDB 11.4 collation is utf8mb4_uca1400_ai_ci.
+    # Both tests mark themselves skipped on SQLite, and phpunit.xml pins the
+    # whole suite to DB_CONNECTION=sqlite / DB_DATABASE=:memory:, so until
+    # this job existed neither test ever ran anywhere.
+    #
+    # This job is additive by construction: it runs exactly these test classes
+    # against a throwaway MariaDB service, never the full suite, and it changes
+    # no existing job - no other job gets slower, redder or less reliable
+    # because of it. It IS part of the `ci-gate` aggregate (2026-10-22): the
+    # invariant it proves is otherwise proven nowhere, and a gate that does not
+    # include it would let a regression through silently. The aggregate waits
+    # for the longest dependency anyway (the E2E matrix), so the gate does not
+    # get slower.
+    name: Backend (MariaDB identity)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    # The database coordinates of the throwaway service. `docker exec -e VAR`
+    # (without a value) copies them from the step environment into the PHP
+    # container, so there is exactly one place that defines them.
+    env:
+      DB_CONNECTION: mariadb
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3307"
+      DB_DATABASE: portal_test_db
+      DB_USERNAME: portal_user
+      DB_PASSWORD: admin
+    services:
+      # Same image, credentials and health contract as the MariaDB service of
+      # the e2e job. The port mapping is the same 3307:3306 the backend
+      # .env.ci expects, so the PHP container reaches the service on
+      # 127.0.0.1:3307 through --network host.
+      mariadb:
+        image: mariadb:11.4
+        ports:
+          - 3307:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: portal_test_db
+          MYSQL_USER: portal_user
+          MYSQL_PASSWORD: admin
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Start PHP container (prod image)
+        # Same image and wiring as the backend PHPUnit job: the pinned
+        # portal-base:8.5 (PHP 8.5 + ext-pcntl + ext-pdo_mysql) on the host
+        # network, so 127.0.0.1:3307 (the MariaDB service) is reachable.
+        run: |
+          docker run -d --name php-mariadb \
+            --user root \
+            --network host \
+            -v "${{ github.workspace }}:/app" \
+            -w /app/backend \
+            ghcr.io/reisinger-pictures/portal-base:8.5 \
+            sleep infinity
+          until docker exec php-mariadb php -v > /dev/null 2>&1; do sleep 1; done
+      - name: Prepare environment
+        run: cp .env.ci .env
+      - name: Install dependencies
+        run: |
+          docker run --rm \
+            --network host \
+            -v "${{ github.workspace }}:/app" \
+            -w /app/backend \
+            composer:2.10.3 install --ignore-platform-reqs --no-interaction --optimize-autoloader
+      - name: Generate app key
+        run: docker exec php-mariadb php artisan key:generate
+      - name: Wait for MariaDB
+        # A started service container is not necessarily ready to accept the
+        # first query. The wait is bounded (120 seconds) and uses the very
+        # connection the test run uses - PDO, same host, port, database and
+        # credentials - so a service that is reachable but not usable fails
+        # here with a clear cause instead of surfacing as a connection error
+        # in the test run.
+        run: |
+          docker exec \
+            -e DB_HOST \
+            -e DB_PORT \
+            -e DB_DATABASE \
+            -e DB_USERNAME \
+            -e DB_PASSWORD \
+            php-mariadb \
+            php -r '
+          $dsn = "mysql:host=".getenv("DB_HOST").";port=".getenv("DB_PORT").";dbname=".getenv("DB_DATABASE").";charset=utf8mb4";
+          $deadline = time() + 120;
+          $last = "no attempt";
+          do {
+              try {
+                  new PDO($dsn, getenv("DB_USERNAME"), getenv("DB_PASSWORD"));
+                  echo "MariaDB is reachable on ".getenv("DB_HOST").":".getenv("DB_PORT")."\n";
+                  exit(0);
+              } catch (Throwable $e) {
+                  $last = $e->getMessage();
+                  sleep(1);
+              }
+          } while (time() < $deadline);
+          fwrite(STDERR, "MariaDB did not accept connections: ".$last."\n");
+          exit(1);
+          '
+      - name: Verify pcntl_fork is available
+        # The race test skips itself without pcntl_fork. A skipped test in a
+        # green job is exactly the failure mode this job exists to remove, so
+        # the extension is checked before the run: a missing pcntl_fork must
+        # fail the job instead of silently downgrading the proof.
+        run: |
+          docker exec php-mariadb php -r 'if (! function_exists("pcntl_fork")) { fwrite(STDERR, "ext-pcntl is missing in the CI PHP image\n"); exit(1); } echo "pcntl_fork available\n";'
+      - name: Run migrations on MariaDB
+        # V039 (contract signer identity: normalized_email + join_scope_key,
+        # unique index, writer guards) has to run on MariaDB, not only on the
+        # SQLite test database.
+        run: |
+          docker exec \
+            -e DB_CONNECTION \
+            -e DB_HOST \
+            -e DB_PORT \
+            -e DB_DATABASE \
+            -e DB_USERNAME \
+            -e DB_PASSWORD \
+            php-mariadb \
+            php artisan migrate --force
+      - name: Run the contract signer identity tests on MariaDB
+        # phpunit.xml pins the suite to DB_CONNECTION=sqlite / DB_DATABASE=:
+        # memory: WITHOUT force, so the environment of this step wins over
+        # the phpunit.xml defaults, and the immutable .env cannot overwrite
+        # them either. Only the two contract identity classes run - never the
+        # full suite.
+        run: |
+          set -o pipefail
+          docker exec \
+            -e DB_CONNECTION \
+            -e DB_HOST \
+            -e DB_PORT \
+            -e DB_DATABASE \
+            -e DB_USERNAME \
+            -e DB_PASSWORD \
+            php-mariadb \
+            php artisan test --no-ansi \
+              --filter='ContractSignerIdentityRaceTest|ContractSignerIdentityTest|ContractContentHeartbeatMySqlTest' 2>&1 | tee /tmp/phpunit-mariadb.log
+      - name: Backend (MariaDB) Test-Summary
+        # A green job that skipped the proof is not a proof: this step turns
+        # a skipped test into a red job, so the MariaDB coverage cannot decay
+        # into a silent no-op.
+        if: always()
+        run: |
+          if [ ! -f /tmp/phpunit-mariadb.log ]; then
+            echo "::error::The MariaDB test step produced no output - the run did not complete."
+            exit 1
+          fi
+          CLEAN=$(sed -e 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-mariadb.log 2>/dev/null || true)
+          SUMMARY=$(grep -E '^[[:space:]]*Tests:|OK \(' <<< "$CLEAN" | tail -n 1 || true)
+          if [ -z "$SUMMARY" ]; then
+            echo "::error::The MariaDB run produced no PHPUnit summary line."
+            exit 1
+          fi
+          echo "MariaDB PHPUnit summary: ${SUMMARY}"
+          if grep -qi 'skipped' <<< "$CLEAN"; then
+            echo "::error::A contract signer identity test was skipped in the MariaDB run."
+            exit 1
+          fi
+          {
+            echo "## Backend (MariaDB identity)"
+            echo ""
+            echo "| Metrik | Wert |"
+            echo "|---|---|"
+            echo "| Treiber | MariaDB 11.4 |"
+            echo "| Klassen | ContractSignerIdentityRaceTest, ContractSignerIdentityTest |"
+            echo "| Ergebnis | ✅ PASS |"
+            echo "| Summary | $SUMMARY |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   frontend:
     name: Frontend (Lint, Build, Vitest)
     runs-on: ubuntu-latest
@@ -764,6 +948,7 @@ jobs:
       - security-contract
       - ratchet
       - backend
+      - backend-mariadb
       - frontend
       - e2e
     runs-on: ubuntu-latest
@@ -773,6 +958,7 @@ jobs:
           SECURITY_CONTRACT_RESULT: ${{ needs.security-contract.result }}
           RATCHET_RESULT: ${{ needs.ratchet.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
+          BACKEND_MARIADB_RESULT: ${{ needs.backend-mariadb.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
         run: |
@@ -780,5 +966,6 @@ jobs:
           [[ "$SECURITY_CONTRACT_RESULT" == "success" ]]
           [[ "$RATCHET_RESULT" == "success" ]]
           [[ "$BACKEND_RESULT" == "success" ]]
+          [[ "$BACKEND_MARIADB_RESULT" == "success" ]]
           [[ "$FRONTEND_RESULT" == "success" ]]
           [[ "$E2E_RESULT" == "success" ]]
