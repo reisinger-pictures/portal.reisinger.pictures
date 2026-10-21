@@ -1,26 +1,37 @@
 # Skills-Marker
 
-agents-skills-consumed: 787670a
-geprüft am: 2026-10-19
+agents-skills-consumed: 4205142
+geprüft am: 2026-10-21
 
-> Stand: geprüft bis `787670a` (= HEAD des Skills-Repos zum Prüfzeitpunkt, 2026-10-19;
-> vollständig `787670a8fc3d22a5ad114bcfd11fab8fb6e9f083`).
-> Range `6629ad2..787670a`: 37 Commits (33 davon mit `.agents/`-Bezug), 21 berührte Skill-Pfade — 5 neue Skills
-> (`laravel`, `react-i18n`, `security-review`, `web-audit`, `update-models`), 3 entfernte
-> (`model-updater`, `update-opencode-models`, `vision-agents`), 12 geänderte und 1
-> Pfadumbenennung (`models` → `update-models`).
-> **Der Working Tree des Skills-Repos war zum Prüfzeitpunkt nicht sauber:** uncommittete
-> Änderungen an `update-models/SKILL.md` und `update-models/references/registry.md`
-> (maschinenweit, ohne Projektbezug). Sie gehörten zu keinem Commit und waren deshalb **nicht**
-> Teil der geprüften Range; sie sind inzwischen als `219171c` committet und werden vom nächsten
-> Fortschreiben abgedeckt.
+> Stand: geprüft bis `4205142` (= HEAD des Skills-Repos zum Prüfzeitpunkt, 2026-10-21,
+> 21:19 UTC; vollständig `4205142828e2f29d9cffdbf481680d678665f0c1`). Der Working Tree des
+> Skills-Repos war zum Prüfzeitpunkt **sauber**.
+> Range `787670a..4205142`: **26 Commits**, davon **24** mit `.agents/`-Bezug; **9** berührte
+> Skill-Verzeichnisse, davon **2 neu** (`ratchet-gates`, `generated-docs`).
 > **Projektstand der Anker:** gemessen am Vorgänger `d8ef650`, seitdem unverändert (Beleg:
 > `git diff --stat d8ef650..HEAD -- AGENTS.md backend/ deployment/ features/ frontend/
-> .github/workflows/` → ohne Ausgabe). Der **Anker-Audit** unten misst die Anker-Gruppen des
-> Vorgänger-Markers gegen dessen Audit-Basis `344604e` (der Vor-Pull-Baum `ee8523f` lag
-> 78 Commits hinter `344604e`); die Korrekturziele sind gegen `d8ef650` nachgezogen.
+> .github/workflows/` → ohne Ausgabe; `d8ef650` ist der **Messstand**, nicht zwingend der
+> direkte Vorgänger). Die **zwei** Anker, deren Zieldatei dieser Commit selbst schreibt
+> (`AGENTS.skills.md`, `AGENTS.todo.md`), gelten **am committeten Stand dieses Commits**.
 > Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel".
 > Format und Ablauf: Skill `skills-marker` im Skills-Repo.
+
+Bezugsrahmen — die gemeinsame Regel, **zitiert statt kopiert**: `skills-marker/SKILL.md` →
+„Bezugsrahmen-Regel" (Skill-ID + Datei + Anker, **ohne Zeilennummer** — die driftet, der
+Anker bleibt); Wortlaut, Belege und Fälle: `skills-marker/references/notes.md`
+§ „Der Bezugsrahmen". Diese Liste nennt die **Fälle**, nicht die Fassung — steht eine
+Form nicht an der Zitierstelle, ist sie hier falsch:
+- (a) was der Commit selbst festschreibt (Marker, Board, geänderte Dateien);
+- (b) eine Fremddatei, die der Commit nicht anfasst und die seit dem genannten Stand
+  **unverändert** ist;
+- (c) eine Datei, die sich seit dem genannten Stand **geändert** hat.
+
+**Lokale Ergänzung:** (1) Das **dritte Verdikt** `offen` in der Spalte `angewendet?` — die
+Upstream-Vorlage kennt nur `ja | nein`; die Upstream-Fälle „trifft zu, ist nicht drin" und
+„trifft nicht zu" sind hier an einem Verdiktwert unterscheidbar. (2) `<stand>` = der
+committete Stand dieses Commits (die SHA, die erst mit dem Commit existiert) — der
+Platzhalter in den Messkommandos dieses Markers und des Boards. Beide ergänzen die
+gemeinsame Regel und ersetzen sie nicht.
 
 ## Skill-Stand
 
@@ -30,103 +41,214 @@ geprüft am: 2026-10-19
 | `build-verify` | ja | `AGENTS.md` §6 (Z. 47): der gemeinsame pull/verify/commit/push-Prozess ist im Skill `build-verify` definiert, repo-spezifische Kommandos bleiben in dieser Datei | — |
 | `codegraph-project-setup` | ja | `AGENTS.md` §11 (Z. 89-92): `.codegraph/` optional und maschinenlokal, `.githooks/pre-commit` fails open, kein Commit-Gate | Lokaler Index ist optional, kein Commit-Gate |
 | `docker-test-image` | ja | `deployment/Dockerfile.e2e` (`ARG PLAYWRIGHT_VERSION` Z. 34, Browser-Install Z. 73-74), `.github/workflows/e2e-image.yml` (Versionsextraktion Z. 47) | — (die Lockfile-Regel des Skills — Browserversion aus dem Lockfile — ist am 2026-10-21 umgesetzt: `db13b2c`; die Board-Position 6 ist damit geschlossen und aus dem Board entfernt, `23ca866`) |
+| `generated-docs` | offen | `features/infrastructure/29-production-operations-runbook.md` (Z. 48 — „currently `mariadb`" gegen `backend/config/database.php` Z. 20), die Zahlen in der Prosa dieses Markers und des Boards — **ohne Generator und ohne Drift-Gate** | `AGENTS.todo.md` → Abschnitt „SKILLS-STAND (2026-10-19)" — **der Eintrag ist vom Owner anzulegen** (Stand 2026-10-21: keine Zeile im Board) |
 | `ghcr-visibility` | ja | `.github/workflows/ci.yml` GHCR-Voraussetzung (Z. 52-61) + `container:`-Image (Z. 392) | — |
 | `github-ci-filters` | ja | `.github/workflows/ci.yml` `paths:` unter `push` (Z. 31) und `pull_request` (Z. 39) — D-23 | — |
 | `laravel` | ja | `backend/AGENTS.md` (Commands Z. 7 mit Pint-Gate Z. 20, Database Setup Policy Z. 22, Migration Policy Z. 32, Parallel Testing Z. 39), `backend/phpunit.xml` (Z. 30-54, hermetische Baseline), `backend/app/Http/Requests/` (22 FormRequests), `backend/app/Policies/` | Die DB-Policy (Produktion `mariadb`, Tests SQLite `:memory:`) weicht vom DB-Standard des Skills (PostgreSQL) ab, und die Abweichung ist **nirgends als Entscheidung festgehalten** → Board „SKILLS-STAND (2026-10-19)", Position 8 |
 | `node-deps` | ja | `frontend/package.json` Z. 72 (`"@playwright/test": "^1.64.1"`), `frontend/pnpm-lock.yaml` Z. 768 (`@playwright/test@1.64.1`) | — (die Named-Locks-Position ist am 2026-10-18 geschlossen: Bump auf 1.64.1, committet `e1ed87a`) |
 | `permissions` | nein | | Maschinen-Sache (globales `permissions`-Array, V2-Naming); das Projekt hat kein `.opencode/` — die Secret-Regel steht in `features/owner-decisions.md` §D-4 (Z. 19) — trifft nicht zu |
 | `playwright-parallel` | ja | `.github/workflows/ci.yml` E2E-Matrix (Z. 425-431), `frontend/playwright.config.ts` (`fullyParallel: true` Z. 19, `workers: isCi ? 4 : 8` Z. 22) | — (die Matrix-Position ist am 2026-10-18 geschlossen) |
+| `ratchet-gates` | ja | `ratchet.config.jsonc` (Gate-Header: `class`, `incident`, `unit`, `direction: ceiling`, `count` mit `registry`/`severities`/`statuses`), `ratchet.baseline.json` (Baseline), `ratchet.findings.json` (Registry als *view*), `.github/workflows/ci.yml` Job „Ratchet gates" (Z. 150-168, `mode: validate`) | — |
 | `react-i18n` | ja | `frontend/lingui.config.ts`, `frontend/src/main.tsx` Z. 5 (`import './logic/I18nProvider'` als erster Import), `frontend/scripts/check-i18n.mjs` (extract→compile-Vergleich + AST-Pass), `frontend/AGENTS.md` §„Lingui / i18n" (Z. 106) | — |
-| `security-review` | ja | `features/security/2026-10-18-review-closure.md` (14 Befunde SEC-01…SEC-14, alle geschlossen und unabhängig verifiziert, jeder mit Regressionstest), `features/security/accepted-risks.md` | — |
+| `security-review` | ja | `features/security/2026-10-18-review-closure.md` (14 Befunde SEC-01…SEC-14, alle geschlossen und unabhängig verifiziert, jeder mit Regressionstest), `features/security/accepted-risks.md`, `ratchet.findings.json` (Severity/Status getrennt, kanonische Werte) | — |
 | `skills-marker` | ja | `AGENTS.skills.md` (diese Datei) | — |
 | `tailscale-serve` | nein | | Kein Dev-Server-Expose im Projekt definiert — trifft nicht zu |
 | `ui-review` | ja | `frontend/tests/screenshots/` (`ui-review.config.ts` Z. 9-10 — Routen-Manifest, zitiert „ui-review skill references/harness.md §5"; dazu `harness.ts`, `ui-screenshots.spec.ts`, `seeds.ts`), `AGENTS.todo.md` §„UI-Review 2026-09-26" | Die Rollenänderung derselben Range traf `AGENTS.md` §6 (verlangte den abgeschafften `vision`-Subagenten); am 2026-10-20 umgestellt auf den verbleibenden Weg (`1818909`, Ergänzung `b86c15c`) — die Board-Position 7 ist an diesem Tag geschlossen und aus dem Board entfernt (Beleg im Commit) |
 | `update-models` | nein | | Modell-Auswahl ist Maschinen-/Account-Sache; das Projekt definiert keine Modelle — trifft nicht zu (ersetzt die früheren Skills `model-updater` + `update-opencode-models`) |
 | `web-audit` | nein | | Kein Live-Site-Audit (Crawl → Bild-Download → Vision-Fan-out → False-Positive-Gate → ZIP-Archiv) im Projekt definiert; die Sitemaps (`backend/routes/api.php:127-128`) sind Produkt-Feature — trifft nicht zu |
 
-## Offen aus dem Bereich `6629ad2..787670a`
+## Offen aus dem Bereich `787670a..4205142`
 
-_Range: 37 Commits, davon 33 mit `.agents/`-Bezug. Jede berührte Skill-Datei gegen **dieses** Projekt geprüft; die
-Entscheidung steht je Zeile. Der Bereich umfasst auch die Regeldatei
-`.agents/rules/build-verify.md` (4 Commits) — sie ist die Kernregel, auf die
-`AGENTS.md` zeigt._
+_Range: 26 Commits, davon 24 mit `.agents/`-Bezug — **gemessen am Stand `4205142` des Skills-Repos**
+(2026-10-21, 21:19 UTC); 9 Skill-Verzeichnisse, 2 davon neu. Jede
+berührte Skill-Datei gegen **dieses** Projekt geprüft; die Entscheidung steht je Skill. Die
+Regeldatei `.agents/rules/build-verify.md` (2 Commits) ist die Kernregel, auf die
+`AGENTS.md` §6 zeigt; sie steht am Ende dieses Abschnitts._
 
 **Neu**
 
-- `laravel` — **ja.** Das Projekt *ist* ein Laravel-Backend (`laravel/framework` ^13, PHP ^8.5) und wendet die Konventionen bereits an: hermetische `phpunit.xml`-Baseline (APP_ENV/BCRYPT_ROUNDS/CACHE_STORE/SESSION_DRIVER/QUEUE_CONNECTION/DB `:memory:`), Seed- und Migrations-Policy in `backend/AGENTS.md`, Pint als Formatter **und** Auto-Fix mit CI-Gate, `paratest` ohne Worker-DB-Setup, 22 `FormRequest`-Klassen, `app/Policies/`, JWT im httpOnly-Cookie, Scout + Meilisearch. **Abweichung:** der DB-Standard des Skills (PostgreSQL, MySQL deprecated) weicht von der projekteigenen DB-Policy ab (Produktion `mariadb`, Tests SQLite `:memory:`) — **der Zustand ist dokumentiert, die Entscheidung nicht**: `backend/config/database.php:20` (Default `mariadb`), `features/infrastructure/29-production-operations-runbook.md:48` („currently `mariadb`"), `backend/AGENTS.md:28` (lokal SQLite) und `backend/AGENTS.md:41` (Test-DB SQLite `:memory:`) beschreiben den Ist-Zustand, aber weder `features/owner-decisions.md` (D-1…D-48) noch `features/tech/07-architectural-decisions.md` (AD-1…AD-10) entscheidet über die DB-Engine (MariaDB fällt dort nur als Messumgebung im D-40-Beweis vor) → das ist eine **offene Lücke, keine beschlossene Abweichung** (offene Position: Board „SKILLS-STAND (2026-10-19)", Position 8). Die Datei-Test-Regel des Skills (`laravel/SKILL.md:41`: „fake every local disk in `setUp()`") ist ebenfalls nicht eingehalten: `Storage::fake()` deckt 64 Verwendungen ab (photos 32, local 21, ftp_inbox 10, public 1), aber **keine Testdatei faket alle vier lokalen Disks** (`photos`, `ftp_inbox`, `local`, `public`) — 40 Testdateien faken genau eine, 10 genau zwei; der eigene Helfer `UsesIsolatedTempDirectory` (5 Testdateien plus Trait) betrifft `filesystems.temp_dir`, nicht das Faking. (Gemessen am Vorgänger-Stand `d8ef650`, seitdem unverändert — `git diff --stat d8ef650..HEAD -- backend/ features/` → ohne Ausgabe.) `980514a` fügte den Metadaten-Block `metadata.opencode/autoinvoke: false` hinzu (Ladung nur per exakter ID).
-- `react-i18n` — **ja.** Das Muster des Skills ist aus genau diesem `frontend/` abgeleitet und vollständig vorhanden: `lingui.config.ts` (de/de, `format-po` ohne Zeilennummern), `src/logic/I18nProvider.tsx` als erster Import in `main.tsx`, `@lingui/core/macro` + `@lingui/react/macro` (die für Lingui v6 korrekten Pfade), `eslint-plugin-lingui`, `lingui:extract`/`lingui:compile`/`check:i18n` und das Gate in `prebuild`. Das Gate macht genau, was der Skill verlangt: extract → msgids gegen die kompilierten Werte vergleichen → stale catalog oder roher Text = Fehler. `980514a` fügte den Metadaten-Block `metadata.opencode/autoinvoke: false` hinzu (Ladung nur per exakter ID).
-- `security-review` — **ja.** Der Ablauf des Skills ist in diesem Projekt **gelaufen und dokumentiert**: `features/security/2026-10-18-review-closure.md` hält die 14 Befunde SEC-01…SEC-14 mit Status, Commit, Regressionstest und Verifikationsrunde fest — genau das Muster des Skills (find → in Wellen schließen → mit Test und Register-Eintrag pinnen). **Population heute gemessen** (Stand `d8ef650`, 2026-10-21): `cd backend && php artisan route:list --json` → **192 Routen, 153 mit `auth:`, 39 ohne** — der Referenzlauf des Skills nennt 189/150/39, die Gesamtzahl ist dieselbe, eine Route ist inzwischen hinter `auth:` (die Zahlen beschreiben den Lauf, nicht eine Regel). `980514a` fügte den Metadaten-Block `metadata.opencode/autoinvoke: false` hinzu (Ladung nur per exakter ID).
-- `web-audit` — **nein.** Kein Live-Site-Audit mit Crawl, Bild-Download, Vision-Fan-out, False-Positive-Gate und ZIP-Archiv ist hier definiert; die öffentlichen Sitemaps sind Produkt-Feature, kein Audit-Scope. `980514a` fügte den Metadaten-Block `metadata.opencode/autoinvoke: false` hinzu (Ladung nur per exakter ID).
-- `update-models` — **nein.** Modell-Auswahl ist Maschinen-/Account-Sache.
+- `ratchet-gates` — **ja.** (5 Commits in der Range.) Neu (`70d49e0`), ergänzt um das gemeinsame Vokabular
+  (`b0d1b51`), die CLI-Map (`d7888cd`) und den Release-Stand (`d5dc52f`). Das Projekt fährt
+  den Mechanismus bereits, ohne den Skill zu nennen: `ratchet.config.jsonc` trägt den
+  Gate-Header der Regel (Feld `class` = Defektklasse, `incident` = der konkrete Anlass,
+  `unit` = Zähleinheit, `direction: ceiling`, `count` mit `registry`/`severities`/`statuses`),
+  `ratchet.baseline.json` trägt die Baseline, `ratchet.findings.json` trägt die Registry —
+  die Prosa `features/security/2026-10-18-review-closure.md` bleibt der menschliche Record,
+  die Registry ist die maschinenlesbare *Sicht*. Die CI fährt den Job „Ratchet gates"
+  (`.github/workflows/ci.yml` Z. 150-168) mit `mode: validate`. **Die kanonischen Namen
+  trägt das Projekt wörtlich:** die Stufen `critical`/`high`/`medium`/`low`/`info`, die
+  Status `open`/`in-progress`/`fixed`/`accepted`/`wontfix`, die Zählregel („`accepted` und
+  `wontfix` zählen nicht, bleiben aber sichtbar — eine Entscheidung ist keine Löschung") und
+  die Trennung von Severity und Status; die Registry bildet die Prosa-Werte `P1`/`P2`/`closed`
+  genau ab (SEC-01…SEC-07 → `critical`, SEC-08…SEC-14 → `high`, alle `fixed`).
+  **Eine bewusste Abweichung:** die Regel nennt die Action `all-the-rest/ratchet-cli@v1`,
+  das Projekt pinnt sie auf einen Commit-SHA (`bedc915967faaced135aec231d5d9b056abdc981`) —
+  die eigene Supply-Chain-Policy verbietet bewegliche Tags (Kommentar in
+  `.github/workflows/ci.yml`).
+- `generated-docs` — **offen.** (1 Commit in der Range.) Neu (`00dbd22`). Das Projekt hat die **Erscheinung**: Zahlen
+  und Fakten in der Prosa, die in Code stehen — die Zählungen dieses Markers und des Boards,
+  `features/infrastructure/29-production-operations-runbook.md` Z. 48 („currently `mariadb`")
+  gegen `backend/config/database.php` Z. 20. Es hat aber **weder einen Generator noch ein
+  Drift-Gate**: im Repo steht kein generierter Block (kein `BEGIN GENERATED`-Marker), und
+  die Regel der Range (`generated-docs/SKILL.md` → „## Numbers in prose") ist nicht umgesetzt.
+  Was das Projekt stattdessen hat, ist eine **eigene** Disziplin (`AGENTS.md` §4: „give a
+  reproducible command for any reported number") — das ist die lokale Antwort, nicht die des
+  Skills, und sie erfüllt die Regel der Range nicht. → **offene Position:** Board
+  „SKILLS-STAND (2026-10-19)" — der Eintrag ist vom Owner anzulegen (dieser Lauf legt
+  **keine** Position an).
 
 **Geändert**
 
-- `agent-config` — **nein.** Maschinen-Setup (globale Config, MCP, `skills`-Array, neue Slash-Command-Templates unter `.agents/commands/`). Die §6-Commit-Policy dieser Range gilt dem Skills-Repo selbst, nicht diesem Projekt. `980514a` ergänzte den §7-Index der 11 verdeckten Skills (ID + Auslöser + Command) und die Zeile `~/.config/opencode/commands/` (ein Slash-Command pro verdecktem Skill).
-- `build-verify` — **ja** (bisher `nein`). Die Range macht daraus eine Verhaltensänderung: die Regeldatei `.agents/rules/build-verify.md` änderte sich viermal (`1a8a9a5`: der „always on"-Anspruch der Regel fällt — sie ist nicht über die `instructions`-Verdrahtung geladen, sondern das Minimum, auf das die Projekte zeigen; `86d677e`: Rule 3 prüft die *Substanz*, nicht die Gates; `aa4e009`: K2 „reine Mechanik ist Text", K4 „begleitende Doku reitet mit"; `18623c5`: separate Commits als Default). Die **frische Session je Runde** stammt dagegen aus `424a7c3` und steht in der **Skill-Datei** `.agents/skills/build-verify/SKILL.md`, nicht in der Regeldatei. Das Projekt adoptiert diesen Flow ausdrücklich — `AGENTS.md` §6 (Z. 47) verweist auf den Skill und hält nur repo-spezifische Kommandos fest. Der optionale Meilenstein-Review bleibt offen, weil das Projekt kein `N` und keinen Release-Takt festlegt — kein Regelbedarf, keine Position. `980514a` ergänzte den CI-Routing-Block (welcher verdeckte Skill bei welchem CI-Symptom geladen wird); der Skill selbst bleibt beworben.
-- `codegraph-project-setup` — **ja.** Neu ist der Scope-Guard („markdown-only repos gain nothing") — dieses Projekt ist ein Code-Repo mit `.codegraph/` und `.githooks/pre-commit`, der Guard greift also nicht. Die Vision-Eskalationsregel wurde auf „selbst neu lesen" umgeschrieben (siehe `vision-agents`). `980514a` fügte den Metadaten-Block `metadata.opencode/autoinvoke: false` hinzu (Ladung nur per exakter ID).
-- `docker-test-image` — **ja.** Die Description wurde gekürzt, die Substanz unverändert; `980514a` fügte den Metadaten-Block `metadata.opencode/autoinvoke: false` hinzu (Ladung nur per exakter ID). Der Skill ist aus genau diesem `deployment/Dockerfile.e2e` abgeleitet (Environment-only-Invariante, `ARG`/`USER root`/`ENV PLAYWRIGHT_BROWSERS_PATH`/`&& ls -1 /ms-playwright`-Postcondition, Rebuild-Trigger mit Lockfile in `paths`, wöchentlicher `schedule:`). **Board-Position 6 ist am 2026-10-21 geschlossen und aus dem Board entfernt** (`23ca866`): die Lockfile-Regel des Skills ist jetzt umgesetzt — die Versionsextraktion liest das aufgelöste Lockfile statt des Manifests (`db13b2c`, mit Fail-closed-Gate).
-- `ghcr-visibility` — **ja.** Description gekürzt; `980514a` fügte den Metadaten-Block `metadata.opencode/autoinvoke: false` hinzu (Ladung nur per exakter ID) — die Regeln selbst blieben unverändert. Die Board-Position 4 („GHCR-Blocker") ist am 2026-10-15 geschlossen und aus dem Board entfernt worden; die Voraussetzung ist im Workflow kommentiert und am 2026-10-15 neu gemessen (beide Pakete `public`). Der alte Verweis auf „Position 4" im Marker war dadurch ein toter Zeiger.
-- `github-ci-filters` — **ja.** Description gekürzt; die Filter stehen unverändert (`paths` mit `!`-Rücknahme, D-23).
-- `node-deps` — **ja.** Description gekürzt; die Range-Regel ist im `frontend/package.json` angewendet. `980514a` fügte den Metadaten-Block `metadata.opencode/autoinvoke: false` hinzu (Ladung nur per exakter ID).
-- `permissions` — **nein.** V2-Naming (`permissions` als geordnetes Array, `shell`/`subagent` als Aktionen) und die Kommando-Korrektur `opencode2` → `opencode` betreffen die Maschinen-Config; das Projekt hat kein `.opencode/`. Die Kommando-Korrektur stammt aus `980514a`; der Commit setzte dort zugleich den Metadaten-Block `metadata.opencode/autoinvoke: false` (Ladung nur per exakter ID).
-- `playwright-parallel` — **ja.** Description gekürzt; Matrix-Muster und Worker-Zahl stehen unverändert. `980514a` fügte den Metadaten-Block `metadata.opencode/autoinvoke: false` hinzu (Ladung nur per exakter ID).
-- `skills-marker` — **ja.** Die Range verlangt stabile Referenzen (Abschnitt/Überschrift/Suchstring statt reiner Zeilennummer) und das Re-Verifizieren **aller** Anker beim Fortschreiben — beides ist in diesem Durchgang angewendet. `980514a` fügte den Metadaten-Block `metadata.opencode/autoinvoke: false` hinzu (Ladung nur per exakter ID).
-- `tailscale-serve` — **nein.** Description gekürzt; im Projekt ist kein Dev-Server-Expose definiert. `980514a` fügte den Metadaten-Block `metadata.opencode/autoinvoke: false` hinzu (Ladung nur per exakter ID).
-- `ui-review` — **ja** (bisher `nein`). Das Projekt hat ein eigenes Screenshot-Harness mit Routen-Manifest (`frontend/tests/screenshots/ui-review.config.ts`), das im Kommentar ausdrücklich „ui-review skill references/harness.md §5" zitiert, und hat die Schleife am 2026-09-26 angewendet. Die Eskalationsregel der Range („hard calls: re-read the image yourself") ist die projektseitige Folge aus dem `vision-agents`-Entfernen und traf `AGENTS.md` §6 → **Board-Position 7** (am 2026-10-20 geschlossen und aus dem Board entfernt, `1818909`: §6 nennt jetzt „visual review is done by the agent itself (method and checklist: the `ui-review` skill) — every configured model is vision-capable, so there is no vision subagent in the loop; on hard visual calls re-read the image yourself instead of guessing"). `980514a` ergänzte den Verweis auf den verdeckten `web-audit`-Skill (Live-Audit statt App-Screenshot) und den Model-Skill-Verweis (in dieser Range `update-models`).
-
-**Entfernt bzw. umbenannt**
-
-- `vision-agents` — **entfernt in `dccdd40`** („single default model, drop custom vision subagent"). Der eigene Vision-Subagent ist gestrichen, die globale Config führt nur `plan`/`general`/`build`/`explore`. Die Zeile verschwindet mit diesem Fortschreiben; die offene Frage — ob das Projekt den Inhalt selbst braucht — ist als **Board-Position 7** beantwortet (ja: `AGENTS.md` §6 nannte den Subagenten; am 2026-10-20 auf „visual review is done by the agent itself (method and checklist: the `ui-review` skill) — every configured model is vision-capable, so there is no vision subagent in the loop; on hard visual calls re-read the image yourself instead of guessing" umgestellt (`1818909`, Satzergänzung `b86c15c`), Position danach geschlossen und aus dem Board entfernt (`1818909`).
-- `model-updater` — **entfernt in `1c51237`** (mit `update-opencode-models` in `models` zusammengeführt).
-- `update-opencode-models` — **entfernt in `1c51237`** (mit `model-updater` in `models` zusammengeführt).
-- `models` — **neu in `1a096ba`, umbenannt in `update-models` (`fc28ea3`)**; der Slash-Command `/update-models` kam dazu. Die Netto-Wirkung ist eine Zeile: `update-models`, weiterhin maschinenweit → **nein**.
+- `agent-config` — **nein.** (4 Commits in der Range.) Maschinen-Setup (globale Config, MCP, `skills`-Array,
+  Slash-Command-Templates). Die Range macht den Skill **versteckt** (`817c01e`: nur per
+  exakter ID ladbar), lässt den §7-Index der verdeckten Skills wachsen (`70d49e0`,
+  `00dbd22`) und schließt die Drift um den ungenutzten `instructions`-Key (`0024d7e`: die
+  Always-on-Regeln stecken in einer `AGENTS.md`, nicht in einem Config-Key). Alles
+  Maschinenkonfiguration; das Projekt definiert kein eigenes Agent-Setup — **die
+  Anwendbarkeit ändert sich nicht**.
+- `build-verify` — **ja.** (4 Commits in der Range.) Die Range macht daraus eine Verhaltensänderung: die Regeldatei
+  `.agents/rules/build-verify.md` und die Skill-Datei tragen jetzt die Pflicht, dass jede
+  Zahl, die etwas über den Commit behauptet, ihren Bezugsrahmen nennt — Zustand **und**
+  Umfang (`build-verify/SKILL.md` → „names what it measures — state and scope"; `0024d7e`
+  präzisiert: die Einbettung in die globale `AGENTS.md` ist die **Kurzform** der Pflicht,
+  Drift ist eine **geänderte Pflicht**, kein abweichender Wortlaut). Das Projekt adoptiert
+  den Flow ausdrücklich — `AGENTS.md` §6 (Z. 47) verweist auf den Skill und hält nur
+  repo-spezifische Kommandos fest; die `Verify:`-Footer der Commit-Bodies tragen Stand und
+  Umfang. `817c01e` kürzt nur die Trigger-Beschreibung des Skills (die Pflichten bleiben).
+- `github-ci-filters` — **ja.** (2 Commits in der Range.) Die Regel der Range wurde korrigiert (`7328fc3`): Schritt 2
+  verbietet nicht mehr die `paths`-Form, sondern nur **auswählende** Include-Listen; die
+  entscheidende Frage lautet jetzt „does every path match at least one positive pattern?"
+  (`github-ci-filters/SKILL.md` → „One question decides"). Das Portal nutzt `paths` mit
+  `'**'` als **einzigem breiten** positivem Muster, der Negation `'!**/*.md'` und vier
+  Re-Includes — das ist die **abziehende** Form, also zulässig. **Schritt 1 (Klassifikation):**
+  kein Check liest eine Markdown-Datei **als Eingabe** — die Sweeps der Regel treffen nur
+  die vier `paths:`-Zeilen der Workflow-Datei und **Erwähnungen** in Kommentaren und
+  Docblocks; der Test, den der Workflow-Kommentar nennt, sagt in seinem Docblock das
+  Gegenteil (`backend/tests/Feature/InfrastructureSupplyChainPolicyTest.php` → „Prose is
+  deliberately not scanned", seit 2026-10-18). **Owner-Entscheidung:** D-23
+  (`features/owner-decisions.md` → „### D-23: Documentation-only CI filtering") hält die
+  `paths`-Form mit `'**'` fest. **Zwei Befunde sind zu melden, nicht zu ändern:** (a) D-23
+  nennt **drei** Re-Includes (`features/infrastructure/**`, `features/ai/**`,
+  `features/e2e-test-strategy.md`), der Workflow hat **vier** — `features/security/**` kam
+  später hinzu; die Entscheidung nachzuziehen ist Sache des Owners. (b) der Kommentar in
+  `.github/workflows/ci.yml` (Z. 20) behauptet „InfrastructureSupplyChainPolicyTest scans
+  .md" — das widerspricht dem Docblock des Tests; die Korrektur gehört in einen eigenen
+  Commit.
+- `security-review` — **ja.** (2 Commits in der Range.) Die Range nimmt die Severity-Namen aus dem kanonischen
+  Vokabular (`b0d1b51`: Stage 2 nennt die Stufen aus `ratchet-gates`, Stage 4 ordnet `info`
+  zuletzt, ein wieder auftauchender Befund ist ein **neuer** Befund und `open`, nicht
+  `fixed`; `b9f140b`: die Namen und ihre Bedeutung sind kanonisch, die Matrix ist die
+  Methode). Das Projekt trennt Severity und Status in der Closure-Tabelle
+  (`features/security/2026-10-18-review-closure.md`, Spalten „Severity"/„Status"), führt
+  alle 14 Befunde als `fixed` — die Regel „ein Befund braucht Owner und Ticket, außer er ist
+  `fixed`" bindet also nichts — und hält in `ratchet.findings.json` die kanonischen Werte
+  wörtlich. **Die Anwendung ändert sich dadurch nicht**; die kanonische Namensliste ist
+  der Grund, warum die Projektwerte kein zweites Vokabular brauchen.
+- `skills-marker` — **ja.** (12 Commits in der Range.) Die Range ist die Kernregel, auf die dieser Marker zeigt: der
+  **Bezugsrahmen** (`e523df9` — die drei Formen (a)/(b)/(c), jede Aussage nennt den Stand,
+  in dem sie gemessen wurde), die **Zitierform** statt Kopie (`65fbecc`, `f7b8f9c`), die
+  Klausel, dass eine Messung, deren Umfang der Commit selbst schreibt, **keinen**
+  Vorgänger-Rahmen trägt (`820c140`), die Klausel „eine Aufzählung trägt zwei Behauptungen"
+  (`37cefe2`) und die Klausel, dass eine Aussage über **wann** etwas galt, den Stand **und**
+  den Messzeitpunkt nennt (`c056e75`; `857070a` und `4205142` berichtigen die Zitate in der
+  Referenz).
+  Beides ist in diesem Durchgang angewendet: die Rahmen sind umgestellt (Form (a) für die
+  beiden Dateien, die der Marker selbst schreibt, Form (b) für die übrigen), die Regel wird
+  **zitiert** statt kopiert, der Ablauf-Abschnitt unten verweist auf den Skill statt eine
+  veraltete Kopie zu führen, und die projekt-eigenen Regeln sind als **lokale Ergänzung**
+  gekennzeichnet.
+- `ui-review` — **ja.** (3 Commits in der Range.) `fa2268f` nimmt den „vision-agent"-Wortlaut aus der Findings-Vorlage
+  — das Projekt hatte den Subagenten bereits abgeschafft (`AGENTS.md` §6: „visual review is
+  done by the agent itself"). `b0d1b51`/`b9f140b` geben der Vorlage die kanonischen Stufen
+  und die Spaltenform Id / Severity / Status / Owner / Ticket / File:Line / Screenshot /
+  Finding / Suggested fix (`ui-review/references/findings-report.md` → „## Template") und
+  verschieben die Verdiktregel auf „unresolved (`open` oder `in-progress`)". **Anwendung im
+  Projekt:** das Harness ist drin (`frontend/tests/screenshots/`: `ui-review.config.ts`
+  Z. 9-10, `harness.ts`, `ui-screenshots.spec.ts`, `seeds.ts`), die Befunde der Runde vom
+  2026-09-26 stehen im Board mit den **kanonischen** Stufen `medium`/`low` — aber in der
+  **alten** Spaltenform (Schwere/Stelle/Befund/Vorschlag): **keine** Id, **kein** Status,
+  **kein** Owner, **kein** Ticket. Die bindende Regel der neuen Vorlage greift heute
+  **nicht**, weil das Projekt **keinen offenen** UI-Befund führt (alle vier sind umgesetzt);
+  für die nächste Runde ist die Form nachzuziehen.
+- `update-models` — **nein.** (3 Commits in der Range.) `219171c` (Namespace-Regel und Snapshot am Config), `8c6b9af`
+  (die `$0`-Aussage auf das konfigurierte Modell eingegrenzt), `817c01e` (versteckt).
+  Modell-Auswahl und -Registry sind Maschinen-/Account-Sache; das Projekt schreibt keine
+  Modell-ID in eine Config — **die Anwendbarkeit ändert sich nicht**.
 
 **Nicht-Skill-Änderungen der Range (ohne Projektbezug)**
 
-- `.agents/commands/{security-review,update-models}.md` (versionierte Command-Templates), `.agents/rules/build-verify.md`, `AGENTS.md`/`README.md`/`AGENTS.todo.md` des Skills-Repos, `.githooks/pre-commit` (entfernt, das Skills-Repo ist markdown-only), `.github/skill-budget.json` + `.github/workflows/skill-budget.yml` + `scripts/skill-budget.mjs` (Budget für *beworbene* Skills — Kontextkosten des Skills-Repos, nicht des Projekts).
+- `.agents/rules/build-verify.md` (2 Commits: `0449b05`, `0024d7e`) — die Kernregel, auf die
+  `AGENTS.md` §6 zeigt; `.agents/commands/{security-review,update-models}.md` sind nicht in
+  dieser Range enthalten. `.github/skill-budget.json` (Budget für *beworbene* Skills) und
+  die Arbeitsdateien des Skills-Repos (README, Task-Liste, eigene Regeln) betreffen das
+  Skills-Repo selbst, nicht das Projekt.
 
-**Anker-Audit (Basis `344604e` — gezählt am 2026-10-19, nachgemessen am 2026-10-21)**
+**Anker-Re-Verifizierung (alle Anker, gemessen am 2026-10-21)**
 
-Alle neun Anker-Gruppen des Vorgänger-Markers — der Stand `344604e`, den der Marker als Audit-Basis nennt — am 2026-10-21 gegen diesen Stand gelesen: **8 von 9 Zeilenanker-Gruppen** waren dort falsch — **4 × Root-`AGENTS.md` umgebaut** (die Datei ist am 2026-10-18/19 auf 104 Zeilen umgebaut und **englisch** geworden — die Abschnittsnummern haben sich verschoben, D-4 liegt jetzt in `features/owner-decisions.md`; die alten `AGENTS.md`-Anker zeigen ins Leere) und **4 × Zieldatei gewachsen** (`ci.yml`, `frontend/package.json`, `frontend/pnpm-lock.yaml`, `frontend/playwright.config.ts` — der Anker zeigte noch auf die Datei, aber auf den falschen Inhalt). Die „5 von 9" des Audit-Texts nennt fünf Gruppen **und** zugleich den Anker-Stand — beides trifft an keinem Stand zusammen: wo alle fünf genannten Gruppen falsch waren (`e1ed87a`, `91ae163`), waren es 6 von 9; wo genau fünf falsch waren, war `node-deps` noch in Ordnung und `github-ci-filters` dafür falsch. Die acht oben sind am Basiscommit `344604e` gemessen, nicht aus dem Audit-Text übernommen. Fünf der acht nennt der Audit-Text:
+Alle Anker dieses Markers sind gegen den committeten Projektstand aufgelöst — **nicht** gegen
+den Arbeitsbaum (`git show <stand>:<datei>`, `git grep <stand> -- <pfad>`). **Zähleinheit:
+Vorkommen** — eine Zählung je Fundstelle, die einen **Ort** adressiert: eine **Zeile** (eine
+Zahl nach „Z."), ein **Bereich** (zwei Zahlen mit Bindestrich), ein **Pfad mit
+Zeilennummer** oder ein **Pfad ohne Zeilennummer**. Ein Pfad mit Zeilennummer zählt
+**einmal** (Zeile und Datei zusammen); dieselbe Datei an zwei Stellen zählt zweimal. Nicht
+mitgezählt werden Pfadmuster mit Platzhalter (sie nennen eine Form, keinen Ort), Verweise auf
+die Maschinen-Config und Verweise auf die **Historie** (alte Anker, die dieser Lauf korrigiert
+hat). Aufteilung: **Projekt** (dieses Repo) und **Upstream** (Skills-Repo). Gemessen:
+**175 Vorkommen** in **82 Zeilen** — **153 Projekt** (in **61 Zeilen**, **67 verschiedene
+Ziele**) und **22 Upstream** (in **21 Zeilen**, **9 verschiedene Ziele**).
 
-- `ui-review` — `AGENTS.md:714-715` zeigte am Vor-Pull-Stand `ee8523f` (773 Zeilen) auf die D-23-Lücke („80 der 113 Markdown-Dateien"), nicht auf den UI-Review-Hinweis; am Basiscommit `344604e` (104 Zeilen) zeigt der Anker ins Leere. **Korrigiert** auf `AGENTS.md` §6 für die Rollenfrage und `frontend/tests/screenshots/` für die Anwendung.
-- `permissions` — `AGENTS.md:457-461` überlappte am Vor-Pull-Stand `ee8523f` D-3 statt D-4 zu benennen; am Basiscommit `344604e` (104 Zeilen) zeigt der Anker ins Leere. **Korrigiert** auf `features/owner-decisions.md` §D-4 (Z. 19).
-- `ghcr-visibility` — `.github/workflows/ci.yml:335` war eine Kommentarzeile; das `container:`-Image steht jetzt in Z. 392 (Stand `d8ef650`). **Korrigiert**.
-- `playwright-parallel` — `frontend/playwright.config.ts:30-31` belegte die *Budgets* (`timeout`, `globalTimeout`), nicht die Worker-Zahl; die Matrix liegt in `ci.yml` jetzt in Z. 425-431, nicht 374-380. **Korrigiert** auf `fullyParallel`/`workers` (Z. 19/22) und die Matrix (Z. 425-431).
-- `node-deps` — `frontend/package.json:71` und `frontend/pnpm-lock.yaml:767` zeigten nach dem Playwright-Bump (`e1ed87a`) auf die falschen Zeilen. **Korrigiert** auf Z. 72 und Z. 768.
-Drei weitere Gruppen waren ebenso falsch und wurden **ohne Befund umgepunktet** — sie gehören zu den acht, stehen aber nicht in der Aufzählung oben:
-
-- `build-verify` — der alte Anker `AGENTS.md:109-122` zeigte nach dem Umbau der Datei ins Leere; **umgepunktet** auf `AGENTS.md` §6 (Z. 47).
-- `codegraph-project-setup` — `AGENTS.md:266-273` zeigte ins Leere; **umgepunktet** auf `AGENTS.md` §11 (Z. 89-92).
-- `github-ci-filters` — `ci.yml:24` war nach dem Wachstum der Datei eine Kommentarzeile statt des `paths:`-Filters; **umgepunktet** auf Z. 31/39 (`push` und `pull_request`).
-
-- Unverändert bestätigt — und deshalb *nicht* umgepunktet — ist nur `docker-test-image`: `deployment/Dockerfile.e2e` (`ARG PLAYWRIGHT_VERSION`, Browser-Install) und `.github/workflows/e2e-image.yml` (Versionsextraktion) — am Basiscommit `344604e` noch Z. 30/69-70 bzw. `:41`, am Stand `d8ef650` Z. 34/73-74 bzw. Z. 47 (die Regel selbst ist inzwischen umgesetzt, `db13b2c`).
+- **Projekt: 67 verschiedene Ziele, 67 Treffer, 0 gedriftet, 0 tot.** 66 Ziele lösen am
+  committeten Stand auf; **1** ist eine **bestätigte Negation** (`.opencode/` — das Projekt
+  hat keins). Geprüft wurde gegen `d8ef650` (Form (b) — die Zieldateien sind seither
+  unverändert, Beleg: `git diff --stat d8ef650..HEAD -- AGENTS.md backend/ deployment/
+  features/ frontend/ .github/workflows/` → ohne Ausgabe) bzw. gegen den committeten Stand
+  dieses Commits (Form (a) — die beiden Anker, deren Zieldatei der Marker selbst schreibt).
+  Die Zeilennummern, die auf **wachsende** Dateien zeigen, sind gemessen und stimmen:
+  `AGENTS.md` §6
+  Z. 47 und §11 Z. 89-92 (die Datei ist am 2026-10-18/19 auf 104 Zeilen umgebaut und
+  englisch geworden — die **alten** `AGENTS.md`-Anker zeigten ins Leere; ihre Zahlen
+  stehen im Vorgänger-Marker und in dessen Commit), `.github/workflows/ci.yml`
+  Z. 31/39/52-61/392/425-431 (779 Zeilen), `deployment/Dockerfile.e2e` Z. 34/73-74,
+  `.github/workflows/e2e-image.yml` Z. 47, `backend/AGENTS.md` Z. 7/20/22/28/32/39/41,
+  `backend/phpunit.xml` Z. 30-54, `backend/routes/api.php` Z. 127-128,
+  `backend/config/database.php` Z. 20, `features/owner-decisions.md` Z. 19 (§D-4),
+  `features/infrastructure/29-production-operations-runbook.md` Z. 48,
+  `frontend/package.json` Z. 72, `frontend/pnpm-lock.yaml` Z. 768,
+  `frontend/playwright.config.ts` Z. 19/22, `frontend/src/main.tsx` Z. 5,
+  `frontend/AGENTS.md` Z. 106, `frontend/tests/screenshots/ui-review.config.ts` Z. 9-10.
+  Die Datei-Anker ohne Zeilennummer sind auf **Existenz** geprüft (`.codegraph/`,
+  `.githooks/pre-commit`, `backend/app/Http/Requests/` mit 22 FormRequests,
+  `backend/app/Policies/`, `frontend/lingui.config.ts`, `frontend/scripts/check-i18n.mjs`,
+  `features/security/2026-10-18-review-closure.md` mit 14 Befunden SEC-01…SEC-14,
+  `features/security/accepted-risks.md`, `frontend/tests/screenshots/` mit `harness.ts`,
+  `ui-screenshots.spec.ts`, `seeds.ts`, `features/owner-decisions.md` mit D-1…D-48,
+  `features/tech/07-architectural-decisions.md` mit AD-1…AD-10,
+  `backend/tests/Feature/InfrastructureSupplyChainPolicyTest.php`).
+- **Upstream: 9 verschiedene Ziele, 9 Treffer, 0 gedriftet, 0 tot — eine Form korrigiert.**
+  Der Upstream-Anker auf `laravel/SKILL.md` trug als Ort eine **Zeilennummer**;
+  die Upstream-Regel verbietet sie im Zitat („Pfad **im Skill** (ID + Datei) und Anker,
+  **ohne** Zeilennummer"). Ersetzt durch den wörtlichen Anker: `laravel/SKILL.md` → „fake every
+  local disk in `setUp()`" (1 Treffer am Stand `4205142`). Die übrigen Upstream-Verweise sind
+  Zitate **ohne** Zeilennummer und haben je **1** Treffer am Stand `4205142`:
+  `skills-marker/SKILL.md` → „Bezugsrahmen-Regel", `skills-marker/references/notes.md`
+  → „## Der Bezugsrahmen", `github-ci-filters/SKILL.md` → „does every path match at least one
+  positive pattern?", `generated-docs/SKILL.md` → „## Numbers in prose",
+  `build-verify/SKILL.md` → „names what it measures — state and scope",
+  `ui-review/references/findings-report.md`
+  → „## Template"; die zwei Dateiverweise `.agents/rules/build-verify.md` und
+  `.github/skill-budget.json` existieren.
+- **Rahmen:** jede Aussage dieses Markers trägt jetzt einen Rahmen. **Form (a)** („am
+  committeten Stand dieses Commits") für die beiden Anker, deren Zieldatei der Marker selbst
+  schreibt (`AGENTS.skills.md`, `AGENTS.todo.md`); **Form (b)** („gemessen am Vorgänger
+  `d8ef650`, seitdem unverändert") für die übrigen, mit dem Diff-Beleg. Im Vorgänger-Marker
+  stand Form (a) **0-mal** (gemessen: 0 Treffer), die Formel „gemessen am Vorgänger"
+  **1-mal** (das Wort „Vorgänger" insgesamt **4-mal**). Der Cursor
+  (`agents-skills-consumed`) ist **kein** Rahmen — er zeigt den Stand des Skills-Repos.
 
 ## Fortschreiben
 
-1. `agents-skills-consumed` ablesen → `<alt>`.
-2. **Erst pullen**, dann im Skills-Repo die Range bilden:
-   `git -C <skills-repo> log --oneline <alt>..HEAD`
-   `git -C <skills-repo> log --name-only --format= <alt>..HEAD -- .agents/skills | sort -u`
-   (Ein lokaler Klon, der nicht gepullt hat, prüft eine Range, die es so nicht gibt — und der
-   eigene Projekt-Stand muss ebenfalls aktuell sein, sonst sind die Anker gegen einen
-   veralteten Baum gemessen.)
-3. Jeden betroffenen Skill gegen **dieses** Projekt prüfen. Trifft eine Änderung zu, wenn
-   sie eine Pflicht, Schwelle, Ausnahme, Konvention oder ein Kommando betrifft, das
-   **hier** gilt:
-   - trifft zu und ist drin → `angewendet: ja` + stabile Referenz (Abschnitt/Überschrift
-     oder Suchstring; eine Zeilennummer nur als Lesehilfe)
-   - trifft zu, ist nicht drin → offene Position: Eintrag in `AGENTS.todo.md` anlegen
-   - trifft nicht zu (das Projekt hat das nicht) → `angewendet: nein` + kurzer Grund
-4. Offene Positionen nach `AGENTS.todo.md`; **alle** bestehenden Anker re-verifizieren —
-   Advancing ist kein Updating, der Marker akkumuliert, und Akkumulation verrottet.
-5. Entfernte Skills nicht stillschweigend streichen: im Bereichs-Abschnitt
-   „`<skill>` — entfernt in `<sha>`" notieren, dann verschwindet die Zeile mit dem
-   Fortschreiben.
-6. Erst wenn für **jeden** Skill aus der Range eine Zeile steht:
-   `agents-skills-consumed: $(git -C <skills-repo> rev-parse --short HEAD)`,
-   `geprüft am:` auf heute, Abschnitte ersetzen.
-7. Falls Regeln oder Skills betroffen waren: die eingebetteten Regeln in der
-   globalen `~/.config/opencode/AGENTS.md` gegen ihre Quelle in `.agents/rules/*` prüfen
-   und bei geänderter **Pflicht** sinngemäß nachziehen, dann
-   `touch ~/.config/opencode/opencode.jsonc`.
+Der Ablauf steht im Skill `skills-marker` — `skills-marker/SKILL.md` → „## 5. Nach einem
+`git pull` im Skills-Repo" (Skill-ID + Datei + Anker, **ohne Zeilennummer** — die driftet,
+der Anker bleibt). Der Marker führt **keine Kopie** des Ablaufs: eine Kopie driftet, wie die
+Prüfung dieser Range gezeigt hat (der Vorgänger-Marker führte Schritt 6 ohne die
+Anker-Re-Verifizierung und ohne die Bezugsrahmen-Regel).
