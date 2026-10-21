@@ -368,6 +368,14 @@ part of the identity check (see S5).
 
 ### S3 — User/IP 429
 
+**Which address the IP bucket holds.** The client's address, not the proxy's:
+the application trusts the direct peer (Caddy) and reads the forwarded chain
+from the right, so the bucket belongs to the customer
+(`backend/bootstrap/app.php`, `trustProxies(at: 'REMOTE_ADDR')`). Measured on
+the host on 2026-10-22: before that rule every request arrived from the
+proxy's container address (`172.18.0.3`), which would have made this signal
+and its 30-per-day quota portal-wide instead of per client.
+
 **Where it is emitted.** Exactly one enforcement point,
 `backend/app/Services/CheckoutRiskService.php:59-67`:
 
@@ -1235,7 +1243,9 @@ up the new value:
    environment block itself changed (`deployment/docker-compose.yml`).
 3. **Verify the effect, not the intention:** call the immediate checkout path
    once. It must answer `503` with `Retry-After: 60` and the body quoted above.
-   A `503` without that body is the global API limiter, not the switch (§3).
+   A `503` **without** that body is the Turnstile outage path
+   (`TurnstileService::rejectUnavailable()`, §3/S8), not the switch; the global
+   API limiter answers `429`, not `503`.
 4. To re-enable: set the value back to `true`, restart, and verify that the
    checkout path creates a PaymentIntent again.
 

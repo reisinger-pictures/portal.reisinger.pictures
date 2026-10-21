@@ -8,6 +8,32 @@ status: approved-soll
 
 ## Status
 
+**Independent review on 2026-10-22: APPROVED WITH CONDITIONS.** A separate
+reviewer compared the implementation against §1–§8 at commit `45386175` and
+found one finding with operational consequence and six with lower severity.
+
+The operational one: **the policy the host serves does not allow
+`https://challenges.cloudflare.com`**, so switching Turnstile on would block
+the challenge script and keep the checkout button disabled for every
+challenged attempt. The required policy change is documented in
+[`content-security-policy.md`](content-security-policy.md); the canonical
+source is the Caddy volume of `proxy-stack`, so the change belongs to the
+owner together with that stack, and Turnstile stays switched off until it is
+made.
+
+The remaining findings were closed on 2026-10-22: an unparseable
+`STRIPE_CHECKOUT_ENABLED` is no longer coerced into a silent `false` (the
+configuration keeps it distinguishable, so the kill switch fails closed **and**
+logs it), the account-age message no longer promises a retry "in wenigen
+Minuten" (the policy is 24 hours), the effective limits are printed by the
+boot-time production check (`ops:validate-production`), and this document
+names no migration number of its own.
+
+What remains with the owner is unchanged: the Stripe-dashboard checklist, the
+Turnstile configuration in production, the monitoring-alarm test, the DPO
+review, and the live proof of the kill switch. They are tracked in
+`AGENTS.todo.md`.
+
 **Approved SOLL architecture (2026-09-23).** This document is the
 implementation contract for the checkout/card-testing defense. V036 and the
 implementation sources are present in the current tree; V036 remains the
@@ -139,7 +165,7 @@ one owner/brand/key conflict contract without pretending that they create a
 PaymentIntent. The immediate-Stripe-only gates (account age, dedicated quota,
 kill switch, Customer/PI creation, and Turnstile) do not expand to those paths.
 Pre-change rows with null identity remain readable only through the explicitly
-documented compatibility rules; no V039 migration is required.
+documented compatibility rules; no additional migration is required for this purpose (the current migration state is stated in `features/tech/07-architectural-decisions.md`, AD-2).
 
 The existing `orders.stripe_payment_intent_id` and `orders.ip_address` columns
 remain the PI linkage and accounting-evidence fields. Add the composite
@@ -240,6 +266,24 @@ The immediate checkout endpoint uses a dedicated named limiter, separate from
 login, registration, password-reset, API, and model-registration limits. The
 route-level buckets are independent: a user bucket cannot be bypassed by
 changing IP, and an IP bucket protects multiple users behind one address.
+
+**Where the quota is enforced:** after the request is classified as an
+immediate positive-value Stripe checkout, the service enforces the quota
+(`CheckoutRiskService::assertCheckoutQuotaAllowed()`), not a route-level
+`throttle:` middleware — the buckets belong to the checkout, not to the route,
+and an exact idempotent replay must not consume the PaymentIntent budget. The
+named limiter registration exists as the declared contract; the runtime
+enforcement is the service, and both read the same limits.
+
+**Which address the buckets see:** the client address, not the proxy's. The
+API is only reachable through Caddy (the FastCGI port is not published to the
+host), and the application trusts the direct peer and reads the forwarded
+chain from the right (`backend/bootstrap/app.php`, `trustProxies(at:
+'REMOTE_ADDR')`), so the bucket belongs to the customer. Without that rule
+every customer would share one bucket — measured in production on 2026-10-22:
+all requests arrived from the proxy's container address, which would have made
+the 30-per-day IP quota a portal-wide limit.
+
 The initial approved policy is:
 
 | Bucket | Checkout operation | Limit | Window/configuration |
@@ -660,7 +704,7 @@ or PaymentIntent gates. Non-immediate paths use the same owner/brand/key/
 fingerprint validation and terminal-order conflict rules, but never create a
 PaymentIntent and do not receive the immediate-only age, quota, kill-switch,
 Customer, PI, or Turnstile checks. Pre-identity legacy rows may remain null;
-there is no V039 migration to backfill them.
+there is no additional migration to backfill them (the current migration state is stated in `features/tech/07-architectural-decisions.md`, AD-2).
 
 The browser checkout client sends an opaque `Idempotency-Key` on every checkout
 request. Header presence is not a global replay guarantee. For non-immediate
