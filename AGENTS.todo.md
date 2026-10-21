@@ -109,10 +109,10 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **7 offene `[ ]`** und **46 wartende
-> `[~]`** über 1785 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (7), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1785). Aufteilung der 7: **4× `manuell prüfen:`** und **3×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **6 offene `[ ]`** und **46 wartende
+> `[~]`** über 1771 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (6), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1771). Aufteilung der 6: **3× `manuell prüfen:`** und **3×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 3 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
@@ -134,7 +134,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (53 = 7 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (52 = 6 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
@@ -736,20 +736,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   der Policy-Text liegt zuerst lesbar im Repo; das ist eine Owner-Entscheidung und
   eine Frage an den `proxy-stack`. **Bis dahin kein offener Bug, sondern eine
   dokumentierte Blindstelle.**
-- [ ] manuell prüfen: **Auszahlungsdaten nach dem automatischen Seed** — Stand ist
-  gemessen und **korrekt**: `bank_holder` = `Florian Reisinger`, `bank_iban` =
-  `DE96100110012179986174`, `bank_bic` = `NTSBDEB1XXX`, `company_*` = Linz,
-  `Robert-Stolz-Straße 8`, 4020, Österreich, `admin@example.com`. Alle acht decken
-  sich mit `DatabaseSeeder.php:212-219` (der alte Anker `:174-181` ist verschoben) und
-  damit mit Ihren echten Daten. **Das echte Risiko steht in keiner Board-Zeile:** der
-  Seeder benutzt `upsert` (`:235`), ein manuelles `db:seed --force` **überschreibt** also
-  in der Produktion gesetzte Werte — die Board-Zeile behauptete das Gegenteil. Das ist
-  der Grund, warum `db:seed --force` in der Produktion nie blind laufen darf
-  (`backend/AGENTS.md`, „Database Setup Policy"). **Worauf es ankommt:** es steht keine
-  Platzhalter-Bankverbindung drin (auf einer frischen DB wäre es `Max Mustermann` /
-  `ATXX XXXX XXXX`), also gehen Auszahlungen an das richtige Konto. Ein kurzer Blick in
-  die Systemeinstellungen genügt.
-
 ### Abweichungen bei der Umsetzung (2026-09-26) — zwei Audits, nicht blind übernommen
 
 - **`CouponInput.test.tsx:148` war ein Fehlalarm.** `removeCoupon()` wird mit
