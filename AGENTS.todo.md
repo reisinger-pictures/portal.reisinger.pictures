@@ -78,7 +78,11 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   Die **Erreichbarkeit ist geprüft** (`pnpm why braces`): `braces` kommt ausschließlich über
   `micromatch` ← `@lingui/cli` / `eslint-plugin-lingui`, also **nur über die Build- und
   Lint-Werkzeuge**; das ausgelieferte Bundle enthält es nicht, und der ReDoS-Pfad bräuchte
-  ein vom Angreifer kontrolliertes Glob-Pattern, das es hier nicht gibt. **Der Alert bleibt
+  ein vom Angreifer kontrolliertes Glob-Pattern, das es hier nicht gibt. **Die Erreichbarkeit
+  ist auf die Bauzeit begrenzt, die Abhängigkeits-Klassifikation nicht:** der Pfad laeuft ueber
+  `@lingui/vite-plugin`, das in `dependencies` steht — `pnpm audit --prod` zaehlt den Alert, obwohl
+  zur Request-Zeit nichts davon laeuft (Praezisierung in `features/security/accepted-risks.md`,
+  C8). **Der Alert bleibt
   in GitHub offen** — ohne verfügbare Version gibt es nichts zu aktualisieren, und ein
   Dismissal wäre eine Sicherheitsentscheidung des Owners. **Erscheint eine gepatchte
   Version, gehört sie in die nächste `node-deps`-Welle**, nicht nebenbei. Die übrigen
@@ -109,15 +113,15 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **4 offene `[ ]`** und **47 wartende
-> `[~]`** über 1932 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
-> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 4, `… | grep -c '^- \[~\]'` → 47,
-> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1932; `<stand>` = der committete Stand dieses
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **5 offene `[ ]`** und **20 wartende
+> `[~]`** über 1310 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
+> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 5, `… | grep -c '^- \[~\]'` → 20,
+> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1310; `<stand>` = der committete Stand dieses
 > Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
 > trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
-> 4: **3× `manuell prüfen:`** und **1× gewöhnliche Arbeit** — die vierte offene Position (die
-> DB-Engine-Policy) ist am 2026-10-21 entschieden und aus dem Board **entfernt** (D-49 in
-> `features/owner-decisions.md`).
+> 5: **3× `manuell prüfen:`**, **1× gewöhnliche Arbeit** und **1× `Entscheidung offen:`** — die
+> offene Position 8 im Abschnitt „SKILLS-STAND (2026-10-19)": die DB-Engine-Policy ist nirgends
+> entschieden, das ist eine **neue** Frage und kein vergessener Entscheidungsdurchgang.
 > **Alle 14 Review-Befunde** sind geschlossen und aus der Liste entfernt (Nachweis in
 > `features/security/2026-10-18-review-closure.md`); die 3 enthalten die Punkte, die in den
 > Freigaben der Wellen A–D als nicht-blockierend eingestuft und deshalb hier festgehalten
@@ -131,15 +135,15 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > 2026-10-20** hat 16 alte Owner-Positionen durchgesehen: 11 davon sind erledigt, maschinell
 > abgedeckt oder überholt und deshalb aus der Liste gegangen; die restlichen sind mit korrigiertem
 > Wortlaut und dem richtigen Werkzeug (Firewalld statt ufw, `ROOT.PEM` statt `cert.pem`,
-> authentifiziert statt anonym lesen) stehen geblieben. Alle 47 `[~]` tragen ein `wartet auf`.
+> authentifiziert statt anonym lesen) stehen geblieben. Alle 20 `[~]` tragen ein `wartet auf`.
 > **Diese Zählung ist ein Stand, keine Zusage** — sie wandert mit jeder Welle; wer eine Position
 > sucht, zählt selbst nach. Der Vergleich zum 2026-09-28-Stand (69 Positionen) ist **kein**
 > Fortschrittsmaß: seither kamen Positionen hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
 > `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
-> (51 = 4 offen + 47 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
-> (1932) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
+> (25 = 5 offen + 20 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
+> (1310) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
 > würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
 > defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
 > **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
@@ -274,7 +278,7 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 
 ### Stand
 
-Alle Entscheidungen D-1 bis D-48 sind getroffen. Soweit sie Code erforderten, sind sie **umgesetzt
+Alle Entscheidungen D-1 bis D-49 sind getroffen. Soweit sie Code erforderten, sind sie **umgesetzt
 und verifiziert** — die Entscheidungen stehen in `features/owner-decisions.md`, die
 zurückgezogenen Varianten direkt darunter in „Verworfen".
 
@@ -643,90 +647,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   `Str::random` + Prüfschleife) und dafür, dass im Request-Log/Response
   nach dem Show-once **kein** Klartext mehr auftaucht; Playwright-E2E für
   Anzeige und Reset.
-- [~] wartet auf die Host-Bindings 2222/989/50000-50100 — ohne sie antwortet im Container nichts, und jedes Messergebnis ist ein Fehlschluss (5 Ursachen, siehe M46). **P1-M35 (P0, neu 2026-09-26) — Testinfrastruktur für den
-  Datei-Transport aufbauen; Config-Weg und Cipher-Frage fallen dabei ab.**
-  **Neu gefasst 2026-09-26:** Das ist **kein Messskript-Problem**, sondern ein
-  Testinfrastruktur-Problem. Messung und Integrationstest (M38) haben
-  ** dieselbe** Voraussetzung: eine gesund konfigurierte SFTPGo-Instanz. Wer
-  das Harness baut, beantwortet die Cipher-Frage nebenbei — sie zu messen,
-  ohne das Harness zu bauen, war in drei Versuchen gescheitert.
-  **Konfigurationsfragen, die das Harness beantworten muss:**
-  (a) **Config-Verzeichnis**: das Image meldet `config file used:
-  "/etc/sftpgo/sftpgo.json"`, `--config-dir` defaultet aber auf `.`; was gewinnt
-  in der Portainer-Stack-Umgebung?
-  (b) **Datenprovider**: der Default ist `sqlite` mit `Name:sftpgo.db`
-  **relativ zum Config-Verzeichnis**; ein nicht persistiertes oder falsch
-  gemountetes Verzeichnis ergibt `no such table: schema_version` und **keinen**
-  Admin-User (`CreateDefaultAdmin:false`), damit 401 auf `/api/v2/token` — die
-  Provisionierung aus M22 kann dann nicht laufen.
-  (c) **Admin-Bootstrap**: `SFTPGO_DEFAULT_ADMIN_USERNAME`/`_PASSWORD` müssen
-  greifen, sonst gibt es keinen API-Zugang.
-  **Konsequenz für M22:** die Client-Implementierung darf **keine** Annahme
-  über Erreichbarkeit oder Seed-Zustand treffen; ein nicht erreichbarer Dienst
-  muss ein sauberer Fehlerpfad sein, kein 500er (vgl. 7.5 im Feature-Doc).
-  **Tests:** PHPUnit mit gemocktem HTTP deckt den 401-Fall ab; den Rest macht
-  das Harness aus M38.
-  **Messbefunde aus drei gescheiterten Sondenversuchen (2026-09-26)** — die
-  Ursache war jedes Mal die Konfiguration, nie SFTPGo selbst:
-  SFTPGo 2.7.6-62ae9ba3. (1) Der erste Versand brachte das falsche Ergebnis
-  „Cipher nicht angeboten", weil FTPS nie gestartet war: konfiguriert war Port
-  9021, gelauscht wurde auf 2022 (Default), also wurde die Config gar nicht
-  gelesen. (2) Der Mount nach `/var/lib/sftpgo` blieb ebenfalls wirkungslos,
-  weil das Image intern `/etc/sftpgo` meldet. (3) FTPS-Bindings liegen unter
-  `ftpserver.bindings[].port` und **nicht** unter `ftpserver.port`;
-  `ftpserver.port` wird stillschweigend ignoriert, ohne Fehlermeldung.
-  **Die eigentliche Lehre:** Solange die Bindung nicht steht, liefert
-  `openssl s_client` **0 gelesene Bytes** und eine leere Cipher-Liste.
-  **Ein leeres Ergebnis als „Cipher nicht angeboten" zu protokollieren ist ein
-  Fehlschluss** — genau dieser Fehler ist entstanden, und er hätte die
-  Grundsatzentscheidung aus einem falschen Grund gekippt. Jede künftige Messung
-  muss deshalb **vor** dem Auslesen der Cipher-Liste prüfen, dass der
-  TLS-Handshake überhaupt abgeschlossen wurde (gelesene Bytes > 0, Protokoll
-  und Cipher gesetzt), und das Ergebnis als Fixture wegschreiben.
-- [~] wartet auf das Harness aus P1-M35 — beide setzen dieselbe gesund konfigurierte SFTPGo-Instanz voraus. **P1-M38 (P0, neu 2026-09-26) — Integrationstest des Datei-Transports
-  über **beide** Protokolle, mit echtem Client gegen echten Dienst.** Ergänzt
-  M35 und M27: das Harness, auf das sich beide stützen.
-  **Was dieser Test beweist — und was nicht.** Ein Client-Protokolltest prüft
-  die **Server-Seite**: Erreichbarkeit, TLS-Handshake, Login, Upload,
-  Ownership-Kette, Passwort-Durchreichung. Er beweist **nicht**, dass die
-  Kamera es kann — die Kamera ist kein `curl`, sie hat eine eigene
-  TLS-Bibliothek, eine eigene Cipher-Liste und ein Passwortfeld, das
-  ausschließlich alphanumerisch akzeptiert. Diese Grenze ist der Grund, warum
-  P1-M32 (Kamera bestätigt) ein **operativer** Schritt bleibt und durch keinen
-  Test ersetzt wird. Wer diesen Test als Kamera-Nachweis zitiert, hat ihn
-  falsch gelesen.
-  **Abgedeckte Lücken** (das ist der eigentliche Wert, alles andere wäre
-  getestete Fremdsoftware):
-  (a) **Passive Port-Range.** Ein FTPS-Client, der 50000–50100 nicht erreicht,
-  baut den TLS-Handshake erfolgreich auf und bricht erst beim Transfer ab. Ein
-  `curl` gegen Port 989 allein findet diesen Fehler **nicht** — der passive
-  Kanal ist ein zweiter TCP-Verbindungspfad. Das ist der häufigste
-  Stillschweizgrund (7.13).
-  (b) **Ownership-Kette.** Datei hochladen und prüfen, dass sie mit
-  `1002:webgroup` ankommt und der `setgid`-Bit auf `ftp/<slug>` gehalten hat.
-  Sonst scheitert der Import nach dem ersten echten Foto, beim Fotografen.
-  (c) **Show-once-Passwort** (M23): ein alphanumerisches 16–24-Zeichen-Passwort
-  muss ohne Sonderzeichen durch Provisionierung und Login kommen. Bisher ist das
-  eine Behauptung, kein Beleg.
-  (d) **Cipher-Fixture**: `openssl s_client` gegen die laufende Instanz, mit
-  **Handshake-Vollständigkeitsprüfung** vor dem Auslesen (siehe M35). Ergebnis
-  als Fixture wegschreiben, damit M27 nicht erneut von einer defekten Sonde
-  ausgeht.
-  **Struktur — drei strikt getrennte Ebenen:**
-  1. *Unit/Feature* (bestehend, `Storage::fake()`): `FtpImportTest` prüft die
-     Pipeline ohne jeden Dienst und bleibt grün. Für `SftpGoClient` (M22) kommt
-     ein gemockter HTTP-Client dazu: jeder Fehlerpfad (Dienst nicht erreichbar,
-     Benutzer existiert, 4xx/5xx) und ein Test, der sicherstellt, dass **kein**
-     Passwort in Log oder Exception landet.
-  2. *Integration*: eigener Job, eigener Compose-Stack mit echtem SFTPGo,
-     provisioniertem Test-User und echtem Client (`curl` für FTPS, `sftp`/`ssh`
-     für SFTP). **Nicht** Teil von `php artisan test` — sonst wird der Test
-     bei der ersten Timing-Abweichung zum Flake und wird abgeschaltet.
-  3. *Manuell*: echte Kamera, echtes Foto. P1-M32, nicht automatisierbar.
-  **Tests:** PHPUnit für `SftpGoClient` (Ebene 1, gemockt). Der Integrationstest
-  ist der Test — er ist **kein** PHPUnit-Fall, sondern ein Skript mit
-  Playwright-Tag `@feature:ftp-transport`, damit er getrennt ausführbar ist und
-  nicht den Smoke-Lauf blockiert.
 - [~] wartet auf die Umsetzung des `reconcileAccount()`-Pfads. Die frühere Blockade durch den Doppel-ID-Konflikt ist entfallen (die `P1-M`-Invariante ist leer, Kommando in der ID-Übersicht oben); den Spaltenteil, den die Einstiegs-Übersicht zu Recht als erledigt führt, hat V041 geliefert und getestet — `php artisan test --filter='FtpAccountStatusMigrationTest|FtpProvisioningStatusTest'` ergibt **16 passed (70 assertions)**. Offen ist allein die Reconciliation, die `features/infrastructure/19-ftp-upload-pipeline.md` §7.16 ausdrücklich führt: „`reconcileAccount()` (P1-M30) ist der vorgesehene Weg und bleibt offen". **P1-M30 (P0) — Spalte für den Provisionierungsstatus auf `users`.**
   **Festgelegt am 2026-09-26:** die Source of Truth ist eine Spalte, **kein**
   Live-Query gegen SFTPGo. Begründung: `FtpController::status()`
@@ -769,34 +689,8 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Dokumentations-Wahrheit (kein Code, aber irreführend)
 
-- [~] wartet auf einen Durchgang nach der Board-Bereinigung vom 2026-09-27 — die Widersprüche lagen an `[x]`-Einträgen, die entfernt wurden. **DOC-4 / DOC-5 / DOC-11** — das Board widerspricht sich selbst: Positionen
-  sind an einer Stelle `[x] abgeschlossen` und an anderer als `offen` /
-  `in Arbeit` geführt. Betroffen: CR-DATA-018/CR-BE-018 (Z. 284/341 vs. 543/545),
-  CR-CRM-008 (Z. 282/283/338 vs. 618), CR-DOC-001 (Z. 410, behauptet „V038").
-
-### Braucht eine Entscheidung oder Betriebs-Evidenz (kein Code)
-
-- [~] wartet auf **Folgetag-Gegenprobe gegen den täglichen 09:20-CEST-Recreate.** `portal_backend`
-  wurde am 2026-09-29T07:19:32Z und 2026-09-30T07:20:05Z **von selbst** neu erzeugt, jeweils mit dem
-  alten Stand. Der Auslöser ist auf dem Host **nicht auffindbar**: keine Cron-Zeile, kein Timer, keine
-  Systemd-Unit, und im Zeitfenster (07:00–07:40Z) wurde keine Datei geschrieben — er kommt also von
-  außen (Portainer-Redeploy des Stacks oder ein externer Job). **Die Prüfung:** am Folgetag nach 09:20
-  CEST `docker inspect portal_backend --format "{{.Config.User}} {{.Created}}"` — steht dort weiter
-  `1000:82` und ein `Created` **nach** dem Deploy, ist der Stand stabil; steht wieder `1000:1000` mit
-  neuem `Created`, hat der Akteur den alten Stack-Stand überschrieben und der Deploy muss über Portainer
-  (nicht CLI) wiederholt werden. **Kein Raten:** die Entscheidung fällt am Messwert, nicht an der Vermutung.
-- [~] wartet auf einen echten Scheduler-Lauf (`app:import-locations`) plus einen Importer-Lauf. Kein Code offen. **P1-A5** — nur noch Live-Nachweis: ein echter Scheduler-Lauf
-  (`app:import-locations`, wöchentlich mit `withoutOverlapping()->onOneServer()`)
-  und ein Importer-Lauf. Kein Code offen.
-- [~] wartet auf einen Queue-/Mail-/Worker-/Scheduler-Lauf. Die Code-Subblöcke R1–R7 sind verifiziert geschlossen. **P1-A7** — nur noch Operations-Evidenz (Queue/Mail/Worker/Scheduler) und
-  eine **Entscheidung zur SMTP-Duplikat-Policy**. Die Code-Subblöcke R1–R7 sind
-  verifiziert geschlossen.
-
-### Bewusst NICHT geändert
-
-
----
-
+- [~] wartet auf den nächsten Watchtower-Recreate als Gegenprobe und auf die Owner-Entscheidung zur Watchtower-Policy — **der Auslöser des täglichen Recreate ist identifiziert (2026-10-21):** es ist **Watchtower**, kein Cron und kein Timer. Belege (read-only auf dem Host): `docker logs --since 96h watchtower` zeigt `Stopping /portal_backend … Creating /portal_backend` am 2026-10-18, -19, -20 und -21 um 08:0x CEST; `crontab -l` kennt nur `volume-backup.sh`, `update_portainer.sh`, `dind-image-gc.sh`; `systemctl list-timers` zeigt keine passende Unit. **Die gefürchtete Folge tritt nicht ein:** `sync.sh:44` synct nach `/home/webadmin/websites/api-portal.reisinger.pictures/`, und `deployment/docker-compose.yml:97` mountet genau dieses Verzeichnis als `/var/www/html` (Bind-Mount) — Watchtower tauscht nur das Image, nicht den Anwendungscode; der UID-Stand `1000:82` (D-1) bleibt stabil (`docker inspect portal_backend --format "{{.Config.User}}"`). Offen: (a) die Gegenprobe beim nächsten Recreate (`docker inspect portal_backend --format "{{.Config.User}} {{.Created}}"`), (b) die Entscheidung, ob Watchtower für `portal_backend` abgeschaltet oder digest-gepinnt werden soll — er zieht derzeit das Tag `portal-base:8.5`, nicht einen Digest.
+- [~] wartet auf den **Mail-Nachweis** — Queue, Worker und Scheduler sind am 2026-10-21 live belegt: die PID-Dateien `/tmp/portal-{scheduler,queue-supervisor,queue-worker}.pid` existieren, der stündliche Scheduler-Mutex in `cache_locks` trägt den Slot-Suffix `2100` (erworben um 21:00:02Z), der Wochenimport lief am Montag-Slot `03:30` (19.477 Orte im Meilisearch-Index `locations`, Batch 2402: 39/39 Tasks succeeded, 0 failed), und die Queue-Tabellen `jobs`/`failed_jobs`/`job_batches` sind leer und fehlerfrei. Die **SMTP-Duplikat-Policy** ist entschieden (D-17 in `features/owner-decisions.md`: gültige Tokens erhalten, kein pauschales Queue-Uniqueness, ein SMTP-Retry darf keine zweite Belastung oder Zustandsänderung auslösen). Offen: ein **zugestellter** Mail-Nachweis aus der Produktion — der Admin-SMTP-Test (`POST /api/management/settings/test-email`) muss ausgelöst und der Provider-/Mailpit-Log danebengelegt werden; die Produktions-DB führt keine Mail-Logtabelle, und `storage/logs/laravel.log` ist vom 2026-04-23.
 ## 🧪 TEST-QUALITÄTS-AUDIT (2026-09-26) — zwei unabhängige Audits
 
 Scope: 84 E2E-Specs (191 `test()`, 278 Testinstanzen, 9.769 Zeilen) und 129
@@ -810,118 +704,6 @@ Die Tag-Policy wird **ohne eine einzige Verletzung** eingehalten (190 von 191
 `test()`-Aufrufen explizit getaggt; die eine Ausnahme nutzt eine berechnete
 Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 **Tiefe und Redundanz**.
-
-### Lücken, die Geld betreffen — höchste Priorität
-
-- [~] wartet auf die 9 neuen Tests in `src/logic/__tests__/usePayouts.test.ts`, die
-  `useAdminPayouts` und `useMyPayouts` abdecken. **Der Einwand war berechtigt:**
-  `ManagementPayoutsView.test.tsx:6` mockt `../../logic/usePayouts` komplett weg und
-  testet nur den Monat/Jahr-Fallback der View — die Zustandsübergaben des Hooks waren
-  tatsächlich ungetestet.
-  **Was der Hook wirklich tut, gegen die Vermutung:** die Monat/Jahr-Auswahl liegt in
-  `ManagementPayoutsView.tsx:12-14` mit Klemmung beim Leeren (`:70-83`), **nicht** im
-  Hook. Es gibt **keinen** Fehlerzustand — kein Hook destrukturiert `error`; die View
-  leitet ihren Fehlerzweig aus `!data` ab. Und **kein** Refetch: die Hooks nehmen keine
-  Argumente, die einzige Revalidierung ist das explizite `mutate()` nach erfolgreicher
-  Mutation. Diese drei Wege wurden deshalb **nicht** getestet, statt sie zu erfinden.
-  Abgedeckt sind der SWR-Schlüssel je Hook, der Loading-Zustand, die beiden Mutatoren
-  mit exaktem Pfad und Body, und die **Reihenfolge** — ein fehlgeschlagener POST
-  revalidiert nicht. Die Reihenfolge ist als Zusicherung getestet und beißt: mit
-  absichtlich gebrochenem `await`-Verhältnis wurde `does not revalidate when
-  calculateMonth rejects` rot.
-- [~] wartet auf die 4 neuen Specs, die alle vier Dialoge über die echte UI öffnen:
-  `admin/gallery-access-modal.spec.ts`, `admin/rating-status-modal.spec.ts`,
-  `admin/text-snippets-modal.spec.ts` und `AT-03-E5` in
-  `photographer/ai-gallery-defaults.spec.ts`. 10 passed (Desktop + Mobile).
-  **Die Board-Angabe „admin-only" für `GalleryAccessModal` war falsch, und sie wäre in
-  einem gescheiterten Test aufgefallen:** die Aktionszeile hängt an `isPhotographer`
-  (`ManagementGalleryActions.tsx:23`) *und* bekommt `onOpenAccess` nur für Admins
-  (`ManagementGalleryView.tsx:95`) — es braucht **beide** Rollen. Gelöst über
-  `createIsolatedUser('photographer', { additionalRoles: ['admin'] })` statt die Spec zu
-  schwächen, und ohne den gesäten Bootstrap-Admin zu benutzen.
-  **Die drei Modal-Bedingungen:** `RatingStatusModal` braucht eine Galerie mit
-  `type === 'selection'` (`GalleryHelper.createAndOpenSelectionGallery`, neu);
-  `AIGalleryDefaultsModal` liegt **verschachtelt** in `GalleryMetadataDefaultsModal`, und
-  der Spec prüft, dass das Kind aufgeht **während das Eltern-Modal offen bleibt**; die
-  KI-Generierung selbst wird **nicht** ausgelöst, weil sie einen Live-AI-Dienst braucht
-  und das Stubben von `/api/ai/*` verboten ist.
-  **Der lügende Kommentar ist korrigiert.** Er behauptete, `AT-03-E4` sei entfernt
-  worden, weil es `/api/ai/status`, `/api/auth/me` und
-  `/api/ai/generate-metadata-text` mocke. Falsch auf beiden Zählern: der Test
-  existiert, und diese drei Pfade kamen **nur innerhalb der Notiz** vor — ein
-  `page.route`/`route.fulfill` existiert in der Datei nicht. Die neue Notiz sagt das
-  ausdrücklich, statt die alte Behauptung zu tilgen.
-
-### Strukturbefunde, nicht jetzt umgesetzt
-
-- [~] wartet auf den CSP-Policy-Text an lesbarer Stelle im Repo. **E2E ist strukturell
-  blind für CSP-Verstöße — und lässt sich das nicht vollständig remedieren.**
-  Befund aus der Wasserzeichen-Reparatur: `playwright.config.ts` setzt **unter CI
-  keinen** `webServer` (`grep -n webServer frontend/playwright.config.ts` → 2 Treffer,
-  Z. 57 `webServer: isCi ? undefined : […]` — unter CI also `undefined`),
-  der E2E-Server ist ein separat gestarteter `pnpm dev` auf 4321
-  (CI: `.github/workflows/ci.yml:672` `pnpm dev > /tmp/vite.log 2>&1 &`; lokal druckt
-  `scripts/e2e-up.sh:221` nur die Startanweisung `log "Frontend (separat): … pnpm dev"`),
-  und
-  `frontend/vite.config.ts:43-55` setzt im `server`-Block **keinen** `headers`-Schlüssel
-  (`grep -n headers frontend/vite.config.ts` → kein Treffer). Die Suite läuft also
-  **ohne jeden CSP-Header** — `frontend/tests/e2e/admin/settings/watermark.spec.ts:37` →
-  `const preview = page.locator('main img[alt="Watermark Preview"]')` ist seit Juni
-  grün, während in Produktion jedes Rendern fehlschlug. **Warum trotzdem kein Header
-  nachziehen:** Die Produktions-CSP steht in **keinem File dieses Repositories**; sie
-  lebt nur im Caddy-Volume von `proxy-stack` (`proxy-stack_caddy_file/_data`). Eine
-  E2E-Kopie müsste `script-src`, `style-src` und `connect-src` raten, und ein
-  Fehlversuch erzeugt über 1000 Fehlschläge, die über das Produkt nichts aussagen.
-  **Was stattdessen getan wurde, und das ist der bessere Weg:** Der Renderer-Test
-  erzwingt die Allowlist `['data:', 'https:']` in einem `Image`-Mock und verweigert
-  alles andere mit `error` — die Suite prüft also die konkrete Invariante, ohne die
-  Umgebung nachzubauen. Zwei Zusatztests sichern den Mock selbst ab.
-  **Bleibende Lücke:** Andere künftige CSP-Blockaden (Skripte, Fonts, `connect-src`)
-  bleiben für E2E unsichtbar. Das ist eine Eigenschaft der Testumgebung, die man
-  kennen muss — **nicht** durch Raten behoben. **Bedingung für eine Remediation:**
-  der Policy-Text liegt zuerst lesbar im Repo; das ist eine Owner-Entscheidung und
-  eine Frage an den `proxy-stack`. **Bis dahin kein offener Bug, sondern eine
-  dokumentierte Blindstelle.**
-### Abweichungen bei der Umsetzung (2026-09-26) — zwei Audits, nicht blind übernommen
-
-- **`CouponInput.test.tsx:148` war ein Fehlalarm.** `removeCoupon()` wird mit
-  **keinen Argumenten** aufgerufen (`CouponInput.tsx:38`), die blanke Assertion
-  ist dort also korrekt. Argumente zu ergänzen wäre falsch gewesen. Von fünf
-  gemeldeten Stellen sind damit **vier** echte.
-- **Zwei der vier E2E-Löschungen wurden zu Verschiebungen.** `guest.spec.ts` und
-  `public-gallery.spec.ts` tragen `@smoke`; ein blindes Löschen hätte
-  Smoke-Abdeckung entfernt, was die Bewertung des Audits nicht abwog. Deshalb:
-  `@smoke` auf `search.spec.ts:4` gehoben (das den Test bereits duplizierte) und
-  `guest.spec.ts` gelöscht; `public-gallery.spec.ts` **umbenannt** statt gelöscht,
-  weil der Testkörper die Login-Formular-Eindeutigkeit prüft und nur der Name
-  log. Der Test hieß „can view public galleries", öffnete aber keine Galerie.
-- **Die verschachtelte-Dialog-Reparatur war zunächst falsch.** Der erste
-  Fix prüfte „zuletzt registriert gewinnt" — aber React führt Effects
-  **kind-zuerst** aus, ein verschachtelter Dialog registriert sich also *vor*
-  seinem Elternteil und der äußere Dialog konsumierte das Escape. Die
-  Korrektur nutzt DOM-Reihenfolge, die die Verschachtelung tatsächlich
-  ausdrückt.
-- **Eine von mir verschärfte Assertion schlug fehl und erwies meine eigene
-  Annahme als falsch:** `handleSave(index)` speichert **eine** Zeile, ich hatte
-  drei erwartet. Der Code war richtig, die Assertion wurde korrigiert — und
-  bleibt schärfer, weil sie jetzt Foto-ID und Payload-Form prüft.
-- **Einheitenregel im Vertrags-Pricing:** Editor-Positionen sind in **Euro**,
-  Snapshot-Positionen in **Cent** (`toSnapshotValue` multipliziert mit
-  `CONTRACT_SNAPSHOT_SCALE`). Ein um Faktor 100 falscher Testwert wäre ein
-  Geldfehler im Test gewesen; der Kommentar pinnt die Regel jetzt explizit.
-
-### Sauber, kein Handlungsbedarf
-
-- Kein `expect(true)` in der gesamten Suite, **keine Snapshot-Tests** (0 Dateien).
-- `tests/Unit/Models/GalleryOrgIdsTest.php:27` sieht wie ein reiner
-  Getter-Test aus, ist aber gerechtfertigt: dokumentierter Regressionstext,
-  prüft die Precondition im *ungeladenen* Zustand.
-- `shootingCalculator.ts calculateCustomStudioPrice` wirkt ungetestet, ist es
-  aber nicht — der Test greift über den Alias `calculateShootingPrice`, eine
-  Einzeiler-Delegation. **Korrekt als Fehlalarm abgetan.**
-- In der gesamten E2E-Suite nur zwei `page.route`-Mocks, beide legitim (einer
-  verzögert und `continue()`t, einer mockt Stripe). **Kein Test mockt weg, was er
-  zu prüfen vorgibt.**
 
 ## 🔍 VOLLSTÄNDIGER HEAD-AUDIT (2026-09-24)
 
@@ -940,14 +722,7 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 - **CR-DATA-018/CR-BE-018:** Contract-E-Mail-Uniqueness zuerst mit bestehenden Mechanismen/Schema lösen; V039+ nur als letztes Mittel.
 - **CR-PAY-013/CR-CODE-002:** Purchase-time-Organisationszuordnung ist beschlossen; Snapshot-/Migrationsauswirkungen vor Implementierung spezifizieren.
 
-- [~] wartet auf die Betriebsnachweise selbst (E2E-Harness, Live-Smoke, GHCR-/Dependency-/Deployment-/Live-Runtime-Nachweise, Secret-/Artifact-Hygiene). **Welle 4 — Betrieb/Release:** E2E-Harness, Live-Smoke, GHCR-/Dependency-/Deployment-/Live-Runtime-Nachweise und Secret-/Artifact-Hygiene abschließen.
-**Akzeptierte Risiken aus dieser Welle (User-Entscheidungen, 2026-09-25/26):**
-
-- **Cross-Brand-Zugriff für Super-Admin** (`ContractController` u. a.): gewollt. Nur der `brand=null`-Super-Admin ist cross-brand; brand-gebundene Admins bleiben isoliert.
-- **Gebührenverteilung Payouts:** „Alles mit Abzug der Payment-Gebühren wird verteilt" ist das gewollte Modell — die Gebühr wird über die eligible Items verteilt.
-- **Migrations-Policy:** Produktion hat **V035**; alles darüber (V036–V040) ist die nicht-produktive Frontier und fachlich konsolidierbar. Eine neue Migration nur, wenn eine Konsolidation technisch nicht geht. **Keine weitergehenden Restriktionen erfinden, die nicht vom User stammen.**
-- **Vertrags-Join-Identität (FINAL-9/CTR-7):** Der geheime `personal_token` **ist** das Authentifizierungsmittel für die Unterzeichnung, und der Join-Link geht an die beteiligte Person — der Link ist die delegierte Autorisierung. Die beim Join angegebene E-Mail ist Anzeigeidentität, **kein Grant**; `sign/{personal_token}` hängt ausschließlich am Token. Siehe Detail-Eintrag im Review-Abschnitt.
-
+- [~] wartet auf die zwei verbleibenden Betriebsnachweise der Welle 4 — die **Plugin-Live-Runtime** (bisher nur der statische Harness `admin.lrplugin/tests/run.sh`; ein Lauf mit laufendem Lightroom Classic und installiertem Plugin steht aus) und **CR-INF-012** (der Live-Runtime-Nachweis). Erledigt und deshalb nicht mehr Teil dieser Position: der E2E-Harness (`tests/scripts/ftp-transport-test/`), Live-Smoke und die acht Deployments (mit `/up` → 200, Bundle-Hash und `migrate:status`), die GHCR-Pullability (`portal-base:8.5` pullbar, der laufende Container auf Digest `sha256:4e9533a8…`), die Dependency-Nachweise (Security-Contract- und Ratchet-Job grün) sowie die Secret-/Artifact-Hygiene.
 ## 🚀 EXECUTION PLAN — CURRENT SESSION (2026-09-25)
 
 > Ziel: alle **actionable** TODOs in Abhängigkeitsreihenfolge abarbeiten. Historische `[x]`-Einträge werden nicht automatisch neu geprüft; stale/duplicate Findings werden durch einen aktuellen Reproduktionstest geschlossen oder als offen markiert. Der aktuelle Working Tree ist dirty; kein Checkbox-Status und kein Diff allein gilt als Verifikationsnachweis.
@@ -1054,267 +829,16 @@ Beide Org-Pakete sind `private`; `backend` und alle 7 E2E-Jobs scheitern mit `un
 Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`, `e2e-pf`, `e2e-fix`, `pf-mailpit`, `pf-meili`, `pf-mariadb`, `pf-meili-local`, `seed-ws-pf` sowie Volumes `ws-head`, `ws-ci-base`, `ws-pf`, `ws-fix` und die Netze `e2e-net`, `pfnet` entfernt; Host-Dienste Meilisearch/Mailpit gestoppt; Worktree `portal-staged-verify` geprüft (`git diff --cached main --diff-filter=A` leer ⇒ kein Unique-Work) und entfernt; Scratch unter `/tmp` bereinigt.
 
 ### Gate 0 — Baseline und Änderungsdisziplin
-- [~] wartet auf erreichbare Host-Ports 127.0.0.1:7701/1025/8025 sowie PHP-GD und ExifTool auf dem Host; der gepinnte CI-Container ist der gültige GD-Testpfad. **Backend-Testumgebung (2026-09-25):** Meilisearch- und Mailpit-Container sind gestartet und intern gesund (`docker exec` Health/Message-API bestätigt), aber die Host-Ports `127.0.0.1:7701/1025/8025` sind aus der Shell-Namespace nicht erreichbar; Compose-Plugin fehlt. 28 root:root-Testartefakte unter `backend/storage/framework/testing` sind gitignored, aber für den Host nicht bereinigbar. PHP-GD/ExifTool fehlen im Host; der gepinnte CI-Container ist der gültige GD-Testpfad, muss aber auf Image-UID/Version geprüft werden.
-- [~] wartet auf die reproduzierten GalleryTreeService-/Invoice-/Frontend-Fehler aus Welle 0 — solange sind die Feature-Wellen nicht sinnvoll startbar. **Gate 0 — Code-Fixes vor Feature-Wellen:** GalleryTreeService-/Invoice-Testfehler und Frontend-Meta-Gallery/Lint-Fehler zuerst reproduzieren, beheben und fokussiert verifizieren; anschließend Backend-Umgebung (Meilisearch/Mailpit/GD/Storage) reproduzierbar herstellen oder als offenen Infrastrukturblocker dokumentieren.
-- [~] wartet auf den Rückgang der parallelen Agentenlast; erst dann die fehlgeschlagenen Delegationen neu starten. Subagent-Infrastruktur-Blocker (`invalid_request_error`, Datenbank-Lock) von Code-Regressions trennen und fehlgeschlagene Delegationen nach Rückgang der parallelen Last erneut starten.
-
-### Workstream A — Payment/Cart/Media
-- [~] wartet auf einen aktuellen Reproduktionstest pro Befund — ohne ihn ist unklar, was noch offen ist. **P1-F/P1-M-Reste:** nur reproduzierte Befunde priorisieren; jede UI-/Routing-Änderung mit Vitest plus Playwright-Functional-Tag, jede Backend-Änderung mit PHPUnit.
-- [~] wartet auf die gebauten Suites — fokussierte Suites zuerst, danach die Gates. **Payment-/Media-Gates:** fokussierte Suites zuerst, danach Full-PHPUnit, Full-Vitest, `pnpm lint:fix`, `pnpm build`, `@smoke` und feature-getaggte E2E-Läufe.
-
-### Workstream B — CRM/Contract/Infra
-- [~] wartet auf Betriebs-/CI-Evidenz: GHCR-Pullability, Deployment-, Secret-, Scheduler-, Storage-Nachweise und die Plugin-Live-Runtime. E2E-Harness, Smoke, parallele Shards, GHCR-Digests/Pullability, Deployment-/Secret-/Scheduler-/Storage-Nachweise und Plugin-Live-Runtime als eigenständige Evidence-Tasks behandeln.
-- [~] wartet auf den Abschluss der Review- und Checklistenpunkte; die Betriebsnachweise (Monitoring/Runbook, Rollback, unabhängige Verifikation) stehen parallel aus. Vor Live-GO: Contract-/Card-Testing-Review, Radar/3DS/Webhook/Privacy-Checkliste, Monitoring/Runbook, Rollback und unabhängige Verifikation abschließen.
-
-**Ausführungsregel:** Jeder Workstream erhält einen separaten Implementierungs-Subagenten und einen separaten Verifier. Tests werden im Task Board mit exaktem Kommando, Ergebnis und Umgebungsstatus fortgeschrieben; ohne diesen Nachweis bleiben die Checkboxen offen.
-
-**Zusätzlich gestartete aktive Teilaufgaben:**
-**Read-only Implementierungs-Audit (2026-09-25; Testquellen vorhanden, Ausführung/Verifier offen):**
-- [~] wartet auf den Abschluss der A7-Subblöcke — R1–R7 sind verifiziert, übrig sind Operations-Evidenz und Product Decisions. **P1-A7 Audit-Split (2026-09-25):** P1-A6 bleibt separat verifiziert. A7 ist in aktive Bugs (malformed provider response, image byte/pixel budget, session-prefix/header validation, manual delete ordering, scheduled cleanup durability, unchecked temp deletion, quote mail-loss), Operations-Evidence (queue/mail/worker/scheduler), Product Decisions (Prompt-Injection, SMTP duplicate policy) und stale/fixed Source-Punkte aufgeteilt. Keine pauschale A7-Schließung.
-**Checkout-Verifier-Blocker (Implementierung 2026-09-25; unabhängige Verifikation folgt):**
-- Immediate-Stripe-Replay verlangt jetzt eine explizite, passende aktive Brand; die Null-/Fingerprint-Legacy-Lookups wurden aus dem positiven Claim-Pfad entfernt. Regressionen für Null-Brand/PI-Exact-Key, Lock-Timeout und Unique-Constraint-Race sind deterministisch und ohne Sleeps umgesetzt.
-- Invoice-Mail nutzt den bestehenden `invoice_snapshots`-JSON-Vertrag als nicht ablaufenden Enqueue-Claim (`InvoiceSnapshot::MAIL_DISPATCH_KEY`) und eine transaktionale Queue-Claim-Schicht. Das ist ausdrücklich **at-most-once durable enqueue**, nicht exactly-once SMTP delivery. Queue-/Marker-Fehler vor dem Commit rollieren den Claim zurück und sind retrybar; Worker-/SMTP-Fehler können mehrfach versucht werden, ein terminaler Job bleibt in `failed_jobs` und verhindert eine automatische zweite Enqueue. Production mit nicht-transaktionaler Queue wird fail-closed abgewiesen. Keine V039+-Migration; der Marker wird aus öffentlichen Snapshot-Resources entfernt.
-- **Fokusnachweis 2026-09-25:** `CheckoutIdempotencyServiceTest` **24 Tests/116 Assertions**, `CheckoutNonImmediateIdempotencyTest` **22/153**, `CheckoutPersistenceIntegrationTest` **7/47** (mit `SCOUT_DRIVER=null`), `CheckoutKillSwitchTest` **6/20**, `FreeOrderCheckoutTest` **1/10**, `CheckoutStripeErrorTest` **19/123**, `WebhookInvoiceMailAtomicDedupeTest` **3/14**, `WebhookReplayMailTest` **1/4** und `StripeWebhookTest` **32/116** grün (mit bekannten `.env`-Warnungen; Scouting-Tests mit `SCOUT_DRIVER=null`). Frontend `CartProvider.test.tsx` + `ClientCartView.test.tsx` + `checkoutSession.test.ts` **47/47** grün. PHP-Syntax (10 geänderte PHP-Dateien), Pint (10 Dateien) und `git diff --check` grün. Der Default-Lauf von `CheckoutPersistenceIntegrationTest` scheitert an Meilisearch `127.0.0.1:7701`; `CheckoutServiceTest` (5 Mail-Pfade) und `MailDeliveryTest` inklusive neuem Invoice-Claim/Mailpit-Test scheitern an SMTP `127.0.0.1:1025` (die Mailpit-API `127.0.0.1:8025` ist ebenfalls nicht erreichbar). Kein Mailpit-Zustellungs-PASS behauptet. Gezieltes ESLint ignoriert die Testdatei standardmäßig; `--no-ignore` meldet nur den bereits vorhandenen unbenutzten `_init`-Parameter in `ClientCartView.test.tsx:462`; mit diesem bestehenden Rule-Ausschluss ist die Datei lint-clean. Kein Playwright ausgeführt.
-
-**Integration & Commit-Ownership (2026-09-25):**
-**Working-Tree-Verifikation (Code committed; Task-Board-Update ausstehend):**
-- Frontend-Final-Gate 2026-09-25: `pnpm test:run` **126/126 Testdateien / 1005/1005 Tests**, `pnpm lint:fix`, `pnpm lint:e2e`, `pnpm build` und Playwright-Collection **396 Tests/84 Dateien** grün; Browserlauf bleibt CI-/Stack-Follow-up.
-- Plugin-Harness `bash admin.lrplugin/tests/run.sh`: grün; echte Lightroom-Runtime bleibt nicht verfügbar.
-- V037: MariaDB-11.4-Migration inklusive Seed und Owner-Trigger-Replay grün; partielle DDL-Retry-Guards, SQLite-Trigger-Cleanup und PostgreSQL-Catalog-Guard implementiert; fokussierte PHPUnit-Regression (53 Assertions), PHP-Syntax/Pint und Disposable-MariaDB-Replay grün.
-- Contract-/Magic-Link-Fokus: PHPUnit 59 Tests/242 Assertions plus `MagicLinkAuthTest` 5/18 grün; Datenbankuhr-Alias auf MariaDB 11.4 direkt verifiziert.
-- Backend-Full-Suite-Lauf 2026-09-24: **umgebungsbedingt blockiert** (Meilisearch `127.0.0.1:7701`, Mailpit `1025/8025` und untracked `backend/.env` fehlten; 813 Aggregatfehler vor Assertions). Kein Produktfehler daraus; offizielle CI-Service-/Container-Baseline bleibt die maßgebliche Referenz.
-- **Verifier-/Commit-Status 2026-09-25:** Die sechs Audit-/A7-Commits sind erstellt; unabhängige Verifier für Frontend, Checkout, Meta-Gallery, V039, AI, Cleanup, Quote und Storage liegen vor. Offen bleiben nur Live-Browser-/Betriebs-Evidence, V037-PostgreSQL und die expliziten A7-Betriebs-/Produktentscheidungen.
-- **Pricing-Verifier-Follow-up (2026-09-25; Pricing-Implementierung + fokussierte Nachweise):** Contract store/update now preflight normalized candidate pricing before model writes; product, running-total, percentage, and persisted-ceiling overflow return 422 without contract/order/snapshot mutation. The shared `PersistedMoney::MAX_CENTS` ceiling is enforced by contract lifecycle/template-copy paths, checkout/collective-invoice guards, and Eloquent `Order`/`InvoiceSnapshot` write events. Legacy template copies preserve order when canonical partition order is unchanged and fail closed with a clear validation error when a discount would move before an item. PDF cents use exact integer formatting. Editor scaling validates at most two decimals and uses bounded `Math.round`; max-safe item/fixed/percent/manual-quantity roundtrips are green. Focused PHPUnit (22 relevant cases in the final pricing slice; warnings only from missing `.env`), focused/full Vitest (992/992), TypeScript tests, lint:fix, build, Pint, PHP syntax, and both diff checks pass. ContractClose/InvoiceService Mailpit paths remain environment-blocked at `127.0.0.1:1025`; no Playwright was run and no files were staged/committed/reset/stashed by this follow-up.
-- **V037-Review (2026-09-25; historical statement reconciled):** Der aktuelle Second-Partial-Retry-Test deckt nun beide Owner-Trigger (Insert/Update) sowie Index-/Unique-Wiederherstellung ab; die frühere Aussage, dass nur Index/Unique geprüft würden, ist stale. Offen bleibt die unabhängige Cross-Driver-Ausführung unter SQLite, MariaDB/MySQL und PostgreSQL.
-- [~] wartet auf einen Live-PostgreSQL-Dienst bzw. `psql` — der PG-Branch ist statisch geprüft, aber nie gelaufen. **V037 Cross-Driver-Retry-Verifikation:** SQLite/MariaDB unabhängig PASS (13/98, beide Owner-Trigger, Partial-Retry-Restore, Index/Unique/Catalog, V001–V039 Seed); PostgreSQL-Branch statisch geprüft, aber kein Live-PostgreSQL-Service/`psql` verfügbar. PG-Live-/Cross-Instance-Evidenz bleibt offen.
-- **V037 Verifikationsanalyse (2026-09-24):** Der breitere `GuestOrderIsolationTest`-Lauf scheiterte an fehlender Meilisearch-Verbindung und nicht beschreibbarer `Storage::fake`-Cleanup-Pfade, nicht an V037; der isolierte Owner/Index-Test ist grün. `RatingUniquenessTest` ist mit `SCOUT_DRIVER=null` (4 Tests/25 Assertions) grün, während der Default-Lauf ausschließlich an Meilisearch `127.0.0.1:7701` scheitert.
-- CI-Fix-Commit `8904c10` ist gepusht; Run `36035927250` auf diesem SHA ist **abgeschlossen rot**. Security-Contract, Backend und Frontend sind grün; Serial-E2E ist grün, sechs parallele E2E-Shards sind rot. Bestätigte Restursachen: Contract-Reset-Assertion, Search-History-State, Rating-PhotoLink, FTP-Navigation, Magic-Link, Cart-Ort/Detached-Link, Cart-Pricing-Sidebar und Coupon-Revalidation.
-- E2E-Laufzeit Run `36035927250`: Frontend 4m25s, Serial-E2E 6m51s, parallele Shards 5m36s–17m09s. Der langsamste parallele Shard erreichte den bisherigen `globalTimeout: 900000` und ließ 26 Tests nicht ausführen; deshalb ist der neue, begrenzte Whole-Suite-Budget `globalTimeout: 1500000` (25 Minuten), der gegenüber dem Maximalwert rund 7m51s CI-Puffer lässt. Per-Test bleibt `timeout: 120000` (120s) unverändert.
-- **E2E-Timeout-Entscheidung (User-Freigabe, 2026-09-25; auditbar):** Die gemessene Maximum-Baseline bleibt der langsamste parallele Shard aus Run `36035927250` mit **17m09s**; der serielle Lauf benötigte 6m51s. Die generische Doppelregel würde daraus 34m18s ergeben, aber der ausdrücklich freigegebene harte Cap bleibt bei **25 Minuten / 1500000 ms** (7m51s über dem gemessenen Maximum), mit **120000 ms / 120s pro Test**. Das ist eine bewusste Ausnahme von der Doppelregel, keine stillschweigende Timeout-Änderung; nach E2E-Änderungen sind neue Messung und explizite User-Freigabe erforderlich. In dieser Session wurde **kein Playwright-Lauf** ausgeführt; der Nachweis bleibt CI-gebunden.
-- [~] wartet auf den Push und den echten Browserlauf im CI-Job; lokal ausdrücklich kein Playwright-Lauf. **CI/E2E-Verifier-Blocker (Implementierung 2026-09-25; Browser-Nachweis folgt nach Push):** Dependabot wartet jetzt ausschließlich auf `CI gate (push)` mit einem 65-Minuten-Job-Gesamtlimit; der Security-Contract prüft Event-Suffix, exakten Filter, Actor/Event-Skip, Fail-closed-Dependencies und Timeout. CustomerModal behandelt `PLZ & Stadt` als benannte Gruppe mit individuellen `aria-label`-Comboboxen; E2E-Regressions decken CustomerModal/AutocompleteInput, ProfileSettingsCard, SearchBar und den privaten Rating-Route-Guard ab (Dateien: `frontend/tests/e2e/admin/crm/management-save-regression.spec.ts`, `frontend/tests/e2e/photographer/photographer.spec.ts`, `frontend/tests/e2e/guest/guest-search-header.spec.ts`, `frontend/tests/e2e/selection/rating-regressions.spec.ts`). **TODO:** Nach Push den echten Browserlauf in CI abwarten und dort die sichtbaren Ergebnisse der getaggten Tests dokumentieren; lokal ausdrücklich kein Playwright-Lauf.
-- Timeout-Policy-Verifikation (2026-09-24): `pnpm exec tsc --noEmit -p tsconfig.node.json`, `pnpm lint:e2e`, `bash tests/infrastructure/ci-security-contract.sh` und `git diff --check` grün; gemäß Auftrag kein Browserlauf.
-- **Cart-Pricing-Sidebar (2026-09-24; Fix umgesetzt, Browser-Verifikation ausstehend):** Run `36035927250` scheiterte auf Desktop und Mobile bereits an den Käufer-Navigationen. `power_user` ist ein Non-Staff-Client; dessen `ClientDashboard` rendert absichtlich `Suche & Entdecken`, aber nicht den staff-only Eintrag `Galerien & Ordner`. `SidebarHelper.navigateToClientGalleries()` verwendet den deutschen Discovery-Eintrag; alle drei Cart-/Coupon-Tests und ihre Tags bleiben erhalten. `SidebarHelper.test.ts` deckt den Client-Link ab (2 fokussierte Vitest-Tests grün), fokussiertes ESLint und `git diff --check` sind grün. Playwright wurde gemäß Auftrag nicht lokal erneut ausgeführt.
-- **Coupon-Revalidation Branch-Readiness (2026-09-24; fokussierter Fix):** Der CI-Fehler war kein Overlay- oder Disabled-Klick: Nach `/photos/...` war der asynchrone `useLicensingMode`-Fallback zunächst die Scope-Karte, während der Fixture explizit Volume-Lizenzierung gesetzt hatte. `coupon-checkout-revalidation.spec.ts` navigiert den Nicht-Staff-Käufer jetzt über die deutsche Discovery-Seite, wartet semantisch auf die Galerieüberschrift und anschließend auf `volume-pricing-card` plus den aktiven deutschen Button `In den Warenkorb`; Invalid-/Expired-/Valid-Coupon-Semantik und `@feature:client:coupon` bleiben unverändert. Test-IDs und ein PhotoDetailView-Branch-Übergang sind durch fokussierte Vitest-Abdeckung geschützt. Lokales Playwright wurde nicht ausgeführt.
-
-**Welle-0-Triage-Ergebnis (Read-only gegen `HEAD=59f9ec6`; 2026-09-24):**
-- **Kanonisch aktiv:** CR-PAY-010, CR-FE-030, CR-CRM-008, CR-TEST-012, CR-FE-041, P1-F7 sowie die verbleibenden Reste aus P1-F10/F11, P1-A6/A7, P1-M9/M14 und das Model-Person-Count-Limit.
-- **Bereits gefixt/stale oder duplicate:** P1-F1–F6/F8/F9/F12, P1-A1–A4, P1-L1–L6 (nur echte Lightroom-Runtime bleibt als Evidence offen), P1-M1/M2/M10–M13/M15, CR-FE-011/019/023/024/034/039, CR-TEST-005, CR-INF-005/006/019, P0-A13/P0-B7/CR-BE-010, CR-CODE-001 sowie die Age-Proof-Positivfallzeile. Die historischen Checkboxen dürfen nicht als neue Bugs double-countet werden.
-  - **Korrigiert 2026-09-26 (damals als DOC-8 gefuehrt; diese DOC-Position ist inzwischen aus dem Board entfernt):** `P0-A13`, `P0-B7` und `CR-BE-010` standen in dieser Pauschalliste als gefixt, waehrend der Einzeleintrag `CR-BE-010` (P2, Review-Integritaet) und die damals wiedereroeffnete Einzelposition `P0-A13 (MEDIUM; reopened)` sie ausdruecklich als NICHT gefixt fuehren. Die Einzeleintraege sind massgeblich, die Pauschalliste war falsch. **Nachtrag 2026-09-28:** Der damalige Stand („nicht gefixt") ist fuer `P0-A13` und `P0-B7` ueberholt — beide sind am 2026-09-28 nachweislich als Nicht-Leck geschlossen, nicht „nie gemeldet": die Begruendung steht in den Bloecken „P0-A … geschlossen 2026-09-28" und „P0-B … geschlossen 2026-09-28" weiter unten. **`CR-BE-010` ist davon nicht erfasst** und wird hier **nicht** mitgeschlossen: der P2-Review-Integritaets-Eintrag bleibt ohne Abschlussvermerk offen.
-- **Nur Verification/Environment:** Tag-Playwright-Ausführung, MariaDB-Migration/E2E, GHCR-/Deployment-/Secret-/Scheduler-/Storage-Nachweise, Plugin-Live-Runtime und Card-Testing-Betriebschecklisten. Diese Blöcke benötigen keinen erfundenen lokalen PASS.
-- **Schema-Entscheidung:** CR-BE-018/CR-DATA-005/CR-DATA-018 bleiben bis zur realen Multi-Connection-/Template-Scope-Entscheidung offen; bestehende V036–V038 dürfen fachlich konsolidiert werden, V039+ nur bei nachgewiesenem unvermeidbarem Defizit. V037 hat zusätzlich einen MariaDB-CHECK-Kompatibilitätsblocker.
-- **CI-Status 2026-09-24:** Der historische Run `36013526580` auf `59f9ec6` bleibt rot (V037/MariaDB-Fehler 1901; Frontend/Backend ansonsten grün). `e1f397d` beseitigte den Migrationsblocker; der darauffolgende Run `36024267904` war rot und deckte die nachgelagerten E2E-/Harness-Befunde auf. Der fokussierte Reparaturcommit `8904c10` ist gepusht; Run `36035927250` ist abgeschlossen rot. Image-Build `36024267953` ist grün; Registry-Namespace/Pullability bleibt separat offen.
-- **E2E-Image-Namespace (2026-09-24):** Build-Run `36024267953` publiziert `ghcr.io/reisinger-pictures/portal-e2e@sha256:127543e4...`; `ci.yml` konsumiert weiterhin `ghcr.io/reisi007/portal-e2e@sha256:d542ae69...`. Ein lokaler `docker manifest inspect` des neuen Manifests endete mit `unauthorized`; Digest-/Namespace-Umstellung ist eine separate Registry-/Pullability-Entscheidung und darf nicht als bereits verifiziert gelten.
-- **CI-E2E-Fehleranalyse Run `36024267904`:** Security/Backend/Frontend grün; alle sieben E2E-Shards erreichen die Tests, diverse API-/Auth-Flows scheitern jedoch. Bestätigte Ursachen sind der rohe `Set-Cookie`-Header, der MariaDB-reservierte Contract-Alias `CURRENT_TIMESTAMP AS current_time`, fehlende Label-/Pflichtfeld-Associierungen, der nicht erlaubte User-Endpoint für Photographers sowie zu unscharfe E2E-Locators. Die entsprechenden Fixes und Regressionen laufen getrennt; keine weiteren lokalen Browser-Retries.
-- [~] wartet auf die unabhängige Verifikation; der Fix ist implementiert, aber nie von einem zweiten Agenten abgenommen. **Invite redemption regression (implemented; independent verification pending, 2026-09-24):** The logged-in-user E2E failure at `magic-link.spec.ts:70` was deterministic, not a consumed invite: `InviteView` returned from its auto-redeem effect with `!loading` after the lookup completed, so no second POST was sent. `GalleryInvite` is a revocable access grant (no `used_at`/expiry); the same token was verified for anonymous-then-registered redemption in PHPUnit. Fixed the loading guard, limited auto-redeem to registered users (`guest_id === null`), and made auth identity dependencies primitive so SWR revalidation cannot cancel navigation. Regression evidence: `InviteView.test.tsx` (4/4), `MagicLinkAuthTest` (same-token flow), PHP syntax, frontend build and targeted lint. Playwright was intentionally not run per task instruction.
-- **Nicht als Fix erlaubt:** laufende Working-Tree-Änderungen erst nach unabhängiger Verifikation, fokussierten Tests, `git diff --check` und separatem Commit als erledig markieren.
-
-**Test-Coverage-Audit der neuen Änderungen (2026-09-24; angefordert)**
-- **Frontend-Full-Gate 2026-09-25 (finaler Verifier):** `pnpm test:run` **126/126 Testdateien / 1005/1005 Tests**, `pnpm lint:fix`, `pnpm lint:e2e`, `pnpm build` inkl. TypeScript/i18n/Vite und Playwright-Collection **396 Tests/84 Dateien** grün; Diff-Checks grün. Browserlauf bleibt CI-/Stack-Follow-up.
-- **Review-Range:** `72f55da...HEAD` (Basis vor diesem Remediation-Commit; nach dem Push durch den späteren Reviewer auflösen)
-- **Backend-Full-Gate 2026-09-24:** Der offizielle Containerlauf mit dem
-  `portal-base:8.5`-Image (Registry `ghcr.io`, Namespace `reisi007` — **vor** der
-  Migration auf `reisinger-pictures`) mit `--network host` und erreichbaren
-  Meilisearch-/Mailpit-Diensten ist **PASS: 1.969 Tests, 0 Fehler, 6.276 Assertions**
-  (1.962 Warnungen nur wegen fehlender lokaler `backend/.env`). Ein vorheriger
-  Hostlauf war wegen der nicht erreichbaren Port-Forwardings umgebungsbedingt
-  fehlgeschlagen und ist kein Code-Failure.
-- **Backend-Integration-Final 2026-09-25:** Focused SQLite-/Container-/MariaDB-Gates für GalleryTree/MetaGallery, Checkout, CRM, Invoice, AI und Storage grün; offizielles PHP-Container-GD/ExifTool und Live Meilisearch/Mailpit-Slices grün. Der Host-Full-Suite-Lauf bleibt wegen `.env`/GD/Meilisearch/Mailpit und der bestehenden V001-PostgreSQL-Einschränkung umgebungsbedingt; kein vollständiger Backend-PASS wird behauptet.
-
-**Bestätigte Findings aus dem unabhängigen Coverage-Audit (umgesetzt/verified; Umgebungs- und Folgeblocker separat)**
-- **CR-FE-040 (P1, implemented/verified):** Das Entfernen eines einzelnen Items aus einem signierten Multi-Photo-Quote invalidiert den Token; der verbleibende Warenkorb wird ohne Quote-Metadaten persistiert und nicht mit veraltetem Token remounted. Regression: `CartProvider.test.tsx` (Multi-Photo-Quote, Persistenz/Remount), fokussiert 45 Tests grün; unabhängiger Verifier bestätigt den ursprünglichen Trigger.
-- **CR-PAY-012 (P1, implemented/verified):** `POST /api/coupons/validate` returns the public `max_items` contract; the percentage preview now honors the server's cheapest-item limit. Regression: `CouponCheckoutControllerTest` (6 tests/19 assertions) plus `useCoupon` max-items Vitest.
-- **CR-FE-047 (P1/P2, implemented/verified):** `useCoupon` resets atomically on eligibility, quote and complete-cart identity changes, ignores stale in-flight responses (including A→B→A), and the keyed `CouponInput` clears its local draft. Regression: 113 focused frontend tests across CartProvider/useCoupon/ClientCartView/cartLogic/CouponInput/LicenseSelector/VolumeLicensing, including non-eligible-item mutation.
-- **CR-FE-048 (P2, implemented/verified):** Mixed carts retain `galleryGroupId` and send bounded, complete gallery/meta-gallery scope arrays to validation. Regression: mixed-scope controller contract plus ClientCartView/useCoupon request tests.
-- **CR-TEST-013 (P2, implemented/verified):** Internal `/api/*` intercepts were removed from coupon/cart, delivery-metadata and AI-config E2E specs; real API fixtures/flows replace them. `pnpm lint:e2e`, targeted Playwright collection (26 tests across five specs) and the moved Vitest coverage pass; the only remaining route interception is the permitted external Stripe.js provider boundary.
-- **CR-TEST-014 (P2, implemented/verified):** `admin.lrplugin/tests/run.sh` registriert `manager_upload_regression.lua`; der Harness-Contract-Test prüft die Lua-Dispatch-Reihenfolge, und der Static-Fallback weist ausdrücklich aus, dass ohne Lua-/Lightroom-Laufzeit keine Live-Ausführung erfolgt. `bash admin.lrplugin/tests/run.sh` ist grün.
-
-**Befund CR-DOC-001 (P2, behoben)**
-- Die Modul-Anweisungen nannten V027/V029 als letzte deploy-bereite Migration, obwohl zum damaligen Auditzeitpunkt V036 die Repository-Frontier war (V035 war laut Deployment-Status zuletzt deployed). Das konnte Agenten dazu verleiten, die falsche Migration zu erweitern und Deployment-/Seed-Anweisungen zu übernehmen. Die damalige Korrektur auf V036 ist inzwischen durch die aktuelle Repository-Frontier V038 (V037 Guest-Ownership, V036 Card-Testing) überholt; `AGENTS.md`/`backend/AGENTS.md` wurden entsprechend auf V038 mit V035 als zuletzt aufgezeichnetem Deployment-Stand und V039+ für neue Migrationen aktualisiert. Keine Produktionsmigration geändert.
-
-**Weitere verifizierte Dokumentationsbefunde (umgesetzt 2026-09-24; Dokumentations-only)**
-
-**Abgrenzung:** Für diese reine Dokumentations-Remediation werden keine
-neuen Test- oder Verifikationsaussagen erstellt. Die allgemeine
-Review-/Baseline-Tracking-Liste bleibt von den offenen Code-/Infra-Befunden
-getrennt.
-
-**Historischer Setup-Recovery-Verifikationslauf (2026-09-24, separater Verifikations-Subagent)**
-- `frontend/pnpm run test:run`: **PASS**, 84 Dateien / 759 Tests; `pnpm lint:fix`: **PASS** ohne tracked Änderungen; `pnpm build`: **PASS**; PHP-Syntax: **PASS** (556/556); `git diff --check`: **PASS**.
-- **Historischer Recovery-Lauf:** `backend/php artisan test`: **PASS nach Setup-Recovery**, 1.718 Warnungen / 7 passed / 4.936 Assertions, 66,49 s. Zuvor **FAIL**, 695 failed / 1.023 Warnungen / 7 passed (2.876 Assertions). Debugging-Analyse: Die ursprünglichen Logs zeigten `Connection refused` zu Meilisearch `127.0.0.1:7701` und Mailpit `127.0.0.1:1025`; nach lokaler CI-Image-/Fallback-Bereitstellung und Installation der fehlenden Host-Pakete `php8.5-gd` sowie ExifTool lief die Suite vollständig grün. Dies war ein Setup-/Umgebungsfehler, keine Code-Regression; die geänderte Umgebung ist nicht tracked und ist nicht der Status des aktuellen Checkouts.
-- **Aktueller Full-Suite-Lauf (2026-09-24, final):** Im GD/ExifTool-Image
-  `portal-base:8.5` (Registry `ghcr.io`, Namespace `reisi007` — **vor** der Migration
-  auf `reisinger-pictures`) mit frischem `TEST_TOKEN=finalcontract`, Meilisearch und
-  Mailpit im gemeinsamen Docker-Netz: **1.964 Tests / 6.241 Assertions, 0 Fehler**
-  (81,98 s). PHP-Syntax, gezieltes Pint und `git diff --check` sind ebenfalls grün.
-
-**Weitere verifizierte Dokumentations-/Infra-Befunde (009–016 Dokumentations-/Config-Konsistenz umgesetzt; 017–025 Dokumentations-only abgeschlossen)**
-**Provisorisches Code-Finding (unabhängige Verifikation abgeschlossen)**
-- **CR-CODE-001 (bestätigt als CR-BE-003):** Der Scratch-Probe wurde unabhängig bestätigt: Quote-Link signiert beliebige IDs und der Checkout/ZIP-Pfad kann ein privates Ziel ausliefern. Keine separate Implementierung; Remediation und Regression laufen unter CR-BE-003.
-- **CR-CODE-002 (P1, purchase-time decision implemented):** `InvoiceService` and the organization summary prefer the purchase-time `invoice_snapshots.customer_details.org_id`; current `users.org_id` membership is used only for legacy snapshots without the key, while present-but-invalid keys fail closed. The existing JSON snapshot column remains sufficient (no migration/V035 change). The per-model Eloquent `InvoiceSnapshot::updating` boundary rejects replacement/removal of a present key; raw Query Builder/DB-facade, bulk Eloquent, and event-disabled writes are explicitly trusted maintenance escape hatches, so this is **application-level**, not hard database-level, immutability.
-
-**Verifizierte Frontend-Befunde (READ-ONLY-Audit, Fix pending)**
-- **CR-FE-001 (P1, implemented/verified):** Quote-Token und validierte Cart-Persistenz werden über `CartProvider`/`cartLogic`版本iert gespeichert; CartProvider- und CartView-Regressionen decke Reload/Navigation, Token-Bindung und stale-token Übergänge ab. Full-Vitest grün.
-- **CR-FE-002 (P1, implemented/verified):** `ClientOrdersView` bietet ZIP nur für download-eligible Status an; Regression für `pending_payment` ist grün.
-- **CR-FE-003 (P1, implemented/verified):** Management-Order-Statusoptionen entsprechen dem Backend-Vertrag; ManagementOrdersView-Regressionen sind grün.
-- **CR-FE-004 (P1, implemented/verified):** Rating-Optimistic-State wird bei Fehlern zurückgerollt, Gast-Tastaturrating ist gesperrt und der Auth-Flow nutzt den vorgesehenen Root-Redirect;useGallery/Selection-Regressionen sind grün.
-- **CR-FE-005 (P2, implemented/verified):** Auth-Revalidierung überschreibt dirty Billing-/Consent-Felder nicht; CartView-Regressionen und Full-Vitest sind grün.
-- **CR-FE-006 (P2, implemented/verified):** `ProtectedRoute` normalizes trailing-slash management routes before rendering; direct `/galleries/` and `/admin-orders/` regression tests are green.
-- **CR-FE-007 (P2, implemented/verified):** Cart and mobile close controls use real links/buttons with accessible names; keyboard/ARIA regressions are green.
-- **CR-FE-008 (P2, implemented/partial):** `ModalDialogShell` now provides a named dialog, Escape/cancel handling and shared focus-trap behavior; broader legacy modal/nested-focus coverage remains partial.
-- **CR-FE-009 (P2, implemented/verified):** Checkout/login/notification controls expose programmatic labels/names and the notifications route is linked from the sidebar; semantic-locator regressions are green.
-- **CR-FE-010 (P2, implemented/verified):** Network helpers now preserve/assert response failures, rating flows check `response.ok()`, and cart persistence has a post-reload checkout regression.
-- **CR-TEST-002 (shared-worktree verification, final snapshot):** Backend `php artisan test` **1.964/1.964 (6.241 Assertions)**; Full-Vitest **109 Dateien/876 Tests**; `pnpm lint:fix`, `pnpm lint:e2e`, `pnpm check:i18n`, `pnpm build`, PHP-Syntax, Pint, `git diff --check` und der Lightroom-Static-Harness (`admin.lrplugin/tests/run.sh`) sind grün. Lua/Lightroom-Live-Runtime bleibt nicht verfügbar.
-- **CR-FE-011 (P1):** Access-cookie expiry prevents `/api/auth/refresh` because the refresh route is behind `auth:api`; idle sessions cannot recover. Separate refresh credential/handler and add PHPUnit/Playwright idle-session regression.
-- **CR-FE-012 (P1, implemented/verified):** Frontend gruppiert Mixed Carts nach effektivem `(mode, preset)` und summiert serverseitig konsistente Gruppen; Pricing-/Cart-Regressionen sind grün.
-- **CR-FE-013 (P1, implemented/verified):** Angezeigte Galerie-ID wird in PhotoDetail-/Management-Lizenz-UI durchgereicht; Komponenten- und Override-Regressionen sind grün.
-- **CR-FE-014 (P1, implemented/verified):** Coupon-UI/Preview/Cart-Totals nutzen den tatsächlichen Server-Pricing-Pfad; Mode-/Percentage-/Fixed-/100%-Regressionen sind grün.
-- **CR-FE-015 (P1, implemented/verified):** Stripe-/Coupon-Polling läuft über den zentralen Refresh/Retry-Pfad; 401→Refresh→Success-Regressionen sind grün.
-- **CR-FE-016 (P1, implemented/verified):** Contract sign/join token boundaries remount by token and guard stale async responses; mutable-token Vitest regressions are green.
-- **CR-FE-017 (P1, implemented/verified):** Customer/product/snippet/permissions modals retain entered state on rejected saves and expose loading protection; focused modal regressions are green.
-- **CR-FE-018 (P1, implemented/verified):** Project/board form transformations now send explicit nulls for cleared assignee/price/count fields; regression coverage is green.
-- **CR-FE-019 (P2):** Stripe loader failure silently disables payment with no retry/error/invoice fallback. Add loader-failure component and tagged checkout tests.
-- **CR-FE-020 (P2, implemented; E2E pending):** Search URL synchronization now has a same-route back/forward regression with a mounted-input marker; tagged execution remains blocked by the E2E harness.
-- **CR-FE-021 (P2, implemented/verified):** Create-user and license-catalog editors reset/version their drafts on reopen and SWR snapshot changes; rerender/reopen unit regressions are green.
-- **CR-FE-022 (P2, implemented/verified):** Brand primary/secondary colors are applied through `BrandRegistry` CSS variables and revalidated after settings writes; unit coverage is green and tagged reload coverage is present but blocked with E2E.
-- **CR-FE-023 (P2, implemented/partial):** Management/global menu openers now expose `aria-expanded`/`aria-controls` and unit coverage is green; the remaining gallery opt-in mobile-tag coverage is still open.
-- **CR-FE-024 (P2, implemented/partial):** Modal shell focus handling is centralized and covered by `ModalDialogShell` tests; nested GalleryModal/document-listener race coverage remains a follow-up.
-- **CR-FE-025 (P2, implemented/verified):** Login/auth E2E helpers use semantic role/name locators and accessible controls; lint/list checks pass, browser execution remains environment-blocked.
-- **CR-FE-026 (P1, implemented/verified):** `CartProvider` groups effective `(mode,preset)` pricing, excludes quote items from tiers, persists quote state and uses server-consistent totals; mixed-cart unit/pricing regressions are green.
-- **CR-FE-027 (P1, verifier caveat):** Separate access/refresh cookie names currently carry the same JWT value; if refresh credential independence is required, issue distinct signed tokens/claims and test rotation/replay. This needs an explicit auth-contract decision.
-- **CR-FE-028 (P1, implemented/verified):** Authenticated raw-fetch paths now use the centralized refresh/retry/error pipeline; external LM Studio remains an explicit provider boundary. Focused API/AI/upload regressions are green.
-- **CR-FE-029 (P2, implemented/verified):** `useAuth` now fetches/propagates `AuthMeUser` through SWR while retaining the broader `User` re-export only for non-auth consumers; type fixtures and tests are green.
-- **CR-FE-030 (P2, decision selected 2026-09-24):** Meta-gallery licensing must resolve per child/gallery group rather than the first child; implement grouped descriptors/UI totals and mixed-child Vitest plus tagged E2E coverage.
-- **CR-FE-031 (P2, implemented/verified):** Volume summaries count only non-quote items for tier thresholds and display totals; mixed quote/non-quote unit regressions are green.
-- **CR-FE-032 (P1, implemented/verified):** Logout clears protected SWR state without revalidation and `useAuth.isLoading` no longer remains true after user/error are absent; hook/UI regressions are green.
-- **CR-FE-033 (P2, implemented/verified):** The SWR auth fetcher is typed as `AuthMeUser`; fixtures and hook tests enforce the `/api/auth/me` contract.
-- **CR-FE-034 (P2, E2E policy):** `management-save-regression.spec.ts` mocks the internal customers CRUD endpoint despite the repository rule against internal-route mocks; move rejection coverage to component/integration tests or implement real backend setup.
-- **CR-FE-035 (P2, implemented/verified):** `pnpm lint:e2e` successfully parses the tagged E2E suite with the TypeScript-aware configuration.
-- **CR-FE-036 (P2, implemented; E2E pending):** Same-route back/forward search coverage with a mounted-input marker is present; execution is blocked by the E2E harness.
-- **CR-FE-037 (P2, implemented/verified):** License-catalog modifier editor has an active-edit SWR rerender regression; draft versioning prevents stale values.
-- **CR-FE-038 (P2, implemented; E2E pending):** Brand-settings E2E is serial, resets global settings, skips the mobile mutation and uses semantic locators; browser execution remains blocked.
-- **CR-FE-039 (P2, implemented/verified):** The shared-worktree `GalleryModal` reference race is resolved; repeated full Vitest runs are green (109 files/876 tests).
-- **CR-TEST-005 (P2, E2E fixture):** Quote cart E2E specs submit fake `mocked-photo-*` IDs, but current quote validation requires real photos; replace with API-created real fixtures before treating tagged E2E as evidence.
-- **CR-TEST-006 (P1, behoben):** `pnpm lint:fix`, `pnpm lint:e2e` und der Full-Vitest-Lauf sind grün; die previous Lingui/Coupon-Erwartungsfehler sind reconciled.
-- **CR-TEST-010 (P1, behoben):** Full-Vitest (109 Dateien/876 Tests) ist grün; Pricing-/Coupon-Erwartungen und Mixed-Cart-Totale sind konsistent.
-- **CR-TEST-011 (P2, i18n blocker, behoben):** `Rabatt` and registration-success messages are extracted/compiled; `check:i18n`, focused lint and build pass.
-- **CR-FE-041 (P2, adjacent i18n gap):** CartItemList still contains raw user-facing German strings for group image/tier summary and discount explanation that the Lingui guard cannot detect. Wrap/translate them and rerun catalog checks.
-- **CR-FE-042 (P1, implemented/verified):** `RatingStatusModal`, `useGallery`-Mutationen und Upload-/AI-Portalpfade nutzen den zentralen Refresh/Retry- und Response-Fehlerpfad; externe LM-Studio-Aufrufe bleiben als explizite Provider-Grenze ohne Portal-Cookie. Fokussierte 96 Vitest-Tests grün; Full-Vitest aktuell 109 Dateien/876 Tests grün.
-- **CR-FE-043 (P2, implemented/verified):** `AbortError` bleibt in `fetcher`/`apiMutate`/`apiUpload`/`apiDownload` erhalten und `ImageHelper` reicht `AbortSignal` bis zum Download durch; Abort-Regressionen sind grün.
-- **CR-FE-044 (P2, exact auth type):** `AuthMeUser` still marks several backend-guaranteed fields optional; decide whether the frontend contract should be an exact mirror and tighten fixtures/types.
-- **CR-FE-045 (P1, implemented/verified):** Central API retry paths now normalize network failures/callbacks and preserve AbortError; canceled callers stop before/after shared refresh. Quote/invite/org lookup effects have stale-response/abort guards; reset logout checks non-OK responses. Focused fetch/invite/cart/reset tests (96) and full Vitest (109/876) are green.
-- **CR-FE-046 (P1, implemented/verified):** LM Studio model discovery rejects non-2xx JSON responses, keeping external provider fallback fail-closed; signal-aware AI regressions are green.
-- **CR-MEDIA-001 (P1, implemented/verified):** Stale unwatermarked file-delivery/ZIP derivatives are deterministically rebuilt and provenance-checked; `MediaVerifierFollowUpsTest` is green.
-- **CR-MEDIA-002 (P1, implemented/verified):** Management tree, group show, settings and authorization paths enforce the complete gallery/group brand tree; focused parent-brand tests are green.
-- **CR-MEDIA-003 (P2, implemented/verified):** Parent-group brand mismatch coverage now includes invite/finish-rating, sitemap and legacy ZIP/selection boundaries; focused tests are green.
-- **CR-MEDIA-004 (P1, implemented/verified):** Selection stale ZIP, legacy order ZIP, quote-decode and watermarked-preview regressions are present and green.
-- **CR-MEDIA-005 (P2, implemented/verified):** `MediaVerifierFollowUpsTest.php`, `InviteRevocationTest.php`, and `PublicMediaBrandIsolationTest.php` are present in the staged change set; release hygiene is closed.
-- **CR-MEDIA-006 (P1, implemented/verified):** `MediaVisibilityService` reloads current photo/gallery/group state and filters generic ZIP/single delivery plus public gallery/search projections; hidden/inherited-hidden regressions pass (15 tests/79 assertions in the focused public-media suite) with no bytes or DownloadLog records.
-- **CR-MEDIA-007 (P1, implemented/verified):** `sendQuote()` atomically claims `pending -> cancelled` before mail; status-race and sequential duplicate regressions pass in `QuoteControllerSecurityTest` (10 tests/27 assertions), with queued-mail semantics asserted correctly.
-- **CR-MEDIA-008 (P1, implemented/verified):** PhotoDownload/FileDelivery reauthorize current order, ownership, brand tree, expiry, access, entitlement and photo state after derivative preparation and immediately before ZIP/single/direct bytes. Late refund/dispute/access-revocation regressions cover ZIP, single and direct media.
-- **CR-MEDIA-009 (P2, implemented/verified):** Late single-download failures remove prepared `base_scale_*` and `dl_*.jpg` derivatives without deleting the persistent source; `MediaLateAuthorizationTest` asserts no temp residue, response bytes or successful log.
-- **CR-BE-020 (P2, implemented/verified):** Explizite `null`-Photo-Job-Counts werden auf Request- und Modellebene abgewiesen; Store/Update/Move/Handoff/Cleanup-Regressionen sind grün.
-- **CR-TEST-003 (P2, coverage gap):** No real idle-session Playwright test expires the access cookie while retaining the refresh cookie; add a tagged browser regression when the local stack is available.
-- **CR-TEST-004 (P2, environment/setup blocker):** Drei tagged-Smoke-Versuche wurden nach dem Frontend-Fix durchgeführt: (1) Host `pnpm test:e2e:smoke` — Chromium fehlt und `::1:4321` ist nicht erreichbar; (2) `portal-e2e`-Image mit pnpm — Modulinstallation brach wegen No-TTY/Store-Mismatch ab; (3) Browser-Image mit direktem Vite/Playwright und konfigurierbarem Mailpit — 2 passed, 10 failed, 50 did-not-run, 1 Setup-Error. Die Admin-Login-Hilfe schlug im frisch geseedeten E2E-Backend weiterhin mit `Ungültige Zugangsdaten` fehl; ein direkter Curl-Login war zwischenzeitlich 200, die Testdaten wurden während des Laufs inkonsistent. Nach drei Versuchen gemäß E2E-Regel keine weitere Retry-Schleife; tagged Smoke in CI mit dem offiziellen `scripts/e2e-up.sh`/Compose-Harness wiederholen.
-
-**Verifizierte Backend-Security-Befunde (READ-ONLY-Audit, Fix pending)**
-- **CR-BE-001 (P1, implemented; verified):** V037 guest ownership and centralized actor scoping are implemented and independently verified: 229 focused tests / 948 assertions plus the corrected real-photo ZIP regression (8/45) passed, V036 untouched, no backfill/sentinel, legacy rows inaccessible, guests denied model/account access and unsupported checkout fails closed. Pint for the new regression passes; remaining baseline style/test blockers are tracked separately.
-- **Migrationsentscheidung (2026-09-24; aktualisiert nach V038-Fortschritt):** V035 ist der zuletzt aufgezeichnete deployte Stand; V036 bleibt die Card-Testing-Migration, V037 die Gast-Ownership-Migration und V038 die aktuelle Repository-Frontier. Neue Änderungen müssen als separate V039+-Migrationen erfolgen; bestehende Migrationen werden nicht nachträglich geändert.
-- **CR-BE-002 (P1, implemented/verified):** Repeated unauthenticated contract joins now fail closed with no personal_token/name/role disclosure; focused contract tests and independent verification pass.
-- **CR-BE-003 (P1, implemented/verified):** Quote issuance, brand/existence/access checks, exact token/item binding, server price, revoked-access rejection and settled order ZIP reauthorization (including hidden/expiry/private access) are implemented. Focused quote/order fulfillment tests pass; public-media and generic delivery visibility are covered under CR-MEDIA-006.
-- **CR-TEST-001 (behoben):** `resolveQuoteToken()` is defined, legacy fake-ID fixtures were replaced, and focused quote tests pass; the independent quote verifier found only the fulfillment gap above.
-- **CR-BE-004 (P1, implemented/verified):** Fresh missing/invalid watermark assets fail closed, provenance markers reject stale derivatives, and file/ZIP/parent-brand follow-up regressions pass in the GD/ExifTool container.
-- **CR-BE-005 (P2, implemented/verified):** Contract personal-token paths enforce status/expires_at/closes_at consistently with DB-time predicates; the `page-exit` route is telemetry-only and parent legacy deadline behaviors pass focused tests.
-- **CR-BE-006 (P2, implemented/verified):** Foreign-brand registration rolls back inserted user/reset state; auth/me contract also passes independently.
-- **CR-BE-007 (P1, implemented/verified for audited surfaces):** Public media/download/context/rating, dual-role upload and JWT host binding enforce current brand/reserved-null rules; two-brand/null-brand regressions are green. A second brand still requires deployment-level live verification.
-- **CR-BE-008 (P1, implemented/verified):** `ContractCloseService` resolves billing users only within the contract brand; foreign/brandless users leave the generated order unowned, while order/invoice brand and ownership remain scoped. `ContractCloseTest`: 4 tests/56 assertions.
-- **CR-BE-009 (P2, implemented/verified):** Org controller/invite and project/photo-job relationship paths enforce brand/access scope; 49 focused org/board relationship tests (114 assertions) are green.
-- **CR-BE-010 (P2, review integrity):** Existing P0-B7 contract-token and P0-A13 watermark entries are not actually fixed; prior “FIXED & VERIFIED” labels and the unsafe existing test must be corrected rather than treated as closed.
-- **CR-BE-011 (P1, implemented/verified):** Reserved-null trust boundaries now fail closed for role-only promotion, existing null-brand non-super-admins, login/reset/refresh, management/gallery authorization and brandless org invites; transient guests retain only active current-host invite access. `ReservedNullBrandTrustBoundaryTest`: 9 tests/25 assertions.
-- **CR-BE-012 (P2, implemented/verified):** `OrgController::show` and all write/sync/invoice guards reject brandless organizations for brand-bound actors; focused org suites are green.
-- **CR-BE-015 (P1, implemented/verified):** Role-only promotion to `super_admin` normalizes an existing brand to null atomically; trust-boundary regression is green.
-- **CR-BE-021 (P1, implemented/verified):** `ImageProcessor::isSafeWatermarkedOutput()` requires watermark provenance/effective derivative proof; stale re-encoded cache regression and file/ZIP rebuild tests are green.
-- **CR-BE-022 (P1, implemented/verified):** Parent/group brand validation is centralized across media/download/rating/management paths; current-brand-under-foreign/null-parent regressions are green.
-- **CR-BE-023 (P1, implemented/verified):** `MailController` invite/rating paths enforce host/resource brand before side effects; focused regressions are green.
-- **CR-CRM-010 (P1, implemented/verified):** Selection no-public/no-original rules are enforced through checkout, quote validation, ZIP delivery, flat-rate media and sitemap; focused selection regressions are green.
-- **CR-TEST-012 (P2, implemented/static-verified 2026-09-24):** `scripts/wait-for-meilisearch.sh` now enforces validated total/request/retry bounds and caps curl/sleep to the remaining deadline; `scripts/e2e-up.sh`, backend PHPUnit CI and E2E CI invoke it before Scout access. `E2ELocationFixturePolicyTest` protects the local/CI ordering and bound contract; Bash syntax, the CI security contract, `git diff --check` and a fake-curl cold-start harness (retry, request cap, 1s deadline, invalid-config fail-closed) pass. No local Playwright run was performed; the live service-container replay remains CI-owned.
-- **CR-TEST-008 (P2, V037 DoD, behoben):** `GuestOrderIsolationTest.php` import/FQCN Pint violations were corrected; targeted Pint, syntax and `php artisan test --filter GuestOrderIsolationTest` pass.
-- **CR-TEST-009 (P1, V037 follow-up, behoben):** Der Gast-ZIP-404 wurde reproduziert und auf eine ungültige Test-Fixture mit synthetischer, nicht persistierter Photo-ID zurückgeführt; Ownership/Brand/Snapshot waren korrekt. Testfixture auf reales `rp`-Gallery/Photo/Sample-Image umgestellt, Cross-Guest-Denial auf null Download-Logs verschärft; `GuestOrderIsolationTest` nun 8 Tests/45 Assertions und verwandte ZIP-Suites 27/83 grün, Pint/Syntax/Diff grün.
-- **CR-BE-016 (P1, implemented/verified):** Existing/otherwise-created `brand = null` non-Super-Admins are rejected by shared authorization/login/reset/refresh boundaries; guest invite semantics remain scoped.
-- **CR-BE-017 (P1, implemented/verified):** Brandless organization invite redemption is rejected without creating a null-brand non-Super-Admin; regression is green.
-- **CR-BE-018 (P1, contract verifier follow-up, partial):** Direct and template join paths now share one stable normalized-email lock identity, lock the scope row, and keep duplicate check/insert plus instance creation in one transaction. The sequential transaction regression proves a mixed-case retry cannot create a second signer/instance, but this is not a single SQL conditional INSERT or a real multi-connection race; keep open pending a durable DB strategy.
-- **CR-BE-019 (P1, contract verifier follow-up, implemented):** Parent legacy deadlines use the earlier effective deadline; the `page-exit` route is explicitly telemetry-only (valid personal token, no contract data/signature mutation, accepted after closure), with audit action `page_exit`. Focused contract tests pass.
-- **CR-DATA-018 (P1, contract verifier follow-up, open):** The current V021 schema has no normalized-email column or durable unique `(contract_id/template, normalized email)` constraint. Application cache/row locks and `LOWER(TRIM(email))` protect supported writers, and the real sequential/transaction regression covers normalized duplicates, but bypass writers or a different cache domain can still insert duplicates. A separate migration decision (backfill, legacy cleanup, normalized column, unique index) remains required; no migration is added here and this finding is not closed.
-- [~] wartet auf einen echten Multi-Connection-Race. Die Testumgebung ist SQLite `:memory:` und kann ihn prinzipiell nicht liefern. **Contract-join verification TODO:** Run a real multi-connection race and make the separate normalized-email/legacy-cleanup/unique-index decision before closing the remaining findings. The current SQLite `:memory:` environment cannot provide that race.
-- **Contract suite environment note (2026-09-24):** An earlier broader contract run reached 75 warnings but two unrelated `ContractCloseTest` cases failed because the configured Mailpit SMTP endpoint `127.0.0.1:1025` refused connections; the join/template/availability tests pass independently. No mail or rating/V036/V037/V038 files were changed for this task.
-- **CI-36024267904 / Contract join (P1, root cause fixed; focused verification):** The initial UI contract-creation test passed, and management create/open requests using the same `E2ESessionHelper` cookie passed; the failing public payloads contained valid names, emails, and `Model`/`Fotograf` roles. A MariaDB 11.4 API reproduction returned `500` before join validation/persistence with `SQLSTATE[42000] ... syntax error ... near 'current_time'` from `Contract::databaseNow()`. `CURRENT_TIME` is a reserved MariaDB word used as an unquoted result alias. The fix uses the portable alias `contract_database_now`; no auth-cookie or E2E harness correction is warranted. `ContractAvailabilityTest::test_database_clock_read_uses_a_mariadb_safe_alias` is the focused regression; the existing direct/template join regressions remain green (47 tests, 156 assertions), and a disposable MariaDB API check now returns `201` for join and `410` for the expired-template check. No Playwright retry was run after the three-attempt limit; the existing contract-uniqueness changes remain untouched, and no migration was changed for this fix.
-
-**Verifizierte Infrastruktur-/Plugin-Befunde (READ-ONLY-Audit, Fix pending)**
-- **CR-INF-001 (P0/P1; implemented/verified):** `sync.sh`/`rclone-backend-filter.txt` protect private storage and Stripe secrets, propagate failures, and real/fake rclone regressions verify ordinary sync plus private/root-SQLite preservation.
-- **CR-INF-002 (P1, implemented/verified):** Production `db:seed` preserves existing settings via `insertOrIgnore`; custom-value regression passes.
-- **CR-INF-003 (P1; historischer Befund, Verifikation offen)** Ein fehlendes `ADMIN_PASSWORD` fiel zuvor auf `admin` zurück, und `admin:update` rotierte ein bestehendes Passwort nicht. Die aktuelle Config/Seeder/Command-Kette ist env-only, fail-closed und rotiert das konfigurierte Passwort; ein aktueller Deployment-Nachweis bleibt offen.
-- **CR-INF-005 (P2):** Empty gallery expiry in `GalleryDialog.lua` is omitted and cannot clear an existing backend expiry; distinguish omitted vs explicit null.
-- **CR-INF-006 (P2):** `/api/auth/me` omits `can_edit_metadata` and saved billing fields required by frontend prefill/permissions; add backend contract and frontend regression tests.
-- **CR-INF-007 (P2; historischer Befund, Verifikation offen)** Frisch geseedete Gallery-Gruppen hatten zuvor `brand = NULL`. Der aktuelle `DatabaseSeeder` setzt die aufgelöste Brand und repariert Legacy-NULL-Gruppen; ein aktueller Fresh-Seed-/Tree-Nachweis bleibt offen.
-- **CR-INF-008 (P2; historischer Befund, Verifikation offen)** Der Location-Import lief zuvor synchron im Seed-Gate und zusätzlich als Hintergrundcommand. Das aktuelle Working Tree ruft `app:import-locations` nicht im Backend-Boot auf; `routes/console.php` plant ihn wöchentlich, mit Lock und transaktionalem Refresh. Live-Scheduler-/Failure-Isolation-Nachweis bleibt offen.
-- **CR-INF-009 (P2; historischer Befund, Verifikation offen)** Ein leeres `PHOTO_STORAGE_PATH` konnte zuvor den Filesystem-Default überschreiben. Der aktuelle Compose-Guard verlangt einen nicht leeren absoluten Pfad und prüft das Mount-Ownership; der Deployment-Nachweis bleibt offen.
-- **CR-INF-012 (P2; historischer Befund, Verifikation offen)** Privileged CLI-/Queue-/Scheduler-Container liefen zuvor als root mit schreibbaren Bind-Mounts. Das aktuelle Working Tree setzt `USER www-data`/UID:GID `1000:1000` und prüft Ownership; der Live-Runtime-Nachweis bleibt offen.
-- **CR-INF-013 (P2; historischer Befund, Verifikation offen)** CI-/Runtime-Images und Actions verwendeten zuvor mutable Tags. Das aktuelle Working Tree enthält Digest-/SHA-Pins; ein aktueller Supply-Chain-Policy-Check bleibt offen.
-- **CR-INF-014 (P2, implemented/verified):** Root and nested SQLite exclusions are ordered before catch-all; real/fake rclone tests verify root files are neither uploaded nor deleted and private storage remains protected.
-- **CR-INF-015 (P1, implemented/verified):** Fresh E2E databases load the checked-in `backend/database/fixtures/e2e-locations.json` through explicit `E2ELocationSeeder`; CI and `scripts/e2e-up.sh` flush/sync/import the Location Scout index afterward. `DatabaseSeeder` remains network-free, production startup contains no location import, and weekly lock/scheduler behavior remains. Focused/live disposable Meilisearch tests, policy checks and scripts pass.
-- **CR-INF-016 (P2, implemented/verified):** Direct Laravel config rejects empty/relative `PHOTO_STORAGE_PATH`; the runtime policy test checks the pinned container's stdout/stderr behavior and passes (6 tests/107 assertions). Local-template portability is covered under CR-INF-020.
-- **CR-INF-017 (P1 release follow-up, open):** Pinned GHCR `portal-base`/`portal-e2e` images are stale and still run as root/UID 33 despite source Dockerfiles using UID 1000; rebuild/re-publish and update digests after verifying image metadata.
-- **CR-INF-018 (P2, source-fixed/release-partial):** Local/test Compose images and E2E Dockerfile Node download are digest/version/checksum pinned and policy-covered, but the published GHCR digests are stale and the frontend CI setup-node job still uses mutable `node-version: 26`. Rebuild/update images and pin that job before closure.
-- **CR-INF-019 (P2 release hygiene, implemented/verified):** The previously deferred hardening/regression paths are included in the final staged change set; the final review must verify the complete `git diff --cached --name-status` before push.
-**Verifizierte Backend-Datenintegritäts-Befunde (READ-ONLY-Audit, Fix pending)**
-- **CR-DATA-001 (P1, implemented/verified):** Coupon group scope now uses `galleries.gallery_group_id` and recursively expands assigned parent/child groups consistently with AuthorizationService; 66 coupon tests/166 assertions, nested/direct/brand checks, targeted Pint/syntax/diff pass.
-- **CR-DATA-002 (P1, implemented/verified):** `ImageController` replacement closure now captures `$originalName`; the null-title/wrong-replacement regression is green in `ImageUploadTest`.
-- **CR-DATA-003 (P1, implemented/verified):** FTP import reads/writes/processes before source cleanup, checks storage/processing failures and removes the inbox file only after DB success; `FtpImportTest` is green.
-- **CR-DATA-004 (P1, implemented/verified):** Payout attribution uses actual bounded photo IDs and handles mixed galleries/photographers; `PayoutCalculationServiceTest` plus order fulfillment are green.
-- **CR-DATA-005 (P1, application-locked/DB invariant open):** Cache/row locks make known repeated/concurrent join/sign writers produce one signer/instance/audit transition, but no durable normalized-email unique constraint or real multi-connection race regression exists; see CR-DATA-018.
-- **CR-DATA-006 (P1, implemented/verified):** Gemeinsamer `ModelPhotoPrimaryService`-Pfad deckt Admin-/Owner-Promotion, Registrierungs-Resubmission, Cleanup und Löschabbruch mit Lock/Transaktion ab. Unabhängige Verifikation: 11/11 Primary-Tests (57 Assertions), 42/42 Owner-Suites, 8/8 Cleanup-Tests; targeted Pint/syntax/diff grün. SQLite-Sequenztests und 30-s-Cache-Lease bleiben als Anwendungs-/Race-Limit dokumentiert.
-- **CR-DATA-007 (P1, implemented/verified):** `GalleryService::updateGroup` synchronizes `org_id` only when supplied, preserving omitted assignments and clearing explicit null; `GalleryServiceTest` is green.
-- **CR-DATA-008 (P1, implemented/verified):** Metadata revert records the pre-revert state and acting user in `PhotoMetadataVersion`; `PhotoMetadataTest` is green.
-- **CR-DATA-009 (P1, implemented/verified):** Public rating mutation enforces current host/brand tree before any rating write; two-brand/null-brand no-mutation regressions are green.
-- **CR-DATA-010 (P2, implemented/verified V038):** Gast-Bewertungen besitzen nun den portablen `actor_key` mit DB-Unique-Invariante, Upsert-Lock und Retry; V038 ist die separate autorisierte Migration (V036/V037 unverändert). `RatingUniquenessTest` deckt Schema/Ownerless-Legacy, deterministische Legacy-Normalisierung, Gast-Deduplizierung und User/Guest-Isolation ab (4 Tests/25 Assertions, `SCOUT_DRIVER=null`); SQLite `migrate:fresh --seed`, V038-`up()`-Idempotenz, Pint, Syntax und Diff-Check sind grün. MariaDB 11.4 bestätigt nullable-Unique-Semantik und V038-Rerun/Deduplizierung; der vollständige MariaDB-Migrationslauf bleibt durch den bestehenden V037-Check-Constraint-Fehler (`user_id` in CHECK, Error 1901) blockiert, ohne V037 zu ändern.
-- **CR-DATA-011 (P2, implemented/verified):** Order/single/gallery ZIP audit records persist bounded actual `photo_ids`/`gallery_ids` (and order linkage where applicable); `OrderDownloadFulfillmentTest` passes.
-- **CR-DATA-012 (P2, implemented/verified):** `CleanupDerivatives` verifies adapter deletion and reports failure/nonzero exit when a derivative remains; `StorageCommandsTest` is green.
-- **CR-DATA-013 (P2, implemented/verified):** Board-Mutationen verwenden Brand-/Owner-sichtbare Cache- und DB-Locks, dichte Reindexierung und owner-scoped Cleanup; 124 Board-Tests/463 Assertions sind grün. Cleanup reindexiert exakt gelöschte Owner/Status-Paare (inkl. Null-Brand); direkte SQL-Writers/echte Multi-Process-Race bleiben als Anwendungsgrenze dokumentiert.
-- **CR-DATA-014 (P1, implemented/verified):** Recursive descendant-group coupon scope is fixed and independently verified (parent→child regression, 66 coupon tests/166 assertions, nested/direct/brand checks, targeted Pint/syntax/diff).
-- **CR-DATA-015 (P1, implemented/verified):** Real single/gallery/order ZIP logs now persist bounded actual photo IDs; `PayoutCalculationServiceTest` and order fulfillment suite pass (42 tests/109 assertions combined), including multi-photographer attribution.
-- **CR-DATA-016 (P2, implemented/verified):** `GalleryService::updateGroup` distinguishes omitted/null `org_id`, and `GalleryGroupModal` forwards `extraOpts`/prefills from `orgs`; focused modal/data-contract regressions are green.
-- **CR-DATA-017 (P2, implemented/verified):** Mixed-gallery order logs carry bounded actual photo/gallery ID payloads and payout attribution; mixed-order regression is green in the 42-test/109-assertion focused fulfillment/payout run.
-- **CR-DATA-019 (P2, implemented/verified):** `GalleryGroupResource` serializes minimal loaded `orgs` (`id`,`name`) and management queries eager-load the relation; `GalleryGroupDataContractTest` passes without exposing domain/brand.
-
-**Verifizierte Checkout-/Payment-Befunde (READ-ONLY-Audit; Status inline)**
-- **CR-PAY-001 (P1, implemented/verified):** Generic coupon CRUD autorisiert effektive Gallery-/Group-Scopes; No-Write-403-Tests decken Foreign/Assigned/Update ab.
-- **CR-PAY-002 (P1, implemented/verified 2026-09-24):** Volume pricing now persists the supported `original` entitlement tier; the focused original-resolution order-ZIP regression passes.
-- **CR-PAY-003 (P1, implemented/verified 2026-09-24):** Effective gallery mode wins over the injected brand-default strategy; explicit `scope_licensing` remains scope-priced and does not consume coupons.
-- **CR-PAY-004 (P1, implemented/verified):** `used_count` ist clientseitig unveränderlich; Max-Use-/Delete-Guard-Regressionen sind grün.
-- **CR-PAY-005 (P1, implemented/verified 2026-09-24):** Mixed volume groups are priced first, scoped validation considers all non-quote volume items, and one coupon is applied once to the combined effective volume subtotal. Fixed, percentage-with-`max_items`, percentage-without-max, scoped-second-gallery, photo-package and mixed scope/volume regressions are green; coupon `max_items`/`photo_package` use effective qualifying-tier prices while invoice lines retain base prices plus the tier breakdown.
-- **CR-PAY-006 (P1, implemented/verified):** Manuelle Order-Statuswechsel löschen Owner/Photo/Tier-Purchase-Caches; Regression und bestehende OrderController-Suite (15/29) sind grün.
-- Verification: `PaymentPricingRegressionTest` **11/11 (53 assertions)**; focused pricing/checkout/coupon run including `PaymentFindingsRegressionTest` **141/141 (374 assertions)**; targeted Pint, PHP syntax, and diff checks pass. No migration files were changed. The broader checkout run remains environment/shared-worktree dependent (Mailpit/Meilisearch and the concurrent brand-isolation changes), so no full-suite green claim is made here.
-- **CR-PAY-007 (P2, implemented/verified):** Cart pricing groups carry the effective custom preset/tier and server-consistent item prices; component/cart regressions are green.
-- **CR-PAY-008 (P2, implemented/verified):** Coupon UI uses the current server-priced cart discount (with an explicit legacy fallback only when no server amount exists); `CouponInput` regression is green.
-- **CR-PAY-009 (P2, implemented/verified):** Zero-value invoice orders are conditionally settled to `paid`; delivery-note flow remains unchanged; regression is grün.
-- **CR-PAY-010 (P1/P2, decision selected 2026-09-24):** Non-immediate checkout paths (Invoice/Free/Quote) must fully honor browser `Idempotency-Key`; implement server-side request claims/idempotent responses and PHPUnit regressions for duplicate success, replay-after-failure and terminal-order conflicts. Immediate Stripe idempotency remains covered.
-- **CR-PAY-011 (P1, implemented/verified):** Signed dispute/refund events use row-locked conditional terminal transitions; refunded/pending/cancelled states cannot regress, disputed→refunded remains allowed, and signed webhook regressions are grün.
-- **CR-PAY-013/CR-CODE-002 (P1, implemented; focused backend verification 2026-09-25):** Collective invoice selection, the organization summary count, and generated collective snapshots use purchase-time organization attribution; current membership remains only the explicit legacy fallback. Candidate selection loads snapshot-bearing delivery notes and filters in PHP, so malformed JSON is excluded without SQLite JSON extraction. `PurchaseTimeOrganizationInvoiceTest` passes **13 cases / 53 assertions** (including Eloquent replacement/removal rejection and malformed JSON after reassignment/non-membership); `CollectiveInvoiceOrganizationAttributionTest` passes **4 cases / 24 assertions**. `OrgControllerTest` passes **10 / 18**; the non-mail `OrgOrganizationCoreTest` subset passes **10 / 19**, while its one user-creation mail path is Mailpit-blocked; the non-mail `InvoiceServiceTest` subset passes **4 / 21** with `MAIL_MAILER=array`. The full `InvoiceServiceTest` is environment-blocked only by Mailpit SMTP `127.0.0.1:1025` (8 transport failures); PHP syntax, Pint, and `git diff --check` pass. No migration was added and V035 remains untouched. Boundary: per-model Eloquent events protect supported `customer_details` writes; raw Query Builder/DB-facade, bulk Eloquent, and event-disabled maintenance writes remain documented bypasses, not a hard database immutability claim.
-- **InvoiceServiceTest failure analysis (2026-09-25):** The exact full file reports 8 failures, all with the same `TransportException` at `InvoiceService.php:149` because the synchronous queue attempts SMTP at `127.0.0.1:1025`; the logs show connection refused before any mail assertion. Replacing only the mail transport with `MAIL_MAILER=array` and selecting the four non-mail cases yields 4/21 green, so the candidate/archiving logic is not the failure source. Host Mailpit remains an environment-only limitation; no mail-path workaround was added to this change.
-- **CR-PAY-014 (P2, follow-up):** `PurchaseService` intentionally keeps legacy purchase-cache writes/invalidation for compatibility but no longer trusts positive cache values for final authorization; remove the write-only cache in a separate cleanup if no external consumer remains.
-
-**Verifizierte CRM-/Model-Flow-Befunde (READ-ONLY-Audit, Fix pending)**
-- **CR-CRM-001 (P1, implemented/verified):** Invite revocation clears transient claims/blacklists across registered-user refresh/redeem paths; `InviteRevocationTest` and related auth tests are green.
-- **CR-CRM-002 (P1, implemented/verified):** Selection galleries are forced non-public/non-free at create/update/model boundaries; inherited-group and delivery-boundary regressions are green.
-- **CR-CRM-003 (P2, implemented/verified):** Model email updates synchronize canonical `customers.email` and encrypted profile snapshot; owner/admin/rollback regressions are green.
-- **CR-CRM-004 (P2, implemented/verified):** Hard erase/expiry removes linked and customerless memberless-act registration invites in the same transaction; regression is green.
-- **CR-CRM-005 (P1, implemented/verified):** Public media/download/context/rating, invite and contract-closure brand boundaries have two-brand/null-brand regressions; purchase-time organization attribution remains the separate CR-PAY-013 product decision.
-- **CR-CRM-006 (P1, implemented/verified):** Scout indexing/removal is deferred until commit; rollback and post-save failure regressions are green.
-- **CR-CRM-007 (P1, implemented/verified):** File manifests are captured at the locked delete boundary and cleanup is queued after commit; authoritative-path regression is green.
-- **CR-CRM-008 (P1, decision selected 2026-09-24; implementation in progress):** File/Scout cleanup must remain retryable even when dispatch itself fails; use existing jobs/tables first and add durable dispatch/outbox fallback tests. A V039+ migration is only permissible if a schema gap is proven.
-- **CR-CRM-009 (P2, implemented/verified):** Independent customerless memberless-act invite cleanup regression is green.
-
----
-
+- [~] wartet auf die zwei verbleibenden Betriebsnachweise — die **Secret-Rotation** von `AI_API_KEY` und `ADMIN_PASSWORD` (das Wertepaar stand beim Auslesen der aufgelösten Compose-Datei im Klartext im Terminal) und die **Plugin-Live-Runtime**. Erledigt und aus dieser Position entfernt: GHCR-Pullability (beide Pakete `public`), die Deployment-Nachweise (acht Deploys mit Live-Messungen), die Storage-Nachweise (`storage/app/private` unversehrt) und der Scheduler-Nachweis (live am 2026-10-21: PID-Dateien, Mutex-Slot, Wochenimport; siehe `features/infrastructure/29-production-operations-runbook.md` §5).
+- [~] wartet nur noch auf die **betrieblichen** Live-GO-Punkte — die Radar-/3DS-/Webhook-/Privacy-Checkliste
+  (Stripe-Dashboard, `features/security/card-testing-protection.md`) und den **Test der Monitoring-Alarme**
+  (in `features/security/card-testing-runbook.md` §1–§3 beschrieben, aber nie ausgelöst).
+  **Erledigt und nicht mehr Teil dieser Position:** der Contract-/Card-Testing-Review (14 Befunde SEC-01…SEC-14,
+  `features/security/2026-10-18-review-closure.md`), das Monitoring-Runbook (§1–§3), der Rollback-Ablauf ohne
+  Datenverlust (§6, 2026-10-21) und die unabhängige Verifikation der Card-Testing-Implementierung (eigene
+  Position unten).
+- [~] wartet nur noch auf die **Operations-Evidenz** (die Mail-Zustellung, siehe die Position zum Queue-/Mail-/Worker-/Scheduler-Nachweis) — die Code-Subblöcke R1–R7 sind verifiziert geschlossen, und die **Product Decisions** sind entschieden (D-17 „Duplicate mail and prompt-injection policies“ in `features/owner-decisions.md`, umgesetzt in `98766c14`). Die im alten Text genannten aktiven Bugs sind heute durch Tests abgedeckt: Session-Header-Validierung (`AISessionHeaderDeploymentPolicyTest`), Bild-Budget (`ModelContactSheetTest`, `ModelContactSheetBulkTest`), Cleanup-Dauerhaftigkeit (`GalleryPhotoCleanupDurabilityTest`, `CleanupGalleriesFailureTest`), Temp-Löschung (`AiTempFileSweepAgreementTest`, `WatermarkMarkerCleanupTest`), Mail-Verlust bei Quotes (`WebhookInvoiceMailAtomicDedupeTest`, `WebhookReplayMailTest`), fehlerhafte Provider-Antwort (`StripeWebhookTest`, `WebhookNullPiTest`), Reihenfolge beim manuellen Löschen (`ManualInvoiceNumberValidationTest`, `GalleryUpdateDeleteTest`).
+- [~] wartet auf den **echten Multi-Connection-Race** gegen MariaDB — die Unique-Index-Entscheidung ist gefallen und umgesetzt (`backend/database/migrations/V039__enforce_contract_signer_identity.php`, Commit `1e86e9c1`: `normalized_email` + `join_scope_key`, ein Preflight, der bei Duplikaten abbricht statt zu löschen, Unique-Index `contract_signers_scope_normalized_email_unique`). Offen bleibt der Lauf: `backend/tests/Feature/Contract/ContractSignerIdentityRaceTest.php:26,30` und `backend/tests/Feature/Contract/ContractSignerIdentityTest.php:217,223` sind driver-gegatet (SQLite `:memory:` kann keine unabhängigen Writer-Verbindungen liefern, `pcntl_fork` fehlt), und `backend/phpunit.xml:39-40` pinnt SQLite → der Lauf findet in CI **nie** statt. Nötig: ein MariaDB-Lauf (CI-Job mit `mariadb:11.4` oder ein `composer test:mariadb`) — siehe die Position zum MySQL-/MariaDB-Testlauf (TST-3).
 ## Model-Registrierung (Magic-Link) + Profile-Iteration (2026-09-18/19 deployiert) — OFFENE Restarbeiten
 
 > Plan: `~/.opencode/plan/model-registrierung.md` · SOLL: `features/crm/05-model-registration.md` + `features/crm/06-model-profile-iteration.md`.
@@ -1410,27 +934,6 @@ getrennt.
 > beitreten und bekommt den Token inline. Das war nie der gemeldete Befund, und es ist
 > dokumentiert entschieden, nicht übersehen.
 
-### P1 — AI / Mail / Jobs / Console — 🟡 OFFENE FOLLOW-UPS (Live-Nachweis + Policy-Entscheidung)
-
-- [~] wartet auf den Live-Scheduler-/Importnachweis; der Code ist verifiziert. **P1-A5 (MEDIUM; historischer Befund, Verifikation offen)** `import-locations` lief im früheren Boot-Flow über HTTP mit `truncate()`. Im aktuellen Working Tree ruft `deployment/docker-compose.yml` den Import beim Boot nicht mehr auf; `routes/console.php` plant ihn wöchentlich und der Command nutzt einen Lock/transactionalen Refresh. Live-Scheduler-/Importnachweis bleibt offen.
-
-### P1 — Modelle / Services / Data-Integrity — ✅ überwiegend FIXED (M3/M12 teilw.)
-
-> **Wichtiger Kontext:** `Brand`-Enum enthält aktuell nur `rp` (SRP in V025/V031 entfernt) → viele Brand-Isolation-Lücken (P0-A*) sind **latent**, nicht live ausnutzbar. Sie werden dennoch gefixt, weil ein zweiter Brand sie sofort scharf macht.
-
-### 🟡 Verifikationsstand (historischer Snapshot 2026-09-12; aktueller Audit 2026-09-24)
-
-- [~] wartet auf einen vollständigen Backend-Lauf für den aktuellen Working Tree (Meilisearch, Mailpit, `.env`). **Gesamt-Baseline:** Der historische Frontend-/PHP-Syntax-/Diff-Check wurde
-  als Setup-Recovery-Datensatz dokumentiert; der aktuelle Checkout hat weitere
-  uncommitted Änderungen. Ein vollständiger Backend-Lauf für den aktuellen
-  Working Tree ist in diesem Docs-only-Pass nicht als grün zu behaupten; der
-  lokale historische Lauf blieb wegen fehlender Meilisearch-/Mailpit-Services
-  und `.env` umgebungsbedingt rot. Der separate Recovery-Verlauf oben bleibt
-  historisch.
-
----
-
-
 ## 🚫 Blockiert — Dependency-Migration TypeScript 6→7
 
 - [~] wartet auf TypeScript-7-Support im Tooling. **Nachzuziehen, sobald das Tooling
@@ -1476,36 +979,12 @@ alle mit Regressionstest:
   nutzt **firewalld**, nicht `ufw`.
 - [ ] manuell prüfen: `AI_API_KEY` und `ADMIN_PASSWORD` im Portal-/Host-Secret-Store rotieren — beide sind beim Auslesen der aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen. **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen
   der aufgelösten Compose-Datei im Klartext durch das Terminal gelaufen.
-- [~] wartet auf einen authentifizierten Aufruf. **Die bisher angegebene Ursache ist
-  ausgeschlossen.** Die Gegenprobe aus diesem Eintrag wurde am 2026-09-28 ausgeführt:
-  `docker exec portal_backend php artisan migrate:status` → **45 `Ran`, 0 `Pending`**,
-  `V041__add_ftp_account_status_to_users.php` ist also gelaufen und die Spalte
-  `ftp_account_status` existiert in Produktion. Der beschriebene Mechanismus — ein
-  Feldzugriff auf eine fehlende Spalte in `FtpController::status()` (Z. 91) — kann damit
-  nicht mehr greifen.
-  **Was offen bleibt:** ein authentifizierter `GET /api/management/ftp/status` ist nie
-  erfolgt. Ohne Auth liefert die Route nachweislich **401**, nicht 500
-  (`backend/routes/api.php:259` definiert ausschließlich `Route::get`; die Gruppe
-  `['auth:api','management']` rendert `AuthenticationException` als JSON). Damit ist
-  **weder ein 500er belegt noch ein Funktionieren** — der Zustand ist `unbelegt`, nicht
-  „in Arbeit".
-  **Korrigierte Diagnose aus dem Vorgänger, weiterhin gültig:** es heißt `GET`, nicht
-  `POST`; und die Begründung, Laravel suche eine fehlende `login`-Route, trifft nicht zu
-  — `auth:api` konsultiert nie eine `login`-Route, und eine solche existiert in
-  `backend/routes/` ohnehin nicht.
 - [~] wartet auf die Anforderung des Owners. Bisher nicht umgesetzt. **dev-vm-Container aus `volume-backup.sh` ausschließen** (angefordert,
   nicht umgesetzt).
 
 ## Nachtrag 2026-09-26, Kamera-Setup aus der Oberfläche bedienbar machen
 
 **Offen (aus dieser Runde):**
-
-- [~] wartet auf einen erreichbaren SFTPGo im E2E-Stack (Harness-Referenz `tests/scripts/ftp-transport-test/`). Die Fail-closed-Absicherung darf **nicht** aufgeweicht werden. **P1-M57 — `profile-ftp-slug.spec.ts` ist rot, weil der E2E-Stack keinen
-  SFTPGo hat.** Der Slug-Wechsel provisioniert jetzt und bricht fail-closed ab,
-  wenn der Dienst fehlt. Die Absicherung darf **nicht** aufgeweicht werden; der
-  E2E-Stack braucht einen erreichbaren SFTPGo oder einen Fake. Harness-Referenz:
-  `tests/scripts/ftp-transport-test/`. *In Arbeit.*
-
 
 ## UI-Review 2026-09-26 — Screenshot-Verifikation der neuen Oberflaechen
 
@@ -1543,10 +1022,6 @@ hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
 | strukturell nicht erfassbar | 2 | `AIGalleryDefaultsModal` (nur aus einem anderen Dialog heraus) und der globale Bestaetigungsdialog (programmatisch, kein `click`-Target) |
 | Roh-Dialoge ohne `ModalShell` | 11 | 6 mit `role="dialog"`, **5 ohne** — die brauchen ein `data-testid`, bevor `waitFor` sie ueberhaupt greifen kann |
 
-- [~] wartet auf zwei ungeklärte Voraussetzungen: das `AI_ENABLED`-Verhalten bei leerem `AI_API_KEY` und die Multipart-Feldnamen des `PhotoHistoryModal`-Uploads. Beides würde sonst einen Capture-Zyklus verbrennen. **Verschoben, weil ungeprueft:** `AIBatchEditModal` (lokales
-  `AI_ENABLED=false` bei **leerem** `AI_API_KEY` — das Verhalten ist damit
-  unbestimmt) und `PhotoHistoryModal` (Multipart-Feldnamen des Uploads
-  unverifiziert). Beides wuerde einen Capture-Zyklus verbrennen.
 ## Dialog-UI-Review 2026-09-27 — Auswertung aller 13 Dialog-Aufnahmen
 
 Vollauf `pnpm test:screenshots`: **44 passed / 0 failed (1,6 min)**, 13 Dialoge ×
@@ -1571,19 +1046,6 @@ Produktionsfehler verkauft worden waere.
 
 
 **Umsetzung 2026-09-27 (alle gegen frische Aufnahmen verifiziert):**
-- [~] wartet auf eine andere Spaltenlogik (`table-layout: fixed` mit `word-break` auf dem Wert). `break-all` verschiebt nur die Bruchstelle und ist damit keine Lösung. **Nicht behoben, ehrlich als offen gefuehrt: Mid-Token-Bruch in der
-  Verbindungstabelle.** Der Fade ist da, aber der Wert bricht auf Mobile
-  weiterhin mitten im Token (`e2e-photographer-uxt` / `hwxr`). `break-all`
-  aendert nur die Bruchstelle, nicht die Tatsache des Bruchs — das ist keine
-  Loesung. Braucht eine andere Spaltenlogik (z. B. `table-layout: fixed` mit
-  `word-break` auf dem Wert), nicht eine weitere Klasse.
-- [~] wartet auf die Korrektur des zweiten Satzes in `V042__add_ftp_password_resets_audit_table.php` — er behauptet „unlimited, unobserved mint", was der Reset-Vertrag nicht ist. **Veralteter Migration-Docblock:** `V042__add_ftp_password_resets_audit_table.php`
-  behauptet noch, die Endpoint waere „an unlimited, unobserved mint for valid
-  credentials". Das ist falsch (ein Reset **ersetzt**, es gibt immer genau ein
-  Credential) und wurde im Service-Docblock bereits korrigiert. Die Migration
-  dokumentiert eine Schemadescheidung und ihr zweiter Satz ist noch richtig —
-  deshalb nur geflaggt, nicht mitgeschleust.
-
 ## CI-Befund 2026-09-27 (Push fa8e19d) — drei CI-Ursachen, alle belegt; danach sechs Dialog-Befunde aus derselben Welle
 
 **1. `Frontend (Lint, Build, Vitest)` rot am Schritt „Build" (Lint war gruen).**
@@ -1629,77 +1091,6 @@ derselbe Fehler wie bei der Auth-Drosselung: eine Zahl aus dem Kontext
 gerissen und zur Entscheidung gemacht.
 
 **Folgepunkte aus der Waehrungs-Migration (2026-09-27):**
-- [~] wartet auf einen `@smoke`-Lauf, der den Drawer-Schließvorgang nach der Scrim-Entfernung bestätigt — lastabhängig, tritt vor dem Galerie-Aufbau auf und ist von den FTP-/Dialog-Änderungen unabhängig. **Vorbestehender Mobile-Flake im geteilten Login-Helfer:** `AuthHelper.ts:48`,
-  `await expect(backdrop).toBeHidden({ timeout: 5000 })` beim Schliessen des
-  Sidebar-Drawers. Lastabhaengig, tritt **vor** dem Gallery-Aufbau auf und ist
-  damit unabhaengig von den FTP-/Dialog-Aenderungen. Nach §6 zu verfolgen.
-**Format-/Layout-Runde 2026-09-27 (alle vier Punkte erledigt):**
-- [~] wartet auf die Bereinigung der drei Dateien — nach dem Muster der abgeschlossenen Welle, aber pro Stelle einzeln (Warenkorbzeilen brauchen einen gruppierten Dezimalwert **ohne** Symbol, nicht `formatEuroWhole`). **Drei weitere Instanzen derselben Message-Muster-Beschaendigung**, die
-  ausserhalb des Auftragsumfangs lagen: `ManagementMetaGalleryView.tsx:113-116`,
-  `CartItemList.tsx:97,110`, `VolumeLicensingCard.tsx:40,101` reichen je einen
-  `formatMoney()`-String (mit Symbol) als Placeholder-Wert ein. Nach dem Muster
-  derselben Aufgabe zu bereinigen. **Wichtig:** `formatEuroWhole` rundet auf ganze
-  Euro — fuer Warenkorbzeilen mit Cent ist das falsch, dort braucht es einen
-  gruppierten Dezimalwert **ohne** Symbol. Nicht pauschal vereinheitlichen.
-- [~] wartet auf eine Entscheidung zwischen `max-width` (überlebt die Kaskade) und Weglassen der Klasse. Beides zugleich ist ein Widerspruch — der Kommentar ersetzt die Wirkung nicht. **`w-36` / `w-24` auf den Preis-/Mengenfeldern sind wirkungslos** und wurden
-  trotzdem behalten, weil sie die gemeinte Breite dokumentieren (mit Kommentar).
-  Entweder `max-width` (ueberlebt die Kaskade) oder Klasse weg — beides zugleich
-  ist ein Widerspruch.
-
-**Owner-Entscheidungen 2026-09-27 (alle vier umgesetzt):**
-- [~] wartet auf den Abschluss des Backend-Fixes — `SettingsController::updateLicenseTerms()` validiert `price_web`/`price_print`/`price_original` noch nicht, `validate()` wirft die ungelisteten Schlüssel weg, `SettingResolver::set()` sieht sie nie. **Offen: die drei Preise persistieren nicht (Backend).**
-  `SettingsController::updateLicenseTerms()` validiert sie nicht, und
-  `validate()` **wirft nicht gelistete Schluessel weg** -> `SettingResolver::set()`
-  sieht sie nie; der Read-Pfad liefert sie auch nicht zurueck. Die drei Keys
-  **existieren** in der Tabelle (ge-seedet in Cent: 7500/14500/45000), aber kein
-  Controller liest oder schreibt sie. Sichtbare Folge: ein eingegebener Preis
-  schnellt nach dem Speichern auf den Default zurueck. Ohne diesen Fix ist die
-  Owner-Entscheidung „Felder ergaenzen" wertlos — laeuft.
-- [~] wartet auf die Umsetzung der Regel selbst: Aussagen über „wie der Code aussieht" an einen Commit binden (`git show HEAD:<pfad>`), nie an den Working Tree. **Vierte Verwechslung derselben Klasse in dieser Sitzung** → vorbeugende
-  Regel: Wenn mehrere Agenten denselben Working Tree veraendern, muss eine
-  Aussage ueber „wie der Code aussieht" an einen **Commit** gebunden werden
-  (`git show HEAD:<pfad>`), nie an den Working Tree. Die ersten drei waren:
-  Throttle-Zahl aus einem Subagenten-Bericht uebernommen, zwei `gh run list`-Eintraege
-  fuer einen CI-Lauf gehalten, ein einzelner Shard-Fehlerauszug fuer den ganzen Lauf.
-- [~] wartet auf den Abschluss der Neuanordnung — beide Fehler sind als testseitig belegt und die Geschwister-Spec ist mitgefixt; offen ist nur die Einordnung selbst. **Zwei vorbestehende E2E-Fehler neu eingeordnet — beide testseitig, und
-  die Last-Attribution war bei beiden falsch:**
-  - **`ecommerce.spec.ts` — reproduziert (3 von 4 Fehlschlaege).** Der
-    **401 war kein Auth-Fehler**, sondern ein Artefakt des Zeitbudgets: der
-    Test lief in die 60-s-Grenze, waehrend der Galerie-`POST` noch unterwegs
-    war; Playwright verwarf den Browser-Kontext, die Anfrage kam ohne Session
-    an, und der Fehler verschwand vollstaendig, sobald das Budget stimmte. Die
-    ZIP-Stufe selbst ist zuverlaessig und schnell (`downloadMs` 449–1049) — der
-    Download-Event war ein **Fehlschluss**; die Antwort lebt in einem
-    `_blank`-Popup, weshalb `page.waitForResponse('/download-zip')` nie
-    matcht. **Die Fix ist ein Timeout, und deshalb ist sie begruendet statt
-    erfunden:** entfernt wurde `test.setTimeout(60000)` — die **einzige** Stelle
-    im E2E-Satz, die den kalibrierten Standard **nach unten** ueberschrieb. Der
-    Kommentar („Erhoehtes Timeout") stammt aus der Zeit, als 30 s Playwright-Default
-    war. `playwright.config.ts` setzt `timeout: 120000`, `frontend/AGENTS.md`
-    fuehrt 120 s als ausdruecklich freigegebenes Budget mit Pruefspur — und
-    dieser Test **ist** ein Login/Upload/Checkout-Fluss. Er erbt jetzt den
-    gemessenen Standard, statt einen veralteten, unkalibrierten zu fahren.
-  - **`projects-board.spec.ts` — nicht reproduzierbar, aber verifiziert.** Der
-    Agent hat nicht „konnte nicht reproduziert" gebucht, sondern messbar gemacht:
-    eine Sonde zeichnete **jede** `POST /api/management/projects`-Antwort mit
-    Wanduhr-Stempel auf, unabhaengig von jeder Wartung. Entscheidend ist die
-    **Renn-Marge** = Antwortankunft − Abonnementzeit: bei 20 Proben raeumten
-    **12 von 20 die Antwort in ≤12 ms ab, Minimum 6 ms**, und der App stellte in
-    100 % der Laeufe genau **eine** POST mit Status **201** an die richtige URL.
-    **Die Last-Zuordnung war invertiert:** bei Last 10 lagen die Margen bei
-    7–342 ms, bei Last 5 bei 6–12 ms. Ein *schnelleres* Backend verkleinert das
-    Fenster — der Flake wird wahrscheinlicher, wenn die Maschine gesund ist.
-    Der Mechanismus wurde separat bewiesen: ein Abonnement **nach** der Antwort
-    wartet sein **komplettes** Budget und scheitert, obwohl die Anfrage 200
-    lieferte — `page.waitForResponse` hat keinen Antwortpuffer.
-    **Die Passzahl ist ausdruecklich NICHT der Beweis** — sie ist vor und nach
-    dem Fix identisch (63/3). Der Beweis sind die 6–12 ms plus der
-    Mechanismustest; die Fix beseitigt das Rennen **konstruktiv** (Listener vor
-    dem auslösenden Klick), nicht durch ein breiteres Fenster.
-  - **Derselbe Defekt in der Geschwister-Spec mitgefixt:** 5 Stellen in
-    `production-board.spec.ts` registrierten den Listener **nach** dem Klick.
-    Dokumentiert an `KanbanHelper.waitForCreate`/`waitForDelete`, damit die
-    Falle an der API sichtbar ist. **60/60 gruen** mit `--workers 1`.
 - [~] wartet auf eine Live-Reproduktion im Lastbereich zwischen 15 und 22 sowie eine Erklärung der 6-von-8-Schieflage auf Mobile. Ohne positiven Beleg wird nichts gebucht. **Offen und ausdruecklich nicht als geloest gebucht:** (a) Die
   **Last-36,9-Variante** des `projects-board`-Fehlers bleibt unerklaert. Das
   behobene Rennen wird unter Last *leichter* zu gewinnen; was bei Last 36,9
@@ -1726,45 +1117,35 @@ gerissen und zur Entscheidung gemacht.
   Mobile — bei 31 Tests pro Projekt mit Chance erklaerbar, aber **kein positiver
   Beleg** fuer eine Mobile-spezifische Ursache und kein Mobile-spezifischer
   Defekt gefunden.
-  Typhaelfte der `maxWidth`-Fix hat **keinen** Unit-Test und kann keinen haben —
-  Vitest typprueft nicht. Der Sabotage-Nachweis zeigt es exakt: mit verengter
-  Union meldet `tsc` `TS2322`, **ohne** Union schluckt `tsc` `"lg"` kommentarlos.
-  Dieser Teil haengt **ausschliesslich** an `tsc -b --force` im Build-Gate. Wenn
-  jemand `tsc -b` ohne `--force` fahren laesst, ist genau diese Haelfte ungesichert.
+  **Die `maxWidth`-Typhaelfte ist geschlossen (2026-10-21):** der Build-Gate fährt
+  jetzt `tsc -b --force` (`frontend/package.json:12`), damit die verengte Union
+  nicht von einem veralteten `tsbuildinfo` abhängt; die Sabotage-Probe und die
+  Begründung stehen in `features/tech/04-testing-guidelines.md` §6a.
 - [~] wartet auf ein späteres Aufräumen der Stack-Env — der Wert hat keinen Secret-Bezug, wird aber über die Ports-Liste geführt. **`SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN`** ist im Compose ein
   Container-Wert ohne Secret-Bezug, wird aber über die Ports-Liste geführt; bei
   einem späteren Aufräumen prüfen, ob es in die Stack-Env gehört.
 
 **Verifikation / Übergabe**
 - [~] wartet auf einen separaten Reviewer-Durchgang; die Umsetzung ist fertig, die Prüfung steht aus. Diff-Review gegen `features/security/card-testing-protection.md` (V036 separat, keine Secrets/PII, keine ungeprüften Stripe-/Turnstile-Bypässe) durch separaten Reviewer.
-- [~] wartet auf den Abschluss der vorstehenden Live-GO-Punkte (Limit-/Race-Lücke, Radar/3DS/Webhook/Privacy, Monitoring, Kill-Switch, Rollback). Vor Live-GO: offene Limit-/Race-Lücke schließen, Radar/3DS/Webhook/Privacy-Checkliste abhaken, Monitoring-Alarme testen, Emergency-Kill-Switch und Rollback ohne Datenverlust dokumentieren; danach Status im Task-Board auf erledigt setzen.
+- [~] wartet auf die **Betriebs**-Live-GO-Punkte: die Radar-/3DS-/Webhook-/Privacy-Checkliste in
+  `features/security/card-testing-protection.md` (acht unangehakte Checkboxen, Stripe-Dashboard)
+  und den **Test der Monitoring-Alarme** (in `features/security/card-testing-runbook.md` §1–§3
+  beschrieben, aber nie ausgelöst). **Dokumentiert und damit erledigt (2026-10-21):** der
+  Emergency-Kill-Switch und der Rollback-Ablauf ohne Datenverlust — jetzt in
+  `features/security/card-testing-runbook.md` §6: was der Schalter blockiert und was nicht, die
+  vier Schritte zum Umlegen in Produktion mit der Verifikation, und die Rollback-Reihenfolge
+  Konfiguration → durable Identifier. Die Limit-/Race-Lücke war bereits am 2026-10-18 gegen eine
+  echte MariaDB geschlossen (40 gleichzeitig freigegebene Clients: 30 × 200 / 10 × 429,
+  0 Deadlocks, 0 × 5xx; `features/security/2026-10-18-review-closure.md`).
+## 📌 SKILLS-STAND (2026-10-19) — Marker auf `787670a` fortgeschrieben
 
----
-
-## 📌 SKILLS-STAND (2026-10-19) — Marker fortgeschrieben auf `4205142` (2026-10-21)
-
-> `AGENTS.skills.md` steht jetzt auf `4205142` (Skills-Repo-HEAD vom 2026-10-21, 21:19 UTC;
-> vollständig `4205142828e2f29d9cffdbf481680d678665f0c1`), geprüft am 2026-10-21; 19 Skills,
-> **13× angewendet, 1× offen, 5× nicht zutreffend**. **Von dem, was hier steht, ist nichts
-> umgesetzt** — Position 7 ist am 2026-10-20 (`1818909`), Position 6 am 2026-10-21
-> (`db13b2c`) und Position 8 am 2026-10-21 (D-49) umgesetzt und deshalb **aus diesem Board
-> entfernt** (siehe „Historie der Nummern" unten; die Belege stehen in den genannten
-> Commits). Das dritte Verdikt `offen` und der Rahmen „am committeten Stand dieses Commits"
-> sind **lokale Ergänzungen** dieses Projekts — der Marker zitiert die gemeinsame Regel
-> (`skills-marker/SKILL.md` → „Bezugsrahmen-Regel") und kopiert sie nicht.
+> `AGENTS.skills.md` steht jetzt auf `787670a` (Skills-Repo-HEAD vom 2026-10-19), geprüft am
+> 2026-10-19; 17 Skills, **12× angewendet, 5× nicht zutreffend**. **Von dem, was hier steht, ist
+> nichts umgesetzt** — Position 7 ist am 2026-10-20 (`1818909`) und Position 6 am 2026-10-21
+> (`db13b2c`) umgesetzt und deshalb **aus diesem Board entfernt** (siehe „Historie der Nummern"
+> unten; die Belege stehen in den genannten Commits).
 > Die Positionen sind Befund-Protokoll, kein Arbeitsauftrag (Board-Regel: Log, kein Auftrag).
 > Jede Zahl ist an `Datei:Zeile` zitierbar und wurde vor dem Schreiben verifiziert.
-> **Rahmen:** jede Aussage dieses Abschnitts, die **den Board selbst** betrifft (die
-> Skill-Zahlen oben, die Positionen, die Historie), gilt **am committeten Stand dieses
-> Commits** — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
-> trägt deshalb nicht; Aussagen über **Fremddateien** nennen ihren Messstand (Regel:
-> `skills-marker/SKILL.md` → „Bezugsrahmen-Regel").
-> **Die Range `787670a..4205142` (26 Commits) hat eine offene Position ergeben:** `generated-docs`
-> — die Projekt-Prosa trägt Zahlen und Fakten, die in Code stehen (Beispiele: die Zählungen in
-> diesem Board, `features/infrastructure/29-production-operations-runbook.md:48` „currently
-> `mariadb`" gegen `backend/config/database.php:20`), aber das Projekt hat **weder einen
-> Generator noch ein Drift-Gate**. **Der Eintrag ist vom Owner anzulegen** — dieser Lauf legt
-> **keine** Position an und schließt **keine**; der Marker verweist auf diesen Abschnitt.
 > **Historie der Nummern in diesem Abschnitt:** Position 1–3 (Named-Locks-Schwelle, Dreiklang,
 > Matrix) sind am 2026-10-18 **committet** (`e1ed87a`, Playwright-Bump auf 1.64.1) und
 > entfernt; Position 4 (GHCR-Blocker) war am 2026-10-15 geschlossen und entfernt; Position 5
@@ -1774,15 +1155,8 @@ gerissen und zur Entscheidung gemacht.
 > 2026-10-20 **geschlossen und entfernt** (`1818909` — die Regelzeile in `AGENTS.md` §6 nennt
 > jetzt den verbleibenden Weg, das Modell liest die Bilder selbst); Position 6 (Lockfile-Regel des
 > Test-Images) ist am 2026-10-21 **geschlossen und entfernt** (`23ca866`) — die Regel ist seit
-> `db13b2c` umgesetzt (Browserversion aus dem aufgelösten Lockfile). Position 8 (die
-> DB-Engine-Policy des Projekts gegen den DB-Standard des `laravel`-Skills) ist am 2026-10-21
-> **geschlossen und entfernt**: die Abweichung ist als **D-49** in
-> `features/owner-decisions.md` festgehalten — Produktion **MariaDB**, Abweichung vom
-> Skill-Standard (PostgreSQL), mit Begründung und Belegstellen. Position 8 war aus der
-> Nachprüfung von `7b1ca62` (2026-10-21) neu; **dieser Abschnitt führt damit keine offene
-> Position mehr.**
-
----
+> `db13b2c` umgesetzt (Browserversion aus dem aufgelösten Lockfile). **Position 8 ist neu aus der
+> Nachprüfung von `7b1ca62` (2026-10-21) und der einzige offene Eintrag in diesem Abschnitt.**
 
 ## 🔑 STRIPE-KONTOWECHSEL (2026-10-15) — neues Konto, Keys, Vite-Vorrang
 
