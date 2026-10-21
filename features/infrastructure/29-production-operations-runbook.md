@@ -221,6 +221,29 @@ it must not be hidden by redirecting all output to `/dev/null`. The health
 check verifies the scheduler loop process, while command-level success still
 requires the target host's scheduler logs and job-specific evidence.
 
+### Measured evidence (2026-10-21)
+
+Host `root@reisinger.pictures`, container `portal_backend`:
+
+```
+docker logs portal_backend --since 48h
+  → "Queue supervisor and scheduler started."     (the scheduler loop runs)
+  → "No scheduled commands are ready to run."     (the one-minute loop ticks)
+
+docker exec portal_backend php artisan schedule:list
+  → 10 scheduled commands, each with a "Next Due", among them:
+    30 3 * * 1  php artisan app:import-locations   Next Due: 4 days from now
+
+docker exec portal_backend php artisan app:import-locations
+  → "All [App\Models\Location] records have been imported."
+  → "✅ Import abgeschlossen!"   (exit 0)
+```
+
+The weekly import is planned in `backend/routes/console.php:30`
+(`Schedule::command('app:import-locations')->weeklyOn(1, '03:30')->withoutOverlapping()->onOneServer()`) ✓ — the plan is live and a run of the command succeeds.
+
+**Why the scheduler's own per-command line is not in the log:** the container was (re)started on 2026-10-21 20:57 UTC (`docker inspect portal_backend --format '{{.State.StartedAt}}'`), so the log of the last weekly run (Monday 2026-10-19, 03:30) was reset with the previous container. The scheduler loop line and the explicit run above are the current evidence; a weekly run can only be read from a container that has not been recreated since.
+
 ## 6. Rollback and release evidence
 
 A rollback must restore the same production topology contract. Do not roll
