@@ -19,6 +19,7 @@ use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -199,9 +200,41 @@ class CheckoutKillSwitchTest extends TestCase
     public function test_invalid_switch_configuration_fails_closed(): void
     {
         config(['app.stripe.checkout_enabled' => 'not-a-boolean']);
+        Log::spy();
         $switch = app(StripeCheckoutKillSwitch::class);
 
         $this->assertFalse($switch->enabled());
+        Log::shouldHaveReceived('error')
+            ->once()
+            ->withArgs(fn (string $message, array $context): bool => str_contains($message, 'STRIPE_CHECKOUT_ENABLED')
+                && ($context['configuration_type'] ?? null) === 'string');
+    }
+
+    public function test_the_shipped_configuration_keeps_an_unparseable_switch_flag_distinguishable(): void
+    {
+        // The contract says an invalid runtime configuration "fails closed and
+        // is logged". That only holds if the shipped configuration does not
+        // coerce an unparseable value into a silent `false`: FILTER_NULL_ON_
+        // FAILURE keeps `null` distinguishable, and the switch treats every
+        // non-boolean as invalid.
+        putenv('STRIPE_CHECKOUT_ENABLED=flase');
+        $_ENV['STRIPE_CHECKOUT_ENABLED'] = 'flase';
+        $_SERVER['STRIPE_CHECKOUT_ENABLED'] = 'flase';
+
+        try {
+            $shipped = require base_path('config/app.php');
+
+            $this->assertNull($shipped['stripe']['checkout_enabled']);
+        } finally {
+            putenv('STRIPE_CHECKOUT_ENABLED');
+            unset($_ENV['STRIPE_CHECKOUT_ENABLED'], $_SERVER['STRIPE_CHECKOUT_ENABLED']);
+        }
+
+        config(['app.stripe.checkout_enabled' => null]);
+        Log::spy();
+
+        $this->assertFalse(app(StripeCheckoutKillSwitch::class)->enabled());
+        Log::shouldHaveReceived('error')->once();
     }
 
     /**
