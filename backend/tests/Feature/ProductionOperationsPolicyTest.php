@@ -172,6 +172,17 @@ class ProductionOperationsPolicyTest extends TestCase
         $this->applyValidProductionConfig();
         app('mail.manager')->forgetMailers();
 
+        // The limits are set explicitly here: the environment differs between
+        // the developer machine and the CI (`.env.ci` raises the checkout
+        // quota to 1000 and drops the account age to 0). The test asserts what
+        // it configured, not what an environment happens to carry.
+        config([
+            'app.checkout_throttle_user_per_hour' => 5,
+            'app.checkout_throttle_ip_per_hour' => 10,
+            'app.checkout_throttle_ip_per_day' => 30,
+            'app.stripe.checkout_new_account_hours' => 24,
+        ]);
+
         try {
             // Artisan::call + output, because expectsOutputToContain matches per
             // write: the limits are one JSON line in one write.
