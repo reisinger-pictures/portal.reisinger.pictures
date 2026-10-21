@@ -110,9 +110,9 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
 > **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **5 offene `[ ]`** und **47 wartende
-> `[~]`** über 1915 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
+> `[~]`** über 1931 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
 > (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 5, `… | grep -c '^- \[~\]'` → 47,
-> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1915; `<stand>` = der committete Stand dieses
+> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1931; `<stand>` = der committete Stand dieses
 > Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
 > trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
 > 5: **3× `manuell prüfen:`**, **1× gewöhnliche Arbeit** und **1× `Entscheidung offen:`** — die
@@ -139,7 +139,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
 > `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
 > (52 = 5 offen + 47 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
-> (1915) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
+> (1931) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
 > würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
 > defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
 > **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
@@ -1741,15 +1741,30 @@ gerissen und zur Entscheidung gemacht.
 
 ---
 
-## 📌 SKILLS-STAND (2026-10-19) — Marker auf `787670a` fortgeschrieben
+## 📌 SKILLS-STAND (2026-10-19) — Marker fortgeschrieben auf `4205142` (2026-10-21)
 
-> `AGENTS.skills.md` steht jetzt auf `787670a` (Skills-Repo-HEAD vom 2026-10-19), geprüft am
-> 2026-10-19; 17 Skills, **12× angewendet, 5× nicht zutreffend**. **Von dem, was hier steht, ist
-> nichts umgesetzt** — Position 7 ist am 2026-10-20 (`1818909`) und Position 6 am 2026-10-21
+> `AGENTS.skills.md` steht jetzt auf `4205142` (Skills-Repo-HEAD vom 2026-10-21, 21:19 UTC;
+> vollständig `4205142828e2f29d9cffdbf481680d678665f0c1`), geprüft am 2026-10-21; 19 Skills,
+> **13× angewendet, 1× offen, 5× nicht zutreffend**. **Von dem, was hier steht, ist nichts
+> umgesetzt** — Position 7 ist am 2026-10-20 (`1818909`) und Position 6 am 2026-10-21
 > (`db13b2c`) umgesetzt und deshalb **aus diesem Board entfernt** (siehe „Historie der Nummern"
-> unten; die Belege stehen in den genannten Commits).
+> unten; die Belege stehen in den genannten Commits). Das dritte Verdikt `offen` und der
+> Rahmen „am committeten Stand dieses Commits" sind **lokale Ergänzungen** dieses Projekts —
+> der Marker zitiert die gemeinsame Regel (`skills-marker/SKILL.md` → „Bezugsrahmen-Regel") und
+> kopiert sie nicht.
 > Die Positionen sind Befund-Protokoll, kein Arbeitsauftrag (Board-Regel: Log, kein Auftrag).
 > Jede Zahl ist an `Datei:Zeile` zitierbar und wurde vor dem Schreiben verifiziert.
+> **Rahmen:** jede Aussage dieses Abschnitts, die **den Board selbst** betrifft (die
+> Skill-Zahlen oben, die Positionen, die Historie), gilt **am committeten Stand dieses
+> Commits** — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
+> trägt deshalb nicht; Aussagen über **Fremddateien** nennen ihren Messstand (Regel:
+> `skills-marker/SKILL.md` → „Bezugsrahmen-Regel").
+> **Die Range `787670a..4205142` (26 Commits) hat eine offene Position ergeben:** `generated-docs`
+> — die Projekt-Prosa trägt Zahlen und Fakten, die in Code stehen (Beispiele: die Zählungen in
+> diesem Board, `features/infrastructure/29-production-operations-runbook.md:48` „currently
+> `mariadb`" gegen `backend/config/database.php:20`), aber das Projekt hat **weder einen
+> Generator noch ein Drift-Gate**. **Der Eintrag ist vom Owner anzulegen** — dieser Lauf legt
+> **keine** Position an und schließt **keine**; der Marker verweist auf diesen Abschnitt.
 > **Historie der Nummern in diesem Abschnitt:** Position 1–3 (Named-Locks-Schwelle, Dreiklang,
 > Matrix) sind am 2026-10-18 **committet** (`e1ed87a`, Playwright-Bump auf 1.64.1) und
 > entfernt; Position 4 (GHCR-Blocker) war am 2026-10-15 geschlossen und entfernt; Position 5
@@ -1760,9 +1775,10 @@ gerissen und zur Entscheidung gemacht.
 > jetzt den verbleibenden Weg, das Modell liest die Bilder selbst); Position 6 (Lockfile-Regel des
 > Test-Images) ist am 2026-10-21 **geschlossen und entfernt** (`23ca866`) — die Regel ist seit
 > `db13b2c` umgesetzt (Browserversion aus dem aufgelösten Lockfile). **Position 8 ist neu aus der
-> Nachprüfung von `7b1ca62` (2026-10-21) und der einzige offene Eintrag in diesem Abschnitt.**
+> Nachprüfung von `7b1ca62` (2026-10-21) und der einzige offene Eintrag in diesem Abschnitt; sie
+> bleibt offen und ist am 2026-10-21 nachgemessen.**
 
-- [ ] Entscheidung offen: **Position 8 — Die DB-Policy des Projekts weicht vom DB-Standard des `laravel`-Skills ab, und die Abweichung ist nirgends als Entscheidung festgehalten:** Der Skill-Standard ist PostgreSQL (MySQL deprecated), das Projekt fährt Produktion `mariadb` und Tests SQLite `:memory:` — `backend/config/database.php:20` (Default `mariadb`), `backend/AGENTS.md:28` (lokal SQLite), `backend/AGENTS.md:41` (Test-DB `:memory:`) und `features/infrastructure/29-production-operations-runbook.md:48` („currently `mariadb`") beschreiben den **Ist-Zustand**. Die **Entscheidung** fehlt: weder `features/owner-decisions.md` (D-1…D-48) noch `features/tech/07-architectural-decisions.md` (AD-1…AD-10) nennt die DB-Engine — MariaDB erscheint dort nur als Messumgebung im D-40-Beweis. Offen: entweder die Abweichung als Entscheidung festhalten (mit Begründung und Ort) oder die Engine umstellen. (Befund aus der Marker-Nachprüfung von `7b1ca62` am 2026-10-21; gemessen am Vorgänger-Stand `d8ef650` — `git diff --stat d8ef650..HEAD -- backend/ features/` → ohne Ausgabe.)
+- [ ] Entscheidung offen: **Position 8 — Die DB-Policy des Projekts weicht vom DB-Standard des `laravel`-Skills ab, und die Abweichung ist nirgends als Entscheidung festgehalten:** Der Skill-Standard ist PostgreSQL (MySQL deprecated), das Projekt fährt Produktion `mariadb` und Tests SQLite `:memory:` — `backend/config/database.php:20` (Default `mariadb`), `backend/AGENTS.md:28` (lokal SQLite), `backend/AGENTS.md:41` (Test-DB `:memory:`) und `features/infrastructure/29-production-operations-runbook.md:48` („currently `mariadb`") beschreiben den **Ist-Zustand**. Die **Entscheidung** fehlt: weder `features/owner-decisions.md` (D-1…D-48) noch `features/tech/07-architectural-decisions.md` (AD-1…AD-10) nennt die DB-Engine — MariaDB erscheint dort nur als Messumgebung im D-40-Beweis. Offen: entweder die Abweichung als Entscheidung festhalten (mit Begründung und Ort) oder die Engine umstellen. (Befund aus der Marker-Nachprüfung von `7b1ca62` am 2026-10-21; **am 2026-10-21 mit dem Marker-Fortschreiben auf `4205142` nachgemessen — der Befund ist unverändert:** dieselben vier Belegstellen tragen denselben Ist-Zustand, `features/owner-decisions.md` führt **48** D-Einträge (D-1…D-48) und `features/tech/07-architectural-decisions.md` **10** AD-Einträge (AD-1…AD-10), und keiner der beiden nennt die DB-Engine — MariaDB erscheint nur als Messumgebung im D-40-Beweis (der Lock-Set-Nachweis in `OrgController::syncUsers`); gemessen am Vorgänger-Stand `d8ef650`, seitdem unverändert (Beleg: `git diff --stat d8ef650..HEAD -- backend/ features/` → ohne Ausgabe).)
 
 
 ---
