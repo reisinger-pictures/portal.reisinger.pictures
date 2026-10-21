@@ -1195,8 +1195,78 @@ Non-negotiable when following this runbook:
 
 ---
 
-## 6. Change log
+## 6. Kill switch and rollback
 
+The kill switch is the one control that stops new checkout attempts without
+touching the money path. It is a **server-side configuration flag**, not a
+request field: `STRIPE_CHECKOUT_ENABLED` (default `true`) reaches the code
+through `backend/config/app.php:135`
+(`filter_var(env('STRIPE_CHECKOUT_ENABLED', true), FILTER_VALIDATE_BOOL)`) and
+is read by `StripeCheckoutKillSwitch::enabled()`.
+
+### 6.1 What it blocks and what it does not
+
+`StripeCheckoutKillSwitch::assertEnabled()` answers a `503` with
+`Retry-After: 60` and a generic German body ("Der Checkout ist vorübergehend
+nicht verfügbar. Bitte versuche es später erneut.") **before** a Customer or a
+PaymentIntent is created — but only on the immediate Stripe checkout path that
+would need a **new or ambiguous** PaymentIntent.
+
+| Flow | With the switch off |
+|---|---|
+| Immediate Stripe checkout, new or ambiguous PI | **blocked** — 503, no Customer, no PI |
+| Exact replay of an already usable pending PI | still readable |
+| Invoice, quote, Lieferschein, settled-free | unaffected |
+
+No client field can override the flag. An invalid runtime value (not a bool)
+is **fail-closed**: `enabled()` returns `false` and logs
+`Invalid STRIPE_CHECKOUT_ENABLED configuration; checkout is fail-closed.` with
+the configuration type only — no request or payment data.
+
+### 6.2 Flipping it in production
+
+The flag is read from the environment, so a change needs the container to pick
+up the new value:
+
+1. Set `STRIPE_CHECKOUT_ENABLED=false` in the backend's environment on the
+   host, where the other `STRIPE_*` values live — **not** in the repository.
+2. Restart the backend container (`docker restart portal_backend`) so the
+   runtime configuration is re-read. Recreate instead of restart when the
+   environment block itself changed (`deployment/docker-compose.yml`).
+3. **Verify the effect, not the intention:** call the immediate checkout path
+   once. It must answer `503` with `Retry-After: 60` and the body quoted above.
+   A `503` without that body is the global API limiter, not the switch (§3).
+4. To re-enable: set the value back to `true`, restart, and verify that the
+   checkout path creates a PaymentIntent again.
+
+The switch does **not** cancel existing PaymentIntents, does not touch orders
+in flight, and does not change the invoice, quote, Lieferschein or settled-free
+paths. It stops the entry, nothing else.
+
+### 6.3 Rollback order
+
+The rule from `card-testing-protection.md` §12.6: **roll back configuration
+before durable identifiers, and never delete a PaymentIntent or an order merely
+to make a dashboard look clean.**
+
+| Order | Action | Why |
+|---|---|---|
+| 1 | Kill switch on (`STRIPE_CHECKOUT_ENABLED=false`) | stops new attempts at the entry, before anything is written |
+| 2 | Configuration back (thresholds, Turnstile enablement, Radar rules) | reversible, no data involved |
+| 3 | Deployment back (the previous image) | the code path returns to the known state |
+| 4 | **Only if** the incident requires it: reconcile the affected PaymentIntents with `stripe:cancel-stale-payment-intents` (S6) and check the webhook quarantine (S5) | durable identifiers are the last resort — deleting a PI or an order loses the evidence an incident review needs |
+
+A rollback that starts at step 4 leaves new attempts running while the old
+identifiers are being cleaned up; the two together make the incident harder to
+read, not easier.
+
+---
+
+## 7. Change log
+
+- **2026-10-21** — Added §6 "Kill switch and rollback": what the switch blocks
+  and what it leaves untouched, the four steps to flip it in production with the
+  verification, and the rollback order from `card-testing-protection.md` §12.6.
 - **2026-09-29** — Initial runbook. Covers S1–S8, the escalation matrix in §3,
   and the eight non-measurable items in §4. Every threshold is either quoted from
   the enforcing line or labelled **[operator]**.
