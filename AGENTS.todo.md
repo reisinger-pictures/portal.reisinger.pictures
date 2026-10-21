@@ -71,37 +71,19 @@ the stated prerequisites, not on a confirmed production exploit.
 Diese Punkte sind in den Freigaben als **nicht-blockierend** eingestuft worden. Sie sind hier,
 weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benannten Ort.
 
-- [ ] manuell prüfen: **Zwei-Verbindungs-Nachweis für D-40 steht aus.**  Das Probe-Skript `backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh` liegt vor
-  (zwei Orgs, deren Akteure gegenseitig Mitglieder sind, gleichzeitige Syncs, InnoDB-
-  Deadlock-Delta). **Der Lauf steht aus:** das Skript braucht einen Docker-Host mit
-  `mariadb:11.4` — hier ist der Docker-Daemon nicht erreichbar, und das SEC-12-Skript
-  läuft aus demselben Grund nicht in CI. **manuell prüfen:** auf einem Host mit Docker
-  ausführen; mit dem alten Lock-Stand (`git show <vor-D-40>:backend/app/Http/Controllers/
-  OrgController.php`) muss das Skript ein **nicht-null** Deadlock-Delta melden, mit dem
-  neuen Stand **null**. **Zweitmessung offen:** dieselbe Messung für `destroy()` statt des
-  zweiten Syncs — die Org-Zeile wird dort inzwischen ebenfalls zuerst gesperrt
-  (`OrgDestroyLockOrderTest` pinnt die Reihenfolge deterministisch), die Zwei-Verbindungs-
-  Evidenz fehlt aber.
-- [ ] **`destroy()` sperrt seine Mitgliederzeilen einzeln statt in einem Bereichsscan (Rest).**
-  Die **Reihenfolge** ist geschlossen: der Destroy plant und lädt seine Mitglieder aufsteigend
-  nach `users.id` — dieselbe Reihenfolge wie `syncUsers()` — und `OrgDestroyLockOrderTest` pinnt
-  sie (die Org-Sperre bleibt die erste Aussage der Transaktion). Offen bleibt die **Form**:
-  der Destroy sperrt seine Mitglieder **je einzelne Aussage** (ein Write pro Mitglied), während
-  der Sync sie in **einem** Bereichsscan sperrt; und der Destroy schreibt die Pivot-Zeile
-  eines Mitglieds (`user_roles`) **vor** der `users`-Zeile dieses Mitglieds, während der Sync
-  **alle** `users`-Sperren **vor** jedem Pivot-Write nimmt. Beides steht so im Code-Kommentar
-  und im Test-Docblock. **Vorbestand**, von D-40 und der destroy-Korrektur nicht eingeführt.
-  **Test:** die Zwei-Verbindungs-Messung des D-40-Probe-Skripts, mit `destroy()` statt des
-  zweiten Syncs — nur sie beurteilt die Restform; der deterministische Test deckt die
-  Reihenfolge ab, nicht die Zyklusfreiheit.
-- [ ] **Mailpit lokal unerreichbar (Umgebung).** Der Container `accriditation_mailpit` mappt
-  `127.0.0.1:1025->1025/tcp`, nimmt aber keine Verbindung an (`socket.connect` → refused). Im
-  vollen Backend-Lauf scheitern dadurch **63** Mail-Tests mit `TransportException`; gegen ein
-  temporäres Mailpit auf anderen Ports läuft die Suite grün (3051 passed). **manuell prüfen:**
-  Container neu starten bzw. Port prüfen, danach den vollen Lauf ohne Port-Override wiederholen.
 
 ---
-- [ ] **Dependabot: 1 offener Alert am Default-Branch** (war 10) — gemessen am 2026-10-18 mit `gh api repos/reisinger-pictures/portal.reisinger.pictures/dependabot/alerts?state=open&per_page=100 -q '.[] | [.security_advisory.severity, .dependency.package.name] | @tsv'` → **1 high (`braces`), 0 critical**. Patch-Stand je Paket (dieselbe Abfrage, `-q '.[] | [.security_advisory.severity, .dependency.package.name, .security_vulnerability.vulnerable_version_range, (.security_vulnerability.first_patched_version.identifier // "KEINE")] | @tsv'`): `undici` (6 Alerts — 1 high + 2 medium + 3 low; verwundbar `< 7.29.1`, installiert `7.29.0`), `source-map-js` (high, `< 1.2.2`, installiert `1.2.1`), `brace-expansion` (medium, `< 5.0.12`), `postcss-selector-parser` (medium, `< 7.1.6`), `braces` (high, `<= 3.0.3`, **`gepatcht-ab=KEINE`**). Dependency-CVEs, **nicht** Endpunkt-Autorisierung → eigener Durchgang (`node-deps`), **ausgeführt** (Ergebnis in den beiden Unterpunkten).
+- [ ] **Dependabot: 1 offener Alert am Default-Branch** (war 10) — **gemessen am 2026-10-21:
+  genau 1 Alert, `high`, `braces`** (verwundbar `<= 3.0.3`, **`gepatcht-ab=KEINE`**), 0 critical.
+  Die **Erreichbarkeit ist geprüft** (`pnpm why braces`): `braces` kommt ausschließlich über
+  `micromatch` ← `@lingui/cli` / `eslint-plugin-lingui`, also **nur über die Build- und
+  Lint-Werkzeuge**; das ausgelieferte Bundle enthält es nicht, und der ReDoS-Pfad bräuchte
+  ein vom Angreifer kontrolliertes Glob-Pattern, das es hier nicht gibt. **Der Alert bleibt
+  in GitHub offen** — ohne verfügbare Version gibt es nichts zu aktualisieren, und ein
+  Dismissal wäre eine Sicherheitsentscheidung des Owners. **Erscheint eine gepatchte
+  Version, gehört sie in die nächste `node-deps`-Welle**, nicht nebenbei. Die übrigen
+  Advisory-Gruppen (`undici`, `source-map-js`, `brace-expansion`,
+  `postcss-selector-parser`) sind in den Wellen unten erledigt.
    - **Ergebnis der `node-deps`-Wellen (`85f102b` + die `undici`-Kopplung):** drei Pakete sind über `overrides` in `frontend/pnpm-workspace.yaml` gehoben (`source-map-js` 1.2.1 → 1.2.2, `brace-expansion` 5.0.9 → 5.0.12, `postcss-selector-parser` 6.0.10 → 7.1.6) — alle **transitiv** und dev/build-only (kein Treffer über alle 40 JS-Chunks, `pnpm why` weist jeden Pfad). `undici` brauchte am Ende **keinen** Override: die Kopplung wurde **gelöst** statt erzwungen — `jsdom@30.0.1` deklariert `^8.9.0` und löst selbst auf `8.12.2` auf, und **alle sechs** offenen `undici`-Advisories enden bei `< 7.29.1` (Range per API gemessen), 8.x liegt also außerhalb; der zwischenzeitliche erzwungene Downgrade auf 7.29.1 ist damit weg. `pnpm audit` 16 → 1, `pnpm audit --prod` 2 → 1, Vitest grün (1423; die 20 zusätzlichen Tests stammen aus der pk_test-Gate-Welle). **`braces` bleibt offen und ist als akzeptiertes Risiko dokumentiert (C8, `features/security/accepted-risks.md`)** — kein Patch existiert, und der verwundbare Eingang wird von keiner der drei realen Aufrufstellen betreten. Beide Wellen unabhängig verifiziert (APPROVED; u. a. minimal-invasiver Lockfile-Diff, CSS byte-identisch trotz Major-Bump, JSDOM-Konstruktionsprobe unter 8.12.2). **Scan-Lag, kein Befund:** die Dependabot-API meldet weiter **10** Alerts, weil ihr letzter Scan vor `85f102b` lief; autoritativ für den lokalen Stand ist `pnpm audit` → **1**.
   - **Verlauf:** 17 → 15 (dompurify, PR #18) → 12 (`league/commonmark` ×2 + `laravel/framework`, PR #17/#16) → **10** (`tinypool` ×2 critical, PR #19) — alle vier über den Auto-Merge, **ohne Handarbeit**. **Der rote-PR-Blocker ist behoben (D-33):** die Security-PRs waren nie wegen ihres Codes rot, sondern weil GitHub die **Actions**-Secrets von jedem Dependabot-Lauf zurückhält — er liest ausschließlich den **Dependabot**-Store (für `push` **und** `pull_request`; nur `pull_request_target` erhält keine). Der Push-Lauf von PR #18 ist nach `@dependabot rebase` **11/11 grün** (`39130666484`) und wurde von `automerge.yml` gemergt (13:29:48Z, Merge-Kommit `e2d280b`).
   - **Der manuelle Rest — Owner-Entscheidung 2026-10-18: eigene `node-deps`-Welle, nicht nebenbei — ausgeführt, Ergebnis im Unterpunkt darüber.** `undici` (6 Alerts), `source-map-js`, `brace-expansion`, `postcss-selector-parser`, `braces`. Für `source-map-js` hat Dependabot seinen PR #20 am 2026-10-18 selbst geschlossen („Looks like source-map-js is no longer updatable, so this is no longer needed"), obwohl der Alert **offen** ist und `frontend/pnpm-lock.yaml:2701` → `source-map-js@1.2.1:` den verwundbaren Stand weiter pinnt. **Sonderfall `braces`:** `first_patched_version` ist leer — es gibt **keine** gefixte Version, der Fall braucht Entfernen/Override statt Bump. Alle übrigen sind Ein-Patch-Sprünge (`undici` 7.29.0 → 7.29.1, `source-map-js` 1.2.1 → 1.2.2, `brace-expansion` → 5.0.12, `postcss-selector-parser` → 7.1.6), aber **transitiv** — deshalb erst Triage (dev-only vs. Produktion), dann `pnpm.overrides`.
@@ -127,16 +109,15 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **16 offene `[ ]`** und **46 wartende
-> `[~]`** über 1830 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (16), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1830). Aufteilung der 16: **8× `manuell prüfen:`** und **8×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **13 offene `[ ]`** und **46 wartende
+> `[~]`** über 1811 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (13), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1811). Aufteilung der 13: **7× `manuell prüfen:`** und **6×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 8 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 6 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
 > A–D") sowie die seitdem aufgedeckten Reste (die Zwei-Verbindungs-Messung, die Restform der
-> User-Zeilen-Sperrreihenfolge von `destroy()`, die
 > Dialog-Befunde, die das Audit vom 2026-10-20 aus Code statt vom Gerät beantwortet hat) und
 > die manuellen Prüfpunkte der Deploys. Die beiden
 > Query-Zähl-Kosten sind geschlossen: die Basislinien sind gepinnt und der Lesepfad löst den
@@ -153,7 +134,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (62 = 16 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (59 = 13 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
