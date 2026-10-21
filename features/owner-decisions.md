@@ -109,7 +109,9 @@ The shared link replaces the authenticated download for the recipient: it is a s
 
 ### D-23: Documentation-only CI filtering
 
-Documentation-only changes may skip the full CI pipeline. Keep `paths` with `'**'` as the sole positive pattern and retain re-inclusions for `features/infrastructure/**`, `features/ai/**`, and `features/e2e-test-strategy.md`, along with Dependabot manifest/lockfile coverage. Do not replace the filter with a blanket Markdown ignore. See [CI workflow](../.github/workflows/ci.yml).
+Documentation-only changes may skip the full CI pipeline. Keep `paths` with `'**'` as the sole positive pattern and retain re-inclusions for `features/infrastructure/**`, `features/ai/**`, `features/security/**`, and `features/e2e-test-strategy.md`, along with Dependabot manifest/lockfile coverage. Do not replace the filter with a blanket Markdown ignore. See [CI workflow](../.github/workflows/ci.yml).
+
+**Revised on 2026-10-21 — the rule stands, the record was behind the workflow.** The previous wording named three re-inclusions (`features/infrastructure/**`, `features/ai/**`, `features/e2e-test-strategy.md`); the workflow has carried a fourth, `features/security/**`, since `8c0c32f` turned the security findings into a gate. The re-inclusions stay deliberately conservative: they cost redundant runs, and a redundant run is loud and self-healing, while a filtered-out change is silent. The reason that once justified them has expired: the ghcr-namespace gate read prose until 2026-10-18, when `InfrastructureSupplyChainPolicyTest::containerArtifactFiles()` stopped walking Markdown — of the 139 Markdown files it walked, five name a `ghcr.io/<organisation>` image reference and none carried a finding the delivered artifacts do not also carry. The re-inclusions therefore no longer keep image-doc drift gated; they are kept because dropping them buys nothing but silence. No filter behaviour changes with this revision.
 
 ### D-24: Frontend Stripe publishable key
 
