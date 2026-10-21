@@ -110,9 +110,9 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
 > **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **6 offene `[ ]`** und **46 wartende
-> `[~]`** über 1771 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> `[~]`** über 1807 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
 > (6), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1771). Aufteilung der 6: **3× `manuell prüfen:`** und **3×
+> `wc -l < AGENTS.todo.md` (1807). Aufteilung der 6: **3× `manuell prüfen:`** und **3×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 3 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
@@ -230,6 +230,42 @@ ist die Frage nicht „ist das besser?", sondern „ist D-x überholt?" — und 
 `features/owner-decisions.md` ersetzt**, nicht ergänzt.
 
 ---
+
+## 🚀 PRODUKTIONS-DEPLOY 2026-10-21 (`52980e2c`) — die Prüfbefehle laufen live
+
+Siebter Deploy desselben Tages: `./sync.sh` gegen den grünen Head `52980e2c`
+(CI `39572251086`, **13 Jobs grün** — Backend, Frontend, alle sechs
+E2E-Shards, Security-Contract, Ratchet). **Übertragen:** die Backend-Dateien
+(die beiden Prüfbefehle, `LicenseTermRules`, `BrandSelection`, der Seeder mit
+der öffentlichen Konstante) und das **unveränderte** Frontend-Bundle — seit dem
+sechsten Deploy hat sich keine Frontend-Quelle geändert (`git log dc290ec..HEAD
+-- frontend/src` ist leer), das Bundle `index-86wfO5VA.js` ist unverändert live.
+
+**In der Produktion ausgeführt und gemessen:**
+
+```
+docker exec portal_backend php artisan ops:check-license-pricing --expect=base_price=14900
+  → 9 Keys, 0 Verstöße, Exit 0        (base_price 14900 = 149,00 €)
+docker exec portal_backend php artisan ops:check-seeded-settings
+  → 3 von 28 Werten weichen ab, Exit 1
+    (calc_outdoor_images_per_hour, base_price, company_email)
+docker exec portal_backend php artisan ops:check-license-pricing --expect=base_price=8000
+  → Exit 1                             (die falsche Erwartung wird erkannt)
+docker exec portal_backend php artisan ops:check-license-pricing --brand=other
+  → Exit 1                             (eine unbekannte Marke wird verweigert)
+```
+
+Der Seed-Vergleich nennt **genau** die drei Abweichungen, die auch die
+unabhängige Messung per `SELECT` gefunden hat — der Befehl und die Messung
+sagen dasselbe. App-Preflight: `/up` → 200, `/api/notifications/preferences`
+ohne Token → 401, `storage/app/private` unversehrt.
+
+**Zum Neustart:** `AGENTS.md` §13 verlangt nach synchronisierten PHP-Änderungen
+ein `docker restart portal_backend`, damit die Caches die neuen Dateien laden.
+Diese Änderung fügt **weder eine Route noch eine Konfiguration** hinzu, und die
+neuen Befehle sind bereits jetzt wirksam (an der laufenden Instanz gemessen) —
+der Neustart ist damit kein offener Punkt, kann aber ohne Risiko gesetzt
+werden.
 
 ## 🚀 PRODUKTIONS-DEPLOY 2026-10-21 (`dc290ec`) — Neustart **erfolgt**
 
