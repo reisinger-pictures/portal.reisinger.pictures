@@ -55,6 +55,10 @@ readonly E2E_SFTPGO_BASE_URL="${E2E_SFTPGO_BASE_URL:-http://127.0.0.1:18081}"
 readonly E2E_SFTPGO_HEALTH_URL="${E2E_SFTPGO_HEALTH_URL:-${E2E_SFTPGO_BASE_URL}/healthz}"
 readonly E2E_SFTPGO_ADMIN_USERNAME="${E2E_SFTPGO_ADMIN_USERNAME:-e2e}"
 readonly E2E_SFTPGO_ADMIN_PASSWORD="${E2E_SFTPGO_ADMIN_PASSWORD:-e2e-sftpgo-admin-2026}"
+# Das Secret der FTP-Ereigniskette (D-36) im Test-Stack. Ein Dummy: es muss nur
+# mit dem in der Ereignisaktion uebereinstimmen, die `ftp:provision-events` im
+# laufenden Test-SFTPGo anlegt.
+readonly E2E_FTP_EVENT_SECRET="${E2E_FTP_EVENT_SECRET:-e2e-local-dummy-event-secret-2026}"
 readonly E2E_SFTPGO_READY_TIMEOUT_SECONDS="${E2E_SFTPGO_READY_TIMEOUT_SECONDS:-60}"
 
 log()  { printf '[e2e-up] %s\n' "$*"; }
@@ -180,6 +184,14 @@ set_env FTP_PUBLIC_HOST "camera.e2e.invalid"
 set_env SFTPGO_SFTP_PORT "2222"
 set_env SFTPGO_FTPS_PORT "989"
 
+# D-36: die Upload-Ereigniskette im laufenden Test-SFTPGo. Das Secret ist ein
+# lokaler Dummy — der Endpunkt vergleicht es nur mit dem, das die Ereignisaktion
+# traegt. Die Event-URL zeigt aus der Sicht des SFTPGo-Containers auf den Host:
+# das Backend lauscht auf 127.0.0.1 und ist unter diesem Namen von aussen nicht
+# erreichbar, `host.docker.internal` dagegen schon.
+set_env FTP_EVENT_SECRET "$E2E_FTP_EVENT_SECRET"
+set_env FTP_EVENT_URL "http://host.docker.internal:${PORT}/api/internal/ftp/upload-event"
+
 # Checkout defense overrides for the isolated E2E backend. The account-age
 # gate and dedicated checkout limiters stay test-only; the risk thresholds
 # still allow the Turnstile checkout spec to exercise its third-attempt path.
@@ -215,6 +227,16 @@ log "Lade E2E-Location-Fixtures und aktualisiere den Test-Suchindex ..."
   php artisan scout:sync-index-settings --env=e2e
   php artisan scout:import 'App\Models\Location' --env=e2e
 )
+
+# --- 4b. D-36: die Upload-Ereignisregel im laufenden Test-SFTPGo ------------
+# Die Regel (Ereignisaktion + Ereignisregel) wird seit 2026-10-21 nicht mehr
+# nur an der Quelle gelesen, sondern gegen ein laufendes SFTPGo geschrieben und
+# von dort zurueckgelesen — die Payload-Form (Endpunkt, Secret-Header,
+# JSON-Body, Timeout) ist damit am laufenden Dienst belegt, nicht nur im Code.
+# Das Kommando ist idempotent: ein zweiter Lauf findet Aktion und Regel und
+# schreibt sie mit demselben Inhalt zurueck.
+log "Provisioniere die FTP-Ereignisregel im Test-SFTPGo ..."
+( cd "$BACKEND" && php artisan ftp:provision-events --env=e2e )
 
 # --- 5. Backend isoliert starten --------------------------------------------
 log "Starte E2E-Backend auf http://127.0.0.1:${PORT} (STRG+C = Stopp)"
