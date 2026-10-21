@@ -55,8 +55,37 @@ class ValidateProductionOperations extends Command
         }
 
         $this->info('Production operations policy passed.');
+        $this->line('Effective checkout limits: '.json_encode($this->effectiveCheckoutLimits(), JSON_UNESCAPED_SLASHES));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The contract requires the effective limits to be readable in a
+     * health/metrics output. The boot-time production check is that output:
+     * it runs before the queue workers and the scheduler start, so the line in
+     * the log states the values that are in force — not the repository
+     * defaults, and not the environment as written but as parsed.
+     *
+     * @return array<string, int|string>
+     */
+    private function effectiveCheckoutLimits(): array
+    {
+        $switch = config('app.stripe.checkout_enabled');
+
+        return [
+            'checkout_enabled' => is_bool($switch) ? ($switch ? 'on' : 'off') : 'invalid',
+            'user_per_hour' => (int) config('app.checkout_throttle_user_per_hour'),
+            'ip_per_hour' => (int) config('app.checkout_throttle_ip_per_hour'),
+            'ip_per_day' => (int) config('app.checkout_throttle_ip_per_day'),
+            'new_account_hours' => (int) config('app.stripe.checkout_new_account_hours'),
+            'turnstile_user_per_hour' => (int) config('app.turnstile_user_threshold_per_hour'),
+            'turnstile_ip_per_hour' => (int) config('app.turnstile_ip_threshold_per_hour'),
+            'turnstile_failure_user_per_hour' => (int) config('app.turnstile_failure_user_threshold_per_hour'),
+            'turnstile_failure_ip_per_hour' => (int) config('app.turnstile_failure_ip_threshold_per_hour'),
+            'turnstile_failure_window_seconds' => (int) config('app.turnstile_failure_window_seconds'),
+            'stale_payment_intent_hours' => (int) config('app.stripe.stale_payment_intent_hours'),
+        ];
     }
 
     /**
