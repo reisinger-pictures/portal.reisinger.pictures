@@ -55,6 +55,30 @@ class CheckSeededSettingsCommandTest extends TestCase
             ->assertExitCode(1);
     }
 
+    public function test_it_names_a_key_that_is_not_stored_at_all(): void
+    {
+        // A key the seeder declares but that no row carries: a seed would
+        // create the row, so the report has to name it as missing rather than
+        // as a difference.
+        $this->storeSeederValues();
+        Setting::query()->where('key', 'bank_bic')->where('brand', 'rp')->delete();
+
+        $this->artisan('ops:check-seeded-settings')
+            ->expectsOutputToContain('bank_bic: nicht gespeichert — ein Seed legt die Zeile an.')
+            ->assertExitCode(1);
+    }
+
+    public function test_it_refuses_a_brand_that_does_not_exist(): void
+    {
+        // An unknown id must not be resolved to B2B silently: the report would
+        // then list the values of one brand under the label of another.
+        $this->storeSeederValues();
+
+        $this->artisan('ops:check-seeded-settings', ['--brand' => 'other'])
+            ->expectsOutputToContain('Unbekannte Marke "other"')
+            ->assertExitCode(1);
+    }
+
     public function test_the_report_reads_the_seeder_s_own_values(): void
     {
         // The command compares against the seeder's constant, not a copy of it:
@@ -69,6 +93,31 @@ class CheckSeededSettingsCommandTest extends TestCase
         $this->assertSame('8000', $authoritative['base_price']);
         $this->assertSame('DE96100110012179986174', $authoritative['bank_iban']);
         $this->assertCount(28, $authoritative);
+    }
+
+    /**
+     * The report must not carry a copy of the seeder's values: a second list
+     * could drift and then name the wrong differences. The command names the
+     * constant, and this pins that it names nothing else.
+     */
+    public function test_the_report_carries_no_copy_of_the_values(): void
+    {
+        $source = file_get_contents(__DIR__.'/../../app/Console/Commands/CheckSeededSettings.php');
+
+        $this->assertIsString($source);
+
+        foreach (DatabaseSeeder::AUTHORITATIVE_SETTINGS as $key => $value) {
+            // Short values ('2.0', '4020') are too common to be a copy.
+            if (mb_strlen($value) < 6) {
+                continue;
+            }
+
+            $this->assertStringNotContainsString(
+                $value,
+                $source,
+                'The command carries a copy of the seeder\'s value for "'.$key.'".',
+            );
+        }
     }
 
     private function storeSeederValues(): void

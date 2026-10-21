@@ -29,7 +29,9 @@ BACKEND_CONTAINER="${PORTAL_BACKEND_CONTAINER:-portal_backend}"
 
 # Die Argumente muessen die entfernte Shell als getrennte Worte sehen; %q
 # quotet sie portabel fuer bash.
-remote_cmd="docker exec ${BACKEND_CONTAINER} php artisan ops:check-seeded-settings"
+# Der Containername wird wie die Argumente quotet: ein Name mit einem
+# Leerzeichen darf nicht in zwei Woerter zerfallen.
+remote_cmd="docker exec $(printf '%q' "$BACKEND_CONTAINER") php artisan ops:check-seeded-settings"
 for argument in "$@"; do
     remote_cmd+=" $(printf '%q' "$argument")"
 done

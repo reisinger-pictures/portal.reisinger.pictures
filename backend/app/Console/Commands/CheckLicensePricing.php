@@ -5,8 +5,8 @@ namespace App\Console\Commands;
 use App\Enums\Brand;
 use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
+use App\Support\BrandSelection;
 use App\Support\LicenseTermRules;
-use App\Values\BrandConfig;
 use Illuminate\Console\Command;
 
 /**
@@ -38,6 +38,10 @@ class CheckLicensePricing extends Command
     public function handle(SettingResolver $resolver): int
     {
         $brand = $this->resolveBrand();
+        if ($brand === false) {
+            return self::FAILURE;
+        }
+
         if ($brand !== null) {
             BrandRegistry::set($brand);
         }
@@ -156,11 +160,16 @@ class CheckLicensePricing extends Command
     }
 
     /**
-     * The brand to resolve: the caller's choice, or null to keep the context
-     * the application already has (a console run has none, so the resolver
-     * falls back to B2B — the brand the production portal runs).
+     * The brand to resolve: the caller's choice, null to keep the context the
+     * application already has (a console run has none, so the resolver falls
+     * back to B2B — the brand the production portal runs), false when the
+     * caller named a brand that does not exist.
+     *
+     * An unknown id is refused instead of being resolved to B2B: the command
+     * would otherwise report the values of one brand under the label of
+     * another.
      */
-    private function resolveBrand(): Brand|BrandConfig|null
+    private function resolveBrand(): Brand|null|false
     {
         $id = $this->option('brand');
 
@@ -168,24 +177,19 @@ class CheckLicensePricing extends Command
             return null;
         }
 
-        $id = trim($id);
-        $enum = Brand::tryFrom($id);
+        $brand = BrandSelection::resolve($id);
 
-        if ($enum !== null) {
-            return $enum;
+        if ($brand === null) {
+            $this->error(sprintf(
+                'Unbekannte Marke "%s" — bekannt: %s.',
+                trim($id),
+                implode(', ', BrandSelection::known()),
+            ));
+
+            return false;
         }
 
-        // A brand that has no enum case yet (a white-label portal) still has a
-        // settings scope; the resolver falls back to B2B for every key the
-        // brand does not carry itself.
-        return new BrandConfig(
-            id: $id,
-            name: $id,
-            theme: Brand::B2B->value,
-            portalName: $id,
-            impressumUrl: null,
-            logoPath: null,
-        );
+        return $brand;
     }
 
     /**

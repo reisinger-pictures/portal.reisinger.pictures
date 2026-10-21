@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\Brand;
 use App\Services\SettingResolver;
 use App\Support\BrandRegistry;
-use App\Values\BrandConfig;
+use App\Support\BrandSelection;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Console\Command;
 
@@ -39,6 +39,10 @@ class CheckSeededSettings extends Command
     public function handle(SettingResolver $resolver): int
     {
         $brand = $this->resolveBrand();
+        if ($brand === false) {
+            return self::FAILURE;
+        }
+
         if ($brand !== null) {
             BrandRegistry::set($brand);
         }
@@ -48,17 +52,18 @@ class CheckSeededSettings extends Command
 
         foreach (DatabaseSeeder::AUTHORITATIVE_SETTINGS as $key => $seeded) {
             $current = $resolver->get($key);
-            $same = (string) $current === (string) $seeded;
+            $missing = $current === null;
+            $same = ! $missing && (string) $current === (string) $seeded;
 
             $rows[] = [
                 $key,
                 $this->shorten((string) $seeded),
-                $current === null ? '—' : $this->shorten((string) $current),
-                $same ? 'gleich' : 'WEICHT AB',
+                $missing ? '—' : $this->shorten((string) $current),
+                $same ? 'gleich' : ($missing ? 'NICHT GESPEICHERT' : 'WEICHT AB'),
             ];
 
             if (! $same) {
-                $differences[] = $key;
+                $differences[$key] = $missing;
             }
         }
 
@@ -69,15 +74,17 @@ class CheckSeededSettings extends Command
         $this->table(['key', 'Seeder', 'gespeichert', 'Zustand'], $rows);
 
         if ($differences !== []) {
-            foreach ($differences as $key) {
-                $this->line(sprintf('  %s: der gespeicherte Wert weicht vom Seeder ab.', $key));
+            foreach ($differences as $key => $missing) {
+                $this->line($missing
+                    ? sprintf('  %s: nicht gespeichert — ein Seed legt die Zeile an.', $key)
+                    : sprintf('  %s: der gespeicherte Wert weicht vom Seeder ab.', $key));
             }
 
             $this->error(sprintf(
-                'Ein Seed würde %d von %d Werten überschreiben (%s).',
+                'Ein Seed würde %d von %d Werten anlegen oder überschreiben (%s).',
                 count($differences),
                 count(DatabaseSeeder::AUTHORITATIVE_SETTINGS),
-                implode(', ', $differences),
+                implode(', ', array_keys($differences)),
             ));
 
             return self::FAILURE;
@@ -92,10 +99,15 @@ class CheckSeededSettings extends Command
     }
 
     /**
-     * The brand to resolve: the caller's choice, or null to keep the context
-     * the application already has.
+     * The brand to resolve: the caller's choice, null to keep the context the
+     * application already has, false when the caller named a brand that does
+     * not exist.
+     *
+     * An unknown id is refused instead of being resolved to B2B: the report
+     * would otherwise list the values of one brand under the label of
+     * another.
      */
-    private function resolveBrand(): Brand|BrandConfig|null
+    private function resolveBrand(): Brand|null|false
     {
         $id = $this->option('brand');
 
@@ -103,21 +115,19 @@ class CheckSeededSettings extends Command
             return null;
         }
 
-        $id = trim($id);
-        $enum = Brand::tryFrom($id);
+        $brand = BrandSelection::resolve($id);
 
-        if ($enum !== null) {
-            return $enum;
+        if ($brand === null) {
+            $this->error(sprintf(
+                'Unbekannte Marke "%s" — bekannt: %s.',
+                trim($id),
+                implode(', ', BrandSelection::known()),
+            ));
+
+            return false;
         }
 
-        return new BrandConfig(
-            id: $id,
-            name: $id,
-            theme: Brand::B2B->value,
-            portalName: $id,
-            impressumUrl: null,
-            logoPath: null,
-        );
+        return $brand;
     }
 
     /**

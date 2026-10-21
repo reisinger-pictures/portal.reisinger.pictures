@@ -337,12 +337,19 @@ Reisinger`, `bank_iban` = `DE96100110012179986174`, `bank_bic` = `NTSBDEB1XXX`,
 `company_street` = `Robert-Stolz-Straße 8`, `company_zip` = `4020`,
 `company_city` = `Linz`, `company_country` = `Österreich`.
 
-**Eine Abweichung ist gewollt und deshalb gefährlich:** `company_email` steht in
-der Produktion auf `florian@reisinger.pictures`, der Seeder schreibt
-`admin@example.com`. Ein `db:seed --force` — und `app:seed-if-fresh`, das
-denselben Seeder ruft — würde die reale Adresse durch die Platzhalteradresse
-ersetzen. Der Seeder ist für diesen Key autoritativ, also ist die Abweichung
-genau die Sorte von Wert, die der Vergleich nennen muss.
+**Drei der 28 autoritativen Werte weichen in der Produktion ab, und alle drei
+sind gewollt — deshalb sind sie gefährlich:**
+
+| Key | Seeder | Produktion | Folge eines Seeds |
+|---|---|---|---|
+| `company_email` | `admin@example.com` | `florian@reisinger.pictures` | die reale Adresse wird durch die Platzhalteradresse ersetzt |
+| `base_price` | `8000` | `14900` | der Preis 149,00 € wird zu 80,00 € (siehe die Preisprüfung oben) |
+| `calc_outdoor_images_per_hour` | `8` | `10` | die Rechenrate sinkt von 10 auf 8 Bilder pro Stunde |
+
+Der Seeder ist für jeden dieser Keys autoritativ, also ist jede Abweichung
+genau die Sorte von Wert, die der Vergleich nennen muss. Die Liste hier ist
+der vollständige Stand des 2026-10-21; `ops:check-seeded-settings` nennt
+unmittelbar davor, was ein Seed am Deploy-Tag tatsächlich treffen würde.
 
 Auf einer **frischen** Datenbank trägt dieselbe Zeile die Platzhalter aus der
 Migration (`bank_holder` = `Max Mustermann`, `bank_iban` = `ATXX XXXX XXXX XXXX
