@@ -9,7 +9,7 @@
     "packageManager": "pnpm@11.23.0",
     "scripts": {
         "dev": "vite",
-        "prebuild": "node scripts/check-turnstile-build.mjs && tsc -b && node scripts/check-i18n.mjs",
+        "prebuild": "node scripts/check-turnstile-build.mjs && tsc -b --force && node scripts/check-i18n.mjs",
         "build": "vite build",
         "postbuild": "node scripts/check-stripe-build.mjs",
         "preview": "vite preview",
