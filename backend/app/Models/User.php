@@ -147,9 +147,19 @@ class User extends Authenticatable implements JWTSubject
         return $this->belongsToMany(Role::class, 'user_roles');
     }
 
+    /**
+     * The gallery groups that are directly assigned to this user.
+     *
+     * This is the client grant pivot. Its `wants_notifications` column is a
+     * legacy column: the notification subscription has its own table
+     * (`group_notification_subscriptions`, V048) since the owner decision of
+     * 2026-10-21 (D-46 / AD-10), and the application neither reads nor writes
+     * that column for groups. It is therefore not selected here; the repair
+     * command reads it from the table directly.
+     */
     public function galleryGroups()
     {
-        return $this->belongsToMany(GalleryGroup::class, 'user_gallery_groups')->withPivot('wants_notifications');
+        return $this->belongsToMany(GalleryGroup::class, 'user_gallery_groups');
     }
 
     /**
@@ -180,6 +190,22 @@ class User extends Authenticatable implements JWTSubject
     public function galleryNotificationSubscriptions()
     {
         return $this->hasMany(GalleryNotificationSubscription::class);
+    }
+
+    /**
+     * The group notification subscriptions of this user.
+     *
+     * A subscription is not a grant. It lives in its own table
+     * (`group_notification_subscriptions`, V048), because writing the opt-in into
+     * `user_gallery_groups` turned every subscription into a group grant over
+     * the whole subtree of the group — see the owner decision of 2026-10-21
+     * (D-46 / AD-10).
+     *
+     * @return HasMany<GroupNotificationSubscription, $this>
+     */
+    public function groupNotificationSubscriptions()
+    {
+        return $this->hasMany(GroupNotificationSubscription::class);
     }
 
     public function photographerGalleries()
