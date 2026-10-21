@@ -38,7 +38,7 @@ The reasons:
 - The scheduler mutex and the database queue share the application connection (`DB_QUEUE_CONNECTION` = `DB_CONNECTION`). `onOneServer()` is only meaningful when every replica uses the same store, and the application database already is that store. See [production operations runbook](infrastructure/29-production-operations-runbook.md) §5.
 - The concurrency proof for the contract-signer identity invariant runs only on MySQL/MariaDB: `backend/tests/Feature/Contract/ContractSignerIdentityRaceTest.php` is driver-gated, because SQLite `:memory:` cannot provide independent writer connections. A switch to PostgreSQL would silently skip exactly the tests that prove the invariant.
 - The deadlock behaviour of the org sync is measured on the real engine (`backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh`), not simulated.
-- The migrations use Laravel's portable `json()` column type, so the schema is not MariaDB-bound. The engine choice is an operating decision, not a portability trap.
+- The migrations use Laravel's portable `json()` column type, but they are **not** engine-neutral: V008, V018 and V019 contain raw MySQL/MariaDB DDL (`MODIFY`, `CHANGE … AFTER`, `ENUM`), V038 relies on MariaDB's case-insensitive collation for the `ratings.actor_key` unique index, and `Contract::databaseNow()` carries a MariaDB-safe alias (`contract_database_now`, `backend/app/Models/Contract.php:262`) that exists precisely because the generic form does not work there. A change of the production engine would therefore also mean **reworking the migrations**, not only the configuration. The engine choice is an operating decision with a known price tag — not a portability trap that can be undone by switching a connection string.
 
 Consequences:
 
@@ -126,7 +126,7 @@ The shared link replaces the authenticated download for the recipient: it is a s
 
 ### D-23: Documentation-only CI filtering
 
-Documentation-only changes may skip the full CI pipeline. Keep `paths` with `'**'` as the sole positive pattern and retain re-inclusions for `features/infrastructure/**`, `features/ai/**`, and `features/e2e-test-strategy.md`, along with Dependabot manifest/lockfile coverage. Do not replace the filter with a blanket Markdown ignore. See [CI workflow](../.github/workflows/ci.yml).
+Documentation-only changes may skip the full CI pipeline. Keep `paths` with `'**'` as the sole positive pattern and retain re-inclusions for `features/infrastructure/**`, `features/ai/**`, `features/security/**`, and `features/e2e-test-strategy.md`, along with Dependabot manifest/lockfile coverage. Do not replace the filter with a blanket Markdown ignore. See [CI workflow](../.github/workflows/ci.yml).
 
 ### D-24: Frontend Stripe publishable key
 
