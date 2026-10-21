@@ -20,6 +20,60 @@ use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
+    /**
+     * The settings rows this seeder is authoritative for.
+     *
+     * The seeder writes these keys with an `upsert` on `(key, brand)`, so every
+     * one of them ends up with the value below — including the rows a migration
+     * created first (V004: the price and licence terms, V005: the bank keys)
+     * and the values an operator set through the UI. A `db:seed` in production
+     * therefore overwrites exactly these keys (backend/AGENTS.md, "Database
+     * Setup Policy").
+     *
+     * The values are public so that the comparison against the stored rows has
+     * **one** source: `ops:check-seeded-settings` reads this constant, not a
+     * copy of it. A second list of values could drift from the one the seeder
+     * writes, and the report would then name the wrong differences.
+     *
+     * @var array<string, string>
+     */
+    public const AUTHORITATIVE_SETTINGS = [
+        'price_web' => '7500',
+        'price_print' => '14500',
+        'price_original' => '45000',
+        'mult_commercial' => '2.0',
+        'mult_unlimited' => '1.5',
+        'mult_international' => '1.5',
+        'term_web' => 'Web & Social Media (PR & Redaktionell). Längste Kante max. 2560px.',
+        'term_print' => 'Print & Editorial (bis A4). Längste Kante max. 4000px.',
+        'term_original' => 'Originalauflösung. Kommerzielle Werbung & uneingeschränkte Nutzung.',
+        'term_territory_national' => 'Nutzung nur im Inland (national).',
+        'term_territory_international' => 'Weltweite, uneingeschränkte räumliche Nutzung.',
+        // Money is cents, whole-euro amounts included (owner decision
+        // 2026-09-28). These two were euros — `'50'` / `'80'` — until
+        // V045__calculator_money_fields_to_cents converted the stored rows;
+        // V016__calculator_settings_defaults still seeds the euro values and
+        // must not be edited, so the migration supersedes it.
+        'calc_base_price' => '5000',
+        'calc_hourly_rate' => '8000',
+        'calc_images_per_hour' => '6',
+        'calc_outdoor_images_per_hour' => '8',
+        'calc_flatrate_multiplier' => '1.2',
+        // Per-image license base prices are stored in cents.
+        'base_price' => '8000',
+        'setup_fee' => '5000',
+        'privacy_fee' => '20000',
+        'extra_image_fee' => '1500',
+        'bank_holder' => 'Florian Reisinger',
+        'company_street' => 'Robert-Stolz-Straße 8',
+        'company_zip' => '4020',
+        'company_city' => 'Linz',
+        'company_country' => 'Österreich',
+        'company_email' => 'admin@example.com',
+        'bank_iban' => 'DE96100110012179986174',
+        'bank_bic' => 'NTSBDEB1XXX',
+    ];
+
     public function run(): void
     {
 
@@ -182,42 +236,7 @@ class DatabaseSeeder extends Seeder
         // `insertOrIgnore` silently skipped exactly those rows. A `db:seed`
         // therefore also overwrites values an operator set through the UI for
         // these 28 keys — see backend/AGENTS.md (Database Setup Policy).
-        $settingDefaults = [
-            'price_web' => '7500',
-            'price_print' => '14500',
-            'price_original' => '45000',
-            'mult_commercial' => '2.0',
-            'mult_unlimited' => '1.5',
-            'mult_international' => '1.5',
-            'term_web' => 'Web & Social Media (PR & Redaktionell). Längste Kante max. 2560px.',
-            'term_print' => 'Print & Editorial (bis A4). Längste Kante max. 4000px.',
-            'term_original' => 'Originalauflösung. Kommerzielle Werbung & uneingeschränkte Nutzung.',
-            'term_territory_national' => 'Nutzung nur im Inland (national).',
-            'term_territory_international' => 'Weltweite, uneingeschränkte räumliche Nutzung.',
-            // Money is cents, whole-euro amounts included (owner decision
-            // 2026-09-28). These two were euros — `'50'` / `'80'` — until
-            // V045__calculator_money_fields_to_cents converted the stored rows;
-            // V016__calculator_settings_defaults still seeds the euro values and
-            // must not be edited, so the migration supersedes it.
-            'calc_base_price' => '5000',
-            'calc_hourly_rate' => '8000',
-            'calc_images_per_hour' => '6',
-            'calc_outdoor_images_per_hour' => '8',
-            'calc_flatrate_multiplier' => '1.2',
-            // Per-image license base prices are stored in cents.
-            'base_price' => '8000',
-            'setup_fee' => '5000',
-            'privacy_fee' => '20000',
-            'extra_image_fee' => '1500',
-            'bank_holder' => 'Florian Reisinger',
-            'company_street' => 'Robert-Stolz-Straße 8',
-            'company_zip' => '4020',
-            'company_city' => 'Linz',
-            'company_country' => 'Österreich',
-            'company_email' => 'admin@example.com',
-            'bank_iban' => 'DE96100110012179986174',
-            'bank_bic' => 'NTSBDEB1XXX',
-        ];
+        $settingDefaults = self::AUTHORITATIVE_SETTINGS;
 
         $settingRows = array_map(
             static fn (string $key, string $value): array => [
