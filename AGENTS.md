@@ -30,6 +30,7 @@
 - Remove completed TODOs rather than checking them off. Keep only open work, explicit owner decisions still needed, conditions being awaited, or manual post-deploy checks.
 - Mark superseded contracts as superseded. Mark fixed findings as fixed rather than leaving their old failure claim in the present tense.
 - Evidence in durable docs must be verifiable: quote the referenced source when giving a line anchor, or cite a symbol; give a reproducible command for any reported number.
+- A statement about how the code looks belongs to a **commit**, not to a working tree: read it with `git show <sha>:<path>` (or `git show HEAD:<path>`) and name the commit. Several agents work on the same tree; a statement anchored only in the working tree describes a state that no commit has and that the next change can invalidate.
 - Do not begin new work with failing or flaky tests. Diagnose and fix existing failures, or document an explicitly accepted risk in the appropriate feature/security document.
 - Do not place implementation status or session history in `features/`; keep it in `AGENTS.todo.md` or Git.
 

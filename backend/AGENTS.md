@@ -95,9 +95,12 @@ The gate `php artisan test` runs **both** suites — `tests/Feature` and `tests/
 ### The local services the full suite needs
 
 The full suite talks to **Meilisearch** (`127.0.0.1:7701`) and **Mailpit** (`127.0.0.1:1025`
-SMTP, `127.0.0.1:8025` API). Both run as containers of the local Docker stack
-(`docker-compose.test.yml`); the frontend development database is a separate SQLite file and
-needs no container.
+SMTP, `127.0.0.1:8025` API). Meilisearch runs as the `search` container of the local Docker
+stack (`docker-compose.test.yml`). **Mailpit is not part of that file** — it is a separate
+process on the developer machine (`brew install mailpit`, then `mailpit` on the command line;
+any container binding 1025 and 8025 serves the same purpose). The CI starts both as workflow
+services (`.github/workflows/ci.yml`, the `backend` and the `e2e` job). The frontend
+development database is a separate SQLite file and needs no container.
 
 If the Docker daemon is not running, the mail and the search tests fail with connection
 errors (`cURL error 7`, `TransportException`) — **environmental, not defects**: the same
