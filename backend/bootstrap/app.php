@@ -41,6 +41,32 @@ return Application::configure(basePath: dirname(__DIR__))
         // kein Route-Lookup, `AuthenticationException` wird überhaupt erst geworfen.
         $middleware->redirectGuestsTo(null);
 
+        // The API is only reachable through Caddy: the FastCGI port is not
+        // published to the host, and Caddy sets `X-Forwarded-For` from the
+        // real peer while ignoring the header a client sends.
+        //
+        // Without trusting the proxy, every request arrives from the proxy's
+        // container address (measured in production: 172.18.0.3 for every
+        // request), and every rate limiter collapses into ONE portal-wide
+        // bucket: the login limiter (5 attempts per minute), the API limiter,
+        // the checkout quota (10/h and 30/d per IP) and the Turnstile
+        // thresholds. The stored `orders.ip_address` named the proxy instead
+        // of the customer, and the S3/S7 runbook signals counted one bucket.
+        //
+        // `at: 'REMOTE_ADDR'` trusts exactly the direct peer — the proxy — and
+        // nothing else. Symfony then takes the RIGHTMOST entry of the
+        // forwarded chain, which is the one the proxy itself wrote, so a
+        // client-supplied entry cannot replace the client address. (`at: '*'`
+        // would trust every address in the chain and fall back to the
+        // leftmost entry — the spoofable one.)
+        //
+        // Only `X-Forwarded-For` and `X-Forwarded-Proto` are trusted: the host
+        // header stays the one Caddy matched.
+        $middleware->trustProxies(
+            at: 'REMOTE_ADDR',
+            headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO,
+        );
+
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Der Redirect-Pfad ist oben entfernt; hier bekommt der 401 auch ohne
