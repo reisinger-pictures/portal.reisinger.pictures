@@ -94,7 +94,7 @@ export default function GalleryAccessModal({galleryId, galleryName, galleryType,
             boxClassName="max-w-2xl"
             height="80vh"
             scrollableBody
-            bodyClassName={hasUsers ? 'border border-base-300 rounded-box p-2' : undefined}
+            bodyClassName={hasUsers ? 'border border-base-300 rounded-box p-2' : ''}
             bodyHead={
                 <>
                     <p className="text-sm opacity-70 mb-4"><Trans>Galerie:</Trans> <strong>{galleryName}</strong></p>

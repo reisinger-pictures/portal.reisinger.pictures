@@ -118,7 +118,12 @@ describe('GalleryAccessModal user list affordances', () => {
         // With users to list, the region carries its frame and the fade that
         // covers a row cut in half at the bottom edge.
         expect(scroller).toHaveClass('border');
-        expect(scroller.querySelector('.sticky.bottom-0')).not.toBeNull();
+        const fade = scroller.querySelector('.sticky.bottom-0');
+        expect(fade).not.toBeNull();
+        // The fade belongs to the bottom edge of the scroll region: it has to be
+        // its last element, otherwise it would cover the first row instead of
+        // the cut one.
+        expect(scroller.lastElementChild).toBe(fade);
     });
 
     // D-43: a direct client assignment carries delivery galleries only. The

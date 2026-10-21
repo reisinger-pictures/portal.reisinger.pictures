@@ -442,16 +442,18 @@ Die Harness-Aufnahmen der Dialoge `gallery-access-dialog` und
 gegen die Checkliste der `ui-review`-Skill geprüft. Ergebnis:
 
 - **Die Cap greift:** beide Dialoge bleiben unter ihrer benannten Höhe
-  (`max-h-80vh`/`max-h-90vh`); ein kurzer Dialog nutzt nur die Höhe, die sein
-  Inhalt braucht.
+  (`max-h-80vh`; `max-h-90vh` ist der andere benannte Wert der Shell); ein kurzer
+  Dialog nutzt nur die Höhe, die sein Inhalt braucht.
 - **Der Kopf bleibt stehen:** Titel und Schließen-Knopf stehen außerhalb der
   scrollenden Region, die Galerie-Zeile, das Suchfeld und der Zähler bleiben
   mit ihnen gepinnt.
-- **Das Fade sitzt am Scrollrand:** der Verlauf am unteren Rand der Liste
+- **Das Fade sitzt am Scrollrand** (nur `gallery-access-dialog`, der
+  Fotografen-Dialog hat keine Liste): der Verlauf am unteren Rand der Liste
   deckt eine halb abgeschnittene Zeile ab.
 
-Ein Befund daraus ist behoben: bei **leerer** Liste blieb im Body ein leerer
-Rahmen mit dem Fade-Gradienten stehen — gemeinsam lesbar wie ein leeres
+Ein Befund aus dem **Code** ist behoben: bei **leerer** Liste blieb im Body ein
+leerer Rahmen mit dem Fade-Gradienten stehen — gemeinsam lesbar wie ein leeres
 Eingabefeld statt wie „hier ist niemand". Der Body kollabiert jetzt, wenn die
 Liste leer ist; der Zähler im gepinnten Kopf („0 Nutzer") trägt den
-Leerzustand. `GalleryAccessModal.test.tsx` pinnt beide Zustände.
+Leerzustand. `GalleryAccessModal.test.tsx` pinnt beide Zustände und die Lage
+des Fades am unteren Rand.
