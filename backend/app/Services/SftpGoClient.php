@@ -64,8 +64,12 @@ class SftpGoClient
     /**
      * `status: 1` = user enabled. Named, because the value is meaningless
      * without the context (0 disables the account).
+     *
+     * Public because the reconciliation (P1-M30) reads the same field to tell
+     * an enabled account from a disabled one: two copies of "1 = enabled"
+     * would be able to disagree about what a disabled account means.
      */
-    private const USER_STATUS_ENABLED = 1;
+    public const USER_STATUS_ENABLED = 1;
 
     /**
      * The instance uploads into its home directory only; no virtual folders are
@@ -179,6 +183,10 @@ class SftpGoClient
      * The raw user object. Public because the explicit reconcile path (P1-M30)
      * needs it: the cached `ftp_account_status` is a cache, and this is how it
      * would be corrected without putting a live query into the read path.
+     *
+     * The `status` field is part of the answer, not a detail: it says whether
+     * the account may be used at all, so a disabled account is an access that
+     * was withdrawn.
      */
     public function findUser(string $username): array
     {
