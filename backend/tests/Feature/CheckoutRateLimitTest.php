@@ -145,8 +145,14 @@ class CheckoutRateLimitTest extends TestCase
         $this->assertQuotaDenied(fn () => $service->assertCheckoutQuotaAllowed($request, $users[2]));
     }
 
-    public function test_untrusted_forwarded_for_does_not_change_checkout_ip_or_quota_keys(): void
+    public function test_the_checkout_quota_follows_the_client_address_the_proxy_forwarded(): void
     {
+        // The API is only reachable through Caddy, and Caddy writes the client
+        // address into `X-Forwarded-For`. The buckets therefore belong to the
+        // customer, not to the proxy — otherwise every customer would share
+        // one bucket and the 30-per-day quota would be a portal-wide limit.
+        // That a client-supplied entry cannot replace the client address is
+        // proven separately in `TrustedProxyTest`.
         config([
             'app.checkout_throttle_user_per_hour' => 100,
             'app.checkout_throttle_ip_per_hour' => 100,
@@ -175,16 +181,16 @@ class CheckoutRateLimitTest extends TestCase
             'brand' => 'rp',
         ]);
 
-        $remoteIp = '198.51.100.44';
-        $forwardedIp = '203.0.113.44';
+        $proxyIp = '198.51.100.44';
+        $clientIp = '203.0.113.44';
         $this->mockStripePaymentIntentSuccess();
 
         try {
             $response = $this
-                ->withServerVariables(['REMOTE_ADDR' => $remoteIp])
+                ->withServerVariables(['REMOTE_ADDR' => $proxyIp])
                 ->withHeaders([
                     'Authorization' => 'Bearer '.$token,
-                    'X-Forwarded-For' => $forwardedIp,
+                    'X-Forwarded-For' => $clientIp,
                 ])
                 ->postJson('/api/orders/checkout', [
                     'items' => [[
@@ -200,17 +206,17 @@ class CheckoutRateLimitTest extends TestCase
                 ]);
 
             $response->assertOk();
-            $this->assertSame($forwardedIp, $response->baseRequest?->header('X-Forwarded-For'));
-            $this->assertSame($remoteIp, $response->baseRequest?->ip());
+            $this->assertSame($clientIp, $response->baseRequest?->header('X-Forwarded-For'));
+            $this->assertSame($clientIp, $response->baseRequest?->ip());
             $order = Order::findOrFail($response->json('order_id'));
 
-            $this->assertSame($remoteIp, $order->ip_address);
-            $this->assertSame(1, RateLimiter::attempts(CheckoutKey::ip($remoteIp, 'checkout-quota-hour')));
-            $this->assertSame(1, RateLimiter::attempts(CheckoutKey::ip($remoteIp, 'checkout-quota-day')));
-            $this->assertSame(1, RateLimiter::attempts(CheckoutKey::ip($remoteIp, 'checkout-risk-attempt')));
-            $this->assertSame(0, RateLimiter::attempts(CheckoutKey::ip($forwardedIp, 'checkout-quota-hour')));
-            $this->assertSame(0, RateLimiter::attempts(CheckoutKey::ip($forwardedIp, 'checkout-quota-day')));
-            $this->assertSame(0, RateLimiter::attempts(CheckoutKey::ip($forwardedIp, 'checkout-risk-attempt')));
+            $this->assertSame($clientIp, $order->ip_address);
+            $this->assertSame(1, RateLimiter::attempts(CheckoutKey::ip($clientIp, 'checkout-quota-hour')));
+            $this->assertSame(1, RateLimiter::attempts(CheckoutKey::ip($clientIp, 'checkout-quota-day')));
+            $this->assertSame(1, RateLimiter::attempts(CheckoutKey::ip($clientIp, 'checkout-risk-attempt')));
+            $this->assertSame(0, RateLimiter::attempts(CheckoutKey::ip($proxyIp, 'checkout-quota-hour')));
+            $this->assertSame(0, RateLimiter::attempts(CheckoutKey::ip($proxyIp, 'checkout-quota-day')));
+            $this->assertSame(0, RateLimiter::attempts(CheckoutKey::ip($proxyIp, 'checkout-risk-attempt')));
         } finally {
             $this->resetStripeHttpClient();
         }
