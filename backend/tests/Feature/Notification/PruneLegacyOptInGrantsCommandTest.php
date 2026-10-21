@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -107,6 +108,7 @@ class PruneLegacyOptInGrantsCommandTest extends TestCase
         ]);
     }
 
+    #[Group('smoke')]
     public function test_a_selected_row_that_is_not_a_candidate_is_kept_and_reported(): void
     {
         // The client is still a member of the organization, so the gallery is

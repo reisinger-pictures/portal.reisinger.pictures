@@ -59,6 +59,16 @@
             "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
+        "test:smoke": [
+            "@putenv SCOUT_DRIVER=collection",
+            "@putenv MAIL_MAILER=array",
+            "@php artisan config:clear --ansi",
+            "@php artisan test --group=smoke"
+        ],
+        "test:feature": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --parallel --testsuite=Feature"
+        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"

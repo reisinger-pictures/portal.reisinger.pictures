@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Support\MocksStripeClient;
 use Tests\TestCase;
 
@@ -38,6 +39,7 @@ class OrderCheckoutTest extends TestCase
         parent::tearDown();
     }
 
+    #[Group('smoke')]
     public function test_checkout_calculates_delta_pricing_with_flatrate_and_modifiers()
     {
         $user = User::factory()->create(['flatrate_level' => 'print']);

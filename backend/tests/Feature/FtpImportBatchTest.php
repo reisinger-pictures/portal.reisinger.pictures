@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -43,6 +44,7 @@ class FtpImportBatchTest extends TestCase
         Storage::fake('photos');
     }
 
+    #[Group('smoke')]
     public function test_fifty_files_are_drained_in_three_batches_without_a_manual_call(): void
     {
         [$user] = $this->importContext();

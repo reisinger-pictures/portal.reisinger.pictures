@@ -15,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 class FtpImportTest extends TestCase
@@ -113,6 +114,7 @@ class FtpImportTest extends TestCase
         $response->assertStatus(422);
     }
 
+    #[Group('smoke')]
     public function test_process_removes_inbox_file_only_after_storage_processing_and_database_success(): void
     {
         [$user, $sourcePath] = $this->createImportContext();

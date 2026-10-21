@@ -11,6 +11,7 @@ use App\Services\AuthorizationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -31,6 +32,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
 {
     use RefreshDatabase;
 
+    #[Group('smoke')]
     public function test_the_opt_in_does_not_write_into_the_grant_pivot(): void
     {
         [$client, $gallery] = $this->orgMemberWithDeliveryGallery();
@@ -68,6 +70,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
         );
     }
 
+    #[Group('smoke')]
     public function test_the_opt_in_is_stored_in_the_subscription_table_and_can_be_revoked(): void
     {
         [$client, $gallery] = $this->orgMemberWithDeliveryGallery();

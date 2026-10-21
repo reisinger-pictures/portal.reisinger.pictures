@@ -20,6 +20,7 @@
 - Bug fixes require a regression test reproducing the bug. Refactoring/dead-code removal may omit tests when justified in the change record.
 - Frontend quality gate: `pnpm lint:fix && pnpm build`. The build includes TypeScript and i18n checks; `tsc -b` is optional diagnosis, not a replacement.
 - Backend quality gate: `php artisan test` with the existing suite green.
+- Inner loop for the backend: from `backend/`, `composer test:smoke` (the tagged subset — 18 existing tests, a few seconds, needs neither Meilisearch nor Mailpit) and `composer test:feature` (the `tests/Feature` suite in parallel; it does not include `tests/Unit`) shorten the local loop. They do **not** replace the backend gate — details and the rules in [`backend/AGENTS.md`](backend/AGENTS.md).
 - Do not add `eslint-disable`, `@ts-ignore`, or `any`.
 
 ## 4. Documentation and task management

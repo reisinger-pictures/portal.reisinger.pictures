@@ -10,6 +10,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\HttpFoundation\File\UploadedFile as SymfonyUploadedFile;
 use Tests\TestCase;
 
@@ -98,6 +99,7 @@ class ModelFileImageBudgetTest extends TestCase
         $this->assertSame(AIService::MAX_IMAGE_BYTES, $store->storedByteBudget());
     }
 
+    #[Group('smoke')]
     public function test_re_encoded_bytes_above_the_stored_budget_are_rejected_before_persisting(): void
     {
         // The gate is `strlen($sanitized) > maxStoredUploadBytes()`; a small

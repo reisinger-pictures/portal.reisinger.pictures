@@ -13,6 +13,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -185,6 +186,7 @@ class BrandFilterChainQueryBaselineTest extends TestCase
      * - a gallery in a chain at the shared depth limit (passes),
      * - a gallery in a chain beyond the shared depth limit (fails closed).
      */
+    #[Group('smoke')]
     public function test_the_set_based_brand_filter_selects_the_same_galleries_as_the_per_gallery_walk(): void
     {
         $fixture = $this->brandFilterFixture();
