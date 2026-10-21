@@ -1656,6 +1656,33 @@ class AuthorizationService
      * group assignment or at least one manageable gallery in the group's
      * subtree; empty groups are manageable for photographers within their own
      * brand (a group has no separate ownership marker).
+     *
+     * The chain of the group and the chain of every gallery of its subtree
+     * are resolved set-based: the subtree's groups and their ancestor closure
+     * are loaded once and the brand walk reads the parents from that map
+     * instead of issuing one `GalleryGroup::find()` per level *and* per
+     * gallery. The gallery list of the subtree is loaded once as well, and
+     * the role decisions are taken before the loop over the galleries.
+     *
+     * What no longer scales with the number of galleries of the subtree are
+     * the *group-chain lookups*: they depend on the depth of the group tree
+     * only. The number of statements as a whole still grows with the number
+     * of galleries, by about one statement per restricted gallery (the
+     * personal assignment of the gallery) and by one statement plus the
+     * depth of the group's chain per gallery whose own restriction flag is
+     * null (the group load of `Gallery::effective_restricted_photographers`).
+     * The gain is a range, not a constant: up to 10 statements for a subtree
+     * with a single gallery and 98 statements for a ten-gallery subtree. The
+     * loop over the galleries is skipped only for a photographer who holds
+     * the target group itself; an assignment to an ancestor or to a
+     * descendant of the target group does not skip it.
+     *
+     * The decisions are unchanged: every rule is `BrandRegistry`'s own (the
+     * same composition as in {@see filterGalleriesByBrandTree()}), the role
+     * decisions are the same, and only the part that genuinely differs per
+     * gallery — the gallery's own brand, the chain of its group, its own
+     * restriction and its own assignment — is read per gallery. The measured
+     * cost is pinned in `GalleryGroupManageQueryBaselineTest`.
      */
     public function canManageGalleryGroup(User $user, GalleryGroup $group): bool
     {
@@ -1664,8 +1691,30 @@ class AuthorizationService
         }
 
         $actorBrand = $this->normalizeBrand($user->brand);
-        if ($actorBrand !== null && ! BrandRegistry::galleryGroupTreeMatchesBrand($group, $actorBrand)) {
-            return false;
+
+        // The group map is the resolver of the brand walk: the walk reads the
+        // parents from the map instead of issuing a `GalleryGroup::find()` of
+        // its own. The map starts with the target group (the caller loaded
+        // it) and holds the subtree's groups and their ancestors once the
+        // subtree is known.
+        $groupsById = new Collection;
+        $resolveGroup = function (string $groupId) use (&$groupsById): ?GalleryGroup {
+            return $groupsById->get($groupId);
+        };
+
+        if ($actorBrand !== null) {
+            // The chain of the target group. The closure is bounded by the
+            // very depth the brand walk reaches, so a chain above the bound
+            // still fails closed: the walk meets a parent the closure did not
+            // resolve and ends the walk there.
+            $groupsById = $this->withAncestorClosure(
+                new Collection([(string) $group->getKey() => $group]),
+                GalleryGroupSubtree::MAX_DEPTH,
+            );
+
+            if (! BrandRegistry::galleryGroupTreeMatchesBrand($group, $actorBrand, $resolveGroup)) {
+                return false;
+            }
         }
 
         if (! $this->sharesBrand($user, $group->brand)) {
@@ -1685,19 +1734,115 @@ class AuthorizationService
         }
 
         $groupIds = $this->getSubGroupIds([$group->id]);
-        $galleryIds = Gallery::whereIn('gallery_group_id', $groupIds)->pluck('id')->all();
 
-        if (empty($galleryIds)) {
+        // The gallery list of the subtree is loaded once. The decision needs
+        // the gallery's own brand, its group and its own restriction flag —
+        // not one lookup per gallery.
+        $galleries = Gallery::whereIn('gallery_group_id', $groupIds)
+            ->get(['id', 'brand', 'gallery_group_id', 'restricted_photographers']);
+
+        if ($galleries->isEmpty()) {
             return true;
         }
 
-        foreach ($galleryIds as $galleryId) {
-            if ($this->canManageGallery($user, $galleryId)) {
+        // The chains of the galleries of the subtree: the galleries live in
+        // the subtree's groups, and the ancestors above them are the target
+        // group's chain, which is already in the map. Only the rows of the
+        // subtree itself are loaded.
+        $groupsById = $groupsById->merge($this->galleryGroupRows($groupIds));
+
+        // The subtree of the photographer's own groups is the same for every
+        // gallery of the subtree, so it is resolved once and not once per
+        // gallery.
+        $photographerGroupIds = null;
+
+        // The transient claims of the actor are synchronized once, before the
+        // loop. The per-gallery walk synchronized them once per gallery; the
+        // decision below does not read them, so one synchronization is
+        // enough and the side effect on the actor stays the same.
+        $this->synchronizeTransientClaims($user);
+
+        foreach ($galleries as $gallery) {
+            // The gallery's own brand and the chain of its group — the part
+            // of the decision that the whole subtree shares.
+            if (! $this->subtreeGalleryMatchesActorBrand($gallery, $actorBrand, $resolveGroup)) {
+                continue;
+            }
+
+            // The part that genuinely differs per gallery: its own
+            // restriction and its own assignment.
+            if (! $gallery->effective_restricted_photographers) {
+                return true;
+            }
+
+            if ($user->photographerGalleries()->where('galleries.id', $gallery->id)->exists()) {
+                return true;
+            }
+
+            $photographerGroupIds ??= $this->photographerGroupScopeIds($user);
+
+            if (in_array($gallery->gallery_group_id, $photographerGroupIds)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Whether the gallery's own brand and the chain of its group match the
+     * actor's brand.
+     *
+     * Every rule is `BrandRegistry`'s own — the own-brand match is
+     * `resourceMatchesBrand()`, the "no group" rule is
+     * `galleryTreeMatchesBrand()` itself, the "missing group" rule is
+     * `galleryGroupTreeMatchesBrand(null, …)` and the group tree is
+     * `galleryGroupTreeMatchesBrand()` with the resolver hook. Only the
+     * *composition* — which rule applies to which case — is local, exactly as
+     * in {@see filterGalleriesByBrandTree()}: a change to a rule in
+     * `BrandRegistry` moves both paths together, and the equivalence probe in
+     * `GalleryGroupManageQueryBaselineTest` detects a divergence.
+     *
+     * @param  callable(string): (GalleryGroup|null)  $resolveGroup
+     */
+    private function subtreeGalleryMatchesActorBrand(Gallery $gallery, ?string $actorBrand, callable $resolveGroup): bool
+    {
+        if (! BrandRegistry::resourceMatchesBrand($gallery->brand, $actorBrand)) {
+            return false;
+        }
+
+        $groupId = $gallery->gallery_group_id;
+
+        if ($groupId === null || $groupId === '') {
+            return BrandRegistry::galleryTreeMatchesBrand($gallery, $actorBrand);
+        }
+
+        $group = $resolveGroup((string) $groupId);
+
+        if (! $group instanceof GalleryGroup) {
+            return BrandRegistry::galleryGroupTreeMatchesBrand(null, $actorBrand);
+        }
+
+        return BrandRegistry::galleryGroupTreeMatchesBrand($group, $actorBrand, $resolveGroup);
+    }
+
+    /**
+     * The subtree of the photographer's own gallery groups.
+     *
+     * The same for every gallery of a group's subtree, so it is resolved once
+     * per call instead of once per gallery.
+     *
+     * @return array<string>
+     */
+    private function photographerGroupScopeIds(User $user): array
+    {
+        $groupIds = $user->photographerGalleryGroups()->pluck('gallery_groups.id')->toArray();
+
+        if (empty($groupIds)) {
+            return [];
+        }
+
+        return $this->getSubGroupIds($groupIds);
     }
 
     /**
