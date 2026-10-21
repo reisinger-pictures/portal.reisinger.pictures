@@ -128,7 +128,7 @@ sechs offenen Dependabot-Branches für `/frontend` änderten vier ausschließlic
 `frontend/pnpm-lock.yaml`. Ein solcher Bump trifft `frontend/pnpm-lock.yaml` in
 `paths` → der Rebuild läuft, extrahierte aber wieder die Range-Untergrenze und
 backte **denselben** Browser unter **demselben** Tag neu ein. Der E2E-Lauf blieb
-grün, weil `ci.yml:622-629` („Verify Playwright browsers (fallback install)") die
+grün, weil `ci.yml:661-668` („Verify Playwright browsers (fallback install)") die
 abweichende Browserversion pro Lauf nachlädt — **damit war die Zusage des
 Test-Images still aufgehoben** („kein Browser-Download pro Run",
 `deployment/Dockerfile.e2e:12-16`), ohne dass irgendwo ein Fehler erschien. Der
