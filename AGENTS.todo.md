@@ -115,10 +115,10 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Protokoll ganz oben. Eine Position mit `Entscheidung offen:` bedeutet, dass eine **neue**
 > Frage entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **4 offene `[ ]`** und **17 wartende
-> `[~]`** über 1318 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
-> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 4, `… | grep -c '^- \[~\]'` → 17,
-> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1318; `<stand>` = der committete Stand dieses
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **4 offene `[ ]`** und **16 wartende
+> `[~]`** über 1300 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
+> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 4, `… | grep -c '^- \[~\]'` → 16,
+> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1300; `<stand>` = der committete Stand dieses
 > Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
 > trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
 > 4: **3× `manuell prüfen:`** und **1× gewöhnliche Arbeit**; **0× `Entscheidung offen:`** — die
@@ -137,15 +137,15 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > 2026-10-20** hat 16 alte Owner-Positionen durchgesehen: 11 davon sind erledigt, maschinell
 > abgedeckt oder überholt und deshalb aus der Liste gegangen; die restlichen sind mit korrigiertem
 > Wortlaut und dem richtigen Werkzeug (Firewalld statt ufw, `ROOT.PEM` statt `cert.pem`,
-> authentifiziert statt anonym lesen) stehen geblieben. Alle 17 `[~]` tragen ein `wartet auf`.
+> authentifiziert statt anonym lesen) stehen geblieben. Alle 16 `[~]` tragen ein `wartet auf`.
 > **Diese Zählung ist ein Stand, keine Zusage** — sie wandert mit jeder Welle; wer eine Position
 > sucht, zählt selbst nach. Der Vergleich zum 2026-09-28-Stand (69 Positionen) ist **kein**
 > Fortschrittsmaß: seither kamen Positionen hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
 > `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
-> (21 = 4 offen + 17 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
-> (1318) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
+> (20 = 4 offen + 16 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
+> (1300) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
 > würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
 > defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
 > **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
@@ -678,24 +678,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   (`proxy-stack` ✓, Owner ✓) — der stärkste, aber auch der aufwendigste Weg ✓. **Bis zur Entscheidung
   gilt (a)**, und die Restlücke steht hier.
 
-- [~] wartet auf den **Deploy und die Live-Verifikation der Proxy-Trust-Regel** — **der Fund war
-  produktionskritisch (2026-10-22):** das Backend vertraute dem Proxy nicht, obwohl die API ausschließlich
-  über Caddy erreichbar ist (`deployment/docker-compose.yml`: der FastCGI-Port 9000 ist nicht zum Host
-  publiziert). Gemessen auf dem Host: `docker logs portal_backend` zeigt für **jede** Anfrage
-  `172.18.0.3` — die Container-Adresse von Caddy. Damit teilten sich **alle** Kunden einen IP-Bucket:
-  die Login-Drosselung (`throttle:{AUTH_THROTTLE_LIMIT},1` → 5 pro Minute im Default, **10 in der
-  Produktion**, `deployment/docker-compose.yml:188`), der API-Limiter, die
-  Checkout-Quota (10/h, 30/Tag je IP) und die Turnstile-Schwellen; `orders.ip_address` speicherte die
-  Proxy-Adresse statt des Kunden, und die Runbook-Signale S3/S7 zählten einen einzigen Bucket. Die
-  Produktion hat **0 Orders** (`SELECT COUNT(*) FROM orders`), deshalb ist der Fehler nie aufgefallen.
-  **Umgesetzt:** `backend/bootstrap/app.php` vertraut jetzt `REMOTE_ADDR` (den direkten Peer) und liest
-  `X-Forwarded-For`/`X-Forwarded-Proto` — Symfony nimmt den **rechtesten** Ketteneintrag, also den vom
-  Proxy selbst geschriebenen; ein vom Client vorangestellter Eintrag kann die Adresse nicht ersetzen
-  (`at: '*'` wäre unsicher gewesen, weil dann der linkeste Eintrag gewinnt). Tests:
-  `backend/tests/Feature/TrustedProxyTest.php` (4 Fälle, inkl. Spoofing-Gegenprobe ✓).
-  **Offen:** Deploy und der Live-Nachweis, dass die Login-Drosselung jetzt je Client zählt — messbar
-  über zwei Anfragen mit unterschiedlichen `X-Forwarded-For`-Werten (die Rate-Limiter-Keys im Cache
-  müssen sich unterscheiden ✓).
 - [~] wartet auf die **Einrichtung der D-36-Ereigniskette in der Produktion** — **am 2026-10-21 auf
   dem Host gemessen: die Kette fehlt vollständig.** (a) Die SFTPGo-Instanz der Produktion hat **keine**
   Event-Action und **keine** Event-Regel (`GET /api/v2/eventactions` und `/api/v2/eventrules` liefern
