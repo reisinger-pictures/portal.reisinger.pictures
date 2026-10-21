@@ -16,9 +16,14 @@ name: CI
 # Docs-only commits ran all 12 jobs (incl. 6 Playwright shards) on 3352977
 # (AGENTS.md + AGENTS.todo.md). `'**'` is the only positive pattern, so no code
 # change can ever be filtered out; the negations drop documentation only. The
-# trailing patterns re-include the docs the ghcr-namespace gate reads as input
-# on purpose (InfrastructureSupplyChainPolicyTest scans .md), keeping image-doc
-# drift gated. `main` has deliberately no branch protection (AGENTS.md D-3), so a
+# trailing patterns re-include the documentation trees deliberately
+# conservative: they cost redundant runs, and a redundant run is loud and
+# self-healing, while a filtered-out change is silent. The reason that once
+# justified them expired on 2026-10-18: InfrastructureSupplyChainPolicyTest
+# stopped scanning prose — the docblock of its containerArtifactFiles() says
+# "Prose is deliberately not scanned." — so the ghcr-namespace gate no longer
+# reads .md as input, and the re-includes no longer keep image-doc drift
+# gated. `main` has deliberately no branch protection (AGENTS.md D-3), so a
 # path-filtered run cannot strand a PR on a required check.
 # `automerge.yml` is the one consumer a filtered check breaks: it waits for
 # `'CI gate (push)'` with `fail-on-no-checks: true`, so a never-reporting check
