@@ -110,9 +110,9 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
 > **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **7 offene `[ ]`** und **46 wartende
-> `[~]`** über 1774 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> `[~]`** über 1785 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
 > (7), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1774). Aufteilung der 7: **4× `manuell prüfen:`** und **3×
+> `wc -l < AGENTS.todo.md` (1785). Aufteilung der 7: **4× `manuell prüfen:`** und **3×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 3 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
@@ -350,9 +350,20 @@ unverändert gegenüber dem vorigen Deploy, Homepage **200**.
   (`FtpController.php:116`), `_quarantine` existiert auf dem Host
   (`FtpInboxImporter.php:135`) — und ein Upload **ohne** Button importiert (D-36-Ereigniskette).
   **Die Hälfte „kein 500er auf `GET /api/management/ftp/status`" ist am 2026-10-19 bestätigt**
-  und erledigt. **Vorher maschinell:** `php artisan ftp:provision-events --dry-run` — die
-  D-36-Ereignisregel wurde **nie gegen ein laufendes SFTPGo** verifiziert
-  (`deployment/README.md:134-136`).
+  und erledigt. **Vorher maschinell:** die D-36-Ereignisregel ist am 2026-10-21 **gegen ein
+  laufendes SFTPGo verifiziert** — `scripts/e2e-up.sh` provisioniert sie bei jedem
+  Test-Stack-Setup, und der Test-SFTPGo zeigt die Aktion (POST, Secret-Header,
+  JSON-Body, Timeout 10 s) und die Regel (`fs_events: ["upload"]`, aktiv) zurück.
+  **In der Produktion ist die Kette aber noch nicht scharf** (gemessen 2026-10-21:
+  der laufende `portal_backend`-Container führt **kein** `FTP_EVENT_SECRET` in seiner
+  Umgebung — 0 Treffer — und `php artisan ftp:provision-events --dry-run` verweigert mit
+  „FTP_EVENT_SECRET ist nicht gesetzt."). Die Aktion und die Regel wurden also **nie** in
+  das Produktions-SFTPGo geschrieben, und jedes Ereignis würde mit 401 abgewiesen
+  (fail-closed, korrekt). **Ein Upload ohne Button importiert in der Produktion daher
+  heute nicht.** Die Schritte stehen in `deployment/README.md:110-127`: Secret in der
+  Portainer-GUI setzen → Stack-**Recreate** (ein Restart übernimmt keine neuen
+  `environment:`-Zeilen) → `docker exec portal_backend php artisan ftp:provision-events`.
+  Erst danach ist der Upload-Teil dieser Position sinnvoll prüfbar.
 
 ---
 
