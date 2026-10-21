@@ -90,4 +90,19 @@ php artisan test --parallel --testsuite=Feature
 
 The gate `php artisan test` runs **both** suites — `tests/Feature` and `tests/Unit` — and is the only run that covers everything.
 
+### The local services the full suite needs
+
+The full suite talks to **Meilisearch** (`127.0.0.1:7701`) and **Mailpit** (`127.0.0.1:1025`
+SMTP, `127.0.0.1:8025` API). Both run as containers of the local Docker stack
+(`docker-compose.test.yml`); the frontend development database is a separate SQLite file and
+needs no container.
+
+If the Docker daemon is not running, the mail and the search tests fail with connection
+errors (`cURL error 7`, `TransportException`) — **environmental, not defects**: the same
+failure set appears on the unmodified tree, and the CI, where the services are started by
+the workflow, is green. With the daemon up, the full local suite is green
+(measured 2026-10-21: 3240 passed, 4 skipped, 14387 assertions, 0 failures). Start Rancher
+Desktop (or any Docker daemon) before a full local run and do not read a connection error as
+a regression.
+
 **`--parallel` has to come first.** `artisan test` forwards the options it does not know to PHPUnit, and Symfony's argument parser stops at the first unknown option — so `php artisan test --testsuite=Feature --parallel` loses the `--parallel` silently and PHPUnit refuses it with `Unknown option "--parallel"`. `--parallel --testsuite=Feature` runs.

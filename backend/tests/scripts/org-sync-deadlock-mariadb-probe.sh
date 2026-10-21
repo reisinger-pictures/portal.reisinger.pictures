@@ -20,13 +20,28 @@
 # Usage (from backend/):
 #   DOCKER_BIN="$HOME/.rd/bin/docker" ./tests/scripts/org-sync-deadlock-mariadb-probe.sh
 #
-# Overridable: MARIADB_IMAGE (default mariadb:11.4), SCENARIOS (default 12),
-# MIN_ROW_LOCK_WAITS (default 1), DOCKER_BIN.
+# The second action can be the org destroy instead of the second sync:
+# SECOND_ACTION=destroy fires DELETE /api/management/orgs/{id} against the second
+# org, over the same fixture (the actors are members of each other's org). The
+# destroy takes the org row first and its members' pivot row before their user
+# row, while the sync locks all of its user rows before any pivot write.
 #
-# MIN_ROW_LOCK_WAITS is the positive control: the two syncs of a scenario lock
-# the same user rows, so a run in which they never overlapped never produced a
-# row-lock wait and proves nothing. A run below that threshold is reported as
-# INCONCLUSIVE (exit 1), not as a pass.
+# What this variant decides - and what it does not: in this fixture the destroy
+# pivots the member of the second org and the sync pivots the member of the
+# first org, so the two pivot sets are DISJOINT. The pivot-order difference is
+# therefore never load-bearing here: a 0-deadlock result shows that this shape
+# forms no cycle, it does NOT show that the pivot order is safe. Reaching that
+# residual needs a concurrent membership move - a third writer that moves a
+# member between orgs while the destroy runs - which this probe does not model.
+#
+# Overridable: MARIADB_IMAGE (default mariadb:11.4), SCENARIOS (default 12),
+# MIN_ROW_LOCK_WAITS (default 1), DOCKER_BIN, SECOND_ACTION (default sync).
+#
+# MIN_ROW_LOCK_WAITS is the positive control: in sync mode the two syncs of a
+# scenario lock the same user rows, in destroy mode the destroy's member write
+# contends with the sync's lock of the same row. A run in which they never
+# overlapped never produced a row-lock wait and proves nothing. A run below that
+# threshold is reported as INCONCLUSIVE (exit 1), not as a pass.
 #
 # CI-only: the script needs Docker. It is not part of the PHPUnit suite and
 # not part of a local test run. To see the pre-D-40 behaviour, revert
@@ -66,6 +81,15 @@ export PATH
 MARIADB_IMAGE="${MARIADB_IMAGE:-mariadb:11.4}"
 SCENARIOS="${SCENARIOS:-12}"
 MIN_ROW_LOCK_WAITS="${MIN_ROW_LOCK_WAITS:-1}"
+SECOND_ACTION="${SECOND_ACTION:-sync}"
+
+case "$SECOND_ACTION" in
+    sync|destroy) ;;
+    *)
+        echo 'SECOND_ACTION must be "sync" or "destroy".' >&2
+        exit 1
+        ;;
+esac
 
 case "$SCENARIOS" in
     ''|*[!0-9]*) echo 'SCENARIOS must be a positive integer.' >&2; exit 1 ;;
@@ -238,7 +262,7 @@ database_version="$("$DOCKER" exec --env "MYSQL_PWD=$database_root_password" "$c
     mariadb --batch --skip-column-names --user=root --execute='SELECT VERSION()')"
 echo "MariaDB server version: $database_version"
 echo "Probe database endpoint: 127.0.0.1:$database_port/$database_name (container only)"
-echo "Scenarios: $SCENARIOS (each fires two concurrent syncs over two orgs)"
+echo "Scenarios: $SCENARIOS (each fires two concurrent actions over two orgs; second action: $SECOND_ACTION)"
 
 if ! (cd "$BACKEND_DIR" && php artisan migrate:fresh --seed --force) >"$temporary_directory/migrate.log" 2>&1; then
     cat "$temporary_directory/migrate.log" >&2
@@ -254,11 +278,26 @@ if ! (cd "$BACKEND_DIR" && php artisan route:list --path=management/orgs --json)
     echo 'Could not enumerate the routes of the org management endpoints.' >&2
     exit 1
 fi
-if ! grep -q 'api.management.orgs.sync-users' "$temporary_directory/routes.json"; then
-    echo 'Harness precondition failed: PUT /api/management/orgs/{id}/users is not routed to OrgController::syncUsers.' >&2
-    exit 1
+if [ "$SECOND_ACTION" = 'destroy' ]; then
+    if ! grep -q 'api.management.orgs.destroy' "$temporary_directory/routes.json"; then
+        echo 'Harness precondition failed: DELETE /api/management/orgs/{id} is not routed to OrgController::destroy.' >&2
+        exit 1
+    fi
+    # The first action of a scenario is still the sync, so its route is checked
+    # as well. A missing route would answer 404 and fail the status histogram,
+    # but the check makes the dependency explicit.
+    if ! grep -q 'api.management.orgs.sync-users' "$temporary_directory/routes.json"; then
+        echo 'Harness precondition failed: PUT /api/management/orgs/{id}/users is not routed to OrgController::syncUsers.' >&2
+        exit 1
+    fi
+    echo 'Precondition verified: the org destroy and the org membership sync route are present.'
+else
+    if ! grep -q 'api.management.orgs.sync-users' "$temporary_directory/routes.json"; then
+        echo 'Harness precondition failed: PUT /api/management/orgs/{id}/users is not routed to OrgController::syncUsers.' >&2
+        exit 1
+    fi
+    echo 'Precondition verified: the org membership sync route is present.'
 fi
-echo 'Precondition verified: the org membership sync route is present.'
 
 cat >"$temporary_directory/seed-fixture.php" <<'PHP'
 <?php
@@ -277,19 +316,33 @@ use App\Support\BrandRegistry;
 BrandRegistry::set(Brand::B2B);
 
 $adminRole = Role::firstOrCreate(['name' => UserRole::ADMIN->value]);
+// The orgs carry a default role and the members hold it. Without it neither
+// the sync nor the destroy writes a user_roles row, and the pivot write is
+// exactly the part of the destroy whose order differs from the sync's.
+$defaultRole = Role::firstOrCreate(['name' => UserRole::CLIENT->value]);
 
 $scenarios = [];
 
 for ($index = 0; $index < (int) getenv('ORG_SYNC_PROBE_SCENARIOS'); $index++) {
-    $orgX = Org::factory()->create(['brand' => Brand::B2B, 'invoice_frequency' => 'immediate']);
-    $orgY = Org::factory()->create(['brand' => Brand::B2B, 'invoice_frequency' => 'immediate']);
+    $orgX = Org::factory()->create([
+        'brand' => Brand::B2B,
+        'invoice_frequency' => 'immediate',
+        'default_role_id' => $defaultRole->id,
+    ]);
+    $orgY = Org::factory()->create([
+        'brand' => Brand::B2B,
+        'invoice_frequency' => 'immediate',
+        'default_role_id' => $defaultRole->id,
+    ]);
 
     // Actor A is a member of org Y, actor B is a member of org X. Both are
     // global admins, so each may sync the other org.
     $actorA = User::factory()->create(['brand' => Brand::B2B, 'org_id' => $orgY->id]);
     $actorA->roles()->attach($adminRole);
+    $actorA->roles()->attach($defaultRole);
     $actorB = User::factory()->create(['brand' => Brand::B2B, 'org_id' => $orgX->id]);
     $actorB->roles()->attach($adminRole);
+    $actorB->roles()->attach($defaultRole);
 
     $scenarios[] = [
         'index' => $index,
@@ -400,15 +453,24 @@ for scenario in $(seq 1 "$SCENARIOS"); do
             client_token="$token_b"
             client_org="$org_y"
         fi
+        if [ "$SECOND_ACTION" = 'destroy' ] && [ "$side" = 'b' ]; then
+            request_method='DELETE'
+            request_url="http://127.0.0.1:$app_port/api/management/orgs/$client_org"
+            request_data=''
+        else
+            request_method='PUT'
+            request_url="http://127.0.0.1:$app_port/api/management/orgs/$client_org/users"
+            request_data='{"user_ids":[]}'
+        fi
         (
             while [ ! -e "$start_gate" ]; do sleep 0.01; done
             curl --connect-timeout 10 --max-time 60 --silent --show-error \
-                --request PUT \
+                --request "$request_method" \
                 --header "Authorization: Bearer $client_token" \
                 --header 'Content-Type: application/json' \
-                --data '{"user_ids":[]}' \
+                --data "$request_data" \
                 --output /dev/null --write-out '%{http_code}\n' \
-                "http://127.0.0.1:$app_port/api/management/orgs/$client_org/users" \
+                "$request_url" \
                 >"$results_directory/$scenario-$side"
         ) &
         client_pids+=("$!")
@@ -428,7 +490,7 @@ timeouts_after="$(status_value Innodb_row_lock_timeouts)"
 row_lock_waits_delta=$((row_lock_waits_after - row_lock_waits_before))
 deadlock_delta=$((deadlocks_after - deadlocks_before))
 
-echo 'HTTP status histogram (one pair of syncs per scenario):'
+echo "HTTP status histogram (one pair of actions per scenario; second action: $SECOND_ACTION):"
 awk '{ count[$1]++ } END { for (status in count) printf "%s %d\n", status, count[status] }' "$results_directory"/* | sort -n
 echo "InnoDB row-lock waits delta: $row_lock_waits_delta (positive control: at least $MIN_ROW_LOCK_WAITS required, $SCENARIOS scenarios)"
 if [ -n "$deadlocks_before" ] && [ -n "$deadlocks_after" ]; then
@@ -455,7 +517,7 @@ actor_ids="$(php -r '
     }
     echo implode(",", $ids);
 ' "$temporary_directory/fixture.json")"
-remaining_actors="$(mariadb_query "SELECT COUNT(*) FROM users WHERE org_id IS NOT NULL AND id IN ($actor_ids)")"
+remaining_actors="$(mariadb_query "SELECT COUNT(*) FROM users WHERE org_id IS NOT NULL AND id IN ($(printf '%s' "$actor_ids" | sed "s/,/','/g; s/^/'/; s/\$/'/"))")"
 echo "Probe actors still assigned to an org (expect 0): $remaining_actors"
 
 stop_server() {
@@ -512,14 +574,22 @@ if [ "$deadlock_counter_available" -ne 1 ]; then
 fi
 
 if [ "$deadlock_delta" -ne 0 ]; then
-    echo "DEFECT: $deadlock_delta InnoDB deadlock(s) under the D-40 lock order. Two concurrent org syncs whose actors are members of each other's org still form a lock cycle." >&2
+    if [ "$SECOND_ACTION" = 'destroy' ]; then
+        echo "DEFECT: $deadlock_delta InnoDB deadlock(s) under the D-40 lock order. A concurrent org destroy and a concurrent org sync, whose actors are members of each other's org, still form a lock cycle." >&2
+    else
+        echo "DEFECT: $deadlock_delta InnoDB deadlock(s) under the D-40 lock order. Two concurrent org syncs whose actors are members of each other's org still form a lock cycle." >&2
+    fi
     exit 2
 fi
 
 # Positive control: without a row-lock wait the two syncs of a scenario never
 # overlapped, so the run observed nothing and proves nothing.
 if [ "$row_lock_waits_delta" -lt "$MIN_ROW_LOCK_WAITS" ]; then
-    echo "INCONCLUSIVE: $row_lock_waits_delta InnoDB row-lock wait(s), at least $MIN_ROW_LOCK_WAITS required. The two syncs of a scenario did not contend, so this run proves nothing about the lock order." >&2
+    if [ "$SECOND_ACTION" = 'destroy' ]; then
+        echo "INCONCLUSIVE: $row_lock_waits_delta InnoDB row-lock wait(s), at least $MIN_ROW_LOCK_WAITS required. The destroy and the sync of a scenario did not contend, so this run proves nothing about the lock order." >&2
+    else
+        echo "INCONCLUSIVE: $row_lock_waits_delta InnoDB row-lock wait(s), at least $MIN_ROW_LOCK_WAITS required. The two syncs of a scenario did not contend, so this run proves nothing about the lock order." >&2
+    fi
     exit 1
 fi
 
@@ -535,7 +605,11 @@ if [ "$mariadb_errors" -ne 0 ]; then
     exit 1
 fi
 
-echo "Lock-order verdict: no deadlock in $SCENARIOS scenarios ($expected_200 concurrent syncs, all HTTP 200, $row_lock_waits_delta InnoDB row-lock wait(s) recorded as the positive control)."
+echo "Lock-order verdict: no deadlock in $SCENARIOS scenarios ($expected_200 concurrent actions, all HTTP 200, $row_lock_waits_delta InnoDB row-lock wait(s) recorded as the positive control)."
 echo 'This is a sample, not a proof of absence: a run can only show that no cycle appeared in the contended scenarios it executed.'
-echo 'Probe completed: the actor, the current members and the incoming members are locked in one ascending set, so two concurrent syncs serialise instead of deadlocking.'
+if [ "$SECOND_ACTION" = 'destroy' ]; then
+    echo 'Probe completed: a concurrent org destroy and a concurrent org sync formed no lock cycle in the sampled scenarios.'
+else
+    echo 'Probe completed: the actor, the current members and the incoming members are locked in one ascending set, so two concurrent syncs serialise instead of deadlocking.'
+fi
 exit 0
