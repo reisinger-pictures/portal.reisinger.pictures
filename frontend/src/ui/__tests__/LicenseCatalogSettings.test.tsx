@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import LicenseCatalogSettings from '../management/components/LicenseCatalogSettings';
@@ -324,5 +324,41 @@ describe('LicenseCatalogSettings', () => {
         });
         expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
         expect(screen.queryByDisplayValue('Ungespeicherter Titel')).not.toBeInTheDocument();
+    });
+
+    /**
+     * The currency sign belongs *into* the price field, as its suffix — not as
+     * a second element standing next to the input.
+     *
+     * As a sibling it is decoration that happens to sit near the number: it
+     * reads as a separate piece of information, and the field itself looks
+     * lopsided, because the sign is not bound to the value it belongs to. The
+     * `join` pattern the repo already uses for money fields binds the two:
+     * the sign shares the border with the input, so the sign is part of the
+     * field and the field is one control.
+     *
+     * The assertion is on the join membership, because that is what the
+     * pattern *is*: the sign is the repo's `join-badge` — the utility that
+     * shares the border with the input — and it sits in the same `join` group
+     * as the number. A loose `span` next to the input does neither.
+     */
+    it('keeps the currency sign inside the price field', async () => {
+        const user = userEvent.setup();
+        renderWithProviders(<LicenseCatalogSettings />);
+
+        const row = screen.getByText('Web-Nutzung', { exact: true }).closest('tr');
+        if (!row) throw new Error('Use-case row not found');
+        await user.click(row.querySelector('button') as HTMLButtonElement);
+
+        // 500000 cents in the catalog, 5000 euro in the editor.
+        const priceInput = screen.getByDisplayValue('5000');
+        const euro = within(row).getByText('€');
+
+        // The sign is a joined member of the field group…
+        expect(euro.parentElement).toHaveClass('join');
+        expect(euro).toHaveClass('join-badge');
+        expect(priceInput).toHaveClass('join-item');
+        // …and the group holds the number it belongs to.
+        expect(euro.parentElement).toContainElement(priceInput);
     });
 });

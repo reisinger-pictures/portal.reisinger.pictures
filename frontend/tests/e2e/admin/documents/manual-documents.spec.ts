@@ -221,4 +221,74 @@ test.describe('Manual Documents & CRM Workflow', () => {
             await expect(page.locator('.text-2xl.font-bold').filter({ hasText: 'Gesamtbetrag' })).toContainText('105,00 €');
         });
     });
+
+    /**
+     * The tap target of the calculator's checkboxes.
+     *
+     * daisyUI's checkbox is 24 px across — measured in the built bundle:
+     * `--size: calc(var(--size-selector) * 6)` with `--size-selector: 0.25rem`
+     * — and 24 px is below the 44 px a finger needs to hit a control
+     * reliably. What carries the interaction is therefore the *target* around
+     * the box: a wrapper of 44 px, centred on the visible box, with the
+     * negative margin taking back exactly the space it adds, so the visible
+     * box does not move a pixel.
+     *
+     * The measurement is the point of the test: it fails if the target
+     * shrinks again, and the tap next to the visible box proves that the
+     * enlarged area really answers the click.
+     *
+     * The wrapper itself is pinned, not merely measured: the parent of the
+     * input is the wrapper, but without it the parent would be the label — an
+     * element of its own size that would satisfy a bare measurement and hide
+     * the missing tap target.
+     */
+    test('The Shooting Calculator checkboxes offer a 44 px tap target', { tag: ['@feature:admin:documents'] }, async ({ page }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+        await auth.login(testUser.email, testUser.password);
+
+        await sidebar.navigateTo('Manuelles Angebot');
+        await page.getByRole('button', { name: 'Paket-Kalkulator' }).click();
+
+        // The dialog renders inside the landmark (D-10), so every locator
+        // here is scoped to it.
+        const dialog = page.locator('main').getByRole('dialog');
+        await expect(dialog).toBeVisible();
+
+        const checkbox = dialog.getByRole('checkbox', { name: /Outdoor-Shooting/ });
+        await expect(checkbox).toBeVisible();
+
+        // The tap target is the wrapper around the visible box — the parent of
+        // the checkbox. It is pinned by its own class, so the assertion fails
+        // if the wrapper disappears; measuring the parent alone would be
+        // satisfied by any ≥ 44 px ancestor (the label around it is one).
+        const target = checkbox.locator('xpath=..');
+        await expect(target).toHaveClass(/size-11/);
+        const targetBox = await target.boundingBox();
+        expect(targetBox).not.toBeNull();
+        expect(targetBox!.width).toBeGreaterThanOrEqual(44);
+        expect(targetBox!.height).toBeGreaterThanOrEqual(44);
+
+        // The visible box stays what it was: the target grew around it, the
+        // box did not.
+        const visualBox = await checkbox.boundingBox();
+        expect(visualBox).not.toBeNull();
+        expect(visualBox!.width).toBeLessThan(44);
+        expect(visualBox!.height).toBeLessThan(44);
+
+        // And the enlarged area really answers a tap: 8 px to the left of the
+        // box is inside the target and outside the box.
+        const tapX = visualBox!.x - 8;
+        const tapY = visualBox!.y + visualBox!.height / 2;
+        // The point belongs to the wrapper and not to the label around it:
+        // that is what makes the enlarged area answer the click.
+        const hit = await page.evaluate(
+            ({ x, y }) => document.elementFromPoint(x, y)?.closest('.size-11')?.className ?? null,
+            { x: tapX, y: tapY },
+        );
+        expect(hit).toContain('size-11');
+
+        await page.mouse.click(tapX, tapY);
+        await expect(checkbox).toBeChecked();
+    });
 });

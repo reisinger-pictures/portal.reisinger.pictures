@@ -114,9 +114,15 @@ function UseCaseRow({ uc, onSave, onDelete }: UseCaseRowProps) {
                         </label>
                     </td>
                     <td className="text-right">
-                        <div className="flex justify-end items-center gap-1">
-                            <input type="number" step="0.01" className="input input-bordered w-24 text-right" value={data.base_price} onChange={e => setData({...data, base_price: parseFloat(e.target.value) || 0})} />
-                            <span className="font-bold opacity-70">€</span>
+                        {/* The currency sign belongs *into* the field: it is the
+                            suffix of the price, not a second element standing
+                            next to it. The `join` pattern is the one this repo
+                            already uses for money fields — the new-use-case
+                            form below, the calculator settings, the manual
+                            invoice. */}
+                        <div className="join">
+                            <input type="number" step="0.01" className="input input-bordered join-item w-24 text-right" value={data.base_price} onChange={e => setData({...data, base_price: parseFloat(e.target.value) || 0})} />
+                            <span className="join-badge">€</span>
                         </div>
                     </td>
                 </>

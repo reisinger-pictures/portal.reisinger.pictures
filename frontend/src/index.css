@@ -129,11 +129,47 @@
 @utility h-80vh {
     height: 80vh;
 }
+/*
+ * Height caps of the dialogs.
+ *
+ * `vh` is the *large* viewport: the height the browser reports with its
+ * toolbars — and with the soft keyboard — taken out of the picture. A dialog
+ * capped with it can therefore be taller than what is actually on screen, and
+ * the footer ends up below the keyboard. `dvh` is the viewport as it is right
+ * now: it shrinks when the soft keyboard opens.
+ *
+ * The two live in *separate* rules on purpose. Written as two declarations in
+ * one rule, the minifier drops the `vh` one (it is always overridden where
+ * `dvh` is understood) and the fallback is gone exactly where it is needed.
+ * As two classes, each rule survives on its own: a browser that does not know
+ * `dvh` drops the second rule and keeps the `vh` cap.
+ *
+ * The dynamic class is applied with Tailwind's important modifier (`!`) in
+ * `ModalShell.tsx`, because the two rules have the same specificity and
+ * Tailwind emits them in alphabetical order — the `dvh` variant before the
+ * `vh` one — so the static cap would win without it. The important
+ * declaration is the one that may not be overridden by the stylesheet order;
+ * the fallback next to it stays ordinary.
+ *
+ * Only the important `dvh` variants end up in the bundle. The plain ones are
+ * dead — the shell never applies them — and Tailwind would emit them if a
+ * comment named the class: the content scan reads class names out of
+ * comments, and the `@utility` definition itself is not scanned. Naming the
+ * class in a comment is therefore enough to put an unused rule back into the
+ * production bundle; this comment calls the variants "the `dvh` one" for
+ * exactly that reason.
+ */
 @utility max-h-80vh {
     max-height: 80vh;
 }
 @utility max-h-90vh {
     max-height: 90vh;
+}
+@utility max-h-80dvh {
+    max-height: 80dvh;
+}
+@utility max-h-90dvh {
+    max-height: 90dvh;
 }
 @utility bg-checkerboard {
     background-image: radial-gradient(circle, var(--color-base-content) 1px, transparent 1px);
@@ -161,6 +197,47 @@
 }
 
 @layer utilities {
+    /* daisyUI caps the dialog box at `100vh` (daisyui@5.7.20,
+       `node_modules/daisyui/components/modal.css`), which is the *large*
+       viewport: with the soft keyboard open the box is taller than the screen
+       and the footer — the row the user has to reach — sits below the
+       keyboard. `dvh` is the viewport as it is right now and shrinks with it.
+
+       This is the cap of the default layout (the bounded layout caps the box
+       itself, see the `dvh` utility above). The rule lives in the `utilities`
+       layer, so it beats daisyUI's own `.modal-box` rule (which sits in the
+       nested `daisyui.l1.l2.l3` layer).
+
+       The cap is a *default*, not a lock: `:where()` gives the rule no
+       specificity, so the app's own utilities win over it — the shell's
+       `max-h-90vh`/`max-h-90dvh!` decide the height of a bounded dialog.
+       Without it this rule would win on stylesheet order instead: the
+       hand-written `utilities` block comes *after* the utilities Tailwind
+       generates, and the two selectors have the same specificity.
+
+       Two rules, and not two declarations in one: the minifier keeps the last
+       declaration of a rule, so a rule with both declarations loses the `vh`
+       one (measured with the project's lightningcss 1.33.0:
+       `.a{max-height:100vh;max-height:100dvh}` → `.a{max-height:100dvh}`).
+       Written this way both survive into the bundle, and the browser itself
+       decides which of them applies.
+
+       The `vh` declaration is the fallback for a browser that does not know
+       `dvh`: the `dvh` declaration is invalid there and is dropped at parse
+       time — an `!important` included — so the `vh` cap is what applies. The
+       `!important` on the dynamic cap makes it beat daisyUI's own `100vh`
+       cap whichever layer the two end up in; the layer order alone already
+       does it, but a cap that depends on where a stylesheet happens to put a
+       rule is a cap that can be lost. */
+    :where(.modal-box) {
+        max-height: 100vh;
+    }
+    @supports (height: 100dvh) {
+        :where(.modal-box) {
+            max-height: 100dvh !important;
+        }
+    }
+
     .input {
         @apply w-full;
     }

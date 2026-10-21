@@ -154,8 +154,9 @@ interface ModalShellProps {
     bodyHead?: ReactNode;
     /**
      * The bounded box height, as one of two named values. Each maps to exactly
-     * one static class (`max-h-80vh` / `max-h-90vh`, both `@utility`
-     * definitions in `index.css`) and is applied only in the bounded layout.
+     * one static class pair (`max-h-80vh max-h-80dvh!` / `max-h-90vh
+     * max-h-90dvh!`, both `@utility` definitions in `index.css`) and is applied
+     * only in the bounded layout.
      *
      * Named rather than free-form for the two reasons the repo has already paid
      * for: a height interpolated into a class name is invisible to Tailwind's
@@ -176,10 +177,24 @@ type ModalShellHeight = '80vh' | '90vh';
  * the class strings are static literals — Tailwind has to see `max-h-80vh` and
  * `max-h-90vh` written out to keep them, and an interpolated `` `max-h-${height}` ``
  * would look like compliance and break in production.
+ *
+ * Each height carries two classes, the static one first and the dynamic one
+ * second: `vh` is the large viewport (the height with the soft keyboard taken
+ * out of the picture), `dvh` is the viewport as it is right now and shrinks
+ * when the keyboard opens. A dialog capped with `vh` alone is taller than the
+ * screen once the keyboard is up, and the footer — the row the user has to
+ * reach — disappears below it.
+ *
+ * The dynamic class carries Tailwind's important modifier, because the two
+ * rules have the same specificity and Tailwind emits them in alphabetical
+ * order — the `dvh` variant before the `vh` one — so the static cap would
+ * win without it. The important declaration is the one that may not be
+ * overridden by the stylesheet order; the fallback next to it stays
+ * ordinary, so a browser that does not know `dvh` keeps the `vh` cap.
  */
 const BOUNDED_HEIGHT_CLASS: Record<ModalShellHeight, string> = {
-    '80vh': 'max-h-80vh',
-    '90vh': 'max-h-90vh',
+    '80vh': 'max-h-80vh max-h-80dvh!',
+    '90vh': 'max-h-90vh max-h-90dvh!',
 };
 
 export default function ModalShell({
