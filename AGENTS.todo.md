@@ -109,13 +109,13 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **9 offene `[ ]`** und **46 wartende
-> `[~]`** über 1794 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (9), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1794). Aufteilung der 9: **5× `manuell prüfen:`** und **4×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **8 offene `[ ]`** und **46 wartende
+> `[~]`** über 1781 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (8), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1781). Aufteilung der 8: **5× `manuell prüfen:`** und **3×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 4 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 3 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
 > A–D") sowie die seitdem aufgedeckten Reste (die Zwei-Verbindungs-Messung, die Restform der
 > Dialog-Befunde, die das Audit vom 2026-10-20 aus Code statt vom Gerät beantwortet hat) und
@@ -134,7 +134,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (55 = 9 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (54 = 8 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
@@ -745,19 +745,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
   Platzhalter-Bankverbindung drin (auf einer frischen DB wäre es `Max Mustermann` /
   `ATXX XXXX XXXX`), also gehen Auszahlungen an das richtige Konto. Ein kurzer Blick in
   die Systemeinstellungen genügt.
-- [ ] **Gegenprobe vor jedem Deploy, der `base_price` berührt:** **Der im Board
-  genannte Lesebefehl funktioniert nicht mehr** — `GET /api/settings/license-terms` liegt
-  hinter `auth:api` **und** `super_admin` (`backend/routes/api.php:187-189`), ein
-  anonymer `curl` liefert **401** statt des Wertes. **Lesbar** mit einem
-  Super-Admin-Token oder per `php artisan tinker` auf der `settings`-Zeile. Die
-  Seeder-Werte (`base_price` = `8000`, `price_web` = `7500`, `price_print` = `14500`,
-  `price_original` = `45000`, `DatabaseSeeder.php:208`) sind mit `upsert` **ableitbar** —
-  die frühere Aussage „nicht aus dem Repository ableitbar" war falsch. Am **2026-09-28**
-  auf Produktion gemessen und plausibel, `min:500` greift nicht. **Damit ist der Auslöser
-  des CI-Fehlers an `package-calculator-config.spec.ts` auf frischen Datenbanken begrenzt**
-  (dort stand `35.00`, 35 Cent, weil `V004:131` die Zeile vorbelegt); Produktion war
-  nie betroffen, weil dort über die Oberfläche gesetzte Werte standen. **Vor dem nächsten
-  Deploy erneut messen — authentifiziert.**
 
 ### Abweichungen bei der Umsetzung (2026-09-26) — zwei Audits, nicht blind übernommen
 
