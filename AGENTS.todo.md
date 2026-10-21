@@ -109,10 +109,10 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **8 offene `[ ]`** und **46 wartende
-> `[~]`** über 1781 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (8), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1781). Aufteilung der 8: **5× `manuell prüfen:`** und **3×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **7 offene `[ ]`** und **46 wartende
+> `[~]`** über 1774 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (7), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1774). Aufteilung der 7: **4× `manuell prüfen:`** und **3×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 3 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
@@ -134,7 +134,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (54 = 8 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (53 = 7 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
@@ -260,13 +260,6 @@ In der Produktion trug **keine** Pivot-Zeile das Opt-in-Flag (gemessen: 0 in
 also nichts zu übernehmen, und es gibt keinen Rest, der eine Zuweisung erzeugen könnte.
 **Ein `--apply` ist hier weder nötig noch sinnvoll.**
 
-- [ ] manuell prüfen: Gegenproben nach dem Neustart — in einer Galerie und in einer Gruppe
-  den Benachrichtigungs-Opt-in **setzen und wieder löschen** (das muss gehen, **ohne** eine
-  Zuweisung zu erzeugen); im „E-Mail senden"-Dialog muss `notified_count` stimmen. Dazu der
-  unveränderte Lesepfad: `/api/auth/me`, ein Org-Benutzer-Sync und ein Org-Löschen (die
-  aufsteigende Sperrreihenfolge), ein Login als Client und als Fotograf, und ein
-  **Gruppen-Umbenennen oder -Löschen** mit Galerien im Unterbaum (der Verwaltungspfad löst
-  die Gruppenkette jetzt gesammelt auf; die Entscheidung muss dieselbe bleiben).
 
 ## 🚀 PRODUKTIONS-DEPLOY 2026-10-21 (`bd48c03`) — abgeschlossen
 
