@@ -730,7 +730,8 @@ Schema-/Backfill-/Rollback-Entscheidung):
   dokumentierten Vertrags ist und ein ungeprüfter Rollback kein Vertrag ist.
 - Die Spalte ist ein **Cache**, nicht die Wahrheit: wird der User in SFTPGo von
   Hand gelöscht, ist sie veraltet. Deshalb ein expliziter
-  `reconcileAccount()`-Pfad statt eines stillen Live-Query.
+  `reconcileAccount()`-Pfad statt eines stillen Live-Query — umgesetzt als
+  `php artisan ftp:reconcile`, Vertrag in §7.16a.
 
 **Umsetzung (P1-M26, ergänzt 2026-09-27).** `FtpController::status()` gibt die
 drei Kontofelder zusammen mit dem Bestand und der Reset-Quota zurück:
@@ -1379,10 +1380,15 @@ fail-closed an beiden Stellen:
 `UserController::destroy()` (Kontolöschung). Beide rufen
 `FtpCredentialService::revoke()` auf, **bevor** sie schreiben.
 
-**Was das nicht löst:** Es gibt weiterhin keine Reconciliation, die einen
-SFTPGo-Account findet, den das Portal nicht kennt — etwa nach einem manuellen
-Eingriff in SFTPGo. `reconcileAccount()` (P1-M30) ist der vorgesehene Weg und
-bleibt offen.
+**Was das nicht löst (Stand 2026-10-21, geändert):** Die Reconciliation, die
+hier früher als offen geführt wurde, **existiert**: `reconcileAccount()`
+(P1-M30) schreibt den Zustand, `php artisan ftp:reconcile` ruft sie auf. Der
+Vertrag steht in **§7.16a**. Offen bleibt genau der Teil, den auch §7.16a nicht
+kann: ein SFTPGo-Account, dessen **Name kein `ftp_slug`** ist, wird von keiner
+Reconciliation gefunden — das Portal kennt Konten nur unter dem Slug, den es
+selbst vergeben hat. Ein manuell im SFTPGo angelegtes Konto unter einem
+fremden Namen bleibt für das Portal unsichtbar; sichtbar wird es erst, wenn
+der Slug des Fotografen auf diesen Namen gesetzt wird.
 
 **Provisionierung ist der Übergang nach `active`.** Die Invariante hält nur,
 wenn der Pfad, der den Account anlegt, den Zustand auch schreibt. Bis V043 tat er
@@ -1453,6 +1459,106 @@ andere ist aktiv" und hätte `revoked` als **Konto aktiv** angezeigt — die ein
 Auskunft, die ein Fotograf über ein nicht funktionierendes Konto nie bekommen
 darf. Als Record ist ein neuer Status ein Compile-Fehler statt einer stillen
 Lüge.
+
+### 7.16a Reconciliation des Kontozustands (P1-M30)
+
+Stand 2026-10-21, umgesetzt.
+
+`users.ftp_account_status` ist ein **Cache** (7.4). Der Lesepfad darf ihn nicht
+reparieren — ein Live-Query in `status()` würde die UI vom Dienst abhängig
+machen (7.5) —, also ist die Reparatur ein **expliziter** Weg:
+`FtpCredentialService::reconcileAccount()` schreibt den Zustand,
+`php artisan ftp:reconcile` ruft sie auf. Es gibt bewusst **keinen** HTTP-Pfad
+dafür: die Reconciliation braucht das SFTPGo-Credential, und ein Endpunkt würde
+einen Dienstausfall in einen Request hineinziehen, der mit der Galerie des
+Fotografen nichts zu tun hat. Der Befehl liest **nur** (`GET
+/api/v2/users/{slug}`); er schreibt nichts in SFTPGo und legt damit auch kein
+Kamera-Passwort auf die Leitung.
+
+```bash
+cd backend
+php artisan ftp:reconcile                    # alle Fotografen mit FTP-Kontoname
+php artisan ftp:reconcile --user=florian     # ein Konto (Slug, User-ID oder E-Mail)
+```
+
+**Die Frage, die sie beantwortet:** „Existiert unter dem Slug dieses Fotografen
+ein SFTPGo-Konto, und ist es nutzbar?" Die Antwort landet in
+`ftp_account_status`, `ftp_provisioned_at` und `ftp_revoked_at`.
+
+| SFTPGo | Portal vorher | Portal nachher | geschrieben |
+|---|---|---|---|
+| Konto, aktiv | `pending` / `error` / `active` | `active` | `ftp_provisioned_at` (nur wenn leer), `ftp_account_error` = `null` |
+| Konto, aktiv | `revoked` | `revoked` (Abweichung) | nichts |
+| Konto, **deaktiviert** | `active` | `revoked` | `ftp_revoked_at`, `ftp_account_error` = `null` |
+| Konto, **deaktiviert** | `error` | `pending` | `ftp_account_error` = `null` |
+| Konto, deaktiviert | `pending` / `revoked` | unverändert | nichts |
+| Konto unbekannt (404) | `active` | `revoked` | `ftp_revoked_at`, `ftp_account_error` = `null` |
+| Konto unbekannt (404) | `error` | `pending` | `ftp_account_error` = `null` |
+| Konto unbekannt (404) | `pending` / `revoked` | unverändert | nichts |
+| nicht erreichbar / nicht konfiguriert / Fehler | beliebig | **unverändert** | `ftp_account_error` = Grund; Ausnahme |
+
+**Fünf Entscheidungen, die die Tabelle trägt:**
+
+1. **`pending` wird nie `revoked`.** `pending` heißt „nie provisioniert" — und
+   ist der Zustand, in dem der Fotograf **Zugangsdaten anfordern darf**
+   (P1-M58). Eine Reconciliation, die `pending` zu `revoked` machte, würde genau
+   diese Tür einem Fotografen wegnehmen, der nie ein Konto hatte. Aus dem
+   gleichen Grund wird `revoked` nicht zu `pending`: der Entzug war eine
+   bewusste Entscheidung (§7.16), und seine Auditspur (`ftp_revoked_at`) darf
+   eine Cache-Korrektur nicht überschreiben.
+2. **Ein deaktiviertes Konto zählt als entzogen.** SFTPGos `status` ist die
+   Antwort des Dienstes auf die Frage „darf dieses Konto benutzt werden?". Ein
+   Konto, das existiert, aber deaktiviert ist, ist ein **entzogener** Zugang —
+   von Hand, im Dienst —, und die Kamera authentifiziert sich damit nicht.
+3. **Ein entzogenes Konto wird nicht wiederbelebt.** Existiert das Konto in
+   SFTPGo wieder, obwohl das Portal es entzogen hat, ist das ein manueller
+   Eingriff. Die Reconciliation **meldet** die Abweichung und lässt den Status
+   `revoked`: eine bewusste Entscheidung zurückzunehmen ist Sache einer
+   Administration, nicht einer Cache-Korrektur. Damit ist die Invariante aus
+   §7.16 („ein Konto existiert genau dann, wenn der Status `active` ist") in
+   genau diesem einen Fall verletzt — und der Fall ist nur durch Handarbeit am
+   Dienst erreichbar.
+4. **Ein unbekanntes Ergebnis ändert nichts (fail-closed).** Ist SFTPGo nicht
+   erreichbar oder nicht konfiguriert, ist der Zustand des Kontos **unbekannt**,
+   nicht „weg". `revoked` zu schreiben hieße, eine funktionierende Kamera
+   wegen eines Ausfalls abzuschalten. Stattdessen bleibt der Status stehen, der
+   Grund landet in `ftp_account_error`, und die `SftpGoException` wird geworfen
+   — kein stilles `active`, kein 500er, sondern eine benannte Ausnahme mit
+   `reason` (`unreachable`, `not_configured`, `unauthorized`, …).
+5. **Ein `error`-Zustand wird aufgelöst, wenn es kein Konto gibt.** `error`
+   heißt „der letzte Provisionierungsversuch ist gescheitert, das Ergebnis ist
+   unbekannt". Die Reconciliation kennt das Ergebnis: es gibt kein Konto. Das ist
+   **kein** Entzug (das Portal hatte nie eines, das es hätte entziehen können),
+   sondern wieder der Zustand, in dem Zugangsdaten angefordert werden können.
+
+**Was der Befehl meldet:** eine Zeile je Konto — **Slug, Zustand, Grund** — und
+eine zählende Zusammenfassung („N aktiv, N entzogen, N unverändert, N
+abweichend, N übersprungen, N fehlgeschlagen, N nicht geprüft"). Kein Name, keine
+E-Mail-Adresse, kein Passwort: das Log eines Laufs überlebt das Terminal, in
+dem er geschrieben wurde, und der Slug ist der Name, unter dem das Konto selbst
+geführt wird. Ein **Dienstausfall beendet den Lauf**, statt jedes weitere Konto
+einmal den Connect-Timeout kosten zu lassen; die nicht geprüften Konten werden
+als solche gezählt und nicht als geprüft.
+
+| Exit-Code | Bedeutung |
+|---|---|
+| `0` | Alle Konten wurden geprüft (ob der Zustand sich änderte oder nicht). Ein Konto mit **unbrauchbarem Namen** (Altwert vor P1-M21) wird *übersprungen* und gezählt, nicht als Fehler gewertet — der Slug wird nicht hinter dem Fotografen umgeschrieben |
+| `1` | Mindestens ein Konto konnte nicht geprüft werden — SFTPGo nicht erreichbar, nicht konfiguriert oder mit Fehlerantwort; **die Zustände dieser Konten wurden nicht verändert** |
+| `2` | `--user` hat niemanden benannt |
+
+**Was die Reconciliation nicht kann:**
+
+- **Sie findet kein Konto, dessen Name kein `ftp_slug` ist.** Das Portal kennt
+  Konten nur unter dem Slug, den es selbst vergeben hat; ein manuell im
+  SFTPGo angelegtes Konto unter einem fremden Namen bleibt unsichtbar.
+- **Sie erzeugt kein Konto und kein Passwort.** Sie korrigiert einen Zustand;
+  ein Konto anlegen kann nur der Provisionierungs- oder der Reset-Pfad
+  (7.3, P1-M58).
+- **Sie prüft nicht, ob die Kamera tatsächlich hochlädt.** Sie fragt den
+  Dienst, nicht das Dateisystem; der Import bleibt davon unberührt (7.5).
+- **Sie läuft nicht von selbst.** Es gibt keinen Scheduler-Eintrag und keinen
+  Aufruf aus einem Request: der Zustand wird geprüft, wenn ein Operator es
+  verlangt.
 
 ### 7.17 Zielordner der Kamera
 

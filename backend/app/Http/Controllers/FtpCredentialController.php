@@ -136,8 +136,9 @@ class FtpCredentialController extends Controller
      * dependency is not, and a retry is the correct answer. An unknown account is
      * 404 because that is a real, actionable state — the cache column from P1-M30
      * says the account exists while the service disagrees, which is precisely the
-     * mismatch P1-M34 has to resolve. Everything else is 502: the service
-     * answered, and the answer was not usable.
+     * mismatch P1-M34 has to resolve and which the reconciliation
+     * (`php artisan ftp:reconcile`) corrects. Everything else is 502: the
+     * service answered, and the answer was not usable.
      */
     private function statusForServiceFailure(SftpGoException $exception): int
     {

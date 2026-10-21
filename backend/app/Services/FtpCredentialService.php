@@ -4,10 +4,12 @@ namespace App\Services;
 
 use App\Exceptions\FtpAuditWriteException;
 use App\Exceptions\FtpCredentialException;
+use App\Exceptions\SftpGoException;
 use App\Models\FtpPasswordReset;
 use App\Models\User;
 use App\Support\FtpInboxDirectory;
 use App\Support\FtpSlug;
+use App\Values\FtpAccountReconciliation;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Throwable;
@@ -248,6 +250,235 @@ class FtpCredentialService
         $user->forceFill([
             'ftp_account_status' => self::STATUS_REVOKED,
             'ftp_revoked_at' => now(),
+        ])->save();
+    }
+
+    /**
+     * Reconciles the cached account state with SFTPGo (P1-M30).
+     *
+     * The columns of V041 are a **cache**, not the truth: an account that was
+     * deleted or disabled by hand in SFTPGo leaves them stale, and the read
+     * path (feature doc 7.4/7.5) is not allowed to repair that — a live query
+     * there would make the inbox UI depend on a service that may be down and
+     * would need a credential for a read. So the repair is an **explicit**
+     * operation, called by `php artisan ftp:reconcile` and by nothing else.
+     *
+     * The question it answers is one: "does an SFTPGo account exist under this
+     * user's slug, and is it enabled?". The answer is written to
+     * `users.ftp_account_status` — plus `ftp_provisioned_at` and
+     * `ftp_revoked_at`, which are the audit trail of that answer.
+     *
+     * | SFTPGo | portal before | portal after |
+     * |---|---|---|
+     * | account, enabled | `pending` / `error` / `active` | `active` |
+     * | account, enabled | `revoked` | `revoked` (divergence, see below) |
+     * | account, disabled | `active` | `revoked` + `ftp_revoked_at` |
+     * | account, disabled | `error` | `pending` |
+     * | account, disabled | `pending` / `revoked` | unchanged |
+     * | unknown (404) | `active` | `revoked` + `ftp_revoked_at` |
+     * | unknown (404) | `error` | `pending` |
+     * | unknown (404) | `pending` / `revoked` | unchanged |
+     * | unreachable / not configured / error | any | **unchanged**, `ftp_account_error` set, exception thrown |
+     *
+     * Five decisions in that table are load-bearing:
+     *
+     * 1. **`pending` never becomes `revoked`.** `pending` means "never
+     *    provisioned", and it is the state in which a photographer may ask for
+     *    credentials (P1-M58). A reconciliation that turned `pending` into
+     *    `revoked` would take that door away — a photographer who never had
+     *    an account would be told their access had been withdrawn. The same
+     *    reason keeps `revoked` from becoming `pending`: the revocation was a
+     *    deliberate decision (role loss, §7.16) and its audit trail
+     *    (`ftp_revoked_at`) must not be overwritten by a cache correction.
+     * 2. **A disabled account counts as withdrawn.** SFTPGo's `status` is the
+     *    service's own answer to "may this account be used?". An account that
+     *    exists but is disabled is an access that was withdrawn — by hand, in
+     *    the service — and the portal has to say so, because the camera will
+     *    not authenticate with it.
+     * 3. **A revoked account is not resurrected.** If the service has an
+     *    account again that the portal revoked, that is a manual intervention.
+     *    The reconciliation reports it as a divergence and leaves the status
+     *    alone: undoing a deliberate revocation is a decision for an operator,
+     *    not a side effect of a cache repair.
+     * 4. **An unknown outcome changes nothing.** If SFTPGo cannot be reached
+     *    or is not configured, the state of the account is *unknown*, not
+     *    "gone". Writing `revoked` there would take a working camera away on
+     *    the strength of an outage. So the status stays, the reason is written
+     *    to `ftp_account_error`, and the exception is thrown — fail-closed, and
+     *    never a silent `active`.
+     * 5. **An `error` state is resolved, not carried over.** `error` means "the
+     *    last provisioning attempt failed, the outcome is unknown". The
+     *    reconciliation knows the outcome: there is no account. That is not a
+     *    revocation — the portal never had one to withdraw — it is `pending`,
+     *    the state in which a credential may be requested again.
+     *
+     * The exception is the `SftpGoException` the client already raises: the
+     * failure is the service's, its `reason` says which one it is
+     * (`unreachable`, `not_configured`, `unauthorized`, …), and it carries no
+     * secret — the camera password never reaches this path, because the
+     * reconciliation only ever reads.
+     *
+     * @throws FtpCredentialException When the account has no
+     *                                usable name.
+     * @throws SftpGoException When the state could
+     *                         not be determined.
+     */
+    public function reconcileAccount(User $user): FtpAccountReconciliation
+    {
+        $username = $this->accountNameFor($user);
+
+        try {
+            $account = $this->sftpGo->findUser($username);
+        } catch (SftpGoException $exception) {
+            // A 404 is a verdict, not a failure: the service answered, and its
+            // answer is "there is no such account".
+            if ($exception->reason === SftpGoException::REASON_NOT_FOUND) {
+                return $this->applyWithdrawnAccount($user, FtpAccountReconciliation::REASON_ACCOUNT_MISSING);
+            }
+
+            // Fail-closed: the outcome is unknown, so nothing about the status
+            // may change. The reason is recorded for the operator, the
+            // exception carries the detail.
+            $this->recordUnverifiableState($user, $exception);
+
+            throw $exception;
+        }
+
+        if (! $this->isAccountEnabled($account)) {
+            return $this->applyWithdrawnAccount($user, FtpAccountReconciliation::REASON_ACCOUNT_DISABLED);
+        }
+
+        return $this->applyUsableAccount($user);
+    }
+
+    /**
+     * The account exists and is enabled: the portal state is `active`.
+     *
+     * `ftp_provisioned_at` is filled only when it is still empty — it records
+     * *that* the account was provisioned, and a reconciliation that overwrote
+     * it with "now" would destroy the history of the original provisioning
+     * (the same reason `revoke()` leaves the column alone).
+     */
+    private function applyUsableAccount(User $user): FtpAccountReconciliation
+    {
+        $previous = (string) $user->ftp_account_status;
+
+        if ($previous === self::STATUS_REVOKED) {
+            // The account was withdrawn deliberately and exists again — a
+            // manual intervention in SFTPGo. Reported, not undone.
+            return FtpAccountReconciliation::divergent(
+                self::STATUS_REVOKED,
+                FtpAccountReconciliation::REASON_REVOKED_ACCOUNT_FOUND,
+            );
+        }
+
+        $changed = $previous !== self::STATUS_ACTIVE || $user->ftp_account_error !== null;
+
+        $attributes = [
+            'ftp_account_status' => self::STATUS_ACTIVE,
+            'ftp_account_error' => null,
+        ];
+
+        if ($user->ftp_provisioned_at === null) {
+            $attributes['ftp_provisioned_at'] = now();
+            $changed = true;
+        }
+
+        if ($changed) {
+            $user->forceFill($attributes)->save();
+        }
+
+        return FtpAccountReconciliation::active(
+            FtpAccountReconciliation::REASON_ACCOUNT_FOUND,
+            $changed,
+        );
+    }
+
+    /**
+     * The account does not exist (404) or is disabled: the access was
+     * withdrawn.
+     *
+     * The state that is written depends on what the portal claimed before,
+     * because "there is no account" and "the account was taken away" are two
+     * different facts (§7.16): only the second one may write `revoked` with
+     * an `ftp_revoked_at`.
+     */
+    private function applyWithdrawnAccount(User $user, string $reason): FtpAccountReconciliation
+    {
+        $previous = (string) $user->ftp_account_status;
+
+        if ($previous === self::STATUS_ACTIVE) {
+            $user->forceFill([
+                'ftp_account_status' => self::STATUS_REVOKED,
+                'ftp_revoked_at' => now(),
+                'ftp_account_error' => null,
+            ])->save();
+
+            return FtpAccountReconciliation::withdrawn(self::STATUS_REVOKED, $reason, true);
+        }
+
+        if ($previous === self::STATUS_ERROR) {
+            // The unknown is resolved: there is no account. That is not a
+            // revocation (the portal never had one to withdraw), it is the
+            // state in which a credential may be requested again.
+            $user->forceFill([
+                'ftp_account_status' => self::STATUS_PENDING,
+                'ftp_account_error' => null,
+            ])->save();
+
+            return FtpAccountReconciliation::withdrawn(self::STATUS_PENDING, $reason, true);
+        }
+
+        // `pending` (never provisioned) and `revoked` (already withdrawn) are
+        // both already the truth; nothing is written and `ftp_revoked_at`
+        // keeps its original instant.
+        return FtpAccountReconciliation::unchanged($previous, $reason);
+    }
+
+    /**
+     * Whether SFTPGo's user object describes an account that may be used.
+     *
+     * `status` is SFTPGo's own switch (`SftpGoClient::USER_STATUS_ENABLED` is
+     * the enabled value). A response without the field is treated as enabled:
+     * the field is part of the documented user object, and the question the
+     * reconciliation is really about is the account's *existence* — a missing
+     * field must not turn a working camera into a `revoked` one.
+     */
+    private function isAccountEnabled(array $account): bool
+    {
+        $status = $account['status'] ?? null;
+
+        if ($status === null) {
+            return true;
+        }
+
+        return (int) $status === SftpGoClient::USER_STATUS_ENABLED;
+    }
+
+    /**
+     * Records why the state could not be determined, without touching the
+     * status.
+     *
+     * The text is written for the inbox UI, which shows it next to the status.
+     * It therefore names the *category* of the failure and not the internals:
+     * a photographer learns that the state could not be checked, the operator
+     * gets the detail from the command output and the exception.
+     */
+    private function recordUnverifiableState(User $user, SftpGoException $exception): void
+    {
+        $reason = match ($exception->reason) {
+            SftpGoException::REASON_UNREACHABLE => 'SFTPGo ist nicht erreichbar. Der Zustand des FTP-Kontos konnte nicht geprüft werden.',
+            SftpGoException::REASON_NOT_CONFIGURED => 'SFTPGo ist nicht konfiguriert. Der Zustand des FTP-Kontos konnte nicht geprüft werden.',
+            SftpGoException::REASON_UNAUTHORIZED => 'SFTPGo hat die Anfrage abgelehnt. Der Zustand des FTP-Kontos konnte nicht geprüft werden.',
+            default => 'SFTPGo hat die Anfrage nicht beantwortet. Der Zustand des FTP-Kontos konnte nicht geprüft werden.',
+        };
+
+        if ($user->ftp_account_error === $reason) {
+            return;
+        }
+
+        $user->forceFill([
+            'ftp_account_error' => $reason,
         ])->save();
     }
 

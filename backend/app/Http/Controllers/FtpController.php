@@ -67,8 +67,9 @@ class FtpController extends Controller
      * service that may be down, and would need a credential for a read. So the
      * columns are the source of truth and are a cache, not a live view: they can
      * be stale if the account is deleted by hand in SFTPGo, which is why
-     * reconciliation is an explicit path (`reconcileAccount()`, P1-M30) instead
-     * of a query hidden in here.
+     * reconciliation is an explicit path (`php artisan ftp:reconcile`,
+     * `FtpCredentialService::reconcileAccount()`, P1-M30) instead of a query
+     * hidden in here.
      *
      * The consequence is what P1-M26 asks for: an empty inbox is no longer the
      * only thing the photographer can see. `pending` says "not provisioned yet"
