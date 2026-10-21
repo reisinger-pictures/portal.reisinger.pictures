@@ -115,15 +115,15 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Protokoll ganz oben. Eine Position mit `Entscheidung offen:` bedeutet, dass eine **neue**
 > Frage entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **4 offene `[ ]`** und **16 wartende
-> `[~]`** über 1301 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
-> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 5, `… | grep -c '^- \[~\]'` → 16,
-> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1301; `<stand>` = der committete Stand dieses
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **4 offene `[ ]`** und **17 wartende
+> `[~]`** über 1318 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
+> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 4, `… | grep -c '^- \[~\]'` → 17,
+> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1318; `<stand>` = der committete Stand dieses
 > Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
 > trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
-> 5: **3× `manuell prüfen:`**, **1× gewöhnliche Arbeit** und **1× `Entscheidung offen:`** — die
-> offene Position 8 im Abschnitt „SKILLS-STAND (2026-10-19)": die DB-Engine-Policy ist nirgends
-> entschieden, das ist eine **neue** Frage und kein vergessener Entscheidungsdurchgang.
+> 4: **3× `manuell prüfen:`** und **1× gewöhnliche Arbeit**; **0× `Entscheidung offen:`** — die
+> DB-Engine-Policy ist inzwischen als **D-49** entschieden (`features/owner-decisions.md`), ihre
+> Position ist deshalb aus dem Board entfernt.
 > **Alle 14 Review-Befunde** sind geschlossen und aus der Liste entfernt (Nachweis in
 > `features/security/2026-10-18-review-closure.md`); die 3 enthalten die Punkte, die in den
 > Freigaben der Wellen A–D als nicht-blockierend eingestuft und deshalb hier festgehalten
@@ -137,15 +137,15 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > 2026-10-20** hat 16 alte Owner-Positionen durchgesehen: 11 davon sind erledigt, maschinell
 > abgedeckt oder überholt und deshalb aus der Liste gegangen; die restlichen sind mit korrigiertem
 > Wortlaut und dem richtigen Werkzeug (Firewalld statt ufw, `ROOT.PEM` statt `cert.pem`,
-> authentifiziert statt anonym lesen) stehen geblieben. Alle 16 `[~]` tragen ein `wartet auf`.
+> authentifiziert statt anonym lesen) stehen geblieben. Alle 17 `[~]` tragen ein `wartet auf`.
 > **Diese Zählung ist ein Stand, keine Zusage** — sie wandert mit jeder Welle; wer eine Position
 > sucht, zählt selbst nach. Der Vergleich zum 2026-09-28-Stand (69 Positionen) ist **kein**
 > Fortschrittsmaß: seither kamen Positionen hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
 > `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
-> (20 = 4 offen + 16 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
-> (1301) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
+> (21 = 4 offen + 17 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
+> (1318) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
 > würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
 > defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
 > **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
@@ -662,12 +662,29 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   **Die Entscheidung:** API-Key zusätzlich setzen (und den Admin-Weg auflösen) oder den JWT-Fallback als
   endgültig festschreiben (und §7.15 um diese Festlegung ergänzen).
 - [~] wartet auf den nächsten Watchtower-Recreate als Gegenprobe und auf die Owner-Entscheidung zur Watchtower-Policy — **der Auslöser des täglichen Recreate ist identifiziert (2026-10-21):** es ist **Watchtower**, kein Cron und kein Timer. Belege (read-only auf dem Host): `docker logs --since 96h watchtower` zeigt `Stopping /portal_backend … Creating /portal_backend` am 2026-10-18, -19, -20 und -21 um 08:0x CEST; `crontab -l` kennt nur `volume-backup.sh`, `update_portainer.sh`, `dind-image-gc.sh`; `systemctl list-timers` zeigt keine passende Unit. **Die gefürchtete Folge tritt nicht ein:** `sync.sh:44` synct nach `/home/webadmin/websites/api-portal.reisinger.pictures/`, und `deployment/docker-compose.yml:97` mountet genau dieses Verzeichnis als `/var/www/html` (Bind-Mount) — Watchtower tauscht nur das Image, nicht den Anwendungscode; der UID-Stand `1000:82` (D-1) bleibt stabil (`docker inspect portal_backend --format "{{.Config.User}}"`). Offen: (a) die Gegenprobe beim nächsten Recreate (`docker inspect portal_backend --format "{{.Config.User}} {{.Created}}"`), (b) die Entscheidung, ob Watchtower für `portal_backend` abgeschaltet oder digest-gepinnt werden soll — er zieht derzeit das Tag `portal-base:8.5`, nicht einen Digest.
+- [~] wartet auf die Owner-Entscheidung, ob die **Vertrauensgrenze der Proxy-Regel enger** gezogen wird —
+  **der Rest ist gemessen (2026-10-22):** `trustProxies(at: 'REMOTE_ADDR')` vertraut den **direkten
+  Peer**, und der legitime Schreiber des `X-Forwarded-For` ist allein Caddy (der FastCGI-Port 9000 ist
+  nicht zum Host publiziert ✓). Aber: der Backend hängt am **extern geteilten** Netz `webret`
+  (`ipv4_address: 172.18.0.31`) und an `portal_internal` — **jeder** Container dieser Netze kann den
+  FastCGI-Port öffnen und damit den Header selbst setzen. Das Gewicht ist gering (es verschafft nur
+  eine falsche Client-Adresse — keine Authentifizierung, keinen Datenzugriff ✓), und **nichts
+  Vertrauenswürdiger schreibt den Header**: Caddy setzt ihn aus dem echten Peer und übergibt den vom
+  Client gelieferten nicht. **Die Alternativen und ihre Preise:** (a) so bleiben (empfohlen — das
+  Nageln auf eine Adresse bricht bei jedem Recreate des Caddy-Containers, und die Regel „vertraue den
+  direkten Peer, lies die Kette von rechts" ist ohnehin die schwächere, aber stabile Zusage ✓); (b) den
+  Backend aus `webret` nehmen und Caddy an `portal_internal` hängen (Compose-Änderung plus Recreate,
+  betrifft `proxy-stack` und damit den Owner ✓); (c) einen geheimen Header von Caddy setzen lassen
+  (`proxy-stack` ✓, Owner ✓) — der stärkste, aber auch der aufwendigste Weg ✓. **Bis zur Entscheidung
+  gilt (a)**, und die Restlücke steht hier.
+
 - [~] wartet auf den **Deploy und die Live-Verifikation der Proxy-Trust-Regel** — **der Fund war
   produktionskritisch (2026-10-22):** das Backend vertraute dem Proxy nicht, obwohl die API ausschließlich
   über Caddy erreichbar ist (`deployment/docker-compose.yml`: der FastCGI-Port 9000 ist nicht zum Host
   publiziert). Gemessen auf dem Host: `docker logs portal_backend` zeigt für **jede** Anfrage
   `172.18.0.3` — die Container-Adresse von Caddy. Damit teilten sich **alle** Kunden einen IP-Bucket:
-  die Login-Drosselung (`throttle:5,1` → 5 Versuche pro Minute **portalweit**), der API-Limiter, die
+  die Login-Drosselung (`throttle:{AUTH_THROTTLE_LIMIT},1` → 5 pro Minute im Default, **10 in der
+  Produktion**, `deployment/docker-compose.yml:188`), der API-Limiter, die
   Checkout-Quota (10/h, 30/Tag je IP) und die Turnstile-Schwellen; `orders.ip_address` speicherte die
   Proxy-Adresse statt des Kunden, und die Runbook-Signale S3/S7 zählten einen einzigen Bucket. Die
   Produktion hat **0 Orders** (`SELECT COUNT(*) FROM orders`), deshalb ist der Fehler nie aufgefallen.
