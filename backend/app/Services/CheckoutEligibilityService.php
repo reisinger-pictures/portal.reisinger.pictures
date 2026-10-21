@@ -21,8 +21,11 @@ class CheckoutEligibilityService
 
     private function denied(): HttpResponseException
     {
+        // The message must not promise a retry in minutes: the policy is
+        // STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS (24 hours by default), so "later"
+        // is the only honest wording.
         return new HttpResponseException(response()->json([
-            'error' => 'Der Account ist noch nicht lange genug aktiviert. Bitte versuche den Checkout in wenigen Minuten erneut.',
+            'error' => 'Der Account ist noch nicht lange genug aktiviert. Bitte versuche den Checkout später erneut.',
         ], 403));
     }
 }
