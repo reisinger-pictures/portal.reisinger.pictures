@@ -109,13 +109,13 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **10 offene `[ ]`** und **46 wartende
-> `[~]`** über 1813 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (10), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1813). Aufteilung der 10: **5× `manuell prüfen:`** und **5×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **9 offene `[ ]`** und **46 wartende
+> `[~]`** über 1794 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (9), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1794). Aufteilung der 9: **5× `manuell prüfen:`** und **4×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 5 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 4 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
 > A–D") sowie die seitdem aufgedeckten Reste (die Zwei-Verbindungs-Messung, die Restform der
 > Dialog-Befunde, die das Audit vom 2026-10-20 aus Code statt vom Gerät beantwortet hat) und
@@ -134,12 +134,12 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (56 = 10 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (55 = 9 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
 > **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **19 von 31 `##`-Abschnitten**
+> Die Positionen liegen in **18 von 31 `##`-Abschnitten**
 > (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
 > `grep -c '^## ' AGENTS.todo.md`). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
@@ -1203,25 +1203,6 @@ getrennt.
 **Backend (PHPUnit) — implementiert & verifiziert**
 **Frontend (Vitest + Playwright) — implementiert & verifiziert**
 **Offen (User-Entscheidungen / Nachträge)**
-- [ ] Lokale E2E-Flakiness `database is locked`: **die im Board genannte Ursache ist
-  widerlegt.** Nicht `busy_timeout=null` — `pdo_sqlite` setzt implizit **60000 ms**,
-  und mit der alten Konfiguration wartete ein blockierter Writer gemessene **471 ms
-  und gelangte**; ein einminütiger Stall ist der tatsächliche Default, kein sofortiges
-  Scheitern. Die reproduzierbare Ursache ist `transaction_mode => 'DEFERRED'`: eine
-  Transaktion, die erst liest und später schreibt, bekommt beim Lock-Upgrade
-  `SQLITE_BUSY`, **ohne den Busy-Handler zu fragen** — dagegen helfen weder
-  `busy_timeout` noch WAL. Gemessen 16 Läufe je Kombination: DEFERRED scheitert in
-  jedem, IMMEDIATE in keinem, in beiden Journal-Modi. `IMMEDIATE` nimmt den
-  Write-Lock bei `BEGIN`, wo der Busy-Handler greift. **Fix committed** (`3a1c102`,
-  zusätzlich WAL und `busy_timeout=5000`), abgesichert durch
-  `backend/tests/Unit/Support/SqliteConnectionTuningTest.php` (3 Tests,
-  9 Assertions, revert-to-red gezeigt). **Workaround `--workers=1` bleibt**, weil die
-  volle Playwright-Flakiness nicht reproduziert wurde — das ist der einzige noch
-  offene Teil dieser Position: reproduzieren und entscheiden, ob der Workaround
-  entfallen kann. Der E2E-Backend ist ein single-threaded `php artisan serve`, also
-  erzeugen parallele Worker für sich allein keine DB-Konkurrenz; der wahrscheinlichere
-  Auslöser ist vermutlich ein zweiter Prozess auf der geteilten Datei; eine
-  `migrate`-Kollision ist jedoch nicht belegt und bleibt eine Hypothese.
 - Hinweis (Setup): lokale `backend/.env` braucht `MODEL_REGISTRATION_THROTTLE_LIMIT=1000` (Parität zu `.env.ci`), sonst 429-Flakes im E2E-Grep-Lauf. `.env` ist gitignored.
 
 **Future (nur TODO, nicht umsetzen)**
