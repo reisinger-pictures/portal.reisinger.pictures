@@ -274,3 +274,51 @@ git diff --check
 These commands validate source and policy only. The base-image GHCR rebuild and
 push, the artifact age behind the consumed compose tag, and live queue, SMTP,
 scheduler, health, and provider evidence remain external release/runtime work.
+
+## 7. Rotating a secret after an exposure
+
+The **policy** is D-4: the production `.env` stays gitignored and unencrypted,
+and secrets are not rotated on a schedule. This section is the **procedure** for
+the one case that overrides the absence of a rotation schedule — a secret that
+was printed, logged, or read out in a terminal. On 2026-09-26 two values
+reached a terminal that way (`AI_API_KEY` and `ADMIN_PASSWORD`, while the
+resolved Compose file was read out). The rotation itself is the owner's action;
+this is the runbook for it.
+
+### 7.1 Order
+
+1. **Prepare the new value without printing it.** Generate it on the host and
+   write it directly into the target store — the Portainer stack environment —
+   not into a shell command that lands in a history or a session transcript.
+   `openssl rand -base64 48` for a generated key; a passphrase from the owner's
+   password manager for `ADMIN_PASSWORD`.
+2. **Recreate or restart the backend container** so the new environment takes
+   effect. A restart is enough when only the value changed; a recreate is
+   required when the Compose environment block itself changed
+   (`deployment/docker-compose.yml`).
+   For `ADMIN_PASSWORD` this step **is** the rotation: the boot flow runs
+   `admin:update`, which always re-hashes the configured bootstrap password
+   onto the existing admin account (`backend/app/Console/Commands/AdminUpdate.php:33-37`).
+3. **Verify the new value is live without printing it** — a length, not the
+   value: `docker exec portal_backend sh -c 'printenv AI_API_KEY | wc -c'`.
+4. **Verify the function that uses it:**
+   - the admin login with the new password (`POST /api/auth/login`),
+   - the AI status (`GET /api/ai/status`) must answer `available`, not
+     `unconfigured` (`AIService::isUnconfigured()`).
+5. **Revoke the old value at its source** — the provider's API-key console for
+   `AI_API_KEY`. Revoking after the new value is proven live keeps the service
+   up during the switch.
+6. **Record the evidence** in `AGENTS.todo.md`: date, which values were rotated,
+   and the measured checks — **without the values**.
+
+### 7.2 What must not happen
+
+- The new value never enters a chat, a commit, a log line, or a recorded
+  terminal session.
+- The old value is not tested after step 2. A successful login with the old
+  password means the container did not pick up the new environment.
+- No rotation rides along with an unrelated deploy. It is its own change with
+  its own verification, because a rotation that shares a deploy cannot be
+  verified separately — and a failed rotation is then indistinguishable from a
+  failed deploy.
+
