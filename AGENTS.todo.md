@@ -84,7 +84,13 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
   zur Request-Zeit nichts davon laeuft (Praezisierung in `features/security/accepted-risks.md`,
   C8). **Der Alert bleibt
   in GitHub offen** — ohne verfügbare Version gibt es nichts zu aktualisieren, und ein
-  Dismissal wäre eine Sicherheitsentscheidung des Owners. **Erscheint eine gepatchte
+  Dismissal wäre eine Sicherheitsentscheidung des Owners. **Der Weg dorthin ist ein Schritt** (der Alert
+  ist GHSA-vfj7-8cjw-p6xm, `npm:braces`, `frontend/pnpm-lock.yaml`):
+  `gh api -X PATCH repos/reisinger-pictures/portal.reisinger.pictures/dependabot/alerts/<alert-id> -f state=dismissed -f dismissed_reason=tolerable_risk -f dismissed_comment="C8: accepted in features/security/accepted-risks.md — no patched version exists (3.0.3 is the highest)."`.
+  **Der Alert bleibt bis dahin offen** — das Repo entscheidet die Grenze (C8), GitHub bekommt nur den
+  Vermerk. **Auslöser für eine Neubewertung:** eine gepatchte Version erscheint (dann gehört der Bump in
+  die nächste `node-deps`-Welle) oder die Abhängigkeit wandert in den Request-Pfad (dann verlässt sie C8).
+  **Erscheint eine gepatchte
   Version, gehört sie in die nächste `node-deps`-Welle**, nicht nebenbei. Die übrigen
   Advisory-Gruppen (`undici`, `source-map-js`, `brace-expansion`,
   `postcss-selector-parser`) sind in den Wellen unten erledigt.
@@ -96,27 +102,23 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
-> **Struktur-Hinweis (2026-09-28, nach Board-Bereinigung und
-> Entscheidungsdurchgang):** Dieses Board enthält **69 offene Positionen**
-> über 1627 Zeilen, **0 erledigte** — erledigte Einträge werden entfernt, nicht
+> **Struktur-Hinweis (Grundsatz, 2026-09-28; die Zählung unten ist der aktuelle Stand):**
+> Dieses Board enthält **nur offene Arbeit** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §4 Board-Hygiene). Jede offene Position trägt einen der drei
-> Gründe, warum sie noch steht: **18× `manuell prüfen:`** (der Owner sieht es sich selbst
+> Gründe, warum sie noch steht: **`manuell prüfen:`** (der Owner sieht es sich selbst
 > an — nach einem Deploy, an einem echten Gerät oder im Stripe-Dashboard),
-> **0× `Entscheidung offen:`** (der Owner muss entscheiden),
-> **46× `wartet auf`** (Bedingung oder Folgetask fehlt noch). Die restlichen **5**
-> sind **gewöhnliche, sofort umsetzbare Arbeit** und tragen deshalb keinen Präfix — ein
-> Präfix ohne Grund wäre schlechter als keiner.
+> **`Entscheidung offen:`** (der Owner muss entscheiden), **`wartet auf`** (Bedingung oder
+> Folgetask fehlt noch). Positionen ohne Präfix sind **gewöhnliche, sofort umsetzbare
+> Arbeit** — ein Präfix ohne Grund wäre schlechter als keiner.
 >
-> **0 heißt: der Entscheidungsdurchgang vom 2026-09-28 ist abgeschlossen.** 21
-> Entscheidungen liegen in `features/owner-decisions.md`, ihr Umsetzungsstand im Protokoll ganz oben.
-> Die letzte offene Entscheidung war D-12 (Initial-Fokus) und ist am selben Tag entschieden
-> worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
-> entstanden ist — nicht, dass eine vergessene offen blieb.
+> **Die Entscheidungen liegen in `features/owner-decisions.md`**, ihr Umsetzungsstand im
+> Protokoll ganz oben. Eine Position mit `Entscheidung offen:` bedeutet, dass eine **neue**
+> Frage entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **5 offene `[ ]`** und **20 wartende
-> `[~]`** über 1310 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
-> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 5, `… | grep -c '^- \[~\]'` → 20,
-> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1310; `<stand>` = der committete Stand dieses
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **4 offene `[ ]`** und **16 wartende
+> `[~]`** über 1301 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
+> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 5, `… | grep -c '^- \[~\]'` → 16,
+> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1301; `<stand>` = der committete Stand dieses
 > Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
 > trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
 > 5: **3× `manuell prüfen:`**, **1× gewöhnliche Arbeit** und **1× `Entscheidung offen:`** — die
@@ -135,21 +137,21 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > 2026-10-20** hat 16 alte Owner-Positionen durchgesehen: 11 davon sind erledigt, maschinell
 > abgedeckt oder überholt und deshalb aus der Liste gegangen; die restlichen sind mit korrigiertem
 > Wortlaut und dem richtigen Werkzeug (Firewalld statt ufw, `ROOT.PEM` statt `cert.pem`,
-> authentifiziert statt anonym lesen) stehen geblieben. Alle 20 `[~]` tragen ein `wartet auf`.
+> authentifiziert statt anonym lesen) stehen geblieben. Alle 16 `[~]` tragen ein `wartet auf`.
 > **Diese Zählung ist ein Stand, keine Zusage** — sie wandert mit jeder Welle; wer eine Position
 > sucht, zählt selbst nach. Der Vergleich zum 2026-09-28-Stand (69 Positionen) ist **kein**
 > Fortschrittsmaß: seither kamen Positionen hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
 > `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
-> (25 = 5 offen + 20 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
-> (1310) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
+> (20 = 4 offen + 16 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
+> (1301) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
 > würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
 > defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
 > **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
 > (Zeilen 202–283) trägt **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist
 > damit gegenstandslos.
-> Die Positionen liegen in **17 von 33 `##`-Abschnitten**
+> Die Positionen liegen in **10 von 33 `##`-Abschnitten**
 > (`git show <stand>:AGENTS.todo.md | awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' | sort -u | wc -l`
 > gegen `git show <stand>:AGENTS.todo.md | grep -c '^## '`; **neu gemessen am 2026-10-21** —
 > die vorherige Angabe war mit dieser Methode nicht reproduzierbar und wurde durch den Messwert
@@ -535,7 +537,7 @@ braucht, nicht nach Schwere oder Familie.
 | ~~P1-M23~~ | **Erledigt** — Passwort-Fluss | FTP-Block |
 | ~~P1-M25~~ | **Erledigt** — Regression lokale Disk | FTP-Block |
 | ~~P1-M28~~ | **Erledigt** — Concurrency-Guard | FTP-Block |
-| ~~P1-M30~~ | **Erledigt** — Migration V041 | FTP-Block |
+| ~~P1-M30~~ | **Erledigt** — Migration V041/V043 + Reconciliation (`php artisan ftp:reconcile`) | FTP-Block |
 | ~~P1-M27~~ | **Erledigt** — Kamera-Spec + Harness | FTP-Block |
 | FE-2 (halb) | i18n-AST-Regel gebaut und satzebenen erweitert, meldet 212 Treffer, warnt nur | unten |
 | P1-M24 | Ordner-Anlage und UID-Modell auf dem Host | FTP-Block |
@@ -647,50 +649,53 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
   `Str::random` + Prüfschleife) und dafür, dass im Request-Log/Response
   nach dem Show-once **kein** Klartext mehr auftaucht; Playwright-E2E für
   Anzeige und Reset.
-- [~] wartet auf die Umsetzung des `reconcileAccount()`-Pfads. Die frühere Blockade durch den Doppel-ID-Konflikt ist entfallen (die `P1-M`-Invariante ist leer, Kommando in der ID-Übersicht oben); den Spaltenteil, den die Einstiegs-Übersicht zu Recht als erledigt führt, hat V041 geliefert und getestet — `php artisan test --filter='FtpAccountStatusMigrationTest|FtpProvisioningStatusTest'` ergibt **16 passed (70 assertions)**. Offen ist allein die Reconciliation, die `features/infrastructure/19-ftp-upload-pipeline.md` §7.16 ausdrücklich führt: „`reconcileAccount()` (P1-M30) ist der vorgesehene Weg und bleibt offen". **P1-M30 (P0) — Spalte für den Provisionierungsstatus auf `users`.**
-  **Festgelegt am 2026-09-26:** die Source of Truth ist eine Spalte, **kein**
-  Live-Query gegen SFTPGo. Begründung: `FtpController::status()`
-  ist ein Endpoint für den Fotografen; ein Live-Query würde die UI vom Dienst
-  abhängig machen, während P1-M26 verlangt, dass der Import ohne SFTPGo
-  weiterläuft. Beides zugleich ist nicht möglich. Zusätzlich würde ein
-  Live-Query im Lesepfad ein Secret auch für Read-Operationen erfordern —
-  das widerspricht dem Gewinn aus P1-M23.
-  **Schema (V041+, Reihe endet bei V040):** `ftp_account_status` enum
-  (`pending` / `active` / `error`), `ftp_provisioned_at` timestamp nullable,
-  `ftp_account_error` text nullable. **Backfill:** alle bestehenden
-  Fotografen auf `pending`, weil der Zustand unbekannt ist — sie wurden nie
-  über SFTPGo provisioniert. **Rollback:** reines Spalten-Drop, kein
-  Datenverlust, weil kein Passwort gespeichert wird (P1-M23).
-  **Behandlung als Cache:** löscht jemand den User in SFTPGo von Hand, ist die
-  Spalte veraltet. Deshalb ein expliziter `reconcileAccount()`-Pfad statt
-  einem stillen Live-Query im Lesepfad.
-  **Tests:** PHPUnit für Default `pending` bei Neuanlage, Übergänge
-  pending→active→error, und dass `status()` bei SFTPGo-Ausfall weiter den
-  gecachten Status liefert statt eines 500ers.
-- [~] wartet auf den Owner-Eintrag von `SFTPGO_BASE_URL`/`SFTPGO_API_KEY` in die Portainer-Stack-Env; das versionierte Compose bleibt bei Platzhaltern. **P1-M31 (P0) — API-Key und Endpoint in den Stack, nicht ins Repo.**
-  `deployment/docker-compose.yml` ist **versioniert**; dort ausschließlich
-  `${SFTPGO_BASE_URL}` und `${SFTPGO_API_KEY}` als Platzhalter. Der Wert selbst
-  gehört in die **Portainer-Stack-Env**. Commit nur die Platzhalter. Das ist
-  exakt die Fehlerklasse aus C1–C4 (hartkodierte Secrets), die das Repo
-  historisch schon einmal getroffen hat.
-  **AGPL:** SFTPGo ist AGPL-3.0. Wir betreiben das offizielle, unveränderte
-  Image, damit haften keine Offenlegungspflichten für das Portal. **Daher
-  ausdrücklich kein selbstgebautes/patchtes Image** — das wäre eine andere
-  Rechtslage. Rechtlich ist das keine Anwaltsberatung, nur die technische
-  Konsequenz aus der Lizenz.
-  **API-Schema nicht raten:** Feldnamen sind nicht verifiziert. Quelle in
-  dieser Reihenfolge: `GET /openapi` an der laufenden Instanz (Swagger UI,
-  im Community-Build aktiv), dann `openapi.yaml` im Repo `drakkan/sftpgo`.
-  `enable_rest_api` im Compose **explizit setzen**, damit es eine bewusste
-  Entscheidung ist und nicht der Default.
-  **Tests:** PHPUnit, dass die Disk-/Config-Definition ohne Secret auskommt
-  (kein Literal in der versionierten Compose-Datei), plus ein
-  Konfigurations-Test auf die gesetzten Platzhalter.
-
-### Offene Dokumentations-Wahrheit (kein Code, aber irreführend)
-
+- [~] wartet auf die Owner-Entscheidung, ob **zusätzlich** ein `SFTPGO_API_KEY` in die Portainer-Stack-Env kommt —
+  **der Repo-Teil ist korrekt, und der Fall funktioniert auch ohne API-Key (live gemessen am 2026-10-21):**
+  `deployment/docker-compose.yml:107-108` führt `SFTPGO_BASE_URL=${SFTPGO_BASE_URL:-http://sftpgo:8080}` und
+  `SFTPGO_API_KEY=${SFTPGO_API_KEY:-}` (Platzhalter ✓, Regressionstest in
+  `backend/tests/Feature/Services/SftpGoClientTest.php:446`), und auf dem Host sind gesetzt:
+  `SFTPGO_BASE_URL` (18 Zeichen), `SFTPGO_ADMIN_USERNAME` (12), `SFTPGO_ADMIN_PASSWORD` (28) —
+  `SFTPGO_API_KEY` ist **leer** (`printenv | wc -c` → 1, also nur der Zeilenumbruch).
+  Der JWT-Fallback über das Admin-Wertepaar ist damit der gepflegte Weg
+  (`features/infrastructure/19-ftp-upload-pipeline.md` §7.15: „Ein Wertepaar, nicht zwei") ✓ — der API-Key ist
+  **nicht** zwingend, wäre aber die sicherere Variante (kein Admin-Passwort im Stack).
+  **Die Entscheidung:** API-Key zusätzlich setzen (und den Admin-Weg auflösen) oder den JWT-Fallback als
+  endgültig festschreiben (und §7.15 um diese Festlegung ergänzen).
 - [~] wartet auf den nächsten Watchtower-Recreate als Gegenprobe und auf die Owner-Entscheidung zur Watchtower-Policy — **der Auslöser des täglichen Recreate ist identifiziert (2026-10-21):** es ist **Watchtower**, kein Cron und kein Timer. Belege (read-only auf dem Host): `docker logs --since 96h watchtower` zeigt `Stopping /portal_backend … Creating /portal_backend` am 2026-10-18, -19, -20 und -21 um 08:0x CEST; `crontab -l` kennt nur `volume-backup.sh`, `update_portainer.sh`, `dind-image-gc.sh`; `systemctl list-timers` zeigt keine passende Unit. **Die gefürchtete Folge tritt nicht ein:** `sync.sh:44` synct nach `/home/webadmin/websites/api-portal.reisinger.pictures/`, und `deployment/docker-compose.yml:97` mountet genau dieses Verzeichnis als `/var/www/html` (Bind-Mount) — Watchtower tauscht nur das Image, nicht den Anwendungscode; der UID-Stand `1000:82` (D-1) bleibt stabil (`docker inspect portal_backend --format "{{.Config.User}}"`). Offen: (a) die Gegenprobe beim nächsten Recreate (`docker inspect portal_backend --format "{{.Config.User}} {{.Created}}"`), (b) die Entscheidung, ob Watchtower für `portal_backend` abgeschaltet oder digest-gepinnt werden soll — er zieht derzeit das Tag `portal-base:8.5`, nicht einen Digest.
-- [~] wartet auf den **Mail-Nachweis** — Queue, Worker und Scheduler sind am 2026-10-21 live belegt: die PID-Dateien `/tmp/portal-{scheduler,queue-supervisor,queue-worker}.pid` existieren, der stündliche Scheduler-Mutex in `cache_locks` trägt den Slot-Suffix `2100` (erworben um 21:00:02Z), der Wochenimport lief am Montag-Slot `03:30` (19.477 Orte im Meilisearch-Index `locations`, Batch 2402: 39/39 Tasks succeeded, 0 failed), und die Queue-Tabellen `jobs`/`failed_jobs`/`job_batches` sind leer und fehlerfrei. Die **SMTP-Duplikat-Policy** ist entschieden (D-17 in `features/owner-decisions.md`: gültige Tokens erhalten, kein pauschales Queue-Uniqueness, ein SMTP-Retry darf keine zweite Belastung oder Zustandsänderung auslösen). Offen: ein **zugestellter** Mail-Nachweis aus der Produktion — der Admin-SMTP-Test (`POST /api/management/settings/test-email`) muss ausgelöst und der Provider-/Mailpit-Log danebengelegt werden; die Produktions-DB führt keine Mail-Logtabelle, und `storage/logs/laravel.log` ist vom 2026-04-23.
+- [~] wartet auf den **Deploy und die Live-Verifikation der Proxy-Trust-Regel** — **der Fund war
+  produktionskritisch (2026-10-22):** das Backend vertraute dem Proxy nicht, obwohl die API ausschließlich
+  über Caddy erreichbar ist (`deployment/docker-compose.yml`: der FastCGI-Port 9000 ist nicht zum Host
+  publiziert). Gemessen auf dem Host: `docker logs portal_backend` zeigt für **jede** Anfrage
+  `172.18.0.3` — die Container-Adresse von Caddy. Damit teilten sich **alle** Kunden einen IP-Bucket:
+  die Login-Drosselung (`throttle:5,1` → 5 Versuche pro Minute **portalweit**), der API-Limiter, die
+  Checkout-Quota (10/h, 30/Tag je IP) und die Turnstile-Schwellen; `orders.ip_address` speicherte die
+  Proxy-Adresse statt des Kunden, und die Runbook-Signale S3/S7 zählten einen einzigen Bucket. Die
+  Produktion hat **0 Orders** (`SELECT COUNT(*) FROM orders`), deshalb ist der Fehler nie aufgefallen.
+  **Umgesetzt:** `backend/bootstrap/app.php` vertraut jetzt `REMOTE_ADDR` (den direkten Peer) und liest
+  `X-Forwarded-For`/`X-Forwarded-Proto` — Symfony nimmt den **rechtesten** Ketteneintrag, also den vom
+  Proxy selbst geschriebenen; ein vom Client vorangestellter Eintrag kann die Adresse nicht ersetzen
+  (`at: '*'` wäre unsicher gewesen, weil dann der linkeste Eintrag gewinnt). Tests:
+  `backend/tests/Feature/TrustedProxyTest.php` (4 Fälle, inkl. Spoofing-Gegenprobe ✓).
+  **Offen:** Deploy und der Live-Nachweis, dass die Login-Drosselung jetzt je Client zählt — messbar
+  über zwei Anfragen mit unterschiedlichen `X-Forwarded-For`-Werten (die Rate-Limiter-Keys im Cache
+  müssen sich unterscheiden ✓).
+- [~] wartet auf die **Einrichtung der D-36-Ereigniskette in der Produktion** — **am 2026-10-21 auf
+  dem Host gemessen: die Kette fehlt vollständig.** (a) Die SFTPGo-Instanz der Produktion hat **keine**
+  Event-Action und **keine** Event-Regel (`GET /api/v2/eventactions` und `/api/v2/eventrules` liefern
+  leere Listen; die konfigurierten Namen `portal-ftp-upload` / `portal-ftp-upload-rule` antworten mit
+  404). (b) `FTP_EVENT_SECRET` ist im laufenden Container **leer** (`printenv | wc -c` → 1, also nur der
+  Zeilenumbruch); der Wert ist laut `deployment/docker-compose.yml:215` ohne Default — ein leeres Secret
+  laesst den Endpunkt jedes Event mit 401 abweisen (fail closed ✓) und den Provisionierungsbefehl
+  abbrechen ✓. (c) Der SFTPGo-Container selbst ist gesetzt: 1 Konto, `status: 1` (aktiv).
+  **Folge:** ein Kamera-Upload landet **ohne** Button nicht automatisch in der Zielgalerie — die
+  D-36-Ereigniskette feuert nie. **Der Weg dorthin (Owner-Aktion, zwei Schreibvorgaenge auf dem Host):**
+  `FTP_EVENT_SECRET` in der Portainer-Stack-Env setzen (nie ins Repo), den Backend-Container neu erzeugen
+  (die Env wird erst dann gelesen), danach `php artisan ftp:provision-events` (idempotent: legt die
+  Aktion an bzw. aktualisiert sie und die Regel) und die Regel mit
+  `GET /api/v2/eventrules/portal-ftp-upload-rule` gegenlesen (`fs_events: ["upload"]`, Status aktiv).
+  **Der Code-Pfad ist gemessen:** die Ereignisregel ist gegen ein laufendes SFTPGo verifiziert
+  (`scripts/e2e-up.sh` provisioniert sie beim Test-Stack-Setup).
+- [~] wartet auf den **Mail-Nachweis** — Queue, Worker und Scheduler sind am 2026-10-21 live belegt: die PID-Dateien `/tmp/portal-{scheduler,queue-supervisor,queue-worker}.pid` existieren, der stündliche Scheduler-Mutex in `cache_locks` trägt den Slot-Suffix `2100` (erworben um 21:00:02Z), der Wochenimport lief am Montag-Slot `03:30` (Meilisearch-Batch **2335**, Task 7200, `enqueuedAt` 2026-10-19T03:30:32Z, `status: succeeded`), der manuelle Lauf vom 2026-10-21 21:07Z erzeugte Batch **2402** (39/39 Tasks succeeded, 19.477 Orte im Index `locations`), und die Queue-Tabellen `jobs`/`failed_jobs`/`job_batches` sind leer und fehlerfrei. Die **SMTP-Duplikat-Policy** ist entschieden (D-17 in `features/owner-decisions.md`: gültige Tokens erhalten, kein pauschales Queue-Uniqueness, ein SMTP-Retry darf keine zweite Belastung oder Zustandsänderung auslösen). Offen: ein **zugestellter** Mail-Nachweis aus der Produktion — der Admin-SMTP-Test (`POST /api/management/settings/test-email`) muss ausgelöst und der Provider-/Mailpit-Log danebengelegt werden; die Produktions-DB führt keine Mail-Logtabelle, und `storage/logs/laravel.log` ist vom 2026-04-23.
 ## 🧪 TEST-QUALITÄTS-AUDIT (2026-09-26) — zwei unabhängige Audits
 
 Scope: 84 E2E-Specs (191 `test()`, 278 Testinstanzen, 9.769 Zeilen) und 129
@@ -764,29 +769,6 @@ Variable, die regelkonform auflöst). Das Problem ist nicht die Ebene, sondern
 
 <details><summary>Tests/Dokumentation (15)</summary>
 
-- [~] wartet auf einen MySQL-/MariaDB-Testlauf — die beiden Tests sind driver-gated und laufen auf CI-SQLite `:memory:` immer skipped, die V039-Uniqueness-Invariante hat so keinen automatisierten Nachweis. **TST-3:** `ContractSignerIdentityRaceTest.php:26,30` + `ContractSignerIdentityTest.php:217,223` sind driver-gated und laufen auf CI-SQLite `:memory:` immer skipped → V039-Uniqueness-Invariante ohne automatisierten Nachweis.
-</details>
-
-### ✅ Finaler unabhängiger Review (DeepSeek-v4.1, 2026-09-26) — Blocker behoben
-
-> Review von `git diff 1b3448d` (gesamtes Changeset, 120 Dateien). Urteil: **NOT_READY** wegen 1× P1. Nach Behebung: **READY_TO_COMMIT**. Der Reviewer verifizierte 15 Fixes als korrekt (PAY-1-Kernlogik, CTR-2/3/5/9, PAY-3, AUTH-1, AIS-2, AIS-5, INFRA-2, FE-4, V036-Idempotenz, AUTH-3/5, APP_DEBUG-Policy, `ContractSigner::$hidden`, `stripe_customer_id`).
-
-**Nachtrag 2026-09-26 (P2-Umsetzung, Commits `fca95c9` / `6a35e07` / `52b8331`):**
-
-**Dependabot-Stand (2026-09-26, Ende der Welle):** **0 offene Security-Alerts** (von 3 high + 2 medium), **0 offene PRs** — alle 3 PRs sind erledigt, aber **nicht auf dem ursprünglichen Weg.**
-
-- **#14 `browserslist` 4.28.4 → 4.29.0: gemergt** (Squash, `8632ab6`). Reiner transitiver Bump, kein Quellcode betroffen, frischer Lauf grün.
-- **#15 `baseline-browser-mapping` 2.11.25: geschlossen als obsolet.** `baseline-browser-mapping` ist **keine direkte Abhängigkeit** (kein Eintrag in `frontend/package.json`), sie kommt transitiv über `browserslist`. #14 hat `baseline-browser-mapping@2.11.25` bereits ins Lockfile gezogen — exakt die Version, die #13/#15 anpeilen. Ein Merge wäre ein No-op und kollidierte zudem, weil beide PRs denselben Lockfile-Eintrag schreiben.
-- **#13 `@tiptap/core` 3.30.2 → 3.30.5 — GEMERGT als `db9f512` mit Lockstep-Fix (s.u.).** Root-Cause war ein Versions-Skew, KEIN Breaking Change. Der rote Frontend-Check meldete `Property 'setParagraph' / 'toggleBold' / 'toggleHeading' / 'toggleItalic' / 'toggleBulletList' / 'toggleOrderedList' does not exist on type 'ChainedCommands'`. Das Changelog widerlegt die Breaking-Change-Annahme: 3.30.3/3.30.4/3.30.5 sind drei Patch-Fixes (Nested-Sibling-JSX, Prototype-Pollution in `mergeAttributes`, Markdown-Attribut-DoS) und ändern die Chain-Typen nicht. **Ursache:** `ChainedCommands`/`Commands`/`RawCommands` werden von den Extension-Paketen per TypeScript-Decoration-Merging auf `@tiptap/core` erweitert. Liest `core` eine andere Version als die Extensions, landen die Augmentationen auf einer anderen Modul-Instanz, der Merge geht verloren und die Kommandos verschwinden aus dem Typ. **Fix:** alle neun Pakete in Lockstep, Range `^3.30.2` → `~3.30.5`, Lockfile pinnt **3.30.6**.
-  - **Warum `~` und nicht `^`:** `^3.30.5` löst **3.31.x** auf, das **keinen Changelog-Eintrag** upstream hat (neueste dokumentierte Version ist 3.30.5). Ein undokumentiertes Minor bei so gekoppelter Typ-Oberfläche nicht blind zu landen, ist keine Option; die Tilde hält die Range in der dokumentierten 3.30-Linie und nimmt weiter Patches an. Die Security-Fixes aus 3.30.4/3.30.5 sind in 3.30.6 kumuliert enthalten.
-  - **Wiederholungssicherung:** dependabot-Gruppe `"@tiptap/*"` in `.github/dependabot.yml`, damit künftige Updates als ein Lockstep-PR ankommen und kein Ein-Paket-Bump den Skew erneut erzeugen kann.
-  - Verifiziert auf 3.30.6: `tsc -p tsconfig.tests.json` exit 0 (der zuvor rote Check), `pnpm lint:fix`/`lint:e2e` exit 0, Vitest 128 Files/1040 Tests, `pnpm build` grün, `wysiwyg-editor.spec.ts` E2E 4/4 in beiden Viewports gegen einen mit geleertem Optimizer-Cache neu gestarteten Vite.
-
-**Beobachtung ohne Bezug zum Tiptap-Bump:** `Backend (PHPUnit)` schlug auf dem Lauf von #13 mit `ImportLocationsNonDestructiveTest` fehl — `FileNotFoundException` auf `storage/app/private/temp/AT_postal.txt`, einem **parallelen Workern geteilten Temp-Pfad**. Der Backend-Lauf auf `main` ist grün. Passt zum bereits bekannten Paratest-/Worker-Konkurrenz-Thema in `backend/AGENTS.md`; als eigener Punkt zu verfolgen, **nicht** als Folge des Dependency-Bumps zu behandeln.
-**Abgeschlossen / widerlegt:** FINAL-2, FINAL-3, FINAL-4, FINAL-5, FINAL-6 und FINAL-7 sind im Nachtrag oben umgesetzt und verifiziert; **FINAL-7 hat sich als gegenstandslos erwiesen** (`orders.total_amount` ist `NOT NULL`, V004). Details und Evidenz dort — dieser Abschnitt listet die erledigten P2 nicht mehr doppelt auf, damit das Board nicht in sich widerspricht.
-
-**Ausdrücklich sauber (nicht regressieren):** Action-/Digest-Pinning, Secret-Hygiene, `pull_request_target`-Gating, rclone-Filter, Non-root in Production, Lua-Timeouts, Checkout-Idempotenz (Fingerprint bindet Brand/Items/Billing/Coupon/server-computed Betrag/Actor), Webhook-Signatur fail-closed auf allen vier Handlern, keine Raw-SQL mit User-Input, `$fillable`-Disziplin, `GalleryGroupSubtree` cycle-safe/depth- und node-bounded, V037-Owner-Trigger auf INSERT **und** UPDATE, V038-Actor-Key server-abgeleitet, AI-Prompt-Injection-Delimiter geschlossen, AI-Logging nur `status`+`body_length`, AI-Budget **vor** Decode, keine neuen E2E-`/api/*`-Mocks, kein localStorage-`addInitScript`, alle neuen E2E-Specs getaggt, `Mail::fake()` nur für Enqueue/Fault-Injection.
-
 ## 🛑 SESSION-HANDOVER (2026-09-25, Ende der Arbeitssession)
 
 **Ergebnis in einem Satz:** 13 verifizierte Commits sind auf `main`; die verbleibenden Arbeitsstränge sind mit **unterschiedlichem Nachweisgrad** committed (2× fertig, 3× halb fertig), und die CI ist aus **genau einem** externen Grund rot.
@@ -838,7 +820,6 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
   Datenverlust (§6, 2026-10-21) und die unabhängige Verifikation der Card-Testing-Implementierung (eigene
   Position unten).
 - [~] wartet nur noch auf die **Operations-Evidenz** (die Mail-Zustellung, siehe die Position zum Queue-/Mail-/Worker-/Scheduler-Nachweis) — die Code-Subblöcke R1–R7 sind verifiziert geschlossen, und die **Product Decisions** sind entschieden (D-17 „Duplicate mail and prompt-injection policies“ in `features/owner-decisions.md`, umgesetzt in `98766c14`). Die im alten Text genannten aktiven Bugs sind heute durch Tests abgedeckt: Session-Header-Validierung (`AISessionHeaderDeploymentPolicyTest`), Bild-Budget (`ModelContactSheetTest`, `ModelContactSheetBulkTest`), Cleanup-Dauerhaftigkeit (`GalleryPhotoCleanupDurabilityTest`, `CleanupGalleriesFailureTest`), Temp-Löschung (`AiTempFileSweepAgreementTest`, `WatermarkMarkerCleanupTest`), Mail-Verlust bei Quotes (`WebhookInvoiceMailAtomicDedupeTest`, `WebhookReplayMailTest`), fehlerhafte Provider-Antwort (`StripeWebhookTest`, `WebhookNullPiTest`), Reihenfolge beim manuellen Löschen (`ManualInvoiceNumberValidationTest`, `GalleryUpdateDeleteTest`).
-- [~] wartet auf den **echten Multi-Connection-Race** gegen MariaDB — die Unique-Index-Entscheidung ist gefallen und umgesetzt (`backend/database/migrations/V039__enforce_contract_signer_identity.php`, Commit `1e86e9c1`: `normalized_email` + `join_scope_key`, ein Preflight, der bei Duplikaten abbricht statt zu löschen, Unique-Index `contract_signers_scope_normalized_email_unique`). Offen bleibt der Lauf: `backend/tests/Feature/Contract/ContractSignerIdentityRaceTest.php:26,30` und `backend/tests/Feature/Contract/ContractSignerIdentityTest.php:217,223` sind driver-gegatet (SQLite `:memory:` kann keine unabhängigen Writer-Verbindungen liefern, `pcntl_fork` fehlt), und `backend/phpunit.xml:39-40` pinnt SQLite → der Lauf findet in CI **nie** statt. Nötig: ein MariaDB-Lauf (CI-Job mit `mariadb:11.4` oder ein `composer test:mariadb`) — siehe die Position zum MySQL-/MariaDB-Testlauf (TST-3).
 ## Model-Registrierung (Magic-Link) + Profile-Iteration (2026-09-18/19 deployiert) — OFFENE Restarbeiten
 
 > Plan: `~/.opencode/plan/model-registrierung.md` · SOLL: `features/crm/05-model-registration.md` + `features/crm/06-model-profile-iteration.md`.
@@ -950,10 +931,12 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
 
 > Approved architecture: `features/security/card-testing-protection.md`. V036 und die zugehörige Implementierung sind im aktuellen Working Tree vorhanden. Der CI-Lauf `35917265654` auf Commit `e73d5cf` ist ein **historischer Verifikationsdatensatz**; er liegt vor den aktuellen uncommitted Änderungen und ist kein Nachweis für diesen vollständigen Working Tree. Eine lokale E2E-Ausführung wurde in diesem Docs-only-Pass nicht gestartet. Betriebs-, Rollout- und Final-Review-Gates bleiben ausdrücklich offen; diese Dokumentationskorrektur behauptet keine neuen Application-Tests.
 
-**Architektur & Backend**
-**Frontend / Stripe.js**
-**Betrieb, Stripe Dashboard & Privacy**
-**Tests**
+**Offene Punkte:** Die Positionen stehen im Board an zwei Stellen — die betrieblichen Live-GO-Punkte
+(Stripe-Dashboard-Checkliste, Monitoring-Alarm-Test) und die unabhängige Verifikation. Der unabhängige Diff-Review
+vom 2026-10-22 ist mit **APPROVED MIT AUFLAGEN** in `features/security/card-testing-protection.md` (§ Status) protokolliert;
+die Auflagen, die ohne den Owner umsetzbar waren, sind am 2026-10-22 geschlossen.
+
+
 
 ## Produktionsdeploy SFTPGo — Vorfall vom 2026-09-26 (abgeschlossen)
 
@@ -973,15 +956,20 @@ alle mit Regressionstest:
   liegt als `/var/lib/sftpgo/ftps/cert.pem` im Container, muss aber auf die Speicherkarte
   als **`ROOT.PEM`** kopiert werden — Canon importiert nur `ROOT.CER` / `ROOT.CRT` /
   `ROOT.PEM` und überspringt `cert.pem` still (`deployment/kamera-einrichtung.md:157-168`).
-  **Firewall-Gegenprobe (10 Sekunden, kein Owner-Task):**
-  `firewall-cmd --zone=public --list-ports` — 989/tcp, 2222/tcp und 50000-50100/tcp sind
-  seit dem 2026-09-27 gesetzt (`deployment/README.md:187-193`), 8080 bleibt zu; der Host
-  nutzt **firewalld**, nicht `ufw`.
-- [ ] manuell prüfen: `AI_API_KEY` und `ADMIN_PASSWORD` im Portal-/Host-Secret-Store rotieren — beide sind beim Auslesen der aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen. **`AI_API_KEY` und `ADMIN_PASSWORD` rotieren.** Beide sind beim Auslesen
-  der aufgelösten Compose-Datei im Klartext durch das Terminal gelaufen.
-- [~] wartet auf die Anforderung des Owners. Bisher nicht umgesetzt. **dev-vm-Container aus `volume-backup.sh` ausschließen** (angefordert,
-  nicht umgesetzt).
-
+  **Firewall-Gegenprobe (10 Sekunden, kein Owner-Task) — am 2026-10-21 gemessen und erledigt:**
+  `firewall-cmd --zone=public --list-ports` → `989/tcp 2222/tcp 50000-50100/tcp` (seit dem
+  2026-09-27 gesetzt, `deployment/README.md:187-193`), 8080 bleibt zu; der Host nutzt
+  **firewalld**, nicht `ufw`. Gegenprobe auf dem Host: `ss -lntp` zeigt 2222 und 989 als
+  `docker-proxy` (IPv4 und IPv6), der TCP-Handshake gegen 127.0.0.1 gelingt für 2222 und 989
+  und **schlägt für 8080 fehl** (erwartet); die passive Range 50000-50100 wird von mehreren
+  `docker-proxy`-Prozessen bedient. Damit ist der Firewall-Stand gemessen; offen bleibt nur
+  der Kamera-Upload selbst.
+- [ ] manuell prüfen: `AI_API_KEY` und `ADMIN_PASSWORD` im Portal-/Host-Secret-Store rotieren — beide sind beim Auslesen der aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen. **Die Rotation selbst bleibt eine Owner-Aktion; das Runbook dafür steht jetzt:**
+  `features/infrastructure/29-production-operations-runbook.md` §7 „Rotating a secret after an exposure" —
+  die Reihenfolge (Wert auf dem Host erzeugen und direkt in die Stack-Env schreiben, Container neu starten bzw.
+  neu erzeugen, mit einer **Länge** statt mit dem Wert verifizieren, die Funktion prüfen, den alten Wert beim
+  Anbieter widerrufen, Nachweis ohne Wert protokollieren) und die drei Dinge, die nicht passieren dürfen (der Wert
+  im Chat oder im Log, ein Test des alten Werts nach dem Neustart, eine Rotation „beiläufig" in einem Deploy).
 ## Nachtrag 2026-09-26, Kamera-Setup aus der Oberfläche bedienbar machen
 
 **Offen (aus dieser Runde):**
@@ -1126,17 +1114,24 @@ gerissen und zur Entscheidung gemacht.
   einem späteren Aufräumen prüfen, ob es in die Stack-Env gehört.
 
 **Verifikation / Übergabe**
-- [~] wartet auf einen separaten Reviewer-Durchgang; die Umsetzung ist fertig, die Prüfung steht aus. Diff-Review gegen `features/security/card-testing-protection.md` (V036 separat, keine Secrets/PII, keine ungeprüften Stripe-/Turnstile-Bypässe) durch separaten Reviewer.
-- [~] wartet auf die **Betriebs**-Live-GO-Punkte: die Radar-/3DS-/Webhook-/Privacy-Checkliste in
-  `features/security/card-testing-protection.md` (acht unangehakte Checkboxen, Stripe-Dashboard)
-  und den **Test der Monitoring-Alarme** (in `features/security/card-testing-runbook.md` §1–§3
-  beschrieben, aber nie ausgelöst). **Dokumentiert und damit erledigt (2026-10-21):** der
-  Emergency-Kill-Switch und der Rollback-Ablauf ohne Datenverlust — jetzt in
-  `features/security/card-testing-runbook.md` §6: was der Schalter blockiert und was nicht, die
-  vier Schritte zum Umlegen in Produktion mit der Verifikation, und die Rollback-Reihenfolge
-  Konfiguration → durable Identifier. Die Limit-/Race-Lücke war bereits am 2026-10-18 gegen eine
-  echte MariaDB geschlossen (40 gleichzeitig freigegebene Clients: 30 × 200 / 10 × 429,
-  0 Deadlocks, 0 × 5xx; `features/security/2026-10-18-review-closure.md`).
+- [~] wartet auf die **betrieblichen** Live-GO-Punkte — die Radar-/3DS-/Webhook-/Privacy-Checkliste
+  (Stripe-Dashboard, `features/security/card-testing-protection.md`), den **Test der Monitoring-Alarme**
+  (in `features/security/card-testing-runbook.md` §1–§3 beschrieben, aber nie ausgelöst), den
+  **Live-Nachweis des Kill-Switches** (§6.2 des Runbooks: der Schalter wurde nie in Produktion ausgeloest)
+  und die **Datenschutz-Freigabe** (§10: Rechtsgrundlagen und Aufbewahrungsfristen sind laut
+  `frontend/src/ui/Privacy.tsx` nicht abschliessend festgelegt; die DPO-Pruefung steht aus).
+  **Die Reihenfolge ist nicht beliebig:** §12.4 des Vertrags erlaubt den Turnstile-Rollout erst, wenn
+  Dashboard-, **CSP-**, Datenschutz- und Siteverify-Checks bestanden sind. Die CSP-Pruefung ist der
+  **Blocker**: die ausgelieferte Policy erlaubt `https://challenges.cloudflare.com` nicht, das
+  Turnstile-Skript und sein Frame wuerden blockiert, und der Checkout-Button bliebe fuer jeden
+  risikobedingten Versuch deaktiviert (Befund des unabhaengigen Reviews vom 2026-10-22; die
+  Aenderung gehoert in das Caddyfile von `proxy-stack` und **nicht** in dieses Repo — der Mirror
+  `deployment/content-security-policy.txt` folgt danach, `./scripts/check-csp-policy.sh` belegt die
+  Uebereinstimmung). `TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET` sind in Produktion leer, die Policy passt
+  also zum Ist-Zustand. **Erledigt und nicht mehr Teil dieser Position:** der Contract-/Card-Testing-
+  Review (APPROVED MIT AUFLAGEN, `features/security/card-testing-protection.md` § Status), das
+  Monitoring-Runbook (§1–§3), der Rollback-Ablauf ohne Datenverlust (§6) und die Auflagen, die ohne
+  den Owner umsetzbar waren.
 ## 📌 SKILLS-STAND (2026-10-19) — Marker auf `787670a` fortgeschrieben
 
 > `AGENTS.skills.md` steht jetzt auf `787670a` (Skills-Repo-HEAD vom 2026-10-19), geprüft am
