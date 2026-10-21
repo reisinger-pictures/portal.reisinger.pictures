@@ -7,7 +7,11 @@
 #   * Composer (Dist-Binary, wie Prod aus einem digest-gepinnten Image)
 #   * Node.js (gepinnte v26.7.0, offizielles Linux-Binary)
 #   * pnpm (exakt frontend/package.json#packageManager)
-#   * Playwright-Chromium inkl. apt-System-Deps (Version == @playwright/test)
+#   * Playwright-Chromium inkl. apt-System-Deps (Version == aufgelöste
+#     @playwright/test-Version aus frontend/pnpm-lock.yaml; der ARG-Default
+#     darunter ist der Fallback für lokale Builds und wird von
+#     tests/infrastructure/verify-playwright-version.sh gegen das Lockfile
+#     geprüft)
 #
 # INVARIANTE: Es wird NUR die Umgebung eingebacken — niemals App-Code,
 # node_modules/ oder vendor/. Die CI mountet den Workspace und installiert

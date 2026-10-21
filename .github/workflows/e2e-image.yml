@@ -38,9 +38,15 @@ jobs:
       - name: Extract build args from repository
         id: versions
         run: |
-          PLAYWRIGHT_VERSION="$(sed -n 's/.*"@playwright\/test"[[:space:]]*:[[:space:]]*"\^\{0,1\}\([0-9][0-9.]*\)".*/\1/p' frontend/package.json | head -n1)"
+          # The browser version comes from the RESOLVED version in the lockfile,
+          # not from the range's lower bound in the manifest: Dependabot updates
+          # the lockfile alone whenever a new version falls inside the declared
+          # range, and the range's lower bound would keep the old browser.
+          # The version binding is verified by
+          # tests/infrastructure/verify-playwright-version.sh.
+          PLAYWRIGHT_VERSION="$(grep -A2 -E "^[[:space:]]+'@playwright/test':[[:space:]]*$" frontend/pnpm-lock.yaml | sed -n 's/^[[:space:]]*version:[[:space:]]*\([0-9][0-9.]*\).*/\1/p' | head -n1)"
           PNPM_VERSION="$(sed -n 's/.*"packageManager"[[:space:]]*:[[:space:]]*"pnpm@\([0-9][0-9.]*\)".*/\1/p' frontend/package.json | head -n1)"
-          [ -n "$PLAYWRIGHT_VERSION" ] || { echo "::error::@playwright/test Version nicht in frontend/package.json gefunden"; exit 1; }
+          [ -n "$PLAYWRIGHT_VERSION" ] || { echo "::error::aufgelöste @playwright/test-Version nicht in frontend/pnpm-lock.yaml gefunden"; exit 1; }
           [ -n "$PNPM_VERSION" ] || { echo "::error::packageManager (pnpm) nicht in frontend/package.json gefunden"; exit 1; }
           echo "playwright_version=${PLAYWRIGHT_VERSION}" >> "$GITHUB_OUTPUT"
           echo "pnpm_version=${PNPM_VERSION}" >> "$GITHUB_OUTPUT"

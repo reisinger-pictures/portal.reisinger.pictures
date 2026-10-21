@@ -27,16 +27,15 @@ aktuellen Commits werden weiterhin im Job installiert.
    - die in `frontend/package.json#packageManager` festgelegte pnpm-Version
    - Playwright-Chromium inklusive apt-Abhängigkeiten unter
      `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`; die Version wird als
-     Build-Argument aus `frontend/package.json` extrahiert — genauer: als
-     **Untergrenze der Range** (`e2e-image.yml` entfernt nur das `^`), weshalb
-     sie mit der aufgelösten Lockfile-Version übereinstimmen muss. Die vier
-     Stellen, die die Zahl tragen, stehen unter „Versionsbindung — vier Stellen,
-     eine Zahl".
+     Build-Argument aus der **aufgelösten Lockfile-Version** extrahiert
+     (`e2e-image.yml` liest `frontend/pnpm-lock.yaml`, nicht die Range-Untergrenze
+     aus dem Manifest — siehe „Versionsbindung — vier Stellen, eine Zahl"). Die
+     vier Stellen, die die Zahl tragen, stehen dort.
 2. **`.github/workflows/e2e-image.yml`** baut das Image bei Änderungen an
    `deployment/Dockerfile.e2e`, dem Workflow selbst oder
    `frontend/pnpm-lock.yaml` auf `main` sowie wöchentlich und manuell. Es
    publiziert `:latest` und einen versionsgebundenen Tag (`portal-e2e:1.64.1`,
-   aus `frontend/package.json`); `ci.yml` pinnt im `container:`-Feld genau
+   aus der aufgelösten Lockfile-Version); `ci.yml` pinnt im `container:`-Feld genau
    diesen versionsgebundenen Tag, nie `latest`. Gepinnt wird nicht mehr über
    `@sha256`: ein Digest-Pin friert ein Image auf einen Build ein und brauchte
    für jeden Patch-Release eine manuelle Aktualisierung, sodass ein Base-Image-
@@ -93,7 +92,11 @@ aktuellen Commits werden weiterhin im Job installiert.
    - `npx playwright install chromium` bleibt ein No-Op-Fallback für eine
      kurzzeitige Versionabweichung zwischen Playwright-Lockfile und Image. Es
      wird nicht mit `--with-deps` aufgerufen, weil die Systemabhängigkeiten im
-     Image gebacken sind.
+     Image gebacken sind. **Dauerhaft** ist die Abweichung ausgeschlossen:
+     `verify-playwright-version.sh` bricht rot, sobald Pin, `ARG`-Default und
+     Lockfile auseinanderlaufen — der Fallback darf nur die kurze Lücke
+     schließen, die ein bewusst nachgezogener Pin eröffnet, nicht einen stillen
+     Dauerzustand tragen.
 
 ## Versionsbindung — vier Stellen, eine Zahl
 
@@ -103,41 +106,56 @@ das Image eingebacken hat:
 
 | Stelle | Rolle |
 |---|---|
-| `frontend/package.json`, `devDependencies."@playwright/test"` | die **Range** (`^1.64.1`) — kein Pin |
+| `frontend/pnpm-lock.yaml`, `importers → devDependencies."@playwright/test"` | die **aufgelöste** Version (`1.64.1`) — die Quelle |
+| `frontend/package.json`, `devDependencies."@playwright/test"` | die **Range** (`^1.64.1`) — die Deklaration, kein Pin |
 | `deployment/Dockerfile.e2e`, `ARG PLAYWRIGHT_VERSION=1.64.1` | Default für **lokale** Builds; CI überschreibt ihn per `build-args` |
-| `.github/workflows/e2e-image.yml`, Extraktion aus `package.json` | bestimmt **Build-Argument und publizierten Tag** |
 | `.github/workflows/ci.yml`, `container.image` | der **Konsument** — der Teil, den man vergisst |
 
-**Die Regel, die den Wert bestimmt:** die Extraktion liest die **Untergrenze der
-Range**, nicht die aufgelöste Lockfile-Version — sie entfernt nur das `^`:
+**Die Regel, die den Wert bestimmt (Stand 2026-10-21):** die aufgelöste
+Lockfile-Version ist die Quelle. Der Image-Workflow liest sie aus dem Lockfile,
+nicht die Untergrenze der Range aus dem Manifest:
 
 ```bash
-sed -n 's/.*"@playwright\/test"[[:space:]]*:[[:space:]]*"\^\{0,1\}\([0-9][0-9.]*\)".*/\1/p' frontend/package.json | head -n1
+grep -A2 -E "^[[:space:]]+'@playwright/test':[[:space:]]*$" frontend/pnpm-lock.yaml \
+  | sed -n 's/^[[:space:]]*version:[[:space:]]*\([0-9][0-9.]*\).*/\1/p' | head -n1
 # 1.64.1
 ```
 
-Deshalb **muss die Untergrenze der Range gleich der aufgelösten Version sein**.
-Liegt sie darunter (etwa `^1.63.0`, was die Lock-Schwelle erfüllt), liefert die
-Extraktion die niedrigere Zahl, während `pnpm install` auf die höchste passende
-auflöst: das Image backt dann den älteren Chromium ein und wird unter der
-niedrigeren Zahl publiziert, während der Runner aus dem Lockfile die höhere
-Version fährt. Ein versionsgebundener Browser ist nicht „ungefähr richtig" —
-gemessen, Befehl daneben:
+**Warum die Range-Untergrenze die falsche Quelle war.** Dependabot (npm,
+`/frontend`, **täglich**, `minor-and-patch` gruppiert) aktualisiert bei einer
+Version **innerhalb** der deklarierten Range **nur das Lockfile** — belegt: von
+sechs offenen Dependabot-Branches für `/frontend` änderten vier ausschließlich
+`frontend/pnpm-lock.yaml`. Ein solcher Bump trifft `frontend/pnpm-lock.yaml` in
+`paths` → der Rebuild läuft, extrahierte aber wieder die Range-Untergrenze und
+backte **denselben** Browser unter **demselben** Tag neu ein. Der E2E-Lauf blieb
+grün, weil `ci.yml:622-629` („Verify Playwright browsers (fallback install)") die
+abweichende Browserversion pro Lauf nachlädt — **damit war die Zusage des
+Test-Images still aufgehoben** („kein Browser-Download pro Run",
+`deployment/Dockerfile.e2e:12-16`), ohne dass irgendwo ein Fehler erschien. Der
+Versionssprung ist real: Chromium 1234 gehört zu Playwright 1.62.1, 1248 zu
+1.64.1 (gemessen mit `npx --yes playwright@<version> install --dry-run chromium`).
 
-```bash
-cd frontend && npx --yes playwright@1.62.1 install --dry-run chromium | grep -i 'playwright chromium'
-# Chrome for Testing 151.0.7922.34 (playwright chromium v1234)
-cd frontend && npx --yes playwright@1.64.1 install --dry-run chromium | grep -i 'playwright chromium'
-# Chrome for Testing 156.0.8078.4 (playwright chromium v1248)
-```
+**Die vier Stellen sind heute gekoppelt, aber nur drei davon sind abgeleitet.**
+Der Image-Workflow leitet Build-Argument und publizierten Tag aus dem Lockfile
+ab. Der `ARG`-Default im Dockerfile und der `container.image`-Pin in `ci.yml`
+sind **Literale** — GitHub löst `container.image` auf, **bevor** die Schritte
+laufen, eine Ableitung im Job wäre unmöglich. Sie stehen deshalb **unter
+Vertrag**, nicht unter Ableitung: `tests/infrastructure/verify-playwright-version.sh`
+prüft fail-closed, dass
 
-Die Range-Untergrenze ist damit die einzige Zahl, die von Hand gewählt wird; sie
-liegt **auf** der aufgelösten Version, nicht darunter. `ARG`-Default und
-`ci.yml`-Pin sind ebenfalls Handarbeit und zählen nur für lokale Builds bzw. als
-Konsument. Ein Lockfile-only-Update (etwa `pnpm update`, oder ein Lockfile-Merge
-ohne Manifest-Änderung) verschiebt die aufgelöste Version, ohne die
-Range-Untergrenze mitzubewegen — dann backt das Image eine andere Zahl ein, als
-der Runner fährt.
+- das Lockfile überhaupt eine auflösbare `@playwright/test`-Version trägt,
+- die aufgelöste Version **innerhalb** der deklarierten Range liegt,
+- der Image-Workflow die Version aus dem **Lockfile** (nicht aus dem Manifest)
+  zieht,
+- der `container.image`-Pin in `ci.yml` und der `ARG`-Default im Dockerfile
+  dieselbe Zahl nennen wie das Lockfile.
+
+Der Pin ist damit **Handarbeit mit Wächter**: ein Lockfile-only-Bump lässt den
+Workflow das Image mit der neuen Browserversion unter dem **neuen** Tag
+publizieren, und der Vertrag bricht **rot**, bis der Pin in `ci.yml` (und der
+`ARG`-Default im Dockerfile) nachgezogen ist. Das ist die gewollte Reihenfolge:
+der Bump der Browserversion soll eine **bewusste** Handlung sein, kein
+stiller Nebeneffekt eines Dependabot-Branches.
 
 `tests/infrastructure/verify-image-freshness.sh` liest den konsumierten
 `portal-e2e`-Tag **ausschließlich aus `ci.yml`** (`resolve_pin`, fail-closed):
