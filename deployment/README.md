@@ -128,12 +128,27 @@ docker compose logs backend | grep -i 'FTP-Import-Kette'
 
 > **Diese Compose-Änderung ist ein Recreate, kein Restart.** `docker restart
 > portal_backend` übernimmt neue `environment:`-Zeilen **nicht** — sie sind zum
-> Erzeugungszeitpunkt in den Container gebacken (`AGENTS.md` §13). Erst ein
+> Erzeugungszeitzeitpunkt in den Container gebacken (`AGENTS.md` §13). Erst ein
 > Stack-Recreate (Portainer-Editor-Update) macht die Variablen wirksam.
 >
-> **Grenze:** die Event-Regel wurde nie gegen eine laufende SFTPGo-Instanz
-> verifiziert (Payload-Form nur an der Quelle gelesen und getestet). Der erste
-> echte Upload nach dem Deploy ist die Gegenprobe.
+> **Stand der Verifikation (2026-10-21):** die Event-Regel ist **gegen ein
+> laufendes SFTPGo geschrieben und von dort zurückgelesen** — im Test-Stack
+> provisioniert `scripts/e2e-up.sh` sie bei jedem Setup (`ftp:provision-events`),
+> und der Test-SFTPGo zeigt danach Aktion und Regel mit dem belegten
+> Payload: Ereignis `upload`, Aktion `POST` auf
+> `/api/internal/ftp/upload-event`, Header `X-FTP-Event-Secret` und
+> `Content-Type: application/json`, Body mit `{{.Event}}`, `{{.Name}}`,
+> `{{.VirtualPath}}`, `{{.FileSize}}`, Timeout 10 s. Die Payload-Form ist damit
+> am laufenden Dienst belegt, nicht nur an der Quelle gelesen.
+>
+> **Offen bleibt der erste echte Upload in der Produktion.** Dort ist die Kette
+> bis heute **nicht scharf**: der laufende `portal_backend`-Container führt kein
+> `FTP_EVENT_SECRET` in seiner Umgebung, und
+> `php artisan ftp:provision-events --dry-run` verweigert mit „FTP_EVENT_SECRET
+> ist nicht gesetzt." — die Aktion und die Regel wurden also nie in das
+> Produktions-SFTPGo geschrieben, und jedes Event würde mit 401 abgewiesen
+> (fail-closed, korrekt). Die Schritte dafür stehen oben: Secret in der
+> Portainer-GUI setzen, Stack-Recreate, `ftp:provision-events` ausführen.
 
 ### Einmalige Host-Voraussetzung: Fotospeicher
 
