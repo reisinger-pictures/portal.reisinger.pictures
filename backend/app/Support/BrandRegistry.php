@@ -267,14 +267,42 @@ class BrandRegistry
         return $brand instanceof Brand ? $brand : Brand::B2B;
     }
 
-    public static function frontendUrl(?Brand $brand = null): string
+    /**
+     * Frontend-URL einer Brand.
+     *
+     * Die Brand darf als Enum-Fall **oder** als rohe Brand-ID übergeben
+     * werden; beide Wege enden in derselben Auflösung. Die Reihenfolge ist:
+     *
+     * 1. **Die Umgebungs-URL hat Vorrang** (`config('app.frontend_url')`,
+     *    gesetzt aus `FRONTEND_URL`). Sie ist per Default **immer** gesetzt
+     *    (sie fällt auf `APP_URL` zurück) — die Brand-Auflösung greift
+     *    deshalb nur, wenn keine Umgebungs-URL konfiguriert ist.
+     * 2. Sonst läuft die Auflösung über `configForBrand()`: die konfigurierte
+     *    `frontend_url` der Brand, sonst deren erster Hostname als
+     *    `https://`-URL.
+     * 3. Hat die Brand **keinen eigenen Config-Eintrag** (z. B. eine
+     *    Legacy-Brand-ID wie `srp`), gibt es keine brand-spezifische
+     *    Frontend — es gilt derselbe allgemeine Default wie bisher
+     *    (`config('app.url')`).
+     *
+     * Es gibt damit **keine** Frontend, die allein wegen einer Brand-ID
+     * garantiert wäre: welche URL ein Link bekommt, entscheidet die
+     * Umgebung, und erst ohne Umgebungs-URL die Brand-Konfiguration.
+     */
+    public static function frontendUrl(Brand|string|null $brand = null): string
     {
         $envUrl = config('app.frontend_url');
         if ($envUrl) {
             return rtrim($envUrl, '/');
         }
-        $brand ??= self::currentOrDefault();
-        $config = self::configForBrand($brand->value);
+
+        $brandId = match (true) {
+            $brand instanceof Brand => $brand->value,
+            is_string($brand) && trim($brand) !== '' => trim($brand),
+            default => self::currentOrDefault()->value,
+        };
+
+        $config = self::configForBrand($brandId);
         if ($config?->frontendUrl) {
             return rtrim($config->frontendUrl, '/');
         }

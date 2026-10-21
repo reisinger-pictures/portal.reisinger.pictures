@@ -70,6 +70,8 @@ test.describe('Model-Profil-Zugang (Magic Link)', () => {
         await expect(page.locator('main').getByRole('heading', { name: 'Models', exact: true })).toBeVisible({ timeout: 15000 });
         await page.locator('#model-filter-q').fill(unique);
 
+        // The prefix matches the card button only: the wrapper around it uses
+        // the `model-frame-` test id, so one element per model is hit.
         const card = page.locator('[data-testid^="model-card-"]').first();
         await expect(card).toBeVisible({ timeout: 15000 });
         await card.click();

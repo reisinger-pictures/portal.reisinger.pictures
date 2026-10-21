@@ -460,11 +460,16 @@ export class E2ESessionHelper {
      * `photoCount` optionally uploads person photos: the first is public and
      * elected as primary, the rest are internal (matches the frontend defaults
      * plus one elected main image for owner photo-management tests).
+     *
+     * `namePrefix` overrides the name prefix (default `E2EDel`) so a spec can
+     * create several models that share one unique prefix and filter the admin
+     * list on it — the selection stays deterministic even when other models
+     * exist in the same database.
      */
-    async createRegisteredModel(options?: { photoCount?: number }): Promise<{ firstName: string; email: string; customerId: string | null }> {
+    async createRegisteredModel(options?: { photoCount?: number; namePrefix?: string }): Promise<{ firstName: string; email: string; customerId: string | null }> {
         await this.ensureAdminLogin();
         const unique = Math.random().toString(36).substring(2, 10);
-        const firstName = `E2EDel${unique}`;
+        const firstName = `${options?.namePrefix ?? 'E2EDel'}${unique}`;
         const email = `e2e-model-${unique}@example.com`;
 
         const invite = await this.createModelInvite({ email, label: `E2E ${unique}` });

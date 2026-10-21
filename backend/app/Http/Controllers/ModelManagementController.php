@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Brand;
 use App\Http\Controllers\Concerns\AdminOnly;
 use App\Models\Customer;
 use App\Models\ModelAccessToken;
 use App\Models\ModelPhoto;
 use App\Models\ModelProfile;
 use App\Services\AuthorizationService;
+use App\Services\ModelContactSheetLinkService;
 use App\Services\ModelContactSheetService;
 use App\Services\ModelFileCleanupService;
 use App\Services\ModelFileStore;
 use App\Services\ModelPhotoPrimaryService;
 use App\Services\ModelProfileEraser;
 use App\Services\ModelQuestionnaire;
+use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -244,6 +247,197 @@ class ModelManagementController extends Controller
         return response()->streamDownload(function () use ($pdf): void {
             echo $pdf;
         }, $filename, ['Content-Type' => 'application/pdf']);
+    }
+
+    /**
+     * Contact Sheet über eine **Auswahl** von Profilen (Phase 3, Ergebnisliste).
+     *
+     * Body: `{ "ids": ["<uuid>", …], "variant": "internal|external" }`.
+     *
+     * Fail-closed: jede ID muss zu einem Profil der Brand des Akteurs gehören
+     * — ein fremdes (oder unbekanntes) Profil lässt den **ganzen** Export mit
+     * 404 abbrechen, statt stillschweigend aus der Auswahl zu fallen. Der
+     * Einzelbogen-Sperrgrund (inaktives Profil ohne Super-Admin) gilt je Profil.
+     *
+     * Audit: eine `model.contact_sheet.export`-Zeile je Profil plus eine
+     * `model.contact_sheet.export_bulk`-Zeile mit Anzahl und Variante — PII-frei.
+     */
+    public function contactSheetBulk(Request $request)
+    {
+        $this->authorizeAdmin();
+        $brand = $this->adminBrand();
+
+        $variant = $request->input('variant');
+        if (! is_string($variant) || ! in_array($variant, ModelContactSheetService::VARIANTS, true)) {
+            throw ValidationException::withMessages([
+                'variant' => 'Ungültige Variante. Erlaubt sind „internal" und „external".',
+            ]);
+        }
+
+        $rawIds = $request->input('ids');
+        $ids = is_array($rawIds) ? array_values($rawIds) : [];
+        if ($ids === [] || count(array_filter($ids, 'is_string')) !== count($ids)) {
+            throw ValidationException::withMessages([
+                'ids' => 'Es muss mindestens eine Model-ID angegeben werden.',
+            ]);
+        }
+
+        // Duplikate zählen nicht mehrfach (der Export betrifft jedes Profil
+        // nur einmal) — das Limit gilt für die **eindeutige** Auswahl.
+        $uniqueIds = array_values(array_unique($ids));
+        if (count($uniqueIds) > ModelContactSheetService::MAX_BULK_PROFILES) {
+            throw ValidationException::withMessages([
+                'ids' => 'Maximal '.ModelContactSheetService::MAX_BULK_PROFILES.' Models pro Contact Sheet.',
+            ]);
+        }
+
+        $profiles = ModelProfile::query()
+            ->forBrand($brand)
+            ->whereIn('id', $uniqueIds)
+            ->get();
+
+        // Fail closed: eine fehlende ID (fremde Brand, unbekannt, gelöscht)
+        // bricht den Export ab — kein stillschweigendes Weglassen.
+        if ($profiles->count() !== count($uniqueIds)) {
+            abort(response()->json(['error' => 'Model nicht gefunden.'], 404));
+        }
+
+        foreach ($profiles as $profile) {
+            $this->authorizeSensitiveProfile($profile);
+        }
+
+        $pdf = $this->contactSheetService->renderCollection($profiles->all(), $variant);
+
+        foreach ($profiles as $profile) {
+            Log::info('model.contact_sheet.export', [
+                'model_profile_id' => $profile->id,
+                'customer_id' => $profile->customer_id,
+                'variant' => $variant,
+                'user_id' => auth('api')->id(),
+            ]);
+        }
+
+        Log::info('model.contact_sheet.export_bulk', [
+            'count' => $profiles->count(),
+            'variant' => $variant,
+            'user_id' => auth('api')->id(),
+        ]);
+
+        $filename = sprintf('models-contact-sheet-%s-%s.pdf', $variant, now()->format('Ymd'));
+
+        return response()->streamDownload(function () use ($pdf): void {
+            echo $pdf;
+        }, $filename, ['Content-Type' => 'application/pdf']);
+    }
+
+    /**
+     * Signierter **Extern-Link** für eine Auswahl von Profilen (Phase 4).
+     *
+     * Body: `{ "ids": ["<uuid>", …] }` — die Variante ist immer `external`;
+     * eine andere Variante im Body wird mit 422 abgelehnt (die interne
+     * Variante enthält PII und darf nie teilbar sein).
+     *
+     * Fail-closed wie der Bulk-Export: jede ID muss zu einem Profil der Brand
+     * des Akteurs gehören, sonst bricht der **ganze** Vorgang mit 404 ab.
+     * `authorizeSensitiveProfile()` gilt je Profil.
+     *
+     * Zusätzlich gilt: die Ausstellung ist nur für Brands mit `Brand`-Enum-Fall
+     * möglich (sonst 422). Nur für sie kann die Host-Bindung der Auslieferung
+     * (`BrandRegistry::currentIdOrNull()`) überhaupt erfüllt werden.
+     *
+     * Der Token ist ein Bearer-Credential: er erscheint nur in der Antwort an
+     * den Admin, niemals in einem Log, einem Audit-Kontext oder einer
+     * Fehlermeldung. Die Audit-Zeile nennt stattdessen die `link_id`.
+     */
+    public function contactSheetShare(Request $request)
+    {
+        $this->authorizeAdmin();
+        $brand = $this->adminBrand();
+
+        // Fail closed: ein Link ist nur für Brands sinnvoll, deren Host-Bindung
+        // erfüllbar ist. Die Auslieferung prüft die Token-Brand gegen die
+        // **Host-Brand** (`BrandRegistry::currentIdOrNull()`), und die ist im
+        // Request-Pfad immer ein `Brand`-Enum-Fall (`BrandContextMiddleware` →
+        // `BrandRegistry::fromHost()` → `Brand::tryFrom($config->id) ??
+        // Brand::B2B`). Eine Brand-ID außerhalb des Enums (Legacy, z. B. `srp`)
+        // kann deshalb **nie** die Host-Brand eines Links sein — der Token
+        // bekäme immer 404. Besser ein abgelehnter Vorgang als ein Link, der
+        // nie funktioniert.
+        if (Brand::tryFrom($brand) === null) {
+            abort(response()->json([
+                'error' => 'Für diese Brand kann kein Extern-Link erstellt werden. Der Link ist nur für Brands verfügbar, die das Portal unterstützt.',
+            ], 422));
+        }
+
+        $variant = $request->input('variant', ModelContactSheetService::VARIANT_EXTERNAL);
+        if (! is_string($variant) || $variant !== ModelContactSheetService::VARIANT_EXTERNAL) {
+            throw ValidationException::withMessages([
+                'variant' => 'Der Extern-Link kann nur die Variante „external" teilen.',
+            ]);
+        }
+
+        $rawIds = $request->input('ids');
+        $ids = is_array($rawIds) ? array_values($rawIds) : [];
+        if ($ids === [] || count(array_filter($ids, 'is_string')) !== count($ids)) {
+            throw ValidationException::withMessages([
+                'ids' => 'Es muss mindestens eine Model-ID angegeben werden.',
+            ]);
+        }
+
+        $uniqueIds = array_values(array_unique($ids));
+        if (count($uniqueIds) > ModelContactSheetService::MAX_BULK_PROFILES) {
+            throw ValidationException::withMessages([
+                'ids' => 'Maximal '.ModelContactSheetService::MAX_BULK_PROFILES.' Models pro Contact Sheet.',
+            ]);
+        }
+
+        $profiles = ModelProfile::query()
+            ->forBrand($brand)
+            ->whereIn('id', $uniqueIds)
+            ->get();
+
+        if ($profiles->count() !== count($uniqueIds)) {
+            abort(response()->json(['error' => 'Model nicht gefunden.'], 404));
+        }
+
+        foreach ($profiles as $profile) {
+            $this->authorizeSensitiveProfile($profile);
+        }
+
+        $links = app(ModelContactSheetLinkService::class);
+        $expiresAt = now()->addDays(ModelContactSheetLinkService::TTL_DAYS);
+        $token = $links->issue($uniqueIds, $brand, $expiresAt);
+
+        Log::info('model.contact_sheet.share_link.created', [
+            'link_id' => $links->linkIdFor($token),
+            'count' => count($uniqueIds),
+            'brand' => $brand,
+            'user_id' => auth('api')->id(),
+        ]);
+
+        // Die URL zeigt auf die Frontend, die `BrandRegistry::frontendUrl()`
+        // für die Brand-ID der Ausstellung auflöst. **Vorrang hat die
+        // Umgebungs-URL** (`FRONTEND_URL`): sie ist per Default gesetzt und
+        // damit in aller Regel die Frontend, auf die der Link zeigt. Erst
+        // wenn keine Umgebungs-URL konfiguriert ist, greift die
+        // Brand-Konfiguration (`frontend_url`, sonst der erste Hostname);
+        // eine Brand ohne eigenen Config-Eintrag fällt auf den allgemeinen
+        // Default (`config('app.url')`) zurück. Eine **garantiert**
+        // brand-spezifische Frontend gibt es damit nicht.
+        //
+        // Die URL allein erfüllt die Host-Bindung **nicht**: die Auslieferung
+        // verlangt zusätzlich, dass die Host-Brand des Requests zur Token-Brand
+        // passt (`BrandRegistry::currentIdOrNull()`). Genau deshalb wird eine
+        // Brand ohne Enum-Fall oben mit 422 abgelehnt — für sie wäre die
+        // Host-Bindung nie erfüllbar.
+        $url = BrandRegistry::frontendUrl($brand).'/kontaktbogen/'.$token;
+
+        return response()->json([
+            'url' => $url,
+            'expires_at' => $expiresAt->toIso8601String(),
+            'variant' => ModelContactSheetService::VARIANT_EXTERNAL,
+            'count' => count($uniqueIds),
+        ], 201);
     }
 
     public function photo(string $id, string $photoId)
