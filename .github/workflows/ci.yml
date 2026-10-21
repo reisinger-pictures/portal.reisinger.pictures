@@ -168,7 +168,7 @@ jobs:
       # this repository's supply-chain contract allows no moving tag, and the
       # moving `v1` tag of the action is a convenience for repositories
       # without such a contract.
-      - uses: all-the-rest/ratchet-cli@bedc915967faaced135aec231d5d9b056abdc981
+      - uses: all-the-rest/ratchet-cli@d45867fe6b92ff1e8bdf6744e1baed3e1c77b721
         with:
           mode: validate
 
