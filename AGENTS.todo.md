@@ -109,10 +109,10 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **6 offene `[ ]`** und **46 wartende
-> `[~]`** über 1807 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (6), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1807). Aufteilung der 6: **3× `manuell prüfen:`** und **3×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **4 offene `[ ]`** und **46 wartende
+> `[~]`** über 1802 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (4), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1802). Aufteilung der 4: **3× `manuell prüfen:`** und **1×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 3 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
@@ -134,14 +134,16 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (52 = 6 offen + 46 wartend
-> + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (50 = 4 offen + 46 wartend
+> + 0 erledigt) und `wc -l < AGENTS.todo.md` (1802). **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
 > **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **18 von 31 `##`-Abschnitten**
+> Die Positionen liegen in **15 von 31 `##`-Abschnitten**
 > (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
-> `grep -c '^## ' AGENTS.todo.md`). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
+> `grep -c '^## ' AGENTS.todo.md`; **neu gemessen am 2026-10-21** — die vorherige Angabe
+> „18 von 31" reproduziert mit dieser Methode nicht und wurde durch den Messwert ersetzt).
+> Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
 > Wer hier eine Position sucht, nutzt `grep -n '^- \['
 > AGENTS.todo.md` und nicht die Reihenfolge im Dokument.
@@ -151,7 +153,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 
 ## 🗳 Entscheidungs-Protokoll (Owner, 2026-09-28)
 
-**Was gilt, steht in `features/owner-decisions.md` (D-1 bis D-46).** Diese Datei sagt nur, **ob es schon
+**Was gilt, steht in `features/owner-decisions.md` (D-1 bis D-48).** Diese Datei sagt nur, **ob es schon
 gilt** — und hält fest, welche Ansätze zurückgezogen wurden, damit sie nicht erneut
 implementiert werden.
 
@@ -164,7 +166,7 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 
 ### Stand
 
-Alle Entscheidungen D-1 bis D-46 sind getroffen. Soweit sie Code erforderten, sind sie **umgesetzt
+Alle Entscheidungen D-1 bis D-48 sind getroffen. Soweit sie Code erforderten, sind sie **umgesetzt
 und verifiziert** — die Entscheidungen stehen in `features/owner-decisions.md`, die
 zurückgezogenen Varianten direkt darunter in „Verworfen".
 
@@ -1218,9 +1220,6 @@ getrennt.
 **Offen (User-Entscheidungen / Nachträge)**
 - Hinweis (Setup): lokale `backend/.env` braucht `MODEL_REGISTRATION_THROTTLE_LIMIT=1000` (Parität zu `.env.ci`), sonst 429-Flakes im E2E-Grep-Lauf. `.env` ist gitignored.
 
-**Future (nur TODO, nicht umsetzen)**
-- [ ] Contact Sheet Phase 3 (Bulk/Ergebnisliste) + Phase 4 (signierter Extern-Link) — Plan: `~/.opencode/plan/pdf-contact-sheet-export.md`
-
 **Model-Zugang (User-Anforderung 2026-09-19) — umgesetzt**
 ---
 
@@ -1323,10 +1322,6 @@ getrennt.
 
 ---
 
-
-## 🟡 OFFEN (Future) — pricing_strategy als Brand-Setting
-
-- [ ] `pricing_strategy` je Brand im Admin-UI editierbar machen (DB-Overlay am Choke-Point `BrandRegistry::buildFromArray()`). Langfristige Arbeit, kein Blocker: laut `features/infrastructure/17-pricing-strategy-pattern.md` §5 („Presets and legacy settings") ist der Editor heute **nicht** Teil der Brand-Settings-Overlay-Whitelist — bis dahin bleiben DB-Setting und Galerie-Felder die autoritativen Stellschrauben.
 
 ## 🚫 Blockiert — Dependency-Migration TypeScript 6→7
 
