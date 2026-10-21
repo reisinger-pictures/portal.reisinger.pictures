@@ -109,49 +109,55 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **4 offene `[ ]`** und **47 wartende
-> `[~]`** über 1844 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (4), `grep -c '^- \[~\]' AGENTS.todo.md` (47), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1844). Aufteilung der 4: **3× `manuell prüfen:`** und **1×
-> gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
-> geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 3 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
-> eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
-> A–D") sowie die seitdem aufgedeckten Reste (die Zwei-Verbindungs-Messung, die Restform der
-> Dialog-Befunde, die das Audit vom 2026-10-20 aus Code statt vom Gerät beantwortet hat) und
-> die manuellen Prüfpunkte der Deploys. Die beiden
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **5 offene `[ ]`** und **47 wartende
+> `[~]`** über 1855 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
+> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 5, `… | grep -c '^- \[~\]'` → 47,
+> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1855; `<stand>` = der committete Stand dieses
+> Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
+> trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
+> 5: **3× `manuell prüfen:`**, **1× gewöhnliche Arbeit** und **1× `Entscheidung offen:`** — die
+> offene Position 8 im Abschnitt „SKILLS-STAND (2026-10-19)": die DB-Engine-Policy ist nirgends
+> entschieden, das ist eine **neue** Frage und kein vergessener Entscheidungsdurchgang.
+> **Alle 14 Review-Befunde** sind geschlossen und aus der Liste entfernt (Nachweis in
+> `features/security/2026-10-18-review-closure.md`); die 3 enthalten die Punkte, die in den
+> Freigaben der Wellen A–D als nicht-blockierend eingestuft und deshalb hier festgehalten
+> wurden (siehe „Neue offene Punkte aus den Wellen A–D") sowie die seitdem aufgedeckten Reste
+> (die Zwei-Verbindungs-Messung, die Restform der Dialog-Befunde, das Audit vom 2026-10-20 aus
+> Code statt vom Gerät beantwortet hat) und die manuellen Prüfpunkte der Deploys. Die beiden
 > Query-Zähl-Kosten sind geschlossen: die Basislinien sind gepinnt und der Lesepfad löst den
 > Brand-Filter gesammelt und den Org-Scope **einmal pro Request** auf — ein Cache über
 > Requests hinweg ist bewusst **nicht** umgesetzt, weil er eine gerade widerrufene Delegation
 > ausliefern würde (`features/auth/01-roles-and-access.md` §6). Die **Aktualitätsprüfung vom
-> 2026-10-20** hat 16 alte Owner-Positionen durchgesehen: 11 davon sind erledigt,
-> maschinell abgedeckt oder überholt und deshalb aus der Liste gegangen; die restlichen sind
-> mit korrigiertem Wortlaut und dem richtigen Werkzeug (Firewalld statt ufw, `ROOT.PEM` statt
-> `cert.pem`, authentifiziert statt anonym lesen) stehen geblieben. Alle 47 `[~]`
-> tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
-> Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
-> zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
-> hinzu, andere wurden entfernt.
+> 2026-10-20** hat 16 alte Owner-Positionen durchgesehen: 11 davon sind erledigt, maschinell
+> abgedeckt oder überholt und deshalb aus der Liste gegangen; die restlichen sind mit korrigiertem
+> Wortlaut und dem richtigen Werkzeug (Firewalld statt ufw, `ROOT.PEM` statt `cert.pem`,
+> authentifiziert statt anonym lesen) stehen geblieben. Alle 47 `[~]` tragen ein `wartet auf`.
+> **Diese Zählung ist ein Stand, keine Zusage** — sie wandert mit jeder Welle; wer eine Position
+> sucht, zählt selbst nach. Der Vergleich zum 2026-09-28-Stand (69 Positionen) ist **kein**
+> Fortschrittsmaß: seither kamen Positionen hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (51 = 4 offen + 47 wartend
-> + 0 erledigt) und `wc -l < AGENTS.todo.md` (1844). **Der hier früher genannte Befehl war defekt:**
-> die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
-> am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
-> **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **16 von 32 `##`-Abschnitten**
-> (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
-> `grep -c '^## ' AGENTS.todo.md`; **neu gemessen am 2026-10-21** — die vorherige Angabe
-> „18 von 31" reproduziert mit dieser Methode nicht und wurde durch den Messwert ersetzt).
-> Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
-> hier **nur** als Orientierung und ist nicht festgeschrieben.
-> Wer hier eine Position sucht, nutzt `grep -n '^- \['
-> AGENTS.todo.md` und nicht die Reihenfolge im Dokument.
+> `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
+> (52 = 5 offen + 47 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
+> (1855) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
+> würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
+> defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
+> **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
+> (Zeilen 202–283) trägt **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist
+> damit gegenstandslos.
+> Die Positionen liegen in **17 von 32 `##`-Abschnitten**
+> (`git show <stand>:AGENTS.todo.md | awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' | sort -u | wc -l`
+> gegen `git show <stand>:AGENTS.todo.md | grep -c '^## '`; **neu gemessen am 2026-10-21** —
+> die vorherige Angabe war mit dieser Methode nicht reproduzierbar und wurde durch den Messwert
+> ersetzt). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie hier **nur** als
+> Orientierung und ist nicht festgeschrieben.
+> Wer hier eine Position sucht, nutzt `git show <stand>:AGENTS.todo.md | grep -n '^- \['` und
+> nicht die Reihenfolge im Dokument.
 
 ## 🔍 HEAD-AUDIT 2026-10-21 — die drei Feature-Commits geprüft, 9 Befunde dispositioniert
 
 Die Commits `605048a6` (Preisstrategie je Marke), `f230a26d` (Contact Sheet Phase 3+4)
-und `30eb32b0` (Board) wurden von einem unabhängigen Audit geprüft: **CHANGES REQUIRED**
+und `d8ef6500` (Board) wurden von einem unabhängigen Audit geprüft: **CHANGES REQUIRED**
 mit 2 `medium`, 1 `low` und 5 **nicht ausgeführten** Messpunkten. Der Haupt-Agent hat
 die fünf offenen Punkte selbst nachgemessen; die beiden `medium`-Befunde sind gemessen
 folgenlos bzw. prozessbedingt nicht mehr schließbar. **Es entsteht keine neue
@@ -179,7 +185,7 @@ verursacht**: `admin/documents/wysiwyg-editor.spec.ts:19`,
 Dreier-Kombination grün**; der Calculator-Pfad (`getLicenseTerms()` / `updateLicenseTerms()`)
 ist im Diff der Features **unverändert**, und im Backend-Log des Volllaufs steht in diesem
 Zeitfenster **kein einziger Fehler** (kein `database is locked`, keine Exception). Der grüne
-Voll-CI des exakt gepushten Heads `30eb32b0` (12/12 Jobs) ist das Gate.
+Voll-CI des exakt gepushten Heads `d8ef6500` (12/12 Jobs) ist das Gate.
 
 - [~] wartet auf eine Ursache für die drei lastabhängigen Volllauf-Fehlschläge —
   `frontend/tests/e2e/admin/documents/wysiwyg-editor.spec.ts:19` (WYSIWYG-Editor),
@@ -1679,19 +1685,24 @@ gerissen und zur Entscheidung gemacht.
 
 > `AGENTS.skills.md` steht jetzt auf `787670a` (Skills-Repo-HEAD vom 2026-10-19), geprüft am
 > 2026-10-19; 17 Skills, **12× angewendet, 5× nicht zutreffend**. **Von dem, was hier steht, ist
-> nichts umgesetzt** — Position 7 ist am 2026-10-19 umgesetzt und deshalb **aus diesem Board
-> entfernt** (siehe „Historie der Nummern" unten; der Beleg steht im Commit).
+> nichts umgesetzt** — Position 7 ist am 2026-10-20 (`1818909`) und Position 6 am 2026-10-21
+> (`db13b2c`) umgesetzt und deshalb **aus diesem Board entfernt** (siehe „Historie der Nummern"
+> unten; die Belege stehen in den genannten Commits).
 > Die Positionen sind Befund-Protokoll, kein Arbeitsauftrag (Board-Regel: Log, kein Auftrag).
 > Jede Zahl ist an `Datei:Zeile` zitierbar und wurde vor dem Schreiben verifiziert.
 > **Historie der Nummern in diesem Abschnitt:** Position 1–3 (Named-Locks-Schwelle, Dreiklang,
 > Matrix) sind am 2026-10-18 **committet** (`e1ed87a`, Playwright-Bump auf 1.64.1) und
 > entfernt; Position 4 (GHCR-Blocker) war am 2026-10-15 geschlossen und entfernt; Position 5
 > (`cancel-in-progress`) ist als Betriebs-Notiz in die Session-Handover-Liste gewandert
-> (`AGENTS.todo.md:934`). Position 6 und 7 sind neu aus dem Marker-Fortschreiben vom 2026-10-19;
-> Position 7 (`AGENTS.md` §6 verlangte den abgeschafften `vision`-Subagenten) ist am selben Tag
-> **geschlossen und entfernt** — die Regelzeile in `AGENTS.md` §6 nennt jetzt den verbleibenden
-> Weg (das Modell liest die Bilder selbst). **Position 6 ist damit der einzige offene Eintrag
-> in diesem Abschnitt.**
+> (`AGENTS.todo.md:989`). Position 6 und 7 sind neu aus dem Marker-Fortschreiben vom
+> 2026-10-19; Position 7 (`AGENTS.md` §6 verlangte den abgeschafften `vision`-Subagenten) ist am
+> 2026-10-20 **geschlossen und entfernt** (`1818909` — die Regelzeile in `AGENTS.md` §6 nennt
+> jetzt den verbleibenden Weg, das Modell liest die Bilder selbst); Position 6 (Lockfile-Regel des
+> Test-Images) ist am 2026-10-21 **geschlossen und entfernt** (`23ca866`) — die Regel ist seit
+> `db13b2c` umgesetzt (Browserversion aus dem aufgelösten Lockfile). **Position 8 ist neu aus der
+> Nachprüfung von `7b1ca62` (2026-10-21) und der einzige offene Eintrag in diesem Abschnitt.**
+
+- [ ] Entscheidung offen: **Position 8 — Die DB-Policy des Projekts weicht vom DB-Standard des `laravel`-Skills ab, und die Abweichung ist nirgends als Entscheidung festgehalten:** Der Skill-Standard ist PostgreSQL (MySQL deprecated), das Projekt fährt Produktion `mariadb` und Tests SQLite `:memory:` — `backend/config/database.php:20` (Default `mariadb`), `backend/AGENTS.md:28` (lokal SQLite), `backend/AGENTS.md:41` (Test-DB `:memory:`) und `features/infrastructure/29-production-operations-runbook.md:48` („currently `mariadb`") beschreiben den **Ist-Zustand**. Die **Entscheidung** fehlt: weder `features/owner-decisions.md` (D-1…D-48) noch `features/tech/07-architectural-decisions.md` (AD-1…AD-10) nennt die DB-Engine — MariaDB erscheint dort nur als Messumgebung im D-40-Beweis. Offen: entweder die Abweichung als Entscheidung festhalten (mit Begründung und Ort) oder die Engine umstellen. (Befund aus der Marker-Nachprüfung von `7b1ca62` am 2026-10-21; gemessen am Vorgänger-Stand `d8ef650` — `git diff --stat d8ef650..HEAD -- backend/ features/` → ohne Ausgabe.)
 
 
 ---
