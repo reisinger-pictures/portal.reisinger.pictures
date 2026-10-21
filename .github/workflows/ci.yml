@@ -84,6 +84,16 @@ jobs:
       # mapping. See tests/infrastructure/compose-entrypoint-contract.sh.
       - name: Verify the compose entrypoint contract
         run: bash tests/infrastructure/compose-entrypoint-contract.sh
+      # The test image's browser version must come from the RESOLVED lockfile
+      # version. Dependabot updates the lockfile alone whenever a new version
+      # falls inside the declared range; the image rebuild trigger fires, but a
+      # version read from the manifest's range lower bound would rebuild the
+      # SAME browser under the SAME tag — the E2E run stays green because
+      # ci.yml installs the browser per run as a fallback, and the image's
+      # promise ("no browser download per run") is cancelled silently. The gate
+      # fails closed on a pin that no longer matches the lockfile.
+      - name: Verify the Playwright version binding
+        run: bash tests/infrastructure/verify-playwright-version.sh
       # CR-INF-001/CR-INF-014: the sync regression was never executed by
       # anything. It is self-contained (mktemp) and fails closed on
       # private-storage exclusions, root SQLite exclusion and partial-sync
@@ -351,10 +361,12 @@ jobs:
     # infrastructure/28-ci-test-image.md.
     container:
       # Concrete tag, never `latest` (P1-M45). e2e-image.yml publishes
-      # portal-e2e:<playwright-version> (1.64.1 today, derived from
-      # frontend/package.json) plus `latest`; this consumer follows the version
-      # tag. verify-image-freshness.sh fails once that artifact is older than
-      # 14 days, so a workflow that silently stopped rebuilding is detected.
+      # portal-e2e:<playwright-version> (1.64.1 today, derived from the
+      # RESOLVED version in frontend/pnpm-lock.yaml) plus `latest`; this
+      # consumer follows the version tag. verify-image-freshness.sh fails once
+      # that artifact is older than 14 days, so a workflow that silently
+      # stopped rebuilding is detected; the pin itself is checked against the
+      # lockfile by verify-playwright-version.sh.
       image: ghcr.io/reisinger-pictures/portal-e2e:1.64.1
       # INFRA-2: the runner mounts the host workspace at $GITHUB_WORKSPACE and
       # runs steps inside this container. Dockerfile.e2e ends in
