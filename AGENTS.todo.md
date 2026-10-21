@@ -109,10 +109,10 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **4 offene `[ ]`** und **46 wartende
-> `[~]`** über 1802 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (4), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1802). Aufteilung der 4: **3× `manuell prüfen:`** und **1×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **4 offene `[ ]`** und **47 wartende
+> `[~]`** über 1844 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (4), `grep -c '^- \[~\]' AGENTS.todo.md` (47), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1844). Aufteilung der 4: **3× `manuell prüfen:`** und **1×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 3 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
@@ -127,19 +127,19 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > 2026-10-20** hat 16 alte Owner-Positionen durchgesehen: 11 davon sind erledigt,
 > maschinell abgedeckt oder überholt und deshalb aus der Liste gegangen; die restlichen sind
 > mit korrigiertem Wortlaut und dem richtigen Werkzeug (Firewalld statt ufw, `ROOT.PEM` statt
-> `cert.pem`, authentifiziert statt anonym lesen) stehen geblieben. Alle 46 `[~]`
+> `cert.pem`, authentifiziert statt anonym lesen) stehen geblieben. Alle 47 `[~]`
 > tragen ein `wartet auf`. **Diese Zählung ist ein Stand, keine
 > Zusage** — sie wandert mit jeder Welle; wer eine Position sucht, zählt selbst nach. Der Vergleich
 > zum 2026-09-28-Stand (69 Positionen) ist **kein** Fortschrittsmaß: seither kamen Positionen
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (50 = 4 offen + 46 wartend
-> + 0 erledigt) und `wc -l < AGENTS.todo.md` (1802). **Der hier früher genannte Befehl war defekt:**
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (51 = 4 offen + 47 wartend
+> + 0 erledigt) und `wc -l < AGENTS.todo.md` (1844). **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
 > **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **15 von 31 `##`-Abschnitten**
+> Die Positionen liegen in **16 von 32 `##`-Abschnitten**
 > (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
 > `grep -c '^## ' AGENTS.todo.md`; **neu gemessen am 2026-10-21** — die vorherige Angabe
 > „18 von 31" reproduziert mit dieser Methode nicht und wurde durch den Messwert ersetzt).
@@ -147,6 +147,48 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
 > Wer hier eine Position sucht, nutzt `grep -n '^- \['
 > AGENTS.todo.md` und nicht die Reihenfolge im Dokument.
+
+## 🔍 HEAD-AUDIT 2026-10-21 — die drei Feature-Commits geprüft, 9 Befunde dispositioniert
+
+Die Commits `605048a6` (Preisstrategie je Marke), `f230a26d` (Contact Sheet Phase 3+4)
+und `30eb32b0` (Board) wurden von einem unabhängigen Audit geprüft: **CHANGES REQUIRED**
+mit 2 `medium`, 1 `low` und 5 **nicht ausgeführten** Messpunkten. Der Haupt-Agent hat
+die fünf offenen Punkte selbst nachgemessen; die beiden `medium`-Befunde sind gemessen
+folgenlos bzw. prozessbedingt nicht mehr schließbar. **Es entsteht keine neue
+Position** — jeder Befund ist geschlossen oder bewusst angenommen (siehe die Tabelle).
+Nachweis je Zeile: der Audit-Bericht und die Nachmessungen des Haupt-Agenten.
+
+| Befund | Status | Nachweis |
+|---|---|---|
+| F-1 (medium) Der i18n-Katalog wurde nicht je Commit getrennt (Commit 1 trägt auch die Strings der zweiten Lieferung) | **angenommen — folgenlos belegt** | Commit 1 **allein** besteht den echten i18n-Check (`✅ i18n check passed (1699 messages compiled)`); die Prüfregel lautet `compiledCount >= msgids.size` und erlaubt das Superset ausdrücklich (`frontend/scripts/check-i18n.mjs:1052`). Ein Rewrite der **gepushten** Historie ist durch die Amend-Regel ausgeschlossen („amend only while … none of it pushed — otherwise a new commit"). Die Abweichung ist in der Commit-Nachricht offengelegt. |
+| F-2 (medium) Die `Verify:`-Footer nennen den Status jedes Finding-ID nicht | **geschlossen** | Der einzige `high`-Befund aus Runde 1 (Scope-Drift) ist durch den **Commit-Split** geschlossen — am Baum nachweisbar: Commit 1 enthält weder Contact-Sheet-Code noch die Bulk-Route noch `namePrefix`, `owner-decisions.md` trägt dort D-47 ohne D-48. N7 (fehlende Drosselung der Bestandsroute) ist als bewusster Zustand in `features/crm/07-model-contact-sheet-export.md` §1 dokumentiert. Die Footer der gepushten Commits sind eingefroren; **dieser Record trägt die Statusliste**. |
+| F-3 (open) 14 fachfremde E2E-Specs in Commit 1 | **geschlossen (nachgemessen)** | 13 der 14 Specs haben je **genau 7 echte neue Zeilen** (Import + `withGlobalSettingsLock`-Wrapper) und **0** entfernte — der Rest der Diff ist reine Re-Einrückung; die 14. Datei ist der Writer-Spec mit dem neuen Preisstrategie-Test. |
+| F-4 (open) Scope-Drift-Muster (`console.log`, `eslint-disable`, `@ts-ignore`, Scratch-Dateien) | **geschlossen (nachgemessen)** | Ein einziger Treffer: `/*eslint-disable*/` in der **generierten** `frontend/locale/de/messages.js` — **vorbestehend** (steht so schon in `01e7f757`). Keine Debug-Ausgabe, keine Scratch-Datei, kein `any`. |
+| F-5 (open) Baum-Ebene der vier geteilten Dateien | **geschlossen (nachgemessen)** | 14 von 14 Prüfungen OK: Commit 1 → `BrandRegistry.php` mit der **alten** `frontendUrl(?Brand $brand = null)` und dem **neuen** `pricingStrategy`, `E2ESessionHelper.ts` **ohne** `namePrefix` und **mit** `pricing_strategy`, `owner-decisions.md` mit D-47, ohne D-48, Kopfzeile „D-1 through D-47"; Commit 2 → derselbe Stand voll („D-1 through D-48", `namePrefix`, `frontendUrl(Brand\|string\|null)`). |
+| F-6 (open) Doku-Aussagen vs. Code im jeweiligen Commit | **geschlossen (nachgemessen)** | Routen, die 25er-Grenze (`ModelContactSheetService::MAX_BULK_PROFILES = 25` + 422 im Controller), das Byte-Budget (32 MiB über die eingebetteten Bytes), die 7-Tage-TTL, die generische 404 und die Auflösungsreihenfolge stimmen zwischen Code und Doku **im selben Commit** überein. |
+| F-7 (open) Board-Zahlen und Board-Commit | **geschlossen (nachgemessen)** | Auf dem **Commit-Blob** gemessen: offen 6 → **4**, wartend **46**, erledigt **0**, Zeilen 1807 → **1802**, `##`-Abschnitte 32 → **31**, Abschnitte mit Position 17 → **15**, Summe der Marker **50**. Die 12 eingefügten Zeilen des Board-Commits sind die **neu gemessene** Struktur-Notiz (die Zeilenzahl 1800 war zuvor um 2 daneben). |
+| F-8 (low) Betreff-Großschreibung „Contact Sheet" | **keine Änderung** | „Contact Sheet" ist ein Eigenname und wird im Deutschen großgeschrieben. |
+**E2E-Laufzeit nach der Lock-Änderung neu gemessen (Pflicht aus der Timeout-Policy):**
+der lokale Volllauf am 2026-10-21 um 22:01 Uhr — **466 Tests, 458 passed, 5 skipped,
+3 failed in 13,9 min** (8 Worker, eine Datenbank). Das 25-Minuten-`globalTimeout` ist damit
+**nicht** ausgeschöpft (rund 55 % davon); eine Anpassung ist **nicht** nötig und wurde **nicht**
+vorgenommen. Die drei Fehlschläge sind **lastbedingt und nicht durch die beiden Features
+verursacht**: `admin/documents/wysiwyg-editor.spec.ts:19`,
+`admin/pricing/package-calculator-config.spec.ts:69` und
+`admin/galleries/meta-gallery-licensing.spec.ts:29` laufen **isoliert und in der
+Dreier-Kombination grün**; der Calculator-Pfad (`getLicenseTerms()` / `updateLicenseTerms()`)
+ist im Diff der Features **unverändert**, und im Backend-Log des Volllaufs steht in diesem
+Zeitfenster **kein einziger Fehler** (kein `database is locked`, keine Exception). Der grüne
+Voll-CI des exakt gepushten Heads `30eb32b0` (12/12 Jobs) ist das Gate.
+
+- [~] wartet auf eine Ursache für die drei lastabhängigen Volllauf-Fehlschläge —
+  `frontend/tests/e2e/admin/documents/wysiwyg-editor.spec.ts:19` (WYSIWYG-Editor),
+  `frontend/tests/e2e/admin/pricing/package-calculator-config.spec.ts:69` (Paket-Rechner) und
+  `frontend/tests/e2e/admin/galleries/meta-gallery-licensing.spec.ts:29` (Meta-Gallery): alle
+  drei laufen isoliert und in der Kombination grün und fielen nur im Volllauf (8 Worker, eine
+  SQLite-Datenbank). Nicht featuresbedingt (der Calculator-Pfad ist im Diff unverändert, das
+  Backend-Log des Laufs ist fehlerfrei). Ursache offen — Verdacht: Suchindex-Lag
+  (Scout/Meilisearch) bzw. DB-Lock unter 466 Tests. **Kein Produktcode betroffen.**
 
 ## ⏳ Backend Offen — nicht implementierte Vorschläge
 
