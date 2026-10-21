@@ -258,3 +258,58 @@ falsch gewesen. Genau deshalb musste die Einheit **jedes** Geldfeldes feststehen
 Ein Client wendet heute `Number(value)` an; das ist auf der sicheren Seite.
 Wer die Einheit aus dem JSON-Typ ableitet, hat sie nicht — der Typ sagt sie
 nicht.
+
+## Die Gegenprobe ist ein Befehl, kein Blick von Hand
+
+Der Leseweg für die Lizenzpreise ist die Route
+`GET /api/settings/license-terms` — sie liegt hinter `auth:api` **und**
+`super_admin`, ein anonymer `curl` liefert **401**. Für die Gegenprobe vor
+einem Deploy, der `base_price` berührt, war das ein Handgriff: Super-Admin-Token
+besorgen oder per `tinker` in die `settings`-Zeile sehen.
+
+**Seit dem 2026-10-21 ist die Gegenprobe ein Kommando:**
+
+```bash
+php artisan ops:check-license-pricing                    # lokal
+./scripts/check-license-pricing.sh                       # auf dem Host
+./scripts/check-license-pricing.sh --expect=base_price=14900
+```
+
+Es löst die effektiven Preise so auf, wie der Kauf-Flow sie auflöst (Marke mit
+B2B-Rückfall, `SettingResolver`) und prüft sie gegen **dieselbe Regeltabelle,
+aus der der Settings-Controller seinen Anfragevertrag ableitet**. Die
+Regeltabelle steht deshalb nicht mehr im Controller, sondern in
+`App\Support\LicenseTermRules` — die Zahlen der Regeln (`min:500`, `min:0`)
+stehen dort **einmal**, und ein zweiter Zahlenstand würde der Prüfung erlauben,
+Werte zu passieren, die der Server ablehnen würde.
+
+Geprüft werden die neun Geld-Keys des Lizenzvertrags
+(`LicenseTermRules::MONEY_KEYS`): vorhanden, ganzzahliger Centbetrag
+(Einheitenwächter `integer`) und mindestens `min:`. Der Einheitenwächter ist
+nicht nebensächlich: ein in Euro gespeicherter Betrag (`'35.00'`) liest sich als
+35 Cent — genau der Defekt, den eine frische Datenbank über `V004:131`
+vorbelegt hat.
+
+**Gemessen in der Produktion am 2026-10-21** (read-only, alle Integer-Cent, alle
+über ihrem Minimum):
+
+| Key | Cent | EUR |
+|---|---|---|
+| `base_price` | **14900** | 149,00 |
+| `calc_base_price` | 5000 | 50,00 |
+| `calc_hourly_rate` | 8000 | 80,00 |
+| `price_web` | 7500 | 75,00 |
+| `price_print` | 14500 | 145,00 |
+| `price_original` | 45000 | 450,00 |
+| `setup_fee` | 5000 | 50,00 |
+| `privacy_fee` | 20000 | 200,00 |
+| `extra_image_fee` | 1500 | 15,00 |
+
+**`base_price` steht in der Produktion absichtlich nicht auf dem Seeder-Wert.**
+Der Seeder schreibt 8000 (`DatabaseSeeder`) per `upsert` auf `(key, brand)` und
+würde den gesetzten Wert 14900 überschreiben — der Seeder ist für die
+Settings-Keys, die er deklariert, autoritativ (siehe
+[`backend/AGENTS.md`](../../backend/AGENTS.md), „Database Setup Policy"). Deshalb
+prüft der Aufruf mit `--expect=base_price=14900`, ob der Wert unverändert ist;
+eine absichtliche Preisanpassung wird mit einem neuen `--expect` sichtbar, ein
+versehentliches Überschreiben nicht.
