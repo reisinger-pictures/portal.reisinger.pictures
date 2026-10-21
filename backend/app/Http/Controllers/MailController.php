@@ -53,7 +53,10 @@ class MailController extends Controller
             $currentGroup = GalleryGroup::find($currentGroup->parent_id);
         }
         if (! empty($groupIds)) {
-            $groupUserIds = DB::table('user_gallery_groups')->whereIn('gallery_group_id', $groupIds)->where('wants_notifications', true)->pluck('user_id')->toArray();
+            // The group subscription lives in its own table (owner decision
+            // 2026-10-21, D-46 / AD-10). The row in `user_gallery_groups`
+            // carries the client group grant and is not read here.
+            $groupUserIds = DB::table('group_notification_subscriptions')->whereIn('gallery_group_id', $groupIds)->pluck('user_id')->toArray();
             $userIds = array_merge($userIds, $groupUserIds);
         }
         $userIds = array_unique($userIds);
