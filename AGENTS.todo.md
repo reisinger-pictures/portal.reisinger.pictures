@@ -110,9 +110,9 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
 > **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **5 offene `[ ]`** und **47 wartende
-> `[~]`** über 1855 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
+> `[~]`** über 1915 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
 > (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 5, `… | grep -c '^- \[~\]'` → 47,
-> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1855; `<stand>` = der committete Stand dieses
+> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1915; `<stand>` = der committete Stand dieses
 > Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
 > trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
 > 5: **3× `manuell prüfen:`**, **1× gewöhnliche Arbeit** und **1× `Entscheidung offen:`** — die
@@ -139,13 +139,13 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
 > `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
 > (52 = 5 offen + 47 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
-> (1855) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
+> (1915) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
 > würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
 > defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
 > **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
 > (Zeilen 202–283) trägt **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist
 > damit gegenstandslos.
-> Die Positionen liegen in **17 von 32 `##`-Abschnitten**
+> Die Positionen liegen in **17 von 33 `##`-Abschnitten**
 > (`git show <stand>:AGENTS.todo.md | awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' | sort -u | wc -l`
 > gegen `git show <stand>:AGENTS.todo.md | grep -c '^## '`; **neu gemessen am 2026-10-21** —
 > die vorherige Angabe war mit dieser Methode nicht reproduzierbar und wurde durch den Messwert
@@ -154,6 +154,66 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Wer hier eine Position sucht, nutzt `git show <stand>:AGENTS.todo.md | grep -n '^- \['` und
 > nicht die Reihenfolge im Dokument.
 
+## 🚀 PRODUKTIONS-DEPLOY 2026-10-21 (`d8ef650b`) — Preisstrategie-Overlay und Contact Sheet Phase 3+4 live
+
+Achter Deploy desselben Tages: `./sync.sh` gegen den grünen **Code-Head** `30eb32b0`
+(CI `39665170779`, **12 Jobs grün** — Backend, Frontend, alle acht E2E-Shards,
+Security-Contract, Ratchet). Der Kopf `d8ef650b` ist ein reiner Board-Commit
+(`AGENTS.todo.md`); sein Code-Baum ist mit `30eb32b0` **identisch**
+(`git diff 30eb32b0 d8ef650b` → nur `AGENTS.todo.md`). Für ihn löst der Pfad-Filter
+der Workflow-Regel (`!**/*.md`) bewusst keinen Lauf aus — die Jobs, die `.md` lesen
+können, wurden deshalb lokal auf dem neuen Kopf ausgeführt: alle drei
+Security-Contract-Skripte grün, die Ratchet-Registry unberührt (0 offene Findings
+= Baseline ✓).
+
+**Vorher auf dem Host geprüft:**
+
+```
+./scripts/check-license-pricing.sh --expect=base_price=14900
+  → 9 Keys, 0 Verstöße, Exit 0
+./scripts/check-seeded-settings.sh
+  → 3 von 28 Werten weichen ab (calc_outdoor_images_per_hour, base_price, company_email)
+```
+
+identisch zum Stand des siebten Deploys → **kein Seed**.
+
+**Übertragen:** 15 Backend-Dateien (der Resolver, der öffentliche Controller, der
+Link-Service, die Collection-View, `routes/api.php`) und das neue Frontend-Bundle
+`index-BYTUJDGu.js`. Keine Manifest- oder Lockfile-Änderung im Umfang → kein
+`pnpm install` nötig. Nach den synchronisierten PHP-Änderungen:
+`docker restart portal_backend` (Container danach `Up (healthy)`).
+
+**Gesundheitsprüfung und das geänderte Verhalten (live gemessen):**
+
+```
+portal.reisinger.pictures/up                                          → 200
+portal.reisinger.pictures/api/notifications/preferences (ohne Token) → 401
+GET /api/settings/license-pricing
+  → 200 {"pricing_strategy":"scope_licensing","volume_pricing":null}
+GET /api/public/model-contact-sheet/<ungültiger Token>
+  → 404 {"error":"Dieser Link ist ungültig oder abgelaufen."}
+GET /kontaktbogen/<ungültiger Token>                                  → 200 (SPA)
+```
+
+Das ausgelieferte Bundle ist **byte-identisch** mit dem lokalen `dist/`:
+`index-BYTUJDGu.js`, `sha256(index.html) = f4d42cec8be9bbf4fbec6a9e7508783f`
+(der vor dem Deploy notierte Hash ✓). `route:list` zeigt die drei neuen Routen ✓;
+die öffentliche Route unterscheidet sich von einer erfundenen Route (Laravel-HTML-404)
+— **kein Token-Orakel** ✓.
+
+**Nach dem Deploy auf dem Host gemessen:**
+
+```
+docker exec portal_backend php artisan ops:check-license-pricing --expect=base_price=14900
+  → 9 Keys, 0 Verstöße, Exit 0        (die Auflösung läuft über den neuen Resolver)
+php artisan migrate:status              → V046–V048 Ran, keine offene Migration
+storage/app/private                     → 6 Einträge, unversehrt
+```
+
+**Preisneutral:** das Overlay `brand_config.pricing_strategy` wird nicht geseedet →
+in Produktion gilt weiterhin die `settings.pricing_strategy`-Zeile, der effektive
+Modus ist live gemessen `scope_licensing` ✓. Der neue Preisstrategie-Pfad wird erst
+wirksam, wenn ein Super-Admin im Admin-UI ein Overlay setzt.
 ## 🔍 HEAD-AUDIT 2026-10-21 — die drei Feature-Commits geprüft, 9 Befunde dispositioniert
 
 Die Commits `605048a6` (Preisstrategie je Marke), `f230a26d` (Contact Sheet Phase 3+4)
