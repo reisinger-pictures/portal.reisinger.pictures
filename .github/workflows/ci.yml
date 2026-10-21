@@ -319,6 +319,13 @@ jobs:
     # whole suite to DB_CONNECTION=sqlite / DB_DATABASE=:memory:, so until
     # this job existed neither test ever ran anywhere.
     #
+    # On SQLite the two classes together report 11 failures and 2 skips, but
+    # the failures are an artefact, not the gap: the race test overrides
+    # connectionsToTransact() with [], so Laravel never caches the in-memory
+    # PDO and the following class starts against an empty :memory: database
+    # (ContractSignerIdentityTest alone: 11 passed, 1 skipped). The real gap
+    # is the two skipped tests - the race and the collation regression.
+    #
     # This job is additive by construction: it runs exactly these test classes
     # against a throwaway MariaDB service, never the full suite, and it changes
     # no existing job - no other job gets slower, redder or less reliable
