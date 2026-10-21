@@ -28,6 +28,23 @@ Assess storage capacity for the deployment host. Developer-machine capacity is n
 
 Keep `API_THROTTLE_LIMIT=1000` in `backend/.env.ci`; document `60` as the production-intended value in `backend/.env.example`. Do not change the production value or application default as part of this CI adjustment.
 
+### D-49: MariaDB in production, SQLite for tests
+
+Production runs **MariaDB 11.4** (`deployment/docker-compose.yml`, the `mariadb:11.4` service with binlog enabled; `backend/config/database.php` defaults to `mariadb`). The local development database is SQLite (a file), and the canonical test database is SQLite `:memory:` (`backend/phpunit.xml`). This deviates from the `laravel` skill's standard (PostgreSQL, MySQL deprecated) — the deviation is deliberate and recorded here instead of being left implicit.
+
+The reasons:
+
+- Production already runs MariaDB 11.4. A switch would be a data migration with a cutover window and a rollback risk, and the project has measured no gain that would pay for it.
+- The scheduler mutex and the database queue share the application connection (`DB_QUEUE_CONNECTION` = `DB_CONNECTION`). `onOneServer()` is only meaningful when every replica uses the same store, and the application database already is that store. See [production operations runbook](infrastructure/29-production-operations-runbook.md) §5.
+- The concurrency proof for the contract-signer identity invariant runs only on MySQL/MariaDB: `backend/tests/Feature/Contract/ContractSignerIdentityRaceTest.php` is driver-gated, because SQLite `:memory:` cannot provide independent writer connections. A switch to PostgreSQL would silently skip exactly the tests that prove the invariant.
+- The deadlock behaviour of the org sync is measured on the real engine (`backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh`), not simulated.
+- The migrations use Laravel's portable `json()` column type, so the schema is not MariaDB-bound. The engine choice is an operating decision, not a portability trap.
+
+Consequences:
+
+- A PostgreSQL CI job and a live PostgreSQL service are **not** a gap and are not required. The PostgreSQL branch of the guest-order migration is not a target.
+- A change of the production engine is a new owner decision that replaces this one. It needs a migration plan, a cutover window, and a re-run of the driver-gated tests against the new engine.
+
 ## Test and repository structure
 
 ### D-7: Sentence-aware i18n check
@@ -109,9 +126,7 @@ The shared link replaces the authenticated download for the recipient: it is a s
 
 ### D-23: Documentation-only CI filtering
 
-Documentation-only changes may skip the full CI pipeline. Keep `paths` with `'**'` as the sole positive pattern and retain re-inclusions for `features/infrastructure/**`, `features/ai/**`, `features/security/**`, and `features/e2e-test-strategy.md`, along with Dependabot manifest/lockfile coverage. Do not replace the filter with a blanket Markdown ignore. See [CI workflow](../.github/workflows/ci.yml).
-
-**Revised on 2026-10-21 — the rule stands, the record was behind the workflow.** The previous wording named three re-inclusions (`features/infrastructure/**`, `features/ai/**`, `features/e2e-test-strategy.md`); the workflow has carried a fourth, `features/security/**`, since `8c0c32f` turned the security findings into a gate. The re-inclusions stay deliberately conservative: they cost redundant runs, and a redundant run is loud and self-healing, while a filtered-out change is silent. The reason that once justified them has expired: the ghcr-namespace gate read prose until 2026-10-18, when `InfrastructureSupplyChainPolicyTest::containerArtifactFiles()` stopped walking Markdown — of the 139 Markdown files it walked, five name a `ghcr.io/<organisation>` image reference and none carried a finding the delivered artifacts do not also carry. The re-inclusions therefore no longer keep image-doc drift gated; they are kept because dropping them buys nothing but silence. No filter behaviour changes with this revision.
+Documentation-only changes may skip the full CI pipeline. Keep `paths` with `'**'` as the sole positive pattern and retain re-inclusions for `features/infrastructure/**`, `features/ai/**`, and `features/e2e-test-strategy.md`, along with Dependabot manifest/lockfile coverage. Do not replace the filter with a blanket Markdown ignore. See [CI workflow](../.github/workflows/ci.yml).
 
 ### D-24: Frontend Stripe publishable key
 
@@ -214,9 +229,3 @@ A gallery notification opt-in is a subscription, never a grant. It lives in its 
 ### D-46: The group notification subscription has its own table
 
 A group notification opt-in is a subscription, never a grant, exactly like the gallery opt-in in D-45. It lives in its own table (`group_notification_subscriptions`) and no longer writes into `user_gallery_groups`, the pivot that carries the client group grant — a group grant covers the whole subtree of the group, so an opt-in stored there produced a grant over the subtree and outlived the membership that justified it. A subscription must not create access and must not keep a group reachable after the membership that justified it was revoked; it is also not part of the grant, so it must not be destroyed together with the grant. The legacy rows that carried the opt-in flag are ambiguous — the flag cannot separate an opt-in-only row from a real grant that was additionally subscribed to — so the migration moves the subscription state and does not delete pivot rows; the remainder stays a documented residual that the owner clears deliberately with `notifications:prune-legacy-group-opt-in-grants`. That command lists every flagged row with its verdict and deletes nothing in its dry run. `--apply` deletes **all** candidate rows unless the operator selects them: `--only=<user_id>:<gallery_group_id>` (repeatable) or `--only-ids=<file>` restricts the deletion to the verified rows, and a selected row that is no longer a candidate is reported and kept. A selected pair that matches no flagged row is reported as `unmatched` and ends the run with a non-zero exit code, so a typo in an id cannot look like a successful repair. A candidate is not proof of an opt-in-only row — the same shape is produced by a real grant that was additionally subscribed to — so every candidate must be verified individually or repaired by hand before it is removed. The grant reader stays untouched: the legacy rows keep granting until the owner removes them deliberately. The preferences endpoint keeps its response shape and lists a subscription without a grant so that it stays revocable, but the name of a group the caller can no longer reach is not disclosed. See [email system & notifications](infrastructure/02-email-system.md), [IDOR protection](auth/01-roles-and-access.md) and [AD-10](tech/07-architectural-decisions.md).
-
-### D-49: MariaDB is the production database engine
-
-The project runs **MariaDB** in production. This is a deliberate deviation from the `laravel` skill's database standard, which names PostgreSQL for development and production and marks MySQL as deprecated for new work: the project does not follow that standard and records the deviation here instead of leaving it undocumented. The default connection is `mariadb` (`backend/config/database.php:20`), the deployment stack provisions the `mariadb:11.4` service (`deployment/docker-compose.yml:5`, `DB_CONNECTION=${DB_CONNECTION:-mariadb}` in Z. 101), and the production runbook names the same engine (`features/infrastructure/29-production-operations-runbook.md:48`). Local development uses a SQLite file and the test suite uses SQLite `:memory:` (`backend/AGENTS.md:28`, `backend/AGENTS.md:41`, `backend/phpunit.xml:39-40`); the test engine is not part of this decision and stays as it is.
-
-The engine is not changed by this decision, and changing it needs a decision of its own: it would be a migration of the live database, not a configuration change, and the engine-dependent parts of the schema and the queries would have to be reworked with it — the case-insensitive collation of `ratings.actor_key` and the portable unique index that avoids MySQL/MariaDB partial-index syntax (`features/tech/01-database-schema.md`), and the MariaDB-safe column alias `contract_database_now` (`backend/app/Models/Contract.php:262`). The decision that needs two real database connections is proven against MariaDB: the D-40 lock-set proof runs on the disposable-MariaDB probe, because a SQLite-only test cannot establish it. See [database schema](tech/01-database-schema.md) and [production runbook](infrastructure/29-production-operations-runbook.md).
