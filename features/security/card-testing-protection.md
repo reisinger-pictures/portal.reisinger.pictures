@@ -276,10 +276,13 @@ named limiter registration exists as the declared contract; the runtime
 enforcement is the service, and both read the same limits.
 
 **Which address the buckets see:** the client address, not the proxy's. The
-API is only reachable through Caddy (the FastCGI port is not published to the
-host), and the application trusts the direct peer and reads the forwarded
-chain from the right (`backend/bootstrap/app.php`, `trustProxies(at:
-'REMOTE_ADDR')`), so the bucket belongs to the customer. Without that rule
+FastCGI port is not published to the host, so the legitimate writer of the
+forwarded header is Caddy; the application trusts the direct peer and reads the
+forwarded chain from the right (`backend/bootstrap/app.php`,
+`trustProxies(at: 'REMOTE_ADDR')`), so the bucket belongs to the customer. The
+boundary is deliberately the direct peer: a container that can open the
+FastCGI port can set the header itself, which buys nothing but a falsified
+client address. Without that rule
 every customer would share one bucket — measured in production on 2026-10-22:
 all requests arrived from the proxy's container address, which would have made
 the 30-per-day IP quota a portal-wide limit.

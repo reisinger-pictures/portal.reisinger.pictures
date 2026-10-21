@@ -34,7 +34,8 @@ The authoritative copy is [`deployment/content-security-policy.txt`](../../deplo
 
 This document describes the **page** policy the portal serves. Two other CSPs exist and are not covered by the mirror:
 
-- **The document policy** for the generated invoice and contact-sheet files: `backend/app/Http/Controllers/SettingsController.php:110` answers those downloads with `default-src 'none'; style-src 'unsafe-inline'; sandbox`. It is stricter than the page policy and belongs to the download, not to the SPA.
+- **The uploaded watermark SVG** is served with its own, stricter policy: `backend/app/Http/Controllers/SettingsController.php:110` answers that download with `default-src 'none'; style-src 'unsafe-inline'; sandbox` — the SVG is user-uploaded, so it must not be able to pull anything. It is the only `Content-Security-Policy` in the backend.
+- **The invoice and the contact sheet carry no CSP.** They are PDFs delivered with `Content-Type` and `Content-Disposition` only (`backend/app/Http/Controllers/ModelContactSheetPublicController.php:94`). A PDF is not a document that a browser renders in the page context, so the page policy does not apply to it.
 - **The E2E environment has no CSP at all** (see the blind spot below).
 
 ## Enabling Turnstile requires a policy change
