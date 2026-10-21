@@ -22,6 +22,7 @@ use App\Http\Controllers\InvoiceDownloadController;
 use App\Http\Controllers\LicenseCatalogController;
 use App\Http\Controllers\LightroomCatalogController;
 use App\Http\Controllers\MailController;
+use App\Http\Controllers\ModelContactSheetPublicController;
 use App\Http\Controllers\ModelInviteController;
 use App\Http\Controllers\ModelManagementController;
 use App\Http\Controllers\ModelProfileAccessController;
@@ -142,6 +143,16 @@ Route::middleware('throttle:model-registration')->group(function () {
     Route::post('/model-profil/{token}/confirm', [ModelProfileAccessController::class, 'confirm'])->name('api.model-profile.confirm');
     Route::post('/model-profil/{token}/transfer-manager', [ModelProfileAccessController::class, 'transferManager'])->name('api.model-profile.transfer-manager');
 });
+
+// Öffentliche Auslieferung des externen Contact Sheets über einen signierten
+// Link (Phase 4). Der Token selbst ist das Bearer-Credential — der Endpunkt
+// ist deshalb bewusst ohne Authentifizierung erreichbar, aber fail-closed:
+// Brand-Bindung, 7-Tage-Ablauf und eine generische 404-Meldung für jeden
+// Fehlerfall (kein Token-Orakel). Gedrosselt wie die übrigen öffentlichen
+// Lese-Endpunkte.
+Route::get('/public/model-contact-sheet/{token}', [ModelContactSheetPublicController::class, 'show'])
+    ->middleware('throttle:api')
+    ->name('api.public.model-contact-sheet.show');
 
 Route::get('/contracts/join/{token}', [ContractJoinController::class, 'check'])->name('api.contracts.join.check');
 Route::post('/contracts/join/{token}', [ContractJoinController::class, 'join'])->name('api.contracts.join.join');
@@ -323,6 +334,18 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/models', [ModelManagementController::class, 'index'])->name('api.management.models.index');
     Route::get('/management/models/{id}/age-proof', [ModelManagementController::class, 'ageProof'])->name('api.management.models.age-proof');
     Route::get('/management/models/{id}/contact-sheet', [ModelManagementController::class, 'contactSheet'])->name('api.management.models.contact-sheet');
+    // Phase 3/4: die beiden neuen Export-Routen sind die teuersten
+    // Management-Endpunkte (bis zu 25 Profile, bis zu 32 MiB eingebettete
+    // Bytes je Dokument) — sie werden deshalb mit demselben `throttle:api`-
+    // Limiter gedrosselt, den auch der öffentliche Auslieferungs-Endpunkt
+    // nutzt. Die Bestandsroute des Einzelbogens (Phase 1/2) bleibt unberührt.
+    Route::post('/management/models/contact-sheet', [ModelManagementController::class, 'contactSheetBulk'])
+        ->middleware('throttle:api')
+        ->name('api.management.models.contact-sheet.bulk');
+    // Phase 4: signierter Extern-Link (immer die externe Variante).
+    Route::post('/management/models/contact-sheet/share', [ModelManagementController::class, 'contactSheetShare'])
+        ->middleware('throttle:api')
+        ->name('api.management.models.contact-sheet.share');
     Route::get('/management/models/{id}/photos/{photoId}', [ModelManagementController::class, 'photo'])->name('api.management.models.photos.download');
     Route::delete('/management/models/{id}/photos/{photoId}', [ModelManagementController::class, 'destroyPhoto'])->name('api.management.models.photos.destroy');
     Route::post('/management/models/{id}/photos/{photoId}/primary', [ModelManagementController::class, 'setPrimaryPhoto'])->name('api.management.models.photos.primary');

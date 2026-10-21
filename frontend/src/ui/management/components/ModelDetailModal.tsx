@@ -12,7 +12,10 @@ import {
     type ManagedModel,
 } from '../../../logic/useModels';
 import {
+    copyTextToClipboard,
+    createModelContactSheetShare,
     downloadModelContactSheet,
+    type ModelContactSheetShare,
     type ModelContactSheetVariant,
 } from '../../../logic/modelContactSheet';
 import { usePermissions } from '../../../logic/usePermissions';
@@ -43,22 +46,6 @@ interface Props {
     onChanged: () => void;
     /** Matched/filter categories pinned to the top of the skill matrix. */
     pinnedCategories?: string[];
-}
-
-async function copyTextToClipboard(text: string): Promise<void> {
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        return;
-    }
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.setAttribute('readonly', '');
-    textarea.className = 'fixed opacity-0 pointer-events-none';
-    document.body.appendChild(textarea);
-    textarea.select();
-    const copied = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    if (!copied) throw new Error('Clipboard copy failed');
 }
 
 function formatDateTime(value: string | null): string {
@@ -124,6 +111,8 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
     const { showToast, confirm } = useUI();
     const { isSuperAdmin, isAdmin } = usePermissions();
     const [isWorking, setIsWorking] = useState(false);
+    // The signed external link for this single profile (Phase 4).
+    const [shareLink, setShareLink] = useState<ModelContactSheetShare | null>(null);
 
     if (!model) return null;
 
@@ -244,6 +233,19 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
             showToast('success', t`Contact Sheet wurde heruntergeladen.`);
         } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : t`Fehler beim Erstellen des Contact Sheets.`);
+        } finally {
+            setIsWorking(false);
+        }
+    };
+
+    const handleCreateShareLink = async () => {
+        setIsWorking(true);
+        try {
+            const share = await createModelContactSheetShare([model.id]);
+            setShareLink(share);
+            showToast('success', t`Extern-Link wurde erstellt.`);
+        } catch (err: unknown) {
+            showToast('error', err instanceof Error ? err.message : t`Fehler beim Erstellen des Extern-Links.`);
         } finally {
             setIsWorking(false);
         }
@@ -374,6 +376,18 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
                                     {action.label}
                                 </button>
                             ))}
+                            <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                disabled={isWorking}
+                                onClick={handleCreateShareLink}
+                                data-testid="model-contact-sheet-share"
+                            >
+                                {isWorking
+                                    ? <span className="loading loading-spinner loading-xs"></span>
+                                    : <span className="iconify mdi--link-variant"></span>}
+                                <Trans>Extern-Link erstellen</Trans>
+                            </button>
                         </div>
                     )}
                     <button type="button" className="btn btn-ghost" onClick={onClose}><Trans>Schließen</Trans></button>
@@ -529,6 +543,26 @@ export default function ModelDetailModal({ model, onClose, onChanged, pinnedCate
                                 <Trans>Profil-Link erstellen</Trans>
                             </button>
                         </div>
+                    )}
+                </div>
+
+                <div className="mb-6" data-testid="model-contact-sheet-share-panel">
+                    <h4 className={groupHeadingClass}><Trans>Extern-Link</Trans></h4>
+                    {shareLink ? (
+                        <div className="rounded-box bg-base-200 p-3">
+                            <input type="text" readOnly value={shareLink.url} className="input input-bordered input-sm w-full font-mono text-xs" data-testid="model-contact-sheet-share-url" />
+                            <p className="text-xs opacity-60 mt-1" data-testid="model-contact-sheet-share-expiry">
+                                <Trans>Läuft ab:</Trans> {formatDateTime(shareLink.expires_at)}
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                <button type="button" className="btn btn-sm btn-primary" onClick={() => handleCopy(shareLink.url)} data-testid="model-contact-sheet-share-copy">
+                                    <span className="iconify mdi--content-copy"></span>
+                                    <Trans>Kopieren</Trans>
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-sm opacity-60"><Trans>Noch kein Extern-Link erstellt.</Trans></p>
                     )}
                 </div>
 

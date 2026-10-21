@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-47. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-48. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -98,6 +98,12 @@ Document the technical handling of Stripe customer/payment-intent IDs, IP addres
 ### D-22: FTP directory provisioning failure status
 
 Return HTTP `503` for FTP inbox directory provisioning failures on both credential-reset and slug-setting paths, without `Retry-After`. Keep `422` for invalid portal prerequisites. See [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md).
+
+### D-48: The contact sheet ships as a collection, and the customer link carries the external sheet only
+
+The bulk export ("Ergebnis als Contact Sheet") is a **second document**, not a repetition of the single sheet: one tile per profile on A4, at most 25 profiles, and exactly **one** photo per profile — the tile grid is a memory budget; a document must not carry the 12 photos of a single sheet for 25 profiles. The privacy split is unchanged and per variant: the internal tile carries the real name, the city and the e-mail, the external tile only the stage name (never a fallback to the real name), the city and public photos only. A selection that contains a profile of another brand or an id that does not resolve fails the **whole** export with 404 instead of silently narrowing the selection — a dropped profile would change the document without a trace.
+
+The shared link replaces the authenticated download for the recipient: it is a signed JWT (the same secret and verification path as the login token), valid for **seven days**, bound to the brand, and it can carry **only** the external variant, because the internal variant contains PII. The token is a bearer credential and never appears in a log line, an audit context or an error message; the audit lines carry the `link_id` (a UUID) instead. Every failure of the public endpoint — invalid, expired, wrong brand, no profile left — answers with the same 404 and the same message, so the endpoint is no token oracle. Profiles that no longer exist are skipped and **named** in the document (count only, PII-free): a silent narrowing is not allowed, and a link without any remaining profile is a 404. The delivery request carries no session cookie (`credentials: 'omit'`), so the link works exactly as the bearer credential it is. Two limits are accepted and documented: the link is **not revocable** before it expires (a new link does not invalidate an older one), and the token payload carries the profile ids in clear text — they are opaque UUIDs, and the endpoint only delivers what the signature covers. See [model contact sheet export](../crm/07-model-contact-sheet-export.md).
 
 ## CI and pricing/API access
 

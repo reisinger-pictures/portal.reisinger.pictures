@@ -27,6 +27,8 @@ test.describe('Model löschen (DSGVO)', () => {
         await expect(page.locator('main').getByRole('heading', { name: 'Models', exact: true })).toBeVisible({ timeout: 15000 });
         await page.locator('#model-filter-q').fill(model.firstName);
 
+        // The prefix matches the card button only: the wrapper around it uses
+        // the `model-frame-` test id, so one element per model is hit.
         const card = page.locator('[data-testid^="model-card-"]').first();
         await expect(card).toBeVisible({ timeout: 15000 });
         await card.click();
@@ -47,6 +49,8 @@ test.describe('Model löschen (DSGVO)', () => {
         await expect(page.locator('main').getByRole('heading', { name: 'Models', exact: true })).toBeVisible({ timeout: 15000 });
         await page.locator('#model-filter-q').fill(model.firstName);
 
+        // The prefix matches the card button only: the wrapper around it uses
+        // the `model-frame-` test id, so one element per model is hit.
         const cardAgain = page.locator('[data-testid^="model-card-"]').first();
         await expect(cardAgain).toBeVisible({ timeout: 15000 });
         await cardAgain.click();
@@ -70,6 +74,8 @@ test.describe('Model löschen (DSGVO)', () => {
         await expect(page.locator('main').getByRole('heading', { name: 'Models', exact: true })).toBeVisible({ timeout: 15000 });
         await page.locator('#model-filter-q').fill(model.firstName);
 
+        // The prefix matches the card button only: the wrapper around it uses
+        // the `model-frame-` test id, so one element per model is hit.
         const card = page.locator('[data-testid^="model-card-"]').first();
         await expect(card).toBeVisible({ timeout: 15000 });
         await card.click();

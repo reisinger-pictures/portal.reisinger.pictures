@@ -19,6 +19,7 @@ const InviteView = lazy(() => import('./ui/InviteView'));
 const OrgInviteView = lazy(() => import('./ui/OrgInviteView'));
 const ModelRegistrationView = lazy(() => import('./ui/ModelRegistrationView'));
 const ModelProfileAccessView = lazy(() => import('./ui/ModelProfileAccessView'));
+const ModelContactSheetShareView = lazy(() => import('./ui/ModelContactSheetShareView'));
 const MyModelsView = lazy(() => import('./ui/MyModelsView'));
 import ContractJoinView from './ui/ContractJoinView';
 import ContractSignView from './ui/ContractSignView';
@@ -119,6 +120,8 @@ export default function App() {
                             <Route path="/org-invite/:token" element={<ErrorBoundary><OrgInviteView/></ErrorBoundary>}/>
                             <Route path="/model-registrierung/:token" element={<ErrorBoundary><ModelRegistrationView/></ErrorBoundary>}/>
                             <Route path="/model-profil/:token" element={<ErrorBoundary><ModelProfileAccessView/></ErrorBoundary>}/>
+                            {/* Phase 4: öffentlicher Extern-Link (Empfänger ohne Login). */}
+                            <Route path="/kontaktbogen/:token" element={<ErrorBoundary><ModelContactSheetShareView/></ErrorBoundary>}/>
                             <Route path="/contracts/join/:token" element={<ErrorBoundary><ContractJoinView/></ErrorBoundary>}/>
                             <Route path="/contracts/sign/:token" element={<ErrorBoundary><ContractSignView/></ErrorBoundary>}/>
 

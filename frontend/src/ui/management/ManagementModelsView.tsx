@@ -39,6 +39,27 @@ import {
     willingnessOrdinal,
     willingnessRangeClass,
 } from '../../logic/modelRegistration';
+import {
+    copyTextToClipboard,
+    createModelContactSheetShare,
+    downloadModelContactSheetBulk,
+    MODEL_CONTACT_SHEET_MAX_BULK,
+    type ModelContactSheetShare,
+    type ModelContactSheetVariant,
+} from '../../logic/modelContactSheet';
+
+function formatDateTime(value: string | null): string {
+    if (!value) return '–';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '–';
+    return date.toLocaleString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
 
 function primaryPhoto(model: ManagedModel): ManagedModelPhoto | null {
     return model.photos.find(photo => photo.id === model.primary_photo_id)
@@ -47,11 +68,13 @@ function primaryPhoto(model: ManagedModel): ManagedModelPhoto | null {
         ?? null;
 }
 
-function ModelCard({ model, matchedCategories, pinnedCategories, onOpen }: {
+function ModelCard({ model, matchedCategories, pinnedCategories, onOpen, selected, onToggleSelect }: {
     model: ManagedModel;
     matchedCategories: string[];
     pinnedCategories: string[];
     onOpen: () => void;
+    selected: boolean;
+    onToggleSelect: () => void;
 }) {
     const photo = primaryPhoto(model);
     // Stock-Fotos is not an experience category but must always be visible;
@@ -63,65 +86,84 @@ function ModelCard({ model, matchedCategories, pinnedCategories, onOpen }: {
     );
 
     return (
-        <button
-            type="button"
-            className="card bg-base-100 border border-base-300 shadow-sm hover:shadow-xl transition-shadow text-left overflow-hidden"
-            onClick={onOpen}
-            data-testid={`model-card-${model.id}`}
-        >
-            <div className="h-48 bg-base-300 flex items-center justify-center overflow-hidden">
-                {photo ? (
-                    <img src={photo.download_url} alt={model.display_name ?? t`Model`} loading="lazy" className="w-full h-full object-cover" />
-                ) : (
-                    <span className="iconify mdi--account-outline text-6xl opacity-30"></span>
-                )}
-            </div>
-            <div className="card-body p-4 gap-2">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                    <h3 className="card-title text-base min-w-0 break-words flex-1">{model.display_name ?? t`Unbenanntes Model`}</h3>
-                    <span className={`badge badge-sm shrink-0 ${modelLifecycleBadgeClass(model.lifecycle_status)}`}>
-                        {modelLifecycleLabel(model.lifecycle_status)}
-                    </span>
+        // The card is a wrapper, not the button: the selection checkbox is
+        // interactive content and must not live inside a <button> (invalid
+        // HTML, and it would swallow the click that opens the detail dialog).
+        // The wrapper's test id deliberately does NOT start with `model-card-`:
+        // a prefix selector (`[data-testid^="model-card-"]`) must match the
+        // card button only, otherwise it hits two elements per model.
+        <div className="relative" data-testid={`model-frame-${model.id}`}>
+            <label className="absolute top-2 left-2 z-10 flex items-center rounded-box bg-base-100/90 px-2 py-1 shadow-sm">
+                <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm"
+                    checked={selected}
+                    onChange={onToggleSelect}
+                    onClick={event => event.stopPropagation()}
+                    aria-label={t`Model für den Contact Sheet auswählen`}
+                    data-testid={`model-select-${model.id}`}
+                />
+            </label>
+            <button
+                type="button"
+                className="card bg-base-100 border border-base-300 shadow-sm hover:shadow-xl transition-shadow text-left overflow-hidden w-full"
+                onClick={onOpen}
+                data-testid={`model-card-${model.id}`}
+            >
+                <div className="h-48 bg-base-300 flex items-center justify-center overflow-hidden">
+                    {photo ? (
+                        <img src={photo.download_url} alt={model.display_name ?? t`Model`} loading="lazy" className="w-full h-full object-cover" />
+                    ) : (
+                        <span className="iconify mdi--account-outline text-6xl opacity-30"></span>
+                    )}
                 </div>
-                <div className="text-sm opacity-70">
-                    {[model.age ? `${model.age} ${t`Jahre`}` : null, [model.city, model.country].filter(Boolean).join(', ')].filter(Boolean).join(' · ') || '–'}
+                <div className="card-body p-4 gap-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                        <h3 className="card-title text-base min-w-0 break-words flex-1">{model.display_name ?? t`Unbenanntes Model`}</h3>
+                        <span className={`badge badge-sm shrink-0 ${modelLifecycleBadgeClass(model.lifecycle_status)}`}>
+                            {modelLifecycleLabel(model.lifecycle_status)}
+                        </span>
+                    </div>
+                    <div className="text-sm opacity-70">
+                        {[model.age ? `${model.age} ${t`Jahre`}` : null, [model.city, model.country].filter(Boolean).join(', ')].filter(Boolean).join(' · ') || '–'}
+                    </div>
+                    {matrixRows.length === 0 ? (
+                        <span className="opacity-40 text-sm">–</span>
+                    ) : (
+                        // No inner scroll: the grid keeps cards wide enough for the
+                        // matrix to fit on mobile and desktop.
+                        <table className="table table-xs w-full" data-testid={`model-matrix-${model.id}`}>
+                            <thead>
+                                <tr>
+                                    <th><Trans>Kategorie</Trans></th>
+                                    <th><Trans>Erfahrung</Trans></th>
+                                    <th className="text-right"><Trans>Lust</Trans></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {matrixRows.map(row => {
+                                    const matched = matchedCategories.includes(row.key);
+                                    return (
+                                        <tr key={row.key}>
+                                            <td className={matched ? 'font-bold text-primary' : ''}>{row.label}</td>
+                                            <td className="whitespace-nowrap">{row.experience ? modelExperienceLabel(row.experience) : '–'}</td>
+                                            <td className="text-right whitespace-nowrap">
+                                                {row.willingness
+                                                    ? <span className={`badge badge-xs sm:badge-sm ${willingnessBadgeClass(row.willingness)}`}>{modelWillingnessLabel(row.willingness)}</span>
+                                                    : '–'}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                    {model.age_proof_required && !model.age_proof_uploaded_at && (
+                        <span className="badge badge-warning badge-sm h-auto whitespace-normal text-left py-1"><Trans>Altersnachweis ausstehend</Trans></span>
+                    )}
                 </div>
-                {matrixRows.length === 0 ? (
-                    <span className="opacity-40 text-sm">–</span>
-                ) : (
-                    // No inner scroll: the grid keeps cards wide enough for the
-                    // matrix to fit on mobile and desktop.
-                    <table className="table table-xs w-full" data-testid={`model-matrix-${model.id}`}>
-                        <thead>
-                            <tr>
-                                <th><Trans>Kategorie</Trans></th>
-                                <th><Trans>Erfahrung</Trans></th>
-                                <th className="text-right"><Trans>Lust</Trans></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {matrixRows.map(row => {
-                                const matched = matchedCategories.includes(row.key);
-                                return (
-                                    <tr key={row.key}>
-                                        <td className={matched ? 'font-bold text-primary' : ''}>{row.label}</td>
-                                        <td className="whitespace-nowrap">{row.experience ? modelExperienceLabel(row.experience) : '–'}</td>
-                                        <td className="text-right whitespace-nowrap">
-                                            {row.willingness
-                                                ? <span className={`badge badge-xs sm:badge-sm ${willingnessBadgeClass(row.willingness)}`}>{modelWillingnessLabel(row.willingness)}</span>
-                                                : '–'}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                )}
-                {model.age_proof_required && !model.age_proof_uploaded_at && (
-                    <span className="badge badge-warning badge-sm h-auto whitespace-normal text-left py-1"><Trans>Altersnachweis ausstehend</Trans></span>
-                )}
-            </div>
-        </button>
+            </button>
+        </div>
     );
 }
 
@@ -130,6 +172,13 @@ export default function ManagementModelsView() {
     const { isAdmin, isSuperAdmin } = usePermissions();
     const { showToast } = useUI();
     const [inviteOpen, setInviteOpen] = useState(false);
+    // Selection for the bulk contact sheet ("Ergebnis als Contact Sheet").
+    // Genuine user state: the checkbox is the only source, the toolbar reads it.
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isBulkWorking, setIsBulkWorking] = useState(false);
+    // The signed external link (Phase 4). It is a snapshot of the selection:
+    // a new selection invalidates the display, the link itself expires.
+    const [shareLink, setShareLink] = useState<ModelContactSheetShare | null>(null);
     // Filters live in the URL (shareable/bookmarkable; Back/Forward consistent).
     const filters = parseModelFilters(searchParams);
     const { models, error, isLoading, mutate } = useModels(filters);
@@ -234,6 +283,69 @@ export default function ManagementModelsView() {
 
     // Lifecycle filtering happens server-side (`lifecycle_status`; default active).
     const visibleModels = models ?? [];
+
+    // --- Selection for the bulk contact sheet -------------------------------
+    const selectionLimit = MODEL_CONTACT_SHEET_MAX_BULK;
+    const overLimit = selectedIds.length > selectionLimit;
+
+    const applySelection = (next: string[]) => {
+        if (next.length > selectionLimit) {
+            showToast('error', t`Maximal 25 Models pro Contact Sheet.`);
+        }
+        setSelectedIds(next);
+        // The link covers the selection it was created for — a changed
+        // selection must not keep showing a stale link.
+        setShareLink(null);
+    };
+
+    const toggleSelection = (modelId: string) => {
+        applySelection(selectedIds.includes(modelId)
+            ? selectedIds.filter(id => id !== modelId)
+            : [...selectedIds, modelId]);
+    };
+
+    const selectAll = () => applySelection(visibleModels.map(model => model.id));
+
+    // "Auswahl aufheben" ist ebenfalls eine **geänderte** Auswahl: der Link
+    // gilt für die Auswahl, für die er erzeugt wurde — er wird mitverworfen.
+    const clearSelection = () => applySelection([]);
+
+    const handleBulkContactSheet = async (variant: ModelContactSheetVariant) => {
+        if (selectedIds.length === 0 || overLimit) return;
+        setIsBulkWorking(true);
+        try {
+            await downloadModelContactSheetBulk(selectedIds, variant);
+            showToast('success', t`Contact Sheet wurde heruntergeladen.`);
+        } catch (err: unknown) {
+            showToast('error', err instanceof Error ? err.message : t`Fehler beim Erstellen des Contact Sheets.`);
+        } finally {
+            setIsBulkWorking(false);
+        }
+    };
+
+    const handleCreateShareLink = async () => {
+        if (selectedIds.length === 0 || overLimit) return;
+        setIsBulkWorking(true);
+        try {
+            const share = await createModelContactSheetShare(selectedIds);
+            setShareLink(share);
+            showToast('success', t`Extern-Link wurde erstellt.`);
+        } catch (err: unknown) {
+            showToast('error', err instanceof Error ? err.message : t`Fehler beim Erstellen des Extern-Links.`);
+        } finally {
+            setIsBulkWorking(false);
+        }
+    };
+
+    const handleCopyShareLink = async () => {
+        if (!shareLink) return;
+        try {
+            await copyTextToClipboard(shareLink.url);
+            showToast('success', t`Link wurde kopiert.`);
+        } catch {
+            showToast('error', t`Konnte Link nicht kopieren.`);
+        }
+    };
 
     const matchedCategories = filters.category ?? [];
     const matchedLabels = matchedCategories.map(modelCategoryLabel);
@@ -418,6 +530,105 @@ export default function ManagementModelsView() {
                 </div>
             )}
 
+            {selectedIds.length > 0 && (
+                <div
+                    className="bg-base-100 border border-base-300 rounded-box p-4 shadow-sm mb-6 flex flex-wrap items-center gap-3"
+                    data-testid="model-selection-toolbar"
+                >
+                    <span className="font-bold" data-testid="model-selection-count">
+                        {selectedIds.length} {selectedIds.length === 1 ? t`Model ausgewählt` : t`Models ausgewählt`}
+                    </span>
+                    <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={selectAll}
+                        data-testid="model-bulk-select-all"
+                    >
+                        <span className="iconify mdi--check-all"></span>
+                        <Trans>Alle auswählen</Trans>
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={clearSelection}
+                        data-testid="model-bulk-clear-selection"
+                    >
+                        <span className="iconify mdi--close"></span>
+                        <Trans>Auswahl aufheben</Trans>
+                    </button>
+                    {isAdmin && (
+                        <div className="ml-auto flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                disabled={isBulkWorking || overLimit}
+                                onClick={() => handleBulkContactSheet('internal')}
+                                data-testid="model-bulk-contact-sheet-internal"
+                            >
+                                {isBulkWorking
+                                    ? <span className="loading loading-spinner loading-xs"></span>
+                                    : <span className="iconify mdi--file-pdf-box"></span>}
+                                <Trans>Ergebnis als Contact Sheet (intern)</Trans>
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                disabled={isBulkWorking || overLimit}
+                                onClick={() => handleBulkContactSheet('external')}
+                                data-testid="model-bulk-contact-sheet-external"
+                            >
+                                {isBulkWorking
+                                    ? <span className="loading loading-spinner loading-xs"></span>
+                                    : <span className="iconify mdi--file-pdf-box"></span>}
+                                <Trans>Ergebnis als Contact Sheet (extern)</Trans>
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                disabled={isBulkWorking || overLimit}
+                                onClick={handleCreateShareLink}
+                                data-testid="model-bulk-contact-sheet-share"
+                            >
+                                {isBulkWorking
+                                    ? <span className="loading loading-spinner loading-xs"></span>
+                                    : <span className="iconify mdi--link-variant"></span>}
+                                <Trans>Extern-Link erstellen</Trans>
+                            </button>
+                        </div>
+                    )}
+                    {shareLink && (
+                        <div className="w-full rounded-box bg-base-200 p-3 space-y-2" data-testid="model-bulk-share-link">
+                            <input
+                                type="text"
+                                readOnly
+                                value={shareLink.url}
+                                className="input input-bordered input-sm w-full font-mono text-xs"
+                                data-testid="model-bulk-share-link-url"
+                            />
+                            <div className="flex flex-wrap items-center gap-3">
+                                <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    onClick={handleCopyShareLink}
+                                    data-testid="model-bulk-share-link-copy"
+                                >
+                                    <span className="iconify mdi--content-copy"></span>
+                                    <Trans>Kopieren</Trans>
+                                </button>
+                                <span className="text-xs opacity-70" data-testid="model-bulk-share-link-expiry">
+                                    <Trans>Gültig bis:</Trans> {formatDateTime(shareLink.expires_at)}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                    {overLimit && (
+                        <span className="text-error text-sm w-full" data-testid="model-selection-limit-hint">
+                            <Trans>Maximal 25 Models pro Contact Sheet.</Trans>
+                        </span>
+                    )}
+                </div>
+            )}
+
             {visibleModels.length === 0 ? (
                 <div className="bg-base-100 border border-base-300 rounded-box p-6 shadow-sm">
                     <EmptyState icon="mdi--account-search-outline" title={t`Keine Models gefunden.`} className="py-10" />
@@ -431,12 +642,39 @@ export default function ManagementModelsView() {
                             matchedCategories={matchedCategories}
                             pinnedCategories={pinnedCategories}
                             onOpen={() => openModel(model)}
+                            selected={selectedIds.includes(model.id)}
+                            onToggleSelect={() => toggleSelection(model.id)}
                         />
                     ))}
                 </div>
             )}
 
-            <ModelDetailModal model={selected} onClose={closeModel} onChanged={() => mutate()} pinnedCategories={pinnedCategories} />
+            {/* Der Dialog gehört zum **gezeigten** Profil — der `key` bindet
+                ihn daran. Beim Wechsel des Profils (und beim Schließen) wird
+                die Komponente neu aufgebaut, und damit **jeder** profilbezogene
+                State verworfen.
+
+                Das ist nicht kosmetisch: der Dialog hält den angezeigten
+                Extern-Link (Phase 4) im State. Ohne den Remount überlebte er
+                das Schließen des Dialogs — der Block „Extern-Link" zeigte nach
+                dem Öffnen eines **anderen** Profils weiterhin die URL und das
+                Ablaufdatum des ersten Profils, während die Kachel die Daten
+                des zweiten zeigte. Wer die URL kopierte, schickte das falsche
+                Blatt (Künstlername, Ort, Foto eines anderen Models) an den
+                Empfänger.
+
+                Ein `useEffect` im Dialog statt des `key` hätte denselben Zweck,
+                aber mit einem Frame, in dem die Daten des **neuen** Profils
+                neben dem Link des **alten** stehen — also genau dem Zustand,
+                der das falsche Blatt verschickt. Der `key` hat keinen
+                Zwischenstand: der neue Dialog startet frisch. */}
+            <ModelDetailModal
+                key={selected?.id ?? 'none'}
+                model={selected}
+                onClose={closeModel}
+                onChanged={() => mutate()}
+                pinnedCategories={pinnedCategories}
+            />
 
             {inviteOpen && <ModelInviteDialog onClose={() => setInviteOpen(false)} />}
         </div>

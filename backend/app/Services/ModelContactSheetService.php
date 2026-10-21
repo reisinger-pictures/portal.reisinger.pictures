@@ -56,6 +56,19 @@ use InvalidArgumentException;
  * definierten `EXPERIENCE_LABELS`/`WILLINGNESS_LABELS`/Kategorien aufgelöst.
  * Die Labels der Auslassungsgründe gehören nicht dazu: sie haben keinen
  * Katalog und stehen in {@see self::OMISSION_LABELS}.
+ *
+ * Phase 3 (Sammlung): {@see self::renderCollection()} rendert dieselbe
+ * Datenselektion je Profil als Kachel-Grid (2 Spalten) auf **einem** Dokument.
+ * Die Privacy-Trennung bleibt dieselbe (intern: Realname/Ort/E-Mail + Foto
+ * unabhängig von der Sichtbarkeit; extern: nur Künstlername/Ort, keine
+ * Kontaktdaten, nur öffentliche Fotos). Pro Profil wird bewusst **ein** Foto
+ * eingebettet ({@see self::COLLECTION_MAX_PHOTOS_PER_PROFILE}) — ein
+ * Memory-Limit, das die Bildanzahl im Dokument auf
+ * {@see self::MAX_BULK_PROFILES} begrenzt. Zusätzlich begrenzt
+ * {@see self::COLLECTION_MAX_TOTAL_PHOTO_BYTES} die **eingebetteten Bytes**
+ * der Sammlung: die Originalbytes werden eingebettet, ein Foto, das das
+ * Restbudget überschreitet, wird nicht eingebettet und auf Dokumentebene
+ * benannt.
  */
 class ModelContactSheetService
 {
@@ -73,6 +86,63 @@ class ModelContactSheetService
      * deshalb höchstens 12 Fotos — die Zusage „alle Fotos" endet hier.
      */
     public const MAX_PHOTOS = 12;
+
+    /**
+     * Maximale Anzahl Profile in **einem** Sammlungs-Contact-Sheet (Phase 3).
+     *
+     * Die Grenze begrenzt das Speicherprofil des gerenderten Dokuments: jedes
+     * Profil trägt höchstens {@see self::COLLECTION_MAX_PHOTOS_PER_PROFILE}
+     * eingebettete Fotos bei, das Dokument also höchstens
+     * `MAX_BULK_PROFILES` Bild-Data-URIs. Der Server ist die Quelle der
+     * Grenze — das Frontend zeigt dieselbe Zahl nur an.
+     */
+    public const MAX_BULK_PROFILES = 25;
+
+    /**
+     * Fotos je Profil im Sammlungs-Contact-Sheet (Phase 3).
+     *
+     * Bewusstes Memory-Limit: die Sammlung zeigt pro Profil **ein** Foto (das
+     * Hauptbild — in der externen Variante nur, wenn es öffentlich ist, sonst
+     * das erste öffentliche Foto, sonst keines). Alle weiteren Fotos des Profils
+     * waren nie Kandidaten und werden wie beim Einzelbogen als Limit-Auslassung
+     * benannt (D-41), nicht stillschweigend verworfen.
+     */
+    public const COLLECTION_MAX_PHOTOS_PER_PROFILE = 1;
+
+    /**
+     * Maximales **Gesamt**-Byte-Budget der eingebetteten Fotos einer Sammlung.
+     *
+     * Das Foto-Limit je Profil ({@see self::COLLECTION_MAX_PHOTOS_PER_PROFILE})
+     * begrenzt die *Anzahl* der Bilder, nicht ihre Größe: eingebettet werden
+     * die **Originalbytes** (JPEG/PNG unverändert), ein Foto darf bis
+     * `PhotoProcessingService::MAX_IMAGE_BYTES` (20 MiB) groß sein. 25 solche
+     * Fotos wären ~500 MiB Rohbytes (~670 MiB Base64) in **einem** HTML-String
+     * — gegen das Prod-`memory_limit` von 1024M.
+     *
+     * Das Budget ist deshalb eine **zusätzliche** Grenze, keine schwächere
+     * Prüfung: der Foto-Prüfpfad (Byte-Cap → Decode → MIME → Dimensions →
+     * GD-Decode) bleibt unverändert. Ein Foto, das das Restbudget
+     * überschreitet, wird **nicht** eingebettet und auf **Dokumentebene**
+     * benannt (Anzahl + Grund, PII-frei) — ein stilles Verengen des Blicks
+     * auf die Sammlung ist nicht erlaubt.
+     *
+     * Rechnungsgröße sind die Rohbytes des gespeicherten Fotos: JPEG/PNG
+     * werden byte-identisch eingebettet, WebP wird zu JPEG normalisiert (in
+     * der Regel kleiner).
+     */
+    public const COLLECTION_MAX_TOTAL_PHOTO_BYTES = 32 * 1024 * 1024;
+
+    /**
+     * Grundbezeichnung der Auslassung wegen des Sammlungs-Budgets (PII-frei).
+     */
+    public const COLLECTION_BUDGET_OMISSION_LABEL = 'Byte-Budget der Sammlung überschritten';
+
+    /**
+     * Anzeigebox (px) eines Fotos in einer Sammlungs-Kachel.
+     */
+    private const COLLECTION_TILE_MAX_WIDTH = 200;
+
+    private const COLLECTION_TILE_MAX_HEIGHT = 140;
 
     /**
      * Gründe, warum ein Foto nicht im Kontaktbogen landet (D-41).
@@ -170,6 +240,105 @@ class ModelContactSheetService
     }
 
     /**
+     * Rendert ein Sammlungs-Contact-Sheet (Phase 3) über eine Auswahl von Profilen.
+     *
+     * Die Kacheln nutzen **dieselbe** Datenselektion wie der Einzelbogen
+     * ({@see self::internalData()} / {@see self::externalData()}) — die
+     * Privacy-Trennung ist damit pro Variante identisch:
+     *  - `internal`: Realname, Ort, E-Mail und das Hauptfoto unabhängig von
+     *    seiner Sichtbarkeit,
+     *  - `external`: nur Künstlername (nie der Realname), Ort, keine
+     *    Kontaktdaten und ausschließlich öffentliche Fotos.
+     *
+     * Pro Profil wird genau **ein** Foto eingebettet
+     * ({@see self::COLLECTION_MAX_PHOTOS_PER_PROFILE}) — das bewusste
+     * Memory-Limit der Sammlung. Fällt dieses Foto aus, benennt die Kachel
+     * Anzahl und Grund (D-41, PII-frei).
+     *
+     * Der Aufrufer ist für die Brand-Isolation zuständig: die übergebenen
+     * Profile müssen zur Brand des Akteurs gehören (der Controller erzwingt
+     * das per `ModelProfile::forBrand()`).
+     *
+     * `$omittedProfiles` benennt die Profile, die der Aufrufer **nicht**
+     * liefern konnte (z. B. weil sie inzwischen gelöscht oder in eine andere
+     * Brand verschoben wurden). Ein stilles Verengen der Auswahl ist nicht
+     * erlaubt: der Bogen nennt die Anzahl der ausgelassenen Profile (PII-frei,
+     * nur ein Zählwert). Standard 0 — ohne Auslassung erscheint kein Hinweis.
+     *
+     * Das **Byte-Budget** der Sammlung ({@see self::COLLECTION_MAX_TOTAL_PHOTO_BYTES})
+     * begrenzt zusätzlich die eingebetteten Bytes: ein Foto, das das Restbudget
+     * überschreitet, wird nicht eingebettet und auf Dokumentebene benannt
+     * (Anzahl + Grund, PII-frei).
+     *
+     * @param  array<int, ModelProfile>  $profiles
+     */
+    public function renderCollection(array $profiles, string $variant, int $omittedProfiles = 0): string
+    {
+        if (! in_array($variant, self::VARIANTS, true)) {
+            throw new InvalidArgumentException("Unbekannte Contact-Sheet-Variante: {$variant}");
+        }
+
+        $external = $variant === self::VARIANT_EXTERNAL;
+        $profiles = array_values($profiles);
+        $total = count($profiles);
+
+        $tiles = [];
+        $remainingBytes = $this->collectionMaxTotalPhotoBytes();
+        $budgetOmitted = 0;
+
+        foreach ($profiles as $index => $profile) {
+            $tile = $this->collectionTile($profile, $external, $index + 1, $total, $remainingBytes);
+
+            $remainingBytes = max(0, $remainingBytes - $tile['usedBytes']);
+            if ($tile['budgetOmitted']) {
+                $budgetOmitted++;
+            }
+
+            $tiles[] = $tile['tile'];
+        }
+
+        // Alle Profile gehören zur Brand des Akteurs (Aufrufer-Garantie) —
+        // deshalb genügt die Brand des ersten Profils für Header und Logo.
+        $brand = $profiles === []
+            ? BrandRegistry::configOrDefault()
+            : $this->brandConfig($profiles[0]);
+
+        $data = [
+            'variant' => $variant,
+            'isExternal' => $external,
+            'generatedAt' => now(),
+            'brandName' => $brand->name,
+            'primaryColor' => $brand->primaryColor,
+            'secondaryColor' => $brand->secondaryColor,
+            'logoDataUri' => $this->logoDataUri($brand),
+            'watermarkText' => $external ? $brand->name : null,
+            'tiles' => $tiles,
+            'total' => $total,
+            'omittedProfiles' => max(0, $omittedProfiles),
+            'budgetOmission' => [
+                'count' => $budgetOmitted,
+                'reason' => self::COLLECTION_BUDGET_OMISSION_LABEL,
+            ],
+        ];
+
+        return Pdf::loadView('pdf.model-contact-sheet-collection', $data)
+            ->setPaper('a4')
+            ->output(['compress' => 0]);
+    }
+
+    /**
+     * Das Byte-Budget der Sammlung.
+     *
+     * `protected`, damit Tests den Grenzwert verkleinern können, ohne ein
+     * 32-MiB-Fixture bauen zu müssen — dasselbe Muster wie
+     * {@see self::inspectRasterImage()}.
+     */
+    protected function collectionMaxTotalPhotoBytes(): int
+    {
+        return self::COLLECTION_MAX_TOTAL_PHOTO_BYTES;
+    }
+
+    /**
      * Interne Variante: alles inkl. PII, Altersnachweis-Status und Snapshot.
      *
      * @return array<string, mixed>
@@ -222,6 +391,121 @@ class ModelContactSheetService
             'displayName' => $stageName !== '' ? $stageName : 'Model',
             'city' => $customer?->city,
             'matrix' => $this->matrix($profile),
+        ];
+    }
+
+    /**
+     * Eine Kachel der Sammlung: Foto, Anzeigename, Ort und die kompakte Matrix.
+     *
+     * Die Auswahl ist dieselbe wie im Einzelbogen — nur die Darstellung ist
+     * kompakter (kein Answers-Snapshot, keine Altersnachweis-Statuszeile).
+     *
+     * `$remainingBytes` ist das Restbudget der Sammlung: reicht es für das
+     * Foto der Kachel nicht mehr, wird das Foto **nicht** eingebettet und
+     * auf Dokumentebene benannt (kein stilles Verengen).
+     *
+     * @return array{tile: array<string, mixed>, usedBytes: int, budgetOmitted: bool}
+     */
+    private function collectionTile(ModelProfile $profile, bool $external, int $index, int $total, int $remainingBytes): array
+    {
+        $profile->loadMissing(['customer', 'photos']);
+
+        $data = $external ? $this->externalData($profile) : $this->internalData($profile);
+        $selection = $this->selectCollectionPhoto($profile, $external, $remainingBytes);
+
+        return [
+            'tile' => [
+                'index' => $index,
+                'total' => $total,
+                'displayName' => $data['displayName'],
+                'city' => $data['city'],
+                // Nur die interne Variante trägt Kontaktdaten.
+                'email' => $external ? null : $this->factValue($data['facts'] ?? [], 'E-Mail'),
+                'matrix' => $data['matrix'],
+                'photo' => $selection['photo'],
+                'omissions' => $selection['omissions'],
+            ],
+            'usedBytes' => $selection['usedBytes'],
+            'budgetOmitted' => $selection['budgetOmitted'],
+        ];
+    }
+
+    /**
+     * Wählt das **eine** Foto der Kachel und zählt die Auslassungen (D-41).
+     *
+     * Kandidaten sind:
+     *  - `internal`: alle Fotos des Profils — angezeigt wird das Hauptbild
+     *    unabhängig von seiner Sichtbarkeit (ersatzweise das erste Foto).
+     *  - `external`: ausschließlich `public`-Fotos — angezeigt wird das
+     *    Hauptbild, sofern es öffentlich ist, sonst das erste öffentliche
+     *    Foto, sonst keines. Ein internes Foto ist **nie** Kandidat: es wird
+     *    weder gezählt noch erwähnt (D-41, externe Variante).
+     *
+     * Der Byte-/MIME-/Dimensions-Vorcheck und der GD-Decode laufen über
+     * {@see self::embedPhoto()} — es gibt keinen zweiten, schwächeren
+     * Bildpfad.
+     *
+     * Reicht das Restbudget der Sammlung nicht mehr für das Foto, wird es
+     * **nicht** eingebettet (`budgetOmitted`) und **nicht** als Kachel-Auslassung
+     * gezählt: die Auslassung wird auf Dokumentebene benannt.
+     *
+     * @return array{photo: array<string, mixed>|null, omissions: array<string, mixed>, usedBytes: int, budgetOmitted: bool}
+     */
+    private function selectCollectionPhoto(ModelProfile $profile, bool $external, int $remainingBytes): array
+    {
+        $photos = $profile->photos;
+        $primary = $photos->firstWhere('is_primary', true);
+
+        if ($external) {
+            $candidates = $photos->where('visibility', ModelPhoto::VISIBILITY_PUBLIC)->values();
+            $candidate = ($primary !== null && $primary->visibility === ModelPhoto::VISIBILITY_PUBLIC)
+                ? $primary
+                : $candidates->first();
+        } else {
+            $candidates = $photos;
+            $candidate = $primary ?? $candidates->first();
+        }
+
+        $reasonCounts = [];
+        $photo = null;
+        $usedBytes = 0;
+        $budgetOmitted = false;
+
+        if ($candidate !== null) {
+            $embedded = $this->embedPhoto(
+                $candidate,
+                true,
+                $external,
+                self::COLLECTION_TILE_MAX_WIDTH,
+                self::COLLECTION_TILE_MAX_HEIGHT,
+                $remainingBytes,
+            );
+
+            if ($embedded['photo'] !== null) {
+                $photo = $embedded['photo'];
+                $usedBytes = $embedded['bytes'];
+            } elseif ($embedded['budgetOmitted']) {
+                // Das Budget der Sammlung ist erschöpft: das Foto wird nicht
+                // eingebettet und auf **Dokumentebene** benannt.
+                $budgetOmitted = true;
+            } else {
+                $reasonCounts[(string) $embedded['reason']] = 1;
+            }
+        }
+
+        // Alles über dem Ein-Foto-Budget der Kachel war nie Kandidat: das ist
+        // eine Limit-Auslassung, keine gescheiterte Prüfung (D-41).
+        $limitOmitted = max(0, $candidates->count() - self::COLLECTION_MAX_PHOTOS_PER_PROFILE);
+
+        return [
+            'photo' => $photo,
+            'omissions' => $this->omissionNote(
+                $reasonCounts,
+                $limitOmitted,
+                'Foto-Limit (max. '.self::COLLECTION_MAX_PHOTOS_PER_PROFILE.')',
+            ),
+            'usedBytes' => $usedBytes,
+            'budgetOmitted' => $budgetOmitted,
         ];
     }
 
@@ -427,7 +711,7 @@ class ModelContactSheetService
      *     limitLine: string|null
      * }
      */
-    private function omissionNote(array $reasonCounts, int $limitOmitted): array
+    private function omissionNote(array $reasonCounts, int $limitOmitted, ?string $limitLabel = null): array
     {
         $checkLines = [];
         foreach (self::OMISSION_PRECEDENCE as $reason) {
@@ -439,7 +723,7 @@ class ModelContactSheetService
 
         $checkTotal = array_sum($reasonCounts);
         $limitLine = $limitOmitted > 0
-            ? $this->omissionLine($limitOmitted, 'Foto-Limit (max. '.self::MAX_PHOTOS.')')
+            ? $this->omissionLine($limitOmitted, $limitLabel ?? 'Foto-Limit (max. '.self::MAX_PHOTOS.')')
             : null;
 
         return [
@@ -460,32 +744,68 @@ class ModelContactSheetService
     /**
      * Entschlüsselt ein Foto und baut eine Data-URI inkl. Anzeigemaßen.
      *
-     * @return array{photo: array<string, mixed>|null, reason: string|null}
+     * `$maxWidth`/`$maxHeight` überschreiben die Standardbox der Variante
+     * (Hauptbild groß, Thumbnail kleiner) — die Sammlung nutzt eine kleinere
+     * Box, weil ihre Kachel halbseitig ist. Der Prüfpfad (Byte-Cap, MIME,
+     * Dimensions-Budget, GD-Decode) ist in beiden Fällen derselbe.
+     *
+     * `$remainingBytes` ist optional: die Sammlung übergibt das Restbudget
+     * ihres Byte-Budgets. Reichen die Bytes des Fotos nicht mehr, wird es
+     * **nicht** eingebettet (`budgetOmitted`) — der Prüfpfad oben bleibt
+     * unverändert, das Budget ist eine **zusätzliche** Grenze.
+     *
+     * @return array{photo: array<string, mixed>|null, reason: string|null, budgetOmitted: bool, bytes: int}
      */
-    private function embedPhoto(ModelPhoto $photo, bool $isPrimary, bool $external): array
-    {
+    private function embedPhoto(
+        ModelPhoto $photo,
+        bool $isPrimary,
+        bool $external,
+        ?int $maxWidth = null,
+        ?int $maxHeight = null,
+        ?int $remainingBytes = null,
+    ): array {
         if (! $photo->path || ! $this->fileStore->exists($photo->path)) {
-            return ['photo' => null, 'reason' => self::OMISSION_UNAVAILABLE];
+            return ['photo' => null, 'reason' => self::OMISSION_UNAVAILABLE, 'budgetOmitted' => false, 'bytes' => 0];
         }
 
         $contents = $this->fileStore->getDecrypted($photo->path);
         if ($contents === '') {
-            return ['photo' => null, 'reason' => self::OMISSION_UNAVAILABLE];
+            return ['photo' => null, 'reason' => self::OMISSION_UNAVAILABLE, 'budgetOmitted' => false, 'bytes' => 0];
         }
 
         $inspection = $this->inspectRasterImage($contents, $photo->mime_type);
         if ($inspection['reasons'] !== []) {
-            return ['photo' => null, 'reason' => $this->primaryReason($inspection['reasons'])];
+            return [
+                'photo' => null,
+                'reason' => $this->primaryReason($inspection['reasons']),
+                'budgetOmitted' => false,
+                'bytes' => 0,
+            ];
+        }
+
+        // Das Byte-Budget der Sammlung: eingebettet werden die **Originalbytes**
+        // (JPEG/PNG unverändert), deshalb sind die Rohbytes die Rechnungsgröße.
+        // Das Foto, das das Restbudget überschreitet, wird nicht eingebettet —
+        // die Data-URI (und damit der Speicher) entsteht erst gar nicht.
+        $bytes = strlen($contents);
+        if ($remainingBytes !== null && $bytes > $remainingBytes) {
+            return ['photo' => null, 'reason' => null, 'budgetOmitted' => true, 'bytes' => 0];
         }
 
         $size = $inspection['size'];
         $dataUri = $this->imageDataUri($contents, $size['mime_type']);
         if ($dataUri === null) {
-            return ['photo' => null, 'reason' => self::OMISSION_DECODE];
+            return ['photo' => null, 'reason' => self::OMISSION_DECODE, 'budgetOmitted' => false, 'bytes' => 0];
         }
 
-        [$maxWidth, $maxHeight] = $isPrimary ? [520, 360] : [250, 190];
-        [$width, $height] = $this->fit($size['width'], $size['height'], $maxWidth, $maxHeight);
+        [$boxWidth, $boxHeight] = $isPrimary ? [520, 360] : [250, 190];
+        if ($maxWidth !== null) {
+            $boxWidth = $maxWidth;
+        }
+        if ($maxHeight !== null) {
+            $boxHeight = $maxHeight;
+        }
+        [$width, $height] = $this->fit($size['width'], $size['height'], $boxWidth, $boxHeight);
 
         return [
             'photo' => [
@@ -499,6 +819,8 @@ class ModelContactSheetService
                 'height' => $height,
             ],
             'reason' => null,
+            'budgetOmitted' => false,
+            'bytes' => $bytes,
         ];
     }
 
@@ -736,6 +1058,22 @@ class ModelContactSheetService
         }
 
         return $compact;
+    }
+
+    /**
+     * Wert einer Faktenzeile (Label → Wert) oder `null`, wenn sie fehlt.
+     *
+     * @param  array<int, array{label: string, value: string}>  $facts
+     */
+    private function factValue(array $facts, string $label): ?string
+    {
+        foreach ($facts as $fact) {
+            if ($fact['label'] === $label) {
+                return $fact['value'];
+            }
+        }
+
+        return null;
     }
 
     private function brandConfig(ModelProfile $profile): BrandConfig
