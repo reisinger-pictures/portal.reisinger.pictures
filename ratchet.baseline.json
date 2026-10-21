@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "rules": {
+    "open-security-findings": {
+      "value": 0
+    }
+  }
+}

@@ -623,13 +623,14 @@ ci_gate_needs="$(
         in_needs { exit }
     ' <<<"$ci_gate_job"
 )"
-for required_job in security-contract backend frontend e2e; do
+for required_job in security-contract ratchet backend frontend e2e; do
     if ! grep -Eq "^[[:space:]]*-[[:space:]]+${required_job}[[:space:]]*$" <<<"$ci_gate_needs"; then
         fail "CI gate must need $required_job"
     fi
 done
 for result_mapping in \
     'SECURITY_CONTRACT_RESULT: ${{ needs.security-contract.result }}' \
+    'RATCHET_RESULT: ${{ needs.ratchet.result }}' \
     'BACKEND_RESULT: ${{ needs.backend.result }}' \
     'FRONTEND_RESULT: ${{ needs.frontend.result }}' \
     'E2E_RESULT: ${{ needs.e2e.result }}'; do
@@ -638,6 +639,7 @@ for result_mapping in \
 done
 for result_assertion in \
     '[[ "$SECURITY_CONTRACT_RESULT" == "success" ]]' \
+    '[[ "$RATCHET_RESULT" == "success" ]]' \
     '[[ "$BACKEND_RESULT" == "success" ]]' \
     '[[ "$FRONTEND_RESULT" == "success" ]]' \
     '[[ "$E2E_RESULT" == "success" ]]'; do

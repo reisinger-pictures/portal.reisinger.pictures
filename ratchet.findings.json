@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "findings": [
+    {
+      "id": "SEC-01",
+      "title": "org admins reassign foreign users",
+      "severity": "critical",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "OrgAdminDelegationBoundaryTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in 488a17f and 5e4c615"
+    },
+    {
+      "id": "SEC-02",
+      "title": "org admins grant unauthorized gallery access",
+      "severity": "critical",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "OrgAdminDelegationBoundaryTest, ManagementUserView*.test.tsx",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in 488a17f and 5e4c615"
+    },
+    {
+      "id": "SEC-03",
+      "title": "numeric role ranking lets org admin self-assign photographer",
+      "severity": "critical",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "OrgAdminDelegationBoundaryTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in 488a17f and 5e4c615"
+    },
+    {
+      "id": "SEC-04",
+      "title": "any account provisions SFTP credentials via profile update",
+      "severity": "critical",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "ProfileFtpProvisioningTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in 488a17f and 5e4c615"
+    },
+    {
+      "id": "SEC-05",
+      "title": "inactive model records downloadable by ordinary admin",
+      "severity": "critical",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "ModelSensitiveDownloadLifecycleTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in 996a02c"
+    },
+    {
+      "id": "SEC-06",
+      "title": "power-user delta ignores coupon and volume discounts",
+      "severity": "critical",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "PayoutCalculationServiceTest, CheckoutServiceTest, PayoutOrderFeeAllocationTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in 996a02c and 6433d04"
+    },
+    {
+      "id": "SEC-07",
+      "title": "repeated single downloads inflate the monthly pool",
+      "severity": "critical",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "PayoutCalculationServiceTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in 996a02c and 6433d04"
+    },
+    {
+      "id": "SEC-08",
+      "title": "uploader-controlled active-document Content-Type",
+      "severity": "high",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "ImageUploadTest, FileDeliveryControllerTest, FtpInboxLocalDiskTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in 8f322cc"
+    },
+    {
+      "id": "SEC-09",
+      "title": "raster dimensions decoded without a pixel budget",
+      "severity": "high",
+      "status": "fixed",
+      "status_since": "2026-10-19",
+      "regression_test": "ModelFileImageBudgetTest, ImageProcessorHardeningTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in 8f322cc, ae1a9ef and 021aeb3"
+    },
+    {
+      "id": "SEC-10",
+      "title": "expired galleries expose photo metadata via context endpoint",
+      "severity": "high",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "SearchPhotoContextVisibilityTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in 8f322cc"
+    },
+    {
+      "id": "SEC-11",
+      "title": "cancelled unpaid orders retain coupon capacity",
+      "severity": "high",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "CancelStalePaymentIntentsCommandTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in ff8c46f"
+    },
+    {
+      "id": "SEC-12",
+      "title": "contract content GET writes request-proportional audit rows",
+      "severity": "high",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "ContractContentHeartbeatMySqlTest, AtomicThrottleRequestsTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in ff8c46f and 27e46cf"
+    },
+    {
+      "id": "SEC-13",
+      "title": "contract closure commits before recipient mail is enqueued",
+      "severity": "high",
+      "status": "fixed",
+      "status_since": "2026-10-18",
+      "regression_test": "ContractCloseTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in ff8c46f"
+    },
+    {
+      "id": "SEC-14",
+      "title": "FTP import buffers unbounded inbox files and batches",
+      "severity": "high",
+      "status": "fixed",
+      "status_since": "2026-10-19",
+      "regression_test": "FtpImportTest, FtpImportBatchTest, FtpQuarantineTest, FtpImportDefaultsTest, FtpStatCacheOrderTest, FtpEventEndpointTest, ProvisionFtpEventsTest",
+      "path": "features/security/2026-10-18-review-closure.md",
+      "note": "closed in 8550c4b, b5e1d7f, c9ec86b and 4b87f34"
+    }
+  ]
+}
