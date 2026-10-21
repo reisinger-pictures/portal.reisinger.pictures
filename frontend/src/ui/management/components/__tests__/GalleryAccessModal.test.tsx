@@ -74,6 +74,27 @@ describe('GalleryAccessModal user list affordances', () => {
         expect(screen.queryByText('prohaska.jalon@example.org')).not.toBeInTheDocument();
     });
 
+    // An empty list must not leave a frame behind. The body is the scroll
+    // region and carries a border, and the fade at its bottom edge is a
+    // gradient that covers a row cut in half — with nobody to list, the two
+    // together render as one empty white box that reads like an empty input
+    // field instead of like "there is nobody here". The count in the pinned
+    // head already states the empty state, so the body collapses.
+    it('collapses the list frame when no user matches', async () => {
+        const user = userEvent.setup();
+        renderModal();
+
+        await user.type(screen.getByPlaceholderText('Nutzer suchen...'), 'zzz-kein-treffer');
+
+        expect(screen.getByText('0 Nutzer')).toBeInTheDocument();
+
+        const box = screen.getByRole('dialog').firstElementChild as HTMLElement;
+        const scroller = box.querySelector('.overflow-y-auto') as HTMLElement;
+        expect(scroller).not.toBeNull();
+        expect(scroller).not.toHaveClass('border');
+        expect(scroller.querySelector('.sticky.bottom-0')).toBeNull();
+    });
+
     // The migration onto the shell's bounded layout. The search field used to be
     // pinned by a hand-rolled `max-h-80vh` box plus its own scroll list; now the
     // shell owns both. This pins that wiring: the head must stay outside the
@@ -94,6 +115,10 @@ describe('GalleryAccessModal user list affordances', () => {
         expect(scroller).not.toContainElement(screen.getByPlaceholderText('Nutzer suchen...'));
         expect(scroller).not.toContainElement(screen.getByText('3 Nutzer'));
         expect(scroller).toContainElement(screen.getByText('prohaska.jalon@example.org'));
+        // With users to list, the region carries its frame and the fade that
+        // covers a row cut in half at the bottom edge.
+        expect(scroller).toHaveClass('border');
+        expect(scroller.querySelector('.sticky.bottom-0')).not.toBeNull();
     });
 
     // D-43: a direct client assignment carries delivery galleries only. The

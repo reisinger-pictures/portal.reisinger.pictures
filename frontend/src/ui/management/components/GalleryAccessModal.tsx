@@ -56,6 +56,15 @@ export default function GalleryAccessModal({galleryId, galleryName, galleryType,
         (u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
     );
 
+    // An empty list must not leave a frame behind. The body is the scroll
+    // region and carries a border, and the fade at its bottom edge is a
+    // gradient that covers a row cut in half — with nothing to list, the two
+    // together render as one empty white box that reads like an empty input
+    // field instead of like "there is nobody here". The count in the pinned
+    // head already states the empty state ("0 Nutzer"), so the body simply
+    // collapses.
+    const hasUsers = (filteredUsers?.length ?? 0) > 0;
+
     const toggleAccess = async (userId: string, hasAccess: boolean) => {
         setProcessingId(userId);
         try {
@@ -85,7 +94,7 @@ export default function GalleryAccessModal({galleryId, galleryName, galleryType,
             boxClassName="max-w-2xl"
             height="80vh"
             scrollableBody
-            bodyClassName="border border-base-300 rounded-box p-2"
+            bodyClassName={hasUsers ? 'border border-base-300 rounded-box p-2' : undefined}
             bodyHead={
                 <>
                     <p className="text-sm opacity-70 mb-4"><Trans>Galerie:</Trans> <strong>{galleryName}</strong></p>
@@ -160,8 +169,10 @@ export default function GalleryAccessModal({galleryId, galleryName, galleryType,
                         })}
                     </div>
                 )}
-                <div aria-hidden="true"
-                     className="sticky bottom-0 h-8 pointer-events-none rounded-b-box bg-linear-to-t from-base-100 to-transparent"></div>
+                {hasUsers && (
+                    <div aria-hidden="true"
+                         className="sticky bottom-0 h-8 pointer-events-none rounded-b-box bg-linear-to-t from-base-100 to-transparent"></div>
+                )}
         </ModalShell>
     );
 }
