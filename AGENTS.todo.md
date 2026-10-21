@@ -128,9 +128,9 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
 > **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **16 offene `[ ]`** und **46 wartende
-> `[~]`** über 1812 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> `[~]`** über 1830 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
 > (16), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1812). Aufteilung der 16: **8× `manuell prüfen:`** und **8×
+> `wc -l < AGENTS.todo.md` (1830). Aufteilung der 16: **8× `manuell prüfen:`** und **8×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
 > die 8 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
@@ -158,7 +158,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
 > **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **18 von 29 `##`-Abschnitten**
+> Die Positionen liegen in **18 von 30 `##`-Abschnitten**
 > (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
 > `grep -c '^## ' AGENTS.todo.md`). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
@@ -250,6 +250,55 @@ ist die Frage nicht „ist das besser?", sondern „ist D-x überholt?" — und 
 
 ---
 
+## 🚀 PRODUKTIONS-DEPLOY 2026-10-21 (`bd48c03`) — Neustart ausstehend
+
+Fünfter Deploy desselben Tages: `./sync.sh` gegen den grünen Head `bd48c03` (CI `39547499786`,
+alle 11 Jobs grün; der Head enthält den automatisch gemergten Dependabot-Bump `324ff65`,
+vite 8.2.2 → 8.2.4, dessen Lockfile vorher mit `pnpm install --frozen-lockfile` installiert
+wurde). **Übertragen:** die Gruppen-Abo-Tabelle mit Migration V048
+(`GroupNotificationSubscription`, `PruneLegacyGroupOptInGrants`, `NotificationController`,
+`MailController`, `User`), der set-basierte Verwaltungspfad in `AuthorizationService`
+(`canManageGalleryGroup()`), die Test-Group-Verträge (kein Produktivcode) und ein neu
+gebautes Frontend-Bundle (`assets/index-CHI4CK5n.js` — der Dialog-Contract: `dvh`-Cap statt
+`vh`, das `€` im Preisfeld, 44-px-Tap-Targets). **Maschinell verifiziert:** die neuen Dateien
+liegen auf dem Host, beide Reparaturbefehle sind registriert, `migrate:status` zeigt **V047
+und V048 als `Pending`** — der Neustart führt sie aus —, das neue Bundle wird ausgeliefert
+(200), `portal.reisinger.pictures/up` → 200, `storage/app/private` unversehrt.
+
+- [ ] manuell prüfen: **`docker restart portal_backend`** — **steht aus.** Der Neustart führt
+  die Migration **selbst** aus: der Entrypoint startet mit
+  `php artisan migrate --force && php artisan app:seed-if-fresh && php artisan admin:update`
+  (`deployment/docker-compose.yml:309`). **V047** legt `gallery_notification_subscriptions`
+  an, **V048** legt `group_notification_subscriptions` an; beide füllen sich aus den
+  markierten Pivot-Zeilen (`user_galleries` bzw. `user_gallery_groups`), und **keine**
+  Pivot-Zeile wird gelöscht. **Kein `db:seed --force`** — die Migrationen fügen keine
+  Settings-Schlüssel hinzu, und der Seeder überschreibt in der Produktion seine autoritativen
+  Werte. Nach dem Neustart prüfen: `docker exec portal_backend php artisan migrate:status`
+  → V047/V048 `Ran`, und `https://portal.reisinger.pictures/up` → 200.
+- [ ] manuell prüfen: **Reparaturlisten lesen, dann Zeile für Zeile entscheiden** — jetzt
+  **zwei** Befehle: `notifications:prune-legacy-opt-in-grants` (Galerie) und
+  `notifications:prune-legacy-group-opt-in-grants` (Gruppe). Der Trockenlauf löscht nichts
+  und nennt in der Spalte `selection` genau das Paar `user_id:gallery_id` bzw.
+  `user_id:gallery_group_id`, das `--only` erwartet. **Achtung:** eine `candidate`-Zeile ist
+  **kein** Beweis für eine reine Opt-in-Zeile — das Flag kann nicht unterscheiden zwischen
+  „durch das Opt-in entstanden" und „echte Zuweisung, die zusätzlich abonniert wurde".
+  **`--apply` ohne Auswahl löscht alle Kandidaten, echte Zuweisungen eingeschlossen.**
+  Deshalb nur gezielt: `--only=<user_id>:<gallery_id> --apply` (wiederholbar, oder
+  `--only-ids=<datei>`) für die einzeln geprüften Zeilen. Eine ausgewählte Zeile, die kein
+  Kandidat mehr ist, wird **nicht** gelöscht, sondern gemeldet; eine Auswahl, die **gar
+  nichts** trifft (Tippfehler in der ID), wird als `unmatched` gemeldet und beendet den Lauf
+  mit **Exit-Code 1** — nur eine Datenbank **ohne** jede markierte Zeile bleibt grün.
+- [ ] manuell prüfen: Gegenproben nach dem Neustart — die **neuen** Verhaltensweisen: in einer
+  Galerie und in einer Gruppe den Benachrichtigungs-Opt-in **setzen und wieder löschen** —
+  das muss gehen, **ohne** eine Zuweisung zu erzeugen; eine abgelaufene Mitgliedschaft darf
+  den Abruf **nicht** wiederherstellen; im „E-Mail senden"-Dialog muss `notified_count`
+  stimmen. Dazu der unveränderte Lesepfad: `/api/auth/me` (Antwortzeit und Inhalt
+  unverändert), ein Org-Benutzer-Sync und ein Org-Löschen (die aufsteigende Sperrreihenfolge),
+  ein Login als Client und als Fotograf (die Brand-Filter-Entscheidung muss identisch
+  bleiben) und — neu aus der Verwaltungs-Optimierung — ein **Gruppen-Umbenennen oder
+  -Löschen** mit Galerien im Unterbaum (der Verwaltungspfad löst die Gruppenkette jetzt
+  gesammelt auf; die Entscheidung muss dieselbe bleiben).
+
 ## 🚀 PRODUKTIONS-DEPLOY 2026-10-21 (`a65e9d7`) — Neustart ausstehend
 
 Dritter Deploy: `./sync.sh` gegen den grünen Head `a65e9d7` (CI `39503917134`, alle 11 Jobs
@@ -262,38 +311,7 @@ Bundle eindeutig, obwohl die Frontend-Quellen unverändert sind — geändert ha
 Kommentar im Screenshot-Seed). **Maschinell verifiziert:** die neuen Dateien liegen auf dem
 Host, `migrate:status` zeigt V047 als **Pending** — der Neustart führt die Migration aus.
 
-- [ ] manuell prüfen: **`docker restart portal_backend`** — **steht aus.** Der Neustart führt
-  die Migration **selbst** aus: der Entrypoint startet mit
-  `php artisan migrate --force && php artisan app:seed-if-fresh && php artisan admin:update`
-  (`deployment/docker-compose.yml:309`), legt also `gallery_notification_subscriptions` an und
-  füllt sie aus den `user_galleries`-Zeilen mit `wants_notifications = 1` (Pivot-Zeilen werden
-  **nicht** gelöscht). **Kein `db:seed --force`** — V047 fügt keine Settings-Schlüssel hinzu,
-  und der Seeder überschreibt in der Produktion seine autoritativen Werte. Nach dem Neustart
-  prüfen: `docker exec portal_backend php artisan migrate:status` → V047 `Ran`, und
-  `https://portal.reisinger.pictures/up` → 200.
-- [ ] manuell prüfen: **Reparaturliste lesen, dann Zeile für Zeile entscheiden** —
-  `docker exec portal_backend php artisan notifications:prune-legacy-opt-in-grants`
-  (Trockenlauf, löscht nichts) listet **jede** markierte Zeile mit ihrem Verdikt
-  (`redundant` / `inert` / `candidate` / `orphaned`). **Achtung:** eine `candidate`-Zeile
-  ist **kein** Beweis für eine reine Opt-in-Zeile — das Flag kann nicht unterscheiden
-  zwischen „durch das Opt-in entstanden" und „echte Zuweisung, die zusätzlich abonniert
-  wurde und deren sonstige Begründigung inzwischen entzogen wurde". **`--apply` ohne
-  Auswahl löscht alle Kandidaten, echte Zuweisungen eingeschlossen.** Deshalb nur
-  gezielt: `--only=<user_id>:<gallery_id> --apply` (wiederholbar, oder
-  `--only-ids=<datei>`) für die einzeln geprüften Zeilen. Eine ausgewählte Zeile, die
-  kein Kandidat mehr ist, wird **nicht** gelöscht, sondern gemeldet; eine Auswahl, die
-  **gar nichts** trifft (Tippfehler in der Galerie-ID), wird als `unmatched` gemeldet und
-  beendet den Lauf mit **Exit-Code 1** — nur eine Datenbank **ohne** jede markierte Zeile
-  bleibt grün (Exit 0, „nichts zu reparieren").
-- [ ] manuell prüfen: Gegnproben nach dem Neustart — die **neuen** Verhaltensweisen: `GET
-  /api/auth/me` (Antwortzeit und Inhalt unverändert, der Lesepfad löst den Org-Scope jetzt
-  einmal auf und die Ahnen-Kette der Brand-Prüfung nur so tief, wie die gemeinsame Prüfung
-  reicht), ein Org-Benutzer-Sync und ein Org-Löschen (die aufsteigende Sperrreihenfolge),
-  sowie ein Login als Client und als Fotograf (die Brand-Filter-Entscheidung muss identisch
-  bleiben — die Äquivalenzprobe deckt die Randfälle ab, der Live-Blick deckt den Rest).
-  **Neu aus D-45:** in einer Galerie den Benachrichtigungs-Opt-in **setzen und wieder
-  löschen** — das muss gehen, ohne eine Zuweisung zu erzeugen; im „E-Mail senden"-Dialog muss
-  `notified_count` stimmen.
+**Die offenen Schritte dieses Deploys sind in den Abschnitt vom 2026-10-21 (`bd48c03`) übernommen** — dort steht der Neustart, der **beide** Migrationen (V047 und V048) ausführt, und die **beide** Reparaturlisten (Galerie und Gruppe).
 
 ## 🚀 PRODUKTIONS-DEPLOY 2026-10-20 (`64b8ae2`) — abgeschlossen
 
