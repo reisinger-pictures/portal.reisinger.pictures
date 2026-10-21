@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 class PersistedMoneyTest extends TestCase
@@ -48,6 +49,7 @@ class PersistedMoneyTest extends TestCase
         }
     }
 
+    #[Group('smoke')]
     public function test_negative_and_null_order_totals_are_rejected_before_insert(): void
     {
         foreach ([-1, null] as $value) {

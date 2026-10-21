@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\PayoutCalculationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -215,6 +216,7 @@ class PayoutCalculationServiceTest extends TestCase
         $this->assertSame(3333, $pool->value_per_share_cents);
     }
 
+    #[Group('smoke')]
     public function test_calculate_pool_shares_zip_uses_max_photo_count(): void
     {
         // full_zip mit photo_count=5, mult original=4 → 20 shares.

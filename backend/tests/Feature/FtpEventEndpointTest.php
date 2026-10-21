@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -132,6 +133,7 @@ class FtpEventEndpointTest extends TestCase
         $this->assertTrue(Storage::disk('ftp_inbox')->exists($sourcePath));
     }
 
+    #[Group('smoke')]
     public function test_a_valid_upload_event_enqueues_exactly_one_job_for_that_account(): void
     {
         [$user] = $this->photographerWithTarget();

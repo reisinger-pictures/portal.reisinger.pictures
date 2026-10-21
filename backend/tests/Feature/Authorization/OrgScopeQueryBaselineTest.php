@@ -13,6 +13,7 @@ use App\Services\AuthorizationService;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -142,6 +143,7 @@ class OrgScopeQueryBaselineTest extends TestCase
      * extends the scope, a detached pivot group revokes it — and the scope
      * that is read afterwards must reflect the write, not the memo.
      */
+    #[Group('smoke')]
     public function test_a_write_to_the_pivot_or_to_the_group_tree_drops_the_memoized_scope(): void
     {
         [$org, $user] = $this->fixture();

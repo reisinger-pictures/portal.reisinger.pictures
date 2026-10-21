@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -214,6 +215,7 @@ class ModelContactSheetTest extends TestCase
         $this->assertStringContainsString('/Subtype /Image', $pdf);
     }
 
+    #[Group('smoke')]
     public function test_external_export_omits_pii_and_internal_photos(): void
     {
         $admin = $this->userWithRole(UserRole::ADMIN);

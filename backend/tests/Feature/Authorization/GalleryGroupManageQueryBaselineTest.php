@@ -14,6 +14,7 @@ use App\Support\GalleryGroupSubtree;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -201,6 +202,7 @@ class GalleryGroupManageQueryBaselineTest extends TestCase
      * and against the pre-optimisation implementation, which resolves the
      * group chain per gallery. Both must agree with the service.
      */
+    #[Group('smoke')]
     public function test_the_group_management_decides_every_fixture_case(): void
     {
         foreach ($this->fixture() as $name => $case) {

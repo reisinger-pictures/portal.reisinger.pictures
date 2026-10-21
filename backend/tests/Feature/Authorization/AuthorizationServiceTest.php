@@ -15,6 +15,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 class AuthorizationServiceTest extends TestCase
@@ -124,6 +125,7 @@ class AuthorizationServiceTest extends TestCase
         );
     }
 
+    #[Group('smoke')]
     public function test_registered_user_cannot_gain_a_foreign_gallery_from_a_claimed_invite_record(): void
     {
         $inviteGallery = Gallery::factory()->create(['brand' => Brand::B2B]);

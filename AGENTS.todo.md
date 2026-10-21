@@ -127,13 +127,13 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > worden. Eine Position mit `Entscheidung offen:` bedeutet damit, dass eine **neue** Frage
 > entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **17 offene `[ ]`** und **46 wartende
-> `[~]`** über 1816 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
-> (17), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
-> `wc -l < AGENTS.todo.md` (1816). Aufteilung der 17: **8× `manuell prüfen:`** und **9×
+> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **16 offene `[ ]`** und **46 wartende
+> `[~]`** über 1812 Zeilen, **0 erledigte** — gemessen mit `grep -c '^- \[ \]' AGENTS.todo.md`
+> (16), `grep -c '^- \[~\]' AGENTS.todo.md` (46), `grep -c '^- \[x\]' AGENTS.todo.md` (0) und
+> `wc -l < AGENTS.todo.md` (1812). Aufteilung der 16: **8× `manuell prüfen:`** und **8×
 > gewöhnliche Arbeit** — **0× `Entscheidung offen:`**. **Alle 14 Review-Befunde** sind
 > geschlossen und aus der Liste entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`);
-> die 9 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
+> die 8 enthalten die Punkte, die in den Freigaben der Wellen A–D als nicht-blockierend
 > eingestuft und deshalb hier festgehalten wurden (siehe „Neue offene Punkte aus den Wellen
 > A–D") sowie die seitdem aufgedeckten Reste (die Zwei-Verbindungs-Messung, die Restform der
 > User-Zeilen-Sperrreihenfolge von `destroy()`, die
@@ -153,12 +153,12 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (63 = 17 offen + 46 wartend
+> `grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]' AGENTS.todo.md` (62 = 16 offen + 46 wartend
 > + 0 erledigt) und `wc -l < AGENTS.todo.md`. **Der hier früher genannte Befehl war defekt:**
 > die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb **nichts** —
 > am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll (Zeilen 50–130) trägt
 > **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist damit gegenstandslos.
-> Die Positionen liegen in **19 von 29 `##`-Abschnitten**
+> Die Positionen liegen in **18 von 29 `##`-Abschnitten**
 > (`awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' AGENTS.todo.md | sort -u | wc -l` gegen
 > `grep -c '^## ' AGENTS.todo.md`). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie
 > hier **nur** als Orientierung und ist nicht festgeschrieben.
@@ -167,10 +167,6 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 
 ## ⏳ Backend Offen — nicht implementierte Vorschläge
 
-- [ ] **PHP-Group-Strategy (vorgeschlagen, nicht implementiert).** Smoke-Tests mit `@group=smoke`
-  taggen und bei Feature-Arbeit nur die Feature-Suite fahren:
-  `php artisan test --testsuite=Feature --parallel`. Vorher die Testsuiten in `phpunit.xml`
-  prüfen. Die Parallel-/SQLite-`:memory:`-Regeln selbst stehen in `backend/AGENTS.md`.
 
 ## 🗳 Entscheidungs-Protokoll (Owner, 2026-09-28)
 

@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Mockery;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -101,6 +102,7 @@ class GroupNotificationSubscriptionTest extends TestCase
         ]);
     }
 
+    #[Group('smoke')]
     public function test_the_opt_in_is_stored_in_the_subscription_table_and_can_be_revoked(): void
     {
         [$client, $group] = $this->assignedClientWithGroup();

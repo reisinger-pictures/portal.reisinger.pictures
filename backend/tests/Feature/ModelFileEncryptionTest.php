@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -58,6 +59,7 @@ class ModelFileEncryptionTest extends TestCase
         $this->assertSame($plain, $store->getDecrypted($path));
     }
 
+    #[Group('smoke')]
     public function test_upload_is_encrypted_and_metadata_stripped(): void
     {
         $store = app(ModelFileStore::class);
