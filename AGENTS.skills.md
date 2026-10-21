@@ -9,10 +9,12 @@ geprüft am: 2026-10-21
 > Range `787670a..4205142`: **26 Commits**, davon **24** mit `.agents/`-Bezug; **9** berührte
 > Skill-Verzeichnisse, davon **2 neu** (`ratchet-gates`, `generated-docs`).
 > **Projektstand der Anker:** gemessen am Vorgänger `d8ef650`, seitdem unverändert (Beleg:
-> `git diff --stat d8ef650..HEAD -- AGENTS.md backend/ deployment/ features/ frontend/
-> .github/workflows/` → ohne Ausgabe; `d8ef650` ist der **Messstand**, nicht zwingend der
-> direkte Vorgänger). Die **zwei** Anker, deren Zieldatei dieser Commit selbst schreibt
-> (`AGENTS.skills.md`, `AGENTS.todo.md`), gelten **am committeten Stand dieses Commits**.
+> `git diff --stat d8ef650..HEAD -- AGENTS.md backend/ deployment/ frontend/` → ohne Ausgabe;
+> `d8ef650` ist der **Messstand**, nicht zwingend der direkte Vorgänger). **Form (a) — am
+> committeten Stand dieses Commits** gilt für die Zieldateien, die diese Serie selbst schreibt
+> (`AGENTS.skills.md`, `AGENTS.todo.md`, `.github/workflows/ci.yml`, `features/owner-decisions.md`)
+> — der Beleg `git diff --stat d8ef650..HEAD -- AGENTS.md backend/ deployment/ features/
+> frontend/ .github/workflows/` ist deshalb **nicht mehr** ohne Ausgabe.
 > Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel".
 > Format und Ablauf: Skill `skills-marker` im Skills-Repo.
 
@@ -42,13 +44,13 @@ gemeinsame Regel und ersetzen sie nicht.
 | `codegraph-project-setup` | ja | `AGENTS.md` §11 (Z. 89-92): `.codegraph/` optional und maschinenlokal, `.githooks/pre-commit` fails open, kein Commit-Gate | Lokaler Index ist optional, kein Commit-Gate |
 | `docker-test-image` | ja | `deployment/Dockerfile.e2e` (`ARG PLAYWRIGHT_VERSION` Z. 34, Browser-Install Z. 73-74), `.github/workflows/e2e-image.yml` (Versionsextraktion Z. 47) | — (die Lockfile-Regel des Skills — Browserversion aus dem Lockfile — ist am 2026-10-21 umgesetzt: `db13b2c`; die Board-Position 6 ist damit geschlossen und aus dem Board entfernt, `23ca866`) |
 | `generated-docs` | offen | `features/infrastructure/29-production-operations-runbook.md` (Z. 48 — „currently `mariadb`" gegen `backend/config/database.php` Z. 20), die Zahlen in der Prosa dieses Markers und des Boards — **ohne Generator und ohne Drift-Gate** | `AGENTS.todo.md` → Abschnitt „SKILLS-STAND (2026-10-19)" — **der Eintrag ist vom Owner anzulegen** (Stand 2026-10-21: keine Zeile im Board) |
-| `ghcr-visibility` | ja | `.github/workflows/ci.yml` GHCR-Voraussetzung (Z. 52-61) + `container:`-Image (Z. 392) | — |
-| `github-ci-filters` | ja | `.github/workflows/ci.yml` `paths:` unter `push` (Z. 31) und `pull_request` (Z. 39) — D-23 | — |
-| `laravel` | ja | `backend/AGENTS.md` (Commands Z. 7 mit Pint-Gate Z. 20, Database Setup Policy Z. 22, Migration Policy Z. 32, Parallel Testing Z. 39), `backend/phpunit.xml` (Z. 30-54, hermetische Baseline), `backend/app/Http/Requests/` (22 FormRequests), `backend/app/Policies/` | Die DB-Policy (Produktion `mariadb`, Tests SQLite `:memory:`) weicht vom DB-Standard des Skills (PostgreSQL) ab, und die Abweichung ist **nirgends als Entscheidung festgehalten** → Board „SKILLS-STAND (2026-10-19)", Position 8 |
+| `ghcr-visibility` | ja | `.github/workflows/ci.yml` GHCR-Voraussetzung (Z. 57-66) + `container:`-Image (Z. 397) | — |
+| `github-ci-filters` | ja | `.github/workflows/ci.yml` `paths:` unter `push` (Z. 36) und `pull_request` (Z. 44) — D-23 | — |
+| `laravel` | ja | `backend/AGENTS.md` (Commands Z. 7 mit Pint-Gate Z. 20, Database Setup Policy Z. 22, Migration Policy Z. 32, Parallel Testing Z. 39), `backend/phpunit.xml` (Z. 30-54, hermetische Baseline), `backend/app/Http/Requests/` (22 FormRequests), `backend/app/Policies/` | — (die DB-Engine-Policy ist am 2026-10-21 **entschieden**: **D-49** in `features/owner-decisions.md` hält **MariaDB** als Produktions-Engine fest — die Abweichung vom DB-Standard des Skills (PostgreSQL) ist als Entscheidung dokumentiert, mit Begründung und Belegstellen: `backend/config/database.php` Z. 20, `features/infrastructure/29-production-operations-runbook.md` Z. 48, `backend/AGENTS.md` Z. 28/41; die Board-Position 8 ist geschlossen und aus dem Board entfernt) |
 | `node-deps` | ja | `frontend/package.json` Z. 72 (`"@playwright/test": "^1.64.1"`), `frontend/pnpm-lock.yaml` Z. 768 (`@playwright/test@1.64.1`) | — (die Named-Locks-Position ist am 2026-10-18 geschlossen: Bump auf 1.64.1, committet `e1ed87a`) |
 | `permissions` | nein | | Maschinen-Sache (globales `permissions`-Array, V2-Naming); das Projekt hat kein `.opencode/` — die Secret-Regel steht in `features/owner-decisions.md` §D-4 (Z. 19) — trifft nicht zu |
-| `playwright-parallel` | ja | `.github/workflows/ci.yml` E2E-Matrix (Z. 425-431), `frontend/playwright.config.ts` (`fullyParallel: true` Z. 19, `workers: isCi ? 4 : 8` Z. 22) | — (die Matrix-Position ist am 2026-10-18 geschlossen) |
-| `ratchet-gates` | ja | `ratchet.config.jsonc` (Gate-Header: `class`, `incident`, `unit`, `direction: ceiling`, `count` mit `registry`/`severities`/`statuses`), `ratchet.baseline.json` (Baseline), `ratchet.findings.json` (Registry als *view*), `.github/workflows/ci.yml` Job „Ratchet gates" (Z. 150-168, `mode: validate`) | — |
+| `playwright-parallel` | ja | `.github/workflows/ci.yml` E2E-Matrix (Z. 430-436), `frontend/playwright.config.ts` (`fullyParallel: true` Z. 19, `workers: isCi ? 4 : 8` Z. 22) | — (die Matrix-Position ist am 2026-10-18 geschlossen) |
+| `ratchet-gates` | ja | `ratchet.config.jsonc` (Gate-Header: `class`, `incident`, `unit`, `direction: ceiling`, `count` mit `registry`/`severities`/`statuses`), `ratchet.baseline.json` (Baseline), `ratchet.findings.json` (Registry als *view*), `.github/workflows/ci.yml` Job „Ratchet gates" (Z. 155-173, `mode: validate`) | — |
 | `react-i18n` | ja | `frontend/lingui.config.ts`, `frontend/src/main.tsx` Z. 5 (`import './logic/I18nProvider'` als erster Import), `frontend/scripts/check-i18n.mjs` (extract→compile-Vergleich + AST-Pass), `frontend/AGENTS.md` §„Lingui / i18n" (Z. 106) | — |
 | `security-review` | ja | `features/security/2026-10-18-review-closure.md` (14 Befunde SEC-01…SEC-14, alle geschlossen und unabhängig verifiziert, jeder mit Regressionstest), `features/security/accepted-risks.md`, `ratchet.findings.json` (Severity/Status getrennt, kanonische Werte) | — |
 | `skills-marker` | ja | `AGENTS.skills.md` (diese Datei) | — |
@@ -75,7 +77,7 @@ Regeldatei `.agents/rules/build-verify.md` (2 Commits) ist die Kernregel, auf di
   `ratchet.baseline.json` trägt die Baseline, `ratchet.findings.json` trägt die Registry —
   die Prosa `features/security/2026-10-18-review-closure.md` bleibt der menschliche Record,
   die Registry ist die maschinenlesbare *Sicht*. Die CI fährt den Job „Ratchet gates"
-  (`.github/workflows/ci.yml` Z. 150-168) mit `mode: validate`. **Die kanonischen Namen
+  (`.github/workflows/ci.yml` Z. 155-173) mit `mode: validate`. **Die kanonischen Namen
   trägt das Projekt wörtlich:** die Stufen `critical`/`high`/`medium`/`low`/`info`, die
   Status `open`/`in-progress`/`fixed`/`accepted`/`wontfix`, die Zählregel („`accepted` und
   `wontfix` zählen nicht, bleiben aber sichtbar — eine Entscheidung ist keine Löschung") und
@@ -127,13 +129,14 @@ Regeldatei `.agents/rules/build-verify.md` (2 Commits) ist die Kernregel, auf di
   Gegenteil (`backend/tests/Feature/InfrastructureSupplyChainPolicyTest.php` → „Prose is
   deliberately not scanned", seit 2026-10-18). **Owner-Entscheidung:** D-23
   (`features/owner-decisions.md` → „### D-23: Documentation-only CI filtering") hält die
-  `paths`-Form mit `'**'` fest. **Zwei Befunde sind zu melden, nicht zu ändern:** (a) D-23
-  nennt **drei** Re-Includes (`features/infrastructure/**`, `features/ai/**`,
+  `paths`-Form mit `'**'` fest. **Beide Befunde sind am 2026-10-21 geschlossen:** (a) D-23
+  nannte **drei** Re-Includes (`features/infrastructure/**`, `features/ai/**`,
   `features/e2e-test-strategy.md`), der Workflow hat **vier** — `features/security/**` kam
-  später hinzu; die Entscheidung nachzuziehen ist Sache des Owners. (b) der Kommentar in
-  `.github/workflows/ci.yml` (Z. 20) behauptet „InfrastructureSupplyChainPolicyTest scans
-  .md" — das widerspricht dem Docblock des Tests; die Korrektur gehört in einen eigenen
-  Commit.
+  später hinzu; die Entscheidung ist nachgezogen (`2a07fd0`: D-23 nennt jetzt alle vier,
+  mit der Historie des Eintrags). (b) der Kommentar in `.github/workflows/ci.yml` (Z. 24)
+  behauptete „InfrastructureSupplyChainPolicyTest scans .md" — das widersprach dem Docblock
+  des Tests; die Korrektur ist im eigenen Commit erfolgt (`fc22482`, die `paths:`-Blöcke sind
+  bytegleich geblieben).
 - `security-review` — **ja.** (2 Commits in der Range.) Die Range nimmt die Severity-Namen aus dem kanonischen
   Vokabular (`b0d1b51`: Stage 2 nennt die Stufen aus `ratchet-gates`, Stage 4 ordnet `info`
   zuletzt, ein wieder auftauchender Befund ist ein **neuer** Befund und `open`, nicht
@@ -194,21 +197,22 @@ Zeilennummer** oder ein **Pfad ohne Zeilennummer**. Ein Pfad mit Zeilennummer z�
 mitgezählt werden Pfadmuster mit Platzhalter (sie nennen eine Form, keinen Ort), Verweise auf
 die Maschinen-Config und Verweise auf die **Historie** (alte Anker, die dieser Lauf korrigiert
 hat). Aufteilung: **Projekt** (dieses Repo) und **Upstream** (Skills-Repo). Gemessen:
-**175 Vorkommen** in **82 Zeilen** — **153 Projekt** (in **61 Zeilen**, **67 verschiedene
+**185 Vorkommen** in **82 Zeilen** — **163 Projekt** (in **61 Zeilen**, **67 verschiedene
 Ziele**) und **22 Upstream** (in **21 Zeilen**, **9 verschiedene Ziele**).
 
 - **Projekt: 67 verschiedene Ziele, 67 Treffer, 0 gedriftet, 0 tot.** 66 Ziele lösen am
   committeten Stand auf; **1** ist eine **bestätigte Negation** (`.opencode/` — das Projekt
   hat keins). Geprüft wurde gegen `d8ef650` (Form (b) — die Zieldateien sind seither
   unverändert, Beleg: `git diff --stat d8ef650..HEAD -- AGENTS.md backend/ deployment/
-  features/ frontend/ .github/workflows/` → ohne Ausgabe) bzw. gegen den committeten Stand
-  dieses Commits (Form (a) — die beiden Anker, deren Zieldatei der Marker selbst schreibt).
+  frontend/` → ohne Ausgabe) bzw. gegen den committeten Stand dieses Commits (Form (a) —
+  die Zieldateien, die diese Serie selbst schreibt: der Marker, der Board, der Workflow und
+  die Entscheidungsdatei).
   Die Zeilennummern, die auf **wachsende** Dateien zeigen, sind gemessen und stimmen:
   `AGENTS.md` §6
   Z. 47 und §11 Z. 89-92 (die Datei ist am 2026-10-18/19 auf 104 Zeilen umgebaut und
   englisch geworden — die **alten** `AGENTS.md`-Anker zeigten ins Leere; ihre Zahlen
   stehen im Vorgänger-Marker und in dessen Commit), `.github/workflows/ci.yml`
-  Z. 31/39/52-61/392/425-431 (779 Zeilen), `deployment/Dockerfile.e2e` Z. 34/73-74,
+  Z. 36/44/57-66/397/430-436 (784 Zeilen), `deployment/Dockerfile.e2e` Z. 34/73-74,
   `.github/workflows/e2e-image.yml` Z. 47, `backend/AGENTS.md` Z. 7/20/22/28/32/39/41,
   `backend/phpunit.xml` Z. 30-54, `backend/routes/api.php` Z. 127-128,
   `backend/config/database.php` Z. 20, `features/owner-decisions.md` Z. 19 (§D-4),
@@ -221,7 +225,7 @@ Ziele**) und **22 Upstream** (in **21 Zeilen**, **9 verschiedene Ziele**).
   `backend/app/Policies/`, `frontend/lingui.config.ts`, `frontend/scripts/check-i18n.mjs`,
   `features/security/2026-10-18-review-closure.md` mit 14 Befunden SEC-01…SEC-14,
   `features/security/accepted-risks.md`, `frontend/tests/screenshots/` mit `harness.ts`,
-  `ui-screenshots.spec.ts`, `seeds.ts`, `features/owner-decisions.md` mit D-1…D-48,
+  `ui-screenshots.spec.ts`, `seeds.ts`, `features/owner-decisions.md` mit D-1…D-49,
   `features/tech/07-architectural-decisions.md` mit AD-1…AD-10,
   `backend/tests/Feature/InfrastructureSupplyChainPolicyTest.php`).
 - **Upstream: 9 verschiedene Ziele, 9 Treffer, 0 gedriftet, 0 tot — eine Form korrigiert.**
