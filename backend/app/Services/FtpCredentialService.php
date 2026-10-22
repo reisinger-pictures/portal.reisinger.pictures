@@ -78,6 +78,13 @@ use Throwable;
  * every attempt it lets through. Neither half is optional: the quota bounds how
  * much disruption one account can cause, the audit row is what makes a reset
  * attributable afterwards.
+ *
+ * The fourth leg is the self-service change (D-51): a photographer who *knows*
+ * their camera password can replace it, and proves that by entering the current
+ * one. It shares the quota and the audit trail with the reset — it is the same
+ * act on the same credential — and differs from it in exactly one thing: the
+ * current password is verified against SFTPGo first. A reset recovers from the
+ * absence of a password, a change needs the password it replaces.
  */
 class FtpCredentialService
 {
@@ -666,6 +673,99 @@ class FtpCredentialService
     }
 
     /**
+     * Changes the camera password of an account, confirmed by the current one
+     * (D-51).
+     *
+     * The reset above is the recovery path for a *lost* password; this is the
+     * path for a password the photographer knows and wants replaced. The
+     * difference is the confirmation: because the portal stores no camera
+     * password (P1-M23), the current one can only be verified against SFTPGo,
+     * and that check is what separates this operation from the reset — a reset
+     * needs no proof of ownership, a change needs the very credential it
+     * replaces.
+     *
+     * The order of the four steps is the contract, and every position in it is
+     * load-bearing:
+     *
+     * 1. **Quota, before anything else.** The change is the same act on the
+     *    same credential as the reset — it replaces the password of a working
+     *    camera — so it shares the hourly per-account quota
+     *    (`assertResetQuotaAvailable()`). A rejected call therefore contacts no
+     *    service, generates no password and writes no audit row: it is the
+     *    refusal of an attempt, not an attempt. The counter is incremented
+     *    before the check, so hammering cannot push the window forward.
+     * 2. **State, before the service is contacted.** Only an `active` account
+     *    has a current password that could be confirmed. A `pending` account
+     *    was never provisioned — it has no password to confirm, and its
+     *    credential comes from the access-data request instead; a `revoked` or
+     *    `error` account may not be re-issued at all (§7.16). The check is the
+     *    existing `assertPasswordMayBeReissued()`, so a state that a later
+     *    migration adds is refused by default.
+     * 3. **The current password is verified against SFTPGo.** The verdict comes
+     *    from the service, because the portal has no copy of the password to
+     *    compare with. A wrong password is a failed attempt: it is audited as
+     *    one and **nothing is written to SFTPGo** — a rejected confirmation may
+     *    not invalidate the credential the camera is holding right now. No new
+     *    password is generated either; a value that is thrown away again would
+     *    only widen the window in which a secret exists.
+     * 4. **Only then is a new password generated and written.** The same
+     *    `generateCameraPassword()` as the reset, so the camera alphabet
+     *    (`^[a-km-zA-HJ-NP-Z2-9]{10,12}$`) is guaranteed — a camera cannot
+     *    type special characters — and the same `resetPassword()` write, which
+     *    keeps the rest of the account configuration intact.
+     *
+     * The audit trail is the same one the reset writes to
+     * (`ftp_password_resets`): a change is a rotation, and the table is the
+     * complete record of the rotations of an account. Every attempt that got
+     * past the quota produces a row, successful or not — the refusal of a
+     * state and a wrong current password are exactly the rows that explain a
+     * photographer's complaint later.
+     *
+     * The new password is returned **once** and is nowhere else: no column, no
+     * cache entry, no log line, no audit row. Neither is the current password —
+     * it is passed to SFTPGo and forgotten.
+     *
+     * A failure of the audit write itself is not swallowed (the same
+     * `FtpAuditWriteException` behaviour as the reset): on the success path it
+     * means the camera runs on a password that nobody wrote down, which is the
+     * harder failure and the deliberate one.
+     *
+     * @param  string|null  $ip  Request address for the audit row, or null when
+     *                           the caller has no trustworthy one (console, job).
+     */
+    public function changeAndShow(User $user, string $currentPassword, ?string $ip = null): string
+    {
+        $this->assertResetQuotaAvailable($user);
+
+        try {
+            $this->assertPasswordMayBeReissued($user);
+            $username = $this->accountNameFor($user);
+
+            // The confirmation, before anything is written: a wrong current
+            // password must not invalidate the credential the camera holds.
+            if (! $this->sftpGo->verifyPassword($username, $currentPassword)) {
+                throw FtpCredentialException::invalidCurrentPassword();
+            }
+
+            $password = $this->generateCameraPassword();
+            $this->sftpGo->resetPassword($username, $password);
+        } catch (Throwable $exception) {
+            // Every refusal and every failure from here on is a failed attempt,
+            // including the portal-side preconditions (a state that may not be
+            // re-issued, no account name, a name that cannot be an account) and
+            // the rejected current password. The row is what makes the attempt
+            // attributable afterwards.
+            $this->recordResetAttempt($user, $ip, false);
+
+            throw $exception;
+        }
+
+        $this->recordResetAttempt($user, $ip, true);
+
+        return $password;
+    }
+
+    /**
      * Only an `active` account has a password that may be replaced.
      *
      * Written as a positive allow rather than as a list of refusals on purpose:
@@ -707,6 +807,11 @@ class FtpCredentialService
      * Appends one row to the P1-M33 audit trail. Called for every attempt that
      * passed the quota, so the table is a complete record of the attempts and
      * not a sample.
+     *
+     * The trail is shared by the reset and the self-service change (D-51): both
+     * replace the password of an account, and an account has exactly one
+     * credential — so a row that could not tell the two apart would be a row
+     * that could not answer the question it exists for.
      */
     private function recordResetAttempt(User $user, ?string $ip, bool $success): void
     {

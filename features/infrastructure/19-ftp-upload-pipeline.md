@@ -1590,8 +1590,8 @@ password_notice}` — dieselbe Form wie der Reset (7.6a), mit derselben
 Show-once-Eigenschaft: das neue Passwort wird einmal zurückgegeben und
 nirgends gespeichert. Die Fehlerbilder: `422` (fehlendes oder **falsches**
 aktuelles Passwort), `409` (der Kontozustand verbietet den Wechsel), `429`
-(mit `Retry-After`), `404` (das Konto existiert im Dienst nicht mehr, obwohl
-der Portal-Cache `active` sagt), `500` (die Audit-Zeile war nicht schreibbar
+(mit `Retry-After`), `404` (der **Dienst** antwortet auf die
+Passwortprüfung mit `404`), `500` (die Audit-Zeile war nicht schreibbar
 — das Passwort wurde dennoch gewechselt, es ist nur nicht nachweisbar),
 `503` (Dienst nicht konfiguriert oder nicht erreichbar), `502` (Dienst
 antwortet unbrauchbar), `401` (nicht angemeldet).
@@ -1602,7 +1602,11 @@ antwortet unbrauchbar), `401` (nicht angemeldet).
 „korrekt", `401`/`403` heißt „falsch", alles andere ist eine benannte
 Ausnahme. Die Admin-API hilft hier nicht: sie liefert für ein Konto kein
 Passwort-Hash, sondern nur `has_password: true` — sie kann die Eingabe also
-nicht prüfen.
+nicht prüfen. **Ein im Dienst nicht mehr vorhandenes Konto erscheint
+deshalb als `422`, nicht als `404`:** der Benutzer-Login unterscheidet
+unbekanntes Konto und falsches Passwort nicht und antwortet in beiden Fällen
+`401`; das ist die Antwort des Dienstes, nicht die des Portals. `404` bleibt
+den Fällen vorbehalten, in denen der Dienst selbst `404` antwortet.
 
 **Die Zugangsdaten gehen in den Basic-Auth-Header, nicht in den
 Query-String.** Gemessen am 2026-10-22 an der Produktionsinstanz

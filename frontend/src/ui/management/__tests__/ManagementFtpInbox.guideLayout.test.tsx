@@ -75,6 +75,7 @@ describe('ManagementFtpInbox camera guide layout', () => {
             setTargetGallery: vi.fn(),
             processInbox: vi.fn(),
             resetCredentials: vi.fn(),
+            changeCredentials: vi.fn(),
             mutate: vi.fn(),
         } as unknown as ReturnType<typeof useFtp>);
     });
