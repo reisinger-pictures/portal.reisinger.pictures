@@ -34,7 +34,11 @@ Form nicht an der Zitierstelle, ist sie hier falsch:
 
 **Lokale Ergänzung:** (1) Das **dritte Verdikt** `offen` in der Spalte `angewendet?` — die
 Upstream-Vorlage kennt nur `ja | nein`; die Upstream-Fälle „trifft zu, ist nicht drin" und
-„trifft nicht zu" sind hier an einem Verdiktwert unterscheidbar. (2) `<stand>` = der
+„trifft nicht zu" sind hier an einem Verdiktwert unterscheidbar. **Diese Tabelle nutzt das dritte
+Verdikt nicht** (gemessen am committeten Stand dieses Commits: **0** Zeilen mit `offen`; die
+Upstream-Regel gibt für den Fall „trifft zu, ist nicht drin" das Verdikt `ja` mit offener Position
+vor — `skills-marker/SKILL.md` → „## 4. Wann trifft eine Skill-Änderung dieses Projekt zu?"). (2)
+`<stand>` = der
 committete Stand dieses Commits (die SHA, die erst mit dem Commit existiert) — der
 Platzhalter in den Messkommandos dieses Markers und des Boards. (3) Die Fall-Liste oben
 (a)/(b)/(c) ist die **projekt-eigene** Zuordnung, welcher Fall wo gilt; der Upstream trägt
@@ -51,7 +55,7 @@ nicht.
 | `build-verify` | ja | `AGENTS.md` §6 (Z. 48): der gemeinsame pull/verify/commit/push-Prozess ist im Skill `build-verify` definiert, repo-spezifische Kommandos bleiben in dieser Datei; die Ausnahme-Klausel der Regel 4 (Pfad-Commit-Klausel) ist **nicht** per Repo-Policy abschaltbar — das Projekt trägt keine eigene (gemessen am committeten Stand `d79f404`: **0** Treffer in `AGENTS.md`) | — |
 | `codegraph-project-setup` | ja | `AGENTS.md` §11 (Z. 90-93): `.codegraph/` optional und maschinenlokal, `.githooks/pre-commit` fails open, kein Commit-Gate | Lokaler Index ist optional, kein Commit-Gate |
 | `docker-test-image` | ja | `deployment/Dockerfile.e2e` (`ARG PLAYWRIGHT_VERSION` Z. 34, Browser-Install Z. 73-74), `.github/workflows/e2e-image.yml` (Versionsextraktion Z. 47) | — (die Lockfile-Regel des Skills — Browserversion aus dem Lockfile — ist am 2026-10-21 umgesetzt: `db13b2c`; die Board-Position 6 ist damit geschlossen und aus dem Board entfernt, `23ca866`) |
-| `generated-docs` | offen | `features/infrastructure/29-production-operations-runbook.md` (Z. 48 — „currently `mariadb`" gegen `backend/config/database.php` Z. 20), die Zahlen in der Prosa dieses Markers und des Boards — **ohne Generator und ohne Drift-Gate**; die Regel des Skills (`generated-docs/SKILL.md` → „## Numbers in prose") ist **nicht** umgesetzt | `AGENTS.todo.md` → Abschnitt „SKILLS-STAND (2026-10-19)" — **der Eintrag ist vom Owner anzulegen** (Stand 2026-10-22: keine Zeile im Board) |
+| `generated-docs` | ja | `features/infrastructure/29-production-operations-runbook.md` (Z. 48 — „currently `mariadb`" gegen `backend/config/database.php` Z. 20), die Zahlen in der Prosa dieses Markers und des Boards — **ohne Generator und ohne Drift-Gate**; die Regel des Skills (`generated-docs/SKILL.md` → „## Numbers in prose") ist **nicht** umgesetzt | `AGENTS.todo.md` → Abschnitt „SKILLS-STAND (2026-10-22)" → **Position 9** — die offene Position, die die Regel des Skills verlangt (`skills-marker/SKILL.md` → „## 3. Die Range", Fall „Trifft zu, ist aber nicht drin") |
 | `ghcr-visibility` | ja | `.github/workflows/ci.yml` GHCR-Voraussetzung (Z. 57-66) + `container:`-Image (Z. 588) | — |
 | `github-ci-filters` | ja | `.github/workflows/ci.yml` `paths:` unter `push` (Z. 36) und `pull_request` (Z. 44) — D-23; die entscheidende Frage des Skills (`github-ci-filters/SKILL.md` → „does every path match at least one positive pattern?") beantwortet D-23 | — |
 | `laravel` | ja | `backend/AGENTS.md` (Commands Z. 7 mit Pint-Gate Z. 20, Database Setup Policy Z. 22, Migration Policy Z. 32, Parallel Testing Z. 39), `backend/phpunit.xml` (Z. 30-54, hermetische Baseline), `backend/app/Http/Requests/` (22 FormRequests), `backend/app/Policies/`; die Regel des Skills für Datei-Tests (`laravel/SKILL.md` → „fake every local disk in `setUp()`") ist im Backend umgesetzt — `Storage::fake(...)` in **51** Testdateien (gemessen am Stand `c6004d8`) | — (die DB-Engine-Policy ist am 2026-10-21 **entschieden**: **D-49** in `features/owner-decisions.md` hält **MariaDB** als Produktions-Engine fest — die Abweichung vom DB-Standard des Skills (PostgreSQL) ist als Entscheidung dokumentiert, mit Begründung und Belegstellen: `backend/config/database.php` Z. 20, `features/infrastructure/29-production-operations-runbook.md` Z. 48, `backend/AGENTS.md` Z. 28/41; die Board-Position 8 ist geschlossen und aus dem Board entfernt) |
@@ -63,7 +67,7 @@ nicht.
 | `security-review` | ja | `features/security/2026-10-18-review-closure.md` (14 Befunde SEC-01…SEC-14, alle geschlossen und unabhängig verifiziert, jeder mit Regressionstest), `features/security/accepted-risks.md`, `ratchet.findings.json` (Severity/Status getrennt, kanonische Werte) | — |
 | `skills-marker` | ja | `AGENTS.skills.md` (diese Datei) | — |
 | `tailscale-serve` | nein | | Kein Dev-Server-Expose im Projekt definiert — trifft nicht zu |
-| `ui-review` | ja | `frontend/tests/screenshots/` (`frontend/tests/screenshots/ui-review.config.ts` Z. 9-10 — Routen-Manifest, zitiert „ui-review skill references/harness.md §5"; dazu `frontend/tests/screenshots/harness.ts`, `frontend/tests/screenshots/ui-screenshots.spec.ts`, `frontend/tests/screenshots/seeds.ts`), `AGENTS.todo.md` §„UI-Review 2026-09-26"; die Vorlage des Befundberichts (`ui-review/references/findings-report.md` → „## Template") | Die Rollenänderung einer früheren Range traf `AGENTS.md` §6 (verlangte den abgeschafften `vision`-Subagenten); am 2026-10-20 umgestellt auf den verbleibenden Weg (`1818909`, Ergänzung `b86c15c`) — die Board-Position 7 ist an diesem Tag geschlossen und aus dem Board entfernt (Beleg im Commit). **Aus der Range `4205142..e559a39`:** die neue Befundvorlage (neun Spalten) und das kanonische Schweregrad-Vokabular sind im Board **nicht** abgebildet — es führt die alte Form (Schwere/Stelle/Befund/Vorschlag). Die Form nachzuziehen ist eine **Eigentümerentscheidung**; dieser Lauf legt **keine** Position an und schließt **keine** |
+| `ui-review` | ja | `frontend/tests/screenshots/` (`frontend/tests/screenshots/ui-review.config.ts` Z. 9-10 — Routen-Manifest, zitiert „ui-review skill references/harness.md §5"; dazu `frontend/tests/screenshots/harness.ts`, `frontend/tests/screenshots/ui-screenshots.spec.ts`, `frontend/tests/screenshots/seeds.ts`), `AGENTS.todo.md` §„UI-Review 2026-09-26"; die Vorlage des Befundberichts (`ui-review/references/findings-report.md` → „## Template") | Die Rollenänderung einer früheren Range traf `AGENTS.md` §6 (verlangte den abgeschafften `vision`-Subagenten); am 2026-10-20 umgestellt auf den verbleibenden Weg (`1818909`, Ergänzung `b86c15c`) — die Board-Position 7 ist an diesem Tag geschlossen und aus dem Board entfernt (Beleg im Commit). **Aus der Range `4205142..e559a39`:** die neue Befundvorlage (neun Spalten) und das kanonische Schweregrad-Vokabular sind im Board **nicht** abgebildet — es führt die alte Form (Schwere/Stelle/Befund/Vorschlag). Die Form nachzuziehen ist eine **Eigentümerentscheidung**; die offene Position dafür steht als **Position 10** im Abschnitt „SKILLS-STAND (2026-10-22)" des Boards (`AGENTS.todo.md`) — sie zu schließen ist eine Owner-Entscheidung, dieser Lauf schließt **keine** |
 | `update-models` | nein | | Modell-Auswahl ist Maschinen-/Account-Sache; das Projekt definiert keine Modelle — trifft nicht zu (ersetzt die früheren Skills `model-updater` + `update-opencode-models`) |
 | `web-audit` | nein | | Kein Live-Site-Audit (Crawl → Bild-Download → Vision-Fan-out → False-Positive-Gate → ZIP-Archiv) im Projekt definiert; die Sitemaps (`backend/routes/api.php:127-128`) sind Produkt-Feature — trifft nicht zu |
 
@@ -85,10 +89,15 @@ sie steht am Ende dieses Abschnitts._
   path-commit clause of rule 4**" und trägt unmittelbar danach den bindenden Satz „The
   path-commit clause of rule 4 binds **every** session in a shared tree, and the responsibility
   is the **committer's**, not the neighbour's; no repo's branch policy overrides it." — die
-  **Pfad-Commit-Klausel ist damit nicht per Repo-Policy abschaltbar**; dieselbe Aussage steht
-  wortgleich im Skill `build-verify` (Schritt 3, Z. 109) und in
-  `build-verify/references/notes.md` (Z. 50, Z. 231, Z. 277) — an **6** Stellen, **1** Form,
-  bytegleich (gemessen am committeten Stand `33cbd00`, Scope `.agents/`).
+  **Pfad-Commit-Klausel ist damit nicht per Repo-Policy abschaltbar**; die Suchzeichenfolge
+  „The path-commit clause of rule 4 binds" steht an **6 Vorkommen in 4 Dateien** (gemessen am
+  committeten Stand `33cbd00`, Scope **alle `*.md`**: `.agents/rules/build-verify.md` Z. 27,
+  `build-verify/SKILL.md` Z. 109, `build-verify/references/notes.md` Z. 50/231/277,
+  `agent-config/SKILL.md` Z. 187; `README.md` **0** Mal) — der **Satz einschließlich seines
+  Schlusspunktes** steht davon **wortgleich an 3**: `.agents/rules/build-verify.md` Z. 27,
+  `agent-config/SKILL.md` Z. 187, `build-verify/references/notes.md` Z. 231; an
+  `build-verify/SKILL.md` Z. 109 und `build-verify/references/notes.md` Z. 50 läuft der Satz
+  **weiter**, `build-verify/references/notes.md` Z. 277 ist eine ** Tabellenzeile**.
   (b) **Die README des Skills-Repos** committet jetzt pfadexplizit (`git add
   .agents/skills/<id>/`, `git show --stat`, `git commit -m "feat(skill): <id>" --
   .agents/skills/<id>/`, `git push`) statt `git add -A && git commit && git push` — genau das
