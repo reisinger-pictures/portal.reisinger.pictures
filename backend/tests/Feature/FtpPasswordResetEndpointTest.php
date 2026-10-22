@@ -238,6 +238,28 @@ class FtpPasswordResetEndpointTest extends TestCase
         $this->assertFalse(FtpPasswordReset::query()->sole()->success);
     }
 
+    public function test_a_revoked_photographer_cannot_reprovision_through_password_reset(): void
+    {
+        Http::fake();
+        $user = $this->photographer();
+        $user->forceFill([
+            'ftp_account_status' => FtpCredentialService::STATUS_REVOKED,
+            'ftp_revoked_at' => now(),
+        ])->save();
+
+        $response = $this->resetFor($user);
+
+        $response->assertStatus(409)
+            ->assertJsonMissingPath('password')
+            ->assertJsonMissingPath('password_notice');
+        Http::assertNothingSent();
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'ftp_account_status' => FtpCredentialService::STATUS_REVOKED,
+        ]);
+        $this->assertFalse(FtpPasswordReset::query()->sole()->success);
+    }
+
     /**
      * A portal-side precondition is a 422, distinct from a service failure. The
      * photographer has to be able to tell "fix your profile" apart from "the

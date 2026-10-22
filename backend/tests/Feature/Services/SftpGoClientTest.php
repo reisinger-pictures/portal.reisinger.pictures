@@ -605,16 +605,15 @@ class SftpGoClientTest extends TestCase
         });
     }
 
-    public function test_delete_user_reports_an_unknown_account(): void
+    public function test_delete_user_treats_an_unknown_account_as_already_absent(): void
     {
         Http::fake([self::USER_URL => Http::response(['error' => 'not found'], 404)]);
 
-        try {
-            (new SftpGoClient)->deleteUser('florian');
-            $this->fail('Expected a SftpGoException for an unknown account.');
-        } catch (SftpGoException $exception) {
-            $this->assertSame(SftpGoException::REASON_NOT_FOUND, $exception->reason);
-        }
+        (new SftpGoClient)->deleteUser('florian');
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'DELETE'
+            && $request->url() === 'http://sftpgo.test:8080/api/v2/users/florian');
     }
 
     public function test_list_folders_returns_the_virtual_folders_of_the_account(): void

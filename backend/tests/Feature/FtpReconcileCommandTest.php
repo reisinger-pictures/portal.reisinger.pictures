@@ -7,10 +7,14 @@ use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\FtpCredentialService;
+use Closure;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -110,6 +114,30 @@ class FtpReconcileCommandTest extends TestCase
         );
         $this->assertNull($fresh->ftp_revoked_at);
         $this->assertNotNull($fresh->ftp_account_error);
+    }
+
+    public function test_the_command_counts_and_reports_accounts_that_can_be_retried(): void
+    {
+        $user = $this->photographer('florian', FtpCredentialService::STATUS_ACTIVE);
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')
+            ->once()
+            ->with(10, \Mockery::type(Closure::class))
+            ->andThrow(new LockTimeoutException);
+        Cache::shouldReceive('lock')
+            ->once()
+            ->with(FtpCredentialService::rotationLockKey((string) $user->getKey()), 120)
+            ->andReturn($lock);
+        Http::fake();
+
+        $exitCode = Artisan::call('ftp:reconcile', ['--user' => 'florian']);
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('florian: später erneut abstimmen (rotation_in_progress)', $output);
+        $this->assertStringContainsString('1 erneut abzustimmen', $output);
+        $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $user->fresh()->ftp_account_status);
+        Http::assertNothingSent();
     }
 
     public function test_the_command_reconciles_only_the_requested_account(): void

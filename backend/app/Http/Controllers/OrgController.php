@@ -10,6 +10,7 @@ use App\Models\Org;
 use App\Models\User;
 use App\Services\AuthorizationService;
 use App\Services\InvoiceService;
+use App\Services\OrgDefaultRolePolicy;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -65,6 +66,10 @@ class OrgController extends Controller
         $openDeliveryNotesCount = app(InvoiceService::class)
             ->countOpenDeliveryNotesForOrg($org);
         $org->setAttribute('open_delivery_notes_count', $openDeliveryNotesCount);
+        $org->setAttribute(
+            'default_role_info',
+            app(OrgDefaultRolePolicy::class)->persistedDefaultInfo($org),
+        );
 
         if ($svc->isOrgAdmin($user)) {
             $org->setAttribute('gallery_assignment_options', $this->galleryAssignmentOptions($org, $svc));
@@ -80,6 +85,7 @@ class OrgController extends Controller
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
+        $defaultRolePolicy = app(OrgDefaultRolePolicy::class);
         $request->validate([
             'name' => 'required|string|max:255',
             'domain' => 'nullable|string|max:255|unique:orgs,domain',
@@ -88,9 +94,19 @@ class OrgController extends Controller
             'shared_flatrate_cents' => 'nullable|integer|min:0',
             'can_purchase_upgrades' => 'boolean',
             'auto_join_policy' => 'in:immediate,requires_invite,disabled',
+            'default_role_id' => $defaultRolePolicy->defaultRoleIdValidationRules(),
         ]);
 
-        $data = $request->only(['name', 'domain', 'invoice_frequency', 'default_flatrate_level', 'shared_flatrate_cents', 'can_purchase_upgrades', 'auto_join_policy']);
+        $data = $request->only([
+            'name',
+            'domain',
+            'invoice_frequency',
+            'default_flatrate_level',
+            'shared_flatrate_cents',
+            'can_purchase_upgrades',
+            'auto_join_policy',
+            'default_role_id',
+        ]);
         $data['brand'] = BrandRegistry::currentOrDefault();
         $org = Org::create($data);
 
@@ -105,12 +121,17 @@ class OrgController extends Controller
             return response()->json(['error' => 'Forbidden'], 403);
         }
 
+        if (! $svc->isAdmin($user) && $request->has('default_role_id')) {
+            return response()->json(['error' => 'Nur Portal-Administratoren dürfen die Standardrolle ändern.'], 403);
+        }
+
         $org = Org::findOrFail($id);
 
         if ($this->brandValue($org) === null || $this->isBrandMismatch($user, $org)) {
             return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
         }
 
+        $defaultRolePolicy = app(OrgDefaultRolePolicy::class);
         $request->validate([
             'name' => 'required|string|max:255',
             'domain' => 'nullable|string|max:255|unique:orgs,domain,'.$id,
@@ -119,9 +140,19 @@ class OrgController extends Controller
             'shared_flatrate_cents' => 'nullable|integer|min:0',
             'can_purchase_upgrades' => 'boolean',
             'auto_join_policy' => 'in:immediate,requires_invite,disabled',
+            'default_role_id' => $defaultRolePolicy->defaultRoleIdValidationRules(),
         ]);
 
-        $org->update($request->only(['name', 'domain', 'invoice_frequency', 'default_flatrate_level', 'shared_flatrate_cents', 'can_purchase_upgrades', 'auto_join_policy']));
+        $org->update($request->only([
+            'name',
+            'domain',
+            'invoice_frequency',
+            'default_flatrate_level',
+            'shared_flatrate_cents',
+            'can_purchase_upgrades',
+            'auto_join_policy',
+            'default_role_id',
+        ]));
 
         return response()->json(['success' => true, 'org' => $org]);
     }
@@ -139,14 +170,22 @@ class OrgController extends Controller
             return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
         }
 
-        DB::transaction(function () use ($org) {
+        $defaultRolePolicy = app(OrgDefaultRolePolicy::class);
+
+        return DB::transaction(function () use ($org, $defaultRolePolicy) {
             // D-40: the org row is locked first — the same row, in the same
             // order syncUsers() takes it. The table order is therefore
             // orgs -> users in this path too, so a destroy and a sync of the
             // same org cannot hold the org row and a member row in opposite
-            // orders. The locked read is the lock itself: the write set still
-            // comes from the org this request authorized.
-            Org::query()->whereKey($org->getKey())->lockForUpdate()->first();
+            // orders. The locked row is the same organization this request
+            // authorized, and supplies the current settings used for cleanup.
+            $org = Org::query()->whereKey($org->getKey())->lockForUpdate()->firstOrFail();
+
+            if (! $defaultRolePolicy->hasSupportedPersistedDefault($org)) {
+                return response()->json([
+                    'error' => 'Die gespeicherte Standardrolle ist ungültig. Bitte repariere sie, bevor du die Organisation löschst.',
+                ], 409);
+            }
 
             // D-40 (follow-up): the member rows are locked in ascending id
             // order — the same order syncUsers() takes them.
@@ -182,9 +221,9 @@ class OrgController extends Controller
             }
 
             $org->delete();
-        });
 
-        return response()->json(['success' => true]);
+            return response()->json(['success' => true]);
+        });
     }
 
     public function syncUsers(Request $request, $id)
@@ -201,7 +240,9 @@ class OrgController extends Controller
             $request->input('user_ids', []),
         )));
 
-        return DB::transaction(function () use ($svc, $authenticatedUserId, $id, $newUserIds) {
+        $defaultRolePolicy = app(OrgDefaultRolePolicy::class);
+
+        return DB::transaction(function () use ($svc, $defaultRolePolicy, $authenticatedUserId, $id, $newUserIds) {
             // D-40: every sync for this org takes the destination lock first.
             // The org row is locked before any user row, so the table order is
             // orgs -> users for every sync, and between two syncs the org lock
@@ -210,6 +251,12 @@ class OrgController extends Controller
             // org cannot hold the org row and a member row in opposite orders
             // either.
             $org = Org::query()->whereKey($id)->lockForUpdate()->firstOrFail();
+
+            if (! $defaultRolePolicy->hasSupportedPersistedDefault($org)) {
+                return response()->json([
+                    'error' => 'Die gespeicherte Standardrolle ist ungültig. Bitte repariere sie, bevor du Nutzer zuweist.',
+                ], 409);
+            }
 
             // The current membership is read inside the org lock, so it is
             // stable against other *syncs* of this org and against the

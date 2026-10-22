@@ -8,10 +8,15 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\FtpCredentialService;
 use App\Support\FtpSlug;
+use Closure;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 /**
@@ -166,6 +171,65 @@ class FtpPasswordChangeEndpointTest extends TestCase
 
         $this->assertTrue($row->success);
         $this->assertSame($user->id, $row->user_id);
+    }
+
+    public function test_a_failing_audit_write_does_not_hand_out_a_password_after_a_successful_change(): void
+    {
+        $this->fakeSuccessfulChangeService();
+        $user = $this->photographer();
+
+        // Eloquent returns an unsaved model when a creating listener vetoes the
+        // insert instead of throwing, so the service must turn this into a 500.
+        FtpPasswordReset::creating(static fn (): bool => false);
+
+        $response = $this->changeFor($user);
+
+        $response->assertStatus(500);
+        $this->assertNull(
+            $response->json('password'),
+            'A password whose rotation cannot be audited must not leave the system.',
+        );
+        $this->assertSame(0, FtpPasswordReset::query()->count());
+
+        $verification = Http::recorded()->first(
+            static fn (array $pair): bool => str_contains($pair[0]->url(), '/api/v2/user/token'),
+        );
+        $this->assertNotNull($verification, 'The current password must be checked before the write.');
+        $this->assertSame(200, $verification[1]->status(), 'The fake accepts the current password.');
+
+        $writes = Http::recorded()->filter(
+            static fn (array $pair): bool => $pair[0]->method() === 'PUT',
+        );
+        $this->assertCount(1, $writes, 'The SFTPGo password write must have happened.');
+        $writtenPassword = $writes->sole()[0]->data()['password'];
+        $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $writtenPassword);
+        $this->assertStringNotContainsString($writtenPassword, $response->getContent());
+    }
+
+    public function test_a_change_lock_timeout_returns_conflict_without_starting_an_attempt(): void
+    {
+        $user = $this->photographer();
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')
+            ->once()
+            ->with(10, \Mockery::type(Closure::class))
+            ->andThrow(new LockTimeoutException);
+        Cache::shouldReceive('lock')
+            ->once()
+            ->with(FtpCredentialService::rotationLockKey((string) $user->getKey()), 120)
+            ->andReturn($lock);
+
+        $response = $this->changeFor($user);
+
+        $response->assertStatus(409);
+        $this->assertNull($response->json('password'));
+        $this->assertSame(0, FtpPasswordReset::query()->count());
+        $this->assertSame(
+            0,
+            RateLimiter::attempts(FtpCredentialService::resetQuotaKey((string) $user->getKey())),
+            'A timeout before lock acquisition is not a credential-change attempt.',
+        );
+        Http::assertNothingSent();
     }
 
     /**
@@ -326,8 +390,11 @@ class FtpPasswordChangeEndpointTest extends TestCase
         $response = $this->changeFor($user);
 
         $response->assertStatus(409);
-        $this->assertNull($response->json('password'));
+        $response->assertJsonMissingPath('password')->assertJsonMissingPath('password_notice');
         Http::assertNothingSent();
+        $this->assertFalse(FtpPasswordReset::query()->sole()->success);
+        $this->assertTrue($user->fresh()->roles->contains('name', UserRole::PHOTOGRAPHER->value));
+        $this->assertSame(FtpCredentialService::STATUS_PENDING, $user->fresh()->ftp_account_status);
     }
 
     /**
@@ -343,8 +410,11 @@ class FtpPasswordChangeEndpointTest extends TestCase
         $response = $this->changeFor($user);
 
         $response->assertStatus(409);
-        $this->assertNull($response->json('password'));
+        $response->assertJsonMissingPath('password')->assertJsonMissingPath('password_notice');
         Http::assertNothingSent();
+        $this->assertFalse(FtpPasswordReset::query()->sole()->success);
+        $this->assertTrue($user->fresh()->roles->contains('name', UserRole::PHOTOGRAPHER->value));
+        $this->assertSame(FtpCredentialService::STATUS_REVOKED, $user->fresh()->ftp_account_status);
     }
 
     /**
@@ -506,6 +576,26 @@ class FtpPasswordChangeEndpointTest extends TestCase
             'sftpgo.test:8080/api/v2/user/token' => Http::response(['error' => 'invalid credentials'], 401),
             'sftpgo.test:8080/api/v2/users/*' => Http::response($this->account(), 200),
         ]);
+    }
+
+    private function fakeSuccessfulChangeService(): void
+    {
+        $account = $this->account();
+
+        Http::fake(function (Request $request) use ($account) {
+            if (str_contains($request->url(), '/api/v2/user/token')) {
+                return Http::response([
+                    'access_token' => 'user-token',
+                    'expires_at' => '2099-01-01T00:00:00Z',
+                ], 200);
+            }
+
+            if ($request->method() === 'PUT') {
+                return Http::response(['message' => 'user updated'], 200);
+            }
+
+            return Http::response($account, 200);
+        });
     }
 
     private function fakeService(): callable

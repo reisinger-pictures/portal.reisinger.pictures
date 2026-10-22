@@ -10,6 +10,9 @@ use App\Models\User;
 use App\Support\FtpInboxDirectory;
 use App\Support\FtpSlug;
 use App\Values\FtpAccountReconciliation;
+use Closure;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Throwable;
@@ -121,6 +124,12 @@ class FtpCredentialService
 
     public const STATUS_ERROR = 'error';
 
+    private const SLUG_REPLACEMENT_ERROR = 'Die FTP-Kontoänderung ist unvollständig. Der Kontostatus muss mit SFTPGo abgeglichen werden.';
+
+    private const REVOCATION_ERROR = 'Der Widerruf des FTP-Kontos ist unvollständig. Der Kontostatus muss mit SFTPGo abgeglichen werden.';
+
+    private const ROLE_RESTORATION_ERROR = 'Die Wiederherstellung des FTP-Kontos ist unvollständig. Der Kontostatus muss mit SFTPGo abgeglichen werden.';
+
     /**
      * Resets allowed per account and per hour (P1-M33).
      *
@@ -162,6 +171,12 @@ class FtpCredentialService
 
     public const RESET_WINDOW_SECONDS = 3600;
 
+    // User verification, admin-token acquisition, account read and write can
+    // each take 15 seconds, plus a 60-second margin for local work.
+    private const ROTATION_LOCK_TTL_SECONDS = 4 * SftpGoClient::TOTAL_TIMEOUT_SECONDS + 60;
+
+    private const ROTATION_LOCK_WAIT_SECONDS = 10;
+
     /**
      * Rate-limiter key for one account's reset quota.
      *
@@ -178,6 +193,17 @@ class FtpCredentialService
     public static function resetQuotaKey(string $userId): string
     {
         return 'ftp-password-reset:'.$userId;
+    }
+
+    /**
+     * Lock key shared by every password operation for one account.
+     *
+     * Public so tests can address the exact per-account lock rather than
+     * duplicating its format.
+     */
+    public static function rotationLockKey(string $userId): string
+    {
+        return 'ftp-password-rotation:'.$userId;
     }
 
     /**
@@ -205,14 +231,93 @@ class FtpCredentialService
     /**
      * Deletes the SFTPGo account for the given slug (P1-M34, slug-change-as-reset).
      *
-     * Called before the user row is updated, so the account is already gone when
-     * the portal commits the new slug. When SFTPGo is unreachable the caller
-     * aborts the transaction — the user row must not be updated if the account
-     * could not be deleted.
+     * Called while the account rotation lock is held, before the profile slug is
+     * updated, so a failed delete cannot persist the new name. The external call
+     * is never enclosed by the profile's database transaction.
      */
     public function deleteUser(string $slug): void
     {
         $this->sftpGo->deleteUser($slug);
+    }
+
+    /**
+     * Replace a photographer's account name while excluding every other
+     * password operation for that account.
+     *
+     * The profile callback owns a short database transaction and runs only
+     * after the old remote account has been deleted. No database transaction
+     * spans either SFTPGo call. Before deletion, the account is marked `error`
+     * so a failed or interrupted distributed operation is recoverable through
+     * the existing reconciliation path rather than being reported as active.
+     *
+     * @param  Closure(User): void  $assertMayChangeSlug  Recheck slug-change authorization under the lock.
+     * @param  Closure(User): void  $persistProfile  Persist the validated profile fields.
+     */
+    public function changeSlugAndShow(
+        User $user,
+        string $newSlug,
+        Closure $assertMayChangeSlug,
+        Closure $persistProfile,
+    ): ?string {
+        return $this->withRotationLock(
+            $user,
+            function () use ($user, $newSlug, $assertMayChangeSlug, $persistProfile): ?string {
+                $user->refresh();
+
+                if ($user->ftp_slug === $newSlug) {
+                    $persistProfile($user);
+
+                    return null;
+                }
+
+                $assertMayChangeSlug($user);
+
+                // A deliberate revocation can only be reversed through the
+                // administrator role-restoration path. A photographer must not
+                // turn a profile slug change into a new SFTPGo account.
+                if ($user->ftp_account_status === self::STATUS_REVOKED) {
+                    throw FtpCredentialException::notResettable(self::STATUS_REVOKED);
+                }
+
+                // Keep the filesystem-before-delete guarantee: a failed mkdir
+                // must leave the old remote account and profile untouched.
+                FtpInboxDirectory::ensure($newSlug);
+
+                // A known local configuration failure has no distributed
+                // ambiguity, so refuse it before changing status or profile.
+                if (! $this->sftpGo->isConfigured()) {
+                    throw SftpGoException::notConfigured();
+                }
+
+                $oldSlug = $user->ftp_slug;
+                $deleteOldAccount = is_string($oldSlug)
+                    && $oldSlug !== ''
+                    && in_array($user->ftp_account_status, [self::STATUS_ACTIVE, self::STATUS_ERROR], true);
+
+                // This durable marker precedes the external delete. If the
+                // process stops after either remote operation, reconciliation
+                // can determine whether the account exists instead of trusting
+                // a stale `active` status.
+                if (! $user->forceFill([
+                    'ftp_account_status' => self::STATUS_ERROR,
+                    'ftp_account_error' => self::SLUG_REPLACEMENT_ERROR,
+                ])->save()) {
+                    throw new \RuntimeException('Could not persist the FTP account replacement state.');
+                }
+
+                if ($deleteOldAccount) {
+                    $this->deleteUser($oldSlug);
+                }
+
+                // The profile update is committed before provisioning, but
+                // after a successful delete. If provisioning has an ambiguous
+                // outcome, the new slug plus `error` lets reconciliation inspect
+                // that exact account name.
+                $persistProfile($user);
+
+                return $this->provisionAndShow($user);
+            },
+        );
     }
 
     /**
@@ -224,40 +329,125 @@ class FtpCredentialService
      * `ftp_provisioned_at` deliberately stays — it records that provisioning
      * happened; `ftp_revoked_at` records when it ended.
      *
-     * Failure and order, same as the slug change (P1-M34): the external delete
-     * comes first, so if SFTPGo is unreachable the exception propagates and
-     * **nothing** is written. The caller aborts the role change or the delete.
-     * A workforce without the photographer role that cannot reach SFTPGo is a
-     * worse state than a refused role change, because the credential would stay
-     * live on a directory that still holds photographs.
+     * Revocation shares the per-user rotation lock with reset, self-change, and
+     * slug replacement. An active account is first marked `error`, then deleted
+     * from SFTPGo, then marked `revoked`. The error marker survives an ambiguous
+     * delete failure, so the user row remains available to `ftp:reconcile`.
+     * No database transaction spans the SFTPGo call.
      *
      * Idempotent by construction:
      * - an already-revoked account returns without touching the service or the
      *   timestamp, so a repeated call cannot move `ftp_revoked_at`;
-     * - a never-provisioned account (`pending`/`error`) has no account to
-     *   delete — there is no external call and no failure — and is marked
-     *   revoked directly. Nothing else would be truthful: the role that could
-     *   request credentials is gone.
-     *
-     * Deliberately not swallowed: a `not_found` from SFTPGo. Only `active`
-     * triggers the delete, and by the invariant that state means the account
-     * exists; a 404 is a real divergence (P1-M34) and must surface rather than
-     * be hidden behind an idempotent-looking revoke.
+     * - an `error` account retries deletion of its known slug because the prior
+     *   response may have been ambiguous; a verified 404 is an absent account;
+     * - a never-provisioned `pending` account moves to revoked without a call;
+     * The account's original `ftp_provisioned_at` is preserved throughout.
      */
     public function revoke(User $user): void
+    {
+        $this->revokeAndThen($user, static function (User $lockedUser): void {});
+    }
+
+    /**
+     * Revoke an account, then perform a short database-only operation while
+     * retaining the account lock.
+     *
+     * The callback is used for role loss and user deletion so another account
+     * write cannot slip between revocation and the corresponding local change.
+     * It must not make SFTPGo calls.
+     *
+     * @param  Closure(User): mixed  $afterRevoke  Local persistence after revocation.
+     */
+    public function revokeAndThen(User $user, Closure $afterRevoke): mixed
+    {
+        return $this->withRotationLock(
+            $user,
+            function () use ($user, $afterRevoke): mixed {
+                $user->refresh();
+                $this->revokeWhileLocked($user);
+
+                return $afterRevoke($user);
+            },
+        );
+    }
+
+    /** Execute revocation after the caller has acquired the per-account lock. */
+    private function revokeWhileLocked(User $user): void
     {
         if ($user->ftp_account_status === self::STATUS_REVOKED) {
             return;
         }
 
-        if ($user->ftp_account_status === self::STATUS_ACTIVE) {
-            $this->deleteUser($this->accountNameFor($user));
+        if (in_array($user->ftp_account_status, [self::STATUS_ACTIVE, self::STATUS_ERROR], true)) {
+            $username = $this->accountNameFor($user);
+
+            if (! $user->forceFill([
+                'ftp_account_status' => self::STATUS_ERROR,
+                'ftp_account_error' => self::REVOCATION_ERROR,
+            ])->save()) {
+                throw new \RuntimeException('Could not persist the FTP account revocation state.');
+            }
+
+            $this->deleteUser($username);
         }
 
-        $user->forceFill([
+        if (! $user->forceFill([
             'ftp_account_status' => self::STATUS_REVOKED,
             'ftp_revoked_at' => now(),
-        ])->save();
+            'ftp_account_error' => null,
+        ])->save()) {
+            throw new \RuntimeException('Could not persist the revoked FTP account state.');
+        }
+    }
+
+    /**
+     * Persist an administrator's photographer-role grant under the account
+     * lock. A deliberate revoke is provisioned again only when an administrator
+     * explicitly restores the role; a never-provisioned pending account keeps
+     * its existing first-time provisioning flow. No database transaction spans
+     * the SFTPGo request.
+     *
+     * @param  Closure(User): mixed  $afterRestore  Local role persistence; it must not make SFTPGo calls.
+     */
+    public function restorePhotographerRoleAndThen(User $user, Closure $afterRestore): mixed
+    {
+        return $this->withRotationLock(
+            $user,
+            function () use ($user, $afterRestore): mixed {
+                $user->refresh();
+
+                if ($user->ftp_account_status === self::STATUS_REVOKED) {
+                    $username = $this->accountNameFor($user);
+                    FtpInboxDirectory::ensure($username);
+
+                    if (! $this->sftpGo->isConfigured()) {
+                        throw SftpGoException::notConfigured();
+                    }
+
+                    if (! $user->forceFill([
+                        'ftp_account_status' => self::STATUS_ERROR,
+                        'ftp_account_error' => self::ROLE_RESTORATION_ERROR,
+                    ])->save()) {
+                        throw new \RuntimeException('Could not persist the FTP account restoration state.');
+                    }
+
+                    $password = $this->generateCameraPassword();
+                    $this->sftpGo->provisionUser($username, $password, $this->homeDirectoryFor($username));
+
+                    if (! $user->forceFill([
+                        'ftp_account_status' => self::STATUS_ACTIVE,
+                        'ftp_provisioned_at' => now(),
+                        'ftp_account_error' => null,
+                    ])->save()) {
+                        throw new \RuntimeException('Could not persist the restored FTP account state.');
+                    }
+                } elseif (! in_array($user->ftp_account_status, [self::STATUS_ACTIVE, self::STATUS_PENDING], true)) {
+                    throw FtpCredentialException::notResettable((string) $user->ftp_account_status);
+                }
+
+                return $afterRestore($user);
+            },
+        );
     }
 
     /**
@@ -332,30 +522,72 @@ class FtpCredentialService
      */
     public function reconcileAccount(User $user): FtpAccountReconciliation
     {
-        $username = $this->accountNameFor($user);
+        $userId = $user->getKey();
 
         try {
-            $account = $this->sftpGo->findUser($username);
-        } catch (SftpGoException $exception) {
-            // A 404 is a verdict, not a failure: the service answered, and its
-            // answer is "there is no such account".
-            if ($exception->reason === SftpGoException::REASON_NOT_FOUND) {
-                return $this->applyWithdrawnAccount($user, FtpAccountReconciliation::REASON_ACCOUNT_MISSING);
+            return $this->withRotationLock(
+                $user,
+                function () use ($userId): FtpAccountReconciliation {
+                    // The caller may have waited behind a slug replacement,
+                    // reset, or revocation. Never use its pre-lock slug/status
+                    // to choose an SFTPGo account or apply a resulting state.
+                    $freshUser = User::query()->find($userId);
+
+                    if ($freshUser === null) {
+                        return FtpAccountReconciliation::skippedDeletedUser();
+                    }
+
+                    $username = $this->accountNameFor($freshUser);
+
+                    try {
+                        $account = $this->sftpGo->findUser($username);
+                    } catch (SftpGoException $exception) {
+                        // A 404 is a verdict, not a failure: the service
+                        // answered, and its answer is "there is no such account".
+                        if ($exception->reason === SftpGoException::REASON_NOT_FOUND) {
+                            return $this->applyWithdrawnAccount(
+                                $freshUser,
+                                FtpAccountReconciliation::REASON_ACCOUNT_MISSING,
+                            );
+                        }
+
+                        // Fail-closed: the outcome is unknown, so nothing about
+                        // the status may change. Record the reason for the
+                        // operator, then preserve the service exception.
+                        $this->recordUnverifiableState($freshUser, $exception);
+
+                        throw $exception;
+                    }
+
+                    if (! $this->isAccountEnabled($account)) {
+                        return $this->applyWithdrawnAccount(
+                            $freshUser,
+                            FtpAccountReconciliation::REASON_ACCOUNT_DISABLED,
+                        );
+                    }
+
+                    return $this->applyUsableAccount($freshUser);
+                },
+            );
+        } catch (FtpCredentialException $exception) {
+            if ($exception->reason !== FtpCredentialException::REASON_ROTATION_IN_PROGRESS) {
+                throw $exception;
             }
 
-            // Fail-closed: the outcome is unknown, so nothing about the status
-            // may change. The reason is recorded for the operator, the
-            // exception carries the detail.
-            $this->recordUnverifiableState($user, $exception);
+            // This is only a read for the outcome message, not a reconciliation
+            // decision. The account lock was not acquired, so leave the row
+            // alone and make the current stored status visible to the caller.
+            $currentUser = User::query()->find($userId);
 
-            throw $exception;
+            if ($currentUser === null) {
+                return FtpAccountReconciliation::skippedDeletedUser();
+            }
+
+            return FtpAccountReconciliation::retryable(
+                (string) $currentUser->ftp_account_status,
+                FtpAccountReconciliation::REASON_ROTATION_IN_PROGRESS,
+            );
         }
-
-        if (! $this->isAccountEnabled($account)) {
-            return $this->applyWithdrawnAccount($user, FtpAccountReconciliation::REASON_ACCOUNT_DISABLED);
-        }
-
-        return $this->applyUsableAccount($user);
     }
 
     /**
@@ -548,6 +780,10 @@ class FtpCredentialService
      */
     public function provisionAndShow(User $user): string
     {
+        if ($user->ftp_account_status === self::STATUS_REVOKED) {
+            throw FtpCredentialException::notResettable(self::STATUS_REVOKED);
+        }
+
         $username = $this->accountNameFor($user);
         $password = $this->generateCameraPassword();
 
@@ -558,10 +794,13 @@ class FtpCredentialService
 
         $this->sftpGo->provisionUser($username, $password, $this->homeDirectoryFor($username));
 
-        $user->forceFill([
+        if (! $user->forceFill([
             'ftp_account_status' => self::STATUS_ACTIVE,
             'ftp_provisioned_at' => now(),
-        ])->save();
+            'ftp_account_error' => null,
+        ])->save()) {
+            throw new \RuntimeException('Could not persist the provisioned FTP account state.');
+        }
 
         return $password;
     }
@@ -645,6 +884,18 @@ class FtpCredentialService
      */
     public function resetAndShow(User $user, ?string $ip = null): string
     {
+        return $this->withRotationLock(
+            $user,
+            fn (): string => $this->resetWhileLocked($user, $ip),
+        );
+    }
+
+    /**
+     * Perform a reset or first-time provisioning while holding the account lock.
+     */
+    private function resetWhileLocked(User $user, ?string $ip): string
+    {
+        $user->refresh();
         $this->assertResetQuotaAvailable($user);
 
         if ($user->ftp_account_status === self::STATUS_PENDING) {
@@ -733,8 +984,47 @@ class FtpCredentialService
      * @param  string|null  $ip  Request address for the audit row, or null when
      *                           the caller has no trustworthy one (console, job).
      */
-    public function changeAndShow(User $user, string $currentPassword, ?string $ip = null): string
+    public function changeAndShow(
+        User $user,
+        #[\SensitiveParameter] string $currentPassword,
+        ?string $ip = null,
+    ): string {
+        return $this->withRotationLock(
+            $user,
+            fn (): string => $this->changeWhileLocked($user, $currentPassword, $ip),
+        );
+    }
+
+    /**
+     * Serialize reset, provisioning and self-service changes for this account.
+     *
+     * The lock covers quota accounting, portal-side state checks, all SFTPGo
+     * calls, and the audit insert; no database transaction spans those calls.
+     */
+    private function withRotationLock(User $user, Closure $rotation): mixed
     {
+        try {
+            return Cache::lock(
+                self::rotationLockKey((string) $user->getKey()),
+                self::ROTATION_LOCK_TTL_SECONDS,
+            )->block(
+                self::ROTATION_LOCK_WAIT_SECONDS,
+                $rotation,
+            );
+        } catch (LockTimeoutException) {
+            throw FtpCredentialException::rotationInProgress();
+        }
+    }
+
+    /**
+     * Execute every part of a self-service change while holding the account lock.
+     */
+    private function changeWhileLocked(
+        User $user,
+        #[\SensitiveParameter] string $currentPassword,
+        ?string $ip,
+    ): string {
+        $user->refresh();
         $this->assertResetQuotaAvailable($user);
 
         try {

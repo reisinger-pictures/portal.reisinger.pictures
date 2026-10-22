@@ -7,7 +7,7 @@ import { renderWithProviders } from '../../../test-setup';
 import { UIContext, type UIContextType } from '../../components/UIContext';
 import { apiMutate } from '../../../api';
 import { useOrgs, type Org } from '../../../logic/useOrgs';
-import { useUsers, type UserDetailed } from '../../../logic/useUsers';
+import { useUsers, UserRole, type UserDetailed } from '../../../logic/useUsers';
 import { usePermissions, type Permissions } from '../../../logic/usePermissions';
 import { useProtectedGalleries, type GalleryTreeResponse } from '../../../logic/useGalleries';
 import ManagementOrgDetailView from '../ManagementOrgDetailView';
@@ -58,6 +58,8 @@ const org: Org = {
     name: 'Firma XYZ',
     domain: 'firma.de',
     invoice_frequency: 'monthly',
+    default_role_id: 'role-client',
+    default_role_info: { id: 'role-client', name: 'client', allowed: true },
     default_flatrate_level: 'none',
     shared_flatrate_cents: 0,
     auto_join_policy: 'requires_invite',
@@ -214,7 +216,11 @@ describe('ManagementOrgDetailView', () => {
         mockOrgData();
         vi.mocked(useUsers).mockReturnValue({
             users,
-            roles: [],
+            roles: [
+                { id: 'role-client', name: UserRole.CLIENT },
+                { id: 'role-power-user', name: UserRole.POWER_USER },
+                { id: 'role-org-admin', name: UserRole.ORG_ADMIN },
+            ],
             createUser: vi.fn().mockResolvedValue(undefined),
             updateUser: vi.fn().mockResolvedValue(undefined),
             deleteUser: vi.fn().mockResolvedValue(undefined),
@@ -341,6 +347,70 @@ describe('ManagementOrgDetailView', () => {
         expect(within(main).queryByText('Geteiltes Flatrate-Budget (Cent)')).not.toBeInTheDocument();
 
         expect(within(main).queryByText(/\(optional\)/i)).not.toBeInTheDocument();
+    });
+
+    it('lets a global admin choose org_admin and explains the scope before saving', async () => {
+        const eventUser = userEvent.setup();
+
+        renderView();
+        const main = screen.getByTestId('page-layout');
+        const roleSelect = within(main).getByRole('combobox', { name: 'Standardrolle für neue Mitglieder' });
+
+        expect(within(roleSelect).getByRole('option', { name: 'Kunde (Standard, nicht explizit gespeichert)' })).toBeInTheDocument();
+        expect(within(roleSelect).getByRole('option', { name: 'Kunde (explizite Rolle)' })).toBeInTheDocument();
+        expect(within(roleSelect).getByRole('option', { name: 'Power-User' })).toBeInTheDocument();
+        expect(within(roleSelect).getByRole('option', { name: 'Organisationsadministrator' })).toBeInTheDocument();
+
+        await eventUser.selectOptions(roleSelect, 'role-org-admin');
+
+        expect(within(main).getByRole('alert')).toHaveTextContent(
+            'Neue Nutzer, die künftig per Domain-Auto-Join beitreten oder von einem Organisationsadministrator angelegt werden, erhalten diese Rolle. Sie können damit Nutzer in dieser Organisation verwalten. Bestehende Nutzer bleiben unverändert.',
+        );
+
+        submitFormOf(main, 'Speichern');
+
+        expect(updateOrg).toHaveBeenCalledWith('org-1', expect.objectContaining({
+            default_role_id: 'role-org-admin',
+        }));
+    });
+
+    it('shows an invalid legacy role and leaves it untouched when only viewing or saving other settings', () => {
+        mockOrgData({
+            org: {
+                ...org,
+                default_role_id: 'legacy-role-id',
+                default_role_info: { id: 'legacy-role-id', name: 'photographer', allowed: false },
+            },
+        });
+
+        renderView();
+        const main = screen.getByTestId('page-layout');
+        const roleSelect = within(main).getByRole('combobox', { name: 'Standardrolle für neue Mitglieder' });
+
+        expect(roleSelect).toHaveValue('legacy-role-id');
+        expect(within(roleSelect).getByRole('option', { name: /photographer · legacy-role-id \(ungültig\)/ })).toBeInTheDocument();
+        expect(within(main).getByRole('alert')).toHaveTextContent(
+            'Die gespeicherte Standardrolle „photographer“ (ID legacy-role-id) ist nicht zulässig.',
+        );
+
+        submitFormOf(main, 'Speichern');
+
+        expect(updateOrg).toHaveBeenCalledWith('org-1', expect.not.objectContaining({ default_role_id: expect.anything() }));
+    });
+
+    it('hides the default-role selector from org admins while preserving their other settings form', () => {
+        vi.mocked(usePermissions).mockReturnValue({
+            ...basePermissions,
+            isAdmin: false,
+            isOrgAdmin: true,
+            orgScope: { gallery_ids: [], gallery_group_ids: ['g1'] },
+        });
+
+        renderView();
+        const main = screen.getByTestId('page-layout');
+
+        expect(within(main).queryByRole('combobox', { name: 'Standardrolle für neue Mitglieder' })).not.toBeInTheDocument();
+        expect(within(fieldOf(main, 'Organisations-Name')).getByRole('textbox')).toHaveValue('Firma XYZ');
     });
 
     it('reveals the shared budget field once a flatrate level is picked and saves its value', async () => {

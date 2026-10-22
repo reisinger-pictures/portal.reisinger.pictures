@@ -49,8 +49,9 @@ use Illuminate\Support\Collection;
  *   *skipped*, not failed: it is counted in the summary and named in a warning,
  *   because the slug is not rewritten behind the photographer's back.
  * - `1` — at least one account could not be checked: SFTPGo was unreachable,
- *   not configured, or answered with an error. The states that *were* checked
- *   before the failure are written; the rest keep their status.
+ *   not configured, answered with an error, or its account lock was busy. The
+ *   states that *were* checked before the failure are written; the rest keep
+ *   their status and can be retried later.
  * - `2` — the `--user` option named nobody.
  */
 class ReconcileFtpAccounts extends Command
@@ -94,6 +95,7 @@ class ReconcileFtpAccounts extends Command
             FtpAccountReconciliation::OUTCOME_WITHDRAWN => 0,
             FtpAccountReconciliation::OUTCOME_UNCHANGED => 0,
             FtpAccountReconciliation::OUTCOME_DIVERGENT => 0,
+            FtpAccountReconciliation::OUTCOME_RETRYABLE => 0,
             'skipped' => 0,
             'failed' => 0,
             'unchecked' => 0,
@@ -138,6 +140,14 @@ class ReconcileFtpAccounts extends Command
 
             $this->line(sprintf('%s: %s (%s)', $this->label($user), $result->status, $result->reason));
 
+            if ($result->outcome === FtpAccountReconciliation::OUTCOME_RETRYABLE) {
+                $this->warn(sprintf('%s: später erneut abstimmen (%s)', $this->label($user), $result->reason));
+            }
+
+            if ($result->outcome === FtpAccountReconciliation::OUTCOME_SKIPPED) {
+                $this->warn(sprintf('%s: übersprungen (%s)', $this->label($user), $result->reason));
+            }
+
             if ($result->outcome === FtpAccountReconciliation::OUTCOME_DIVERGENT) {
                 $this->warn(sprintf(
                     '%s: das Konto existiert in SFTPGo, wurde im Portal aber entzogen — der Status bleibt "revoked". Bitte manuell entscheiden.',
@@ -148,18 +158,19 @@ class ReconcileFtpAccounts extends Command
 
         $this->newLine();
         $this->info(sprintf(
-            'Reconciliation abgeschlossen: %d aktiv, %d entzogen, %d unverändert, %d abweichend, %d übersprungen, %d fehlgeschlagen, %d nicht geprüft (von %d Konten).',
+            'Reconciliation abgeschlossen: %d aktiv, %d entzogen, %d unverändert, %d abweichend, %d erneut abzustimmen, %d übersprungen, %d fehlgeschlagen, %d nicht geprüft (von %d Konten).',
             $counters[FtpAccountReconciliation::OUTCOME_ACTIVE],
             $counters[FtpAccountReconciliation::OUTCOME_WITHDRAWN],
             $counters[FtpAccountReconciliation::OUTCOME_UNCHANGED],
             $counters[FtpAccountReconciliation::OUTCOME_DIVERGENT],
+            $counters[FtpAccountReconciliation::OUTCOME_RETRYABLE],
             $counters['skipped'],
             $counters['failed'],
             $counters['unchecked'],
             $users->count(),
         ));
 
-        if ($counters['failed'] > 0) {
+        if ($counters['failed'] > 0 || $counters[FtpAccountReconciliation::OUTCOME_RETRYABLE] > 0) {
             $this->error('Mindestens ein Konto konnte nicht geprüft werden — der Zustand dieser Konten wurde nicht verändert.');
 
             return self::FAILURE;

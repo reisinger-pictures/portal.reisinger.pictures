@@ -31,7 +31,7 @@ Brands laufen ausschließlich im Hintergrund. Organisationen sind das sichtbare 
     'name'                => 'string',           // Firmenname
     'domain'              => 'string|null',       // E-Mail-Domain für Auto-Join (z.B. "zeitung.at")
     'invoice_frequency'   => 'immediate|monthly|quarterly',
-    'default_role_id'     => 'UUID|null',         // Rolle, die User bei Auto-Join erhalten (SOLL, fehlt)
+    'default_role_id'     => 'UUID|null',         // Organization default role (D-57)
     'default_flatrate_level' => 'none|web|print|original', // SOLL, fehlt
     'can_purchase_upgrades'  => 'boolean',        // Dürfen User trotz Flatrate kaufen? (SOLL, fehlt)
     'auto_join_policy'    => 'immediate|requires_invite|disabled', // SOLL, fehlt
@@ -61,6 +61,12 @@ Brands laufen ausschließlich im Hintergrund. Organisationen sind das sichtbare 
 - SOLL: `default_role_id` auf Organisation definiert die Rolle für Auto-Join
 - Fallback: `client` (wie aktuell hartcodiert)
 - Mapping-Löschung revoziert die Rolle (NEU — war im alten System ein Bug, dass persistierte Rollen nicht entfernt wurden)
+
+### 2.4. Per-organization default role
+
+Portal admins can configure an organization's default role as `client`, `power_user`, or `org_admin`. `null` resolves to `client`. The value is applied only when a user is newly assigned through domain auto-join or created by an org admin; editing it does not change existing members. Only portal admins may change the setting. The UI explains that choosing `org_admin` grants organization-scoped user-management rights to each newly assigned user.
+
+`photographer`, `admin`, and `super_admin` are not valid organization defaults. A photographer role is tied to the FTP credential lifecycle, while the global admin roles exceed an organization's scope. An unsupported legacy value resolves to `client` for new assignments and is surfaced for repair. Organization member removal and organization deletion fail closed until the setting is repaired; they must not silently detach an unsupported specialized role. Existing photographer roles are removed only through the lock-aware FTP revocation path.
 
 ---
 

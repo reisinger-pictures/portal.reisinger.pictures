@@ -10,10 +10,15 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\FtpCredentialService;
 use App\Values\FtpAccountReconciliation;
+use Closure;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -243,6 +248,112 @@ class FtpAccountReconciliationTest extends TestCase
             Carbon::parse($fresh->ftp_revoked_at)->equalTo(Carbon::parse('2026-09-26 10:11:12')),
             'The revocation instant must not be moved.',
         );
+    }
+
+    public function test_reconciliation_waits_for_the_shared_lock_and_uses_the_fresh_slug_and_status(): void
+    {
+        $user = $this->photographer('old-slug', FtpCredentialService::STATUS_ACTIVE);
+        $expectedTransactionLevel = DB::transactionLevel();
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')
+            ->once()
+            ->with(10, \Mockery::type(Closure::class))
+            ->andReturnUsing(function (int $seconds, Closure $callback) use ($user): mixed {
+                // A slug replacement has completed while reconciliation was
+                // waiting: its failed provisioning left the new slug in error.
+                DB::table('users')->where('id', $user->getKey())->update([
+                    'ftp_slug' => 'new-slug',
+                    'ftp_account_status' => FtpCredentialService::STATUS_ERROR,
+                    'ftp_account_error' => 'Provisioning outcome is unknown.',
+                ]);
+
+                return $callback();
+            });
+        Cache::shouldReceive('lock')
+            ->once()
+            ->with(FtpCredentialService::rotationLockKey((string) $user->getKey()), 120)
+            ->andReturn($lock);
+        Http::fake(function (Request $request) use ($expectedTransactionLevel) {
+            $this->assertSame($expectedTransactionLevel, DB::transactionLevel());
+            $this->assertSame(self::SFTPGO_BASE_URL.'/api/v2/users/new-slug', $request->url());
+
+            return Http::response(['message' => 'user not found'], 404);
+        });
+
+        $result = app(FtpCredentialService::class)->reconcileAccount($user);
+
+        $this->assertSame(FtpAccountReconciliation::OUTCOME_WITHDRAWN, $result->outcome);
+        $this->assertSame(FtpAccountReconciliation::REASON_ACCOUNT_MISSING, $result->reason);
+        $this->assertSame(FtpCredentialService::STATUS_PENDING, $result->status);
+        $this->assertTrue($result->changed);
+        $this->assertDatabaseHas('users', [
+            'id' => $user->getKey(),
+            'ftp_slug' => 'new-slug',
+            'ftp_account_status' => FtpCredentialService::STATUS_PENDING,
+            'ftp_account_error' => null,
+        ]);
+        Http::assertSentCount(1);
+        Http::assertNotSent(fn (Request $request): bool => str_ends_with($request->url(), '/api/v2/users/old-slug'));
+    }
+
+    public function test_lock_timeout_returns_retryable_without_sftpgo_or_a_status_write(): void
+    {
+        $user = $this->photographer('florian', FtpCredentialService::STATUS_ACTIVE);
+        DB::table('users')->where('id', $user->getKey())->update([
+            'ftp_account_status' => FtpCredentialService::STATUS_ERROR,
+            'ftp_account_error' => 'Another operation is in progress.',
+        ]);
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')
+            ->once()
+            ->with(10, \Mockery::type(Closure::class))
+            ->andThrow(new LockTimeoutException);
+        Cache::shouldReceive('lock')
+            ->once()
+            ->with(FtpCredentialService::rotationLockKey((string) $user->getKey()), 120)
+            ->andReturn($lock);
+        Http::fake();
+
+        $result = app(FtpCredentialService::class)->reconcileAccount($user);
+
+        $this->assertSame(FtpAccountReconciliation::OUTCOME_RETRYABLE, $result->outcome);
+        $this->assertSame(FtpAccountReconciliation::REASON_ROTATION_IN_PROGRESS, $result->reason);
+        $this->assertSame(FtpCredentialService::STATUS_ERROR, $result->status);
+        $this->assertFalse($result->changed);
+        $this->assertDatabaseHas('users', [
+            'id' => $user->getKey(),
+            'ftp_account_status' => FtpCredentialService::STATUS_ERROR,
+            'ftp_account_error' => 'Another operation is in progress.',
+        ]);
+        Http::assertNothingSent();
+    }
+
+    public function test_deleted_user_is_skipped_after_lock_acquisition_without_sftpgo(): void
+    {
+        $user = $this->photographer('florian', FtpCredentialService::STATUS_ACTIVE);
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')
+            ->once()
+            ->with(10, \Mockery::type(Closure::class))
+            ->andReturnUsing(function (int $seconds, Closure $callback) use ($user): mixed {
+                DB::table('users')->where('id', $user->getKey())->delete();
+
+                return $callback();
+            });
+        Cache::shouldReceive('lock')
+            ->once()
+            ->with(FtpCredentialService::rotationLockKey((string) $user->getKey()), 120)
+            ->andReturn($lock);
+        Http::fake();
+
+        $result = app(FtpCredentialService::class)->reconcileAccount($user);
+
+        $this->assertSame(FtpAccountReconciliation::OUTCOME_SKIPPED, $result->outcome);
+        $this->assertSame(FtpAccountReconciliation::REASON_USER_DELETED, $result->reason);
+        $this->assertSame('deleted', $result->status);
+        $this->assertFalse($result->changed);
+        $this->assertDatabaseMissing('users', ['id' => $user->getKey()]);
+        Http::assertNothingSent();
     }
 
     /**

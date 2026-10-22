@@ -1,12 +1,19 @@
 import useSWR from 'swr';
 import { apiMutate, fetcher } from '../api';
 
+export interface OrgDefaultRoleInfo {
+    id: string;
+    name: string | null;
+    allowed: boolean;
+}
+
 export interface Org {
     id: string;
     name: string;
     domain: string | null;
     invoice_frequency: 'immediate' | 'monthly' | 'quarterly';
     default_role_id?: string | null;
+    default_role_info?: OrgDefaultRoleInfo | null;
     default_flatrate_level?: 'none' | 'web' | 'print' | 'original';
     shared_flatrate_cents?: number | null;
     auto_join_policy?: 'immediate' | 'requires_invite' | 'disabled';

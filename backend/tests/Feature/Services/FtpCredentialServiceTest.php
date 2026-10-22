@@ -250,6 +250,23 @@ class FtpCredentialServiceTest extends TestCase
         $this->assertFalse(Schema::hasColumn('users', 'ftp_credentials'));
     }
 
+    public function test_provision_and_show_refuses_a_revoked_account(): void
+    {
+        Http::fake();
+        $user = User::factory()->create(['ftp_slug' => 'florian']);
+        $user->forceFill(['ftp_account_status' => FtpCredentialService::STATUS_REVOKED])->save();
+
+        try {
+            app(FtpCredentialService::class)->provisionAndShow($user);
+            $this->fail('A revoked account must not be provisioned through the generic service path.');
+        } catch (FtpCredentialException $exception) {
+            $this->assertSame(FtpCredentialException::REASON_NOT_RESETTABLE, $exception->reason);
+        }
+
+        Http::assertNothingSent();
+        $this->assertSame(FtpCredentialService::STATUS_REVOKED, $user->fresh()->ftp_account_status);
+    }
+
     public function test_provision_and_show_does_not_leak_the_password_into_the_log(): void
     {
         Http::fake([
