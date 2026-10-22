@@ -12,6 +12,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use JsonException;
 use SensitiveParameter;
 
 /**
@@ -26,13 +27,16 @@ use SensitiveParameter;
  *
  * - `GET  /api/v2/token`            — `security: [BasicAuth]`, returns
  *   `{access_token, expires_at}`. A POST here answers 405.
+ * - `GET  /api/v2/user/token`       — the *user* login, `security: [BasicAuth]`
+ *   as well: it authenticates a user by its own credentials and is the only
+ *   place a camera password can be checked against the service (D-51).
  * - `POST /api/v2/users`            — add a user, 201 with the user object.
  * - `GET  /api/v2/users/{username}` — read a user, 404 when unknown.
  * - `PUT  /api/v2/users/{username}` — update, 200 with `{message}`.
  * - `DELETE /api/v2/users/{username}` — 200 with `{message}`.
  * - Auth: header `X-SFTPGO-API-KEY` (preferred) or `Authorization: Bearer <jwt>`.
  *
- * Two decisions that the API forces and that are easy to get wrong:
+ * Three decisions that the API forces and that are easy to get wrong:
  *
  * 1. `resetPassword()` is a read-modify-write. `updateUser`
  *    (internal/httpd/api_user.go) decodes the request body into a *fresh* user
@@ -42,6 +46,15 @@ use SensitiveParameter;
  *    working account — the camera would authenticate and then see nothing.
  * 2. `disconnect=1` on that update, so an already connected session cannot keep
  *    using the old password after a reset.
+ * 3. The body of a read-modify-write keeps the **shape** of the answer, not
+ *    only its values. SFTPGo renders empty values as empty JSON *objects*
+ *    (`filters.totp_config.secret`, `filesystem.osconfig`, …) and PHP's
+ *    `json_encode` writes an empty *array* as `[]`. A body with
+ *    `"secret":[]` where the service sent `"secret":{}` is refused with HTTP
+ *    400 — measured on SFTPGo 2.7.6: `json: cannot unmarshal array into Go
+ *    struct field UserTOTPConfig.filters.totp_config.secret of type
+ *    kms.BaseSecret`. The write path therefore decodes the answer as objects,
+ *    the read path keeps the associative arrays its callers index into.
  *
  * Secrets: a camera password is never logged, never put into an exception and
  * never kept here. The `#[\SensitiveParameter]` attributes additionally redact it
@@ -130,13 +143,18 @@ class SftpGoClient
     /**
      * Rotates the password of an existing account and keeps everything else
      * about it (see the read-modify-write note in the class docblock).
+     *
+     * The account is read as an **object**, not as an associative array: the
+     * body that goes back has to have the same shape the service sent, and an
+     * empty object would become an empty array on the way (see
+     * `findUserObject()`).
      */
     public function resetPassword(string $username, #[SensitiveParameter] string $password): array
     {
         $this->assertUsableUsername($username);
 
-        $current = $this->findUser($username);
-        $current['password'] = $password;
+        $current = $this->findUserObject($username);
+        $current->password = $password;
 
         $response = $this->call('reset_password', $username, fn (PendingRequest $request) => $request->put(
             $this->userPath($username).'?disconnect=1',
@@ -190,13 +208,45 @@ class SftpGoClient
      */
     public function findUser(string $username): array
     {
+        return $this->assertJsonObject($this->readUser($username), $username);
+    }
+
+    /**
+     * The user object as the service sent it — decoded as objects, not as
+     * associative arrays.
+     *
+     * The shape is not a detail here. SFTPGo renders empty values as empty
+     * JSON *objects* (`filters.totp_config.secret`, `filesystem.osconfig`, …)
+     * and PHP's `json_encode` writes an empty *array* as `[]`. A body that
+     * carries `"secret":[]` where the service sent `"secret":{}` is refused
+     * with HTTP 400 — measured on SFTPGo 2.7.6: `json: cannot unmarshal array
+     * into Go struct field UserTOTPConfig.filters.totp_config.secret of type
+     * kms.BaseSecret`. Decoding into `stdClass` keeps `{}` an object, and the
+     * re-encoded body has the shape the service sent.
+     *
+     * Only the write path needs this. `findUser()` answers with associative
+     * arrays, because its callers index into them.
+     */
+    private function findUserObject(string $username): object
+    {
+        return $this->decodeJsonObject($this->readUser($username), $username);
+    }
+
+    /**
+     * The user object as the service answered it, before it is decoded.
+     *
+     * The read is the documented reason `resetPassword()` exists (see the
+     * class docblock), so it is not optional — but it is also the step that
+     * decides the shape of the body that goes back, which is why both read
+     * paths go through this one method.
+     */
+    private function readUser(string $username): Response
+    {
         $this->assertUsableUsername($username);
 
-        $response = $this->call('find', $username, fn (PendingRequest $request) => $request->get(
+        return $this->call('find', $username, fn (PendingRequest $request) => $request->get(
             $this->userPath($username),
         ));
-
-        return $this->assertJsonObject($response, $username);
     }
 
     /**
@@ -367,6 +417,30 @@ class SftpGoClient
         $decoded = $response->json();
 
         if (! is_array($decoded) || $decoded === [] || array_is_list($decoded)) {
+            throw SftpGoException::malformedResponse($username);
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * The counterpart of `assertJsonObject()`, for the path that has to keep
+     * the shape of the answer: `json_decode()` without the associative flag
+     * turns every object into a `stdClass`, and an empty object stays an empty
+     * object.
+     *
+     * A body that is no JSON at all is the same failure as a body that is no
+     * object: `malformedResponse()`, not a transport error.
+     */
+    private function decodeJsonObject(Response $response, string $username): object
+    {
+        try {
+            $decoded = json_decode($response->body(), false, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw SftpGoException::malformedResponse($username);
+        }
+
+        if (! is_object($decoded) || get_object_vars($decoded) === []) {
             throw SftpGoException::malformedResponse($username);
         }
 

@@ -355,6 +355,67 @@ class SftpGoClientTest extends TestCase
         });
     }
 
+    /**
+     * The update has to keep the *shape* of the answer, not only its values.
+     *
+     * SFTPGo renders empty objects (`filters.totp_config.secret`,
+     * `filesystem.osconfig`, …), and PHP's `json_encode` writes an empty
+     * *array* as `[]`. A `PUT` with `"secret":[]` is refused by the service —
+     * measured on SFTPGo 2.7.6: `json: cannot unmarshal array into Go struct
+     * field UserTOTPConfig.filters.totp_config.secret of type kms.BaseSecret`.
+     * The password reset therefore never worked against a real instance: every
+     * test faked the HTTP client, and the JSON round-trip was never exercised.
+     */
+    public function test_the_password_reset_keeps_the_empty_json_objects_of_the_user(): void
+    {
+        Http::fake(function (Request $request) {
+            if ($request->method() === 'PUT') {
+                return Http::response(['message' => 'User updated'], 200);
+            }
+
+            // The body of a real answer, in the shape the service renders it:
+            // the empty values there are objects, not arrays.
+            return Http::response(
+                '{"id":7,"status":1,"username":"florian","has_password":true,'
+                .'"home_dir":"/var/www/ftp/florian","uid":0,"gid":0,"max_sessions":0,'
+                .'"quota_size":0,"quota_files":0,"permissions":{"/":["*"]},'
+                .'"upload_data_transfer":0,"download_data_transfer":0,"total_data_transfer":0,'
+                .'"description":"Portal FTP-Kamera-Zugang",'
+                .'"filters":{"hooks":{"external_auth_disabled":false,"pre_login_disabled":false,'
+                .'"check_password_disabled":false},"totp_config":{"secret":{}}},'
+                .'"filesystem":{"provider":0,"osconfig":{},"s3config":{},"gcsconfig":{},'
+                .'"azblobconfig":{},"cryptconfig":{},"sftpconfig":{},"httpconfig":{}}}',
+                200,
+                ['Content-Type' => 'application/json'],
+            );
+        });
+
+        (new SftpGoClient)->resetPassword('florian', self::PASSWORD_MARKER);
+
+        Http::assertSent(function (Request $request): bool {
+            if ($request->method() !== 'PUT') {
+                return false;
+            }
+
+            $body = $request->body();
+
+            // The empty objects stay objects: the service refuses an array there.
+            $this->assertStringContainsString('"secret":{}', $body);
+            $this->assertStringContainsString('"osconfig":{}', $body);
+            $this->assertStringNotContainsString('"secret":[]', $body);
+            $this->assertStringNotContainsString('"osconfig":[]', $body);
+
+            // The rest of the account survived the round-trip (read-modify-write).
+            $this->assertSame('/var/www/ftp/florian', $request->data()['home_dir']);
+            $this->assertSame(['/' => ['*']], $request->data()['permissions']);
+            $this->assertSame(self::PASSWORD_MARKER, $request->data()['password']);
+            // The password travels in the body, never in the URL.
+            $this->assertStringNotContainsString(self::PASSWORD_MARKER, $request->url());
+
+            return true;
+        });
+    }
+
     public function test_reset_password_of_an_unknown_account_fails_before_the_update(): void
     {
         Http::fake([self::USER_URL => Http::response(['error' => 'not found'], 404)]);

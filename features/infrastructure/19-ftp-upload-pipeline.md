@@ -813,6 +813,16 @@ Admin-API. **Kein** FTP-/SFTP-Protokoll-Speak im Portal.
   vorher den User, ersetzt das Passwort und schreibt das vollständige Objekt
   zurück — mit `?disconnect=1`, damit eine bestehende Sitzung nicht mit dem
   alten Passwort weiterläuft.
+- **Das zurückgeschriebene Objekt behält die Form der Antwort.** Ein leeres
+  JSON-Objekt muss ein Objekt bleiben (`{}`), nicht zu `[]` werden. Wird die
+  Antwort mit `json_decode($body, true)` gelesen, wird `{}` zu `[]`, und der
+  `PUT` scheitert mit **`400`** und `json: cannot unmarshal array into Go
+  struct field UserTOTPConfig.filters.totp_config.secret of type
+  kms.BaseSecret` — der Reset lief deshalb nie gegen ein echtes SFTPGo.
+  Seit dem 2026-10-22 dekodieren `findUserObject()` und
+  `decodeJsonObject()` in Objekte; der Regressionstest in
+  `backend/tests/Feature/Services/SftpGoClientTest.php` prüft die
+  `"secret": {}`-Form des Bodys.
 - **Kein automatisches `retry()`.** Ein wiederholtes `POST /api/v2/users` aus
   einer verlorenen Antwort heraus erzeugt ein zweites Konto (409) statt eines
   sauberen Fehlers.
