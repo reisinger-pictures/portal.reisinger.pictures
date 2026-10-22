@@ -63,6 +63,8 @@ class FtpCredentialException extends RuntimeException
      */
     public const REASON_INVALID_CURRENT_PASSWORD = 'invalid_current_password';
 
+    public const REASON_ROTATION_IN_PROGRESS = 'rotation_in_progress';
+
     public function __construct(
         public readonly string $reason,
         string $message,
@@ -207,6 +209,17 @@ class FtpCredentialException extends RuntimeException
         return new self(
             self::REASON_INVALID_CURRENT_PASSWORD,
             'Das aktuelle Kamera-Passwort ist nicht korrekt. Bitte prüfe es und versuche es erneut.',
+        );
+    }
+
+    /**
+     * Another password operation for this account still holds the lock.
+     */
+    public static function rotationInProgress(): self
+    {
+        return new self(
+            self::REASON_ROTATION_IN_PROGRESS,
+            'Für dieses FTP-Konto wird gerade ein Kamera-Passwort geändert oder eingerichtet. Bitte versuche es erneut.',
         );
     }
 }

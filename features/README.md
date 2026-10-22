@@ -4,7 +4,7 @@ This directory serves as the single source of truth for all technical concepts, 
 
 ## Cross-cutting decisions
 
-* [Owner decisions](owner-decisions.md) - Current normative owner decisions D-1 through D-55.
+* [Owner decisions](owner-decisions.md) - Current normative owner decisions D-1 through D-57.
 * [Accepted security risks](security/accepted-risks.md) - Current accepted dependency/security risks.
 * [The findings registry](security/findings-registry.md) - The security findings as a number: the machine-readable view of the review closure and the gate that counts it.
 

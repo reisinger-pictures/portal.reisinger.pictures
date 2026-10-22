@@ -4,19 +4,25 @@ namespace Tests\Feature;
 
 use App\Enums\Brand;
 use App\Enums\UserRole;
+use App\Exceptions\FtpCredentialException;
 use App\Exceptions\SftpGoException;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\FtpCredentialService;
+use Closure;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
  * §7.16: losing the photographer role — by role change or account deletion —
- * ends the SFTPGo camera account, and nothing that writes happens before it.
+ * ends the SFTPGo camera account before the local role or user row changes.
  *
  * The invariant these tests pin: an SFTPGo account exists exactly when
  * `users.ftp_account_status === 'active'`. So the interesting cases are not
@@ -40,11 +46,18 @@ class FtpCredentialRevocationTest extends TestCase
      */
     private string $inboxRoot;
 
+    private ?int $expectedSftpGoTransactionLevel = null;
+
+    private int $deleteResponseStatus = 200;
+
     private const SFTPGO_BASE_URL = 'http://sftpgo.test:8080';
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->expectedSftpGoTransactionLevel = null;
+        $this->deleteResponseStatus = 200;
 
         $this->inboxRoot = $this->useTemporaryFtpInboxRoot();
 
@@ -58,6 +71,7 @@ class FtpCredentialRevocationTest extends TestCase
     {
         $admin = $this->admin();
         $photographer = $this->photographer('max');
+        $this->expectedSftpGoTransactionLevel = DB::transactionLevel();
 
         $response = $this->asAdmin($admin)->putJson(
             "/api/management/users/{$photographer->id}",
@@ -129,31 +143,221 @@ class FtpCredentialRevocationTest extends TestCase
     {
         $admin = $this->admin();
         $photographer = $this->photographer('max');
+        $this->expectedSftpGoTransactionLevel = DB::transactionLevel();
 
         $response = $this->asAdmin($admin)
             ->deleteJson("/api/management/users/{$photographer->id}");
 
         $response->assertOk();
 
-        // The external delete is the observable proof that revocation ran; the
-        // row is gone afterwards, so the ordering is "account first, row second"
-        // inside one transaction.
+        // The external delete is the observable proof that revocation ran; it
+        // occurs before the row is deleted, but outside the database transaction.
         Http::assertSent(fn (Request $request): bool => $request->method() === 'DELETE'
             && str_ends_with($request->url(), '/api/v2/users/max'));
         $this->assertDatabaseMissing('users', ['id' => $photographer->id]);
     }
 
+    public function test_deleting_a_revoked_photographer_does_not_recreate_the_remote_account(): void
+    {
+        $admin = $this->admin();
+        $photographer = $this->photographer('max', FtpCredentialService::STATUS_REVOKED);
+
+        $this->asAdmin($admin)
+            ->deleteJson("/api/management/users/{$photographer->id}")
+            ->assertOk();
+
+        Http::assertNothingSent();
+        $this->assertDatabaseMissing('users', ['id' => $photographer->id]);
+    }
+
+    public function test_deletion_holds_the_shared_rotation_lock_through_revocation_and_row_delete(): void
+    {
+        $admin = $this->admin();
+        $photographer = $this->photographer('max');
+        $service = app(FtpCredentialService::class);
+        $held = false;
+        $nestedFailure = null;
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')
+            ->twice()
+            ->with(10, \Mockery::type(Closure::class))
+            ->andReturnUsing(function (int $seconds, Closure $callback) use (&$held): mixed {
+                if ($held) {
+                    throw new LockTimeoutException;
+                }
+
+                $held = true;
+
+                try {
+                    return $callback();
+                } finally {
+                    $held = false;
+                }
+            });
+        Cache::shouldReceive('lock')
+            ->twice()
+            ->with(FtpCredentialService::rotationLockKey((string) $photographer->getKey()), 120)
+            ->andReturn($lock);
+        User::deleting(function (User $deletingUser) use ($photographer, $service, &$nestedFailure): void {
+            if (! $deletingUser->is($photographer)) {
+                return;
+            }
+
+            try {
+                $service->changeAndShow($deletingUser, 'current-camera-password');
+            } catch (FtpCredentialException $exception) {
+                $nestedFailure = $exception;
+            }
+        });
+
+        $response = $this->asAdmin($admin)->deleteJson("/api/management/users/{$photographer->id}");
+
+        $response->assertOk();
+        $this->assertInstanceOf(FtpCredentialException::class, $nestedFailure);
+        $this->assertSame(FtpCredentialException::REASON_ROTATION_IN_PROGRESS, $nestedFailure->reason);
+        $this->assertDatabaseMissing('users', ['id' => $photographer->id]);
+        Http::assertSentCount(1);
+    }
+
+    public function test_user_deletion_lock_timeout_returns_conflict_and_keeps_the_user(): void
+    {
+        $admin = $this->admin();
+        $photographer = $this->photographer('max');
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')
+            ->once()
+            ->with(10, \Mockery::type(Closure::class))
+            ->andThrow(new LockTimeoutException);
+        Cache::shouldReceive('lock')
+            ->once()
+            ->with(FtpCredentialService::rotationLockKey((string) $photographer->getKey()), 120)
+            ->andReturn($lock);
+
+        $response = $this->asAdmin($admin)->deleteJson("/api/management/users/{$photographer->id}");
+
+        $response->assertStatus(409)->assertJsonStructure(['error']);
+        $this->assertDatabaseHas('users', [
+            'id' => $photographer->id,
+            'ftp_account_status' => FtpCredentialService::STATUS_ACTIVE,
+        ]);
+        Http::assertNothingSent();
+    }
+
+    public function test_remote_revoke_failure_keeps_the_user_with_error_status(): void
+    {
+        $admin = $this->admin();
+        $photographer = $this->photographer('max');
+        $this->deleteResponseStatus = 503;
+
+        $response = $this->asAdmin($admin)->deleteJson("/api/management/users/{$photographer->id}");
+
+        $response->assertStatus(500);
+        $this->assertDatabaseHas('users', [
+            'id' => $photographer->id,
+            'ftp_slug' => 'max',
+            'ftp_account_status' => FtpCredentialService::STATUS_ERROR,
+        ]);
+        $this->assertNotEmpty($photographer->fresh()->ftp_account_error);
+        $this->assertNull($photographer->fresh()->ftp_revoked_at);
+        Http::assertSentCount(1);
+    }
+
+    public function test_retrying_a_failed_role_revocation_deletes_again_before_detaching_the_role(): void
+    {
+        $admin = $this->admin();
+        $photographer = $this->photographer('max');
+        $this->deleteResponseStatus = 503;
+
+        $firstResponse = $this->asAdmin($admin)->putJson(
+            "/api/management/users/{$photographer->id}",
+            ['role_ids' => [$this->roleId(UserRole::CLIENT)], 'brand' => Brand::B2B->value],
+        );
+
+        $firstResponse->assertStatus(500);
+        $afterFailure = $photographer->fresh();
+        $this->assertSame(FtpCredentialService::STATUS_ERROR, $afterFailure->ftp_account_status);
+        $this->assertTrue($afterFailure->roles->contains('name', UserRole::PHOTOGRAPHER->value));
+        Http::assertSentCount(1);
+
+        // The first 503 may have arrived after SFTPGo deleted the account. The
+        // retry must still issue DELETE; 404 is the verified absent state.
+        $this->deleteResponseStatus = 404;
+        $this->asAdmin($admin)->putJson(
+            "/api/management/users/{$photographer->id}",
+            ['role_ids' => [$this->roleId(UserRole::CLIENT)], 'brand' => Brand::B2B->value],
+        )->assertOk();
+
+        Http::assertSentCount(2);
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'DELETE'
+            && str_ends_with($request->url(), '/api/v2/users/max'));
+        $afterRetry = $photographer->fresh();
+        $this->assertSame(FtpCredentialService::STATUS_REVOKED, $afterRetry->ftp_account_status);
+        $this->assertTrue($afterRetry->roles->pluck('name')->doesntContain(UserRole::PHOTOGRAPHER->value));
+    }
+
+    public function test_retrying_user_deletion_accepts_an_already_missing_remote_account(): void
+    {
+        $admin = $this->admin();
+        $photographer = $this->photographer('max');
+        $this->deleteResponseStatus = 503;
+
+        $this->asAdmin($admin)
+            ->deleteJson("/api/management/users/{$photographer->id}")
+            ->assertStatus(500);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $photographer->id,
+            'ftp_account_status' => FtpCredentialService::STATUS_ERROR,
+        ]);
+        Http::assertSentCount(1);
+
+        // The remote delete may have completed despite the failed response.
+        $this->deleteResponseStatus = 404;
+        $this->asAdmin($admin)
+            ->deleteJson("/api/management/users/{$photographer->id}")
+            ->assertOk();
+
+        Http::assertSentCount(2);
+        $this->assertDatabaseMissing('users', ['id' => $photographer->id]);
+    }
+
+    public function test_admin_role_restoration_provisions_a_revoked_photographer_under_the_shared_lock(): void
+    {
+        $admin = $this->admin();
+        $user = $this->client('max');
+        $user->forceFill([
+            'ftp_account_status' => FtpCredentialService::STATUS_REVOKED,
+            'ftp_revoked_at' => now(),
+        ])->save();
+        $this->expectedSftpGoTransactionLevel = DB::transactionLevel();
+
+        $response = $this->asAdmin($admin)->putJson(
+            "/api/management/users/{$user->id}",
+            [
+                'role_ids' => [$this->roleId(UserRole::CLIENT), $this->roleId(UserRole::PHOTOGRAPHER)],
+                'brand' => Brand::B2B->value,
+            ],
+        );
+
+        $response->assertOk()->assertJsonMissingPath('password');
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
+            && $request->url() === self::SFTPGO_BASE_URL.'/api/v2/users'
+            && ($request->data()['username'] ?? null) === 'max');
+
+        $restored = $user->fresh();
+        $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $restored->ftp_account_status);
+        $this->assertNull($restored->ftp_account_error);
+        $this->assertTrue($restored->roles->contains('name', UserRole::PHOTOGRAPHER->value));
+    }
+
     // ── Fail-closed ──────────────────────────────────────────────────────────
 
     /**
-     * The deliberate decision, not an accident: if SFTPGo is unreachable, the
-     * role change is refused and *nothing* changes.
-     *
-     * Without the fail-closed wiring the role would be synced first (or the
-     * update would proceed) and a live credential would outlive the role that
-     * justified it. The test catches the exception rather than rendering it,
-     * because there is no handler for it — and that absence is part of what is
-     * pinned: no "saved anyway" path hides behind a 500.
+     * If SFTPGo is unreachable, the role change is refused and the user remains
+     * present with an explicit `error` status for reconciliation. A live
+     * credential must not outlive the role change, and a stale `active` status
+     * must not claim the outcome is known.
      */
     public function test_a_role_change_is_refused_when_sftpgo_is_unreachable(): void
     {
@@ -178,7 +382,8 @@ class FtpCredentialRevocationTest extends TestCase
         }
 
         $unchanged = $photographer->fresh();
-        $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $unchanged->ftp_account_status);
+        $this->assertSame(FtpCredentialService::STATUS_ERROR, $unchanged->ftp_account_status);
+        $this->assertNotEmpty($unchanged->ftp_account_error);
         $this->assertNull($unchanged->ftp_revoked_at);
         $this->assertTrue(
             $unchanged->roles->pluck('name')->contains(UserRole::PHOTOGRAPHER->value),
@@ -291,11 +496,19 @@ class FtpCredentialRevocationTest extends TestCase
     {
         Http::fake([
             'sftpgo.test:8080/api/v2/users*' => function (Request $request) {
+                if ($this->expectedSftpGoTransactionLevel !== null) {
+                    $this->assertSame(
+                        $this->expectedSftpGoTransactionLevel,
+                        DB::transactionLevel(),
+                        'SFTPGo HTTP calls must not run inside a database transaction.',
+                    );
+                }
+
                 $account = $this->accountIn($request);
 
                 return match ($request->method()) {
                     'POST' => Http::response($this->sftpGoUser($account), 201),
-                    'DELETE' => Http::response(['message' => 'user deleted'], 200),
+                    'DELETE' => Http::response(['message' => 'user deleted'], $this->deleteResponseStatus),
                     default => Http::response($this->sftpGoUser($account), 200),
                 };
             },

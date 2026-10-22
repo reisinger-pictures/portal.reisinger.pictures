@@ -1384,27 +1384,40 @@ mehr. `ftp_provisioned_at` bleibt ebenfalls stehen: es beschreibt die
 *vergangene* Provisionierung, `ftp_revoked_at` sagt, wann sie endete; beide
 zusammen lesen sich korrekt. Es gibt keinen Zustand, in dem der Portal-Stand und
 der Dienst auseinanderlaufen, ohne dass das System es bemerkt. Daraus folgt
-fail-closed an beiden Stellen:
+fail-closed an beiden Stellen. Slug-Wechsel, Reset/Selbständerung und Widerruf
+teilen einen per User-ID adressierten Cache-Lock; kein SFTPGo-HTTP-Aufruf läuft
+innerhalb einer Datenbanktransaktion. Die Lock-Lease ist 120 Sekunden, die
+maximale Wartezeit 10 Sekunden; belegter Lock ergibt `409` ohne Schreibversuch.
 
-- **Slug-Wechsel** (P1-M34): Der alte Account wird gelöscht, bevor der neue
-  User-Datensatz geschrieben wird. Ist SFTPGo nicht erreichbar, bricht der
-  Vorgang ab und der User bleibt unverändert. Grund: ohne Abbruch bekäme der
-  Fotograf einen Slug, für den es weder Verzeichnis noch Account gibt — das sieht
-  in der Oberfläche wie ein leerer Posteingang aus und nicht wie ein Fehler.
-- **Entzug bei Rollenverlust** (neu): Verlässt jemand die Rolle Fotograf, wird
-  der SFTPGo-Account gelöscht und `revoked` + `ftp_revoked_at` geschrieben. Auch
-  hier fail-closed: ist SFTPGo nicht erreichbar, wird der Rollenwechsel
-  abgelehnt. Eine Belegschaft ohne Fotograf-Rolle, die SFTPGo nicht erreichen
-  kann, ist ein schlechterer Zustand als ein abgelehnter Rollenwechsel.
+- **Slug-Wechsel** (P1-M34): Vor dem Remote-Delete markiert das Portal den
+  Kontostatus `error`. Bei fehlgeschlagenem Delete bleibt der alte Slug mit
+  `error`; nach erfolgreichem Delete wird der neue Slug gespeichert und das neue
+  Konto provisioniert. Scheitert die Provisionierung, bleibt der neue Slug mit
+  `error`; es wird kein Passwort angezeigt. `ftp:reconcile` gleicht den
+  gespeicherten Slug mit SFTPGo ab.
+- **Entzug bei Rollenverlust oder Kontolöschung:** Unter demselben Lock wird ein
+  aktives Konto zuerst auf `error` gesetzt und dann bei SFTPGo gelöscht. Nach
+  erfolgreichem Delete schreibt das Portal `revoked` + `ftp_revoked_at`; erst
+  danach folgen Rollenänderung oder User-Löschung in einer kurzen DB-Transaktion.
+  Schlägt der Remote-Delete fehl, bleibt der User erhalten und `error` ist
+  reconcilebar. Schlägt die lokale Rollen-/Löschtransaktion nach erfolgreichem
+  Remote-Delete fehl, bleibt der Account `revoked` und die lokale Änderung kann
+  erneut versucht werden; ein verteilter Rollback ist nicht möglich.
 
 **Verdrahtung:** `UserController::update()` (Rollenwechsel über `role_ids`) und
-`UserController::destroy()` (Kontolöschung). Beide rufen
-`FtpCredentialService::revoke()` auf, **bevor** sie schreiben.
+`UserController::destroy()` (Kontolöschung) halten den Lock bis zur lokalen
+Änderung. Der SFTPGo-Delete liegt außerhalb der Datenbanktransaktion.
 
 **Was das nicht löst (Stand 2026-10-21, geändert):** Die Reconciliation, die
 hier früher als offen geführt wurde, **existiert**: `reconcileAccount()`
 (P1-M30) schreibt den Zustand, `php artisan ftp:reconcile` ruft sie auf. Der
-Vertrag steht in **§7.16a**. Offen bleibt genau der Teil, den auch §7.16a nicht
+Vertrag steht in **§7.16a**. `reconcileAccount()` nimmt denselben per-User-Lock
+wie Passwortwechsel, Slug-Ersatz und Widerruf; nach dem Erwerb lädt es den User
+neu und verwendet keinen vor dem Warten gelesenen Slug oder Status. Ist der Lock
+belegt, liefert die Reconciliation `retryable`, ohne SFTPGo aufzurufen oder
+Status zu schreiben. Ist der User während des Wartens gelöscht worden, wird er
+als `skipped` gemeldet. So kann ein alter SFTPGo-Read keinen nachfolgenden
+Slug-/Widerrufszustand überschreiben. Offen bleibt genau der Teil, den auch §7.16a nicht
 kann: ein SFTPGo-Account, dessen **Name kein `ftp_slug`** ist, wird von keiner
 Reconciliation gefunden — das Portal kennt Konten nur unter dem Slug, den es
 selbst vergeben hat. Ein manuell im SFTPGo angelegtes Konto unter einem
@@ -1554,7 +1567,7 @@ ein SFTPGo-Konto, und ist es nutzbar?" Die Antwort landet in
 
 **Was der Befehl meldet:** eine Zeile je Konto — **Slug, Zustand, Grund** — und
 eine zählende Zusammenfassung („N aktiv, N entzogen, N unverändert, N
-abweichend, N übersprungen, N fehlgeschlagen, N nicht geprüft"). Kein Name, keine
+abweichend, N erneut abzustimmen, N übersprungen, N fehlgeschlagen, N nicht geprüft"). Kein Name, keine
 E-Mail-Adresse, kein Passwort: das Log eines Laufs überlebt das Terminal, in
 dem er geschrieben wurde, und der Slug ist der Name, unter dem das Konto selbst
 geführt wird. Ein **Dienstausfall beendet den Lauf**, statt jedes weitere Konto
@@ -1564,7 +1577,7 @@ als solche gezählt und nicht als geprüft.
 | Exit-Code | Bedeutung |
 |---|---|
 | `0` | Alle Konten wurden geprüft (ob der Zustand sich änderte oder nicht). Ein Konto mit **unbrauchbarem Namen** (Altwert vor P1-M21) wird *übersprungen* und gezählt, nicht als Fehler gewertet — der Slug wird nicht hinter dem Fotografen umgeschrieben |
-| `1` | Mindestens ein Konto konnte nicht geprüft werden — SFTPGo nicht erreichbar, nicht konfiguriert oder mit Fehlerantwort; **die Zustände dieser Konten wurden nicht verändert** |
+| `1` | Mindestens ein Konto konnte nicht geprüft werden — SFTPGo nicht erreichbar, nicht konfiguriert, mit Fehlerantwort oder der gemeinsame Account-Lock war belegt; **die Zustände dieser Konten wurden nicht verändert** |
 | `2` | `--user` hat niemanden benannt |
 
 **Was die Reconciliation nicht kann:**
@@ -1589,24 +1602,49 @@ als solche gezählt und nicht als geprüft.
 password_notice}` — dieselbe Form wie der Reset (7.6a), mit derselben
 Show-once-Eigenschaft: das neue Passwort wird einmal zurückgegeben und
 nirgends gespeichert. Die Fehlerbilder: `422` (fehlendes oder **falsches**
-aktuelles Passwort), `409` (der Kontozustand verbietet den Wechsel), `429`
-(mit `Retry-After`), `404` (der **Dienst** antwortet auf die
-Passwortprüfung mit `404`), `500` (die Audit-Zeile war nicht schreibbar
+aktuelles Passwort), `409` (der Kontozustand verbietet den Wechsel oder ein
+anderer Passwortvorgang hält den Kontosperr-Lock), `429`
+(mit `Retry-After`), `404` (die Passwortprüfung war erfolgreich, aber der
+anschließende Admin-API-Read des Kontos antwortet mit `404`), `500` (die
+Audit-Zeile war nicht schreibbar
 — das Passwort wurde dennoch gewechselt, es ist nur nicht nachweisbar),
 `503` (Dienst nicht konfiguriert oder nicht erreichbar), `502` (Dienst
 antwortet unbrauchbar), `401` (nicht angemeldet).
 
 **Die Prüfung des aktuellen Passworts.** Das Portal hält kein Kamerapasswort
-(7.3) und kann die Frage deshalb nur an den Dienst stellen: SFTPGOs
+(7.3) und kann die Frage deshalb nur an den Dienst stellen: Der SFTPGo-
 **Benutzer-Login** `GET /api/v2/user/token` beantwortet sie. `200` heißt
 „korrekt", `401`/`403` heißt „falsch", alles andere ist eine benannte
 Ausnahme. Die Admin-API hilft hier nicht: sie liefert für ein Konto kein
 Passwort-Hash, sondern nur `has_password: true` — sie kann die Eingabe also
-nicht prüfen. **Ein im Dienst nicht mehr vorhandenes Konto erscheint
-deshalb als `422`, nicht als `404`:** der Benutzer-Login unterscheidet
+nicht prüfen. **Ein im Dienst nicht mehr vorhandenes Konto erscheint bei
+dieser Prüfung als `422`, nicht als `404`:** der Benutzer-Login unterscheidet
 unbekanntes Konto und falsches Passwort nicht und antwortet in beiden Fällen
-`401`; das ist die Antwort des Dienstes, nicht die des Portals. `404` bleibt
-den Fällen vorbehalten, in denen der Dienst selbst `404` antwortet.
+`401`. Der dokumentierte `404` entsteht erst danach, wenn die Prüfung mit
+`200` erfolgreich war und der Admin-API-Read des Kontos das Fehlen meldet.
+
+**Parallele Kontoänderungen.** Selbständerung, Recovery-Reset, Slug-Wechsel und
+Widerruf bei Rollenverlust/Kontolöschung schreiben dieselbe SFTPGo-
+Zugangsdatenzeile und verwenden deshalb denselben Per-Account-Cache-Lock. Bei
+Reset und Selbständerung umfasst er Quota,
+Zustandsprüfung, gegebenenfalls Bestätigung, Passwortwechsel und Audit (beim
+Reset außerdem die Provisionierung eines noch nicht eingerichteten Kontos); beim
+Slug-Wechsel serialisiert er Löschen, Profilaktualisierung und Provisionierung;
+beim Widerruf hält er zusätzlich die lokale Rollenänderung oder Kontolöschung.
+Die Lease beträgt 120 Sekunden; ein Vorgang wartet höchstens 10 Sekunden auf
+den Lock. Ist er dann noch belegt, antwortet das Portal mit `409`, bevor Quota,
+SFTPGo oder Audit berührt werden. Es wird keine Datenbanktransaktion über die
+externen HTTP-Aufrufe gehalten. Ein Lock-Timeout ist kein Passwortwechselversuch
+und wird nicht auditiert.
+
+**Fehlerzustand beim Slug-Wechsel.** Ein SFTPGo-Delete und die anschließende
+Neuprovisionierung sind keine gemeinsame Datenbanktransaktion. Vor dem externen
+Delete markiert das Portal den Kontostatus als `error`; erst nach erfolgreichem
+Delete wird der neue Slug gespeichert und das neue Konto provisioniert. Scheitert
+das Delete, bleibt der alte Slug mit `error`; scheitert die Provisionierung,
+bleibt der neue Slug mit `error`. In beiden Fällen wird kein neues Passwort
+ausgeliefert. `ftp:reconcile` kann den Kontostatus anhand des jeweils gespeicherten
+Slugs mit SFTPGo abgleichen; es gibt keinen Rollback der externen Änderung.
 
 **Die Zugangsdaten gehen in den Basic-Auth-Header, nicht in den
 Query-String.** Gemessen am 2026-10-22 an der Produktionsinstanz

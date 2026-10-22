@@ -13,20 +13,18 @@ use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * The first slug change (P1-M58), the same hole one line before the reset.
+ * First-slug provisioning and recovery from an uncertain account state.
  *
  * `User::booted()` gives every new user a slug, but no account: a fresh
  * photographer is `pending` and SFTPGo has never heard of that name. The slug
- * change branch deleted the old account unconditionally as soon as a slug was
- * set, `SftpGoClient::deleteUser()` reports a 404 as `not_found` instead of
- * swallowing it, and the branch is fail-closed on purpose — so *every first slug
- * change* died with an HTTP 500. The way to get a camera account was blocked one
- * line earlier than the reset 404 that P1-M58 also fixes.
+ * A fresh photographer is `pending`, so changing the generated slug skips a
+ * delete and provisions the new name. An `error` status is different: the last
+ * remote operation may have completed despite an ambiguous response, so the
+ * known old name is deleted again; a 404 verifies it is already absent.
  *
- * The guard is the same one `FtpCredentialService::revoke()` already carries: an
- * account is deleted only when the status says one exists (19-ftp 7.16). It
- * narrows *whether* the delete happens, never whether a failure is tolerated —
- * `active` plus an unreachable service still aborts the change, pinned here.
+ * The status decides whether deletion is skipped (`pending`) or retried
+ * (`active` / `error`), never whether an uncertain failure is tolerated: an
+ * unreachable service still aborts the change, pinned here.
  *
  * The counter direction (an `active` account is still deleted and recreated, in
  * that order) lives in `FtpSlugValidationTest`, where the `DELETE`-then-`POST`
@@ -120,11 +118,10 @@ class FtpFirstSlugChangeTest extends TestCase
     }
 
     /**
-     * An `error` account is in the same position as `pending` as far as SFTPGo is
-     * concerned — one that may or may not exist is not one that can be deleted —
-     * and the change has to work for it too rather than 500 on a 404.
+     * An `error` account may or may not exist. Retry deleting its known name
+     * before provisioning the replacement; the lock serializes that recovery.
      */
-    public function test_an_account_in_error_is_not_deleted_either(): void
+    public function test_an_account_in_error_retries_deleting_its_known_name(): void
     {
         $photographer = $this->photographer(FtpCredentialService::STATUS_ERROR);
         $token = auth('api')->login($photographer);
@@ -137,18 +134,19 @@ class FtpFirstSlugChangeTest extends TestCase
 
         $response->assertOk();
         $this->assertSame(
-            ['POST '.self::SFTPGO_BASE_URL.'/api/v2/users'],
+            [
+                'DELETE '.self::SFTPGO_BASE_URL.'/api/v2/users/max',
+                'POST '.self::SFTPGO_BASE_URL.'/api/v2/users',
+            ],
             $this->callsSentToSftpGo(),
         );
         $this->assertSame('active', $photographer->fresh()?->ftp_account_status);
     }
 
     /**
-     * Fail-closed must not regress: the guard decides *whether* to delete, not
-     * that failures are tolerated. An `active` account with an unreachable
-     * service still aborts the change, and the slug stays as it was — otherwise
-     * the photographer would end up with a slug that names no account at all,
-     * which looks in the inbox like an empty one and not like a failure.
+     * Fail-closed must not regress: an unreachable service aborts the change.
+     * The old slug remains because the DELETE did not return successfully, while
+     * `error` records that the remote account's outcome is uncertain.
      */
     public function test_an_active_account_still_aborts_the_change_when_sftpgo_is_unreachable(): void
     {
@@ -173,13 +171,14 @@ class FtpFirstSlugChangeTest extends TestCase
             'id' => $photographer->id,
             'ftp_slug' => $slugBefore,
         ]);
-        $this->assertSame('active', $photographer->fresh()?->ftp_account_status);
+        $this->assertSame(FtpCredentialService::STATUS_ERROR, $photographer->fresh()?->ftp_account_status);
+        $this->assertNotEmpty($photographer->fresh()?->ftp_account_error);
     }
 
     /**
-     * The same fail-closed rule for a `pending` photographer: the delete is
-     * skipped, but the provisioning is a real SFTPGo write, so an outage still
-     * aborts instead of committing a slug whose account does not exist.
+     * For `pending`, no old account is deleted. The validated new slug is
+     * committed before the create; if that SFTPGo call is uncertain, the new
+     * slug and `error` remain so reconciliation can inspect that name.
      */
     public function test_a_pending_account_aborts_the_change_when_sftpgo_is_unreachable(): void
     {
@@ -200,9 +199,11 @@ class FtpFirstSlugChangeTest extends TestCase
         $response->assertStatus(500);
         $this->assertDatabaseHas('users', [
             'id' => $photographer->id,
-            'ftp_slug' => $slugBefore,
+            'ftp_slug' => 'j-doe',
+            'ftp_account_status' => FtpCredentialService::STATUS_ERROR,
         ]);
-        $this->assertSame('pending', $photographer->fresh()?->ftp_account_status);
+        $this->assertNotSame('j-doe', $slugBefore);
+        $this->assertNotEmpty($photographer->fresh()?->ftp_account_error);
         $this->assertNull($photographer->fresh()?->ftp_provisioned_at);
     }
 

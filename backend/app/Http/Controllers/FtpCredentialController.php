@@ -169,11 +169,11 @@ class FtpCredentialController extends Controller
     }
 
     /**
-     * 429 for the quota, 409 for an account state that may not be re-issued, 503
-     * for an inbox directory the host will not give us, 422 for every other
-     * portal-side precondition. The reason is not exposed in the payload: the
-     * message is the whole contract, and a client cannot act on a
-     * machine-readable variant of it.
+     * 429 for the quota, 409 for an account state that may not be re-issued or
+     * an in-progress password operation, 503 for an inbox directory the host
+     * will not give us, and 422 for every other portal-side precondition. The
+     * reason is not exposed in the payload: the message is the whole contract,
+     * and a client cannot act on a machine-readable variant of it.
      *
      * `not_resettable` is a conflict and not an unprocessable request: nothing
      * about the request is wrong, the account simply is not in a state that
@@ -201,7 +201,8 @@ class FtpCredentialController extends Controller
     private function fromCredentialException(FtpCredentialException $exception): JsonResponse
     {
         return match ($exception->reason) {
-            FtpCredentialException::REASON_NOT_RESETTABLE => response()->json(
+            FtpCredentialException::REASON_NOT_RESETTABLE,
+            FtpCredentialException::REASON_ROTATION_IN_PROGRESS => response()->json(
                 ['error' => $exception->getMessage()],
                 409,
             ),

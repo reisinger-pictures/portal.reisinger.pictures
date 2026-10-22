@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\UserRole;
+use App\Exceptions\FtpCredentialException;
 use App\Http\Controllers\Concerns\EnforcesBrandIsolation;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
@@ -15,6 +16,7 @@ use App\Models\User;
 use App\Services\ActivationTokenService;
 use App\Services\AuthorizationService;
 use App\Services\FtpCredentialService;
+use App\Services\OrgDefaultRolePolicy;
 use App\Support\BrandRegistry;
 use App\Support\DirectGalleryGrant;
 use Illuminate\Http\Request;
@@ -95,7 +97,9 @@ class UserController extends Controller
             }
         }
 
-        return DB::transaction(function () use ($request, $managerOrg) {
+        $defaultRolePolicy = app(OrgDefaultRolePolicy::class);
+
+        return DB::transaction(function () use ($request, $managerOrg, $defaultRolePolicy) {
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
@@ -106,16 +110,8 @@ class UserController extends Controller
             // If created by a Customer Manager, assign to their org
             if ($managerOrg) {
                 $user->org_id = $managerOrg->id;
-
-                // Inherit role from org's default_role_id
-                $roleId = $managerOrg->default_role_id;
-                if (! $roleId) {
-                    $clientRole = Role::where('name', UserRole::CLIENT->value)->first();
-                    $roleId = $clientRole?->id;
-                }
-                if ($roleId) {
-                    $user->roles()->attach($roleId);
-                }
+                $inheritedRole = $defaultRolePolicy->roleForNewAssignment($managerOrg);
+                $user->roles()->attach($inheritedRole->id);
 
                 // Inherit flatrate settings from org
                 if ($managerOrg->default_flatrate_level) {
@@ -324,30 +320,57 @@ class UserController extends Controller
             $updates['brand'] = $isSuperAdminSelection ? null : $request->input('brand');
         }
 
-        DB::transaction(function () use ($request, $user, $roleIds, $updates, $hadPhotographerRole, $keepsPhotographerRole) {
-            // The account goes before the role does, inside the same
-            // transaction: a raise from SFTPGo (unreachable) rolls the whole
-            // update back, so a live credential never outlives the role that
-            // justified it and the sync cannot run without the revocation.
-            if ($hadPhotographerRole && ! $keepsPhotographerRole) {
-                app(FtpCredentialService::class)->revoke($user);
-            }
+        $persistUpdate = function (User $targetUser) use ($request, $roleIds, $updates): void {
+            DB::transaction(function () use ($request, $targetUser, $roleIds, $updates): void {
+                if ($request->has('role_ids')) {
+                    $targetUser->roles()->sync($roleIds ?? []);
+                }
+                if ($request->has('gallery_group_ids')) {
+                    $targetUser->galleryGroups()->sync($request->input('gallery_group_ids', []));
+                }
+                if ($request->has('gallery_ids')) {
+                    $targetUser->galleries()->sync($request->input('gallery_ids', []));
+                }
 
-            if ($request->has('role_ids')) {
-                $user->roles()->sync($roleIds ?? []);
-            }
-            if ($request->has('gallery_group_ids')) {
-                $user->galleryGroups()->sync($request->input('gallery_group_ids', []));
-            }
-            if ($request->has('gallery_ids')) {
-                $user->galleries()->sync($request->input('gallery_ids', []));
-            }
+                if ($updates !== []) {
+                    $targetUser->fill($updates);
+                    $targetUser->save();
+                }
+            });
+        };
 
-            if ($updates !== []) {
-                $user->fill($updates);
-                $user->save();
+        if ($hadPhotographerRole && ! $keepsPhotographerRole) {
+            try {
+                // Keep the account lock through the local role transaction so a
+                // slug change cannot reprovision between revoke and role loss.
+                app(FtpCredentialService::class)->revokeAndThen($user, $persistUpdate);
+            } catch (FtpCredentialException $exception) {
+                if ($exception->reason === FtpCredentialException::REASON_ROTATION_IN_PROGRESS) {
+                    return response()->json(['error' => $exception->getMessage()], 409);
+                }
+
+                throw $exception;
             }
-        });
+        } elseif (! $hadPhotographerRole && $keepsPhotographerRole) {
+            try {
+                // Photographer-role gains share the account lock with every
+                // other account write. A revoked account is re-provisioned only
+                // through this administrator path; pending first-time accounts
+                // keep their existing self-service provisioning flow.
+                app(FtpCredentialService::class)->restorePhotographerRoleAndThen($user, $persistUpdate);
+            } catch (FtpCredentialException $exception) {
+                if (in_array($exception->reason, [
+                    FtpCredentialException::REASON_ROTATION_IN_PROGRESS,
+                    FtpCredentialException::REASON_NOT_RESETTABLE,
+                ], true)) {
+                    return response()->json(['error' => $exception->getMessage()], 409);
+                }
+
+                throw $exception;
+            }
+        } else {
+            $persistUpdate($user);
+        }
 
         return response()->json(['success' => true]);
     }
@@ -466,17 +489,27 @@ class UserController extends Controller
             return response()->json(['error' => 'Forbidden (Brand Isolation)'], 403);
         }
 
-        // §7.16: an account exists iff the status is `active`. Same order and
-        // fail-closed rule as the role change — revoke first, delete second, in
-        // one transaction, so an SFTPGo outage leaves the account in place
-        // instead of deleting the row and orphaning a live credential.
-        DB::transaction(function () use ($user): void {
-            if ($user->ftp_account_status === FtpCredentialService::STATUS_ACTIVE) {
-                app(FtpCredentialService::class)->revoke($user);
+        // §7.16: the lock spans both remote revocation and local deletion. The
+        // SFTPGo call happens outside the database transaction; if it fails or
+        // the lock is busy, the user row remains available for recovery/retry.
+        try {
+            app(FtpCredentialService::class)->revokeAndThen(
+                $user,
+                static function (User $lockedUser): void {
+                    DB::transaction(function () use ($lockedUser): void {
+                        if (! $lockedUser->delete()) {
+                            throw new \RuntimeException('Could not delete the user after FTP account revocation.');
+                        }
+                    });
+                },
+            );
+        } catch (FtpCredentialException $exception) {
+            if ($exception->reason === FtpCredentialException::REASON_ROTATION_IN_PROGRESS) {
+                return response()->json(['error' => $exception->getMessage()], 409);
             }
 
-            $user->delete();
-        });
+            throw $exception;
+        }
 
         return response()->json(['success' => true]);
     }

@@ -133,6 +133,10 @@ msgstr "{groupPayableCount} Bilder × {groupTotalPriceText} € (Tier {groupTot
 #~ msgid "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
 #~ msgstr "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
 
+#: src/ui/management/ManagementOrgDetailView.tsx
+msgid "{legacyRoleName} · {legacyRoleId} (ungültig)"
+msgstr "{legacyRoleName} · {legacyRoleId} (ungültig)"
+
 #: src/ui/management/ManagementOrgsView.tsx
 msgid "{metaGalleryCount} Meta-Galerien"
 msgstr "{metaGalleryCount} Meta-Galerien"
@@ -2012,6 +2016,10 @@ msgstr "Die Daten werden automatisch in die Rechnung übernommen."
 #: src/ui/Impressum.tsx
 msgid "Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit, die Sie unter"
 msgstr "Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit, die Sie unter"
+
+#: src/ui/management/ManagementOrgDetailView.tsx
+msgid "Die gespeicherte Standardrolle „{legacyRoleName}“ (ID {legacyRoleId}) ist nicht zulässig. Wähle eine gültige Rolle und speichere, um die Konfiguration zu reparieren."
+msgstr "Die gespeicherte Standardrolle „{legacyRoleName}“ (ID {legacyRoleId}) ist nicht zulässig. Wähle eine gültige Rolle und speichere, um die Konfiguration zu reparieren."
 
 #: src/ui/ModelProfileAccessView.tsx
 msgid "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen."
@@ -4081,6 +4089,14 @@ msgstr "Kritischer Fehler"
 msgid "Kunde"
 msgstr "Kunde"
 
+#: src/ui/management/ManagementOrgDetailView.tsx
+msgid "Kunde (explizite Rolle)"
+msgstr "Kunde (explizite Rolle)"
+
+#: src/ui/management/ManagementOrgDetailView.tsx
+msgid "Kunde (Standard, nicht explizit gespeichert)"
+msgstr "Kunde (Standard, nicht explizit gespeichert)"
+
 #: src/ui/management/ManagementCustomersView.tsx
 msgid "Kunde aktualisiert"
 msgstr "Kunde aktualisiert"
@@ -4659,6 +4675,10 @@ msgstr "Mit dem Erwerb einer Lizenz erhält der Kunde das einfache, nicht übert
 msgid "Mit der Bestätigung der Checkbox „Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download)“ erteilt der Kunde diese ausdrückliche Zustimmung. Ab dem Zeitpunkt der Freischaltung des Downloads gilt das Rücktrittsrecht als erloschen."
 msgstr "Mit der Bestätigung der Checkbox „Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download)“ erteilt der Kunde diese ausdrückliche Zustimmung. Ab dem Zeitpunkt der Freischaltung des Downloads gilt das Rücktrittsrecht als erloschen."
 
+#: src/ui/management/ManagementOrgDetailView.tsx
+msgid "Mitgliederrolle"
+msgstr "Mitgliederrolle"
+
 #: src/logic/modelRegistration.ts
 msgid "Mittel"
 msgstr "Mittel"
@@ -4956,6 +4976,10 @@ msgstr "Neue Galerie"
 #: src/ui/components/GalleryGroupModal.tsx
 msgid "Neue Meta-Galerie erstellen"
 msgstr "Neue Meta-Galerie erstellen"
+
+#: src/ui/management/ManagementOrgDetailView.tsx
+msgid "Neue Nutzer, die künftig per Domain-Auto-Join beitreten oder von einem Organisationsadministrator angelegt werden, erhalten diese Rolle. Sie können damit Nutzer in dieser Organisation verwalten. Bestehende Nutzer bleiben unverändert."
+msgstr "Neue Nutzer, die künftig per Domain-Auto-Join beitreten oder von einem Organisationsadministrator angelegt werden, erhalten diese Rolle. Sie können damit Nutzer in dieser Organisation verwalten. Bestehende Nutzer bleiben unverändert."
 
 #: src/ui/management/ManagementOrgsView.tsx
 msgid "Neue Organisation"
@@ -5395,6 +5419,11 @@ msgstr "Organisations-Name"
 msgid "Organisations-Verwaltung"
 msgstr "Organisations-Verwaltung"
 
+#: src/ui/management/components/UserTable.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
+msgid "Organisationsadministrator"
+msgstr "Organisationsadministrator"
+
 #: src/ui/client/DeliveryView.tsx
 msgid "Original"
 msgstr "Original"
@@ -5605,6 +5634,7 @@ msgid "Position"
 msgstr "Position"
 
 #: src/ui/management/components/UserTable.tsx
+#: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Power-User"
 msgstr "Power-User"
 
@@ -6402,6 +6432,10 @@ msgstr "Standard-Vertrag"
 msgid "Standard-Wert"
 msgstr "Standard-Wert"
 
+#: src/ui/management/ManagementOrgDetailView.tsx
+msgid "Standardrolle für neue Mitglieder"
+msgstr "Standardrolle für neue Mitglieder"
+
 #: src/ui/management/ManagementContractView.tsx
 msgid "Starten"
 msgstr "Starten"
@@ -6774,6 +6808,10 @@ msgstr "unbegrenzt"
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Unbekannt"
 msgstr "Unbekannt"
+
+#: src/ui/management/ManagementOrgDetailView.tsx
+msgid "Unbekannte Rolle"
+msgstr "Unbekannte Rolle"
 
 #: src/ui/components/ErrorBoundary.tsx
 #: src/ui/management/ManagementSettingsView.tsx

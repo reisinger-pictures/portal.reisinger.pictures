@@ -242,9 +242,8 @@ class SftpGoClient
     }
 
     /**
-     * Removes the account. A 404 is reported as `not_found` instead of being
-     * swallowed: a mismatch between `users.ftp_slug` and the name in SFTPGo is
-     * an open question (P1-M34) and must not be hidden by an idempotent delete.
+     * Removes the account. A 404 is an idempotent success: after an ambiguous
+     * delete response, the next attempt can verify that the account is absent.
      */
     public function deleteUser(string $username): void
     {
@@ -252,7 +251,7 @@ class SftpGoClient
 
         $this->call('delete', $username, fn (PendingRequest $request) => $request->delete(
             $this->userPath($username),
-        ));
+        ), allowNotFound: true);
     }
 
     /**

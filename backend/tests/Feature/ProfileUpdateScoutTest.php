@@ -108,17 +108,11 @@ class ProfileUpdateScoutTest extends TestCase
     }
 
     /**
-     * The fail-closed decision reaches further than the slug: a profile update
-     * is one transaction, so a refused slug change discards the rest of the
-     * request as well.
-     *
-     * A photographer who changes the name and the camera login in one form
-     * expects one answer, and a half-applied update is the worst of both: the
-     * portal would show a new name with the old account, or a new account with
-     * the old name, and neither matches what was sent. Pinning it here also
-     * documents that the transaction — not the call order — is what makes the
-     * update atomic: `$user->update()` runs after the service call, so a future
-     * reordering would still be caught by the rollback this test relies on.
+     * A missing SFTPGo configuration is knowable before the account operation
+     * starts, so it must not persist any of the submitted profile fields. This
+     * does not claim that a later remote failure can roll back a distributed
+     * operation; those outcomes leave the account in the explicit `error`
+     * state and are covered by FtpSlugChangePasswordTest.
      */
     public function test_a_refused_slug_change_also_discards_the_name_change_from_the_same_request(): void
     {

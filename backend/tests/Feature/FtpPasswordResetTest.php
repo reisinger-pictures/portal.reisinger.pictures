@@ -257,6 +257,29 @@ class FtpPasswordResetTest extends TestCase
         );
     }
 
+    public function test_a_revoked_photographer_cannot_be_provisioned_by_the_reset_service(): void
+    {
+        Http::fake();
+        $user = $this->photographer();
+        $user->forceFill([
+            'ftp_account_status' => FtpCredentialService::STATUS_REVOKED,
+            'ftp_revoked_at' => now(),
+        ])->save();
+
+        try {
+            app(FtpCredentialService::class)->resetAndShow($user, '203.0.113.7');
+            $this->fail('Expected a revoked FTP account to refuse reset/provisioning.');
+        } catch (FtpCredentialException $exception) {
+            $this->assertSame(FtpCredentialException::REASON_NOT_RESETTABLE, $exception->reason);
+        }
+
+        $row = FtpPasswordReset::query()->sole();
+        $this->assertFalse($row->success);
+        $this->assertSame($user->id, $row->user_id);
+        $this->assertSame(FtpCredentialService::STATUS_REVOKED, $user->fresh()->ftp_account_status);
+        Http::assertNothingSent();
+    }
+
     /**
      * The counter counts attempts, not successes, and a rejected call still
      * consumes one. That is what stops a hammering client from pushing the window

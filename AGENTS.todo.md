@@ -90,26 +90,30 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Protokoll ganz oben. Eine Position mit `Entscheidung offen:` bedeutet, dass eine **neue**
 > Frage entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-22):** **3 offene `[ ]`** und **9 wartende
-> `[~]`** über 1213 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
-> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 3, `… | grep -c '^- \[~\]'` → 9,
-> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1213; `<stand>` = der committete Stand dieses
+> **Struktur-Hinweis, fortgeschrieben (2026-10-22):** **7 offene `[ ]`** und **9 wartende
+> `[~]`** über 1268 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
+> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 7, `… | grep -c '^- \[~\]'` → 9,
+> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1268; `<stand>` = der committete Stand dieses
 > Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
 > trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
-> 3: **3× `manuell prüfen:`** und **0× gewöhnliche Arbeit**; **0× `Entscheidung offen:`** — die
+> 7: **3× `manuell prüfen:`** und **4× gewöhnliche Arbeit**; **0× `Entscheidung offen:`** — die
 > offenen Owner-Fragen der Runde vom 2026-10-22 sind entschieden und als **D-50** (Proxy-Trust-
 > Grenze), **D-51** (Selbständerung des Kamera-Passworts), **D-52** (Watchtower-Policy),
 > **D-53** (SFTPGo-Admin-Wertepaar), **D-54** (`CREATE_DEFAULT_ADMIN` im Compose) und
-> **D-55** (CSP-Erweiterung, Turnstile bleibt aus) in `features/owner-decisions.md`
-> festgehalten; ihre Positionen sind deshalb aus dem Board entfernt. Gegenüber dem Stand vom
-> 2026-10-21 (4 `[ ]`, 16 `[~]`, 1300 Zeilen) sind **8 Positionen weg** — 7 geschlossen
+> **D-55** (CSP-Erweiterung, Turnstile bleibt aus), **D-56** (Fail-closed bei lokalem
+> Fehler nach erfolgreichem FTP-Widerruf) und **D-57** (Org-Default-Rollen) in
+> `features/owner-decisions.md` festgehalten; die
+> Owner-Fragen sind entschieden. D-51 war im früheren Board voreilig als
+> abgeschlossen geführt: Umsetzung und CI waren fertig, aber der Deploy erfolgte nicht. Die
+> Vorab-Review fand neue Blocker; die Fixrunde steht deshalb wieder als offene Arbeit unten.
+> Gegenüber dem Stand vom 2026-10-21 (4 `[ ]`, 16 `[~]`, 1300 Zeilen) waren **8 Positionen weg** — 7 als geschlossen markiert
 > (Dependabot-Alert dismissed, `SFTPGO_API_KEY`-Weg, Watchtower-Policy, Proxy-Trust-Grenze,
 > D-36-Ereigniskette in Produktion, `CREATE_DEFAULT_ADMIN` in der Cutover-Checkliste,
-> Selbständerung des Kamera-Passworts mit Tests und Deploy), 1 als Dublette zusammengeführt
+> Selbständerung des Kamera-Passworts mit Tests — damals fälschlich als deployed gezählt und inzwischen wieder offen), 1 als Dublette zusammengeführt
 > (die Live-GO-Punkte standen zweimal); eine Position wurde umformuliert und bleibt
 > (Live-GO-Punkte mit dem zurückgestellten Kill-Switch-Nachweis).
-> **Alle 14 Review-Befunde** sind geschlossen und aus der Liste entfernt (Nachweis in
-> `features/security/2026-10-18-review-closure.md`); die 3 enthalten die Punkte, die in den
+> **Alle 14 Review-Befunde der Prüfung vom 2026-10-18** sind geschlossen und aus der Liste entfernt (Nachweis in
+> `features/security/2026-10-18-review-closure.md`); die 7 offenen Punkte enthalten die Punkte, die in den
 > Freigaben der Wellen A–D als nicht-blockierend eingestuft und deshalb hier festgehalten
 > wurden (siehe „Neue offene Punkte aus den Wellen A–D") sowie die seitdem aufgedeckten Reste
 > (die Zwei-Verbindungs-Messung, die Restform der Dialog-Befunde, das Audit vom 2026-10-20 aus
@@ -121,15 +125,15 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > 2026-10-20** hat 16 alte Owner-Positionen durchgesehen: 11 davon sind erledigt, maschinell
 > abgedeckt oder überholt und deshalb aus der Liste gegangen; die restlichen sind mit korrigiertem
 > Wortlaut und dem richtigen Werkzeug (Firewalld statt ufw, `ROOT.PEM` statt `cert.pem`,
-> authentifiziert statt anonym lesen) stehen geblieben. Alle 10 `[~]` tragen ein `wartet auf`.
+> authentifiziert statt anonym lesen) stehen geblieben. Alle 9 `[~]` tragen ein `wartet auf`.
 > **Diese Zählung ist ein Stand, keine Zusage** — sie wandert mit jeder Welle; wer eine Position
 > sucht, zählt selbst nach. Der Vergleich zum 2026-09-28-Stand (69 Positionen) ist **kein**
 > Fortschrittsmaß: seither kamen Positionen hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
 > `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
-> (12 = 3 offen + 9 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
-> (1213) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
+> (16 = 7 offen + 9 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
+> (1268) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
 > würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
 > defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
 > **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
@@ -614,7 +618,39 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
+- [ ] D-51 absichern und ausliefern: alle SFTPGo-Kontomutationen und die Reconciliation (frischen User nach demselben Account-Lock laden) serialisieren; externe Aufrufe aus DB-Transaktionen verlagern; Remote-Delete-Retries fail-closed halten; Org-Default-Rollen gemäß D-57 (client/power_user/org_admin, nur Portal-Admin änderbar) validieren und konfigurierbar machen, ungültige Legacy-Werte sichtbar/fail-closed behandeln; unabhängige Nachprüfung, vollständige Backend-Gates sowie Frontend-/E2E-Gates ausführen, Fix committen/pushen und nur mit grüner CI des exakten Heads deployen; danach Neustart, Live-Proben und Nachweis dokumentieren.
+- [ ] Nach dem D-51-Release die bestätigten Security-/Finanzintegritäts-Findings priorisieren und mit Regressionstests beheben; zuerst AUTH-1 (Org-Rollenübernahme) und PAY-1 (Refund/Dispute vor Success), danach SEC-1 (CSRF) und die bestätigten Media-/Operations-Findings. Owner-Grenzen/bedingte Fälle vor einer Änderung entscheiden.
 - [~] wartet auf den **Mail-Nachweis** — Queue, Worker und Scheduler sind am 2026-10-21 live belegt: die PID-Dateien `/tmp/portal-{scheduler,queue-supervisor,queue-worker}.pid` existieren, der stündliche Scheduler-Mutex in `cache_locks` trägt den Slot-Suffix `2100` (erworben um 21:00:02Z), der Wochenimport lief am Montag-Slot `03:30` (Meilisearch-Batch **2335**, Task 7200, `enqueuedAt` 2026-10-19T03:30:32Z, `status: succeeded`), der manuelle Lauf vom 2026-10-21 21:07Z erzeugte Batch **2402** (39/39 Tasks succeeded, 19.477 Orte im Index `locations`), und die Queue-Tabellen `jobs`/`failed_jobs`/`job_batches` sind leer und fehlerfrei. Die **SMTP-Duplikat-Policy** ist entschieden (D-17 in `features/owner-decisions.md`: gültige Tokens erhalten, kein pauschales Queue-Uniqueness, ein SMTP-Retry darf keine zweite Belastung oder Zustandsänderung auslösen). Offen: ein **zugestellter** Mail-Nachweis aus der Produktion — der Admin-SMTP-Test (`POST /api/management/settings/test-email`) muss ausgelöst und der Provider-/Mailpit-Log danebengelegt werden; die Produktions-DB führt keine Mail-Logtabelle, und `storage/logs/laravel.log` ist vom 2026-04-23.
+
+### Security- und Stripe-Audit — Source-Validierung am Snapshot `f3aea9e0`
+
+Die Befunde wurden nach der Dokumentation einzeln gegen den committed Quellstand `f3aea9e0627d3f36a631d152844be87f73399852` und die referenzierten Tests/Verträge geprüft. „Bestätigt“ bedeutet hier einen belegten Source-Boundary-Fehler, nicht einen erfolgreichen Live-Exploit. Es liefen keine Tests und keine Produktions- oder Stripe-Dashboard-Proben; Caddy, Host-Modi, Ist-Daten und SFTPGo-Symlink-Verhalten bleiben ausdrücklich unbestätigt.
+
+- **SEC-1 — bestätigt, mittlere Source-Schwere; Exploit bedingt:** Cookie-authentifizierte unsafe methods haben keinen Origin-/CSRF-Token-Check. `SameSite=Lax` (`Controller.php:19-29`) blockiert keine same-site sibling-origin Form-POSTs; `SendInviteEmailRequest` validiert nur Felder, und `InviteController::sendEmail` erzeugt/verschickt bei `application/x-www-form-urlencoded` einen Bearer-Invite. Auch Login, Rating und `sync-access` nehmen Daten ohne JSON-only-Guard entgegen (`routes/api.php`, Requests/Controller). Die Sicherheitsdoku `features/security/csrf-strategy.md:34-43` behauptet eine JSON-only-Grenze, die diese Pfade nicht durchsetzen. Die Angreiferkontrolle über einen sibling-origin ist nicht belegt; Tests müssen insbesondere Invite ohne Mail/Row und Login-CSRF prüfen.
+- **AUTH-1 — bestätigt, hoch:** `OrgInviteController::redeem()` weist den bestehenden Nutzer Org B zu und fügt `client` hinzu, entfernt aber `org_admin` nicht (`OrgInviteController.php:150-159`). `AuthorizationService::isOrgAdmin()` prüft nur Rolle plus nicht-null `org_id`; die Management-Allowlist lässt Org-Admin-Funktionen zu (`:1469-1475`; `ManagementMiddleware.php:52-60`). Ein same-brand Client-Invite kann damit eine bestehende Org-A-Admin-Berechtigung auf Org B übertragen.
+- **AUTH-2 — bestätigt, niedrig:** Öffentliche Registrierung unterscheidet existierende Adressen: `unique:users` liefert Validierungsfehler, neue Adressen erhalten Erfolg (`AuthController.php:65-70, 134`; `routes/api.php:63-68`). Der Auth-Throttle begrenzt die Rate, beseitigt den Account-Existence-Oracle aber nicht.
+- **AUTH-3 — aktuell nicht erreichbar:** `brands.php` und `Brand` aktivieren nur `rp`; das mögliche Host-Mismatch-Managementproblem wird erst mit einer zweiten aktiven Brand relevant. Nicht als jetzige Schwachstelle führen.
+- **SEC-2 — bestätigter dokumentierter Transport-Rest, kein neues Finding:** FTPD `TLS_MODE=1` erlaubt laut Compose-Kommentar einen Client ohne `AUTH TLS`; Port 989 und passive Range werden veröffentlicht. Der FTP/FTPS-Fallback ist im selben Compose-Abschnitt ausdrücklich als bewusste Kompatibilitätsentscheidung dokumentiert, SFTP ist empfohlen. Nur durch neue Owner-Entscheidung auf „TLS zwingend“ ändern.
+- **SEC-3 — bestätigt, bereits bekannt:** SFTPGo-Provisionierung setzt keine Account-Quota (`SftpGoClient.php:123-138`); Importlimits binden den vorgelagerten Inbox-Speicher nicht. Das ist bereits als offener Transport-Quota-Rest SEC-14 in `features/security/2026-10-18-review-closure.md` dokumentiert, also kein neuer Befund.
+- **MEDIA-1 — Code-Guard fehlt, aktuelle Erreichbarkeit bedingt:** `ImageController::upload()` lädt `Gallery::find()` ohne Brand-Scope und erlaubt jeden Actor mit `isAdmin()` und `isPhotographer()` ohne `canManageGallery()`-Prüfung (`ImageController.php:25-43, 74-112`). `Gallery` hat keinen globalen Brand-Scope. Im Snapshot ist aber nur `rp` aktiv; Migration V031 führt `srp` nach `rp` zusammen. Ohne vorhandene fremde/legacy Galerie ist die Cross-Brand-Wirkung nicht belegt. Vor Aktivierung einer zweiten Brand absichern und danach testen.
+- **MEDIA-2 — bestätigt, P2:** ZIPs nutzen denselben deterministischen `base_scale_{photoId}_{tier}.jpg` in `TempDirectory::path('photo_download')`; der Lock schützt nur Skalierung, danach liest `injectMetadata()` den Scratch-Pfad erneut (`PhotoDownloadController.php:546-590`). Ein Manager kann damit nach einer Web-Tier-Skalierung ein unwatermarked Artefakt an dieselbe Stelle schreiben, bevor das Nicht-Manager-Archiv es konsumiert.
+- **MEDIA-3 — bestätigt, P2:** Public free-gallery ZIPs sind unauthenticated und per IP auf drei Requests/Minute gedrosselt, aber ein einzelner Aufruf lädt alle Fotos und erzeugt sie vor dem Stream als Scratch-Dateien; keine Foto-/Byte-Aggregatgrenze im Loop (`routes/api.php:176-179`; `PhotoDownloadController.php:417-439, 538-619`).
+- **MEDIA-4 — bestätigt, P2:** Ersatz überschreibt die Originaldatei derselben Photo-ID, ohne Derivate zu invalidieren (`ImageController.php:74-112`); keine Photo-Observer/Update-Cleanup-Stelle gefunden. Thumbnail-URLs versionieren nach unverändertem `created_at` (`Photo.php:177-214`), und FileDelivery liefert immutable Jahrescache (`:183-194`); alte Pixel können serverseitig und browserseitig fortbestehen.
+- **MEDIA-5 — bedingt, nicht bestätigt:** `is_file()`/`fopen()` folgen Symlinks und es gibt keine realpath-Konfinierung (`FtpInboxImporter.php:453-479`); `CAMERA_PERMISSIONS` ist `['/' => ['*']]` (`SftpGoClient.php:92, 123-138`). Ob deployed SFTPGo 2.7 einen Link aus dem Home zulässt, ist mit diesem Source-Stand nicht entscheidbar.
+- **MEDIA-6 — kein Finding:** Flat-rate-Web-Zugriff auf Originalbytes ist im Test und Delivery-Vertrag explizit vorgesehen (`FileDeliveryControllerTest`, `features/...`); nur eine spätere Policy-Änderung kann das öffnen.
+- **BROWSER-1 — unbestätigte Deployment-Frage:** CSP-Mirror enthält kein `frame-ancestors`; Laravel setzt XFO nur auf API-Antworten. Die statische SPA-Datei kommt über Caddy außerhalb dieses Commits; echte Root-Response-Header fehlen. Kein Clickjacking-Finding ohne Host-Nachweis.
+- **BROWSER-2 — bestätigter lokaler Cache-Effekt, kein Server-Bypass:** Geschützte Medien werden `private, max-age=31536000, immutable` geliefert. Ein gemeinsames Browserprofil kann zuvor ausgelieferte Bytes nach Rechterevokation lokal behalten; das ist nur bei gemeinsam genutztem Browser relevant und nicht serverseitig widerrufbar.
+- **OPS-1 — bestätigter Config-Guard-Mangel, Ausnutzung konfigurationsabhängig:** `FTP_EVENT_URL` akzeptiert absolute HTTP- oder HTTPS-URLs zu beliebigen Hosts (`config/ftp.php:49-62`); `ProvisionFtpEvents` setzt `FTP_EVENT_SECRET` in den Request-Header (`:131-140, 247-263`). Die Production-Policy validiert diesen Host/Scheme nicht (`ProductionOperationsPolicy.php:41-46`). Ein HTTP/fremdes URL-Environment kann das Secret offenlegen; tatsächliche Produktionseinstellung nicht geprüft.
+- **OPS-2 — bestätigte Klartext-Konfiguration, lateral bedingt:** Compose und Config defaulten auf `http://sftpgo:8080`; JWT-Fallback sendet Admin-Basic-Credentials und danach Bearer-Token (`services.php:64-77`; `SftpGoClient.php:532-546, 649-656`). API ist nicht host-published und SFTPGo sitzt nur im internen Docker-Netz. Ein normaler Internetclient erreicht es nicht; das Risiko setzt Zugriff mit Paketbeobachtung/MITM auf Host oder internem Netz voraus.
+- **OPS-3 — bestätigte unsichere Rechte-Policy, lokaler/PHP-Foothold nötig:** `sync.sh` setzt Backend-Dateien auf `F666`, Verzeichnisse auf `D2777`; Compose bind-mountet den Code read-write für den Backend-Prozess (`sync.sh:42-53, 69-83`; `docker-compose.yml:82, 96-99`). Die Policy erlaubt lokalen Prozessen und kompromittiertem App-Code dauerhafte Source-Änderungen. Host-Modi wurden nicht live geprüft.
+- **OPS-4 — bestätigte Owner-Aktion, keine aktuelle Kompromittierung belegt:** Historische Ausgabe von `AI_API_KEY` und `ADMIN_PASSWORD` steht im Runbook/Board; Rotation/Widerrufsbeleg ist ein bestehender Owner-TODO. Aus dem Audit folgt nicht, dass Werte aktuell aktiv oder extern exponiert sind.
+- **PAY-1 — bestätigt, P1:** Refund/Dispute-Handler quittieren 200 und schließen den Event-Claim, auch wenn `transitionTerminalPaymentStatus()` bei `pending_payment` wegen der erlaubten Quellstatus ablehnt (`WebhookController.php:111-188, 457-482, 699-745`). Erfolgs-Reconciliation erlaubt danach `pending_payment → paid` (`PaymentIntentReconciliationService.php:106-128`). Der bestehende Regressionstest pinnt nur den ersten Teil und testet nicht das nachfolgende Success-Event. Stripe-Event-Reihenfolge ist laut Auditor-Doku nicht garantiert; dieser Ablauf kann Zugriff nach Refund/Chargeback wiederherstellen.
+- **PAY-2 — bestätigt, P2/admin path:** `OrderController::updateStatus()` setzt `cancelled` nur lokal; es storniert den PaymentIntent nicht (`:61-85`). Stale-Intent-Sweep selektiert nur `pending_payment`; späterer `payment_intent.succeeded` wird für `cancelled` ignoriert (`CancelStalePaymentIntents.php:64-69`; `WebhookController.php:271-279`). Ein bereits ausgegebener Client-Secret kann damit eine nicht erfüllte Zahlung abschließen.
+- **PAY-3 — bestätigt, P2/admin-only:** Die Managementroute erlaubt `paid`; `updateStatus()` schreibt den Wert direkt ohne Stripe-Settlement-/Offline-Rechnungsprüfung (`routes/api.php:360-361`; `OrderController.php:61-87`). `paid` ist download-berechtigt (`PurchaseService.php:30-45`). Das erfordert einen Admin-Account.
+- **PAY-4 — bestätigt fehlender Automatismus, Produktpolicy offen:** Endpoint-Doku abonniert vier Events, `charge.dispute.closed` fehlt; unbekannte Events werden 200 quittiert. `disputed` sperrt Downloads. Weder Contract noch Test sagt, ob gewonnene Disputes automatisch Zugriff wiederherstellen sollen; deshalb keine bestätigte Schwachstelle, sondern Recovery-/Owner-Entscheidung.
+- **PAY-5 — Datenlücke bestätigt, finanzieller Schaden bedingt:** Teilrefunds bleiben absichtlich `paid` und Refund-Beträge werden nicht gespeichert; Payout-Berechnung summiert weiterhin Snapshot-Netto für `paid`-Orders. Ein Überzahlen entsteht nur, falls Fotografen-Payouts die Rückerstattung tragen statt die Plattform.
+- **PAY-6 — kein Security-Finding:** Implizite Stripe-API-Version und SDK-Versiondrift sind Wartungsrisiken, aber kein belegter Exploit.
+
 ## 🧪 TEST-QUALITÄTS-AUDIT (2026-09-26) — zwei unabhängige Audits
 
 Scope: 84 E2E-Specs (191 `test()`, 278 Testinstanzen, 9.769 Zeilen) und 129

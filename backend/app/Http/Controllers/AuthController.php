@@ -4,17 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Enums\AutoJoinPolicy;
 use App\Enums\Brand;
-use App\Enums\UserRole;
 use App\Exceptions\FtpCredentialException;
 use App\Mail\ActivateAccountMail;
 use App\Models\Org;
 use App\Models\OrgInvite;
-use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivationTokenService;
 use App\Services\AIService;
 use App\Services\AuthorizationService;
 use App\Services\FtpCredentialService;
+use App\Services\OrgDefaultRolePolicy;
 use App\Support\BrandRegistry;
 use App\Support\FtpInboxDirectory;
 use App\Support\FtpSlug;
@@ -193,16 +192,8 @@ class AuthController extends Controller
         $org = $domain ? Org::where('domain', $domain)->first() : null;
         $orgBrandMatches = $org && BrandRegistry::resourceMatchesCurrent($org->brand);
         if ($org && $orgBrandMatches && $org->auto_join_policy === AutoJoinPolicy::IMMEDIATE && ! $user->org_id) {
-            // Assign role from org's default_role_id, fallback to client
-            $roleId = $org->default_role_id;
-            if (! $roleId) {
-                $clientRole = Role::where('name', UserRole::CLIENT->value)->first();
-                throw_unless($clientRole, \RuntimeException::class, 'Critical: Default CLIENT role missing in database.');
-                $roleId = $clientRole->id;
-            }
-            if ($roleId) {
-                $user->roles()->attach($roleId);
-            }
+            $defaultRole = app(OrgDefaultRolePolicy::class)->roleForNewAssignment($org);
+            $user->roles()->attach($defaultRole->id);
 
             // Inherit flatrate settings from org
             if ($org->default_flatrate_level) {
@@ -276,119 +267,88 @@ class AuthController extends Controller
             ]
         );
 
-        // Set by the slug-change branch when the old folder is retained, and read
-        // after the transaction: before the commit a warning would be a lie if the
-        // transaction rolled back.
+        // Set after the old account is deleted and read after the profile write:
+        // the old folder is retained because it may still contain uploads.
         $orphanedInboxPath = null;
+        $newSlug = $validated['ftp_slug'] ?? null;
+        $credentialResponse = null;
 
-        // Das Rueckgabewert wird absichtlich weitergegeben. `DB::transaction()`
-        // liefert den Wert der Closure zurueck; ohne ihn zu benutzen,
-        // antwortete der Slug-Wechsel mit `{"success": true}` und das soeben
-        // erzeugte Passwort wurde niemandem angezeigt — ein working account,
-        // dessen Passwort niemand kennt, mit dem Reset-Endpunkt (3x/Stunde)
-        // als einzigem Ausweg. Die Nicht-Slug-Aenderungen liefern null.
-        $credentialResponse = DB::transaction(function () use ($user, $validated, &$orphanedInboxPath) {
-            // P1-M34: Ein Slug-Wechsel ist ein Reset. Der alte SFTPGo-Account
-            // wird gelöscht, der neue Account mit einem neuen Passwort
-            // angelegt. Das Passwort wird einmal zurückgegeben, nicht
-            // gespeichert. Race Condition: SFTPGo's PUT ersetzt das ganze
-            // User-Objekt, also wäre Read-Modify-Write nötig — und das hat
-            // Race Conditions. Der Reset vermeidet das und bleibt konsistent
-            // mit dem Show-once-Konzept.
-            $oldSlug = $user->ftp_slug;
-            $newSlug = $validated['ftp_slug'] ?? null;
+        if (is_string($newSlug)) {
+            $credentialSvc = app(FtpCredentialService::class);
 
-            if ($newSlug && $oldSlug !== $newSlug) {
-                // D-2 (AGENTS.md §14): the software creates `ftp/<newSlug>`
-                // itself, and the slug is stored only if that succeeded. SFTPGo
-                // does not create the folder ("you have to create the folder on
-                // disk yourself", feature doc 7.9), so without this the account
-                // would point at a directory that does not exist — which does not
-                // surface as an error from the portal, only as an empty inbox.
-                //
-                // It runs before the old account is deleted on purpose: that
-                // keeps the two failure modes apart. A folder that cannot be
-                // created changes *nothing at all*, while a stored slug whose
-                // folder is missing is the state D-2 exists to make
-                // unrepresentable. Looked at from the other side: a failed
-                // delete after this point leaves the slug unchanged and the new
-                // folder behind, which is harmless litter (see the warning
-                // below) — the reverse order would leave a live account without
-                // a folder.
-                try {
-                    FtpInboxDirectory::ensure($newSlug);
-                } catch (FtpCredentialException $exception) {
-                    // 503, not 422 and not 500. The inbox directory is a host
-                    // dependency: a missing `ftp/` bind mount, a read-only
-                    // filesystem or wrong permissions cannot be corrected in the
-                    // request, so the portal is fine and the dependency is not.
-                    // Same reading, same code as an unreachable SFTPGo in
-                    // FtpCredentialController::statusForServiceFailure() — and the
-                    // reset endpoint answers this identical cause with 503 too.
+            try {
+                // Slug-bearing profile writes use the same per-account lock as
+                // reset and self-change. The service calls this callback only
+                // after a successful old-account delete; only the profile write
+                // itself is transactional, never an SFTPGo HTTP call.
+                $password = $credentialSvc->changeSlugAndShow(
+                    $user,
+                    $newSlug,
+                    function (User $lockedUser): void {
+                        if (! app(AuthorizationService::class)->isPhotographer($lockedUser)) {
+                            throw new HttpResponseException(response()->json([
+                                'error' => 'Der FTP-Login kann nur von Fotografen geändert werden.',
+                            ], 403));
+                        }
+                    },
+                    function (User $lockedUser) use ($validated, $newSlug, &$orphanedInboxPath): void {
+                        $oldSlug = $lockedUser->ftp_slug;
+
+                        if (is_string($oldSlug) && $oldSlug !== '' && $oldSlug !== $newSlug) {
+                            $oldInboxPath = FtpInboxDirectory::pathFor($oldSlug);
+                            if (is_dir($oldInboxPath)) {
+                                $orphanedInboxPath = $oldInboxPath;
+                            }
+                        }
+
+                        DB::transaction(function () use ($lockedUser, $validated): void {
+                            if (! $lockedUser->update($validated)) {
+                                throw new \RuntimeException('Could not persist the profile update.');
+                            }
+
+                            $lockedUser->photos()->searchable();
+                        });
+                    },
+                );
+
+                if ($password !== null) {
+                    $credentialResponse = response()->json([
+                        'success' => true,
+                        'ftp_password' => $password,
+                        'ftp_password_note' => 'Dieses Passwort wird nur einmal angezeigt. Speichere es sofort.',
+                    ]);
+                }
+            } catch (FtpCredentialException $exception) {
+                if (in_array($exception->reason, [
+                    FtpCredentialException::REASON_ROTATION_IN_PROGRESS,
+                    FtpCredentialException::REASON_NOT_RESETTABLE,
+                ], true)) {
+                    return response()->json(['error' => $exception->getMessage()], 409);
+                }
+
+                if (in_array($exception->reason, [
+                    FtpCredentialException::REASON_UNCREATABLE_INBOX_DIRECTORY,
+                    FtpCredentialException::REASON_UNUSABLE_INBOX_PATH,
+                ], true)) {
                     return response()->json(['error' => $exception->getMessage()], 503);
                 }
 
-                // The old folder is deliberately not deleted: it can still hold
-                // uploads that were not imported yet, and removing it would
-                // destroy them. The operator is told about it once the
-                // transaction has committed.
-                if ($oldSlug !== null && $oldSlug !== '') {
-                    $oldInboxPath = FtpInboxDirectory::pathFor($oldSlug);
-                    if (is_dir($oldInboxPath)) {
-                        $orphanedInboxPath = $oldInboxPath;
-                    }
+                throw $exception;
+            } finally {
+                if ($orphanedInboxPath !== null) {
+                    // The folder can still hold unimported uploads, and removing
+                    // it would destroy them. The operator decides what to do.
+                    Log::warning('Der FTP-Ordner des vorherigen Logins bleibt erhalten.', ['path' => $orphanedInboxPath]);
                 }
-
-                $credentialSvc = app(FtpCredentialService::class);
-
-                // 1. Alten Account löschen (falls vorhanden). Wenn SFTPGo
-                //    nicht erreichbar ist, abbrechen — der User soll nicht
-                //    aktualisiert werden, wenn der Account nicht gelöscht
-                //    wurde.
-                //
-                //    Nur wenn laut Status ein Account *existiert* (19-ftp 7.16).
-                //    `User::booted()` vergibt bei jedem Anlegen einen Slug, aber
-                //    kein Konto: Ein Fotograf, der seinen ersten Slug wechselt,
-                //    ist `pending` und hat in SFTPGo nichts, was man löschen
-                //    könnte. `SftpGoClient::deleteUser()` meldet ein 404 aber
-                //    als `not_found` statt es zu schlucken — mit dem
-                //    Fail-closed-Verhalten brach damit *jeder* erste
-                //    Slug-Wechsel mit HTTP 500 ab. Der Guard ist derselbe wie
-                //    in `FtpCredentialService::revoke()`: kein Delete ohne
-                //    Status `active`, sonst hielte SFTPGo einen Account, den das
-                //    Portal nicht als existierend führt. Fail-closed bleibt
-                //    unberührt — ist der Status `active` und SFTPGo nicht
-                //    erreichbar, bricht der Wechsel weiterhin ab.
-                if ($oldSlug && $user->ftp_account_status === FtpCredentialService::STATUS_ACTIVE) {
-                    $credentialSvc->deleteUser($oldSlug);
-                }
-
-                // 2. User aktualisieren (neuer Slug)
-                $user->update($validated);
-                $user->photos()->searchable();
-
-                // 3. Neuen Account anlegen mit neuem Passwort
-                $password = $credentialSvc->provisionAndShow($user);
-
-                return response()->json([
-                    'success' => true,
-                    'ftp_password' => $password,
-                    'ftp_password_note' => 'Dieses Passwort wird nur einmal angezeigt. Speichere es sofort.',
-                ]);
             }
+        } else {
+            DB::transaction(function () use ($user, $validated): void {
+                if (! $user->update($validated)) {
+                    throw new \RuntimeException('Could not persist the profile update.');
+                }
 
-            $user->update($validated);
-            $user->photos()->searchable();
-
-            return null;
-        });
-
-        if ($orphanedInboxPath !== null) {
-            // The owner has to learn about the retained folder: it is litter
-            // that still holds photographs, and the previous account (and so the
-            // camera configured with it) no longer exists. Deleting it is not
-            // something the portal may decide on its own.
-            Log::warning('Der FTP-Ordner des vorherigen Logins bleibt erhalten.', ['path' => $orphanedInboxPath]);
+                $user->photos()->searchable();
+            });
         }
 
         return $credentialResponse ?? response()->json(['success' => true]);

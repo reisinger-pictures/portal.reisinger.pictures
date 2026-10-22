@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-55. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-57. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -226,6 +226,14 @@ The production stack manages **one** credential pair for SFTPGo: `SFTPGO_ADMIN_U
 ### D-54: The SFTPGo admin bootstrap stays a compose value
 
 `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` is a hardcoded value of the versioned compose file, not a stack-env variable. It has no secret relation, and it has to be effective before the first start — without it the `admins` table stays empty and the token answers 401, so a stack that depends on someone remembering the variable would fail closed on every fresh deploy. Owner decision of 2026-10-22: the value stays in the compose file and the cutover checklist is corrected to say so. See [FTP cutover checklist](infrastructure/19-ftp-cutover-checklist.md) §2.
+
+### D-56: Remote FTP revocation remains fail-closed if local persistence fails
+
+When SFTPGo has successfully revoked a photographer account but the following local role-update or user-delete transaction fails, do not attempt to recreate the remote account or restore a camera password. The portal keeps the truthful `revoked` status and the still-existing role or user row; the management operation returns an error, and an administrator retries the local role change or deletion. A distributed rollback would require recovering or replacing a show-once camera password and could not restore the previous credential safely. See [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md) §7.16.
+
+### D-57: Organization default roles are explicit, scoped bulk grants
+
+An organization may configure its default role as `client`, `power_user`, or `org_admin`; `null` means `client`. The default applies only to users newly assigned to that organization through domain auto-join or org-admin user creation; changing it does not rewrite existing users. `org_admin` is a deliberate per-organization bulk grant of user-management rights scoped to that organization, so the UI must explain that consequence. Only portal admins may change the default. `photographer`, `admin`, and `super_admin` are never valid organization defaults: photographer access has its own FTP credential lifecycle, and the global admin roles exceed the organization's scope. Unsupported legacy values fall back to `client` for new assignments, are surfaced for repair, and block organization membership removal/destruction rather than silently detaching a specialized role. Existing photographer roles are revoked explicitly through the lock-aware FTP lifecycle. See [organization core](b2b/01-organisation-core.md#24-per-organization-default-role).
 
 ## Rate limiting, access grants, and runtime requirements
 

@@ -7,10 +7,15 @@ use App\Exceptions\SftpGoException;
 use App\Models\FtpPasswordReset;
 use App\Models\User;
 use App\Services\FtpCredentialService;
+use App\Services\SftpGoClient;
 use App\Support\FtpSlug;
+use Closure;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
@@ -141,6 +146,27 @@ class FtpPasswordChangeTest extends TestCase
         }
     }
 
+    public function test_current_password_is_redacted_from_an_exception_trace(): void
+    {
+        Http::fake([
+            'sftpgo.test:8080/api/v2/user/token' => Http::response(['error' => 'invalid credentials'], 401),
+        ]);
+        $user = $this->photographer();
+        $trace = null;
+
+        try {
+            app(FtpCredentialService::class)->changeAndShow($user, self::CURRENT_PASSWORD);
+            $this->fail('A rejected current password must throw.');
+        } catch (FtpCredentialException $exception) {
+            $trace = json_encode($exception->getTrace(), JSON_THROW_ON_ERROR);
+        }
+
+        $this->assertIsString($trace);
+        $this->assertStringContainsString('changeWhileLocked', $trace);
+        $this->assertStringNotContainsString(self::CURRENT_PASSWORD, $trace);
+        $this->assertFalse(FtpPasswordReset::query()->sole()->success);
+    }
+
     // ── Order ────────────────────────────────────────────────────────────────
 
     /**
@@ -252,6 +278,220 @@ class FtpPasswordChangeTest extends TestCase
             (int) RateLimiter::attempts(FtpCredentialService::resetQuotaKey($user->getKey())),
             'The change has to consume the quota of the reset, not a bucket of its own.',
         );
+    }
+
+    public function test_password_rotation_locks_are_isolated_per_user(): void
+    {
+        $firstUser = $this->photographer(['email' => 'first@example.com', 'ftp_slug' => 'florian']);
+        $secondUser = $this->photographer(['email' => 'second@example.com', 'ftp_slug' => 'sabine']);
+        $firstLock = $this->lockThatRunsCallback();
+        $secondLock = $this->lockThatRunsCallback();
+
+        Cache::shouldReceive('lock')
+            ->once()
+            ->with(FtpCredentialService::rotationLockKey((string) $firstUser->getKey()), 120)
+            ->andReturn($firstLock);
+        Cache::shouldReceive('lock')
+            ->once()
+            ->with(FtpCredentialService::rotationLockKey((string) $secondUser->getKey()), 120)
+            ->andReturn($secondLock);
+
+        $sftpGo = \Mockery::mock(SftpGoClient::class);
+        $sftpGo->shouldReceive('verifyPassword')
+            ->once()
+            ->with('florian', self::CURRENT_PASSWORD)
+            ->andReturnTrue();
+        $sftpGo->shouldReceive('verifyPassword')
+            ->once()
+            ->with('sabine', self::CURRENT_PASSWORD)
+            ->andReturnTrue();
+        $sftpGo->shouldReceive('resetPassword')
+            ->once()
+            ->with('florian', \Mockery::type('string'))
+            ->andReturn([]);
+        $sftpGo->shouldReceive('resetPassword')
+            ->once()
+            ->with('sabine', \Mockery::type('string'))
+            ->andReturn([]);
+        $service = new FtpCredentialService($sftpGo);
+
+        $firstPassword = $service->changeAndShow($firstUser, self::CURRENT_PASSWORD);
+        $secondPassword = $service->changeAndShow($secondUser, self::CURRENT_PASSWORD);
+
+        $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $firstPassword);
+        $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $secondPassword);
+        $this->assertCount(2, FtpPasswordReset::query()->where('success', true)->get());
+    }
+
+    public function test_reset_and_change_share_the_same_lock_including_pending_provisioning(): void
+    {
+        $user = $this->photographer(
+            ['ftp_slug' => 'florian'],
+            FtpCredentialService::STATUS_PENDING,
+        );
+        $provisionLock = $this->lockThatRunsCallback();
+        $changeLock = $this->lockThatRunsCallback();
+        Cache::shouldReceive('lock')
+            ->twice()
+            ->with(FtpCredentialService::rotationLockKey((string) $user->getKey()), 120)
+            ->andReturn($provisionLock, $changeLock);
+
+        $sftpGo = \Mockery::mock(SftpGoClient::class);
+        $sftpGo->shouldReceive('provisionUser')
+            ->once()
+            ->with('florian', \Mockery::type('string'), $this->inboxRoot.'/florian')
+            ->andReturn([]);
+        $sftpGo->shouldReceive('verifyPassword')
+            ->once()
+            ->with('florian', self::CURRENT_PASSWORD)
+            ->andReturnTrue();
+        $sftpGo->shouldReceive('resetPassword')
+            ->once()
+            ->with('florian', \Mockery::type('string'))
+            ->andReturn([]);
+        $service = new FtpCredentialService($sftpGo);
+
+        $provisionedPassword = $service->resetAndShow($user);
+        $changedPassword = $service->changeAndShow($user->fresh(), self::CURRENT_PASSWORD);
+
+        $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $provisionedPassword);
+        $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $changedPassword);
+        $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $user->fresh()->ftp_account_status);
+        // First-time provisioning retains its existing no-audit behavior; the
+        // subsequent self-change still records its successful rotation.
+        $this->assertTrue(FtpPasswordReset::query()->sole()->success);
+    }
+
+    /**
+     * Simulate a second same-account request arriving while the first rotation
+     * is verifying its password. It must time out at the same lock, so only the
+     * outer request can write, audit success, and return a password.
+     */
+    public function test_overlapping_changes_for_one_user_cannot_both_report_success(): void
+    {
+        $user = $this->photographer(['ftp_slug' => 'florian']);
+        $held = false;
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')
+            ->twice()
+            ->with(10, \Mockery::type(Closure::class))
+            ->andReturnUsing(function (int $seconds, Closure $callback) use (&$held): mixed {
+                if ($held) {
+                    throw new LockTimeoutException;
+                }
+
+                $held = true;
+
+                try {
+                    return $callback();
+                } finally {
+                    $held = false;
+                }
+            });
+        Cache::shouldReceive('lock')
+            ->twice()
+            ->with(FtpCredentialService::rotationLockKey((string) $user->getKey()), 120)
+            ->andReturn($lock);
+
+        $nestedFailure = null;
+        $sftpGo = \Mockery::mock(SftpGoClient::class);
+        $service = new FtpCredentialService($sftpGo);
+        $sftpGo->shouldReceive('verifyPassword')
+            ->once()
+            ->with('florian', self::CURRENT_PASSWORD)
+            ->andReturnUsing(function (
+                string $username,
+                #[\SensitiveParameter] string $password,
+            ) use (&$nestedFailure, $service, $user): bool {
+                $this->assertSame('florian', $username);
+                $this->assertSame(self::CURRENT_PASSWORD, $password);
+
+                try {
+                    $service->changeAndShow($user, self::CURRENT_PASSWORD);
+                } catch (FtpCredentialException $exception) {
+                    $nestedFailure = $exception;
+                }
+
+                return true;
+            });
+        $sftpGo->shouldReceive('resetPassword')
+            ->once()
+            ->with('florian', \Mockery::type('string'))
+            ->andReturn([]);
+
+        $password = $service->changeAndShow($user, self::CURRENT_PASSWORD);
+
+        $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $password);
+        $this->assertInstanceOf(FtpCredentialException::class, $nestedFailure);
+        $this->assertSame(FtpCredentialException::REASON_ROTATION_IN_PROGRESS, $nestedFailure->reason);
+        $this->assertSame(1, FtpPasswordReset::query()->count());
+        $this->assertSame(1, FtpPasswordReset::query()->where('success', true)->count());
+        $this->assertSame(1, RateLimiter::attempts(FtpCredentialService::resetQuotaKey((string) $user->getKey())));
+    }
+
+    public function test_a_reset_cannot_overlap_a_same_user_change(): void
+    {
+        $user = $this->photographer(['ftp_slug' => 'florian']);
+        $held = false;
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')
+            ->twice()
+            ->with(10, \Mockery::type(Closure::class))
+            ->andReturnUsing(function (int $seconds, Closure $callback) use (&$held): mixed {
+                if ($held) {
+                    throw new LockTimeoutException;
+                }
+
+                $held = true;
+
+                try {
+                    return $callback();
+                } finally {
+                    $held = false;
+                }
+            });
+        Cache::shouldReceive('lock')
+            ->twice()
+            ->with(FtpCredentialService::rotationLockKey((string) $user->getKey()), 120)
+            ->andReturn($lock);
+
+        $resetReturned = false;
+        $resetFailure = null;
+        $sftpGo = \Mockery::mock(SftpGoClient::class);
+        $service = new FtpCredentialService($sftpGo);
+        $sftpGo->shouldReceive('verifyPassword')
+            ->once()
+            ->with('florian', self::CURRENT_PASSWORD)
+            ->andReturnUsing(function (
+                string $username,
+                #[\SensitiveParameter] string $password,
+            ) use (&$resetFailure, &$resetReturned, $service, $user): bool {
+                $this->assertSame('florian', $username);
+                $this->assertSame(self::CURRENT_PASSWORD, $password);
+
+                try {
+                    $service->resetAndShow($user);
+                    $resetReturned = true;
+                } catch (FtpCredentialException $exception) {
+                    $resetFailure = $exception;
+                }
+
+                return true;
+            });
+        $sftpGo->shouldReceive('resetPassword')
+            ->once()
+            ->with('florian', \Mockery::type('string'))
+            ->andReturn([]);
+
+        $password = $service->changeAndShow($user, self::CURRENT_PASSWORD);
+
+        $this->assertMatchesRegularExpression(FtpCredentialService::PASSWORD_PATTERN, $password);
+        $this->assertFalse($resetReturned, 'The nested recovery request must not report success.');
+        $this->assertInstanceOf(FtpCredentialException::class, $resetFailure);
+        $this->assertSame(FtpCredentialException::REASON_ROTATION_IN_PROGRESS, $resetFailure->reason);
+        $this->assertSame(1, RateLimiter::attempts(FtpCredentialService::resetQuotaKey((string) $user->getKey())));
+        $this->assertSame(1, FtpPasswordReset::query()->count());
+        $this->assertTrue(FtpPasswordReset::query()->sole()->success);
     }
 
     // ── Audit trail ──────────────────────────────────────────────────────────
@@ -400,6 +640,17 @@ class FtpPasswordChangeTest extends TestCase
 
             return Http::response($account, 200);
         });
+    }
+
+    private function lockThatRunsCallback(): Lock
+    {
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')
+            ->once()
+            ->with(10, \Mockery::type(Closure::class))
+            ->andReturnUsing(static fn (int $seconds, Closure $callback): mixed => $callback());
+
+        return $lock;
     }
 
     private function account(): array

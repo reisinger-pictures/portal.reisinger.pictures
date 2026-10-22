@@ -12,7 +12,7 @@ namespace App\Values;
  *
  * - `status` — the portal status **after** the run (`active`, `revoked`,
  *   `pending`, or the status that was left untouched). It is the state a
- *   photographer would see in the inbox.
+ *   photographer would see in the inbox, or `deleted` when the row was gone.
  * - `outcome` — what the reconciliation found, which is *not* the same question
  *   as the status: a `revoked` account that exists again is `divergent`, not
  *   `active`, because the reconciliation refuses to undo a deliberate
@@ -44,6 +44,12 @@ final class FtpAccountReconciliation
      */
     public const OUTCOME_DIVERGENT = 'divergent';
 
+    /** The account lock was busy; reconciliation can be retried later. */
+    public const OUTCOME_RETRYABLE = 'retryable';
+
+    /** The user row no longer exists; there is no account state to reconcile. */
+    public const OUTCOME_SKIPPED = 'skipped';
+
     /** SFTPGo has the account and it is enabled. */
     public const REASON_ACCOUNT_FOUND = 'account_found';
 
@@ -58,6 +64,12 @@ final class FtpAccountReconciliation
      * stays `revoked`; the operator has to decide what to do.
      */
     public const REASON_REVOKED_ACCOUNT_FOUND = 'revoked_account_found';
+
+    /** Another operation holds the shared per-account lock. */
+    public const REASON_ROTATION_IN_PROGRESS = 'rotation_in_progress';
+
+    /** The user was deleted before reconciliation acquired the account lock. */
+    public const REASON_USER_DELETED = 'user_deleted';
 
     private function __construct(
         public readonly string $status,
@@ -98,5 +110,17 @@ final class FtpAccountReconciliation
     public static function divergent(string $status, string $reason): self
     {
         return new self($status, self::OUTCOME_DIVERGENT, $reason, false);
+    }
+
+    /** The lock was not acquired, so no SFTPGo read or state change was made. */
+    public static function retryable(string $status, string $reason): self
+    {
+        return new self($status, self::OUTCOME_RETRYABLE, $reason, false);
+    }
+
+    /** The row disappeared before the lock-protected reconciliation began. */
+    public static function skippedDeletedUser(): self
+    {
+        return new self('deleted', self::OUTCOME_SKIPPED, self::REASON_USER_DELETED, false);
     }
 }

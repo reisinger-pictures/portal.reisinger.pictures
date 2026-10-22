@@ -3,7 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import {useState} from 'react';
 import {useNavigate, useParams} from 'react-router-dom';
 import {Org, OrgUser, useOrgs} from '../../logic/useOrgs';
-import {useUsers} from '../../logic/useUsers';
+import {useUsers, UserRole} from '../../logic/useUsers';
 import {FlatGroup} from '../../logic/useGalleries';
 import {flattenGroups} from '../../logic/utils';
 import {useProtectedGalleries} from '../../logic/useGalleries';
@@ -27,10 +27,21 @@ interface OrgSettingsProps {
     setSharedFlatrateCents: (v: number) => void;
     autoJoinPolicy: 'immediate' | 'requires_invite' | 'disabled';
     setAutoJoinPolicy: (v: 'immediate' | 'requires_invite' | 'disabled') => void;
+    canEditDefaultRole: boolean;
+    defaultRoleId: string;
+    setDefaultRoleId: (v: string) => void;
+    defaultRoleInfo: Org['default_role_info'];
+    defaultRoleOptions: Array<{ id: string; name: UserRole; label: string }>;
+    isOrgAdminDefaultRole: boolean;
     handleSaveGeneral: (e: React.FormEvent) => void;
 }
 
-const OrgSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFlatrateLevel, setDefaultFlatrateLevel, sharedFlatrateCents, setSharedFlatrateCents, autoJoinPolicy, setAutoJoinPolicy, handleSaveGeneral}: OrgSettingsProps) => (
+const OrgSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFlatrateLevel, setDefaultFlatrateLevel, sharedFlatrateCents, setSharedFlatrateCents, autoJoinPolicy, setAutoJoinPolicy, canEditDefaultRole, defaultRoleId, setDefaultRoleId, defaultRoleInfo, defaultRoleOptions, isOrgAdminDefaultRole, handleSaveGeneral}: OrgSettingsProps) => {
+    const legacyRoleName = defaultRoleInfo?.name ?? t`Unbekannte Rolle`;
+    const legacyRoleId = defaultRoleInfo?.id ?? '';
+    const legacyRoleLabel = t`${legacyRoleName} · ${legacyRoleId} (ungültig)`;
+
+    return (
     <form onSubmit={handleSaveGeneral}
           className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm space-y-4">
         <h2 className="font-bold text-xl border-b border-base-300 pb-2 mb-4"><Trans>Einstellungen</Trans></h2>
@@ -80,9 +91,48 @@ const OrgSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFl
                 <option value="disabled"><Trans>Deaktiviert</Trans></option>
             </select>
         </div>
+        {canEditDefaultRole && (
+            <fieldset className="fieldset">
+                <legend className="fieldset-legend"><Trans>Mitgliederrolle</Trans></legend>
+                <label htmlFor="org-default-role" className="label">
+                    <span className="label-text font-bold"><Trans>Standardrolle für neue Mitglieder</Trans></span>
+                </label>
+                <select
+                    id="org-default-role"
+                    value={defaultRoleId}
+                    onChange={event => setDefaultRoleId(event.target.value)}
+                    className="select w-full"
+                >
+                    <option value=""><Trans>Kunde (Standard, nicht explizit gespeichert)</Trans></option>
+                    {defaultRoleInfo?.allowed === false && (
+                        <option value={defaultRoleInfo.id}>
+                            {legacyRoleLabel}
+                        </option>
+                    )}
+                    {defaultRoleOptions.map(option => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                    ))}
+                </select>
+                {defaultRoleInfo?.allowed === false && (
+                    <div role="alert" className="alert alert-warning mt-3">
+                        <span>
+                            <Trans>Die gespeicherte Standardrolle „{legacyRoleName}“ (ID {legacyRoleId}) ist nicht zulässig. Wähle eine gültige Rolle und speichere, um die Konfiguration zu reparieren.</Trans>
+                        </span>
+                    </div>
+                )}
+                {isOrgAdminDefaultRole && (
+                    <div role="alert" className="alert alert-warning mt-3">
+                        <span>
+                            <Trans>Neue Nutzer, die künftig per Domain-Auto-Join beitreten oder von einem Organisationsadministrator angelegt werden, erhalten diese Rolle. Sie können damit Nutzer in dieser Organisation verwalten. Bestehende Nutzer bleiben unverändert.</Trans>
+                        </span>
+                    </div>
+                )}
+            </fieldset>
+        )}
         <button type="submit" className="btn btn-primary w-full mt-4"><Trans>Speichern</Trans></button>
     </form>
-);
+    );
+};
 
 interface OrgInvoicingProps {
     org: Org;
@@ -197,9 +247,9 @@ export default function ManagementOrgDetailView() {
         syncGroups,
         generateCollectiveInvoice
     } = useOrgs(id);
-    const {users} = useUsers();
+    const {users, roles} = useUsers();
     const {tree} = useProtectedGalleries();
-    const {isOrgAdmin, orgScope} = usePermissions();
+    const {isAdmin, isSuperAdmin, isOrgAdmin, orgScope} = usePermissions();
 
     const [name, setName] = useState('');
     const [domain, setDomain] = useState('');
@@ -207,6 +257,7 @@ export default function ManagementOrgDetailView() {
     const [defaultFlatrateLevel, setDefaultFlatrateLevel] = useState<'none' | 'web' | 'print' | 'original'>('none');
     const [sharedFlatrateCents, setSharedFlatrateCents] = useState(0);
     const [autoJoinPolicy, setAutoJoinPolicy] = useState<'immediate' | 'requires_invite' | 'disabled'>('immediate');
+    const [defaultRoleId, setDefaultRoleId] = useState('');
 
     const [selUsers, setSelUsers] = useState<string[]>([]);
     const [selGroups, setSelGroups] = useState<string[]>([]);
@@ -223,6 +274,7 @@ export default function ManagementOrgDetailView() {
         setDefaultFlatrateLevel(org.default_flatrate_level || 'none');
         setSharedFlatrateCents(org.shared_flatrate_cents ?? 0);
         setAutoJoinPolicy(org.auto_join_policy || 'immediate');
+        setDefaultRoleId(org.default_role_id ?? '');
         setSelUsers(org.users?.map(u => u.id) || []);
         setSelGroups(org.gallery_groups?.map(g => g.id) || []);
     }
@@ -230,14 +282,18 @@ export default function ManagementOrgDetailView() {
     const handleSaveGeneral = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await updateOrg(id!, {
+            const data: Partial<Org> = {
                 name,
                 domain: domain || null,
                 invoice_frequency: freq,
                 default_flatrate_level: defaultFlatrateLevel,
                 shared_flatrate_cents: sharedFlatrateCents,
                 auto_join_policy: autoJoinPolicy,
-            });
+            };
+            if (defaultRoleId !== (org?.default_role_id ?? '')) {
+                data.default_role_id = defaultRoleId || null;
+            }
+            await updateOrg(id!, data);
             showToast('success', t`Organisation aktualisiert.`);
         } catch (err: unknown) {
             showToast('error', err instanceof Error ? err.message : String(err));
@@ -307,6 +363,19 @@ export default function ManagementOrgDetailView() {
         setArr(arr.includes(toggleId) ? arr.filter(x => x !== toggleId) : [...arr, toggleId]);
     };
 
+    const defaultRoleLabels = [
+        {name: UserRole.CLIENT, label: t`Kunde (explizite Rolle)`},
+        {name: UserRole.POWER_USER, label: t`Power-User`},
+        {name: UserRole.ORG_ADMIN, label: t`Organisationsadministrator`},
+    ];
+    const defaultRoleOptions = defaultRoleLabels.flatMap(({name, label}) => {
+        const role = roles?.find(candidate => candidate.name === name);
+        return role ? [{id: role.id, name: role.name, label}] : [];
+    });
+    const isOrgAdminDefaultRole = defaultRoleOptions.some(
+        option => option.id === defaultRoleId && option.name === UserRole.ORG_ADMIN,
+    );
+
     if (isLoading) return <div className="p-10 flex justify-center"><span
         className="loading loading-spinner loading-lg"></span></div>;
     if (!org) return <div className="p-10"><ErrorMessage message={t`Organisation nicht gefunden.`}/></div>;
@@ -346,10 +415,13 @@ export default function ManagementOrgDetailView() {
                     <div className="lg:col-span-1 space-y-6">
                                     <OrgSettings name={name} setName={setName} domain={domain} setDomain={setDomain} freq={freq}
                                     setFreq={setFreq}
-                                    defaultFlatrateLevel={defaultFlatrateLevel} setDefaultFlatrateLevel={setDefaultFlatrateLevel}
-                                    sharedFlatrateCents={sharedFlatrateCents} setSharedFlatrateCents={setSharedFlatrateCents}
-                                    autoJoinPolicy={autoJoinPolicy} setAutoJoinPolicy={setAutoJoinPolicy}
-                                    handleSaveGeneral={handleSaveGeneral}/>
+                                     defaultFlatrateLevel={defaultFlatrateLevel} setDefaultFlatrateLevel={setDefaultFlatrateLevel}
+                                     sharedFlatrateCents={sharedFlatrateCents} setSharedFlatrateCents={setSharedFlatrateCents}
+                                     autoJoinPolicy={autoJoinPolicy} setAutoJoinPolicy={setAutoJoinPolicy}
+                                     canEditDefaultRole={isAdmin || isSuperAdmin} defaultRoleId={defaultRoleId}
+                                     setDefaultRoleId={setDefaultRoleId} defaultRoleInfo={org.default_role_info ?? null}
+                                     defaultRoleOptions={defaultRoleOptions} isOrgAdminDefaultRole={isOrgAdminDefaultRole}
+                                     handleSaveGeneral={handleSaveGeneral}/>
                         <OrgInvoicing org={org} isGenerating={isGenerating}
                                          handleGenerateInvoice={handleGenerateInvoice}/>
                     </div>
