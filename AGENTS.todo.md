@@ -1131,11 +1131,19 @@ gerissen und zur Entscheidung gemacht.
   Review (APPROVED MIT AUFLAGEN, `features/security/card-testing-protection.md` § Status), das
   Monitoring-Runbook (§1–§3), der Rollback-Ablauf ohne Datenverlust (§6) und die Auflagen, die ohne
   den Owner umsetzbar waren.
-## 📌 SKILLS-STAND (2026-10-19) — Marker auf `787670a` fortgeschrieben
+## 📌 SKILLS-STAND (2026-10-22) — Marker auf `33cbd00` fortgeschrieben
 
-> `AGENTS.skills.md` steht jetzt auf `787670a` (Skills-Repo-HEAD vom 2026-10-19), geprüft am
-> 2026-10-19; 17 Skills, **12× angewendet, 5× nicht zutreffend**. **Von dem, was hier steht, ist
-> nichts umgesetzt** — Position 7 ist am 2026-10-20 (`1818909`) und Position 6 am 2026-10-21
+> `AGENTS.skills.md` steht jetzt auf `33cbd00` (Skills-Repo-HEAD vom 2026-10-22, 06:24 UTC), geprüft
+> am 2026-10-22; **19 Zeilen in der Marker-Tabelle `## Skill-Stand`** (`AGENTS.skills.md`, Z. 50-72)
+> — **14× `ja`, 5× `nein`, 0× `offen`** (gemessen am committeten Stand dieses Commits;
+> **Zähleinheit: Zeilen der Tabelle** — ``git show <stand>:AGENTS.skills.md | grep -cE '^\| `[^|]+ \|
+> (ja|nein|offen) \|'`` → **19**, davon `ja` → **14**, `nein` → **5**, `offen` → **0**; `<stand>` =
+> der committete Stand dieses Commits (Platzhalter, definiert in `AGENTS.skills.md` → „Lokale
+> Ergänzung" (2)). **Eine andere
+> Größe, getrennt gezählt:** die **17 versteckten Skills** (`metadata.opencode/autoinvoke: false`) —
+> an den Revs `e559a39` und `33cbd00` **je 17**, unverändert; **Zähleinheit: Skills mit
+> deaktiviertem Autoinvoke**, nicht die Zeilenzahl der Marker-Tabelle. **Von dem, was hier steht,
+> ist nichts umgesetzt** — Position 7 ist am 2026-10-20 (`1818909`) und Position 6 am 2026-10-21
 > (`db13b2c`) umgesetzt und deshalb **aus diesem Board entfernt** (siehe „Historie der Nummern"
 > unten; die Belege stehen in den genannten Commits).
 > Die Positionen sind Befund-Protokoll, kein Arbeitsauftrag (Board-Regel: Log, kein Auftrag).
@@ -1150,7 +1158,19 @@ gerissen und zur Entscheidung gemacht.
 > jetzt den verbleibenden Weg, das Modell liest die Bilder selbst); Position 6 (Lockfile-Regel des
 > Test-Images) ist am 2026-10-21 **geschlossen und entfernt** (`23ca866`) — die Regel ist seit
 > `db13b2c` umgesetzt (Browserversion aus dem aufgelösten Lockfile). **Position 8 ist neu aus der
-> Nachprüfung von `7b1ca62` (2026-10-21) und der einzige offene Eintrag in diesem Abschnitt.**
+> Nachprüfung von `7b1ca62` (2026-10-21); sie ist am 2026-10-21 entschieden (D-49 in
+> `features/owner-decisions.md`: „MariaDB in production, SQLite for tests") und deshalb **aus diesem
+> Board entfernt** — geschlossene Positionen dieses Boards werden entfernt, nicht abgehakt; sie steht
+> deshalb **nicht** als offener Eintrag in diesem Abschnitt. **Position 9 und 10 sind am 2026-10-22
+> neu aus dem Marker-Fortschreiben auf `33cbd00`** — die Regel des Skills verlangt für beide Skills
+> eine offene Position (`skills-marker/SKILL.md` → „## 3. Die Range": „Erst wenn für **jeden**
+> Skill aus der Range eine dieser drei Zeilen steht, wird der Marker auf den neuen SHA gesetzt.
+> Nie vorher.") — und stehen als offene Einträge unten; die offenen Positionen in diesem Abschnitt
+> sind damit **9 und 10** (2 — gemessen am committeten Stand dieses Commits: **2** `- [ ]`-Einträge
+> und **0** `- [x]` in diesem Abschnitt).
+
+- [ ] **Position 9 — Die Zahlen in der Prosa des Markers und dieses Boards stehen ohne Generator und ohne Drift-Gate (die Regel des Skills `generated-docs` → „## Numbers in prose" ist nicht umgesetzt):** Die Regel lautet: „A number in prose is an artifact: it is generated together with the block that owns it, or it is replaced by a reference to the generated table — a number typed into a sentence is a copy of a fact somebody else maintains, and it ages silently" (`generated-docs/SKILL.md` → „## Numbers in prose"; die beiden Auswege und der Drift-Gate-Mechanismus stehen in `generated-docs/references/drift-and-generation.md`). **Betroffen sind genau die Zahlen, die der Marker bei jedem Fortschreiben neu setzt** — die Zeilen und Verdiktwerte der Marker-Tabelle (`AGENTS.skills.md` → Abschnitt „## Skill-Stand", Z. 50-72: **19** Zeilen, **14×** `ja`, **5×** `nein`), die Ankerzahl des Markers (dort „197 Vorkommen in 85 Zeilen", Abschnitt „Anker-Re-Verifizierung"), die Dateilängen (`.github/workflows/ci.yml` **978** Zeilen) und die Positions- und Zeilenangaben in diesem Abschnitt — jede davon ist **handgeschrieben** und altert still, ohne dass ein Gate es meldet. **Befehl:** ``git show <stand>:AGENTS.skills.md | grep -cE '^\| `[^|]+ \| (ja|nein|offen) \|'`` → **19**; ``git show <stand>:.github/workflows/ci.yml | wc -l`` → **978**. **Fix-Richtung (nicht ausgeführt):** die Zahlen entweder **aus einem Generator beziehen** (Tabelle, Ankerzahl, Dateilängen) **oder** durch einen **Verweis auf eine erzeugte Tabelle** ersetzen — welcher der beiden Wege gilt, ist eine **Eigentümerentscheidung**; ohne sie bleibt die Abweichung eine stille Kopie (Muster für eine ausdrücklich festgehaltene Abweichung: D-49 in `features/owner-decisions.md`).
+- [ ] **Position 10 — Die Befundvorlage des Skills `ui-review` (neun Spalten) und das kanonische Schweregrad-Vokabular sind im Board nicht abgebildet — er führt die alte Form (Schwere/Stelle/Befund/Vorschlag):** Aus der Range `4205142..e559a39` des Skills-Repos. Die Vorlage des Skills verlangt die Spalten `Id | Severity | Status | Owner | Ticket | File:Line | Screenshot | Finding | Suggested fix` (`ui-review/references/findings-report.md` → „## Template"), Schweregrade und Status kommen aus dem **kanonischen** Vokabular (`ratchet-gates/references/vocabulary.md` → „## Severity levels": `critical`/`high`/`medium`/`low`/`info`; „## Statuses": `open`/`in-progress`/`fixed`/`accepted`/`wontfix`; „Severity and status are recorded separately"). **Der Board trägt die alte Form:** `| Schwere | Stelle | Befund | Vorschlag |` (`AGENTS.todo.md:983`, Abschnitt „UI-Review 2026-09-26") und `| Befund | Schwere | Von mir geprueft |` (`AGENTS.todo.md:1021`, Abschnitt „Dialog-Screenshots 2026-09-27") — ohne `Id`, `Status`, `Owner`, `Ticket` und `Screenshot`, mit deutschsprachigen Spaltennamen, und der Bearbeitungsstand steht **im Text der Zelle** (in `AGENTS.todo.md:985` z. B. „**Erledigt 2026-09-26: …**" in der Vorschlagsspalte) statt in einer eigenen Statusspalte. **Befehl:** ``grep -n '^| Schwere |' AGENTS.todo.md`` → **983**. **Fix-Richtung (nicht ausgeführt):** die Befundtabellen des Boards auf die neun Spalten und das kanonische Vokabular umstellen **oder** die Abweichung ausdrücklich als Eigentümerentscheidung festhalten (Muster: D-49 in `features/owner-decisions.md`); die Entscheidung ist vom Owner zu treffen — dieser Lauf legt die Position an und schließt keine.
 
 ## 🔑 STRIPE-KONTOWECHSEL (2026-10-15) — neues Konto, Keys, Vite-Vorrang
 
