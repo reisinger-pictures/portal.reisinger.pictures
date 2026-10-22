@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-49. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-55. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in `AGENTS.todo.md`; domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -29,7 +29,6 @@ Assess storage capacity for the deployment host. Developer-machine capacity is n
 Keep `API_THROTTLE_LIMIT=1000` in `backend/.env.ci`; document `60` as the production-intended value in `backend/.env.example`. Do not change the production value or application default as part of this CI adjustment.
 
 ### D-49: MariaDB in production, SQLite for tests
-
 Production runs **MariaDB 11.4** (`deployment/docker-compose.yml`, the `mariadb:11.4` service with binlog enabled; `backend/config/database.php` defaults to `mariadb`). The local development database is SQLite (a file), and the canonical test database is SQLite `:memory:` (`backend/phpunit.xml`). This deviates from the `laravel` skill's standard (PostgreSQL, MySQL deprecated) — the deviation is deliberate and recorded here instead of being left implicit.
 
 The reasons:
@@ -44,6 +43,10 @@ Consequences:
 
 - A PostgreSQL CI job and a live PostgreSQL service are **not** a gap and are not required. The PostgreSQL branch of the guest-order migration is not a target.
 - A change of the production engine is a new owner decision that replaces this one. It needs a migration plan, a cutover window, and a re-run of the driver-gated tests against the new engine.
+
+### D-52: Watchtower keeps supervising `portal_backend`
+
+Watchtower recreates `portal_backend` once a day (measured 2026-10-22 at 07:58:42 CEST) and continues to do so. It pulls the image by **tag** (`ghcr.io/reisinger-pictures/portal-base:8.5`), not by digest, and that is accepted: the application code is not touched by the recreate, because the deployed code lives in a bind mount, and the container keeps its `1000:82` identity (D-1), because the `user:` line of the compose stanza is part of the container configuration the recreate clones. The accepted residual is the unpinned image: a base-image update reaches production without a deploy, which is the same trade the tag pin already makes for the deploy path (see [production operations runbook](infrastructure/29-production-operations-runbook.md) §2).
 
 ## Test and repository structure
 
@@ -122,6 +125,20 @@ The bulk export ("Ergebnis als Contact Sheet") is a **second document**, not a r
 
 The shared link replaces the authenticated download for the recipient: it is a signed JWT (the same secret and verification path as the login token), valid for **seven days**, bound to the brand, and it can carry **only** the external variant, because the internal variant contains PII. The token is a bearer credential and never appears in a log line, an audit context or an error message; the audit lines carry the `link_id` (a UUID) instead. Every failure of the public endpoint — invalid, expired, wrong brand, no profile left — answers with the same 404 and the same message, so the endpoint is no token oracle. Profiles that no longer exist are skipped and **named** in the document (count only, PII-free): a silent narrowing is not allowed, and a link without any remaining profile is a 404. The delivery request carries no session cookie (`credentials: 'omit'`), so the link works exactly as the bearer credential it is. Two limits are accepted and documented: the link is **not revocable** before it expires (a new link does not invalidate an older one), and the token payload carries the profile ids in clear text — they are opaque UUIDs, and the endpoint only delivers what the signature covers. See [model contact sheet export](../crm/07-model-contact-sheet-export.md).
 
+### D-50: The proxy trust boundary stays at the direct peer
+
+The backend trusts the **direct peer** (`trustProxies(at: 'REMOTE_ADDR')` in `backend/bootstrap/app.php`) and reads the forwarded chain from the right, so the client address of a request is the one Caddy saw. The FastCGI port is not published to the host, and Caddy sets the header from the real peer instead of passing the client's own `X-Forwarded-For` through.
+
+The backend is attached to the shared external network `webnet` (`172.18.0.31`) in addition to `portal_internal`, so **any** container on those networks can open the FastCGI port and set the header itself. The weight of that is limited to one falsified client address — no authentication and no data access are reachable through it — and nothing trusted writes the header besides Caddy.
+
+Owner decision of 2026-10-22: **keep it that way.** The alternatives are not taken: moving the backend out of `webnet` and hanging Caddy on `portal_internal` changes the deployment topology of the `proxy-stack` repository and the shared network it lives in, and pinning the trust to a fixed address breaks on every recreate of the Caddy container. A secret header from Caddy would be the strongest variant, but it needs a second Caddy configuration and a second secret in the stack for a gain that is bounded by the item above. The rule "trust the direct peer, read the chain from the right" is the weaker but stable promise; the residual gap is documented here and stays visible.
+
+### D-55: The CSP allows the Cloudflare challenge origin; Turnstile stays switched off
+
+The Content-Security-Policy of the portal allows `https://challenges.cloudflare.com` in `script-src`, `frame-src` and `connect-src`. Owner decision of 2026-10-22: the policy is extended **now**, because it is the one check of the card-testing rollout contract that is purely technical, and without it a switched-on challenge would leave the checkout button permanently disabled for every risk-flagged attempt.
+
+Turnstile itself stays **off**: no `TURNSTILE_SITE_KEY` and no `TURNSTILE_SECRET` in production, so the challenge branch does not run. The extension is the precondition, not the activation; the remaining conditions of the contract — the Stripe dashboard checks, the data-protection approval for Cloudflare as a processor, and the siteverify check — are still open. The card-testing protection therefore keeps working without the challenge: the attempt limits, the account age and the Stripe-side rules are what enforce the contract today. See [content security policy](security/content-security-policy.md) and [card-testing protection](security/card-testing-protection.md) §12.
+
 ## CI and pricing/API access
 
 ### D-23: Documentation-only CI filtering
@@ -189,6 +206,26 @@ An SFTPGo upload event enqueues background import work; each job processes a bou
 ### D-37: Quarantine of unimportable files
 
 After a configurable number of failed attempts, move a permanently unimportable file to a discoverable quarantine subdirectory. Keep it visible through SFTP and the UI; never delete it. See [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md).
+
+### D-51: The photographer changes the camera password themselves, confirmed by the current password
+
+A photographer may change their **own** camera (FTP/SFTP) password. The change is confirmed by entering the **current** camera password, which the portal verifies against SFTPGo: the portal stores no camera password at all (it is generated, shown once and discarded — P1-M23), so the only authority that can answer the question is the service that holds the credential. The new password is **generated by the portal** in the camera charset (`/^[a-km-zA-HJ-NP-Z2-9]{10,12}$/`, 57 characters — [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md) §7.3) and shown exactly once, like every other camera password in the system. The photographer does not choose it: a chosen password either violates the charset a camera can type or reuses the portal login password, and a credential that is the same string as the session password turns one leak into two.
+
+The existing reset endpoint stays the **recovery** path for a password that is lost — which the show-once contract makes a normal case, not an edge case. It is offered as an explicit second step next to the confirmation, never as the default, and it invalidates the old password immediately; the hourly per-account quota covers both paths.
+
+The current password reaches SFTPGo in the **Basic-auth header** of its user-login endpoint, never in a query string: a query string lands in the SFTPGo HTTP access log in full (measured on the production instance on 2026-10-22), and a credential in a log file is a credential in a log file. The portal stores neither the old nor the new password — no column, no cache entry, no log line.
+
+**What this decision does and does not buy:** the confirmation prevents an **accidental** rotation (a click that would silently invalidate a working camera mid-shooting) and puts a proof of possession into the audit trail next to the rotation attempt. It is **not** a defence against a hijacked portal session: the recovery path stays reachable with the session alone, and a portal session already grants far more than the camera credential does. Making the recovery path admin-only would close that, and is not part of this decision.
+
+See [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md) §7.16b.
+
+### D-53: The SFTPGo admin pair is the only managed credential path
+
+The production stack manages **one** credential pair for SFTPGo: `SFTPGO_ADMIN_USERNAME` and `SFTPGO_ADMIN_PASSWORD`. The JWT fallback over that pair is the final mechanism; `SFTPGO_API_KEY` stays **unset** in production. Owner decision of 2026-10-22: a second mechanism would be a second failure path that someone has to maintain, and the pair that is already documented and tested (§7.15) works. The API-key placeholder stays in the compose file as the documented way if SFTPGo's admin access is ever named differently. See [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md) §7.15.
+
+### D-54: The SFTPGo admin bootstrap stays a compose value
+
+`SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` is a hardcoded value of the versioned compose file, not a stack-env variable. It has no secret relation, and it has to be effective before the first start — without it the `admins` table stays empty and the token answers 401, so a stack that depends on someone remembering the variable would fail closed on every fresh deploy. Owner decision of 2026-10-22: the value stays in the compose file and the cutover checklist is corrected to say so. See [FTP cutover checklist](infrastructure/19-ftp-cutover-checklist.md) §2.
 
 ## Rate limiting, access grants, and runtime requirements
 

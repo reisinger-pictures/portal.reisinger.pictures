@@ -66,7 +66,7 @@ Follow the module-specific `AGENTS.md` in addition to these repository-wide rule
 ## 9. Security and owner decisions
 
 - Do not weaken established tenant isolation, authentication, upload validation, authenticated file delivery, server-authoritative pricing, or HTML-sanitization boundaries. Follow the applicable `features/` contract.
-- Owner decisions D-1 through D-49 are maintained in [`features/owner-decisions.md`](features/owner-decisions.md). Treat that file as the canonical current decision set; keep implementation status in `AGENTS.todo.md` and domain detail in the linked feature specifications.
+- Owner decisions D-1 through D-55 are maintained in [`features/owner-decisions.md`](features/owner-decisions.md). Treat that file as the canonical current decision set; keep implementation status in `AGENTS.todo.md` and domain detail in the linked feature specifications.
 - The accepted dependency risk C8 is recorded in [`features/security/accepted-risks.md`](features/security/accepted-risks.md). Do not change its accepted boundary without a reviewed decision.
 
 ## 10. IntelliJ Run Configurations (`.run`) (STRICT)

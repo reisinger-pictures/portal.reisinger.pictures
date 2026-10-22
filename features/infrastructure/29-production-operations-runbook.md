@@ -128,6 +128,40 @@ that exits therefore makes the health contract fail while the supervisor
 attempts its restart; a stale PID from a previous container cannot pass because
 the markers are removed at startup.
 
+### Container supervision by Watchtower
+
+Watchtower recreates `portal_backend` once a day without a deploy (measured on
+the production host: `Stopping /portal_backend … Creating /portal_backend` on
+2026-10-18, -19, -20 and -21 around 08:00 CEST and on 2026-10-22 at 07:58:42
+CEST; it is **not** a cron job and **not** a systemd timer — `crontab -l` knows
+only `volume-backup.sh`, `update_portainer.sh` and `dind-image-gc.sh`). It also
+recreates `caddy` (2026-10-22, 02:09 CEST).
+
+What a Watchtower recreate touches and what it does not:
+
+- It replaces the **image** and recreates the container from the existing
+  container configuration. The application code is **not** touched: `sync.sh`
+  writes to `/home/webadmin/websites/api-portal.reisinger.pictures/` and
+  `deployment/docker-compose.yml` mounts exactly that directory as
+  `/var/www/html`, so the deployed code survives a recreate unchanged.
+- The **UID stays `1000:82`** (D-1) because the `user:` line of the compose
+  stanza is part of the container configuration — the image itself declares
+  `USER=www-data`, so the compose line is load-bearing and must not be
+  removed. The line to re-read after the next recreate is
+  `docker inspect portal_backend --format "{{.Config.User}} {{.Created}}"`.
+- The **environment is cloned from the running container**, not re-read from
+  the Portainer stack env. A variable added to the stack env afterwards
+  therefore reaches the container only through a compose recreate, and the
+  recreate must use `--no-deps --force-recreate backend`: the `composer_init`
+  service in the same stack fails (`composer install` on a non-writable
+  vendor, `deployment/docker-compose.yml:73`) and aborts the `up` run
+  before the backend is started.
+
+The image is pulled by **tag** (`ghcr.io/reisinger-pictures/portal-base:8.5`),
+not by digest — see the pin discussion in section 2 and
+[`deployment/image-pin-freshness.md`](../../deployment/image-pin-freshness.md).
+Owner decision D-52: Watchtower keeps running for `portal_backend`.
+
 ### Operator checks after a deploy
 
 Run these from the repository root on the target host and retain the output as

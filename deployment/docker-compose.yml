@@ -479,7 +479,7 @@ services:
       # gepinnte Adresse bricht den Deploy mit "no configured subnet contains IP
       # address". Auf portal_internal wird nichts gepinnt — der Dienstname
       # `sftpgo` loest per Docker-DNS auf, eine feste IP wird nicht gebraucht.
-      # Der Backend pinnt seine IP nur auf webret, weil Caddy darauf routet.
+      # Der Backend pinnt seine IP nur auf webnet, weil Caddy darauf routet.
       - portal_internal
     # Non-root wie der Backend (verify-image-nonroot.sh ist CI-Gate).
     # Der Host-Pfad gehoert 1002:webgroup mit setgid, NICHT 1000:1000:

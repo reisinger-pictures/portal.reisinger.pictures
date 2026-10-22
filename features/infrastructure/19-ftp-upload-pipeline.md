@@ -657,9 +657,13 @@ verschlüsselten Secrets at rest. Der zwischenzeitlich erwogene Entwurf mit
 `encrypted`-Cast auf einer `text`-Spalte (Muster `ModelProfile.php:55-62`) ist
 **hinfällig**.
 
-*Offen (Produktentscheidung):* dürfen Fotografen ihr Passwort selbst ändern
-oder nur der Admin? Ein Selbständerungs-Flow bräuchte einen Confirm-Schritt
-mit dem aktuellen Passwort.
+*Entschieden (D-51, Owner 2026-10-22):* Fotografen dürfen ihr Passwort **selbst
+ändern** — bestätigt durch das **aktuelle** Passwort, das gegen SFTPGo geprüft
+wird, weil das Portal kein Kamerapasswort hält und nur der Dienst die Frage
+beantworten kann. Das **neue** Passwort erzeugt der Portal (Kamera-Charset,
+einmalige Anzeige); der Fotograf wählt es nicht. Der bestehende Reset bleibt der
+**Recovery-Weg** für ein verlorenes Passwort und wird als expliziter zweiter
+Schritt angeboten, nicht als Default. Einzelheiten in 7.16b.
 
 **Umsetzung (P1-M23).** `FtpCredentialService`
 (`app/Services/FtpCredentialService.php`) kapselt genau diese vier Schritte;
@@ -1329,6 +1333,13 @@ Board: P1-M38 (Integrationstest), P1-M35 (Harness und Config-Weg), P1-M27
   `SFTPGO_DEFAULT_ADMIN_*`, der Backend-Service deklarierte keines der beiden
   Paare, und mit leerem `SFTPGO_API_KEY` wäre die Provisionierung mit 401
   gescheitert, während die Konfiguration korrekt aussah.
+  **Bestätigt (Owner 2026-10-22, D-53):** es bleibt bei diesem Wertepaar. Ein
+  zusätzlicher `SFTPGO_API_KEY` in der Stack-Env wird **nicht** gesetzt: der
+  JWT-Fallback über das Admin-Paar ist der endgültige Weg, ein zweiter
+  Mechanismus wäre ein zweiter Fehlerpfad, den jemand pflegen müsste. Der
+  API-Key-Platzhalter im Compose bleibt bestehen (er ist der dokumentierte
+  Weg, falls SFTPGo den Admin-Zugang abweichend benennt), ist aber in
+  Produktion leer.
 
 ### 7.16 Lebenszyklus des Kamera-Kontos
 
@@ -1553,12 +1564,70 @@ als solche gezählt und nicht als geprüft.
   SFTPGo angelegtes Konto unter einem fremden Namen bleibt unsichtbar.
 - **Sie erzeugt kein Konto und kein Passwort.** Sie korrigiert einen Zustand;
   ein Konto anlegen kann nur der Provisionierungs- oder der Reset-Pfad
-  (7.3, P1-M58).
+  (7.3, P1-M58), ein Passwort nur der Provisionierungs-, der Reset- oder der
+  Selbständerungs-Pfad (7.16b).
 - **Sie prüft nicht, ob die Kamera tatsächlich hochlädt.** Sie fragt den
   Dienst, nicht das Dateisystem; der Import bleibt davon unberührt (7.5).
 - **Sie läuft nicht von selbst.** Es gibt keinen Scheduler-Eintrag und keinen
   Aufruf aus einem Request: der Zustand wird geprüft, wenn ein Operator es
   verlangt.
+
+### 7.16b Selbständerung des Kamera-Passworts (D-51)
+
+**Der Weg.** `POST /api/management/ftp/change-password`, Body
+`{"current_password": "…"}`. Erfolg ist `200` mit `{success, password,
+password_notice}` — dieselbe Form wie der Reset (7.6a), mit derselben
+Show-once-Eigenschaft: das neue Passwort wird einmal zurückgegeben und
+nirgends gespeichert. Die Fehlerbilder: `422` (fehlendes oder **falsches**
+aktuelles Passwort), `409` (der Kontozustand verbietet den Wechsel), `429`
+(mit `Retry-After`), `404` (das Konto existiert im Dienst nicht mehr, obwohl
+der Portal-Cache `active` sagt), `500` (die Audit-Zeile war nicht schreibbar
+— das Passwort wurde dennoch gewechselt, es ist nur nicht nachweisbar),
+`503` (Dienst nicht konfiguriert oder nicht erreichbar), `502` (Dienst
+antwortet unbrauchbar), `401` (nicht angemeldet).
+
+**Die Prüfung des aktuellen Passworts.** Das Portal hält kein Kamerapasswort
+(7.3) und kann die Frage deshalb nur an den Dienst stellen: SFTPGOs
+**Benutzer-Login** `GET /api/v2/user/token` beantwortet sie. `200` heißt
+„korrekt", `401`/`403` heißt „falsch", alles andere ist eine benannte
+Ausnahme. Die Admin-API hilft hier nicht: sie liefert für ein Konto kein
+Passwort-Hash, sondern nur `has_password: true` — sie kann die Eingabe also
+nicht prüfen.
+
+**Die Zugangsdaten gehen in den Basic-Auth-Header, nicht in den
+Query-String.** Gemessen am 2026-10-22 an der Produktionsinstanz
+(SFTPGo 2.7.6): der Query-String landet **vollständig** im HTTP-Zugriffslog
+des Dienstes — das Zugriffslog führt die vollständige Request-URL, ein
+Passwort im Query-String steht damit im Logfile. Mit dem Basic-Auth-Header
+wurde dieselbe Anfrage mit einer Testmarke wiederholt: **null** Treffer im
+Log. Ein Credential im Log ist ein Credential im Log.
+
+**Was der Pfad nicht tut.** Er schreibt keine Spalte, keine Datei, kein
+Cache-Element und keine Logzeile mit einem Passwort; der Audit-Eintrag
+(7.6a) bekommt den Benutzer, die IP und ein Erfolgsflag, aber kein
+Passwort. Das aktuelle Passwort wird **nicht** gespeichert, das neue nur
+einmal ausgeliefert. Die Stundenquota (7.6a) gilt für **beide** Wege — der
+Selbständerung und dem Reset —, denn es ist dieselbe Handlung auf demselben
+Credential. Der Kontozustand wird vor jedem Schreibzugriff geprüft: ein
+`pending`-Konto hat kein aktuelles Passwort (das ist ein Provisionierungs-,
+ kein Change-Fall), ein `revoked`- oder `error`-Konto bekommt keins.
+
+**Der Reset bleibt der Recovery-Weg** und ist im selben Dialog der
+**explizite zweite Schritt**, nie der Default: die Show-once-Eigenschaft
+macht ein verlorenes Passwort zum Normalfall, nicht zum Randfall. Der
+Reset-Pfad schlägt das alte Passwort sofort tot — die Kamera muss neu
+konfiguriert werden —, und genau das steht dort.
+
+**Was die Bestätigung kauft — und was nicht.** Sie verhindert eine
+**versehentliche** Rotation (ein Klick, der eine laufende Kamera mitten im
+Shooting stilllegt) und legt einen **Besitznachweis** in den Audit-Trail
+neben den Rotationsversuch. Sie ist **keine** Abwehr gegen eine übernommene
+Portalsitzung: der Recovery-Weg bleibt mit der Sitzung allein erreichbar,
+und eine Portalsitzung gewährt ohnehin weit mehr als das Kamera-Credential.
+Den Recovery-Weg auf die Administration zu legen würde das schließen und
+ist **nicht** Teil dieser Entscheidung (D-51).
+
+Siehe [Owner-Entscheidungen](../owner-decisions.md) (D-51).
 
 ### 7.17 Zielordner der Kamera
 
@@ -1751,14 +1820,30 @@ zwei neuen `environment:`-Zeilen werden von `docker restart` **nicht**
 Änderung muss der Stack neu erzeugt werden (Portainer-Stack-Editor-Update), erst
 danach greifen die Variablen. `sync.sh` allein reicht dafür nicht.
 
-**Grenze — keine Live-Verifikation gegen eine laufende SFTPGo-Instanz.** Die
-Payload-Form (Platzhalter, `timeout`, `body`, `Content-Type`) ist an der Quelle
-gelesen — `openapi/openapi.yaml` v2.7.6, `internal/common/eventmanager.go`,
-`internal/common/actions.go`, `internal/dataprovider/eventrule.go` — und durch
-Tests gepinnt, aber **nie** gegen eine laufende SFTPGo-Instanz ausgeführt. §7.6
-verlangt dieselbe Live-Prüfung für den User-Pfad; genau das Fehlen dieser Prüfung
-ist der Grund, aus dem die drei fehlenden Felder bis zum 2026-10-18 überlebt
-haben. Nach dem ersten echten Deploy gehört deshalb eine Gegenprobe dazu:
-`php artisan ftp:provision-events` muss mit Exit 0 enden, und ein echter
-Kamera-Upload muss einen Job auslösen (Backend-Log:
-`FTP-Import-Kette abgeschlossen.`).
+**Live-Verifikation (2026-10-22, Produktion).** Die Kette ist eingerichtet und
+gegen die laufende Instanz geprüft:
+
+- `FTP_EVENT_SECRET` liegt in der Portainer-Stack-Env (64 Hex-Zeichen, auf dem
+  Host erzeugt, nie ausgegeben); der Backend-Container wurde **neu erzeugt**
+  (eine Env-Änderung braucht einen Recreate, kein Restart).
+- `php artisan ftp:provision-events` endete mit Exit 0: Event-Aktion
+  `portal-ftp-upload` und Event-Regel `portal-ftp-upload-rule` angelegt, beide
+  gegen die Admin-API zurückgelesen — die Regel trägt `fs_events: ["upload"]`
+  und ist **aktiv** (`status: 1`).
+- Die Kette wurde am **öffentlichen** Endpunkt geprüft, nicht nur intern:
+  falsches Secret → `401 unauthorized`; echtes Secret mit dem echten
+  `ftp_slug` → `200 no_target_gallery`; echtes Secret mit unbekanntem Slug →
+  `200 unknown_account`. Der Nachweis endet bei `no_target_gallery`, weil in
+  Produktion **0 von 1** Usern eine Zielgalerie gesetzt hat — genau die in
+  3.4 dokumentierte Grenze „keine Zielgalerie, kein Import".
+- **Secret-Rotation im Zuge der Prüfung:** die erste Provisionierung schrieb
+  ein Secret, das in einer Diagnoseausgabe im Klartext stand. Es wurde
+  ersetzt (neues Secret in der Stack-Env, Backend neu erzeugen, Aktion und
+  Regel über denselben idempotenten Befehl neu geschrieben) — der
+  Header-Wert der Aktion und die Container-Env tragen danach denselben
+  64-Zeichen-Wert.
+
+Der Teil, der **weiterhin** offen ist, ist der echte Kamera-Upload: er muss
+einen Job auslösen (Backend-Log: `FTP-Import-Kette abgeschlossen.`). Dafür
+braucht es ein Konto mit Zielgalerie und eine Kamera, die auf `ftp/<slug>`
+hochlädt — beides ist eine Betreiber- und Hardware-Aufgabe, kein Deploy.
