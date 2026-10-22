@@ -10,7 +10,7 @@ text is mirrored here in one machine-readable place, so it can be reviewed
 without access to the host:
 
 ```
-default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://*.stripe.com; frame-src 'self' https://js.stripe.com https://*.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self'
+default-src 'self'; script-src 'self' https://js.stripe.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://*.stripe.com https://challenges.cloudflare.com; frame-src 'self' https://js.stripe.com https://*.stripe.com https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'
 ```
 
 The authoritative copy is [`deployment/content-security-policy.txt`](../../deployment/content-security-policy.txt) — the file, not this prose. The canonical source stays the Caddy volume of `proxy-stack`; this repository holds a **readable mirror** plus a drift check (see below).
@@ -20,12 +20,12 @@ The authoritative copy is [`deployment/content-security-policy.txt`](../../deplo
 | Directive | Why the application needs it |
 |---|---|
 | `default-src 'self'` | Everything is served from the portal's own origin (the SPA and the API are same-origin, see [`csrf-strategy.md`](csrf-strategy.md)). |
-| `script-src 'self' https://js.stripe.com` | Stripe.js is loaded from Stripe's CDN — the checkout iframe and the card testing path need it. |
+| `script-src 'self' https://js.stripe.com https://challenges.cloudflare.com` | Stripe.js is loaded from Stripe's CDN — the checkout iframe and the card testing path need it. The Cloudflare origin carries the Turnstile widget script, which the risk-based challenge loads (the challenge itself is off in production, D-55). |
 | `style-src 'self' 'unsafe-inline'` | React's inline `style` attributes and imperative style writes need it: `frontend/src/ui/components/KanbanBoard.tsx:58`, `frontend/src/ui/components/WysiwygEditor.tsx:339`, `frontend/src/logic/brandRegistry.ts:45`. Tailwind compiles at build time and injects no runtime style. |
 | `img-src 'self' data: https:` | `data:` for the generated previews (the watermark preview is a `data:` URI). The galleries deliver same-origin via `/api/media/…` (`backend/app/Models/Photo.php:177`), so the `https:` allowance has **no consumer in the code** — it is a leftover that the portal does not need and does not use. |
 | `font-src 'self'` | The portal serves its own fonts; no third-party font host. |
-| `connect-src 'self' https://*.stripe.com` | The API calls Stripe (payment intents, card testing) — same-origin for everything else. |
-| `frame-src 'self' https://js.stripe.com https://*.stripe.com` | The Stripe payment iframe and the 3DS/SCA challenge frames. |
+| `connect-src 'self' https://*.stripe.com https://challenges.cloudflare.com` | The API calls Stripe (payment intents, card testing) — same-origin for everything else. The Cloudflare origin is the challenge's own network traffic. |
+| `frame-src 'self' https://js.stripe.com https://*.stripe.com https://challenges.cloudflare.com` | The Stripe payment iframe, the 3DS/SCA challenge frames and the Turnstile frame. |
 | `object-src 'none'` | No plugins, no `<object>`, no `<embed>`. |
 | `base-uri 'self'` | A `<base>` tag may not redirect the relative URLs. |
 | `form-action 'self'` | Forms may only post to the portal's own origin — no form-action hijacking into a third party. |
@@ -44,22 +44,18 @@ The card-testing protection can enable Cloudflare Turnstile as a risk-based
 challenge. The widget loads its script from Cloudflare
 (`frontend/src/ui/client/components/TurnstileWidget.tsx:5`) and renders in a
 Cloudflare frame, so the policy must allow `https://challenges.cloudflare.com`
-in `script-src`, `frame-src` and `connect-src`. **The current policy does not
-allow it** — with Turnstile switched on, the widget script would be blocked and
-the checkout button would stay disabled for every challenged attempt.
+in `script-src`, `frame-src` and `connect-src`.
 
-The host serves the policy from the Caddy volume of `proxy-stack`, so the
-change belongs there first; afterwards the mirror in
-`deployment/content-security-policy.txt` is updated and the drift check proves
-that both agree:
-
-```sh
-./scripts/check-csp-policy.sh
-```
-
-Until that change is made on the host, Turnstile must stay switched off — the
-production configuration currently has no `TURNSTILE_SITE_KEY`, which is
-consistent with the policy as served.
+**Done on 2026-10-22** (owner decision D-55): the Caddyfile of the
+`proxy-stack` repository now allows that origin in the three directives, the
+mirror in `deployment/content-security-policy.txt` follows, and the drift check
+below proves that host and repository say the same thing (exit 0 measured
+after the rollout). The challenge itself stays **off**: the production
+configuration has no `TURNSTILE_SITE_KEY` and no `TURNSTILE_SECRET`, so the
+risk-based branch does not run. The remaining conditions of the rollout
+contract — the Stripe dashboard checks, the data-protection approval for
+Cloudflare as a processor, and the siteverify check — are unaffected by the
+policy change; the policy was the one purely technical prerequisite.
 
 ## The E2E suite is structurally blind for CSP violations
 

@@ -26,20 +26,32 @@
 ## 2. Docker-Stack (Portainer)
 
 - [ ] **Compose-Datei aktualisieren** (aus `deployment/docker-compose.yml`)
-- [ ] **Env-Variablen setzen:**
+- [ ] **In der Portainer-Stack-Env setzen** (Betriebswerte und Geheimnisse,
+      **nicht** ins Repo):
   - `SFTPGO_BASE_URL=http://sftpgo:8080`
-  - `SFTPGO_API_KEY=<密钥>` (in Portainer-Stack-Env, nicht im Repo)
   - `SFTPGO_DEFAULT_ADMIN_USERNAME=<user>`
   - `SFTPGO_DEFAULT_ADMIN_PASSWORD=<pass>`
-  - `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` (sonst keine Admins)
-  - `SFTPGO_DATA_PROVIDER__DRIVER=sqlite`
-  - `SFTPGO_DATA_PROVIDER__NAME=sftpgo.db`
-  - `SFTPGO_FTPSERVER__BINDINGS__0__PORT=989`
-  - `SFTPGO_FTPSERVER__BINDINGS__0__CERTIFICATE_FILE=/etc/sftpgo/cert.pem`
-  - `SFTPGO_FTPSERVER__BINDINGS__0__KEY_FILE=/etc/sftpgo/key.pem`
-  - `SFTPGO_FTPD__PASSIVE_PORT_RANGE__START=50000`
-  - `SFTPGO_FTPD__PASSIVE_PORT_RANGE__END=50100`
-  - `SFTPGO_FTPD__BINDINGS__0__PASSIVE=true`
+  - `SFTPGO_API_KEY=<密钥>` — **optional und in Produktion nicht gesetzt**: der
+        JWT-Fallback über das Admin-Wertepaar ist der endgültige Weg
+        (Owner-Entscheidung 2026-10-22, D-53, §7.15). Der Platzhalter im
+        Compose bleibt der dokumentierte Weg, falls SFTPGo den
+        Admin-Zugang abweichend benennt.
+  - `SFTPGO_FTPD_TLS_MODE=<0|1|2>` (Default 1 = implizites TLS)
+  - `SFTPGO_PASV_PORT_START=50000`, `SFTPGO_PASV_PORT_END=50100` (passive
+        FTPS-Range)
+  - `SFTPGO_SFTP_PORT=2222`, `SFTPGO_FTPS_PORT=989` (nur die **Host**-Ports;
+        die Container-Ports sind im Compose festgelegt)
+- [ ] **Feste Compose-Werte** (stehen in `deployment/docker-compose.yml` und
+      gehören **nicht** in die Stack-Env — sie haben keinen Secret-Bezug und
+      müssen ohne Pflege eines Stack-Env wirken):
+  - `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` (sonst keine Admins —
+        der Wert muss **vor** dem ersten Start wirksam sein, sonst bleibt die
+        `admins`-Tabelle leer und der Token antwortet mit 401; D-54)
+  - `SFTPGO_FTPD__BINDINGS__0__ADDRESS=0.0.0.0`
+  - `SFTPGO_FTPD__BINDINGS__0__PORT=989`
+  - `SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_FILE=/var/lib/sftpgo/ftps/cert.pem`
+  - `SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_KEY_FILE=/var/lib/sftpgo/ftps/key.pem`
+  - `SFTPGO_SFTPD__BINDINGS__0__ADDRESS=0.0.0.0`
   - Optional: `SFTPGO_FTPD__BINDINGS__0__CIPHER_SUITES` (Go-Namen, kommagetrennt)
 - [ ] **Zertifikat:** SFTPGo erstellt beim ersten Start ein Self-Signed-Zertifikat
       unter `/etc/sftpgo/`. Die Kamera akzeptiert es (verifiziert mit pure-ftpd).
@@ -114,7 +126,7 @@ ftp:provision-folders` — oder einfach das nächste `up -d`.
 
 | Symptom | Ursache | Fix |
 |---|---|---|
-| 401 auf `/api/v2/token` | Admin-User nicht erstellt | `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` setzen |
+| 401 auf `/api/v2/token` | Admin-User nicht erstellt | `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` im **Compose** prüfen (nicht in der Stack-Env) |
 | `no such table: schema_version` | Volume falsch gemountet oder nicht beschreibbar | `sftpgo_data` → `/var/lib/sftpgo` prüfen |
 | TLS-Handshake erfolgreich, Upload bricht ab | Passive Ports nicht offen | 50000-50100 in Firewall öffnen |
 | `SSL handshake has read 0 bytes` | Dienst nicht erreichbar oder falscher Port | Compose-Log prüfen, Port-Mapping prüfen |
