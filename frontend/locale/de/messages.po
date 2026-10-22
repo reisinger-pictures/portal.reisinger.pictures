@@ -402,6 +402,7 @@ msgstr "Ab {minQuantity} Bildern {price} € pro Bild"
 #: src/ui/management/components/ProductBatchTable.tsx
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 #: src/ui/management/components/UserPermissionsModal.tsx
+#: src/ui/management/ManagementFtpInbox.tsx
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Abbrechen"
 msgstr "Abbrechen"
@@ -567,6 +568,10 @@ msgstr "Aktuelle Ziel-Galerie"
 #: src/ui/ModelProfileAccessView.tsx
 msgid "Aktueller Manager"
 msgstr "Aktueller Manager"
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Aktuelles Kamera-Passwort"
+msgstr "Aktuelles Kamera-Passwort"
 
 #: src/ui/client/components/SelectionFilterBar.tsx
 #: src/ui/management/ManagementModelsView.tsx
@@ -1381,6 +1386,10 @@ msgstr "Bitte bestätige die Sicherheitsprüfung und versuche es erneut."
 msgid "Bitte bestätige zuerst die Sicherheitsprüfung."
 msgstr "Bitte bestätige zuerst die Sicherheitsprüfung."
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Bitte das aktuelle Kamera-Passwort eingeben."
+msgstr "Bitte das aktuelle Kamera-Passwort eingeben."
+
 #: src/logic/modelRegistration.ts
 msgid "Bitte ein Datum in der Vergangenheit angeben."
 msgstr "Bitte ein Datum in der Vergangenheit angeben."
@@ -1607,6 +1616,10 @@ msgstr "Darf nicht negativ sein"
 msgid "dargestellt."
 msgstr "dargestellt."
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Das aktuelle Kamera-Passwort bestätigt die Änderung. Danach wird ein neues Kamera-Passwort erzeugt und genau einmal angezeigt — die Kamera muss mit dem neuen Passwort neu konfiguriert werden."
+msgstr "Das aktuelle Kamera-Passwort bestätigt die Änderung. Danach wird ein neues Kamera-Passwort erzeugt und genau einmal angezeigt — die Kamera muss mit dem neuen Passwort neu konfiguriert werden."
+
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "das einmal angezeigte Passwort"
 msgstr "das einmal angezeigte Passwort"
@@ -1630,6 +1643,10 @@ msgstr "Das Foto wird von der privaten Ablage entfernt."
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Das ist der erste Weg. Das Stammzertifikat ist der Fallback, falls die Kamera mit dieser Einstellung keine Verbindung aufnimmt."
 msgstr "Das ist der erste Weg. Das Stammzertifikat ist der Fallback, falls die Kamera mit dieser Einstellung keine Verbindung aufnimmt."
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Das Kamera-Passwort konnte nicht geändert werden."
+msgstr "Das Kamera-Passwort konnte nicht geändert werden."
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Das Konto steht noch auf „pending\""
@@ -3689,6 +3706,10 @@ msgid "Kamera-Konto noch nicht angelegt"
 msgstr "Kamera-Konto noch nicht angelegt"
 
 #: src/ui/management/ManagementFtpInbox.tsx
+msgid "Kamera-Passwort ändern"
+msgstr "Kamera-Passwort ändern"
+
+#: src/ui/management/ManagementFtpInbox.tsx
 msgid "Kamera-Verbindung"
 msgstr "Kamera-Verbindung"
 
@@ -5279,6 +5300,10 @@ msgstr "ohne @"
 msgid "Ohne aktivierte Konfiguration wird Turnstile nicht geladen. Die Aufbewahrung von Turnstile-Signalen und technischen Protokolldaten richtet sich nach den beim Betreiber und bei Cloudflare geltenden Aufbewahrungsregeln; die konkreten Fristen teilt der Betreiber auf Anfrage mit."
 msgstr "Ohne aktivierte Konfiguration wird Turnstile nicht geladen. Die Aufbewahrung von Turnstile-Signalen und technischen Protokolldaten richtet sich nach den beim Betreiber und bei Cloudflare geltenden Aufbewahrungsregeln; die konkreten Fristen teilt der Betreiber auf Anfrage mit."
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Ohne das aktuelle Passwort kannst du das Kamera-Passwort zurücksetzen. Das alte Passwort wird dabei sofort ungültig — die Kamera muss danach neu konfiguriert werden."
+msgstr "Ohne das aktuelle Passwort kannst du das Kamera-Passwort zurücksetzen. Das alte Passwort wird dabei sofort ungültig — die Kamera muss danach neu konfiguriert werden."
+
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Online-Verbot (Privacy Fee)"
 msgstr "Online-Verbot (Privacy Fee)"
@@ -5461,6 +5486,10 @@ msgstr "Passiver Bereich (Firewall)"
 msgid "Passwort"
 msgstr "Passwort"
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Passwort ändern"
+msgstr "Passwort ändern"
+
 #: src/ui/ResetPassword.tsx
 msgid "Passwort bestätigen"
 msgstr "Passwort bestätigen"
@@ -5473,9 +5502,17 @@ msgstr "Passwort erforderlich"
 msgid "Passwort festlegen"
 msgstr "Passwort festlegen"
 
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Passwort nicht mehr bekannt?"
+msgstr "Passwort nicht mehr bekannt?"
+
 #: src/ui/ResetPassword.tsx
 msgid "Passwort speichern & Anmelden"
 msgstr "Passwort speichern & Anmelden"
+
+#: src/ui/management/ManagementFtpInbox.tsx
+msgid "Passwort zurücksetzen"
+msgstr "Passwort zurücksetzen"
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Pauschalpreis"

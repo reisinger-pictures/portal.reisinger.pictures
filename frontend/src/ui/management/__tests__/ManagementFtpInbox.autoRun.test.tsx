@@ -97,6 +97,7 @@ function installFtpMock() {
         setTargetGallery: vi.fn(),
         processInbox,
         resetCredentials: vi.fn(),
+        changeCredentials: vi.fn(),
         mutate,
     } as unknown as ReturnType<typeof useFtp>));
 }

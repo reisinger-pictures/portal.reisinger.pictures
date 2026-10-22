@@ -381,3 +381,210 @@ describe('useFtp.resetCredentials', () => {
         expect(statusReads()).toBe(readsBefore);
     });
 });
+
+/**
+ * `changeCredentials` (D-51) is the photographer's own replacement of the
+ * camera password, and the confirmation is the current password — the portal
+ * keeps no copy of it, so it can only be checked by the service.
+ *
+ * The request therefore carries a credential, and where it travels is the
+ * security property of this hook: in the body, never in the URL. A URL ends up
+ * in a proxy log, in a browser history entry and in a `Referer` header, so a
+ * password in it is a password in three places at once.
+ *
+ * The failure modes are as different from each other as the reset's are: a
+ * 422 means the typed current password was wrong and a different one fixes it,
+ * a 429 means the hourly quota is spent and only waiting helps. One opaque
+ * failure would leave the photographer guessing — and a blind retry is exactly
+ * what the quota punishes.
+ */
+describe('useFtp.changeCredentials', () => {
+    const CREDENTIALS = {
+        success: true,
+        password: 'Kamera-P4sswort-4711',
+        password_notice: 'Dieses Passwort wird genau einmal angezeigt.',
+    };
+
+    /**
+     * The camera password the photographer types into the dialog. It is the
+     * confirmation, and it is the value that must not leak into the URL.
+     */
+    const CURRENT_PASSWORD = 'kamerapasswort01';
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('posts the current password to the change endpoint and hands the new password back', async () => {
+        const fetchMock = vi.fn().mockImplementation((url: string) => {
+            if (url.endsWith('/change-password')) {
+                return Promise.resolve(jsonResponse(CREDENTIALS));
+            }
+
+            return Promise.resolve(jsonResponse({...BASE_STATUS, ftp_account_status: 'active'}));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp();
+        await waitFor(() => expect(result.current.status).toBeDefined());
+
+        const responses: ResetCredentialsResponse[] = [];
+        await act(async () => {
+            responses.push(await result.current.changeCredentials(CURRENT_PASSWORD));
+        });
+
+        // The new password comes back exactly once, in the shape the reset uses
+        // as well — the same act, the same show-once contract.
+        expect(responses).toEqual([CREDENTIALS]);
+        expect(responses[0]).toMatchObject({
+            password: CREDENTIALS.password,
+            password_notice: CREDENTIALS.password_notice,
+        });
+
+        const postCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/change-password'));
+        expect(postCall).toBeDefined();
+        expect(postCall?.[1]).toMatchObject({method: 'POST'});
+    });
+
+    it('refetches the status after a change, so the account state on screen is the current one', async () => {
+        const fetchMock = vi.fn().mockImplementation((url: string) => {
+            if (url.endsWith('/change-password')) {
+                return Promise.resolve(jsonResponse(CREDENTIALS));
+            }
+
+            return Promise.resolve(jsonResponse(BASE_STATUS));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp();
+        await waitFor(() => expect(result.current.status).toBeDefined());
+
+        // Count only the status reads: the POST under test is a fetch call too,
+        // and counting it would hide the very thing being asserted.
+        const statusReads = () => fetchMock.mock.calls.filter(([url]) => !String(url).endsWith('/change-password')).length;
+        const readsBefore = statusReads();
+
+        await act(async () => {
+            await result.current.changeCredentials(CURRENT_PASSWORD);
+        });
+
+        // The refetch is the "it worked" signal — it is what tells the
+        // photographer that the camera can authenticate with the new password.
+        // Exactly one read: a change that read the status twice would show a
+        // state nobody asked for.
+        expect(statusReads()).toBe(readsBefore + 1);
+    });
+
+    it('sends the current password in the body and never in the URL', async () => {
+        const fetchMock = vi.fn().mockImplementation((url: string) => {
+            if (url.endsWith('/change-password')) {
+                return Promise.resolve(jsonResponse(CREDENTIALS));
+            }
+
+            return Promise.resolve(jsonResponse(BASE_STATUS));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp();
+        await waitFor(() => expect(result.current.status).toBeDefined());
+
+        await act(async () => {
+            await result.current.changeCredentials(CURRENT_PASSWORD);
+        });
+
+        const postCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/change-password'));
+        expect(postCall).toBeDefined();
+
+        // A credential in the URL is a credential in the proxy log, in the
+        // browser history and in a `Referer` header.
+        expect(String(postCall?.[0])).not.toContain(CURRENT_PASSWORD);
+
+        // The body is the only place it belongs, and it is the only thing in
+        // it: the current password and nothing else.
+        expect(postCall?.[1]).toMatchObject({
+            method: 'POST',
+            body: JSON.stringify({current_password: CURRENT_PASSWORD}),
+        });
+    });
+
+    it('surfaces a wrong current password as a 422 instead of swallowing it', async () => {
+        const message = 'Das aktuelle Kamera-Passwort ist nicht korrekt. Bitte prüfe es und versuche es erneut.';
+        const fetchMock = vi.fn().mockImplementation((url: string) => {
+            if (url.endsWith('/change-password')) {
+                return Promise.resolve(jsonResponse({error: message}, 422));
+            }
+
+            return Promise.resolve(jsonResponse(BASE_STATUS));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp();
+        await waitFor(() => expect(result.current.status).toBeDefined());
+
+        const request = result.current.changeCredentials(CURRENT_PASSWORD);
+
+        // A wrong current password is the one refusal a different input fixes,
+        // so the client has to be able to tell it apart from the others.
+        await expect(request).rejects.toMatchObject({
+            status: 422,
+            message,
+        });
+
+        // …and the refusal hands out no credential: the rejection carries the
+        // status and the server's own words, never a password.
+        await expect(request).rejects.not.toHaveProperty('password');
+    });
+
+    it('surfaces a rate limit as a 429 instead of swallowing it', async () => {
+        const message = 'Zu viele FTP-Passwort-Zurücksetzungen für dieses Konto (maximal 10 pro Stunde). Bitte später erneut versuchen.';
+        const fetchMock = vi.fn().mockImplementation((url: string) => {
+            if (url.endsWith('/change-password')) {
+                return Promise.resolve(jsonResponse({error: message}, 429));
+            }
+
+            return Promise.resolve(jsonResponse(BASE_STATUS));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp();
+        await waitFor(() => expect(result.current.status).toBeDefined());
+
+        const request = result.current.changeCredentials(CURRENT_PASSWORD);
+
+        // The quota is a fixed number per hour, so a caller that cannot see 429
+        // will keep pressing a button that cannot succeed.
+        await expect(request).rejects.toMatchObject({
+            status: 429,
+            message,
+        });
+
+        await expect(request).rejects.not.toHaveProperty('password');
+    });
+
+    it('does not swallow a failed change, so the status is not refetched as if it had worked', async () => {
+        const fetchMock = vi.fn().mockImplementation((url: string) => {
+            if (url.endsWith('/change-password')) {
+                return Promise.resolve(jsonResponse({error: 'Konto existiert laut Cache nicht.'}, 404));
+            }
+
+            return Promise.resolve(jsonResponse(BASE_STATUS));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderFtp();
+        await waitFor(() => expect(result.current.status).toBeDefined());
+
+        const statusReads = () => fetchMock.mock.calls.filter(([url]) => !String(url).endsWith('/change-password')).length;
+        const readsBefore = statusReads();
+
+        await expect(result.current.changeCredentials(CURRENT_PASSWORD)).rejects.toMatchObject({status: 404});
+
+        // No refetch: the refetch is the "it worked" signal, and firing it after a
+        // failure would show an account state that never happened.
+        expect(statusReads()).toBe(readsBefore);
+    });
+});

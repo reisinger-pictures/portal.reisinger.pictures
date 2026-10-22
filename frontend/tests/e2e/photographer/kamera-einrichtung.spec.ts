@@ -20,6 +20,13 @@ import { SidebarHelper } from '../helpers/SidebarHelper';
  * DOM. A hardcoded copy of the same values in the dialog would fail this test,
  * which is the point.
  *
+ * The account state decides what the one button on the Kamera-Konto card does
+ * (D-51): a `pending` account has no password that could be confirmed, so the
+ * click provisions it directly; an `active` account opens the confirmation
+ * dialog, and the reset is the recovery path inside it. Both branches are
+ * covered below, and the real path — a confirmation checked against the real
+ * SFTPGo — is covered by `ftp-password-change.spec.ts`.
+ *
  * No `page.goto` for navigation: the guide is reached by clicking the button in the
  * inbox card, which is also the user path that button exists for.
  *
@@ -256,6 +263,10 @@ test.describe('Kamera einrichten: Anleitung und Zugangsdaten', () => {
 
         await accountCard.getByTestId('ftp-credentials-button').click();
 
+        // A pending account has no password that could be confirmed, so the
+        // click provisions it directly — no confirmation dialog in between.
+        await expect(main.getByRole('dialog', { name: 'Kamera-Passwort ändern' })).toHaveCount(0);
+
         await expect(main.getByText(password)).toBeVisible();
         await expect(main.getByText(passwordNotice)).toBeVisible();
         // The server's own wording, not an invented one.
@@ -283,13 +294,20 @@ test.describe('Kamera einrichten: Anleitung und Zugangsdaten', () => {
                 body: JSON.stringify({error: 'Zu viele Passwort-Änderungen. Bitte später erneut versuchen.'}),
             });
         });
-        await stubStatus(page);
+        // An active account: the button opens the confirmation dialog, and the
+        // reset is the recovery path inside it (D-51). The quota covers this
+        // path exactly like the one of a pending account.
+        await stubStatus(page, {ftp_account_status: 'active'});
 
         await auth.login(testUser.email, testUser.password);
         await sidebar.navigateTo('Dashboard');
 
         const main = page.getByRole('main');
         await main.getByTestId('ftp-credentials-button').click();
+
+        const dialog = main.getByRole('dialog', { name: 'Kamera-Passwort ändern' });
+        await expect(dialog).toBeVisible();
+        await dialog.getByTestId('ftp-change-recovery').click();
 
         // The toast container is global (`toast-global`) and sits outside `main`,
         // so it is addressed from the page — the same as every other toast

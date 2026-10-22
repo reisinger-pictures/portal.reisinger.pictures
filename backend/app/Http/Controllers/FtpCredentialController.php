@@ -8,9 +8,10 @@ use App\Exceptions\SftpGoException;
 use App\Services\FtpCredentialService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
- * Camera credential endpoint (P1-M33).
+ * Camera credential endpoints (P1-M33, D-51).
  *
  * A separate controller from `FtpController` on purpose. That one is the import
  * pipeline, and feature doc 7.8 fixes its shape: `setTarget()`, `status()` and
@@ -19,6 +20,13 @@ use Illuminate\Http\Request;
  * opposite of that — it is nothing but an SFTPGo write — so putting it in
  * `FtpController` would have made the class do two unrelated jobs and given the
  * import path a reason to change.
+ *
+ * Two doors, one discipline: `resetPassword()` hands out a credential for a
+ * password the photographer no longer has, `changePassword()` replaces one they
+ * still know. Both carry the same `management/ftp*` permission, the same hourly
+ * quota, the same audit trail and the same show-once contract, so they belong
+ * in one controller — two controllers would have meant two places where the
+ * quota could be forgotten.
  */
 class FtpCredentialController extends Controller
 {
@@ -84,6 +92,83 @@ class FtpCredentialController extends Controller
     }
 
     /**
+     * Changes the calling user's camera password, confirmed by the current one
+     * (D-51).
+     *
+     * The counterpart to {@see FtpCredentialController::resetPassword()}: the
+     * reset recovers a lost password, this one replaces a known one. The
+     * difference the photographer sees is the confirmation field — the current
+     * camera password has to be entered, because the portal cannot ask SFTPGo
+     * "is this the right password?" without being told a password it does not
+     * have (P1-M23).
+     *
+     * **The account is always `auth('api')->user()`.** A `user_id` in the body
+     * is ignored: changing another photographer's camera credential is the
+     * abuse the per-account quota and the audit trail exist to make visible, so
+     * the surface for it is not offered at all. The only input is the current
+     * password, and it belongs to the caller's own account.
+     *
+     * The error contract is the same one the reset uses, with one addition:
+     * a current password the service rejects is a **422**, not a 409. The
+     * difference is what a retry can achieve — a 409 says that nothing the
+     * photographer does will help (the account is revoked, in an error state or
+     * never provisioned), while a wrong current password is corrected by
+     * typing a different one. The status has to say that, because the client
+     * decides whether to offer a retry.
+     *
+     * The validation failure is answered in the same shape as every other
+     * error of this endpoint — a German `error` string — instead of Laravel's
+     * field/message structure. One error shape for one endpoint is worth more
+     * than the field-level detail: the frontend renders one message either way,
+     * and a client that has to understand two error formats for one endpoint
+     * has two places to get it wrong.
+     */
+    public function changePassword(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'current_password' => 'required|string',
+            ]);
+        } catch (ValidationException) {
+            // `required` covers the missing *and* the empty value, and `string`
+            // rejects a non-string. The camera alphabet has no spaces, so the
+            // global trimming cannot change a correct password.
+            return response()->json([
+                'error' => 'Das aktuelle Kamera-Passwort muss angegeben werden.',
+            ], 422);
+        }
+
+        $user = auth('api')->user();
+
+        try {
+            $password = $this->credentials->changeAndShow(
+                $user,
+                $validated['current_password'],
+                $request->ip(),
+            );
+        } catch (FtpAuditWriteException $exception) {
+            // The password was rotated but could not be recorded, so it is not
+            // handed out: an untraceable credential is not one the photographer
+            // can safely rely on, and the camera is now on a password nobody
+            // wrote down. The exception's message already says both.
+            return response()->json(['error' => $exception->getMessage()], 500);
+        } catch (FtpCredentialException $exception) {
+            return $this->fromCredentialException($exception);
+        } catch (SftpGoException $exception) {
+            return response()->json(
+                ['error' => $exception->getMessage()],
+                $this->statusForServiceFailure($exception),
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'password' => $password,
+            'password_notice' => 'Dieses Passwort wird genau einmal angezeigt. Es ist nicht gespeichert und nicht wiederherstellbar — das bisherige Kamera-Passwort gilt ab sofort nicht mehr.',
+        ]);
+    }
+
+    /**
      * 429 for the quota, 409 for an account state that may not be re-issued, 503
      * for an inbox directory the host will not give us, 422 for every other
      * portal-side precondition. The reason is not exposed in the payload: the
@@ -97,6 +182,11 @@ class FtpCredentialController extends Controller
      * would promise that a corrected input fixes it, and there is no input to
      * correct. The reset handler in the inbox already distinguishes 409, so the
      * status also reaches a client that can act on it.
+     *
+     * `invalid_current_password` is the opposite case and therefore a 422: the
+     * current password is wrong, and a different one fixes it. The two states
+     * are told apart by the status, because the client has to know whether
+     * another try is worth it.
      *
      * The inbox directory is the other case where there is nothing to correct in
      * the request, but it is not a conflict either: a missing `ftp/` bind mount,
@@ -114,6 +204,10 @@ class FtpCredentialController extends Controller
             FtpCredentialException::REASON_NOT_RESETTABLE => response()->json(
                 ['error' => $exception->getMessage()],
                 409,
+            ),
+            FtpCredentialException::REASON_INVALID_CURRENT_PASSWORD => response()->json(
+                ['error' => $exception->getMessage()],
+                422,
             ),
             FtpCredentialException::REASON_RATE_LIMITED => response()->json(
                 ['error' => $exception->getMessage()],

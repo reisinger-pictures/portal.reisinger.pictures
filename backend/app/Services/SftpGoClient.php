@@ -165,6 +165,83 @@ class SftpGoClient
     }
 
     /**
+     * Checks a camera password against the account's own login (D-51).
+     *
+     * The portal does not keep the camera password (P1-M23), so the only place
+     * the photographer's *current* password can be verified is SFTPGo itself.
+     * The check therefore goes to the **user** endpoint
+     * (`GET /api/v2/user/token`), which authenticates a user by its own
+     * credentials — the same check the camera performs when it connects. The
+     * Admin API cannot do this: it writes credentials, it does not test them.
+     *
+     * **The credentials travel in the HTTP Basic header, not in the query
+     * string.** The endpoint is documented with `security: [BasicAuth]`, and
+     * the query-string variant was rejected after a measurement on the
+     * production instance (SFTPGo 2.7.6): SFTPGo's HTTP access log contains
+     * the **full request URL**, so credentials in the query would be written
+     * into a log file the portal neither owns nor can redact. The header does
+     * not appear there.
+     *
+     * **No admin credential is attached.** The other methods authenticate with
+     * the API key or the admin JWT; both would be wrong here — the request has
+     * to be authenticated *as the camera account*, and a second credential
+     * would put the admin secret on a path that needs only the user's own.
+     * That is why this method builds its own request instead of going through
+     * `call()`, which would add the admin token and map the statuses with the
+     * Admin API's rules.
+     *
+     * Only three answers exist, and they are not interchangeable:
+     *
+     * - **200** — the credentials are correct.
+     * - **401 / 403** — they are not, or the account may not log in at all.
+     * - **anything else** — the service answered something unusable. That is a
+     *   failure of the service and not a wrong password, so it is raised as
+     *   the `SftpGoException` the rest of this class uses; the status mapping
+     *   is the existing one (`fromStatus()`), not a parallel scheme.
+     *
+     * A transport failure (refused connection, timeout) raises the same
+     * exception with the `unreachable` reason — never `false`, because "the
+     * service is down" and "the password is wrong" lead to different actions.
+     *
+     * The password is never logged, never part of a URL and never part of an
+     * exception message; `#[\SensitiveParameter]` keeps it out of stack traces.
+     */
+    public function verifyPassword(string $username, #[SensitiveParameter] string $password): bool
+    {
+        $this->assertUsableUsername($username);
+
+        $startedAt = microtime(true);
+
+        try {
+            $response = Http::connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
+                ->timeout(self::TOTAL_TIMEOUT_SECONDS)
+                ->acceptJson()
+                ->withBasicAuth($username, $password)
+                ->get($this->userTokenPath());
+        } catch (ConnectionException $exception) {
+            // The transport error carries the URL, not the request body, so the
+            // camera password is not part of the chain.
+            $this->logCall('verify_password', $username, null, $startedAt);
+
+            throw SftpGoException::unreachable($username, $exception);
+        }
+
+        $this->logCall('verify_password', $username, $response, $startedAt);
+
+        if ($response->status() === 200) {
+            return true;
+        }
+
+        // The service answered and rejected the credentials. That is the
+        // expected answer to a wrong password — not a failure of the service.
+        if (in_array($response->status(), [401, 403], true)) {
+            return false;
+        }
+
+        throw SftpGoException::fromStatus($username, $response->status());
+    }
+
+    /**
      * Removes the account. A 404 is reported as `not_found` instead of being
      * swallowed: a mismatch between `users.ftp_slug` and the name in SFTPGo is
      * an open question (P1-M34) and must not be hidden by an idempotent delete.
@@ -491,6 +568,19 @@ class SftpGoClient
         // before this is reached; the encoding is defence in depth, not
         // decoration.
         return $this->usersPath().'/'.rawurlencode($username);
+    }
+
+    /**
+     * The *user* token endpoint — not the Admin API one.
+     *
+     * A separate path because it is a separate service with a separate
+     * audience: the Admin API acts on accounts, this one logs a user in. The
+     * camera password belongs to the second one, and putting it on the Admin
+     * API path would put the wrong credential in front of the wrong service.
+     */
+    private function userTokenPath(): string
+    {
+        return $this->baseUrl().'/api/v2/user/token';
     }
 
     private function eventActionsPath(): string

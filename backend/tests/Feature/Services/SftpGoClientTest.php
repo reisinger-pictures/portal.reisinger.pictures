@@ -34,6 +34,12 @@ class SftpGoClientTest extends TestCase
     private const TOKEN_URL = 'sftpgo.test:8080/api/v2/token';
 
     /**
+     * The *user* token endpoint: the login of a camera account, not of the
+     * admin. It is where a camera password is verified (D-51).
+     */
+    private const USER_TOKEN_URL = 'sftpgo.test:8080/api/v2/user/token';
+
+    /**
      * Matches the camera rule on purpose, so the leak tests carry a value a
      * real provisioning would really send.
      */
@@ -430,6 +436,161 @@ class SftpGoClientTest extends TestCase
         Http::assertNotSent(fn (Request $request): bool => $request->method() === 'PUT');
     }
 
+    // ── Password verification (D-51) ─────────────────────────────────────────
+
+    /**
+     * The verification is a *user* login: the account's own credentials go to
+     * the user endpoint, in the Basic header. The portal stores no camera
+     * password (P1-M23), so the service is the only place where one can be
+     * checked.
+     */
+    public function test_the_verification_uses_the_account_credentials_in_the_basic_header(): void
+    {
+        Http::fake([self::USER_TOKEN_URL => Http::response(['access_token' => 'user-token'], 200)]);
+
+        $this->assertTrue((new SftpGoClient)->verifyPassword('florian', self::PASSWORD_MARKER));
+
+        Http::assertSent(function (Request $request): bool {
+            $this->assertSame('GET', $request->method());
+            $this->assertSame('http://sftpgo.test:8080/api/v2/user/token', $request->url());
+            $this->assertSame(
+                'Basic '.base64_encode('florian:'.self::PASSWORD_MARKER),
+                $request->header('Authorization')[0],
+            );
+
+            return true;
+        });
+    }
+
+    /**
+     * A wrong password is an answer, not a failure: the service rejected the
+     * credentials, so the method says so and the caller decides what to do.
+     */
+    public function test_the_verification_reports_wrong_credentials_as_false(): void
+    {
+        Http::fake([self::USER_TOKEN_URL => Http::response(['error' => 'invalid credentials'], 401)]);
+
+        $this->assertFalse((new SftpGoClient)->verifyPassword('florian', self::PASSWORD_MARKER));
+    }
+
+    /**
+     * A 403 is the same answer: the account may not log in (disabled, or a
+     * protocol that is not allowed). It is not a wrong password that a retry
+     * could fix, but the caller cannot tell the two apart — and must not have
+     * to.
+     */
+    public function test_the_verification_reports_a_forbidden_account_as_false(): void
+    {
+        Http::fake([self::USER_TOKEN_URL => Http::response(['error' => 'forbidden'], 403)]);
+
+        $this->assertFalse((new SftpGoClient)->verifyPassword('florian', self::PASSWORD_MARKER));
+    }
+
+    /**
+     * An answer that is neither a confirmation nor a rejection is a failure of
+     * the service. It must not be reported as a wrong password: the
+     * photographer would retype a password that is perfectly fine.
+     */
+    public function test_the_verification_reports_an_unusable_answer_as_a_service_failure(): void
+    {
+        Http::fake([self::USER_TOKEN_URL => Http::response(['error' => 'internal failure'], 500)]);
+
+        try {
+            (new SftpGoClient)->verifyPassword('florian', self::PASSWORD_MARKER);
+            $this->fail('Expected a SftpGoException for an unusable answer.');
+        } catch (SftpGoException $exception) {
+            $this->assertSame(SftpGoException::REASON_SERVER_ERROR, $exception->reason);
+            $this->assertSame(500, $exception->status);
+        }
+    }
+
+    /**
+     * A transport failure is not a wrong password either. The two lead to
+     * different actions — one to a retry, the other to a retyped password — so
+     * they may not share an answer.
+     */
+    public function test_the_verification_reports_an_unreachable_service_as_an_exception(): void
+    {
+        Http::fake(fn () => throw new ConnectionException('cURL error 28: Operation timed out'));
+
+        try {
+            (new SftpGoClient)->verifyPassword('florian', self::PASSWORD_MARKER);
+            $this->fail('Expected a SftpGoException for an unreachable service.');
+        } catch (SftpGoException $exception) {
+            $this->assertSame(SftpGoException::REASON_UNREACHABLE, $exception->reason);
+            $this->assertNull($exception->status);
+            $this->assertInstanceOf(ConnectionException::class, $exception->getPrevious());
+        }
+    }
+
+    /**
+     * The password must not travel in the URL. SFTPGo's HTTP access log
+     * contains the full request URL (measured on the production instance), so a
+     * query string would write the camera password into a log file the portal
+     * neither owns nor can redact.
+     */
+    public function test_the_verification_never_puts_the_password_into_the_url(): void
+    {
+        Http::fake([self::USER_TOKEN_URL => Http::response(['access_token' => 'user-token'], 200)]);
+
+        (new SftpGoClient)->verifyPassword('florian', self::PASSWORD_MARKER);
+
+        Http::assertSent(function (Request $request): bool {
+            $this->assertStringNotContainsString(self::PASSWORD_MARKER, $request->url());
+            $this->assertStringNotContainsString(self::PASSWORD_MARKER, (string) $request->body());
+
+            return true;
+        });
+    }
+
+    /**
+     * The verification must not carry an admin credential. The request has to
+     * be authenticated *as the camera account*; an API key or an admin JWT
+     * would put the admin secret on a path that needs only the user's own.
+     */
+    public function test_the_verification_carries_no_admin_credential(): void
+    {
+        Http::fake([self::USER_TOKEN_URL => Http::response(['access_token' => 'user-token'], 200)]);
+
+        (new SftpGoClient)->verifyPassword('florian', self::PASSWORD_MARKER);
+
+        Http::assertSent(fn (Request $request): bool => ! $request->hasHeader(SftpGoClient::API_KEY_HEADER));
+        Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/api/v2/token'));
+
+        // The same with the JWT fallback: the admin token is not even fetched.
+        $this->configure(['api_key' => null, 'admin_username' => 'admin', 'admin_password' => 'admin-secret']);
+        Http::fake();
+
+        (new SftpGoClient)->verifyPassword('florian', self::PASSWORD_MARKER);
+
+        Http::assertSent(fn (Request $request): bool => ! str_contains($request->url(), '/api/v2/token'));
+    }
+
+    /**
+     * The password of a verification must not reach the log either. The log
+     * record of the call carries operation, account, status, duration and the
+     * body *length* — never the body, never a header.
+     */
+    public function test_the_verification_keeps_the_password_out_of_the_log(): void
+    {
+        Http::fake([self::USER_TOKEN_URL => Http::response(['access_token' => 'user-token'], 200)]);
+
+        $records = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$records): void {
+            $records[] = $event;
+        });
+
+        (new SftpGoClient)->verifyPassword('florian', self::PASSWORD_MARKER);
+
+        $this->assertNotEmpty($records, 'The verification must be logged.');
+
+        foreach ($records as $record) {
+            $serialized = (string) json_encode([$record->level, $record->message, $record->context], JSON_THROW_ON_ERROR);
+
+            $this->assertStringNotContainsString(self::PASSWORD_MARKER, $serialized);
+        }
+    }
+
     public function test_delete_user_removes_the_account(): void
     {
         Http::fake([self::USER_URL => Http::response(['message' => 'User deleted'], 200)]);
@@ -529,9 +690,10 @@ class SftpGoClientTest extends TestCase
 
         $source = (string) file_get_contents(app_path('Services/SftpGoClient.php'));
 
-        // Both the Admin API call and the token call carry the fixed budgets.
-        $this->assertSame(2, substr_count($source, 'connectTimeout(self::CONNECT_TIMEOUT_SECONDS)'));
-        $this->assertSame(2, substr_count($source, '->timeout(self::TOTAL_TIMEOUT_SECONDS)'));
+        // The Admin API call, the admin token call and the user token call (the
+        // password verification, D-51) carry the fixed budgets.
+        $this->assertSame(3, substr_count($source, 'connectTimeout(self::CONNECT_TIMEOUT_SECONDS)'));
+        $this->assertSame(3, substr_count($source, '->timeout(self::TOTAL_TIMEOUT_SECONDS)'));
         // A retried POST /users would create a second account (409).
         $this->assertStringNotContainsString('->retry(', $source);
     }

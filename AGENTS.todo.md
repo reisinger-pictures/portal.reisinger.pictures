@@ -73,31 +73,6 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 
 
 ---
-- [ ] **Dependabot: 1 offener Alert am Default-Branch** (war 10) — **gemessen am 2026-10-21:
-  genau 1 Alert, `high`, `braces`** (verwundbar `<= 3.0.3`, **`gepatcht-ab=KEINE`**), 0 critical.
-  Die **Erreichbarkeit ist geprüft** (`pnpm why braces`): `braces` kommt ausschließlich über
-  `micromatch` ← `@lingui/cli` / `eslint-plugin-lingui`, also **nur über die Build- und
-  Lint-Werkzeuge**; das ausgelieferte Bundle enthält es nicht, und der ReDoS-Pfad bräuchte
-  ein vom Angreifer kontrolliertes Glob-Pattern, das es hier nicht gibt. **Die Erreichbarkeit
-  ist auf die Bauzeit begrenzt, die Abhängigkeits-Klassifikation nicht:** der Pfad laeuft ueber
-  `@lingui/vite-plugin`, das in `dependencies` steht — `pnpm audit --prod` zaehlt den Alert, obwohl
-  zur Request-Zeit nichts davon laeuft (Praezisierung in `features/security/accepted-risks.md`,
-  C8). **Der Alert bleibt
-  in GitHub offen** — ohne verfügbare Version gibt es nichts zu aktualisieren, und ein
-  Dismissal wäre eine Sicherheitsentscheidung des Owners. **Der Weg dorthin ist ein Schritt** (der Alert
-  ist GHSA-vfj7-8cjw-p6xm, `npm:braces`, `frontend/pnpm-lock.yaml`):
-  `gh api -X PATCH repos/reisinger-pictures/portal.reisinger.pictures/dependabot/alerts/<alert-id> -f state=dismissed -f dismissed_reason=tolerable_risk -f dismissed_comment="C8: accepted in features/security/accepted-risks.md — no patched version exists (3.0.3 is the highest)."`.
-  **Der Alert bleibt bis dahin offen** — das Repo entscheidet die Grenze (C8), GitHub bekommt nur den
-  Vermerk. **Auslöser für eine Neubewertung:** eine gepatchte Version erscheint (dann gehört der Bump in
-  die nächste `node-deps`-Welle) oder die Abhängigkeit wandert in den Request-Pfad (dann verlässt sie C8).
-  **Erscheint eine gepatchte
-  Version, gehört sie in die nächste `node-deps`-Welle**, nicht nebenbei. Die übrigen
-  Advisory-Gruppen (`undici`, `source-map-js`, `brace-expansion`,
-  `postcss-selector-parser`) sind in den Wellen unten erledigt.
-   - **Ergebnis der `node-deps`-Wellen (`85f102b` + die `undici`-Kopplung):** drei Pakete sind über `overrides` in `frontend/pnpm-workspace.yaml` gehoben (`source-map-js` 1.2.1 → 1.2.2, `brace-expansion` 5.0.9 → 5.0.12, `postcss-selector-parser` 6.0.10 → 7.1.6) — alle **transitiv** und dev/build-only (kein Treffer über alle 40 JS-Chunks, `pnpm why` weist jeden Pfad). `undici` brauchte am Ende **keinen** Override: die Kopplung wurde **gelöst** statt erzwungen — `jsdom@30.0.1` deklariert `^8.9.0` und löst selbst auf `8.12.2` auf, und **alle sechs** offenen `undici`-Advisories enden bei `< 7.29.1` (Range per API gemessen), 8.x liegt also außerhalb; der zwischenzeitliche erzwungene Downgrade auf 7.29.1 ist damit weg. `pnpm audit` 16 → 1, `pnpm audit --prod` 2 → 1, Vitest grün (1423; die 20 zusätzlichen Tests stammen aus der pk_test-Gate-Welle). **`braces` bleibt offen und ist als akzeptiertes Risiko dokumentiert (C8, `features/security/accepted-risks.md`)** — kein Patch existiert, und der verwundbare Eingang wird von keiner der drei realen Aufrufstellen betreten. Beide Wellen unabhängig verifiziert (APPROVED; u. a. minimal-invasiver Lockfile-Diff, CSS byte-identisch trotz Major-Bump, JSDOM-Konstruktionsprobe unter 8.12.2). **Scan-Lag, kein Befund:** die Dependabot-API meldet weiter **10** Alerts, weil ihr letzter Scan vor `85f102b` lief; autoritativ für den lokalen Stand ist `pnpm audit` → **1**.
-  - **Verlauf:** 17 → 15 (dompurify, PR #18) → 12 (`league/commonmark` ×2 + `laravel/framework`, PR #17/#16) → **10** (`tinypool` ×2 critical, PR #19) — alle vier über den Auto-Merge, **ohne Handarbeit**. **Der rote-PR-Blocker ist behoben (D-33):** die Security-PRs waren nie wegen ihres Codes rot, sondern weil GitHub die **Actions**-Secrets von jedem Dependabot-Lauf zurückhält — er liest ausschließlich den **Dependabot**-Store (für `push` **und** `pull_request`; nur `pull_request_target` erhält keine). Der Push-Lauf von PR #18 ist nach `@dependabot rebase` **11/11 grün** (`39130666484`) und wurde von `automerge.yml` gemergt (13:29:48Z, Merge-Kommit `e2d280b`).
-  - **Der manuelle Rest — Owner-Entscheidung 2026-10-18: eigene `node-deps`-Welle, nicht nebenbei — ausgeführt, Ergebnis im Unterpunkt darüber.** `undici` (6 Alerts), `source-map-js`, `brace-expansion`, `postcss-selector-parser`, `braces`. Für `source-map-js` hat Dependabot seinen PR #20 am 2026-10-18 selbst geschlossen („Looks like source-map-js is no longer updatable, so this is no longer needed"), obwohl der Alert **offen** ist und `frontend/pnpm-lock.yaml:2701` → `source-map-js@1.2.1:` den verwundbaren Stand weiter pinnt. **Sonderfall `braces`:** `first_patched_version` ist leer — es gibt **keine** gefixte Version, der Fall braucht Entfernen/Override statt Bump. Alle übrigen sind Ein-Patch-Sprünge (`undici` 7.29.0 → 7.29.1, `source-map-js` 1.2.1 → 1.2.2, `brace-expansion` → 5.0.12, `postcss-selector-parser` → 7.1.6), aber **transitiv** — deshalb erst Triage (dev-only vs. Produktion), dann `pnpm.overrides`.
-
 > Stand: 2026-09-27. Architekturentscheidungen in `features/`.
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
@@ -115,15 +90,24 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Protokoll ganz oben. Eine Position mit `Entscheidung offen:` bedeutet, dass eine **neue**
 > Frage entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-21):** **4 offene `[ ]`** und **16 wartende
-> `[~]`** über 1300 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
-> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 4, `… | grep -c '^- \[~\]'` → 16,
-> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1300; `<stand>` = der committete Stand dieses
+> **Struktur-Hinweis, fortgeschrieben (2026-10-22):** **3 offene `[ ]`** und **9 wartende
+> `[~]`** über 1213 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
+> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 3, `… | grep -c '^- \[~\]'` → 9,
+> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1213; `<stand>` = der committete Stand dieses
 > Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
 > trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
-> 4: **3× `manuell prüfen:`** und **1× gewöhnliche Arbeit**; **0× `Entscheidung offen:`** — die
-> DB-Engine-Policy ist inzwischen als **D-49** entschieden (`features/owner-decisions.md`), ihre
-> Position ist deshalb aus dem Board entfernt.
+> 3: **3× `manuell prüfen:`** und **0× gewöhnliche Arbeit**; **0× `Entscheidung offen:`** — die
+> offenen Owner-Fragen der Runde vom 2026-10-22 sind entschieden und als **D-50** (Proxy-Trust-
+> Grenze), **D-51** (Selbständerung des Kamera-Passworts), **D-52** (Watchtower-Policy),
+> **D-53** (SFTPGo-Admin-Wertepaar), **D-54** (`CREATE_DEFAULT_ADMIN` im Compose) und
+> **D-55** (CSP-Erweiterung, Turnstile bleibt aus) in `features/owner-decisions.md`
+> festgehalten; ihre Positionen sind deshalb aus dem Board entfernt. Gegenüber dem Stand vom
+> 2026-10-21 (4 `[ ]`, 16 `[~]`, 1300 Zeilen) sind **8 Positionen weg** — 7 geschlossen
+> (Dependabot-Alert dismissed, `SFTPGO_API_KEY`-Weg, Watchtower-Policy, Proxy-Trust-Grenze,
+> D-36-Ereigniskette in Produktion, `CREATE_DEFAULT_ADMIN` in der Cutover-Checkliste,
+> Selbständerung des Kamera-Passworts mit Tests und Deploy), 1 als Dublette zusammengeführt
+> (die Live-GO-Punkte standen zweimal); eine Position wurde umformuliert und bleibt
+> (Live-GO-Punkte mit dem zurückgestellten Kill-Switch-Nachweis).
 > **Alle 14 Review-Befunde** sind geschlossen und aus der Liste entfernt (Nachweis in
 > `features/security/2026-10-18-review-closure.md`); die 3 enthalten die Punkte, die in den
 > Freigaben der Wellen A–D als nicht-blockierend eingestuft und deshalb hier festgehalten
@@ -137,21 +121,21 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > 2026-10-20** hat 16 alte Owner-Positionen durchgesehen: 11 davon sind erledigt, maschinell
 > abgedeckt oder überholt und deshalb aus der Liste gegangen; die restlichen sind mit korrigiertem
 > Wortlaut und dem richtigen Werkzeug (Firewalld statt ufw, `ROOT.PEM` statt `cert.pem`,
-> authentifiziert statt anonym lesen) stehen geblieben. Alle 16 `[~]` tragen ein `wartet auf`.
+> authentifiziert statt anonym lesen) stehen geblieben. Alle 10 `[~]` tragen ein `wartet auf`.
 > **Diese Zählung ist ein Stand, keine Zusage** — sie wandert mit jeder Welle; wer eine Position
 > sucht, zählt selbst nach. Der Vergleich zum 2026-09-28-Stand (69 Positionen) ist **kein**
 > Fortschrittsmaß: seither kamen Positionen hinzu, andere wurden entfernt.
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
 > `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
-> (20 = 4 offen + 16 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
-> (1300) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
+> (12 = 3 offen + 9 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
+> (1213) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
 > würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
 > defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
 > **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
-> (Zeilen 202–283) trägt **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist
+> (der Abschnitt `## 🗳 Entscheidungs-Protokoll`) trägt **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist
 > damit gegenstandslos.
-> Die Positionen liegen in **10 von 33 `##`-Abschnitten**
+> Die Positionen liegen in **9 von 33 `##`-Abschnitten**
 > (`git show <stand>:AGENTS.todo.md | awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' | sort -u | wc -l`
 > gegen `git show <stand>:AGENTS.todo.md | grep -c '^## '`; **neu gemessen am 2026-10-21** —
 > die vorherige Angabe war mit dieser Methode nicht reproduzierbar und wurde durch den Messwert
@@ -267,7 +251,7 @@ Voll-CI des exakt gepushten Heads `d8ef6500` (12/12 Jobs) ist das Gate.
 
 ## 🗳 Entscheidungs-Protokoll (Owner, 2026-09-28)
 
-**Was gilt, steht in `features/owner-decisions.md` (D-1 bis D-48).** Diese Datei sagt nur, **ob es schon
+**Was gilt, steht in `features/owner-decisions.md` (D-1 bis D-55).** Diese Datei sagt nur, **ob es schon
 gilt** — und hält fest, welche Ansätze zurückgezogen wurden, damit sie nicht erneut
 implementiert werden.
 
@@ -280,7 +264,7 @@ darunter. Wer diese Trennung auflöst, hat die Board-Hygiene gebrochen.
 
 ### Stand
 
-Alle Entscheidungen D-1 bis D-49 sind getroffen. Soweit sie Code erforderten, sind sie **umgesetzt
+Alle Entscheidungen **D-1 bis D-55** sind getroffen. Soweit sie Code erforderten, sind sie **umgesetzt
 und verifiziert** — die Entscheidungen stehen in `features/owner-decisions.md`, die
 zurückgezogenen Varianten direkt darunter in „Verworfen".
 
@@ -630,70 +614,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [~] wartet auf die Produktentscheidung, ob Fotografen ihr Passwort selbst ändern dürfen (Confirm-Flow mit aktuellem Passwort) oder nur der Admin. **P1-M23 (P0) — Passwort-Erzeugung und Show-once, statt Verschlüsselung
-  at rest.** Das ist die **entscheidende Entlastung gegenüber P1-M18** und
-  der eigentliche Grund für den Wechsel: SFTPGo hält das Passwort, das
-  Portal muss es **nicht** speichern. Damit entfallen `ftp_credentials` als
-  verschlüsselte Tabelle, `FILE_ENCRYPTION_KEY` und der
-  `FILE_ENCRYPTION_PREVIOUS_KEYS`-Rotationspfad vollständig.
-  **Ablauf:** PHP erzeugt ein kamerataugliches Passwort
-  (`^[a-z0-9]{16,24}$`, keine Sonderzeichen — Kameras können sie nicht
-  eingeben), übergibt es per HTTPS an SFTPGo, **zeigt es einmal** an und
-  verwirft es. Verloren → `resetPassword()`, nicht wiederherstellbar.
-  **Offen (Produktentscheidung, nicht Implementierung):** dürfen Fotografen ihr
-  Passwort selbst ändern (dann Confirm-Flow mit dem aktuellen Passwort) oder
-  nur der Admin? Nicht als Code-Task vergeben, bis das geklärt ist.
-  **Der Provisionierungsstatus selbst ist in P1-M30 festgelegt** (Spalte auf
-  `users`, kein Live-Query) — die frühere Unklarheit ist aufgelöst.
-  **Tests:** PHPUnit für Erzeugung (Länge, Charset, keine Kollision nach
-  `Str::random` + Prüfschleife) und dafür, dass im Request-Log/Response
-  nach dem Show-once **kein** Klartext mehr auftaucht; Playwright-E2E für
-  Anzeige und Reset.
-- [~] wartet auf die Owner-Entscheidung, ob **zusätzlich** ein `SFTPGO_API_KEY` in die Portainer-Stack-Env kommt —
-  **der Repo-Teil ist korrekt, und der Fall funktioniert auch ohne API-Key (live gemessen am 2026-10-21):**
-  `deployment/docker-compose.yml:107-108` führt `SFTPGO_BASE_URL=${SFTPGO_BASE_URL:-http://sftpgo:8080}` und
-  `SFTPGO_API_KEY=${SFTPGO_API_KEY:-}` (Platzhalter ✓, Regressionstest in
-  `backend/tests/Feature/Services/SftpGoClientTest.php:446`), und auf dem Host sind gesetzt:
-  `SFTPGO_BASE_URL` (18 Zeichen), `SFTPGO_ADMIN_USERNAME` (12), `SFTPGO_ADMIN_PASSWORD` (28) —
-  `SFTPGO_API_KEY` ist **leer** (`printenv | wc -c` → 1, also nur der Zeilenumbruch).
-  Der JWT-Fallback über das Admin-Wertepaar ist damit der gepflegte Weg
-  (`features/infrastructure/19-ftp-upload-pipeline.md` §7.15: „Ein Wertepaar, nicht zwei") ✓ — der API-Key ist
-  **nicht** zwingend, wäre aber die sicherere Variante (kein Admin-Passwort im Stack).
-  **Die Entscheidung:** API-Key zusätzlich setzen (und den Admin-Weg auflösen) oder den JWT-Fallback als
-  endgültig festschreiben (und §7.15 um diese Festlegung ergänzen).
-- [~] wartet auf den nächsten Watchtower-Recreate als Gegenprobe und auf die Owner-Entscheidung zur Watchtower-Policy — **der Auslöser des täglichen Recreate ist identifiziert (2026-10-21):** es ist **Watchtower**, kein Cron und kein Timer. Belege (read-only auf dem Host): `docker logs --since 96h watchtower` zeigt `Stopping /portal_backend … Creating /portal_backend` am 2026-10-18, -19, -20 und -21 um 08:0x CEST; `crontab -l` kennt nur `volume-backup.sh`, `update_portainer.sh`, `dind-image-gc.sh`; `systemctl list-timers` zeigt keine passende Unit. **Die gefürchtete Folge tritt nicht ein:** `sync.sh:44` synct nach `/home/webadmin/websites/api-portal.reisinger.pictures/`, und `deployment/docker-compose.yml:97` mountet genau dieses Verzeichnis als `/var/www/html` (Bind-Mount) — Watchtower tauscht nur das Image, nicht den Anwendungscode; der UID-Stand `1000:82` (D-1) bleibt stabil (`docker inspect portal_backend --format "{{.Config.User}}"`). Offen: (a) die Gegenprobe beim nächsten Recreate (`docker inspect portal_backend --format "{{.Config.User}} {{.Created}}"`), (b) die Entscheidung, ob Watchtower für `portal_backend` abgeschaltet oder digest-gepinnt werden soll — er zieht derzeit das Tag `portal-base:8.5`, nicht einen Digest.
-- [~] wartet auf die Owner-Entscheidung, ob die **Vertrauensgrenze der Proxy-Regel enger** gezogen wird —
-  **der Rest ist gemessen (2026-10-22):** `trustProxies(at: 'REMOTE_ADDR')` vertraut den **direkten
-  Peer**, und der legitime Schreiber des `X-Forwarded-For` ist allein Caddy (der FastCGI-Port 9000 ist
-  nicht zum Host publiziert ✓). Aber: der Backend hängt am **extern geteilten** Netz `webret`
-  (`ipv4_address: 172.18.0.31`) und an `portal_internal` — **jeder** Container dieser Netze kann den
-  FastCGI-Port öffnen und damit den Header selbst setzen. Das Gewicht ist gering (es verschafft nur
-  eine falsche Client-Adresse — keine Authentifizierung, keinen Datenzugriff ✓), und **nichts
-  Vertrauenswürdiger schreibt den Header**: Caddy setzt ihn aus dem echten Peer und übergibt den vom
-  Client gelieferten nicht. **Die Alternativen und ihre Preise:** (a) so bleiben (empfohlen — das
-  Nageln auf eine Adresse bricht bei jedem Recreate des Caddy-Containers, und die Regel „vertraue den
-  direkten Peer, lies die Kette von rechts" ist ohnehin die schwächere, aber stabile Zusage ✓); (b) den
-  Backend aus `webret` nehmen und Caddy an `portal_internal` hängen (Compose-Änderung plus Recreate,
-  betrifft `proxy-stack` und damit den Owner ✓); (c) einen geheimen Header von Caddy setzen lassen
-  (`proxy-stack` ✓, Owner ✓) — der stärkste, aber auch der aufwendigste Weg ✓. **Bis zur Entscheidung
-  gilt (a)**, und die Restlücke steht hier.
-
-- [~] wartet auf die **Einrichtung der D-36-Ereigniskette in der Produktion** — **am 2026-10-21 auf
-  dem Host gemessen: die Kette fehlt vollständig.** (a) Die SFTPGo-Instanz der Produktion hat **keine**
-  Event-Action und **keine** Event-Regel (`GET /api/v2/eventactions` und `/api/v2/eventrules` liefern
-  leere Listen; die konfigurierten Namen `portal-ftp-upload` / `portal-ftp-upload-rule` antworten mit
-  404). (b) `FTP_EVENT_SECRET` ist im laufenden Container **leer** (`printenv | wc -c` → 1, also nur der
-  Zeilenumbruch); der Wert ist laut `deployment/docker-compose.yml:215` ohne Default — ein leeres Secret
-  laesst den Endpunkt jedes Event mit 401 abweisen (fail closed ✓) und den Provisionierungsbefehl
-  abbrechen ✓. (c) Der SFTPGo-Container selbst ist gesetzt: 1 Konto, `status: 1` (aktiv).
-  **Folge:** ein Kamera-Upload landet **ohne** Button nicht automatisch in der Zielgalerie — die
-  D-36-Ereigniskette feuert nie. **Der Weg dorthin (Owner-Aktion, zwei Schreibvorgaenge auf dem Host):**
-  `FTP_EVENT_SECRET` in der Portainer-Stack-Env setzen (nie ins Repo), den Backend-Container neu erzeugen
-  (die Env wird erst dann gelesen), danach `php artisan ftp:provision-events` (idempotent: legt die
-  Aktion an bzw. aktualisiert sie und die Regel) und die Regel mit
-  `GET /api/v2/eventrules/portal-ftp-upload-rule` gegenlesen (`fs_events: ["upload"]`, Status aktiv).
-  **Der Code-Pfad ist gemessen:** die Ereignisregel ist gegen ein laufendes SFTPGo verifiziert
-  (`scripts/e2e-up.sh` provisioniert sie beim Test-Stack-Setup).
 - [~] wartet auf den **Mail-Nachweis** — Queue, Worker und Scheduler sind am 2026-10-21 live belegt: die PID-Dateien `/tmp/portal-{scheduler,queue-supervisor,queue-worker}.pid` existieren, der stündliche Scheduler-Mutex in `cache_locks` trägt den Slot-Suffix `2100` (erworben um 21:00:02Z), der Wochenimport lief am Montag-Slot `03:30` (Meilisearch-Batch **2335**, Task 7200, `enqueuedAt` 2026-10-19T03:30:32Z, `status: succeeded`), der manuelle Lauf vom 2026-10-21 21:07Z erzeugte Batch **2402** (39/39 Tasks succeeded, 19.477 Orte im Index `locations`), und die Queue-Tabellen `jobs`/`failed_jobs`/`job_batches` sind leer und fehlerfrei. Die **SMTP-Duplikat-Policy** ist entschieden (D-17 in `features/owner-decisions.md`: gültige Tokens erhalten, kein pauschales Queue-Uniqueness, ein SMTP-Retry darf keine zweite Belastung oder Zustandsänderung auslösen). Offen: ein **zugestellter** Mail-Nachweis aus der Produktion — der Admin-SMTP-Test (`POST /api/management/settings/test-email`) muss ausgelöst und der Provider-/Mailpit-Log danebengelegt werden; die Produktions-DB führt keine Mail-Logtabelle, und `storage/logs/laravel.log` ist vom 2026-04-23.
 ## 🧪 TEST-QUALITÄTS-AUDIT (2026-09-26) — zwei unabhängige Audits
 
@@ -811,13 +731,6 @@ Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`
 
 ### Gate 0 — Baseline und Änderungsdisziplin
 - [~] wartet auf die zwei verbleibenden Betriebsnachweise — die **Secret-Rotation** von `AI_API_KEY` und `ADMIN_PASSWORD` (das Wertepaar stand beim Auslesen der aufgelösten Compose-Datei im Klartext im Terminal) und die **Plugin-Live-Runtime**. Erledigt und aus dieser Position entfernt: GHCR-Pullability (beide Pakete `public`), die Deployment-Nachweise (acht Deploys mit Live-Messungen), die Storage-Nachweise (`storage/app/private` unversehrt) und der Scheduler-Nachweis (live am 2026-10-21: PID-Dateien, Mutex-Slot, Wochenimport; siehe `features/infrastructure/29-production-operations-runbook.md` §5).
-- [~] wartet nur noch auf die **betrieblichen** Live-GO-Punkte — die Radar-/3DS-/Webhook-/Privacy-Checkliste
-  (Stripe-Dashboard, `features/security/card-testing-protection.md`) und den **Test der Monitoring-Alarme**
-  (in `features/security/card-testing-runbook.md` §1–§3 beschrieben, aber nie ausgelöst).
-  **Erledigt und nicht mehr Teil dieser Position:** der Contract-/Card-Testing-Review (14 Befunde SEC-01…SEC-14,
-  `features/security/2026-10-18-review-closure.md`), das Monitoring-Runbook (§1–§3), der Rollback-Ablauf ohne
-  Datenverlust (§6, 2026-10-21) und die unabhängige Verifikation der Card-Testing-Implementierung (eigene
-  Position unten).
 - [~] wartet nur noch auf die **Operations-Evidenz** (die Mail-Zustellung, siehe die Position zum Queue-/Mail-/Worker-/Scheduler-Nachweis) — die Code-Subblöcke R1–R7 sind verifiziert geschlossen, und die **Product Decisions** sind entschieden (D-17 „Duplicate mail and prompt-injection policies“ in `features/owner-decisions.md`, umgesetzt in `98766c14`). Die im alten Text genannten aktiven Bugs sind heute durch Tests abgedeckt: Session-Header-Validierung (`AISessionHeaderDeploymentPolicyTest`), Bild-Budget (`ModelContactSheetTest`, `ModelContactSheetBulkTest`), Cleanup-Dauerhaftigkeit (`GalleryPhotoCleanupDurabilityTest`, `CleanupGalleriesFailureTest`), Temp-Löschung (`AiTempFileSweepAgreementTest`, `WatermarkMarkerCleanupTest`), Mail-Verlust bei Quotes (`WebhookInvoiceMailAtomicDedupeTest`, `WebhookReplayMailTest`), fehlerhafte Provider-Antwort (`StripeWebhookTest`, `WebhookNullPiTest`), Reihenfolge beim manuellen Löschen (`ManualInvoiceNumberValidationTest`, `GalleryUpdateDeleteTest`).
 ## Model-Registrierung (Magic-Link) + Profile-Iteration (2026-09-18/19 deployiert) — OFFENE Restarbeiten
 
@@ -1108,10 +1021,6 @@ gerissen und zur Entscheidung gemacht.
   jetzt `tsc -b --force` (`frontend/package.json:12`), damit die verengte Union
   nicht von einem veralteten `tsbuildinfo` abhängt; die Sabotage-Probe und die
   Begründung stehen in `features/tech/04-testing-guidelines.md` §6a.
-- [~] wartet auf ein späteres Aufräumen der Stack-Env — der Wert hat keinen Secret-Bezug, wird aber über die Ports-Liste geführt. **`SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN`** ist im Compose ein
-  Container-Wert ohne Secret-Bezug, wird aber über die Ports-Liste geführt; bei
-  einem späteren Aufräumen prüfen, ob es in die Stack-Env gehört.
-
 **Verifikation / Übergabe**
 - [~] wartet auf die **betrieblichen** Live-GO-Punkte — die Radar-/3DS-/Webhook-/Privacy-Checkliste
   (Stripe-Dashboard, `features/security/card-testing-protection.md`), den **Test der Monitoring-Alarme**
@@ -1119,6 +1028,10 @@ gerissen und zur Entscheidung gemacht.
   **Live-Nachweis des Kill-Switches** (§6.2 des Runbooks: der Schalter wurde nie in Produktion ausgeloest)
   und die **Datenschutz-Freigabe** (§10: Rechtsgrundlagen und Aufbewahrungsfristen sind laut
   `frontend/src/ui/Privacy.tsx` nicht abschliessend festgelegt; die DPO-Pruefung steht aus).
+  **Der Kill-Switch-Nachweis ist vom Owner zurückgestellt (2026-10-22, „Nein,
+  Nachweis später")** — er bleibt Owner-Aufgabe und wird hier nicht als erledigt
+  geführt; die Produktion hat 0 Orders, ein Auslösen wäre also folgenlos, der
+  Vertrag (§12, Punkt 3) verlangt den Nachweis aber weiterhin.
   **Die Reihenfolge ist nicht beliebig:** §12.4 des Vertrags erlaubt den Turnstile-Rollout erst, wenn
   Dashboard-, **CSP-**, Datenschutz- und Siteverify-Checks bestanden sind. Die CSP-Pruefung ist der
   **Blocker**: die ausgelieferte Policy erlaubt `https://challenges.cloudflare.com` nicht, das

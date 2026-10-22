@@ -51,6 +51,7 @@ function renderInbox(quarantineCount: number, uploadPath: string | null = '/') {
         setTargetGallery: vi.fn(),
         processInbox: vi.fn(),
         resetCredentials: vi.fn(),
+        changeCredentials: vi.fn(),
         mutate: vi.fn(),
     } as unknown as ReturnType<typeof useFtp>);
 

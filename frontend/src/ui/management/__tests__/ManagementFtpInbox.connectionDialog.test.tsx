@@ -48,6 +48,7 @@ function mockStatus(overrides: Partial<FtpStatus> = {}) {
         setTargetGallery: vi.fn(),
         processInbox: vi.fn(),
         resetCredentials: vi.fn(),
+        changeCredentials: vi.fn(),
         mutate: vi.fn(),
     } as unknown as ReturnType<typeof useFtp>);
 }

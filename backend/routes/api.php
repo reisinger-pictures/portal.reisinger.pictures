@@ -316,6 +316,11 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     // Import-Pfad in FtpController unangetastet bleibt (§7.8). `api/management/ftp*`
     // ist für Fotografen in der ManagementMiddleware bereits freigegeben.
     Route::post('/management/ftp/reset-password', [FtpCredentialController::class, 'resetPassword'])->name('api.management.ftp.reset-password');
+    // D-51: Passwort-Änderung durch den Fotografen selbst. Anders als der Reset
+    // verlangt sie den Nachweis des aktuellen Passworts (Prüfung gegen SFTPGo),
+    // weil sie ein bestehendes Passwort ersetzt statt eines verlorenen zu
+    // ersetzen. Gleiche Quota, gleicher Audit-Trail, gleiche Show-once-Semantik.
+    Route::post('/management/ftp/change-password', [FtpCredentialController::class, 'changePassword'])->name('api.management.ftp.change-password');
 
     Route::get('/management/orgs', [OrgController::class, 'index'])->name('api.management.orgs.index');
     Route::post('/management/orgs', [OrgController::class, 'store'])->name('api.management.orgs.store');

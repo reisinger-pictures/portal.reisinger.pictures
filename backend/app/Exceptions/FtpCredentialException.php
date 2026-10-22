@@ -29,6 +29,12 @@ use RuntimeException;
  * not a failure of the input and not a failure of the service, it is a state the
  * portal refuses to touch, so it cannot be an `SftpGoException` and it never
  * reaches SFTPGo either.
+ *
+ * The fifth is `invalid_current_password` (D-51): the photographer confirmed a
+ * change with a current camera password that SFTPGo rejected. The service
+ * answered the question — the password is simply not the right one — so the
+ * answer is a portal-side precondition and not an `SftpGoException`, even
+ * though the verdict comes from the service.
  */
 class FtpCredentialException extends RuntimeException
 {
@@ -45,6 +51,17 @@ class FtpCredentialException extends RuntimeException
     public const REASON_RATE_LIMITED = 'rate_limited';
 
     public const REASON_NOT_RESETTABLE = 'not_resettable';
+
+    /**
+     * The photographer entered a current camera password that the service
+     * rejected (D-51).
+     *
+     * A separate reason because it is the only one of these that is decided
+     * by the *input* and not by the state of the account: a wrong password is
+     * corrected by typing a different one, while a revoked account is not
+     * corrected by anything the photographer can do.
+     */
+    public const REASON_INVALID_CURRENT_PASSWORD = 'invalid_current_password';
 
     public function __construct(
         public readonly string $reason,
@@ -148,18 +165,48 @@ class FtpCredentialException extends RuntimeException
      * away deliberately, and an `error` one has an unknown outcome that only a
      * look at the service can resolve.
      *
-     * The two known states are spelled out as cases rather than as constants:
+     * The three known states are spelled out as cases rather than as constants:
      * this class reports on the service from the outside and does not depend on
      * `FtpCredentialService`, so the default arm covers `error` and every state a
      * future migration may add.
+     *
+     * `pending` has its own text because the default arm would be a lie about
+     * it: `pending` means "never provisioned", not "in an error state". The
+     * photographer has a way out here — the account is created through the
+     * access-data request — and the message has to name it, because the two
+     * states need opposite actions. `pending` is refused only where a credential
+     * is to be *changed* (D-51): a never-provisioned account has no current
+     * password that could be confirmed.
      */
     public static function notResettable(string $status): self
     {
         $message = match ($status) {
             'revoked' => 'Der FTP-Kamera-Zugang dieses Kontos wurde entzogen und kann nicht zurückgesetzt werden. Bitte wende dich an die Administration, wenn du den Zugang wieder benötigst.',
+            'pending' => 'Für dieses Konto wurde noch kein FTP-Kamera-Zugang eingerichtet. Bitte fordere zuerst die Zugangsdaten an.',
             default => 'Der FTP-Kamera-Zugang dieses Kontos ist in einem fehlerhaften Zustand und kann nicht zurückgesetzt werden. Bitte wende dich an die Administration.',
         };
 
         return new self(self::REASON_NOT_RESETTABLE, $message);
+    }
+
+    /**
+     * The current camera password was rejected by SFTPGo (D-51).
+     *
+     * The message names the *camera* password on purpose: the photographer is
+     * looking at a portal that also asks for a portal password, and the two
+     * are easy to mix up. It also promises what a retry can achieve — a
+     * different, correct password — because that is the one thing the
+     * photographer can do about it.
+     *
+     * The value never appears in the message, in the reason or in the log: the
+     * factory receives no password at all, so there is no path by which it
+     * could reach any of them.
+     */
+    public static function invalidCurrentPassword(): self
+    {
+        return new self(
+            self::REASON_INVALID_CURRENT_PASSWORD,
+            'Das aktuelle Kamera-Passwort ist nicht korrekt. Bitte prüfe es und versuche es erneut.',
+        );
     }
 }
