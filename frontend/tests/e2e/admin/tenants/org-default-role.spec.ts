@@ -121,7 +121,9 @@ test.describe('Organization default role', () => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         await auth.login(orgAdmin.email, orgAdmin.password);
-        await sidebar.navigateTo('Benutzer & Rechte');
+        // A pure org admin (no admin role) sees the `/users` entry as "Mein Team";
+        // "Benutzer & Rechte" is the admin-only label for the same route.
+        await sidebar.navigateTo('Mein Team');
 
         const main = page.getByRole('main');
         const search = main.getByPlaceholder('Nutzer suchen (Name oder E-Mail)...');
