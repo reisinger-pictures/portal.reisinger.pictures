@@ -90,13 +90,13 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Protokoll ganz oben. Eine Position mit `Entscheidung offen:` bedeutet, dass eine **neue**
 > Frage entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-23):** **7 offene `[ ]`** und **9 wartende
-> `[~]`** über 1270 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
-> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 7, `… | grep -c '^- \[~\]'` → 9,
-> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1270; `<stand>` = der committete Stand dieses
+> **Struktur-Hinweis, fortgeschrieben (2026-10-23):** **6 offene `[ ]`** und **9 wartende
+> `[~]`** über 1264 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
+> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 6, `… | grep -c '^- \[~\]'` → 9,
+> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1264; `<stand>` = der committete Stand dieses
 > Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
 > trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
-> 7: **3× `manuell prüfen:`** und **4× gewöhnliche Arbeit**; **0× `Entscheidung offen:`** — die
+> 6: **2× `manuell prüfen:`** und **4× gewöhnliche Arbeit**; **0× `Entscheidung offen:`** — die
 > offenen Owner-Fragen der Runde vom 2026-10-22 sind entschieden und als **D-50** (Proxy-Trust-
 > Grenze), **D-51** (Selbständerung des Kamera-Passworts), **D-52** (Watchtower-Policy),
 > **D-53** (SFTPGo-Admin-Wertepaar), **D-54** (`CREATE_DEFAULT_ADMIN` im Compose) und
@@ -106,7 +106,8 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Owner-Fragen sind entschieden. Der D-51/D-57-Redo-Review ist auf Quellenebene `APPROVED`;
 > der Fix-Commit `a9c0fcb` ist gepusht. CI `39992368192` ist für den exakten Head
 > `a9c0fcb79d9ddc4b5bcfa2fcdab1141d0516a9ea` grün (Backend, Frontend und Playwright Desktop/Mobile).
-> Deployment und Live-Proben sind nicht Teil dieses Push-Auftrags und bleiben unten offen.
+> Sync ist ausgeführt; der Owner meldet den Backend-Neustart als erledigt. Healthcheck und
+> Verhaltensprobe bleiben unten offen.
 > Gegenüber dem Stand vom 2026-10-21 (4 `[ ]`, 16 `[~]`, 1300 Zeilen) waren **8 Positionen weg** — 7 als geschlossen markiert
 > (Dependabot-Alert dismissed, `SFTPGO_API_KEY`-Weg, Watchtower-Policy, Proxy-Trust-Grenze,
 > D-36-Ereigniskette in Produktion, `CREATE_DEFAULT_ADMIN` in der Cutover-Checkliste,
@@ -114,7 +115,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > (die Live-GO-Punkte standen zweimal); eine Position wurde umformuliert und bleibt
 > (Live-GO-Punkte mit dem zurückgestellten Kill-Switch-Nachweis).
 > **Alle 14 Review-Befunde der Prüfung vom 2026-10-18** sind geschlossen und aus der Liste entfernt (Nachweis in
-> `features/security/2026-10-18-review-closure.md`); die 7 offenen Punkte enthalten die Punkte, die in den
+> `features/security/2026-10-18-review-closure.md`); die 6 offenen Punkte enthalten die Punkte, die in den
 > Freigaben der Wellen A–D als nicht-blockierend eingestuft und deshalb hier festgehalten
 > wurden (siehe „Neue offene Punkte aus den Wellen A–D") sowie die seitdem aufgedeckten Reste
 > (die Zwei-Verbindungs-Messung, die Restform der Dialog-Befunde, das Audit vom 2026-10-20 aus
@@ -133,8 +134,8 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 >
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
 > `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
-> (16 = 7 offen + 9 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
-> (1270) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
+> (15 = 6 offen + 9 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
+> (1264) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
 > würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
 > defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
 > **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
@@ -619,7 +620,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [ ] D-51/D-57 nach separat angefordertem Deploy live prüfen: gepushter Commit `a9c0fcb`, exakte CI `39992368192` grün. Noch offen: Deploy gemäß Betriebsablauf, nötiger Backend-Neustart, Healthcheck/Probe des geänderten Verhaltens und Live-Nachweis dokumentieren. In diesem Auftrag wurde nicht deployed.
+- [ ] D-51/D-57 nach Sync und Backend-Neustart live prüfen: gepushter Commit `a9c0fcb`, exakte CI `39992368192` grün; Sync ausgeführt und Backend-Neustart vom Owner gemeldet. Noch offen: Healthcheck/Probe des geänderten Verhaltens und den Nachweis dokumentieren.
 - [ ] Nach dem D-51-Release die bestätigten Security-/Finanzintegritäts-Findings priorisieren und mit Regressionstests beheben; zuerst AUTH-1 (Org-Rollenübernahme) und PAY-1 (Refund/Dispute vor Success), danach SEC-1 (CSRF) und die bestätigten Media-/Operations-Findings. Owner-Grenzen/bedingte Fälle vor einer Änderung entscheiden.
 - [~] wartet auf den **Mail-Nachweis** — Queue, Worker und Scheduler sind am 2026-10-21 live belegt: die PID-Dateien `/tmp/portal-{scheduler,queue-supervisor,queue-worker}.pid` existieren, der stündliche Scheduler-Mutex in `cache_locks` trägt den Slot-Suffix `2100` (erworben um 21:00:02Z), der Wochenimport lief am Montag-Slot `03:30` (Meilisearch-Batch **2335**, Task 7200, `enqueuedAt` 2026-10-19T03:30:32Z, `status: succeeded`), der manuelle Lauf vom 2026-10-21 21:07Z erzeugte Batch **2402** (39/39 Tasks succeeded, 19.477 Orte im Index `locations`), und die Queue-Tabellen `jobs`/`failed_jobs`/`job_batches` sind leer und fehlerfrei. Die **SMTP-Duplikat-Policy** ist entschieden (D-17 in `features/owner-decisions.md`: gültige Tokens erhalten, kein pauschales Queue-Uniqueness, ein SMTP-Retry darf keine zweite Belastung oder Zustandsänderung auslösen). Offen: ein **zugestellter** Mail-Nachweis aus der Produktion — der Admin-SMTP-Test (`POST /api/management/settings/test-email`) muss ausgelöst und der Provider-/Mailpit-Log danebengelegt werden; die Produktions-DB führt keine Mail-Logtabelle, und `storage/logs/laravel.log` ist vom 2026-04-23.
 
@@ -644,7 +645,6 @@ Die Befunde wurden nach der Dokumentation einzeln gegen den committed Quellstand
 - **OPS-1 — bestätigter Config-Guard-Mangel, Ausnutzung konfigurationsabhängig:** `FTP_EVENT_URL` akzeptiert absolute HTTP- oder HTTPS-URLs zu beliebigen Hosts (`config/ftp.php:49-62`); `ProvisionFtpEvents` setzt `FTP_EVENT_SECRET` in den Request-Header (`:131-140, 247-263`). Die Production-Policy validiert diesen Host/Scheme nicht (`ProductionOperationsPolicy.php:41-46`). Ein HTTP/fremdes URL-Environment kann das Secret offenlegen; tatsächliche Produktionseinstellung nicht geprüft.
 - **OPS-2 — bestätigte Klartext-Konfiguration, lateral bedingt:** Compose und Config defaulten auf `http://sftpgo:8080`; JWT-Fallback sendet Admin-Basic-Credentials und danach Bearer-Token (`services.php:64-77`; `SftpGoClient.php:532-546, 649-656`). API ist nicht host-published und SFTPGo sitzt nur im internen Docker-Netz. Ein normaler Internetclient erreicht es nicht; das Risiko setzt Zugriff mit Paketbeobachtung/MITM auf Host oder internem Netz voraus.
 - **OPS-3 — bestätigte unsichere Rechte-Policy, lokaler/PHP-Foothold nötig:** `sync.sh` setzt Backend-Dateien auf `F666`, Verzeichnisse auf `D2777`; Compose bind-mountet den Code read-write für den Backend-Prozess (`sync.sh:42-53, 69-83`; `docker-compose.yml:82, 96-99`). Die Policy erlaubt lokalen Prozessen und kompromittiertem App-Code dauerhafte Source-Änderungen. Host-Modi wurden nicht live geprüft.
-- **OPS-4 — bestätigte Owner-Aktion, keine aktuelle Kompromittierung belegt:** Historische Ausgabe von `AI_API_KEY` und `ADMIN_PASSWORD` steht im Runbook/Board; Rotation/Widerrufsbeleg ist ein bestehender Owner-TODO. Aus dem Audit folgt nicht, dass Werte aktuell aktiv oder extern exponiert sind.
 - **PAY-1 — bestätigt, P1:** Refund/Dispute-Handler quittieren 200 und schließen den Event-Claim, auch wenn `transitionTerminalPaymentStatus()` bei `pending_payment` wegen der erlaubten Quellstatus ablehnt (`WebhookController.php:111-188, 457-482, 699-745`). Erfolgs-Reconciliation erlaubt danach `pending_payment → paid` (`PaymentIntentReconciliationService.php:106-128`). Der bestehende Regressionstest pinnt nur den ersten Teil und testet nicht das nachfolgende Success-Event. Stripe-Event-Reihenfolge ist laut Auditor-Doku nicht garantiert; dieser Ablauf kann Zugriff nach Refund/Chargeback wiederherstellen.
 - **PAY-2 — bestätigt, P2/admin path:** `OrderController::updateStatus()` setzt `cancelled` nur lokal; es storniert den PaymentIntent nicht (`:61-85`). Stale-Intent-Sweep selektiert nur `pending_payment`; späterer `payment_intent.succeeded` wird für `cancelled` ignoriert (`CancelStalePaymentIntents.php:64-69`; `WebhookController.php:271-279`). Ein bereits ausgegebener Client-Secret kann damit eine nicht erfüllte Zahlung abschließen.
 - **PAY-3 — bestätigt, P2/admin-only:** Die Managementroute erlaubt `paid`; `updateStatus()` schreibt den Wert direkt ohne Stripe-Settlement-/Offline-Rechnungsprüfung (`routes/api.php:360-361`; `OrderController.php:61-87`). `paid` ist download-berechtigt (`PurchaseService.php:30-45`). Das erfordert einen Admin-Account.
@@ -767,7 +767,7 @@ Beide Org-Pakete sind `private`; `backend` und alle 7 E2E-Jobs scheitern mit `un
 Docker-Container `e2e-head`, `e2e-ci`, `e2e-mariadb`, `e2e-meili`, `e2e-mailpit`, `e2e-pf`, `e2e-fix`, `pf-mailpit`, `pf-meili`, `pf-mariadb`, `pf-meili-local`, `seed-ws-pf` sowie Volumes `ws-head`, `ws-ci-base`, `ws-pf`, `ws-fix` und die Netze `e2e-net`, `pfnet` entfernt; Host-Dienste Meilisearch/Mailpit gestoppt; Worktree `portal-staged-verify` geprüft (`git diff --cached main --diff-filter=A` leer ⇒ kein Unique-Work) und entfernt; Scratch unter `/tmp` bereinigt.
 
 ### Gate 0 — Baseline und Änderungsdisziplin
-- [~] wartet auf die zwei verbleibenden Betriebsnachweise — die **Secret-Rotation** von `AI_API_KEY` und `ADMIN_PASSWORD` (das Wertepaar stand beim Auslesen der aufgelösten Compose-Datei im Klartext im Terminal) und die **Plugin-Live-Runtime**. Erledigt und aus dieser Position entfernt: GHCR-Pullability (beide Pakete `public`), die Deployment-Nachweise (acht Deploys mit Live-Messungen), die Storage-Nachweise (`storage/app/private` unversehrt) und der Scheduler-Nachweis (live am 2026-10-21: PID-Dateien, Mutex-Slot, Wochenimport; siehe `features/infrastructure/29-production-operations-runbook.md` §5).
+- [~] wartet auf den **Plugin-Live-Runtime-Nachweis**. Erledigt und aus dieser Position entfernt: GHCR-Pullability (beide Pakete `public`), die Deployment-Nachweise (acht Deploys mit Live-Messungen), die Storage-Nachweise (`storage/app/private` unversehrt) und der Scheduler-Nachweis (live am 2026-10-21: PID-Dateien, Mutex-Slot, Wochenimport; siehe `features/infrastructure/29-production-operations-runbook.md` §5).
 - [~] wartet nur noch auf die **Operations-Evidenz** (die Mail-Zustellung, siehe die Position zum Queue-/Mail-/Worker-/Scheduler-Nachweis) — die Code-Subblöcke R1–R7 sind verifiziert geschlossen, und die **Product Decisions** sind entschieden (D-17 „Duplicate mail and prompt-injection policies“ in `features/owner-decisions.md`, umgesetzt in `98766c14`). Die im alten Text genannten aktiven Bugs sind heute durch Tests abgedeckt: Session-Header-Validierung (`AISessionHeaderDeploymentPolicyTest`), Bild-Budget (`ModelContactSheetTest`, `ModelContactSheetBulkTest`), Cleanup-Dauerhaftigkeit (`GalleryPhotoCleanupDurabilityTest`, `CleanupGalleriesFailureTest`), Temp-Löschung (`AiTempFileSweepAgreementTest`, `WatermarkMarkerCleanupTest`), Mail-Verlust bei Quotes (`WebhookInvoiceMailAtomicDedupeTest`, `WebhookReplayMailTest`), fehlerhafte Provider-Antwort (`StripeWebhookTest`, `WebhookNullPiTest`), Reihenfolge beim manuellen Löschen (`ManualInvoiceNumberValidationTest`, `GalleryUpdateDeleteTest`).
 ## Model-Registrierung (Magic-Link) + Profile-Iteration (2026-09-18/19 deployiert) — OFFENE Restarbeiten
 
@@ -913,12 +913,6 @@ alle mit Regressionstest:
   und **schlägt für 8080 fehl** (erwartet); die passive Range 50000-50100 wird von mehreren
   `docker-proxy`-Prozessen bedient. Damit ist der Firewall-Stand gemessen; offen bleibt nur
   der Kamera-Upload selbst.
-- [ ] manuell prüfen: `AI_API_KEY` und `ADMIN_PASSWORD` im Portal-/Host-Secret-Store rotieren — beide sind beim Auslesen der aufgelösten Compose-Datei im Klartext durch ein Terminal gelaufen. **Die Rotation selbst bleibt eine Owner-Aktion; das Runbook dafür steht jetzt:**
-  `features/infrastructure/29-production-operations-runbook.md` §7 „Rotating a secret after an exposure" —
-  die Reihenfolge (Wert auf dem Host erzeugen und direkt in die Stack-Env schreiben, Container neu starten bzw.
-  neu erzeugen, mit einer **Länge** statt mit dem Wert verifizieren, die Funktion prüfen, den alten Wert beim
-  Anbieter widerrufen, Nachweis ohne Wert protokollieren) und die drei Dinge, die nicht passieren dürfen (der Wert
-  im Chat oder im Log, ein Test des alten Werts nach dem Neustart, eine Rotation „beiläufig" in einem Deploy).
 ## Nachtrag 2026-09-26, Kamera-Setup aus der Oberfläche bedienbar machen
 
 **Offen (aus dieser Runde):**
