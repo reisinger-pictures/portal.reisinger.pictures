@@ -21,6 +21,16 @@
           "statuses": ["open", "in-progress"]
         }
       }
-    }
+    },
+    // The report is generated from the current marker, board and workflow.
+    // Its command is local and deterministic; Ratchet supplies a temporary
+    // output path so the drift check does not modify the working tree.
+    "generated": [
+      {
+        "path": "features/tech/position-9-metrics.md",
+        "command": ["node", "scripts/generate-position-9-metrics.mjs"],
+        "output_arg": "--output"
+      }
+    ]
   }
 ]
