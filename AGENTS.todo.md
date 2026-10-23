@@ -90,10 +90,10 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Protokoll ganz oben. Eine Position mit `Entscheidung offen:` bedeutet, dass eine **neue**
 > Frage entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-22):** **7 offene `[ ]`** und **9 wartende
-> `[~]`** über 1269 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
+> **Struktur-Hinweis, fortgeschrieben (2026-10-23):** **7 offene `[ ]`** und **9 wartende
+> `[~]`** über 1270 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
 > (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 7, `… | grep -c '^- \[~\]'` → 9,
-> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1269; `<stand>` = der committete Stand dieses
+> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1270; `<stand>` = der committete Stand dieses
 > Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
 > trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
 > 7: **3× `manuell prüfen:`** und **4× gewöhnliche Arbeit**; **0× `Entscheidung offen:`** — die
@@ -103,9 +103,10 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > **D-55** (CSP-Erweiterung, Turnstile bleibt aus), **D-56** (Fail-closed bei lokalem
 > Fehler nach erfolgreichem FTP-Widerruf) und **D-57** (Org-Default-Rollen) in
 > `features/owner-decisions.md` festgehalten; die
-> Owner-Fragen sind entschieden. Der spätere D-51/D-57-Redo-Review hebt die früheren
-> `CHANGES REQUIRED`-Befunde auf und ist auf Quellenebene `APPROVED`. Full Backend und
-> Playwright-Runtime-Gates sowie CI für den exakten Head bleiben offen (siehe unten).
+> Owner-Fragen sind entschieden. Der D-51/D-57-Redo-Review ist auf Quellenebene `APPROVED`;
+> der erste Push-CI-Lauf `39986637896` war wegen E2E-Fehlern in Desktop-/Mobile-Shard 2 rot.
+> Der E2E-Fix ist auf Quellenebene `APPROVED`; erneute CI des exakten Heads bleibt offen
+> (siehe unten).
 > Gegenüber dem Stand vom 2026-10-21 (4 `[ ]`, 16 `[~]`, 1300 Zeilen) waren **8 Positionen weg** — 7 als geschlossen markiert
 > (Dependabot-Alert dismissed, `SFTPGO_API_KEY`-Weg, Watchtower-Policy, Proxy-Trust-Grenze,
 > D-36-Ereigniskette in Produktion, `CREATE_DEFAULT_ADMIN` in der Cutover-Checkliste,
@@ -133,7 +134,7 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
 > `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
 > (16 = 7 offen + 9 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
-> (1269) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
+> (1270) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
 > würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
 > defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
 > **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
@@ -618,7 +619,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [ ] D-51/D-57 ausliefern: Full Backend und Playwright-Runtime-Gates bleiben offen (Docker-CLI vorhanden, Daemon-Socket `/Users/florianreisinger/.rd/docker.sock` fehlt; Meilisearch `127.0.0.1:7701` und Mailpit `127.0.0.1:1025`/`8025` nicht erreichbar). Quellen-Redo-Review: `APPROVED`; unabhängig ausgeführt: fokussierte Backend-Tests 72/456 Assertions, `composer test:smoke` 18/163 Assertions, Frontend-Vitest 164 Dateien/1549 Tests. Implementierer meldet `pnpm lint:fix && pnpm build` und `pnpm lint:e2e` grün. Nach Commit-Amend pushen und CI des exakten Heads bis grün beobachten; erst dann deployen und Live-Proben/Nachweis dokumentieren.
+- [ ] D-51/D-57 ausliefern: Quellen-Redo-Review und E2E-Fix-Review `APPROVED`; CI `39986637896` hatte Frontend/Backend grün, aber E2E Desktop-/Mobile-Shard 2 rot (falsches Org-Admin-Menülabel; Mobile-Invite-Klick auf den geschlossenen Sidebar-Drawer). `pnpm lint:e2e`, `pnpm exec tsc -b` und Playwright-List sind unabhängig grün; Runtime-E2E lokal durch fehlenden Docker-Daemon blockiert. Nach Fix-Commit pushen und CI des exakten Heads erneut bis grün beobachten; erst danach deployen und Live-Proben/Nachweis dokumentieren.
 - [ ] Nach dem D-51-Release die bestätigten Security-/Finanzintegritäts-Findings priorisieren und mit Regressionstests beheben; zuerst AUTH-1 (Org-Rollenübernahme) und PAY-1 (Refund/Dispute vor Success), danach SEC-1 (CSRF) und die bestätigten Media-/Operations-Findings. Owner-Grenzen/bedingte Fälle vor einer Änderung entscheiden.
 - [~] wartet auf den **Mail-Nachweis** — Queue, Worker und Scheduler sind am 2026-10-21 live belegt: die PID-Dateien `/tmp/portal-{scheduler,queue-supervisor,queue-worker}.pid` existieren, der stündliche Scheduler-Mutex in `cache_locks` trägt den Slot-Suffix `2100` (erworben um 21:00:02Z), der Wochenimport lief am Montag-Slot `03:30` (Meilisearch-Batch **2335**, Task 7200, `enqueuedAt` 2026-10-19T03:30:32Z, `status: succeeded`), der manuelle Lauf vom 2026-10-21 21:07Z erzeugte Batch **2402** (39/39 Tasks succeeded, 19.477 Orte im Index `locations`), und die Queue-Tabellen `jobs`/`failed_jobs`/`job_batches` sind leer und fehlerfrei. Die **SMTP-Duplikat-Policy** ist entschieden (D-17 in `features/owner-decisions.md`: gültige Tokens erhalten, kein pauschales Queue-Uniqueness, ein SMTP-Retry darf keine zweite Belastung oder Zustandsänderung auslösen). Offen: ein **zugestellter** Mail-Nachweis aus der Produktion — der Admin-SMTP-Test (`POST /api/management/settings/test-email`) muss ausgelöst und der Provider-/Mailpit-Log danebengelegt werden; die Produktions-DB führt keine Mail-Logtabelle, und `storage/logs/laravel.log` ist vom 2026-04-23.
 

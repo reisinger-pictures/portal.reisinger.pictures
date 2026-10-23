@@ -126,16 +126,29 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
         await main.getByPlaceholder('z.B. Maria Muster').fill('Invited Employee');
         await main.locator('input[type="password"]').fill('SecurePass123!');
         await main.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
+
+        const redeemResponsePromise = page.waitForResponse(
+            (response) => response.url().includes('/api/org-invites/redeem') && response.request().method() === 'POST',
+        );
         await main.getByRole('button', { name: 'Account aktivieren & Beitreten' }).click();
+        const redeemResponse = await redeemResponsePromise;
+        if (!redeemResponse.ok()) throw new Error(`Invite redeem failed: ${await redeemResponse.text()}`);
 
         // The invitee receives the configured org_admin role, which counts as
         // staff (`isStaff`), so `ProtectedDashboard` renders the management
-        // dashboard — never the client dashboard. The landing view is
-        // `structure`, which has no heading for a non-photographer, so the
-        // logged-in assertion uses a management view an org admin can reach;
-        // its sidebar entry ("Mein Team") exists only for admins/org admins.
-        await sidebar.navigateTo('Mein Team');
-        await expect(main.getByRole('heading', { name: 'Benutzer & Rechte' })).toBeVisible({ timeout: 15000 });
+        // dashboard — never the client dashboard. The redeem call and the
+        // redirect to `/` are the registration-completion signals.
+        //
+        // Do not drive the mobile drawer here: the click used to race the route
+        // transition, opening the drawer on the invite page while the link then
+        // resolved in the freshly mounted dashboard whose drawer was still
+        // closed (Playwright: "element is outside of the viewport"). The landing
+        // assertion below instead proves the logged-in dashboard rendered the
+        // org-admin management entry, which exists only for admins/org admins.
+        await expect(page).toHaveURL(/\/$/);
+        const dashboardSidebar = page.getByRole('complementary');
+        await expect(dashboardSidebar.getByRole('link', { name: 'Mein Team' }))
+            .toHaveAttribute('href', '/users', { timeout: 15000 });
 
         const invitedUserRes = await request.get('/api/management/users', {
             headers: { 'Accept': 'application/json', 'Cookie': adminToken }
