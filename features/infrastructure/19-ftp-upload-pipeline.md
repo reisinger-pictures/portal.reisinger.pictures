@@ -1408,6 +1408,22 @@ maximale Wartezeit 10 Sekunden; belegter Lock ergibt `409` ohne Schreibversuch.
 `UserController::destroy()` (Kontolöschung) halten den Lock bis zur lokalen
 Änderung. Der SFTPGo-Delete liegt außerhalb der Datenbanktransaktion.
 
+**Rollensnapshot als Vorbedingung (D-51/D-56).** Ein Rollenwechsel, der die
+Fotografen-Mitgliedschaft ändert, muss den Rollensatz mitbringen, den der Editor
+geladen hat (`expected_role_ids`). Der Editor erfasst ihn beim Öffnen des
+Dialogs; die gewünschte Auswahl reist getrennt in `role_ids`. Der Abgleich läuft
+unter demselben per-User-Lock und gegen die dort frisch gelesenen `user_roles`,
+vor jedem SFTPGo-Aufruf und vor jeder Rollen-/User-Schreibung. Fehlt der
+Snapshot oder weicht er vom persistierten Satz ab, antwortet das Portal `409`
+und schreibt nichts: ein veraltetes Formular, das noch `photographer` enthält,
+kann eine zwischenzeitliche Entziehung weder zurücknehmen noch das Konto
+wiederherstellen. Eine bewusste Wiederherstellung durch einen Administrator
+bleibt möglich — nach dem Neuladen ist der erwartete Satz der aktuelle (ohne
+`photographer`), der gewünschte fügt die Rolle hinzu, und der Snapshot stimmt.
+Ein Rollenwechsel ohne Änderung der Fotografen-Mitgliedschaft braucht keinen
+Snapshot und verhält sich unverändert; ein unveränderter Rollensatz wird nicht
+blockiert, damit ein Metadaten-Save und ein idempotenter Retry weiterlaufen.
+
 **Was das nicht löst (Stand 2026-10-21, geändert):** Die Reconciliation, die
 hier früher als offen geführt wurde, **existiert**: `reconcileAccount()`
 (P1-M30) schreibt den Zustand, `php artisan ftp:reconcile` ruft sie auf. Der

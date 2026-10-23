@@ -123,7 +123,7 @@ const OrgSettings = ({name, setName, domain, setDomain, freq, setFreq, defaultFl
                 {isOrgAdminDefaultRole && (
                     <div role="alert" className="alert alert-warning mt-3">
                         <span>
-                            <Trans>Neue Nutzer, die künftig per Domain-Auto-Join beitreten oder von einem Organisationsadministrator angelegt werden, erhalten diese Rolle. Sie können damit Nutzer in dieser Organisation verwalten. Bestehende Nutzer bleiben unverändert.</Trans>
+                            <Trans>Neue Nutzer, die künftig per Domain-Auto-Join beitreten, von einem Organisationsadministrator angelegt oder per Einladung aufgenommen werden, erhalten diese Rolle. Das gilt auch für bereits bestehende Accounts, die per Einladung beitreten. Mit der Rolle „Organisationsadministrator“ können sie Nutzer in dieser Organisation verwalten. Bereits bestehende Mitglieder bleiben unverändert.</Trans>
                         </span>
                     </div>
                 )}

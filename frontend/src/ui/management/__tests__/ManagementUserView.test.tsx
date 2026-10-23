@@ -270,6 +270,7 @@ describe('ManagementUserView delegation boundary', () => {
                 1,
                 'user-1',
                 [],
+                [],
                 ['legacy-group'],
                 ['legacy-selection'],
                 false,
@@ -295,6 +296,7 @@ describe('ManagementUserView delegation boundary', () => {
                 [],
                 [],
                 [],
+                [],
                 false,
                 'none',
                 'rp',
@@ -313,6 +315,60 @@ describe('ManagementUserView delegation boundary', () => {
         expect(within(dialog).getByRole('checkbox', { name: 'Delivery A' })).toBeInTheDocument();
         expect(within(dialog).getByRole('checkbox', { name: 'Delivery B' })).toBeInTheDocument();
         expect(within(dialog).getByRole('checkbox', { name: 'Root C' })).toBeInTheDocument();
+    });
+});
+
+describe('ManagementUserView stale role snapshot conflict (D-51/D-56)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+
+        vi.mocked(useProtectedGalleries).mockReturnValue({
+            tree,
+            isLoading: false,
+            isError: undefined,
+            mutate: vi.fn().mockResolvedValue(undefined),
+            createGroup: vi.fn().mockResolvedValue(undefined),
+            createGallery: vi.fn().mockResolvedValue(undefined),
+            updateGroup: vi.fn().mockResolvedValue(undefined),
+            updateGallery: vi.fn().mockResolvedValue(undefined),
+            deleteGroup: vi.fn().mockResolvedValue(undefined),
+            deleteGallery: vi.fn().mockResolvedValue(undefined),
+        });
+
+        vi.mocked(usePermissions).mockReturnValue(basePermissions);
+    });
+
+    // A 409 means the editor's mount-time role snapshot no longer matches the
+    // server. Closing the dialog is the recovery: `useUsers.updateUser` has
+    // already refreshed the list, so reopening captures the current roles.
+    it('closes the stale editor and tells the operator to reopen it', async () => {
+        const conflict = Object.assign(
+            new Error('Die Rollen wurden inzwischen geändert. Bitte die Benutzerverwaltung neu laden und erneut speichern.'),
+            {status: 409},
+        );
+        vi.mocked(useUsers).mockReturnValue({
+            users: [target],
+            roles: [{id: 'role-client', name: UserRole.CLIENT}],
+            createUser: vi.fn().mockResolvedValue(undefined),
+            updateUser: vi.fn().mockRejectedValue(conflict),
+            deleteUser: vi.fn().mockResolvedValue(undefined),
+        });
+
+        const eventUser = userEvent.setup();
+        renderView();
+        const dialog = await openEditor(eventUser);
+
+        await eventUser.click(within(dialog).getByRole('button', {name: 'Speichern'}));
+
+        await waitFor(() => {
+            expect(uiContext.showToast).toHaveBeenCalledWith(
+                'error',
+                'Die Rollen wurden inzwischen geändert. Der Dialog wurde geschlossen – bitte erneut öffnen und die Rechte erneut speichern.',
+            );
+        });
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog', {name: 'Max Mustermann bearbeiten'})).not.toBeInTheDocument();
+        });
     });
 });
 
@@ -388,6 +444,7 @@ describe('ManagementUserView direct gallery assignment (D-43)', () => {
             expect(updateUser).toHaveBeenNthCalledWith(
                 1,
                 'user-1',
+                [],
                 [],
                 [],
                 ['ga4'],

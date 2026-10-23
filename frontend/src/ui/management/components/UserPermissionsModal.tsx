@@ -12,7 +12,7 @@ interface UserPermissionsModalProps {
     flatGroups: FlatGroup[];
     flatGalleries: Gallery[];
     onClose: () => void;
-    onSave: (id: string, roles: string[], groups: string[], galleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: string | null, canPurchaseUpgrades: boolean) => Promise<void>;
+    onSave: (id: string, expectedRoleIds: string[], roles: string[], groups: string[], galleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: string | null, canPurchaseUpgrades: boolean) => Promise<void>;
 }
 
 const SUPER_ADMIN_ROLE_NAME = UserRole.SUPER_ADMIN;
@@ -27,6 +27,11 @@ export default function UserPermissionsModal({
                                                  onSave
                                              }: UserPermissionsModalProps) {
     const [selRoles, setSelRoles] = useState<string[]>(user.roles.map(r => r.id));
+    // D-51/D-56: the role set this editor opened with. It is captured once at
+    // mount (the modal is keyed by user id) and sent alongside the desired
+    // selection, so the API can refuse a save whose view of the roles went
+    // stale — without blocking a deliberate restoration after a fresh load.
+    const [expectedRoleIds] = useState<string[]>(() => user.roles.map(r => r.id));
     const [selGroups, setSelGroups] = useState<string[]>(user.gallery_groups.map(g => g.id));
     const [selGalleries, setSelGalleries] = useState<string[]>(user.galleries.map(g => g.id));
 
@@ -82,7 +87,7 @@ export default function UserPermissionsModal({
         if (isSaving) return;
         setIsSaving(true);
         try {
-            await onSave(user.id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, effectiveBrand, canPurchaseUpgrades);
+            await onSave(user.id, expectedRoleIds, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, effectiveBrand, canPurchaseUpgrades);
         } catch {
             // The parent reports the API error; retain the selected permissions.
             setIsSaving(false);

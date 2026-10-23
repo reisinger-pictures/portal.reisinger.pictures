@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\Brand;
 use App\Enums\UserRole;
+use App\Exceptions\FtpCredentialException;
+use App\Exceptions\SftpGoException;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\FtpCredentialService;
@@ -114,6 +116,42 @@ class FtpReconcileCommandTest extends TestCase
         );
         $this->assertNull($fresh->ftp_revoked_at);
         $this->assertNotNull($fresh->ftp_account_error);
+    }
+
+    public function test_a_skipped_account_is_not_counted_as_unchecked_after_a_service_wide_failure(): void
+    {
+        $users = collect([
+            $this->photographer('florian', FtpCredentialService::STATUS_ACTIVE),
+            $this->photographer('sabine', FtpCredentialService::STATUS_ACTIVE),
+            $this->photographer('max', FtpCredentialService::STATUS_ACTIVE),
+        ])->sortBy('id')->values();
+        [$firstAttempt, $serviceFailure, $notAttempted] = $users->all();
+
+        $attemptedSlugs = [];
+        $credentials = \Mockery::mock(FtpCredentialService::class);
+        $credentials->shouldReceive('reconcileAccount')
+            ->twice()
+            ->andReturnUsing(function (User $user) use (&$attemptedSlugs, $firstAttempt): never {
+                $attemptedSlugs[] = $user->ftp_slug;
+
+                if ($user->is($firstAttempt)) {
+                    throw FtpCredentialException::unusableAccountName((string) $user->ftp_slug);
+                }
+
+                throw SftpGoException::unreachable((string) $user->ftp_slug);
+            });
+        $this->app->instance(FtpCredentialService::class, $credentials);
+
+        $exitCode = Artisan::call('ftp:reconcile');
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode);
+        $this->assertSame([$firstAttempt->ftp_slug, $serviceFailure->ftp_slug], $attemptedSlugs);
+        $this->assertStringContainsString('1 übersprungen', $output);
+        $this->assertStringContainsString('1 fehlgeschlagen', $output);
+        $this->assertStringContainsString('1 nicht geprüft', $output);
+        $this->assertStringContainsString('von 3 Konten', $output);
+        $this->assertNotContains($notAttempted->ftp_slug, $attemptedSlugs);
     }
 
     public function test_the_command_counts_and_reports_accounts_that_can_be_retried(): void

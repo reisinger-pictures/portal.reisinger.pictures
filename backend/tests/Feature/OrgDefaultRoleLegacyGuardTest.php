@@ -69,10 +69,23 @@ class OrgDefaultRoleLegacyGuardTest extends TestCase
         $incomingMember->roles()->attach($client->id);
         $headers = ['Authorization' => 'Bearer '.auth('api')->login($admin)];
 
-        $writes = $this->collectWriteStatements(function () use ($headers, $org, $incomingMember): void {
+        $this->withHeaders($headers)
+            ->putJson('/api/management/orgs/'.$org->id.'/users', [
+                'user_ids' => [$existingMember->id, $incomingMember->id],
+            ])
+            ->assertOk();
+
+        $this->assertSame($org->id, $incomingMember->fresh()->org_id);
+        $this->assertSame(['client'], $incomingMember->fresh()->roles()->orderBy('name')->pluck('name')->all());
+        $this->assertSame(
+            ['client', 'photographer'],
+            $existingMember->fresh()->roles()->orderBy('name')->pluck('name')->all(),
+        );
+
+        $writes = $this->collectWriteStatements(function () use ($headers, $org): void {
             $this->withHeaders($headers)
                 ->putJson('/api/management/orgs/'.$org->id.'/users', [
-                    'user_ids' => [$incomingMember->id],
+                    'user_ids' => [],
                 ])
                 ->assertStatus(409)
                 ->assertJsonPath('error', 'Die gespeicherte Standardrolle ist ungültig. Bitte repariere sie, bevor du Nutzer zuweist.');
@@ -80,7 +93,7 @@ class OrgDefaultRoleLegacyGuardTest extends TestCase
 
         $this->assertSame([], $writes);
         $this->assertSame($org->id, $existingMember->fresh()->org_id);
-        $this->assertNull($incomingMember->fresh()->org_id);
+        $this->assertSame($org->id, $incomingMember->fresh()->org_id);
         $this->assertTrue($existingMember->fresh()->roles->contains('id', $photographer->id));
         $this->assertTrue($existingMember->fresh()->roles->contains('id', $client->id));
 

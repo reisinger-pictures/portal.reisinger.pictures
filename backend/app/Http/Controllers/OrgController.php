@@ -252,12 +252,6 @@ class OrgController extends Controller
             // either.
             $org = Org::query()->whereKey($id)->lockForUpdate()->firstOrFail();
 
-            if (! $defaultRolePolicy->hasSupportedPersistedDefault($org)) {
-                return response()->json([
-                    'error' => 'Die gespeicherte Standardrolle ist ungültig. Bitte repariere sie, bevor du Nutzer zuweist.',
-                ], 409);
-            }
-
             // The current membership is read inside the org lock, so it is
             // stable against other *syncs* of this org and against the
             // *destroy* of this org: such a writer would have to take the same
@@ -330,6 +324,12 @@ class OrgController extends Controller
                 ->keys()
                 ->all();
             $removedUserIds = array_values(array_diff($oldUserIds, $newUserIds));
+
+            if ($removedUserIds !== [] && ! $defaultRolePolicy->hasSupportedPersistedDefault($org)) {
+                return response()->json([
+                    'error' => 'Die gespeicherte Standardrolle ist ungültig. Bitte repariere sie, bevor du Nutzer zuweist.',
+                ], 409);
+            }
 
             foreach ($newUserIds as $newUserId) {
                 if (! $lockedUsers->has($newUserId)) {

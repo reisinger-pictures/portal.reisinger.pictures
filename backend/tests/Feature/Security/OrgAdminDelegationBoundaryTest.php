@@ -939,6 +939,7 @@ class OrgAdminDelegationBoundaryTest extends TestCase
         $this->as($admin)
             ->putJson("/api/management/users/{$target->id}", [
                 'role_ids' => [$photographer->id],
+                'expected_role_ids' => [$this->role(UserRole::CLIENT)->id],
                 'brand' => self::BRAND,
             ])
             ->assertOk();

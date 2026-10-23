@@ -136,4 +136,107 @@ describe('ManagementUserView org-admin gallery options', () => {
         });
         expect(fetcher).not.toHaveBeenCalledWith('/api/management/galleries');
     });
+
+    it('lets an org admin assign the org_admin role to a user in their organization', async () => {
+        const updateUser = vi.fn().mockResolvedValue(undefined);
+        vi.mocked(useUsers).mockReturnValue({
+            users: [target],
+            roles: [
+                { id: 'role-client', name: UserRole.CLIENT },
+                { id: 'role-power-user', name: UserRole.POWER_USER },
+                { id: 'role-org-admin', name: UserRole.ORG_ADMIN },
+                { id: 'role-customer-manager', name: UserRole.CUSTOMER_MANAGER },
+            ],
+            createUser: vi.fn().mockResolvedValue(undefined),
+            updateUser,
+            deleteUser: vi.fn().mockResolvedValue(undefined),
+        });
+
+        const eventUser = userEvent.setup();
+        renderWithProviders(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <MemoryRouter>
+                    <UIContext.Provider value={uiContext}>
+                        <ManagementUserView />
+                    </UIContext.Provider>
+                </MemoryRouter>
+            </SWRConfig>,
+        );
+
+        await eventUser.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+        const dialog = screen.getByRole('dialog', { name: 'Max Mustermann bearbeiten' });
+        const orgAdminRole = within(dialog).getByRole('checkbox', { name: UserRole.ORG_ADMIN });
+
+        expect(orgAdminRole).not.toBeChecked();
+        expect(within(dialog).queryByRole('checkbox', { name: UserRole.CUSTOMER_MANAGER })).not.toBeInTheDocument();
+        await eventUser.click(orgAdminRole);
+        expect(orgAdminRole).toBeChecked();
+        await eventUser.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+        await waitFor(() => {
+            expect(updateUser).toHaveBeenCalledWith(
+                'user-1',
+                [],
+                ['role-org-admin'],
+                [],
+                [],
+                false,
+                'none',
+                null,
+                false,
+            );
+        });
+    });
+
+    it('lets an org admin remove the org_admin role from a user in their organization', async () => {
+        const updateUser = vi.fn().mockResolvedValue(undefined);
+        vi.mocked(useUsers).mockReturnValue({
+            users: [{
+                ...target,
+                roles: [{ id: 'role-org-admin', name: UserRole.ORG_ADMIN }],
+            }],
+            roles: [
+                { id: 'role-client', name: UserRole.CLIENT },
+                { id: 'role-power-user', name: UserRole.POWER_USER },
+                { id: 'role-org-admin', name: UserRole.ORG_ADMIN },
+            ],
+            createUser: vi.fn().mockResolvedValue(undefined),
+            updateUser,
+            deleteUser: vi.fn().mockResolvedValue(undefined),
+        });
+
+        const eventUser = userEvent.setup();
+        renderWithProviders(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <MemoryRouter>
+                    <UIContext.Provider value={uiContext}>
+                        <ManagementUserView />
+                    </UIContext.Provider>
+                </MemoryRouter>
+            </SWRConfig>,
+        );
+
+        await eventUser.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+        const dialog = screen.getByRole('dialog', { name: 'Max Mustermann bearbeiten' });
+        const orgAdminRole = within(dialog).getByRole('checkbox', { name: UserRole.ORG_ADMIN });
+
+        expect(orgAdminRole).toBeChecked();
+        await eventUser.click(orgAdminRole);
+        expect(orgAdminRole).not.toBeChecked();
+        await eventUser.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+        await waitFor(() => {
+            expect(updateUser).toHaveBeenCalledWith(
+                'user-1',
+                ['role-org-admin'],
+                [],
+                [],
+                [],
+                false,
+                'none',
+                null,
+                false,
+            );
+        });
+    });
 });

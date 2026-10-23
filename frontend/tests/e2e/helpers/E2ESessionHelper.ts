@@ -355,10 +355,17 @@ export class E2ESessionHelper {
         });
         this.rememberAdminCookies(createRes);
         if (!createRes.ok()) throw new Error(`Failed to create user ${email}. Status: ${createRes.status()} Body: ${await createRes.text()}`);
-        const createData = await createRes.json();
+        const createData = await createRes.json() as { user?: { id?: string; roles?: Array<{ id: string }> } };
         const userId = createData.user?.id;
         if (!userId) throw new Error('User ID missing in response: ' + JSON.stringify(createData));
         this.createdUserIds.push(userId);
+
+        // D-51/D-56: a role write that crosses the photographer boundary must
+        // carry the role set the editor loaded. A freshly created user has no
+        // roles here: `POST /api/management/users` builds its `UserResource`
+        // without loading `roles`, so the create response never carries an
+        // inherited role set and the snapshot is empty.
+        const expectedRoleIds = (createData.user?.roles ?? []).map((assigned) => assigned.id);
 
         const rolesRes = await this.request.get('/api/management/roles', { headers });
         this.rememberAdminCookies(rolesRes);
@@ -387,6 +394,7 @@ export class E2ESessionHelper {
         const updateUserRes = await this.request.put(`/api/management/users/${userId}`, {
             data: {
                 role_ids: [roleId, ...additionalRoleIds],
+                expected_role_ids: expectedRoleIds,
                 gallery_ids: options?.assignGalleryId ? [options.assignGalleryId] : [],
                 gallery_group_ids: [],
                 can_edit_metadata: false,
