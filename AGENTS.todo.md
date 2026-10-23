@@ -104,9 +104,9 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Fehler nach erfolgreichem FTP-Widerruf) und **D-57** (Org-Default-Rollen) in
 > `features/owner-decisions.md` festgehalten; die
 > Owner-Fragen sind entschieden. Der D-51/D-57-Redo-Review ist auf Quellenebene `APPROVED`;
-> der erste Push-CI-Lauf `39986637896` war wegen E2E-Fehlern in Desktop-/Mobile-Shard 2 rot.
-> Der E2E-Fix ist auf Quellenebene `APPROVED`; erneute CI des exakten Heads bleibt offen
-> (siehe unten).
+> der Fix-Commit `a9c0fcb` ist gepusht. CI `39992368192` ist für den exakten Head
+> `a9c0fcb79d9ddc4b5bcfa2fcdab1141d0516a9ea` grün (Backend, Frontend und Playwright Desktop/Mobile).
+> Deployment und Live-Proben sind nicht Teil dieses Push-Auftrags und bleiben unten offen.
 > Gegenüber dem Stand vom 2026-10-21 (4 `[ ]`, 16 `[~]`, 1300 Zeilen) waren **8 Positionen weg** — 7 als geschlossen markiert
 > (Dependabot-Alert dismissed, `SFTPGO_API_KEY`-Weg, Watchtower-Policy, Proxy-Trust-Grenze,
 > D-36-Ereigniskette in Produktion, `CREATE_DEFAULT_ADMIN` in der Cutover-Checkliste,
@@ -619,7 +619,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 ### Offene Code-Arbeit
 
-- [ ] D-51/D-57 ausliefern: Quellen-Redo-Review und E2E-Fix-Review `APPROVED`; CI `39986637896` hatte Frontend/Backend grün, aber E2E Desktop-/Mobile-Shard 2 rot (falsches Org-Admin-Menülabel; Mobile-Invite-Klick auf den geschlossenen Sidebar-Drawer). `pnpm lint:e2e`, `pnpm exec tsc -b` und Playwright-List sind unabhängig grün; Runtime-E2E lokal durch fehlenden Docker-Daemon blockiert. Nach Fix-Commit pushen und CI des exakten Heads erneut bis grün beobachten; erst danach deployen und Live-Proben/Nachweis dokumentieren.
+- [ ] D-51/D-57 nach separat angefordertem Deploy live prüfen: gepushter Commit `a9c0fcb`, exakte CI `39992368192` grün. Noch offen: Deploy gemäß Betriebsablauf, nötiger Backend-Neustart, Healthcheck/Probe des geänderten Verhaltens und Live-Nachweis dokumentieren. In diesem Auftrag wurde nicht deployed.
 - [ ] Nach dem D-51-Release die bestätigten Security-/Finanzintegritäts-Findings priorisieren und mit Regressionstests beheben; zuerst AUTH-1 (Org-Rollenübernahme) und PAY-1 (Refund/Dispute vor Success), danach SEC-1 (CSRF) und die bestätigten Media-/Operations-Findings. Owner-Grenzen/bedingte Fälle vor einer Änderung entscheiden.
 - [~] wartet auf den **Mail-Nachweis** — Queue, Worker und Scheduler sind am 2026-10-21 live belegt: die PID-Dateien `/tmp/portal-{scheduler,queue-supervisor,queue-worker}.pid` existieren, der stündliche Scheduler-Mutex in `cache_locks` trägt den Slot-Suffix `2100` (erworben um 21:00:02Z), der Wochenimport lief am Montag-Slot `03:30` (Meilisearch-Batch **2335**, Task 7200, `enqueuedAt` 2026-10-19T03:30:32Z, `status: succeeded`), der manuelle Lauf vom 2026-10-21 21:07Z erzeugte Batch **2402** (39/39 Tasks succeeded, 19.477 Orte im Index `locations`), und die Queue-Tabellen `jobs`/`failed_jobs`/`job_batches` sind leer und fehlerfrei. Die **SMTP-Duplikat-Policy** ist entschieden (D-17 in `features/owner-decisions.md`: gültige Tokens erhalten, kein pauschales Queue-Uniqueness, ein SMTP-Retry darf keine zweite Belastung oder Zustandsänderung auslösen). Offen: ein **zugestellter** Mail-Nachweis aus der Produktion — der Admin-SMTP-Test (`POST /api/management/settings/test-email`) muss ausgelöst und der Provider-/Mailpit-Log danebengelegt werden; die Produktions-DB führt keine Mail-Logtabelle, und `storage/logs/laravel.log` ist vom 2026-04-23.
 
