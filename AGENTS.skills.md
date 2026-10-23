@@ -35,8 +35,8 @@ Form nicht an der Zitierstelle, ist sie hier falsch:
 **Lokale Ergänzung:** (1) Das **dritte Verdikt** `offen` in der Spalte `angewendet?` — die
 Upstream-Vorlage kennt nur `ja | nein`; die Upstream-Fälle „trifft zu, ist nicht drin" und
 „trifft nicht zu" sind hier an einem Verdiktwert unterscheidbar. **Diese Tabelle nutzt das dritte
-Verdikt nicht** (gemessen am committeten Stand dieses Commits: **0** Zeilen mit `offen`; die
-Upstream-Regel gibt für den Fall „trifft zu, ist nicht drin" das Verdikt `ja` mit offener Position
+Verdikt nicht** (die generierte Tabelle in `features/tech/position-9-metrics.md` weist keine Zeile
+mit `offen` aus; die Upstream-Regel gibt für den Fall „trifft zu, ist nicht drin" das Verdikt `ja` mit offener Position
 vor — `skills-marker/SKILL.md` → „## 4. Wann trifft eine Skill-Änderung dieses Projekt zu?"). (2)
 `<stand>` = der
 committete Stand dieses Commits (die SHA, die erst mit dem Commit existiert) — der
@@ -55,7 +55,7 @@ nicht.
 | `build-verify` | ja | `AGENTS.md` §6 (Z. 48): der gemeinsame pull/verify/commit/push-Prozess ist im Skill `build-verify` definiert, repo-spezifische Kommandos bleiben in dieser Datei; die Ausnahme-Klausel der Regel 4 (Pfad-Commit-Klausel) ist **nicht** per Repo-Policy abschaltbar — das Projekt trägt keine eigene (gemessen am committeten Stand `d79f404`: **0** Treffer in `AGENTS.md`) | — |
 | `codegraph-project-setup` | ja | `AGENTS.md` §11 (Z. 90-93): `.codegraph/` optional und maschinenlokal, `.githooks/pre-commit` fails open, kein Commit-Gate | Lokaler Index ist optional, kein Commit-Gate |
 | `docker-test-image` | ja | `deployment/Dockerfile.e2e` (`ARG PLAYWRIGHT_VERSION` Z. 34, Browser-Install Z. 73-74), `.github/workflows/e2e-image.yml` (Versionsextraktion Z. 47) | — (die Lockfile-Regel des Skills — Browserversion aus dem Lockfile — ist am 2026-10-21 umgesetzt: `db13b2c`; die Board-Position 6 ist damit geschlossen und aus dem Board entfernt, `23ca866`) |
-| `generated-docs` | ja | `features/infrastructure/29-production-operations-runbook.md` (Z. 48 — „currently `mariadb`" gegen `backend/config/database.php` Z. 20), die Zahlen in der Prosa dieses Markers und des Boards — **ohne Generator und ohne Drift-Gate**; die Regel des Skills (`generated-docs/SKILL.md` → „## Numbers in prose") ist **nicht** umgesetzt | `AGENTS.todo.md` → Abschnitt „SKILLS-STAND (2026-10-22)" → **Position 9** — die offene Position, die die Regel des Skills verlangt (`skills-marker/SKILL.md` → „## 3. Die Range", Fall „Trifft zu, ist aber nicht drin") |
+| `generated-docs` | ja | `features/infrastructure/29-production-operations-runbook.md` (Z. 48 — „currently `mariadb`" gegen `backend/config/database.php` Z. 20); die Zahlen dieses Markers und des Boards werden von `scripts/generate-position-9-metrics.mjs` erzeugt (`features/tech/position-9-metrics.md`, Drift-Gate in `ratchet.config.jsonc`) — die Regel des Skills (`generated-docs/SKILL.md` → „## Numbers in prose") ist umgesetzt | — (Position 9 ist am 2026-10-23 umgesetzt und aus dem Board entfernt) |
 | `ghcr-visibility` | ja | `.github/workflows/ci.yml` GHCR-Voraussetzung (Z. 57-66) + `container:`-Image (Z. 588) | — |
 | `github-ci-filters` | ja | `.github/workflows/ci.yml` `paths:` unter `push` (Z. 36) und `pull_request` (Z. 44) — D-23; die entscheidende Frage des Skills (`github-ci-filters/SKILL.md` → „does every path match at least one positive pattern?") beantwortet D-23 | — |
 | `laravel` | ja | `backend/AGENTS.md` (Commands Z. 7 mit Pint-Gate Z. 20, Database Setup Policy Z. 22, Migration Policy Z. 32, Parallel Testing Z. 39), `backend/phpunit.xml` (Z. 30-54, hermetische Baseline), `backend/app/Http/Requests/` (22 FormRequests), `backend/app/Policies/`; die Regel des Skills für Datei-Tests (`laravel/SKILL.md` → „fake every local disk in `setUp()`") ist im Backend umgesetzt — `Storage::fake(...)` in **51** Testdateien (gemessen am Stand `c6004d8`) | — (die DB-Engine-Policy ist am 2026-10-21 **entschieden**: **D-49** in `features/owner-decisions.md` hält **MariaDB** als Produktions-Engine fest — die Abweichung vom DB-Standard des Skills (PostgreSQL) ist als Entscheidung dokumentiert, mit Begründung und Belegstellen: `backend/config/database.php` Z. 20, `features/infrastructure/29-production-operations-runbook.md` Z. 48, `backend/AGENTS.md` Z. 28/41; die Board-Position 8 ist geschlossen und aus dem Board entfernt) |
@@ -150,18 +150,22 @@ Vorkommen ist eine Stelle in `AGENTS.skills.md`, die **einen Ort adressiert**:
 **Nicht** gezählt werden Pfadmuster mit Platzhaltern (`*`, `<…>`), Verweise auf die
 Maschinen-Config (`opencode.jsonc`, `~/.config/…`) und Verweise auf die **Historie**
 (Commit-SHAs; die **Korrekturstabelle** unten nennt die *alten* Anker und zählt deshalb
-nicht mit). Aufteilung: **Projekt** (dieses Repo) und **Upstream** (Skills-Repo). **Die Zahl
-und die Zähleinheit stammen aus dem Vorgänger-Marker `d79f404`** (daselbst gemessen am
-2026-10-22): **197** Vorkommen in **85** Zeilen — **138** Projekt (in **47** Zeilen, **37**
-verschiedene Zieldateien, **34** Zeilenanker) und **59** Upstream (in **43** Zeilen, **15**
-verschiedene Zieldateien, **14** Zeilenanker). **Unverändert übernommen**, weil sich am
-**Ankerbestand** nichts geändert hat: die Range berührt **nur** Dateien im Skills-Repo
-(leerer Diff über die Projektpfade, Form (b)), und **jeder** Upstream-Anker wurde am Stand
-`33cbd00` **neu gemessen** — alle treffen, mit **denselben** Zeilennummern. Der **Text**
-dieses Markers hat den Range-Abschnitt ersetzt und **zwei** Upstream-Dateien benannt, die das
-Audit von `d79f404` noch nicht führte (`build-verify/references/notes.md`,
-`agent-config/SKILL.md`): die **Upstream-Zieldateien** sind damit **15 → 17**, die
-**Upstream-Ziele** **29 → 31**; die **Projekt-Ziele** bleiben **71 unverändert**.
+nicht mit). Aufteilung: **Projekt** (dieses Repo) und **Upstream** (Skills-Repo). **Die Zähleinheit
+stammt aus dem Vorgänger-Marker `d79f404`; die aktuelle Zahl der Anker-Vorkommen und -Zeilen wird
+generiert** (`scripts/generate-position-9-metrics.mjs` → `features/tech/position-9-metrics.md`,
+Drift-Gate in `ratchet.config.jsonc`). Der Vorgänger-Marker nennt am 2026-10-22 **197** Vorkommen
+in **85** Zeilen — **138** Projekt (in **47** Zeilen, **37** verschiedene Zieldateien, **34**
+Zeilenanker) und **59** Upstream (in **43** Zeilen, **15** verschiedene Zieldateien, **14**
+Zeilenanker); diese handschriftliche Zahl ist historisch und wird nicht fortgeschrieben — der
+Generator zählt nach der oben definierten Regel und weicht deshalb von ihr ab. **Unverändert
+übernommen** wurde der **Ankerbestand**, weil sich an ihm nichts geändert hat: die Range berührt
+**nur** Dateien im Skills-Repo (leerer Diff über die Projektpfade, Form (b)), und **jeder**
+Upstream-Anker wurde am Stand `33cbd00` **neu gemessen** — alle treffen, mit **denselben**
+Zeilennummern. Der **Text** dieses Markers hat den Range-Abschnitt ersetzt und **zwei**
+Upstream-Dateien benannt, die das Audit von `d79f404` noch nicht führte
+(`build-verify/references/notes.md`, `agent-config/SKILL.md`): die **Upstream-Zieldateien** sind
+damit **15 → 17**, die **Upstream-Ziele** **29 → 31**; die **Projekt-Ziele** bleiben **71
+unverändert**.
 
 - **Projekt: 71 Ziele (37 Dateien + 34 Zeilenanker) — 67 treffen, 4 sind gedriftet und
   korrigiert, 0 sind tot.** Die Ziele lösen am
@@ -175,7 +179,7 @@ Audit von `d79f404` noch nicht führte (`build-verify/references/notes.md`,
   ohne Zeilennummer (der Pin der `ratchet-cli`-Action; die Zähleinheit zählt keine Werte).
   Unverändert gemessen und stimmig:
   `AGENTS.md` §11 Z. 90-93 (die Datei ist 109 Zeilen lang), `.github/workflows/ci.yml`
-  Z. 36/44/57-66/155-173/24 (978 Zeilen), `deployment/Dockerfile.e2e` Z. 34/73-74,
+  Z. 36/44/57-66/155-173/24 (Zeilenzahl generiert), `deployment/Dockerfile.e2e` Z. 34/73-74,
   `.github/workflows/e2e-image.yml` Z. 47, `backend/AGENTS.md` Z. 7/20/22/28/32/39/41,
   `backend/phpunit.xml` Z. 30-54, `backend/routes/api.php` Z. 127-128,
   `backend/config/database.php` Z. 20, `features/owner-decisions.md` Z. 19 (§D-4),
