@@ -22,6 +22,51 @@ const user: UserDetailed = {
 };
 
 describe('UserPermissionsModal', () => {
+    it('sends the role set it opened with alongside the desired selection (D-51/D-56)', async () => {
+        const eventUser = userEvent.setup();
+        const onClose = vi.fn();
+        const onSave = vi.fn().mockResolvedValue(undefined);
+
+        const photographerUser: UserDetailed = {
+            ...user,
+            roles: [{ id: 'role-photographer', name: UserRole.PHOTOGRAPHER }],
+        };
+
+        renderWithProviders(
+            <UserPermissionsModal
+                user={photographerUser}
+                roles={[
+                    { id: 'role-photographer', name: UserRole.PHOTOGRAPHER },
+                    { id: 'role-client', name: UserRole.CLIENT },
+                ]}
+                isOrgAdmin={false}
+                flatGroups={[]}
+                flatGalleries={[]}
+                onClose={onClose}
+                onSave={onSave}
+            />,
+        );
+
+        // The editor opens with the photographer role and removes it. The
+        // snapshot must stay the loaded set, not the desired selection: the API
+        // compares it against the roles it reads under the FTP account lock.
+        await eventUser.click(screen.getByRole('checkbox', { name: UserRole.PHOTOGRAPHER }));
+        await eventUser.click(screen.getByRole('button', { name: 'Speichern' }));
+
+        await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+        expect(onSave).toHaveBeenCalledWith(
+            'user-1',
+            ['role-photographer'],
+            [],
+            [],
+            [],
+            false,
+            'none',
+            null,
+            false,
+        );
+    });
+
     it('keeps selected permissions open when saving rejects', async () => {
         const eventUser = userEvent.setup();
         const onClose = vi.fn();

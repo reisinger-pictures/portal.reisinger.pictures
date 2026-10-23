@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\UserRole;
 use App\Exceptions\FtpAuditWriteException;
 use App\Exceptions\FtpCredentialException;
 use App\Exceptions\SftpGoException;
@@ -352,9 +353,9 @@ class FtpCredentialService
      * Revoke an account, then perform a short database-only operation while
      * retaining the account lock.
      *
-     * The callback is used for role loss and user deletion so another account
-     * write cannot slip between revocation and the corresponding local change.
-     * It must not make SFTPGo calls.
+     * Its callers are the `revoke()` wrapper and user deletion, so another
+     * account write cannot slip between revocation and the corresponding local
+     * change. It must not make SFTPGo calls.
      *
      * @param  Closure(User): mixed  $afterRevoke  Local persistence after revocation.
      */
@@ -367,6 +368,44 @@ class FtpCredentialService
                 $this->revokeWhileLocked($user);
 
                 return $afterRevoke($user);
+            },
+        );
+    }
+
+    /**
+     * Serialize a user-role edit with every other write to this FTP account.
+     *
+     * The update callback receives the fresh user and a transition callback.
+     * It must finish authorization checks before invoking that transition; its
+     * persistence callback must be database-only. This keeps SFTPGo calls
+     * outside database transactions while the shared account lock covers both
+     * the remote transition and the following local role write.
+     *
+     * @param  Closure(User, Closure(bool, Closure(User): mixed): mixed): mixed  $update
+     */
+    public function withRoleUpdateLock(User $user, Closure $update): mixed
+    {
+        $userId = $user->getKey();
+
+        return $this->withRotationLock(
+            $user,
+            function () use ($userId, $update): mixed {
+                $freshUser = User::query()->findOrFail($userId);
+                $applyPhotographerRoleChange = function (bool $keepsPhotographerRole, Closure $persistUpdate) use ($freshUser): mixed {
+                    $hadPhotographerRole = $freshUser->roles()
+                        ->where('name', UserRole::PHOTOGRAPHER->value)
+                        ->exists();
+
+                    if ($hadPhotographerRole && ! $keepsPhotographerRole) {
+                        $this->revokeWhileLocked($freshUser);
+                    } elseif (! $hadPhotographerRole && $keepsPhotographerRole) {
+                        $this->restorePhotographerRoleWhileLocked($freshUser);
+                    }
+
+                    return $persistUpdate($freshUser);
+                };
+
+                return $update($freshUser, $applyPhotographerRoleChange);
             },
         );
     }
@@ -407,47 +446,41 @@ class FtpCredentialService
      * its existing first-time provisioning flow. No database transaction spans
      * the SFTPGo request.
      *
-     * @param  Closure(User): mixed  $afterRestore  Local role persistence; it must not make SFTPGo calls.
+     * Called only by `withRoleUpdateLock()`, which has already acquired the
+     * shared account lock and re-read the target. There is deliberately no
+     * public "restore and persist" entry point: it would let a caller bypass
+     * the role-snapshot precondition that the validated update path enforces.
      */
-    public function restorePhotographerRoleAndThen(User $user, Closure $afterRestore): mixed
+    private function restorePhotographerRoleWhileLocked(User $user): void
     {
-        return $this->withRotationLock(
-            $user,
-            function () use ($user, $afterRestore): mixed {
-                $user->refresh();
+        if ($user->ftp_account_status === self::STATUS_REVOKED) {
+            $username = $this->accountNameFor($user);
+            FtpInboxDirectory::ensure($username);
 
-                if ($user->ftp_account_status === self::STATUS_REVOKED) {
-                    $username = $this->accountNameFor($user);
-                    FtpInboxDirectory::ensure($username);
+            if (! $this->sftpGo->isConfigured()) {
+                throw SftpGoException::notConfigured();
+            }
 
-                    if (! $this->sftpGo->isConfigured()) {
-                        throw SftpGoException::notConfigured();
-                    }
+            if (! $user->forceFill([
+                'ftp_account_status' => self::STATUS_ERROR,
+                'ftp_account_error' => self::ROLE_RESTORATION_ERROR,
+            ])->save()) {
+                throw new \RuntimeException('Could not persist the FTP account restoration state.');
+            }
 
-                    if (! $user->forceFill([
-                        'ftp_account_status' => self::STATUS_ERROR,
-                        'ftp_account_error' => self::ROLE_RESTORATION_ERROR,
-                    ])->save()) {
-                        throw new \RuntimeException('Could not persist the FTP account restoration state.');
-                    }
+            $password = $this->generateCameraPassword();
+            $this->sftpGo->provisionUser($username, $password, $this->homeDirectoryFor($username));
 
-                    $password = $this->generateCameraPassword();
-                    $this->sftpGo->provisionUser($username, $password, $this->homeDirectoryFor($username));
-
-                    if (! $user->forceFill([
-                        'ftp_account_status' => self::STATUS_ACTIVE,
-                        'ftp_provisioned_at' => now(),
-                        'ftp_account_error' => null,
-                    ])->save()) {
-                        throw new \RuntimeException('Could not persist the restored FTP account state.');
-                    }
-                } elseif (! in_array($user->ftp_account_status, [self::STATUS_ACTIVE, self::STATUS_PENDING], true)) {
-                    throw FtpCredentialException::notResettable((string) $user->ftp_account_status);
-                }
-
-                return $afterRestore($user);
-            },
-        );
+            if (! $user->forceFill([
+                'ftp_account_status' => self::STATUS_ACTIVE,
+                'ftp_provisioned_at' => now(),
+                'ftp_account_error' => null,
+            ])->save()) {
+                throw new \RuntimeException('Could not persist the restored FTP account state.');
+            }
+        } elseif (! in_array($user->ftp_account_status, [self::STATUS_ACTIVE, self::STATUS_PENDING], true)) {
+            throw FtpCredentialException::notResettable((string) $user->ftp_account_status);
+        }
     }
 
     /**

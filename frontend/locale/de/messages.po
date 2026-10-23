@@ -2057,6 +2057,10 @@ msgstr "Die Lieferung der bestellten digitalen Inhalte erfolgt ausschließlich i
 msgid "Die Passwörter stimmen nicht überein."
 msgstr "Die Passwörter stimmen nicht überein."
 
+#: src/ui/management/ManagementUserView.tsx
+msgid "Die Rollen wurden inzwischen geändert. Der Dialog wurde geschlossen – bitte erneut öffnen und die Rechte erneut speichern."
+msgstr "Die Rollen wurden inzwischen geändert. Der Dialog wurde geschlossen – bitte erneut öffnen und die Rechte erneut speichern."
+
 #: src/ui/management/FtpConnectionRows.tsx
 #~ msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera eingerichtet werden kann."
 #~ msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera eingerichtet werden kann."
@@ -4978,8 +4982,12 @@ msgid "Neue Meta-Galerie erstellen"
 msgstr "Neue Meta-Galerie erstellen"
 
 #: src/ui/management/ManagementOrgDetailView.tsx
-msgid "Neue Nutzer, die künftig per Domain-Auto-Join beitreten oder von einem Organisationsadministrator angelegt werden, erhalten diese Rolle. Sie können damit Nutzer in dieser Organisation verwalten. Bestehende Nutzer bleiben unverändert."
-msgstr "Neue Nutzer, die künftig per Domain-Auto-Join beitreten oder von einem Organisationsadministrator angelegt werden, erhalten diese Rolle. Sie können damit Nutzer in dieser Organisation verwalten. Bestehende Nutzer bleiben unverändert."
+#~ msgid "Neue Nutzer, die künftig per Domain-Auto-Join beitreten oder von einem Organisationsadministrator angelegt werden, erhalten diese Rolle. Sie können damit Nutzer in dieser Organisation verwalten. Bestehende Nutzer bleiben unverändert."
+#~ msgstr "Neue Nutzer, die künftig per Domain-Auto-Join beitreten oder von einem Organisationsadministrator angelegt werden, erhalten diese Rolle. Sie können damit Nutzer in dieser Organisation verwalten. Bestehende Nutzer bleiben unverändert."
+
+#: src/ui/management/ManagementOrgDetailView.tsx
+msgid "Neue Nutzer, die künftig per Domain-Auto-Join beitreten, von einem Organisationsadministrator angelegt oder per Einladung aufgenommen werden, erhalten diese Rolle. Das gilt auch für bereits bestehende Accounts, die per Einladung beitreten. Mit der Rolle „Organisationsadministrator“ können sie Nutzer in dieser Organisation verwalten. Bereits bestehende Mitglieder bleiben unverändert."
+msgstr "Neue Nutzer, die künftig per Domain-Auto-Join beitreten, von einem Organisationsadministrator angelegt oder per Einladung aufgenommen werden, erhalten diese Rolle. Das gilt auch für bereits bestehende Accounts, die per Einladung beitreten. Mit der Rolle „Organisationsadministrator“ können sie Nutzer in dieser Organisation verwalten. Bereits bestehende Mitglieder bleiben unverändert."
 
 #: src/ui/management/ManagementOrgsView.tsx
 msgid "Neue Organisation"

@@ -19,6 +19,7 @@ use App\Services\FtpCredentialService;
 use App\Services\OrgDefaultRolePolicy;
 use App\Support\BrandRegistry;
 use App\Support\DirectGalleryGrant;
+use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -149,9 +150,40 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, $id)
     {
+        $user = User::findOrFail($id);
+
+        if (! $request->has('role_ids')) {
+            return $this->applyUpdate($request, $user);
+        }
+
+        try {
+            return app(FtpCredentialService::class)->withRoleUpdateLock(
+                $user,
+                fn (User $freshUser, Closure $applyPhotographerRoleChange): mixed => $this->applyUpdate(
+                    $request,
+                    $freshUser,
+                    $applyPhotographerRoleChange,
+                ),
+            );
+        } catch (FtpCredentialException $exception) {
+            if (in_array($exception->reason, [
+                FtpCredentialException::REASON_ROTATION_IN_PROGRESS,
+                FtpCredentialException::REASON_NOT_RESETTABLE,
+            ], true)) {
+                return response()->json(['error' => $exception->getMessage()], 409);
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function applyUpdate(
+        UpdateUserRequest $request,
+        User $user,
+        ?Closure $applyPhotographerRoleChange = null,
+    ) {
         $svc = app(AuthorizationService::class);
         $currentUser = auth('api')->user();
-        $user = User::findOrFail($id);
 
         if (! $svc->isAdmin($currentUser)) {
             if (! $svc->isOrgAdmin($currentUser)) {
@@ -295,11 +327,31 @@ class UserController extends Controller
             : $user->roles()->pluck('name')->all();
         $isSuperAdminSelection = in_array(UserRole::SUPER_ADMIN->value, $selectedRoleNames, true);
 
-        // §7.16: losing the photographer role ends the camera account. The two
-        // facts are read before the transaction because the decision is the
-        // *transition*, not the new state — `revoke()` then runs before the role
-        // rows change.
-        $hadPhotographerRole = $user->roles()->where('name', UserRole::PHOTOGRAPHER->value)->exists();
+        // D-51/D-56: a write that changes photographer membership — and can
+        // therefore revoke or restore the camera account — must carry the role
+        // set its editor loaded. `update()` re-read the target under the shared
+        // per-user FTP lock, so comparing the snapshot against these fresh ids
+        // turns a stale form into a conflict instead of a silent re-grant. The
+        // deliberate administrator restoration still passes: after a reload the
+        // expected set is the current one and only the desired set adds the role.
+        if ($request->has('role_ids')) {
+            $freshHasPhotographer = $user->roles()
+                ->where('name', UserRole::PHOTOGRAPHER->value)
+                ->exists();
+            $selectionHasPhotographer = in_array(UserRole::PHOTOGRAPHER->value, $selectedRoleNames, true);
+
+            if ($freshHasPhotographer !== $selectionHasPhotographer
+                && (! $request->has('expected_role_ids')
+                    || $this->roleSelectionChanged($request->input('expected_role_ids', []), $user))
+            ) {
+                return response()->json([
+                    'error' => 'Die Rollen wurden inzwischen geändert. Bitte die Benutzerverwaltung neu laden und erneut speichern.',
+                ], 409);
+            }
+        }
+
+        // The role transition is based on the fresh role set read after acquiring
+        // the shared FTP lock, not on a stale user snapshot from before it.
         $keepsPhotographerRole = in_array(UserRole::PHOTOGRAPHER->value, $selectedRoleNames, true);
 
         $updates = [];
@@ -339,35 +391,8 @@ class UserController extends Controller
             });
         };
 
-        if ($hadPhotographerRole && ! $keepsPhotographerRole) {
-            try {
-                // Keep the account lock through the local role transaction so a
-                // slug change cannot reprovision between revoke and role loss.
-                app(FtpCredentialService::class)->revokeAndThen($user, $persistUpdate);
-            } catch (FtpCredentialException $exception) {
-                if ($exception->reason === FtpCredentialException::REASON_ROTATION_IN_PROGRESS) {
-                    return response()->json(['error' => $exception->getMessage()], 409);
-                }
-
-                throw $exception;
-            }
-        } elseif (! $hadPhotographerRole && $keepsPhotographerRole) {
-            try {
-                // Photographer-role gains share the account lock with every
-                // other account write. A revoked account is re-provisioned only
-                // through this administrator path; pending first-time accounts
-                // keep their existing self-service provisioning flow.
-                app(FtpCredentialService::class)->restorePhotographerRoleAndThen($user, $persistUpdate);
-            } catch (FtpCredentialException $exception) {
-                if (in_array($exception->reason, [
-                    FtpCredentialException::REASON_ROTATION_IN_PROGRESS,
-                    FtpCredentialException::REASON_NOT_RESETTABLE,
-                ], true)) {
-                    return response()->json(['error' => $exception->getMessage()], 409);
-                }
-
-                throw $exception;
-            }
+        if ($applyPhotographerRoleChange !== null) {
+            $applyPhotographerRoleChange($keepsPhotographerRole, $persistUpdate);
         } else {
             $persistUpdate($user);
         }

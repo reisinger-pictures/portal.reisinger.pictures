@@ -50,16 +50,30 @@ export function useUsers() {
         await mutateUsers();
     };
 
-    const updateUser = async (id: string, role_ids: string[], gallery_group_ids: string[], gallery_ids: string[], can_edit_metadata: boolean, flatrate_level: string, brand: string | null, canPurchaseUpgrades: boolean) => {
-        await apiMutate(`/api/management/users/${id}`, 'PUT', {
-            role_ids,
-            gallery_group_ids,
-            gallery_ids,
-            can_edit_metadata,
-            flatrate_level,
-            brand,
-            can_purchase_upgrades: canPurchaseUpgrades
-        });
+    // `expectedRoleIds` is the role set the editor loaded. The API compares it
+    // against the roles it reads under the shared FTP account lock, so a stale
+    // form conflicts (409) instead of silently re-granting the photographer
+    // role (and with it the camera account).
+    const updateUser = async (id: string, expectedRoleIds: string[], role_ids: string[], gallery_group_ids: string[], gallery_ids: string[], can_edit_metadata: boolean, flatrate_level: string, brand: string | null, canPurchaseUpgrades: boolean) => {
+        try {
+            await apiMutate(`/api/management/users/${id}`, 'PUT', {
+                role_ids,
+                expected_role_ids: expectedRoleIds,
+                gallery_group_ids,
+                gallery_ids,
+                can_edit_metadata,
+                flatrate_level,
+                brand,
+                can_purchase_upgrades: canPurchaseUpgrades
+            });
+        } catch (error: unknown) {
+            // D-51/D-56: a refused save (e.g. the 409 stale role snapshot) must
+            // still refresh the list. The editor's next attempt then starts
+            // from the roles the server actually holds instead of the stale set
+            // that caused the conflict.
+            await mutateUsers().catch(() => undefined);
+            throw error;
+        }
         await mutateUsers();
     };
 

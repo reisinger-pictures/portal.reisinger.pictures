@@ -57,6 +57,12 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
         const orgAdminRole = roles.find((role) => role.name === 'org_admin');
         if (!orgAdminRole) throw new Error('org_admin role not found');
 
+        const orgUpdateRes = await request.put(`/api/management/orgs/${orgId}`, {
+            data: { name: orgName, invoice_frequency: 'immediate', default_role_id: orgAdminRole.id },
+            headers
+        });
+        if (!orgUpdateRes.ok()) throw new Error(`Failed to configure organization default role: ${await orgUpdateRes.text()}`);
+
         const updateUserRes = await request.put(`/api/management/users/${userId}`, {
             data: { role_ids: [orgAdminRole.id], gallery_ids: [], gallery_group_ids: [], can_edit_metadata: false, brand: 'rp' },
             headers
@@ -83,29 +89,29 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
         return { email, password, orgName, orgId, userId };
     }
 
-    test('Org-Admin lädt User ein, User registriert sich und hat Org', { tag: ['@feature:auth:invite'] }, async ({ page, request }) => {
-        const { email, password, orgId } = await createOrgAdmin(request, adminToken);
+    test('Org-Admin lädt User ein, der die konfigurierte Organisationsrolle erhält', { tag: ['@feature:auth:invite', '@feature:org-default-role'] }, async ({ page, request }) => {
+        const { email, password, orgId, orgName } = await createOrgAdmin(request, adminToken);
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         const mailpit = new MailpitHelper(request);
+        const main = page.getByRole('main');
 
         await auth.login(email, password);
         await sidebar.navigateTo('Organisationen');
 
-        const orgCard = page.locator('main .card').first();
+        const orgCard = main.locator('.card').filter({ hasText: orgName });
         await expect(orgCard).toBeVisible({ timeout: 10000 });
         await orgCard.click();
 
-        const inviteBtn = page.locator('main').getByRole('button', { name: '+ Einladen' });
+        const inviteBtn = main.getByRole('button', { name: '+ Einladen' });
         await expect(inviteBtn).toBeVisible({ timeout: 10000 });
         await inviteBtn.click();
 
         const guestEmail = `e2e-invited-${Math.random().toString(36).substring(2, 10)}@example.com`;
-        const inviteModal = page.locator('.modal-open').last();
+        const inviteModal = main.getByRole('dialog', { name: 'Nutzer in Organisation einladen' });
         await inviteModal.locator('input[type="email"]').fill(guestEmail);
         await inviteModal.getByRole('button', { name: 'Einladung Senden' }).click();
-
-        await expect(page.locator('.toast')).toContainText('Einladung erfolgreich versendet', { timeout: 10000 });
+        await expect(inviteModal).toHaveCount(0);
 
         await auth.logout();
 
@@ -113,36 +119,58 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
         expect(inviteToken).toBeTruthy();
 
         await page.goto(`/org-invite/${inviteToken}`);
-        await expect(page.locator('h2:has-text("Einladung zu Organisation")')).toBeVisible({ timeout: 10000 });
-        await page.getByRole('button', { name: 'Beitreten & Fortfahren' }).click();
-        await expect(page.locator('h2:has-text("Account erstellen")')).toBeVisible();
+        await expect(main.getByRole('heading', { name: 'Einladung zu Organisation' })).toBeVisible({ timeout: 10000 });
+        await main.getByRole('button', { name: 'Beitreten & Fortfahren' }).click();
+        await expect(main.getByRole('heading', { name: 'Account erstellen' })).toBeVisible();
 
-        await page.getByPlaceholder('z.B. Maria Muster').fill('Invited Employee');
-        await page.locator('.card-body').locator('input[type="password"]').fill('SecurePass123!');
-        await page.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
-        await page.getByRole('button', { name: 'Account aktivieren & Beitreten' }).click();
+        await main.getByPlaceholder('z.B. Maria Muster').fill('Invited Employee');
+        await main.locator('input[type="password"]').fill('SecurePass123!');
+        await main.getByRole('checkbox', { name: /datenschutzerklärung/i }).check();
+        await main.getByRole('button', { name: 'Account aktivieren & Beitreten' }).click();
 
-        await expect(page.locator('h1:has-text("Willkommen zurück")')).toBeVisible({ timeout: 15000 });
+        // The invitee receives the configured org_admin role, which counts as
+        // staff (`isStaff`), so `ProtectedDashboard` renders the management
+        // dashboard — never the client dashboard. The landing view is
+        // `structure`, which has no heading for a non-photographer, so the
+        // logged-in assertion uses a management view an org admin can reach;
+        // its sidebar entry ("Mein Team") exists only for admins/org admins.
+        await sidebar.navigateTo('Mein Team');
+        await expect(main.getByRole('heading', { name: 'Benutzer & Rechte' })).toBeVisible({ timeout: 15000 });
 
         const invitedUserRes = await request.get('/api/management/users', {
             headers: { 'Accept': 'application/json', 'Cookie': adminToken }
         });
-        const usersData = invitedUserRes.ok() ? await invitedUserRes.json() : null;
-        const usersList = usersData ? (Array.isArray(usersData) ? usersData : usersData.data) : [];
-        const invitedUser = usersList?.find((u: { email: string }) => u.email === guestEmail);
-        if (invitedUser) {
-            helper.trackUser(invitedUser.id);
-        }
+        if (!invitedUserRes.ok()) throw new Error(`User lookup failed. Status: ${invitedUserRes.status()} Body: ${await invitedUserRes.text()}`);
+        type ManagedUser = { id: string; email: string; is_photographer: boolean; roles?: Array<{ name: string }> };
+        const usersData = await invitedUserRes.json() as { data?: ManagedUser[] } | ManagedUser[];
+        const usersList = Array.isArray(usersData) ? usersData : usersData.data ?? [];
+        const invitedUser = usersList.find((user) => user.email === guestEmail);
+        if (!invitedUser) throw new Error(`Invited user ${guestEmail} was not found after registration.`);
+        helper.trackUser(invitedUser.id);
+
+        expect(invitedUser.roles?.map((role) => role.name)).toContain('org_admin');
+        expect(invitedUser.roles?.map((role) => role.name)).not.toContain('photographer');
+        expect(invitedUser.is_photographer).toBe(false);
+
+        const invitedLoginRes = await request.post('/api/auth/login', {
+            data: { email: guestEmail, password: 'SecurePass123!' },
+            headers: { 'Accept': 'application/json' }
+        });
+        if (!invitedLoginRes.ok()) throw new Error(`Invited user login failed: ${await invitedLoginRes.text()}`);
+        const invitedCookie = extractCookieHeader(invitedLoginRes);
+        if (!invitedCookie) throw new Error('Invited user login response did not contain an auth cookie');
+
+        const ftpProcessRes = await request.post('/api/management/ftp/process', {
+            headers: { 'Accept': 'application/json', 'Cookie': invitedCookie }
+        });
+        expect(ftpProcessRes.status()).toBe(403);
 
         const tenantRes = await request.get(`/api/management/orgs/${orgId}`, {
             headers: { 'Accept': 'application/json', 'Cookie': adminToken }
         });
-        if (tenantRes.ok()) {
-            const tenantData = await tenantRes.json();
-            const tenantUserIds = tenantData.users?.map((u: { id: string }) => u.id) || [];
-            if (invitedUser) {
-                expect(tenantUserIds).toContain(invitedUser.id);
-            }
-        }
+        if (!tenantRes.ok()) throw new Error(`Organization lookup failed. Status: ${tenantRes.status()} Body: ${await tenantRes.text()}`);
+        const tenantData = await tenantRes.json() as { users?: Array<{ id: string }> };
+        const tenantUserIds = tenantData.users?.map((user) => user.id) ?? [];
+        expect(tenantUserIds).toContain(invitedUser.id);
     });
 });

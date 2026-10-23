@@ -101,8 +101,10 @@ class AuthController extends Controller
                         ->where('expires_at', '>', now())
                         ->first();
                     if ($pendingInvite) {
+                        $defaultRole = app(OrgDefaultRolePolicy::class)->roleForNewAssignment($org);
                         $user->org_id = $org->id;
                         $user->save();
+                        $user->roles()->syncWithoutDetaching([$defaultRole->id]);
                         $pendingInvite->delete();
                     }
                 }
@@ -193,7 +195,7 @@ class AuthController extends Controller
         $orgBrandMatches = $org && BrandRegistry::resourceMatchesCurrent($org->brand);
         if ($org && $orgBrandMatches && $org->auto_join_policy === AutoJoinPolicy::IMMEDIATE && ! $user->org_id) {
             $defaultRole = app(OrgDefaultRolePolicy::class)->roleForNewAssignment($org);
-            $user->roles()->attach($defaultRole->id);
+            $user->roles()->syncWithoutDetaching([$defaultRole->id]);
 
             // Inherit flatrate settings from org
             if ($org->default_flatrate_level) {

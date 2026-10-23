@@ -3,14 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Brand;
-use App\Enums\UserRole;
 use App\Http\Controllers\Concerns\EnforcesBrandIsolation;
 use App\Mail\OrgInviteMail;
 use App\Models\Org;
 use App\Models\OrgInvite;
-use App\Models\Role;
 use App\Models\User;
 use App\Services\AuthorizationService;
+use App\Services\OrgDefaultRolePolicy;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -152,11 +151,8 @@ class OrgInviteController extends Controller
             $user->brand = $inviteBrand;
             $user->save();
 
-            // Client-Rolle vergeben falls noch keine
-            $clientRole = Role::where('name', UserRole::CLIENT->value)->first();
-            if ($clientRole && ! $user->roles->contains($clientRole->id)) {
-                $user->roles()->syncWithoutDetaching([$clientRole->id]);
-            }
+            $defaultRole = app(OrgDefaultRolePolicy::class)->roleForNewAssignment($invite->org);
+            $user->roles()->syncWithoutDetaching([$defaultRole->id]);
 
             // Token entwerten
             $invite->delete();

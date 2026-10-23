@@ -10,6 +10,23 @@ import CreateUserModal from './components/CreateUserModal';
 import UserTable from './components/UserTable';
 import { useUI } from '../components/UIContext';
 
+// D-51/D-56: `UserController::update` refuses a role write whose editor
+// snapshot no longer matches the roles it reads under the shared FTP account
+// lock (409). Reopening the dialog is what makes that conflict recoverable:
+// `useUsers.updateUser` refreshes the list even on failure, so the next open
+// captures the current role set as its snapshot.
+const ROLE_CONFLICT_FRAGMENT = 'Rollen wurden inzwischen geändert';
+
+function isRoleSnapshotConflict(error: unknown): boolean {
+    return typeof error === 'object'
+        && error !== null
+        && 'status' in error
+        && error.status === 409
+        && 'message' in error
+        && typeof error.message === 'string'
+        && error.message.includes(ROLE_CONFLICT_FRAGMENT);
+}
+
 export default function ManagementUserView() {
     const {isSuperAdmin, isAdmin, isOrgAdmin, orgScope} = usePermissions();
     const {users, roles,  createUser, updateUser, } = useUsers();
@@ -56,14 +73,22 @@ export default function ManagementUserView() {
         ? roles
         : (isAdmin
             ? roles?.filter(r => r.name !== UserRole.SUPER_ADMIN)
-            : roles?.filter(r => [UserRole.POWER_USER, UserRole.CLIENT, UserRole.CUSTOMER_MANAGER].includes(r.name)));
+            : roles?.filter(r => [UserRole.POWER_USER, UserRole.CLIENT, UserRole.ORG_ADMIN].includes(r.name)));
 
-    const handleSaveUser = async (id: string, selRoles: string[], selGroups: string[], selGalleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: string | null, canPurchaseUpgrades: boolean) => {
+    const handleSaveUser = async (id: string, expectedRoleIds: string[], selRoles: string[], selGroups: string[], selGalleries: string[], canEditMeta: boolean, flatrateLevel: string, brand: string | null, canPurchaseUpgrades: boolean) => {
         try {
-            await updateUser(id, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, brand, canPurchaseUpgrades);
+            await updateUser(id, expectedRoleIds, selRoles, selGroups, selGalleries, canEditMeta, flatrateLevel, brand, canPurchaseUpgrades);
             showToast('success', t`Nutzerrechte gespeichert.`);
         } catch (error: unknown) {
-            showToast('error', t`Fehler beim Speichern der Rechte.`);
+            if (isRoleSnapshotConflict(error)) {
+                // Close the editor so the mount-time role snapshot cannot be
+                // submitted again. The refreshed list hands the reopened modal
+                // the current roles, and a deliberate retry can then proceed.
+                setEditingUser(null);
+                showToast('error', t`Die Rollen wurden inzwischen geändert. Der Dialog wurde geschlossen – bitte erneut öffnen und die Rechte erneut speichern.`);
+            } else {
+                showToast('error', t`Fehler beim Speichern der Rechte.`);
+            }
             throw error;
         }
         setEditingUser(null);

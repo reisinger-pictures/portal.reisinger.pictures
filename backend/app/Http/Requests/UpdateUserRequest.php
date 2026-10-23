@@ -26,6 +26,12 @@ class UpdateUserRequest extends FormRequest
         return [
             'role_ids' => 'array',
             'role_ids.*' => 'exists:roles,id',
+            // D-51/D-56: the role set the editor loaded. A role write that
+            // crosses the camera-account boundary is only accepted when this
+            // snapshot still matches the persisted roles under the shared
+            // per-user lock (see `UserController::applyUpdate()`).
+            'expected_role_ids' => 'array',
+            'expected_role_ids.*' => 'exists:roles,id',
             'gallery_group_ids' => 'array',
             'gallery_group_ids.*' => 'exists:gallery_groups,id',
             'gallery_ids' => 'array',

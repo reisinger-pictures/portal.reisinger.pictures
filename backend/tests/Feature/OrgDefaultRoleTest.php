@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\AutoJoinPolicy;
 use App\Enums\UserRole;
 use App\Models\Org;
+use App\Models\OrgInvite;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\OrgDefaultRolePolicy;
@@ -39,13 +40,16 @@ class OrgDefaultRoleTest extends TestCase
         return $user;
     }
 
-    private function org(?Role $defaultRole = null, ?string $domain = null): Org
-    {
+    private function org(
+        ?Role $defaultRole = null,
+        ?string $domain = null,
+        AutoJoinPolicy $autoJoinPolicy = AutoJoinPolicy::IMMEDIATE,
+    ): Org {
         return Org::factory()->create([
             'brand' => 'rp',
             'domain' => $domain,
             'default_role_id' => $defaultRole?->id,
-            'auto_join_policy' => AutoJoinPolicy::IMMEDIATE,
+            'auto_join_policy' => $autoJoinPolicy,
         ]);
     }
 
@@ -76,7 +80,7 @@ class OrgDefaultRoleTest extends TestCase
         return ['Authorization' => 'Bearer '.auth('api')->login($user)];
     }
 
-    public function test_each_allowlisted_role_is_inherited_by_persisted_role_id_in_both_creation_paths(): void
+    public function test_each_allowlisted_role_is_inherited_by_persisted_role_id_in_all_join_paths(): void
     {
         Mail::fake();
 
@@ -109,6 +113,47 @@ class OrgDefaultRoleTest extends TestCase
             $created = User::query()->findOrFail($createdId);
             $this->assertSame($managedOrg->id, $created->org_id);
             $this->assertSame([$roleName], $created->roles()->pluck('name')->all());
+
+            $directOrg = $this->org($defaultRole);
+            $directEmail = 'direct-'.$roleName.'@example.com';
+            OrgInvite::create([
+                'email' => $directEmail,
+                'org_id' => $directOrg->id,
+                'token' => 'direct-'.$roleName,
+                'expires_at' => now()->addDays(7),
+            ]);
+
+            $this->app['auth']->forgetGuards();
+            $this->withHeaders(['Authorization' => ''])->postJson('/api/org-invites/redeem', [
+                'token' => 'direct-'.$roleName,
+                'name' => 'Direct invite member',
+                'password' => 'password123',
+                'accept_privacy' => true,
+            ])->assertOk();
+
+            $directMember = User::query()->where('email', $directEmail)->firstOrFail();
+            $this->assertSame($directOrg->id, $directMember->org_id);
+            $this->assertSame([$roleName], $directMember->roles()->pluck('name')->all());
+
+            $pendingDomain = 'pending-'.$domainSuffix.'.example.com';
+            $pendingOrg = $this->org($defaultRole, $pendingDomain, AutoJoinPolicy::REQUIRES_INVITE);
+            $pendingEmail = 'pending-'.$roleName.'@'.$pendingDomain;
+            OrgInvite::create([
+                'email' => $pendingEmail,
+                'org_id' => $pendingOrg->id,
+                'token' => 'pending-'.$roleName,
+                'expires_at' => now()->addDays(7),
+            ]);
+
+            $this->postJson('/api/auth/register', [
+                'name' => 'Pending invite member',
+                'email' => $pendingEmail,
+            ])->assertOk();
+
+            $pendingMember = User::query()->where('email', $pendingEmail)->firstOrFail();
+            $this->assertSame($pendingOrg->id, $pendingMember->org_id);
+            $this->assertSame([$roleName], $pendingMember->roles()->pluck('name')->all());
+            $this->assertDatabaseMissing('org_invites', ['token' => 'pending-'.$roleName]);
         }
     }
 
@@ -128,6 +173,40 @@ class OrgDefaultRoleTest extends TestCase
         $autoJoined = $autoJoinUser->fresh();
         $this->assertSame($autoJoinOrg->id, $autoJoined->org_id);
         $this->assertSame([$client->name], $autoJoined->roles()->pluck('name')->all());
+
+        $directOrg = $this->org();
+        OrgInvite::create([
+            'email' => 'direct-null-default@example.com',
+            'org_id' => $directOrg->id,
+            'token' => 'direct-null-default',
+            'expires_at' => now()->addDays(7),
+        ]);
+        $this->app['auth']->forgetGuards();
+        $this->withHeaders(['Authorization' => ''])->postJson('/api/org-invites/redeem', [
+            'token' => 'direct-null-default',
+            'name' => 'Direct null default member',
+            'password' => 'password123',
+            'accept_privacy' => true,
+        ])->assertOk();
+        $directMember = User::query()->where('email', 'direct-null-default@example.com')->firstOrFail();
+        $this->assertSame([$client->name], $directMember->roles()->pluck('name')->all());
+
+        $pendingDomain = 'pending-null-default.example.com';
+        $pendingOrg = $this->org(null, $pendingDomain, AutoJoinPolicy::REQUIRES_INVITE);
+        $pendingEmail = 'pending@'.$pendingDomain;
+        OrgInvite::create([
+            'email' => $pendingEmail,
+            'org_id' => $pendingOrg->id,
+            'token' => 'pending-null-default',
+            'expires_at' => now()->addDays(7),
+        ]);
+        $this->postJson('/api/auth/register', [
+            'name' => 'Pending null default member',
+            'email' => $pendingEmail,
+        ])->assertOk();
+        $pendingMember = User::query()->where('email', $pendingEmail)->firstOrFail();
+        $this->assertSame($pendingOrg->id, $pendingMember->org_id);
+        $this->assertSame([$client->name], $pendingMember->roles()->pluck('name')->all());
 
         $managedOrg = $this->org();
         $orgAdmin = $this->admin(UserRole::ORG_ADMIN->value, $managedOrg);
@@ -171,6 +250,43 @@ class OrgDefaultRoleTest extends TestCase
             $this->assertSame([$client->name], $autoJoined->roles()->pluck('name')->all());
             $this->assertFalse($autoJoined->roles->contains('name', $unsupportedName));
 
+            $directOrg = $this->org($unsupportedRole);
+            $directEmail = 'direct-'.$domainSuffix.'@example.com';
+            OrgInvite::create([
+                'email' => $directEmail,
+                'org_id' => $directOrg->id,
+                'token' => 'direct-'.$domainSuffix,
+                'expires_at' => now()->addDays(7),
+            ]);
+            $this->app['auth']->forgetGuards();
+            $this->withHeaders(['Authorization' => ''])->postJson('/api/org-invites/redeem', [
+                'token' => 'direct-'.$domainSuffix,
+                'name' => 'Direct legacy default member',
+                'password' => 'password123',
+                'accept_privacy' => true,
+            ])->assertOk();
+            $directMember = User::query()->where('email', $directEmail)->firstOrFail();
+            $this->assertSame([$client->name], $directMember->roles()->pluck('name')->all());
+            $this->assertFalse($directMember->roles->contains('name', $unsupportedName));
+
+            $pendingDomain = 'pending-'.$domainSuffix.'.example.com';
+            $pendingOrg = $this->org($unsupportedRole, $pendingDomain, AutoJoinPolicy::REQUIRES_INVITE);
+            $pendingEmail = 'pending-'.$domainSuffix.'@'.$pendingDomain;
+            OrgInvite::create([
+                'email' => $pendingEmail,
+                'org_id' => $pendingOrg->id,
+                'token' => 'pending-'.$domainSuffix,
+                'expires_at' => now()->addDays(7),
+            ]);
+            $this->postJson('/api/auth/register', [
+                'name' => 'Pending legacy default member',
+                'email' => $pendingEmail,
+            ])->assertOk();
+            $pendingMember = User::query()->where('email', $pendingEmail)->firstOrFail();
+            $this->assertSame($pendingOrg->id, $pendingMember->org_id);
+            $this->assertSame([$client->name], $pendingMember->roles()->pluck('name')->all());
+            $this->assertFalse($pendingMember->roles->contains('name', $unsupportedName));
+
             $managedOrg = $this->org($unsupportedRole);
             $orgAdmin = $this->admin(UserRole::ORG_ADMIN->value, $managedOrg);
             $response = $this->withHeaders($this->headersFor($orgAdmin))
@@ -187,7 +303,7 @@ class OrgDefaultRoleTest extends TestCase
         }
 
         Log::shouldHaveReceived('warning')
-            ->times(8)
+            ->times(16)
             ->with(
                 'Unsupported organization default role; using CLIENT for a new assignment.',
                 \Mockery::on(fn (array $context): bool => array_keys($context) === [
@@ -196,6 +312,81 @@ class OrgDefaultRoleTest extends TestCase
                     'default_role_name',
                 ]),
             );
+    }
+
+    public function test_deferred_auto_join_does_not_duplicate_a_role_the_user_already_holds(): void
+    {
+        $powerUser = $this->role(UserRole::POWER_USER->value);
+        $org = $this->org($powerUser, 'already-role.example.com');
+        $user = User::factory()->create([
+            'brand' => 'rp',
+            'email' => 'member@already-role.example.com',
+            'org_id' => null,
+        ]);
+        $user->roles()->attach($powerUser->id);
+
+        $this->resetPassword($user, $this->resetToken($user));
+
+        $joined = $user->fresh();
+        $this->assertSame($org->id, $joined->org_id);
+        $this->assertSame([$powerUser->name], $joined->roles()->pluck('name')->all());
+        $this->assertSame(1, DB::table('user_roles')
+            ->where('user_id', $user->id)
+            ->where('role_id', $powerUser->id)
+            ->count());
+    }
+
+    public function test_direct_invite_adds_the_configured_role_to_an_existing_account_idempotently(): void
+    {
+        $defaultRole = $this->role(UserRole::POWER_USER->value);
+        $org = $this->org($defaultRole);
+        $member = User::factory()->create([
+            'brand' => 'rp',
+            'email' => 'existing-invitee@example.com',
+        ]);
+        $member->roles()->attach($defaultRole->id);
+        OrgInvite::create([
+            'email' => $member->email,
+            'org_id' => $org->id,
+            'token' => 'existing-invitee-token',
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $this->app['auth']->forgetGuards();
+        $this->withHeaders(['Authorization' => ''])->postJson('/api/org-invites/redeem', [
+            'token' => 'existing-invitee-token',
+            'name' => 'Existing invitee',
+            'password' => 'password123',
+            'accept_privacy' => true,
+        ])->assertOk();
+
+        $this->assertSame($org->id, $member->fresh()->org_id);
+        $this->assertSame([$defaultRole->name], $member->fresh()->roles()->pluck('name')->all());
+        $this->assertSame(1, DB::table('user_roles')
+            ->where('user_id', $member->id)
+            ->where('role_id', $defaultRole->id)
+            ->count());
+    }
+
+    public function test_manual_membership_sync_does_not_apply_the_configured_default_role(): void
+    {
+        $admin = $this->admin();
+        $client = $this->role(UserRole::CLIENT->value);
+        $powerUser = $this->role(UserRole::POWER_USER->value);
+        $org = $this->org($powerUser);
+        $member = User::factory()->create(['brand' => 'rp']);
+        $member->roles()->attach($client->id);
+
+        $this->withHeaders($this->headersFor($admin))
+            ->putJson('/api/management/orgs/'.$org->id.'/users', [
+                'user_ids' => [$member->id],
+            ])
+            ->assertOk();
+
+        $joined = $member->fresh();
+        $this->assertSame($org->id, $joined->org_id);
+        $this->assertSame([$client->name], $joined->roles()->pluck('name')->all());
+        $this->assertFalse($joined->roles->contains('id', $powerUser->id));
     }
 
     public function test_default_role_validation_accepts_allowed_ids_and_rejects_every_other_role_name(): void

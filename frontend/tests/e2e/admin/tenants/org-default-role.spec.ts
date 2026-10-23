@@ -110,4 +110,48 @@ test.describe('Organization default role', () => {
         const detail = await detailResponse.json() as { default_role_id: string | null };
         expect(detail.default_role_id).toBeNull();
     });
+
+    test('an organization admin can assign and remove the org_admin role in their organization', { tag: ['@feature:org-default-role'] }, async ({ page, request }) => {
+        const org = await createOrgFixture(request, helper, `E2E Org Admin Role ${Math.random().toString(36).slice(2, 10)}`);
+        const orgAdmin = await helper.createIsolatedUser('client');
+        const member = await helper.createIsolatedUser('client');
+        await setUserRoles(request, helper, orgAdmin.id, ['client', 'org_admin']);
+        await syncOrgMembers(request, helper, org.id, [orgAdmin.id, member.id]);
+
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+        await auth.login(orgAdmin.email, orgAdmin.password);
+        await sidebar.navigateTo('Benutzer & Rechte');
+
+        const main = page.getByRole('main');
+        const search = main.getByPlaceholder('Nutzer suchen (Name oder E-Mail)...');
+        await search.fill(member.email);
+        const memberRow = main.getByRole('row').filter({ hasText: member.email });
+        await memberRow.getByRole('button', { name: 'Bearbeiten' }).click();
+
+        let dialog = main.getByRole('dialog', { name: 'E2E client bearbeiten' });
+        const orgAdminRole = dialog.getByRole('checkbox', { name: 'org_admin' });
+        await expect(orgAdminRole).toBeVisible();
+        await expect(orgAdminRole).not.toBeChecked();
+        await orgAdminRole.check();
+        await dialog.getByRole('button', { name: 'Speichern' }).click();
+
+        await memberRow.getByRole('button', { name: 'Bearbeiten' }).click();
+        dialog = main.getByRole('dialog', { name: 'E2E client bearbeiten' });
+        const selectedOrgAdminRole = dialog.getByRole('checkbox', { name: 'org_admin' });
+        await expect(selectedOrgAdminRole).toBeChecked();
+        await selectedOrgAdminRole.uncheck();
+        await dialog.getByRole('button', { name: 'Speichern' }).click();
+
+        const orgAdminCookie = await helper.loginAs(orgAdmin.email, orgAdmin.password);
+        const usersResponse = await request.get('/api/management/users', {
+            headers: { Accept: 'application/json', Cookie: orgAdminCookie },
+        });
+        if (!usersResponse.ok()) throw new Error(`Reading organization users failed: ${await usersResponse.text()}`);
+        const users = await usersResponse.json() as {
+            data: Array<{ id: string; roles: Array<{ name: string }> }>;
+        };
+        const updatedMember = users.data.find(user => user.id === member.id);
+        expect(updatedMember?.roles.map(role => role.name)).toEqual(['client']);
+    });
 });

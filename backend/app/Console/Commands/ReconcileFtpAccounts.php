@@ -101,9 +101,11 @@ class ReconcileFtpAccounts extends Command
             'unchecked' => 0,
         ];
 
-        $checked = 0;
+        $attempted = 0;
 
         foreach ($users as $user) {
+            $attempted++;
+
             try {
                 $result = $credentials->reconcileAccount($user);
             } catch (FtpCredentialException $exception) {
@@ -120,7 +122,7 @@ class ReconcileFtpAccounts extends Command
                 $this->error(sprintf('%s: fehlgeschlagen (%s)', $this->label($user), $exception->getMessage()));
 
                 if (in_array($exception->reason, self::SERVICE_WIDE_REASONS, true)) {
-                    $unchecked = $users->count() - $checked - 1;
+                    $unchecked = $users->count() - $attempted;
                     $counters['unchecked'] = $unchecked;
 
                     $this->error(sprintf(
@@ -135,7 +137,6 @@ class ReconcileFtpAccounts extends Command
                 continue;
             }
 
-            $checked++;
             $counters[$result->outcome]++;
 
             $this->line(sprintf('%s: %s (%s)', $this->label($user), $result->status, $result->reason));
