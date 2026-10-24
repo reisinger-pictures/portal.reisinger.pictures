@@ -59,6 +59,14 @@ class ProtectApiMutations
     private function hasAllowedMutationContentType(Request $request): bool
     {
         $contentType = strtolower(trim(explode(';', (string) $request->header('Content-Type'), 2)[0]));
+        if ($contentType === '') {
+            // The boundary governs what a body may be, not whether one exists.
+            // A request without a body cannot submit a form — DELETE and the
+            // zero-payload POSTs are body-less by design — so it is allowed
+            // only while it really carries nothing.
+            return trim((string) $request->getContent()) === '';
+        }
+
         if ($contentType === 'application/json') {
             return true;
         }

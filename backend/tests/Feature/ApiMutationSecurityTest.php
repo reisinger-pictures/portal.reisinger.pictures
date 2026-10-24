@@ -88,6 +88,46 @@ class ApiMutationSecurityTest extends TestCase
             ->assertOk();
     }
 
+    public function test_a_body_less_mutation_passes_the_content_type_boundary(): void
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $jwt = auth('api')->login($user);
+        $csrf = $this->csrfCredentials();
+        Auth::forgetGuards();
+
+        // DELETE and the zero-payload POSTs carry no body at all; the JSON
+        // boundary governs what a body may be, so it must not reject them. The
+        // test client sends a form content type of its own for a POST, so it is
+        // cleared here to model a client that sends none.
+        $this->withUnencryptedCookie('rp_jwt', $jwt)
+            ->withUnencryptedCookie('XSRF-TOKEN', $csrf['cookie'])
+            ->withHeaders($csrf['headers'])
+            ->post('/api/auth/logout', [], ['CONTENT_TYPE' => ''])
+            ->assertOk();
+    }
+
+    public function test_a_body_without_a_content_type_is_still_rejected(): void
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $jwt = auth('api')->login($user);
+        $csrf = $this->csrfCredentials();
+        Auth::forgetGuards();
+
+        $server = $this->transformHeadersToServerVars($csrf['headers']);
+        $server['CONTENT_TYPE'] = '';
+
+        $this->call(
+            'POST',
+            '/api/auth/logout',
+            [],
+            ['rp_jwt' => $jwt, 'XSRF-TOKEN' => $csrf['cookie']],
+            [],
+            $server,
+            'email=attacker-controlled@example.com',
+        )
+            ->assertStatus(415);
+    }
+
     public function test_cross_origin_form_submission_cannot_create_or_send_an_org_invite(): void
     {
         $org = Org::factory()->create();

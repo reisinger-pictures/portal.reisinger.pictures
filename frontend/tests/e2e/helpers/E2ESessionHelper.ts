@@ -3,7 +3,7 @@ import path from 'node:path';
 import { APIRequestContext, type APIResponse } from '@playwright/test';
 import { E2ECookieJar, extractCookieHeader } from './E2ECookieJar';
 import { MailpitHelper } from './MailpitHelper';
-import {browserAuthHeaders} from './BrowserAuthHeaders';
+import {browserAuthHeaders, browserAuthHeadersFromRequest} from './BrowserAuthHeaders';
 
 const e2eBrandSettings = {
     accounting_email: 'brand-settings-e2e@example.com',
@@ -191,7 +191,7 @@ export class E2ESessionHelper {
         if (this.adminToken) return;
         const loginRes = await this.request.post('/api/auth/login', {
             data: { email: process.env.ADMIN_EMAIL || 'admin@example.com', password: process.env.ADMIN_PASSWORD || 'admin' },
-            headers: { 'Accept': 'application/json' }
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(this.request) }
         });
         if (!loginRes.ok()) throw new Error('Admin login failed: ' + await loginRes.text());
 
@@ -334,7 +334,7 @@ export class E2ESessionHelper {
     async loginAs(email: string, password: string, _options?: { brand?: string }): Promise<string> {
         const loginRes = await this.request.post('/api/auth/login', {
             data: { email, password },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(this.request) },
         });
         if (!loginRes.ok()) throw new Error(`Login failed for ${email}: ${await loginRes.text()}`);
         const cookieHeader = extractCookieHeader(loginRes);
@@ -532,7 +532,7 @@ export class E2ESessionHelper {
         }
 
         const res = await this.request.post(`/api/model-registration/${token}`, {
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(this.request) },
             multipart: {
                 ...fields,
                 ...photoFields,
@@ -628,7 +628,7 @@ export class E2ESessionHelper {
         });
 
         const res = await this.request.post(`/api/model-registration/${token}`, {
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(this.request) },
             multipart: {
                 ...fields,
                 'persons[0][age_proof]': { name: 'sample.jpg', mimeType: 'image/jpeg', buffer: ageProof },

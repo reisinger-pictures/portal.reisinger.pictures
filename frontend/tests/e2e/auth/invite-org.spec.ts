@@ -4,7 +4,7 @@ import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
-import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
+import {browserAuthHeaders, browserAuthHeadersFromRequest} from '../helpers/BrowserAuthHeaders';
 
 test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', () => {
     let helper: E2ESessionHelper;
@@ -168,7 +168,7 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
 
         const invitedLoginRes = await request.post('/api/auth/login', {
             data: { email: guestEmail, password: 'SecurePass123!' },
-            headers: { 'Accept': 'application/json' }
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) }
         });
         if (!invitedLoginRes.ok()) throw new Error(`Invited user login failed: ${await invitedLoginRes.text()}`);
         const invitedCookie = extractCookieHeader(invitedLoginRes);

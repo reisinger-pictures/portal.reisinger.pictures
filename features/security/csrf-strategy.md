@@ -32,12 +32,16 @@ unsafe:
    Any supplied cross-origin Origin/Referer is still rejected. This preserves
    existing server/plugin and token-link flows without allowing browser form
    submissions to cross the boundary.
-4. Mutations must use `application/json`. `multipart/form-data` is accepted only
-   on the existing file endpoints:
+4. A mutation body must be `application/json`. `multipart/form-data` is accepted
+   only on the existing file endpoints:
    `/api/management/upload`, `/api/management/settings/watermark`,
    `/api/management/invoices/extract-offer`,
    `/api/model-registration/{token}`, and `/api/model-profil/{token}`.
-   Form-encoded, text, and other mutation bodies are rejected with `415`.
+   Form-encoded, text, and other mutation bodies are rejected with `415`. The
+   boundary governs what a body may be, not whether one exists: a request with
+   no `Content-Type` and an empty body (body-less `DELETE`, zero-payload `POST`)
+   is allowed, while a request with no `Content-Type` but a non-empty body is
+   still rejected with `415`.
 5. Stripe webhook ingress is exempt from browser-origin and cookie-token checks
    because Stripe authenticates it with `Stripe-Signature`; the secret-gated
    internal FTP event ingress is similarly exempt because it authenticates its
@@ -60,9 +64,13 @@ unsafe:
 - Non-browser clients that authenticate with a JWT cookie are held to the same
   contract: they must send a matching `Origin`/`Referer` and the
   `X-XSRF-TOKEN` header. The E2E helpers do exactly that
-  (`frontend/tests/e2e/helpers/BrowserAuthHeaders.ts`), and the backend tests use
-  `Tests\TestCase::csrfCredentials()`, which mints the token through a real API
-  response.
+  (`frontend/tests/e2e/helpers/BrowserAuthHeaders.ts`); a harness call that
+  carries a folded `Cookie` header uses `browserAuthHeaders()`, while the
+  standalone Playwright `request` fixture — whose own cookie jar holds the JWT
+  after a harness login — uses `browserAuthHeadersFromRequest()`, which reads
+  the token from that jar and mints one through `GET /api/ping` when the jar has
+  none yet. The backend tests use `Tests\TestCase::csrfCredentials()`, which
+  mints the token through a real API response.
 - Login is protected even before a JWT cookie exists: a browser-supplied
   cross-origin `Origin`/`Referer` is rejected, and an HTML form cannot satisfy
   the JSON-only mutation boundary. The token is additionally sent whenever the
