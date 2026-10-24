@@ -95,10 +95,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       # The action installs the released binary and verifies its SHA-256
       # against the checksums of the release. It is pinned to a commit SHA:
-      # this repository's supply-chain contract allows no moving tag. The SHA
-      # is the v0.4.0 release commit — v0.3.2's manifest is unparseable
-      # upstream (`name: @all-the-rest/ratchet-cli`); Dependabot bumps the pin.
-      - uses: all-the-rest/ratchet-cli@ef09f00a86aba3c097563b0ff4b4f94b28e40096
+      # this repository's supply-chain contract allows no moving tag.
+      # The SHA is the v0.5.0 release commit.
+      # Dependabot bumps the pin.
+      - uses: all-the-rest/ratchet-cli@99c25b1e18331a1473d43091d37e23f23bc1c30d
         with:
           mode: validate
 
