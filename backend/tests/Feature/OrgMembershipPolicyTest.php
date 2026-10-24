@@ -9,6 +9,7 @@ use App\Models\OrgInvite;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -86,6 +87,42 @@ class OrgMembershipPolicyTest extends TestCase
         $this->assertSame($orgB->id, $member->fresh()->org_id);
         $this->assertSame(['admin', 'photographer', 'power_user'], $this->roleNames($member->fresh()));
         $this->assertDatabaseMissing('org_invites', ['token' => $invite->token]);
+    }
+
+    /**
+     * The browser contract: the auth cookie is the session, and the invite
+     * token in the body must not shadow it. The JWT parser reads a request
+     * field named `token` before it reads the cookie, so this request is
+     * anonymous unless the controller falls back to the cookie — and the guest
+     * branch would then demand `name` and `password`.
+     */
+    public function test_a_logged_in_browser_redeems_its_invite_with_the_token_in_the_body(): void
+    {
+        $client = $this->role(UserRole::CLIENT);
+        $powerUser = $this->role(UserRole::POWER_USER);
+        $orgA = $this->org($client);
+        $orgB = $this->org($powerUser);
+        $member = User::factory()->create(['brand' => 'rp', 'org_id' => $orgA->id]);
+        $member->roles()->attach($client->id);
+        $invite = $this->invite($orgB, $member->email, 'browser-cookie-org-switch-token');
+
+        $jwt = auth('api')->login($member);
+        Auth::forgetGuards();
+        $csrf = $this->csrfCredentials();
+
+        $this->withUnencryptedCookie('rp_jwt', $jwt)
+            ->withUnencryptedCookie('XSRF-TOKEN', $csrf['cookie'])
+            ->withHeaders($csrf['headers'])
+            ->withCredentials()
+            ->postJson('/api/org-invites/redeem', [
+                'token' => $invite->token,
+                'accept_privacy' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertSame($orgB->id, $member->fresh()->org_id);
+        $this->assertSame([$powerUser->name], $this->roleNames($member->fresh()));
     }
 
     public function test_existing_email_account_can_switch_orgs_by_redeeming_its_invite(): void

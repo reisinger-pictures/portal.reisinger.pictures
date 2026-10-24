@@ -58,6 +58,16 @@ test.describe('E5: Kein B2B-Label sichtbar für Org-Admin', () => {
         const orgAdminRole = roles.find((role) => role.name === 'org_admin');
         if (!orgAdminRole) throw new Error('org_admin role not found');
 
+        // The membership sync gives a new member the organization's default
+        // role, so the membership is assigned first and the roles are set
+        // afterwards - the order the management UI uses (assign the member in
+        // the organization, then edit the roles).
+        const syncRes = await request.put(`/api/management/orgs/${orgId}/users`, {
+            data: { user_ids: [userId] },
+            headers
+        });
+        if (!syncRes.ok()) throw new Error(`Org membership assignment failed: ${await syncRes.text()}`);
+
         const updateUserRes = await request.put(`/api/management/users/${userId}`, {
             data: { role_ids: [orgAdminRole.id], gallery_ids: [], gallery_group_ids: [], can_edit_metadata: false, brand: 'rp' },
             headers
@@ -65,11 +75,6 @@ test.describe('E5: Kein B2B-Label sichtbar für Org-Admin', () => {
         if (!updateUserRes.ok()) {
             throw new Error(`Failed to configure user ${email}. Status: ${updateUserRes.status()} Body: ${await updateUserRes.text()}`);
         }
-
-        await request.put(`/api/management/orgs/${orgId}/users`, {
-            data: { user_ids: [userId] },
-            headers
-        });
 
         const mailpit = new MailpitHelper(request);
         const resetToken = await mailpit.extractPasswordResetToken(email);

@@ -71,8 +71,11 @@ test.describe('Organization default role', () => {
     test('an organization admin cannot see or change the default role', { tag: ['@feature:org-default-role'] }, async ({ page, request }) => {
         const org = await createOrgFixture(request, helper, `E2E Org Admin Default Role ${Math.random().toString(36).slice(2, 10)}`);
         const orgAdmin = await helper.createIsolatedUser('client');
-        await setUserRoles(request, helper, orgAdmin.id, ['client', 'org_admin']);
+        // The membership sync gives a new member the organization's default
+        // role and clears org-scoped roles set before it, so the membership
+        // comes first and the roles are set afterwards.
         await syncOrgMembers(request, helper, org.id, [orgAdmin.id]);
+        await setUserRoles(request, helper, orgAdmin.id, ['client', 'org_admin']);
 
         const adminToken = await adminCookie(helper);
         const rolesResponse = await request.get('/api/management/roles', {
@@ -116,8 +119,10 @@ test.describe('Organization default role', () => {
         const org = await createOrgFixture(request, helper, `E2E Org Admin Role ${Math.random().toString(36).slice(2, 10)}`);
         const orgAdmin = await helper.createIsolatedUser('client');
         const member = await helper.createIsolatedUser('client');
-        await setUserRoles(request, helper, orgAdmin.id, ['client', 'org_admin']);
+        // Same order as above: the sync assigns the membership and the default
+        // role, the role edit runs afterwards.
         await syncOrgMembers(request, helper, org.id, [orgAdmin.id, member.id]);
+        await setUserRoles(request, helper, orgAdmin.id, ['client', 'org_admin']);
 
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

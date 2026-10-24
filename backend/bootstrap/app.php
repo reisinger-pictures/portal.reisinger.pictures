@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuthenticateJwtCookie;
 use App\Http\Middleware\BrandContextMiddleware;
 use App\Http\Middleware\ManagementMiddleware;
 use App\Http\Middleware\ProtectApiMutations;
@@ -21,6 +22,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(BrandContextMiddleware::class);
         $middleware->append(SetSecurityHeaders::class);
+        // A browser session is authenticated by its cookie; a request field
+        // named `token` is data, not a credential. See the middleware.
+        $middleware->append(AuthenticateJwtCookie::class);
         $middleware->append(ProtectApiMutations::class);
         // Registriere den Alias für unsere Admin-Middleware
         $middleware->alias([

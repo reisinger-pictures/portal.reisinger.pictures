@@ -163,6 +163,10 @@ test.describe('Organisation membership (sync and delete)', () => {
             canPurchaseUpgrades: true,
         });
         const member = await helper.createIsolatedUser('client');
+        // The membership sync assigns the organization's default role and
+        // clears org-scoped roles set before it, so the membership comes first
+        // and the org admin role is set afterwards.
+        await syncOrgMembers(request, helper, org.id, [member.id]);
         // An organisation admin is a user who is a member of the organisation —
         // that is what the scope of `/api/auth/me` reports.
         await setUserRoles(request, helper, member.id, ['client', 'org_admin']);
@@ -172,7 +176,6 @@ test.describe('Organisation membership (sync and delete)', () => {
             flatrate_level: 'web',
             can_purchase_upgrades: true,
         });
-        await syncOrgMembers(request, helper, org.id, [member.id]);
 
         // Before the delete the member is bound to the organisation.
         const scopeBefore = await readAuthOrgScope(request, helper, member);

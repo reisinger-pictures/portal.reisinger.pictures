@@ -9,6 +9,7 @@ status: active
 ## 1. Authentication Concept
 - **Stateless JWT:** The API uses JSON Web Tokens (JWT) via `php-open-source-saver/jwt-auth`. There are no PHP sessions (the `web` guard is deactivated).
 - **Storage & XSS Prevention:** Tokens are NEVER sent in the JSON body or stored in `localStorage`. They are attached as secure, `HttpOnly`, `SameSite=Lax` cookies (`rp_jwt`).
+- **Cookie precedence:** A request that carries the auth cookie and no `Authorization` header is a browser session, and the cookie decides who it is. `AuthenticateJwtCookie` promotes the cookie to the header before the JWT parsers run, because the package reads a request field named `token` *before* the cookie — a mutation body that carries a `token` (redeeming an organization or gallery invite) would otherwise be treated as anonymous. An explicit bearer token keeps precedence; a request without the cookie is untouched.
 - **Silent Refresh:** The frontend Axios/Fetch layer intercepts `401 Unauthorized` errors, calls `/api/auth/refresh` to get a new cookie, and retries the original request seamlessly.
 - **Session Lifetime (SOLL, 2026-08-13):** Access-Token TTL 240 min (`JWT_TTL`); Refresh-Fenster **7 Tage** (`JWT_REFRESH_TTL=10080`), rolling via `refresh_iat=true`. Nach 7 Tagen Inaktivität ist ein Re-Login erforderlich (härtet den Rolling-Refresh ab — vorher 14 Tage). Prod-Steuerung über Portainer-Env `JWT_REFRESH_TTL`.
 
