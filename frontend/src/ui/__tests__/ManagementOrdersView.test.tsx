@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../test-setup';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -254,5 +254,60 @@ describe('ManagementOrdersView', () => {
 
         expect(screen.getByText('Nutzungsrechte')).toBeInTheDocument();
         expect(screen.queryByText(/\(optional\)/i)).not.toBeInTheDocument();
+    });
+
+    // A refused Stripe cancellation answers 502 with a German `error` in the
+    // JSON body while the order keeps its status. The bare `catch` used to
+    // swallow it and the admin only saw the generic text, so the same action
+    // was retried unchanged.
+    it('shows the 502 server message when a status change is refused', async () => {
+        const user = userEvent.setup();
+        const showToast = vi.fn();
+        const mutate = vi.fn();
+        const serverMessage = 'Die Bestellung ist bereits bezahlt. Eine Stornierung kann nicht über Stripe durchgeführt werden; eine Stornierung ist kein Erstattungsweg.';
+
+        vi.mocked(useSWR).mockReturnValue({
+            data: mockOrders,
+            error: undefined,
+            isLoading: false,
+            mutate,
+        } as never);
+
+        vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
+        // The rejection shape `handleApiError` produces for a 502 whose body is
+        // `{"error": "…"}`.
+        vi.mocked(apiMutate).mockRejectedValue(Object.assign(new Error(serverMessage), { status: 502, info: { error: serverMessage } }));
+
+        renderView();
+
+        await user.selectOptions(screen.getAllByRole('combobox')[0], 'cancelled');
+
+        await waitFor(() => expect(showToast).toHaveBeenCalledWith('error', serverMessage));
+        expect(apiMutate).toHaveBeenCalledWith('/api/management/orders/o1/status', 'PUT', { status: 'cancelled' });
+        expect(showToast).not.toHaveBeenCalledWith('error', 'Fehler beim Speichern');
+        expect(mutate).not.toHaveBeenCalled();
+    });
+
+    // A rejection that carries no readable error object has no message to show,
+    // so the generic fallback must stay.
+    it('falls back to the generic message when a status change rejects without a readable error body', async () => {
+        const user = userEvent.setup();
+        const showToast = vi.fn();
+
+        vi.mocked(useSWR).mockReturnValue({
+            data: mockOrders,
+            error: undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        } as never);
+
+        vi.mocked(useUI).mockReturnValue({ showToast, confirm: vi.fn(), hasUnsavedChanges: false, setUnsavedChanges: vi.fn() });
+        vi.mocked(apiMutate).mockRejectedValue({ status: 502 });
+
+        renderView();
+
+        await user.selectOptions(screen.getAllByRole('combobox')[0], 'cancelled');
+
+        await waitFor(() => expect(showToast).toHaveBeenCalledWith('error', 'Fehler beim Speichern'));
     });
 });

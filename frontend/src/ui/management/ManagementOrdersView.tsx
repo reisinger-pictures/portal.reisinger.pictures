@@ -30,8 +30,8 @@ export default function ManagementOrdersView() {
             await apiMutate(`/api/management/orders/${id}/status`, 'PUT', { status: newStatus });
             showToast('success', t`Status aktualisiert`);
             mutate();
-        } catch {
-            showToast('error', t`Fehler beim Speichern`);
+        } catch (e: unknown) {
+            showToast('error', e instanceof Error ? e.message : t`Fehler beim Speichern`);
         }
     };
 
