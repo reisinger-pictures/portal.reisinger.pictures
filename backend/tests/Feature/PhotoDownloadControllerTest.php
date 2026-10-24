@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\ImageProcessor;
 use App\Services\MediaVisibilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
@@ -59,6 +60,19 @@ class PhotoDownloadControllerTest extends TestCase
         $this->tearDownIsolatedTempDirectory();
 
         parent::tearDown();
+    }
+
+    private function useArchiveControllerWithoutExifTool(): void
+    {
+        $this->app->instance(PhotoDownloadController::class, new ArchiveAuditPhotoDownloadController(
+            app(ImageProcessor::class),
+            app(MediaVisibilityService::class),
+        ));
+    }
+
+    private function publicZipLockKey(): string
+    {
+        return 'zip_public_'.hash('sha256', '127.0.0.1');
     }
 
     public function test_authorized_user_can_download_single_image_and_metadata_is_injected()
@@ -179,6 +193,160 @@ class PhotoDownloadControllerTest extends TestCase
             'gallery_id' => $gallery->id,
             'photo_count' => 2,
         ]);
+    }
+
+    public function test_gallery_zip_preparations_use_distinct_scratch_files_for_the_same_photo(): void
+    {
+        config(['scout.driver' => 'null']);
+        $gallery = Gallery::factory()->create([
+            'type' => 'delivery',
+            'is_public' => true,
+            'is_free_download' => true,
+        ]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        Storage::disk('photos')->put(
+            $gallery->id.'/'.$photo->filename,
+            file_get_contents(base_path('tests/Fixtures/sample.jpg')),
+        );
+        $this->actingAs(User::factory()->create(), 'api');
+        $this->useArchiveControllerWithoutExifTool();
+
+        $this->get("/api/galleries/{$gallery->id}/download-zip")->assertStatus(200);
+        $this->get("/api/galleries/{$gallery->id}/download-zip")->assertStatus(200);
+
+        $scratchFiles = glob($this->isolatedTempDir('photo_download').'/base_scale_'.$photo->id.'_original_*.jpg');
+        $this->assertIsArray($scratchFiles);
+        $this->assertCount(2, $scratchFiles);
+        $this->assertNotSame($scratchFiles[0], $scratchFiles[1]);
+    }
+
+    public function test_public_guest_zip_is_limited_by_an_ip_lock_until_stream_completion(): void
+    {
+        config(['scout.driver' => 'null']);
+        $gallery = Gallery::factory()->create([
+            'type' => 'delivery',
+            'is_public' => true,
+            'is_free_download' => true,
+        ]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        Storage::disk('photos')->put(
+            $gallery->id.'/'.$photo->filename,
+            file_get_contents(base_path('tests/Fixtures/sample.jpg')),
+        );
+        $this->useArchiveControllerWithoutExifTool();
+        $lockKey = $this->publicZipLockKey();
+
+        $response = $this->get("/api/galleries/{$gallery->id}/download-zip");
+        $response->assertStatus(200);
+        $this->assertFalse(Cache::lock($lockKey, 3600)->get());
+
+        ob_start();
+        try {
+            $response->sendContent();
+        } finally {
+            ob_end_clean();
+        }
+
+        $probe = Cache::lock($lockKey, 3600);
+        $this->assertTrue($probe->get());
+        $probe->release();
+    }
+
+    public function test_public_guest_zip_shutdown_fallback_releases_lock_when_stream_never_runs(): void
+    {
+        $lockKey = $this->publicZipLockKey();
+        $lock = Cache::lock($lockKey, 3600);
+        $this->assertTrue($lock->get());
+
+        $method = new \ReflectionMethod(PhotoDownloadController::class, 'registerPublicDownloadLockCleanup');
+        $release = $method->invoke(app(PhotoDownloadController::class), $lock);
+        $probe = null;
+
+        try {
+            // PHP does not expose a way to run queued shutdown handlers during
+            // a test without ending the process; invoke the registered callback
+            // directly to cover the case where the stream callback never runs.
+            $release();
+
+            $probe = Cache::lock($lockKey, 3600);
+            $this->assertTrue($probe->get(), 'The shutdown callback should release the public ZIP lock.');
+
+            // Calling the normal cleanup path after shutdown cleanup is a no-op
+            // and must not release a lock acquired by another request.
+            $release();
+            $this->assertFalse(Cache::lock($lockKey, 3600)->get());
+        } finally {
+            $probe?->release();
+            $release();
+        }
+    }
+
+    public function test_second_public_guest_zip_from_the_same_ip_gets_429_when_the_lock_is_held(): void
+    {
+        config(['scout.driver' => 'null']);
+        $gallery = Gallery::factory()->create([
+            'type' => 'delivery',
+            'is_public' => true,
+            'is_free_download' => true,
+        ]);
+        $lock = Cache::lock($this->publicZipLockKey(), 3600);
+        $this->assertTrue($lock->get());
+
+        $this->getJson("/api/galleries/{$gallery->id}/download-zip")
+            ->assertStatus(429)
+            ->assertJson(['error' => 'Es läuft bereits ein ZIP-Download von dieser Adresse. Bitte warten Sie, bis dieser abgeschlossen ist.']);
+
+        $lock->release();
+    }
+
+    public function test_authenticated_gallery_zip_is_not_blocked_by_a_public_guest_lock(): void
+    {
+        config(['scout.driver' => 'null']);
+        $gallery = Gallery::factory()->create([
+            'type' => 'delivery',
+            'is_public' => true,
+            'is_free_download' => true,
+        ]);
+        $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        Storage::disk('photos')->put(
+            $gallery->id.'/'.$photo->filename,
+            file_get_contents(base_path('tests/Fixtures/sample.jpg')),
+        );
+        $this->useArchiveControllerWithoutExifTool();
+        $lock = Cache::lock($this->publicZipLockKey(), 3600);
+        $this->assertTrue($lock->get());
+
+        $response = $this->actingAs(User::factory()->create(), 'api')
+            ->get("/api/galleries/{$gallery->id}/download-zip");
+        $response->assertStatus(200);
+        ob_start();
+        try {
+            $response->sendContent();
+        } finally {
+            ob_end_clean();
+        }
+
+        $this->assertFalse(Cache::lock($this->publicZipLockKey(), 3600)->get());
+        $lock->release();
+    }
+
+    public function test_public_guest_zip_releases_its_ip_lock_when_preparation_fails(): void
+    {
+        config(['scout.driver' => 'null']);
+        $gallery = Gallery::factory()->create([
+            'type' => 'delivery',
+            'is_public' => true,
+            'is_free_download' => true,
+        ]);
+        $this->useArchiveControllerWithoutExifTool();
+
+        $this->getJson("/api/galleries/{$gallery->id}/download-zip")
+            ->assertStatus(422)
+            ->assertJson(['error' => 'Der ZIP-Download enthält keine Bilder.']);
+
+        $probe = Cache::lock($this->publicZipLockKey(), 3600);
+        $this->assertTrue($probe->get());
+        $probe->release();
     }
 
     public function test_empty_public_gallery_zip_returns_422_without_a_download_log(): void

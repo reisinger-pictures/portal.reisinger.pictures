@@ -228,14 +228,15 @@ class PhotoLogicTest extends TestCase
         $this->assertStringContainsString('?v='.$expectedV.'_', $photo->url);
     }
 
-    public function test_url_attribute_uses_v1_when_created_at_null(): void
+    public function test_url_attribute_uses_v1_when_no_timestamp_is_set(): void
     {
         // created_at ist DB-seitig NOT NULL + Timestamp-Trait setzt es beim Insert.
-        // Den Code-Pfad ($this->created_at ? timestamp : '1') testen wir über
-        // eine Speicher-Zuweisung ohne save().
+        // Den Code-Pfad (updated_at → created_at → '1') testen wir über eine
+        // Speicher-Zuweisung ohne save().
         $gallery = Gallery::factory()->create();
         $photo = Photo::factory()->for($gallery)->create();
         $photo->created_at = null;
+        $photo->updated_at = null;
 
         $this->assertStringContainsString('?v=1_', $photo->url);
     }

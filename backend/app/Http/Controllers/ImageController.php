@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Gallery;
 use App\Models\Photo;
 use App\Services\AuthorizationService;
+use App\Services\ImageProcessor;
 use App\Services\PhotoProcessingService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -100,12 +101,21 @@ class ImageController extends Controller
                 throw new \Exception('Datei konnte nicht gespeichert werden.');
             }
 
+            if ($existingPhoto) {
+                $this->invalidatePhotoDerivatives($targetDir, $filename, $photoId);
+            }
+
             $targetPath = Storage::disk('photos')->path($targetDir.'/'.$filename);
             $thumbPath = Storage::disk('photos')->path($thumbsDir.'/'.md5($filename.'1024').'.webp');
 
             $filteredMeta = array_intersect_key($meta, array_flip((new Photo)->getFillable()));
 
             if ($existingPhoto) {
+                $versionTime = now();
+                if ($existingPhoto->updated_at !== null && $versionTime->timestamp <= $existingPhoto->updated_at->timestamp) {
+                    $versionTime = $existingPhoto->updated_at->copy()->addSecond();
+                }
+                $existingPhoto->setUpdatedAt($versionTime);
                 $existingPhoto->fill(array_merge([
                     'user_id' => $user->id,
                     'lr_uuid' => $lrUuid,
@@ -127,5 +137,35 @@ class ImageController extends Controller
 
             return response()->json(['success' => true, 'photo_id' => $photo->id]);
         }, 3);
+    }
+
+    private function invalidatePhotoDerivatives(string $galleryId, string $filename, string $photoId): void
+    {
+        $thumbnailPaths = [];
+        $watermarkedPaths = ["{$galleryId}/_watermarked/{$filename}"];
+        $legacyThumbnail = md5($filename.'1024').'.webp';
+        $thumbnailPaths[] = "{$galleryId}/_thumbs/{$legacyThumbnail}";
+        $watermarkedPaths[] = "{$galleryId}/_thumbs/_watermarked/{$legacyThumbnail}";
+
+        foreach (Photo::DERIVATIVE_SIZES as $size) {
+            $thumbnailPaths[] = "{$galleryId}/_thumbs/{$size}/{$photoId}.webp";
+            $watermarkedPaths[] = "{$galleryId}/_thumbs/_watermarked/{$size}/{$photoId}.webp";
+        }
+
+        $paths = array_merge(
+            $thumbnailPaths,
+            $watermarkedPaths,
+            array_map(
+                static fn (string $path): string => $path.ImageProcessor::WATERMARK_MARKER_SUFFIX,
+                $watermarkedPaths,
+            ),
+        );
+        $disk = Storage::disk('photos');
+        $disk->delete($paths);
+
+        $remaining = array_values(array_filter($paths, static fn (string $path): bool => $disk->exists($path)));
+        if ($remaining !== []) {
+            throw new \RuntimeException('Bildderivate konnten nach dem Fotoersatz nicht entfernt werden.');
+        }
     }
 }
