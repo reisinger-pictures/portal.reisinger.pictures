@@ -14,3 +14,9 @@ status: active
 ## 2. Watermarking (Fallback)
 - If an unprivileged user (guest) accesses a public gallery, a visible SVG watermark is rasterized and stamped onto the image (via `Imagick`).
 - To prevent heavy CPU load during mass-downloads, the rasterized SVG is cached in resolution "buckets" (`master_{width}.png`, e.g., `master_500.png`).
+
+## 3. Public ZIP preparation concurrency
+- Unauthenticated ZIP downloads of public free-download galleries are limited to one active request per client IP. A concurrent request from the same IP receives HTTP 429 with a German retry message; the lock covers preparation and streaming and is released on completion or failure.
+- Authenticated ZIP downloads are not subject to this per-IP lock. Existing route-level rate limiting remains in force.
+- There is no photo-count or byte-size cap: one very large public gallery still incurs the cost of one complete ZIP preparation.
+- ZIP preparation uses a unique scratch file for each scaled photo, tier, and request so concurrent preparations cannot overwrite or consume each other's intermediate image.

@@ -17,17 +17,24 @@ use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
 use App\Support\TempDirectory;
 use Carbon\Carbon;
+use Closure;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Process\Process;
 use ZipStream\ZipStream;
 
 class PhotoDownloadController extends Controller
 {
+    private const PUBLIC_ZIP_LOCK_TTL_SECONDS = 3600;
+
+    private const PUBLIC_ZIP_LOCKED_MESSAGE = 'Es läuft bereits ein ZIP-Download von dieser Adresse. Bitte warten Sie, bis dieser abgeschlossen ist.';
+
     public function __construct(
         private readonly ImageProcessor $imageProcessor,
         private readonly MediaVisibilityService $mediaVisibility,
@@ -414,6 +421,26 @@ class PhotoDownloadController extends Controller
         });
     }
 
+    /**
+     * @return Closure(): void
+     */
+    private function registerPublicDownloadLockCleanup(Lock $lock): Closure
+    {
+        $released = false;
+        $release = static function () use ($lock, &$released): void {
+            if ($released) {
+                return;
+            }
+
+            $released = true;
+            $lock->release();
+        };
+
+        register_shutdown_function($release);
+
+        return $release;
+    }
+
     public function downloadZip(Request $request, $galleryId)
     {
         $tier = $request->query('tier', 'original');
@@ -424,6 +451,18 @@ class PhotoDownloadController extends Controller
         $baseStoragePath = rtrim(Storage::disk('photos')->path(''), '/\\');
         $preparedFiles = [];
         $downloadLogId = null;
+        $releasePublicDownloadLock = null;
+
+        if ($user === null && $gallery->effective_is_public && $gallery->effective_is_free_download) {
+            $publicDownloadLock = Cache::lock(
+                'zip_public_'.hash('sha256', (string) $request->ip()),
+                self::PUBLIC_ZIP_LOCK_TTL_SECONDS,
+            );
+            if (! $publicDownloadLock->get()) {
+                return response()->json(['error' => self::PUBLIC_ZIP_LOCKED_MESSAGE], 429);
+            }
+            $releasePublicDownloadLock = $this->registerPublicDownloadLockCleanup($publicDownloadLock);
+        }
 
         try {
             // Prepare every derivative before returning a streaming response. A
@@ -463,7 +502,7 @@ class PhotoDownloadController extends Controller
             $downloadLogId = $downloadLog->getKey();
             $this->registerTempFileCleanup($this->preparedFilePaths($preparedFiles));
 
-            return response()->streamDownload(function () use ($preparedFiles, $galleryId, $tier, $downloadLogId) {
+            return response()->streamDownload(function () use ($preparedFiles, $galleryId, $tier, $downloadLogId, $releasePublicDownloadLock) {
                 try {
                     // This is the last authorization check before ZipStream is
                     // allowed to write its first byte.
@@ -481,6 +520,7 @@ class PhotoDownloadController extends Controller
                     throw $e;
                 } finally {
                     $this->removeTempFiles($this->preparedFilePaths($preparedFiles));
+                    $releasePublicDownloadLock?->__invoke();
                 }
             }, $currentGallery->slug.'_'.$tier.'.zip');
         } catch (HttpException $e) {
@@ -488,6 +528,7 @@ class PhotoDownloadController extends Controller
                 DownloadLog::query()->whereKey($downloadLogId)->delete();
             }
             $this->removeTempFiles($this->preparedFilePaths($preparedFiles));
+            $releasePublicDownloadLock?->__invoke();
 
             return response()->json(['error' => $e->getMessage()], $e->getStatusCode());
         } catch (\Throwable $e) {
@@ -495,6 +536,7 @@ class PhotoDownloadController extends Controller
                 DownloadLog::query()->whereKey($downloadLogId)->delete();
             }
             $this->removeTempFiles($this->preparedFilePaths($preparedFiles));
+            $releasePublicDownloadLock?->__invoke();
 
             throw $e;
         }
@@ -568,13 +610,13 @@ class PhotoDownloadController extends Controller
                     );
                 }
 
-                $scaledPath = $tempDir.'/base_scale_'.$photo->id.'_'.$tier.'.jpg';
+                $scaledPath = $tempDir.'/base_scale_'.$photo->id.'_'.$tier.'_'.Str::uuid().'.jpg';
                 $cleanupFiles[] = $scaledPath;
                 $scaleSucceeded = false;
                 Cache::lock('scale_'.$photo->id.'_'.$tier, 60)->block(30, function () use ($sourcePath, $scaledPath, $maxWidth, &$scaleSucceeded) {
-                    // Do not reuse a deterministic temp file here: an older
-                    // request may have left an unwatermarked derivative at the
-                    // same path.  Re-scale from the verified source every time.
+                    // Each request has a unique scratch path, while the scale
+                    // lock serializes work for this photo and tier. A request
+                    // therefore cannot consume another request's scale output.
                     if (is_file($scaledPath)) {
                         @unlink($scaledPath);
                     }
@@ -967,7 +1009,7 @@ class PhotoDownloadController extends Controller
                     continue;
                 }
 
-                $scaledPath = $tempDir.'/base_scale_'.$photo->id.'_'.$tier.'.jpg';
+                $scaledPath = $tempDir.'/base_scale_'.$photo->id.'_'.$tier.'_'.Str::uuid().'.jpg';
                 $cleanupFiles[] = $scaledPath;
                 $maxWidth = self::DOWNLOAD_TIERS[$tier];
                 $scaleSucceeded = false;

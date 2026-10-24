@@ -276,4 +276,72 @@ class ImageUploadTest extends TestCase
         $this->assertSame('null-title-uuid', $nullTitlePhoto->lr_uuid);
         $this->assertDatabaseCount('photos', 2);
     }
+
+    public function test_replacing_photo_versions_urls_and_refreshes_cached_derivatives(): void
+    {
+        config(['scout.driver' => 'null']);
+        $photographer = $this->createPhotographerUser();
+        $gallery = $this->createDeliveryGallery();
+        $photographer->galleries()->attach($gallery);
+        $photo = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'lr_uuid' => 'replace-existing-photo',
+        ]);
+        Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, $this->fixtureContent);
+
+        $this->actingAs($photographer, 'api');
+        $oldUrls = [$photo->url, $photo->thumb_url, $photo->srcset];
+        $oldThumbnailResponse = $this->get("/api/media/{$gallery->slug}/_thumbs/800/{$photo->id}.webp");
+        $oldThumbnailResponse->assertStatus(200);
+        ob_start();
+        $oldThumbnailResponse->sendContent();
+        $oldThumbnail = ob_get_clean();
+
+        $watermarkedOriginal = $gallery->id.'/_watermarked/'.$photo->filename;
+        $watermarkedThumb = $gallery->id.'/_thumbs/_watermarked/800/'.$photo->id.'.webp';
+        Storage::disk('photos')->put($watermarkedOriginal, $this->fixtureContent);
+        Storage::disk('photos')->put($watermarkedOriginal.'.watermark.json', '{}');
+        Storage::disk('photos')->put($watermarkedThumb, $oldThumbnail);
+        Storage::disk('photos')->put($watermarkedThumb.'.watermark.json', '{}');
+
+        $replacement = UploadedFile::fake()->createWithContent(
+            'replacement.jpg',
+            $this->jpegWithColor(20, 180, 80),
+        );
+        $this->postJson('/api/management/upload', [
+            'gallery_id' => $gallery->id,
+            'lr_uuid' => 'replace-existing-photo',
+            'file' => $replacement,
+        ])->assertStatus(200)->assertJson(['photo_id' => $photo->id]);
+
+        $photo->refresh();
+        $this->assertNotSame($oldUrls[0], $photo->url);
+        $this->assertNotSame($oldUrls[1], $photo->thumb_url);
+        $this->assertNotSame($oldUrls[2], $photo->srcset);
+        Storage::disk('photos')->assertMissing($gallery->id.'/_thumbs/800/'.$photo->id.'.webp');
+        Storage::disk('photos')->assertMissing($watermarkedOriginal);
+        Storage::disk('photos')->assertMissing($watermarkedOriginal.'.watermark.json');
+        Storage::disk('photos')->assertMissing($watermarkedThumb);
+        Storage::disk('photos')->assertMissing($watermarkedThumb.'.watermark.json');
+
+        $newThumbnailResponse = $this->get("/api/media/{$gallery->slug}/_thumbs/800/{$photo->id}.webp");
+        $newThumbnailResponse->assertStatus(200);
+        ob_start();
+        $newThumbnailResponse->sendContent();
+        $newThumbnail = ob_get_clean();
+        $this->assertNotSame($oldThumbnail, $newThumbnail);
+    }
+
+    private function jpegWithColor(int $red, int $green, int $blue): string
+    {
+        $image = imagecreatetruecolor(600, 600);
+        $color = imagecolorallocate($image, $red, $green, $blue);
+        imagefill($image, 0, 0, $color);
+        ob_start();
+        imagejpeg($image, null, 90);
+        $contents = ob_get_clean();
+        imagedestroy($image);
+
+        return (string) $contents;
+    }
 }

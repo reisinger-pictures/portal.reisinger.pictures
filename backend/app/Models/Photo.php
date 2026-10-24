@@ -176,7 +176,7 @@ class Photo extends Model
 
     public function getUrlAttribute()
     {
-        $v = $this->created_at ? $this->created_at->timestamp : '1';
+        $v = $this->mediaVersion();
         $reqWm = $this->requiresWatermark();
         if ($reqWm) {
             $v .= '_'.Cache::get('watermark_version', '1');
@@ -188,7 +188,7 @@ class Photo extends Model
 
     public function getThumbUrlAttribute()
     {
-        $v = $this->created_at ? $this->created_at->timestamp : '1';
+        $v = $this->mediaVersion();
         $reqWm = $this->requiresWatermark();
         if ($reqWm) {
             $v .= '_'.Cache::get('watermark_version', '1');
@@ -200,7 +200,7 @@ class Photo extends Model
 
     public function getSrcsetAttribute()
     {
-        $v = $this->created_at ? $this->created_at->timestamp : '1';
+        $v = $this->mediaVersion();
         $reqWm = $this->requiresWatermark();
         if ($reqWm) {
             $v .= '_'.Cache::get('watermark_version', '1');
@@ -212,6 +212,11 @@ class Photo extends Model
                $baseUrl.'_thumbs/400/'.$this->id.'.webp?v='.$v.' 400w, '.
                $baseUrl.'_thumbs/800/'.$this->id.'.webp?v='.$v.' 800w, '.
                $baseUrl.'_thumbs/1200/'.$this->id.'.webp?v='.$v.' 1200w';
+    }
+
+    private function mediaVersion(): string
+    {
+        return (string) ($this->updated_at?->timestamp ?? $this->created_at?->timestamp ?? 1);
     }
 
     public function shouldBeSearchable()
