@@ -40,7 +40,8 @@ RUN chmod 0755 /usr/local/bin/portal-backend-supervisor /usr/local/bin/validate-
 RUN echo "memory_limit = 1024M" > /usr/local/etc/php/conf.d/php-base.ini \
     && echo "upload_max_filesize = 64M" >> /usr/local/etc/php/conf.d/php-base.ini \
     && echo "post_max_size = 64M" >> /usr/local/etc/php/conf.d/php-base.ini \
-    && echo "max_execution_time = 600" >> /usr/local/etc/php/conf.d/php-base.ini
+    && echo "max_execution_time = 600" >> /usr/local/etc/php/conf.d/php-base.ini \
+    && echo "session.upload_progress.enabled = Off" >> /usr/local/etc/php/conf.d/php-base.ini
 
 # PHP-FPM, Artisan, queue workers and scheduler all share the non-root identity.
 USER www-data
