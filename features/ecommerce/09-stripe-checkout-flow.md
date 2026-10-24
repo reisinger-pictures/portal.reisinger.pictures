@@ -38,6 +38,8 @@ pending_payment → disputed (verified matching dispute webhook)
 pending_payment → refunded (verified matching full-refund webhook)
 ```
 
+When an admin cancels an order with a stored PaymentIntent, the intent is canceled at Stripe before the order status is written. If Stripe cannot cancel it because it is already paid, processing, or an API error occurs, the endpoint returns 502 and the order keeps its current status; a cancellation is never a silent local-only write, and it is not a refund path.
+
 Negative payment events are terminal even when they arrive before the success
 event. A verified dispute or full refund bound to the order's stored PaymentIntent
 may move `pending_payment` to `disputed` or `refunded`; strict success

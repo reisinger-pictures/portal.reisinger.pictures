@@ -5,12 +5,16 @@ namespace App\Http\Controllers;
 use App\Http\Resources\OrderResource;
 use App\Models\Order;
 use App\Services\AuthorizationService;
+use App\Services\StripePaymentService;
 use App\Support\ActorIdentity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
 {
+    public function __construct(private readonly StripePaymentService $stripePayment) {}
+
     public function index()
     {
         $orders = Order::query()
@@ -77,6 +81,13 @@ class OrderController extends Controller
         }
 
         $order = $query->findOrFail($id);
+        if ($request->status === 'cancelled') {
+            $error = $this->cancelOpenPaymentIntent($order);
+            if ($error !== null) {
+                return response()->json(['error' => $error], 502);
+            }
+        }
+
         $order->update(['status' => $request->status]);
 
         // PurchaseService caches the positive result per photo/tier. An admin
@@ -85,6 +96,56 @@ class OrderController extends Controller
         $this->clearPurchasedCache($order);
 
         return response()->json(['success' => true]);
+    }
+
+    private function cancelOpenPaymentIntent(Order $order): ?string
+    {
+        $paymentIntentId = $order->stripe_payment_intent_id;
+        if (! is_string($paymentIntentId) || trim($paymentIntentId) === '') {
+            return null;
+        }
+
+        $paymentIntentId = trim($paymentIntentId);
+
+        try {
+            $paymentIntent = $this->stripePayment->retrievePaymentIntent($paymentIntentId);
+            $status = $paymentIntent['status'] ?? null;
+
+            if ($status === 'succeeded') {
+                return 'Die Bestellung ist bereits bezahlt. Eine Stornierung kann nicht über Stripe durchgeführt werden; eine Stornierung ist kein Erstattungsweg.';
+            }
+
+            if ($status !== 'canceled') {
+                $this->stripePayment->cancelPaymentIntent($paymentIntentId);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('order.cancel.payment_intent_not_cancelled', [
+                'order_id' => (string) $order->getKey(),
+                'payment_intent_id' => $paymentIntentId,
+                'exception_class' => $exception::class,
+                'exception_message' => $this->safeStripeExceptionMessage($exception),
+            ]);
+
+            return 'Die Stornierung konnte bei Stripe nicht abgeschlossen werden. Der Bestellstatus wurde nicht geändert.';
+        }
+
+        return null;
+    }
+
+    private function safeStripeExceptionMessage(\Throwable $exception): string
+    {
+        $message = $exception->getMessage();
+        $stripeSecret = config('services.stripe.secret');
+        if (is_string($stripeSecret) && $stripeSecret !== '') {
+            $message = str_replace($stripeSecret, '[REDACTED_STRIPE_SECRET]', $message);
+        }
+
+        $message = preg_replace('/\b(?:sk|rk)_(?:test|live)_[A-Za-z0-9_-]+\b/i', '[REDACTED_STRIPE_SECRET]', $message) ?? '';
+        $message = preg_replace('/\bpi_[A-Za-z0-9_-]+_secret_[A-Za-z0-9_-]+\b/i', '[REDACTED_CLIENT_SECRET]', $message) ?? '';
+        $message = preg_replace('/\bclient[_-]?secret\s*[:=]\s*["\']?[^"\'\s,;]+/i', 'client_secret=[REDACTED]', $message) ?? '';
+        $message = preg_replace('/\bauthorization\s*:\s*bearer\s+\S+/i', 'Authorization: Bearer [REDACTED]', $message) ?? '';
+
+        return substr($message, 0, 500);
     }
 
     private function clearPurchasedCache(Order $order): void
