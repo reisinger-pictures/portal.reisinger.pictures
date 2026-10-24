@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Console\Commands\ProvisionFtpEvents;
+use App\Support\ProductionOperationsPolicy;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\Client\Response;
@@ -47,7 +48,7 @@ class ProvisionFtpEventsTest extends TestCase
                 'admin_username' => null,
                 'admin_password' => null,
             ],
-            'ftp.events.url' => 'http://portal.test/api/internal/ftp/upload-event',
+            'ftp.events.url' => ProductionOperationsPolicy::FTP_EVENT_URL,
             'ftp.events.secret' => 'first-secret',
             'ftp.events.secret_header' => 'X-FTP-Event-Secret',
             'ftp.events.action_name' => self::ACTION,
@@ -66,7 +67,7 @@ class ProvisionFtpEventsTest extends TestCase
         Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
             && str_ends_with($request->url(), '/api/v2/eventactions')
             && $request->data()['type'] === 1
-            && $request->data()['options']['http_config']['endpoint'] === 'http://portal.test/api/internal/ftp/upload-event'
+            && $request->data()['options']['http_config']['endpoint'] === ProductionOperationsPolicy::FTP_EVENT_URL
             && $request->data()['options']['http_config']['method'] === 'POST'
             && $request->data()['options']['http_config']['timeout'] === ProvisionFtpEvents::HTTP_TIMEOUT_SECONDS
             && $request->data()['options']['http_config']['body'] === ProvisionFtpEvents::UPLOAD_EVENT_BODY
@@ -289,23 +290,22 @@ class ProvisionFtpEventsTest extends TestCase
      * string instead of the default, so a fix that only touches the `env()`
      * default argument would still abort on every deploy. The three unusable
      * shapes are therefore all "not set" and must all resolve to
-     * `APP_URL + /api/internal/ftp/upload-event`.
+     * `ProductionOperationsPolicy::FTP_EVENT_URL`.
      */
     public function test_the_event_url_default_covers_missing_empty_and_whitespace_variables(): void
     {
-        $appUrl = 'https://portal.test';
-        $expected = $appUrl.'/api/internal/ftp/upload-event';
+        $expected = ProductionOperationsPolicy::FTP_EVENT_URL;
 
         foreach ([null, '', '   '] as $unusable) {
             $config = $this->loadFtpConfig([
-                'APP_URL' => $appUrl,
+                'APP_URL' => 'https://portal.test',
                 'FTP_EVENT_URL' => $unusable,
             ]);
 
             $this->assertSame(
                 $expected,
                 $config['events']['url'],
-                'FTP_EVENT_URL = '.var_export($unusable, true).' must fall back to APP_URL + endpoint.',
+                'FTP_EVENT_URL = '.var_export($unusable, true).' must resolve to the internal event listener.',
             );
         }
     }
@@ -323,26 +323,18 @@ class ProvisionFtpEventsTest extends TestCase
         $this->assertSame('https://events.example.invalid/portal-hook', $config['events']['url']);
     }
 
-    /**
-     * The second half of the chain: the fallback may only be derived from an
-     * `APP_URL` that SFTPGo would accept.
-     *
-     * SFTPGo's rule is a case-sensitive `http://`/`https://` prefix, so a bare
-     * host, another scheme or a relative path must yield `null` — the command
-     * then names the missing value instead of provisioning an action SFTPGo
-     * answers 400 to.
-     */
-    public function test_the_event_url_default_requires_an_absolute_http_app_url(): void
+    public function test_the_event_url_default_is_independent_of_app_url(): void
     {
-        foreach (['portal.test', 'ftp://portal.test', '/relative/path'] as $unusableAppUrl) {
+        foreach (['/relative/path', 'https://portal.test'] as $appUrl) {
             $config = $this->loadFtpConfig([
-                'APP_URL' => $unusableAppUrl,
+                'APP_URL' => $appUrl,
                 'FTP_EVENT_URL' => null,
             ]);
 
-            $this->assertNull(
+            $this->assertSame(
+                ProductionOperationsPolicy::FTP_EVENT_URL,
                 $config['events']['url'],
-                'APP_URL '.var_export($unusableAppUrl, true).' cannot produce an absolute http(s) endpoint.',
+                'APP_URL '.var_export($appUrl, true).' must not affect the internal event URL default.',
             );
         }
     }

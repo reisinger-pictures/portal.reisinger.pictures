@@ -96,59 +96,76 @@ Drei Fallen, alle drei belegt:
 Gegenprobe nach dem Deploy: im Dashboard beim Endpunkt **„Send test webhook"** →
 **HTTP 200** heißt Signatur stimmt, **400** heißt der `whsec` passt nicht.
 
-### FTP-Upload-Events (D-36) — zwei Werte und ein Provisionierungsschritt
+### FTP-Upload-Events (D-36) — interner Listener und Provisionierung
 
-Der automatische FTP-Import wird von einem SFTPGo-**Filesystem-Event** ausgelöst:
-nach jedem Upload POSTet SFTPGo an den internen Endpunkt des Portals. Dafür
-braucht der Backend-Container zwei Variablen (im Compose bereits verdrahtet):
+Der automatische FTP-Import wird von einem SFTPGo-**Filesystem-Event** ausgelöst.
+SFTPGo erreicht den HTTP-Endpunkt über den Caddy-Seitendienst `ftp-events` im
+Docker-Netzwerk; dieser leitet ausschließlich den Upload-Event-Pfad an den
+FastCGI-only-Backend weiter. Alle anderen Pfade antworten mit 404.
 
 ```bash
 FTP_EVENT_SECRET=<generiertes Secret>   # Pflicht
-FTP_EVENT_URL=                          # optional; Default = APP_URL + /api/internal/ftp/upload-event
+FTP_EVENT_URL=                          # optional; Default = http://ftp-events:8080/api/internal/ftp/upload-event
 ```
 
 `FTP_EVENT_SECRET` gehört in die Portainer-GUI, nie ins Repo (Klasse C1–C4).
-`FTP_EVENT_URL` darf leer bleiben.
+`FTP_EVENT_URL` darf leer bleiben; `config/ftp.php` verwendet dann den internen
+Listener. Das Secret verlässt damit nicht das Docker-Netz. Sobald SFTPGo auf den
+internen Listener umgestellt und ein echter Upload bestätigt ist, wird die
+öffentliche Route `/api/internal/*` nicht mehr benötigt.
 
-**Einmalig nach dem Deploy** — die Regel liegt im SFTPGo-Datenprovider und wird
-nicht vom Entrypoint geschrieben:
+**Verbindliche Reihenfolge für den Wechsel:**
 
-```bash
-docker compose exec backend php artisan ftp:provision-events
-```
+0. **Vor dem Recreate prüfen, ob `FTP_EVENT_URL` in der Portainer-Stack-Env
+   explizit gesetzt ist.** Die Production-Policy verlangt inzwischen exakt
+   `http://ftp-events:8080/api/internal/ftp/upload-event`; sie läuft beim Start
+   des Backend-Containers vor dem Supervisor (`ops:validate-production` im
+   `command:` des `backend`-Service). Ein dort noch gesetzter alter öffentlicher
+   Wert lässt den Backend-Container nach dem Recreate nicht starten
+   (fail-closed, beabsichtigt). Deshalb zuerst prüfen und die Variable leeren
+   (dann greift der interne Default) oder auf den internen Wert setzen:
 
-Ohne diesen Schritt weist der Endpunkt jedes Event mit **401** ab (fail-closed,
-korrekt) und es wird nichts automatisch importiert. Der Befehl ist idempotent —
-ein zweiter Lauf aktualisiert dieselbe Aktion und Regel. Gegenprobe:
+   ```bash
+   docker exec portal_backend printenv FTP_EVENT_URL
+   ```
+
+   Ein leerer Wert ist der dokumentierte Default und besteht die Policy.
+1. Den Stack vollständig recreaten/aktualisieren, damit der Dienst `ftp-events`
+   und der neue interne Default gestartet werden.
+2. Die im SFTPGo-Datenprovider gespeicherte Aktion auf die interne URL setzen
+   (der Entrypoint ändert Provider-Zustand nicht):
+
+   ```bash
+   docker compose exec backend php artisan ftp:provision-events
+   ```
+
+3. Einen echten Upload ausführen und nachweisen, dass das Event den Import
+   auslöst.
+4. **Erst nach diesem Nachweis** `/api/internal/*` im Host-Caddy öffentlich
+   blockieren. Die Host-Caddy-Konfiguration liegt außerhalb dieses Repositories.
+
+Der Provisionierungsbefehl ist idempotent; ein weiterer Lauf aktualisiert
+dieselbe Aktion und Regel. Ohne gültiges Secret wird nichts provisioniert und
+der Event-Endpunkt weist jedes Event mit **401** ab (fail-closed). Gegenprobe:
 
 ```bash
 docker compose exec backend php artisan ftp:provision-events --dry-run
 docker compose logs backend | grep -i 'FTP-Import-Kette'
 ```
 
-> **Diese Compose-Änderung ist ein Recreate, kein Restart.** `docker restart
-> portal_backend` übernimmt neue `environment:`-Zeilen **nicht** — sie sind zum
-> Erzeugungszeitzeitpunkt in den Container gebacken (`AGENTS.md` §13). Erst ein
-> Stack-Recreate (Portainer-Editor-Update) macht die Variablen wirksam.
+> **Produktionsstatus (Stand der Belege):** Die letzte dokumentierte
+> Produktionsprüfung ist die Live-Verifikation vom 2026-10-22: Secret in der
+> Portainer-Stack-Env gesetzt, Backend-Container neu erzeugt,
+> `ftp:provision-events` mit Exit 0, Aktion und Regel gegen die Admin-API
+> zurückgelesen, und der Endpunkt antwortete ohne Secret mit **401**. Die
+> frühere Messung vom 2026-10-21 („kein Secret im Container, Provisionierung nie
+> gelaufen") ist dadurch **überholt**. Welcher Zustand heute gilt, wird nicht
+> behauptet, sondern vor dem Wechsel gemessen:
 >
-> **Stand der Verifikation (2026-10-21):** die Event-Regel ist **gegen ein
-> laufendes SFTPGo geschrieben und von dort zurückgelesen** — im Test-Stack
-> provisioniert `scripts/e2e-up.sh` sie bei jedem Setup (`ftp:provision-events`),
-> und der Test-SFTPGo zeigt danach Aktion und Regel mit dem belegten
-> Payload: Ereignis `upload`, Aktion `POST` auf
-> `/api/internal/ftp/upload-event`, Header `X-FTP-Event-Secret` und
-> `Content-Type: application/json`, Body mit `{{.Event}}`, `{{.Name}}`,
-> `{{.VirtualPath}}`, `{{.FileSize}}`, Timeout 10 s. Die Payload-Form ist damit
-> am laufenden Dienst belegt, nicht nur an der Quelle gelesen.
->
-> **Offen bleibt der erste echte Upload in der Produktion.** Dort ist die Kette
-> bis heute **nicht scharf**: der laufende `portal_backend`-Container führt kein
-> `FTP_EVENT_SECRET` in seiner Umgebung, und
-> `php artisan ftp:provision-events --dry-run` verweigert mit „FTP_EVENT_SECRET
-> ist nicht gesetzt." — die Aktion und die Regel wurden also nie in das
-> Produktions-SFTPGo geschrieben, und jedes Event würde mit 401 abgewiesen
-> (fail-closed, korrekt). Die Schritte dafür stehen oben: Secret in der
-> Portainer-GUI setzen, Stack-Recreate, `ftp:provision-events` ausführen.
+> ```bash
+> docker exec portal_backend printenv FTP_EVENT_SECRET | wc -c   # 0 = nicht gesetzt
+> docker compose exec backend php artisan ftp:provision-events --dry-run
+> ```
 
 ### Einmalige Host-Voraussetzung: Fotospeicher
 

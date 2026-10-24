@@ -14,31 +14,15 @@
  */
 
 /*
- * D-36: the internal endpoint SFTPGo posts its upload events to, and how it
- * authenticates against it.
+ * D-36: the upload-event secret must stay inside the Docker network. The
+ * backend is php-fpm-only and speaks FastCGI, so SFTPGo reaches its HTTP event
+ * endpoint through the `ftp-events:8080` listener defined in
+ * deployment/docker-compose.yml.
  *
- * `url` defaults to the portal's own public URL plus the endpoint path, because
- * that is the only address SFTPGo can reach in every deployment (in-network
- * service names differ per compose revision).
- *
- * The default cannot be expressed with `env()`'s second argument. The compose
- * file always publishes `FTP_EVENT_URL` — as `${FTP_EVENT_URL:-}`, i.e. an
- * **empty string** when Portainer has no value — and Laravel's `env()` returns
- * that empty string rather than the default (`PhpOption\Some::getOrCall` hands
- * back `''`, and `PutenvAdapter` maps an empty putenv value to `Some('')`). So
- * "missing" and "present but empty" must be resolved to the same thing here, or
- * the documented promise ("leer darf bleiben", deployment/README.md §FTP-Upload-
- * Events, 19-ftp-upload-pipeline.md §7.18.1) would be false in the deployed
- * stack and `ftp:provision-events` would abort on every deploy. Whitespace
- * counts as empty too.
- *
- * The fallback is only usable when `APP_URL` itself is an absolute http(s) URL,
- * because that is exactly what SFTPGo accepts: `EventActionHTTPConfig.validate()`
- * (`internal/dataprovider/eventrule.go`, v2.7.6) runs
- * `util.IsStringPrefixInSlice($endpoint, ['http://', 'https://'])` — a
- * case-sensitive prefix check. A relative `APP_URL` therefore yields `null`
- * rather than a malformed endpoint, and `ftp:provision-events` names the missing
- * value instead of letting SFTPGo answer 400.
+ * Compose always publishes FTP_EVENT_URL as `${FTP_EVENT_URL:-}`. When unset,
+ * Laravel's `env()` returns an empty string, so missing, empty and whitespace
+ * values all resolve to the internal default below. A configured non-empty
+ * value wins; the production operations policy requires it to match exactly.
  *
  * `secret` has no default on purpose: an empty secret makes the endpoint reject
  * every event with 401 rather than accept unauthenticated ones. `secret_header`
@@ -46,20 +30,11 @@
  * `ftp:provision-events`, and one constant beats two env values that have to be
  * kept in sync.
  */
-$isAbsoluteHttpUrl = static function (mixed $url): bool {
-    if (! is_string($url)) {
-        return false;
-    }
-
-    return str_starts_with($url, 'http://') || str_starts_with($url, 'https://');
-};
-
 $configuredEventUrl = env('FTP_EVENT_URL');
-$appUrl = env('APP_URL');
 
 $eventUrl = is_string($configuredEventUrl) && trim($configuredEventUrl) !== ''
     ? trim($configuredEventUrl)
-    : ($isAbsoluteHttpUrl($appUrl) ? rtrim(trim((string) $appUrl), '/').'/api/internal/ftp/upload-event' : null);
+    : 'http://ftp-events:8080/api/internal/ftp/upload-event';
 
 return [
     'import' => [

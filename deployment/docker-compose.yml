@@ -318,6 +318,30 @@ services:
       webnet:
         ipv4_address: 172.18.0.31
 
+  # Interner HTTP-Pfad fuer das SFTPGo-Upload-Event (OPS-1).
+  # backend spricht nur PHP-FPM/FastCGI auf Port 9000; SFTPGo haengt nur an
+  # portal_internal und erreicht den Host-Caddy auf webnet nicht. Das
+  # FTP_EVENT_SECRET muss im Docker-Netz bleiben. Dieser Dienst ist der einzige
+  # interne HTTP-Pfad und leitet genau einen Endpoint weiter; alles andere gibt
+  # 404 zurueck.
+  # UID 1000 liest den Host-Baum 1002:webgroup ueber GID 82 (2775+setgid).
+  ftp-events:
+    image: caddy:2.11-alpine
+    container_name: portal_ftp_events
+    restart: unless-stopped
+    user: "1000:82"
+    volumes:
+      - /home/webadmin/websites/api-portal.reisinger.pictures:/var/www/html:ro,Z
+      - ./Caddyfile.ftp-events:/etc/caddy/Caddyfile:ro
+    environment:
+      - XDG_DATA_HOME=/tmp/caddy/data
+      - XDG_CONFIG_HOME=/tmp/caddy/config
+      - XDG_CACHE_HOME=/tmp/caddy/cache
+    tmpfs:
+      - /tmp
+    networks:
+      - portal_internal
+
   # Ersetzt pure-ftpd als Datei-Transport fuer Kameras (P1-M22 ff.).
   # Drei Portklassen mit unterschiedlicher Erreichbarkeit — das ist der
   # entscheidende Punkt, siehe features/infrastructure/19-ftp-upload-pipeline.md

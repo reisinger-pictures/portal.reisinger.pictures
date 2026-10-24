@@ -24,6 +24,64 @@ class ProductionOperationsPolicyTest extends TestCase
         $this->assertSame([], $violations);
     }
 
+    public function test_internal_ftp_event_url_passes_the_policy(): void
+    {
+        $this->assertSame(
+            [],
+            $this->policy()->violations($this->validConfig(), 60, 5, true),
+        );
+    }
+
+    public function test_missing_or_empty_ftp_event_url_is_a_violation(): void
+    {
+        foreach ([null, ''] as $url) {
+            $config = $this->validConfig();
+            if ($url === null) {
+                unset($config['ftp']['events']['url']);
+            } else {
+                $config['ftp']['events']['url'] = $url;
+            }
+
+            $this->assertContains(
+                'FTP_EVENT_URL must be the internal event listener ('.ProductionOperationsPolicy::FTP_EVENT_URL.'); the upload-event secret must not leave the Docker network.',
+                $this->policy()->violations($config, 60, 5, true),
+            );
+        }
+    }
+
+    public function test_public_app_url_derived_ftp_event_url_is_a_violation(): void
+    {
+        $config = $this->validConfig();
+        $config['ftp']['events']['url'] = 'https://portal.example.test/api/internal/ftp/upload-event';
+
+        $this->assertContains(
+            'FTP_EVENT_URL must be the internal event listener ('.ProductionOperationsPolicy::FTP_EVENT_URL.'); the upload-event secret must not leave the Docker network.',
+            $this->policy()->violations($config, 60, 5, true),
+        );
+    }
+
+    public function test_foreign_host_ftp_event_url_is_a_violation(): void
+    {
+        $config = $this->validConfig();
+        $config['ftp']['events']['url'] = 'http://events.example.invalid/api/internal/ftp/upload-event';
+
+        $this->assertContains(
+            'FTP_EVENT_URL must be the internal event listener ('.ProductionOperationsPolicy::FTP_EVENT_URL.'); the upload-event secret must not leave the Docker network.',
+            $this->policy()->violations($config, 60, 5, true),
+        );
+    }
+
+    public function test_https_ftp_event_listener_url_is_a_violation(): void
+    {
+        $config = $this->validConfig();
+        $config['ftp']['events']['url'] = 'https://ftp-events:8080/api/internal/ftp/upload-event';
+
+        $this->assertContains(
+            'FTP_EVENT_URL must be the internal event listener ('.ProductionOperationsPolicy::FTP_EVENT_URL.'); the upload-event secret must not leave the Docker network.',
+            $this->policy()->violations($config, 60, 5, true),
+        );
+    }
+
     public function test_laravel13_symfony_transport_uses_scheme_and_requires_tls(): void
     {
         $originalMailer = config('mail.mailers.smtp');
@@ -500,6 +558,11 @@ class ProductionOperationsPolicyTest extends TestCase
             'app' => [
                 'debug' => false,
             ],
+            'ftp' => [
+                'events' => [
+                    'url' => ProductionOperationsPolicy::FTP_EVENT_URL,
+                ],
+            ],
             'database' => [
                 'default' => 'mariadb',
             ],
@@ -560,6 +623,7 @@ class ProductionOperationsPolicyTest extends TestCase
 
         config([
             'app.debug' => $config['app']['debug'],
+            'ftp.events.url' => $config['ftp']['events']['url'],
             'queue' => $config['queue'],
             'database.default' => $config['database']['default'],
             'cache.default' => $config['cache']['default'],

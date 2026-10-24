@@ -1,0 +1,17 @@
+# Internal HTTP listener for the SFTPGo upload event (OPS-1).
+#
+# The backend container is php-fpm and speaks FastCGI only; SFTPGo is attached
+# to `portal_internal` and cannot reach the host Caddy on `webnet`. This sidecar
+# is the only HTTP path between them, and it serves exactly one endpoint.
+# Everything else answers 404, so the container cannot become a general-purpose
+# proxy into the application.
+:8080 {
+	route {
+		@ftpEvent path /api/internal/ftp/upload-event
+		handle @ftpEvent {
+			root * /var/www/html/public
+			php_fastcgi backend:9000
+		}
+		respond 404
+	}
+}
