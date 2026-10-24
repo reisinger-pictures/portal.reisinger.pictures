@@ -265,6 +265,25 @@ class ImageUploadTest extends TestCase
         $this->assertDatabaseCount('photos', 0);
     }
 
+    public function test_admin_without_photographer_role_gets_photographer_error_before_foreign_brand_lookup(): void
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B->value]);
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
+        $gallery = $this->createDeliveryGallery(['brand' => 'srp']);
+        $file = UploadedFile::fake()->createWithContent('test.jpg', $this->fixtureContent);
+
+        $response = $this->actingAs($user, 'api')
+            ->postJson('/api/management/upload', [
+                'gallery_id' => $gallery->id,
+                'lr_uuid' => 'uuid-admin-without-photographer-foreign-brand',
+                'file' => $file,
+            ]);
+
+        $response->assertStatus(403);
+        $response->assertJson(['error' => 'Nur Fotografen dürfen Bilder hochladen.']);
+        $this->assertDatabaseCount('photos', 0);
+    }
+
     public function test_admin_photographer_can_upload_to_its_own_unknown_brand_gallery(): void
     {
         $user = $this->createAdminPhotographerUser('srp');
