@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\StripePaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -151,6 +152,11 @@ class OrderStatusCancellationTest extends TestCase
                 'status' => 'pending_payment',
                 'stripe_payment_intent_id' => '',
             ]),
+            Order::factory()->create([
+                'brand' => Brand::B2B,
+                'status' => 'pending_payment',
+                'stripe_payment_intent_id' => '   ',
+            ]),
         ];
         $stripePayment = $this->createMock(StripePaymentService::class);
         $stripePayment->expects($this->never())->method('retrievePaymentIntent');
@@ -166,7 +172,26 @@ class OrderStatusCancellationTest extends TestCase
         }
     }
 
-    public function test_non_cancelled_status_keeps_existing_behavior_without_stripe_calls(): void
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function nonCancelledStatusProvider(): array
+    {
+        return [
+            'pending' => ['pending'],
+            'invoice_created' => ['invoice_created'],
+            'pending_payment' => ['pending_payment'],
+            'paid' => ['paid'],
+            'overdue' => ['overdue'],
+            'disputed' => ['disputed'],
+            'refunded' => ['refunded'],
+            'delivery_note' => ['delivery_note'],
+            'archived_in_collective' => ['archived_in_collective'],
+        ];
+    }
+
+    #[DataProvider('nonCancelledStatusProvider')]
+    public function test_non_cancelled_status_keeps_existing_behavior_without_stripe_calls(string $status): void
     {
         $order = $this->orderWithPaymentIntent('pi_non_cancelled_target');
         $stripePayment = $this->createMock(StripePaymentService::class);
@@ -174,10 +199,60 @@ class OrderStatusCancellationTest extends TestCase
         $stripePayment->expects($this->never())->method('cancelPaymentIntent');
         $this->app->instance(StripePaymentService::class, $stripePayment);
 
-        $this->putJson("/api/management/orders/{$order->id}/status", ['status' => 'overdue'], $this->adminHeaders())
+        $this->putJson("/api/management/orders/{$order->id}/status", ['status' => $status], $this->adminHeaders())
             ->assertOk();
 
-        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'overdue']);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => $status]);
+    }
+
+    public function test_cancel_call_returning_a_non_canceled_status_returns_502_and_logs_warning(): void
+    {
+        $order = $this->orderWithPaymentIntent('pi_cancel_not_applied');
+        $stripePayment = $this->createMock(StripePaymentService::class);
+        $stripePayment->expects($this->once())
+            ->method('retrievePaymentIntent')
+            ->with('pi_cancel_not_applied')
+            ->willReturn(['status' => 'requires_payment_method']);
+        $stripePayment->expects($this->once())
+            ->method('cancelPaymentIntent')
+            ->with('pi_cancel_not_applied')
+            ->willReturn(['status' => 'requires_action']);
+        $this->app->instance(StripePaymentService::class, $stripePayment);
+        Log::spy();
+
+        $response = $this->putJson("/api/management/orders/{$order->id}/status", ['status' => 'cancelled'], $this->adminHeaders())
+            ->assertStatus(502);
+        $this->assertStringContainsString('bei Stripe nicht abgeschlossen', $response->json('error'));
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'pending_payment']);
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context): bool => $message === 'order.cancel.payment_intent_not_cancelled'
+                && $context['order_id'] === (string) $order->getKey()
+                && $context['payment_intent_id'] === 'pi_cancel_not_applied'
+                && $context['payment_intent_status'] === 'requires_action'
+                && ! array_key_exists('exception_class', $context)
+                && ! array_key_exists('exception_message', $context))
+            ->once();
+    }
+
+    public function test_customer_order_index_does_not_construct_the_stripe_client(): void
+    {
+        $admin = User::factory()->create(['brand' => Brand::B2B]);
+        $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
+        $order = Order::factory()->create([
+            'user_id' => $admin->id,
+            'brand' => Brand::B2B,
+            'status' => 'paid',
+        ]);
+
+        // Degraded config: the Stripe SDK throws when the client is built
+        // without a secret, so the read path must not resolve the service.
+        config(['services.stripe.secret' => null]);
+        $this->assertFalse($this->app->bound(StripePaymentService::class));
+
+        $this->getJson('/api/orders', ['Authorization' => 'Bearer '.auth('api')->login($admin)])
+            ->assertOk()
+            ->assertJsonFragment(['id' => $order->id]);
     }
 
     private function orderWithPaymentIntent(string $paymentIntentId): Order
