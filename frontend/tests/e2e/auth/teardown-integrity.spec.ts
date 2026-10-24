@@ -2,7 +2,7 @@ import {expect, test} from '@playwright/test';
 import {extractCookieHeader} from '../helpers/E2ECookieJar';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {UserDetailed} from '../../../src/logic/useUsers';
-import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
+import {browserAuthHeaders, browserAuthHeadersFromRequest} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Teardown Integrity Validation', () => {
     test('Flow AK: UserController@destroy properly wipes user and ensures test isolation', { tag: ['@feature:auth:teardown'] }, async ({request}) => {
@@ -12,7 +12,7 @@ test.describe('Teardown Integrity Validation', () => {
         // Als Super-Admin anmelden um die DB abzufragen
         const loginRes = await request.post('/api/auth/login', {
             data: {email: 'admin@example.com', password: 'admin'},
-            headers: {'Accept': 'application/json'}
+            headers: {'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request)}
         });
         expect(loginRes.ok()).toBeTruthy();
         const adminToken = extractCookieHeader(loginRes);

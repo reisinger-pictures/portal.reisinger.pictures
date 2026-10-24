@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
-import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
+import {browserAuthHeaders, browserAuthHeadersFromRequest} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('Digital Contracts Workflow', () => {
     let helper: E2ESessionHelper;
@@ -121,7 +121,7 @@ test.describe('Digital Contracts Workflow', () => {
                 email: `anna-${uniqueSuffix}@example.com`,
                 roles: ['Model'],
             },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(join1Res.ok()).toBeTruthy();
         const join1Data = await join1Res.json();
@@ -138,7 +138,7 @@ test.describe('Digital Contracts Workflow', () => {
 
         const sign1Res = await request.post(`/api/contracts/sign/${token1}`, {
             data: { accept_contract: true, content_version: contentVersion1 },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(sign1Res.ok()).toBeTruthy();
 
@@ -149,7 +149,7 @@ test.describe('Digital Contracts Workflow', () => {
                 email: `ben-${uniqueSuffix}@example.com`,
                 roles: ['Fotograf'],
             },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(join2Res.ok()).toBeTruthy();
         const join2Data = await join2Res.json();
@@ -166,7 +166,7 @@ test.describe('Digital Contracts Workflow', () => {
 
         const sign2Res = await request.post(`/api/contracts/sign/${token2}`, {
             data: { accept_contract: true, content_version: contentVersion2 },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(sign2Res.ok()).toBeTruthy();
 
@@ -219,7 +219,7 @@ test.describe('Digital Contracts Workflow', () => {
                 email: `discount-${uniqueSuffix}@example.com`,
                 roles: ['Model'],
             },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(joinRes.ok()).toBeTruthy();
         const personalToken = (await joinRes.json()).personal_token as string;
@@ -279,14 +279,14 @@ test.describe('Digital Contracts Workflow', () => {
 
         const firstJoinRes = await request.post(`/api/contracts/join/${joinTokens[0]}`, {
             data: { name: 'First Signer', email: `first-${uniqueSuffix}@example.com`, roles: ['Model'] },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(firstJoinRes.ok()).toBeTruthy();
         const firstJoinData = await firstJoinRes.json();
 
         const secondJoinRes = await request.post(`/api/contracts/join/${joinTokens[1]}`, {
             data: { name: 'Second Signer', email: `second-${uniqueSuffix}@example.com`, roles: ['Fotograf'] },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(secondJoinRes.ok()).toBeTruthy();
         const secondJoinData = await secondJoinRes.json();
@@ -375,7 +375,7 @@ test.describe('Digital Contracts Workflow', () => {
         // Client joins
         const joinRes = await request.post(`/api/contracts/join/${joinToken}`, {
             data: { name: 'Test User', email: `test-${uniqueSuffix}@example.com`, roles: ['Model'] },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(joinRes.ok()).toBeTruthy();
         const joinData = await joinRes.json();
@@ -448,7 +448,7 @@ test.describe('Digital Contracts Workflow', () => {
 
         const joinRes = await request.post(`/api/contracts/join/${joinToken}`, {
             data: { name: 'Template Signer', email: `tpl-${uniqueSuffix}@example.com`, roles: ['Model'] },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(joinRes.ok()).toBeTruthy();
         const joinData = await joinRes.json();
@@ -463,7 +463,7 @@ test.describe('Digital Contracts Workflow', () => {
 
         const signRes = await request.post(`/api/contracts/sign/${personalToken}`, {
             data: { accept_contract: true, content_version: contentVersion },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(signRes.ok()).toBeTruthy();
 
@@ -583,14 +583,14 @@ test.describe('Digital Contracts Workflow', () => {
 
         const join1Res = await request.post(`/api/contracts/join/${joinToken}`, {
             data: { name: 'Alice', email: `alice-${uniqueSuffix}@example.com`, roles: ['Model'] },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(join1Res.ok()).toBeTruthy();
         const token1 = (await join1Res.json()).personal_token;
 
         const join2Res = await request.post(`/api/contracts/join/${joinToken}`, {
             data: { name: 'Bob', email: `bob-${uniqueSuffix}@example.com`, roles: ['Fotograf'] },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         expect(join2Res.ok()).toBeTruthy();
         const token2 = (await join2Res.json()).personal_token;
@@ -602,7 +602,7 @@ test.describe('Digital Contracts Workflow', () => {
             const contentVersion = (await contentRes.json()).contract.content_version;
             const signRes = await request.post(`/api/contracts/sign/${token}`, {
                 data: { accept_contract: true, content_version: contentVersion },
-                headers: { 'Accept': 'application/json' },
+                headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
             });
             expect(signRes.ok()).toBeTruthy();
         }

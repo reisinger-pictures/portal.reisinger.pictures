@@ -4,7 +4,7 @@ import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
 import { KanbanHelper } from '../../helpers/KanbanHelper';
-import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
+import {browserAuthHeaders, browserAuthHeadersFromRequest} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('Projekte-Board (Admin)', () => {
     // Board-Mutationen verändern das Board live (Karten werden eingefügt/verschoben) und die
@@ -235,7 +235,7 @@ test.describe('Projekte-Board (Admin)', () => {
         // 1) Echtes Angebot-PDF mit eingebettetem Kundenname/-E-Mail über das Backend erzeugen.
         const loginApi = await request.post('/api/auth/login', {
             data: { email: superAdmin.email, password: superAdmin.password },
-            headers: { 'Accept': 'application/json' },
+            headers: { 'Accept': 'application/json', ...await browserAuthHeadersFromRequest(request) },
         });
         if (!loginApi.ok()) throw new Error(`Admin login failed: ${await loginApi.text()}`);
         const cookie = extractCookieHeader(loginApi);

@@ -26,8 +26,23 @@ function response(options: {
     };
 }
 
-function requestWith(post: ReturnType<typeof vi.fn>, get: ReturnType<typeof vi.fn>, put: ReturnType<typeof vi.fn>): APIRequestContext {
-    return { post, get, put } as unknown as APIRequestContext;
+/**
+ * The request fixture keeps its own cookie jar, so the fake carries one too:
+ * every real API response sets `XSRF-TOKEN`, and the helper reads it from
+ * `storageState()` instead of minting one through `GET /api/ping`.
+ */
+function requestWith(
+    post: ReturnType<typeof vi.fn>,
+    get: ReturnType<typeof vi.fn>,
+    put: ReturnType<typeof vi.fn>,
+    cookies: Array<{ name: string; value: string }> = [{ name: 'XSRF-TOKEN', value: 'csrf-token' }],
+): APIRequestContext {
+    return {
+        post,
+        get,
+        put,
+        storageState: vi.fn().mockResolvedValue({ cookies, origins: [] }),
+    } as unknown as APIRequestContext;
 }
 
 function loginResponse(): FakeResponse {
