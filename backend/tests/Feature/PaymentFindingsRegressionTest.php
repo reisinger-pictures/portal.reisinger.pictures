@@ -333,7 +333,7 @@ class PaymentFindingsRegressionTest extends TestCase
         Mail::assertNothingSent();
     }
 
-    public function test_dispute_and_refund_events_do_not_mutate_pending_orders(): void
+    public function test_dispute_and_refund_events_do_not_mutate_pending_quote_orders_but_terminate_pending_payments(): void
     {
         $quoteOrder = Order::factory()->create([
             'status' => 'pending',
@@ -361,8 +361,11 @@ class PaymentFindingsRegressionTest extends TestCase
             ]],
         ], $secret)->assertOk();
 
+        // A pending quote request is not a payment: the dispute must not touch
+        // it. A pending PaymentIntent, by contrast, is terminated by the
+        // verified event so that a later success cannot restore access.
         $this->assertDatabaseHas('orders', ['id' => $quoteOrder->id, 'status' => 'pending']);
-        $this->assertDatabaseHas('orders', ['id' => $paymentOrder->id, 'status' => 'pending_payment']);
+        $this->assertDatabaseHas('orders', ['id' => $paymentOrder->id, 'status' => 'refunded']);
         Mail::assertNothingSent();
     }
 

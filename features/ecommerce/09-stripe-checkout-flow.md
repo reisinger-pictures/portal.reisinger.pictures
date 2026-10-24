@@ -34,7 +34,16 @@ cart → [payment_method=stripe]  → pending_payment → paid
 
 paid → disputed → refunded
 paid → refunded (direct)
+pending_payment → disputed (verified matching dispute webhook)
+pending_payment → refunded (verified matching full-refund webhook)
 ```
+
+Negative payment events are terminal even when they arrive before the success
+event. A verified dispute or full refund bound to the order's stored PaymentIntent
+may move `pending_payment` to `disputed` or `refunded`; strict success
+reconciliation only accepts `pending_payment`, so a later
+`payment_intent.succeeded` cannot restore download access. Partial refunds do not
+change the order status or access.
 
 ## 2. Complete Checkout Lifecycle
 
@@ -112,8 +121,8 @@ The endpoint `POST /api/webhooks/stripe` accepts raw JSON payloads. Signature ve
 |---|---|
 | `payment_intent.succeeded` | Use `metadata.order_id` only to locate a candidate. For V036 orders, require the event PI ID, complete server-owned metadata (checkout key, fingerprint, generation, user/account evidence, amount/currency), received amount, and mapped Customer to match, then conditionally transition `pending_payment → paid`, enrich `stripe_fee_cents` when available, and durably enqueue `InvoiceMail` at most once. A signed event may bind a still-null local PI ID only in the same validated transition. Clearly pre-V036 orders retain only the explicit legacy compatibility defined by the security feature. |
 | `payment_intent.payment_failed` | Require the stored PI ID and current generation plus the applicable V036 identity to match; deduplicate by event ID and record only bounded failure telemetry. The order remains recoverable and no fulfillment is granted. |
-| `charge.dispute.created` | Find order by `stripe_payment_intent_id` → update `status=disputed`. Email `ACCOUNTING_EMAIL` with dispute notification. |
-| `charge.refunded` | Find order by `stripe_payment_intent_id` → update `status=refunded` only for a full refund. |
+| `charge.dispute.created` | After signature verification, find the order by the event's `payment_intent` and require it to equal the order's stored `stripe_payment_intent_id`; under a row lock, transition `paid`, invoice-settled states, or `pending_payment` to `disputed`. Email `ACCOUNTING_EMAIL` with dispute notification. |
+| `charge.refunded` | After signature verification, find the order by the event's `payment_intent` and require it to equal the order's stored `stripe_payment_intent_id`; transition `paid`, invoice-settled states, `disputed`, or `pending_payment` to `refunded` only for a full refund. Partial refunds preserve status and access. |
 
 ### 3.3 PaymentIntent → Order Linking
 
@@ -183,7 +192,8 @@ that key-loss case.
 | Webhook delivery delayed | A checkout replay that sees a remotely succeeded PI returns `payment_pending` with a poll URL and no client secret. It cannot grant paid access; the signed webhook normally performs the strict paid transition. |
 | Webhook not delivered | The signed webhook remains the normal authority. Scheduled stale-PI cleanup may reconcile a remotely succeeded PI only by its stored ID and only after the same strict identity, amount, received-amount, Customer, and generation checks. |
 | Duplicate webhook delivery | Stripe event deduplication, the conditional paid transition, and the durable mail-enqueue claim prevent repeated state changes or a second enqueue. SMTP delivery retries remain queue-worker behavior. |
-| Dispute/chargeback | Order set to `disputed`. Downloads blocked (access gates check order status). Admin notified via email. |
+| Dispute/chargeback before or after success | A verified dispute bound to the stored PaymentIntent sets the order to `disputed`, including from `pending_payment`. Downloads are blocked (access gates check order status); admin is notified. Any later success webhook is ignored by strict reconciliation because the order is no longer `pending_payment`. |
+| Full refund before or after success | A verified full refund bound to the stored PaymentIntent sets the order to `refunded`, including from `pending_payment`. A later success webhook cannot restore access. Partial refunds preserve status and access. |
 | Signature verification failure | 400 returned. Stripe retries with exponential backoff. All configured secrets are tried; if none match, logs error with secret count. |
 
 ## 6. Non-Stripe Payment Paths

@@ -395,6 +395,122 @@ class StripeWebhookTest extends TestCase
         ]);
     }
 
+    public function test_dispute_before_success_keeps_the_order_terminal(): void
+    {
+        $user = User::factory()->create();
+        $order = $this->identityOrder($user, 'pi_dispute_out_of_order');
+        $secret = 'whsec_dispute_out_of_order';
+        Config::set('services.stripe.webhook_secret', $secret);
+
+        $dispute = [
+            'id' => 'evt_dispute_out_of_order',
+            'type' => 'charge.dispute.created',
+            'data' => ['object' => ['payment_intent' => 'pi_dispute_out_of_order']],
+        ];
+        [, $disputeSignature] = $this->signPayload($secret, $dispute);
+
+        $this->postJson('/api/webhooks/stripe', $dispute, [
+            'Stripe-Signature' => $disputeSignature,
+        ])->assertOk();
+
+        $success = [
+            'id' => 'evt_success_after_dispute',
+            'type' => 'payment_intent.succeeded',
+            'data' => ['object' => [
+                'id' => 'pi_dispute_out_of_order',
+                'amount' => 5000,
+                'currency' => 'eur',
+                'amount_received' => 5000,
+                'metadata' => $this->metadataFor($order),
+            ]],
+        ];
+        [, $successSignature] = $this->signPayload($secret, $success);
+
+        $this->postJson('/api/webhooks/stripe', $success, [
+            'Stripe-Signature' => $successSignature,
+        ])->assertOk()->assertJson(['status' => 'ignored', 'reason' => 'order_not_pending']);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'disputed',
+        ]);
+        Mail::assertNotQueued(InvoiceMail::class);
+    }
+
+    public function test_full_refund_before_success_keeps_the_order_terminal(): void
+    {
+        $user = User::factory()->create();
+        $order = $this->identityOrder($user, 'pi_refund_out_of_order');
+        $secret = 'whsec_refund_out_of_order';
+        Config::set('services.stripe.webhook_secret', $secret);
+
+        $refund = [
+            'id' => 'evt_refund_out_of_order',
+            'type' => 'charge.refunded',
+            'data' => ['object' => [
+                'payment_intent' => 'pi_refund_out_of_order',
+                'refunded' => true,
+            ]],
+        ];
+        [, $refundSignature] = $this->signPayload($secret, $refund);
+
+        $this->postJson('/api/webhooks/stripe', $refund, [
+            'Stripe-Signature' => $refundSignature,
+        ])->assertOk();
+
+        $success = [
+            'id' => 'evt_success_after_refund',
+            'type' => 'payment_intent.succeeded',
+            'data' => ['object' => [
+                'id' => 'pi_refund_out_of_order',
+                'amount' => 5000,
+                'currency' => 'eur',
+                'amount_received' => 5000,
+                'metadata' => $this->metadataFor($order),
+            ]],
+        ];
+        [, $successSignature] = $this->signPayload($secret, $success);
+
+        $this->postJson('/api/webhooks/stripe', $success, [
+            'Stripe-Signature' => $successSignature,
+        ])->assertOk()->assertJson(['status' => 'ignored', 'reason' => 'order_not_pending']);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'refunded',
+        ]);
+        Mail::assertNotQueued(InvoiceMail::class);
+    }
+
+    public function test_unverified_or_unmatched_dispute_does_not_terminate_pending_order(): void
+    {
+        $user = User::factory()->create();
+        $order = $this->identityOrder($user, 'pi_dispute_binding');
+        $secret = 'whsec_dispute_binding';
+        Config::set('services.stripe.webhook_secret', $secret);
+
+        $dispute = [
+            'id' => 'evt_dispute_binding',
+            'type' => 'charge.dispute.created',
+            'data' => ['object' => ['payment_intent' => 'pi_not_the_order_intent']],
+        ];
+        [, $invalidSignature] = $this->signPayload('whsec_wrong_secret', $dispute);
+
+        $this->postJson('/api/webhooks/stripe', $dispute, [
+            'Stripe-Signature' => $invalidSignature,
+        ])->assertStatus(400);
+
+        [, $validSignature] = $this->signPayload($secret, $dispute);
+        $this->postJson('/api/webhooks/stripe', $dispute, [
+            'Stripe-Signature' => $validSignature,
+        ])->assertOk();
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'pending_payment',
+        ]);
+    }
+
     public function test_dispute_created_webhook_is_idempotent(): void
     {
         $order = Order::factory()->create([
