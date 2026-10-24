@@ -73,7 +73,7 @@ test('counts defined anchor forms and excludes patterns, machine config, command
     });
 });
 
-test('counts only open named positions in the skills section and locates cited historical rows', () => {
+test('counts only open named positions in the skills section and the legacy board finding tables', () => {
     const metrics = collectMetricsFromSources({
         skillsMarker: skillsMarkerFixture,
         todoBoard: todoBoardFixture,
@@ -83,11 +83,21 @@ test('counts only open named positions in the skills section and locates cited h
     assert.deepEqual(metrics.todo, {
         openPositions: [{number: 4, status: 'open', line: 3}],
         closedPositions: [{number: 5, status: 'closed', line: 4}],
-        uiReviewHeaderLines: [7],
-        dialogReviewHeaderLines: [10],
-        completionExampleLines: [8],
+        legacyFindingTables: 2,
     });
     assert.equal(metrics.workflowLines, 2);
+});
+
+test('the board itself carries no legacy finding table', async () => {
+    const metrics = collectMetricsFromSources({
+        skillsMarker: skillsMarkerFixture,
+        todoBoard: await readFile(path.join(REPOSITORY_ROOT, 'AGENTS.todo.md'), 'utf8'),
+        ciWorkflow: 'one\ntwo\n',
+    });
+
+    // Owner decision 2026-10-24: a UI review's findings are a report in the
+    // skill's nine-column form, never a table on the board.
+    assert.equal(metrics.todo.legacyFindingTables, 0);
 });
 
 test('renders stable Markdown without timestamps or checkout-specific paths', () => {

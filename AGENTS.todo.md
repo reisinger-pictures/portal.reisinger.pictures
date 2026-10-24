@@ -66,18 +66,12 @@ the stated prerequisites, not on a confirmed production exploit.
 
 ---
 
-### Neue offene Punkte aus den Wellen A–D und ihren Nachprüfungen (2026-10-18)
-
-Diese Punkte sind in den Freigaben als **nicht-blockierend** eingestuft worden. Sie sind hier,
-weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benannten Ort.
-
-
 ---
 > Stand: 2026-09-27. Architekturentscheidungen in `features/`.
 >
 > Test-Regel (DoD): Backend → PHPUnit, Frontend-Logik → Vitest, UI/Formulare → Playwright-E2E.
 >
-> **Struktur-Hinweis (Grundsatz, 2026-09-28; die Zählung unten ist der aktuelle Stand):**
+> **Struktur-Hinweis (Grundsatz, 2026-09-28):**
 > Dieses Board enthält **nur offene Arbeit** — erledigte Einträge werden entfernt, nicht
 > abgehakt (`AGENTS.md` §4 Board-Hygiene). Jede offene Position trägt einen der drei
 > Gründe, warum sie noch steht: **`manuell prüfen:`** (der Owner sieht es sich selbst
@@ -86,67 +80,46 @@ weil eine Freigabe sie sonst mitnimmt: keine ist erledigt, jede hat einen benann
 > Folgetask fehlt noch). Positionen ohne Präfix sind **gewöhnliche, sofort umsetzbare
 > Arbeit** — ein Präfix ohne Grund wäre schlechter als keiner.
 >
+> **Ein UI-Review-Ergebnis ist ein Report, keine Board-Tabelle (Owner-Entscheidung
+> 2026-10-24, ehemalige Position 10):** Befunde eines `ui-review`-Laufs folgen der Vorlage
+> des Skills — neun Spalten `Id | Severity | Status | Owner | Ticket | File:Line |
+> Screenshot | Finding | Suggested fix` (`ui-review/references/findings-report.md`) — und dem
+> kanonischen Vokabular (`ratchet-gates/references/vocabulary.md`: `critical`/`high`/
+> `medium`/`low`/`info` sowie `open`/`in-progress`/`fixed`/`accepted`/`wontfix`, Status
+> getrennt vom Schweregrad). Der Report liegt bei den Review-Artefakten, nicht auf dem Board.
+> Auf dem Board steht nur, was daraus **offen** bleibt — je eine Zeile mit einem der drei
+> Gründe oben, nie die Befundtabelle selbst.
+>
 > **Die Entscheidungen liegen in `features/owner-decisions.md`**, ihr Umsetzungsstand im
 > Protokoll ganz oben. Eine Position mit `Entscheidung offen:` bedeutet, dass eine **neue**
 > Frage entstanden ist — nicht, dass eine vergessene offen blieb.
 >
-> **Struktur-Hinweis, fortgeschrieben (2026-10-23):** **6 offene `[ ]`** und **9 wartende
-> `[~]`** über 1264 Zeilen, **0 erledigte** — **am committeten Stand dieses Commits** gemessen
-> (`git show <stand>:AGENTS.todo.md | grep -c '^- \[ \]'` → 6, `… | grep -c '^- \[~\]'` → 9,
-> `… | grep -c '^- \[x\]'` → 0, `… | wc -l` → 1264; `<stand>` = der committete Stand dieses
-> Commits — der Board wird von diesem Commit geschrieben, ein Vorgänger-Vergleich des Boards
-> trägt deshalb nicht; Regel: `skills-marker/SKILL.md` → „Bezugsrahmen-Regel"). Aufteilung der
-> 6: **2× `manuell prüfen:`** und **4× gewöhnliche Arbeit**; **0× `Entscheidung offen:`** — die
-> offenen Owner-Fragen der Runde vom 2026-10-22 sind entschieden und als **D-50** (Proxy-Trust-
-> Grenze), **D-51** (Selbständerung des Kamera-Passworts), **D-52** (Watchtower-Policy),
-> **D-53** (SFTPGo-Admin-Wertepaar), **D-54** (`CREATE_DEFAULT_ADMIN` im Compose) und
-> **D-55** (CSP-Erweiterung, Turnstile bleibt aus), **D-56** (Fail-closed bei lokalem
-> Fehler nach erfolgreichem FTP-Widerruf) und **D-57** (Org-Default-Rollen) in
-> `features/owner-decisions.md` festgehalten; die
-> Owner-Fragen sind entschieden. Der D-51/D-57-Redo-Review ist auf Quellenebene `APPROVED`;
-> der Fix-Commit `a9c0fcb` ist gepusht. CI `39992368192` ist für den exakten Head
-> `a9c0fcb79d9ddc4b5bcfa2fcdab1141d0516a9ea` grün (Backend, Frontend und Playwright Desktop/Mobile).
-> Sync ist ausgeführt; der Owner meldet den Backend-Neustart als erledigt. Healthcheck und
-> Verhaltensprobe bleiben unten offen.
-> Gegenüber dem Stand vom 2026-10-21 (4 `[ ]`, 16 `[~]`, 1300 Zeilen) waren **8 Positionen weg** — 7 als geschlossen markiert
-> (Dependabot-Alert dismissed, `SFTPGO_API_KEY`-Weg, Watchtower-Policy, Proxy-Trust-Grenze,
-> D-36-Ereigniskette in Produktion, `CREATE_DEFAULT_ADMIN` in der Cutover-Checkliste,
-> Selbständerung des Kamera-Passworts mit Tests — damals fälschlich als deployed gezählt und inzwischen wieder offen), 1 als Dublette zusammengeführt
-> (die Live-GO-Punkte standen zweimal); eine Position wurde umformuliert und bleibt
-> (Live-GO-Punkte mit dem zurückgestellten Kill-Switch-Nachweis).
-> **Alle 14 Review-Befunde der Prüfung vom 2026-10-18** sind geschlossen und aus der Liste entfernt (Nachweis in
-> `features/security/2026-10-18-review-closure.md`); die 6 offenen Punkte enthalten die Punkte, die in den
-> Freigaben der Wellen A–D als nicht-blockierend eingestuft und deshalb hier festgehalten
-> wurden (siehe „Neue offene Punkte aus den Wellen A–D") sowie die seitdem aufgedeckten Reste
-> (die Zwei-Verbindungs-Messung, die Restform der Dialog-Befunde, das Audit vom 2026-10-20 aus
-> Code statt vom Gerät beantwortet hat) und die manuellen Prüfpunkte der Deploys. Die beiden
-> Query-Zähl-Kosten sind geschlossen: die Basislinien sind gepinnt und der Lesepfad löst den
-> Brand-Filter gesammelt und den Org-Scope **einmal pro Request** auf — ein Cache über
-> Requests hinweg ist bewusst **nicht** umgesetzt, weil er eine gerade widerrufene Delegation
-> ausliefern würde (`features/auth/01-roles-and-access.md` §6). Die **Aktualitätsprüfung vom
-> 2026-10-20** hat 16 alte Owner-Positionen durchgesehen: 11 davon sind erledigt, maschinell
-> abgedeckt oder überholt und deshalb aus der Liste gegangen; die restlichen sind mit korrigiertem
-> Wortlaut und dem richtigen Werkzeug (Firewalld statt ufw, `ROOT.PEM` statt `cert.pem`,
-> authentifiziert statt anonym lesen) stehen geblieben. Alle 9 `[~]` tragen ein `wartet auf`.
-> **Diese Zählung ist ein Stand, keine Zusage** — sie wandert mit jeder Welle; wer eine Position
-> sucht, zählt selbst nach. Der Vergleich zum 2026-09-28-Stand (69 Positionen) ist **kein**
-> Fortschrittsmaß: seither kamen Positionen hinzu, andere wurden entfernt.
+> **Struktur-Hinweis, fortgeschrieben (2026-10-24):** die Zahlen dieses Boards werden
+> **nicht mehr von Hand gepflegt** — sie stehen generiert in
+> [`features/tech/position-9-metrics.md`](features/tech/position-9-metrics.md)
+> (`node scripts/generate-position-9-metrics.mjs`), mit Drift-Gate in `ratchet.config.jsonc`
+> und Regressionstest `tests/infrastructure/ratchet-metrics-generator.test.mjs`. Ein
+> handgeschriebener Stand in diesem Block ist bei der nächsten Welle falsch; wer eine Zahl
+> braucht, liest sie dort oder zählt selbst nach. Offene Owner-Fragen der Runde vom
+> 2026-10-22 sind entschieden und als **D-50** (Proxy-Trust-Grenze), **D-51** (Selbständerung
+> des Kamera-Passworts), **D-52** (Watchtower-Policy), **D-53** (SFTPGo-Admin-Wertepaar),
+> **D-54** (`CREATE_DEFAULT_ADMIN` im Compose), **D-55** (CSP-Erweiterung, Turnstile bleibt
+> aus), **D-56** (Fail-closed bei lokalem Fehler nach erfolgreichem FTP-Widerruf) und **D-57**
+> (Org-Default-Rollen) in `features/owner-decisions.md` festgehalten.
 >
-> **Gemessen, nicht geschätzt:** die Zahlen oben stammen aus
-> `git show <stand>:AGENTS.todo.md | grep -cE '^[[:space:]]*[-*][[:space:]]*\[[x ~]\]'`
-> (15 = 6 offen + 9 wartend + 0 erledigt) und `git show <stand>:AGENTS.todo.md | wc -l`
-> (1264) — beides **am committeten Stand dieses Commits**; ein `grep` über den Arbeitsbaum
-> würde den Vorgänger-Stand messen, nicht den committeten. **Der hier früher genannte Befehl war
-> defekt:** die Fassung `\[\[[x ~]\]]` verlangt **zwei** öffnende Klammern und traf deshalb
-> **nichts** — am 2026-10-18 gemessen: 0 Treffer, Exit 1. Das Entscheidungs-Protokoll
-> (der Abschnitt `## 🗳 Entscheidungs-Protokoll`) trägt **keine** solchen Listenpunkte, der frühere Ausschluss-Hinweis ist
-> damit gegenstandslos.
-> Die Positionen liegen in **9 von 33 `##`-Abschnitten**
-> (`git show <stand>:AGENTS.todo.md | awk '/^## /{h=$0} /^- \[[ ~]\]/{print h}' | sort -u | wc -l`
-> gegen `git show <stand>:AGENTS.todo.md | grep -c '^## '`; **neu gemessen am 2026-10-21** —
-> die vorherige Angabe war mit dieser Methode nicht reproduzierbar und wurde durch den Messwert
-> ersetzt). Diese Zahl ändert sich mit jeder Runde, deshalb steht sie hier **nur** als
-> Orientierung und ist nicht festgeschrieben.
+> **Alle 14 Review-Befunde der Prüfung vom 2026-10-18** sind geschlossen und aus der Liste
+> entfernt (Nachweis in `features/security/2026-10-18-review-closure.md`). Die beiden
+> Query-Zähl-Kosten sind ebenfalls geschlossen: die Basislinien sind gepinnt und der Lesepfad
+> löst den Brand-Filter gesammelt und den Org-Scope **einmal pro Request** auf — ein Cache
+> über Requests hinweg ist bewusst **nicht** umgesetzt, weil er eine gerade widerrufene
+> Delegation ausliefern würde (`features/auth/01-roles-and-access.md` §6).
+>
+> **Zählweise (bleibt gültig, weil sie die Methode beschreibt, nicht den Stand):** die
+> Positionen sind die Listenpunkte `- [ ]` und `- [~]` dieses Boards; die Zahl der
+> `##`-Abschnitte, in denen eine Position liegt, ändert sich mit jeder Runde und ist keine
+> Kennzahl. Ein `grep` über den Arbeitsbaum misst den Arbeitsbaum; eine Aussage über den
+> committeten Stand braucht `git show <stand>:AGENTS.todo.md` (`skills-marker/SKILL.md` →
+> „Bezugsrahmen-Regel").
 > Wer hier eine Position sucht, nutzt `git show <stand>:AGENTS.todo.md | grep -n '^- \['` und
 > nicht die Reihenfolge im Dokument.
 
@@ -622,7 +595,6 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 
 - [ ] D-51/D-57 nach Sync und Backend-Neustart live prüfen: gepushter Commit `a9c0fcb`, exakte CI `39992368192` grün; Sync ausgeführt und Backend-Neustart vom Owner gemeldet. Noch offen: Healthcheck/Probe des geänderten Verhaltens und den Nachweis dokumentieren.
 - [ ] Die übrigen bestätigten Findings des Audits vom 2026-10-18 abarbeiten. Behoben sind AUTH-1 (`eef22da5`), PAY-1 (`86e1768f`), SEC-1 (`8b31bf0e`) und MEDIA-2/3/4 (`6122ee7a`); offen bleiben die unten weiterhin als bestätigt geführten Positionen. Owner-Grenzen und bedingte Fälle vor einer Änderung entscheiden.
-- [~] wartet auf Docker/CI: Die neuen CSRF-Header für den E2E-Harness (`frontend/tests/e2e/helpers/BrowserAuthHeaders.ts`, Cookie-Aufrufe in 44 Specs) und der neue Invite-Wechsel-E2E (`org-membership.spec.ts`) sind lokal nicht gelaufen, weil kein Docker-Daemon verfügbar ist. Nachweis: `pnpm test:e2e:smoke` und `npx playwright test --grep @feature:org-membership` gegen den gepushten Head bzw. eine grüne CI.
 - [~] wartet auf den **Mail-Nachweis** — Queue, Worker und Scheduler sind am 2026-10-21 live belegt: die PID-Dateien `/tmp/portal-{scheduler,queue-supervisor,queue-worker}.pid` existieren, der stündliche Scheduler-Mutex in `cache_locks` trägt den Slot-Suffix `2100` (erworben um 21:00:02Z), der Wochenimport lief am Montag-Slot `03:30` (Meilisearch-Batch **2335**, Task 7200, `enqueuedAt` 2026-10-19T03:30:32Z, `status: succeeded`), der manuelle Lauf vom 2026-10-21 21:07Z erzeugte Batch **2402** (39/39 Tasks succeeded, 19.477 Orte im Index `locations`), und die Queue-Tabellen `jobs`/`failed_jobs`/`job_batches` sind leer und fehlerfrei. Die **SMTP-Duplikat-Policy** ist entschieden (D-17 in `features/owner-decisions.md`: gültige Tokens erhalten, kein pauschales Queue-Uniqueness, ein SMTP-Retry darf keine zweite Belastung oder Zustandsänderung auslösen). Offen: ein **zugestellter** Mail-Nachweis aus der Produktion — der Admin-SMTP-Test (`POST /api/management/settings/test-email`) muss ausgelöst und der Provider-/Mailpit-Log danebengelegt werden; die Produktions-DB führt keine Mail-Logtabelle, und `storage/logs/laravel.log` ist vom 2026-04-23.
 
 ### Security- und Stripe-Audit — Source-Validierung am Snapshot `f3aea9e0`
@@ -914,70 +886,6 @@ alle mit Regressionstest:
   und **schlägt für 8080 fehl** (erwartet); die passive Range 50000-50100 wird von mehreren
   `docker-proxy`-Prozessen bedient. Damit ist der Firewall-Stand gemessen; offen bleibt nur
   der Kamera-Upload selbst.
-## Nachtrag 2026-09-26, Kamera-Setup aus der Oberfläche bedienbar machen
-
-**Offen (aus dieser Runde):**
-
-## UI-Review 2026-09-26 — Screenshot-Verifikation der neuen Oberflaechen
-
-Erstmals das Screenshot-Harness auf die neuen Oberflaechen angewendet
-(`tests/screenshots/`, Manifest um `kamera-einrichtung` und
-`photographer-dashboard` erweitert, inkl. Fotografen-Auth). 4 Aufnahmen
-(je Desktop/Mobile), alle Seiten rendern korrekt, keine kritischen Befunde.
-
-| Schwere | Stelle | Befund | Vorschlag |
-|---|---|---|---|
-| medium | `KameraEinrichtung.tsx` (Schritt 2) | Der Guide nennt **„Neues Kamera-Passwort"**, aber der Button heißt fuer `pending` **„Kamera-Zugang einrichten"**. Ein Fotograf, der dem Guide folgt, sucht einen Button, den es nicht gibt — und genau diese Diskrepanz hat den Slug-Wechsel-Blockade beheben sollen. | Beide Labels nennen, oder den zustandabhaehngigen Text erklären. **Erledigt 2026-09-26: der Guide nennt jetzt den pending-Button „Kamera-Zugang einrichten".** |
-| medium | `ManagementFtpInbox.tsx:57` | **„Fuer FTPS ist kein Verschluesselungsmodus hinterlegt — bitte den Support kontaktieren"**. Wird nur angezeigt, wenn der Modus fehlt (in Produktion gesetzt). „Support kontaktieren" ist fuer einen Fotografen eine Sackgasse: er kann eine Server-Konfiguration nicht aendern. | Neutralere Formulierung ohne Support-Weg, z. B. was fehlt und warum. **Erledigt 2026-09-26: neutrale Formulierung „Ohne diesen Modus kann die Kamera FTPS nicht aushandeln — nutze daher SFTP" (Inbox und Guide).** |
-| low | `photographer-dashboard` (Mobile) | Der lange Upload-Ordner-Pfad (`ftp_folder`) bricht ueber **drei Zeilen** um und quetscht die Karte | Zeilenumbruch kontrollieren (`break-all` nur fuer lange Pfade) oder kuerzer anzeigen. **Erledigt 2026-09-27: `break-all` + `text-base md:text-lg` in `ManagementFtpInbox.tsx`, linke Spalte `min-w-0` — der Pfad bricht jetzt kontrolliert in zwei Zeilen.** |
-| low | Header (Mobile) | **„Reisinger Fot…"** abgeschnitten | Vorbestehend, nicht von dieser Runde — nur vermerkt. **Erledigt 2026-09-27: Root Cause war eine dreifach duplizierte Kopfzeile — nicht der zuerst gefixte `GlobalSearchHeader`. Siehe Folge-Runde unten.** |
-
-**Nicht Beanstandungen:** Die Verbindungstabelle rendert auf beiden Viewports sauber;
-die Status-Warnung (`pending`) und der Button sitzen in einer Zeile; die
-Abschnitte des Guides sind klar getrennt. Das FTPS-Modus-Problem und der
-Button-Name sind **eigenen** Fuerke, keine vorbestehenden Maengel.
-
-**Folge-Runde 2026-09-26 (die drei Kernbefunde des Owners umgesetzt):**
-**Folge-Task (Harness-Luecke) — erledigt 2026-09-27:**
-**Folge-Runde 2026-09-27 (die zwei `low`-Befunde umgesetzt):**
-## Dialog-Screenshots 2026-09-27 — Abdeckung, Blocker und tote Stellen
-
-Ziel: **jeder Dialog ist bildgeprueft**, nicht nur funktional getestet. Die
-Kamera-Anleitung war der Anlass — genau diese Lqecke (kein `click`-Nav-Schritt)
-hat den Dialog-Test erzwungen. Bestand (Inventur, gegen den Code geprueft):
-
-| Kategorie | Anzahl | Bemerkung |
-|---|---|---|
-| `ModalShell`-Familie (inkl. `ModalDialogShell`) | 18 | davon 3 keine eigenen Dialogflaechen (Shared Contract, Form-Wrapper, Inhalt der FTP-Anleitung) und 1 bereits erfasst (`photographer-guide-dialog`) |
-| davon neu erfassbar mit vorhandenen Seeds | 4 | `shooting-calculator`, `photo-job`, `volume-preset`, `model-detail` |
-| davon neu erfassbar mit neuem Gallery-Seed | 8 | Zugriff, Einladungslink, Bewertungen, Metadaten-Vorgaben, Fotografen-Team, E-Mail, Galerie bearbeiten, Meta-Galerie bearbeiten |
-| strukturell nicht erfassbar | 2 | `AIGalleryDefaultsModal` (nur aus einem anderen Dialog heraus) und der globale Bestaetigungsdialog (programmatisch, kein `click`-Target) |
-| Roh-Dialoge ohne `ModalShell` | 11 | 6 mit `role="dialog"`, **5 ohne** — die brauchen ein `data-testid`, bevor `waitFor` sie ueberhaupt greifen kann |
-
-## Dialog-UI-Review 2026-09-27 — Auswertung aller 13 Dialog-Aufnahmen
-
-Vollauf `pnpm test:screenshots`: **44 passed / 0 failed (1,6 min)**, 13 Dialoge ×
-Desktop/Mobile. Auswertung in zwei Hälften (5 + 8 Dialoge) gegen
-`ui-review-checklist.md`, danach **jeder high- und medium-Befund von mir am Bild
-nachgeprueft**. Protokoll: 26 Bilder, 38 Befunde, davon **6 bestaetigt, 1
-widerlegt**, Rest low. Widerlegt heisst: ein plausibler Scheinbefund, der als
-Produktionsfehler verkauft worden waere.
-
-| Befund | Schwere | Von mir geprueft |
-|---|---|---|
-| `gallery-edit-dialog`: Dialog hoeher als der Viewport, Footer mit „Speichern" abgeschnitten (Desktop + Mobile) | **high** | **bestaetigt** — Desktop zeigt nur einen ~10 px-Streifen der Footer-Buttons, der Primaer-Button ist ohne Scrollen unerreichbar |
-| `gallery-invite-dialog` (Mobile): zwei Optionsbeschreibungen verlieren Text am Kartenrand, „durchgewun" endet mitten im Wort — kein Umbruch, kein Ellipsis | **high** | **bestaetigt** — Textverlust; die dritte Karte daneben bricht korrekt um |
-| `gallery-access-dialog`: letzte Listenzeile mitten durch die Glyphen abgeschnitten, keine Scroll-/`Fade`-Affordanz | **medium** | **bestaetigt** |
-| **Waehrung mit Punkt-Dezimaltrennzeichen** (`369.00 €`, `30.00`) in durchgehend deutscher Oberflaeche | **medium** | **bestaetigt als echter Produktionsfehler** |
-| `gallery-metadata-defaults` (Mobile): Fusszeile stapelt vollbreit | — | **bestaetigt korrekt** — das ist das richtige Mobile-Muster |
-| `Hinzufügen`-Button zentriert gegen den Name/E-Mail-Block statt auf der Namenslinie | low | **bestaetigt** |
-| `model-detail` (Mobile): „Altersnachweis"-Karte 48 % breit neben 100 % breiter „Datenstand"-Karte | low | gemeldet |
-| `model-detail`: „Profil-Angaben" / „Basisdaten" typografisch identisch, Hierarchie geht verloren | low | gemeldet |
-| `volume-preset`: `€` ist Flex-Geschwister statt Feld-Suffix, Input dadurch schief | low | gemeldet |
-| `mm/dd/yyyy` im nativen Datumsfeld | medium | **WIDERLEGT — Harness-Artefakt**, siehe unten |
-
-
-**Umsetzung 2026-09-27 (alle gegen frische Aufnahmen verifiziert):**
 ## CI-Befund 2026-09-27 (Push fa8e19d) — drei CI-Ursachen, alle belegt; danach sechs Dialog-Befunde aus derselben Welle
 
 **1. `Frontend (Lint, Build, Vitest)` rot am Schritt „Build" (Lint war gruen).**
@@ -1110,13 +1018,12 @@ gerissen und zur Entscheidung gemacht.
 > umgesetzt und entfernt** — die Zahlen des Markers und dieses Boards werden jetzt in
 > `features/tech/position-9-metrics.md` generiert, mit Drift-Gate in `ratchet.config.jsonc` und
 > Regressionstest `tests/infrastructure/ratchet-metrics-generator.test.mjs`. **Position 10 ist am
-> 2026-10-22 neu aus dem Marker-Fortschreiben auf `33cbd00`** — die Regel des Skills verlangt eine
-> offene Position (`skills-marker/SKILL.md` → „## 3. Die Range": „Erst wenn für **jeden** Skill aus
-> der Range eine dieser drei Zeilen steht, wird der Marker auf den neuen SHA gesetzt. Nie
-> vorher.") — und steht als offener Eintrag unten; die offenen Positionen und ihre Zeilen stehen
-> in der generierten Tabelle.
-
-- [ ] **Position 10 — Die Befundvorlage des Skills `ui-review` (neun Spalten) und das kanonische Schweregrad-Vokabular sind im Board nicht abgebildet — er führt die alte Form (Schwere/Stelle/Befund/Vorschlag):** Aus der Range `4205142..e559a39` des Skills-Repos. Die Vorlage des Skills verlangt die Spalten `Id | Severity | Status | Owner | Ticket | File:Line | Screenshot | Finding | Suggested fix` (`ui-review/references/findings-report.md` → „## Template"), Schweregrade und Status kommen aus dem **kanonischen** Vokabular (`ratchet-gates/references/vocabulary.md` → „## Severity levels": `critical`/`high`/`medium`/`low`/`info`; „## Statuses": `open`/`in-progress`/`fixed`/`accepted`/`wontfix`; „Severity and status are recorded separately"). **Der Board trägt die alte Form:** `| Schwere | Stelle | Befund | Vorschlag |` (`AGENTS.todo.md:927`, Abschnitt „UI-Review 2026-09-26") und `| Befund | Schwere | Von mir geprueft |` (`AGENTS.todo.md:965`, Abschnitt „Dialog-Screenshots 2026-09-27") — ohne `Id`, `Status`, `Owner`, `Ticket` und `Screenshot`, mit deutschsprachigen Spaltennamen, und der Bearbeitungsstand steht **im Text der Zelle** (in `AGENTS.todo.md:929` z. B. „**Erledigt 2026-09-26: …**" in der Vorschlagsspalte) statt in einer eigenen Statusspalte. **Befehl:** ``grep -n '^| Schwere |' AGENTS.todo.md`` → **927**. **Fix-Richtung (nicht ausgeführt):** die Befundtabellen des Boards auf die neun Spalten und das kanonische Vokabular umstellen **oder** die Abweichung ausdrücklich als Eigentümerentscheidung festhalten (Muster: D-49 in `features/owner-decisions.md`); die Entscheidung ist vom Owner zu treffen — dieser Lauf legt die Position an und schließt keine.
+> 2026-10-24 entschieden und entfernt** (Owner-Entscheidung): das Board führte die Befundtables
+> der Runde 2026-09-26/27 in der alten Vier-Spalten-Form; die Befunde sind nachgemessen und
+> vollständig geschlossen, die Tabellen deshalb gelöscht statt auf die Neun-Spalten-Vorlage
+> migriert. Die Vorwärtsregel steht im Struktur-Hinweis oben: ein UI-Review-Ergebnis ist ein
+> Report nach der Skill-Vorlage, keine Board-Tabelle. Die offenen Positionen und ihre Zeilen
+> stehen in der generierten Tabelle.
 
 ## 🔑 STRIPE-KONTOWECHSEL (2026-10-15) — neues Konto, Keys, Vite-Vorrang
 
