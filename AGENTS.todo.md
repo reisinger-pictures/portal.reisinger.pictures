@@ -1,14 +1,5 @@
 # Task Board — Portal Reisinger Pictures
 
-## Portal CI remediation — 2026-10-24
-
-- **Ratchet pin: fixed.** `.github/workflows/ci.yml` now pins the v0.4.0 release commit (`ef09f00a`); v0.3.2's manifest is unparseable upstream (`name: @all-the-rest/ratchet-cli` → `action.yml: (Line: 1, Col: 7) ... find character that cannot start any token`). `.github/dependabot.yml` additionally tracks the `github-actions` ecosystem, so the SHA pin follows the newest release while the supply-chain contract keeps rejecting moving tags.
-- **E2E Origin/CSRF rejection: fixed.** Harness logins and every mutation call send `Origin` plus `X-XSRF-TOKEN` (`browserAuthHeadersFromRequest()` reads the standalone request fixture's own cookie jar and mints a token through `GET /api/ping` when the jar has none). The JSON boundary additionally accepts a mutation with no `Content-Type` and an empty body — body-less `DELETE` and zero-payload `POST` were answered with `415` — while a non-empty body without a content type stays rejected. Regression tests: `ApiMutationSecurityTest::test_a_body_less_mutation_passes_the_content_type_boundary` and `::test_a_body_without_a_content_type_is_still_rejected`.
-- **Org E2E ordering: fixed.** The membership sync gives a new member the organization's default role and clears org-scoped roles set before it, so `org-default-role.spec.ts`, `org-edit.spec.ts`, `no-b2b-label.spec.ts`, `no-create-org.spec.ts` and `org-membership.spec.ts` now assign the membership first and edit the roles afterwards (the order the management UI uses).
-- **Invite redeem from a logged-in browser: fixed.** The JWT package reads a request field named `token` before the auth cookie, so redeeming an invite (the body carries the invite token) looked anonymous and was answered with the guest validation errors for `name` and `password`. `AuthenticateJwtCookie` promotes the auth cookie to the `Authorization` header the parsers read first; an explicit bearer token keeps precedence. Regression tests: `JwtCookieAuthenticationTest` (cookie wins over a body `token`, bearer wins over the cookie) and `OrgMembershipPolicyTest::test_a_logged_in_browser_redeems_its_invite_with_the_token_in_the_body`.
-- [~] Awaiting the CI run of this commit: the E2E shards are the gate; backend PHPUnit, frontend lint/build/Vitest, the security contract and the Ratchet gates were green on head `9a0b8b8a` (run [`40115693223`](https://github.com/reisinger-pictures/portal.reisinger.pictures/actions/runs/40115693223)).
-- Open observation: the serial E2E job of `40103749482` reported `dragCard: source and target must be in the desktop viewport`. It is not explained by the CSRF change and stays open until the next run shows whether it persists.
-
 ## Architecture & Security Review — 2026-10-18
 
 **Execution hold:** This section records review findings only. Remediation, new tests,
