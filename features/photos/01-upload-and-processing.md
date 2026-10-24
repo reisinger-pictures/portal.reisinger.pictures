@@ -39,6 +39,8 @@ status: active
 - **Web Upload:** Direct upload via the frontend.
 - **FTP Inbox:** Photographers can upload files via FTP. The `FtpController` processes the queue.
 
+The authenticated upload endpoint resolves galleries within the actor's brand; a foreign-brand gallery is returned as not found (404). After the photographer-role guard, gallery authorization uses `AuthorizationService::canManageGallery()`.
+
 
 ## 4. Metadata Application & Gallery Defaults
 - **Upload Time:** Gallery metadata defaults (e.g., `default_city`) are copied directly to the `Photo` database row during upload if the original image lacks EXIF/IPTC data.

@@ -27,11 +27,6 @@ class ImageController extends Controller
             'file' => 'required|image|mimes:jpeg,jpg|max:20480|dimensions:min_width=500,min_height=500,max_width=15000,max_height=15000',
         ]);
 
-        $gallery = Gallery::find($request->gallery_id);
-        if (! $gallery) {
-            return response()->json(['error' => 'Galerie nicht gefunden'], 404);
-        }
-
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
 
@@ -39,7 +34,16 @@ class ImageController extends Controller
             return response()->json(['error' => 'Nur Fotografen dürfen Bilder hochladen.'], 403);
         }
 
-        if (! $svc->isSuperAdmin($user) && ! $svc->isAdmin($user) && ! ($svc->isPhotographer($user) && $svc->canPhotographerAccessGallery($user, $gallery->id))) {
+        $gallery = Gallery::find($request->gallery_id);
+        if (! $gallery) {
+            return response()->json(['error' => 'Galerie nicht gefunden'], 404);
+        }
+
+        if (! $svc->sharesBrand($user, $gallery->brand)) {
+            return response()->json(['error' => 'Galerie nicht gefunden'], 404);
+        }
+
+        if (! $svc->canManageGallery($user, (string) $gallery->getKey())) {
             return response()->json(['error' => 'Keine Berechtigung für diese Galerie.'], 403);
         }
 

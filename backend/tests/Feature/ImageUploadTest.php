@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Brand;
 use App\Enums\UserRole;
 use App\Models\Gallery;
 use App\Models\Photo;
@@ -31,6 +32,15 @@ class ImageUploadTest extends TestCase
     private function createPhotographerUser(): User
     {
         $user = User::factory()->create();
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
+
+        return $user;
+    }
+
+    private function createAdminPhotographerUser(string $brand): User
+    {
+        $user = User::factory()->create(['brand' => $brand]);
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
         return $user;
@@ -216,6 +226,85 @@ class ImageUploadTest extends TestCase
 
         $response->assertStatus(403);
         $response->assertJson(['error' => 'Keine Berechtigung für diese Galerie.']);
+    }
+
+    public function test_admin_photographer_cannot_upload_to_a_foreign_brand_gallery(): void
+    {
+        $user = $this->createAdminPhotographerUser('srp');
+        $gallery = $this->createDeliveryGallery(['brand' => Brand::B2B->value]);
+        $file = UploadedFile::fake()->createWithContent('test.jpg', $this->fixtureContent);
+
+        $response = $this->actingAs($user, 'api')
+            ->postJson('/api/management/upload', [
+                'gallery_id' => $gallery->id,
+                'lr_uuid' => 'uuid-foreign-brand',
+                'file' => $file,
+            ]);
+
+        $response->assertStatus(404);
+        $response->assertJson(['error' => 'Galerie nicht gefunden']);
+        $this->assertDatabaseCount('photos', 0);
+    }
+
+    public function test_admin_without_photographer_role_gets_photographer_error_for_same_brand_gallery(): void
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B->value]);
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
+        $gallery = $this->createDeliveryGallery(['brand' => Brand::B2B->value]);
+        $file = UploadedFile::fake()->createWithContent('test.jpg', $this->fixtureContent);
+
+        $response = $this->actingAs($user, 'api')
+            ->postJson('/api/management/upload', [
+                'gallery_id' => $gallery->id,
+                'lr_uuid' => 'uuid-admin-without-photographer',
+                'file' => $file,
+            ]);
+
+        $response->assertStatus(403);
+        $response->assertJson(['error' => 'Nur Fotografen dürfen Bilder hochladen.']);
+        $this->assertDatabaseCount('photos', 0);
+    }
+
+    public function test_admin_photographer_can_upload_to_its_own_unknown_brand_gallery(): void
+    {
+        $user = $this->createAdminPhotographerUser('srp');
+        $gallery = $this->createDeliveryGallery(['brand' => 'srp']);
+        $file = UploadedFile::fake()->createWithContent('test.jpg', $this->fixtureContent);
+
+        $response = $this->actingAs($user, 'api')
+            ->postJson('/api/management/upload', [
+                'gallery_id' => $gallery->id,
+                'lr_uuid' => 'uuid-own-unknown-brand',
+                'file' => $file,
+            ]);
+
+        $response->assertOk()->assertJsonStructure(['photo_id']);
+        $this->assertNotEmpty($response->json('photo_id'));
+        $this->assertDatabaseHas('photos', [
+            'id' => $response->json('photo_id'),
+            'gallery_id' => $gallery->id,
+        ]);
+    }
+
+    public function test_same_brand_admin_photographer_can_upload(): void
+    {
+        $user = $this->createAdminPhotographerUser(Brand::B2B->value);
+        $gallery = $this->createDeliveryGallery(['brand' => Brand::B2B->value]);
+        $file = UploadedFile::fake()->createWithContent('test.jpg', $this->fixtureContent);
+
+        $response = $this->actingAs($user, 'api')
+            ->postJson('/api/management/upload', [
+                'gallery_id' => $gallery->id,
+                'lr_uuid' => 'uuid-same-brand-admin-photographer',
+                'file' => $file,
+            ]);
+
+        $response->assertOk()->assertJsonStructure(['photo_id']);
+        $this->assertNotEmpty($response->json('photo_id'));
+        $this->assertDatabaseHas('photos', [
+            'id' => $response->json('photo_id'),
+            'gallery_id' => $gallery->id,
+        ]);
     }
 
     public function test_regular_user_gets_403_via_management_middleware(): void
