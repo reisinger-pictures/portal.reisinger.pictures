@@ -325,6 +325,17 @@ services:
   # interne HTTP-Pfad und leitet genau einen Endpoint weiter; alles andere gibt
   # 404 zurueck.
   # UID 1000 liest den Host-Baum 1002:webgroup ueber GID 82 (2775+setgid).
+  #
+  # Der Caddyfile-Mount ist ABSOLUT, und das ist keine Kosmetik: dieser Stack
+  # laeuft aus Portainer, dessen Compose-Datei unter
+  # /var/lib/docker/volumes/portainer_data/_data/compose/23/docker-compose.yml
+  # liegt. Ein relatives Bind-Ziel wird gegen DIESES Verzeichnis aufgeloest —
+  # dort gibt es die Datei nicht, und Docker Compose legt stattdessen ein
+  # VERZEICHNIS an. Caddy startet dann mit einem Verzeichnis als Konfiguration
+  # und laeuft in eine Restart-Schleife. Deshalb legt sync.sh die Datei unter
+  # dem festen Host-Pfad ab, und der Mount liest genau von dort. Der Pfad hier
+  # und der Default in sync.sh (CADDY_DEST) muessen identisch bleiben — der
+  # Regressionstest tests/infrastructure/rsync-sync-regression.sh prueft das.
   ftp-events:
     image: caddy:2.11-alpine
     container_name: portal_ftp_events
@@ -332,7 +343,7 @@ services:
     user: "1000:82"
     volumes:
       - /home/webadmin/websites/api-portal.reisinger.pictures:/var/www/html:ro,Z
-      - ./Caddyfile.ftp-events:/etc/caddy/Caddyfile:ro
+      - /home/webadmin/portal/caddy/Caddyfile.ftp-events:/etc/caddy/Caddyfile:ro
     environment:
       - XDG_DATA_HOME=/tmp/caddy/data
       - XDG_CONFIG_HOME=/tmp/caddy/config

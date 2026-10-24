@@ -19,6 +19,10 @@
 #   5. destination-only Dateien im privaten Storage bleiben erhalten
 #   6. Stale-Dateien ausserhalb der Excludes werden GELOESCHT (Mirror-Semantik)
 #   7. SQLite-Dateien (lokal + destination-only) bleiben unangetastet
+#   8. Die Caddyfile des ftp-events-Seitendienstes wird als EINZELDATEI
+#      uebertragen, inkl. --mkpath (Zielverzeichnis fehlt auf frischem Host)
+#   9. Drift: der Compose-Mount und der sync.sh-Default nennen DENSELBEN
+#      absoluten Host-Pfad (Portainer loest relative Pfade falsch auf)
 #
 # Aufruf:  bash tests/infrastructure/rsync-sync-regression.sh
 # Exit:    0 = alles gruen, 1 = Regression
@@ -28,6 +32,7 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 SYNC_SCRIPT="$ROOT_DIR/sync.sh"
 EXCLUDE_FILE="$ROOT_DIR/rsync-backend-exclude.txt"
+COMPOSE_FILE="$ROOT_DIR/deployment/docker-compose.yml"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/rsync-sync-regression.XXXXXX")"
 # KEEP_TMP=1 laesst das Fixture zur Fehlersuche stehen.
 if [[ -n "${KEEP_TMP:-}" ]]; then
@@ -72,6 +77,31 @@ grep -Fq -- '--exclude-from=rsync-backend-exclude.txt' "$SYNC_SCRIPT" \
 pass 'sync.sh invariants (strict mode, --delete, no --delete-excluded, exclude file)'
 
 # ============================================================================
+# 1b. Drift: Compose-Mount und sync.sh-Default muessen identisch sein
+# ============================================================================
+# Der Stack laeuft aus Portainer; ein relatives Bind-Ziel wuerde gegen
+# Portainers eigenes Compose-Verzeichnis aufgeloest und dort als VERZEICHNIS
+# angelegt (Caddy startet dann mit einem Verzeichnis als Config -> Crashloop).
+# Deshalb ist der Mount absolut, und sync.sh legt die Datei unter genau diesem
+# Pfad ab. Zwei Stellen, ein Wert -- hier verglichen.
+[[ -f "$COMPOSE_FILE" ]] || fail "compose file not found: $COMPOSE_FILE"
+
+compose_mount="$(sed -n 's#^[[:space:]]*-[[:space:]]*\(.*Caddyfile\.ftp-events\):/etc/caddy/Caddyfile.*$#\1#p' "$COMPOSE_FILE")"
+sync_default="$(sed -n 's#^CADDY_DEST=.*SSH_TARGET}:\(.*\)}"$#\1#p' "$SYNC_SCRIPT")"
+
+[[ -n "$compose_mount" ]] \
+    || fail 'no Caddyfile.ftp-events mount found in deployment/docker-compose.yml'
+[[ -n "$sync_default" ]] \
+    || fail 'no CADDY_DEST default found in sync.sh'
+[[ "$compose_mount" == /* ]] \
+    || fail "compose mount for Caddyfile.ftp-events must be an absolute host path, got: '$compose_mount'"
+[[ "$sync_default" == /* ]] \
+    || fail "sync.sh CADDY_DEST default must be an absolute host path, got: '$sync_default'"
+[[ "$compose_mount" == "$sync_default" ]] \
+    || fail "Caddyfile path drift: compose mounts '$compose_mount' but sync.sh uploads to '$sync_default'"
+pass "Caddyfile host path is identical in compose mount and sync.sh ($compose_mount)"
+
+# ============================================================================
 # 2. Pflichtregeln in der Exclude-Datei
 # ============================================================================
 require_rule() {
@@ -107,6 +137,7 @@ mkdir -p \
     "$PROJECT/backend/bootstrap/cache" \
     "$PROJECT/backend/out" \
     "$PROJECT/frontend/dist/assets" \
+    "$PROJECT/deployment" \
     "$DEST/api-portal.reisinger.pictures/app" \
     "$DEST/api-portal.reisinger.pictures/storage/app/private/model-age-proofs/destination-only" \
     "$DEST/api-portal.reisinger.pictures/vendor/pkg" \
@@ -132,6 +163,8 @@ printf 'source-database\n'     > "$PROJECT/backend/database.sqlite"
 printf 'source-sqlite3\n'      > "$PROJECT/backend/foo.sqlite3"
 printf 'frontend-index\n'      > "$PROJECT/frontend/dist/index.html"
 printf 'frontend-asset\n'      > "$PROJECT/frontend/dist/assets/app-NEW.js"
+# Einzeldatei-Ziel des dritten Schritts. Bewusst kleiner, erkennbarer Inhalt.
+printf ':8080 {\n\trespond 404\n}\n' > "$PROJECT/deployment/Caddyfile.ftp-events"
 
 # Ziel (was schon auf dem Server liegt)
 printf 'destination-secret\n'  > "$DEST/api-portal.reisinger.pictures/storage/app/private/stripe_secret.txt"
@@ -147,6 +180,7 @@ cd "$PROJECT"
 
 API_OUT="$TMP_ROOT/api.out"
 WEB_OUT="$TMP_ROOT/web.out"
+CADDY_OUT="$TMP_ROOT/caddy.out"
 
 # WICHTIG: die KOPIE im Fixture ausfuehren, nicht $SYNC_SCRIPT. sync.sh macht
 # `cd "$(dirname "$0")"` — mit dem Originalpfad wuerde es in den echten
@@ -160,15 +194,18 @@ WEB_OUT="$TMP_ROOT/web.out"
 RSYNC_BIN="$RSYNC_BIN" \
 PORTAL_API_DEST="$DEST/api-portal.reisinger.pictures/" \
 PORTAL_WEB_DEST="$DEST/web-portal.reisinger.pictures/dist/" \
+PORTAL_CADDY_DEST="$DEST/caddy/Caddyfile.ftp-events" \
     bash "$PROJECT/sync.sh" --dry-run --itemize-changes > "$TMP_ROOT/full.out" 2>&1 \
     || fail "sync.sh --dry-run exited non-zero:
 $(tail -20 "$TMP_ROOT/full.out")"
 
-# Trenne die beiden rsync-Aufrufe anhand der Itemize-Zeilen.
-# Der Backend-Lauf referenziert backend/, der Frontend-Lauf frontend/dist/.
+# Trenne die rsync-Aufrufe anhand der Itemize-Zeilen an den Echo-Markern.
+# Der Backend-Lauf referenziert backend/, der Frontend-Lauf frontend/dist/,
+# der dritte Lauf genau eine Datei (deployment/Caddyfile.ftp-events).
 sed -n '/Synchronisiere/,/^$/!p' /dev/null 2>/dev/null || true
-awk '/📦 Sync: API-Ordner/,/🎨 Sync: Frontend/' "$TMP_ROOT/full.out" | grep -E '^([<>*.]|c|h)' > "$API_OUT" || true
-awk '/🎨 Sync: Frontend/,0'                       "$TMP_ROOT/full.out" | grep -E '^([<>*.]|c|h)' > "$WEB_OUT" || true
+awk '/📦 Sync: API-Ordner/,/🎨 Sync: Frontend/'        "$TMP_ROOT/full.out" | grep -E '^([<>*.]|c|h)' > "$API_OUT" || true
+awk '/🎨 Sync: Frontend/,/🔐 Sync: Caddyfile/'         "$TMP_ROOT/full.out" | grep -E '^([<>*.]|c|h)' > "$WEB_OUT" || true
+awk '/🔐 Sync: Caddyfile/,0'                           "$TMP_ROOT/full.out" | grep -E '^([<>*.]|c|h)' > "$CADDY_OUT" || true
 
 # --- 3. Secrets / Abhaengigkeiten werden NICHT uebertragen -------------------
 assert_not_transferred() {
@@ -238,5 +275,30 @@ grep -qF 'app/keep.txt' "$API_OUT" \
 grep -qF 'index.html' "$WEB_OUT" \
     || fail 'frontend index.html was not selected'
 pass 'ordinary source files are selected for transfer'
+
+# --- 8. Caddyfile des ftp-events-Seitendienstes: genau eine Datei -----------
+# Das Ziel ist ein DATEIPFAD, kein Verzeichnis. Es darf deshalb genau eine
+# Auswahl-Zeile geben, und die muss auf Caddyfile.ftp-events enden. Mehr als
+# eine Zeile hiesse: der Schritt hat ein Verzeichnis oder mehrere Dateien
+# erwischt (z.B. weil die Quelle versehentlich ./deployment/ ist).
+grep -qF 'Caddyfile.ftp-events' "$CADDY_OUT" \
+    || fail "caddy step selected nothing:
+$(cat "$CADDY_OUT")"
+grep -qE '^>f.*Caddyfile\.ftp-events$' "$CADDY_OUT" \
+    || fail "caddy step did not select exactly the source file for transfer:
+$(cat "$CADDY_OUT")"
+caddy_selected="$(grep -cE '^[<>]' "$CADDY_OUT" || true)"
+[[ "$caddy_selected" == "1" ]] \
+    || fail "caddy step must transfer exactly one file, got $caddy_selected itemize lines:
+$(cat "$CADDY_OUT")"
+# --mkpath: das Elternverzeichnis $DEST/caddy existiert im Fixture NICHT.
+# Ohne das Flag waere der Lauf oben schon mit Exit 1 gescheitert; zusaetzlich
+# hier die konkrete Fehlermeldung ausschliessen.
+caddy_missing="$(grep -i 'No such file or directory' "$TMP_ROOT/full.out" | grep -i 'caddy' || true)"
+if [[ -n "$caddy_missing" ]]; then
+    fail "caddy step failed to create the destination directory (--mkpath missing?):
+$caddy_missing"
+fi
+pass 'caddy file is transferred as a single file, --mkpath covers the missing directory'
 
 printf '\nOK: all rsync sync regressions passed\n'

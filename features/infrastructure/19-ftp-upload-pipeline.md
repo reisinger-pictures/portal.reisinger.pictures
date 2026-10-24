@@ -1853,6 +1853,12 @@ nur an `portal_internal`, proxyt exakt `/api/internal/ftp/upload-event` an
 interne HTTP-Pfad zwischen SFTPGo und Backend. Die Production-Policy akzeptiert
 nur `http://ftp-events:8080/api/internal/ftp/upload-event`.
 
+Seine Caddyfile überträgt `sync.sh` als Einzeldatei nach
+`/home/webadmin/portal/caddy/Caddyfile.ftp-events`, und der Compose-Mount liest
+genau diesen absoluten Host-Pfad — ein relatives Bind-Ziel würde aus Portainer
+gegen dessen eigenes Compose-Verzeichnis aufgelöst und dort als Verzeichnis
+angelegt.
+
 `FTP_EVENT_SECRET` hat **keinen** Default: ein leerer Wert muss den Endpunkt
 fail-closed machen, nicht Events ohne Authentifizierung annehmen.
 
