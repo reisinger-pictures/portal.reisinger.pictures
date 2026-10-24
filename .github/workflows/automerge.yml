@@ -44,6 +44,7 @@ jobs:
           # them via env and read them from process.env inside the script.
           UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
           DEPENDENCY_GROUP: ${{ steps.metadata.outputs.dependency-group }}
+          PACKAGE_ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
         with:
           script: |
             const updateType = process.env.UPDATE_TYPE || '';
@@ -78,12 +79,20 @@ jobs:
             // und werden bewusst NIE auto-gemergt
             const notDocker = !dependencyGroup.includes('docker');
 
+            // GitHub Actions werden ebenfalls NIE auto-gemergt. Ihr voller
+            // Commit-SHA ist die Supply-Chain-Grenze dieses Repos; ein
+            // unbeaufsichtigter SHA-Wechsel würde genau die aushebeln, und die
+            // semver-Klassifikation eines Tag-/SHA-Wechsels sagt nichts über
+            // den Inhalt der neuen Aktion.
+            const packageEcosystem = process.env.PACKAGE_ECOSYSTEM || '';
+            const notActions = packageEcosystem !== 'github-actions';
+
             // WICHTIG: `return` statt core.setOutput('result', ...) - github-script
             // reserviert den Output-Namen "result" für den Script-Rückgabewert und
             // überschreibt ein manuell gesetztes Output "result" sonst mit "".
             // (Bewiesen im Debug-Lauf 2026-08-25; ohne Fix werden die Merge-Schritte
             // still geskippt, obwohl der Run "success" meldet.)
-            return (safeGroup || safeIndividual) && notDocker;
+            return (safeGroup || safeIndividual) && notDocker && notActions;
 
       # running-workflow-name verhindert, dass wait-on-check auf SICH SELBST
       # wartet (der AutomERGE-Run hängt am head-sha).
