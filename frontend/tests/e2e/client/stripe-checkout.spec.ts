@@ -8,6 +8,7 @@ import {ModalHelper} from '../helpers/ModalHelper';
 import {SidebarHelper} from '../helpers/SidebarHelper';
 import {StripeHelper} from '../helpers/StripeHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Stripe Checkout Workflow', () => {
     // CI-Flakiness-Schutz: Stripe-API ist von CI-Runner-IPs zeitweise nicht
@@ -209,7 +210,7 @@ test.describe('Stripe Checkout Workflow', () => {
             headers: {
                 Accept: 'application/json',
                 'Content-Type': 'application/json',
-                Cookie: helper.getAdminToken(),
+                Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
             },
         });
         expect(paidResponse.ok(), await paidResponse.text()).toBeTruthy();

@@ -1,5 +1,6 @@
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 import { E2ESessionHelper } from './E2ESessionHelper';
+import {browserAuthHeaders} from './BrowserAuthHeaders';
 
 /**
  * Fixtures for the specs that pin the **access scope**: which membership
@@ -96,7 +97,7 @@ export async function createOrgFixture(
             default_flatrate_level: options.defaultFlatrateLevel ?? 'none',
             can_purchase_upgrades: options.canPurchaseUpgrades ?? false,
         },
-        headers: { Accept: 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
 
     const body = await readJson<{ org?: { id?: string } }>(response, `Creating the organisation "${name}"`);
@@ -136,7 +137,7 @@ export async function createDeliveryGallery(
 
     const response = await request.post('/api/management/galleries', {
         data,
-        headers: { Accept: 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
 
     const body = await readJson<{ gallery?: { id?: string; slug?: string } }>(
@@ -168,7 +169,7 @@ export async function createGalleryGroupFixture(
     const cookie = await helper.loginAs(owner.email, owner.password);
     const response = await request.post('/api/management/gallery-groups', {
         data: { name, is_public: null },
-        headers: { Accept: 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
 
     const body = await readJson<{ group?: { id?: string } }>(response, `Creating the gallery group "${name}"`);
@@ -195,7 +196,7 @@ export async function syncOrgMembers(
     const cookie = await adminCookie(helper);
     const response = await request.put(`/api/management/orgs/${orgId}/users`, {
         data: { user_ids: userIds },
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
     if (!response.ok()) {
         throw new Error(`Syncing the members of the organisation ${orgId} failed: ${await response.text()}`);
@@ -221,7 +222,7 @@ export async function setUserGalleryGroups(
     const cookie = await adminCookie(helper);
     const response = await request.put(`/api/management/users/${userId}`, {
         data: { gallery_group_ids: groupIds },
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
     if (!response.ok()) {
         throw new Error(`Writing the group assignment of the user ${userId} failed: ${await response.text()}`);
@@ -245,7 +246,7 @@ export async function assignPhotographerToGroup(
     const cookie = await adminCookie(helper);
     const response = await request.post(`/api/management/gallery-groups/${groupId}/sync-photographers`, {
         data: { user_id: userId, action: 'attach' },
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
     if (!response.ok()) {
         throw new Error(`Assigning the photographer ${userId} to the group ${groupId} failed: ${await response.text()}`);
@@ -273,7 +274,7 @@ export async function createMemberUser(
 
     const response = await request.post('/api/management/users', {
         data: { name: 'E2E Member', email },
-        headers: { Accept: 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
     const body = await readJson<{ user?: { id?: string } }>(response, `Creating the member ${email}`);
     const id = body.user?.id;
@@ -299,7 +300,7 @@ export async function setUserRoles(
 ): Promise<void> {
     const cookie = await adminCookie(helper);
     const rolesResponse = await request.get('/api/management/roles', {
-        headers: { Accept: 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
     const roles = await readJson<Array<{ id: string; name: string }>>(rolesResponse, 'Reading the role list');
     const roleIds = roleNames.map((name) => {
@@ -310,7 +311,7 @@ export async function setUserRoles(
 
     const response = await request.put(`/api/management/users/${userId}`, {
         data: { role_ids: roleIds, brand: 'rp' },
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
     if (!response.ok()) {
         throw new Error(`Writing the roles of the user ${userId} failed: ${await response.text()}`);
@@ -333,7 +334,7 @@ export async function setUserScope(
     const cookie = await adminCookie(helper);
     const response = await request.put(`/api/management/users/${userId}`, {
         data: values,
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
     if (!response.ok()) {
         throw new Error(`Writing the scope of the user ${userId} failed: ${await response.text()}`);
@@ -355,7 +356,7 @@ export async function readUserScope(
 ): Promise<{ flatrate_level: string; can_purchase_upgrades: boolean } | null> {
     const cookie = await adminCookie(helper);
     const response = await request.get('/api/management/users', {
-        headers: { Accept: 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
     const body = await readJson<{ data?: Array<{ id: string; flatrate_level?: string; can_purchase_upgrades?: boolean }> }>(
         response,
@@ -382,7 +383,7 @@ export async function readOrgMembers(
 ): Promise<Array<{ id: string; email: string }> | null> {
     const cookie = await adminCookie(helper);
     const response = await request.get(`/api/management/orgs/${orgId}`, {
-        headers: { Accept: 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
     if (response.status() === 404) return null;
     if (!response.ok()) {
@@ -410,7 +411,7 @@ export async function readAuthOrgScope(
 ): Promise<{ org_id?: string } | null> {
     const cookie = await helper.loginAs(user.email, user.password);
     const response = await request.get('/api/auth/me', {
-        headers: { Accept: 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
     if (!response.ok()) {
         throw new Error(`Reading /api/auth/me failed (HTTP ${response.status()}): ${await response.text()}`);

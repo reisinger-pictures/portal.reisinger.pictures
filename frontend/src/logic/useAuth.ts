@@ -1,6 +1,6 @@
 import useSWR, {mutate as globalMutate} from 'swr';
 import {t} from "@lingui/core/macro";
-import {fetcher, refreshAuthSession, type AuthMeUser, type User} from '../api';
+import {csrfHeaders, fetcher, refreshAuthSession, type AuthMeUser, type User} from '../api';
 import {clearCheckoutSession} from './checkoutSession';
 
 // `useAuth` returns the /api/auth/me contract. Keep the broader `User`
@@ -36,7 +36,7 @@ export function useAuth() {
     const login = async (email: string, password: string): Promise<void> => {
         const response = await fetch('/api/auth/login', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', ...csrfHeaders()},
             credentials: 'include',
             body: JSON.stringify({email, password})
         });
@@ -50,7 +50,7 @@ export function useAuth() {
     const register = async (name: string, email: string): Promise<string> => {
         const response = await fetch('/api/auth/register', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', ...csrfHeaders()},
             credentials: 'include',
             body: JSON.stringify({name, email})
         });
@@ -65,7 +65,7 @@ export function useAuth() {
     const logout = async (): Promise<void> => {
         const requestLogout = (): Promise<Response> => fetch('/api/auth/logout', {
             method: 'POST',
-            headers: {'Accept': 'application/json'},
+            headers: {'Accept': 'application/json', ...csrfHeaders()},
             credentials: 'include'
         });
 

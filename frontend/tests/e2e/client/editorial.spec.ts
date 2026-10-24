@@ -6,6 +6,7 @@ import {FormHelper} from '../helpers/FormHelper';
 import {ModalHelper} from '../helpers/ModalHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 import {SidebarHelper} from '../helpers/SidebarHelper';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Editorial Only UI & Checkout Constraints', () => {
     let helper: E2ESessionHelper;
@@ -59,7 +60,7 @@ test.describe('Editorial Only UI & Checkout Constraints', () => {
         const adminToken = helper.getAdminToken();
         await page.request.post(`/api/management/galleries/${resData.gallery.id}/sync-access`, {
             data: {user_id: clientUser.id, action: 'attach'},
-            headers: {'Cookie': adminToken, 'Accept': 'application/json'}
+            headers: {'Cookie': adminToken, ...browserAuthHeaders(adminToken), 'Accept': 'application/json'}
         });
 
         await auth.logout();

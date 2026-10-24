@@ -4,6 +4,7 @@ import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
 import { FormHelper } from '../../helpers/FormHelper';
 import { ModalHelper } from '../../helpers/ModalHelper';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('Gallery & Group Modals Roundtrip', () => {
     let helper: E2ESessionHelper;
@@ -38,7 +39,7 @@ test.describe('Gallery & Group Modals Roundtrip', () => {
     });
 
     test('Gallery visibility follows a parent policy without losing explicit intent', { tag: ['@feature:admin:galleries', '@regression'] }, async ({ page, request }) => {
-        const adminHeaders = { 'Accept': 'application/json', 'Cookie': helper.getAdminToken() };
+        const adminHeaders = { 'Accept': 'application/json', 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken())};
         const suffix = Math.random().toString(36).substring(2, 8);
         const createGroup = async (name: string, isPublic: boolean | null) => {
             const response = await request.post('/api/management/gallery-groups', {
@@ -113,7 +114,7 @@ test.describe('Gallery & Group Modals Roundtrip', () => {
     });
 
     test('Editing a group without touching its organisation preserves all assignments', { tag: ['@feature:admin:galleries', '@regression'] }, async ({ page, request }) => {
-        const adminHeaders = { 'Accept': 'application/json', 'Cookie': helper.getAdminToken() };
+        const adminHeaders = { 'Accept': 'application/json', 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken())};
         const orgName = `E2E Group Org ${Math.random().toString(36).substring(2, 8)}`;
         const orgResponse = await request.post('/api/management/orgs', {
             data: { name: orgName, invoice_frequency: 'immediate' },
@@ -199,7 +200,7 @@ test.describe('Gallery & Group Modals Roundtrip', () => {
 
     test('Meta route preserves and forwards organisation assignments while editing a group', { tag: ['@feature:admin:galleries', '@regression'] }, async ({ page, request }) => {
         const adminUser = await helper.createIsolatedUser('admin');
-        const adminHeaders = { 'Accept': 'application/json', 'Cookie': helper.getAdminToken() };
+        const adminHeaders = { 'Accept': 'application/json', 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken())};
         const firstOrgName = `E2E Meta Org A ${Math.random().toString(36).substring(2, 8)}`;
         const firstOrgResponse = await request.post('/api/management/orgs', {
             data: { name: firstOrgName, invoice_frequency: 'immediate' },

@@ -94,7 +94,7 @@ class ModelProfileAccessTest extends TestCase
                 ]],
                 'manager_index' => 0,
             ],
-            ['Accept' => 'application/json']
+            ['Accept' => 'application/json', 'Content-Type' => 'multipart/form-data']
         )->assertCreated();
 
         return ModelProfile::whereHas('customer', fn ($q) => $q->where('email', $email))->firstOrFail();
@@ -326,7 +326,7 @@ class ModelProfileAccessTest extends TestCase
         $this->post(
             "/api/model-profil/{$token->token}",
             ['answers' => $this->personAnswers(), 'age_proof' => UploadedFile::fake()->image('ausweis.jpg')],
-            ['Accept' => 'application/json']
+            ['Accept' => 'application/json', 'Content-Type' => 'multipart/form-data']
         )->assertOk();
 
         $profile->refresh();
@@ -345,7 +345,7 @@ class ModelProfileAccessTest extends TestCase
         $this->post(
             "/api/model-profil/{$token->token}",
             ['answers' => $this->personAnswers(), 'age_proof' => UploadedFile::fake()->image('neu.jpg')],
-            ['Accept' => 'application/json']
+            ['Accept' => 'application/json', 'Content-Type' => 'multipart/form-data']
         )->assertOk();
 
         $profile->refresh();
@@ -376,7 +376,7 @@ class ModelProfileAccessTest extends TestCase
         $this->post(
             "/api/model-profil/{$token->token}",
             ['answers' => $answers, 'age_proof' => UploadedFile::fake()->image('neu.jpg')],
-            ['Accept' => 'application/json']
+            ['Accept' => 'application/json', 'Content-Type' => 'multipart/form-data']
         )->assertStatus(500);
 
         $profile->refresh();

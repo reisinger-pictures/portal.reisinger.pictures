@@ -1,5 +1,6 @@
 import {expect, test} from '@playwright/test';
 import {AuthHelper} from '../helpers/AuthHelper';
+import {browserAuthHeaders, browserAuthHeadersFromPage} from '../helpers/BrowserAuthHeaders';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {FormHelper} from '../helpers/FormHelper';
 import {GalleryHelper} from '../helpers/GalleryHelper';
@@ -92,7 +93,7 @@ test.describe('Risk-triggered Turnstile checkout', () => {
 
         const adminHeaders = {
             Accept: 'application/json',
-            Cookie: helper.getAdminToken()
+            Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken())
         };
         const galleryResponse = await request.get(`/api/galleries/${gallerySlug}`, {headers: adminHeaders});
         expect(galleryResponse.ok()).toBeTruthy();
@@ -141,7 +142,8 @@ test.describe('Risk-triggered Turnstile checkout', () => {
                     data: {...checkoutPayload, billing_name: `Turnstile Prime ${attempt}`},
                     headers: {
                         Accept: 'application/json',
-                        'Idempotency-Key': crypto.randomUUID()
+                        'Idempotency-Key': crypto.randomUUID(),
+                        ...await browserAuthHeadersFromPage(page),
                     }
                 });
                 expect(response.status(), await response.text()).toBe(200);

@@ -4,6 +4,7 @@ import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
 import { KanbanHelper } from '../../helpers/KanbanHelper';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('Projekte-Board (Admin)', () => {
     // Board-Mutationen verändern das Board live (Karten werden eingefügt/verschoben) und die
@@ -253,7 +254,7 @@ test.describe('Projekte-Board (Admin)', () => {
                 customer_email: customerEmail,
                 items: [{ type: 'item', description: 'Fotografie', price: 250, qty: 1 }],
             },
-            headers: { 'Accept': 'application/pdf', 'Cookie': cookie },
+            headers: { 'Accept': 'application/pdf', 'Cookie': cookie, ...browserAuthHeaders(cookie)},
         });
         expect(pdfRes.status()).toBe(200);
         const pdfBase64 = (await pdfRes.body()).toString('base64');

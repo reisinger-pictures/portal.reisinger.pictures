@@ -47,6 +47,7 @@ describe('useAuth', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals();
+        document.cookie = 'XSRF-TOKEN=; Max-Age=0; path=/';
     });
 
     it('returns loading state initially when no data', () => {
@@ -112,6 +113,38 @@ describe('useAuth', () => {
         }));
 
         vi.unstubAllGlobals();
+    });
+
+    it('echoes the CSRF cookie on direct login, register, and logout requests', async () => {
+        vi.mocked(useSWR).mockReturnValue({
+            data: authMeUserFixture,
+            error: undefined,
+            isLoading: false,
+            mutate: vi.fn(),
+        } as never);
+
+        document.cookie = 'XSRF-TOKEN=signed-token; path=/';
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve({message: 'Registrierung erfolgreich'}),
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const {result} = renderHook(() => useAuth());
+        await result.current.login('test@test.com', 'password123');
+        await result.current.register('Max', 'max@test.com');
+        await result.current.logout();
+
+        expect(fetchMock.mock.calls.map(([input]) => input)).toEqual([
+            '/api/auth/login',
+            '/api/auth/register',
+            '/api/auth/logout',
+        ]);
+        for (const [, init] of fetchMock.mock.calls) {
+            expect((init as RequestInit).headers).toEqual(expect.objectContaining({
+                'X-XSRF-TOKEN': 'signed-token',
+            }));
+        }
     });
 
     it('register calls fetch and returns success message', async () => {

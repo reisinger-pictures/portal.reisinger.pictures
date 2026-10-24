@@ -245,7 +245,7 @@ class ManualDocumentTest extends TestCase
         $extractRes = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->post('/api/management/invoices/extract-offer', [
                 'pdf' => $uploadedFile,
-            ]);
+            ], ['Content-Type' => 'multipart/form-data']);
 
         $extractRes->assertStatus(200);
         $extractRes->assertJsonPath('customer_name', 'Smart Doc Tester');
@@ -288,7 +288,7 @@ class ManualDocumentTest extends TestCase
         );
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->post('/api/management/invoices/extract-offer', ['pdf' => $uploadedFile])
+            ->post('/api/management/invoices/extract-offer', ['pdf' => $uploadedFile], ['Content-Type' => 'multipart/form-data'])
             ->assertStatus(400)
             ->assertJsonPath('error', 'Angebot nicht auslesbar oder abgelaufen.');
 
@@ -319,7 +319,7 @@ class ManualDocumentTest extends TestCase
         );
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->post('/api/management/invoices/extract-offer', ['pdf' => $uploadedFile])
+            ->post('/api/management/invoices/extract-offer', ['pdf' => $uploadedFile], ['Content-Type' => 'multipart/form-data'])
             ->assertStatus(404)
             ->assertJsonPath('error', 'Kein eingebettetes Angebot in diesem PDF gefunden.');
 

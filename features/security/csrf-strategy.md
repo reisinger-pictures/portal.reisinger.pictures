@@ -1,48 +1,89 @@
 # CSRF Strategy
 
-## Status: Implemented (2026-07-14)
+## Status: Implemented with review requested (2026-10-23)
 
 ## Architecture
 
-- **Frontend (SPA)**: `portal.reisinger.pictures` (port 443)
-- **Backend (API)**: same-origin at `portal.reisinger.pictures/api/*` (Caddy FastCGI to `portal_backend`)
+- The React SPA and `/api/*` are same-origin in production.
+- The SPA uses `credentials: 'include'` and the API issues the `rp_jwt` access
+  cookie and `rp_jwt_refresh` refresh cookie as `HttpOnly; SameSite=Lax`.
+- Laravel trusts only the direct proxy peer for `X-Forwarded-For` and
+  `X-Forwarded-Proto`; it deliberately does not trust `X-Forwarded-Host`.
+  Vite's local proxy changes `Host`, so local browser origins are compared with
+  the configured `app.frontend_url` as well as the effective request origin.
+- There is no application `config/cors.php` allowlist. The production API is
+  same-origin; cross-origin browser access is not part of the client contract.
 
-The SPA and the API are served from the same origin, so `SameSite=Lax` applies trivially — there is no cross-origin scenario anymore, and same-origin requests always include the cookie.
+## Unsafe-request contract
 
-## Protection Mechanism
+All `/api/*` methods other than `GET`, `HEAD`, and `OPTIONS` are treated as
+unsafe:
 
-### SameSite=Lax
+1. If `Origin` or `Referer` is supplied, each supplied value must parse to the
+   effective request origin or the origin configured by `app.frontend_url`.
+   Invalid, `null`, and cross-origin values are rejected with `403`. If both
+   headers are present, both must match.
+2. An unsafe request with either JWT cookie (`rp_jwt` or `rp_jwt_refresh`) must
+   include a valid same-origin check and the CSRF token described below. A
+   missing/invalid origin, cookie token, or header token fails closed with
+   `403`, even if an Authorization header is also present.
+3. Cookie-less requests without Origin/Referer remain available to non-browser
+   API clients using bearer credentials or high-entropy token-link credentials.
+   Any supplied cross-origin Origin/Referer is still rejected. This preserves
+   existing server/plugin and token-link flows without allowing browser form
+   submissions to cross the boundary.
+4. Mutations must use `application/json`. `multipart/form-data` is accepted only
+   on the existing file endpoints:
+   `/api/management/upload`, `/api/management/settings/watermark`,
+   `/api/management/invoices/extract-offer`,
+   `/api/model-registration/{token}`, and `/api/model-profil/{token}`.
+   Form-encoded, text, and other mutation bodies are rejected with `415`.
+5. Stripe webhook ingress is exempt from browser-origin and cookie-token checks
+   because Stripe authenticates it with `Stripe-Signature`; the secret-gated
+   internal FTP event ingress is similarly exempt because it authenticates its
+   caller with `FTP_EVENT_SECRET`. Both still require JSON content.
 
-The auth cookie `rp_jwt` is set with `SameSite=Lax`:
+## CSRF token protocol
 
-```php
-cookie('rp_jwt', $token, $ttl, '/', null, $secure, true, false, 'Lax');
-```
+- API responses set a host-only, `SameSite=Lax`, JavaScript-readable
+  `XSRF-TOKEN` cookie. Its value is a nonce signed with `APP_KEY`; it is
+  stateless and requires no database/session state. It expires with the refresh
+  session (`JWT_REFRESH_TTL`, 14 days by default) and is re-issued on every API
+  response, so a still-valid session never runs into a missing token.
+- Cookie-authenticated unsafe requests must echo that value in the
+  `X-XSRF-TOKEN` header. The server checks the signature, expiry, and constant-
+  time equality between cookie and header.
+- `frontend/src/api.ts` reads the cookie and adds the header to unsafe JSON,
+  multipart, download-mutation, and refresh requests. It does not add a custom
+  header to safe reads. Direct login, registration, and logout requests in
+  `frontend/src/logic/useAuth.ts` use the same shared helper.
+- Non-browser clients that authenticate with a JWT cookie are held to the same
+  contract: they must send a matching `Origin`/`Referer` and the
+  `X-XSRF-TOKEN` header. The E2E helpers do exactly that
+  (`frontend/tests/e2e/helpers/BrowserAuthHeaders.ts`), and the backend tests use
+  `Tests\TestCase::csrfCredentials()`, which mints the token through a real API
+  response.
+- Login is protected even before a JWT cookie exists: a browser-supplied
+  cross-origin `Origin`/`Referer` is rejected, and an HTML form cannot satisfy
+  the JSON-only mutation boundary. The token is additionally sent whenever the
+  SPA already has one.
 
-`SameSite=Lax` ensures:
+## Review note
 
-| Request origin | Request type | Cookie sent? |
-|---|---|---|
-| `portal.reisinger.pictures` → `/api/*` (same-origin) | SPA fetch/XHR | ✅ Yes |
-| `portal.reisinger.pictures` → `/api/*` (same-origin) | Navigation | ✅ Yes |
-| `attacker.com` → `portal.reisinger.pictures` | `<form>` POST (cross-site) | ❌ No |
-| `attacker.com` → `portal.reisinger.pictures` | `fetch()` with `credentials: 'include'` (cross-site) | ❌ No |
-| `attacker.com` → `portal.reisinger.pictures` | Top-level GET navigation (cross-site) | ⚠️ Safe methods only |
+The defensive contract for this round intentionally permits a cookie-less
+request with no Origin/Referer so non-browser bearer-token and token-link clients
+continue to work. Browser unsafe requests carry Origin or Referer and are
+validated; cookie-authenticated unsafe requests additionally require the
+signed double-submit token. The multipart allowlist is limited to the five
+currently used upload paths above. Owner review is requested to confirm these
+two compatibility boundaries; neither is silently expanded to other API
+routes.
 
-### Defense-in-Depth
+## Defense-in-depth
 
-1. **JSON-only API**: Every endpoint expects `Content-Type: application/json`. A `<form>` POST sends `application/x-www-form-urlencoded` — the API does not process it.
-2. **Same-origin API (no CORS needed)**: The API is served same-origin under `/api/*`, so the original CORS allowlist is obsolete. Cross-site requests cannot carry the cookie (`SameSite=Lax`) and fail at the auth layer.
-3. **httpOnly cookie**: The JWT is inaccessible to JavaScript (`HttpOnly=true`), preventing token theft via XSS.
-4. **Role-based authorization**: All state-changing operations require specific roles (`management`, `super_admin`). Even if a CSRF succeeded, the attacker would need privilege escalation.
-
-## Why not Sanctum Stateful-CSRF?
-
-- Sanctum is not installed and would require a new dependency.
-- The app uses JWT (stateless) for all auth — adding Sanctum's stateful SPA auth alongside would introduce two parallel authentication mechanisms without clear benefit.
-- `SameSite=Lax` provides sufficient protection for same-site architecture.
-
-## History
-
-- **Pre-2026-07-14**: `Controller.php` set `SameSite=None` in production (`$secure ? 'None' : 'Lax'`). This was incorrect — it treated cross-origin (different subdomain) as cross-site, needlessly disabling SameSite protection. `SameSite=None` allowed CSRF via cross-site `<form>` POSTs.
-- **2026-07-14**: Changed to always use `SameSite=Lax`. This fixes cross-site CSRF exposure while maintaining full SPA functionality (same-site requests are unaffected).
+- `SameSite=Lax` prevents cookies on cross-site subresource/form requests in
+  supporting browsers, but is not treated as the sole CSRF control.
+- `HttpOnly` keeps JWT credentials inaccessible to JavaScript.
+- The API is JSON-only except for the explicit multipart upload paths.
+- Route authentication and role authorization remain required where specified;
+  they are independent of the CSRF checks.

@@ -1,6 +1,8 @@
 let refreshPromise: Promise<boolean> | null = null;
 
 const REFRESH_ENDPOINT = '/api/auth/refresh';
+const CSRF_COOKIE_NAME = 'XSRF-TOKEN';
+const CSRF_HEADER_NAME = 'X-XSRF-TOKEN';
 /**
  * Auth bootstrap/termination requests are the only generic-helper exceptions.
  * Retrying them from their own 401 would recurse into refresh (or create a
@@ -30,6 +32,27 @@ const normalizedApiPath = (url: string): string => {
 
 const shouldAttemptRefresh = (url: string): boolean =>
     !AUTH_ENDPOINTS_WITHOUT_REFRESH.has(normalizedApiPath(url));
+
+export const csrfHeaders = (): Record<string, string> => {
+    if (typeof document === 'undefined') return {};
+
+    const prefix = `${CSRF_COOKIE_NAME}=`;
+    const cookie = document.cookie
+        .split(';')
+        .map(part => part.trim())
+        .find(part => part.startsWith(prefix));
+    if (!cookie) return {};
+
+    try {
+        const token = decodeURIComponent(cookie.slice(prefix.length));
+        return token ? {[CSRF_HEADER_NAME]: token} : {};
+    } catch {
+        return {};
+    }
+};
+
+const isUnsafeMethod = (method: string): boolean =>
+    !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
 
 /**
  * Fetch rejects with an AbortError when a caller cancels a request.  It is a
@@ -73,7 +96,8 @@ export const refreshAuthSession = (): Promise<boolean> => {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    ...csrfHeaders(),
                 },
                 credentials: 'include'
             });
@@ -232,7 +256,7 @@ export const fetcher = async <T>(url: string, options: ApiRequestOptions = {}): 
 export const apiUpload = async <T>(url: string, body: FormData, options: ApiRequestOptions = {}): Promise<T> => {
     const requestOptions: RequestInit = {
         method: 'POST',
-        headers: { 'Accept': 'application/json' },
+        headers: { 'Accept': 'application/json', ...csrfHeaders() },
         credentials: 'include',
         body,
         ...(options.signal ? { signal: options.signal } : {})
@@ -268,7 +292,7 @@ export const apiMutate = async <T>(
 ): Promise<T> => {
     const requestOptions: RequestInit = {
         method,
-        headers: {...getHeaders(), ...options.headers},
+        headers: {...getHeaders(), ...options.headers, ...csrfHeaders()},
         credentials: 'include',
         body: body ? JSON.stringify(body) : undefined,
         ...(options.signal ? { signal: options.signal } : {})
@@ -343,13 +367,15 @@ export const apiDownload = async (
     url: string,
     options: ApiDownloadOptions = {}
 ): Promise<DownloadedFile> => {
+    const method = options.method ?? (options.body !== undefined && options.body !== null ? 'POST' : 'GET');
     const requestOptions: RequestInit = {
         headers: {
             'Accept': options.accept ?? 'application/pdf, application/octet-stream',
-            ...options.headers
+            ...options.headers,
+            ...(isUnsafeMethod(method) ? csrfHeaders() : {}),
         },
         credentials: 'include',
-        ...(options.method ? { method: options.method } : {}),
+        method,
         ...(options.body !== undefined ? { body: options.body } : {}),
         ...(options.signal ? { signal: options.signal } : {})
     };

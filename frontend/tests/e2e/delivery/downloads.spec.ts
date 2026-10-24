@@ -8,6 +8,7 @@ import {ModalHelper} from '../helpers/ModalHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 import {FormHelper} from '../helpers/FormHelper';
 import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 const watermarkAsset = readFileSync(path.resolve(process.cwd(), 'public/brands/rp/logo-email-64.png'));
 
@@ -25,7 +26,7 @@ async function ensureDeliveryWatermarkAsset(request: APIRequestContext, adminTok
         },
         headers: {
             Accept: 'application/json',
-            Cookie: adminToken,
+            Cookie: adminToken, ...browserAuthHeaders(adminToken),
         },
     });
     const body = await response.text();
@@ -60,7 +61,7 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
                 can_edit_metadata: false,
                 flatrate_level: flatrateLevel
             },
-            headers: {'Cookie': adminToken, 'Accept': 'application/json'}
+            headers: {'Cookie': adminToken, ...browserAuthHeaders(adminToken), 'Accept': 'application/json'}
         });
         if (!putRes.ok()) {
             console.error('PUT /api/management/users failed:', putRes.status(), await putRes.text());
@@ -99,7 +100,7 @@ test.describe('Download Triggers UI & Flatrate Restrictions', () => {
 
         const syncAccessResponse = await request.post(`/api/management/galleries/${galleryId}/sync-access`, {
             data: {user_id: clientUser.id, action: 'attach'},
-            headers: {'Cookie': adminToken, 'Accept': 'application/json'}
+            headers: {'Cookie': adminToken, ...browserAuthHeaders(adminToken), 'Accept': 'application/json'}
         });
         const syncAccessBody = await syncAccessResponse.text();
         expect(syncAccessResponse.ok(), syncAccessBody).toBeTruthy();

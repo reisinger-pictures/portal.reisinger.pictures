@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('G6: Gallery Tree Organisation Filter', () => {
     let helper: E2ESessionHelper;
@@ -18,7 +19,7 @@ test.describe('G6: Gallery Tree Organisation Filter', () => {
 
     test('Organisation filter hides groups assigned to other tenants', { tag: ['@feature:admin:Org'] }, async ({ page, request }) => {
         const adminToken = helper.getAdminToken();
-        const headers = { 'Accept': 'application/json', 'Cookie': adminToken };
+        const headers = { 'Accept': 'application/json', 'Cookie': adminToken, ...browserAuthHeaders(adminToken)};
 
         const tenant1Name = `E2E Org 1 ${Math.random().toString(36).substring(2, 10)}`;
         const tenant1Res = await request.post('/api/management/orgs', {

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../../helpers/AuthHelper';
+import { browserAuthHeadersFromPage } from '../../helpers/BrowserAuthHeaders';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
 
@@ -96,6 +97,7 @@ test.describe('Volume-Licensing Presets Admin Workflow', () => {
                 headers: {
                     Accept: 'application/json',
                     Referer: 'http://localhost:4321/',
+                    ...await browserAuthHeadersFromPage(page),
                 },
             });
             expect(response.ok(), await response.text()).toBeTruthy();

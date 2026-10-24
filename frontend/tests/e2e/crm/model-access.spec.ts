@@ -3,6 +3,7 @@ import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import path from 'path';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 async function fillSinglePerson(page: Page, unique: string) {
     const block = page.locator('main').getByTestId('model-person-0');
@@ -110,7 +111,7 @@ test.describe('Model-Profil-Zugang (Magic Link)', () => {
 
         // 5. Cleanup: die im Test erzeugten CRM-Customers entfernen.
         const modelsRes = await request.get('/api/management/models?q=' + encodeURIComponent(unique), {
-            headers: { 'Accept': 'application/json', 'Cookie': helper.getAdminToken() },
+            headers: { 'Accept': 'application/json', 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken())},
         });
         const createdModels = await modelsRes.json() as Array<{ customer_id: string }>;
         for (const model of createdModels) {

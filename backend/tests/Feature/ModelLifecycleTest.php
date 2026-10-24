@@ -97,7 +97,7 @@ class ModelLifecycleTest extends TestCase
                 'age_proof' => UploadedFile::fake()->image('ausweis.jpg'),
             ]],
             'manager_index' => 0,
-        ], ['Accept' => 'application/json'])->assertCreated();
+        ], ['Accept' => 'application/json', 'Content-Type' => 'multipart/form-data'])->assertCreated();
 
         $profile = ModelProfile::firstOrFail();
         $this->assertNotNull($profile->last_confirmed_at);

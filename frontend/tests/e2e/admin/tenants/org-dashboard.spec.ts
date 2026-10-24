@@ -6,6 +6,7 @@ import { ModalHelper } from '../../helpers/ModalHelper';
 import { MailpitHelper } from '../../helpers/MailpitHelper';
 import { FormHelper } from '../../helpers/FormHelper';
 import { UserDetailed } from '../../../../src/logic/useUsers';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('Org Management & Invoicing Workflow', () => {
     let helper: E2ESessionHelper;
@@ -71,11 +72,11 @@ test.describe('Org Management & Invoicing Workflow', () => {
         const invBtn = page.getByRole('button', { name: 'Sammelrechnung erstellen' });
         await expect(invBtn).toBeVisible();
 
-        const usersRes = await request.get('/api/management/users', { headers: { 'Cookie': helper.getAdminToken() } });
+        const usersRes = await request.get('/api/management/users', { headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken())} });
         const usersData = await usersRes.json();
         const guestUser = usersData.data?.find((u: UserDetailed) => u.email === guestEmail);
         if (guestUser) {
-            await request.delete(`/api/test/cleanup-user/${guestUser.id}`, { headers: { 'Cookie': helper.getAdminToken() } });
+            await request.delete(`/api/test/cleanup-user/${guestUser.id}`, { headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken())} });
         }
     });
 });

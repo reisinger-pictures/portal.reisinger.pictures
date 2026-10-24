@@ -121,7 +121,7 @@ class ModelRegistrationTest extends TestCase
                 'act' => ['answers' => $act],
                 'manager_index' => $managerIndex,
             ],
-            ['Accept' => 'application/json']
+            ['Accept' => 'application/json', 'Content-Type' => 'multipart/form-data']
         );
     }
 

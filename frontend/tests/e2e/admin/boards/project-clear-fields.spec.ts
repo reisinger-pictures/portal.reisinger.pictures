@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('Project board clear-field regression', () => {
     test.describe.configure({ mode: 'serial' });
@@ -27,7 +28,7 @@ test.describe('Project board clear-field regression', () => {
                 assignee_id: admin.id,
                 price_cents: 12345,
             },
-            headers: { Accept: 'application/json', Cookie: cookie },
+            headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
         });
         expect(createResponse.ok()).toBeTruthy();
         const { project } = await createResponse.json() as { project: { id: string } };

@@ -4,6 +4,7 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
 import path from 'path';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 interface PersonData {
     firstName: string;
@@ -143,7 +144,7 @@ test.describe('Model-Registrierung (öffentlicher Flow)', () => {
         // 6. Cleanup: Die im öffentlichen Flow erzeugten CRM-Customers entfernen
         // (beide Personen teilen den `unique`-Suffix in der E-Mail).
         const modelsRes = await request.get('/api/management/models?q=' + encodeURIComponent(unique), {
-            headers: { 'Accept': 'application/json', 'Cookie': helper.getAdminToken() },
+            headers: { 'Accept': 'application/json', 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken())},
         });
         const createdModels = await modelsRes.json() as Array<{ customer_id: string }>;
         for (const model of createdModels) {
@@ -221,7 +222,7 @@ test.describe('Model-Registrierung (öffentlicher Flow)', () => {
 
         // 5. Cleanup: die im öffentlichen Flow erzeugte CRM-Customer entfernen.
         const modelsRes = await request.get('/api/management/models?q=' + encodeURIComponent(unique), {
-            headers: { 'Accept': 'application/json', 'Cookie': helper.getAdminToken() },
+            headers: { 'Accept': 'application/json', 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken())},
         });
         const createdModels = await modelsRes.json() as Array<{ customer_id: string }>;
         for (const model of createdModels) {

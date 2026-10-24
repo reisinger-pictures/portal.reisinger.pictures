@@ -4,6 +4,7 @@ import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { withGlobalSettingsLock, SHOOTING_CALCULATOR_SETTINGS_LOCK } from '../../helpers/GlobalSettingsLock';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('Manual Documents & CRM Workflow', () => {
     let helper: E2ESessionHelper;
@@ -21,7 +22,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
         // CRM Kunde vorbereiten
         const custRes = await request.post('/api/management/customers', {
             data: { name: `E2E VIP ${uniqueSuffix}`, zip: '1010', city: 'Wien' },
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' }
         });
         const custData = await custRes.json();
         if (custData?.customer?.id) helper.trackCustomer(custData.customer.id);
@@ -29,7 +30,7 @@ test.describe('Manual Documents & CRM Workflow', () => {
         // Textbaustein vorbereiten
         const snipRes = await request.post('/api/management/text-snippets', {
             data: { title: `E2E Snippet ${uniqueSuffix}`, shortcut: snippetShortcut, content_html: `<p>Magic${uniqueSuffix}Content</p>` },
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' }
         });
         const snipData = await snipRes.json();
         if (snipData?.snippet?.id) helper.trackSnippet(snipData.snippet.id);
@@ -37,14 +38,14 @@ test.describe('Manual Documents & CRM Workflow', () => {
         // Katalog-Einträge (Produkt & Rabatt) vorbereiten
         const prodRes = await request.post('/api/management/products', {
             data: { type: 'item', name: `E2E Product ${uniqueSuffix}`, description: 'E2E Leistung', price: 15000 },
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' }
         });
         const prodData = await prodRes.json();
         if (prodData?.product?.id) helper.trackProduct(prodData.product.id);
 
         const discRes = await request.post('/api/management/products', {
             data: { type: 'discount_fixed', name: `E2E Discount ${uniqueSuffix}`, description: 'E2E Rabatt', price: 2000 },
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' }
         });
         const discData = await discRes.json();
         if (discData?.product?.id) helper.trackProduct(discData.product.id);

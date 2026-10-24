@@ -100,7 +100,7 @@ class ModelRegistrationSuccessMailTest extends TestCase
                 ],
                 'manager_index' => 0,
             ],
-            ['Accept' => 'application/json']
+            ['Accept' => 'application/json', 'Content-Type' => 'multipart/form-data']
         );
 
         $response->assertCreated();
@@ -172,7 +172,7 @@ class ModelRegistrationSuccessMailTest extends TestCase
                 ]],
                 'manager_index' => 0,
             ],
-            ['Accept' => 'application/json']
+            ['Accept' => 'application/json', 'Content-Type' => 'multipart/form-data']
         )->assertStatus(500);
 
         Mail::assertNothingQueued();

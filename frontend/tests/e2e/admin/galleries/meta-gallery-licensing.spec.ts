@@ -4,6 +4,7 @@ import {expect, test} from '@playwright/test';
 import {AuthHelper} from '../../helpers/AuthHelper';
 import {E2ESessionHelper} from '../../helpers/E2ESessionHelper';
 import {SidebarHelper} from '../../helpers/SidebarHelper';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
 const sampleImage = readFileSync(sampleImagePath);
@@ -35,7 +36,7 @@ test.describe('Meta-gallery child licensing', () => {
         const headers = {
             Accept: 'application/json',
             'Content-Type': 'application/json',
-            Cookie: helper.getAdminToken(),
+            Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
         };
         const groupResponse = await request.post('/api/management/gallery-groups', {
             data: {name: `E2E Meta Licensing ${suffix}`},
@@ -103,7 +104,7 @@ test.describe('Meta-gallery child licensing', () => {
             galleries.push({id: galleryId, name: definition.name});
 
             const uploadResponse = await request.post('/api/management/upload', {
-                headers: {Accept: 'application/json', Cookie: helper.getAdminToken()},
+                headers: {Accept: 'application/json', Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken())},
                 multipart: {
                     gallery_id: galleryId,
                     lr_uuid: `e2e-meta-${galleryId}`,

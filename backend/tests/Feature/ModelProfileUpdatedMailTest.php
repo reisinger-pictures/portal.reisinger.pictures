@@ -100,7 +100,7 @@ class ModelProfileUpdatedMailTest extends TestCase
                 ]],
                 'manager_index' => 0,
             ],
-            ['Accept' => 'application/json']
+            ['Accept' => 'application/json', 'Content-Type' => 'multipart/form-data']
         )->assertCreated();
 
         $profile = ModelProfile::whereHas('customer', fn ($q) => $q->where('email', $email))->firstOrFail();

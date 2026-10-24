@@ -110,7 +110,7 @@ class ModelPhotoTest extends TestCase
         return $this->post(
             "/api/model-registration/{$invite->token}",
             ['persons' => $persons, 'manager_index' => 0],
-            ['Accept' => 'application/json']
+            ['Accept' => 'application/json', 'Content-Type' => 'multipart/form-data']
         );
     }
 

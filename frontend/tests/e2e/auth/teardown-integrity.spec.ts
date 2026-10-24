@@ -2,6 +2,7 @@ import {expect, test} from '@playwright/test';
 import {extractCookieHeader} from '../helpers/E2ECookieJar';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {UserDetailed} from '../../../src/logic/useUsers';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Teardown Integrity Validation', () => {
     test('Flow AK: UserController@destroy properly wipes user and ensures test isolation', { tag: ['@feature:auth:teardown'] }, async ({request}) => {
@@ -19,7 +20,7 @@ test.describe('Teardown Integrity Validation', () => {
 
         // Verifizieren, dass der Test-User VOR dem Teardown existiert
         let usersRes = await request.get('/api/management/users', {
-            headers: {'Cookie': adminToken}
+            headers: {'Cookie': adminToken, ...browserAuthHeaders(adminToken)}
         });
         let usersData = await usersRes.json();
         let found = usersData.data.find((u: UserDetailed) => u.email === testUser.email);
@@ -30,7 +31,7 @@ test.describe('Teardown Integrity Validation', () => {
 
         // Verifizieren, dass der Test-User NACH dem Teardown vollständig verschwunden ist
         usersRes = await request.get('/api/management/users', {
-            headers: {'Cookie': adminToken}
+            headers: {'Cookie': adminToken, ...browserAuthHeaders(adminToken)}
         });
         usersData = await usersRes.json();
         found = usersData.data.find((u: UserDetailed) => u.email === testUser.email);

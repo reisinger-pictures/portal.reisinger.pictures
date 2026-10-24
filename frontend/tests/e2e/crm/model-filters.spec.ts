@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Model-Filter & Deeplink', () => {
     let helper: E2ESessionHelper;
@@ -65,7 +66,7 @@ test.describe('Model-Filter & Deeplink', () => {
         // Fixture via the sanctioned API helper (no DB/localStorage hacking).
         const model = await helper.createRegisteredModel();
         const listRes = await request.get('/api/management/models?q=' + encodeURIComponent(model.firstName), {
-            headers: { 'Accept': 'application/json', 'Cookie': helper.getAdminToken() },
+            headers: { 'Accept': 'application/json', 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken())},
         });
         expect(listRes.ok()).toBeTruthy();
         const list = await listRes.json() as Array<{ id: string }>;
