@@ -18,8 +18,8 @@ Generated from the current repository files. The values below are derived; do no
 | Anchor references (generator definition) | 236 | 143 path references + 93 numbered locator groups |
 | Lines containing anchor locators | 86 | AGENTS.skills.md; definition in this report header |
 | CI workflow LF-terminated lines | 864 | .github/workflows/ci.yml (`wc -l` semantics) |
-| Open SKILLS-STAND positions | 1 | Position 10 (AGENTS.todo.md:1128) |
+| Open SKILLS-STAND positions | 1 | Position 10 (AGENTS.todo.md:1119) |
 | Closed SKILLS-STAND positions | 0 | none |
-| UI-Review table header | AGENTS.todo.md:937 | `| Schwere | Stelle | Befund | Vorschlag |` in its named section |
-| Dialog-UI-Review table header | AGENTS.todo.md:975 | `| Befund | Schwere | Von mir geprueft |` in its named section |
-| UI-Review completion examples | AGENTS.todo.md:939, AGENTS.todo.md:940 | `**Erledigt 2026-09-26:**` in the UI-Review section |
+| UI-Review table header | AGENTS.todo.md:928 | `| Schwere | Stelle | Befund | Vorschlag |` in its named section |
+| Dialog-UI-Review table header | AGENTS.todo.md:966 | `| Befund | Schwere | Von mir geprueft |` in its named section |
+| UI-Review completion examples | AGENTS.todo.md:930, AGENTS.todo.md:931 | `**Erledigt 2026-09-26:**` in the UI-Review section |
