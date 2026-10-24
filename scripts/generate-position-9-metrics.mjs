@@ -148,10 +148,6 @@ function measureAnchorReferences(source) {
     };
 }
 
-function findMatchingLines(lines, predicate) {
-    return lines.flatMap((line, index) => predicate(line) ? [index + 1] : []);
-}
-
 function measureTodoBoard(source) {
     const lines = source.split(/\r?\n/);
     const skillsSection = findSection(lines, /^##\s+.*SKILLS-STAND\b/);
@@ -168,27 +164,18 @@ function measureTodoBoard(source) {
         }
     }
 
-    const uiReviewSection = findSection(lines, /^##\s+UI-Review 2026-09-26\b/);
-    const dialogReviewSection = findSection(lines, /^##\s+Dialog-UI-Review 2026-09-27\b/);
-    const uiReviewHeaderLines = findMatchingLines(
-        uiReviewSection.lines,
-        (line) => /^\| Schwere \| Stelle \| Befund \| Vorschlag \|/.test(line),
-    ).map((line) => line + uiReviewSection.start);
-    const dialogReviewHeaderLines = findMatchingLines(
-        dialogReviewSection.lines,
-        (line) => /^\| Befund \| Schwere \| Von mir geprueft \|/.test(line),
-    ).map((line) => line + dialogReviewSection.start);
-    const completionExampleLines = findMatchingLines(
-        uiReviewSection.lines,
-        (line) => line.includes('**Erledigt 2026-09-26:'),
-    ).map((line) => line + uiReviewSection.start);
+    // Owner decision 2026-10-24 (formerly Position 10): a UI review's findings
+    // are a report in the skill's nine-column form, never a table on this board.
+    // The two legacy four-column headers are counted so the decision stays
+    // measurable instead of resting on the absence of a heading.
+    const legacyFindingTables = lines.filter(
+        (line) => /^\|\s*(Schwere \| Stelle \| Befund \| Vorschlag|Befund \| Schwere \| Von mir geprueft)\s*\|$/.test(line),
+    ).length;
 
     return {
         openPositions: positions.filter((position) => position.status === 'open'),
         closedPositions: positions.filter((position) => position.status === 'closed'),
-        uiReviewHeaderLines,
-        dialogReviewHeaderLines,
-        completionExampleLines,
+        legacyFindingTables,
     };
 }
 
@@ -223,7 +210,7 @@ export function renderMetrics(metrics) {
         '<!--',
         'Definitions: skills rows are body rows under `## Skill-Stand` with a verdict of `ja`, `nein` or `offen`.',
         'Anchor occurrences count concrete backtick-delimited file/directory paths plus each numeric group after `Z.` (slash-separated groups count separately); glob/placeholder paths, machine config paths, command/source snippets and the historical correction table are excluded. Anchor lines are source lines with at least one such occurrence.',
-        'Workflow lines use LF-terminated-line (`wc -l`) semantics. TODO positions are open checklist entries in the `SKILLS-STAND` section only. Historical table/example line numbers are located by their exact row/text within their named sections.',
+        'Workflow lines use LF-terminated-line (`wc -l`) semantics. TODO positions are open checklist entries in the `SKILLS-STAND` section only. Board finding tables are counted in the two legacy four-column forms; the owner decision of 2026-10-24 keeps a UI review\'s findings in its report, so the count stays at 0.',
         '-->',
         '',
         '# Position 9 metrics',
@@ -241,9 +228,7 @@ export function renderMetrics(metrics) {
         '| CI workflow LF-terminated lines | ' + metrics.workflowLines + ' | .github/workflows/ci.yml (`wc -l` semantics) |',
         `| Open SKILLS-STAND positions | ${metrics.todo.openPositions.length} | ${positionDetails} |`,
         `| Closed SKILLS-STAND positions | ${metrics.todo.closedPositions.length} | ${metrics.todo.closedPositions.map(({number, line}) => `Position ${number} (AGENTS.todo.md:${line})`).join(', ') || 'none'} |`,
-        '| UI-Review table header | ' + linesLabel(metrics.todo.uiReviewHeaderLines) + ' | `| Schwere | Stelle | Befund | Vorschlag |` in its named section |',
-        '| Dialog-UI-Review table header | ' + linesLabel(metrics.todo.dialogReviewHeaderLines) + ' | `| Befund | Schwere | Von mir geprueft |` in its named section |',
-        '| UI-Review completion examples | ' + linesLabel(metrics.todo.completionExampleLines) + ' | `**Erledigt 2026-09-26:**` in the UI-Review section |',
+        `| Board finding tables in the legacy four-column form | ${metrics.todo.legacyFindingTables} | owner decision 2026-10-24: a UI review's findings live in its report, not on the board |`,
         '',
     ].join('\n');
 }

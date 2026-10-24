@@ -2,7 +2,7 @@
 <!--
 Definitions: skills rows are body rows under `## Skill-Stand` with a verdict of `ja`, `nein` or `offen`.
 Anchor occurrences count concrete backtick-delimited file/directory paths plus each numeric group after `Z.` (slash-separated groups count separately); glob/placeholder paths, machine config paths, command/source snippets and the historical correction table are excluded. Anchor lines are source lines with at least one such occurrence.
-Workflow lines use LF-terminated-line (`wc -l`) semantics. TODO positions are open checklist entries in the `SKILLS-STAND` section only. Historical table/example line numbers are located by their exact row/text within their named sections.
+Workflow lines use LF-terminated-line (`wc -l`) semantics. TODO positions are open checklist entries in the `SKILLS-STAND` section only. Board finding tables are counted in the two legacy four-column forms; the owner decision of 2026-10-24 keeps a UI review's findings in its report, so the count stays at 0.
 -->
 
 # Position 9 metrics
@@ -18,8 +18,6 @@ Generated from the current repository files. The values below are derived; do no
 | Anchor references (generator definition) | 236 | 143 path references + 93 numbered locator groups |
 | Lines containing anchor locators | 86 | AGENTS.skills.md; definition in this report header |
 | CI workflow LF-terminated lines | 864 | .github/workflows/ci.yml (`wc -l` semantics) |
-| Open SKILLS-STAND positions | 1 | Position 10 (AGENTS.todo.md:1119) |
+| Open SKILLS-STAND positions | 0 | none |
 | Closed SKILLS-STAND positions | 0 | none |
-| UI-Review table header | AGENTS.todo.md:928 | `| Schwere | Stelle | Befund | Vorschlag |` in its named section |
-| Dialog-UI-Review table header | AGENTS.todo.md:966 | `| Befund | Schwere | Von mir geprueft |` in its named section |
-| UI-Review completion examples | AGENTS.todo.md:930, AGENTS.todo.md:931 | `**Erledigt 2026-09-26:**` in the UI-Review section |
+| Board finding tables in the legacy four-column form | 0 | owner decision 2026-10-24: a UI review's findings live in its report, not on the board |
