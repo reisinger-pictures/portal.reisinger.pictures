@@ -689,9 +689,11 @@ class WebhookController extends Controller
     /**
      * Apply only documented payment-terminal transitions under a row lock.
      *
-     * `refunded` and `cancelled` are terminal for dispute/refund events, and
-     * neither event may turn a pending quote or pending payment into a
-     * negative-access state. A dispute may follow a settled status, and a full
+     * `refunded` and `cancelled` are terminal for dispute/refund events. A
+     * verified matching dispute or full refund may also terminate a pending
+     * PaymentIntent before the success event arrives; strict reconciliation
+     * will then refuse the later success because the order is no longer
+     * `pending_payment`. A dispute may follow a settled status, and a full
      * refund may follow either a settled status or `disputed` (paid → disputed
      * → refunded). The conditional update also prevents a late event from
      * winning a concurrent status transition.
@@ -701,6 +703,7 @@ class WebhookController extends Controller
         $allowedSourceStatuses = match ($targetStatus) {
             'disputed' => [
                 'paid',
+                'pending_payment',
                 'invoice_created',
                 'overdue',
                 'delivery_note',
@@ -708,6 +711,7 @@ class WebhookController extends Controller
             ],
             'refunded' => [
                 'paid',
+                'pending_payment',
                 'invoice_created',
                 'overdue',
                 'delivery_note',
