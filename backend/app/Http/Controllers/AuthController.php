@@ -194,19 +194,35 @@ class AuthController extends Controller
         $org = $domain ? Org::where('domain', $domain)->first() : null;
         $orgBrandMatches = $org && BrandRegistry::resourceMatchesCurrent($org->brand);
         if ($org && $orgBrandMatches && $org->auto_join_policy === AutoJoinPolicy::IMMEDIATE && ! $user->org_id) {
-            $defaultRole = app(OrgDefaultRolePolicy::class)->roleForNewAssignment($org);
-            $user->roles()->syncWithoutDetaching([$defaultRole->id]);
+            $user = DB::transaction(function () use ($org, $user): User {
+                // Match membership-sync lock order and re-check the user under
+                // lock: another explicit join may have assigned an org after
+                // this reset request first read the account.
+                $lockedOrg = Org::query()->whereKey($org->getKey())->lockForUpdate()->first();
+                $lockedUser = User::query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
 
-            // Inherit flatrate settings from org
-            if ($org->default_flatrate_level) {
-                $user->flatrate_level = $org->default_flatrate_level;
-            }
-            if ($org->can_purchase_upgrades) {
-                $user->can_purchase_upgrades = true;
-            }
+                if (! $lockedOrg
+                    || ! BrandRegistry::resourceMatchesCurrent($lockedOrg->brand)
+                    || $lockedOrg->auto_join_policy !== AutoJoinPolicy::IMMEDIATE
+                    || $lockedUser->org_id !== null) {
+                    return $lockedUser;
+                }
 
-            $user->org_id = $org->id;
-            $user->save();
+                app(OrgDefaultRolePolicy::class)->assignRoleForNewAssignment($lockedUser, $lockedOrg);
+
+                // Inherit flatrate settings from org
+                if ($lockedOrg->default_flatrate_level) {
+                    $lockedUser->flatrate_level = $lockedOrg->default_flatrate_level;
+                }
+                if ($lockedOrg->can_purchase_upgrades) {
+                    $lockedUser->can_purchase_upgrades = true;
+                }
+
+                $lockedUser->org_id = $lockedOrg->id;
+                $lockedUser->save();
+
+                return $lockedUser;
+            });
         }
 
         $token = Auth::guard('api')->login($user);

@@ -64,13 +64,35 @@ Brands laufen ausschließlich im Hintergrund. Organisationen sind das sichtbare 
 
 ### 2.4. Per-organization default role
 
-Portal admins can configure an organization's default role as `client`, `power_user`, or `org_admin`. `null` resolves to `client`. The value is applied when a user joins through domain auto-join, is created by an org admin, or accepts an organization invite (including a pending invite accepted during registration). Editing the default does not change existing members. `OrgController::syncUsers()` can associate an existing account with an organization but does not grant the configured default role. Only portal admins may change the setting. The UI explains that choosing `org_admin` grants organization-scoped user-management rights to each joining account.
+Portal admins can configure an organization's default role as `client`, `power_user`, or `org_admin`. `null` resolves to `client`. The value is applied when a user joins through domain auto-join, is created by an org admin, accepts an organization invite (including a pending invite accepted during registration), or is newly added through `OrgController::syncUsers()`. Editing the default does not change existing members. Only portal admins may change the setting. The UI explains that choosing `org_admin` grants organization-scoped user-management rights to each joining account.
 
 `photographer`, `admin`, and `super_admin` are not valid organization defaults. A photographer role is tied to the FTP credential lifecycle, while the global admin roles exceed an organization's scope. An unsupported legacy value resolves to `client` for new assignments and is surfaced for repair. Organization member removal and organization deletion fail closed until the setting is repaired; they must not silently detach an unsupported specialized role. Existing photographer roles are removed only through the lock-aware FTP revocation path.
 
 ---
 
 ## 3. User-Zuordnung
+
+### 3.0. Einzelne Organisations-Mitgliedschaft
+
+Ein User kann zu einem Zeitpunkt genau einer Organisation angehören. Das
+Akzeptieren einer Einladung zu einer anderen Organisation ist die ausdrückliche
+Einwilligung zum Wechsel. Bei diesem Wechsel werden vor der Zuweisung die
+organisationsbezogenen Rollen `client`, `power_user` und `org_admin` der
+bisherigen Mitgliedschaft entfernt; anschließend erhält der User genau die
+Default-Rolle der Zielorganisation. `photographer`, `admin` und `super_admin`
+bleiben erhalten. Eine manuelle Zuordnung über `OrgController::syncUsers()` darf
+eine bestehende Mitgliedschaft dagegen nicht stillschweigend verschieben und
+wird mit einem Konflikt abgelehnt. Ein User ohne `org_id` kann beitreten und
+erhält die Default-Rolle der Zielorganisation. Domain-Auto-Join überschreibt
+keine bestehende Mitgliedschaft. Ein Beitritt zur selben Organisation bleibt
+idempotent.
+
+Bei einer expliziten Entfernung aus einer Organisation werden die
+organisationsbezogenen Rollen `client`, `power_user` und `org_admin` entfernt.
+Dadurch kann eine spätere Mitgliedschaft in einer anderen Organisation keine
+delegierten Rechte der vorherigen Organisation übernehmen. Die bestehenden
+Flatrate- und Upgrade-Aufräumregeln bei Entfernung bzw. Organisationslöschung
+bleiben davon unberührt.
 
 Es gibt drei Wege, User einer Organisation zuzuordnen:
 

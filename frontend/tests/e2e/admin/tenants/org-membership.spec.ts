@@ -1,9 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
+import { MailpitHelper } from '../../helpers/MailpitHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
 import { ToastHelper } from '../../helpers/ToastHelper';
 import {
+    adminCookie,
     createMemberUser,
     createOrgFixture,
     readAuthOrgScope,
@@ -14,6 +16,7 @@ import {
     syncOrgMembers,
     STUDIO_ADMIN,
 } from '../../helpers/AccessScopeFixture';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 /**
  * The membership of an organisation, as the management view writes it and as
@@ -83,6 +86,74 @@ test.describe('Organisation membership (sync and delete)', () => {
         expect(members?.map((member) => member.id)).toContain(newMember.id);
         // ...and the omitted one is not.
         expect(members?.map((member) => member.id)).not.toContain(currentMember.id);
+    });
+
+    test('accepting another org invite switches membership without carrying org_admin', { tag: ['@feature:org-membership'] }, async ({ page, request }) => {
+        const suffix = Math.random().toString(36).substring(2, 10);
+        const orgA = await createOrgFixture(request, helper, `E2E Invite Source ${suffix}`);
+        const orgB = await createOrgFixture(request, helper, `E2E Invite Destination ${suffix}`);
+        const member = await helper.createIsolatedUser('client');
+        await syncOrgMembers(request, helper, orgA.id, [member.id]);
+        await setUserRoles(request, helper, member.id, ['client', 'org_admin']);
+
+        const adminToken = await adminCookie(helper);
+        const rolesResponse = await request.get('/api/management/roles', {
+            headers: { Accept: 'application/json', Cookie: adminToken, ...browserAuthHeaders(adminToken)},
+        });
+        if (!rolesResponse.ok()) throw new Error(`Reading roles failed: ${await rolesResponse.text()}`);
+        const roles = await rolesResponse.json() as Array<{ id: string; name: string }>;
+        const powerUserRole = roles.find((role) => role.name === 'power_user');
+        if (!powerUserRole) throw new Error('power_user role was not returned by /api/management/roles');
+
+        const destinationUpdate = await request.put(`/api/management/orgs/${orgB.id}`, {
+            data: {
+                name: orgB.name,
+                invoice_frequency: 'immediate',
+                default_role_id: powerUserRole.id,
+            },
+            headers: { Accept: 'application/json', Cookie: adminToken, ...browserAuthHeaders(adminToken)},
+        });
+        if (!destinationUpdate.ok()) {
+            throw new Error(`Configuring the destination default role failed: ${await destinationUpdate.text()}`);
+        }
+
+        const inviteResponse = await request.post(`/api/management/orgs/${orgB.id}/invites`, {
+            data: { email: member.email },
+            headers: { Accept: 'application/json', Cookie: adminToken, ...browserAuthHeaders(adminToken)},
+        });
+        if (!inviteResponse.ok()) throw new Error(`Creating the organization invite failed: ${await inviteResponse.text()}`);
+
+        const inviteToken = await new MailpitHelper(request).extractOrgInviteToken(member.email);
+        if (!inviteToken) throw new Error(`The Org B invite email for ${member.email} did not contain a token`);
+
+        const auth = new AuthHelper(page);
+        await auth.login(member.email, member.password);
+        await page.goto(`/org-invite/${inviteToken}`);
+
+        const main = page.getByRole('main');
+        await expect(main.getByRole('heading', { name: 'Einladung zu Organisation' })).toBeVisible({ timeout: 20000 });
+        const redeemResponsePromise = page.waitForResponse(
+            (response) => response.url().includes('/api/org-invites/redeem') && response.request().method() === 'POST',
+        );
+        await main.getByRole('button', { name: 'Beitreten & Fortfahren' }).click();
+        const redeemResponse = await redeemResponsePromise;
+        if (!redeemResponse.ok()) throw new Error(`Accepting the organization invite failed: ${await redeemResponse.text()}`);
+        await expect(page).toHaveURL(/\/$/, { timeout: 20000 });
+
+        const sourceMembers = await readOrgMembers(request, helper, orgA.id);
+        const destinationMembers = await readOrgMembers(request, helper, orgB.id);
+        expect(sourceMembers?.map((candidate) => candidate.id)).not.toContain(member.id);
+        expect(destinationMembers?.map((candidate) => candidate.id)).toContain(member.id);
+
+        const usersResponse = await request.get('/api/management/users', {
+            headers: { Accept: 'application/json', Cookie: adminToken, ...browserAuthHeaders(adminToken)},
+        });
+        if (!usersResponse.ok()) throw new Error(`Reading users failed: ${await usersResponse.text()}`);
+        const users = await usersResponse.json() as {
+            data?: Array<{ id: string; roles?: Array<{ name: string }> }>;
+        };
+        const movedMember = users.data?.find((candidate) => candidate.id === member.id);
+        expect(movedMember?.roles?.map((role) => role.name)).toEqual(['power_user']);
     });
 
     test('deleting an organisation detaches its members', { tag: TAG }, async ({ page, request }) => {

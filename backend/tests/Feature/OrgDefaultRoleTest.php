@@ -368,7 +368,7 @@ class OrgDefaultRoleTest extends TestCase
             ->count());
     }
 
-    public function test_manual_membership_sync_does_not_apply_the_configured_default_role(): void
+    public function test_manual_membership_sync_applies_the_configured_default_role_to_a_new_member(): void
     {
         $admin = $this->admin();
         $client = $this->role(UserRole::CLIENT->value);
@@ -385,8 +385,8 @@ class OrgDefaultRoleTest extends TestCase
 
         $joined = $member->fresh();
         $this->assertSame($org->id, $joined->org_id);
-        $this->assertSame([$client->name], $joined->roles()->pluck('name')->all());
-        $this->assertFalse($joined->roles->contains('id', $powerUser->id));
+        $this->assertSame([$powerUser->name], $joined->roles()->pluck('name')->all());
+        $this->assertFalse($joined->roles->contains('id', $client->id));
     }
 
     public function test_default_role_validation_accepts_allowed_ids_and_rejects_every_other_role_name(): void

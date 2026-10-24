@@ -207,9 +207,7 @@ class OrgController extends Controller
 
             $users = User::whereIn('id', $userIds)->orderBy('id')->get();
             foreach ($users as $user) {
-                if ($org->default_role_id && $user->roles->contains($org->default_role_id)) {
-                    $user->roles()->detach($org->default_role_id);
-                }
+                $defaultRolePolicy->clearOrgScopedRoles($user);
                 if ($org->default_flatrate_level && $user->flatrate_level === $org->default_flatrate_level) {
                     $user->flatrate_level = 'none';
                 }
@@ -254,16 +252,10 @@ class OrgController extends Controller
 
             // The current membership is read inside the org lock, so it is
             // stable against other *syncs* of this org and against the
-            // *destroy* of this org: such a writer would have to take the same
-            // org row first. It is NOT stable against every writer of
-            // `users.org_id` — none of OrgInviteController::redeem(),
-            // UserController::store(), AuthController::register() and
-            // AuthController::resetPassword() (membership added) takes this org
-            // row lock. This read decides the *membership* — who is detached —
-            // not the lock set: a member added after it is not detached by this
-            // sync, and if it is submitted in `user_ids` as well it enters the
-            // lock set through the requested ids, but a requested member is
-            // never in the removed set either.
+            // *destroy* of this org. Invite redemption and deferred auto-join
+            // take the destination org lock before locking an existing user as
+            // well. Account-creation paths only add new users here. The user
+            // lock below remains authoritative for cross-org assignment checks.
             $currentMemberIds = User::query()
                 ->where('org_id', $id)
                 ->orderBy('id')
@@ -358,6 +350,15 @@ class OrgController extends Controller
                 }
             }
 
+            foreach ($newUserIds as $newUserId) {
+                $incomingUser = $lockedUsers->get($newUserId);
+                if ($incomingUser->org_id !== null && (string) $incomingUser->org_id !== (string) $id) {
+                    return response()->json([
+                        'error' => 'Benutzer gehört bereits einer anderen Organisation an. Bitte entferne zuerst die bestehende Mitgliedschaft.',
+                    ], 409);
+                }
+            }
+
             // SEC-20261018-01: membership cannot hand an org admin a studio role
             // capability. Existing out-of-domain members may remain in a sync
             // unchanged, but may not be newly imported or detached. Admins and
@@ -370,12 +371,6 @@ class OrgController extends Controller
                 foreach ($newlyAddedUserIds as $newUserId) {
                     $incomingUser = $lockedUsers->get($newUserId);
                     $incomingRoleNames = $incomingUser->roles->pluck('name')->all();
-
-                    if ($incomingUser->org_id !== null && (string) $incomingUser->org_id !== (string) $id) {
-                        return response()->json([
-                            'error' => 'Benutzer aus einer anderen Organisation können nicht übernommen werden.',
-                        ], 422);
-                    }
 
                     if (array_diff($incomingRoleNames, $orgRoleNames) !== []) {
                         return response()->json([
@@ -412,15 +407,14 @@ class OrgController extends Controller
                 $incomingUser = $lockedUsers->get($newUserId);
                 $incomingUser->org_id = $id;
                 $incomingUser->save();
+                $defaultRolePolicy->assignRoleForNewAssignment($incomingUser, $org);
             }
 
             foreach ($removedUserIds as $removedUserId) {
                 $removedUser = $lockedUsers->get($removedUserId);
 
-                // Revoke organization-derived role + flatrate from removed users.
-                if ($org->default_role_id && $removedUser->roles->contains('id', $org->default_role_id)) {
-                    $removedUser->roles()->detach($org->default_role_id);
-                }
+                // Revoke all organization-scoped roles + flatrate from removed users.
+                $defaultRolePolicy->clearOrgScopedRoles($removedUser);
                 if ($org->default_flatrate_level && $removedUser->flatrate_level === $org->default_flatrate_level) {
                     $removedUser->flatrate_level = 'none';
                 }
