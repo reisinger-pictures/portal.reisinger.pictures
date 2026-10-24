@@ -10,6 +10,9 @@
 #   ./sync.sh              echter Deploy
 #   ./sync.sh --dry-run    nur anzeigen, nichts aendern (empfohlen zuerst)
 #
+# Was uebertragen wird: 1) Backend (API), 2) Frontend-Build (dist/),
+# 3) die Caddyfile des internen FTP-Event-Listeners (Einzeldatei).
+#
 # Warum rsync und nicht scp: rclone sync war ein MIRROR (inkl. Loeschen). Der
 # Frontend-Build erzeugt content-hashed Assets, jeder Deploy muss den alten
 # Hash entfernen — scp -r hat kein --delete und wuerde die Dateien liegen lassen.
@@ -43,6 +46,14 @@ SITES="${PORTAL_SITES:-/home/webadmin/websites}"
 SSH_TARGET="${PORTAL_SSH_TARGET:-root@reisinger.pictures}"
 API_DEST="${PORTAL_API_DEST:-${SSH_TARGET}:${SITES}/api-portal.reisinger.pictures/}"
 WEB_DEST="${PORTAL_WEB_DEST:-${SSH_TARGET}:${SITES}/web-portal.reisinger.pictures/dist/}"
+# Die Caddyfile des ftp-events-Seitendienstes liegt NICHT im websites-Baum,
+# sondern unter einem festen Host-Pfad. Grund: der Stack laeuft aus Portainer,
+# und ein relatives Bind-Ziel in deployment/docker-compose.yml wuerde gegen
+# Portainers eigenes Compose-Verzeichnis aufgeloest (dort existiert die Datei
+# nicht -> Docker legt ein Verzeichnis an -> Caddy-Crashloop). Der Mount dort
+# und dieser Default muessen identisch bleiben; der Regressionstest vergleicht
+# beide.
+CADDY_DEST="${PORTAL_CADDY_DEST:-${SSH_TARGET}:/home/webadmin/portal/caddy/Caddyfile.ftp-events}"
 
 # Connection-Reuse: bei ~13.000 Backend-Dateien sonst ein Handshake pro Datei.
 SSH_OPTS="-o ControlMaster=auto -o ControlPath=/tmp/ssh-sync-%r@%h:%p -o ControlPersist=60"
@@ -89,6 +100,22 @@ echo "🎨 Sync: Frontend (dist)..."
 "$RSYNC_BIN" ./frontend/dist/ "$WEB_DEST" \
   --archive \
   --delete \
+  "$CHOWN" \
+  "$CHMOD" \
+  --info=progress2 \
+  --rsh="ssh $SSH_OPTS" \
+  ${RSYNC_EXTRA[@]+"${RSYNC_EXTRA[@]}"}
+
+# --- 3. Caddyfile des internen FTP-Event-Listeners (OPS-1) -----------------
+# Einzeldatei, kein Mirror: kein --delete (das Ziel IST die Datei). --mkpath
+# ist Pflicht, weil /home/webadmin/portal/caddy auf einem frischen Host noch
+# nicht existiert; ohne das Flag bricht rsync mit "No such file or directory"
+# ab. Danach muss der Portainer-Stack aktualisiert werden, damit der neue
+# Mount greift (deployment/README.md, FTP-Upload-Events).
+echo "🔐 Sync: Caddyfile fuer den internen FTP-Event-Listener..."
+"$RSYNC_BIN" ./deployment/Caddyfile.ftp-events "$CADDY_DEST" \
+  --archive \
+  --mkpath \
   "$CHOWN" \
   "$CHMOD" \
   --info=progress2 \

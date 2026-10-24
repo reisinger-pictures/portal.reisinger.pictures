@@ -103,6 +103,20 @@ SFTPGo erreicht den HTTP-Endpunkt über den Caddy-Seitendienst `ftp-events` im
 Docker-Netzwerk; dieser leitet ausschließlich den Upload-Event-Pfad an den
 FastCGI-only-Backend weiter. Alle anderen Pfade antworten mit 404.
 
+Die Caddyfile dieses Seitendienstes liegt **nicht** neben der Compose-Datei:
+`sync.sh` lädt `deployment/Caddyfile.ftp-events` als dritten Schritt nach
+`/home/webadmin/portal/caddy/Caddyfile.ftp-events` (`--mkpath` legt das
+Verzeichnis auf einem frischen Host an), und der Compose-Mount liest **genau
+diesen absoluten Pfad**. Ein relatives `./Caddyfile.ftp-events` wäre hier falsch:
+der Stack läuft aus Portainer, dessen Compose-Datei unter
+`/var/lib/docker/volumes/portainer_data/_data/compose/23/docker-compose.yml`
+liegt; ein relatives Bind-Ziel wird gegen dieses Verzeichnis aufgelöst, die Datei
+fehlt dort, und Docker Compose legt stattdessen ein **Verzeichnis** an — Caddy
+startet dann mit einem Verzeichnis als Konfiguration und läuft in eine
+Restart-Schleife. Deshalb gilt die Reihenfolge **erst syncen, dann den Stack
+aktualisieren**: ein Stack-Update vor dem ersten Sync, der die Datei ablegt,
+startet den Dienst ohne Caddyfile.
+
 ```bash
 FTP_EVENT_SECRET=<generiertes Secret>   # Pflicht
 FTP_EVENT_URL=                          # optional; Default = http://ftp-events:8080/api/internal/ftp/upload-event
