@@ -336,10 +336,15 @@ class InfrastructureSupplyChainPolicyTest extends TestCase
         );
 
         $this->assertStringContainsString(
-            "run: bash {$gate}",
+            'run: sh scripts/gates.sh full security',
             $this->ciJob('security-contract'),
-            'the security-contract job must run the artifact gate: it is the only job without an image dependency, '
+            'the security-contract job must invoke the grouped gate containing the artifact gate: it is the only job without an image dependency, '
                 .'so it keeps enforcing the non-root property while backend and e2e are blocked on a private package'
+        );
+        $this->assertStringContainsString(
+            "bash {$gate}",
+            $this->read('scripts/gates.sh'),
+            'the grouped security gate must retain the pinned base-image artifact check'
         );
     }
 

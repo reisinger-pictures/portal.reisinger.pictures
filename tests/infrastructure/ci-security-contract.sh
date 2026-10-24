@@ -489,10 +489,12 @@ frontend_ci_job="$(
     ' "$CI_WORKFLOW"
 )"
 [[ -n "$frontend_ci_job" ]] || fail 'CI must define the frontend job'
-assert_contains_text "$frontend_ci_job" '        run: pnpm lint:e2e' \
+assert_contains_text "$frontend_ci_job" '        run: sh ../scripts/gates.sh full frontend' \
+    'frontend CI must invoke the grouped frontend gate'
+assert_contains "$ROOT_DIR/scripts/gates.sh" 'pnpm lint:e2e' \
     'frontend CI must lint the Playwright E2E sources'
-assert_contains_text "$frontend_ci_job" \
-    '        run: pnpm exec tsc -p tsconfig.tests.json --noEmit --pretty false' \
+assert_contains "$ROOT_DIR/scripts/gates.sh" \
+    'pnpm exec tsc -p tsconfig.tests.json --noEmit --pretty false' \
     'frontend CI must type-check the E2E-inclusive test sources'
 
 e2e_ci_job="$(
@@ -513,14 +515,16 @@ security_contract_job="$(
     ' "$CI_WORKFLOW"
 )"
 [[ -n "$security_contract_job" ]] || fail 'CI must define the security-contract job'
+assert_contains_text "$security_contract_job" '        run: sh scripts/gates.sh full security' \
+    'the security-contract job must invoke the grouped security gate'
 for contract_step in \
     'bash tests/infrastructure/ci-security-contract.sh' \
     'bash tests/infrastructure/rsync-sync-regression.sh' \
     'bash tests/infrastructure/verify-image-nonroot.sh' \
     'bash tests/infrastructure/verify-image-freshness.sh' \
     'bash tests/infrastructure/image-pin-freshness-regression.sh'; do
-    assert_contains_text "$security_contract_job" "        run: $contract_step" \
-        "the security-contract job must run $contract_step"
+    assert_contains "$ROOT_DIR/scripts/gates.sh" "$contract_step" \
+        "the grouped security gate must run $contract_step"
 done
 assert_contains_text "$e2e_ci_job" \
     "    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork == false)" \

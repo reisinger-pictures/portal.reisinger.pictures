@@ -145,3 +145,20 @@ Diese Regeln sind aus Fehlschlägen entstanden, nicht aus Vermutungen. Jede nenn
   Do not resend `role_ids` after `createIsolatedUser()` has already assigned
   them. A new brand requires a reviewed config/enum change, not a test-only
   fixture value.
+
+## 8. Verification gate dispatcher
+
+`scripts/gates.sh` is the executable definition of the project tiers:
+
+- `sh scripts/gates.sh fast` is the local-safe gate: frontend `pnpm lint:fix`
+  and `pnpm build`, backend Pint check, and `git diff --check`. It does not run
+  PHPUnit, Vitest, Playwright, or other test suites.
+- `sh scripts/gates.sh full <group>` is restricted to GitHub Actions and is
+  invoked by the existing parallel CI jobs. Groups are `security`, `backend`,
+  `mariadb`, `frontend`, and `e2e`; the E2E group receives the matrix shard
+  arguments. CI setup, services, and job-level environment remain in the
+  workflow, and each job invokes its group once.
+- The `security` group retains the repository's infrastructure/security
+  contracts, including `verify-image-nonroot.sh`; its workflow job has no image
+  dependency so it can continue checking the published image boundary when
+  image-dependent jobs are unavailable.
