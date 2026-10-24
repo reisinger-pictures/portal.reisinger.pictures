@@ -58,6 +58,21 @@ updates:
         applies-to: security-updates
         patterns: ["*"]
         update-types: ["minor", "patch"]
+  # Actions sind auf einen vollen Commit-SHA gepinnt (Supply-Chain-Vertrag in
+  # `tests/infrastructure/ci-security-contract.sh`); ein beweglicher Tag waere
+  # dort ein Fehler. Dependabot ist der Weg, auf dem der Pin der neuesten
+  # Release folgt: es oeffnet einen PR mit dem neuen SHA, und die Pruefung
+  # bleibt eine menschliche Entscheidung — der Gruppenname steht bewusst nicht
+  # in der `SAFE_GROUPS`-Liste von `automerge.yml`.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: {interval: "weekly"}
+    open-pull-requests-limit: 8
+    labels: ["dependencies"]
+    groups:
+      github-actions:
+        applies-to: version-updates
+        patterns: ["*"]
   - package-ecosystem: docker
     directory: "/deployment"
     schedule: {interval: "weekly"}
