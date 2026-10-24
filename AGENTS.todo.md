@@ -1,5 +1,16 @@
 # Task Board — Portal Reisinger Pictures
 
+## Portal CI findings — 2026-10-24 (documentation only)
+
+**Owner scope:** document the current CI failures only; do not change Portal code or workflows. The owner explicitly accepts the red E2E result as an exception for this task. This is not a green CI/deployment gate.
+
+- CI run [`40103749482`](https://github.com/reisinger-pictures/portal.reisinger.pictures/actions/runs/40103749482), exact head `b2df12a47140e88891a3d580727a974ff34782e1` (the PHP mitigation): backend PHPUnit, frontend lint/build/Vitest, security contract and MariaDB identity jobs passed; Ratchet, E2E and the aggregate CI gate failed. The separate Portal E2E-image build [`40103926564`](https://github.com/reisinger-pictures/portal.reisinger.pictures/actions/runs/40103926564) passed; it does not verify application E2E behavior.
+- **Ratchet:** the runner could not load the pinned action manifest at `.github/workflows/ci.yml:101`; log: `action.yml: (Line: 1, Col: 7)... find character that cannot start any token`. The referenced revision `4933fd325ca0782dab3bddf6ed65c7100b699a91` has invalid YAML at the unquoted `name: @all-the-rest/ratchet-cli`. No workflow change was made. Revision `7f9dd4258ba84f3508ed150570ec752a7c4d49e7` was checked as valid and retains the action's default v0.3.2 behavior, but was not applied.
+- **E2E Origin rejection:** CI logs include `Cross-origin mutation rejected.` from login/setup requests. `E2ESessionHelper.ts` sends only `Accept` on its `/api/auth/login` POSTs (`ensureAdminLogin` and `loginAs`); `BrowserAuthHeaders.ts` provides the E2E Origin helper, while `ProtectApiMutations` rejects mutations without an allowed Origin/Referer when its policy requires one. The request headers received by the backend are not logged, so the missing/invalid Origin is a plausible cause, not a confirmed runtime explanation. The same rejection was present in earlier run [`40102003421`](https://github.com/reisinger-pictures/portal.reisinger.pictures/actions/runs/40102003421), before the PHP mitigation.
+- The serial E2E job in `40103749482` reported **6 failed, 14 did not run, 30 passed**. Besides Origin-rejected login/setup requests, its output includes `dragCard: source and target must be in the desktop viewport`; a desktop shard also reports failed contract assertions at `contracts.spec.ts:506` and `:581`. These remain observations, not remediated findings.
+
+- [~] Waiting for a separate owner instruction before any Portal CI remediation; the current task intentionally makes no Portal code or workflow changes.
+
 ## Architecture & Security Review — 2026-10-18
 
 **Execution hold:** This section records review findings only. Remediation, new tests,
