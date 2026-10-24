@@ -39,7 +39,7 @@ status: active
 - **Web Upload:** Direct upload via the frontend.
 - **FTP Inbox:** Photographers can upload files via FTP. The `FtpController` processes the queue.
 
-The authenticated upload endpoint resolves galleries within the actor's brand; a foreign-brand gallery is returned as not found (404). After the photographer-role guard, gallery authorization uses `AuthorizationService::canManageGallery()`.
+The authenticated upload endpoint applies the photographer-role guard first: an actor without the photographer role receives the photographer 403 before any gallery is resolved, so the check reveals nothing about gallery existence. After that guard, a gallery of a foreign brand is answered with the unchanged 404 `Galerie nicht gefunden`, and gallery authorization runs through `AuthorizationService::canManageGallery()`.
 
 
 ## 4. Metadata Application & Gallery Defaults
