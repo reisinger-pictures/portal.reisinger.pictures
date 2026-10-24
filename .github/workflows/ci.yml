@@ -79,78 +79,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Verify workflow and artifact security invariants
-        run: bash tests/infrastructure/ci-security-contract.sh
-      # Both Compose-v5 traps that took production down on 2026-09-26 are
-      # invisible to `docker compose config` and to a container that happens to
-      # boot: a `#` inside the folded `command:` comments out the rest of the
-      # joined line, and Compose v5 emits every `$(...)` as `$$(...)` so the
-      # shell expands `$$` to its PID. Neither shows up in a log. The gate reads
-      # the command block statically and fails closed on the whole guard, the
-      # migration sequence, the internal-network pin and the SFTPGo bootstrap
-      # mapping. See tests/infrastructure/compose-entrypoint-contract.sh.
-      - name: Verify the compose entrypoint contract
-        run: bash tests/infrastructure/compose-entrypoint-contract.sh
-      # The test image's browser version must come from the RESOLVED lockfile
-      # version. Dependabot updates the lockfile alone whenever a new version
-      # falls inside the declared range; the image rebuild trigger fires, but a
-      # version read from the manifest's range lower bound would rebuild the
-      # SAME browser under the SAME tag — the E2E run stays green because
-      # ci.yml installs the browser per run as a fallback, and the image's
-      # promise ("no browser download per run") is cancelled silently. The gate
-      # fails closed on a pin that no longer matches the lockfile.
-      - name: Verify the Playwright version binding
-        run: bash tests/infrastructure/verify-playwright-version.sh
-      # CR-INF-001/CR-INF-014: the sync regression was never executed by
-      # anything. It is self-contained (mktemp) and fails closed on
-      # private-storage exclusions, root SQLite exclusion and partial-sync
-      # propagation, so it belongs next to the other infrastructure contracts.
-      # Migrated 2026-09-26 from rclone to rsync: the test now drives the real
-      # sync.sh with a real rsync --dry-run against a local fixture instead of
-      # simulating rclone's filter engine in Python.
-      - name: Verify rsync sync exclusions and failure propagation
-        run: bash tests/infrastructure/rsync-sync-regression.sh
-      # P1-I5: the pinned base image must not run as root. This inspects the
-      # published artifact anonymously - a source-only 'USER www-data' check is
-      # not evidence, because the digest production pinned until d7f3596 was
-      # built before that line existed and ran as uid 0. A private package
-      # answers 401/403 and FAILS this step on purpose; it never degrades to a
-      # skip. See tests/infrastructure/verify-image-nonroot.sh.
-      - name: Verify the pinned base image is not a root image
-        run: bash tests/infrastructure/verify-image-nonroot.sh
-      # INFRA-6: the plugin harness must fail closed (non-zero) when neither
-      # python3 nor lua is available instead of reporting success after zero
-      # checks.
-      - name: Verify the Lightroom plugin harness fails closed
-        run: bash tests/infrastructure/plugin-harness-fail-closed.sh
-      # P2-T4: the harness above only proves the runner fails closed when no
-      # runtime is present. Nothing actually executed the suites, so a real Lua
-      # defect could ship green. This runs them for real. The source-level
-      # static checks need only python3; lua is installed so the four Lua
-      # suites execute too. Ubuntu's package ships the interpreter as lua5.x
-      # rather than lua, so the symlink is explicit instead of left to chance.
-      # No Lightroom runtime is involved either way — these are pure-Lua unit
-      # checks plus source invariants.
-      - name: Run the Lightroom plugin regression suites
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq lua5.4
-          if ! command -v lua >/dev/null 2>&1; then
-            sudo ln -sf "$(command -v lua5.4)" /usr/local/bin/lua
-          fi
-          bash admin.lrplugin/tests/run.sh
-      # INFRA-10: the images are consumed through mutable tags, so this gate
-      # resolves the artifact each consumed tag currently points at and fails
-      # when it is older than the documented maximum age. A workflow that
-      # silently stopped rebuilding therefore still trips the gate, which is the
-      # property the old digest pin provided and the tag pin no longer does.
-      - name: Verify the consumed image tags are fresh
-        run: bash tests/infrastructure/verify-image-freshness.sh
-      # The freshness policy itself is regression-tested against a fixture
-      # registry (a stale artifact must fail, a fresh one must pass).
-      - name: Verify the image pin freshness gate
-        run: bash tests/infrastructure/image-pin-freshness-regression.sh
+      - name: Run security contracts
+        run: sh scripts/gates.sh full security
 
   ratchet:
     # The gates of this repository: the security findings of the 2026-10-18
@@ -242,21 +172,14 @@ jobs:
             composer:2.10.3 install --ignore-platform-reqs --no-interaction --optimize-autoloader
       - name: Generate app key
         run: docker exec php php artisan key:generate
-      - name: Check PHP formatting (Pint)
+      - name: Backend Pint and PHPUnit gate
         # Pint runs in --test mode, so it reports and never rewrites. This is a
         # gate, not a formatter: it fails the build on style, so formatting
         # cannot silently drift back in across a large changeset. The codebase
         # was normalised once (165 files) when the gate was added, so this
         # starts from a clean baseline. Locally: cd backend && ./vendor/bin/pint,
         # then commit the result.
-        run: docker exec php ./vendor/bin/pint --test
-      - name: Run PHPUnit
-        # Parallele Worker via paratest (portal-base:8.5 enthaelt seit dem
-        # Rebuild ext-pcntl + posix). pipefail laesst den Step fehlschlagen,
-        # wenn Tests rot sind (nicht das tee). Log fuer Summary-Step.
-        run: |
-          set -o pipefail
-          docker exec php php artisan test --no-ansi --parallel 2>&1 | tee /tmp/phpunit.log
+        run: sh ../scripts/gates.sh full backend
       - name: Backend Test-Summary
         if: always()
         run: |
@@ -433,38 +356,11 @@ jobs:
         # fail the job instead of silently downgrading the proof.
         run: |
           docker exec php-mariadb php -r 'if (! function_exists("pcntl_fork")) { fwrite(STDERR, "ext-pcntl is missing in the CI PHP image\n"); exit(1); } echo "pcntl_fork available\n";'
-      - name: Run migrations on MariaDB
+      - name: Migrate and run MariaDB identity tests
         # V039 (contract signer identity: normalized_email + join_scope_key,
         # unique index, writer guards) has to run on MariaDB, not only on the
         # SQLite test database.
-        run: |
-          docker exec \
-            -e DB_CONNECTION \
-            -e DB_HOST \
-            -e DB_PORT \
-            -e DB_DATABASE \
-            -e DB_USERNAME \
-            -e DB_PASSWORD \
-            php-mariadb \
-            php artisan migrate --force
-      - name: Run the contract signer identity tests on MariaDB
-        # phpunit.xml pins the suite to DB_CONNECTION=sqlite / DB_DATABASE=:
-        # memory: WITHOUT force, so the environment of this step wins over
-        # the phpunit.xml defaults, and the immutable .env cannot overwrite
-        # them either. Only the two contract identity classes run - never the
-        # full suite.
-        run: |
-          set -o pipefail
-          docker exec \
-            -e DB_CONNECTION \
-            -e DB_HOST \
-            -e DB_PORT \
-            -e DB_DATABASE \
-            -e DB_USERNAME \
-            -e DB_PASSWORD \
-            php-mariadb \
-            php artisan test --no-ansi \
-              --filter='ContractSignerIdentityRaceTest|ContractSignerIdentityTest|ContractContentHeartbeatMySqlTest' 2>&1 | tee /tmp/phpunit-mariadb.log
+        run: sh ../scripts/gates.sh full mariadb
       - name: Backend (MariaDB) Test-Summary
         # A green job that skipped the proof is not a proof: this step turns
         # a skipped test into a red job, so the MariaDB coverage cannot decay
@@ -518,23 +414,13 @@ jobs:
         run: test "$(node --version)" = "v26.7.0"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Lint
-        run: pnpm lint
-      - name: Lint E2E
-        run: pnpm lint:e2e
-      - name: Type-check E2E-inclusive test sources
-        run: pnpm exec tsc -p tsconfig.tests.json --noEmit --pretty false
-      # prebuild (tsc -b + check-i18n) läuft automatisch vor `pnpm build`
-      - name: Build
-        run: pnpm build
+      - name: Frontend checks
+        run: sh ../scripts/gates.sh full frontend
         env:
           # Public build configuration only; never expose TURNSTILE_SECRET here.
-          # Set the repository variable to enable the production build gate.
           VITE_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
           TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
           TURNSTILE_BUILD_REQUIRED: ${{ vars.TURNSTILE_BUILD_REQUIRED || 'false' }}
-      - name: Unit tests
-        run: pnpm test:run
 
   e2e:
     # 3 Projekt-Shards je (Desktop / Mobile; 1/3 und 3/3 mit --workers=2,
@@ -877,7 +763,7 @@ jobs:
         # below is the intentionally sanitized CI output.
         run: |
           set -o pipefail
-          pnpm test:e2e ${{ matrix.args }} --reporter=list 2>&1 | tee /tmp/e2e.log
+          sh ../scripts/gates.sh full e2e ${{ matrix.args }}
         env:
           CI: "1"
           ADMIN_EMAIL: admin@example.com
