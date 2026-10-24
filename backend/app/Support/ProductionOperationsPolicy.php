@@ -26,6 +26,8 @@ final class ProductionOperationsPolicy
 
     public const SMTP_SCHEMES = ['smtp', 'smtps'];
 
+    public const FTP_EVENT_URL = 'http://ftp-events:8080/api/internal/ftp/upload-event';
+
     /**
      * @param  array<string, mixed>  $config
      * @return list<string>
@@ -43,6 +45,7 @@ final class ProductionOperationsPolicy
         $this->validateScheduler($config, $usesOnOneServerScheduler, $violations);
         $this->validateMail($config, $violations);
         $this->validateDebug($config, $violations);
+        $this->validateFtpEvents($config, $violations);
 
         return array_values(array_unique($violations));
     }
@@ -386,6 +389,21 @@ final class ProductionOperationsPolicy
             $debug === true,
             $violations,
             'APP_DEBUG must not be true in production.',
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  list<string>  $violations
+     */
+    private function validateFtpEvents(array $config, array &$violations): void
+    {
+        $eventUrl = $this->stringValue($config['ftp']['events']['url'] ?? null);
+
+        $this->addViolation(
+            $eventUrl !== self::FTP_EVENT_URL,
+            $violations,
+            'FTP_EVENT_URL must be the internal event listener ('.self::FTP_EVENT_URL.'); the upload-event secret must not leave the Docker network.',
         );
     }
 

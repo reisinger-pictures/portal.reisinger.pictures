@@ -1829,27 +1829,29 @@ zwei Konstanten nebeneinander. `ProvisionFtpEventsTest` pinnt zusätzlich
 
 | Config-Key | Default | Wo der Default steht |
 |---|---|---|
-| `FTP_EVENT_URL` | `APP_URL` + `/api/internal/ftp/upload-event`; leer/Leerraum → Default, aber nur bei absoluter `http(s)`-`APP_URL`; ein gesetzter Wert ohne `http(s)` → Befehl bricht ab | `grep -n "FTP_EVENT_URL" backend/config/ftp.php` |
+| `FTP_EVENT_URL` | `http://ftp-events:8080/api/internal/ftp/upload-event`; fehlend/leer/Leerraum → interner Default; Produktion akzeptiert nur exakt diese URL | `grep -n "FTP_EVENT_URL" backend/config/ftp.php` |
 | `FTP_EVENT_SECRET` | **kein Default.** Leer heißt: der Endpunkt lehnt jedes Event mit 401 ab, und der Befehl bricht ab | `grep -n "'secret'" backend/config/ftp.php` |
 | Header-Name | `X-FTP-Event-Secret` (kein Env-Key: er ist der Vertrag zwischen Endpunkt und Befehl) | `grep -n "secret_header" backend/config/ftp.php` |
 | Aktions-/Regelname | `portal-ftp-upload` / `portal-ftp-upload-rule` | `grep -n "action_name" backend/config/ftp.php` |
 
-`FTP_EVENT_URL` hat als Default die eigene öffentliche URL plus Endpunkt-Pfad,
-weil das die einzige Adresse ist, die SFTPGo in jeder Deployment-Variante
-erreicht (In-Network-Servicenamen unterscheiden sich je Compose-Revision).
+Der Default ist die interne Listener-Adresse, damit das Event-Secret nicht über
+die öffentliche `APP_URL` zum Host-Caddy und zurück gesendet wird. Die Compose-
+Datei publiziert `FTP_EVENT_URL=${FTP_EVENT_URL:-}` immer; fehlend, leer und
+reiner Leerraum werden in `config/ftp.php` deshalb auf denselben internen
+Default abgebildet. Ein gesetzter, nichtleerer Wert überschreibt den Default,
+aber `ProductionOperationsPolicy::validateFtpEvents()` weist in Produktion jede
+Abweichung beim Containerstart zurück.
 
-**Leer heißt nicht „gesetzt" (fixiert 2026-10-18).** Die Compose-Datei
-publiziert die Variable **immer** (`FTP_EVENT_URL=${FTP_EVENT_URL:-}`), in
-Portainer ohne Wert also als **Leerstring** — und Laravels `env()` liefert bei
-vorhandener-leerer Variable den Leerstring statt des Defaults. Fehlend, leer und
-reiner Leerraum werden deshalb in `config/ftp.php` auf denselben Fall abgebildet.
-Der Default entsteht nur, wenn `APP_URL` selbst absolut mit `http://`/`https://`
-beginnt — genau die Prüfung, die SFTPGo anwendet
-(`EventActionHTTPConfig.validate()`, `util.IsStringPrefixInSlice`,
-case-sensitiv); eine relative `APP_URL` ergibt `null`, und der Befehl nennt den
-fehlenden Wert, statt eine Aktion zu schreiben, die SFTPGo mit **400** ablehnt.
-Dasselbe Schema prüft der Befehl auch für einen **gesetzten** `FTP_EVENT_URL`
-vor dem Request.
+#### Interner Listener
+
+Der Backend-Container führt nur PHP-FPM aus und spricht FastCGI auf Port 9000;
+er hat keinen HTTP-Listener. SFTPGo hängt ausschließlich an `portal_internal`,
+während der Host-Caddy auf `webnet` liegt. Das Secret darf diese interne
+Netzwerkgrenze nicht verlassen. Der Caddy-Seitendienst `ftp-events` hängt daher
+nur an `portal_internal`, proxyt exakt `/api/internal/ftp/upload-event` an
+`backend:9000` und antwortet für jeden anderen Pfad mit 404. Er ist der einzige
+interne HTTP-Pfad zwischen SFTPGo und Backend. Die Production-Policy akzeptiert
+nur `http://ftp-events:8080/api/internal/ftp/upload-event`.
 
 `FTP_EVENT_SECRET` hat **keinen** Default: ein leerer Wert muss den Endpunkt
 fail-closed machen, nicht Events ohne Authentifizierung annehmen.
@@ -1870,7 +1872,7 @@ Befehl. Zwei Dinge gehören dazu:
 
    `FTP_EVENT_SECRET` ist ein Secret und gehört in die Portainer-Stack-Env, nie
    ins Repo (dieselbe Klasse wie C1–C4). `FTP_EVENT_URL` darf leer bleiben — der
-   Default aus `config/ftp.php` (`APP_URL` + Endpunkt-Pfad) greift.
+   Default aus `config/ftp.php` ist der interne Listener `ftp-events:8080`.
 2. **Der Provisionierungsschritt**, ausgeführt **nach** dem Start des
    Backend-Containers, weil er die Admin-API erreichen muss:
 
@@ -1915,3 +1917,11 @@ Der Teil, der **weiterhin** offen ist, ist der echte Kamera-Upload: er muss
 einen Job auslösen (Backend-Log: `FTP-Import-Kette abgeschlossen.`). Dafür
 braucht es ein Konto mit Zielgalerie und eine Kamera, die auf `ftp/<slug>`
 hochlädt — beides ist eine Betreiber- und Hardware-Aufgabe, kein Deploy.
+
+**Nachtrag (2026-10-24):** Der dort geprüfte öffentliche Endpunkt war der
+temporäre Zustand vor OPS-1; das Event läuft jetzt über den internen Listener,
+und der Block oben bleibt der Beleg für die Payload- und Secret-Kette.
+
+Der verbindliche Produktions-Rollout und die nötige Reihenfolge für den echten
+Upload-Nachweis stehen in `deployment/README.md`, Abschnitt
+„FTP-Upload-Events (D-36)“.
