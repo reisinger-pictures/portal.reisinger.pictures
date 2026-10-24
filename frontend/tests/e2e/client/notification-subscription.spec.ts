@@ -14,6 +14,7 @@ import {
     type FixtureGallery,
     type FixtureUser,
 } from '../helpers/AccessScopeFixture';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 /**
  * A notification opt-in is a **subscription**, never a grant (owner decisions
@@ -62,7 +63,7 @@ async function waitForSearchIndex(
     const cookie = await helper.loginAs(client.email, client.password);
     await expect(async () => {
         const response = await request.get(`/api/search?q=${encodeURIComponent(gallery.name)}`, {
-            headers: { Accept: 'application/json', Cookie: cookie },
+            headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
         });
         if (!response.ok()) {
             throw new Error(`The search request failed (HTTP ${response.status()})`);

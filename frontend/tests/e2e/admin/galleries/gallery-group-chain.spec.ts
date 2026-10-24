@@ -9,6 +9,7 @@ import {
     createGalleryGroupFixture,
     STUDIO_ADMIN,
 } from '../../helpers/AccessScopeFixture';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 /**
  * The management path of a gallery group: rename and delete.
@@ -123,7 +124,7 @@ test.describe('The group chain of the management path', () => {
         // the button and the download would have used.)
         const cookie = await helper.loginAs(photographer.email, photographer.password);
         const galleryResponse = await request.get(`/api/galleries/${gallery.slug}`, {
-            headers: { Accept: 'application/json', Cookie: cookie },
+            headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
         });
         expect(
             galleryResponse.status(),

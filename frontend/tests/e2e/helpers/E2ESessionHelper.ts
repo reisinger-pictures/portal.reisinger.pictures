@@ -3,6 +3,7 @@ import path from 'node:path';
 import { APIRequestContext, type APIResponse } from '@playwright/test';
 import { E2ECookieJar, extractCookieHeader } from './E2ECookieJar';
 import { MailpitHelper } from './MailpitHelper';
+import {browserAuthHeaders} from './BrowserAuthHeaders';
 
 const e2eBrandSettings = {
     accounting_email: 'brand-settings-e2e@example.com',
@@ -210,7 +211,7 @@ export class E2ESessionHelper {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Cookie': this.adminToken!,
+                'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!),
             },
         });
         this.rememberAdminCookies(response);
@@ -239,7 +240,7 @@ export class E2ESessionHelper {
     private async getLicenseTermsPayload(): Promise<Record<string, unknown>> {
         await this.ensureAdminLogin();
         const response = await this.request.get('/api/settings/license-terms', {
-            headers: { 'Accept': 'application/json', 'Cookie': this.adminToken! },
+            headers: { 'Accept': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)},
         });
         this.rememberAdminCookies(response);
         if (!response.ok()) {
@@ -315,7 +316,7 @@ export class E2ESessionHelper {
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'Cookie': this.adminToken!,
+                'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!),
             },
         });
         this.rememberAdminCookies(response);
@@ -347,7 +348,7 @@ export class E2ESessionHelper {
         const email = `e2e-${roleName}-${uniqueId}@example.com`;
         const password = 'SecurePassword123!';
         
-        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
+        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)};
 
         const createRes = await this.request.post('/api/management/users', {
             data: { name: `E2E ${roleName}`, email },
@@ -421,7 +422,7 @@ export class E2ESessionHelper {
         if (options?.assignGalleryId && options?.wantsNotifications) {
             await this.request.post(`/api/galleries/${options.assignGalleryId}/opt-in`, {
                 data: { wants_notifications: true },
-                headers: { 'Accept': 'application/json', 'Cookie': userCookies }
+                headers: { 'Accept': 'application/json', 'Cookie': userCookies, ...browserAuthHeaders(userCookies)}
             });
         }
 
@@ -447,7 +448,7 @@ export class E2ESessionHelper {
      */
     async createModelInvite(payload: string | { email?: string; label?: string }) {
         await this.ensureAdminLogin();
-        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)};
         const input = typeof payload === 'string' ? { email: payload } : payload;
         const data: { email?: string; label?: string } = {};
         if (input.email) data.email = input.email;
@@ -543,7 +544,7 @@ export class E2ESessionHelper {
         // Resolve the created customer for teardown (super-admin token sees all brands).
         let customerId: string | null = null;
         const listRes = await this.request.get('/api/management/models?q=' + encodeURIComponent(firstName), {
-            headers: { 'Accept': 'application/json', 'Cookie': this.adminToken! },
+            headers: { 'Accept': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)},
         });
         this.rememberAdminCookies(listRes);
         if (listRes.ok()) {
@@ -563,7 +564,7 @@ export class E2ESessionHelper {
      */
     private async resolveModelCustomerId(firstName: string): Promise<string | null> {
         const listRes = await this.request.get('/api/management/models?q=' + encodeURIComponent(firstName), {
-            headers: { 'Accept': 'application/json', 'Cookie': this.adminToken! },
+            headers: { 'Accept': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)},
         });
         this.rememberAdminCookies(listRes);
         if (!listRes.ok()) return null;
@@ -645,7 +646,7 @@ export class E2ESessionHelper {
     /** Create a 24h profile access link for a registered model (admin endpoint). */
     async createModelAccessLink(customerId: string): Promise<{ link: string; expires_at: string | null }> {
         await this.ensureAdminLogin();
-        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)};
         const res = await this.request.post(`/api/management/models/${customerId}/access-link`, { data: {}, headers });
         this.rememberAdminCookies(res);
         if (!res.ok()) throw new Error(`Model access link creation failed: ${await res.text()}`);
@@ -655,7 +656,7 @@ export class E2ESessionHelper {
     /** Delete a customer created by a model registration (cascade removes the profile). */
     async deleteModelCustomer(id: string) {
         await this.ensureAdminLogin();
-        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
+        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)};
         const response = await this.request.delete(`/api/management/customers/${id}`, { headers }).catch(() => null);
         if (response) this.rememberAdminCookies(response);
     }
@@ -674,7 +675,7 @@ export class E2ESessionHelper {
      */
     async assignUserToGalleryGroups(userId: string, groupIds: string[]): Promise<void> {
         await this.ensureAdminLogin();
-        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)};
 
         // No read-back: there is no GET for a single management user, and a
         // freshly created isolated user has no group assignments yet, so
@@ -691,7 +692,7 @@ export class E2ESessionHelper {
 
     async createVolumePreset(data: { name: string; tiers: Array<{ min_quantity: number; price_cents: number }> }): Promise<VolumePresetResponse> {
         await this.ensureAdminLogin();
-        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)};
         const res = await this.request.post('/api/management/settings/volume-presets', { data, headers });
         this.rememberAdminCookies(res);
         if (!res.ok()) throw new Error(`Volume preset creation failed: ${await res.text()}`);
@@ -700,7 +701,7 @@ export class E2ESessionHelper {
 
     async createCoupon(data: CouponDefinition): Promise<CouponResponse> {
         await this.ensureAdminLogin();
-        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)};
         const res = await this.request.post('/api/management/coupons', { data, headers });
         this.rememberAdminCookies(res);
         if (!res.ok()) throw new Error(`Coupon creation failed: ${await res.text()}`);
@@ -709,7 +710,7 @@ export class E2ESessionHelper {
 
     async updateCoupon(id: string, data: Partial<CouponDefinition>): Promise<CouponResponse> {
         await this.ensureAdminLogin();
-        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)};
         const res = await this.request.put(`/api/management/coupons/${id}`, { data, headers });
         this.rememberAdminCookies(res);
         if (!res.ok()) throw new Error(`Coupon update failed: ${await res.text()}`);
@@ -722,7 +723,7 @@ export class E2ESessionHelper {
         volumePresetId: string | number | null = null,
     ) {
         await this.ensureAdminLogin();
-        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken! };
+        const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)};
         const res = await this.request.put(`/api/management/galleries/${galleryId}`, {
             data: { licensing_mode: licensingMode, volume_preset_id: volumePresetId },
             headers,
@@ -733,7 +734,7 @@ export class E2ESessionHelper {
 
     async seedBillingSettings() {
         await this.ensureAdminLogin();
-        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
+        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)};
         const response = await this.request.put('/api/management/settings/billing-details', {
             data: {
                 bank_holder: 'Reisinger Pictures GmbH',
@@ -750,7 +751,7 @@ export class E2ESessionHelper {
     }
 
     private async deleteResources(ids: string[], endpoint: string, label: string) {
-        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken! };
+        const headers = { 'Accept': 'application/json', 'Cookie': this.adminToken!, ...browserAuthHeaders(this.adminToken!)};
         for (const id of ids) {
             const response = await this.request.delete(`${endpoint}/${id}`, { headers })
                 .catch((err) => {

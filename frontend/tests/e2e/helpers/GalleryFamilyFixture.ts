@@ -1,5 +1,6 @@
 import { type APIRequestContext } from '@playwright/test';
 import { E2ESessionHelper } from './E2ESessionHelper';
+import {browserAuthHeaders} from './BrowserAuthHeaders';
 
 /**
  * The ONE deterministic gallery seed the whole gallery-dialog family hangs on.
@@ -84,7 +85,7 @@ async function createGalleryAsUser(
             type: definition.type,
             is_public: definition.isPublic,
         },
-        headers: { Accept: 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
 
     if (!response.ok()) {
@@ -159,7 +160,7 @@ export async function createReferenceGalleryGroup(
     const cookie = await helper.loginAs(user.email, user.password);
     const response = await request.post('/api/management/gallery-groups', {
         data: { name: REFERENCE_GALLERY_GROUP.name, is_public: REFERENCE_GALLERY_GROUP.isPublic },
-        headers: { Accept: 'application/json', Cookie: cookie },
+        headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
     });
 
     if (!response.ok()) {

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('Digital Contracts Workflow', () => {
     let helper: E2ESessionHelper;
@@ -87,7 +88,7 @@ test.describe('Digital Contracts Workflow', () => {
                 discounts: [],
             },
             headers: {
-                'Cookie': helper.getAdminToken(),
+                'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
                 'Accept': 'application/json',
             },
         });
@@ -100,7 +101,7 @@ test.describe('Digital Contracts Workflow', () => {
         // Open the contract
         const openRes = await request.post(`/api/management/contracts/${contractId}/open`, {
             headers: {
-                'Cookie': helper.getAdminToken(),
+                'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
                 'Accept': 'application/json',
             },
         });
@@ -172,7 +173,7 @@ test.describe('Digital Contracts Workflow', () => {
         // ADMIN: Close the contract
         const closeRes = await request.post(`/api/management/contracts/${contractId}/close`, {
             headers: {
-                'Cookie': helper.getAdminToken(),
+                'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
                 'Accept': 'application/json',
             },
         });
@@ -184,7 +185,7 @@ test.describe('Digital Contracts Workflow', () => {
 
     test('signing view displays the authoritative total for percentage and fixed discounts', { tag: ['@regression', '@feature:contracts'] }, async ({ page, request }) => {
         const headers = {
-            'Cookie': helper.getAdminToken(),
+            'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
             'Accept': 'application/json',
         };
 
@@ -249,7 +250,7 @@ test.describe('Digital Contracts Workflow', () => {
 
     test('CR-FE-016: changing a contract token clears identity, consent and signed state while retaining reusable roles', { tag: ['@regression', '@feature:contracts'] }, async ({ page, request }) => {
         const headers = {
-            'Cookie': helper.getAdminToken(),
+            'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
             'Accept': 'application/json',
         };
         const joinTokens: string[] = [];
@@ -351,7 +352,7 @@ test.describe('Digital Contracts Workflow', () => {
                 discounts: [],
             },
             headers: {
-                'Cookie': helper.getAdminToken(),
+                'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
                 'Accept': 'application/json',
             },
         });
@@ -363,7 +364,7 @@ test.describe('Digital Contracts Workflow', () => {
 
         // Open the contract (start signing period)
         const openRes = await request.post(`/api/management/contracts/${contractId}/open`, {
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' },
         });
         expect(openRes.ok()).toBeTruthy();
         const openData = await openRes.json();
@@ -388,7 +389,7 @@ test.describe('Digital Contracts Workflow', () => {
         // Admin edits the contract while signer has it open (increments content_version)
         const editRes = await request.put(`/api/management/contracts/${contractId}`, {
             data: { terms_html: `<p>Version 2 - ${uniqueSuffix}</p>` },
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' },
         });
         expect(editRes.ok()).toBeTruthy();
 
@@ -427,7 +428,7 @@ test.describe('Digital Contracts Workflow', () => {
                 expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
             },
             headers: {
-                'Cookie': helper.getAdminToken(),
+                'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
                 'Accept': 'application/json',
             },
         });
@@ -438,7 +439,7 @@ test.describe('Digital Contracts Workflow', () => {
         helper.trackContract(templateId);
 
         const openRes = await request.post(`/api/management/contracts/${templateId}/open`, {
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' },
         });
         expect(openRes.ok()).toBeTruthy();
         const openData = await openRes.json();
@@ -467,7 +468,7 @@ test.describe('Digital Contracts Workflow', () => {
         expect(signRes.ok()).toBeTruthy();
 
         const instancesRes = await request.get(`/api/management/contracts/${templateId}/instances`, {
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' },
         });
         expect(instancesRes.ok()).toBeTruthy();
         const instances = await instancesRes.json();
@@ -490,7 +491,7 @@ test.describe('Digital Contracts Workflow', () => {
                 expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
             },
             headers: {
-                'Cookie': helper.getAdminToken(),
+                'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
                 'Accept': 'application/json',
             },
         });
@@ -500,7 +501,7 @@ test.describe('Digital Contracts Workflow', () => {
         helper.trackContract(templateId);
 
         const openRes = await request.post(`/api/management/contracts/${templateId}/open`, {
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' },
         });
         expect(openRes.ok()).toBeTruthy();
         const openData = await openRes.json();
@@ -509,7 +510,7 @@ test.describe('Digital Contracts Workflow', () => {
         await request.put(`/api/management/contracts/${templateId}`, {
             data: { expires_at: '2000-01-01T00:00:00.000Z' },
             headers: {
-                'Cookie': helper.getAdminToken(),
+                'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
                 'Accept': 'application/json',
             },
         });
@@ -566,7 +567,7 @@ test.describe('Digital Contracts Workflow', () => {
                 expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
             },
             headers: {
-                'Cookie': helper.getAdminToken(),
+                'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
                 'Accept': 'application/json',
             },
         });
@@ -575,7 +576,7 @@ test.describe('Digital Contracts Workflow', () => {
         helper.trackContract(templateId);
 
         const openRes = await request.post(`/api/management/contracts/${templateId}/open`, {
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' },
         });
         expect(openRes.ok()).toBeTruthy();
         const joinToken = (await openRes.json()).join_link.split('/contracts/join/')[1];
@@ -607,7 +608,7 @@ test.describe('Digital Contracts Workflow', () => {
         }
 
         const instancesRes = await request.get(`/api/management/contracts/${templateId}/instances`, {
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' },
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' },
         });
         expect(instancesRes.ok()).toBeTruthy();
         const instances = await instancesRes.json();

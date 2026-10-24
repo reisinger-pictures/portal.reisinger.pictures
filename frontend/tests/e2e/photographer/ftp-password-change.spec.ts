@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 /**
  * The photographer changes their own camera password (D-51).
@@ -46,7 +47,7 @@ test.describe('Kamera-Passwort ändern', () => {
         // page ever sees it.
         const cookie = await helper.loginAs(testUser.email, testUser.password);
         const resetResponse = await request.post('/api/management/ftp/reset-password', {
-            headers: { 'Accept': 'application/json', Cookie: cookie },
+            headers: { 'Accept': 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
         });
         // The body is read once and kept: `text()` consumes it, so a second
         // read for the failure message would make the `json()` below fail for

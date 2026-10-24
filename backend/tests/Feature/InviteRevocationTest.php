@@ -215,8 +215,12 @@ class InviteRevocationTest extends TestCase
     private function asRefreshToken(string $token): self
     {
         $this->resetJwtState();
+        $csrf = $this->csrfCredentials();
 
-        return $this->withUnencryptedCookie('rp_jwt_refresh', $token)->withCredentials();
+        return $this->withUnencryptedCookie('XSRF-TOKEN', $csrf['cookie'])
+            ->withUnencryptedCookie('rp_jwt_refresh', $token)
+            ->withHeaders($csrf['headers'])
+            ->withCredentials();
     }
 
     private function resetJwtState(): void

@@ -3,6 +3,7 @@ import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { KanbanHelper } from '../helpers/KanbanHelper';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Bildbearbeitungs-Board (Photographer)', () => {
     // Status-Select-Transitions verändern das Board live; die Tests teilen sich
@@ -85,7 +86,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
         const adminCookie = await helper.loginAs(superAdmin.email, superAdmin.password);
         const createRes = await request.post('/api/management/photo-jobs', {
             data: { title, lightroom_catalog: catalogName },
-            headers: { 'Accept': 'application/json', 'Cookie': adminCookie },
+            headers: { 'Accept': 'application/json', 'Cookie': adminCookie, ...browserAuthHeaders(adminCookie)},
         });
         expect(createRes.ok()).toBeTruthy();
         expect((await createRes.json()).photo_job.lightroom_catalog_is_mine).toBe(false);
@@ -135,7 +136,7 @@ test.describe('Bildbearbeitungs-Board (Photographer)', () => {
                 total_count: 24,
                 selected_count: 12,
             },
-            headers: { Accept: 'application/json', Cookie: cookie },
+            headers: { Accept: 'application/json', Cookie: cookie, ...browserAuthHeaders(cookie)},
         });
         expect(createResponse.ok()).toBeTruthy();
         const { photo_job: photoJob } = await createResponse.json() as { photo_job: { id: string } };

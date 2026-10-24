@@ -184,7 +184,7 @@ class ModelContactSheetBulkTest extends TestCase
         $ids = array_fill(0, ModelContactSheetService::MAX_BULK_PROFILES + 1, $profile->id);
 
         $response = $this->actingAs($admin, 'api')
-            ->post('/api/management/models/contact-sheet', ['ids' => $ids, 'variant' => 'internal'])
+            ->postJson('/api/management/models/contact-sheet', ['ids' => $ids, 'variant' => 'internal'])
             ->assertOk();
 
         $text = $this->pdfText($response->streamedContent());
@@ -251,7 +251,7 @@ class ModelContactSheetBulkTest extends TestCase
         $this->assertSame(ModelProfile::LIFECYCLE_INACTIVE, $profile->lifecycleStatus());
 
         $this->actingAs($superAdmin, 'api')
-            ->post('/api/management/models/contact-sheet', ['ids' => [$profile->id], 'variant' => 'internal'])
+            ->postJson('/api/management/models/contact-sheet', ['ids' => [$profile->id], 'variant' => 'internal'])
             ->assertOk();
     }
 
@@ -272,7 +272,7 @@ class ModelContactSheetBulkTest extends TestCase
         $this->addPhoto($second, self::PUBLIC_PHOTO, ModelPhoto::VISIBILITY_PUBLIC, true);
 
         $response = $this->actingAs($admin, 'api')
-            ->post('/api/management/models/contact-sheet', [
+            ->postJson('/api/management/models/contact-sheet', [
                 'ids' => [$first->id, $second->id],
                 'variant' => 'internal',
             ]);
@@ -312,7 +312,7 @@ class ModelContactSheetBulkTest extends TestCase
         $this->addPhoto($second, self::PUBLIC_PHOTO, ModelPhoto::VISIBILITY_PUBLIC, true);
 
         $pdf = $this->actingAs($admin, 'api')
-            ->post('/api/management/models/contact-sheet', [
+            ->postJson('/api/management/models/contact-sheet', [
                 'ids' => [$first->id, $second->id],
                 'variant' => 'internal',
             ])
@@ -352,7 +352,7 @@ class ModelContactSheetBulkTest extends TestCase
         $this->addPhoto($second, self::PUBLIC_PHOTO, ModelPhoto::VISIBILITY_PUBLIC, true, 24);
 
         $response = $this->actingAs($admin, 'api')
-            ->post('/api/management/models/contact-sheet', [
+            ->postJson('/api/management/models/contact-sheet', [
                 'ids' => [$first->id, $second->id],
                 'variant' => 'external',
             ]);
@@ -407,7 +407,7 @@ class ModelContactSheetBulkTest extends TestCase
         $this->addPhoto($profile, 'Zweites.png', ModelPhoto::VISIBILITY_PUBLIC, false);
 
         $text = $this->pdfText($this->actingAs($admin, 'api')
-            ->post('/api/management/models/contact-sheet', [
+            ->postJson('/api/management/models/contact-sheet', [
                 'ids' => [$profile->id],
                 'variant' => 'internal',
             ])
@@ -447,7 +447,7 @@ class ModelContactSheetBulkTest extends TestCase
         ]);
 
         $text = $this->pdfText($this->actingAs($admin, 'api')
-            ->post('/api/management/models/contact-sheet', [
+            ->postJson('/api/management/models/contact-sheet', [
                 'ids' => [$profile->id],
                 'variant' => 'internal',
             ])
@@ -589,7 +589,7 @@ class ModelContactSheetBulkTest extends TestCase
         Log::spy();
 
         $this->actingAs($admin, 'api')
-            ->post('/api/management/models/contact-sheet', [
+            ->postJson('/api/management/models/contact-sheet', [
                 'ids' => [$first->id, $second->id],
                 'variant' => 'external',
             ])

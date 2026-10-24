@@ -4,6 +4,7 @@ import { AuthHelper } from '../helpers/AuthHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', () => {
     let helper: E2ESessionHelper;
@@ -25,7 +26,7 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
     });
 
     async function createOrgAdmin(request: APIRequestContext, token: string) {
-        const headers = { 'Accept': 'application/json', 'Cookie': token };
+        const headers = { 'Accept': 'application/json', 'Cookie': token, ...browserAuthHeaders(token)};
         const orgName = `E2E Org ${Math.random().toString(36).substring(2, 10)}`;
         const tenantRes = await request.post('/api/management/orgs', {
             data: { name: orgName, invoice_frequency: 'immediate' },
@@ -151,7 +152,7 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
             .toHaveAttribute('href', '/users', { timeout: 15000 });
 
         const invitedUserRes = await request.get('/api/management/users', {
-            headers: { 'Accept': 'application/json', 'Cookie': adminToken }
+            headers: { 'Accept': 'application/json', 'Cookie': adminToken, ...browserAuthHeaders(adminToken)}
         });
         if (!invitedUserRes.ok()) throw new Error(`User lookup failed. Status: ${invitedUserRes.status()} Body: ${await invitedUserRes.text()}`);
         type ManagedUser = { id: string; email: string; is_photographer: boolean; roles?: Array<{ name: string }> };
@@ -174,12 +175,12 @@ test.describe('E4: Org-Admin lädt User ein → User registriert → hat Org', (
         if (!invitedCookie) throw new Error('Invited user login response did not contain an auth cookie');
 
         const ftpProcessRes = await request.post('/api/management/ftp/process', {
-            headers: { 'Accept': 'application/json', 'Cookie': invitedCookie }
+            headers: { 'Accept': 'application/json', 'Cookie': invitedCookie, ...browserAuthHeaders(invitedCookie)}
         });
         expect(ftpProcessRes.status()).toBe(403);
 
         const tenantRes = await request.get(`/api/management/orgs/${orgId}`, {
-            headers: { 'Accept': 'application/json', 'Cookie': adminToken }
+            headers: { 'Accept': 'application/json', 'Cookie': adminToken, ...browserAuthHeaders(adminToken)}
         });
         if (!tenantRes.ok()) throw new Error(`Organization lookup failed. Status: ${tenantRes.status()} Body: ${await tenantRes.text()}`);
         const tenantData = await tenantRes.json() as { users?: Array<{ id: string }> };

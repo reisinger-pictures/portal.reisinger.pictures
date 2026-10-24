@@ -9,6 +9,7 @@ import { UploadHelper } from '../helpers/UploadHelper';
 import { MailpitHelper } from '../helpers/MailpitHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { Role } from '../../../src/logic/useUsers';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Custom Quotes Full Workflow', () => {
     let helper: E2ESessionHelper;
@@ -43,7 +44,7 @@ test.describe('Custom Quotes Full Workflow', () => {
         await upload.uploadSampleImage();
 
         const validAdminToken = helper.getAdminToken();
-        const rolesRes = await page.request.get('/api/management/roles', { headers: { 'Cookie': validAdminToken } });
+        const rolesRes = await page.request.get('/api/management/roles', { headers: { 'Cookie': validAdminToken, ...browserAuthHeaders(validAdminToken)} });
         expect(rolesRes.ok()).toBeTruthy();
         const rolesData = await rolesRes.json();
         const roles = Array.isArray(rolesData) ? rolesData : (rolesData.data || []);
@@ -52,7 +53,7 @@ test.describe('Custom Quotes Full Workflow', () => {
 
         const galleryUrl = page.url();
         const gallerySlug = galleryUrl.split('/').pop();
-        const galRes = await page.request.get(`/api/galleries/${gallerySlug}`, { headers: { 'Cookie': validAdminToken } });
+        const galRes = await page.request.get(`/api/galleries/${gallerySlug}`, { headers: { 'Cookie': validAdminToken, ...browserAuthHeaders(validAdminToken)} });
         expect(galRes.ok()).toBeTruthy();
         const galData = await galRes.json();
         const galId = galData.gallery?.id;
@@ -61,7 +62,7 @@ test.describe('Custom Quotes Full Workflow', () => {
         // Wir weisen dem Client die Galerie zu
         const assignRes = await page.request.put(`/api/management/users/${clientUser.id}`, {
             data: { role_ids: [powerUserRoleId], gallery_ids: [galId], gallery_group_ids: [], can_edit_metadata: false, brand: 'rp' },
-            headers: { 'Cookie': validAdminToken, 'Accept': 'application/json', 'Content-Type': 'application/json' }
+            headers: { 'Cookie': validAdminToken, ...browserAuthHeaders(validAdminToken), 'Accept': 'application/json', 'Content-Type': 'application/json' }
         });
         expect(assignRes.ok()).toBeTruthy();
         await auth.logout();

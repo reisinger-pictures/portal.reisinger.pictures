@@ -4,6 +4,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
 const sampleImage = readFileSync(sampleImagePath);
@@ -27,7 +28,7 @@ test.describe('Coupon Admin CRUD', () => {
         const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'rp' });
 
         const couponCode = `FIXED-${Math.random().toString(36).substring(2, 8)}`;
-        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, ...browserAuthHeaders(srpCookie), 'Referer': 'http://localhost:4321/' };
         const createRes = await request.post('/api/management/coupons', {
             // `value` is cents for `fixed` (owner decision 2026-09-28).
             data: { code: couponCode, type: 'fixed', value: 1500, scope_type: 'global', active: true },
@@ -49,7 +50,7 @@ test.describe('Coupon Admin CRUD', () => {
         const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'rp' });
 
         const couponOrgCode = `ORG-${Math.random().toString(36).substring(2, 8)}`;
-        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, ...browserAuthHeaders(srpCookie), 'Referer': 'http://localhost:4321/' };
         const orgRes = await request.post('/api/management/coupons', {
             data: { code: couponOrgCode, type: 'fixed', value: 1000, scope_type: 'global', active: true },
             headers: couHeaders,
@@ -74,7 +75,7 @@ test.describe('Coupon Admin CRUD', () => {
         const jsonHeaders = (cookie: string) => ({
             'Accept': 'application/json',
             'Content-Type': 'application/json',
-            'Cookie': cookie,
+            'Cookie': cookie, ...browserAuthHeaders(cookie),
             'Referer': 'http://localhost:4321/',
         });
 
@@ -103,7 +104,7 @@ test.describe('Coupon Admin CRUD', () => {
         const uploadResponse = await request.post('/api/management/upload', {
             headers: {
                 'Accept': 'application/json',
-                'Cookie': photographerCookie,
+                'Cookie': photographerCookie, ...browserAuthHeaders(photographerCookie),
                 'Referer': 'http://localhost:4321/',
             },
             multipart: {
@@ -210,7 +211,7 @@ test.describe('Coupon Admin CRUD', () => {
         const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'rp' });
 
         const toggleCouponCode = `TOGGLE-${Math.random().toString(36).substring(2, 8)}`;
-        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, ...browserAuthHeaders(srpCookie), 'Referer': 'http://localhost:4321/' };
         const toggleRes = await request.post('/api/management/coupons', {
             data: { code: toggleCouponCode, type: 'percentage', value: 10, scope_type: 'global', active: true },
             headers: couHeaders,

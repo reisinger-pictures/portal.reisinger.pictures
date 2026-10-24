@@ -6,6 +6,7 @@ import { GalleryHelper } from '../helpers/GalleryHelper';
 import {SidebarHelper} from "../helpers/SidebarHelper";
 import {ModalHelper} from "../helpers/ModalHelper";
 import {NetworkHelper} from "../helpers/NetworkHelper";
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Communication Workflow (Flows E, F)', () => {
     let helper: E2ESessionHelper;
@@ -40,7 +41,7 @@ test.describe('Communication Workflow (Flows E, F)', () => {
         const clientUser = await helper.createIsolatedUser('client');
         await request.post(`/api/management/galleries/${galleryId}/sync-access`, {
             data: { user_id: clientUser.id, action: 'attach' },
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' }
         });
 
         // Login as client, toggle email opt-in ON

@@ -5,6 +5,7 @@ import {GalleryHelper} from '../helpers/GalleryHelper';
 import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
 import {SidebarHelper} from '../helpers/SidebarHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Quote Cart Restore Workflow', () => {
     let helper: E2ESessionHelper;
@@ -45,7 +46,7 @@ test.describe('Quote Cart Restore Workflow', () => {
         await auth.logout();
 
         const detailRes = await request.get(`/api/galleries/${gallerySlug}`, {
-            headers: {'Cookie': helper.getAdminToken(), Accept: 'application/json'},
+            headers: {'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), Accept: 'application/json'},
         });
         expect(detailRes.ok(), await detailRes.text()).toBeTruthy();
         const detail = await detailRes.json() as {photos?: Array<{id?: string}>};
@@ -54,7 +55,7 @@ test.describe('Quote Cart Restore Workflow', () => {
 
         const quoteRes = await request.post('/api/management/orders/quote-link', {
             data: {photo_ids: photoIds.slice(0, 2), custom_price: 150000},
-            headers: {Cookie: helper.getAdminToken(), Accept: 'application/json', 'Content-Type': 'application/json'},
+            headers: {Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), Accept: 'application/json', 'Content-Type': 'application/json'},
         });
         expect(quoteRes.ok(), await quoteRes.text()).toBeTruthy();
         const quoteData = await quoteRes.json() as {link?: string};

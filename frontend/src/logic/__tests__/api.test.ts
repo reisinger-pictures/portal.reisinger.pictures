@@ -73,6 +73,51 @@ describe('apiMutate', () => {
     });
 });
 
+describe('CSRF token header', () => {
+    it('echoes the readable token on every unsafe helper and omits it from reads', async () => {
+        const csrfToken = 'signed.token.value';
+        vi.stubGlobal('document', {cookie: 'theme=dark; XSRF-TOKEN=signed%2Etoken%2Evalue'});
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(new Response(JSON.stringify({success: true}), {
+                status: 200,
+                headers: {'Content-Type': 'application/json'},
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({success: true}), {
+                status: 200,
+                headers: {'Content-Type': 'application/json'},
+            }))
+            .mockResolvedValueOnce(new Response(new Blob(['%PDF']), {
+                status: 200,
+                headers: {'Content-Type': 'application/pdf'},
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({data: true}), {
+                status: 200,
+                headers: {'Content-Type': 'application/json'},
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({success: true}), {
+                status: 200,
+                headers: {'Content-Type': 'application/json'},
+            }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await apiMutate('/api/example', 'POST', {value: true});
+        await apiUpload('/api/management/upload', new FormData());
+        await apiDownload('/api/management/invoices/manual', {
+            method: 'POST',
+            body: JSON.stringify({invoice_number: 'R-1'}),
+        });
+        await fetcher('/api/read');
+        await refreshAuthSession();
+
+        for (const requestIndex of [0, 1, 2, 4]) {
+            const request = fetchMock.mock.calls[requestIndex][1] as RequestInit;
+            expect(request.headers).toEqual(expect.objectContaining({'X-XSRF-TOKEN': csrfToken}));
+        }
+        const readRequest = fetchMock.mock.calls[3][1] as RequestInit;
+        expect(readRequest.headers).not.toHaveProperty('X-XSRF-TOKEN');
+    });
+});
+
 describe('auth session refresh', () => {
     it('refreshes an expired access session for /api/auth/me and retries the original request', async () => {
         const user: AuthMeUser = {

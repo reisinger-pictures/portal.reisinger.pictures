@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('Product Batch Edit Workflow', () => {
     let helper: E2ESessionHelper;
@@ -16,14 +17,14 @@ test.describe('Product Batch Edit Workflow', () => {
         // Seed two products
         const p1 = await request.post('/api/management/products', {
             data: { type: 'item', name: `Batch Item 1 ${uniqueId}`, description: 'Desc 1', price: 100 },
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' }
         });
         const d1 = await p1.json();
         helper.trackProduct(d1.product.id);
 
         const p2 = await request.post('/api/management/products', {
             data: { type: 'item', name: `Batch Item 2 ${uniqueId}`, description: 'Desc 2', price: 200 },
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json' }
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json' }
         });
         const d2 = await p2.json();
         helper.trackProduct(d2.product.id);

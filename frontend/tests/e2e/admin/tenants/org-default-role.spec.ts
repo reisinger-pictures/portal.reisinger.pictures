@@ -9,6 +9,7 @@ import {
     STUDIO_ADMIN,
     syncOrgMembers,
 } from '../../helpers/AccessScopeFixture';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('Organization default role', () => {
     let helper: E2ESessionHelper;
@@ -28,7 +29,7 @@ test.describe('Organization default role', () => {
 
         const adminToken = await adminCookie(helper);
         const rolesResponse = await request.get('/api/management/roles', {
-            headers: { Accept: 'application/json', Cookie: adminToken },
+            headers: { Accept: 'application/json', Cookie: adminToken, ...browserAuthHeaders(adminToken)},
         });
         if (!rolesResponse.ok()) throw new Error(`Role lookup failed: ${await rolesResponse.text()}`);
         const roles = await rolesResponse.json() as Array<{ id: string; name: string }>;
@@ -50,14 +51,14 @@ test.describe('Organization default role', () => {
         await main.getByRole('button', { name: 'Speichern', exact: true }).click();
 
         const detailResponse = await request.get(`/api/management/orgs/${org.id}`, {
-            headers: { Accept: 'application/json', Cookie: adminToken },
+            headers: { Accept: 'application/json', Cookie: adminToken, ...browserAuthHeaders(adminToken)},
         });
         if (!detailResponse.ok()) throw new Error(`Reading organization failed: ${await detailResponse.text()}`);
         const detail = await detailResponse.json() as { default_role_id: string | null };
         expect(detail.default_role_id).toBe(orgAdminRole.id);
 
         const usersResponse = await request.get('/api/management/users', {
-            headers: { Accept: 'application/json', Cookie: adminToken },
+            headers: { Accept: 'application/json', Cookie: adminToken, ...browserAuthHeaders(adminToken)},
         });
         if (!usersResponse.ok()) throw new Error(`Reading users failed: ${await usersResponse.text()}`);
         const users = await usersResponse.json() as {
@@ -75,7 +76,7 @@ test.describe('Organization default role', () => {
 
         const adminToken = await adminCookie(helper);
         const rolesResponse = await request.get('/api/management/roles', {
-            headers: { Accept: 'application/json', Cookie: adminToken },
+            headers: { Accept: 'application/json', Cookie: adminToken, ...browserAuthHeaders(adminToken)},
         });
         if (!rolesResponse.ok()) throw new Error(`Role lookup failed: ${await rolesResponse.text()}`);
         const roles = await rolesResponse.json() as Array<{ id: string; name: string }>;
@@ -99,12 +100,12 @@ test.describe('Organization default role', () => {
                 invoice_frequency: 'immediate',
                 default_role_id: powerUserRole.id,
             },
-            headers: { Accept: 'application/json', Cookie: orgAdminToken },
+            headers: { Accept: 'application/json', Cookie: orgAdminToken, ...browserAuthHeaders(orgAdminToken)},
         });
         expect(rejectedUpdate.status()).toBe(403);
 
         const detailResponse = await request.get(`/api/management/orgs/${org.id}`, {
-            headers: { Accept: 'application/json', Cookie: adminToken },
+            headers: { Accept: 'application/json', Cookie: adminToken, ...browserAuthHeaders(adminToken)},
         });
         if (!detailResponse.ok()) throw new Error(`Reading organization failed: ${await detailResponse.text()}`);
         const detail = await detailResponse.json() as { default_role_id: string | null };
@@ -147,7 +148,7 @@ test.describe('Organization default role', () => {
 
         const orgAdminCookie = await helper.loginAs(orgAdmin.email, orgAdmin.password);
         const usersResponse = await request.get('/api/management/users', {
-            headers: { Accept: 'application/json', Cookie: orgAdminCookie },
+            headers: { Accept: 'application/json', Cookie: orgAdminCookie, ...browserAuthHeaders(orgAdminCookie)},
         });
         if (!usersResponse.ok()) throw new Error(`Reading organization users failed: ${await usersResponse.text()}`);
         const users = await usersResponse.json() as {

@@ -164,6 +164,34 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
+     * Issue a CSRF token through the real API path and return the cookie value
+     * plus the headers a browser would send.
+     *
+     * The token is minted by the middleware itself, so this helper cannot drift
+     * from the signing format: a request without the cookie is rejected, and the
+     * first response of any `/api/*` call carries the signed token.
+     *
+     * @return array{cookie: string, headers: array<string, string>}
+     */
+    protected function csrfCredentials(): array
+    {
+        $token = (string) $this->getJson('/api/ping')->getCookie('XSRF-TOKEN', false)?->getValue();
+        if ($token === '') {
+            throw new RuntimeException('The API did not issue an XSRF-TOKEN cookie.');
+        }
+
+        return [
+            'cookie' => $token,
+            'headers' => [
+                'X-XSRF-TOKEN' => $token,
+                // The test client builds absolute URLs from `app.url`, so this
+                // is exactly the effective request origin.
+                'Origin' => rtrim((string) config('app.url'), '/'),
+            ],
+        ];
+    }
+
+    /**
      * Register a local disk below a user-owned, per-test system temp root.
      *
      * Storage::fake uses a fixed project-local root that may contain artifacts

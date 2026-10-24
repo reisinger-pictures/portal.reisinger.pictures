@@ -4,6 +4,7 @@ import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Gallery-Scoped Coupons', () => {
     let helper: E2ESessionHelper;
@@ -28,7 +29,7 @@ test.describe('Gallery-Scoped Coupons', () => {
             headers: {
                 Accept: 'application/json',
                 'Content-Type': 'application/json',
-                Cookie: helper.getAdminToken(),
+                Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
             },
         });
         if (!response.ok()) throw new Error(`Gallery volume-mode update failed: ${await response.text()}`);
@@ -51,7 +52,7 @@ test.describe('Gallery-Scoped Coupons', () => {
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://localhost:4321/');
         const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'rp' });
         const couponCode = `GAL-${Math.random().toString(36).substring(2, 8)}`;
-        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, ...browserAuthHeaders(srpCookie), 'Referer': 'http://localhost:4321/' };
         const createRes = await request.post('/api/management/coupons', {
             // `value` is cents for `fixed` (owner decision 2026-09-28): 1000 is
             // 10,00 €, which is the amount the assertion below pins.
@@ -108,7 +109,7 @@ test.describe('Gallery-Scoped Coupons', () => {
         await auth.login(srpAdmin.email, srpAdmin.password, 'http://localhost:4321/');
         const srpCookie = await helper.loginAs(srpAdmin.email, srpAdmin.password, { brand: 'rp' });
         const couponCode = `GAL-${Math.random().toString(36).substring(2, 8)}`;
-        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, 'Referer': 'http://localhost:4321/' };
+        const couHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': srpCookie, ...browserAuthHeaders(srpCookie), 'Referer': 'http://localhost:4321/' };
         const createRes2 = await request.post('/api/management/coupons', {
             // Cents for `fixed`; this row is only about scope rejection, but the
             // value must still be a valid amount.

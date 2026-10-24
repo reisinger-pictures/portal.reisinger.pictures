@@ -4,6 +4,7 @@ import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
 import { MailpitHelper } from '../../helpers/MailpitHelper';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('E6: Kein Organisation anlegen Button für Org-Admin', () => {
     let helper: E2ESessionHelper;
@@ -25,7 +26,7 @@ test.describe('E6: Kein Organisation anlegen Button für Org-Admin', () => {
     });
 
     async function createOrgAdmin(request: APIRequestContext, token: string) {
-        const headers = { 'Accept': 'application/json', 'Cookie': token };
+        const headers = { 'Accept': 'application/json', 'Cookie': token, ...browserAuthHeaders(token)};
         const orgName = `E2E Org ${Math.random().toString(36).substring(2, 10)}`;
         const tenantRes = await request.post('/api/management/orgs', {
             data: { name: orgName, invoice_frequency: 'immediate' },

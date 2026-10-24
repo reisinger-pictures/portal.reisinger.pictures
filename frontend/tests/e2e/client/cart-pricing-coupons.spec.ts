@@ -7,6 +7,7 @@ import {ModalHelper} from '../helpers/ModalHelper';
 import {SidebarHelper} from '../helpers/SidebarHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 import {formatMoney} from '../../../src/logic/utils';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 type User = {email: string; password: string; id: string};
 type GalleryFixture = {id: string; name: string; slug: string};
@@ -333,7 +334,7 @@ test.describe('Cart pricing and coupon integration', () => {
             licensingMode: 'scope_licensing',
         }]);
         const galleryRes = await request.get(`/api/galleries/${fixtures[0].slug}`, {
-            headers: {Cookie: helper.getAdminToken(), Accept: 'application/json'},
+            headers: {Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), Accept: 'application/json'},
         });
         expect(galleryRes.ok(), await galleryRes.text()).toBeTruthy();
         const galleryData = await galleryRes.json() as {photos?: Array<{id?: string}>};
@@ -342,7 +343,7 @@ test.describe('Cart pricing and coupon integration', () => {
 
         const quoteRes = await request.post('/api/management/orders/quote-link', {
             data: {photo_ids: [photoId], custom_price: 1500},
-            headers: {Cookie: helper.getAdminToken(), Accept: 'application/json', 'Content-Type': 'application/json'},
+            headers: {Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), Accept: 'application/json', 'Content-Type': 'application/json'},
         });
         expect(quoteRes.ok(), await quoteRes.text()).toBeTruthy();
         const quoteData = await quoteRes.json() as {link?: string};

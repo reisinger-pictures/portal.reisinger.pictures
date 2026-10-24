@@ -6,6 +6,7 @@ import { UploadHelper } from '../../helpers/UploadHelper';
 import { FormHelper } from '../../helpers/FormHelper';
 import { PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock } from '../../helpers/GlobalSettingsLock';
 import { ModalHelper } from '../../helpers/ModalHelper';
+import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
 test.describe('Audit Logs (Download Logs)', () => {
     let helper: E2ESessionHelper;
@@ -54,7 +55,7 @@ test.describe('Audit Logs (Download Logs)', () => {
         const adminToken = helper.getAdminToken();
         await request.post(`/api/management/galleries/${galleryId}/sync-access`, {
             data: { user_id: clientUser.id, action: 'attach' },
-            headers: { 'Cookie': adminToken, 'Accept': 'application/json' }
+            headers: { 'Cookie': adminToken, ...browserAuthHeaders(adminToken), 'Accept': 'application/json' }
         });
 
         await auth.logout();

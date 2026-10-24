@@ -156,7 +156,8 @@ class AuthControllerTest extends TestCase
         // The expired access token is sent as a bearer header to prove that
         // auth:api is not involved. A browser would have removed rp_jwt by now;
         // only the longer-lived refresh cookie is sent below.
-        $response = $this->withHeader('Authorization', "Bearer $token")
+        $response = $this->withValidCsrf()
+            ->withHeader('Authorization', "Bearer $token")
             ->withUnencryptedCookie('rp_jwt_refresh', $token)
             ->withCredentials()
             ->postJson('/api/auth/refresh');
@@ -178,7 +179,8 @@ class AuthControllerTest extends TestCase
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $token = Auth::guard('api')->login($user);
 
-        $first = $this->withUnencryptedCookie('rp_jwt_refresh', $token)
+        $first = $this->withValidCsrf()
+            ->withUnencryptedCookie('rp_jwt_refresh', $token)
             ->withCredentials()
             ->postJson('/api/auth/refresh');
         $first->assertStatus(200)->assertCookie('rp_jwt')->assertCookie('rp_jwt_refresh');
@@ -186,7 +188,8 @@ class AuthControllerTest extends TestCase
 
         $this->assertNotSame($token, $rotatedRefreshToken);
 
-        $second = $this->withUnencryptedCookie('rp_jwt_refresh', $token)
+        $second = $this->withValidCsrf()
+            ->withUnencryptedCookie('rp_jwt_refresh', $token)
             ->withCredentials()
             ->postJson('/api/auth/refresh');
         $second->assertStatus(401)
@@ -198,7 +201,8 @@ class AuthControllerTest extends TestCase
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $token = Auth::guard('api')->login($user);
 
-        $response = $this->withUnencryptedCookie('rp_jwt', $token)
+        $response = $this->withValidCsrf()
+            ->withUnencryptedCookie('rp_jwt', $token)
             ->withCredentials()
             ->postJson('/api/auth/logout');
 
@@ -272,5 +276,13 @@ class AuthControllerTest extends TestCase
         } finally {
             Carbon::setTestNow();
         }
+    }
+
+    private function withValidCsrf(): static
+    {
+        $csrf = $this->csrfCredentials();
+
+        return $this->withUnencryptedCookie('XSRF-TOKEN', $csrf['cookie'])
+            ->withHeaders($csrf['headers']);
     }
 }

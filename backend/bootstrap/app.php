@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\BrandContextMiddleware;
 use App\Http\Middleware\ManagementMiddleware;
+use App\Http\Middleware\ProtectApiMutations;
 use App\Http\Middleware\SetSecurityHeaders;
 use App\Http\Middleware\SuperAdminMiddleware;
 use Illuminate\Auth\AuthenticationException;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(BrandContextMiddleware::class);
         $middleware->append(SetSecurityHeaders::class);
+        $middleware->append(ProtectApiMutations::class);
         // Registriere den Alias für unsere Admin-Middleware
         $middleware->alias([
             'management' => ManagementMiddleware::class,

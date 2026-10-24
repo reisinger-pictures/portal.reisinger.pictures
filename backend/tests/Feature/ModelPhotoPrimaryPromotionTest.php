@@ -154,7 +154,7 @@ class ModelPhotoPrimaryPromotionTest extends TestCase
                 ]],
             ]],
             'manager_index' => 0,
-        ], ['Accept' => 'application/json'])->assertCreated();
+        ], ['Accept' => 'application/json', 'Content-Type' => 'multipart/form-data'])->assertCreated();
 
         $this->assertTrue($lockObservedDuringActCreate);
         $this->assertFalse(Cache::lock($lockName)->isLocked());

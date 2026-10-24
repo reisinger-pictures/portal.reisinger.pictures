@@ -97,7 +97,11 @@ class ReservedNullBrandTrustBoundaryTest extends TestCase
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
         $token = Auth::guard('api')->login($user);
 
-        $this->withUnencryptedCookie('rp_jwt_refresh', $token)
+        $csrf = $this->csrfCredentials();
+
+        $this->withUnencryptedCookie('XSRF-TOKEN', $csrf['cookie'])
+            ->withUnencryptedCookie('rp_jwt_refresh', $token)
+            ->withHeaders($csrf['headers'])
             ->withCredentials()
             ->postJson('/api/auth/refresh')
             ->assertUnauthorized();

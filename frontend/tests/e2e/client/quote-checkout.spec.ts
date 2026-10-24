@@ -9,6 +9,7 @@ import { ModalHelper } from '../helpers/ModalHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
 import { StripeHelper } from '../helpers/StripeHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
+import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Quote Checkout Workflow', () => {
     // CI-Flakiness-Schutz: Stripe-API ist von CI-Runner-IPs zeitweise nicht
@@ -53,13 +54,13 @@ test.describe('Quote Checkout Workflow', () => {
         const galleryUrl = page.url();
         const gallerySlug = galleryUrl.split('/').pop();
         const validAdminToken = helper.getAdminToken();
-        const galRes = await request.get(`/api/galleries/${gallerySlug}`, { headers: { 'Cookie': validAdminToken } });
+        const galRes = await request.get(`/api/galleries/${gallerySlug}`, { headers: { 'Cookie': validAdminToken, ...browserAuthHeaders(validAdminToken)} });
         const galData = await galRes.json();
         const galId = galData.gallery?.id;
         expect(galId).toBeTruthy();
 
         // Galerie dem Buyer zuweisen (power_user-Rolle)
-        const rolesRes = await request.get('/api/management/roles', { headers: { 'Cookie': validAdminToken } });
+        const rolesRes = await request.get('/api/management/roles', { headers: { 'Cookie': validAdminToken, ...browserAuthHeaders(validAdminToken)} });
         expect(rolesRes.ok()).toBeTruthy();
         const rolesData = await rolesRes.json();
         const roles = Array.isArray(rolesData) ? rolesData : (rolesData.data || []);
@@ -68,12 +69,12 @@ test.describe('Quote Checkout Workflow', () => {
 
         const assignRes = await request.put(`/api/management/users/${buyerUser.id}`, {
             data: { role_ids: [powerUserRoleId], gallery_ids: [galId], gallery_group_ids: [], can_edit_metadata: false, brand: 'rp' },
-            headers: { 'Cookie': validAdminToken, 'Accept': 'application/json', 'Content-Type': 'application/json' }
+            headers: { 'Cookie': validAdminToken, ...browserAuthHeaders(validAdminToken), 'Accept': 'application/json', 'Content-Type': 'application/json' }
         });
         expect(assignRes.ok()).toBeTruthy();
 
         // Galerie-Photos aus der Gallery-Detail-Response abrufen
-        const galDetailRes = await request.get(`/api/galleries/${gallerySlug}`, { headers: { 'Cookie': validAdminToken } });
+        const galDetailRes = await request.get(`/api/galleries/${gallerySlug}`, { headers: { 'Cookie': validAdminToken, ...browserAuthHeaders(validAdminToken)} });
         const galDetailData = await galDetailRes.json();
         const photos = Array.isArray(galDetailData.photos) ? galDetailData.photos : [];
         expect(photos.length).toBeGreaterThan(0);
@@ -85,7 +86,7 @@ test.describe('Quote Checkout Workflow', () => {
         // --- 2. Admin generiert quote_token mit Festpreis (1500 € = 150000 Cent) ---
         const quoteRes = await request.post('/api/management/orders/quote-link', {
             data: { photo_ids: [photoId], custom_price: 150000, rights_text: 'Exklusivnutzung Print + Web, 2 Jahre, Österreich' },
-            headers: { 'Cookie': helper.getAdminToken(), 'Accept': 'application/json', 'Content-Type': 'application/json' }
+            headers: { 'Cookie': helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()), 'Accept': 'application/json', 'Content-Type': 'application/json' }
         });
         expect(quoteRes.ok()).toBeTruthy();
         const quoteData = await quoteRes.json();
@@ -167,7 +168,7 @@ test.describe('Quote Checkout Workflow', () => {
             headers: {
                 Accept: 'application/json',
                 'Content-Type': 'application/json',
-                Cookie: helper.getAdminToken(),
+                Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
             },
         });
         expect(paidResponse.ok(), await paidResponse.text()).toBeTruthy();
