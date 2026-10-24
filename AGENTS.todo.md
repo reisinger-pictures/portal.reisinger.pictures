@@ -469,16 +469,17 @@ unverändert gegenüber dem vorigen Deploy, Homepage **200**.
   laufendes SFTPGo verifiziert** — `scripts/e2e-up.sh` provisioniert sie bei jedem
   Test-Stack-Setup, und der Test-SFTPGo zeigt die Aktion (POST, Secret-Header,
   JSON-Body, Timeout 10 s) und die Regel (`fs_events: ["upload"]`, aktiv) zurück.
-  **In der Produktion ist die Kette aber noch nicht scharf** (gemessen 2026-10-21:
-  der laufende `portal_backend`-Container führt **kein** `FTP_EVENT_SECRET` in seiner
-  Umgebung — 0 Treffer — und `php artisan ftp:provision-events --dry-run` verweigert mit
-  „FTP_EVENT_SECRET ist nicht gesetzt."). Die Aktion und die Regel wurden also **nie** in
-  das Produktions-SFTPGo geschrieben, und jedes Ereignis würde mit 401 abgewiesen
-  (fail-closed, korrekt). **Ein Upload ohne Button importiert in der Produktion daher
-  heute nicht.** Die Schritte stehen in `deployment/README.md:110-127`: Secret in der
-  Portainer-GUI setzen → Stack-**Recreate** (ein Restart übernimmt keine neuen
-  `environment:`-Zeilen) → `docker exec portal_backend php artisan ftp:provision-events`.
-  Erst danach ist der Upload-Teil dieser Position sinnvoll prüfbar.
+  **In der Produktion ist die Kette laut Live-Verifikation vom 2026-10-22 eingerichtet und
+  geprüft:** Secret in der Portainer-Stack-Env, Backend-Container neu erzeugt,
+  `ftp:provision-events` mit Exit 0, Aktion und Regel gegen die Admin-API zurückgelesen, und
+  der Endpunkt antwortete ohne Secret mit 401 (Beleg:
+  `features/infrastructure/19-ftp-upload-pipeline.md`, Abschnitt „Live-Verifikation").
+  Eine ältere Messung vom 2026-10-21 („kein Secret im Container") ist dadurch **überholt**.
+  **Offen bleibt der echte Kamera-Upload mit Zielgalerie** — in Produktion hatte 0 von 1
+  Usern eine Zielgalerie, und ohne Zielgalerie importiert nichts. Seit `5ad3b767` läuft das
+  Event über den internen `ftp-events`-Listener; die verbindliche Reihenfolge beim Ausrollen
+  (Env prüfen → Recreate → `ftp:provision-events` → echter Upload → `/api/internal/*` im
+  Host-Caddy sperren) steht in `deployment/README.md`, Abschnitt „FTP-Upload-Events (D-36)".
 
 ---
 
@@ -594,7 +595,7 @@ unten ist gegen den Code geprüft; Belege stehen bei der jeweiligen Zeile.
 ### Offene Code-Arbeit
 
 - [ ] D-51/D-57 nach Sync und Backend-Neustart live prüfen: gepushter Commit `a9c0fcb`, exakte CI `39992368192` grün; Sync ausgeführt und Backend-Neustart vom Owner gemeldet. Noch offen: Healthcheck/Probe des geänderten Verhaltens und den Nachweis dokumentieren.
-- [ ] Die übrigen bestätigten Findings des Audits vom 2026-10-18 abarbeiten. Behoben sind AUTH-1 (`eef22da5`), PAY-1 (`86e1768f`), PAY-2 (`facf791f`), SEC-1 (`8b31bf0e`), MEDIA-1 (`fecef37e`) und MEDIA-2/3/4 (`6122ee7a`); offen bleiben die unten weiterhin als bestätigt geführten Positionen. Owner-Grenzen und bedingte Fälle vor einer Änderung entscheiden.
+- [ ] Die übrigen bestätigten Findings des Audits vom 2026-10-18 abarbeiten. Behoben sind AUTH-1 (`eef22da5`), PAY-1 (`86e1768f`), PAY-2 (`facf791f`), SEC-1 (`8b31bf0e`), MEDIA-1 (`fecef37e`), MEDIA-2/3/4 (`6122ee7a`) und OPS-1 (`5ad3b767`); offen bleiben die unten weiterhin als bestätigt geführten Positionen. Owner-Grenzen und bedingte Fälle vor einer Änderung entscheiden.
 - [~] wartet auf den **Mail-Nachweis** — Queue, Worker und Scheduler sind am 2026-10-21 live belegt: die PID-Dateien `/tmp/portal-{scheduler,queue-supervisor,queue-worker}.pid` existieren, der stündliche Scheduler-Mutex in `cache_locks` trägt den Slot-Suffix `2100` (erworben um 21:00:02Z), der Wochenimport lief am Montag-Slot `03:30` (Meilisearch-Batch **2335**, Task 7200, `enqueuedAt` 2026-10-19T03:30:32Z, `status: succeeded`), der manuelle Lauf vom 2026-10-21 21:07Z erzeugte Batch **2402** (39/39 Tasks succeeded, 19.477 Orte im Index `locations`), und die Queue-Tabellen `jobs`/`failed_jobs`/`job_batches` sind leer und fehlerfrei. Die **SMTP-Duplikat-Policy** ist entschieden (D-17 in `features/owner-decisions.md`: gültige Tokens erhalten, kein pauschales Queue-Uniqueness, ein SMTP-Retry darf keine zweite Belastung oder Zustandsänderung auslösen). Offen: ein **zugestellter** Mail-Nachweis aus der Produktion — der Admin-SMTP-Test (`POST /api/management/settings/test-email`) muss ausgelöst und der Provider-/Mailpit-Log danebengelegt werden; die Produktions-DB führt keine Mail-Logtabelle, und `storage/logs/laravel.log` ist vom 2026-04-23.
 
 ### Security- und Stripe-Audit — Source-Validierung am Snapshot `f3aea9e0`
@@ -615,7 +616,7 @@ Die Befunde wurden nach der Dokumentation einzeln gegen den committed Quellstand
 - **MEDIA-6 — kein Finding:** Flat-rate-Web-Zugriff auf Originalbytes ist im Test und Delivery-Vertrag explizit vorgesehen (`FileDeliveryControllerTest`, `features/...`); nur eine spätere Policy-Änderung kann das öffnen.
 - **BROWSER-1 — unbestätigte Deployment-Frage:** CSP-Mirror enthält kein `frame-ancestors`; Laravel setzt XFO nur auf API-Antworten. Die statische SPA-Datei kommt über Caddy außerhalb dieses Commits; echte Root-Response-Header fehlen. Kein Clickjacking-Finding ohne Host-Nachweis.
 - **BROWSER-2 — bestätigter lokaler Cache-Effekt, kein Server-Bypass:** Geschützte Medien werden `private, max-age=31536000, immutable` geliefert. Ein gemeinsames Browserprofil kann zuvor ausgelieferte Bytes nach Rechterevokation lokal behalten; das ist nur bei gemeinsam genutztem Browser relevant und nicht serverseitig widerrufbar.
-- **OPS-1 — bestätigter Config-Guard-Mangel, Ausnutzung konfigurationsabhängig:** `FTP_EVENT_URL` akzeptiert absolute HTTP- oder HTTPS-URLs zu beliebigen Hosts (`config/ftp.php:49-62`); `ProvisionFtpEvents` setzt `FTP_EVENT_SECRET` in den Request-Header (`:131-140, 247-263`). Die Production-Policy validiert diesen Host/Scheme nicht (`ProductionOperationsPolicy.php:41-46`). Ein HTTP/fremdes URL-Environment kann das Secret offenlegen; tatsächliche Produktionseinstellung nicht geprüft.
+- **OPS-1 — behoben in `5ad3b767`:** `FTP_EVENT_URL` akzeptierte jede absolute http(s)-URL, und `ftp:provision-events` setzt `FTP_EVENT_SECRET` in den Request-Header; die Production-Policy prüfte diesen Host/Scheme nicht. Das Backend spricht nur FastCGI, SFTPGo hängt nur an `portal_internal`, also lief der dokumentierte Default über die öffentliche `APP_URL` hinaus und zurück. Jetzt ist der Caddy-Sidecar `ftp-events` der einzige interne HTTP-Pfad (genau ein Endpoint, sonst 404), `config/ftp.php` defaultet darauf, und die Policy akzeptiert beim Backend-Start nur exakt diese URL; Tests: `ProductionOperationsPolicyTest`, `ProvisionFtpEventsTest`.
 - **OPS-2 — bestätigte Klartext-Konfiguration, lateral bedingt:** Compose und Config defaulten auf `http://sftpgo:8080`; JWT-Fallback sendet Admin-Basic-Credentials und danach Bearer-Token (`services.php:64-77`; `SftpGoClient.php:532-546, 649-656`). API ist nicht host-published und SFTPGo sitzt nur im internen Docker-Netz. Ein normaler Internetclient erreicht es nicht; das Risiko setzt Zugriff mit Paketbeobachtung/MITM auf Host oder internem Netz voraus.
 - **OPS-3 — bestätigte unsichere Rechte-Policy, lokaler/PHP-Foothold nötig:** `sync.sh` setzt Backend-Dateien auf `F666`, Verzeichnisse auf `D2777`; Compose bind-mountet den Code read-write für den Backend-Prozess (`sync.sh:42-53, 69-83`; `docker-compose.yml:82, 96-99`). Die Policy erlaubt lokalen Prozessen und kompromittiertem App-Code dauerhafte Source-Änderungen. Host-Modi wurden nicht live geprüft.
 - **PAY-1 — behoben in `86e1768f`:** Refund/Dispute-Handler quittierten 200 und schlossen den Event-Claim, auch wenn `transitionTerminalPaymentStatus()` bei `pending_payment` wegen der erlaubten Quellstatus ablehnte (`WebhookController.php:111-188, 457-482, 699-745`). Erfolgs-Reconciliation erlaubte danach `pending_payment → paid` (`PaymentIntentReconciliationService.php:106-128`). Der bestehende Regressionstest pinnte nur den ersten Teil und testete nicht das nachfolgende Success-Event; Stripe-Event-Reihenfolge ist laut Auditor-Doku nicht garantiert, dieser Ablauf konnte Zugriff nach Refund/Chargeback wiederherstellen. Beide negativen Events sind jetzt auch aus `pending_payment` terminal, und der spätere Success wird abgelehnt; Tests: `StripeWebhookTest` (Out-of-Order-Dispute/-Refund) und `PaymentFindingsRegressionTest`.
