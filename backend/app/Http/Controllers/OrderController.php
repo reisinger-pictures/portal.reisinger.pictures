@@ -13,8 +13,6 @@ use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
 {
-    public function __construct(private readonly StripePaymentService $stripePayment) {}
-
     public function index()
     {
         $orders = Order::query()
@@ -106,9 +104,13 @@ class OrderController extends Controller
         }
 
         $paymentIntentId = trim($paymentIntentId);
+        // Resolved lazily: the Stripe client is built eagerly in the service
+        // constructor and throws without a secret, which must not break the
+        // customer read paths that share this controller.
+        $stripePayment = app(StripePaymentService::class);
 
         try {
-            $paymentIntent = $this->stripePayment->retrievePaymentIntent($paymentIntentId);
+            $paymentIntent = $stripePayment->retrievePaymentIntent($paymentIntentId);
             $status = $paymentIntent['status'] ?? null;
 
             if ($status === 'succeeded') {
@@ -116,7 +118,19 @@ class OrderController extends Controller
             }
 
             if ($status !== 'canceled') {
-                $this->stripePayment->cancelPaymentIntent($paymentIntentId);
+                $result = $stripePayment->cancelPaymentIntent($paymentIntentId);
+
+                // Fail closed: the order must not be marked cancelled unless
+                // Stripe actually reports the intent as canceled.
+                if (($result['status'] ?? null) !== 'canceled') {
+                    Log::warning('order.cancel.payment_intent_not_cancelled', [
+                        'order_id' => (string) $order->getKey(),
+                        'payment_intent_id' => $paymentIntentId,
+                        'payment_intent_status' => $result['status'] ?? null,
+                    ]);
+
+                    return 'Die Stornierung konnte bei Stripe nicht abgeschlossen werden. Der Bestellstatus wurde nicht geändert.';
+                }
             }
         } catch (\Throwable $exception) {
             Log::warning('order.cancel.payment_intent_not_cancelled', [
@@ -145,7 +159,7 @@ class OrderController extends Controller
         $message = preg_replace('/\bclient[_-]?secret\s*[:=]\s*["\']?[^"\'\s,;]+/i', 'client_secret=[REDACTED]', $message) ?? '';
         $message = preg_replace('/\bauthorization\s*:\s*bearer\s+\S+/i', 'Authorization: Bearer [REDACTED]', $message) ?? '';
 
-        return substr($message, 0, 500);
+        return mb_substr($message, 0, 500, 'UTF-8');
     }
 
     private function clearPurchasedCache(Order $order): void
