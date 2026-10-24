@@ -121,19 +121,59 @@ class OrgInviteController extends Controller
             return response()->json(['error' => 'Keine Berechtigung für diese Einladung.'], 403);
         }
 
-        return DB::transaction(function () use ($request, $invite, $inviteBrand, $user) {
-            if (! $user) {
-                // Neuen User erstellen
-                $existing = User::where('email', $invite->email)->first();
+        $isAuthenticatedUser = $user !== null;
+        $authenticatedUserId = $user?->getKey();
 
-                // Brand isolation also applies to the logged-out flow: an existing
-                // brand-bound account must not be moved into a foreign-brand (or
-                // brand-less) org via an invite of another brand.
-                if ($existing && $this->isBrandMismatch($existing, $invite->org)) {
+        return DB::transaction(function () use ($request, $invite, $isAuthenticatedUser, $authenticatedUserId) {
+            // Keep the same org -> user lock order as membership sync. Accepting
+            // this invite is explicit consent to switch organizations.
+            $org = Org::query()->whereKey($invite->org_id)->lockForUpdate()->first();
+            if (! $org) {
+                return response()->json(['error' => 'Einladung nicht gefunden.'], 404);
+            }
+
+            $invite = OrgInvite::query()
+                ->whereKey($invite->getKey())
+                ->where('token', $request->token)
+                ->where('expires_at', '>', now())
+                ->lockForUpdate()
+                ->first();
+            if (! $invite) {
+                return response()->json(['error' => 'Einladung nicht gefunden.'], 404);
+            }
+            $invite->setRelation('org', $org);
+
+            $inviteBrand = $this->brandValue($org);
+            if ($inviteBrand === null || ! BrandRegistry::resourceMatchesCurrent($inviteBrand)) {
+                return response()->json(['error' => 'Keine Berechtigung für diese Einladung.'], 403);
+            }
+
+            if ($isAuthenticatedUser) {
+                $user = User::query()
+                    ->whereKey($authenticatedUserId)
+                    ->lockForUpdate()
+                    ->first();
+                if (! $user) {
+                    return response()->json(['error' => 'Unauthenticated'], 401);
+                }
+
+                if ($this->isBrandMismatch($user, $org)) {
+                    return response()->json(['error' => 'Keine Berechtigung für diese Einladung.'], 403);
+                }
+            } else {
+                // Existing accounts may explicitly switch organizations by
+                // accepting this invite, but never across the existing brand
+                // isolation boundary.
+                $user = User::query()
+                    ->where('email', $invite->email)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($user && $this->isBrandMismatch($user, $org)) {
                     return response()->json(['error' => 'Keine Berechtigung für diese Einladung.'], 403);
                 }
 
-                $user = $existing ?? User::create([
+                $user ??= User::create([
                     'name' => $request->name,
                     'email' => $invite->email,
                     'password' => Hash::make($request->password),
@@ -146,23 +186,26 @@ class OrgInviteController extends Controller
                 }
             }
 
-            // Org-Zuweisung sicherstellen
-            $user->org_id = $invite->org_id;
-            $user->brand = $inviteBrand;
-            $user->save();
+            $sameOrg = (string) $user->org_id === (string) $org->id;
+            if (! $sameOrg) {
+                $defaultRolePolicy = app(OrgDefaultRolePolicy::class);
 
-            $defaultRole = app(OrgDefaultRolePolicy::class)->roleForNewAssignment($invite->org);
-            $user->roles()->syncWithoutDetaching([$defaultRole->id]);
+                // Remove the previous organization's delegated authority before
+                // changing org_id, then grant only the destination default role.
+                $defaultRolePolicy->assignRoleForNewAssignment($user, $org);
+                $user->org_id = $org->id;
+                $user->brand = $inviteBrand;
+                $user->save();
+            }
 
-            // Token entwerten
+            // Token consumption follows every validation and membership write,
+            // so a rejected brand-bound redemption leaves it available.
             $invite->delete();
 
-            if ($user === auth('api')->user()) {
-                // Bereits eingeloggt — Session bleibt bestehen
+            if ($isAuthenticatedUser) {
                 return response()->json(['success' => true]);
             }
 
-            // Neuen User einloggen
             Auth::guard('api')->logout();
             $token = Auth::guard('api')->login($user);
 

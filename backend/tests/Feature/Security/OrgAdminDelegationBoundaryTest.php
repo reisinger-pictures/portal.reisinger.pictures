@@ -161,8 +161,8 @@ class OrgAdminDelegationBoundaryTest extends TestCase
 
         $this->as($adminA)
             ->putJson("/api/management/orgs/{$orgA->id}/users", ['user_ids' => [$victim->id]])
-            ->assertStatus(422)
-            ->assertJsonPath('error', 'Benutzer aus einer anderen Organisation können nicht übernommen werden.');
+            ->assertStatus(409)
+            ->assertJsonPath('error', 'Benutzer gehört bereits einer anderen Organisation an. Bitte entferne zuerst die bestehende Mitgliedschaft.');
 
         $this->assertDatabaseHas('users', ['id' => $victim->id, 'org_id' => $orgB->id]);
 
@@ -187,7 +187,7 @@ class OrgAdminDelegationBoundaryTest extends TestCase
             ->putJson("/api/management/orgs/{$orgA->id}/users", [
                 'user_ids' => [$valid->id, $foreign->id],
             ])
-            ->assertStatus(422);
+            ->assertStatus(409);
 
         // Validation runs before the transaction, so not even the valid id of a
         // rejected sync may move. A partial write here would be the failure the
@@ -352,7 +352,7 @@ class OrgAdminDelegationBoundaryTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $client->id, 'org_id' => $org->id]);
     }
 
-    public function test_admin_can_still_move_a_user_out_of_another_org(): void
+    public function test_admin_sync_cannot_silently_move_a_user_out_of_another_org(): void
     {
         $orgA = $this->org();
         $orgB = $this->org();
@@ -361,9 +361,9 @@ class OrgAdminDelegationBoundaryTest extends TestCase
 
         $this->as($admin)
             ->putJson("/api/management/orgs/{$orgA->id}/users", ['user_ids' => [$victim->id]])
-            ->assertOk();
+            ->assertStatus(409);
 
-        $this->assertDatabaseHas('users', ['id' => $victim->id, 'org_id' => $orgA->id]);
+        $this->assertDatabaseHas('users', ['id' => $victim->id, 'org_id' => $orgB->id]);
     }
 
     // ── SEC-20261018-02: galleries and groups ────────────────────────────────

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\UserRole;
 use App\Models\Org;
 use App\Models\Role;
+use App\Models\User;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -59,6 +60,32 @@ class OrgDefaultRolePolicy
         ]);
 
         return $this->clientRole();
+    }
+
+    /**
+     * Replace any organization-scoped role carried by the account with the
+     * destination organization's default for a new membership.
+     */
+    public function assignRoleForNewAssignment(User $user, Org $org): void
+    {
+        $role = $this->roleForNewAssignment($org);
+        $this->clearOrgScopedRoles($user);
+        $user->roles()->syncWithoutDetaching([$role->id]);
+    }
+
+    /**
+     * Remove roles whose authority is scoped to an organization.
+     */
+    public function clearOrgScopedRoles(User $user): void
+    {
+        $roleIds = Role::query()
+            ->whereIn('name', self::ALLOWED_ROLE_NAMES)
+            ->pluck('id')
+            ->all();
+
+        if ($roleIds !== []) {
+            $user->roles()->detach($roleIds);
+        }
     }
 
     /**
