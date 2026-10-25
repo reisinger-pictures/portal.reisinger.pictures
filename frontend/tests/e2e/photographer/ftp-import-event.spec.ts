@@ -105,8 +105,12 @@ test.describe('FTP upload event imports into the target gallery', () => {
 
     test.afterEach(async () => {
         // The importer moves the file; anything left behind is this run's own
-        // fixture (a failed assertion above it), so it goes with the test.
-        if (inboxDirectory !== '') rmSync(inboxDirectory, {recursive: true, force: true});
+        // fixture (a failed assertion above it), so it goes with the test. The
+        // existence check replaces `force: true`: the importer may already have
+        // removed the directory, and a missing path is the normal case, not an
+        // error. `force` is banned in E2E tests by the lint rule that forbids
+        // forcing Playwright actions past the UI.
+        if (inboxDirectory !== '' && existsSync(inboxDirectory)) rmSync(inboxDirectory, {recursive: true});
         if (helper) await helper.teardown();
     });
 
