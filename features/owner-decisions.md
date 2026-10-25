@@ -6,7 +6,7 @@ This is the canonical current contract for owner decisions D-1 through D-57. App
 
 ### D-1: SFTPGo and backend identity
 
-Run SFTPGo as `1002:82` and the backend as `1000:82`. See [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md).
+Run SFTPGo and the backend as `1002:82` — the uid of the website tree they write and its group. Do not run either as a non-owner and compensate with world-writable file modes: the backend ran as `1000:82` until 2026-10-25 and only `sync.sh`'s `F666`/`D2777` made that work (finding OPS-3). Owner decision 2026-10-25: align the uid first, then close the file modes. See [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md) and [deployment](../deployment/README.md).
 
 ### D-2: FTP inbox directory provisioning
 
@@ -46,7 +46,7 @@ Consequences:
 
 ### D-52: Watchtower keeps supervising `portal_backend`
 
-Watchtower recreates `portal_backend` once a day (measured 2026-10-22 at 07:58:42 CEST) and continues to do so. It pulls the image by **tag** (`ghcr.io/reisinger-pictures/portal-base:8.5`), not by digest, and that is accepted: the application code is not touched by the recreate, because the deployed code lives in a bind mount, and the container keeps its `1000:82` identity (D-1), because the `user:` line of the compose stanza is part of the container configuration the recreate clones. The accepted residual is the unpinned image: a base-image update reaches production without a deploy, which is the same trade the tag pin already makes for the deploy path (see [production operations runbook](infrastructure/29-production-operations-runbook.md) §2).
+Watchtower recreates `portal_backend` once a day (measured 2026-10-22 at 07:58:42 CEST) and continues to do so. It pulls the image by **tag** (`ghcr.io/reisinger-pictures/portal-base:8.5`), not by digest, and that is accepted: the application code is not touched by the recreate, because the deployed code lives in a bind mount, and the container keeps its `1002:82` identity (D-1), because the `user:` line of the compose stanza is part of the container configuration the recreate clones. The accepted residual is the unpinned image: a base-image update reaches production without a deploy, which is the same trade the tag pin already makes for the deploy path (see [production operations runbook](infrastructure/29-production-operations-runbook.md) §2).
 
 ## Test and repository structure
 

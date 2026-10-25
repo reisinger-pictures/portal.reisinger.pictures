@@ -80,9 +80,10 @@ done
 # Identity and path guards must read the environment without expansion.
 # The uid and gid literals are pinned independently because they have to agree
 # with the backend's `user:` — a stale gid literal makes the container refuse to
-# start while every other assertion here stays green. AGENTS.md D-1/D-2: the
-# backend runs 1000:82, group webgroup.
-for needed in 'id -u | grep -qx 1000' 'id -g | grep -qx 82' 'printenv APP_ENV' \
+# start while every other assertion here stays green. D-1 (Owner-Entscheidung
+# 2026-10-25, OPS-3): the backend runs 1002:82, the uid of the website tree it
+# writes, group webgroup.
+for needed in 'id -u | grep -qx 1002' 'id -g | grep -qx 82' 'printenv APP_ENV' \
               'printenv APP_KEY' 'printenv JWT_SECRET' 'printenv FILE_ENCRYPTION_KEY' \
               'printenv ADMIN_EMAIL' 'printenv ADMIN_PASSWORD' 'printenv PHOTO_STORAGE_PATH' \
               'printenv AI_SESSION_HEADER' 'printenv AI_SESSION_PREFIX' \
@@ -101,6 +102,27 @@ composer_init_service="$(awk '
 ' "$COMPOSE")"
 grep -qF '    user: "1002:82"' <<<"$composer_init_service" \
     || fail 'composer_init must run as 1002:82, the website-tree owner, or package replacement blocks backend startup'
+
+# The backend must run as the tree owner, and no service may keep the old
+# non-owner identity: 1000:82 was the precondition that forced the
+# world-writable F666/D2777 sync modes (OPS-3). One identity in the compose
+# file, and it is the one sync.sh chowns to.
+backend_service="$(awk '
+    /^  backend:$/ { in_service = 1; next }
+    in_service && /^  [a-z_]+:/ { in_service = 0 }
+    in_service { print }
+' "$COMPOSE")"
+grep -qF '    user: "1002:82"' <<<"$backend_service" \
+    || fail 'the backend must run as 1002:82, the uid of the tree it writes (D-1, OPS-3)'
+if grep -qF 'user: "1000:82"' "$COMPOSE"; then
+    fail 'a service still runs as 1000:82; that non-owner identity is what made the world-writable sync modes necessary'
+fi
+sync_tree_owner="$(sed -n 's/^TREE_OWNER="\${PORTAL_TREE_OWNER:-\([0-9]*:[0-9]*\)}"$/\1/p' "$ROOT_DIR/sync.sh")"
+[[ -n "$sync_tree_owner" ]] \
+    || fail 'sync.sh declares no TREE_OWNER default; the tree owner cannot be compared'
+if ! grep -qF "    user: \"${sync_tree_owner}\"" <<<"$backend_service"; then
+    fail "the backend does not run as the tree owner sync.sh writes (${sync_tree_owner}) — that drift is the OPS-3 cause"
+fi
 
 # 19-ftp 7.9 forbids rewriting /home/webadmin/websites to 1000:1000, so the
 # ownership comparison must stay out; writability is the property that matters.

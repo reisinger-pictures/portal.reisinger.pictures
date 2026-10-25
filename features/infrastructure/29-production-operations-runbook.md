@@ -17,7 +17,8 @@ evidence listed below on the target host.
 The current deployment uses the provisioned MariaDB service. It does **not**
 introduce Redis, Horizon, Supervisor, or another external process manager.
 The shell supervisor in `deployment/backend-supervisor.sh` is intentionally
-small and runs inside the existing PHP-FPM container as UID/GID `1000:82`.
+small and runs inside the existing PHP-FPM container as UID/GID `1002:82`, the
+uid of the website tree it writes (D-1, owner decision 2026-10-25).
 The base-image workflow rebuilds the image when that script or the raw preflight
 script changes. It publishes to the **org namespace
 `ghcr.io/reisinger-pictures/portal-base`** via
@@ -144,7 +145,7 @@ What a Watchtower recreate touches and what it does not:
   writes to `/home/webadmin/websites/api-portal.reisinger.pictures/` and
   `deployment/docker-compose.yml` mounts exactly that directory as
   `/var/www/html`, so the deployed code survives a recreate unchanged.
-- The **UID stays `1000:82`** (D-1) because the `user:` line of the compose
+- The **UID stays `1002:82`** (D-1) because the `user:` line of the compose
   stanza is part of the container configuration — the image itself declares
   `USER=www-data`, so the compose line is load-bearing and must not be
   removed. The line to re-read after the next recreate is

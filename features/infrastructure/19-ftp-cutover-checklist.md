@@ -16,8 +16,9 @@
 - [ ] **SFTPGo-Ordner auf dem Host:** `ftp/<slug>` mit `1002:webgroup` und
       `2775` (setgid, Gruppe schreibbar, **Welt nicht schreibbar**) — neue Dateien
       erben die Gruppe. **Geändert 2026-09-28, D-2 (FTP inbox directory provisioning):** vorher
-      stand hier `2777`. **Nicht** `2755` — damit kann UID 1000 weder anlegen noch
-      `unlink`en, und `FtpController::process()` macht genau das. Kein gemeinsamer
+      stand hier `2777`. **Nicht** `2755` — damit kann der Prozess in einem
+      fremden Verzeichnis weder anlegen noch `unlink`en, und
+      `FtpController::process()` macht genau das. Kein gemeinsamer
       `r1`-User mehr; jeder User bekommt sein eigenes Home. Ab D-2 legt das Portal
       den Ordner selbst an; dieser Punkt gilt nur für den Bestand und für den
       Handbetrieb vor dem ersten Slug-Wechsel.
@@ -59,8 +60,8 @@
 - [ ] **Volume `sftpgo_data` mounten** → `/var/lib/sftpgo` (ohne das ist die
       Instanz nach jedem Neustart ohne Admin-User)
 - [ ] **Container-User:** `1002:82` (Host-Konvention des Website-Baums, D-1) —
-      **nicht** `1000:82` wie das Backend, weil der Container auf den Host-Pfad
-      schreibt
+      seit 2026-10-25 dieselbe Identität wie das Backend, weil beide auf denselben
+      Host-Baum schreiben
 
 ## 3. Firewall (Host)
 

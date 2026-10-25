@@ -83,6 +83,7 @@ case "$mode" in
         bash tests/infrastructure/compose-entrypoint-contract.sh
         bash tests/infrastructure/verify-playwright-version.sh
         bash tests/infrastructure/rsync-sync-regression.sh
+        bash tests/infrastructure/sync-permissions-contract.sh
         bash tests/infrastructure/verify-image-nonroot.sh
         bash tests/infrastructure/plugin-harness-fail-closed.sh
         sudo apt-get update -qq

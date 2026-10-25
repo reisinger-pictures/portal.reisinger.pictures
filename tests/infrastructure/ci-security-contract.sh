@@ -520,6 +520,7 @@ assert_contains_text "$security_contract_job" '        run: sh scripts/gates.sh 
 for contract_step in \
     'bash tests/infrastructure/ci-security-contract.sh' \
     'bash tests/infrastructure/rsync-sync-regression.sh' \
+    'bash tests/infrastructure/sync-permissions-contract.sh' \
     'bash tests/infrastructure/verify-image-nonroot.sh' \
     'bash tests/infrastructure/verify-image-freshness.sh' \
     'bash tests/infrastructure/image-pin-freshness-regression.sh'; do

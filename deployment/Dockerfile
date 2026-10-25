@@ -6,7 +6,22 @@ FROM php:${PHP_VERSION}-fpm
 # Database driver: mysql (default) or pgsql
 ARG DB_EXT=mysql
 
-# Runtime identity. 1000:1000 matches the deployment bind mounts owned by webadmin.
+# Runtime identity. The image's own user is www-data 1000:1000 (the CI and E2E
+# jobs override it with `--user root` for the mounted workspace). Production
+# does not use it: deployment/docker-compose.yml runs every service that writes
+# the website tree as `user: "1002:82"` (D-1, owner decision 2026-10-25), which
+# overrides this build-time identity.
+#
+# No passwd entry for 1002 is needed, and none is created here on purpose:
+#   - php-fpm resolves the pool's `user`/`group` only while running as root
+#     (fpm_unix.c: "the 'user' directive is ignored when FPM is not running as
+#     root"); this container never is, so it runs as the current uid either way;
+#   - Laravel and the backend commands never call getpwuid/posix_getpwuid, and
+#     `id -u`/`id -g` in the start guard compare numbers, not names;
+#   - composer_init and sftpgo already run as 1002:82 from images that have no
+#     such entry, and both work in production.
+# Adding an entry would be an untested second identity source; the numeric
+# `user:` in compose stays the single one.
 ARG RUNTIME_UID=1000
 ARG RUNTIME_GID=1000
 
