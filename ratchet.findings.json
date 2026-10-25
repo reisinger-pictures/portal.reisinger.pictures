@@ -216,12 +216,11 @@
       "id": "OPS-3",
       "title": "Unsichere Dateirechte / Sync-Rechte",
       "severity": "medium",
-      "status": "open",
+      "status": "fixed",
       "status_since": "2026-10-25",
+      "regression_test": "InfrastructureSupplyChainPolicyTest, tests/infrastructure/rsync-sync-regression.sh, tests/infrastructure/sync-permissions-contract.sh",
       "path": "features/security/findings-registry.md",
-      "note": "Ursache war der uid-Konflikt: Baum 1002, Backend 1000; sync.sh setzte F666/D2777. Im Repository behoben (Backend 1002:82, 0644/0755, 2775 nur fuer storage/ und bootstrap/cache/), Rollout offen.",
-      "owner": "reisi007",
-      "ticket": "#31"
+      "note": "Ursache war der uid-Konflikt: Baum 1002, Backend 1000; sync.sh setzte F666/D2777. Behoben und am 2026-10-25 ausgerollt: Backend 1002:82, Code 0644/0755, 2775 nur fuer storage/ und bootstrap/cache/, Foto-Speicher 1002:82. Entscheidend war die Default-ACL (default:other::rwx) — sie ueberschrieb umask 0022 und machte jede neue Datei wieder 0666; Schritt 0 setzt jetzt zusaetzlich o::r-x/d:o::r-x und o::r--. Gemessen nach dem Recreate: 0 welt-schreibbare Pfade, Schreibprobe 0644, /up 200, 0 Restarts."
     }
   ]
 }

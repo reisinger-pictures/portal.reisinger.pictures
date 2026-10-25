@@ -38,9 +38,9 @@ The closed entries carry their commit and their regression test instead.
 
 ### The findings of the snapshot audit
 
-Eight findings came out of the audit of snapshot `f3aea9e0`. Six are `fixed`,
-one is `accepted` and one is still `open`; every one of them keeps its GitHub
-issue, and the issue carries the decision or the fix that closed it.
+Eight findings came out of the audit of snapshot `f3aea9e0`. Seven are `fixed`
+and one is `accepted`; none is open. Every one of them keeps its GitHub issue,
+and the issue carries the decision or the fix that closed it.
 
 | ID | Severity | Status | Issue | Title (registry wording) | Note (registry wording) |
 |---|---|---|---|---|---|
@@ -51,7 +51,7 @@ issue, and the issue carries the decision or the fix that closed it.
 | `SEC-2` | `medium` | `fixed` | #28 | FTPS ohne erzwungenes AUTH TLS | Kein Risiko, sondern ein Doku-Fehler: `TLS_MODE=1` ist `MandatoryEncryption`, gemessen `421 TLS is required`. Regressionstest: Harness Teil 5. |
 | `MEDIA-5` | `medium` | `fixed` | #29 | SFTPGo-Symlinks / realpath-Konfinierung nicht bestätigt | Import lehnt jeden Symlink ab (vorher rot), SFTPGo verweigert die Anlage (`symlink_mode` = 0); Rest #38. Regressionstest `FtpInboxSymlinkTest`. |
 | `OPS-2` | `medium` | `accepted` | #30 | Klartext-Kommunikation im internen Netz | Getragen: das Admin-API ist nicht host-veröffentlicht (gemessen), nur im internen Docker-Netz. |
-| `OPS-3` | `medium` | `open` | #31 | Unsichere Dateirechte / Sync-Rechte | Ursache war der uid-Konflikt: Baum 1002, Backend 1000, `sync.sh` setzte `F666`/`D2777`. Im Repository behoben (Backend `1002:82`, `0644/0755`, `2775` nur für `storage/` und `bootstrap/cache/`); der Rollout steht aus. |
+| `OPS-3` | `medium` | `fixed` | #31 | Unsichere Dateirechte / Sync-Rechte | Ausgerollt 2026-10-25: Backend `1002:82`, Code `0644`/`0755`, `2775` nur auf `storage/` und `bootstrap/cache/`; die eigentliche Ursache war die Default-ACL `other::rwx`. |
 
 ## What counts
 
@@ -67,8 +67,8 @@ The rule lives in `ratchet.config.jsonc`:
 
 `open` and `in-progress` count; `accepted` and `wontfix` do not count but stay
 visible — a decision is not a deletion. The count is **0** today: the two `high`
-findings of the audit (`AUTH-2`, `PAY-3`) are fixed, and the remaining finding
-`OPS-3` plus the `accepted` `OPS-2` are `medium`, so they stay visible without
+findings of the audit (`AUTH-2`, `PAY-3`) are fixed, no finding is open any more,
+and the single `accepted` one (`OPS-2`) is `medium`, so it stays visible without
 counting. The baseline is 0 and the direction is `ceiling`: any new open
 `critical`/`high` finding turns the gate red.
 
