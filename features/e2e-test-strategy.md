@@ -97,6 +97,22 @@ with `pnpm test:e2e:failed`, but an agent gets at most three fix attempts. After
 three unsuccessful attempts, stop and report the logs and root-cause analysis
 instead of entering an unbounded retry loop.
 
+## FTP upload-event coverage (`@feature:ftp-import`)
+
+`frontend/tests/e2e/photographer/ftp-import-event.spec.ts` is the contract
+holder for D-36's "no button press" path: it puts a JPEG into the configured
+inbox root (`FTP_STORAGE_PATH`, absolute in both stacks), posts the
+SFTPGo-shaped upload event with the shared secret from `FTP_EVENT_SECRET`, and
+then asserts — after one reload of the gallery, with the browser kept off the
+dashboard so the card's catch-up import cannot mask a broken trigger — that the
+photo is in the target gallery and that the source file has left the inbox
+(moved, not copied). It deliberately proves **event → import → gallery**, not
+the FTPS transport (`tests/scripts/ftp-transport-test/`); no SFTPGo delivers the
+event in CI, because the service container cannot reach the job's backend, so
+the spec sends the event itself. Both the backend and the spec read
+`FTP_EVENT_SECRET` and `FTP_STORAGE_PATH` from the E2E job's environment, so a
+mismatch cannot make the spec pass against a differently configured backend.
+
 ## Commands and workflow
 
 ### Local development
