@@ -83,6 +83,68 @@ else
     fail_case "Vorbedingung verletzt: Fixture 'handshake-gueltig' nicht akzeptiert"
 fi
 
+# --- Klartext-Login-Ablehnung (TLS-Zwang) ----------------------------------
+# 19-ftp 7.13: `TLS_MODE=1` ist MandatoryEncryption, nicht "explizites TLS mit
+# optionalem Klartext-Zweig". Diese Aussage stand eine Zeit lang falsch herum
+# in unserer eigenen Doku. Der Parser darf deshalb nur eine echte Ablehnung
+# als Beleg durchlassen — und muss einen gelungenen Klartext-Login als
+# Fehlschlag erkennen, statt ihn als "kein TLS erzwungen" zu uebersehen.
+head1 "plaintext_refusal_assert — TLS-Zwang"
+if plaintext_refusal_assert "$FIXTURES/plaintext-tls-required.txt" >/dev/null 2>&1; then
+    pass "421 TLS is required wird als belegter TLS-Zwang akzeptiert"
+else
+    fail_case "421 TLS is required wurde nicht als TLS-Zwang erkannt"
+fi
+if plaintext_refusal_assert "$FIXTURES/plaintext-login-ok.txt" >/dev/null 2>&1; then
+    fail_case "ein erfolgreicher Klartext-Login (230) wurde als TLS-Zwang akzeptiert"
+else
+    pass "erfolgreicher Klartext-Login wird als Widerspruch abgelehnt"
+fi
+if plaintext_refusal_assert "$FIXTURES/plaintext-ohne-antwort.txt" >/dev/null 2>&1; then
+    fail_case "eine Antwort ohne Ablehnung wurde als Beleg akzeptiert"
+else
+    pass "Antwort ohne Ablehnung wird abgelehnt (kein Beleg fuer den Zwang)"
+fi
+
+# --- Symlink-Erzeugung (MEDIA-5) --------------------------------------------
+# Die Vorbedingung der Importer-Frage: kann das Konto einen Symlink anlegen,
+# und was landet als Ziel im Link? Der Parser darf eine Ablehnung nicht als
+# "Link existiert" lesen und einen existierenden Link nicht als Ablehnung.
+head1 "symlink_verdict / symlink_target_escapes — MEDIA-5"
+got="$(symlink_verdict "$FIXTURES/symlink-create-unsupported.txt" "")"
+[ "$got" = "REFUSED_UNSUPPORTED" ] \
+    && pass "unbekanntes Kommando (symlink_mode=0) wird als Ablehnung gelesen" \
+    || fail_case "Ablehnung 'Operation unsupported' ergab '$got'"
+got="$(symlink_verdict "$FIXTURES/symlink-create-permission.txt" "")"
+[ "$got" = "REFUSED_PERMISSION" ] \
+    && pass "fehlendes create_symlinks wird als Rechte-Ablehnung gelesen" \
+    || fail_case "Ablehnung 'Permission denied' ergab '$got'"
+ziel="$(cat "$FIXTURES/symlink-readlink-ziel.txt")"
+got="$(symlink_verdict /dev/null "$ziel")"
+[ "$got" = "ACCEPTED ../../../../etc/passwd" ] \
+    && pass "gespeichertes relatives Ziel wird woertlich ausgelesen" \
+    || fail_case "gespeichertes Ziel ergab '$got'"
+# Genau der Fehler aus der ersten Fassung: Client-Text ist kein Linkziel.
+if symlink_log_is_transport_failure "$FIXTURES/symlink-verbindung-weg.txt"; then
+    pass "abgebrochene Verbindung wird als Transportfehler erkannt"
+else
+    fail_case "'Connection closed.' wurde nicht als Transportfehler erkannt"
+fi
+rc=0
+got="$(symlink_verdict "$FIXTURES/symlink-verbindung-weg.txt" "")" || rc=$?
+[ "$got" = "UNKLAR" ] && [ "$rc" -eq 1 ] \
+    && pass "ohne Ziel und ohne Ablehnung bleibt der Befund UNKLAR (Exit 1)" \
+    || fail_case "unvollstaendige Messung ergab '$got' mit Exit $rc"
+symlink_target_escapes "../../../../etc/passwd" "/var/www/ftp/camtest" \
+    && pass "relatives Ziel mit .. wird als 'ausserhalb des Home' erkannt" \
+    || fail_case "relatives Ziel mit .. wurde als 'innerhalb' gewertet"
+symlink_target_escapes "/var/www/ftp/camtest/foto.jpg" "/var/www/ftp/camtest" \
+    && fail_case "absolutes Ziel im Home wurde als 'ausserhalb' gewertet" \
+    || pass "absolutes Ziel im Home gilt als 'innerhalb'"
+symlink_target_escapes "/etc/passwd" "/var/www/ftp/camtest" \
+    && pass "absolutes Ziel ausserhalb des Home wird erkannt" \
+    || fail_case "absolutes Ziel /etc/passwd wurde als 'innerhalb' gewertet"
+
 # --- Passivport aus dem curl-Trace ------------------------------------------
 head1 "pasv_port_from_trace — EPSV (229) und PASV (227)"
 # 229: Extended Passive Mode, Port steht direkt drin.
@@ -141,6 +203,36 @@ if grep -q 'TLS-HANDSHAKE UNVOLLSTAENDIG' "$HARNESS_DIR/lib/common.sh"; then
     pass "Wetterfunktion meldet einen benannten Fehler statt stillzuschweigen"
 else
     fail_case "Wetterfunktion hat keinen benannten Fehlerpfad"
+fi
+
+# Die Klartext-Probe muss im Ablauf aufgerufen werden, sonst ist sie toter
+# Code — und die falsche Annahme "AUTH ist optional" koennte unbemerkt
+# zurueckkommen (19-ftp 7.13).
+if grep -q '^mandatory_tls_report || true$' "$VERIFY" 2>/dev/null; then
+    pass "verify.sh ruft die Klartext-Probe im Ablauf auf"
+else
+    fail_case "verify.sh ruft mandatory_tls_report nicht mehr auf"
+fi
+
+if grep -q 'KLARTEXT-LOGIN MOEGLICH' "$HARNESS_DIR/lib/common.sh"; then
+    pass "Klartext-Parser hat einen benannten Fehlerpfad fuer gelungenen Login"
+else
+    fail_case "Klartext-Parser unterscheidet einen gelungenen Login nicht von einer Ablehnung"
+fi
+
+# Dasselbe fuer die Symlink-Probe (MEDIA-5): der Aufruf im Ablauf und ein
+# benannter UNKLAR-Pfad, damit eine unvollstaendige Messung nicht als
+# "kein Symlink moeglich" durchgeht.
+if grep -q '^symlink_report || true$' "$VERIFY" 2>/dev/null; then
+    pass "verify.sh ruft die Symlink-Probe im Ablauf auf"
+else
+    fail_case "verify.sh ruft symlink_report nicht mehr auf"
+fi
+
+if grep -q "printf 'UNKLAR'" "$HARNESS_DIR/lib/common.sh"; then
+    pass "Symlink-Parser hat einen benannten UNKLAR-Pfad"
+else
+    fail_case "Symlink-Parser kann eine unvollstaendige Messung nicht von einer Ablehnung trennen"
 fi
 
 # `timeout` (GNU-coreutils) existiert auf macOS nicht. Wer es doch benutzt,

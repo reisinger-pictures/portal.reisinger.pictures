@@ -14,6 +14,10 @@
 #   * Die Datei liegt hinterher im erwarteten Verzeichnis, mit erwarteter
 #     Groesse und identischer Pruefsumme.
 #   * Welche TLS-Cipher-Suites der Dienst tatsaechlich anbietet.
+#   * Dass ein Klartext-`USER` ohne `AUTH TLS` abgelehnt wird (`421 TLS is
+#     required`): `TLS_MODE=1` ist MandatoryEncryption, nicht optional (7.13).
+#   * Ob das Kamera-Konto einen Symlink anlegen kann und was als Ziel im Link
+#     landet — Vorbedingung der Importer-Frage (MEDIA-5, #29).
 #
 # Was dieses Skript ausdruecklich NICHT beweist:
 #   * Dass die echte Kamera den Server erreicht. Die Kamera ist kein curl,
@@ -29,7 +33,7 @@ REQUIRE_CAMERA_CIPHERS=0
 for arg in "$@"; do
     case "$arg" in
         --require-camera-ciphers) REQUIRE_CAMERA_CIPHERS=1 ;;
-        -h|--help) sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,26p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) fail "Unbekanntes Argument: $arg" ;;
     esac
 done
@@ -569,6 +573,182 @@ uid_report() {
 }
 
 # ===========================================================================
+# Teil 5 — Klartext-Login muss scheitern (TLS-Zwang)
+#
+# 19-ftp 7.13: `TLS_MODE=1` ist in ftpserverlib `MandatoryEncryption`. Diese
+# Probe prueft die Auth-Ablehnung, nicht den Handshake: sie sendet `USER`
+# ohne `AUTH TLS` im Klartext und verlangt `421 TLS is required` sowie keinen
+# erfolgreichen Login. Der Klartext-Greeting davor ist erwartet — genau er
+# hat die frueher falsche Aussage "AUTH ist optional" plausibel gemacht.
+# ===========================================================================
+mandatory_tls_report() {
+    head1 "Klartext-Login-Ablehnung (TLS-Zwang, 19-ftp 7.13)"
+    local trace="$REPORT_DIR/plaintext-user-attempt.txt" rc=0 reason="" verdict="ABGELEHNT"
+    set +e
+    plaintext_login_probe "$trace"
+    rc=$?
+    set -e
+    if [ "$rc" -eq 124 ]; then
+        note_failure "Klartext-Probe gegen ${FTPS_HOST} lief in den Watchdog: keine Antwort.
+  Das ist kein Befund ueber den TLS-Zwang. Rohprotokoll: ${trace}"
+        return 1
+    fi
+    if [ "$rc" -ne 0 ]; then
+        note_failure "Klartext-Probe gegen ${FTPS_HOST} konnte keine Verbindung aufbauen (Exit ${rc}).
+  Das ist kein Befund ueber den TLS-Zwang. Rohprotokoll: ${trace}"
+        return 1
+    fi
+    if reason="$(plaintext_refusal_assert "$trace" 2>&1)"; then
+        ok "Klartext-USER ohne AUTH TLS: 421 TLS is required, kein Login (${trace})"
+    else
+        verdict="NICHT BELEGT"
+        note_failure "${reason}"
+    fi
+    {
+        printf '\nKlartext-Login-Ablehnung (Teil 5)\n'
+        printf '=================================\n'
+        printf 'Erwartung: `USER` ohne `AUTH TLS` -> 4xx mit TLS-Bezug, kein 2xx/3xx\n'
+        printf '           (TLS_MODE=1 = MandatoryEncryption, 19-ftp 7.13).\n'
+        printf 'Ergebnis : %s\n' "$verdict"
+        printf 'Transkript: %s\n' "$trace"
+        sed 's/^/  /' "$trace"
+    } >> "$REPORT_TXT"
+}
+
+# ===========================================================================
+# Teil 6 — Symlink-Erzeugung durch das Kamera-Konto (MEDIA-5, #29)
+#
+# Der Importer (FtpInboxImporter) darf einem Symlink nicht aus dem Inbox-Baum
+# folgen. Die Vorbedingung dieser Frage ist, ob das Konto ueberhaupt einen
+# Symlink anlegen kann — und was als Ziel im Link landet.
+#
+# Warum ein RELATIVES Ziel geprueft wird: SFTPGo loest den Zielpfad nur
+# virtuell auf (fuer die Rechtepruefung) und schreibt bei relativem Ziel den
+# uebergebenen String woertlich in den Link
+# (internal/common/connection.go:990-1004, pkg/sftp request.go:203-207).
+# `../../../../etc/passwd` ist damit der schaerfste Fall: aus dem Home
+# /var/www/ftp/<user> zeigt er auf /etc/passwd des Containers.
+#
+# Der erwartete Befund ist ABLEHNUNG: `common.symlink_mode` ist per Default 0
+# (internal/config/config.go:213, sftpgo.json:12), `ftpd.enable_site` false
+# (config.go:300, sftpgo.json:147). Der Harness setzt beides nicht.
+# ===========================================================================
+sftp_stdin_commands() {
+    # sftp_stdin_commands BEFEHLSDATEI LOGDATEI -> Exitcode von sftp.
+    # Dieselben SSH-Optionen wie sftp_upload (Teil 2), aber ohne `-vv` und mit
+    # beliebigem Kommandosatz: hier wird nichts uebertragen, sondern
+    # `ln -s` und `readlink` ausgefuehrt.
+    local cmd_file="$1" log_out="$2"
+    local askpass="$RUNTIME_DIR/sftp-symlink-askpass.sh"
+    cat > "$askpass" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' '${FTP_PASSWORD}'
+EOF
+    chmod 0700 "$askpass"
+    local code=0
+    run_with_timeout 60 env "SSH_ASKPASS=$askpass" SSH_ASKPASS_REQUIRE=force DISPLAY=:0 \
+        sftp -P "$SFTP_PORT" \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        -o LogLevel=ERROR \
+        -o PreferredAuthentications=password \
+        -o PubkeyAuthentication=no \
+        -o NumberOfPasswordPrompts=1 \
+        -o BatchMode=no \
+        "${FTP_USERNAME}@127.0.0.1" < "$cmd_file" > "$log_out" 2>&1 || code=$?
+    rm -f "$askpass"
+    return "$code"
+}
+
+symlink_report() {
+    head1 "Symlink-Erzeugung durch das Kamera-Konto (MEDIA-5, #29)"
+    local name="harness-symlink-escape"
+    local link_target="../../../../etc/passwd"
+    local cmd_file="$REPORT_DIR/symlink-commands.txt"
+    local create_log="$REPORT_DIR/symlink-create.log"
+    local host_link="$HOST_HOME/$name"
+    local rc_create=0 verdict="" target="" escaped="nein"
+
+    # Ohne Host-Home gibt es kein lstat und damit kein Ziel. Ein leerer Pfad
+    # wuerde `rm -f` auf "/" ansetzen — deshalb hier hart abbrechen.
+    if [ -z "$HOST_HOME" ] || [ ! -d "$HOST_HOME" ]; then
+        note_failure "Symlink-Probe: Home-Verzeichnis auf dem Host fehlt (${HOST_HOME:-leer}).
+  Ohne Bind-Mount ist das Linkziel nicht messbar."
+        return 1
+    fi
+
+    # Vorbedingung: keine Reste aus einem abgebrochenen Lauf.
+    rm -f "$host_link" 2>/dev/null || true
+
+    # 1) Anlegen. Das Ziel zeigt bewusst aus dem Home heraus.
+    printf 'ln -s %s %s\nquit\n' "$link_target" "$name" > "$cmd_file"
+    sftp_stdin_commands "$cmd_file" "$create_log" || rc_create=$?
+    if [ "$rc_create" -eq 124 ]; then
+        note_failure "Symlink-Probe: sftp lief in den Watchdog. Rohprotokoll: ${create_log}"
+        return 1
+    fi
+
+    # 2) Nachsehen, was der Server gespeichert hat — vom HOST aus, nicht aus
+    #    der sftp-Ausgabe. Das Home ist ein Bind-Mount; `readlink` auf dem Host
+    #    ist ein lstat und damit eindeutig. sftp-Text enthaelt im Fehlerfall
+    #    Zeilen wie "Connection closed.", die als Ziel fehlgelesen werden
+    #    koennen (in einer ersten Fassung genau so passiert).
+    if [ -L "$host_link" ]; then
+        target="$(readlink "$host_link" 2>/dev/null || true)"
+    fi
+
+    if [ -z "$target" ] && symlink_log_is_transport_failure "$create_log"; then
+        note_failure "Symlink-Probe: die SSH-Verbindung/Anmeldung kam nicht zustande.
+  Das ist kein Befund ueber symlink_mode. Rohprotokoll: ${create_log}"
+        return 1
+    fi
+
+    verdict="$(symlink_verdict "$create_log" "$target")" || true
+    case "$verdict" in
+        REFUSED_UNSUPPORTED)
+            ok "Symlink-Anlage wird abgelehnt: 'operation unsupported' (symlink_mode=0)"
+            ;;
+        REFUSED_PERMISSION)
+            ok "Symlink-Anlage wird abgelehnt: 'permission denied'"
+            warn "Ablehnung ueber die Rechte, nicht ueber symlink_mode — CAMERA_PERMISSIONS ist ['/' => ['*']], das ist eine Abweichung."
+            ;;
+        "ACCEPTED "*)
+            target="${verdict#ACCEPTED }"
+            if symlink_target_escapes "$target" "$FTP_HOMEDIR"; then
+                escaped="ja"
+            fi
+            note_failure "Symlink-Anlage wurde ANGENOMMEN — die dokumentierte Konfiguration sagt symlink_mode=0.
+  Gespeichertes Ziel : ${target}
+  Zeigt aus dem Home : ${escaped}
+  Das ist eine Abweichung vom dokumentierten Stack (MEDIA-5, #29). Der
+  Importer darf einem Link NICHT folgen, unabhaengig von dieser Messung.
+  Rohprotokoll: ${create_log}"
+            # Aufraeumen, damit der naechste Lauf nicht auf einem Link sitzt.
+            rm -f "$host_link" 2>/dev/null || true
+            ;;
+        *)
+            note_failure "Symlink-Probe: nicht entscheidbar (sftp exit ${rc_create}, kein Link auf dem Host).
+  Weder ein gespeichertes Ziel noch eine benannte Ablehnung im Protokoll.
+  Rohprotokoll: ${create_log}"
+            ;;
+    esac
+
+    {
+        printf '\nSymlink-Erzeugung durch das Kamera-Konto (Teil 6, MEDIA-5 #29)\n'
+        printf '==================================================================\n'
+        printf 'Frage      : kann das Konto einen Symlink anlegen, der aus dem Home zeigt?\n'
+        printf 'Versuch    : `ln -s %s %s` im Home, Ziel danach per lstat auf dem Host gelesen\n' "$link_target" "$name"
+        printf 'Ergebnis   : %s\n' "$verdict"
+        [ -n "$target" ] && printf 'Ziel im Link: %s (ausserhalb des Home: %s)\n' "$target" "$escaped"
+        printf 'Regel      : SFTPGo verlangt symlink_mode & 1 (Default 0) und fuer FTP\n'
+        printf '             zusaetzlich ftpd.enable_site (Default false).\n'
+        printf 'FTP-Seite  : SITE SYMLINK ist mit enable_site=false nicht erreichbar —\n'
+        printf '             aus dem Default abgeleitet, in diesem Teil NICHT gemessen.\n'
+        printf 'Protokoll  : %s\n' "$create_log"
+    } >> "$REPORT_TXT"
+}
+
+# ===========================================================================
 # Ablauf
 # ===========================================================================
 head1 "Vorbereitung"
@@ -595,7 +775,7 @@ FTPS_SIZE="$(file_size_of "$FTPS_PAYLOAD")"; FTPS_SHA="$(sha256_of "$FTPS_PAYLOA
 SFTP_SIZE="$(file_size_of "$SFTP_PAYLOAD")"; SFTP_SHA="$(sha256_of "$SFTP_PAYLOAD")"
 ok "Payloads: ftps ${FTPS_SIZE} B / sftp ${SFTP_SIZE} B"
 
-head1 "1/4 FTPS-Upload (curl, explizites AUTH TLS)"
+head1 "1/6 FTPS-Upload (curl, explizites AUTH TLS)"
 # Zwei Durchlaeufe: ueber Extended Passive Mode (EPSV, 229) und ueber das
 # klassische PASV (227). Aeltere Kameras sprechen nur PASV, neuere nur EPSV —
 # der passive Datenkanal ist der zweite TCP-Pfad, und genau an ihm scheitert
@@ -603,14 +783,14 @@ head1 "1/4 FTPS-Upload (curl, explizites AUTH TLS)"
 ftps_upload "FTPS" "$FTPS_PAYLOAD" "ftps-upload.txt" epsv || true
 ftps_upload "FTPS" "$FTPS_PAYLOAD" "ftps-upload.txt" pasv || true
 
-head1 "2/4 SFTP-Upload (sftp, nicht-interaktiv)"
+head1 "2/6 SFTP-Upload (sftp, nicht-interaktiv)"
 sftp_upload "SFTP" "$SFTP_PAYLOAD" "sftp-upload.txt" || true
 
-head1 "3/4 Dateien auf dem Host pruefen"
+head1 "3/6 Dateien auf dem Host pruefen"
 check_file_landed "FTPS-Datei" "$HOST_HOME/ftps-upload.txt" "$FTPS_SIZE" "$FTPS_SHA" || true
 check_file_landed "SFTP-Datei" "$HOST_HOME/sftp-upload.txt" "$SFTP_SIZE" "$SFTP_SHA" || true
 
-head1 "4/4 Passivbereich und Cipher"
+head1 "4/6 Passivbereich und Cipher"
 # Passiver Datenkanal: der tatsaechlich benutzte Port steht im curl-Trace
 # (227 oder 229). Wir pruefen, dass er INNERHALB des publizierten Bereichs
 # liegt. Das ist der direkte Nachweis fuer 19-ftp 7.13 — ein blosser
@@ -637,12 +817,19 @@ log "Produktions-Passivbereich: ${PRODUCTION_PASV_PORT_START}-${PRODUCTION_PASV_
 cipher_report
 uid_report
 
+head1 "5/6 Klartext-Login muss scheitern (TLS-Zwang)"
+mandatory_tls_report || true
+
+head1 "6/6 Symlink-Erzeugung durch das Kamera-Konto (MEDIA-5)"
+symlink_report || true
+
 head1 "Gesamtergebnis"
 printf '  Fehlschlaege (Harness oder Dienst): %d\n' "$FAILURES"
 printf '  Befunde (sauber gemessen, Entscheidung noetig): %d\n' "$FINDINGS"
 if [ "$FAILURES" -eq 0 ]; then
     printf '%s  BESTANDEN%s  Upload ueber FTPS (EPSV und PASV) und SFTP verifiziert,\n' "$C_OK" "$C_RESET"
-    printf '              Dateigroesse und SHA-256 bestaetigt, Cipher-Report erstellt.\n'
+    printf '              Dateigroesse und SHA-256 bestaetigt, Klartext-Login abgelehnt,\n'
+    printf '              Cipher-Report erstellt.\n'
     if [ "$FINDINGS" -gt 0 ]; then
         printf '%s  %d BEFUND(E)%s  Messung war vollstaendig, das Ergebnis ist aber nicht das gewuenschte.\n' \
             "$C_WARN" "$FINDINGS" "$C_RESET"

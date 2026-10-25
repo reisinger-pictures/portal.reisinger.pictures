@@ -1,0 +1,3 @@
+greeting: 220 SFTPGo_2.7.6
+USER -> 331 Password required for camtest
+PASS -> 230 User logged in, proceed
