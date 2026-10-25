@@ -32,6 +32,10 @@
 #    that .env.production and config/services.php already use. SFTPGo reads
 #    `SFTPGO_DEFAULT_ADMIN_*`; a second, separately pasted value pair is how the
 #    container ended up with an empty admin and a restart loop.
+#
+# 5. A one-shot init service that cannot delete files in a tree it does not own
+#    exits 1; `depends_on: service_completed_successfully` then leaves the backend
+#    in `Created`, so the site is down without a backend log line.
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -81,10 +85,22 @@ done
 for needed in 'id -u | grep -qx 1000' 'id -g | grep -qx 82' 'printenv APP_ENV' \
               'printenv APP_KEY' 'printenv JWT_SECRET' 'printenv FILE_ENCRYPTION_KEY' \
               'printenv ADMIN_EMAIL' 'printenv ADMIN_PASSWORD' 'printenv PHOTO_STORAGE_PATH' \
-              'printenv AI_SESSION_HEADER' 'printenv AI_SESSION_PREFIX'; do
+              'printenv AI_SESSION_HEADER' 'printenv AI_SESSION_PREFIX' \
+              'printenv FTP_EVENT_SECRET'; do
     grep -qF -- "$needed" <<<"$CMD_BLOCK" \
         || fail "the fail-closed guard lost this check: $needed"
 done
+
+# composer_init must run as the website-tree owner. Otherwise Composer cannot
+# delete/replace a package file, exits 1, and service_completed_successfully
+# blocks the backend before it can emit a log line.
+composer_init_service="$(awk '
+    /^  composer_init:$/ { in_service = 1; next }
+    in_service && /^  [a-z_]+:/ { in_service = 0 }
+    in_service { print }
+' "$COMPOSE")"
+grep -qF '    user: "1002:82"' <<<"$composer_init_service" \
+    || fail 'composer_init must run as 1002:82, the website-tree owner, or package replacement blocks backend startup'
 
 # 19-ftp 7.9 forbids rewriting /home/webadmin/websites to 1000:1000, so the
 # ownership comparison must stay out; writability is the property that matters.
@@ -95,7 +111,8 @@ fi
 # The migration gate and the supervisor hand-off must all be reachable.
 for step in 'validate-production-env || exit 1' 'ops:validate-production || exit 1' \
             'migrate --force' 'app:seed-if-fresh' 'admin:update' \
-            'ftp:provision-folders --fix-permissions' 'scout:sync-index-settings' \
+            'ftp:provision-folders --fix-permissions' 'ftp:provision-events || exit 1' \
+            'scout:sync-index-settings' \
             'queue:restart' 'exec /usr/local/bin/portal-backend-supervisor'; do
     grep -qF -- "$step" <<<"$CMD_BLOCK" \
         || fail "the start sequence lost a step: $step"

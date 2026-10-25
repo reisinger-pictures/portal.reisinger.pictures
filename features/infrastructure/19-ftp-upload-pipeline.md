@@ -1751,6 +1751,9 @@ php artisan ftp:provision-events
 php artisan ftp:provision-events --dry-run   # kontaktiert SFTPGo nicht, zeigt Ziel-URL und Regel
 ```
 
+Im Betrieb läuft der Befehl bei jedem Backend-Start im `command:`-Block
+(fail-closed, siehe 7.18.1); die Aufrufe hier sind die Diagnose von Hand.
+
 **Benutzte Admin-Endpunkte** (`openapi/openapi.yaml` v2.7.6, nicht geraten):
 
 | Zweck | Aufruf |
@@ -1862,39 +1865,30 @@ angelegt.
 `FTP_EVENT_SECRET` hat **keinen** Default: ein leerer Wert muss den Endpunkt
 fail-closed machen, nicht Events ohne Authentifizierung annehmen.
 
-### 7.18.1 Ausrollen der Event-Regel (Deploy-Seite)
+Die Provisionierung der SFTPGo-Aktion und -Regel läuft jetzt bei jedem
+Backend-Start im `command:`-Block über `ftp:provision-events`, idempotent und
+fail-closed; sie ist kein manueller Deploy-Schritt mehr.
 
-Die Regel liegt im SFTPGo-Datenprovider und wird deshalb **nicht** vom
-Container-Entrypoint geschrieben, sondern einmalig (idempotent wiederholbar) per
-Befehl. Zwei Dinge gehören dazu:
+### 7.18.1 Startvoraussetzungen (Deploy-Seite)
 
-1. **Die zwei Variablen im Backend-Service** von `deployment/docker-compose.yml`
-   (neben `FTP_STORAGE_PATH`):
+Die beiden Variablen gehören in den Backend-Service von
+`deployment/docker-compose.yml` (neben `FTP_STORAGE_PATH`):
 
-   ```yaml
-   - FTP_EVENT_URL=${FTP_EVENT_URL:-}
-   - FTP_EVENT_SECRET=${FTP_EVENT_SECRET:-}
-   ```
+```yaml
+- FTP_EVENT_URL=${FTP_EVENT_URL:-}
+- FTP_EVENT_SECRET=${FTP_EVENT_SECRET:-}
+```
 
-   `FTP_EVENT_SECRET` ist ein Secret und gehört in die Portainer-Stack-Env, nie
-   ins Repo (dieselbe Klasse wie C1–C4). `FTP_EVENT_URL` darf leer bleiben — der
-   Default aus `config/ftp.php` ist der interne Listener `ftp-events:8080`.
-2. **Der Provisionierungsschritt**, ausgeführt **nach** dem Start des
-   Backend-Containers, weil er die Admin-API erreichen muss:
-
-   ```bash
-   docker compose exec backend php artisan ftp:provision-events
-   ```
-
-   Ohne diesen Schritt antwortet der Endpunkt auf jedes Event **401**
-   (fail-closed, korrekt), und es wird nichts automatisch importiert — das ist
-   kein Fehler des Codes, sondern ein unvollständiger Deploy.
+`FTP_EVENT_SECRET` ist ein Secret und gehört in die Portainer-Stack-Env, nie ins
+Repo (dieselbe Klasse wie C1–C4). `FTP_EVENT_URL` darf leer bleiben — der
+Default aus `config/ftp.php` ist der interne Listener `ftp-events:8080`.
 
 **Eine Compose-Änderung ist ein Recreate, kein Restart (AGENTS.md §13).** Die
 zwei neuen `environment:`-Zeilen werden von `docker restart` **nicht**
 übernommen — sie sind zum Erzeugungszeitpunkt in den Container gebacken. Nach der
 Änderung muss der Stack neu erzeugt werden (Portainer-Stack-Editor-Update), erst
-danach greifen die Variablen. `sync.sh` allein reicht dafür nicht.
+danach greifen die Variablen. `FTP_EVENT_SECRET` muss daher vor dem Recreate
+gesetzt sein. `sync.sh` allein reicht dafür nicht.
 
 **Live-Verifikation (2026-10-22, Produktion).** Die Kette ist eingerichtet und
 gegen die laufende Instanz geprüft:
