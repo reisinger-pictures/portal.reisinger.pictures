@@ -17,6 +17,7 @@ use App\Services\OrgDefaultRolePolicy;
 use App\Support\BrandRegistry;
 use App\Support\FtpInboxDirectory;
 use App\Support\FtpSlug;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -29,6 +30,19 @@ use Illuminate\Support\Facades\Storage;
 
 class AuthController extends Controller
 {
+    /**
+     * The one success payload of `register()` (AUTH-2).
+     *
+     * An address that already has an account and an address that just got one
+     * must be indistinguishable, so every branch — existing account, created
+     * account, lost insert race — answers from this constant and the body
+     * cannot drift between them.
+     */
+    private const REGISTRATION_SUCCESS = [
+        'success' => true,
+        'message' => 'Registrierung erfolgreich. Bitte prüfe deine E-Mails.',
+    ];
+
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -63,77 +77,103 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
+        // AUTH-2: no `unique:users` rule. "422 for a taken address, 200 for a
+        // free one" is an account-existence oracle, so the endpoint answers both
+        // with the same success instead of telling the caller which case it is.
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => 'required|string|email|max:255',
         ]);
 
-        return DB::transaction(function () use ($validated) {
-            $user = User::create([
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'password' => null, // Initial passwortlos!
-                'brand' => BrandRegistry::currentOrDefault(),
-            ]);
+        // Resolve the account before anything else. An existing address is not
+        // touched at all: no insert, no org/invite handling, no activation
+        // token, no mail.
+        //
+        // Accepted tradeoff: someone who mistypes an address that already exists
+        // is told "check your email" and receives nothing. That is deliberate —
+        // naming the collision would restore the oracle this check closes — and
+        // account recovery is the `reset-password` path, whose mail goes only to
+        // the inbox of an address nobody can take over from here.
+        if (User::where('email', $validated['email'])->exists()) {
+            return response()->json(self::REGISTRATION_SUCCESS);
+        }
 
-            $domain = explode('@', $validated['email'])[1] ?? null;
-            $org = $domain ? Org::where('domain', $domain)->first() : null;
+        try {
+            return DB::transaction(function () use ($validated) {
+                $user = User::create([
+                    'name' => $validated['name'],
+                    'email' => $validated['email'],
+                    'password' => null, // Initial passwortlos!
+                    'brand' => BrandRegistry::currentOrDefault(),
+                ]);
 
-            if ($org) {
-                // Brand check: an org without a concrete current-host brand is
-                // legacy data and cannot be used as a registration authority.
-                if (! BrandRegistry::resourceMatchesCurrent($org->brand)) {
-                    // Throwing a response exception is intentional: returning a
-                    // response from a transaction commits everything written so far.
-                    // The user insert above must therefore be rolled back before the
-                    // 403 reaches the client.
-                    throw new HttpResponseException(response()->json([
-                        'error' => 'Registrierung für diese Domain ist auf diesem Portal nicht möglich.',
-                    ], 403));
-                }
+                $domain = explode('@', $validated['email'])[1] ?? null;
+                $org = $domain ? Org::where('domain', $domain)->first() : null;
 
-                // Evaluate auto_join_policy
-                if ($org->auto_join_policy === AutoJoinPolicy::REQUIRES_INVITE) {
-                    // No auto-join — user must be invited manually
-                    // Still attach if there's a pending invite for this email
-                    $pendingInvite = OrgInvite::where('email', $validated['email'])
-                        ->where('org_id', $org->id)
-                        ->where('expires_at', '>', now())
-                        ->first();
-                    if ($pendingInvite) {
-                        $defaultRole = app(OrgDefaultRolePolicy::class)->roleForNewAssignment($org);
-                        $user->org_id = $org->id;
-                        $user->save();
-                        $user->roles()->syncWithoutDetaching([$defaultRole->id]);
-                        $pendingInvite->delete();
+                if ($org) {
+                    // Brand check: an org without a concrete current-host brand is
+                    // legacy data and cannot be used as a registration authority.
+                    if (! BrandRegistry::resourceMatchesCurrent($org->brand)) {
+                        // Throwing a response exception is intentional: returning a
+                        // response from a transaction commits everything written so far.
+                        // The user insert above must therefore be rolled back before the
+                        // 403 reaches the client.
+                        throw new HttpResponseException(response()->json([
+                            'error' => 'Registrierung für diese Domain ist auf diesem Portal nicht möglich.',
+                        ], 403));
                     }
+
+                    // Evaluate auto_join_policy
+                    if ($org->auto_join_policy === AutoJoinPolicy::REQUIRES_INVITE) {
+                        // No auto-join — user must be invited manually
+                        // Still attach if there's a pending invite for this email
+                        $pendingInvite = OrgInvite::where('email', $validated['email'])
+                            ->where('org_id', $org->id)
+                            ->where('expires_at', '>', now())
+                            ->first();
+                        if ($pendingInvite) {
+                            $defaultRole = app(OrgDefaultRolePolicy::class)->roleForNewAssignment($org);
+                            $user->org_id = $org->id;
+                            $user->save();
+                            $user->roles()->syncWithoutDetaching([$defaultRole->id]);
+                            $pendingInvite->delete();
+                        }
+                    }
+                    // DISABLED and IMMEDIATE: no auto-join at registration — deferred to password reset
                 }
-                // DISABLED and IMMEDIATE: no auto-join at registration — deferred to password reset
-            }
 
-            // The token row is claimed, never overwritten (D-17): a still valid
-            // token stays the one the person already holds in their inbox, and
-            // no second mail goes out. `resetPassword()` resolves the account by
-            // email at click time, so the earlier link activates *this* account —
-            // which is why the response stays the same success in both cases.
-            $token = app(ActivationTokenService::class)->issue($user->email);
+                // The token row is claimed, never overwritten (D-17): a still valid
+                // token stays the one the person already holds in their inbox, and
+                // no second mail goes out. `resetPassword()` resolves the account by
+                // email at click time, so the earlier link activates *this* account —
+                // which is why the response stays the same success in both cases.
+                $token = app(ActivationTokenService::class)->issue($user->email);
 
-            if ($token !== null) {
-                $link = BrandRegistry::frontendUrl().'/reset-password?token='.$token.'&email='.urlencode($user->email);
+                if ($token !== null) {
+                    $link = BrandRegistry::frontendUrl().'/reset-password?token='.$token.'&email='.urlencode($user->email);
 
-                Mail::to($user->email)->send(
-                    new ActivateAccountMail(
-                        $user->name,
-                        'Willkommen! Um deinen Account zu aktivieren und ein sicheres Passwort zu vergeben, klicke bitte auf den folgenden Button:',
-                        $link,
-                        'Account aktivieren',
-                        'Account aktivieren'
-                    )
-                );
-            }
+                    Mail::to($user->email)->send(
+                        new ActivateAccountMail(
+                            $user->name,
+                            'Willkommen! Um deinen Account zu aktivieren und ein sicheres Passwort zu vergeben, klicke bitte auf den folgenden Button:',
+                            $link,
+                            'Account aktivieren',
+                            'Account aktivieren'
+                        )
+                    );
+                }
 
-            return response()->json(['success' => true, 'message' => 'Registrierung erfolgreich. Bitte prüfe deine E-Mails.']);
-        });
+                return response()->json(self::REGISTRATION_SUCCESS);
+            });
+        } catch (UniqueConstraintViolationException) {
+            // Two concurrent registrations can both pass the existence check;
+            // `users.email` is unique, so the loser's insert lands here after the
+            // transaction rolled its own writes back. Answering with the same
+            // success keeps the race from becoming a 500 that discloses what the
+            // check above just hid. Only the unique violation is translated —
+            // every other database exception keeps propagating.
+            return response()->json(self::REGISTRATION_SUCCESS);
+        }
     }
 
     public function resetPassword(Request $request)
