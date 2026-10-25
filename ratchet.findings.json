@@ -145,76 +145,70 @@
       "id": "AUTH-2",
       "title": "Account-Existence-Oracle bei Registrierung",
       "severity": "high",
-      "status": "open",
+      "status": "fixed",
       "status_since": "2026-10-25",
+      "regression_test": "RegistrationPrivacyTest",
       "path": "features/security/findings-registry.md",
-      "note": "Registrierung verr\u00e4t \u00fcber unique:users existierende Adressen; Fix erfordert generische Antwort plus Benachrichtigung an bestehende Adresse (bed\u00fcrfe Owner-Entscheidung)",
-      "owner": "reisi007",
-      "ticket": "#24"
+      "note": "unique:users entfernt; bestehende und neue Adresse antworten aus derselben Konstante, die bestehende Adresse wird nicht angefasst (kein Insert, kein Invite-Verbrauch, kein Token, keine Mail). Verlorenes Insert-Rennen faengt UniqueConstraintViolationException und antwortet gleich. Owner-Entscheidung 2026-10-25: stumm, bewusst ohne Benachrichtigung an die bestehende Adresse."
     },
     {
       "id": "PAY-3",
       "title": "paid ohne Settlement-Pr\u00fcfung \u00fcber Management-Route setzbar",
       "severity": "high",
-      "status": "open",
+      "status": "fixed",
       "status_since": "2026-10-25",
+      "regression_test": "OrderStatusPaidTest",
       "path": "features/security/findings-registry.md",
-      "note": "OrderController::updateStatus() schreibt paid direkt; download-berechtigt. Admin-only, aber keine Pr\u00fcfung. Entscheidung n\u00f6tig.",
-      "owner": "reisi007",
-      "ticket": "#25"
+      "note": "Uebergangsregel statt neuem Berechtigungssystem (Owner-Entscheidung 2026-10-25): paid nur aus der Rechnungskette (invoice_created, overdue, delivery_note, archived_in_collective), bei von Stripe bestaetigtem PaymentIntent oder als idempotenter Rewrite. refunded/disputed werden unbedingt abgewiesen (ein Refund laesst den Intent auf succeeded). Stripe-Lookup-Fehler = 502, fail closed."
     },
     {
       "id": "PAY-4",
       "title": "charge.dispute.closed nicht abonniert / Wiederherstellung ungekl\u00e4rt",
       "severity": "medium",
-      "status": "open",
+      "status": "fixed",
       "status_since": "2026-10-25",
+      "regression_test": "DisputeClosedRestorationTest",
       "path": "features/security/findings-registry.md",
-      "note": "disputed sperrt Downloads, aber gewonnener Dispute wird nicht automatisch bearbeitet - Owner-Entscheidung",
-      "owner": "reisi007",
-      "ticket": "#26"
+      "note": "Owner-Entscheidung 2026-10-25: gewonnen -> automatisch frei, verloren -> gesperrt. Webhook-Zweig charge.dispute.closed restauriert disputed -> paid und leert den Purchase-Cache; die Allow-List ist genau ['disputed'], ein zwischenzeitlicher Refund kann also nicht wieder geoeffnet werden. Offen bleibt nur der Owner-Schritt in der Stripe-Dashboard-Subscription (fuenftes Event), der Code ist bereit."
     },
     {
       "id": "PAY-5",
       "title": "Teil-Refunds nicht erfasst, Payout-Berechnung gef\u00e4hrdet",
       "severity": "medium",
-      "status": "open",
+      "status": "fixed",
       "status_since": "2026-10-25",
+      "regression_test": "PartialRefundPayoutTest",
       "path": "features/security/findings-registry.md",
-      "note": "Refund-Betr\u00e4ge werden nicht gespeichert; paid bleibt paid",
-      "owner": "reisi007",
-      "ticket": "#27"
+      "note": "Owner-Entscheidung 2026-10-25: fuer den Kunden aendert ein Teil-Refund nichts (Status, Zugriff), fuer den Fotografen-Anteil schon. refunded_amount_cents (V049) wird aus charge.refunded monoton gespeichert und in calculatePowerUserDelta proportional vom Zeilenumsatz abgezogen. Rest: Refunds nach Monatsabschluss werden nicht zurueckgeholt, siehe #37 (PAY-6)."
     },
     {
       "id": "SEC-2",
       "title": "FTPS ohne erzwungenes AUTH TLS",
       "severity": "medium",
-      "status": "open",
+      "status": "fixed",
       "status_since": "2026-10-25",
+      "regression_test": "tests/scripts/ftp-transport-test/verify.sh Teil 5, plaintext_refusal_assert in self-test.sh",
       "path": "features/security/findings-registry.md",
-      "note": "Bewusste Kompatibilit\u00e4tsentscheidung f\u00fcr Kamera, aber dokumentiert offen",
-      "owner": "reisi007",
-      "ticket": "#28"
+      "note": "Kein Risiko, sondern ein Doku-Fehler: TLS_MODE=1 ist in ftpserverlib MandatoryEncryption. Gemessen am 2026-10-25 gegen die laufende SFTPGo 2.7.6: USER ohne AUTH TLS -> 421 TLS is required, Verbindung geschlossen. Die frueher in deployment/docker-compose.yml behauptete Klartext-Oeffnung ist zurueckgezogen; die Probe im Harness pinnt die Ablehnung."
     },
     {
       "id": "MEDIA-5",
       "title": "SFTPGo-Symlinks / realpath-Konfinierung nicht best\u00e4tigt",
       "severity": "medium",
-      "status": "open",
+      "status": "fixed",
       "status_since": "2026-10-25",
+      "regression_test": "FtpInboxSymlinkTest, verify.sh Teil 6 (Symlink-Anlage durch das Kamera-Konto)",
       "path": "features/security/findings-registry.md",
-      "note": "is_file()/fopen() folgen Symlinks, keine realpath-Konfinierung",
-      "owner": "reisi007",
-      "ticket": "#29"
+      "note": "Belegt statt vermutet: der Import hat einen Link aus der Inbox heraus gelesen (Test rot), isRegularFile() lehnt jetzt jeden Symlink ab (Test gruen, Ftp-Suite 489 gruen). Die Vorbedingung ist zusaetzlich gemessen: SFTPGo verweigert die Link-Anlage per Default (common.symlink_mode = 0, connection.go:973), FTP SITE SYMLINK ist doppelt zu (enable_site=false). Rest: der Inbox-Pfad selbst ist nicht geprueft, siehe #38 (MEDIA-6)."
     },
     {
       "id": "OPS-2",
       "title": "Klartext-Kommunikation im internen Netz",
       "severity": "medium",
-      "status": "open",
+      "status": "accepted",
       "status_since": "2026-10-25",
       "path": "features/security/findings-registry.md",
-      "note": "JWT-Fallback sendet Credentials; nur intern erreichbar",
+      "note": "Owner-Entscheidung 2026-10-25: getragen, nicht behoben. Gemessen: das Admin-API ist nicht host-veroeffentlicht (127.0.0.1:8080 auf dem Host = connection refused), SFTPGo sitzt nur im internen Docker-Netz. TLS im internen Netz waere Betriebsaufwand ohne Bedrohungsmodell.",
       "owner": "reisi007",
       "ticket": "#30"
     },
@@ -225,7 +219,7 @@
       "status": "open",
       "status_since": "2026-10-25",
       "path": "features/security/findings-registry.md",
-      "note": "sync.sh setzt F666/D2777, read-write mounts",
+      "note": "Ursache war der uid-Konflikt: Baum 1002, Backend 1000; sync.sh setzte F666/D2777. Im Repository behoben (Backend 1002:82, 0644/0755, 2775 nur fuer storage/ und bootstrap/cache/), Rollout offen.",
       "owner": "reisi007",
       "ticket": "#31"
     }

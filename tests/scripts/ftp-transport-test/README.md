@@ -278,6 +278,14 @@ Vollständiger Lauf aus sauberem Zustand, `drakkan/sftpgo:2.7.x`
 | FTPS, TLS 1.2 erzwungen | TLSv1.2 | `ECDHE-RSA-AES128-GCM-SHA256` |
 | SFTP | — | KEX `ecdh-sha2-nistp256`, Cipher `aes128-gcm@openssh.com` |
 
+**Teil 5 misst die Auth-Ablehnung, nicht nur den Handshake:** ein Klartext-
+`USER` ohne `AUTH TLS` wird mit `421 TLS is required` beantwortet und die
+Verbindung geschlossen (`TLS_MODE=1` = `MandatoryEncryption`, 19-ftp 7.13).
+
+**Teil 6 misst die Symlink-Vorbedingung von MEDIA-5 (#29):** `ln -s` mit einem
+relativen Ziel, das aus dem Home zeigt, danach lstat auf dem Host-Bind-Mount.
+Erwartet ist die Ablehnung, weil `common.symlink_mode` per Default `0` ist.
+
 **Angebotene Suites, vollständig:**
 
 - **TLS 1.2 — 3 Suites:** `ECDHE-RSA-AES128-GCM-SHA256`,
@@ -424,7 +432,7 @@ Compose-Projekte, kein `chown -R` und kein `adduser -h` (19-ftp 7.9).
 | Datei | Inhalt |
 |---|---|
 | `up.sh` | Stack starten, Zertifikat erzeugen, Admin prüfen, User provisionieren, `verify.sh` aufrufen |
-| `verify.sh` | Uploads über FTPS (EPSV + PASV) und SFTP, Größe/Prüfsumme, Cipher-Report, UID |
+| `verify.sh` | Uploads über FTPS (EPSV + PASV) und SFTP, Größe/Prüfsumme, Cipher-Report, UID, Klartext-Ablehnung des Logins |
 | `down.sh` | Vollständiger Abbau mit Nachkontrolle |
 | `self-test.sh` | Hermetische Wetter-Unit-Tests und Quelltext-Invarianten, ohne Docker |
 | `docker-compose.yml` | Der Harness-Stack. Explizit **kein** Produktionsstack. |

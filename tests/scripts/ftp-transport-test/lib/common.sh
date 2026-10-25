@@ -328,6 +328,161 @@ tls_cipher() {
     printf '%s' "$v"
 }
 
+# --- Klartext-Login-Ablehnung (TLS-Zwang) ----------------------------------
+#
+# features/infrastructure/19-ftp-upload-pipeline.md 7.13: `TLS_MODE=1` ist
+# nicht "explizites TLS mit optionalem Klartext-Zweig", sondern in
+# ftpserverlib `MandatoryEncryption`. Ohne `AUTH TLS` wird `USER` mit
+# `421 TLS is required` beantwortet. Diese Zusage stand in unserer eigenen
+# Doku einmal falsch herum (Klartext angeblich moeglich, Firewall-Regel
+# noetig); der folgende Probe haelt die gemessene Richtung fest.
+#
+# Bewusst KEIN TLS-Client und kein Duplikat von tls_probe: hier wird die
+# Klartextstrecke absichtlich im Klartext gesprochen. Was zaehlt, ist die
+# Antwort auf `USER`, nicht ein Handshake. Der Klartext-Greeting
+# (`220 SFTPGo_2.7.6`) ist erwartet und kommt VOR `AUTH TLS` — genau er hat
+# die falsche Annahme plausibel gemacht.
+
+# _plaintext_session PORT BENUTZER PASSWORT
+# Schreibt das Transkript nach stdout. Ein nicht erreichbarer Dienst ist ein
+# Fehlerfall (return 1), kein Messergebnis.
+_plaintext_session() {
+    local port="$1" user="$2" pass="$3" line
+    exec 3<>"/dev/tcp/127.0.0.1/${port}" 2>/dev/null || return 1
+    # `read -t` ist der Timeout: macOS hat kein GNU-`timeout`, und der Server
+    # schliesst die Verbindung nach der Ablehnung — ohne Timeout wuerde der
+    # Probe dort haengen.
+    if IFS= read -r -t 10 line <&3; then
+        printf 'greeting: %s\n' "$line"
+    else
+        printf 'greeting: <keine>\n'
+    fi
+    # `|| true`: nach dem 421 schliesst der Server, der naechste Schreibzugriff
+    # bekommt EPIPE. Das ist Teil der Messung, nicht ihr Abbruch.
+    printf 'USER %s\r\n' "$user" >&3 || true
+    if IFS= read -r -t 10 line <&3; then
+        printf 'USER -> %s\n' "$line"
+    else
+        printf 'USER -> <keine Antwort>\n'
+    fi
+    printf 'PASS %s\r\n' "$pass" >&3 || true
+    if IFS= read -r -t 10 line <&3; then
+        printf 'PASS -> %s\n' "$line"
+    else
+        printf 'PASS -> <keine Antwort>\n'
+    fi
+    exec 3<&- 3>&- || true
+    return 0
+}
+
+# plaintext_login_probe DATEI
+# Misst gegen das explizite FTPS-Binding und legt das Transkript ab.
+# Exit 0 = Messung zustande gekommen, 124 = Watchdog, sonst Verbindungsfehler.
+plaintext_login_probe() {
+    local out="$1"
+    : > "$out"
+    run_with_timeout 25 _plaintext_session "$FTPS_PORT" "$FTP_USERNAME" "$FTP_PASSWORD" \
+        >> "$out" 2>&1
+}
+
+# plaintext_refusal_assert DATEI
+# 0 = die Aufzeichnung belegt den TLS-Zwang: der Server hat gesprochen, `USER`
+#     wurde ohne AUTH TLS mit 4xx plus `TLS` abgelehnt und KEIN Befehl mit
+#     2xx/3xx quittiert (also kein Login).
+# 1 = sonst, mit benanntem Grund auf stderr. Die drei Fehlerbilder sind
+#     getrennt, weil sie verschiedene Ursachen haben: toter Dienst, offener
+#     Klartext-Zugang, unvollstaendige Messung.
+plaintext_refusal_assert() {
+    local out="$1"
+    if ! grep -qE '^greeting: [0-9][0-9][0-9]' "$out"; then
+        printf 'KLARTEXT-PROBE OHNE GREETING: der Dienst hat nicht einmal gesprochen.\n' >&2
+        printf '  Das ist KEIN Befund ueber den TLS-Zwang, sondern ein nicht erreichbarer Dienst.\n' >&2
+        printf '  Rohprotokoll: %s\n' "$out" >&2
+        return 1
+    fi
+    if grep -qE '^(USER|PASS) -> [23][0-9][0-9]' "$out"; then
+        printf 'KLARTEXT-LOGIN MOEGLICH: ein Befehl ohne AUTH TLS wurde mit 2xx/3xx quittiert.\n' >&2
+        printf '  Das widerspricht TLS_MODE=1 = MandatoryEncryption.\n' >&2
+        printf '  Rohprotokoll: %s\n' "$out" >&2
+        return 1
+    fi
+    if ! grep -qiE '^USER -> 4[0-9][0-9].*TLS' "$out"; then
+        printf 'KEINE ABLEHNUNG MESSBAR: `USER` bekam weder 2xx/3xx noch ein 4xx mit TLS-Bezug.\n' >&2
+        printf '  Die Probe hat damit nichts ueber den TLS-Zwang bewiesen.\n' >&2
+        printf '  Rohprotokoll: %s\n' "$out" >&2
+        return 1
+    fi
+    return 0
+}
+
+# --- Symlink-Erzeugung durch das Kamera-Konto (MEDIA-5, #29) ----------------
+#
+# Vorbedingung der Importer-Frage: kann das Kamera-Konto ueberhaupt einen
+# Symlink anlegen, und was steht als Ziel im Link? SFTPGo v2.7.6 verlangt
+# dafuer `common.symlink_mode & 1` (internal/common/connection.go:973); der
+# Default ist 0 (internal/config/config.go:213 und die ausgelieferte
+# sftpgo.json:12). Fuer den FTP-Weg zusaetzlich `ftpd.enable_site`
+# (Default false, config.go:300, sftpgo.json:147), das die Bindung als
+# `DisableSite` an ftpserverlib weiterreicht (internal/ftpd/server.go:126).
+#
+# Der interessante Fall ist ein RELATIVES Ziel: SFTPGo setzt die virtuelle
+# Aufloesung nur fuer die Rechtepruefung ein und schreibt bei relativem Ziel
+# den uebergebenen String woertlich in den Link
+# (internal/common/connection.go:990-1004). Deshalb wird genau der gemessen.
+#
+# symlink_verdict ANLEGE-LOG GESPEICHERTES-ZIEL
+#   ACCEPTED <ziel>      das Ziel wurde (vom Host aus) im Link gelesen
+#   REFUSED_UNSUPPORTED  Server lehnt das Anlegen als nicht unterstuetzt ab
+#   REFUSED_PERMISSION   Server verweigert das Anlegen (create_symlinks fehlt)
+#   UNKLAR               keine belastbare Aussage (Exit 1)
+#
+# Das Ziel kommt NICHT aus der sftp-Ausgabe, sondern vom Host-Dateisystem
+# (readlink auf den Bind-Mount). Grund, gemessen am 2026-10-25: die
+# sftp-Ausgabe enthaelt im Fehlerfall Zeilen wie "Connection closed." — die
+# wurden in einer ersten Fassung als Linkziel gelesen und erzeugten ein
+# falsches "ACCEPTED". Client-Text ist keine Messung, lstat auf dem Host ist
+# eine.
+symlink_verdict() {
+    local create_log="$1" target="$2"
+    if [ -n "$target" ]; then
+        printf 'ACCEPTED %s' "$target"
+        return 0
+    fi
+    if grep -qiE 'operation unsupported|not implemented|unsupported' "$create_log"; then
+        printf 'REFUSED_UNSUPPORTED'
+        return 0
+    fi
+    if grep -qiE 'permission denied' "$create_log"; then
+        printf 'REFUSED_PERMISSION'
+        return 0
+    fi
+    printf 'UNKLAR'
+    return 1
+}
+
+# Ist das Anlege-Log gar kein Messergebnis, sondern eine gescheiterte
+# Verbindung/Anmeldung? Dann darf daraus kein "abgelehnt" werden.
+symlink_log_is_transport_failure() {
+    grep -qiE 'connection (closed|refused|reset)|kex_exchange_identification|no matching host key|Permission denied \(' "$1"
+}
+
+# Liegt das gespeicherte Ziel ausserhalb des Home? Nur fuer die Anzeige: der
+# Probe-Link zeigt bewusst mit `..` heraus. Ein absoluter Zielpfad zaehlt als
+# "ausserhalb", wenn er nicht mit dem Home-Praefix beginnt.
+symlink_target_escapes() {
+    local target="$1" home="$2"
+    case "$target" in
+        ../*) return 0 ;;
+    esac
+    case "$target" in
+        /*) case "$target" in
+                "$home"|"$home"/*) return 1 ;;
+                *) return 0 ;;
+            esac ;;
+    esac
+    return 1
+}
+
 # --- Kleinkram -------------------------------------------------------------
 
 sha256_of() {
