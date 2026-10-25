@@ -484,14 +484,18 @@ unverändert gegenüber dem vorigen Deploy, Homepage **200**.
   Backend-Start (idempotent, fail-closed) statt als Deploy-Schritt; der manuelle Lauf hat die
   gespeicherte Aktion auf `http://ftp-events:8080/api/internal/ftp/upload-event` umgestellt
   (aus dem SFTPGo-Datenprovider zurückgelesen, Regel `fs_events: ["upload"]` aktiv).
-  **Offen und in dieser Reihenfolge zu tun:** (a) `FTP_EVENT_SECRET` in der
-  Portainer-Stack-Env wieder setzen — der Wert steht in
-  `portainer_data/compose/23/stack.env.bak-rotate-20261022-083937` — und den Stack mit der
-  aktuellen `deployment/docker-compose.yml` aktualisieren; die Stack-Datei auf dem Host
-  (`portainer_data/compose/23/docker-compose.yml`) kennt den Dienst `ftp-events` noch nicht,
-  obwohl der Container läuft, und ohne das Secret verweigert der Backend-Start künftig
-  (fail-closed); (b) der echte Kamera-Upload mit Zielgalerie — in Produktion hatte 0 von 1
-  Usern eine Zielgalerie, und ohne Zielgalerie importiert nichts. Die Ablauflogik steht in
+  **Offen ist nur noch der echte Kamera-Upload.** Der Deploy-Teil ist am 2026-10-25 erledigt
+  und gemessen: die Portainer-Stack-Datei enthält den Dienst `ftp-events` und den
+  Startup-Schritt, `FTP_EVENT_SECRET` liegt wieder in der Stack-Env (Container: 64 Zeichen),
+  und der Start hat die Aktion selbst geschrieben (`Event-Aktion 'portal-ftp-upload'
+  aktualisiert`, `Event-Regel 'portal-ftp-upload-rule' aktualisiert`). Proben aus dem
+  Backend-Container gegen den Sidecar: richtiges Secret → `200 no_target_gallery`, falsches
+  Secret → `401 unauthorized`, unbekannter Nutzer → `200 unknown_account`, jeder andere Pfad
+  → `404`. Für den Import fehlt die Zielgalerie: der einzige Account (`florian`) hat
+  `current_ftp_gallery_id = NULL`, und ohne Zielgalerie importiert nichts (D-36-Grenze).
+  Also: im Management eine Zielgalerie setzen, ein Foto per FTPS hochladen, dann
+  `docker logs portal_backend 2>&1 | grep -i 'FTP'` prüfen (Worker und Scheduler laufen im
+  Container, einen separaten `queue:work`-Aufruf gibt es nicht). Die Ablauflogik steht in
   `deployment/README.md`, Abschnitt „FTP-Upload-Events (D-36)".
 
 ---
