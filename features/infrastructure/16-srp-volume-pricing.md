@@ -9,7 +9,7 @@
 > (siehe `17-pricing-strategy-pattern.md`) und kann pro Brand **oder pro Gallery**
 > aktiviert werden. F2 und die Preset-Zuordnung sind umgesetzt; die alten
 > Flach-Settings werden nur noch als Legacy-Migrationsquelle gelesen.
-> Verknüpft: `17-pricing-strategy-pattern.md` und `27-volume-licensing-presets.md`; die frühere `AGENTS.todo.md`-F5-Referenz ist historisch.
+> Verknüpft: `17-pricing-strategy-pattern.md` und `27-volume-licensing-presets.md`.
 > Erstellt 2026-07-01, Update 2026-07-14.
 
 ## 1. Kontext

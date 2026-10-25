@@ -3,10 +3,8 @@
 > **Status:** `active` — verbindlicher Soll-Zustand.
 > Erstellt 2026-07-01.
 >
-> **Verknüpfte Tasks:** Transport und Provisioning: Abschnitt 7 in
-> `19-ftp-upload-pipeline.md`; Umsetzung: P1-M21 bis P1-M32 in
-> `AGENTS.todo.md`. (Der frühere Verweis auf `FT-01` war verwaist — dieses
-> Task existiert im Board nicht mehr.)
+> **Verknüpft:** Transport und Provisioning: Abschnitt 7 in
+> `19-ftp-upload-pipeline.md`.
 
 ## 1. Kontext
 

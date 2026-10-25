@@ -222,7 +222,7 @@ pasv_port_from_trace() {
 
 # --- TLS-Handshake-Vollstaendigkeit (der Kern der Messfalle) ---------------
 #
-# AGENTS.todo.md P1-M35 und 19-ftp 7.11: ein nicht erreichbarer Dienst
+# features/infrastructure/19-ftp-upload-pipeline.md §7.11: ein nicht erreichbarer Dienst
 # liefert bei `openssl s_client` "SSL handshake has read 0 bytes" und eine
 # LEERE Cipher-Liste. Das als "Cipher nicht angeboten" zu protokollieren war
 # ein Fehlschluss, der schon einmal eine Grundsatzentscheidung gekippt hat.

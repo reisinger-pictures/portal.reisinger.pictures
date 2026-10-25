@@ -1,7 +1,6 @@
 # Lightroom Plugin — Multi-Org Support Gap (R-16)
 
 > **Status:** ✅ Gelöst (2026-07-02). Siehe Änderungen unten.
-> Verknüpft mit `AGENTS.todo.md` → L-01.
 
 ## 1. Kontext
 

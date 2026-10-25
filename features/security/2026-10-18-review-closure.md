@@ -10,10 +10,12 @@ non-blocking notes this review left behind; they are recorded in the rows below 
 verification round that produced the verdict.
 
 This document is the durable record of what the 2026-10-18 source review found and what
-was done about it. The findings themselves, as originally written, are in `AGENTS.todo.md`
-(section "Architecture & Security Review — 2026-10-18") and in the commit that recorded them
-(`d5a412c`). The board keeps only the findings that are still open; this file keeps all of
-them with their outcome, because a closed finding is history, not work.
+was done about it. Its machine-readable form is the registry `ratchet.findings.json`, whose
+entries point back here through their `path`; commit `d5a412c` records the findings as
+originally written. The findings that are still open are carried as GitHub issues — `#24`–`#31`
+for the findings of the 2026-10-18 audit against snapshot `f3aea9e0`, `#32`–`#34` for the
+operational proofs that followed. This file keeps all 14 review findings with their outcome,
+because a closed finding is history, not work.
 
 Rules applied here: a finding is **closed** only after an independent verifier returned
 `APPROVED` on the final state. An `APPROVED` that carried non-blocking notes keeps those
@@ -101,8 +103,12 @@ Measured with `FtpImportTest`; the batch semantics are the owner decision D-35.
 
 ## Non-blocking notes carried forward
 
-* SEC-01..04 (verify round 3): `getOrgGroupScope` is uncached and runs twice per `/api/auth/me`
-  and again on the org detail endpoint — a hot path, cost only. The `syncUsers` lock order is
+* SEC-01..04 (verify round 3): `getOrgGroupScope` was uncached and ran twice per `/api/auth/me`
+  and again on the org detail endpoint — a hot path, cost only, not an access defect. The two
+  query-count costs that note left behind are **closed**: the baselines are pinned and the read
+  path resolves the brand filter collectively and the org scope once per request; a cache across
+  requests is deliberately **not** implemented, because it would hand out a just-revoked
+  delegation. The contract is `features/auth/01-roles-and-access.md` §6. The `syncUsers` lock order is
   **org → one ascending user lock set** (D-40): the org row is locked first, then the actor, the
   current members and the incoming members are locked in a single primary-key range scan, so two
   concurrent syncs over different orgs whose actors are members of each other's org serialise

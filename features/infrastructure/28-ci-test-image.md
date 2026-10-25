@@ -192,7 +192,9 @@ Eintrag.
 Projektkonfiguration. Der serielle Eintrag läuft ohne `--project`, damit die
 ausgewählten Specs in Desktop und Mobile angeboten werden; explizite
 Projekt-Skips (z. B. der Mobile-Skip in `brand-settings`) bleiben maßgeblich.
-Die Auswahl umfasst die beiden Board-Suites, `project-clear-fields`,
+Die Auswahl umfasst die beiden Board-Suites
+(`tests/e2e/admin/boards/projects-board.spec.ts` und
+`tests/e2e/photographer/production-board.spec.ts`), `project-clear-fields`,
 `brand-settings` und `billing-details`. Die ersten vier Suites verwenden
 Playwright-Serial-Modus; `billing-details` wird wegen der globalen Settings
 ebenfalls isoliert. Das ist eine Testplanungs-Ausnahme, keine Erlaubnis für

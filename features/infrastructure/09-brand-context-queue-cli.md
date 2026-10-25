@@ -1,9 +1,9 @@
 # Brand-Context in Queue-/CLI-Kontexten — Konzept & Implementierung
 
 > **Status:** Beschreibt den **Ist-Stand** (Implementierung) und die zugrunde liegende Problemanalyse.
-> Verknüpft: `AGENTS.todo.md` A-08, `features/infrastructure/06-multi-domain-branding.md`,
+> Verknüpft: `features/infrastructure/06-multi-domain-branding.md`,
 > `features/infrastructure/08-org-brand-concept.md`, `features/infrastructure/12-brand-registry-and-settings-fixes.md`.
-> Erstellt 2026-06-29. Aktualisiert 2026-07-01 (A-08 Queue State-Resetter).
+> Erstellt 2026-06-29. Aktualisiert 2026-07-01 (Queue State-Resetter).
 > Korrigiert 2026-09-28: Zeilenanker, Container-Bindung statt `config('app.brand')`,
 > SRP-Bezüge entfernt.
 

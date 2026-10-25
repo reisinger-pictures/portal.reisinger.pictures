@@ -2,7 +2,8 @@
   "version": 1,
   "rules": {
     "open-security-findings": {
-      "value": 0
+      "value": 2,
+      "reason": "2026-10-25: the registry now carries the open findings of the snapshot audit that were only prose on the board before; AUTH-2 and PAY-3 are open high, tracked as issues #24 and #25. The count may only fall from here."
     }
   }
 }

@@ -31,8 +31,9 @@ names no migration number of its own.
 
 What remains with the owner is unchanged: the Stripe-dashboard checklist, the
 Turnstile configuration in production, the monitoring-alarm test, the DPO
-review, and the live proof of the kill switch. They are tracked in
-`AGENTS.todo.md`.
+review, and the live proof of the kill switch. Their contracts are the
+checklist and monitoring in §9, the required controls in §10, and the kill
+switch in §3.0.1.
 
 **Approved SOLL architecture (2026-09-23).** This document is the
 implementation contract for the checkout/card-testing defense. V036 and the
@@ -40,9 +41,9 @@ implementation sources are present in the current tree; V036 remains the
 separate Card-Testing migration. The current migration state — including the
 number a new migration takes — is stated in exactly one place,
 `features/tech/07-architectural-decisions.md` (AD-2), and is deliberately not
-restated here. Operational rollout and final
-review remain tracked in `AGENTS.todo.md`; CI references in that board are
-historical evidence, not a claim about every uncommitted change. The existing
+restated here. Operational rollout and final review are governed by §12
+(Rollout and acceptance); a CI run is a historical dataset about the commit it
+ran on, not a claim about every uncommitted change. The existing
 checkout flow in
 [`features/ecommerce/09-stripe-checkout-flow.md`](../ecommerce/09-stripe-checkout-flow.md)
 remains the reference for order states and Stripe integration; the rules below
@@ -69,11 +70,10 @@ nothing in this section is an execution result.
   two checkout attempts, asserts the third returns `403` `turnstile_required`,
   and asserts the widget token is submitted on the retry with an unchanged
   `Idempotency-Key`.
-- **The board's claim that this feature has no Playwright E2E is outdated.**
-  That spec was added in `d46f95a` (2026-09-23) and is tracked in git;
-  `grep -rlniE "card.?test|turnstile|3ds" frontend/tests/e2e` returns two files,
-  not zero. Correcting that entry is board work and is deliberately not done
-  here.
+- **This feature does have a Playwright E2E — an earlier claim to the contrary
+  is outdated.** That spec was added in `d46f95a` (2026-09-23) and is tracked in
+  git; `grep -rlniE "card.?test|turnstile|3ds" frontend/tests/e2e` returns two
+  files, not zero.
 - **Not verified here:** that any of the three suites is green at this head. The
   read-only pass ran no `php artisan` and no Playwright command. Verification is
   still owed: `cd backend && php artisan test --filter
@@ -756,8 +756,10 @@ still null may bind that event PI under the same locked conditional transition.
    path, then enable risk-based Turnstile only after its Dashboard, CSP,
    privacy, and Siteverify checks pass. Verify that invoice/Lieferschein,
    settled-free, and reactive-quote flows remain unchanged.
-5. Run the PHPUnit, Vitest, and Playwright tasks recorded in
-   `AGENTS.todo.md`, followed by the full backend suite and frontend lint/build.
+5. Run the PHPUnit, Vitest, and Playwright tasks named under *Current-tree
+   verification* above (the three PHPUnit feature tests, `TurnstileWidget.test.tsx`,
+   and `turnstile-checkout.spec.ts`), followed by the full backend suite and
+   frontend lint/build.
 6. Review Radar, 3DS, webhook identity mismatches, and failure telemetry before
    declaring the feature live. Roll back configuration before rolling back
    durable identifiers; never delete a PI or order merely to make a dashboard

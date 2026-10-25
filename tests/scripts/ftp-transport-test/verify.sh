@@ -311,7 +311,7 @@ cipher_report() {
         fail "Referenz-Handshake gegen ${FTPS_HOST} war unvollstaendig.
   Es wird KEIN Cipher-Ergebnis protokolliert. Ein leeres Ergebnis bei
   unvollstaendigem Handshake war die Ursache fuer drei fehlgeschlagene
-  Messversuche (AGENTS.todo.md P1-M35, 19-ftp 7.11).
+  Messversuche (features/infrastructure/19-ftp-upload-pipeline.md §7.11).
   Rohprotokoll: ${ref}"
     fi
     local ref_proto ref_cipher

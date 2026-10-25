@@ -1,9 +1,9 @@
-# AI Testing Strategy (relocated to AGENTS.todo.md)
+# AI Testing Strategy
 
-> **This file has been cleaned up per the features/ audit (2026-07-01).**
-> Detailed test-case tracking lives in `AGENTS.todo.md` under the current AI and
-> E2E audit/verification sections; this file now contains only the verification
-> criteria derived from the Soll-Zustand in `01-ai-service-architecture.md`.
+> **This file is the durable verification contract** derived from the Soll-Zustand
+> in [`01-ai-service-architecture.md`](01-ai-service-architecture.md). Open work and
+> its evidence live in GitHub issues; this file states what has to hold, not what is
+> currently being worked on.
 
 ## Verification Criteria (Soll-Zustand)
 

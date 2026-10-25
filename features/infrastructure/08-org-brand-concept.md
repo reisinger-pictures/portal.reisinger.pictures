@@ -45,8 +45,8 @@ Semantisch ist ein Org aber eine **Kundengruppe** (eine Firma mit mehreren einge
 Mitarbeitern), nicht ein klassischer „Mandant" im Rechts-/Steuer-Sinn.
 
 **Entscheidung (2026-06-29):** **„Organisation"** wurde als UI-Begriff gewählt.
-Code-intern bleibt der Begriff `Org`/`org_id` unverändert — nur die deutschen UI-Labels
-(~21 Stellen) müssen noch von „Mandant" auf „Organisation" aktualisiert werden (siehe `AGENTS.todo.md` T-01).
+Code-intern bleibt der Begriff `Org`/`org_id` unverändert; die deutschen UI-Labels
+sprechen von „Organisation".
 
 ## 4. Beziehung der Konzepte zueinander
 

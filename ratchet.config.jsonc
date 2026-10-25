@@ -14,23 +14,13 @@
         "incident": "SEC-01: org admins reassign foreign users — closed in 488a17f and 5e4c615 (verify round 3 APPROVED)",
         "unit": "findings",
         "direction": "ceiling",
-        "description": "the counted scope is the registry `ratchet.findings.json` — the machine-readable view of the 2026-10-18 architecture and security review. The levels that count are the canonical `critical` (P1) and `high` (P2); the statuses that count are `open` and `in-progress`. `accepted` and `wontfix` do not count but stay visible — a decision is not a deletion. The count is 0 today: all 14 findings of the review are closed, and a new open finding moves the count above the baseline",
+        "description": "the counted scope is the registry `ratchet.findings.json` — the machine-readable view of the 2026-10-18 architecture and security review. The levels that count are the canonical `critical` (P1) and `high` (P2); the statuses that count are `open` and `in-progress`. `accepted` and `wontfix` do not count but stay visible — a decision is not a deletion. The count is 2 today: the 14 findings of the review are closed, and two findings of the later snapshot audit are open (`AUTH-2`, `PAY-3`). The ceiling may only fall from here",
         "count": {
           "registry": "ratchet.findings.json",
           "severities": ["critical", "high"],
           "statuses": ["open", "in-progress"]
         }
       }
-    },
-    // The report is generated from the current marker, board and workflow.
-    // Its command is local and deterministic; Ratchet supplies a temporary
-    // output path so the drift check does not modify the working tree.
-    "generated": [
-      {
-        "path": "features/tech/position-9-metrics.md",
-        "command": ["node", "scripts/generate-position-9-metrics.mjs"],
-        "output_arg": "--output"
-      }
-    ]
+    }
   }
 ]

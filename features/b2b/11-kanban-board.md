@@ -343,8 +343,7 @@ Die gesammelten `workflow_logs` ermöglichen langfristig:
 ## 11. Verification boundary
 
 Diese Datei definiert den SOLL-Vertrag, nicht den Abschlussstatus der
-Implementierung. Der aktuelle E2E-Abdeckungs- und Rest-Task-Stand gehört in
-`AGENTS.todo.md`; ein grüner Teil-Lauf (beispielsweise `@smoke`) ist keine
+Implementierung. Ein grüner Teil-Lauf (beispielsweise `@smoke`) ist keine
 Aussage, dass alle Board-Pfade oder Rollen vollständig verifiziert sind.
 
 Die vorhandenen Board-Specs (`frontend/tests/e2e/admin/boards/projects-board.spec.ts`

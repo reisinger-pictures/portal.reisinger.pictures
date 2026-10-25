@@ -140,6 +140,94 @@
       "regression_test": "FtpImportTest, FtpImportBatchTest, FtpQuarantineTest, FtpImportDefaultsTest, FtpStatCacheOrderTest, FtpEventEndpointTest, ProvisionFtpEventsTest",
       "path": "features/security/2026-10-18-review-closure.md",
       "note": "closed in 8550c4b, b5e1d7f, c9ec86b and 4b87f34"
+    },
+    {
+      "id": "AUTH-2",
+      "title": "Account-Existence-Oracle bei Registrierung",
+      "severity": "high",
+      "status": "open",
+      "status_since": "2026-10-25",
+      "path": "features/security/findings-registry.md",
+      "note": "Registrierung verr\u00e4t \u00fcber unique:users existierende Adressen; Fix erfordert generische Antwort plus Benachrichtigung an bestehende Adresse (bed\u00fcrfe Owner-Entscheidung)",
+      "owner": "reisi007",
+      "ticket": "#24"
+    },
+    {
+      "id": "PAY-3",
+      "title": "paid ohne Settlement-Pr\u00fcfung \u00fcber Management-Route setzbar",
+      "severity": "high",
+      "status": "open",
+      "status_since": "2026-10-25",
+      "path": "features/security/findings-registry.md",
+      "note": "OrderController::updateStatus() schreibt paid direkt; download-berechtigt. Admin-only, aber keine Pr\u00fcfung. Entscheidung n\u00f6tig.",
+      "owner": "reisi007",
+      "ticket": "#25"
+    },
+    {
+      "id": "PAY-4",
+      "title": "charge.dispute.closed nicht abonniert / Wiederherstellung ungekl\u00e4rt",
+      "severity": "medium",
+      "status": "open",
+      "status_since": "2026-10-25",
+      "path": "features/security/findings-registry.md",
+      "note": "disputed sperrt Downloads, aber gewonnener Dispute wird nicht automatisch bearbeitet - Owner-Entscheidung",
+      "owner": "reisi007",
+      "ticket": "#26"
+    },
+    {
+      "id": "PAY-5",
+      "title": "Teil-Refunds nicht erfasst, Payout-Berechnung gef\u00e4hrdet",
+      "severity": "medium",
+      "status": "open",
+      "status_since": "2026-10-25",
+      "path": "features/security/findings-registry.md",
+      "note": "Refund-Betr\u00e4ge werden nicht gespeichert; paid bleibt paid",
+      "owner": "reisi007",
+      "ticket": "#27"
+    },
+    {
+      "id": "SEC-2",
+      "title": "FTPS ohne erzwungenes AUTH TLS",
+      "severity": "medium",
+      "status": "open",
+      "status_since": "2026-10-25",
+      "path": "features/security/findings-registry.md",
+      "note": "Bewusste Kompatibilit\u00e4tsentscheidung f\u00fcr Kamera, aber dokumentiert offen",
+      "owner": "reisi007",
+      "ticket": "#28"
+    },
+    {
+      "id": "MEDIA-5",
+      "title": "SFTPGo-Symlinks / realpath-Konfinierung nicht best\u00e4tigt",
+      "severity": "medium",
+      "status": "open",
+      "status_since": "2026-10-25",
+      "path": "features/security/findings-registry.md",
+      "note": "is_file()/fopen() folgen Symlinks, keine realpath-Konfinierung",
+      "owner": "reisi007",
+      "ticket": "#29"
+    },
+    {
+      "id": "OPS-2",
+      "title": "Klartext-Kommunikation im internen Netz",
+      "severity": "medium",
+      "status": "open",
+      "status_since": "2026-10-25",
+      "path": "features/security/findings-registry.md",
+      "note": "JWT-Fallback sendet Credentials; nur intern erreichbar",
+      "owner": "reisi007",
+      "ticket": "#30"
+    },
+    {
+      "id": "OPS-3",
+      "title": "Unsichere Dateirechte / Sync-Rechte",
+      "severity": "medium",
+      "status": "open",
+      "status_since": "2026-10-25",
+      "path": "features/security/findings-registry.md",
+      "note": "sync.sh setzt F666/D2777, read-write mounts",
+      "owner": "reisi007",
+      "ticket": "#31"
     }
   ]
 }

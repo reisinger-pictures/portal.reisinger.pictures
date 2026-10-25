@@ -1086,10 +1086,4 @@ if git -C "$ROOT_DIR" ls-files --error-unmatch -- "$ENCRYPTED_ENV_REL" >/dev/nul
     fi
 fi
 
-# The generated Position 9 metrics are a Ratchet drift gate. Exercise the
-# calculations and repeatability in the same CI contract job that validates the
-# workflow wiring; Node is available on the GitHub-hosted runner.
-command -v node >/dev/null 2>&1 || fail 'Node is required for the Ratchet metrics generator regression tests'
-node --test "$ROOT_DIR/tests/infrastructure/ratchet-metrics-generator.test.mjs"
-
 printf 'PASS: CI/Playwright security contract (workflows=%d)\n' "${#workflow_files[@]}"

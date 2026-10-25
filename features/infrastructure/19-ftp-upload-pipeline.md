@@ -4,6 +4,11 @@
 > Describes the complete FTP upload pipeline: watch → parse → import → cleanup.
 > References: `features/infrastructure/13-ftp-brand-isolation.md`.
 > Account-Provisioning und Transport (SFTPGo): Abschnitt 7.
+>
+> Die Kürzel `P1-M21` … `P1-M58` sind historische Arbeitspaket-Nummern aus dem
+> 2026 entfernten Projekt-Board. Sie stehen nur noch als Provenienz an
+> Entscheidungen und datierten Korrekturen; kein Tracker löst sie mehr auf.
+> Offene Arbeit läuft in GitHub Issues.
 
 ## 1. Pipeline Overview
 
@@ -493,7 +498,6 @@ Gallery assignment is purely explicit via `setTarget()`:
 > der Dateitransport ist ein **externer Dienst** und nicht Teil des Portals.
 > Verbindlicher Soll-Zustand, in Umsetzung.
 >
-> **Verknüpfte Tasks:** P1-M21 bis P1-M32 in `AGENTS.todo.md`.
 > Infrastruktur-Seite: `~/dev/strato-vps/ANALYSIS.md` Abschnitt 6e.
 
 ### 7.0 Stack-Zuordnung
@@ -861,10 +865,10 @@ nicht.
 
 - **Pro Konto, nicht global.** Sonst könnte ein Fotograf den Recovery-Weg allen
   anderen nehmen.
-- **Schlüssel ist die User-ID, nicht der Slug.** P1-M34 lässt offen, ob
+- **Schlüssel ist die User-ID, nicht der Slug.** Offen (siehe #36), ob
   `users.ftp_slug` oder der SFTPGo-Store führend ist; ein Slug-Schlüssel würde
   bei einem Rename still ein frisches Kontingent gutschreiben.
-- **Konstante, kein Config-Wert.** Zehn ist eine Sicherheitsregel aus dem Board,
+- **Konstante, kein Config-Wert.** Zehn ist eine Sicherheitsregel,
   keine Kapazitätseinstellung — und ein Wert in `config/app.php` könnte als `0`
   ausgeliefert werden, was den Recovery-Weg still abschaltet.
 - **Von 3 auf 10 angehoben — das schwächt den Guard, und das ist die ehrliche
@@ -1000,7 +1004,7 @@ ersten Start per `openssl` selbstsigniert erzeugt und liegt unter
 (`.CER`/`.CRT`/`.PEM`) plus „Zielserver vertrauen → Aktivieren", sonst bricht die
 Übertragung mit Error 48 ab (cam.start.canon UG-06_Network_0230). Die Datei liegt
 im Container unter `/var/lib/sftpgo/ftps/cert.pem`; ein Download aus der GUI ist
-noch nicht gebaut (offen, `AGENTS.todo.md`).
+noch nicht gebaut (siehe #35).
 
 Aus dem Vorfall vom 2026-09-26, verbindlich für jeden Prozess, der auf
 `/home/webadmin/websites` schreibt.
@@ -1206,9 +1210,9 @@ zweiten Stack **nicht** reversibel, solange die Dateien nur einmal existieren.
 1. **Sicherung vor allem anderen.** Kompletter `ftp`-Baum inkl. Eigentümer und
    Rechten (`1002:webgroup`, `2775`/setgid). Nachweis, dass ein **Restore
    geprüft** wurde, nicht nur, dass ein Backup existiert.
-2. **Konfiguration verifiziert** (P1-M35), **Cipher-Liste gemessen und
-   schriftlich festgehalten** (P1-M27).
-3. **Kamera bestätigt den neuen Zugang** (P1-M32) — mit der echten Kamera und
+2. **Konfiguration verifiziert**, **Cipher-Liste gemessen und
+   schriftlich festgehalten** (Messweg: `tests/scripts/ftp-transport-test/`).
+3. **Kamera bestätigt den neuen Zugang** (siehe #32) — mit der echten Kamera und
    einem echten Upload. Ein erfolgreicher Desktop-Client beweist nichts.
 4. **Erst jetzt** Konto in SFTPGo provisionieren und den alten Zugang am
    Fotografen widerrufen. `pure-ftpd` läuft bis hierher **unverändert weiter**.
@@ -1303,7 +1307,7 @@ die Kamera.**
 Die Kamera ist kein `curl`. Sie hat eine eigene TLS-Bibliothek, eine eigene
 Cipher-Liste und ein Passwortfeld, das ausschließlich alphanumerisch akzeptiert.
 Ein grüner Integrationstest sagt daher **nicht**, dass die Kamera den Server
-erreicht — das bleibt P1-M32 und ist ein operativer Schritt, den kein CI-Job
+erreicht — das bleibt #32 und ist ein operativer Schritt, den kein CI-Job
 ersetzen kann.
 
 Trotzdem ist die Integrationsebene die wertvollste, weil sie die Lücke zwischen
@@ -1323,8 +1327,12 @@ niemand prüft:
 - **Die Cipher-Liste als Fixture** — mit Handshake-Vollständigkeitsprüfung vor
   dem Auslesen. Siehe die Messfalle in 7.11.
 
-Board: P1-M38 (Integrationstest), P1-M35 (Harness und Config-Weg), P1-M27
-(Cipher-Frage selbst).
+Der Harness unter `tests/scripts/ftp-transport-test/` ist der Ort, an dem diese
+Ebene läuft, und die drei Punkte sind seine Abnahmekriterien: der
+Integrationstest über beide Protokolle in `verify.sh`, der Harness- und
+Config-Weg in `up.sh` samt `docker-compose.yml`, und die Cipher-Liste als
+Fixture mit Handshake-Vollständigkeitsprüfung (`--require-camera-ciphers`,
+Messfalle in 7.11).
 
 ### 7.15 Bewusst nicht im Compose-Stack
 

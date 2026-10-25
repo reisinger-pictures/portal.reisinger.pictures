@@ -4,7 +4,7 @@
 > Diese Datei ist die **einzige** Anleitung für den Produktions-Deploy.
 >
 > Architektur: `features/infrastructure/19-ftp-upload-pipeline.md`
-> Board: `AGENTS.todo.md` (P1-M21…M36)
+> Offene Deploy-Nachweise: #32 (Kamera-Upload), #34 (Mail-Zustellung); FTP-Pipeline: `features/infrastructure/19-ftp-upload-pipeline.md` §7.11 (offene Punkte); `pure-ftpd`-Gegenprobe: Schritt 6.
 
 ---
 
@@ -442,7 +442,7 @@ R6 Mark II, Menüpfade aus dem Herstellerhandbuch, alle einzutragenden Werte, un
 drei stillen Fehlerquellen (Dateiname `ROOT.PEM`, `Verzeichnisstruktur: Standard`,
 Konto-Zustand `pending`).
 
-Kurzfassung: der Test ist der einzige offene Cutover-Schritt (P1-M32). Zuerst SFTP
+Kurzfassung: der Test ist der einzige offene Cutover-Schritt (#32). Zuerst SFTP
 probieren — ein Port, kein Zertifikat, keine passive Range. Nur wenn die Kamera SFTP
 nicht spricht, FTPS mit dem importierten Stammzertifikat.
 
@@ -543,12 +543,11 @@ Betrieb doch anders verhält als im Test.
 > **⚠️ Dieses Fenster ist am 2026-09-27 geschlossen worden, und zwar vor der
 > Kamera-Bestätigung.** Der alte Stack ist abgeschaltet, sein Image archiviert
 > (Beleg oben). Schritt 3 des verbindlichen Runbooks — „Kamera bestätigt den
-> neuen Zugang (P1-M32) — mit der echten Kamera und einem echten Upload"
-> (`features/infrastructure/19-ftp-upload-pipeline.md:853`) — steht laut Board
-> weiterhin offen: „[ ] manuell prüfen: erstes Kamera-Foto über FTPS/SFTP
-> hochladen und prüfen, dass `FtpController::process()` es der Galerie zuordnet …
-> P1-M32 — echter Kamera-Test. Heute ausdrücklich offengelassen."
-> (Board, Position „manuell prüfen: erstes Kamera-Foto … P1-M32 — echter Kamera-Test"). Die
+> neuen Zugang — mit der echten Kamera und einem echten Upload"
+> (`features/infrastructure/19-ftp-upload-pipeline.md:853`) — steht weiterhin
+> offen und ist als #32 geführt: erstes Kamera-Foto über FTPS/SFTP hochladen und
+> prüfen, dass `FtpController::process()` es der Galerie zuordnet — echter
+> Kamera-Test, heute ausdrücklich offengelassen. Die
 > Reihenfolge aus 7.12 wurde also nicht eingehalten,
 > und zwar außerhalb dieses Repos.
 >
@@ -565,7 +564,7 @@ Betrieb doch anders verhält als im Test.
 |---|---|---|
 | Upload bricht ohne Fehler ab | passive Range zu | `firewall-cmd --zone=public --list-ports` — muss `50000-50100/tcp` enthalten |
 | `Connection refused` auf 2222/989 | Port-Mapping oder Firewall | beide prüfen |
-| Kamera verlangt Passwort neu | Provisionierung nicht gelaufen | Portal-Status prüfen (M26-Spalten) |
+| Kamera verlangt Passwort neu | Provisionierung nicht gelaufen | Portal-Status prüfen (Provisionierungsspalten auf `users`, `features/infrastructure/19-ftp-upload-pipeline.md` §7.4) |
 | `no such table: schema_version` | `sftpgo_data`-Volume nicht persistiert | Volume prüfen, sonst verliert jeder Neustart alle Konten |
 | `401` auf `/api/v2/token` | Admin-User fehlt | `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` prüfen |
 | Datei liegt da, Import sieht sie nicht | setgid fehlt | `ftp:provision-folders --fix-permissions` |

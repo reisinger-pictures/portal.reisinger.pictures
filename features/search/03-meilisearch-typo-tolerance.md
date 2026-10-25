@@ -2,7 +2,6 @@
 
 > **Status:** Beschreibt den **Stand des Systems** nach dem Typo-Toleranz-Fix (2026-06-29).
 > Kein Umsetzungsplan. Verknüpft: `features/search/01-search-and-discovery.md`.
-> Zugehörige Aufgabe: `AGENTS.todo.md` M-01.
 
 ## 1. Stand
 

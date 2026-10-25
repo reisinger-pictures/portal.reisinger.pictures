@@ -15,22 +15,42 @@ the severity of a finding.
 
 ## What is in the registry
 
-One entry per finding of the review (`SEC-01`…`SEC-14`):
+One entry per reviewed finding. The registry started with the 14 findings of the
+2026-10-18 architecture and security review (`SEC-01`…`SEC-14`) and also carries the
+eight open findings of the 2026-10-18 audit against snapshot `f3aea9e0`. The two
+series number differently: the review uses two digits (`SEC-02`), the snapshot audit
+one (`SEC-2`).
 
 | Field | Meaning |
 |---|---|
-| `id` | the identifier of the finding in the review (`SEC-01`) |
+| `id` | the identifier of the finding in its review (`SEC-01`) |
 | `title` | the finding in one line |
-| `severity` | the canonical level: `critical` (P1) or `high` (P2) |
-| `status` | the canonical status — all 14 are `fixed` today |
+| `severity` | the canonical level: `critical` (P1), `high` (P2), `medium`, `low` |
+| `status` | the canonical status — `fixed` for the 14 review findings, `open` for the eight snapshot-audit findings |
 | `status_since` | the day the status was reached |
 | `regression_test` | the test that proves the fix |
 | `path` | the document that holds the finding |
-| `note` | the commits that closed it |
+| `note` | the substance of the finding: the commits that closed it, or what it needs |
 
 `owner` and `ticket` are mandatory for every entry that is **not** `fixed`: an
 open finding has nobody, and a finding without an owner is a graveyard entry.
 The closed entries carry their commit and their regression test instead.
+
+### The open findings
+
+All eight are `open`; each one is a GitHub issue, and the issue carries the
+decision or the fix that closes it.
+
+| ID | Severity | Status | Issue | Title (registry wording) | Note (registry wording) |
+|---|---|---|---|---|---|
+| `AUTH-2` | `high` | `open` | #24 | Account-Existence-Oracle bei Registrierung | Registrierung verrät über `unique:users` existierende Adressen; Fix erfordert generische Antwort plus Benachrichtigung an bestehende Adresse (bedürfe Owner-Entscheidung) |
+| `PAY-3` | `high` | `open` | #25 | paid ohne Settlement-Prüfung über Management-Route setzbar | `OrderController::updateStatus()` schreibt `paid` direkt; download-berechtigt. Admin-only, aber keine Prüfung. Entscheidung nötig. |
+| `PAY-4` | `medium` | `open` | #26 | charge.dispute.closed nicht abonniert / Wiederherstellung ungeklärt | `disputed` sperrt Downloads, aber gewonnener Dispute wird nicht automatisch bearbeitet - Owner-Entscheidung |
+| `PAY-5` | `medium` | `open` | #27 | Teil-Refunds nicht erfasst, Payout-Berechnung gefährdet | Refund-Beträge werden nicht gespeichert; `paid` bleibt `paid` |
+| `SEC-2` | `medium` | `open` | #28 | FTPS ohne erzwungenes AUTH TLS | Bewusste Kompatibilitätsentscheidung für Kamera, aber dokumentiert offen |
+| `MEDIA-5` | `medium` | `open` | #29 | SFTPGo-Symlinks / realpath-Konfinierung nicht bestätigt | `is_file()`/`fopen()` folgen Symlinks, keine realpath-Konfinierung |
+| `OPS-2` | `medium` | `open` | #30 | Klartext-Kommunikation im internen Netz | JWT-Fallback sendet Credentials; nur intern erreichbar |
+| `OPS-3` | `medium` | `open` | #31 | Unsichere Dateirechte / Sync-Rechte | `sync.sh` setzt F666/D2777, read-write mounts |
 
 ## What counts
 
@@ -45,9 +65,10 @@ The rule lives in `ratchet.config.jsonc`:
 ```
 
 `open` and `in-progress` count; `accepted` and `wontfix` do not count but stay
-visible — a decision is not a deletion. The count is **0** today: all 14
-findings of the review are closed. The baseline is 0 and the direction is
-`ceiling`: the number may only fall.
+visible — a decision is not a deletion. The count is **2** today: `AUTH-2` and
+`PAY-3` are `open` and `high`; the six `medium` findings stay visible and do not
+count. The baseline is 2 and the direction is `ceiling`: the number may only
+fall.
 
 ## The gate
 
@@ -65,20 +86,22 @@ config.
 
 ## What is not in the registry
 
-The registry holds the **findings of the 2026-10-18 source review**. Three
-classes stay outside it, and each of them is named here rather than left
-implicit:
+The registry holds the **findings of the 2026-10-18 reviews** — the architecture
+and security review and the audit against snapshot `f3aea9e0`. Three classes
+stay outside it, and each of them is named here rather than left implicit:
 
 - The **accepted risks** (`features/security/accepted-risks.md`) are decisions
   about a dependency, not findings of the review. They stay in their own
   document.
-- The **open work** of the project (`AGENTS.todo.md`) is a task list with its
-  own severities (P0–P3). Its severities are the project's, not the canonical
-  ones, and a task is not a finding of a review: the two lists are counted by
-  different means.
-- The **findings of the other reviews** — the `CR-*` series in
+- The **open work** of the project lives in GitHub issues. An issue may name a
+  finding and carry the decision or the fix, but an issue is not itself a
+  registry entry: the registry holds findings with a canonical severity and
+  status, the tracker holds work. The three layers are distinct —
+  `ratchet.findings.json` is the machine-readable registry, the GitHub issues
+  are the work list, and `features/security/*` is the human record.
+- The **findings of further reviews** — the `CR-*` series in
   `features/infrastructure/` and the other feature documents — belong to their
-  own rounds. They are not findings of the 2026-10-18 review, and folding them
+  own rounds. They are not findings of the 2026-10-18 reviews, and folding them
   in would give one number two meanings.
 
 ## The mirror is not machine-checked
@@ -90,7 +113,9 @@ and registry are migrated in the same commit. The CI runs the gate when the
 registry changes — and, since the closure document is an input of the gate,
 also when the document changes; it does not compare them.
 
-The `path` of an entry points at the **closure table**, the document that
-holds the finding: the table names the closing commits and the regression
-test, not the line of code the defect lived in.
+The `path` of an entry points at the document that holds the finding: for the
+14 review findings the **closure table**, which names the closing commits and
+the regression test, and for the eight snapshot-audit findings this document,
+whose table above is their human record. Neither path is the line of code the
+defect lived in.
 
