@@ -448,6 +448,46 @@ quarantined upload is discoverable over SFTP and in the status JSON, but not yet
 surfaced as a UI element. The UI is a separate, tracked piece of work; this
 document does not claim it exists.
 
+### 3.7 Symbolic links are never imported
+
+**The rule:** the walk imports only entries for which `is_link()` is false. A
+symlink is skipped, not quarantined — it never enters the walk, so it cannot
+block it and D-37 does not apply to it. `file_count` and `quarantine_count`
+follow the same view of the directory.
+
+Why the rule exists: `is_file()` and `fopen()` follow links, and the importer
+runs on the **host** with no chroot. A link in the inbox therefore used to be a
+read primitive out of the account's home — measured on 2026-10-25: a link to a
+file outside the inbox was imported as a photo and the foreign target was
+copied, because nothing on that path called `realpath`. The fix is
+`FtpInboxImporter::isRegularFile()`; `FtpInboxSymlinkTest` pins
+"link out of the inbox is not imported", "a regular file is still imported",
+"a directory link is not traversed" and "every link is rejected".
+
+`is_link()` rather than a `realpath()` prefix comparison, deliberately: a
+`realpath()` on a path that vanished between listing and read returns `false`,
+and the natural `false`-means-reject handling would silently skip a **real**
+upload — a worse defect than the one being fixed. A lost entry behaves exactly
+as before.
+
+**The precondition, measured, not assumed:** the camera account *could* create
+such a link if the server let it. SFTPGo's `common.symlink_mode` defaults to
+`0`, which disables link creation on every backend regardless of account
+permissions (`internal/common/connection.go`, the
+`IsSymlinkCreationAllowed` gate; our account is created with
+`CAMERA_PERMISSIONS = ['/' => ['*']]`, which does grant `create_symlinks` — the
+global switch is the only thing refusing). FTP `SITE SYMLINK` is blocked twice
+over: `enable_site` is not set and defaults to false, and `symlink_mode` would
+refuse anyway. Harness `Teil 6` pins the refusal; if
+`SFTPGO_COMMON__SYMLINK_MODE` is ever set to `1`, the importer rule above is
+what still holds.
+
+Two limits are tracked, not claimed away:
+[#38](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/38)
+covers the inbox path itself being a directory link (the entry check cannot see
+that), and a hard link is invisible to `is_link()` — creating one outside the
+home is prevented by the SFTPGo chroot, not by this check.
+
 ## 4. Brand Isolation
 
 See `features/infrastructure/13-ftp-brand-isolation.md` for full details. Summary:
@@ -1115,7 +1155,8 @@ User `florian` unter pure-ftpd heute schon darüber funktioniert.
 **Achtung:** SFTPGo lauscht für SFTP und FTPS auf **getrennten Ports**
 (`sshd`/`ftpd` mit eigener `address`), sie teilen sich keinen. Für FTPS wird
 `AUTH TLS` auf dem normalen FTP-Port unterstützt, also explizites FTPS ohne
-zusätzlichen Port. Die Portwahl ist Teil des Portal-Stacks — die Firewall
+zusätzlichen Port — und mit `TLS_MODE=1` **erzwungen** (7.13), nicht als
+optionaler Klartext-Weg. Die Portwahl ist Teil des Portal-Stacks — die Firewall
 dokumentiert `~/dev/strato-vps/ANALYSIS.md` Abschnitt 6e.
 
 **Stand 2026-09-26: die Messung ist nachgeholt, gegen die laufende
@@ -1240,7 +1281,7 @@ werden genutzt), der Verwaltungsport bleibt drinnen. Alles andere ist Detail.
 | Port | Zweck | Erreichbar | Compose |
 |---|---|---|---|
 | 2222 (Host) → **2022** (Container) | SFTP (SSH) | **öffentlich** | `ports:` |
-| 989 (Host) → 989 | FTPS (explizites TLS) | **öffentlich** | `ports:` |
+| 989 (Host) → 989 | FTPS (explizites TLS, erzwungen) | **öffentlich** | `ports:` |
 | 50000–50100 | Passive FTPS-Datenkanal | **öffentlich** | `ports:` als Range |
 | 8080 | HTTP- und Admin-API | **nur `portal_internal`** | *kein* `ports:` |
 
@@ -1288,8 +1329,22 @@ Nicht-Erreichbarkeit gewesen:
 
 Zusätzlich: `exec sftpgo serve` ist zwingend, blankes `sftpgo` druckt nur die
 Hilfe und beendet sich mit 0. Und `TLS_MODE=1` ist **explizites** TLS (`AUTH
-TLS`), weil eine Canon-Kamera direkt nach dem Verbindungsaufbau `AUTH TLS`
-sendet und implizites FTPS nicht zuverlässig unterstützt
+TLS`) **und erzwingt es zugleich**: ein Klartext-Login ist nicht möglich, auch
+nicht als „optionaler zweiter Weg". Der Modus heißt in `ftpserverlib`
+`MandatoryEncryption`; ohne vorheriges `AUTH TLS` antwortet der Server auf
+`USER` mit `421 TLS is required` und schließt die Verbindung, und derselbe
+Zwang gilt für den Datenkanal. Gemessen am **2026-10-25** gegen die laufende
+`drakkan/sftpgo:2.7.x` (SFTPGo 2.7.6) auf 989: Greeting
+`220 SFTPGo_2.7.6`, danach `USER probe` → `421 TLS is required`. Im Quelltext
+setzt `internal/ftpd/server.go` `TLSRequired:
+ftpserver.TLSRequirement(binding.TLSMode)`; die gepinnte `ftpserverlib`
+v0.32.4 (`driver.go`) zählt `0 = ClearOrEncrypted`, `1 =
+MandatoryEncryption`, `2 = ImplicitEncryption`, und `handle_auth.go` bzw.
+`client_handler.go` setzen den Zwang für Steuer- und Datenkanal durch. Das
+Klartext-Greeting vor `AUTH TLS` bleibt bestehen und ist genau das, was die
+Kamera erwartet; es ist die Begrüßung, nicht der Zugang. Trotzdem bleibt
+Modus `1` richtig, weil eine Canon-Kamera direkt nach dem Verbindungsaufbau
+`AUTH TLS` sendet und implizites FTPS nicht zuverlässig unterstützt
 (cam.start.canon UG-06_Network_0060).
 
 ### 7.14 Teststrategie für den Transport
