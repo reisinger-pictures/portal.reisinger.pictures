@@ -144,42 +144,49 @@ internen Listener umgestellt und ein echter Upload bestätigt ist, wird die
    ```
 
    Ein leerer Wert ist der dokumentierte Default und besteht die Policy.
+   `FTP_EVENT_SECRET` muss dagegen gesetzt sein, sonst verweigert der Start
+   (siehe unten); prüfen mit
+   `docker exec portal_backend printenv FTP_EVENT_SECRET | wc -c` — **0** heißt
+   nicht gesetzt.
 1. Den Stack vollständig recreaten/aktualisieren, damit der Dienst `ftp-events`
    und der neue interne Default gestartet werden.
-2. Die im SFTPGo-Datenprovider gespeicherte Aktion auf die interne URL setzen
-   (der Entrypoint ändert Provider-Zustand nicht):
-
-   ```bash
-   docker compose exec backend php artisan ftp:provision-events
-   ```
-
-3. Einen echten Upload ausführen und nachweisen, dass das Event den Import
+2. Einen echten Upload ausführen und nachweisen, dass das Event den Import
    auslöst.
-4. **Erst nach diesem Nachweis** `/api/internal/*` im Host-Caddy öffentlich
-   blockieren. Die Host-Caddy-Konfiguration liegt außerhalb dieses Repositories.
+3. Der öffentliche Pfad `/api/internal/*` ist seit 2026-10-25 im Host-Caddy auf
+   **404** gesetzt (Konfiguration außerhalb dieses Repositories, `~/dev/caddyfile`);
+   der interne Listener ist damit der einzige Weg. Der Nachweis aus Schritt 2
+   steht noch aus, deshalb gilt die Kette bis dahin als nicht scharf.
 
-Der Provisionierungsbefehl ist idempotent; ein weiterer Lauf aktualisiert
-dieselbe Aktion und Regel. Ohne gültiges Secret wird nichts provisioniert und
-der Event-Endpunkt weist jedes Event mit **401** ab (fail-closed). Gegenprobe:
+Die Provisionierung der SFTPGo-Aktion und -Regel läuft idempotent bei jedem
+Backend-Start im `command:`-Block vor dem Supervisor und schreibt dieselbe Aktion
+und Regel erneut; ein manueller Deploy-Schritt ist nicht nötig. Sie arbeitet
+fail-closed: fehlt `FTP_EVENT_SECRET`, verweigert der Start mit
+`FATAL: FTP_EVENT_SECRET ist nicht gesetzt`, daher muss das Secret **vor dem
+Recreate** in der Portainer-Stack-Env stehen. Beim Kaltstart kann SFTPGo noch
+nicht erreichbar sein; dann beendet sich das Backend, und Docker startet es
+erneut, bis die Provisionierung gelingt. Das ist das beabsichtigte fail-closed
+Verhalten, kein Hängen.
+
+Der Event-Endpunkt selbst weist ohne Secret jedes Event mit **401** ab
+(fail-closed); der Start verweigert in diesem Fall aber schon vorher (Guard).
+Gegenprobe nach dem Start: Beide Provisionierungszeilen müssen im Start-Log
+erscheinen:
 
 ```bash
-docker compose exec backend php artisan ftp:provision-events --dry-run
-docker compose logs backend | grep -i 'FTP-Import-Kette'
+docker logs portal_backend 2>&1 | grep -E 'Event-Aktion|Event-Regel'
 ```
 
-> **Produktionsstatus (Stand der Belege):** Die letzte dokumentierte
-> Produktionsprüfung ist die Live-Verifikation vom 2026-10-22: Secret in der
-> Portainer-Stack-Env gesetzt, Backend-Container neu erzeugt,
-> `ftp:provision-events` mit Exit 0, Aktion und Regel gegen die Admin-API
-> zurückgelesen, und der Endpunkt antwortete ohne Secret mit **401**. Die
-> frühere Messung vom 2026-10-21 („kein Secret im Container, Provisionierung nie
-> gelaufen") ist dadurch **überholt**. Welcher Zustand heute gilt, wird nicht
-> behauptet, sondern vor dem Wechsel gemessen:
->
-> ```bash
-> docker exec portal_backend printenv FTP_EVENT_SECRET | wc -c   # 0 = nicht gesetzt
-> docker compose exec backend php artisan ftp:provision-events --dry-run
-> ```
+> **Produktionsstatus (Stand der Belege):** Die letzte vollständige
+> Live-Verifikation war am 2026-10-22: Secret in der Portainer-Stack-Env gesetzt,
+> Backend-Container neu erzeugt, Aktion und Regel gegen die Admin-API
+> zurückgelesen, und der Endpunkt antwortete ohne Secret mit **401**. Am
+> 2026-10-25 verschob eine manuelle Provisionierung die gespeicherte Aktion auf
+> `http://ftp-events:8080/api/internal/ftp/upload-event`; die URL wurde aus dem
+> SFTPGo-Datenprovider zurückgelesen. Der beim Stack-Update erstellte
+> Backend-Container hatte jedoch ein leeres `FTP_EVENT_SECRET`, weil der Wert in
+> der Stack-Umgebung verloren gegangen war. Deshalb wird die Event-Kette **heute
+> nicht als scharf bestätigt**; genau deshalb verweigert der neue Start-Guard
+> ohne Secret den Start.
 
 ### Einmalige Host-Voraussetzung: Fotospeicher
 

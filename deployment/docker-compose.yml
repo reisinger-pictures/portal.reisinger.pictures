@@ -66,7 +66,12 @@ services:
 
   composer_init:
     image: composer:2.10.3
-    user: "1000:1000"
+    # Der gemountete Website-Baum gehört 1002:webgroup. Muss composer install
+    # ein Paket ersetzen oder löschen, scheitert es ohne Schreibrecht auf dem
+    # nicht gruppenschreibbaren Elternverzeichnis mit "Could not delete .../LICENSE"
+    # (Exit 1); dadurch blockiert depends_on: service_completed_successfully den
+    # Backend-Start und die Website bleibt ohne Backend-Logzeile down.
+    user: "1002:82"
     container_name: portal_composer
     volumes:
       - /home/webadmin/websites/api-portal.reisinger.pictures:/app:Z
@@ -203,12 +208,13 @@ services:
       - FTP_STORAGE_PATH=/var/www/ftp
       # FTP-Upload-Events (D-36). SFTPGo POSTet je hochgeladener Datei ein
       # Filesystem-Event an den internen Endpunkt; der Import laeuft dann ohne
-      # Klick. FTP_EVENT_URL darf leer bleiben (Default: APP_URL +
-      # /api/internal/ftp/upload-event). FTP_EVENT_SECRET hat bewusst keinen
-      # Default: ein leerer Wert laesst den Endpunkt jedes Event mit 401
-      # abweisen (fail closed) und den Provisionierungsbefehl abbrechen. Die
-      # Regel selbst liegt im SFTPGo-Datenprovider und wird einmalig per
-      # `php artisan ftp:provision-events` geschrieben (deployment/README.md,
+      # Klick. FTP_EVENT_URL darf leer bleiben (Default: der interne Listener
+      # http://ftp-events:8080/api/internal/ftp/upload-event). FTP_EVENT_SECRET
+      # hat bewusst keinen Default: ein leerer Wert laesst den Endpunkt jedes
+      # Event mit 401 abweisen (fail closed) und bricht den Start ab (Guard im
+      # command-Block). Die Regel selbst liegt im SFTPGo-Datenprovider und wird
+      # bei jedem Backend-Start durch `php artisan ftp:provision-events`
+      # geschrieben, idempotent und fail-closed (deployment/README.md,
       # 19-ftp-upload-pipeline.md 7.18.1). Das Secret gehoert in die
       # Portainer-Stack-Env, nie ins Repo (Klasse C1-C4).
       - FTP_EVENT_URL=${FTP_EVENT_URL:-}
@@ -283,6 +289,10 @@ services:
     #
     # Gegenprobe vor jedem Deploy (siehe deployment/README.md):
     #   docker compose config --format json | grep -c '\$\$'   -> muss 0 sein
+    # SFTPGo-Aktion und -Regel sind Provider-Zustand außerhalb des Containers.
+    # Der idempotente Befehl schreibt dieselbe Aktion erneut und läuft bei jedem
+    # Start; ein manueller Deploy-Schritt ist daher nicht nötig. Fail-closed:
+    # eine dunkle Event-Kette muss beim Deploy sichtbar sein, nicht später still.
     command: >
       sh -c "
       id -u | grep -qx 1000 || { echo 'FATAL: Backend muss als UID 1000 laufen. Start verweigert (fail-closed)!'; exit 1; };
@@ -302,12 +312,14 @@ services:
       printenv PHOTO_STORAGE_PATH | xargs -r -I{} test -d {} || { echo 'FATAL: PHOTO_STORAGE_PATH ist kein Verzeichnis. Start verweigert!'; exit 1; };
       printenv PHOTO_STORAGE_PATH | xargs -r -I{} test -w {} || { echo 'FATAL: PHOTO_STORAGE_PATH ist fuer UID 1000 nicht schreibbar. Start verweigert!'; exit 1; };
       [ -x /usr/local/bin/validate-production-env ] && [ -x /usr/local/bin/portal-backend-supervisor ] || { echo 'FATAL: Production preflight/supervisor is missing. Rebuild portal-base:8.5, push GHCR, update the pinned compose tag, then redeploy. No migration or seed was run.'; exit 1; };
+      printenv FTP_EVENT_SECRET | grep -q . || { echo 'FATAL: FTP_EVENT_SECRET ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
       /usr/local/bin/validate-production-env || exit 1;
       php artisan cache:clear || exit 1;
       php artisan optimize || exit 1;
       php artisan ops:validate-production || exit 1;
       php artisan migrate --force && php artisan app:seed-if-fresh && php artisan admin:update || exit 1;
       php artisan ftp:provision-folders --fix-permissions || exit 1;
+      php artisan ftp:provision-events || exit 1;
       php artisan scout:sync-index-settings || exit 1;
       php artisan queue:restart || exit 1;
       echo 'Starte Supervisor...';
