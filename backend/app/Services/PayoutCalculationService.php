@@ -708,6 +708,23 @@ class PayoutCalculationService
                 );
             }
 
+            // Owner decision 2026-10-25 (issue #27 / PAY-5): a partial refund
+            // leaves the order `paid` and the customer's access intact, but the
+            // photographer is paid on the money that stayed with the platform.
+            // The refund is borne in exactly the proportion of the normal split:
+            // it is allocated across the photo lines by their revenue and
+            // subtracted from each line BEFORE the fee and share computation, so
+            // there is no second refund-specific split. Each photographer's
+            // share therefore shrinks in the same ratio as their revenue.
+            $refundCents = max(0, (int) ($order->refunded_amount_cents ?? 0));
+            if ($refundCents > 0) {
+                $refundCents = min($refundCents, array_sum($photoRevenue));
+                $refundAllocations = $this->allocateCentsProportionally($refundCents, $photoRevenue);
+                foreach ($photoRevenue as $lineIndex => $lineRevenue) {
+                    $photoRevenue[$lineIndex] = max(0, $lineRevenue - ($refundAllocations[$lineIndex] ?? 0));
+                }
+            }
+
             $totalPhotoRevenue = array_sum($photoRevenue);
             if ($totalPhotoRevenue <= 0) {
                 continue;

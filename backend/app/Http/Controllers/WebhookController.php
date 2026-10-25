@@ -147,6 +147,72 @@ class WebhookController extends Controller
                     return response()->json(['status' => 'success']);
                 },
             );
+        } elseif ($eventType === 'charge.dispute.closed') {
+            $dispute = $this->eventObject($event);
+
+            return $this->withWebhookEventClaim(
+                $this->webhookEventKey($this->eventId($event), $dispute, 'charge.dispute.closed'),
+                function () use ($dispute): JsonResponse {
+                    $piId = $this->customerOrPaymentIntentId($dispute, 'payment_intent');
+                    if ($piId === null) {
+                        Log::warning('Webhook: closed dispute with null payment_intent, skipping', [
+                            'dispute_id' => $this->valueString($this->objectValue($dispute, 'id')),
+                        ]);
+
+                        return response()->json(['status' => 'success']);
+                    }
+
+                    $order = Order::where('stripe_payment_intent_id', $piId)->first();
+                    if ($order === null) {
+                        return response()->json(['status' => 'success']);
+                    }
+
+                    $disputeStatus = $this->valueString($this->objectValue($dispute, 'status'));
+
+                    if ($disputeStatus === 'won') {
+                        // A won dispute is a positive payment signal: restore
+                        // the settled state through the same locked guard the
+                        // negative transitions use. `refunded` is deliberately
+                        // not an allowed source status, so a full refund that
+                        // landed while the dispute was open stays terminal —
+                        // a won dispute never re-opens a refunded order.
+                        $this->transitionTerminalPaymentStatus($order, 'paid');
+
+                        // The signal is positive, so the purchase cache is
+                        // cleared too: a cached negative result from the
+                        // disputed window would otherwise keep blocking the
+                        // download after the gate has opened again.
+                        $this->clearPurchasedCache($order);
+
+                        return response()->json(['status' => 'success']);
+                    }
+
+                    if ($disputeStatus === 'lost' || $disputeStatus === 'warning_closed') {
+                        // A lost dispute is final: the order keeps its
+                        // `disputed` status and downloads stay blocked.
+                        Log::info('Webhook: dispute closed without restoration, access remains blocked', [
+                            'order_id' => $order->getKey(),
+                            'dispute_id' => $this->valueString($this->objectValue($dispute, 'id')),
+                            'dispute_status' => $disputeStatus,
+                        ]);
+
+                        return response()->json(['status' => 'success']);
+                    }
+
+                    // Any other dispute status (e.g. `needs_response`,
+                    // `under_review`, `charge_refunded`) is not a terminal
+                    // outcome for this domain. Change nothing and still answer
+                    // 200 so an unhandled event does not make Stripe retry
+                    // forever.
+                    Log::warning('Webhook: closed dispute with unexpected status, no change applied', [
+                        'order_id' => $order->getKey(),
+                        'dispute_id' => $this->valueString($this->objectValue($dispute, 'id')),
+                        'dispute_status' => $disputeStatus,
+                    ]);
+
+                    return response()->json(['status' => 'success']);
+                },
+            );
         } elseif ($eventType === 'charge.refunded') {
             $charge = $this->eventObject($event);
 
@@ -166,17 +232,28 @@ class WebhookController extends Controller
                     // domain the `refunded` order state means a FULL refund (see
                     // features/ecommerce/09-stripe-checkout-flow.md), so partial
                     // refunds must not revoke the customer's download access.
+                    // The refunded money is persisted for both shapes before the
+                    // full/partial split: a partial refund keeps status and
+                    // access, but it reduces the photographer payout
+                    // (PayoutCalculationService).
+                    $order = Order::where('stripe_payment_intent_id', $piId)->first();
+                    $amountRefunded = $this->valueInt($this->objectValue($charge, 'amount_refunded')) ?? 0;
+                    if ($order !== null) {
+                        $order->refunded_amount_cents = $this->recordRefundedAmount($order, $amountRefunded);
+                    }
+
                     if (! $this->isFullRefund($charge)) {
                         Log::warning('Webhook: partial refund received, order access preserved', [
                             'charge_id' => $this->valueString($this->objectValue($charge, 'id')),
+                            'order_id' => $order?->getKey(),
                             'amount' => $this->valueInt($this->objectValue($charge, 'amount')),
                             'amount_refunded' => $this->valueInt($this->objectValue($charge, 'amount_refunded')),
+                            'refunded_amount_cents' => $order?->refunded_amount_cents,
                         ]);
 
                         return response()->json(['status' => 'success']);
                     }
 
-                    $order = Order::where('stripe_payment_intent_id', $piId)->first();
                     if ($order !== null) {
                         $this->transitionTerminalPaymentStatus($order, 'refunded');
                         // Keep the cache fail-closed even when the terminal-state
@@ -669,6 +746,40 @@ class WebhookController extends Controller
     }
 
     /**
+     * Persist the charge's cumulative refunded amount on the order.
+     *
+     * Stripe reports `amount_refunded` as a running total for the charge, so the
+     * stored value is a monotonic maximum: a replayed older event with a smaller
+     * total must not undo a newer refund. The value is clamped to
+     * `0 … orders.total_amount` — a refund can never exceed what was charged,
+     * and the payout calculation must never see a negative revenue base.
+     *
+     * @return int the stored value
+     */
+    private function recordRefundedAmount(Order $order, int $amountRefundedCents): int
+    {
+        return DB::transaction(function () use ($order, $amountRefundedCents): int {
+            $lockedOrder = Order::query()
+                ->lockForUpdate()
+                ->find($order->getKey());
+            if ($lockedOrder === null) {
+                return 0;
+            }
+
+            $chargedCents = max(0, (int) $lockedOrder->total_amount);
+            $clamped = max(0, min($amountRefundedCents, $chargedCents));
+            $stored = max((int) ($lockedOrder->refunded_amount_cents ?? 0), $clamped);
+
+            if ($stored !== (int) ($lockedOrder->refunded_amount_cents ?? 0)) {
+                $lockedOrder->refunded_amount_cents = $stored;
+                $lockedOrder->save();
+            }
+
+            return $stored;
+        });
+    }
+
+    /**
      * A Stripe Charge is only fully refunded when `refunded` is true. Partial refunds
      * keep the order's download access intact.
      */
@@ -697,10 +808,20 @@ class WebhookController extends Controller
      * refund may follow either a settled status or `disputed` (paid → disputed
      * → refunded). The conditional update also prevents a late event from
      * winning a concurrent status transition.
+     *
+     * The reverse direction exists for a WON dispute: `disputed → paid`
+     * restores download access. Its source allow-list is deliberately exactly
+     * `['disputed']` — in particular a won dispute must NOT reopen an order
+     * that was refunded in the meantime. Because `refunded` is not an allowed
+     * source status, the row lock plus the conditional update refuse it and a
+     * refund stays terminal.
      */
     private function transitionTerminalPaymentStatus(Order $order, string $targetStatus): ?Order
     {
         $allowedSourceStatuses = match ($targetStatus) {
+            'paid' => [
+                'disputed',
+            ],
             'disputed' => [
                 'paid',
                 'pending_payment',

@@ -81,7 +81,8 @@ class BrandScopingOrderTest extends TestCase
     {
         $token = $this->adminTokenForBrand(null);
 
-        $foreignOrder = Order::factory()->create(['brand' => Brand::B2B->value, 'status' => 'pending']);
+        // Starts in the invoice chain because `pending` -> `paid` is the transition the PAY-3 guard rejects.
+        $foreignOrder = Order::factory()->create(['brand' => Brand::B2B->value, 'status' => 'invoice_created']);
 
         $response = $this->withHeaders($this->bearer($token))
             ->putJson("/api/management/orders/{$foreignOrder->id}/status", ['status' => 'paid']);

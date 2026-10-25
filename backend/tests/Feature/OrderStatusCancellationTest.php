@@ -181,7 +181,7 @@ class OrderStatusCancellationTest extends TestCase
             'pending' => ['pending'],
             'invoice_created' => ['invoice_created'],
             'pending_payment' => ['pending_payment'],
-            'paid' => ['paid'],
+            // `paid` is guarded by a transition rule and covered in OrderStatusPaidTest.
             'overdue' => ['overdue'],
             'disputed' => ['disputed'],
             'refunded' => ['refunded'],

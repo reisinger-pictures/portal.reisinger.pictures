@@ -86,6 +86,13 @@ class OrderController extends Controller
             }
         }
 
+        if ($request->status === 'paid') {
+            $rejection = $this->paidTransitionRejection($order);
+            if ($rejection !== null) {
+                return response()->json(['error' => $rejection['error']], $rejection['status']);
+            }
+        }
+
         $order->update(['status' => $request->status]);
 
         // PurchaseService caches the positive result per photo/tier. An admin
@@ -144,6 +151,91 @@ class OrderController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Guard for the transition to `paid`.
+     *
+     * `paid` is download-eligible (PurchaseService::DOWNLOAD_ELIGIBLE_STATUSES),
+     * so an unrestricted admin write would grant paid access without any
+     * payment. The transition is therefore allowed only from states that do not
+     * turn an unpaid order into an accessible one. `refunded` and `disputed` are
+     * rejected unconditionally: the Stripe intent stays `succeeded` after a
+     * refund, so the intent alone cannot prove that the money is still there.
+     *
+     * @return array{status: int, error: string}|null null when the transition is allowed
+     */
+    private function paidTransitionRejection(Order $order): ?array
+    {
+        // Idempotent rewrite: the order is already paid, so the status does not
+        // change and no access is granted that was not granted before.
+        if ($order->status === 'paid') {
+            return null;
+        }
+
+        // Invoice chain: for B2B the access is already granted at
+        // `invoice_created` (PurchaseService: "invoice = B2B, collected
+        // offline"), and `overdue`, `delivery_note` and `archived_in_collective`
+        // are settled org flows. Setting `paid` there is a bookkeeping step,
+        // not an access grant.
+        if (in_array($order->status, ['invoice_created', 'overdue', 'delivery_note', 'archived_in_collective'], true)) {
+            return null;
+        }
+
+        // Terminal states are never reopened by a status flip. A refunded
+        // PaymentIntent stays `succeeded` in Stripe, so the intent alone cannot
+        // prove that the money is still there; a refunded order needs a new
+        // payment, and a won dispute is restored by the `charge.dispute.closed`
+        // webhook, not by this route. Rejected before the lookup on purpose: no
+        // Stripe call is made for these states.
+        if (in_array($order->status, ['refunded', 'disputed'], true)) {
+            return [
+                'status' => 422,
+                'error' => 'Eine zurückgezahlte oder bestrittene Bestellung kann nicht über den Bestellstatus wieder auf paid gesetzt werden: Der Stripe-Zahlungsstatus bleibt nach einer Erstattung auf succeeded und belegt nicht, dass das Geld noch vorhanden ist. Eine Erstattung erfordert eine neue Zahlung; ein gewonnener Disput wird über den Webhook wiederhergestellt.',
+            ];
+        }
+
+        // No invoice and no Stripe intent: nothing confirms a payment, so the
+        // status write would be a pure access grant.
+        $paymentIntentId = $order->stripe_payment_intent_id;
+        if (! is_string($paymentIntentId) || trim($paymentIntentId) === '') {
+            return [
+                'status' => 422,
+                'error' => 'paid kann nur aus der Rechnungskette oder bei einer von Stripe bestätigten Zahlung gesetzt werden.',
+            ];
+        }
+
+        $paymentIntentId = trim($paymentIntentId);
+        // Resolved lazily: the Stripe client is built eagerly in the service
+        // constructor and throws without a secret, which must not break the
+        // customer read paths that share this controller.
+        $stripePayment = app(StripePaymentService::class);
+
+        try {
+            $paymentIntent = $stripePayment->retrievePaymentIntent($paymentIntentId);
+            if (($paymentIntent['status'] ?? null) === 'succeeded') {
+                return null;
+            }
+        } catch (\Throwable $exception) {
+            // Fail closed: without a Stripe answer the payment is unproven, and
+            // a 422 would suggest the request itself was wrong.
+            Log::warning('order.paid.payment_intent_lookup_failed', [
+                'order_id' => (string) $order->getKey(),
+                'payment_intent_id' => $paymentIntentId,
+                'exception_class' => $exception::class,
+                'exception_message' => $this->safeStripeExceptionMessage($exception),
+            ]);
+
+            return [
+                'status' => 502,
+                'error' => 'Die Zahlung konnte bei Stripe nicht geprüft werden. Der Bestellstatus wurde nicht geändert.',
+            ];
+        }
+
+        return [
+            'status' => 422,
+            'error' => 'paid kann nur aus der Rechnungskette oder bei einer von Stripe bestätigten Zahlung gesetzt werden.',
+        ];
     }
 
     private function safeStripeExceptionMessage(\Throwable $exception): string

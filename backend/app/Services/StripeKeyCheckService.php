@@ -29,8 +29,11 @@ use Throwable;
 class StripeKeyCheckService
 {
     /**
-     * The four webhook events the checkout/dispute flow depends on. A missing
+     * The five webhook events the checkout/dispute flow depends on. A missing
      * one is a `warn`, not a `fail`: payments can still settle without it.
+     *
+     * The check compares by subset (see {@see checkWebhookEndpoint()}): every
+     * event listed here must be subscribed, additional subscriptions are fine.
      *
      * @var array<int, string>
      */
@@ -38,6 +41,7 @@ class StripeKeyCheckService
         'payment_intent.succeeded',
         'payment_intent.payment_failed',
         'charge.dispute.created',
+        'charge.dispute.closed',
         'charge.refunded',
     ];
 
@@ -238,7 +242,7 @@ class StripeKeyCheckService
 
     /**
      * Confirm a webhook endpoint exists for the app's canonical URL, is
-     * enabled, and subscribes all four required events. Uses the same URL
+     * enabled, and subscribes all five required events. Uses the same URL
      * construction as the rest of the app (BrandRegistry::frontendUrl()).
      *
      * @return array{key: string, status: string, message: string}
@@ -287,6 +291,8 @@ class StripeKeyCheckService
         if (! is_array($enabledEvents)) {
             $enabledEvents = [];
         }
+        // Subset check, not an exact match: every required event must be
+        // subscribed, but an endpoint with additional events is still complete.
         $missingEvents = array_values(array_diff(self::REQUIRED_WEBHOOK_EVENTS, $enabledEvents));
 
         if ($missingEvents !== []) {

@@ -52,6 +52,7 @@ class Order extends Model
         'brand',
         'total_amount',
         'stripe_fee_cents',
+        'refunded_amount_cents',
         'coupon_id',
         'coupon_discount_cents',
         'is_quote_request',
@@ -72,6 +73,7 @@ class Order extends Model
         'guest_id' => 'string',
         'total_amount' => 'integer',
         'stripe_fee_cents' => 'integer',
+        'refunded_amount_cents' => 'integer',
         'coupon_discount_cents' => 'integer',
         'payment_intent_generation' => 'integer',
         'payment_failure_count' => 'integer',
@@ -109,6 +111,14 @@ class Order extends Model
             // assertNonNegativeCentsIfPresent() would only weaken this guard
             // for a state the schema cannot produce.
             PersistedMoney::assertNonNegativeCents($order->total_amount, 'orders.total_amount');
+            // A refunded amount is money that came back out; it can never be
+            // negative. `refunded_amount_cents` is NOT NULL with default 0
+            // (V049), exactly like `total_amount`, so there is no nullable
+            // legacy shape to tolerate here either.
+            PersistedMoney::assertNonNegativeCents(
+                $order->refunded_amount_cents ?? 0,
+                'orders.refunded_amount_cents',
+            );
             // Nullable legacy columns may stay null, but a present value must
             // never be negative or exceed the persisted money ceiling.
             PersistedMoney::assertFitsCents($order->coupon_discount_cents, 'orders.coupon_discount_cents');

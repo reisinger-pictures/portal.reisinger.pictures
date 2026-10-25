@@ -442,6 +442,7 @@ class StripeKeyCheckControllerTest extends TestCase
             'payment_intent.succeeded',
             'payment_intent.payment_failed',
             'charge.dispute.created',
+            'charge.dispute.closed',
         ]]));
 
         $response = $this->actingAs($this->superAdmin, 'api')
@@ -452,6 +453,34 @@ class StripeKeyCheckControllerTest extends TestCase
         $this->assertSame('warn', $check['status']);
         $this->assertStringContainsString('charge.refunded', $check['message']);
         $this->assertStringContainsString('we_', $check['message']);
+        $this->assertNoSecretMaterial($response);
+    }
+
+    /**
+     * The disputed-order restoration path depends on `charge.dispute.closed`
+     * (PAY-4 / issue #26). An endpoint that subscribes the other four events is
+     * complete for every older flow and still incomplete for that one, so the
+     * check has to name exactly this event — this is the verdict the owner reads
+     * to know the Dashboard subscription step is still outstanding.
+     */
+    public function test_webhook_endpoint_missing_dispute_closed_warns_and_names_it(): void
+    {
+        $this->mockStripeApi($this->healthyStripeResponder(['events' => [
+            'payment_intent.succeeded',
+            'payment_intent.payment_failed',
+            'charge.dispute.created',
+            'charge.refunded',
+        ]]));
+
+        $response = $this->actingAs($this->superAdmin, 'api')
+            ->postJson('/api/management/settings/stripe-check', ['bundle_mode' => 'test']);
+
+        $response->assertStatus(200);
+        $check = $this->checkByKey($response, 'stripe_webhook_endpoint');
+        $this->assertSame('warn', $check['status']);
+        $this->assertStringContainsString('charge.dispute.closed', $check['message']);
+        // The event that is subscribed must not be reported as missing.
+        $this->assertStringNotContainsString('charge.refunded', $check['message']);
         $this->assertNoSecretMaterial($response);
     }
 
@@ -615,6 +644,7 @@ class StripeKeyCheckControllerTest extends TestCase
                 'payment_intent.succeeded',
                 'payment_intent.payment_failed',
                 'charge.dispute.created',
+                'charge.dispute.closed',
                 'charge.refunded',
             ],
         ];
