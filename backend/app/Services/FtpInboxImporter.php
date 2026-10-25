@@ -473,9 +473,30 @@ class FtpInboxImporter
         clearstatcache(true, $path);
     }
 
+    /**
+     * Whether the directory entry is a regular file this import may read.
+     *
+     * MEDIA-5: a symlink is never read — not even one that resolves inside the
+     * inbox. The client's home is granted `['/' => ['*']]`
+     * (`SftpGoClient::CAMERA_PERMISSIONS`), so it may create a link named
+     * `x.jpg` that points anywhere the backend process can reach. `is_file()`
+     * and `fopen()` both follow that link, which would import a foreign file
+     * with the importer's own privileges and then let the unlink below remove
+     * the client's link. Rejecting every link via `is_link()` is deliberately
+     * cheaper than a `realpath()` prefix comparison against the inbox: a
+     * `realpath()` on a path that vanished between the listing and the read
+     * returns `false`, and the obvious `false`-means-reject handling would
+     * silently skip a real upload — a worse bug than the one guarded here.
+     * A camera never has a reason to upload a link, so nothing legitimate is
+     * lost (pinned by `FtpInboxSymlinkTest`).
+     *
+     * Consequence for the read-only counters (`countInboxImages()`,
+     * `quarantineCount()`): a link no longer counts as a file, which matches
+     * the import's own view of the inbox.
+     */
     protected function isRegularFile(string $path): bool
     {
-        return is_file($path);
+        return ! is_link($path) && is_file($path);
     }
 
     protected function fileSize(string $path): int|false
