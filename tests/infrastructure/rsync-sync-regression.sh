@@ -23,6 +23,12 @@
 #      uebertragen, inkl. --mkpath (Zielverzeichnis fehlt auf frischem Host)
 #   9. Drift: der Compose-Mount und der sync.sh-Default nennen DENSELBEN
 #      absoluten Host-Pfad (Portainer loest relative Pfade falsch auf)
+#  10. Rechte und Eigentum, die der Sync WIRKLICH erzeugt (OPS-3): ein zweiter,
+#      echter Lauf ohne --dry-run in ein frisches Ziel muss 0644/0755 liefern,
+#      2775+setgid ausschliesslich unter storage/ und bootstrap/cache/, keinen
+#      Welt-Schreibbarkeitsrest und den konfigurierten Baumeigentuemer. Der
+#      Parser-Teil oben sieht nur, WAS uebertragen wird; hier wird gemessen,
+#      WIE es ankommt.
 #
 # Aufruf:  bash tests/infrastructure/rsync-sync-regression.sh
 # Exit:    0 = alles gruen, 1 = Regression
@@ -300,5 +306,155 @@ if [[ -n "$caddy_missing" ]]; then
 $caddy_missing"
 fi
 pass 'caddy file is transferred as a single file, --mkpath covers the missing directory'
+
+# ============================================================================
+# 10. Rechte und Eigentum, die der Sync tatsaechlich erzeugt (OPS-3)
+# ============================================================================
+# Der Lauf oben ist ein --dry-run: er beweist die Auswahl, nicht die Rechte.
+# Der Befund OPS-3 war aber genau ein Rechte-Befund (F666/D2777). Deshalb ein
+# zweiter, echter Lauf in ein frisches Ziel.
+#
+# Eigentum: der Test laeuft als normaler Benutzer und kann nicht auf 1002:82
+# chownen. Er setzt deshalb denselben Seam, den Produktion als Default nutzt
+# (PORTAL_TREE_OWNER) auf die eigene uid:gid. Damit ist die Eigentums-Zusicherung
+# pruefbar, ohne root zu sein: was immer der Sync als Baumeigentuemer einsetzt,
+# muss auf JEDER Datei und JEDEM Verzeichnis ankommen.
+REAL_DEST="$TMP_ROOT/real-destination"
+mkdir -p "$REAL_DEST/web-portal.reisinger.pictures"
+TEST_OWNER="$(id -u):$(id -g)"
+
+RSYNC_BIN="$RSYNC_BIN" \
+PORTAL_TREE_OWNER="$TEST_OWNER" \
+PORTAL_API_DEST="$REAL_DEST/api-portal.reisinger.pictures/" \
+PORTAL_WEB_DEST="$REAL_DEST/web-portal.reisinger.pictures/dist/" \
+PORTAL_CADDY_DEST="$REAL_DEST/caddy/Caddyfile.ftp-events" \
+    bash "$PROJECT/sync.sh" > "$TMP_ROOT/real.out" 2>&1 \
+    || fail "the real (non-dry-run) sync exited non-zero:
+$(tail -20 "$TMP_ROOT/real.out")"
+
+[[ -f "$REAL_DEST/api-portal.reisinger.pictures/app/keep.txt" ]] \
+    || fail "the real sync did not transfer a source file:
+$(tail -20 "$TMP_ROOT/real.out")"
+
+# Die Laufzeit-Baeume sind ausgeschlossen. Der Verzeichnis-Schritt darf sie
+# anlegen und korrigieren, aber NIEMALS Inhalt hochladen: das lokale
+# storage/logs/laravel.log waere sonst im Ziel, und im echten Deploy wuerde ein
+# lokales Log das Produktionslog ueberschreiben.
+[[ ! -e "$REAL_DEST/api-portal.reisinger.pictures/storage/logs/laravel.log" ]] \
+    || fail 'the runtime-tree step transferred a local log file into the destination'
+[[ ! -e "$REAL_DEST/api-portal.reisinger.pictures/bootstrap/cache/config.php" ]] \
+    || fail 'the runtime-tree step transferred a local cache file into the destination'
+[[ ! -e "$REAL_DEST/api-portal.reisinger.pictures/storage/app/private/stripe_secret.txt" ]] \
+    || fail 'the real sync uploaded the local stripe secret'
+[[ ! -e "$REAL_DEST/api-portal.reisinger.pictures/database.sqlite" ]] \
+    || fail 'the real sync uploaded the local SQLite database'
+
+# Modi und Eigentum pro Pfad. python3 ist bereits Voraussetzung von
+# verify-image-nonroot.sh; `stat` ist zwischen BSD und GNU nicht portabel, und
+# das setgid-Bit taucht in `stat -f %Lp` auf macOS nicht auf.
+python3 - "$TEST_OWNER" \
+    "$REAL_DEST/api-portal.reisinger.pictures" \
+    "$REAL_DEST/web-portal.reisinger.pictures/dist" <<'PY' \
+    || fail 'the modes or ownership the sync produced are not the OPS-3 contract'
+import os
+import stat
+import sys
+
+owner = sys.argv[1]
+uid, gid = (int(part) for part in owner.split(':'))
+roots = sys.argv[2:]
+problems = []
+
+
+def writable(relative):
+    return (
+        relative == 'storage'
+        or relative.startswith('storage/')
+        or relative == 'bootstrap/cache'
+    )
+
+
+for root in roots:
+    for dirpath, dirnames, filenames in os.walk(root):
+        relative = os.path.relpath(dirpath, root)
+        info = os.lstat(dirpath)
+        mode = stat.S_IMODE(info.st_mode)
+        expected = 0o2775 if writable(relative) else 0o755
+        if mode != expected:
+            problems.append(f'directory {relative}: {oct(mode)} != {oct(expected)}')
+        if (info.st_uid, info.st_gid) != (uid, gid):
+            problems.append(
+                f'directory {relative}: owner {info.st_uid}:{info.st_gid} != {owner}'
+            )
+        for name in filenames:
+            path = os.path.join(dirpath, name)
+            info = os.lstat(path)
+            if stat.S_ISLNK(info.st_mode):
+                continue
+            mode = stat.S_IMODE(info.st_mode)
+            if mode != 0o644:
+                problems.append(f'file {os.path.relpath(path, root)}: {oct(mode)} != 0o644')
+            if (info.st_uid, info.st_gid) != (uid, gid):
+                problems.append(
+                    f'file {os.path.relpath(path, root)}: owner '
+                    f'{info.st_uid}:{info.st_gid} != {owner}'
+                )
+
+if problems:
+    print('\n'.join(problems), file=sys.stderr)
+    sys.exit(1)
+PY
+
+# Das Ziel-Wurzelverzeichnis der API ist KEIN beschreibbarer Baum: der
+# Verzeichnis-Schritt benutzt ein /./-Marker, damit er dort nichts aufweitet.
+python3 - "$REAL_DEST/api-portal.reisinger.pictures" <<'PY' \
+    || fail 'the sync widened the API tree root instead of the runtime trees only'
+import os
+import stat
+import sys
+
+info = os.lstat(sys.argv[1])
+mode = stat.S_IMODE(info.st_mode)
+if mode != 0o755:
+    print(f'the API tree root is {oct(mode)}, expected 0o755', file=sys.stderr)
+    sys.exit(1)
+PY
+
+# Die Einzeldatei des dritten Schritts traegt dieselben 0644.
+python3 - "$REAL_DEST/caddy/Caddyfile.ftp-events" <<'PY' \
+    || fail 'the Caddyfile was not transferred with 0644'
+import os
+import stat
+import sys
+
+mode = stat.S_IMODE(os.lstat(sys.argv[1]).st_mode)
+if mode != 0o644:
+    print(f'the Caddyfile is {oct(mode)}, expected 0o644', file=sys.stderr)
+    sys.exit(1)
+PY
+
+# Kein Rest von Welt-Schreibbarkeit: der Befund war genau das. setgid (2000)
+# ist erlaubt, das Welt-Schreibrecht (0002) nirgends.
+world_writable="$(python3 - "$REAL_DEST" <<'PY'
+import os
+import stat
+import sys
+
+hits = []
+for dirpath, dirnames, filenames in os.walk(sys.argv[1]):
+    for name in dirnames + filenames:
+        path = os.path.join(dirpath, name)
+        info = os.lstat(path)
+        if info.st_mode & stat.S_IWOTH:
+            hits.append(path)
+print('\n'.join(hits))
+PY
+)"
+if [[ -n "$world_writable" ]]; then
+    fail "the sync produced world-writable paths (OPS-3):
+$world_writable"
+fi
+
+pass "real sync produces 0644 files, 0755 directories, 2775 only under storage/ and bootstrap/cache/, owner ${TEST_OWNER}"
 
 printf '\nOK: all rsync sync regressions passed\n'

@@ -11,7 +11,8 @@
 #   ./sync.sh --dry-run    nur anzeigen, nichts aendern (empfohlen zuerst)
 #
 # Was uebertragen wird: 1) Backend (API), 2) Frontend-Build (dist/),
-# 3) die Caddyfile des internen FTP-Event-Listeners (Einzeldatei).
+# 3) die Caddyfile des internen FTP-Event-Listeners (Einzeldatei),
+# 4) die Rechte der Laufzeit-Baeume im Backend (nur Metadaten, kein Inhalt).
 #
 # Warum rsync und nicht scp: rclone sync war ein MIRROR (inkl. Loeschen). Der
 # Frontend-Build erzeugt content-hashed Assets, jeder Deploy muss den alten
@@ -58,10 +59,26 @@ CADDY_DEST="${PORTAL_CADDY_DEST:-${SSH_TARGET}:/home/webadmin/portal/caddy/Caddy
 # Connection-Reuse: bei ~13.000 Backend-Dateien sonst ein Handshake pro Datei.
 SSH_OPTS="-o ControlMaster=auto -o ControlPath=/tmp/ssh-sync-%r@%h:%p -o ControlPersist=60"
 
-# Rechte-Modell der Sites: 1002:webgroup, Dateien 666, Verzeichnisse 2777
-# (setgid). Ein reines -a wuerde die LOKALEN Rechte (644/755) durchdruecken.
-CHOWN="--chown=1002:webgroup"
-CHMOD="--chmod=D2777,F666"
+# Rechte-Modell der Sites: 1002:82 (uid des Website-Baums, gid webgroup).
+# Seit der Owner-Entscheidung 2026-10-25 (OPS-3, Issue #31) laeuft auch der
+# Backend-Container mit dieser Identitaet (`user: "1002:82"` in
+# deployment/docker-compose.yml). Damit ist der schreibende Prozess der
+# Eigentuemer der Dateien und das Welt-Schreibrecht entfaellt:
+#   - uebertragene Dateien 0644, uebertragene Verzeichnisse 0755;
+#   - nur die Baeume, die Laravel zur Laufzeit beschreibt (storage/,
+#     bootstrap/cache/), bleiben gruppenschreibbar: 2775 mit setgid, dieselbe
+#     Konvention wie App\Support\FtpInboxDirectory::MODE.
+# Vorher stand hier F666/D2777. Das war die Notloesung fuer den uid-Konflikt
+# (Baum 1002, Backend 1000): ohne Welt-Schreibrecht konnte die laufende UID
+# weder in `app/` noch in `storage/` schreiben. Mit angeglichener uid ist das
+# Schreibrecht des Eigentuemers ausreichend; 0644/0755 ist der Befund OPS-3.
+# Begruendung und Rollout: deployment/README.md, Abschnitt "4. Deploy".
+# `--chown` numerisch, weil der Gruppenname webgroup nur auf dem Host existiert;
+# `--chown=1002:webgroup` scheitert lokal im Regressionstest mit "Unknown
+# --groupmap name". PORTAL_TREE_OWNER ist derselbe Test-Seam wie PORTAL_*_DEST.
+TREE_OWNER="${PORTAL_TREE_OWNER:-1002:82}"
+CHOWN="--chown=${TREE_OWNER}"
+CHMOD="--chmod=D755,F644"
 
 # Argumente durchreichen, damit ./sync.sh --dry-run funktioniert.
 # Bash 3.2 (macOS) behandelt ein leeres Array unter `set -u` als ungebundene
@@ -119,6 +136,37 @@ echo "🔐 Sync: Caddyfile fuer den internen FTP-Event-Listener..."
   "$CHOWN" \
   "$CHMOD" \
   --info=progress2 \
+  --rsh="ssh $SSH_OPTS" \
+  ${RSYNC_EXTRA[@]+"${RSYNC_EXTRA[@]}"}
+
+# --- 4. Rechte der Laufzeit-Baeume (OPS-3) ---------------------------------
+# storage/ und bootstrap/cache/ sind die einzigen Baeume, die Laravel (und der
+# FTP-Import) zur Laufzeit beschreibt. Beide stehen in
+# rsync-backend-exclude.txt, damit lokale Logs, kompilierte Views und private
+# Altersnachweise weder hochgeladen noch von --delete geloescht werden. Genau
+# deshalb kann Schritt 1 ihre Rechte nicht setzen: ausgeschlossene Verzeichnisse
+# fasst rsync nicht an, und auf einem bestehenden Host bleiben sie auf 2777
+# stehen.
+#
+# Dieser Lauf uebertraegt deshalb KEINEN Inhalt: --include='*/' --exclude='*'
+# laesst nur Verzeichnisse durch, ein --delete fehlt bewusst. Er setzt
+# 2775+setgid (Gruppe webgroup bleibt schreibfaehig, neue Eintraege erben die
+# Gruppe) und den Baumeigentuemer. Der /./-Marker mit --relative haelt das
+# Ziel-Wurzelverzeichnis aus dem Lauf, --no-implied-dirs den Zwischenschritt
+# `bootstrap/` (nur `bootstrap/cache/` ist beschreibbar; Schritt 1 setzt
+# `bootstrap/` auf 0755 und dieser Lauf darf das nicht wieder aufweiten).
+# idempotent: ein zweiter Lauf meldet nichts zu tun.
+echo "🔧 Sync: Rechte der Laufzeit-Baeume..."
+"$RSYNC_BIN" ./backend/./storage/ ./backend/./bootstrap/cache/ "$API_DEST" \
+  --relative \
+  --no-implied-dirs \
+  --recursive \
+  --perms \
+  --times \
+  --include='*/' \
+  --exclude='*' \
+  "$CHOWN" \
+  --chmod=D2775 \
   --rsh="ssh $SSH_OPTS" \
   ${RSYNC_EXTRA[@]+"${RSYNC_EXTRA[@]}"}
 

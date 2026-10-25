@@ -19,7 +19,7 @@ use App\Exceptions\FtpCredentialException;
  *
  * ## Ownership without root
  *
- * The web process is not root (deployment: backend `user: "1000:82"`, sftpgo
+ * The web process is not root (deployment: backend and sftpgo both
  * `user: "1002:82"` per D-1) and it must not `chown` a foreign target — a
  * `chown -R` over the website tree is explicitly forbidden (feature doc 7.9,
  * incident 2026-09-26). Neither is needed here:

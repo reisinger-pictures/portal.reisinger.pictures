@@ -18,9 +18,10 @@ use Illuminate\Support\Facades\Storage;
  *
  * Ownership and the setgid bit are set with the group only — the directory
  * owner stays whoever created it. A `chown` of the user would be wrong: the
- * backend container runs as uid 1000, the host tree belongs to 1002:webgroup,
- * and the group (with setgid) is what makes new files readable by the
- * importing process.
+ * creating process is the web process, the host tree belongs to 1002:82, and
+ * the group (with setgid) is what keeps new files readable by the importing
+ * process. Since D-1 (owner decision 2026-10-25) both processes run as the
+ * tree's uid, so the owner the kernel assigns is the right one as well.
  */
 class ProvisionFtpFolders extends Command
 {
@@ -120,8 +121,8 @@ class ProvisionFtpFolders extends Command
 
     /**
      * The setgid bit is what makes this work: without it a file created by
-     * SFTPGo (uid 1000) lands in the directory's own group instead of
-     * `webgroup`, and the importing backend loses read access to the upload.
+     * SFTPGo lands in the directory's own group instead of `webgroup`, and the
+     * importing backend loses read access to the upload.
      *
      * The mode is applied, the owner is not. Chowning to another uid inside a
      * container is how the 2026-09-26 ownership incident happened (an

@@ -537,12 +537,15 @@ PHP;
 
         // No service runs on the old 1000:1000 identity any more; every one of
         // them carries the website tree's identity, because that is what lets it
-        // write inside the 2775+setgid directories:
+        // write without world-writable modes:
         //   - sftpgo as 1002:82 — an upload must inherit group webgroup via
         //     setgid instead of landing in the uploader's own group;
-        //   - backend as 1000:82 — `FtpController::process()` creates the
-        //     inbox directory and then `unlink`s the uploaded file again,
-        //     which UID 1000 in group 1000 cannot do in such a directory;
+        //   - backend as 1002:82 — the tree's owner. Until 2026-10-25 it ran as
+        //     1000:82, was therefore *not* the owner, and only the world-
+        //     writable modes F666/D2777 from `sync.sh` let it write (finding
+        //     OPS-3). With the aligned uid the owner bit is enough, and the
+        //     `unlink` in `FtpController::process()` works because the process
+        //     owns the inbox parent it creates;
         //   - composer_init as 1002:82, the tree owner — a `composer install`
         //     that has to replace a package deletes inside 1002-owned
         //     directories, and as 1000:1000 it failed with "Could not delete
@@ -552,6 +555,9 @@ PHP;
         // back means its runtime user was copied rather than derived from the
         // write rules above.
         $this->assertSame(0, substr_count($compose, 'user: "1000:1000"'));
+        // ... and the old non-owner identity must not come back either: it is
+        // the exact precondition that made the world-writable modes necessary.
+        $this->assertSame(0, substr_count($compose, 'user: "1000:82"'));
         $this->assertMatchesRegularExpression(
             '/^\s*user:\s*"1002:82"$/m',
             $this->composeService('composer_init'),
@@ -574,22 +580,30 @@ PHP;
                 $this->composeService('sftpgo')
             )
         );
-        // Same two steps for the backend, whose group is the D-1 subject: a
-        // 1000:1000 backend recreates exactly the 2775+setgid failure D-2
-        // exists to prevent, and it is invisible at runtime until an import
-        // tries to unlink its own upload.
+        // Same two steps for the backend, whose identity is the OPS-3 subject:
+        // as 1000:82 it recreated exactly the ownership mismatch that made the
+        // world-writable `F666`/`D2777` sync modes look necessary, and nothing
+        // at runtime would show it — the app kept working only because every
+        // file was writable by everyone.
         $this->assertMatchesRegularExpression(
-            '/^\s*user:\s*"1000:82"$/m',
+            '/^\s*user:\s*"1002:82"$/m',
             $this->composeService('backend'),
-            'the backend service must run as 1000:82; see AGENTS.md D-1 and D-2'
+            'the backend service must run as the tree owner 1002:82; see AGENTS.md D-1 and OPS-3'
         );
         $this->assertDoesNotMatchRegularExpression(
             '/^\s*user:/m',
             str_replace(
-                'user: "1000:82"',
+                'user: "1002:82"',
                 '',
                 $this->composeService('backend')
             )
+        );
+        // The read-only sidecar only reads the tree, but it carries the same
+        // identity: one identity in the compose file, not two.
+        $this->assertMatchesRegularExpression(
+            '/^\s*user:\s*"1002:82"$/m',
+            $this->composeService('ftp-events'),
+            'the ftp-events sidecar must carry the same identity as the tree it mounts read-only'
         );
         // The fail-closed startup guard pins uid *and* gid as a shell string
         // inside `command:`. Both literals have to agree with the `user:`
@@ -598,9 +612,9 @@ PHP;
         // ever notice — the guard is a string, not compose state. Before D-1
         // this is exactly the drift that would have shipped.
         $this->assertStringContainsString(
-            "id -u | grep -qx 1000 || { echo 'FATAL: Backend muss als UID 1000 laufen. Start verweigert (fail-closed)!'; exit 1; }",
+            "id -u | grep -qx 1002 || { echo 'FATAL: Backend muss als UID 1002 laufen. Start verweigert (fail-closed)!'; exit 1; }",
             $compose,
-            'the fail-closed startup guard must still pin the backend to UID 1000'
+            'the fail-closed startup guard must still pin the backend to UID 1002, the tree owner'
         );
         $this->assertStringContainsString(
             "id -g | grep -qx 82 || { echo 'FATAL: Backend muss als GID 82 (webgroup) laufen. Start verweigert (fail-closed)!'; exit 1; }",
@@ -612,7 +626,7 @@ PHP;
         $this->assertStringContainsString('USER www-data', $e2eDockerfile);
         // Schreibbarkeit statt Eigentum. 19-ftp 7.9 verbietet `chown -R` auf
         // /home/webadmin/websites, ein Eigentumsvergleich waere also nicht
-        // erfuellbar. Geprueft wird das, was zaehlt: ob UID 1000 schreiben darf.
+        // erfuellbar. Geprueft wird das, was zaehlt: ob UID 1002 schreiben darf.
         // Der explizite Negativ-Test haelt den unerfuellbaren Eigentumscheck
         // draussen, falls ihn jemand zurueckholt.
         $this->assertStringContainsString(
@@ -644,6 +658,104 @@ PHP;
         // Seed ausgeloest haette. Owner-Entscheidung 2026-09-28.
         $this->assertStringNotContainsString('artisan db:seed', $compose);
         $this->assertStringNotContainsString('app:import-locations', $compose);
+    }
+
+    /**
+     * Finding OPS-3 had exactly one cause: the container identity and the
+     * identity of the files it writes were two different numbers, and the
+     * world-writable modes in `sync.sh` (`F666`/`D2777`) were the workaround
+     * that hid it. Nothing compared the two numbers, so the mismatch could live
+     * in production for weeks.
+     *
+     * This is that comparison. `sync.sh` declares the tree owner once
+     * (`TREE_OWNER`, with `PORTAL_TREE_OWNER` as the regression test's seam) and
+     * applies it as `--chown` to every rsync step; the backend container must
+     * run as exactly that identity. Both halves of the finding are pinned:
+     *   - the owner is the one the sync writes,
+     *   - the modes are 0644/0755 for code and 2775+setgid (the
+     *     `FtpInboxDirectory::MODE` convention) only for the two runtime trees
+     *     Laravel actually writes, with no world-writable mode anywhere.
+     */
+    public function test_backend_identity_is_the_tree_owner_written_by_sync_and_no_mode_is_world_writable(): void
+    {
+        $sync = $this->read('sync.sh');
+        $owner = $this->treeOwnerDeclaredInSync($sync);
+
+        $this->assertStringContainsString(
+            'CHOWN="--chown=${TREE_OWNER}"',
+            $sync,
+            'sync.sh must apply its declared tree owner to every transfer, otherwise a root-owned file lands unwritable for the app'
+        );
+        $this->assertSame(
+            4,
+            substr_count($sync, '"$CHOWN"'),
+            'every rsync step of sync.sh (backend, frontend, Caddyfile, runtime trees) must pass "$CHOWN"'
+        );
+
+        $backendUser = $this->composeService('backend');
+        $matched = preg_match('/^\s*user:\s*"(\d+:\d+)"$/m', $backendUser, $matches);
+        $this->assertSame(1, $matched, 'the backend service must declare a numeric `user:`');
+        $this->assertSame(
+            $owner,
+            $matches[1],
+            'the backend uid:gid must equal the tree owner sync.sh writes ('
+                .$owner.'); a difference is the OPS-3 cause and needs world-writable files to work'
+        );
+
+        $syncCode = $this->withoutFullLineComments($sync);
+
+        foreach (['F666', 'D2777', 'chmod 666', 'chmod 777'] as $widening) {
+            $this->assertStringNotContainsString(
+                $widening,
+                $syncCode,
+                "sync.sh must not hand out world-writable modes ({$widening}); "
+                    .'the running uid is the tree owner and needs only 0644/0755'
+            );
+        }
+
+        $this->assertStringContainsString(
+            'CHMOD="--chmod=D755,F644"',
+            $sync,
+            'transferred files must be 0644 and transferred directories 0755 — the world-writable F666/D2777 pair is the OPS-3 finding'
+        );
+        // Exactly two chmod specifications: the 0755/0644 default and the
+        // 2775 one for the runtime trees. A third one is how a wider mode
+        // slipped in unnoticed.
+        $this->assertSame(
+            2,
+            substr_count($syncCode, '--chmod='),
+            'sync.sh must use exactly two --chmod specifications: D755,F644 and D2775 for the runtime trees'
+        );
+        $this->assertStringContainsString(
+            '--chmod=D2775',
+            $syncCode,
+            'storage/ and bootstrap/cache/ stay group-writable with setgid (2775); the app and host maintenance share group webgroup'
+        );
+        // Only the trees Laravel writes may be widened. The step is a directory
+        // walk (no content transfer, no --delete), so it cannot resurrect
+        // private storage that the exclude file protects.
+        $this->assertStringContainsString(
+            '"$RSYNC_BIN" ./backend/./storage/ ./backend/./bootstrap/cache/ "$API_DEST"',
+            $syncCode,
+            'the 2775 step must cover storage/ and bootstrap/cache/ and nothing else'
+        );
+    }
+
+    /**
+     * The uid:gid `sync.sh` chowns transfers to.
+     */
+    private function treeOwnerDeclaredInSync(string $sync): string
+    {
+        $matched = preg_match('/^TREE_OWNER="\$\{PORTAL_TREE_OWNER:-(\d+:\d+)\}"$/m', $sync, $matches);
+
+        $this->assertSame(
+            1,
+            $matched,
+            'sync.sh must declare the tree owner as TREE_OWNER="${PORTAL_TREE_OWNER:-<uid>:<gid>}": '
+                .'PORTAL_TREE_OWNER is the regression test seam, the default is production'
+        );
+
+        return $matches[1];
     }
 
     /**

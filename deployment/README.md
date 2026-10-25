@@ -192,12 +192,13 @@ docker logs portal_backend 2>&1 | grep -E 'Event-Aktion|Event-Regel'
 
 ### Einmalige Host-Voraussetzung: Fotospeicher
 
-Der Backend läuft als `1000:82`, der Fotospeicher gehörte `33:33` mit `755`.
-Ohne diesen Schritt verweigert der fail-closed Guard den Start mit
-`PHOTO_STORAGE_PATH ist fuer UID 1000 nicht schreibbar`:
+Der Backend läuft als `1002:82` (Owner-Entscheidung 2026-10-25, OPS-3), der
+Fotospeicher gehörte `33:33` mit `755`. Ohne diesen Schritt verweigert der
+fail-closed Guard den Start mit
+`PHOTO_STORAGE_PATH ist fuer UID 1002 nicht schreibbar`:
 
 ```bash
-chown -R 1000:1000 /home/webadmin/portal/images
+chown -R 1002:82 /home/webadmin/portal/images
 find /home/webadmin/portal/images -type d -exec chmod 2775 {} +
 ```
 
@@ -335,7 +336,114 @@ Caching-Problem. Steht als STRICT-Regel in `AGENTS.md` §13.
 Der Frontend-Sync braucht keinen Neustart (`dist/` ist statisch), und
 Migrationen laufen nicht mit — die gehören bewusst und getrennt dazu.
 
+#### Rechte-Modell: UID 1002 und geschlossene Dateirechte (OPS-3)
 
+Owner-Entscheidung 2026-10-25 (Issue #31): erst die Identität angleichen, dann
+die Dateirechte schließen. Der `backend`-Container läuft seitdem als
+`1002:82` — der **Eigentümer** des Website-Baums, nicht mehr `1000:82`
+(D-1). `sync.sh` schreibt deshalb `1002:82`, Dateien `0644`, Verzeichnisse
+`0755`; `2775` mit setgid bleibt ausschließlich auf den zwei Bäumen, die
+Laravel zur Laufzeit beschreibt (`storage/`, `bootstrap/cache/` — dieselbe
+Konvention wie `App\Support\FtpInboxDirectory::MODE`). Vorher stand dort
+`F666`/`D2777`; das Welt-Schreibrecht war die Notlösung für den uid-Konflikt.
+
+**Reihenfolge (einmalig vor dem ersten Recreate, dann nur noch 1–5):**
+
+```bash
+# 0. Einmalig, idempotent: Eigentum der Laufzeit-Bäume und des Fotospeichers.
+#    sync.sh fasst die Laufzeit-Bäume nicht an (Excludes in
+#    rsync-backend-exclude.txt), der Verzeichnis-Schritt setzt dort nur
+#    Verzeichnisse und Eigentum — Dateien bleiben, wie der alte 1000er-Prozess
+#    sie hinterlassen hat (0600, uid 1000). Ohne diesen Schritt kann die neue
+#    UID sie weder lesen (Altersnachweise, Fotos in storage/app/private) noch
+#    überschreiben (bootstrap/cache/config.php) — `php artisan optimize` im
+#    Start bricht dann mit `exit 1` ab, und der Container startet nicht.
+API=/home/webadmin/websites/api-portal.reisinger.pictures
+find "$API/storage" "$API/bootstrap/cache" -exec chown -h 1002:82 {} +
+find "$API/storage" "$API/bootstrap/cache" -type f -perm -0002 -exec chmod o-w {} +
+#    Der Fotospeicher liegt außerhalb des Syncs. 1002:82 + 2775 hält BEIDE
+#    Identitäten schreibfähig (1002 als Eigentümer, 1000 über Gruppe 82) —
+#    deshalb braucht ein Rollback kein zweites chown.
+chown -R 1002:82 /home/webadmin/portal/images
+find /home/webadmin/portal/images -type d -exec chmod 2775 {} +
+```
+
+1. `./sync.sh` — setzt Eigentum und Modi aller übertragenen Dateien, dazu
+   `2775` auf `storage/` und `bootstrap/cache/`.
+2. Den Stack in **Portainer** auf die neue Compose-Datei aktualisieren. Die
+   `user:`-Zeile, die der Host tatsächlich startet, steht in der Kopie des
+   Stacks (`/var/lib/docker/volumes/portainer_data/_data/compose/…`), nicht in
+   diesem Repo — ein Sync allein ändert die Identität **nicht**.
+3. `backend` **recreaten**, nicht restarten:
+
+   ```bash
+   cd /data/compose/15/       # Portainer-Stack-Verzeichnis
+   docker compose up -d --force-recreate backend
+   ```
+
+   `user:` ist Laufzeitkonfiguration des Containers. `docker restart` behält
+   die alte Konfiguration und damit uid 1000 — der Container liefe dann genau
+   in den Zustand, den dieser Deploy beseitigt. `AGENTS.md` §13: recreate statt
+   restart bei Änderungen an `command`, `entrypoint`, `environment`, `volumes`
+   oder `user`.
+4. Health: `curl -sS -o /dev/null -w '%{http_code}\n' https://api-portal.reisinger.pictures/up`
+5. Schreibnachweis — Identität, beide beschreibbaren Bäume und ein echter
+   Request:
+
+   ```bash
+   docker exec portal_backend sh -c 'id -u; id -g'        # muss 1002 und 82 sein
+   docker exec portal_backend sh -c '
+     f=storage/framework/views/.ops3-probe; c=bootstrap/cache/.ops3-probe
+     printf ok > "$f" && printf ok > "$c" && rm -f "$f" "$c" && echo "write ok"'
+   curl -sS -o /dev/null -w '%{http_code}\n' https://api-portal.reisinger.pictures/up
+   ```
+
+   Ein Log-Schreibrecht beweist hier nichts: `LOG_CHANNEL=stderr` schreibt nach
+   stderr, nicht nach `storage/logs`. Die Proben oben treffen die Bäume, die
+   die Anwendung wirklich beschreibt (kompilierte Views, Config-Cache; der
+   Start schreibt letzteren ohnehin mit `php artisan optimize`).
+
+**Rollback — ein `git revert`:**
+
+```bash
+git revert <commit-dieses-changes>   # stellt user: "1000:82" UND F666/D2777 wieder her
+./sync.sh                            # mit dem alten Skript: alte Modi, alte Ownership
+# Stack in Portainer aktualisieren, dann:
+cd /data/compose/15/ && docker compose up -d --force-recreate backend
+```
+
+Beide Hälften des Befunds liegen in diesem einen Commit (Identität in der
+Compose-Datei, Modi in `sync.sh`), und die alten Modi sind genau das, was das
+alte Skript schreibt — der Revert kann also keinen halben Zustand erzeugen, in
+dem 1000 gegen `0644` läuft und nicht mehr schreiben kann. Der Schritt 0 muss
+**nicht** zurückgenommen werden: `2775` mit Gruppe `82` bleibt für einen
+`1000:82`-Prozess schreibfähig, und die Dateien gehören dem Baum-Eigentümer
+`1002` — genau wie vor dem Deploy.
+
+**Was ein Sync korrigiert und was nicht:** alles, was `sync.sh` überträgt, wird
+beim nächsten Sync auch ohne Inhaltsänderung korrigiert — rsync vergleicht die
+Rechte und meldet `.f...p.g...` (`p` = permissions changed), die Datei selbst
+bleibt unangetastet. Es bleibt also **keine** übertragene Datei „bis zur
+nächsten Änderung“ auf `0666` stehen. **Nicht** korrigiert werden Dateien in den
+ausgeschlossenen Laufzeit-Bäumen (`storage/**`, `bootstrap/cache/**`): der
+Verzeichnis-Schritt setzt dort nur Verzeichnisse (2775) und Eigentum. Ob Schritt
+0 gelaufen ist, prüft deshalb genau eine Zeile — sie muss **leer** sein:
+
+```bash
+find /home/webadmin/websites/api-portal.reisinger.pictures/storage \
+     /home/webadmin/websites/api-portal.reisinger.pictures/bootstrap/cache \
+     -type f \( ! -user 1002 -o -perm -0002 \)
+```
+
+Ein Treffer heißt: Datei aus der alten 1000er-Zeit (falscher Eigentümer) oder
+Welt-Schreibrecht übrig — dann Schritt 0 nachziehen. Beides ist idempotent.
+
+Gates für diese Änderung: `tests/infrastructure/sync-permissions-contract.sh`
+(keine `F666`/`D2777`, ein Baumeigentümer, 2775 nur auf den zwei Bäumen),
+`tests/infrastructure/rsync-sync-regression.sh` (misst die Rechte, die ein
+echter Lauf erzeugt) und
+`backend/tests/Feature/InfrastructureSupplyChainPolicyTest.php` (Backend-UID ==
+Baumeigentümer aus `sync.sh`).
 
 ```bash
 cd /data/compose/15/       # Portainer-Stack-Verzeichnis
@@ -343,23 +451,23 @@ docker compose up -d
 ```
 
 Der `backend`-Entrypoint erledigt beim Start **automatisch**, ohne Zutun.
-Vollständig, in Ausführungsreihenfolge (`deployment/docker-compose.yml:246-272`) —
+Vollständig, in Ausführungsreihenfolge (`deployment/docker-compose.yml:300-330`) —
 die Liste vorher enthielt nur 3 Einträge und ließ unter anderem den Seed weg:
 
 ```bash
 # reproduziert die vollständige Schrittliste
-awk 'NR>=263 && NR<=272' deployment/docker-compose.yml \
+awk 'NR>=321 && NR<=328' deployment/docker-compose.yml \
   | grep -oE 'php artisan [a-z:-]+|/usr/local/bin/[a-z-]+' | sort -u
 ```
 
-0. **Fail-closed-Vorprüfung** — 17 `exit 1`-Guards (`docker-compose.yml:246-262`),
-   davon 12 über `printenv | grep`: UID **und** GID 1000, `APP_ENV=production`,
-   `APP_KEY`, `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
-   `PHOTO_STORAGE_PATH` (gesetzt, absolut, existierendes beschreibbares
-   Verzeichnis), `AI_SESSION_HEADER`/`AI_SESSION_PREFIX` (Zeichensatz),
-   Beschreibbarkeit von `/var/www/html` und `/var/www/ftp` sowie das Vorhandensein
-   von `validate-production-env` und `portal-backend-supervisor` im Image.
-   Fehlt **ein** Wert, startet der Container gar nicht.
+0. **Fail-closed-Vorprüfung** — 18 `exit 1`-Guards (`docker-compose.yml:302-319`),
+   davon 13 über `printenv`: UID **1002** und GID **82** (der Baumeigentümer,
+   D-1), `APP_ENV=production`, `APP_KEY`, `JWT_SECRET`, `FILE_ENCRYPTION_KEY`,
+   `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PHOTO_STORAGE_PATH` (gesetzt, absolut,
+   existierendes beschreibares Verzeichnis), `AI_SESSION_HEADER`/`AI_SESSION_PREFIX`
+   (Zeichensatz), Beschreibbarkeit von `/var/www/html` und `/var/www/ftp` sowie das
+   Vorhandensein von `validate-production-env` und `portal-backend-supervisor` im
+   Image. Fehlt **ein** Wert, startet der Container gar nicht.
 1. `validate-production-env` — bricht ab, wenn ein Pflichtwert fehlt
 2. `php artisan cache:clear` — leert den Anwendungs-Cache
 3. `php artisan optimize` — baut Config-/Route-/Event-Caches
@@ -424,7 +532,8 @@ idempotent.
 docker compose logs backend | grep seed-if-fresh     # "Fresh database seeded." oder "already seeded"
 docker compose logs backend | grep ftp:provision   # Ordner-Anlage
 docker compose logs sftpgo | grep -iE "error|fatal"
-docker compose exec sftpgo sh -c 'id'             # muss uid=1000 sein
+docker compose exec sftpgo sh -c 'id'             # muss uid=1002 sein (Baumeigentuemer, D-1)
+docker compose exec backend sh -c 'id'            # muss uid=1002, gid=82 sein
 ```
 
 ### Health

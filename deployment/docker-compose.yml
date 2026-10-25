@@ -66,11 +66,12 @@ services:
 
   composer_init:
     image: composer:2.10.3
-    # Der gemountete Website-Baum gehört 1002:webgroup. Muss composer install
-    # ein Paket ersetzen oder löschen, scheitert es ohne Schreibrecht auf dem
-    # nicht gruppenschreibbaren Elternverzeichnis mit "Could not delete .../LICENSE"
-    # (Exit 1); dadurch blockiert depends_on: service_completed_successfully den
-    # Backend-Start und die Website bleibt ohne Backend-Logzeile down.
+    # Der gemountete Website-Baum gehört 1002:82 (webgroup) — dieselbe
+    # Identitaet wie Backend und sftpgo. Muss composer install ein Paket
+    # ersetzen oder löschen, scheitert es ohne Schreibrecht auf dem
+    # Elternverzeichnis mit "Could not delete .../LICENSE" (Exit 1); dadurch
+    # blockiert depends_on: service_completed_successfully den Backend-Start und
+    # die Website bleibt ohne Backend-Logzeile down.
     user: "1002:82"
     container_name: portal_composer
     volumes:
@@ -79,12 +80,16 @@ services:
 
   backend:
     image: ghcr.io/reisinger-pictures/portal-base:8.5
-    # UID 1000 (Host-Konvention des Website-Baums), GID 82 = webgroup.
-    # D-1/D-2: `FtpController::process()` legt das Inbox-Verzeichnis an und
-    # `unlink`t die Datei danach wieder. In einem 2775+setgid-Verzeichnis
-    # kann UID 1000 das nur ueber die Gruppe. Start-Guard weiter unten
-    # (GID-Zeile) muss mit dieser Zahl uebereinstimmen.
-    user: "1000:82"
+    # UID 1002 = Eigentuemer des Website-Baums, GID 82 = webgroup.
+    # Owner-Entscheidung 2026-10-25 (OPS-3, Issue #31): erst die Identitaet
+    # angleichen, dann die Dateirechte schliessen. Vorher stand hier 1000:82 —
+    # der Prozess war nicht der Eigentuemer des Baums, und nur deshalb musste
+    # sync.sh F666/D2777 schreiben, damit er ueberhaupt schreiben konnte.
+    # Mit 1002:82 schreibt er als Eigentuemer; `App\Support\FtpInboxDirectory`
+    # und 19-ftp 7.9 nennen dieselbe Zahl ("der Prozess muss als uid des Baums
+    # laufen"). Start-Guard weiter unten (UID- und GID-Zeile) muss mit dieser
+    # Zahl uebereinstimmen.
+    user: "1002:82"
     container_name: portal_backend
     restart: unless-stopped
     depends_on:
@@ -260,17 +265,16 @@ services:
     # 2026-09-26. Siehe features/infrastructure/01-deployment.md 9.
     #
     # Bewusst NUR Existenz + Schreibbarkeit fuer die laufende UID, kein
-    # Ownership-Vergleich: 19-ftp 7.9 verbietet das Umstellen von
-    # /home/webadmin/websites auf 1000:1000, der Host haelt 1002:webgroup
-    # mit 2775+setgid. Ein stat-Vergleich auf die Backend-Identitaet waere
-    # damit unerfuellbar, ohne die bindende Regel zu brechen. Die Identitaet
-    # selbst ist weiterhin ueber die `user:`-Zeile dieses Stanzas erzwungen:
-    # UID 1000, GID 82. D-1/D-2, 2026-09-29 — vorher stand dort 1000:1000,
-    # und genau diese fehlende Gruppenzugehoerigkeit waere der Grund gewesen,
-    # aus dem `FtpController::process()` das Anlegen bzw. `unlink`en in einem
-    # 2775+setgid-Inbox-Verzeichnis scheitert. Die GID-Zeile des Guards
-    # weiter unten muss dieselbe Zahl nennen, sonst verweigert der Container
-    # den Start.
+    # Ownership-Vergleich: der Host haelt 1002:webgroup mit 2775+setgid, und
+    # 19-ftp 7.9 verbietet, den Baum per `chown -R` umzuschreiben. Seit
+    # 2026-10-25 laeuft der Backend-Prozess selbst als 1002:82, ein
+    # stat-Vergleich waere also erfuellbar — er bleibt trotzdem draussen, weil
+    # er eine bindende Regel (kein `chown -R` im Baum) nur scheinbar pruefen
+    # wuerde und die Schreibbarkeit das eigentliche Kriterium ist. Die
+    # Identitaet selbst ist ueber die `user:`-Zeile dieses Stanzas erzwungen:
+    # UID 1002, GID 82 (D-1, Owner-Entscheidung 2026-10-25). Die UID- und
+    # GID-Zeile des Guards weiter unten muessen dieselben Zahlen nennen, sonst
+    # verweigert der Container den Start.
     # ACHTUNG — zwei Compose-v5-Fallen in diesem Block, beide schon produktiv
     # aufgefallen. 1) KEIN `#` innerhalb von `command:`, auch nicht als
     # Kommentar: `command: >` ist ein gefalteter Skalar, alle Zeilen werden zu
@@ -279,8 +283,8 @@ services:
     # vom 2026-09-26). 2) KEIN `$` ausser in `$(...)`, und auch dort ist es
     # kaputt: Compose v5.0.2 gibt JEDE Command-Substitution als `$$(...)` aus,
     # auch wenn in der Datei schon `$$` steht. Der Container-Shell expandiert
-    # `$$` dann zur PID — aus `[ "$$(id -u)" -ne 1000 ]` wird
-    # `[ "1(id -u)" -ne 1000 ]`, also `Illegal number` und FATAL. Ebenso
+    # `$$` dann zur PID — aus `[ "$$(id -u)" -ne 1002 ]` wird
+    # `[ "1(id -u)" -ne 1002 ]`, also `Illegal number` und FATAL. Ebenso
     # werden `$${APP_ENV}` zu `1234{APP_ENV}`. Nachgewiesen mit
     # Docker Compose v5.0.2; `$$` wirkt in KEINER YAML-Form. Deshalb liest
     # dieser Guard ueber `printenv | grep` und `xargs -I{}` statt ueber
@@ -295,7 +299,7 @@ services:
     # eine dunkle Event-Kette muss beim Deploy sichtbar sein, nicht später still.
     command: >
       sh -c "
-      id -u | grep -qx 1000 || { echo 'FATAL: Backend muss als UID 1000 laufen. Start verweigert (fail-closed)!'; exit 1; };
+      id -u | grep -qx 1002 || { echo 'FATAL: Backend muss als UID 1002 laufen. Start verweigert (fail-closed)!'; exit 1; };
       id -g | grep -qx 82 || { echo 'FATAL: Backend muss als GID 82 (webgroup) laufen. Start verweigert (fail-closed)!'; exit 1; };
       printenv APP_ENV | grep -qx production || { echo 'FATAL: APP_ENV muss im Produktions-Stack production sein. Start verweigert (fail-closed)!'; exit 1; };
       printenv APP_KEY | grep -q . || { echo 'FATAL: APP_KEY ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
@@ -307,10 +311,10 @@ services:
       printenv PHOTO_STORAGE_PATH | grep -q '^/' || { echo 'FATAL: PHOTO_STORAGE_PATH muss ein absoluter Mount-Pfad sein. Start verweigert!'; exit 1; };
       printenv AI_SESSION_HEADER | grep -qE '^[A-Za-z0-9-]*$' || { echo 'FATAL: AI_SESSION_HEADER darf nur Buchstaben, Ziffern und Bindestriche enthalten. Start verweigert (fail-closed)!'; exit 1; };
       printenv AI_SESSION_PREFIX | grep -qE '^[A-Za-z0-9._-]*$' || { echo 'FATAL: AI_SESSION_PREFIX darf nur Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich enthalten. Start verweigert (fail-closed)!'; exit 1; };
-      [ -d /var/www/html ] && [ -w /var/www/html ] || { echo 'FATAL: /var/www/html fehlt oder ist fuer UID 1000 nicht schreibbar. Start verweigert!'; exit 1; };
-      [ -d /var/www/ftp ] && [ -w /var/www/ftp ] || { echo 'FATAL: /var/www/ftp fehlt oder ist fuer UID 1000 nicht schreibbar. Start verweigert!'; exit 1; };
+      [ -d /var/www/html ] && [ -w /var/www/html ] || { echo 'FATAL: /var/www/html fehlt oder ist fuer UID 1002 nicht schreibbar. Start verweigert!'; exit 1; };
+      [ -d /var/www/ftp ] && [ -w /var/www/ftp ] || { echo 'FATAL: /var/www/ftp fehlt oder ist fuer UID 1002 nicht schreibbar. Start verweigert!'; exit 1; };
       printenv PHOTO_STORAGE_PATH | xargs -r -I{} test -d {} || { echo 'FATAL: PHOTO_STORAGE_PATH ist kein Verzeichnis. Start verweigert!'; exit 1; };
-      printenv PHOTO_STORAGE_PATH | xargs -r -I{} test -w {} || { echo 'FATAL: PHOTO_STORAGE_PATH ist fuer UID 1000 nicht schreibbar. Start verweigert!'; exit 1; };
+      printenv PHOTO_STORAGE_PATH | xargs -r -I{} test -w {} || { echo 'FATAL: PHOTO_STORAGE_PATH ist fuer UID 1002 nicht schreibbar. Start verweigert!'; exit 1; };
       [ -x /usr/local/bin/validate-production-env ] && [ -x /usr/local/bin/portal-backend-supervisor ] || { echo 'FATAL: Production preflight/supervisor is missing. Rebuild portal-base:8.5, push GHCR, update the pinned compose tag, then redeploy. No migration or seed was run.'; exit 1; };
       printenv FTP_EVENT_SECRET | grep -q . || { echo 'FATAL: FTP_EVENT_SECRET ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
       /usr/local/bin/validate-production-env || exit 1;
@@ -336,8 +340,11 @@ services:
   # FTP_EVENT_SECRET muss im Docker-Netz bleiben. Dieser Dienst ist der einzige
   # interne HTTP-Pfad und leitet genau einen Endpoint weiter; alles andere gibt
   # 404 zurueck.
-  # UID 1000 liest den Host-Baum 1002:webgroup ueber GID 82 (2775+setgid).
-  #
+  # UID 1002 = Eigentuemer des Website-Baums, GID 82 = webgroup. Dieser Dienst
+  # liest den Baum nur (`:ro`); die Identitaet ist trotzdem dieselbe wie im
+  # Backend, damit die Compose-Datei genau eine Identitaet kennt und ein
+  # Lesefehler nicht von einer zweiten, zufaelligen uid abhaengt
+  # (Owner-Entscheidung 2026-10-25, OPS-3).
   # Der Caddyfile-Mount ist ABSOLUT, und das ist keine Kosmetik: dieser Stack
   # laeuft aus Portainer, dessen Compose-Datei unter
   # /var/lib/docker/volumes/portainer_data/_data/compose/23/docker-compose.yml
@@ -352,7 +359,7 @@ services:
     image: caddy:2.11-alpine
     container_name: portal_ftp_events
     restart: unless-stopped
-    user: "1000:82"
+    user: "1002:82"
     volumes:
       - /home/webadmin/websites/api-portal.reisinger.pictures:/var/www/html:ro,Z
       - /home/webadmin/portal/caddy/Caddyfile.ftp-events:/etc/caddy/Caddyfile:ro
@@ -420,11 +427,35 @@ services:
       # Klartext-Greeting sah nach einem Fehler aus und war es nicht.
       #
       # Fuer einen zweiten, explizit unverschluesselten Zugriffsweg gibt es
-      # keine Abschaltung: `AUTH` ist optional, ein Client kann die TLS-Stufe
-      # auch auslassen. Das entspricht dem FTP-Standard und dem Verhalten der
-      # Kamera, ist aber eine bewusste Entscheidung und keine Konfigurations-
-      # nachlaessigkeit — wer FTPS erzwingen will, braegt eine Firewall-Regel
-      # auf 989 ohne 21.
+      # KEINE Oeffnung, und es braucht auch keine Firewall-Regel, um eine zu
+      # schliessen. `TLS_MODE=1` heisst in ftpserverlib `MandatoryEncryption`:
+      # TLS ist fuer den Steuer- UND den Datenkanal Pflicht. Ein `USER` ohne
+      # vorheriges `AUTH TLS` wird mit `421 TLS is required` beantwortet, der
+      # Server schliesst die Verbindung, ein Login kommt nicht zustande.
+      #
+      # KORREKTUR 2026-10-25: Die frueher an dieser Stelle stehende Aussage
+      # war FALSCH und ist zurueckgezogen. Sie behauptete, `AUTH` sei optional
+      # und ein Client koenne die TLS-Stufe auslassen, und leitete daraus eine
+      # Firewall-Regel "989 ohne 21" ab. Einen solchen Klartext-Zugang gibt es
+      # nicht. Plausibel klang sie nur, weil der Greeting `220 SFTPGo_2.7.6`
+      # weiterhin im Klartext VOR `AUTH TLS` gesendet wird — das ist die
+      # Begruessung, nicht der Zugang, und genau der Ablauf, den die Kamera
+      # erwartet (siehe oben).
+      #
+      # Gemessen am 2026-10-25 gegen die laufende `drakkan/sftpgo:2.7.x`
+      # (SFTPGo 2.7.6), Bindung auf 127.0.0.1:989:
+      #   greeting: b'220 SFTPGo_2.7.6\r\n'
+      #   USER probe  ->  b'421 TLS is required\r\n'   (Server schliesst)
+      # Quelle: SFTPGo v2.7.6, internal/ftpd/server.go setzt
+      # `TLSRequired: ftpserver.TLSRequirement(binding.TLSMode)`. Die
+      # ftpserverlib-Fassung aus demselben go.mod (v0.32.4, driver.go) kennt
+      # 0 = ClearOrEncrypted, 1 = MandatoryEncryption, 2 = ImplicitEncryption.
+      # Erzwungen wird das im Steuerkanal (handle_auth.go: ein `USER` ohne
+      # TLS-Kontrollkanal wird abgelehnt) und im Datenkanal
+      # (client_handler.go verlangt TLS fuer Transfers).
+      # `2` (implizit) bleibt deshalb die falsche Wahl: die Canon-Kamera
+      # sendet nach dem Verbindungsaufbau `AUTH TLS` im Klartext und
+      # scheitert damit an einem Listener, der von Anfang an TLS erwartet.
       - SFTPGO_FTPD__BINDINGS__0__ADDRESS=0.0.0.0
       - SFTPGO_FTPD__BINDINGS__0__PORT=989
       # Aus der Stack-Env, damit die Anzeige im Management-UI nicht etwas
@@ -528,14 +559,15 @@ services:
       # `sftpgo` loest per Docker-DNS auf, eine feste IP wird nicht gebraucht.
       # Der Backend pinnt seine IP nur auf webnet, weil Caddy darauf routet.
       - portal_internal
-    # Non-root wie der Backend (verify-image-nonroot.sh ist CI-Gate).
-    # Der Host-Pfad gehoert 1002:webgroup mit setgid, NICHT 1000:1000:
+    # Non-root wie der Backend (verify-image-nonroot.sh ist CI-Gate) und mit
+    # derselben Identitaet wie der Baum: 1002:82 (Owner-Entscheidung
+    # 2026-10-25, OPS-3) — vorher lief nur dieser Dienst als Baum-Eigentuemer,
+    # waehrend das Backend mit 1000 daneben lag.
     # features/infrastructure/19-ftp-upload-pipeline.md 7.9 verbietet
-    # ausdruecklich, /home/webadmin/websites per chown -R auf 1000
-    # umzuschreiben (Vorfall 2026-09-26: 38.969 Dateien). uid 1000 schreibt
-    # in 2775+setgid trotzdem, und neue Dateien erben die Gruppe webgroup —
-    # genau das soll 7.9. Deshalb wird hier nichts gechownt, weder von hier
-    # noch aus dem Backend-Entrypoint.
+    # ausdruecklich, /home/webadmin/websites per chown -R umzuschreiben
+    # (Vorfall 2026-09-26: 38.969 Dateien); 2775+setgid bleibt die Konvention,
+    # damit neue Uploads die Gruppe webgroup erben. Gechownt wird hier nichts,
+    # weder von hier noch aus dem Backend-Entrypoint.
     user: "1002:82"
 
 networks:

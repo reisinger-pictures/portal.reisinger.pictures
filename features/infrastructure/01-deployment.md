@@ -84,7 +84,8 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
 
 ## 9. Produktion-Sicherheits-Gatekeeper
 - **Identitäts-Guard:** Der `backend`-Container verweigert den Start, wenn er
-  nicht als UID:GID `1000:82` läuft.
+  nicht als UID:GID `1002:82` läuft — der Eigentümer des Website-Baums und
+  seine Gruppe (D-1, Owner-Entscheidung 2026-10-25, OPS-3).
 - **Credential-/Pfad-Guard:** Er verweigert den Start bei leerem
   `APP_KEY`, `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, `ADMIN_EMAIL`,
   `ADMIN_PASSWORD` oder `PHOTO_STORAGE_PATH`. `PHOTO_STORAGE_PATH` muss ein
@@ -92,15 +93,15 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
   `/var/www/ftp` müssen als Verzeichnis existieren und für die laufende UID
   schreibbar sein. Die Prüfung erfolgt generisch ohne hartcodierte
   Schlüsselwerte.
-- **Ownership wird bewusst *nicht* geprüft:** `/home/webadmin/websites` gehört
-  `1002:webgroup` mit setgid und darf laut `19-ftp-upload-pipeline.md` 7.9
-  **nicht** per `chown -R` auf `1000:1000` umgeschrieben werden (Vorfall
-  2026-09-26: 38.969 Dateien). Ein `stat`-Vergleich auf `1000:1000` wäre damit
-  unerfüllbar, ohne die bindende Regel zu brechen. Maßgeblich ist die
-  Schreibbarkeit der laufenden UID; die Identität selbst bleibt über den
-  Identitäts-Guard und `user: "1000:82"` erzwungen. Der Fotospeicher
-  `/home/webadmin/portal/images` liegt außerhalb des `websites`-Baums und ist
-  auf `1000:1000` mit `2775` gesetzt.
+- **Ownership wird bewusst *nicht* geprüft:** Seit 2026-10-25 ist der Prozess
+  selbst der Eigentümer des Baums, ein `stat`-Vergleich wäre also erfüllbar.
+  Er bleibt draußen, weil 19-ftp 7.9 ein `chown -R` über
+  `/home/webadmin/websites` verbietet (Vorfall 2026-09-26: 38.969 Dateien) und
+  eine Reparatur damit nicht in Reichweite des Containers liegt; maßgeblich ist
+  die Schreibbarkeit der laufenden UID. Die Identität selbst bleibt über den
+  Identitäts-Guard und `user: "1002:82"` erzwungen. Der Fotospeicher
+  `/home/webadmin/portal/images` liegt außerhalb des `websites`-Baums und wird
+  einmalig auf `1002:82` mit `2775` gesetzt (deployment/README.md).
 - **Keine Shell-Expansion im Compose-`command:`:** Docker Compose v5.0.2 gibt
   jede Command-Substitution als `$$(...)` aus und reduziert `$$` in keiner
   YAML-Form auf `$`. Die Shell im Container expandiert `$$` zur PID, womit
