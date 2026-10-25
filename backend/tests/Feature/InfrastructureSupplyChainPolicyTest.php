@@ -535,19 +535,28 @@ PHP;
         $dockerfile = $this->read('deployment/Dockerfile');
         $e2eDockerfile = $this->read('deployment/Dockerfile.e2e');
 
-        // composer_init is the last service left on 1000:1000. Both
-        // long-running services carry the website tree's group webgroup (82)
-        // instead, because that is what lets them write inside 2775+setgid
-        // directories:
+        // No service runs on the old 1000:1000 identity any more; every one of
+        // them carries the website tree's identity, because that is what lets it
+        // write inside the 2775+setgid directories:
         //   - sftpgo as 1002:82 — an upload must inherit group webgroup via
         //     setgid instead of landing in the uploader's own group;
         //   - backend as 1000:82 — `FtpController::process()` creates the
         //     inbox directory and then `unlink`s the uploaded file again,
-        //     which UID 1000 in group 1000 cannot do in such a directory.
-        // The count is a regression guard: a further occurrence means a new
-        // service was added without deciding its runtime user, and losing the
-        // two asserted below means one was silently changed.
-        $this->assertSame(1, substr_count($compose, 'user: "1000:1000"'));
+        //     which UID 1000 in group 1000 cannot do in such a directory;
+        //   - composer_init as 1002:82, the tree owner — a `composer install`
+        //     that has to replace a package deletes inside 1002-owned
+        //     directories, and as 1000:1000 it failed with "Could not delete
+        //     .../LICENSE", exit 1, after which `depends_on:
+        //     service_completed_successfully` kept the backend in `Created`.
+        // The count is the regression guard: a new service that brings 1000:1000
+        // back means its runtime user was copied rather than derived from the
+        // write rules above.
+        $this->assertSame(0, substr_count($compose, 'user: "1000:1000"'));
+        $this->assertMatchesRegularExpression(
+            '/^\s*user:\s*"1002:82"$/m',
+            $this->composeService('composer_init'),
+            'composer_init must run as the website-tree owner 1002:82, or a package replacement exits 1 and blocks the backend start'
+        );
         // The sftpgo user is asserted inside its own stanza, not file-wide: a
         // global `user: "1002:82"` elsewhere would satisfy a plain
         // assertStringContainsString while the service itself stayed on 1000.
