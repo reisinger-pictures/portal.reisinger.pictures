@@ -151,7 +151,9 @@ internen Listener umgestellt und ein echter Upload bestätigt ist, wird die
 1. Den Stack vollständig recreaten/aktualisieren, damit der Dienst `ftp-events`
    und der neue interne Default gestartet werden.
 2. Einen echten Upload ausführen und nachweisen, dass das Event den Import
-   auslöst.
+   auslöst. Voraussetzung ist eine **Zielgalerie** am Konto
+   (`current_ftp_gallery_id`); ohne sie antwortet der Endpunkt bewusst mit `200
+   no_target_gallery`, und es wird nichts importiert (D-36-Grenze).
 3. Der öffentliche Pfad `/api/internal/*` ist seit 2026-10-25 im Host-Caddy auf
    **404** gesetzt (Konfiguration außerhalb dieses Repositories, `~/dev/caddyfile`);
    der interne Listener ist damit der einzige Weg. Der Nachweis aus Schritt 2
