@@ -366,6 +366,22 @@ find "$API/storage" "$API/bootstrap/cache" -type f -perm -0002 -exec chmod o-w {
 #    deshalb braucht ein Rollback kein zweites chown.
 chown -R 1002:82 /home/webadmin/portal/images
 find /home/webadmin/portal/images -type d -exec chmod 2775 {} +
+#    Zwei Pfade erreicht weder der Sync noch der Laufzeit-Schritt und sie
+#    tragen trotzdem ausführbaren bzw. geladenen Code: `vendor/` wird
+#    serverseitig von composer_init erzeugt (rsync schließt es aus), und die
+#    `.env*`-Dateien sind aus demselben Grund ausgeschlossen. Beide standen
+#    aus früheren Läufen auf 2777/0666. `go-w` statt eines Modus: die
+#    Gruppe 82 bleibt schreibfähig, nur `other` verliert es.
+chmod -R go-w "$API/vendor"
+find "$API" -maxdepth 1 -name '.env.*' -perm -0002 -exec chmod o-w {} +
+#    UND: die Default-ACL der Laufzeit-Bäume. Sie lautet `default:other::rwx`
+#    und überschreibt `umask 0022` — jede danach geschriebene Datei ist wieder
+#    0666, ohne dass ein Modus das verhindern könnte (gemessen 2026-10-25:
+#    `bootstrap/cache/config.php` war nach dem Recreate erneut welt-schreibbar).
+#    `chmod` allein hält also nicht; die ACL muss mit. Verzeichnisse behalten
+#    `o::r-x` (Durchqueren für die Auslieferung), Dateien bekommen `o::r--`.
+find "$API/storage" "$API/bootstrap/cache" -type d -exec setfacl -m o::r-x,d:o::r-x {} +
+find "$API/storage" "$API/bootstrap/cache" -type f -exec setfacl -m o::r-- {} +
 ```
 
 1. `./sync.sh` — setzt Eigentum und Modi aller übertragenen Dateien, dazu
@@ -377,16 +393,31 @@ find /home/webadmin/portal/images -type d -exec chmod 2775 {} +
 3. `backend` **recreaten**, nicht restarten:
 
    ```bash
-   cd /data/compose/15/       # Portainer-Stack-Verzeichnis
-   docker compose up -d --force-recreate backend
+   # Host-Pfad des Stack-Verzeichnisses. `/data/compose/23` ist der Pfad
+   # INNERHALB des Portainer-Containers und auf dem Host nicht vorhanden; die
+   # Nummer ist die Stack-ID und kann sich aendern, deshalb vorher pruefen:
+   #   docker inspect portal_backend \
+   #     --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}'
+   cd /var/lib/docker/volumes/portainer_data/_data/compose/23/
+   docker compose -p portal-reisinger-pictures --env-file stack.env \
+     up -d --force-recreate backend
    ```
+
+   `--env-file stack.env` ist **Pflicht**: die `${…}`-Platzhalter der Datei
+   werden von Portainer aus `stack.env` gefuellt, und `docker compose` liest
+   diese Datei nicht von selbst. Ohne sie wird die Umgebung leer — der
+   Start-Guard verweigert dann den Start (`FATAL: FTP_EVENT_SECRET ist nicht
+   gesetzt`), die Seite ist weg. Probe vor dem Recreate:
+   `docker compose -p portal-reisinger-pictures --env-file stack.env config`
+   muss denselben `environment:`-Block zeigen wie
+   `docker inspect portal_backend`.
 
    `user:` ist Laufzeitkonfiguration des Containers. `docker restart` behält
    die alte Konfiguration und damit uid 1000 — der Container liefe dann genau
    in den Zustand, den dieser Deploy beseitigt. `AGENTS.md` §13: recreate statt
    restart bei Änderungen an `command`, `entrypoint`, `environment`, `volumes`
    oder `user`.
-4. Health: `curl -sS -o /dev/null -w '%{http_code}\n' https://api-portal.reisinger.pictures/up`
+4. Health: `curl -sS -o /dev/null -w '%{http_code}\n' https://portal.reisinger.pictures/up`
 5. Schreibnachweis — Identität, beide beschreibbaren Bäume und ein echter
    Request:
 
@@ -395,7 +426,7 @@ find /home/webadmin/portal/images -type d -exec chmod 2775 {} +
    docker exec portal_backend sh -c '
      f=storage/framework/views/.ops3-probe; c=bootstrap/cache/.ops3-probe
      printf ok > "$f" && printf ok > "$c" && rm -f "$f" "$c" && echo "write ok"'
-   curl -sS -o /dev/null -w '%{http_code}\n' https://api-portal.reisinger.pictures/up
+   curl -sS -o /dev/null -w '%{http_code}\n' https://portal.reisinger.pictures/up
    ```
 
    Ein Log-Schreibrecht beweist hier nichts: `LOG_CHANNEL=stderr` schreibt nach
@@ -409,7 +440,9 @@ find /home/webadmin/portal/images -type d -exec chmod 2775 {} +
 git revert <commit-dieses-changes>   # stellt user: "1000:82" UND F666/D2777 wieder her
 ./sync.sh                            # mit dem alten Skript: alte Modi, alte Ownership
 # Stack in Portainer aktualisieren, dann:
-cd /data/compose/15/ && docker compose up -d --force-recreate backend
+cd /var/lib/docker/volumes/portainer_data/_data/compose/23/ && \
+  docker compose -p portal-reisinger-pictures --env-file stack.env \
+  up -d --force-recreate backend
 ```
 
 Beide Hälften des Befunds liegen in diesem einen Commit (Identität in der
@@ -446,8 +479,8 @@ echter Lauf erzeugt) und
 Baumeigentümer aus `sync.sh`).
 
 ```bash
-cd /data/compose/15/       # Portainer-Stack-Verzeichnis
-docker compose up -d
+cd /var/lib/docker/volumes/portainer_data/_data/compose/23/
+docker compose -p portal-reisinger-pictures --env-file stack.env up -d
 ```
 
 Der `backend`-Entrypoint erledigt beim Start **automatisch**, ohne Zutun.
@@ -539,7 +572,7 @@ docker compose exec backend sh -c 'id'            # muss uid=1002, gid=82 sein
 ### Health
 
 ```bash
-curl -sS -o /dev/null -w '%{http_code}\n' https://api-portal.reisinger.pictures/up
+curl -sS -o /dev/null -w '%{http_code}\n' https://portal.reisinger.pictures/up
 ```
 
 ---

@@ -102,6 +102,15 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
   Identitäts-Guard und `user: "1002:82"` erzwungen. Der Fotospeicher
   `/home/webadmin/portal/images` liegt außerhalb des `websites`-Baums und wird
   einmalig auf `1002:82` mit `2775` gesetzt (deployment/README.md).
+- **Modi allein genügen auf diesem Host nicht:** `storage/` und
+  `bootstrap/cache/` tragen eine Default-ACL mit `default:other::rwx`. Sie
+  überschreibt `umask 0022`, jede neu geschriebene Datei ist danach wieder
+  `0666` — gemessen 2026-10-25: `bootstrap/cache/config.php` war nach dem
+  Recreate erneut welt-schreibbar, obwohl alle Dateien vorher per `chmod`
+  geschlossen worden waren. Der Rollout setzt deshalb zusätzlich
+  `o::r-x`/`d:o::r-x` (Verzeichnisse, durchquerbar für die Auslieferung) und
+  `o::r--` (Dateien); das ist Teil von Schritt 0 in `deployment/README.md`, und
+  eine Schreibprobe nach dem Recreate muss sie bestätigen.
 - **Keine Shell-Expansion im Compose-`command:`:** Docker Compose v5.0.2 gibt
   jede Command-Substitution als `$$(...)` aus und reduziert `$$` in keiner
   YAML-Form auf `$`. Die Shell im Container expandiert `$$` zur PID, womit
