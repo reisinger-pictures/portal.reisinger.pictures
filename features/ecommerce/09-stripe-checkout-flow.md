@@ -19,7 +19,7 @@ Orders track the following states, enforced by `Order::booted()`:
 | `paid` | Stripe payment confirmed or non-Stripe order settled | Strict Stripe reconciliation, manual settlement, or settled-free checkout |
 | `overdue` | Invoice payment overdue | Manual admin action |
 | `cancelled` | Order cancelled by admin (also set when a quote is superseded) | Admin `updateStatus` or `sendQuote` |
-| `disputed` | Chargeback initiated | Webhook `charge.dispute.created` |
+| `disputed` | Chargeback initiated; downloads blocked until the dispute is decided | Webhook `charge.dispute.created` |
 | `refunded` | Full refund processed | Webhook `charge.refunded` |
 | `archived_in_collective` | Consolidated into a collective invoice | Org collective invoice generation |
 
@@ -34,9 +34,14 @@ cart → [payment_method=stripe]  → pending_payment → paid
 
 paid → disputed → refunded
 paid → refunded (direct)
+disputed → paid (won `charge.dispute.closed` webhook only)
 pending_payment → disputed (verified matching dispute webhook)
 pending_payment → refunded (verified matching full-refund webhook)
 ```
+
+`disputed → paid` is the only restoration edge: it is allowed from `disputed`
+alone, so a won dispute can never reopen an order that reached `refunded`,
+`cancelled`, or any unsettled state.
 
 When an admin cancels an order with a stored PaymentIntent, the intent is canceled at Stripe before the order status is written. If Stripe cannot cancel it because it is already paid, processing, or an API error occurs, the endpoint returns 502 and the order keeps its current status; a cancellation is never a silent local-only write, and it is not a refund path. The management UI surfaces the returned `error` message instead of a generic failure, so the admin sees why the cancellation was refused.
 
@@ -45,7 +50,22 @@ event. A verified dispute or full refund bound to the order's stored PaymentInte
 may move `pending_payment` to `disputed` or `refunded`; strict success
 reconciliation only accepts `pending_payment`, so a later
 `payment_intent.succeeded` cannot restore download access. Partial refunds do not
-change the order status or access.
+change the order status or access. Both refund shapes are persisted: the webhook
+stores Stripe's cumulative `charge.amount_refunded` in
+`orders.refunded_amount_cents` (clamped to `0 … orders.total_amount`,
+monotonically increasing across replayed events), and a non-zero refunded amount
+reduces the photographer payout proportionally — the refund is allocated across
+the invoice snapshot's photo lines by their revenue and subtracted before the fee
+and photographer-share computation, so the photographer bears it in the same
+ratio as the normal split (`PayoutCalculationService::calculatePowerUserDelta()`).
+See §3.2.
+
+A dispute is decided by `charge.dispute.closed`: `won` restores `disputed → paid`
+and clears the purchase cache so the download gate opens again, while `lost` and
+Stripe's `warning_closed` keep the order `disputed` and access blocked. The
+restoration edge is guarded by the same locked, conditional update as the
+negative transitions and accepts `disputed` only — a full refund that landed
+while the dispute was open stays terminal.
 
 ## 2. Complete Checkout Lifecycle
 
@@ -124,7 +144,8 @@ The endpoint `POST /api/webhooks/stripe` accepts raw JSON payloads. Signature ve
 | `payment_intent.succeeded` | Use `metadata.order_id` only to locate a candidate. For V036 orders, require the event PI ID, complete server-owned metadata (checkout key, fingerprint, generation, user/account evidence, amount/currency), received amount, and mapped Customer to match, then conditionally transition `pending_payment → paid`, enrich `stripe_fee_cents` when available, and durably enqueue `InvoiceMail` at most once. A signed event may bind a still-null local PI ID only in the same validated transition. Clearly pre-V036 orders retain only the explicit legacy compatibility defined by the security feature. |
 | `payment_intent.payment_failed` | Require the stored PI ID and current generation plus the applicable V036 identity to match; deduplicate by event ID and record only bounded failure telemetry. The order remains recoverable and no fulfillment is granted. |
 | `charge.dispute.created` | After signature verification, find the order by the event's `payment_intent` and require it to equal the order's stored `stripe_payment_intent_id`; under a row lock, transition `paid`, invoice-settled states, or `pending_payment` to `disputed`. Email `ACCOUNTING_EMAIL` with dispute notification. |
-| `charge.refunded` | After signature verification, find the order by the event's `payment_intent` and require it to equal the order's stored `stripe_payment_intent_id`; transition `paid`, invoice-settled states, `disputed`, or `pending_payment` to `refunded` only for a full refund. Partial refunds preserve status and access. |
+| `charge.dispute.closed` | After signature verification, find the order by the event's `payment_intent` and require it to equal the order's stored `stripe_payment_intent_id`. A dispute status of `won` performs the locked, conditional `disputed → paid` transition and clears the purchase cache; the source allow-list is exactly `disputed`, so a refunded order is never reopened. `lost` and `warning_closed` leave the order `disputed` and access blocked (logged at info level). Any other status logs a warning and changes nothing. Every outcome answers 200. |
+| `charge.refunded` | After signature verification, find the order by the event's `payment_intent` and require it to equal the order's stored `stripe_payment_intent_id`. Persist the charge's cumulative `amount_refunded` in `orders.refunded_amount_cents` for full and partial refunds alike (clamped to `0 … orders.total_amount`, never decreased by a replayed older event). Transition `paid`, invoice-settled states, `disputed`, or `pending_payment` to `refunded` only for a full refund; partial refunds preserve status and access but reduce the photographer payout proportionally (§1.1). |
 
 ### 3.3 PaymentIntent → Order Linking
 
@@ -194,8 +215,8 @@ that key-loss case.
 | Webhook delivery delayed | A checkout replay that sees a remotely succeeded PI returns `payment_pending` with a poll URL and no client secret. It cannot grant paid access; the signed webhook normally performs the strict paid transition. |
 | Webhook not delivered | The signed webhook remains the normal authority. Scheduled stale-PI cleanup may reconcile a remotely succeeded PI only by its stored ID and only after the same strict identity, amount, received-amount, Customer, and generation checks. |
 | Duplicate webhook delivery | Stripe event deduplication, the conditional paid transition, and the durable mail-enqueue claim prevent repeated state changes or a second enqueue. SMTP delivery retries remain queue-worker behavior. |
-| Dispute/chargeback before or after success | A verified dispute bound to the stored PaymentIntent sets the order to `disputed`, including from `pending_payment`. Downloads are blocked (access gates check order status); admin is notified. Any later success webhook is ignored by strict reconciliation because the order is no longer `pending_payment`. |
-| Full refund before or after success | A verified full refund bound to the stored PaymentIntent sets the order to `refunded`, including from `pending_payment`. A later success webhook cannot restore access. Partial refunds preserve status and access. |
+| Dispute/chargeback before or after success | A verified dispute bound to the stored PaymentIntent sets the order to `disputed`, including from `pending_payment`. Downloads are blocked (access gates check order status); admin is notified. Any later success webhook is ignored by strict reconciliation because the order is no longer `pending_payment`. A later `charge.dispute.closed` with status `won` restores `paid` and download access; `lost`/`warning_closed` keep the block; a refund that landed in the meantime is never undone. |
+| Full refund before or after success | A verified full refund bound to the stored PaymentIntent sets the order to `refunded`, including from `pending_payment`, and stores the refunded amount in `orders.refunded_amount_cents`. A later success webhook cannot restore access. Partial refunds preserve status and access but are persisted and reduce the photographer payout proportionally. |
 | Signature verification failure | 400 returned. Stripe retries with exponential backoff. All configured secrets are tried; if none match, logs error with secret count. |
 
 ## 6. Non-Stripe Payment Paths

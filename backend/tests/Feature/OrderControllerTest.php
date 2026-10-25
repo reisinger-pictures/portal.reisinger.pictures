@@ -152,7 +152,7 @@ class OrderControllerTest extends TestCase
 
         $order = Order::factory()->create([
             'brand' => Brand::B2B,
-            'status' => 'pending',
+            'status' => 'invoice_created',
         ]);
 
         $response = $this->withHeaders(['Authorization' => "Bearer {$token}"])

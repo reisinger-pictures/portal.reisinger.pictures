@@ -201,6 +201,30 @@ the photographer share. This makes photographer attribution follow actual coupon
 coverage: a coupon for one photo does not reduce every photographer's revenue,
 and shares and revenue cannot exceed the collectible amount.
 
+### Refunds in the payout
+
+A partial refund changes nothing for the customer — the order keeps its status
+and the download access — but it reduces what the photographer is paid. That is
+an owner decision (2026-10-25), not an inference from the revenue split.
+
+`charge.refunded` stores the charge's cumulative `amount_refunded` in
+`orders.refunded_amount_cents` (clamped to `0 … total_amount`, and monotonic
+under a replayed older event). `calculatePowerUserDelta()` then allocates that
+amount proportionally across the order's photo revenues — the same
+`allocateCentsProportionally()` the discount fallback uses — and subtracts it
+**before** the fee proration and the share split. The refund is therefore borne
+in the same ratio as the normal split, and an order whose refund consumes all
+photo revenue is skipped rather than contributing a negative amount. The
+customer-facing invoice is untouched by this: `refunded_amount_cents` is not
+part of the snapshot, and `InvoiceSnapshot::customerDetailsForPresentation()`
+sees no new key.
+
+One limit is deliberate and tracked separately ([#37](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/37)):
+a refund that arrives after its month's statement is `approved` or `paid` is not
+clawed back, because `addStatementDelta()` returns for those statuses. The rule
+"a closed month stays closed" currently holds for the power-user delta; whether
+it should is the open decision there.
+
 Snapshots **without** the map cannot reveal which photos a targeted coupon
 covered. "Without" is not a historical-only category: a collective invoice
 snapshot is still created today with only `items` in its `customer_details`

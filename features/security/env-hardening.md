@@ -152,10 +152,19 @@ nicht blockierend, `fail` = kaputt/inkonsistent.
 | 2 | `frontend_bundle_mode` | `bundle_mode` gleich dem Modus des Server-`STRIPE_KEY`; `null` heißt „Schlüssel fehlt im Bundle". Es wird nur der Modus verglichen, nie ein Key-Wert. | — |
 | 3 | `stripe_balance` | `$stripe->balance->retrieve()`, gültig und `livemode` gleich Soll-Modus. Ein Stripe-Code (z. B. `api_key_expired`, `more_permissions_required`) wird wörtlich durchgereicht, nicht verflacht. | — |
 | 4 | `stripe_account` | `$stripe->accounts->retrieve()`; sobald das Konto abrufbar ist, steht die `id` (`acct_…`) in der Meldung. | Nicht gesetzte `charges_enabled`/`payouts_enabled`/`details_submitted` sind `warn`, weil Zahlungen trotzdem gehen können. |
-| 5 | `stripe_webhook_endpoint` | `$stripe->webhookEndpoints->all(['limit' => 100])`; gesuchte URL wird **so** gebaut, wie die App sie sonst baut (`rtrim(BrandRegistry::frontendUrl(), '/').'/api/webhooks/stripe'`). Kein Endpunkt / nicht `enabled` → `fail`; `enabled`, aber die vier Events fehlen → `warn` (fehlende benannt). | Fehlende Events bremsen die Verarbeitung, blockieren aber keine Zahlung. |
+| 5 | `stripe_webhook_endpoint` | `$stripe->webhookEndpoints->all(['limit' => 100])`; gesuchte URL wird **so** gebaut, wie die App sie sonst baut (`rtrim(BrandRegistry::frontendUrl(), '/').'/api/webhooks/stripe'`). Kein Endpunkt / nicht `enabled` → `fail`; `enabled`, aber Events aus `StripeKeyCheckService::REQUIRED_WEBHOOK_EVENTS` fehlen → `warn` (fehlende benannt). | Fehlende Events bremsen die Verarbeitung, blockieren aber keine Zahlung. |
 
-Die vier erforderlichen Webhook-Ereignisse: `payment_intent.succeeded`,
-`payment_intent.payment_failed`, `charge.dispute.created`, `charge.refunded`.
+Die fünf Ereignisse, auf die der Checkout-/Dispute-Flow angewiesen ist:
+`payment_intent.succeeded`, `payment_intent.payment_failed`,
+`charge.dispute.created`, `charge.dispute.closed`, `charge.refunded`.
+
+Die Event-Auswahl wird im Stripe-Dashboard gepflegt, nicht in diesem Repository:
+kein Code, keine Migration und kein Deploy legt sie an oder ändert sie. Prüfung 5
+meldet eine fehlende Auswahl deshalb nur als `warn`; die Korrektur ist eine
+Dashboard-Aktion am Endpunkt `…/api/webhooks/stripe`. Die Code-Seite der Prüfung
+ist die Konstante `StripeKeyCheckService::REQUIRED_WEBHOOK_EVENTS`; sie muss
+dieselbe Ereignismenge abdecken wie der Flow, sonst meldet die Prüfung eine
+fehlende Dashboard-Auswahl nicht.
 
 **Soll-Modus aus APP_ENV.** `StripeKeyMode::fromEnvironment()` bildet
 `config('app.env')` ab: `production` → `live`, alles andere (`local`, `testing`, …)
