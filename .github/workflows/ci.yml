@@ -13,8 +13,11 @@ name: CI
 # Push-Lauf auf demselben Head-SHA — `automerge.yml` wartet exakt auf
 # `CI gate (push)`. `pull_request` deckt normale Same-Repo-PRs weiterhin
 # fail-closed ab.
-# Docs-only commits ran all 12 jobs (incl. 6 Playwright shards) on 3352977
-# (AGENTS.md + AGENTS.todo.md). `'**'` is the only positive pattern, so no code
+# Docs-only commits have run all 12 jobs (incl. 6 Playwright shards) — 3352977
+# is one example. The trigger block below re-includes `features/infrastructure/**`,
+# `features/ai/**`, `features/security/**` and `features/e2e-test-strategy.md`, so
+# a doc-only commit inside those trees still runs everything.
+# `'**'` is the only positive pattern, so no code
 # change can ever be filtered out; the negations drop documentation only. The
 # trailing patterns re-include the documentation trees deliberately
 # conservative: they cost redundant runs, and a redundant run is loud and
@@ -84,9 +87,9 @@ jobs:
 
   ratchet:
     # The gates of this repository: the security findings of the 2026-10-18
-    # review are counted against a baseline that may only fall. The count is 0
-    # today (all 14 findings are closed) — the gate says so, and a new open
-    # finding turns it red.
+    # review are counted against a baseline that may only fall. The count is 2
+    # today (the 14 review findings are closed; AUTH-2 and PAY-3 are open) —
+    # the gate says so, and it may only go down from here.
     name: Ratchet gates
     runs-on: ubuntu-latest
     permissions:

@@ -114,7 +114,7 @@ When `type = 'percentage'`, an optional `max_items` (unsigned integer) limits th
 **Herkunft:** User-Request (2026-08-19): „Gutscheine für Volume Licensing à 10 Fotos für 40 €".
 Bestehende Typen decken das nicht ab — `fixed`/`percentage` sind reine Rabatt-Codes, die automatische
 Volume-Staffel kennt keinen einlösbaren Paket-Preis. `photo_package` ist ein dritter Coupon-Typ, der
-**N Fotos zum Festpreis Y €** gewährt. Tracking: `AGENTS.todo.md` → Plan **P1**.
+**N Fotos zum Festpreis Y €** gewährt.
 
 **Semantik (Einlöse-Regeln):**
 

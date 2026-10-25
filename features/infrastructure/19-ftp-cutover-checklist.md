@@ -4,7 +4,7 @@
 > dann mit echten Kameras testen und korrigieren.
 >
 > **Quellen:** Harness-Befund (`tests/scripts/ftp-transport-test/`),
-> `19-ftp-upload-pipeline.md` §7, Board P1-M24/M32/M36.
+> `19-ftp-upload-pipeline.md` §7.
 
 ---
 

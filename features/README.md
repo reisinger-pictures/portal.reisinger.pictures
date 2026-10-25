@@ -12,7 +12,7 @@ This directory serves as the single source of truth for all technical concepts, 
 
 ### 🤖 AI / Metadata Generation
 * [01-ai-service-architecture.md](ai/01-ai-service-architecture.md) - 3-state machine, vision/text flows, provider strategy pattern.
-* [02-testing-strategy.md](ai/02-testing-strategy.md) - Verification criteria (detailed test cases in AGENTS.todo.md).
+* [02-testing-strategy.md](ai/02-testing-strategy.md) - Verification criteria for the AI service (backend, frontend, E2E).
 
 ### 🔐 Auth & Roles
 * [01-roles-and-access.md](auth/01-roles-and-access.md) - Core RBAC, JWT, and Domain Mapping.

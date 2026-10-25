@@ -6,8 +6,8 @@ reviewed 2026-09-24). Baut auf
 der aktuelle Ziel- und Ist-Vertrag; §6 enthält den Decision-Log und §8 den
 inzwischen implementierten Contract-Nachtrag.
 
-**Grundlage:** `AGENTS.todo.md` → Block „Model-Profile Iteration (User-Feedback
-2026-09-19, erfasst — einzuplanen)". Die Nummerierung dieses Dokuments folgt der
+**Grundlage:** Das User-Feedback vom 2026-09-19 und der Single-Katalog-v1-Vertrag
+aus `05-model-registration.md`. Die Nummerierung dieses Dokuments folgt der
 Anforderungsliste, nicht einer Umsetzungsreihenfolge.
 
 ## 0. Zweck & Abgrenzung
@@ -18,10 +18,11 @@ entschlackt und um „Bereitschaft" erweitert, Profile bekommen einen Lebenszykl
 mit Reaktivierungs-Mails, die Admin-Ansichten werden auf Karten + Hauptbild +
 kompakte Details umgestellt, und die Sicherheit der Bildspeicherung wird belegt.
 
-**Nicht Teil dieses Dokuments** (separate Blöcke in `AGENTS.todo.md`):
+**Nicht Teil dieses Dokuments:**
 
-- Screenshot-/Vision-Findings F1–F4, E2E-SQLite-Flakiness, Personenzahl-Sanity-Limit
-  (in `05-model-registration.md` bzw. `AGENTS.todo.md` geführt).
+- Screenshot-/Vision-Findings F1–F4 und E2E-SQLite-Flakiness bleiben außerhalb
+  dieses Vertrags; das Personenzahl-Sanity-Limit ist in
+  [`05-model-registration.md`](05-model-registration.md) dokumentiert.
 - **Model-Zugang / Profil-Magic-Link / „Meine Profile"** war ursprünglich ein
   separater Anforderungsblock; der Zugangs- und Owner-Update-Vertrag ist inzwischen
   in §8.2 dieses Dokuments als aktueller SOLL festgehalten.
@@ -508,7 +509,7 @@ darstellen.
   Altersberechnung für §2.2.
 - [`07-model-contact-sheet-export.md`](07-model-contact-sheet-export.md) —
   aktueller PDF-Export für interne/externe Varianten.
-- `AGENTS.todo.md` — Ausgangs-Anforderungsblock und Verifikations-TODOs.
+- `AGENTS.md` — Verifikationsregeln und Quality Gates, die für diesen Vertrag gelten.
 - Profile-Magic-Link, „Meine Profile" und Owner-Updates sind in §8.2 als
   aktueller Contract dokumentiert.
 

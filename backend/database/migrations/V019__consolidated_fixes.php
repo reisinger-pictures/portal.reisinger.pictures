@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Consolidated fixes + coupon SRP-01 Phase A extensions.
  *
- * V018 left several structural issues (documented in AGENTS.todo.md §5):
+ * V018 left several structural issues:
  *  1. settings has unique(key,brand) but no explicit PK
  *  2. Organisation/Tenant model missing columns for core feature
  *  3. Rename customer_manager → org_admin role

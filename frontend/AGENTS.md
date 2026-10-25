@@ -56,12 +56,12 @@ E2E workflow:
 1. After every code change: `pnpm test:e2e:smoke`
 2. Feature-specific: `npx playwright test --grep @feature:<name>`
 3. Only before deployment: `npx playwright test` (full suite)
-4. Document flaky tests in `AGENTS.todo.md` with file + test name, cause (if known), and a `flaky` tag in the commit/PR.
+4. Document flaky tests in the header comment of the spec file itself (`frontend/tests/e2e/…/…spec.ts`) with file + test name and the cause (if known), and tag the commit/PR `flaky`.
 5. Reproduce a focused failure with `npx playwright test --last-failed`; at most three fix attempts per failing test, then return the root-cause analysis instead of continuing a retry loop.
 
 E2E Timeout Policy (STRICT):
 
-- Before each session measure the current minimum runtime (`npx playwright test`) and set the timeout to twice the measured value; document the rule and the runtime in `AGENTS.todo.md`. Re-measure after E2E changes.
+- Before each session measure the current minimum runtime (`npx playwright test`) and set the timeout to twice the measured value; record the measurement in the timeout comment of `frontend/playwright.config.ts` (immediately above `timeout`). Re-measure after E2E changes.
 - The approved exception stands: `globalTimeout` is **25 minutes (`1500000` ms)** and the per-test timeout is **120 s (`120000` ms)**. Do not change it silently; any change needs a new measurement and explicit owner approval. Contract and derivation: [`features/e2e-test-strategy.md`](../features/e2e-test-strategy.md).
 
 ## STRICT Frontend Rules

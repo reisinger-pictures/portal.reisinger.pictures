@@ -6,8 +6,7 @@
 > die neue Staff-Brand-Bound-Regelung ersetzt. Siehe Decision Log (§7) und `15-strict-user-brand-isolation.md`.
 >
 > Ursprünglich: `active` — beschreibt den verbindlichen, entschiedenen Endzustand.
-> Verknüpft: `AGENTS.todo.md` A-01 (aufgelöst), T-03 (ehem. R-15b), T-09,
-> `features/infrastructure/08-org-brand-concept.md`,
+> Verknüpft: `features/infrastructure/08-org-brand-concept.md`,
 > `features/auth/01-roles-and-access.md`.
 > Erstellt 2026-06-29; Policy-Entscheidung (A-01) 2026-06-29.
 

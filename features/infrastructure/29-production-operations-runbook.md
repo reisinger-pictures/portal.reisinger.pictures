@@ -342,8 +342,9 @@ this is the runbook for it.
 5. **Revoke the old value at its source** — the provider's API-key console for
    `AI_API_KEY`. Revoking after the new value is proven live keeps the service
    up during the switch.
-6. **Record the evidence** in `AGENTS.todo.md`: date, which values were rotated,
-   and the measured checks — **without the values**.
+6. **Record the evidence** in this runbook, as a dated *Measured evidence* block
+   in §7 (the form §5 already uses): date, which values were rotated, and the
+   measured checks — **without the values**.
 
 ### 7.2 What must not happen
 

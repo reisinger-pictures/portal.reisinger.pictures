@@ -7,9 +7,7 @@
 
 ## 2. Documentation boundary (STRICT)
 
-> **`AGENTS.md` files contain only durable, actionable rules and instructions.** Do not put status reports, owner decisions or their rationales, audit evidence or history, completed work, TODOs, or implementation narratives in them. Put durable product and system contracts in `features/`, owner decisions in [`features/owner-decisions.md`](features/owner-decisions.md), and current work/status in `AGENTS.todo.md`.
-
-**Rules only, no decisions:** This file contains rules only — instructions that apply to any work in this repo. Durable decisions, rationale, measurements and history do not belong here but in `features/` (or the project docs); open work goes to `AGENTS.todo.md`, settled matters to git history.
+> **`AGENTS.md` files contain only durable, actionable rules and instructions.** No status reports, owner decisions or their rationales, audit evidence, history, completed work, TODOs, or implementation narratives. Durable product and system contracts go to `features/`, owner decisions to [`features/owner-decisions.md`](features/owner-decisions.md), open work to GitHub issues, and settled matters stay in git history. This file therefore contains rules only — they apply to any work in this repository.
 
 ## 3. Definition of Done and quality gates
 
@@ -20,19 +18,20 @@
 - Bug fixes require a regression test reproducing the bug. Refactoring/dead-code removal may omit tests when justified in the change record.
 - Frontend quality gate: `pnpm lint:fix && pnpm build`. The build includes TypeScript and i18n checks; `tsc -b` is optional diagnosis, not a replacement.
 - Backend quality gate: `php artisan test` with the existing suite green.
-- Inner loop for the backend: from `backend/`, `composer test:smoke` (the tagged subset — 18 existing tests, a few seconds, needs neither Meilisearch nor Mailpit) and `composer test:feature` (the `tests/Feature` suite in parallel; it does not include `tests/Unit`) shorten the local loop. They do **not** replace the backend gate — details and the rules in [`backend/AGENTS.md`](backend/AGENTS.md).
+- Inner loop for the backend: from `backend/`, `composer test:smoke` (the tagged subset; a few seconds, needs neither Meilisearch nor Mailpit) and `composer test:feature` (the `tests/Feature` suite in parallel; it does not include `tests/Unit`) shorten the local loop. They do **not** replace the backend gate — details and the rules in [`backend/AGENTS.md`](backend/AGENTS.md).
 - Do not add `eslint-disable`, `@ts-ignore`, or `any`.
 
 ## 4. Documentation and task management
 
 - `features/` is the durable desired state: architecture, data models, API contracts, feature specifications, and owner decisions. Keep it current with system changes.
-- `AGENTS.todo.md` is the temporary work list and session/review record. Every feature needs actionable implementation and test TODOs there. Do not use it as a permanent archive.
-- Remove completed TODOs rather than checking them off. Keep only open work, explicit owner decisions still needed, conditions being awaited, or manual post-deploy checks.
+- **Open work lives in GitHub issues, not in a file.** One issue per actionable item; the title carries the finding ID when there is one (`[PAY-3] …`), the body carries the evidence and — for a decision-bound item — the exact decision needed. An issue is closed by the commit that fixes it or by the measured proof, and its closing comment names that proof. Do not reintroduce a work-list file (`AGENTS.todo.md` was removed on 2026-10-25); a second tracker drifts against the first.
+- **Security findings have a machine-readable registry:** [`ratchet.findings.json`](ratchet.findings.json), guarded by a monotonic ceiling in [`ratchet.config.jsonc`](ratchet.config.jsonc). An entry that is not `fixed` must carry `owner` and `ticket` — Ratchet rejects the registry otherwise — and the ceiling may only fall. A finding is never deleted to make a count move: `accepted` and `wontfix` stay visible. The human record stays in `features/security/`. When a fix lands, set `status: fixed` with `status_since` and the `regression_test`, then lower the ceiling with `ratchet baseline update`; raising it requires `ratchet baseline raise --reason`. Run `ratchet check` before pushing — CI runs the same gate.
+- **Issue hygiene:** labels are `finding`, `severity:high`/`severity:medium`, `decision-needed`, `manual-check`. A `decision-needed` issue names the options and the consequence of each; a `manual-check` issue names the exact command or screen and is closed only with the measured result quoted. When the commit is the proof, close it from the commit (`Closes #N`). Do not open an issue for work that lands in the same change.
 - Mark superseded contracts as superseded. Mark fixed findings as fixed rather than leaving their old failure claim in the present tense.
 - Evidence in durable docs must be verifiable: quote the referenced source when giving a line anchor, or cite a symbol; give a reproducible command for any reported number.
 - A statement about how the code looks belongs to a **commit**, not to a working tree: read it with `git show <sha>:<path>` (or `git show HEAD:<path>`) and name the commit. Several agents work on the same tree; a statement anchored only in the working tree describes a state that no commit has and that the next change can invalidate.
 - Do not begin new work with failing or flaky tests. Diagnose and fix existing failures, or document an explicitly accepted risk in the appropriate feature/security document.
-- Do not place implementation status or session history in `features/`; keep it in `AGENTS.todo.md` or Git.
+- Do not place implementation status or session history in `features/`; keep it in the issue tracker or Git.
 
 ## 5. Engineering rules
 
@@ -43,7 +42,7 @@
 ## 6. Agent roles and delegation
 
 - The main agent plans and reviews with full project context; an implementer receives an isolated task, relevant files, and specific instructions.
-- A `build` agent is an orchestrator, not an implementer. Except for small typo or policy edits in `AGENTS.md`/`AGENTS.todo.md`, it may work only on those files and directly referenced documentation. Delegate code, tests, templates, and component work to a `general` implementer; visual review is done by the agent itself (method and checklist: the `ui-review` skill) — every configured model is vision-capable, so there is no vision subagent in the loop; on hard visual calls re-read the image yourself instead of guessing. The project keeps its own screenshot harness under `frontend/tests/screenshots/`.
+- A `build` agent is an orchestrator, not an implementer. Except for small typo or policy edits in `AGENTS.md`, it may work only on that file and directly referenced documentation. Delegate code, tests, templates, and component work to a `general` implementer; visual review is done by the agent itself (method and checklist: the `ui-review` skill) — every configured model is vision-capable, so there is no vision subagent in the loop; on hard visual calls re-read the image yourself instead of guessing. The project keeps its own screenshot harness under `frontend/tests/screenshots/`.
 - Delegate independent work in parallel when that reduces coordination cost without coupling the tasks.
 - The shared pull/verify/commit/push process is defined by the `build-verify` skill; keep repository-specific commands and constraints here, not a duplicate workflow.
 
@@ -66,7 +65,7 @@ Follow the module-specific `AGENTS.md` in addition to these repository-wide rule
 ## 9. Security and owner decisions
 
 - Do not weaken established tenant isolation, authentication, upload validation, authenticated file delivery, server-authoritative pricing, or HTML-sanitization boundaries. Follow the applicable `features/` contract.
-- Owner decisions D-1 through D-57 are maintained in [`features/owner-decisions.md`](features/owner-decisions.md). Treat that file as the canonical current decision set; keep implementation status in `AGENTS.todo.md` and domain detail in the linked feature specifications.
+- Owner decisions D-1 through D-57 are maintained in [`features/owner-decisions.md`](features/owner-decisions.md). Treat that file as the canonical current decision set; keep implementation status in the issue tracker and domain detail in the linked feature specifications.
 - The accepted dependency risk C8 is recorded in [`features/security/accepted-risks.md`](features/security/accepted-risks.md). Do not change its accepted boundary without a reviewed decision.
 
 ## 10. IntelliJ Run Configurations (`.run`) (STRICT)

@@ -3,8 +3,8 @@
 > **Status:** `active` — verbindlicher Soll-Zustand.
 > Erstellt 2026-07-01; ersetzt Policy A (A-01) aus `10-frontend-brand-tenant-isolation.md`.
 >
-> **Verknüpfte Tasks:** U-01 (Login Brand-Mismatch Rejection), U-02 (Staff brand-bound),
-> `AGENTS.todo.md` Entscheidungen E-01, E-02, E-03 (2026-06-30, User).
+> **Verknüpft:** U-01 (Login Brand-Mismatch Rejection), U-02 (Staff brand-bound) —
+> Regel und Matrix stehen in §1–§2 dieses Dokuments.
 
 ## 1. Kontext
 
