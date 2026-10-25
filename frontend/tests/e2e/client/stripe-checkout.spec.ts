@@ -201,19 +201,38 @@ test.describe('Stripe Checkout Workflow', () => {
         }, { timeout: 60000 });
         await payButton.evaluate(el => (el as HTMLButtonElement).click());
 
-        // The disposable E2E stack does not guarantee webhook delivery. Move
-        // the real order through the management API so the browser still polls
-        // the actual backend order resource; polling/refresh itself is covered
-        // by the StripeCheckoutForm Vitest regression.
-        const paidResponse = await request.put(`/api/management/orders/${orderId}/status`, {
-            data: {status: 'paid'},
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
-            },
-        });
-        expect(paidResponse.ok(), await paidResponse.text()).toBeTruthy();
+        // The disposable E2E stack does not deliver webhooks, so the real order
+        // still has to be moved through the management API and the browser keeps
+        // polling the actual backend order resource (polling/refresh itself is
+        // covered by the StripeCheckoutForm Vitest regression).
+        //
+        // That route is not a status override any more: since the PAY-3 guard it
+        // accepts `paid` only from the invoice chain or when Stripe reports this
+        // order's PaymentIntent as `succeeded`. The payment above is real, so the
+        // guard passes as soon as Stripe has settled it — which is asynchronous
+        // even though the iframe already returned. The PUT is therefore repeated
+        // until the guard confirms the payment; its 422 means "not settled yet",
+        // not "not allowed". Nothing is asserted away: the route still verifies
+        // the payment against Stripe on every attempt. Any other rejection (e.g.
+        // the fail-closed 502 when Stripe cannot be reached) is retried too, but
+        // never accepted: the bounded window ends in a failure that carries the
+        // last status and body.
+        let lastPaidAttempt = '';
+        await expect(async () => {
+            const paidResponse = await request.put(`/api/management/orders/${orderId}/status`, {
+                data: {status: 'paid'},
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
+                },
+            });
+            lastPaidAttempt = `${paidResponse.status()} ${await paidResponse.text()}`;
+            expect(
+                paidResponse.status(),
+                `Der Bestellstatus wurde nicht auf paid gesetzt: ${lastPaidAttempt}`,
+            ).toBe(200);
+        }).toPass({timeout: 45000, intervals: [1000, 2000, 3000]});
 
         // Stripe confirmation precedes the server-authoritative paid state.
         // Wait for the authenticated status poll before checking the success toast.
