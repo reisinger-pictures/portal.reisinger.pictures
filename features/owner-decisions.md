@@ -235,6 +235,16 @@ When SFTPGo has successfully revoked a photographer account but the following lo
 
 An organization may configure its default role as `client`, `power_user`, or `org_admin`; `null` means `client`. The default applies when a user joins through domain auto-join, org-admin account creation, or an accepted organization invite (including a pending invite accepted during registration). Changing it does not rewrite existing users. `OrgController::syncUsers()` may associate an existing account with an organization but does not grant the configured default role. `org_admin` is a deliberate per-organization bulk grant of user-management rights scoped to that organization, so the UI must explain that consequence. Only portal admins may change the default. `photographer`, `admin`, and `super_admin` are never valid organization defaults: photographer access has its own FTP credential lifecycle, and the global admin roles exceed the organization's scope. Unsupported legacy values fall back to `client` for new account joins, are surfaced for repair, and block organization membership removal/destruction rather than silently detaching a specialized role. Existing photographer roles are revoked explicitly through the lock-aware FTP lifecycle. See [organization core](b2b/01-organisation-core.md#24-per-organization-default-role).
 
+### D-59: A symlinked or escaping inbox path is an operational failure
+
+`FtpInboxImporter` resolves `inboxPath` and the account home with `realpath()` and refuses the walk unless the inbox resolves to a directory **inside** the account home. The existing per-entry check (`! is_link($path) && is_file($path)`) only rejects symlink **entries**; an inbox directory that is itself a link, or a path that resolves out of the home, would pass it and be walked. Such a state is **not** a client state: SFTPGo's chroot and `common.symlink_mode = 0` keep a photographer from creating it, so its presence means a host, ACL, or provisioning defect. It is therefore reported as an operational failure — an error-level log line plus a visible failed import — and never as a quiet empty run or a new photographer-facing "inbox invalid" status. See [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md).
+
+## Payouts
+
+### D-58: A refund after month close is a negative correction in the next statement
+
+Photographer payouts run **one month in arrears**: the statement for a month is calculated after that month has closed. A refund that arrives after the month's statement was approved or paid is therefore not booked into that statement — a closed statement is immutable and is never recalculated or reopened. It becomes an **explicit negative correction line** in the next open statement, deducted from the following payout. That includes a **full** refund that moves the order to `refunded`: falling out of the paid-order basis must reduce the photographer's share, not silently drop it. The correction is visible in the statement as its own line with the originating order, so a photographer can trace the deduction; it is never a silent change of a total. See [payout system](infrastructure/04-payout-system.md).
+
 ## Rate limiting, access grants, and runtime requirements
 
 ### D-38: Prioritized atomic rate limiting
