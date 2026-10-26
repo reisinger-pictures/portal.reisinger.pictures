@@ -246,6 +246,16 @@ class FtpInboxImporter
 
         $inboxPath = $this->inboxPath($user);
 
+        $inboxPathIssue = $this->inboxPathIssue($user, $inboxPath);
+        if ($inboxPathIssue !== null) {
+            Log::error('FTP-Import: Der Posteingang liegt nicht sicher im FTP-Konto.', [
+                'user_id' => $user->id,
+                'reason' => $inboxPathIssue,
+            ]);
+
+            return FtpImportResult::rejected(FtpImportStatus::UnreadableInbox, self::UNREADABLE_INBOX_MESSAGE);
+        }
+
         if (! is_dir($inboxPath)) {
             return FtpImportResult::empty();
         }
@@ -396,6 +406,78 @@ class FtpInboxImporter
         }
 
         return $root.$uploadPath;
+    }
+
+    /**
+     * Reject linked inbox-path components below the disk root or an inbox outside its account home (D-59).
+     *
+     * The configured disk root is a trusted anchor and may itself be a symlink;
+     * the walk starts with the account-home component below it. The resolved
+     * home prefix also prevents sibling names such as
+     * `/home/photographer-old` from matching `/home/photographer`.
+     */
+    private function inboxPathIssue(User $user, string $inboxPath): ?string
+    {
+        $disk = Storage::disk('ftp_inbox');
+        $diskRootPath = $disk->path('');
+        $homePath = $disk->path((string) ($user->ftp_slug ?? $user->id));
+
+        clearstatcache(true, $inboxPath);
+        clearstatcache(true, $homePath);
+
+        $diskRootPath = rtrim($diskRootPath, DIRECTORY_SEPARATOR);
+        if ($diskRootPath === '') {
+            $diskRootPath = DIRECTORY_SEPARATOR;
+        }
+
+        $diskRootPrefix = $diskRootPath === DIRECTORY_SEPARATOR
+            ? DIRECTORY_SEPARATOR
+            : $diskRootPath.DIRECTORY_SEPARATOR;
+        if ($inboxPath !== $diskRootPath && ! str_starts_with($inboxPath, $diskRootPrefix)) {
+            return 'inbox is outside ftp_inbox disk root';
+        }
+
+        // The configured disk root is the trusted anchor and may itself be a
+        // symlink. Inspect each component below it, including the account home,
+        // without relying on realpath() so dangling links are still detected.
+        $relativeInboxPath = $inboxPath === $diskRootPath
+            ? ''
+            : substr($inboxPath, strlen($diskRootPrefix));
+        $currentPath = $diskRootPath;
+        foreach (explode(DIRECTORY_SEPARATOR, $relativeInboxPath) as $component) {
+            if ($component === '') {
+                continue;
+            }
+
+            $currentPath = $currentPath === DIRECTORY_SEPARATOR
+                ? $currentPath.$component
+                : $currentPath.DIRECTORY_SEPARATOR.$component;
+            clearstatcache(true, $currentPath);
+            if (is_link($currentPath)) {
+                return 'symlinked inbox';
+            }
+        }
+
+        $resolvedInbox = realpath($inboxPath);
+        $resolvedHome = realpath($homePath);
+
+        // A vanished inbox keeps the established empty-inbox behavior. If it
+        // still exists but either path cannot be resolved, containment cannot be
+        // proved and the state is an operational failure.
+        if ($resolvedInbox === false && ! is_dir($inboxPath)) {
+            return null;
+        }
+
+        if ($resolvedInbox === false || $resolvedHome === false) {
+            return 'inbox resolves outside account home';
+        }
+
+        $homePrefix = rtrim($resolvedHome, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
+        if ($resolvedInbox !== $resolvedHome && ! str_starts_with($resolvedInbox, $homePrefix)) {
+            return 'inbox resolves outside account home';
+        }
+
+        return null;
     }
 
     /** How many files currently sit in the quarantine folder of one inbox. */
@@ -994,10 +1076,18 @@ class FtpInboxImporter
      * fixture is ignored and a simulated unreadable directory is the only way to
      * reach the error branch).
      *
-     * @return int|null Null when the directory exists but cannot be opened.
+     * @return int|null Null when the path or one of its ancestors is symlinked or cannot be opened or safely resolved.
      */
-    public function countInboxImages(string $inboxPath): ?int
+    public function countInboxImages(string $inboxPath, User $user): ?int
     {
+        if ($this->inboxPathIssue($user, $inboxPath) !== null) {
+            return null;
+        }
+
+        if (! is_dir($inboxPath)) {
+            return 0;
+        }
+
         $directory = @opendir($inboxPath);
         if ($directory === false) {
             // See selectImportBatch(): a vanished directory is empty, only a

@@ -36,7 +36,7 @@ enum FtpImportStatus: string
     /** The stored `current_ftp_gallery_id` points at a deleted gallery. */
     case GalleryMissing = 'gallery_missing';
 
-    /** The inbox directory exists but cannot be opened (host/permission fault). */
+    /** The inbox path is symlinked or cannot be opened/resolved (host/path fault). */
     case UnreadableInbox = 'unreadable_inbox';
 
     /** A file exceeds the per-file or the whole-run byte budget (HTTP 413). */

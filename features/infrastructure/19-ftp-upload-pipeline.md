@@ -448,45 +448,36 @@ quarantined upload is discoverable over SFTP and in the status JSON, but not yet
 surfaced as a UI element. The UI is a separate, tracked piece of work; this
 document does not claim it exists.
 
-### 3.7 Symbolic links are never imported
+### 3.7 Symlink and inbox-path containment (D-59)
 
-**The rule:** the walk imports only entries for which `is_link()` is false. A
-symlink is skipped, not quarantined — it never enters the walk, so it cannot
-block it and D-37 does not apply to it. `file_count` and `quarantine_count`
-follow the same view of the directory.
+The importer rejects symlink **entries** with `! is_link($path) && is_file($path)`;
+they are skipped, not quarantined, and `file_count` follows the same view. This
+entry check is not the boundary for the walk itself: before either the import
+walk or the read-only `file_count` walk, `FtpInboxImporter` resolves the inbox
+and account home with `realpath()`. The inbox must resolve to a directory inside
+the resolved account home (or to the home itself for upload path `/`), using a
+separator-terminated prefix so a sibling such as `/home/photographer-old` does
+not match `/home/photographer`. The inbox path itself is rejected if it is a
+symlink, even when its target is inside the account home.
 
-Why the rule exists: `is_file()` and `fopen()` follow links, and the importer
-runs on the **host** with no chroot. A link in the inbox therefore used to be a
-read primitive out of the account's home — measured on 2026-10-25: a link to a
-file outside the inbox was imported as a photo and the foreign target was
-copied, because nothing on that path called `realpath`. The fix is
-`FtpInboxImporter::isRegularFile()`; `FtpInboxSymlinkTest` pins
-"link out of the inbox is not imported", "a regular file is still imported",
-"a directory link is not traversed" and "every link is rejected".
+A missing inbox remains an empty inbox. An existing inbox that is symlinked or
+resolves outside the home is an operational failure, not a photographer-facing
+input error: import returns `UnreadableInbox` (HTTP 500) and logs one error with
+the user id and reason; the status count returns `null`, which its endpoint maps
+to HTTP 500. Nothing is quarantined. This is a host, ACL, or provisioning defect,
+not a client state: SFTPGo's chroot and `common.symlink_mode = 0` prevent a
+photographer from creating such paths.
 
-`is_link()` rather than a `realpath()` prefix comparison, deliberately: a
-`realpath()` on a path that vanished between listing and read returns `false`,
-and the natural `false`-means-reject handling would silently skip a **real**
-upload — a worse defect than the one being fixed. A lost entry behaves exactly
-as before.
-
-**The precondition, measured, not assumed:** the camera account *could* create
-such a link if the server let it. SFTPGo's `common.symlink_mode` defaults to
-`0`, which disables link creation on every backend regardless of account
-permissions (`internal/common/connection.go`, the
-`IsSymlinkCreationAllowed` gate; our account is created with
-`CAMERA_PERMISSIONS = ['/' => ['*']]`, which does grant `create_symlinks` — the
-global switch is the only thing refusing). FTP `SITE SYMLINK` is blocked twice
-over: `enable_site` is not set and defaults to false, and `symlink_mode` would
-refuse anyway. Harness `Teil 6` pins the refusal; if
-`SFTPGO_COMMON__SYMLINK_MODE` is ever set to `1`, the importer rule above is
-what still holds.
-
-Two limits are tracked, not claimed away:
-[#38](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/38)
-covers the inbox path itself being a directory link (the entry check cannot see
-that), and a hard link is invisible to `is_link()` — creating one outside the
-home is prevented by the SFTPGo chroot, not by this check.
+The host-side walk has no chroot, and `is_file()`/`fopen()` follow links, so
+per-entry checks alone cannot protect an inbox directory that is itself a link
+or whose path resolves outside the account home. `FtpInboxSymlinkTest` pins the
+inbox-link refusal, outside-home refusal, and regular-file happy path. A hard
+link is invisible to `is_link()`; creating one outside the home is prevented by
+the SFTPGo chroot, not by this check. SFTPGo's `common.symlink_mode` defaults to
+`0` and disables link creation on every backend regardless of account
+permissions (`internal/common/connection.go`, the `IsSymlinkCreationAllowed`
+gate). FTP `SITE SYMLINK` is blocked because `enable_site` defaults to false;
+the harness pins this configuration.
 
 ## 4. Brand Isolation
 

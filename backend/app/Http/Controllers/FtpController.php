@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\FtpImportStatus;
 use App\Http\Resources\GalleryResource;
 use App\Jobs\ImportFtpBatch;
+use App\Models\User;
 use App\Services\AuthorizationService;
 use App\Services\FtpCredentialService;
 use App\Services\FtpInboxImporter;
@@ -94,21 +95,15 @@ class FtpController extends Controller
         $user = auth('api')->user();
         $inboxPath = $this->importer()->inboxPath($user);
 
-        $fileCount = 0;
-        if (is_dir($inboxPath)) {
-            $fileCount = $this->countInboxImages($inboxPath);
+        $fileCount = $this->countInboxImages($inboxPath);
 
-            // A directory that exists but cannot be opened is a host/permission
-            // fault, not an empty inbox. Reporting 0 would make a broken mount
-            // look like "nothing uploaded", and `count()` on the old `glob()`
-            // result turned the same fault into a TypeError — a 500 with no
-            // usable message. The endpoint is polled, so it answers with a
-            // named error instead.
-            if ($fileCount === null) {
-                return response()->json([
-                    'error' => 'Der FTP-Posteingang konnte nicht gelesen werden.',
-                ], 500);
-            }
+        // An inbox path that cannot be opened or proven to sit inside the
+        // account home is a host/permission fault, not an empty inbox. The count
+        // guard also checks a missing path's ancestors before returning zero.
+        if ($fileCount === null) {
+            return response()->json([
+                'error' => 'Der FTP-Posteingang konnte nicht gelesen werden.',
+            ], 500);
         }
 
         $user->load('currentFtpGallery');
@@ -238,11 +233,16 @@ class FtpController extends Controller
      * opened: the suite runs as root in CI, where a `chmod` fixture is ignored
      * and would make the test green for the wrong reason.
      *
-     * @return int|null Null when the directory exists but cannot be opened.
+     * @return int|null Null when the path is a symlink or cannot be opened or safely resolved.
      */
     protected function countInboxImages(string $inboxPath): ?int
     {
-        return $this->importer()->countInboxImages($inboxPath);
+        $user = auth('api')->user();
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        return $this->importer()->countInboxImages($inboxPath, $user);
     }
 
     /**
