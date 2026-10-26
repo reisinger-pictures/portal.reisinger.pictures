@@ -3,33 +3,33 @@
 namespace Tests\Feature;
 
 use App\Enums\Brand;
+use App\Enums\FtpImportStatus;
 use App\Enums\UserRole;
+use App\Http\Controllers\FtpController;
 use App\Models\Gallery;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\FtpInboxImporter;
 use App\Services\PhotoProcessingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
- * MEDIA-5: the inbox walk must not follow a symlink out of the inbox.
+ * MEDIA-5 and MEDIA-6 (D-59): the inbox walk must not follow symlinks out of the inbox.
  *
- * The camera-facing SFTPGo account is created with `['/' => ['*']]`
- * (`SftpGoClient::CAMERA_PERMISSIONS`), i.e. the client may create anything in
- * its home directory — including a symlink. The importer then decided what to
- * import with `is_file()`/`fopen()`, and both follow links: a link named
- * `x.jpg` pointing at a file outside the inbox was read, staged and imported as
- * if the client had uploaded that file, and the read happened with the
- * backend's own privileges rather than the client's.
+ * The camera-facing SFTPGo account has broad per-directory permissions, but
+ * `common.symlink_mode = 0` prevents the photographer from creating symlinks.
+ * The host-side importer nevertheless runs without a chroot, so these tests
+ * pin both the per-entry checks and D-59's fail-closed inbox-path containment.
  *
  * This suite pins the safe behaviour, not the implementation: nothing outside
  * the inbox is imported, the regular upload path keeps working, and a
- * subdirectory link is never traversed. The intra-inbox case is asserted as
- * "every symlink is rejected" because that is the implemented rule — the
- * cheapest one that does not need a second path resolution whose failure mode
- * is a silently skipped real upload.
+ * subdirectory link is never traversed. Per-entry links are rejected directly
+ * rather than resolved: a `realpath()` failure for a vanished entry must not
+ * silently skip an otherwise real upload.
  */
 class FtpInboxSymlinkTest extends TestCase
 {
@@ -42,6 +42,8 @@ class FtpInboxSymlinkTest extends TestCase
      * is not reachable from the inbox by any prefix comparison.
      */
     private string $outsideDirectory = '';
+
+    private ?string $symlinkedDiskRoot = null;
 
     protected function setUp(): void
     {
@@ -60,18 +62,14 @@ class FtpInboxSymlinkTest extends TestCase
 
     protected function tearDown(): void
     {
-        // The fake disks are discarded by Storage::fake(); the outside fixture
-        // directory is ours, and the links inside the inbox are not files the
-        // disk cleanup removes on every platform.
-        foreach (scandir($this->outsideDirectory) ?: [] as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-
-            @unlink($this->outsideDirectory.DIRECTORY_SEPARATOR.$entry);
+        if ($this->symlinkedDiskRoot !== null && is_link($this->symlinkedDiskRoot)) {
+            unlink($this->symlinkedDiskRoot);
         }
 
-        @rmdir($this->outsideDirectory);
+        // The fake disks are discarded by Storage::fake(); clean the separately
+        // created outside fixture, including the nested target used by the path
+        // traversal regression.
+        File::deleteDirectory($this->outsideDirectory);
 
         parent::tearDown();
     }
@@ -119,6 +117,195 @@ class FtpInboxSymlinkTest extends TestCase
         $this->assertDatabaseCount('photos', 1);
         $this->assertCount(1, Storage::disk('photos')->allFiles());
         $this->assertFalse(Storage::disk('ftp_inbox')->exists($sourcePath));
+    }
+
+    public function test_a_missing_inbox_remains_a_quiet_empty_result(): void
+    {
+        config(['services.ftp_transport.upload_path' => '/nested/inbox']);
+        $user = $this->createImportContext();
+
+        $inbox = $this->inboxPath($user);
+        $ancestor = dirname($inbox);
+        $this->assertTrue(rmdir($inbox));
+        $this->assertTrue(rmdir($ancestor));
+        Log::spy();
+
+        $result = app(FtpInboxImporter::class)->importBatch($user);
+
+        $this->assertSame(FtpImportStatus::Empty, $result->status);
+        $this->assertSame(0, app(FtpInboxImporter::class)->countInboxImages($inbox, $user));
+        Log::shouldNotHaveReceived('error');
+
+        $this->actingAs($user, 'api');
+        $response = app(FtpController::class)->status();
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(0, $response->getData(true)['file_count']);
+    }
+
+    public function test_a_dangling_ancestor_symlink_is_rejected_and_logged(): void
+    {
+        config(['services.ftp_transport.upload_path' => '/nested/inbox']);
+        $user = $this->createImportContext();
+        $this->createDanglingInboxAncestorSymlink($user);
+
+        $this->mockPhotoProcessing();
+
+        $this->assertInboxPathRejected($user, 'symlinked inbox');
+        $this->assertNothingImported();
+    }
+
+    public function test_status_reports_a_dangling_ancestor_symlink_as_unreadable(): void
+    {
+        config(['services.ftp_transport.upload_path' => '/nested/inbox']);
+        $user = $this->createImportContext();
+        $inbox = $this->createDanglingInboxAncestorSymlink($user);
+
+        $this->assertFalse(is_link($inbox));
+        $this->assertNull(app(FtpInboxImporter::class)->countInboxImages($inbox, $user));
+
+        $this->actingAs($user, 'api');
+        $response = app(FtpController::class)->status();
+        $this->assertSame(500, $response->getStatusCode());
+        $this->assertSame(
+            ['error' => 'Der FTP-Posteingang konnte nicht gelesen werden.'],
+            $response->getData(true),
+        );
+    }
+
+    public function test_a_dangling_account_home_symlink_is_rejected_and_logged(): void
+    {
+        config(['services.ftp_transport.upload_path' => '/nested/inbox']);
+        $user = $this->createImportContext();
+        $this->createDanglingAccountHomeSymlink($user);
+
+        $this->mockPhotoProcessing();
+
+        $this->assertInboxPathRejected($user, 'symlinked inbox');
+        $this->assertNothingImported();
+    }
+
+    public function test_status_reports_a_dangling_account_home_symlink_as_unreadable(): void
+    {
+        config(['services.ftp_transport.upload_path' => '/nested/inbox']);
+        $user = $this->createImportContext();
+        $inbox = $this->createDanglingAccountHomeSymlink($user);
+
+        $this->assertNull(app(FtpInboxImporter::class)->countInboxImages($inbox, $user));
+
+        $this->actingAs($user, 'api');
+        $response = app(FtpController::class)->status();
+        $this->assertSame(500, $response->getStatusCode());
+        $this->assertSame(
+            ['error' => 'Der FTP-Posteingang konnte nicht gelesen werden.'],
+            $response->getData(true),
+        );
+    }
+
+    public function test_a_symlinked_ftp_inbox_disk_root_is_a_trusted_anchor(): void
+    {
+        config(['services.ftp_transport.upload_path' => '/nested/inbox']);
+
+        $targetRoot = $this->outsideDirectory.DIRECTORY_SEPARATOR.'real-disk-root';
+        $this->assertTrue(mkdir($targetRoot));
+        $this->symlinkedDiskRoot = $this->outsideDirectory.DIRECTORY_SEPARATOR.'symlinked-disk-root';
+        $this->assertTrue(symlink($targetRoot, $this->symlinkedDiskRoot));
+
+        config(['filesystems.disks.ftp_inbox.root' => $this->symlinkedDiskRoot]);
+        Storage::set('ftp_inbox', Storage::build([
+            'driver' => 'local',
+            'root' => $this->symlinkedDiskRoot,
+            'throw' => false,
+        ]));
+
+        $user = $this->createImportContext();
+        $inbox = $this->inboxPath($user);
+        $this->assertTrue(is_link(rtrim(Storage::disk('ftp_inbox')->path(''), DIRECTORY_SEPARATOR)));
+        $this->assertSame(0, app(FtpInboxImporter::class)->countInboxImages($inbox, $user));
+
+        $this->putSampleImage($user->ftp_slug.'/nested/inbox/source.jpg');
+        $this->mockPhotoProcessing();
+
+        $result = app(FtpInboxImporter::class)->importBatch($user);
+
+        $this->assertSame(1, $result->imported);
+        $this->assertDatabaseCount('photos', 1);
+    }
+
+    public function test_a_dangling_inbox_symlink_is_rejected_and_logged(): void
+    {
+        config(['services.ftp_transport.upload_path' => '/incoming']);
+        $user = $this->createImportContext();
+        $this->createDanglingInboxSymlink($user);
+
+        $this->mockPhotoProcessing();
+
+        $this->assertInboxPathRejected($user, 'symlinked inbox');
+        $this->assertNothingImported();
+    }
+
+    public function test_status_reports_a_dangling_inbox_symlink_as_unreadable(): void
+    {
+        config(['services.ftp_transport.upload_path' => '/incoming']);
+        $user = $this->createImportContext();
+        $inbox = $this->createDanglingInboxSymlink($user);
+
+        $this->assertNull(app(FtpInboxImporter::class)->countInboxImages($inbox, $user));
+
+        $this->actingAs($user, 'api');
+        $response = app(FtpController::class)->status();
+        $this->assertSame(500, $response->getStatusCode());
+        $this->assertSame(
+            ['error' => 'Der FTP-Posteingang konnte nicht gelesen werden.'],
+            $response->getData(true),
+        );
+    }
+
+    public function test_a_symlinked_inbox_inside_the_account_home_is_rejected_and_logged(): void
+    {
+        config(['services.ftp_transport.upload_path' => '/incoming']);
+        $user = $this->createImportContext();
+
+        $home = Storage::disk('ftp_inbox')->path((string) $user->ftp_slug);
+        $inbox = $this->inboxPath($user);
+        $target = $home.DIRECTORY_SEPARATOR.'alternate-inbox';
+        $this->assertTrue(mkdir($target));
+        $source = $target.DIRECTORY_SEPARATOR.'source.jpg';
+        $this->writeSampleImage($source);
+        $this->assertTrue(rmdir($inbox));
+        $this->assertTrue(symlink($target, $inbox));
+
+        $this->mockPhotoProcessing();
+
+        $this->assertInboxPathRejected($user, 'symlinked inbox');
+        $this->assertNothingImported();
+        $this->assertFileExists($source);
+        $this->assertSame($this->sampleBytes(), filesize($source));
+    }
+
+    public function test_an_inbox_resolving_outside_the_account_home_is_rejected_and_logged(): void
+    {
+        config(['services.ftp_transport.upload_path' => '/nested/inbox']);
+        $user = $this->createImportContext();
+
+        $inbox = $this->inboxPath($user);
+        $nested = dirname($inbox);
+        $this->assertTrue(rmdir($inbox));
+        $this->assertTrue(rmdir($nested));
+
+        $sourceDirectory = $this->outsideDirectory.DIRECTORY_SEPARATOR.'inbox';
+        $this->assertTrue(mkdir($sourceDirectory));
+        $source = $sourceDirectory.DIRECTORY_SEPARATOR.'source.jpg';
+        $this->writeSampleImage($source);
+        $this->assertTrue(symlink($this->outsideDirectory, $nested));
+        $this->assertFalse(is_link($inbox), 'Only the parent path should be linked in this fixture.');
+        $this->assertTrue(is_dir($inbox));
+
+        $this->mockPhotoProcessing();
+        $this->assertNull(app(FtpInboxImporter::class)->countInboxImages($inbox, $user));
+        $this->assertInboxPathRejected($user, 'symlinked inbox');
+        $this->assertNothingImported();
+        $this->assertFileExists($source);
+        $this->assertSame($this->sampleBytes(), filesize($source));
     }
 
     public function test_a_directory_symlink_inside_the_inbox_is_not_traversed(): void
@@ -205,6 +392,52 @@ class FtpInboxSymlinkTest extends TestCase
         return app(FtpInboxImporter::class)->inboxPath($user);
     }
 
+    private function createDanglingInboxSymlink(User $user): string
+    {
+        $inbox = $this->inboxPath($user);
+        $this->assertTrue(rmdir($inbox));
+
+        $target = $this->outsideDirectory.DIRECTORY_SEPARATOR.'missing-target';
+        $this->assertTrue(symlink($target, $inbox));
+        $this->assertTrue(is_link($inbox));
+        $this->assertFalse(is_dir($inbox));
+
+        return $inbox;
+    }
+
+    private function createDanglingInboxAncestorSymlink(User $user): string
+    {
+        $inbox = $this->inboxPath($user);
+        $ancestor = dirname($inbox);
+        $this->assertTrue(rmdir($inbox));
+        $this->assertTrue(rmdir($ancestor));
+
+        $target = $this->outsideDirectory.DIRECTORY_SEPARATOR.'missing-ancestor-target';
+        $this->assertTrue(symlink($target, $ancestor));
+        $this->assertTrue(is_link($ancestor));
+        clearstatcache(true, $inbox);
+        $this->assertFalse(is_link($inbox));
+        $this->assertFalse(is_dir($inbox));
+
+        return $inbox;
+    }
+
+    private function createDanglingAccountHomeSymlink(User $user): string
+    {
+        $inbox = $this->inboxPath($user);
+        $home = Storage::disk('ftp_inbox')->path((string) $user->ftp_slug);
+        $this->assertTrue(File::deleteDirectory($home));
+
+        $target = $this->outsideDirectory.DIRECTORY_SEPARATOR.'missing-account-home-target';
+        $this->assertTrue(symlink($target, $home));
+        $this->assertTrue(is_link($home));
+        clearstatcache(true, $inbox);
+        $this->assertFalse(is_link($inbox));
+        $this->assertFalse(is_dir($inbox));
+
+        return $inbox;
+    }
+
     private function putSampleImage(string $relativePath): void
     {
         $contents = file_get_contents(base_path('tests/Fixtures/sample.jpg'));
@@ -243,6 +476,23 @@ class FtpInboxSymlinkTest extends TestCase
     {
         $this->assertDatabaseCount('photos', 0);
         $this->assertSame([], Storage::disk('photos')->allFiles());
+    }
+
+    private function assertInboxPathRejected(User $user, string $reason): void
+    {
+        Log::spy();
+
+        $result = app(FtpInboxImporter::class)->importBatch($user);
+
+        $this->assertSame(FtpImportStatus::UnreadableInbox, $result->status);
+        $this->assertSame('Der FTP-Posteingang konnte nicht gelesen werden.', $result->error);
+        $this->assertSame(0, $result->imported);
+
+        Log::shouldHaveReceived('error')->once()->withArgs(
+            static fn (string $message, array $context): bool => str_contains($message, 'Posteingang')
+                && ($context['user_id'] ?? null) === $user->id
+                && ($context['reason'] ?? null) === $reason,
+        );
     }
 
     /**
