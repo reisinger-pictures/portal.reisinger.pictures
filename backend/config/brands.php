@@ -21,7 +21,7 @@ return [
         ],
         'is_active' => true,
         'frontend_url' => 'https://portal.reisinger.pictures',
-        'from_address' => 'portal@reisinger.pictures',
+        'from_address' => 'florian@reisinger.pictures',
         'from_name' => 'Reisinger Foto Portal',
         'accounting_email' => 'accounting@reisinger.pictures',
         'primary_color' => '#1E5631',

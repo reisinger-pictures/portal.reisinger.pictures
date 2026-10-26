@@ -208,7 +208,7 @@ function BrandSettingsForm({ brand }: { brand: BrandSetting }) {
 
                 <div className="form-control">
                     <label className="label"><span className="label-text font-bold">Absender-E-Mail</span></label>
-                    <input type="email" className="input input-bordered" placeholder="portal@reisinger.pictures"
+                    <input type="email" className="input input-bordered" placeholder="florian@reisinger.pictures"
                            disabled={!canEdit} {...register('from_address')} />
                     {errors.from_address &&
                         <span className="text-error text-xs mt-1">{errors.from_address.message}</span>}

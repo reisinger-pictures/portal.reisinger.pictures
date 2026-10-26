@@ -163,16 +163,18 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - ACCOUNTING_EMAIL=${ACCOUNTING_EMAIL}
       # ---
-      # E-Mail-Versand (SMTP via ZeptoMail, Migration vom Gmail-REST-OAuth am 2026-08-24)
+      # E-Mail-Versand (SMTP über das Zoho-Mail-Postfach, seit 2026-10-26)
       # Konfiguration liegt in .env.production:
       #   MAIL_MAILER=smtp
       #   MAIL_SCHEME=smtp
       #   MAIL_REQUIRE_TLS=true
-      #   MAIL_HOST=smtp.zeptomail.eu
+      #   MAIL_HOST=smtppro.zoho.eu
       #   MAIL_PORT=587
-      #   MAIL_USERNAME=emailapikey
-      #   MAIL_PASSWORD=<ZeptoMail-API-Key>
-      #   MAIL_FROM_ADDRESS=noreply@reisinger.pictures
+      #   MAIL_USERNAME=florian@reisinger.pictures
+      #   MAIL_PASSWORD=<Zoho-App-Passwort>
+      #   MAIL_FROM_ADDRESS=florian@reisinger.pictures
+      # Der Absender MUSS das authentifizierte Postfach sein; Zoho weist fremde
+      # Absender mit "5.7.1 Sender is not allowed to relay emails" ab.
       # Der Gmail-REST-OAuth-Transport (GmailRestTransport) bleibt als Fallback
       # im Code erhalten; OAUTH_*-Secrets sind aus dem PROD-Setup entfernt.
       # ---

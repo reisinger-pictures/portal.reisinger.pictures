@@ -80,6 +80,15 @@ Siehe `backend/app/Mail/BrandAwareMail.php`. *(Historisch: diese Datei existiert
 nicht mehr; der Trait wurde durch `backend/app/Mail/AbstractBrandAwareMailable.php`
 ersetzt — siehe Status-Hinweis oben.)*
 
+**Transport-Bedingung für den Absender:** Der effektive Absender eines Brands
+(`from_address`, Config-Default in `backend/config/brands.php`, überschreibbar über
+die Brand-Settings) muss beim SMTP-Provider **autorisiert** sein — also das
+authentifizierte Postfach selbst oder ein dort eingerichteter Alias sein. Ein
+fremder Absender wird abgewiesen: Zoho Mail antwortet mit `5.7.1 Sender is not
+allowed to relay emails`, ZeptoMail akzeptierte dagegen jede Adresse der
+verifizierten Domain. Ein eigener Absender pro Brand setzt deshalb einen
+entsprechenden Alias bzw. eine eigene verifizierte Domain beim Provider voraus.
+
 ## 6. Hostname-Konvention (E2E Test Locators)
 
 | Hostname | Brand | Beschreibung |
