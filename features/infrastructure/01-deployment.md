@@ -12,7 +12,7 @@ status: active
 
 ## 2. Environment Variables
 - All configuration is managed via Portainer environment variables, overriding the `.env` file.
-- Key variables include database credentials (`DB_ROOT_PASSWORD`), Meilisearch keys (`MEILI_MASTER_KEY`), and SMTP settings (production currently uses ZeptoMail; the legacy Gmail transport remains only as a code fallback).
+- Key variables include database credentials (`DB_ROOT_PASSWORD`), Meilisearch keys (`MEILI_MASTER_KEY`), and SMTP settings (production sends through the Zoho Mail mailbox via `smtppro.zoho.eu`; the legacy Gmail transport remains only as a code fallback).
 - Production queue/scheduler values are explicit: `QUEUE_CONNECTION=database`, `DB_QUEUE_CONNECTION=DB_CONNECTION`, `DB_QUEUE_RETRY_AFTER=90`, `QUEUE_WORKER_TIMEOUT=60`, and a shared `CACHE_STORE=database` with `DB_CACHE_CONNECTION=DB_CONNECTION` and `DB_CACHE_LOCK_CONNECTION=DB_CACHE_CONNECTION`. The values are validated before background processes start; see [29-production-operations-runbook.md](29-production-operations-runbook.md).
 - Production SMTP requires `MAIL_MAILER=smtp`, `MAIL_SCHEME=smtp|smtps`, `MAIL_REQUIRE_TLS=true`, a host/port, credentials, and a real `MAIL_FROM_ADDRESS`/`MAIL_FROM_NAME`. `MAIL_ENCRYPTION` is ignored by Laravel 13/Symfony and is not a TLS control. Local Mailpit and CI fixtures are intentionally exempt because the policy is production-only.
 
@@ -80,7 +80,7 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
 
 - **Fail closed:** Missing `APP_KEY`/`JWT_SECRET`/`FILE_ENCRYPTION_KEY`/`ADMIN_EMAIL`/`ADMIN_PASSWORD` aborts the production start (see §9). Blank env values are treated as unset — never silently replaced.
 - **Debug mode:** `APP_DEBUG` defaults to **`false`** (`config/app.php`) and MUST stay `false` in production. Verbose error pages are a local-dev-only opt-in (`.env.example` ships `APP_DEBUG=true`); `deployment/docker-compose.yml` defaults to `${APP_DEBUG:-false}`.
-- **Production secrets are machine-local:** `backend/.env.production` (and `deployment/.env.production`) is **untracked/gitignored**. Only key names and placeholder templates live in the repo — real values (DB, SMTP/ZeptoMail, Stripe live keys) are provided per host via Portainer env / the local env file. Never commit or quote secret values.
+- **Production secrets are machine-local:** `backend/.env.production` (and `deployment/.env.production`) is **untracked/gitignored**. Only key names and placeholder templates live in the repo — real values (DB, SMTP app password, Stripe live keys) are provided per host via Portainer env / the local env file. Never commit or quote secret values.
 
 ## 9. Produktion-Sicherheits-Gatekeeper
 - **Identitäts-Guard:** Der `backend`-Container verweigert den Start, wenn er
