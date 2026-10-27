@@ -13,6 +13,7 @@ use App\Http\Controllers\FileDeliveryController;
 use App\Http\Controllers\FtpController;
 use App\Http\Controllers\FtpCredentialController;
 use App\Http\Controllers\FtpEventController;
+use App\Http\Controllers\FtpsCertificateController;
 use App\Http\Controllers\GalleryController;
 use App\Http\Controllers\GalleryFrontendController;
 use App\Http\Controllers\ImageController;
@@ -309,6 +310,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo'])->name('api.management.settings.system');
 
     Route::get('/management/ftp/status', [FtpController::class, 'status'])->name('api.management.ftp.status');
+    Route::get('/management/ftp/certificate', [FtpsCertificateController::class, 'download'])->name('api.management.ftp.certificate');
     Route::post('/management/ftp/target', [FtpController::class, 'setTarget'])->name('api.management.ftp.target');
     Route::post('/management/ftp/process', [FtpController::class, 'process'])->name('api.management.ftp.process');
     // P1-M33: Passwort-Reset — der einzige Recovery-Weg (SFTPGo kennt das alte

@@ -145,6 +145,35 @@ test.describe('Kamera einrichten: Anleitung und Zugangsdaten', () => {
         await expect(dialog).toHaveCount(0);
     });
 
+    test('downloads the optional ROOT.PEM certificate from the camera setup guide', { tag: ['@feature:ftp'] }, async ({ page, request }) => {
+        helper = new E2ESessionHelper(request);
+        const testUser = await helper.createIsolatedUser('photographer');
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        await stubStatus(page);
+        await page.route('**/api/management/ftp/certificate', route => route.fulfill({
+            status: 200,
+            contentType: 'application/x-pem-file',
+            headers: {'Content-Disposition': 'attachment; filename="ROOT.PEM"'},
+            body: '-----BEGIN CERTIFICATE-----\npublic certificate\n-----END CERTIFICATE-----\n',
+        }));
+        await auth.login(testUser.email, testUser.password);
+        await sidebar.navigateTo('Dashboard');
+
+        const main = page.getByRole('main');
+        const cameraSection = main.locator('.card').filter({ hasText: 'Kamera-Verbindung' });
+        await cameraSection.getByRole('button', { name: 'Anleitung öffnen' }).click();
+
+        const dialog = main.getByRole('dialog', { name: 'Kamera einrichten' });
+        await expect(dialog.getByText('Die Kamera akzeptiert das Zertifikat auch ohne Import über „Zielserver vertrauen“.')).toBeVisible();
+        const downloadPromise = page.waitForEvent('download');
+        await dialog.getByRole('button', { name: 'ROOT.PEM herunterladen' }).click();
+        const download = await downloadPromise;
+
+        expect(download.suggestedFilename()).toBe('ROOT.PEM');
+    });
+
     test('opens every connection row in the dialog and closes it with Escape', { tag: ['@feature:ftp'] }, async ({ page, request }) => {
         helper = new E2ESessionHelper(request);
         const testUser = await helper.createIsolatedUser('photographer');

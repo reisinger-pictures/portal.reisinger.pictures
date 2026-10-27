@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
+import { apiDownload } from '../../api';
 import type {FtpConnection} from '../../logic/ftpConnection';
 import {FtpConnectionBlock} from './FtpConnectionRows';
 
@@ -27,18 +29,43 @@ import {FtpConnectionBlock} from './FtpConnectionRows';
  * point: a caller that forgets it is a TypeScript error, not a guide that quietly
  * falls back to a number nobody checked.
  *
- * The root-certificate procedure is deliberately absent. It is a fallback for
- * when `Vertrauenswürdige Zielserver` does not work, and it is only worth
- * freezing into a procedure once that has actually happened.
+ * Importing the root certificate is an optional fallback: Canon can also trust
+ * the self-signed FTPS certificate through `Vertrauenswürdige Zielserver`.
  */
 export default function KameraEinrichtungContent({connection, resetLimitPerHour}: {connection: FtpConnection; resetLimitPerHour: number}) {
     const {host, username, sftp_port, ftps_port, pasv_port_start, pasv_port_end, ftps_tls_mode, path} = connection;
+    const [downloadingCertificate, setDownloadingCertificate] = useState(false);
+    const [certificateDownloadError, setCertificateDownloadError] = useState<string | null>(null);
     const missing = t`nicht konfiguriert`;
     const serverValue = host ?? missing;
     const userValue = username ?? missing;
     const sftpValue = sftp_port !== null ? String(sftp_port) : missing;
     const ftpsValue = ftps_port !== null ? String(ftps_port) : missing;
     const pasvValue = pasv_port_start !== null && pasv_port_end !== null ? `${pasv_port_start}\u2013${pasv_port_end}` : missing;
+
+    const downloadCertificate = async () => {
+        setDownloadingCertificate(true);
+        setCertificateDownloadError(null);
+
+        try {
+            const {blob, filename} = await apiDownload('/api/management/ftp/certificate', {
+                accept: 'application/x-pem-file',
+            });
+            const objectUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = objectUrl;
+            anchor.download = filename ?? 'ROOT.PEM';
+            anchor.rel = 'noopener';
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            URL.revokeObjectURL(objectUrl);
+        } catch {
+            setCertificateDownloadError(t`Das Zertifikat konnte nicht heruntergeladen werden.`);
+        } finally {
+            setDownloadingCertificate(false);
+        }
+    };
 
     // Canons Assistent bietet neben `Stammverzeichnis` ein eigenes `Ordner
     // wählen`. Der Zielordner kommt deshalb aus der Verbindung statt aus diesem
@@ -172,6 +199,17 @@ export default function KameraEinrichtungContent({connection, resetLimitPerHour}
                                 Gerät wählen → FTP-Server → Vertrauenswürdige Zielserver → Aktivieren.</Trans></p>
                             <p className="text-sm mt-1"><Trans>Das ist der erste Weg. Das Stammzertifikat ist der Fallback,
                                 falls die Kamera mit dieser Einstellung keine Verbindung aufnimmt.</Trans></p>
+                            <p className="text-sm mt-1"><Trans>Die Kamera akzeptiert das Zertifikat auch ohne Import über „Zielserver vertrauen“.</Trans></p>
+                            <button
+                                type="button"
+                                className="btn btn-outline btn-sm mt-2"
+                                onClick={() => void downloadCertificate()}
+                                disabled={downloadingCertificate}
+                                aria-busy={downloadingCertificate}
+                            >
+                                {downloadingCertificate ? <Trans>Zertifikat wird geladen …</Trans> : <Trans>ROOT.PEM herunterladen</Trans>}
+                            </button>
+                            {certificateDownloadError && <p className="text-sm text-error mt-2" role="alert">{certificateDownloadError}</p>}
                         </div>
                     </div>
 
@@ -307,10 +345,22 @@ export default function KameraEinrichtungContent({connection, resetLimitPerHour}
                 <span className="iconify mdi--information-outline text-xl"></span>
                 <div>
                     <h3 className="font-bold"><Trans>Zum Stammzertifikat</Trans></h3>
-                    <p className="text-sm"><Trans>Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit
-                        „Vertrauenswürdige Zielserver" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst
-                        noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht
-                        trägt.</Trans></p>
+                    <p className="text-sm"><Trans>Die Kamera akzeptiert das Zertifikat auch ohne Import über „Zielserver vertrauen".</Trans>{' '}
+                        <Trans>Das ist der erste Weg. Das Stammzertifikat ist der Fallback, falls die Kamera mit dieser Einstellung keine Verbindung aufnimmt.</Trans></p>
+                    <button
+                        type="button"
+                        className="btn btn-sm mt-2"
+                        disabled={downloadingCertificate}
+                        aria-busy={downloadingCertificate}
+                        onClick={downloadCertificate}
+                    >
+                        <Trans>ROOT.PEM herunterladen</Trans>
+                    </button>
+                    {certificateDownloadError && (
+                        <p role="alert" className="alert alert-error mt-2 text-sm">
+                            {certificateDownloadError}
+                        </p>
+                    )}
                 </div>
             </div>
         </>
