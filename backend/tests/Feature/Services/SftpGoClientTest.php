@@ -77,7 +77,7 @@ class SftpGoClientTest extends TestCase
     public function test_provision_user_creates_an_enabled_camera_account(): void
     {
         Http::fake([
-            self::USERS_URL => Http::response([
+            'sftpgo.test:8080/api/v2/users*' => Http::response([
                 'id' => 7,
                 'username' => 'florian',
                 'status' => 1,
@@ -640,6 +640,157 @@ class SftpGoClientTest extends TestCase
         $this->assertSame([], (new SftpGoClient)->listFolders('florian'));
     }
 
+    public function test_list_camera_accounts_filters_the_documented_array_response(): void
+    {
+        $users = [
+            [
+                'username' => 'admin-api',
+                'home_dir' => '/var/www/admin-api',
+            ],
+            [
+                'username' => 'florian',
+                'home_dir' => '/var/www/ftp/florian',
+                'description' => 'Portal FTP-Kamera-Zugang',
+            ],
+            [
+                'username' => 'service-user',
+                'home_dir' => '/var/www/service',
+                'description' => 'Service account',
+            ],
+        ];
+
+        Http::fake([
+            'sftpgo.test:8080/api/v2/users*' => function (Request $request) use ($users) {
+                parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+                return Http::response(($query['offset'] ?? '0') === '0' ? $users : []);
+            },
+        ]);
+
+        $this->assertSame([
+            ['username' => 'florian', 'home_dir' => '/var/www/ftp/florian'],
+        ], (new SftpGoClient)->listCameraAccounts());
+
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
+            && $request->url() === 'http://sftpgo.test:8080/api/v2/users?limit=500&offset=0&order=ASC');
+    }
+
+    public function test_list_camera_accounts_rejects_a_repeated_username_at_the_page_boundary(): void
+    {
+        $this->fakeTwoPageCameraAccountList([
+            $this->serviceAccount('b'),
+            $this->cameraAccount('ccc'),
+        ]);
+
+        try {
+            (new SftpGoClient)->listCameraAccounts();
+            $this->fail('Expected a SftpGoException for a repeated username across pages.');
+        } catch (SftpGoException $exception) {
+            $this->assertSame(SftpGoException::REASON_INCONSISTENT_ACCOUNT_LIST, $exception->reason);
+            $this->assertStringContainsString("'b'", $exception->getMessage());
+        }
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_list_camera_accounts_rejects_a_page_start_before_the_previous_boundary(): void
+    {
+        $this->fakeTwoPageCameraAccountList([
+            $this->cameraAccount('a499'),
+            $this->cameraAccount('ccc'),
+        ]);
+
+        try {
+            (new SftpGoClient)->listCameraAccounts();
+            $this->fail('Expected a SftpGoException for a page that moved behind the previous boundary.');
+        } catch (SftpGoException $exception) {
+            $this->assertSame(SftpGoException::REASON_INCONSISTENT_ACCOUNT_LIST, $exception->reason);
+            $this->assertStringContainsString('a499', $exception->getMessage());
+        }
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_list_camera_accounts_rejects_a_page_that_is_not_ordered_by_username(): void
+    {
+        Http::fake([
+            'sftpgo.test:8080/api/v2/users*' => Http::response([
+                $this->cameraAccount('ccc'),
+                $this->cameraAccount('aaa'),
+            ], 200),
+        ]);
+
+        try {
+            (new SftpGoClient)->listCameraAccounts();
+            $this->fail('Expected a SftpGoException for a page that is not ordered by username.');
+        } catch (SftpGoException $exception) {
+            $this->assertSame(SftpGoException::REASON_INCONSISTENT_ACCOUNT_LIST, $exception->reason);
+            $this->assertStringContainsString('aaa', $exception->getMessage());
+        }
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_list_camera_accounts_returns_a_clean_two_page_listing(): void
+    {
+        $this->fakeTwoPageCameraAccountList([$this->cameraAccount('ccc')]);
+
+        $this->assertSame([
+            ['username' => 'a498', 'home_dir' => '/var/www/ftp/a498'],
+            ['username' => 'ccc', 'home_dir' => '/var/www/ftp/ccc'],
+        ], (new SftpGoClient)->listCameraAccounts());
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_list_camera_accounts_rejects_a_non_object_entry(): void
+    {
+        Http::fake([
+            'sftpgo.test:8080/api/v2/users*' => Http::response([
+                [
+                    'username' => 'florian',
+                    'home_dir' => '/var/www/ftp/florian',
+                    'description' => 'Portal FTP-Kamera-Zugang',
+                ],
+                null,
+            ]),
+        ]);
+
+        try {
+            (new SftpGoClient)->listCameraAccounts();
+            $this->fail('Expected a SftpGoException for a non-object camera-account entry.');
+        } catch (SftpGoException $exception) {
+            $this->assertSame(SftpGoException::REASON_MALFORMED_RESPONSE, $exception->reason);
+        }
+    }
+
+    public function test_list_camera_accounts_rejects_a_wrapper_object_and_an_unusable_camera_username(): void
+    {
+        foreach ([
+            ['users' => []],
+            [[
+                'username' => 'bad/name',
+                'home_dir' => '/var/www/ftp/bad-name',
+                'description' => 'Portal FTP-Kamera-Zugang',
+            ]],
+            // A non-camera entry without a usable username would silently drop
+            // out of the ordering check, so it is malformed too.
+            [[
+                'home_dir' => '/var/www/admin-api',
+                'description' => 'Service account',
+            ]],
+        ] as $body) {
+            Http::fake(['sftpgo.test:8080/api/v2/users*' => Http::response($body)]);
+
+            try {
+                (new SftpGoClient)->listCameraAccounts();
+                $this->fail('Expected a SftpGoException for a malformed camera-account list.');
+            } catch (SftpGoException $exception) {
+                $this->assertSame(SftpGoException::REASON_MALFORMED_RESPONSE, $exception->reason);
+            }
+        }
+    }
+
     public function test_a_successful_but_malformed_body_is_rejected(): void
     {
         Http::fake([self::USER_URL => Http::response('<html>gateway</html>', 200)]);
@@ -662,6 +813,60 @@ class SftpGoClientTest extends TestCase
         } catch (SftpGoException $exception) {
             $this->assertSame(SftpGoException::REASON_MALFORMED_RESPONSE, $exception->reason);
         }
+    }
+
+    /**
+     * @param  list<array{username: string, home_dir: string, description: string}>  $secondPage
+     */
+    private function fakeTwoPageCameraAccountList(array $secondPage): void
+    {
+        $firstPage = array_map(
+            static fn (int $index): array => [
+                'username' => sprintf('a%03d', $index),
+                'home_dir' => '/var/www/ftp/service-'.$index,
+                'description' => 'Service account',
+            ],
+            range(0, 497),
+        );
+        $firstPage[] = $this->cameraAccount('a498');
+        $firstPage[] = $this->serviceAccount('b');
+
+        Http::fake([
+            'sftpgo.test:8080/api/v2/users*' => function (Request $request) use ($firstPage, $secondPage) {
+                parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+                $this->assertSame('ASC', $query['order'] ?? null);
+
+                $offset = (int) ($query['offset'] ?? 0);
+
+                // The client advances by what a page actually returned, so the
+                // second page (one entry) is followed by an empty third page.
+                return Http::response(match (true) {
+                    $offset === 0 => $firstPage,
+                    $offset === 500 => $secondPage,
+                    default => [],
+                });
+            },
+        ]);
+    }
+
+    /** @return array{username: string, home_dir: string, description: string} */
+    private function cameraAccount(string $username): array
+    {
+        return [
+            'username' => $username,
+            'home_dir' => '/var/www/ftp/'.$username,
+            'description' => 'Portal FTP-Kamera-Zugang',
+        ];
+    }
+
+    /** @return array{username: string, home_dir: string, description: string} */
+    private function serviceAccount(string $username): array
+    {
+        return [
+            'username' => $username,
+            'home_dir' => '/var/www/ftp/service-'.$username,
+            'description' => 'Service account',
+        ];
     }
 
     public function test_the_tracked_config_carries_only_placeholders_and_the_in_network_default(): void

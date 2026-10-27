@@ -14,9 +14,9 @@ namespace App\Values;
  *   `pending`, or the status that was left untouched). It is the state a
  *   photographer would see in the inbox, or `deleted` when the row was gone.
  * - `outcome` — what the reconciliation found, which is *not* the same question
- *   as the status: a `revoked` account that exists again is `divergent`, not
- *   `active`, because the reconciliation refuses to undo a deliberate
- *   revocation (§7.16).
+ *   as the status: a `revoked` account that exists again or a missing
+ *   `active`/`error` slug alongside an unclaimed camera account is `divergent`,
+ *   because the reconciliation leaves those operator decisions unresolved.
  * - `reason` — what SFTPGo said, as a stable machine-readable token. The
  *   command prints it next to the slug, so an operator can see *why* a row
  *   changed without reading a sentence.
@@ -38,10 +38,7 @@ final class FtpAccountReconciliation
     /** Nothing had to be corrected (the state already matched, or must not move). */
     public const OUTCOME_UNCHANGED = 'unchanged';
 
-    /**
-     * A revoked account exists in SFTPGo again — a manual intervention that the
-     * reconciliation reports instead of undoing.
-     */
+    /** The portal and SFTPGo disagree in a way that needs an operator decision. */
     public const OUTCOME_DIVERGENT = 'divergent';
 
     /** The account lock was busy; reconciliation can be retried later. */
@@ -55,6 +52,9 @@ final class FtpAccountReconciliation
 
     /** SFTPGo does not know the account (404). */
     public const REASON_ACCOUNT_MISSING = 'account_missing';
+
+    /** The portal slug is missing while an unclaimed camera account exists. */
+    public const REASON_ACCOUNT_NAME_DRIFT = 'account_name_drift';
 
     /** SFTPGo has the account, but it is disabled — the access was withdrawn. */
     public const REASON_ACCOUNT_DISABLED = 'account_disabled';
@@ -102,10 +102,8 @@ final class FtpAccountReconciliation
     }
 
     /**
-     * The portal and the service disagree in the one direction the
-     * reconciliation does not resolve on its own: a revoked account that
-     * exists again. The status stays `revoked` — the revocation was a
-     * deliberate decision, and a cache correction is not the place to undo it.
+     * The portal and service disagree in a way the reconciliation does not
+     * resolve on its own. The status stays as supplied; the operator decides.
      */
     public static function divergent(string $status, string $reason): self
     {

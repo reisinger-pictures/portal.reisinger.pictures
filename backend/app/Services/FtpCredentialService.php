@@ -553,14 +553,14 @@ class FtpCredentialService
      * @throws SftpGoException When the state could
      *                         not be determined.
      */
-    public function reconcileAccount(User $user): FtpAccountReconciliation
+    public function reconcileAccount(User $user, array $orphanAccountNames = []): FtpAccountReconciliation
     {
         $userId = $user->getKey();
 
         try {
             return $this->withRotationLock(
                 $user,
-                function () use ($userId): FtpAccountReconciliation {
+                function () use ($userId, $orphanAccountNames): FtpAccountReconciliation {
                     // The caller may have waited behind a slug replacement,
                     // reset, or revocation. Never use its pre-lock slug/status
                     // to choose an SFTPGo account or apply a resulting state.
@@ -578,6 +578,14 @@ class FtpCredentialService
                         // A 404 is a verdict, not a failure: the service
                         // answered, and its answer is "there is no such account".
                         if ($exception->reason === SftpGoException::REASON_NOT_FOUND) {
+                            if ($orphanAccountNames !== []
+                                && in_array($freshUser->ftp_account_status, [self::STATUS_ACTIVE, self::STATUS_ERROR], true)) {
+                                return FtpAccountReconciliation::divergent(
+                                    (string) $freshUser->ftp_account_status,
+                                    FtpAccountReconciliation::REASON_ACCOUNT_NAME_DRIFT,
+                                );
+                            }
+
                             return $this->applyWithdrawnAccount(
                                 $freshUser,
                                 FtpAccountReconciliation::REASON_ACCOUNT_MISSING,
