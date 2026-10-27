@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Order;
 use App\Models\PayoutCorrection;
 use App\Models\PayoutOpenItem;
+use App\Models\PayoutOrderBooking;
 use App\Models\PhotographerStatement;
 use App\Models\User;
 use App\Services\PayoutCalculationService;
@@ -190,5 +191,95 @@ class PayoutMigrationTest extends TestCase
             ->sole();
         $this->assertSame(3000, $january->rolled_over_amount_cents);
         $this->assertSame(3000, $january->total_payable_cents);
+    }
+
+    public function test_v052_creates_the_booking_schema_and_documented_indexes(): void
+    {
+        $columns = collect(Schema::getColumns('payout_order_bookings'))
+            ->pluck('name')
+            ->map(fn (string $name): string => strtolower($name))
+            ->all();
+        foreach ([
+            'id',
+            'order_id',
+            'user_id',
+            'statement_id',
+            'month',
+            'year',
+            'share_cents',
+            'photo_revenue_cents',
+            'refunded_cents',
+            'created_at',
+            'updated_at',
+        ] as $column) {
+            $this->assertContains($column, $columns);
+        }
+
+        $indexes = collect(Schema::getIndexes('payout_order_bookings'));
+        $indexColumns = $indexes
+            ->map(fn (array $index): array => array_map('strtolower', $index['columns']))
+            ->all();
+        $this->assertContains(['user_id', 'year', 'month'], $indexColumns);
+        $uniqueIndexColumns = $indexes
+            ->filter(fn (array $index): bool => $index['unique'])
+            ->map(fn (array $index): array => array_map('strtolower', $index['columns']))
+            ->all();
+        $this->assertContains(['order_id', 'user_id', 'year', 'month'], $uniqueIndexColumns);
+    }
+
+    public function test_v052_does_not_backfill_historical_statements_or_rewrite_their_money(): void
+    {
+        $photographer = User::factory()->create();
+        Order::factory()->paid()->create();
+        $statement = PhotographerStatement::query()->create([
+            'user_id' => $photographer->id,
+            'month' => 6,
+            'year' => 2025,
+            'status' => 'approved',
+            'delta_surcharge_earnings_cents' => 1234,
+            'earned_amount_cents' => 5678,
+            'total_payable_cents' => 9012,
+        ]);
+
+        Schema::drop('payout_order_bookings');
+        $migration = require database_path('migrations/V052__create_payout_order_bookings.php');
+        $migration->up();
+
+        $this->assertSame(0, PayoutOrderBooking::query()->count());
+        $this->assertSame(1234, $statement->fresh()->delta_surcharge_earnings_cents);
+        $this->assertSame(5678, $statement->fresh()->earned_amount_cents);
+        $this->assertSame(9012, $statement->fresh()->total_payable_cents);
+    }
+
+    public function test_v052_statement_reference_nulls_on_delete_and_order_reference_cascades(): void
+    {
+        $photographer = User::factory()->create();
+        $order = Order::factory()->paid()->create();
+        $statement = PhotographerStatement::query()->create([
+            'user_id' => $photographer->id,
+            'month' => 6,
+            'year' => 2026,
+        ]);
+        $booking = PayoutOrderBooking::query()->create([
+            'order_id' => $order->id,
+            'user_id' => $photographer->id,
+            'statement_id' => $statement->id,
+            'month' => 6,
+            'year' => 2026,
+            'share_cents' => 500,
+            'photo_revenue_cents' => 1000,
+            'refunded_cents' => 0,
+        ]);
+
+        $this->assertSame(0, $booking->refunded_cents);
+        $statement->delete();
+        $this->assertNull($booking->fresh()->statement_id);
+
+        $migration = require database_path('migrations/V052__create_payout_order_bookings.php');
+        $migration->down();
+        $this->assertTrue(Schema::hasTable('payout_order_bookings'), 'down() is intentionally empty.');
+
+        $order->delete();
+        $this->assertDatabaseMissing('payout_order_bookings', ['id' => $booking->id]);
     }
 }

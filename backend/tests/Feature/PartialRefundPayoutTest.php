@@ -8,6 +8,7 @@ use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\PayoutCorrection;
 use App\Models\PayoutOpenItem;
+use App\Models\PayoutOrderBooking;
 use App\Models\Photo;
 use App\Models\PhotographerStatement;
 use App\Models\User;
@@ -390,6 +391,180 @@ class PartialRefundPayoutTest extends TestCase
             ->where('year', 2026)
             ->sole();
         $this->assertSame(-$bookedShare, $nextStatement->total_payable_cents);
+    }
+
+    public function test_late_full_refund_uses_the_booked_share_after_the_photo_is_deleted(): void
+    {
+        [$photographer, $photo, $order] = $this->makePaidOrder('pi_late_full_deleted_photo');
+        $statement = $this->approveJuneStatement($photographer);
+        $bookedShare = $statement->delta_surcharge_earnings_cents;
+
+        $photo->delete();
+
+        $this->postRefundEvent([
+            'payment_intent' => 'pi_late_full_deleted_photo',
+            'refunded' => true,
+            'amount' => 5000,
+            'amount_refunded' => 5000,
+        ], 'evt_late_full_deleted_photo');
+
+        $this->assertDatabaseHas('payout_corrections', [
+            'order_id' => $order->id,
+            'user_id' => $photographer->id,
+            'amount_cents' => -$bookedShare,
+        ]);
+    }
+
+    public function test_late_partial_refund_uses_the_booking_basis_and_caps_at_the_booked_share(): void
+    {
+        [$photographer, $photo, $order] = $this->makePaidOrder('pi_late_partial_booking');
+        $statement = $this->approveJuneStatement($photographer);
+        $bookedShare = $statement->delta_surcharge_earnings_cents;
+        $photo->delete();
+
+        $this->postRefundEvent([
+            'payment_intent' => 'pi_late_partial_booking',
+            'refunded' => false,
+            'amount' => 5000,
+            'amount_refunded' => 1500,
+        ], 'evt_late_partial_booking_1500');
+
+        $firstCorrection = PayoutCorrection::query()->sole();
+        $this->assertSame(-750, $firstCorrection->amount_cents);
+
+        // This is still delivered as a partial-refund event, but its cumulative
+        // amount exceeds the charge and is clamped to the full booked share.
+        $this->postRefundEvent([
+            'payment_intent' => 'pi_late_partial_booking',
+            'refunded' => false,
+            'amount' => 5000,
+            'amount_refunded' => 9000,
+        ], 'evt_late_partial_booking_over_total');
+
+        $this->assertSame(2, PayoutCorrection::query()->count());
+        $this->assertSame(-$bookedShare, (int) PayoutCorrection::query()->sum('amount_cents'));
+        $this->assertSame(-$bookedShare, (int) PayoutOpenItem::query()->where('source_type', 'refund')->sum('amount_cents'));
+        $this->assertSame('paid', $order->fresh()->status);
+    }
+
+    public function test_late_full_refund_after_a_partial_one_reverses_only_the_remaining_booked_share(): void
+    {
+        [$photographer] = $this->makePaidOrder('pi_late_partial_then_full');
+        $statement = $this->approveJuneStatement($photographer);
+        $bookedShare = $statement->delta_surcharge_earnings_cents;
+
+        $this->postRefundEvent([
+            'payment_intent' => 'pi_late_partial_then_full',
+            'refunded' => false,
+            'amount' => 5000,
+            'amount_refunded' => 1500,
+        ], 'evt_late_partial_then_full_partial');
+        $this->postRefundEvent([
+            'payment_intent' => 'pi_late_partial_then_full',
+            'refunded' => true,
+            'amount' => 5000,
+            'amount_refunded' => 5000,
+        ], 'evt_late_partial_then_full_full');
+
+        $corrections = PayoutCorrection::query()->orderBy('refund_amount_cents')->get();
+        $this->assertCount(2, $corrections);
+        $this->assertSame(-750, $corrections[0]->amount_cents);
+        $this->assertSame(-($bookedShare - 750), $corrections[1]->amount_cents);
+        $this->assertSame(-$bookedShare, (int) $corrections->sum('amount_cents'));
+    }
+
+    public function test_month_recalculation_upserts_bookings_idempotently_and_replaces_changed_values(): void
+    {
+        [$photographer, , $order] = $this->makePaidOrder('pi_booking_recalculation', 4000);
+
+        $this->service->calculatePowerUserDelta(6, 2026);
+        $booking = PayoutOrderBooking::query()->sole();
+        $original = $booking->only([
+            'id',
+            'order_id',
+            'user_id',
+            'statement_id',
+            'month',
+            'year',
+            'share_cents',
+            'photo_revenue_cents',
+            'refunded_cents',
+        ]);
+        $this->assertSame((string) $order->id, (string) $booking->order_id);
+        $this->assertSame((string) $photographer->id, (string) $booking->user_id);
+        $this->assertSame(2000, $booking->share_cents);
+        $this->assertSame(4000, $booking->photo_revenue_cents);
+        $this->assertSame(0, $booking->refunded_cents);
+        $this->assertNotNull($booking->statement_id);
+
+        $this->service->calculatePowerUserDelta(6, 2026);
+        $this->assertDatabaseCount('payout_order_bookings', 1);
+        $this->assertSame($original, PayoutOrderBooking::query()->sole()->only(array_keys($original)));
+
+        $snapshot = $order->invoiceSnapshot;
+        $details = $snapshot->customer_details;
+        $details['items'][0]['price'] = 3000;
+        $details[InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY] = ['0' => 3000];
+        $snapshot->customer_details = $details;
+        $snapshot->total_net = 3000;
+        $snapshot->total_gross = 3000;
+        $snapshot->save();
+
+        $this->service->calculatePowerUserDelta(6, 2026);
+
+        $updatedBooking = PayoutOrderBooking::query()->sole();
+        $this->assertSame((string) $booking->id, (string) $updatedBooking->id);
+        $this->assertSame(1500, $updatedBooking->share_cents);
+        $this->assertSame(3000, $updatedBooking->photo_revenue_cents);
+        $this->assertSame(1, PayoutOrderBooking::query()->count());
+    }
+
+    public function test_locked_statement_booking_is_not_changed_by_month_recalculation(): void
+    {
+        [$photographer, $photo, $order] = $this->makePaidOrder('pi_locked_booking');
+        $statement = $this->approveJuneStatement($photographer);
+        $booking = PayoutOrderBooking::query()->sole();
+        $originalBooking = $booking->only([
+            'id',
+            'statement_id',
+            'share_cents',
+            'photo_revenue_cents',
+            'refunded_cents',
+        ]);
+        $originalStatement = $statement->only([
+            'status',
+            'delta_surcharge_earnings_cents',
+            'earned_amount_cents',
+            'total_payable_cents',
+        ]);
+
+        $photo->delete();
+        $this->service->calculatePowerUserDelta(6, 2026);
+
+        $this->assertSame($originalBooking, $booking->fresh()->only(array_keys($originalBooking)));
+        $this->assertSame($originalStatement, $statement->fresh()->only(array_keys($originalStatement)));
+        $this->assertSame((string) $order->id, (string) $booking->order_id);
+    }
+
+    public function test_pre_v052_order_without_a_booking_uses_current_photo_recomputation(): void
+    {
+        [$photographer, $photo, $order] = $this->makePaidOrder('pi_legacy_without_booking');
+        $this->approveJuneStatement($photographer);
+
+        // Removing the row models a statement booked before V052. Its stored
+        // share is not inferred: the legacy fallback sees the current photo set.
+        PayoutOrderBooking::query()->where('order_id', $order->id)->delete();
+        $photo->delete();
+
+        $this->postRefundEvent([
+            'payment_intent' => 'pi_legacy_without_booking',
+            'refunded' => true,
+            'amount' => 5000,
+            'amount_refunded' => 5000,
+        ], 'evt_legacy_without_booking');
+
+        $this->assertSame(0, PayoutCorrection::query()->count());
+        $this->assertSame(0, PayoutOpenItem::query()->where('source_type', 'refund')->count());
     }
 
     public function test_negative_correction_carries_across_a_missing_statement_month(): void

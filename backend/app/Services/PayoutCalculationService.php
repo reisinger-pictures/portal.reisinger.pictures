@@ -9,12 +9,14 @@ use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\PayoutCorrection;
 use App\Models\PayoutOpenItem;
+use App\Models\PayoutOrderBooking;
 use App\Models\PayoutPool;
 use App\Models\Photo;
 use App\Models\PhotographerStatement;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class PayoutCalculationService
 {
@@ -528,9 +530,8 @@ class PayoutCalculationService
         $endDate = $startDate->copy()->endOfMonth();
 
         // Paid orders and fully refunded orders both belong to this month. A
-        // full refund contributes zero in an open statement, but it must remain
-        // in the order basis so a late-refund correction can compare its booked
-        // share with the new refunded share.
+        // full refund contributes zero in an open statement; retaining the order
+        // also lets this pass replace its booking row when the month is open.
         $orders = Order::whereIn('status', ['paid', 'refunded'])
             ->where('is_quote_request', false)
             ->whereBetween('created_at', [$startDate, $endDate])
@@ -559,17 +560,30 @@ class PayoutCalculationService
         $photos = Photo::select('id', 'user_id')->whereIn('id', array_unique($photoIds))->get()->keyBy('id');
 
         $deltaContributions = [];
+        $orderBookings = [];
         foreach ($orders as $order) {
+            $refundCents = max(0, (int) ($order->refunded_amount_cents ?? 0));
             foreach ($this->calculateOrderPhotographerShares(
                 $order,
                 $photos,
-                max(0, (int) ($order->refunded_amount_cents ?? 0)),
-            ) as $userId => $shareCents) {
-                $deltaContributions[(string) $userId] = ($deltaContributions[(string) $userId] ?? 0) + $shareCents;
+                $refundCents,
+            ) as $userId => $booking) {
+                $shareCents = $booking['share_cents'];
+                $orderBookings[] = [
+                    'order_id' => (string) $order->getKey(),
+                    'user_id' => (string) $userId,
+                    'share_cents' => $shareCents,
+                    'photo_revenue_cents' => $booking['photo_revenue_cents'],
+                    'refunded_cents' => $refundCents,
+                ];
+
+                if ($shareCents > 0) {
+                    $deltaContributions[(string) $userId] = ($deltaContributions[(string) $userId] ?? 0) + $shareCents;
+                }
             }
         }
 
-        $this->replaceDeltaContributions($month, $year, $deltaContributions);
+        $this->replaceDeltaContributions($month, $year, $deltaContributions, $orderBookings);
     }
 
     /**
@@ -580,10 +594,11 @@ class PayoutCalculationService
      * Approved/paid statements remain immutable.
      *
      * @param  array<string, int>  $contributions
+     * @param  list<array{order_id: string, user_id: string, share_cents: int, photo_revenue_cents: int, refunded_cents: int}>  $orderBookings
      */
-    private function replaceDeltaContributions(int $month, int $year, array $contributions): void
+    private function replaceDeltaContributions(int $month, int $year, array $contributions, array $orderBookings): void
     {
-        DB::transaction(function () use ($month, $year, $contributions): void {
+        DB::transaction(function () use ($month, $year, $contributions, $orderBookings): void {
             $statements = PhotographerStatement::query()
                 ->where('month', $month)
                 ->where('year', $year)
@@ -591,10 +606,14 @@ class PayoutCalculationService
                 ->lockForUpdate()
                 ->get();
             $statementsByUser = [];
+            $lockedUserIds = [];
 
             foreach ($statements as $statement) {
-                $statementsByUser[(string) $statement->user_id] = $statement;
+                $userId = (string) $statement->user_id;
+                $statementsByUser[$userId] = $statement;
                 if ($statement->isLocked()) {
+                    $lockedUserIds[$userId] = true;
+
                     continue;
                 }
 
@@ -622,6 +641,7 @@ class PayoutCalculationService
                         ->whereKey($statement->getKey())
                         ->lockForUpdate()
                         ->firstOrFail();
+                    $statementsByUser[(string) $userId] = $statement;
                 }
 
                 if ($statement->isLocked()) {
@@ -630,6 +650,73 @@ class PayoutCalculationService
 
                 $statement->delta_surcharge_earnings_cents = $deltaCents;
                 $statement->save();
+            }
+
+            $bookingUsers = [];
+            $ordersByUser = [];
+            foreach ($orderBookings as $booking) {
+                $userId = $booking['user_id'];
+                if (isset($lockedUserIds[$userId])) {
+                    continue;
+                }
+                $bookingUsers[$userId] = true;
+                $ordersByUser[$userId][] = $booking['order_id'];
+            }
+
+            $existingBookingUsers = PayoutOrderBooking::query()
+                ->where('year', $year)
+                ->where('month', $month)
+                ->distinct()
+                ->pluck('user_id')
+                ->map(fn ($userId): string => (string) $userId)
+                ->all();
+            foreach (array_unique([...$existingBookingUsers, ...array_keys($bookingUsers)]) as $userId) {
+                if (isset($lockedUserIds[$userId])) {
+                    continue;
+                }
+
+                $staleBookings = PayoutOrderBooking::query()
+                    ->where('year', $year)
+                    ->where('month', $month)
+                    ->where('user_id', $userId);
+                $orderIds = array_values(array_unique($ordersByUser[$userId] ?? []));
+                if ($orderIds !== []) {
+                    $staleBookings->whereNotIn('order_id', $orderIds);
+                }
+                $staleBookings->delete();
+            }
+
+            $now = now();
+            $rows = [];
+            foreach ($orderBookings as $booking) {
+                $userId = $booking['user_id'];
+                if (isset($lockedUserIds[$userId])) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'id' => (string) Str::uuid(),
+                    'order_id' => $booking['order_id'],
+                    'user_id' => $userId,
+                    'statement_id' => isset($statementsByUser[$userId])
+                        ? (string) $statementsByUser[$userId]->getKey()
+                        : null,
+                    'month' => $month,
+                    'year' => $year,
+                    'share_cents' => $booking['share_cents'],
+                    'photo_revenue_cents' => $booking['photo_revenue_cents'],
+                    'refunded_cents' => $booking['refunded_cents'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+
+            if ($rows !== []) {
+                PayoutOrderBooking::query()->upsert(
+                    $rows,
+                    ['order_id', 'user_id', 'year', 'month'],
+                    ['statement_id', 'share_cents', 'photo_revenue_cents', 'refunded_cents', 'updated_at'],
+                );
             }
         }, 3);
     }
@@ -640,14 +727,65 @@ class PayoutCalculationService
      */
     public function recordLateRefundCorrections(Order $order, int $previousRefundCents, int $currentRefundCents): void
     {
-        if ($currentRefundCents <= $previousRefundCents) {
+        if ($currentRefundCents <= $previousRefundCents || $order->created_at === null) {
             return;
         }
 
+        $closedYear = (int) $order->created_at->year;
+        $closedMonth = (int) $order->created_at->month;
+        $bookings = PayoutOrderBooking::query()
+            ->where('order_id', (string) $order->getKey())
+            ->where('year', $closedYear)
+            ->where('month', $closedMonth)
+            ->get();
+
+        if ($bookings->isNotEmpty()) {
+            // The webhook records this correction before transitioning a full
+            // refund to status=refunded, so the cumulative charge amount is also
+            // authoritative for recognizing that full-refund event here.
+            $isFullRefund = $order->status === 'refunded'
+                || $currentRefundCents >= max(0, (int) $order->total_amount);
+
+            foreach ($bookings as $booking) {
+                $statement = PhotographerStatement::query()
+                    ->where('user_id', (string) $booking->user_id)
+                    ->where('year', $closedYear)
+                    ->where('month', $closedMonth)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($statement === null || ! $statement->isLocked()) {
+                    continue;
+                }
+
+                $beforeReductionCents = $this->bookingRefundReduction($booking, $previousRefundCents);
+                $afterReductionCents = $isFullRefund
+                    ? max(0, (int) $booking->share_cents)
+                    : $this->bookingRefundReduction($booking, $currentRefundCents);
+                $amountCents = $beforeReductionCents - $afterReductionCents;
+
+                if ($amountCents < 0) {
+                    $this->storeLateRefundCorrection(
+                        $order,
+                        (string) $booking->user_id,
+                        $closedMonth,
+                        $closedYear,
+                        $currentRefundCents,
+                        $amountCents,
+                    );
+                }
+            }
+
+            return;
+        }
+
+        // Pre-V052 orders have no booking row. Preserve their historical
+        // behavior by recomputing from the invoice snapshot and current photos;
+        // no historical share is invented or backfilled.
         $order->loadMissing('invoiceSnapshot');
         $customerDetails = $order->invoiceSnapshot?->customer_details;
         $items = is_array($customerDetails) ? ($customerDetails['items'] ?? []) : [];
-        if (! is_array($items) || $order->created_at === null) {
+        if (! is_array($items)) {
             return;
         }
 
@@ -665,8 +803,6 @@ class PayoutCalculationService
 
         $beforeShares = $this->calculateOrderPhotographerShares($order, $photos, $previousRefundCents);
         $afterShares = $this->calculateOrderPhotographerShares($order, $photos, $currentRefundCents);
-        $closedYear = (int) $order->created_at->year;
-        $closedMonth = (int) $order->created_at->month;
 
         foreach (array_unique([...array_keys($beforeShares), ...array_keys($afterShares)]) as $userId) {
             $statement = PhotographerStatement::query()
@@ -680,59 +816,96 @@ class PayoutCalculationService
                 continue;
             }
 
-            $amountCents = ($afterShares[$userId] ?? 0) - ($beforeShares[$userId] ?? 0);
-            if ($amountCents >= 0) {
-                continue;
+            $amountCents = ($afterShares[$userId]['share_cents'] ?? 0)
+                - ($beforeShares[$userId]['share_cents'] ?? 0);
+            if ($amountCents < 0) {
+                $this->storeLateRefundCorrection(
+                    $order,
+                    (string) $userId,
+                    $closedMonth,
+                    $closedYear,
+                    $currentRefundCents,
+                    $amountCents,
+                );
             }
-
-            DB::transaction(function () use (
-                $order,
-                $userId,
-                $closedMonth,
-                $closedYear,
-                $currentRefundCents,
-                $amountCents,
-            ): void {
-                $correction = PayoutCorrection::query()->createOrFirst(
-                    [
-                        'order_id' => (string) $order->getKey(),
-                        'user_id' => (string) $userId,
-                        'closed_month' => $closedMonth,
-                        'closed_year' => $closedYear,
-                        'refund_amount_cents' => $currentRefundCents,
-                    ],
-                    [
-                        'amount_cents' => $amountCents,
-                        'settled_at' => null,
-                    ],
-                );
-
-                PayoutOpenItem::query()->createOrFirst(
-                    [
-                        'source_type' => 'refund',
-                        'source_id' => (string) $correction->getKey(),
-                    ],
-                    [
-                        'user_id' => (string) $correction->user_id,
-                        'order_id' => (string) $correction->order_id,
-                        'origin_month' => (int) $correction->closed_month,
-                        'origin_year' => (int) $correction->closed_year,
-                        'amount_cents' => (int) $correction->amount_cents,
-                        'settled_month' => $correction->settled_month,
-                        'settled_year' => $correction->settled_year,
-                        'settled_at' => $correction->settled_at,
-                    ],
-                );
-            }, 3);
         }
+    }
+
+    private function bookingRefundReduction(PayoutOrderBooking $booking, int $cumulativeRefundCents): int
+    {
+        $shareCents = max(0, (int) $booking->share_cents);
+        $photoRevenueCents = max(0, (int) $booking->photo_revenue_cents);
+        $newRefundCents = max(0, $cumulativeRefundCents - (int) $booking->refunded_cents);
+
+        if ($shareCents === 0 || $photoRevenueCents === 0 || $newRefundCents === 0) {
+            return 0;
+        }
+
+        $proportionalReduction = (int) bcdiv(
+            bcmul((string) $shareCents, (string) $newRefundCents, 0),
+            (string) $photoRevenueCents,
+            0,
+        );
+
+        return min($shareCents, $proportionalReduction);
+    }
+
+    private function storeLateRefundCorrection(
+        Order $order,
+        string $userId,
+        int $closedMonth,
+        int $closedYear,
+        int $currentRefundCents,
+        int $amountCents,
+    ): void {
+        DB::transaction(function () use (
+            $order,
+            $userId,
+            $closedMonth,
+            $closedYear,
+            $currentRefundCents,
+            $amountCents,
+        ): void {
+            $correction = PayoutCorrection::query()->createOrFirst(
+                [
+                    'order_id' => (string) $order->getKey(),
+                    'user_id' => $userId,
+                    'closed_month' => $closedMonth,
+                    'closed_year' => $closedYear,
+                    'refund_amount_cents' => $currentRefundCents,
+                ],
+                [
+                    'amount_cents' => $amountCents,
+                    'settled_at' => null,
+                ],
+            );
+
+            PayoutOpenItem::query()->createOrFirst(
+                [
+                    'source_type' => 'refund',
+                    'source_id' => (string) $correction->getKey(),
+                ],
+                [
+                    'user_id' => (string) $correction->user_id,
+                    'order_id' => (string) $correction->order_id,
+                    'origin_month' => (int) $correction->closed_month,
+                    'origin_year' => (int) $correction->closed_year,
+                    'amount_cents' => (int) $correction->amount_cents,
+                    'settled_month' => $correction->settled_month,
+                    'settled_year' => $correction->settled_year,
+                    'settled_at' => $correction->settled_at,
+                ],
+            );
+        }, 3);
     }
 
     /**
      * Apply the same proportional refund, fee and share split used by the
-     * monthly calculation, returning each photographer's aggregate share.
+     * monthly calculation, returning each photographer's share and the
+     * order's remaining photo-backed revenue used as its refund basis.
      *
      * @param  EloquentCollection<string, Photo>  $photos
-     * @return array<string, int>
+     * @return array<string, array{share_cents: int, photo_revenue_cents: int}>
      */
     private function calculateOrderPhotographerShares(Order $order, EloquentCollection $photos, int $refundCents): array
     {
@@ -802,6 +975,11 @@ class PayoutCalculationService
             return [];
         }
 
+        $photographerIds = array_values(array_unique(array_filter(array_map(
+            static fn (array $item): ?string => $item['user_id'] === null ? null : (string) $item['user_id'],
+            $photoItems,
+        ))));
+
         $snapshotNet = max(0, (int) ($snapshot->total_net ?? 0));
         if ($hasExplicitAttribution) {
             $photoRevenue = array_map(
@@ -833,8 +1011,12 @@ class PayoutCalculationService
         }
 
         $totalPhotoRevenue = array_sum($photoRevenue);
+        $shares = array_fill_keys($photographerIds, 0);
         if ($totalPhotoRevenue <= 0) {
-            return [];
+            return array_fill_keys($photographerIds, [
+                'share_cents' => 0,
+                'photo_revenue_cents' => 0,
+            ]);
         }
 
         $stripeFeePercent = config('services.stripe.fee_percent', 0.04);
@@ -853,7 +1035,6 @@ class PayoutCalculationService
             : 0;
         $itemFees = $this->allocateCentsProportionally($photoFeeCents, $photoRevenue);
 
-        $shares = [];
         foreach ($photoItems as $index => $item) {
             if (! $item['user_id'] || ($photoRevenue[$index] ?? 0) <= 0) {
                 continue;
@@ -862,10 +1043,18 @@ class PayoutCalculationService
             $netCents = max(0, $photoRevenue[$index] - ($itemFees[$index] ?? 0));
             $shareCents = (int) bcmul((string) $netCents, '0.50', 0);
             $userId = (string) $item['user_id'];
-            $shares[$userId] = ($shares[$userId] ?? 0) + $shareCents;
+            $shares[$userId] += $shareCents;
         }
 
-        return $shares;
+        $shareDetails = [];
+        foreach ($shares as $userId => $shareCents) {
+            $shareDetails[$userId] = [
+                'share_cents' => $shareCents,
+                'photo_revenue_cents' => $totalPhotoRevenue,
+            ];
+        }
+
+        return $shareDetails;
     }
 
     /**
