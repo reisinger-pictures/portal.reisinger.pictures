@@ -346,21 +346,8 @@ export default function KameraEinrichtungContent({connection, resetLimitPerHour}
                 <div>
                     <h3 className="font-bold"><Trans>Zum Stammzertifikat</Trans></h3>
                     <p className="text-sm"><Trans>Die Kamera akzeptiert das Zertifikat auch ohne Import über „Zielserver vertrauen".</Trans>{' '}
-                        <Trans>Das ist der erste Weg. Das Stammzertifikat ist der Fallback, falls die Kamera mit dieser Einstellung keine Verbindung aufnimmt.</Trans></p>
-                    <button
-                        type="button"
-                        className="btn btn-sm mt-2"
-                        disabled={downloadingCertificate}
-                        aria-busy={downloadingCertificate}
-                        onClick={downloadCertificate}
-                    >
-                        <Trans>ROOT.PEM herunterladen</Trans>
-                    </button>
-                    {certificateDownloadError && (
-                        <p role="alert" className="alert alert-error mt-2 text-sm">
-                            {certificateDownloadError}
-                        </p>
-                    )}
+                        <Trans>Das ist der erste Weg. Das Stammzertifikat ist der Fallback, falls die Kamera mit dieser Einstellung keine Verbindung aufnimmt.</Trans>{' '}
+                        <Trans>Der Download steht bei den FTPS-Einstellungen.</Trans></p>
                 </div>
             </div>
         </>

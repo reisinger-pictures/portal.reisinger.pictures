@@ -1865,6 +1865,10 @@ msgstr "Delta (Aufpreis):"
 msgid "Der Client erwartet implizites TLS"
 msgstr "Der Client erwartet implizites TLS"
 
+#: src/ui/management/KameraEinrichtungContent.tsx
+msgid "Der Download steht bei den FTPS-Einstellungen."
+msgstr "Der Download steht bei den FTPS-Einstellungen."
+
 #: src/ui/management/components/ModelInviteDialog.tsx
 msgid "Der Einladungslink wird ungültig und kann nicht mehr verwendet werden."
 msgstr "Der Einladungslink wird ungültig und kann nicht mehr verwendet werden."
