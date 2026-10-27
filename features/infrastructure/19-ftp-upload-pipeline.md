@@ -1034,8 +1034,21 @@ ersten Start per `openssl` selbstsigniert erzeugt und liegt unter
 **Für die Kamera exportieren:** Canon verlangt die Datei auf der Speicherkarte
 (`.CER`/`.CRT`/`.PEM`) plus „Zielserver vertrauen → Aktivieren", sonst bricht die
 Übertragung mit Error 48 ab (cam.start.canon UG-06_Network_0230). Die Datei liegt
-im Container unter `/var/lib/sftpgo/ftps/cert.pem`; ein Download aus der GUI ist
-noch nicht gebaut (siehe #35).
+im Container unter `/var/lib/sftpgo/ftps/cert.pem`.
+
+**Download (D-61):** `GET /api/management/ftp/certificate` holt das Zertifikat
+aus dem **laufenden TLS-Handshake** der FTPS-Bindung — nicht aus einer Kopie und
+nicht aus dem Volume. Das Backend verbindet sich intern auf den FTPS-Port
+(`services.ftp_transport.internal_host`/`internal_ftps_port`) und spricht je nach
+`ftps_tls_mode` explizit (`220` → `AUTH TLS` → `234`) oder implizit TLS. Es
+exportiert ausschließlich das Peer-Zertifikat; `key.pem` ist auf diesem Pfad
+nicht adressierbar. Die Antwort ist `application/x-pem-file` mit
+`Content-Disposition: attachment; filename="ROOT.PEM"` und `no-store` — der Name
+ist Bindevorschrift, weil Canon anders benannte Dateien still überspringt. Ein
+fehlgeschlagener Handshake ist ein sichtbares 503, nie eine veraltete Datei.
+Medium: über die Management-Oberfläche (optionaler Schritt in
+[`deployment/kamera-einrichtung.md`](../../deployment/kamera-einrichtung.md));
+`docker cp` bleibt nur der Notweg, wenn der Dienst nicht erreichbar ist.
 
 Aus dem Vorfall vom 2026-09-26, verbindlich für jeden Prozess, der auf
 `/home/webadmin/websites` schreibt.
