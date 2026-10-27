@@ -239,6 +239,14 @@ An organization may configure its default role as `client`, `power_user`, or `or
 
 `FtpInboxImporter` resolves `inboxPath` and the account home with `realpath()` and refuses the walk unless the inbox resolves to a directory **inside** the account home. The existing per-entry check (`! is_link($path) && is_file($path)`) only rejects symlink **entries**; an inbox directory that is itself a link, or a path that resolves out of the home, would pass it and be walked. Such a state is **not** a client state: SFTPGo's chroot and `common.symlink_mode = 0` keep a photographer from creating it, so its presence means a host, ACL, or provisioning defect. It is therefore reported as an operational failure — an error-level log line plus a visible failed import — and never as a quiet empty run or a new photographer-facing "inbox invalid" status. See [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md).
 
+### D-60: `users.ftp_slug` is authoritative; a rename is a provisioning run
+
+The portal database is the single source of truth for the FTP account name. `users.ftp_slug` names both the SFTPGo account and the inbox directory; SFTPGo never renames an account on its own. A rename is therefore a **provisioning run** through the lock-aware slug-change path, which deletes the old remote account before creating the new one. Reconciliation never adopts a name it finds in SFTPGo: a remote camera account under a name that no portal slug claims is a **name drift**, not a new truth. Because a 404 for the portal's slug is then not proof that the access was withdrawn, the reconciler detects drift at the set level — camera accounts no portal user claims, and portal slugs without a camera account — and reports it as its own finding with the account status untouched. The operator decides whether to re-provision the account or correct the service. See [FTP upload pipeline](infrastructure/19-ftp-upload-pipeline.md) §7.16a.
+
+### D-61: The certificate download reads the certificate the service actually presents
+
+The management download of the FTPS certificate is sourced from the live TLS handshake of the running SFTPGo binding, not from a file copy and not from a mounted volume. The certificate lives in the `sftpgo_data` volume, which the backend does not see, and a copy could differ from what the service presents after a rotation. Only the **public** certificate leaves the portal — the handshake path cannot address `key.pem`. Importing it into the camera is an **optional** setup step: Canon accepts an unknown self-signed certificate through "Zielserver vertrauen", so the download removes a shell step rather than gating the setup. If the service is unreachable, the download fails visibly instead of serving a stale file. See [camera setup](../deployment/kamera-einrichtung.md).
+
 ## Payouts
 
 ### D-58: A refund after month close is a negative correction in the next statement
