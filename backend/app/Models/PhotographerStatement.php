@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class PhotographerStatement extends Model
@@ -32,6 +33,15 @@ class PhotographerStatement extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function corrections(): HasMany
+    {
+        return $this->hasMany(PayoutCorrection::class, 'user_id', 'user_id')
+            ->where('settled_month', $this->month)
+            ->where('settled_year', $this->year)
+            ->orderBy('created_at')
+            ->orderBy('id');
     }
 
     protected static function booted()

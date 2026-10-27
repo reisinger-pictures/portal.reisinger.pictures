@@ -46,6 +46,19 @@ export default function PhotographerPayoutsView() {
                                 <td className="text-right text-sm font-mono opacity-80">
                                     <Trans>Pool:</Trans> {formatMoney(stmt.pool_earnings_cents)}<br/>
                                     <Trans>Delta (Aufpreis):</Trans> {formatMoney(stmt.delta_surcharge_earnings_cents)}<br/>
+                                    {stmt.corrections.length > 0 && (
+                                        <ul className="list text-left text-xs">
+                                            {stmt.corrections.map(correction => (
+                                                <li className="list-row gap-2 px-0 py-1" key={correction.id}>
+                                                    <span>
+                                                        <Trans>Korrektur Bestellung</Trans> {correction.order_reference}<br/>
+                                                        <span className="opacity-70"><Trans>Geschlossener Monat:</Trans> {correction.closed_month} / {correction.closed_year}</span>
+                                                    </span>
+                                                    <span>{formatMoney(correction.amount_cents)}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
                                     <span className="opacity-50"><Trans>Rollover:</Trans> {formatMoney(stmt.rolled_over_amount_cents)}</span>
                                 </td>
                                 <td className="text-right font-mono font-bold text-lg text-primary">
