@@ -99,6 +99,37 @@ rewritten. A rollback that drops the new table would lose open-item state while
 leaving `payout_corrections` and all statement rows untouched; migration
 `down()` is intentionally empty under the repository migration policy.
 
+### 2.5 `payout_order_bookings`
+
+* `id` (UUID, Primary)
+* `order_id`, `user_id` (UUID foreign keys to the originating order and photographer; cascade on delete)
+* `statement_id` (nullable UUID foreign key to the statement that received the share; set null when that statement is deleted)
+* `month`, `year` (the booked order period)
+* `share_cents` (the photographer's actual booked share for this order)
+* `photo_revenue_cents` (the order's remaining photo-backed revenue used as its proportional-refund basis at booking time)
+* `refunded_cents` (cumulative order refund already observed at booking time; defaults to zero)
+* `created_at`, `updated_at` (timestamps)
+
+The natural key is `(order_id, user_id, year, month)`; the photographer-period
+lookup index is `(user_id, year, month)`. During the authoritative
+`calculatePowerUserDelta()` pass for a month, each eligible paid/refunded,
+non-quote order records one row per photographer using the same
+`calculateOrderPhotographerShares()` split used by the payout calculation. A
+recalculation upserts those values and removes stale rows for unlocked
+statements; it never edits a locked (`approved`/`paid`) statement or its booking
+rows. The booking's `photo_revenue_cents` is the remaining photo-backed revenue
+after refunds already reflected in `refunded_cents`.
+
+V052 intentionally has **no historical backfill**. Historical statements only
+store aggregates, so their per-order shares cannot be reconstructed safely from
+current photos. Existing statement money is never rewritten. Orders booked
+before V052 have no booking row and their later refund correction explicitly
+falls back to recomputing from the invoice snapshot and current photos; this
+legacy fallback retains the former behavior and cannot recover a deleted or
+changed photo's historical share. An executed rollback would discard the
+booking evidence and leave statements/corrections unchanged; `down()` is
+intentionally empty under the repository migration policy.
+
 ## 3. Data-integrity contract
 
 ### 3.1 Natural keys and duplicate policy (P1-M16)
@@ -269,16 +300,28 @@ booked share unreversed. The customer-facing invoice is untouched:
 
 Under D-58, a refund received after the originating statement is `approved` or
 `paid` creates a `payout_corrections` row in the same transaction that advances
-the order's cumulative refund. Its negative amount is the difference between the
-photographer shares computed at the previously stored refund amount (the share
-already booked) and the new cumulative amount, using the same proportional
-allocation, fee proration, and 50% split as the normal calculation. Each row
-identifies the order, photographer, closed period, and cumulative refund
-snapshot. The unique key makes the cumulative snapshot idempotent; a later
-increase in the cumulative refund produces only its incremental share reduction.
-The same transaction creates a `refund` item in `payout_open_items` with the
-correction's source ID, signed amount, and closed origin period. The correction
-remains the refund audit record.
+the order's cumulative refund. When a V052 booking row exists, a full refund
+reverses that photographer's booked `share_cents` exactly. If earlier partial
+refund corrections already exist, the full-refund event books only the remaining
+amount, so the cumulative correction equals exactly `-share_cents` rather than
+over-recovering it. A partial refund uses the booking's remaining
+`photo_revenue_cents` as the denominator: the cumulative reduction is
+`min(share_cents, floor(share_cents * (cumulative_refund - refunded_cents) /
+photo_revenue_cents))`; each correction row records only the difference from
+the previously observed cumulative refund. Thus partial reductions are
+proportional and capped at the booked share. The ledger values, not the current
+photo set, determine both amounts.
+
+For a pre-V052 order without a booking row, correction generation falls back to
+the existing invoice-snapshot/current-photo recomputation. This is a deliberate
+compatibility boundary, not a historical reconstruction: photos deleted,
+replaced, or changed since that statement may still make the fallback differ
+from its original booking. Each `payout_corrections` row identifies the order,
+photographer, closed period, and cumulative refund snapshot. The unique key
+makes the cumulative snapshot idempotent; a later increase produces only its
+incremental share reduction. The same transaction creates a `refund` item in
+`payout_open_items` with the correction's source ID, signed amount, and closed
+origin period. The correction remains the refund audit record.
 
 `payout_open_items` is the single source for unsettled carry and refund amounts.
 Every finalization locks and claims all unsettled items whose origin period is
