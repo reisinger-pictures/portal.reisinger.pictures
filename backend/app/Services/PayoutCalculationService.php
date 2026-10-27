@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\PayoutChronologyException;
 use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
@@ -28,6 +29,8 @@ class PayoutCalculationService
 
     public function calculatePoolShares(PayoutPool $pool)
     {
+        $this->assertChronological((int) $pool->month, (int) $pool->year);
+
         $startDate = Carbon::create($pool->year, $pool->month, 1)->startOfMonth();
         $endDate = $startDate->copy()->endOfMonth();
 
@@ -474,7 +477,7 @@ class PayoutCalculationService
 
             foreach ($statements as $statement) {
                 $statementsByUser[(string) $statement->user_id] = $statement;
-                if (in_array($statement->status, ['approved', 'paid'], true)) {
+                if ($statement->isLocked()) {
                     continue;
                 }
 
@@ -505,7 +508,7 @@ class PayoutCalculationService
                         ->firstOrFail();
                 }
 
-                if (in_array($statement->status, ['approved', 'paid'], true)) {
+                if ($statement->isLocked()) {
                     continue;
                 }
 
@@ -516,70 +519,10 @@ class PayoutCalculationService
         }, 3);
     }
 
-    /**
-     * Add one surcharge contribution to the statement for a photographer/month.
-     *
-     * The natural-key index makes the insert race-safe; the row lock makes the
-     * read/modify/write arithmetic atomic and also serializes approval. A
-     * locked statement is checked only after the lock is acquired, so an
-     * approval cannot be overwritten by a concurrent calculation.
-     */
-    private function addStatementDelta(
-        string $userId,
-        int $month,
-        int $year,
-        int $deltaEarningsCents,
-    ): void {
-        DB::transaction(function () use (
-            $userId,
-            $month,
-            $year,
-            $deltaEarningsCents,
-        ): void {
-            $identity = [
-                'user_id' => $userId,
-                'year' => $year,
-                'month' => $month,
-            ];
-
-            $statement = PhotographerStatement::query()
-                ->where($identity)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->first();
-
-            if ($statement === null) {
-                // createOrFirst uses a savepoint to turn a concurrent unique
-                // insert into a read of the winning row. The V040 index is the
-                // final authority across independent application processes.
-                $statement = PhotographerStatement::query()->createOrFirst(
-                    $identity,
-                    [
-                        'total_shares_earned' => '0.0000',
-                        'pool_earnings_cents' => 0,
-                        'delta_surcharge_earnings_cents' => 0,
-                        'status' => 'pending',
-                    ],
-                );
-
-                $statement = PhotographerStatement::query()
-                    ->whereKey($statement->getKey())
-                    ->lockForUpdate()
-                    ->firstOrFail();
-            }
-
-            if (in_array($statement->status, ['approved', 'paid'], true)) {
-                return;
-            }
-
-            $statement->delta_surcharge_earnings_cents =
-                ($statement->delta_surcharge_earnings_cents ?? 0) + $deltaEarningsCents;
-            $statement->save();
-        }, 3);
-    }
-
     public function calculatePowerUserDelta(int $month, int $year)
     {
+        $this->assertChronological($month, $year);
+
         $startDate = Carbon::create($year, $month, 1)->startOfMonth();
         $endDate = $startDate->copy()->endOfMonth();
 
@@ -614,15 +557,80 @@ class PayoutCalculationService
         // Memory-Optimierung: Nur die benötigten Spalten laden, um das PHP Memory Limit zu schonen
         $photos = Photo::select('id', 'user_id')->whereIn('id', array_unique($photoIds))->get()->keyBy('id');
 
+        $deltaContributions = [];
         foreach ($orders as $order) {
             foreach ($this->calculateOrderPhotographerShares(
                 $order,
                 $photos,
                 max(0, (int) ($order->refunded_amount_cents ?? 0)),
             ) as $userId => $shareCents) {
-                $this->addStatementDelta($userId, $month, $year, $shareCents);
+                $deltaContributions[(string) $userId] = ($deltaContributions[(string) $userId] ?? 0) + $shareCents;
             }
         }
+
+        $this->replaceDeltaContributions($month, $year, $deltaContributions);
+    }
+
+    /**
+     * Replace the order-derived portion of every statement for this month.
+     *
+     * The monthly order calculation is authoritative, so replaying it replaces
+     * each unlocked statement's delta instead of incrementing the stored value.
+     * Approved/paid statements remain immutable.
+     *
+     * @param  array<string, int>  $contributions
+     */
+    private function replaceDeltaContributions(int $month, int $year, array $contributions): void
+    {
+        DB::transaction(function () use ($month, $year, $contributions): void {
+            $statements = PhotographerStatement::query()
+                ->where('month', $month)
+                ->where('year', $year)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $statementsByUser = [];
+
+            foreach ($statements as $statement) {
+                $statementsByUser[(string) $statement->user_id] = $statement;
+                if ($statement->isLocked()) {
+                    continue;
+                }
+
+                $statement->delta_surcharge_earnings_cents = 0;
+                $statement->save();
+            }
+
+            foreach ($contributions as $userId => $deltaCents) {
+                $statement = $statementsByUser[(string) $userId] ?? null;
+                if ($statement === null) {
+                    $statement = PhotographerStatement::query()->createOrFirst(
+                        [
+                            'user_id' => (string) $userId,
+                            'year' => $year,
+                            'month' => $month,
+                        ],
+                        [
+                            'total_shares_earned' => '0.0000',
+                            'pool_earnings_cents' => 0,
+                            'delta_surcharge_earnings_cents' => 0,
+                            'status' => 'pending',
+                        ],
+                    );
+                    $statement = PhotographerStatement::query()
+                        ->whereKey($statement->getKey())
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                }
+
+                if ($statement->isLocked()) {
+                    continue;
+                }
+
+                $statement->delta_surcharge_earnings_cents = $deltaCents;
+                $statement->save();
+            }
+        }, 3);
     }
 
     /**
@@ -667,7 +675,7 @@ class PayoutCalculationService
                 ->lockForUpdate()
                 ->first();
 
-            if ($statement === null || ! in_array($statement->status, ['approved', 'paid'], true)) {
+            if ($statement === null || ! $statement->isLocked()) {
                 continue;
             }
 
@@ -868,6 +876,8 @@ class PayoutCalculationService
     public function finalizeStatements(int $month, int $year)
     {
         DB::transaction(function () use ($month, $year): void {
+            $this->assertChronological($month, $year);
+
             $corrections = PayoutCorrection::query()
                 ->whereNull('settled_at')
                 ->where(function ($query) use ($month, $year): void {
@@ -907,7 +917,7 @@ class PayoutCalculationService
                     ->lockForUpdate()
                     ->first();
 
-                if ($statement !== null && in_array($statement->status, ['approved', 'paid'], true)) {
+                if ($statement !== null && $statement->isLocked()) {
                     continue;
                 }
 
@@ -927,7 +937,7 @@ class PayoutCalculationService
                         ->firstOrFail();
                 }
 
-                if (in_array($statement->status, ['approved', 'paid'], true)) {
+                if ($statement->isLocked()) {
                     continue;
                 }
 
@@ -958,7 +968,7 @@ class PayoutCalculationService
             foreach ($statements as $stmt) {
                 // Locked statements (approved/paid) are immutable: never recompute or
                 // downgrade their status — they are the payout audit trail.
-                if (in_array($stmt->status, ['approved', 'paid'], true)) {
+                if ($stmt->isLocked()) {
                     continue;
                 }
 
@@ -1003,5 +1013,32 @@ class PayoutCalculationService
                 $stmt->save();
             }
         }, 3);
+    }
+
+    public function assertChronological(int $month, int $year): void
+    {
+        $blockingStatement = PhotographerStatement::query()
+            ->where(function ($query) use ($month, $year): void {
+                $query->where('year', '>', $year)
+                    ->orWhere(function ($query) use ($month, $year): void {
+                        $query->where('year', $year)
+                            ->where('month', '>', $month);
+                    });
+            })
+            ->orderBy('year')
+            ->orderBy('month')
+            ->lockForUpdate()
+            ->first();
+
+        if ($blockingStatement === null) {
+            return;
+        }
+
+        $requestedPeriod = sprintf('%02d/%d', $month, $year);
+        $blockingPeriod = sprintf('%02d/%d', $blockingStatement->month, $blockingStatement->year);
+
+        throw new PayoutChronologyException(
+            "Die Abrechnung für {$requestedPeriod} ist gesperrt: Für den späteren Monat {$blockingPeriod} existiert bereits eine finale Abrechnung. Bitte rechne die Monate chronologisch ab.",
+        );
     }
 }

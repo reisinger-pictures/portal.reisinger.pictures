@@ -3,6 +3,12 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
+use App\Exceptions\PayoutChronologyException;
+use App\Models\InvoiceSnapshot;
+use App\Models\Order;
+use App\Models\PayoutCorrection;
+use App\Models\PayoutPool;
+use App\Models\Photo;
 use App\Models\PhotographerStatement;
 use App\Models\Role;
 use App\Models\User;
@@ -145,5 +151,181 @@ class PayoutLockedStatementsTest extends TestCase
         ]);
         $this->assertSame(-750, $july->fresh()->total_payable_cents);
         $this->assertSame(-750, $september->fresh()->total_payable_cents);
+    }
+
+    public function test_finalize_service_rejects_an_earlier_month_when_a_later_statement_exists(): void
+    {
+        $photographer = User::factory()->create();
+        PhotographerStatement::query()->create([
+            'user_id' => $photographer->id,
+            'month' => 9,
+            'year' => 2026,
+            'status' => 'pending',
+        ]);
+
+        $this->expectException(PayoutChronologyException::class);
+        $this->expectExceptionMessage(
+            'Die Abrechnung für 08/2026 ist gesperrt: Für den späteren Monat 09/2026 existiert bereits eine finale Abrechnung. Bitte rechne die Monate chronologisch ab.',
+        );
+
+        (new PayoutCalculationService)->finalizeStatements(8, 2026);
+    }
+
+    public function test_recalculation_after_calculation_without_pool_amount_keeps_stored_amount(): void
+    {
+        $token = $this->actingAsSuperAdmin();
+        $photographer = User::factory()->create();
+        $photo = Photo::factory()->create(['user_id' => $photographer->id]);
+        $order = Order::factory()->paid()->create([
+            'stripe_fee_cents' => 0,
+            'created_at' => '2026-05-10 12:00:00',
+        ]);
+        InvoiceSnapshot::query()->create([
+            'order_id' => $order->id,
+            'customer_details' => [
+                'items' => [['photoId' => $photo->id, 'price' => 1000, 'tier' => 'web']],
+            ],
+            'total_net' => 1000,
+            'total_gross' => 1200,
+            'tax_rate' => 20.00,
+        ]);
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/management/payouts/calculate', [
+                'month' => 5,
+                'year' => 2026,
+                'net_pool_cents' => 12345,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('photographer_statements', [
+            'user_id' => $photographer->id,
+            'month' => 5,
+            'year' => 2026,
+        ]);
+        $pool = PayoutPool::query()->where(['month' => 5, 'year' => 2026])->sole();
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/management/payouts/calculate', [
+                'month' => 5,
+                'year' => 2026,
+            ])
+            ->assertOk();
+
+        $this->assertSame(12345, $pool->fresh()->net_pool_cents);
+    }
+
+    public function test_orphan_pool_without_statement_requires_pool_amount(): void
+    {
+        $token = $this->actingAsSuperAdmin();
+        $pool = PayoutPool::query()->create([
+            'month' => 5,
+            'year' => 2026,
+            'net_pool_cents' => 12345,
+            'photographer_share_percent' => 50,
+        ]);
+
+        $this->assertDatabaseMissing('photographer_statements', [
+            'month' => 5,
+            'year' => 2026,
+        ]);
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/management/payouts/calculate', [
+                'month' => 5,
+                'year' => 2026,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('net_pool_cents');
+
+        $this->assertSame(12345, $pool->fresh()->net_pool_cents);
+        $this->assertDatabaseMissing('photographer_statements', [
+            'month' => 5,
+            'year' => 2026,
+        ]);
+    }
+
+    public function test_booked_correction_is_recalculation_evidence_without_statement(): void
+    {
+        $token = $this->actingAsSuperAdmin();
+        $photographer = User::factory()->create();
+        $order = Order::factory()->paid()->create([
+            'created_at' => '2026-04-10 12:00:00',
+        ]);
+        $pool = PayoutPool::query()->create([
+            'month' => 5,
+            'year' => 2026,
+            'net_pool_cents' => 12345,
+            'photographer_share_percent' => 50,
+        ]);
+        PayoutCorrection::query()->create([
+            'order_id' => $order->id,
+            'user_id' => $photographer->id,
+            'refund_amount_cents' => 1000,
+            'amount_cents' => -500,
+            'closed_month' => 4,
+            'closed_year' => 2026,
+            'settled_at' => now(),
+            'settled_month' => 5,
+            'settled_year' => 2026,
+        ]);
+
+        $this->assertDatabaseMissing('photographer_statements', [
+            'month' => 5,
+            'year' => 2026,
+        ]);
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/management/payouts/calculate', [
+                'month' => 5,
+                'year' => 2026,
+            ])
+            ->assertOk();
+
+        $this->assertSame(12345, $pool->fresh()->net_pool_cents);
+        $this->assertDatabaseHas('photographer_statements', [
+            'user_id' => $photographer->id,
+            'month' => 5,
+            'year' => 2026,
+        ]);
+    }
+
+    public function test_recalculation_with_pool_amount_updates_stored_amount(): void
+    {
+        $token = $this->actingAsSuperAdmin();
+        $pool = PayoutPool::query()->create([
+            'month' => 5,
+            'year' => 2026,
+            'net_pool_cents' => 12345,
+            'photographer_share_percent' => 50,
+        ]);
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/management/payouts/calculate', [
+                'month' => 5,
+                'year' => 2026,
+                'net_pool_cents' => 23456,
+            ])
+            ->assertOk();
+
+        $this->assertSame(23456, $pool->fresh()->net_pool_cents);
+    }
+
+    public function test_first_calculation_requires_pool_amount(): void
+    {
+        $token = $this->actingAsSuperAdmin();
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/management/payouts/calculate', [
+                'month' => 5,
+                'year' => 2026,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('net_pool_cents');
+
+        $this->assertDatabaseMissing('payout_pools', [
+            'month' => 5,
+            'year' => 2026,
+        ]);
     }
 }

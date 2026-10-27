@@ -12,6 +12,8 @@ class PhotographerStatement extends Model
 {
     use HasFactory, HasUuids;
 
+    private const LOCKED_STATUSES = ['approved', 'paid'];
+
     protected $fillable = [
         'user_id', 'sequence_number', 'month', 'year',
         'total_shares_earned', 'pool_earnings_cents', 'delta_surcharge_earnings_cents',
@@ -29,6 +31,11 @@ class PhotographerStatement extends Model
         'total_payable_cents' => 'integer',
         'status' => 'string',
     ];
+
+    public function isLocked(): bool
+    {
+        return in_array($this->status, self::LOCKED_STATUSES, true);
+    }
 
     public function user()
     {
