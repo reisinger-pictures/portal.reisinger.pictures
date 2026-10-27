@@ -66,16 +66,38 @@ The system remunerates photographers based on actual usage (downloads) by end cu
 Corrections have no target period. The natural key is
 `(order_id, user_id, closed_year, closed_month, refund_amount_cents)`. A later
 cumulative refund creates a separate incremental line; a replay of the same
-cumulative amount cannot create another line. The claim index covers
-`(settled_at, closed_year, closed_month)` and the statement lookup index covers
-`(user_id, settled_month, settled_year)`.
+cumulative amount cannot create another audit line. The correction row remains
+the refund audit record; its settlement fields mirror the matching refund item
+in `payout_open_items`.
 
-Backfill is intentionally empty: existing aggregate statements do not identify
-the share already booked for each order or when each persisted refund arrived,
-so reconstructing historical correction rows would invent financial facts.
-Rollback drops the table and loses pending and settled correction history; it
-does not modify statement rows. The migration `down()` is not run under the
-repository migration policy.
+### 2.4 `payout_open_items`
+* `id` (UUID, Primary)
+* `user_id` (UUID, Foreign Key to `users`)
+* `source_type` (`carry` or `refund`)
+* `source_id` (nullable UUID: originating statement for carry, correction row for refund)
+* `order_id` (nullable UUID; populated for refunds)
+* `origin_month`, `origin_year` (the period the item belongs to)
+* `amount_cents` (Signed Integer; carries may be positive, zero, or negative)
+* `settled_month`, `settled_year`, `settled_at` (nullable actual booking period and time)
+* `created_at`, `updated_at` (timestamps)
+
+The unique `(source_type, source_id)` key permits at most one item per source.
+The global claim index is `(settled_at, origin_year, origin_month)`; the
+user-scoped claim index is `(user_id, settled_at, origin_year, origin_month)`;
+the settlement lookup index is `(settled_year, settled_month)`. The migration
+re-runs both backfills when the table already exists and inserts by the unique
+source key, so a retry completes missing rows without duplicating existing ones.
+
+V051 backfills every existing `payout_corrections` row one-to-one as a refund
+item, preserving its closed period, signed amount, and settlement state. It
+backfills a carry only from the photographer's latest statement overall, and
+only when that statement is a non-zero `rollover`. Earlier rollover statements
+already flowed into later statements; backfilling all of them would book the
+same balance more than once. If the latest statement is `pending`, `approved`,
+or `paid`, no carry is backfilled. Existing statement money columns are never
+rewritten. A rollback that drops the new table would lose open-item state while
+leaving `payout_corrections` and all statement rows untouched; migration
+`down()` is intentionally empty under the repository migration policy.
 
 ## 3. Data-integrity contract
 
@@ -254,26 +276,36 @@ allocation, fee proration, and 50% split as the normal calculation. Each row
 identifies the order, photographer, closed period, and cumulative refund
 snapshot. The unique key makes the cumulative snapshot idempotent; a later
 increase in the cumulative refund produces only its incremental share reduction.
+The same transaction creates a `refund` item in `payout_open_items` with the
+correction's source ID, signed amount, and closed origin period. The correction
+remains the refund audit record.
 
-A correction has no target month. Every finalization locks and claims all
-unsettled corrections whose closed period is earlier than the period being
-finalized. It resolves the photographer's statement for that period, creating a
-zeroed statement when missing. If that statement is `approved` or `paid`, it is
-left untouched and the correction stays unsettled for a later finalization.
-Otherwise, the correction is booked into the current statement and records
-`settled_at`, `settled_month`, and `settled_year`. A correction created after a
-month's finalization is therefore claimed by the following finalization rather
-than being stranded on a period that has already closed.
+`payout_open_items` is the single source for unsettled carry and refund amounts.
+Every finalization locks and claims all unsettled items whose origin period is
+strictly earlier than the period being finalized. A refund item with no current
+statement retains the existing behavior of creating a zeroed statement. An
+open carry alone does not manufacture statements in an otherwise idle month; it
+remains unsettled until a statement for that photographer is finalized. If the
+destination statement is `approved` or `paid`, it is left untouched and
+eligible items stay unsettled for a later finalization. Claiming a refund item
+also updates the matching correction audit row's settlement fields.
 
-`earned_amount_cents` sums the correction lines booked into the statement's
-period by `(settled_month, settled_year)`, regardless of `settled_at`. This lets
-a recalculation recreate a removed statement and sum its existing correction
-lines again without booking them into another period. A line is never lost and
-never booked twice. Approved and paid statements are never touched. For a new
-statement, carry derives solely from the latest prior statement by `(year,
-month)`: `rollover` carries its `total_payable_cents` (even zero), while
-`pending`, `approved`, and `paid` carry zero. A finalized zero is a boundary; a
-missing statement month is not. If no prior statement exists, carry is zero. The
+`earned_amount_cents` is pool earnings plus delta surcharge earnings plus the
+refund items booked into the statement period. `rolled_over_amount_cents` is
+the sum of carry items booked into that period, and `total_payable_cents` is
+earned plus carry. Both sums are re-read by `(settled_month, settled_year)` on
+recalculation, regardless of `settled_at`, so a removed statement can be
+recreated without booking an item twice or moving it to another period.
+Approved and paid statements are never touched.
+
+When a statement finalizes as `rollover`, it creates one carry item whose source
+is that statement, origin is that period, and signed amount is its full
+`total_payable_cents`. A non-zero negative or positive total is carried; a zero
+item may be omitted and acts as a boundary, so an older amount cannot reappear.
+Claiming a carry settles the previous item before the current rollover creates
+its replacement. Missing statement months do not consume an item. The former
+latest-prior-statement lookback is removed: statements' stored money columns
+remain historical audit values, while the ledger is the only carry source. The
 existing payout threshold is unchanged.
 
 The management calculation endpoint enforces chronological finalization: it

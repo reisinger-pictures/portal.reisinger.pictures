@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\PayoutChronologyException;
 use App\Http\Resources\PayoutPoolResource;
 use App\Http\Resources\PhotographerStatementResource;
-use App\Models\PayoutCorrection;
+use App\Models\PayoutOpenItem;
 use App\Models\PayoutPool;
 use App\Models\PhotographerStatement;
 use App\Services\PayoutCalculationService;
@@ -52,7 +52,7 @@ class PayoutController extends Controller
                     ->where($poolIdentity)
                     ->exists();
                 if (! $hasCalculationEvidence) {
-                    $hasCalculationEvidence = PayoutCorrection::query()
+                    $hasCalculationEvidence = PayoutOpenItem::query()
                         ->where('settled_month', $poolIdentity['month'])
                         ->where('settled_year', $poolIdentity['year'])
                         ->whereNotNull('settled_at')
@@ -101,6 +101,11 @@ class PayoutController extends Controller
                     ->get()
                     ->reject(fn (PhotographerStatement $statement): bool => $statement->isLocked());
                 if ($recalculable->isNotEmpty()) {
+                    PayoutOpenItem::query()
+                        ->where('source_type', 'carry')
+                        ->whereIn('source_id', $recalculable->modelKeys())
+                        ->delete();
+
                     PhotographerStatement::query()
                         ->whereKey($recalculable->modelKeys())
                         ->delete();

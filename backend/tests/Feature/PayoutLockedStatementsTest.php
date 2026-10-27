@@ -7,6 +7,7 @@ use App\Exceptions\PayoutChronologyException;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\PayoutCorrection;
+use App\Models\PayoutOpenItem;
 use App\Models\PayoutPool;
 use App\Models\Photo;
 use App\Models\PhotographerStatement;
@@ -114,6 +115,14 @@ class PayoutLockedStatementsTest extends TestCase
             'year' => 2026,
             'total_payable_cents' => -750,
             'status' => 'rollover',
+        ]);
+        PayoutOpenItem::query()->create([
+            'user_id' => $photographer->id,
+            'source_type' => 'carry',
+            'source_id' => $july->id,
+            'origin_month' => 7,
+            'origin_year' => 2026,
+            'amount_cents' => -750,
         ]);
         $september = PhotographerStatement::query()->create([
             'user_id' => $photographer->id,
@@ -258,7 +267,7 @@ class PayoutLockedStatementsTest extends TestCase
             'net_pool_cents' => 12345,
             'photographer_share_percent' => 50,
         ]);
-        PayoutCorrection::query()->create([
+        $correction = PayoutCorrection::query()->create([
             'order_id' => $order->id,
             'user_id' => $photographer->id,
             'refund_amount_cents' => 1000,
@@ -266,6 +275,18 @@ class PayoutLockedStatementsTest extends TestCase
             'closed_month' => 4,
             'closed_year' => 2026,
             'settled_at' => now(),
+            'settled_month' => 5,
+            'settled_year' => 2026,
+        ]);
+        PayoutOpenItem::query()->create([
+            'user_id' => $photographer->id,
+            'source_type' => 'refund',
+            'source_id' => $correction->id,
+            'order_id' => $order->id,
+            'origin_month' => 4,
+            'origin_year' => 2026,
+            'amount_cents' => -500,
+            'settled_at' => $correction->settled_at,
             'settled_month' => 5,
             'settled_year' => 2026,
         ]);

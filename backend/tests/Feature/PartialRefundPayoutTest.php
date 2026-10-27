@@ -7,6 +7,7 @@ use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\PayoutCorrection;
+use App\Models\PayoutOpenItem;
 use App\Models\Photo;
 use App\Models\PhotographerStatement;
 use App\Models\User;
@@ -103,6 +104,10 @@ class PartialRefundPayoutTest extends TestCase
             ->where('year', 2026)
             ->sole();
         $statement->update(['status' => 'approved']);
+        PayoutOpenItem::query()
+            ->where('source_type', 'carry')
+            ->where('source_id', $statement->id)
+            ->delete();
 
         return $statement->fresh();
     }
@@ -323,6 +328,13 @@ class PartialRefundPayoutTest extends TestCase
         $this->assertNull($correction->settled_month);
         $this->assertNull($correction->settled_year);
         $this->assertNull($correction->settled_at);
+        $refundItem = PayoutOpenItem::query()->sole();
+        $this->assertSame('refund', $refundItem->source_type);
+        $this->assertSame((string) $correction->id, (string) $refundItem->source_id);
+        $this->assertSame(-750, $refundItem->amount_cents);
+        $this->assertSame(6, $refundItem->origin_month);
+        $this->assertSame(2026, $refundItem->origin_year);
+        $this->assertNull($refundItem->settled_at);
 
         $this->assertSame('approved', $statement->fresh()->status);
         $this->assertSame($bookedTotal, $statement->fresh()->total_payable_cents);
@@ -339,6 +351,9 @@ class PartialRefundPayoutTest extends TestCase
         $this->assertSame(7, $correction->fresh()->settled_month);
         $this->assertSame(2026, $correction->fresh()->settled_year);
         $this->assertNotNull($correction->fresh()->settled_at);
+        $this->assertSame(7, $refundItem->fresh()->settled_month);
+        $this->assertSame(2026, $refundItem->fresh()->settled_year);
+        $this->assertNotNull($refundItem->fresh()->settled_at);
 
         $resource = (new PhotographerStatementResource($nextStatement))->resolve(request());
         $this->assertSame(1, count($resource['corrections']));
@@ -365,6 +380,7 @@ class PartialRefundPayoutTest extends TestCase
 
         $this->assertSame('refunded', $order->fresh()->status);
         $this->assertSame(-$bookedShare, PayoutCorrection::query()->sole()->amount_cents);
+        $this->assertSame(-$bookedShare, PayoutOpenItem::query()->sole()->amount_cents);
 
         $this->service->finalizeStatements(7, 2026);
 
@@ -388,6 +404,13 @@ class PartialRefundPayoutTest extends TestCase
             'amount_refunded' => 1500,
         ], 'evt_late_gap_missing');
         $this->service->finalizeStatements(7, 2026);
+        $julyCarry = PayoutOpenItem::query()
+            ->where('source_type', 'carry')
+            ->where('origin_month', 7)
+            ->where('origin_year', 2026)
+            ->sole();
+        $this->assertSame(-750, $julyCarry->amount_cents);
+        $this->assertNull($julyCarry->settled_at);
 
         $this->assertDatabaseMissing('photographer_statements', [
             'user_id' => $photographer->id,
@@ -412,6 +435,13 @@ class PartialRefundPayoutTest extends TestCase
             ->sole();
         $this->assertSame(-750, $september->rolled_over_amount_cents);
         $this->assertSame(-750, $september->total_payable_cents);
+        $this->assertSame(9, $julyCarry->fresh()->settled_month);
+        $this->assertSame(-750, PayoutOpenItem::query()
+            ->where('source_type', 'carry')
+            ->where('origin_month', 9)
+            ->where('origin_year', 2026)
+            ->sole()
+            ->amount_cents);
     }
 
     public function test_zero_balance_after_negative_correction_stops_the_older_rollover(): void
@@ -443,6 +473,12 @@ class PartialRefundPayoutTest extends TestCase
             ->sole();
         $this->assertSame(-750, $august->rolled_over_amount_cents);
         $this->assertSame(0, $august->total_payable_cents);
+        $this->assertDatabaseMissing('payout_open_items', [
+            'user_id' => $photographer->id,
+            'source_type' => 'carry',
+            'origin_month' => 8,
+            'origin_year' => 2026,
+        ]);
 
         PhotographerStatement::query()->create([
             'user_id' => $photographer->id,
@@ -462,6 +498,12 @@ class PartialRefundPayoutTest extends TestCase
         $this->assertSame(0, $september->rolled_over_amount_cents);
         $this->assertSame(0, $september->total_payable_cents);
         $this->assertSame('rollover', $september->status);
+        $this->assertDatabaseMissing('payout_open_items', [
+            'user_id' => $photographer->id,
+            'source_type' => 'carry',
+            'origin_month' => 9,
+            'origin_year' => 2026,
+        ]);
     }
 
     public function test_zero_balance_after_positive_rollover_stops_the_older_rollover(): void
@@ -489,6 +531,15 @@ class PartialRefundPayoutTest extends TestCase
             'amount_cents' => -750,
             'closed_month' => 6,
             'closed_year' => 2026,
+        ]);
+        PayoutOpenItem::query()->create([
+            'user_id' => $photographer->id,
+            'source_type' => 'refund',
+            'source_id' => PayoutCorrection::query()->sole()->id,
+            'order_id' => $order->id,
+            'origin_month' => 6,
+            'origin_year' => 2026,
+            'amount_cents' => -750,
         ]);
         PhotographerStatement::query()->create([
             'user_id' => $photographer->id,
@@ -539,6 +590,7 @@ class PartialRefundPayoutTest extends TestCase
         $this->postRefundEvent($charge, 'evt_late_replay');
         $this->postRefundEvent($charge, 'evt_late_replay');
         $this->assertSame(1, PayoutCorrection::query()->count());
+        $this->assertSame(1, PayoutOpenItem::query()->where('source_type', 'refund')->count());
 
         $this->service->finalizeStatements(7, 2026);
         $this->service->finalizeStatements(7, 2026);
@@ -567,6 +619,10 @@ class PartialRefundPayoutTest extends TestCase
             ->sole()
             ->total_payable_cents);
         $this->assertNotNull(PayoutCorrection::query()->sole()->settled_at);
+        $this->assertNotNull(PayoutOpenItem::query()
+            ->where('source_type', 'refund')
+            ->sole()
+            ->settled_at);
     }
 
     public function test_late_correction_never_mutates_an_approved_statement(): void
@@ -593,6 +649,7 @@ class PartialRefundPayoutTest extends TestCase
 
         $this->assertSame($original, $statement->fresh()->only(array_keys($original)));
         $this->assertSame(1, PayoutCorrection::query()->count());
+        $this->assertSame(1, PayoutOpenItem::query()->where('source_type', 'refund')->count());
     }
 
     public function test_correction_created_after_next_month_finalized_is_claimed_by_following_finalize(): void
@@ -682,6 +739,10 @@ class PartialRefundPayoutTest extends TestCase
 
         $this->assertSame($approvedAmounts, $approvedJuly->fresh()->only(array_keys($approvedAmounts)));
         $this->assertNull($correction->fresh()->settled_at);
+        $this->assertNull(PayoutOpenItem::query()
+            ->where('source_type', 'refund')
+            ->sole()
+            ->settled_at);
         $this->assertNull($correction->fresh()->settled_month);
         $this->assertNull($correction->fresh()->settled_year);
 
@@ -697,5 +758,9 @@ class PartialRefundPayoutTest extends TestCase
         $this->assertSame(8, $correction->fresh()->settled_month);
         $this->assertSame(2026, $correction->fresh()->settled_year);
         $this->assertNotNull($correction->fresh()->settled_at);
+        $this->assertSame(8, PayoutOpenItem::query()
+            ->where('source_type', 'refund')
+            ->sole()
+            ->settled_month);
     }
 }
