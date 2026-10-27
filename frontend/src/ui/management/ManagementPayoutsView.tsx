@@ -153,6 +153,19 @@ export default function ManagementPayoutsView() {
                                         <Trans>{sharesEarned} Shares</Trans><br/>
                                         <span
                                             className="opacity-50"><Trans>Rollover: {rolledOverAmount}</Trans></span>
+                                        {stmt.corrections.length > 0 && (
+                                            <ul className="list mt-1 text-xs">
+                                                {stmt.corrections.map(correction => (
+                                                    <li className="list-row gap-2 px-0 py-1" key={correction.id}>
+                                                        <span>
+                                                            <Trans>Korrektur Bestellung</Trans> {correction.order_reference}<br/>
+                                                            <span className="opacity-70"><Trans>Geschlossener Monat:</Trans> {correction.closed_month} / {correction.closed_year}</span>
+                                                        </span>
+                                                        <span>{formatMoney(correction.amount_cents)}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
                                     </td>
                                     <td className="text-right font-mono font-bold text-base text-primary">
                                         {formatMoney(stmt.total_payable_cents)}

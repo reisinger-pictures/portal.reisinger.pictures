@@ -3316,6 +3316,11 @@ msgstr "Geschlecht"
 msgid "Geschlossen"
 msgstr "Geschlossen"
 
+#: src/ui/management/ManagementPayoutsView.tsx
+#: src/ui/photographer/PhotographerPayoutsView.tsx
+msgid "Geschlossener Monat:"
+msgstr "Geschlossener Monat:"
+
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Gespeichert!"
 msgstr "Gespeichert!"
@@ -4062,6 +4067,11 @@ msgstr "Kopieren"
 #: src/ui/management/components/InviteModal.tsx
 msgid "Kopiert!"
 msgstr "Kopiert!"
+
+#: src/ui/management/ManagementPayoutsView.tsx
+#: src/ui/photographer/PhotographerPayoutsView.tsx
+msgid "Korrektur Bestellung"
+msgstr "Korrektur Bestellung"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "Kostenfrei (Flatrate)"

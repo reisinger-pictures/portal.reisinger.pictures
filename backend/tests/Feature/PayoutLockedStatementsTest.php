@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\PhotographerStatement;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\PayoutCalculationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -95,5 +96,54 @@ class PayoutLockedStatementsTest extends TestCase
 
         // Recalculable (pending/rollover) rows are replaced by the recalculation.
         $this->assertNull(PhotographerStatement::find($pending->id));
+    }
+
+    public function test_calculate_rejects_an_earlier_month_after_a_later_month_is_finalized(): void
+    {
+        $token = $this->actingAsSuperAdmin();
+        $photographer = User::factory()->create();
+        $july = PhotographerStatement::query()->create([
+            'user_id' => $photographer->id,
+            'month' => 7,
+            'year' => 2026,
+            'total_payable_cents' => -750,
+            'status' => 'rollover',
+        ]);
+        $september = PhotographerStatement::query()->create([
+            'user_id' => $photographer->id,
+            'month' => 9,
+            'year' => 2026,
+            'pool_earnings_cents' => 0,
+            'delta_surcharge_earnings_cents' => 0,
+        ]);
+
+        (new PayoutCalculationService)->finalizeStatements(9, 2026);
+        $september->refresh();
+        $this->assertSame('rollover', $september->status);
+        $this->assertSame(-750, $september->total_payable_cents);
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/management/payouts/calculate', [
+                'month' => 8,
+                'year' => 2026,
+                'net_pool_cents' => 100000,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath(
+                'message',
+                'Die Abrechnung für 08/2026 ist gesperrt: Für den späteren Monat 09/2026 existiert bereits eine finale Abrechnung. Bitte rechne die Monate chronologisch ab.',
+            );
+
+        $this->assertDatabaseMissing('payout_pools', [
+            'month' => 8,
+            'year' => 2026,
+        ]);
+        $this->assertDatabaseMissing('photographer_statements', [
+            'user_id' => $photographer->id,
+            'month' => 8,
+            'year' => 2026,
+        ]);
+        $this->assertSame(-750, $july->fresh()->total_payable_cents);
+        $this->assertSame(-750, $september->fresh()->total_payable_cents);
     }
 }

@@ -37,6 +37,7 @@ const statement: PhotographerStatement = {
     rolled_over_amount_cents: 0,
     total_payable_cents: 25000,
     status: 'pending',
+    corrections: [],
 };
 
 describe('useAdminPayouts', () => {

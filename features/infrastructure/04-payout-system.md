@@ -19,9 +19,10 @@ The system remunerates photographers based on actual usage (downloads) by end cu
 * **Exclusion of Free Downloads:** Downloads from galleries where `is_free_download = true` are strictly ignored and generate **0 shares**.
 * **Power-User Surcharge (Delta Logic):** If a flat-rate customer pays an explicit surcharge for a download, this net delta (after Stripe fees) is distributed *directly* to the photographer, independently of the share pool.
 * **Sleeper Customers:** Flat-rate revenues from customers without downloads remain 100% with the platform.
+* **Arrears & closed statements:** A month's payout is calculated after that month closes, one month in arrears. `approved` and `paid` statements are immutable. A later refund is booked as an explicit negative correction in the next finalized statement after the originating period, never by changing the closed statement.
 
 ### 1.2 MVP Workflow & Visualization
-1. **Calculation:** A cron job calculates the pools at the beginning of the month, determines the total shares per pool, and calculates the `value_per_share_cents`.
+1. **Calculation:** After a calendar month closes, the calculation for that month runs in the following month. It calculates the pools, total shares, and `value_per_share_cents` from the closed month's activity.
 2. **Visualization (Management UI):** The Super Admin sees the total unique downloads vs. generated shares per pool (e.g., "100 Downloads ≙ 240.5 Shares") and the value of a single share.
 3. **Approval:** The Super Admin approves the statements.
 4. **Statement PDF:** Generation of the credit overview for the photographer.
@@ -51,6 +52,30 @@ The system remunerates photographers based on actual usage (downloads) by end cu
 * `rolled_over_amount_cents` (Integer)
 * `total_payable_cents` (Integer)
 * `status` (Enum: `pending`, `rollover`, `approved`, `paid`)
+
+### 2.3 `payout_corrections`
+* `id` (UUID, Primary)
+* `order_id`, `user_id` (UUIDs identifying the originating order and photographer; cascade with their owning records)
+* `refund_amount_cents` (Unsigned Integer — cumulative refund snapshot used for this idempotent correction)
+* `amount_cents` (Signed Integer, always negative)
+* `closed_month`, `closed_year` (the approved/paid statement period being corrected)
+* `settled_at` (nullable timestamp; set when a finalization books the correction)
+* `settled_month`, `settled_year` (nullable integers; the statement period in which the correction was actually booked)
+* `created_at`, `updated_at` (timestamps)
+
+Corrections have no target period. The natural key is
+`(order_id, user_id, closed_year, closed_month, refund_amount_cents)`. A later
+cumulative refund creates a separate incremental line; a replay of the same
+cumulative amount cannot create another line. The claim index covers
+`(settled_at, closed_year, closed_month)` and the statement lookup index covers
+`(user_id, settled_month, settled_year)`.
+
+Backfill is intentionally empty: existing aggregate statements do not identify
+the share already booked for each order or when each persisted refund arrived,
+so reconstructing historical correction rows would invent financial facts.
+Rollback drops the table and loses pending and settled correction history; it
+does not modify statement rows. The migration `down()` is not run under the
+repository migration policy.
 
 ## 3. Data-integrity contract
 
@@ -209,21 +234,56 @@ an owner decision (2026-10-25), not an inference from the revenue split.
 
 `charge.refunded` stores the charge's cumulative `amount_refunded` in
 `orders.refunded_amount_cents` (clamped to `0 … total_amount`, and monotonic
-under a replayed older event). `calculatePowerUserDelta()` then allocates that
-amount proportionally across the order's photo revenues — the same
-`allocateCentsProportionally()` the discount fallback uses — and subtracts it
-**before** the fee proration and the share split. The refund is therefore borne
-in the same ratio as the normal split, and an order whose refund consumes all
-photo revenue is skipped rather than contributing a negative amount. The
-customer-facing invoice is untouched by this: `refunded_amount_cents` is not
-part of the snapshot, and `InvoiceSnapshot::customerDetailsForPresentation()`
-sees no new key.
+under a replayed older event). The monthly calculation allocates that amount
+proportionally across the order's photo revenues — the same
+`allocateCentsProportionally()` used by the discount fallback — and subtracts it
+**before** fee proration and the share split. An open month's recalculation
+therefore reduces each photographer's share in the same ratio as the revenue
+split. The fully refunded `refunded` order status is included in this calculation
+basis and contributes zero, rather than disappearing while leaving its already
+booked share unreversed. The customer-facing invoice is untouched:
+`refunded_amount_cents` is not part of the snapshot, and
+`InvoiceSnapshot::customerDetailsForPresentation()` sees no new key.
 
-One limit is deliberate and tracked separately ([#37](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/37)):
-a refund that arrives after its month's statement is `approved` or `paid` is not
-clawed back, because `addStatementDelta()` returns for those statuses. The rule
-"a closed month stays closed" currently holds for the power-user delta; whether
-it should is the open decision there.
+Under D-58, a refund received after the originating statement is `approved` or
+`paid` creates a `payout_corrections` row in the same transaction that advances
+the order's cumulative refund. Its negative amount is the difference between the
+photographer shares computed at the previously stored refund amount (the share
+already booked) and the new cumulative amount, using the same proportional
+allocation, fee proration, and 50% split as the normal calculation. Each row
+identifies the order, photographer, closed period, and cumulative refund
+snapshot. The unique key makes the cumulative snapshot idempotent; a later
+increase in the cumulative refund produces only its incremental share reduction.
+
+A correction has no target month. Every finalization locks and claims all
+unsettled corrections whose closed period is earlier than the period being
+finalized. It resolves the photographer's statement for that period, creating a
+zeroed statement when missing. If that statement is `approved` or `paid`, it is
+left untouched and the correction stays unsettled for a later finalization.
+Otherwise, the correction is booked into the current statement and records
+`settled_at`, `settled_month`, and `settled_year`. A correction created after a
+month's finalization is therefore claimed by the following finalization rather
+than being stranded on a period that has already closed.
+
+`earned_amount_cents` sums the correction lines booked into the statement's
+period by `(settled_month, settled_year)`, regardless of `settled_at`. This lets
+a recalculation recreate a removed statement and sum its existing correction
+lines again without booking them into another period. A line is never lost and
+never booked twice. Approved and paid statements are never touched. For a new
+statement, carry derives solely from the latest prior statement by `(year,
+month)`: `rollover` carries its `total_payable_cents` (even zero), while
+`pending`, `approved`, and `paid` carry zero. A finalized zero is a boundary; a
+missing statement month is not. If no prior statement exists, carry is zero. The
+existing payout threshold is unchanged.
+
+The management calculation endpoint enforces chronological finalization: it
+returns HTTP 422 and names the later period when a later statement is already
+finalized. Any status except a pre-finalization draft counts, including
+`rollover`, `pending`, `approved`, and `paid`. Recalculating the same period is
+allowed. Both photographer and management statement APIs expose each booked
+correction separately with its order reference, negative cents, originating
+closed period, and actual settled period; both statement views render those
+traceable lines.
 
 Snapshots **without** the map cannot reveal which photos a targeted coupon
 covered. "Without" is not a historical-only category: a collective invoice

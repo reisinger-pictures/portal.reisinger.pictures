@@ -32,11 +32,34 @@ class PayoutController extends Controller
             'net_pool_cents' => 'required|integer|min:0|max:100000000',
         ]);
 
-        DB::transaction(function () use ($request, $service) {
+        return DB::transaction(function () use ($request, $service) {
             $poolIdentity = [
                 'year' => (int) $request->year,
                 'month' => (int) $request->month,
             ];
+
+            $blockingStatement = PhotographerStatement::query()
+                ->where(function ($query) use ($poolIdentity): void {
+                    $query->where('year', '>', $poolIdentity['year'])
+                        ->orWhere(function ($query) use ($poolIdentity): void {
+                            $query->where('year', $poolIdentity['year'])
+                                ->where('month', '>', $poolIdentity['month']);
+                        });
+                })
+                ->where('status', '!=', 'draft')
+                ->orderBy('year')
+                ->orderBy('month')
+                ->lockForUpdate()
+                ->first();
+
+            if ($blockingStatement !== null) {
+                $requestedPeriod = sprintf('%02d/%d', $poolIdentity['month'], $poolIdentity['year']);
+                $blockingPeriod = sprintf('%02d/%d', $blockingStatement->month, $blockingStatement->year);
+
+                return response()->json([
+                    'message' => "Die Abrechnung für {$requestedPeriod} ist gesperrt: Für den späteren Monat {$blockingPeriod} existiert bereits eine finale Abrechnung. Bitte rechne die Monate chronologisch ab.",
+                ], 422);
+            }
 
             // createOrFirst is the race-safe insert primitive: the V040
             // natural-key index resolves a concurrent first insert, and the
@@ -76,24 +99,25 @@ class PayoutController extends Controller
             $service->calculatePoolShares($pool);
             $service->calculatePowerUserDelta($pool->month, $pool->year);
             $service->finalizeStatements($pool->month, $pool->year);
-        });
 
-        return response()->json(['success' => true]);
+            return response()->json(['success' => true]);
+        });
     }
 
     public function approveStatement($id)
     {
-        DB::transaction(function () use ($id): void {
+        return DB::transaction(function () use ($id) {
             $stmt = PhotographerStatement::query()
                 ->whereKey($id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
             if ($stmt->status === 'pending') {
                 $stmt->update(['status' => 'approved']);
             }
-        });
 
-        return response()->json(['success' => true]);
+            return response()->json(['success' => true]);
+        });
     }
 
     public function markAsPaid($id)

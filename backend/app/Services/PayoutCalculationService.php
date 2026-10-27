@@ -6,10 +6,12 @@ use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
+use App\Models\PayoutCorrection;
 use App\Models\PayoutPool;
 use App\Models\Photo;
 use App\Models\PhotographerStatement;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
 
 class PayoutCalculationService
@@ -581,8 +583,11 @@ class PayoutCalculationService
         $startDate = Carbon::create($year, $month, 1)->startOfMonth();
         $endDate = $startDate->copy()->endOfMonth();
 
-        // Wir werten alle bezahlten Shop-Bestellungen in diesem Monat aus (Keine manuellen Angebote)
-        $orders = Order::where('status', 'paid')
+        // Paid orders and fully refunded orders both belong to this month. A
+        // full refund contributes zero in an open statement, but it must remain
+        // in the order basis so a late-refund correction can compare its booked
+        // share with the new refunded share.
+        $orders = Order::whereIn('status', ['paid', 'refunded'])
             ->where('is_quote_request', false)
             ->whereBetween('created_at', [$startDate, $endDate])
             ->with('invoiceSnapshot')
@@ -609,164 +614,223 @@ class PayoutCalculationService
         // Memory-Optimierung: Nur die benötigten Spalten laden, um das PHP Memory Limit zu schonen
         $photos = Photo::select('id', 'user_id')->whereIn('id', array_unique($photoIds))->get()->keyBy('id');
 
-        $stripeFeePercent = config('services.stripe.fee_percent', 0.04);
-
         foreach ($orders as $order) {
-            $snapshot = $order->invoiceSnapshot;
-            if (! $snapshot) {
-                continue;
-            }
-
-            $customerDetails = $snapshot->customer_details;
-            $items = is_array($customerDetails) ? ($customerDetails['items'] ?? []) : [];
-            if (! is_array($items)) {
-                continue;
-            }
-
-            // New checkout snapshots carry exact post-volume/post-coupon photo
-            // revenue separately from their customer-facing aggregate discount
-            // lines. Historical snapshots cannot reveal which photos a targeted
-            // coupon covered, so retain a capped, proportional fallback instead
-            // of pretending that their original item-level coverage is known.
-            $photoItems = [];
-            $totalPhotoGross = 0;
-            $discountCents = 0;
-            $payoutAttribution = is_array($customerDetails)
-                ? ($customerDetails[InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY] ?? null)
-                : null;
-            $hasExplicitAttribution = is_array($payoutAttribution);
-            $explicitAttributionTotal = 0;
-            foreach ($items as $lineIndex => $item) {
-                if (! is_array($item)) {
-                    continue;
-                }
-
-                $type = $item['type'] ?? null;
-                if (is_string($type) && str_starts_with($type, 'discount_')) {
-                    $rowTotal = $item['row_total'] ?? null;
-                    if (is_numeric($rowTotal) && (int) $rowTotal < 0) {
-                        $discountCents += abs((int) $rowTotal);
-                    }
-
-                    continue;
-                }
-
-                if (! isset($item['photoId'], $item['price']) || ! is_numeric($item['price'])) {
-                    continue;
-                }
-
-                $priceCents = max(0, (int) $item['price']);
-                if ($priceCents <= 0 || ! empty($item['isQuote'])) {
-                    continue;
-                }
-
-                $hasLineAttribution = is_array($payoutAttribution)
-                    && array_key_exists((string) $lineIndex, $payoutAttribution)
-                    && is_numeric($payoutAttribution[(string) $lineIndex]);
-                $lineRevenue = $hasLineAttribution
-                    ? (int) $payoutAttribution[(string) $lineIndex]
-                    : null;
-                if ($hasExplicitAttribution && (! $hasLineAttribution || $lineRevenue < 0 || $lineRevenue > $priceCents)) {
-                    $hasExplicitAttribution = false;
-                }
-
-                $photo = $photos->get((string) $item['photoId']);
-                $photoItems[] = [
-                    'user_id' => $photo?->user_id,
-                    'price' => $priceCents,
-                    'explicit_net_revenue' => $lineRevenue,
-                ];
-                $totalPhotoGross += $priceCents;
-            }
-
-            if ($totalPhotoGross <= 0) {
-                continue;
-            }
-
-            $snapshotNet = max(0, (int) ($snapshot->total_net ?? 0));
-            if ($hasExplicitAttribution) {
-                $photoRevenue = array_map(
-                    fn (array $item): int => (int) $item['explicit_net_revenue'],
-                    $photoItems,
-                );
-                $explicitAttributionTotal = array_sum($photoRevenue);
-                if ($explicitAttributionTotal > $snapshotNet) {
-                    $hasExplicitAttribution = false;
-                }
-            }
-
-            if (! $hasExplicitAttribution) {
-                // Aggregate-only legacy snapshots do not identify targeted
-                // coupon coverage. A proportional split is the conservative
-                // best-effort fallback, capped by both their itemized discounts
-                // and the immutable amount actually recorded as collected.
-                $discountedPhotoRevenue = max(0, $totalPhotoGross - min($discountCents, $totalPhotoGross));
-                $allocablePhotoRevenue = min($snapshotNet, $discountedPhotoRevenue);
-                $photoRevenue = $this->allocateCentsProportionally(
-                    $allocablePhotoRevenue,
-                    array_column($photoItems, 'price'),
-                );
-            }
-
-            // Owner decision 2026-10-25 (issue #27 / PAY-5): a partial refund
-            // leaves the order `paid` and the customer's access intact, but the
-            // photographer is paid on the money that stayed with the platform.
-            // The refund is borne in exactly the proportion of the normal split:
-            // it is allocated across the photo lines by their revenue and
-            // subtracted from each line BEFORE the fee and share computation, so
-            // there is no second refund-specific split. Each photographer's
-            // share therefore shrinks in the same ratio as their revenue.
-            $refundCents = max(0, (int) ($order->refunded_amount_cents ?? 0));
-            if ($refundCents > 0) {
-                $refundCents = min($refundCents, array_sum($photoRevenue));
-                $refundAllocations = $this->allocateCentsProportionally($refundCents, $photoRevenue);
-                foreach ($photoRevenue as $lineIndex => $lineRevenue) {
-                    $photoRevenue[$lineIndex] = max(0, $lineRevenue - ($refundAllocations[$lineIndex] ?? 0));
-                }
-            }
-
-            $totalPhotoRevenue = array_sum($photoRevenue);
-            if ($totalPhotoRevenue <= 0) {
-                continue;
-            }
-
-            // Allocate the order fee against the amount collected for the
-            // whole order, then prorate only the photo-backed portion. Fees
-            // belonging to non-photo lines and unowned photos are never shifted
-            // onto another photographer's revenue.
-            $feeCents = max(0, (int) ($order->stripe_fee_cents
-                ?? round($snapshotNet * max(0, (float) $stripeFeePercent))));
-            $feeCents = min($feeCents, $snapshotNet);
-            $photoFeeCents = $snapshotNet > 0
-                ? min(
-                    $totalPhotoRevenue,
-                    (int) bcdiv(
-                        bcmul((string) $feeCents, (string) $totalPhotoRevenue, 0),
-                        (string) $snapshotNet,
-                        0,
-                    ),
-                )
-                : 0;
-            $itemFees = $this->allocateCentsProportionally($photoFeeCents, $photoRevenue);
-
-            foreach ($photoItems as $index => $item) {
-                if (! $item['user_id'] || ($photoRevenue[$index] ?? 0) <= 0) {
-                    continue;
-                }
-
-                $netCents = max(0, $photoRevenue[$index] - ($itemFees[$index] ?? 0));
-
-                // Fotografen-Anteil: 50% vom Netto-Aufpreis (exakt ueber bcmath)
-                $photogShareCents = (int) bcmul((string) $netCents, '0.50', 0);
-
-                $this->addStatementDelta(
-                    (string) $item['user_id'],
-                    $month,
-                    $year,
-                    $photogShareCents,
-                );
+            foreach ($this->calculateOrderPhotographerShares(
+                $order,
+                $photos,
+                max(0, (int) ($order->refunded_amount_cents ?? 0)),
+            ) as $userId => $shareCents) {
+                $this->addStatementDelta($userId, $month, $year, $shareCents);
             }
         }
+    }
+
+    /**
+     * Persist the share reduction caused by a newly observed cumulative refund
+     * when the order's accounting statement is already closed.
+     */
+    public function recordLateRefundCorrections(Order $order, int $previousRefundCents, int $currentRefundCents): void
+    {
+        if ($currentRefundCents <= $previousRefundCents) {
+            return;
+        }
+
+        $order->loadMissing('invoiceSnapshot');
+        $customerDetails = $order->invoiceSnapshot?->customer_details;
+        $items = is_array($customerDetails) ? ($customerDetails['items'] ?? []) : [];
+        if (! is_array($items) || $order->created_at === null) {
+            return;
+        }
+
+        $photoIds = [];
+        foreach ($items as $item) {
+            if (is_array($item) && isset($item['photoId'])) {
+                $photoIds[] = (string) $item['photoId'];
+            }
+        }
+        $photos = Photo::query()
+            ->select('id', 'user_id')
+            ->whereIn('id', array_unique($photoIds))
+            ->get()
+            ->keyBy('id');
+
+        $beforeShares = $this->calculateOrderPhotographerShares($order, $photos, $previousRefundCents);
+        $afterShares = $this->calculateOrderPhotographerShares($order, $photos, $currentRefundCents);
+        $closedYear = (int) $order->created_at->year;
+        $closedMonth = (int) $order->created_at->month;
+
+        foreach (array_unique([...array_keys($beforeShares), ...array_keys($afterShares)]) as $userId) {
+            $statement = PhotographerStatement::query()
+                ->where('user_id', $userId)
+                ->where('year', $closedYear)
+                ->where('month', $closedMonth)
+                ->lockForUpdate()
+                ->first();
+
+            if ($statement === null || ! in_array($statement->status, ['approved', 'paid'], true)) {
+                continue;
+            }
+
+            $amountCents = ($afterShares[$userId] ?? 0) - ($beforeShares[$userId] ?? 0);
+            if ($amountCents >= 0) {
+                continue;
+            }
+
+            PayoutCorrection::query()->createOrFirst(
+                [
+                    'order_id' => (string) $order->getKey(),
+                    'user_id' => (string) $userId,
+                    'closed_month' => $closedMonth,
+                    'closed_year' => $closedYear,
+                    'refund_amount_cents' => $currentRefundCents,
+                ],
+                [
+                    'amount_cents' => $amountCents,
+                    'settled_at' => null,
+                ],
+            );
+        }
+    }
+
+    /**
+     * Apply the same proportional refund, fee and share split used by the
+     * monthly calculation, returning each photographer's aggregate share.
+     *
+     * @param  EloquentCollection<string, Photo>  $photos
+     * @return array<string, int>
+     */
+    private function calculateOrderPhotographerShares(Order $order, EloquentCollection $photos, int $refundCents): array
+    {
+        $snapshot = $order->invoiceSnapshot;
+        if (! $snapshot) {
+            return [];
+        }
+
+        $customerDetails = $snapshot->customer_details;
+        $items = is_array($customerDetails) ? ($customerDetails['items'] ?? []) : [];
+        if (! is_array($items)) {
+            return [];
+        }
+
+        // New checkout snapshots carry exact post-volume/post-coupon photo
+        // revenue separately from their customer-facing aggregate discount.
+        // Historical snapshots retain a capped proportional fallback.
+        $photoItems = [];
+        $totalPhotoGross = 0;
+        $discountCents = 0;
+        $payoutAttribution = is_array($customerDetails)
+            ? ($customerDetails[InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY] ?? null)
+            : null;
+        $hasExplicitAttribution = is_array($payoutAttribution);
+        foreach ($items as $lineIndex => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $type = $item['type'] ?? null;
+            if (is_string($type) && str_starts_with($type, 'discount_')) {
+                $rowTotal = $item['row_total'] ?? null;
+                if (is_numeric($rowTotal) && (int) $rowTotal < 0) {
+                    $discountCents += abs((int) $rowTotal);
+                }
+
+                continue;
+            }
+
+            if (! isset($item['photoId'], $item['price']) || ! is_numeric($item['price'])) {
+                continue;
+            }
+
+            $priceCents = max(0, (int) $item['price']);
+            if ($priceCents <= 0 || ! empty($item['isQuote'])) {
+                continue;
+            }
+
+            $hasLineAttribution = is_array($payoutAttribution)
+                && array_key_exists((string) $lineIndex, $payoutAttribution)
+                && is_numeric($payoutAttribution[(string) $lineIndex]);
+            $lineRevenue = $hasLineAttribution ? (int) $payoutAttribution[(string) $lineIndex] : null;
+            if ($hasExplicitAttribution && (! $hasLineAttribution || $lineRevenue < 0 || $lineRevenue > $priceCents)) {
+                $hasExplicitAttribution = false;
+            }
+
+            $photo = $photos->get((string) $item['photoId']);
+            $photoItems[] = [
+                'user_id' => $photo?->user_id,
+                'price' => $priceCents,
+                'explicit_net_revenue' => $lineRevenue,
+            ];
+            $totalPhotoGross += $priceCents;
+        }
+
+        if ($totalPhotoGross <= 0) {
+            return [];
+        }
+
+        $snapshotNet = max(0, (int) ($snapshot->total_net ?? 0));
+        if ($hasExplicitAttribution) {
+            $photoRevenue = array_map(
+                static fn (array $item): int => (int) $item['explicit_net_revenue'],
+                $photoItems,
+            );
+            if (array_sum($photoRevenue) > $snapshotNet) {
+                $hasExplicitAttribution = false;
+            }
+        }
+
+        if (! $hasExplicitAttribution) {
+            $discountedPhotoRevenue = max(0, $totalPhotoGross - min($discountCents, $totalPhotoGross));
+            $allocablePhotoRevenue = min($snapshotNet, $discountedPhotoRevenue);
+            $photoRevenue = $this->allocateCentsProportionally(
+                $allocablePhotoRevenue,
+                array_column($photoItems, 'price'),
+            );
+        }
+
+        // A refund is allocated to photo revenue in the same proportion as the
+        // normal split, before fee proration and the photographer share.
+        $refundCents = min(max(0, $refundCents), array_sum($photoRevenue));
+        if ($refundCents > 0) {
+            $refundAllocations = $this->allocateCentsProportionally($refundCents, $photoRevenue);
+            foreach ($photoRevenue as $lineIndex => $lineRevenue) {
+                $photoRevenue[$lineIndex] = max(0, $lineRevenue - ($refundAllocations[$lineIndex] ?? 0));
+            }
+        }
+
+        $totalPhotoRevenue = array_sum($photoRevenue);
+        if ($totalPhotoRevenue <= 0) {
+            return [];
+        }
+
+        $stripeFeePercent = config('services.stripe.fee_percent', 0.04);
+        $feeCents = max(0, (int) ($order->stripe_fee_cents
+            ?? round($snapshotNet * max(0, (float) $stripeFeePercent))));
+        $feeCents = min($feeCents, $snapshotNet);
+        $photoFeeCents = $snapshotNet > 0
+            ? min(
+                $totalPhotoRevenue,
+                (int) bcdiv(
+                    bcmul((string) $feeCents, (string) $totalPhotoRevenue, 0),
+                    (string) $snapshotNet,
+                    0,
+                ),
+            )
+            : 0;
+        $itemFees = $this->allocateCentsProportionally($photoFeeCents, $photoRevenue);
+
+        $shares = [];
+        foreach ($photoItems as $index => $item) {
+            if (! $item['user_id'] || ($photoRevenue[$index] ?? 0) <= 0) {
+                continue;
+            }
+
+            $netCents = max(0, $photoRevenue[$index] - ($itemFees[$index] ?? 0));
+            $shareCents = (int) bcmul((string) $netCents, '0.50', 0);
+            $userId = (string) $item['user_id'];
+            $shares[$userId] = ($shares[$userId] ?? 0) + $shareCents;
+        }
+
+        return $shares;
     }
 
     /**
@@ -804,6 +868,86 @@ class PayoutCalculationService
     public function finalizeStatements(int $month, int $year)
     {
         DB::transaction(function () use ($month, $year): void {
+            $corrections = PayoutCorrection::query()
+                ->whereNull('settled_at')
+                ->where(function ($query) use ($month, $year): void {
+                    $query->where('closed_year', '<', $year)
+                        ->orWhere(function ($query) use ($month, $year): void {
+                            $query->where('closed_year', $year)
+                                ->where('closed_month', '<', $month);
+                        });
+                })
+                ->orderBy('closed_year')
+                ->orderBy('closed_month')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            // Recreate a statement that was removed during recalculation when
+            // it has already-booked correction lines. Also include users with
+            // newly claimable lines so a correction can create a zeroed row.
+            $bookedCorrectionUsers = PayoutCorrection::query()
+                ->where('settled_month', $month)
+                ->where('settled_year', $year)
+                ->distinct()
+                ->pluck('user_id');
+            $correctionUsers = $corrections->pluck('user_id')
+                ->merge($bookedCorrectionUsers)
+                ->unique();
+            $claimableUsers = [];
+
+            foreach ($correctionUsers as $userId) {
+                $identity = [
+                    'user_id' => $userId,
+                    'year' => $year,
+                    'month' => $month,
+                ];
+                $statement = PhotographerStatement::query()
+                    ->where($identity)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($statement !== null && in_array($statement->status, ['approved', 'paid'], true)) {
+                    continue;
+                }
+
+                if ($statement === null) {
+                    $statement = PhotographerStatement::query()->createOrFirst(
+                        $identity,
+                        [
+                            'total_shares_earned' => '0.0000',
+                            'pool_earnings_cents' => 0,
+                            'delta_surcharge_earnings_cents' => 0,
+                            'status' => 'pending',
+                        ],
+                    );
+                    $statement = PhotographerStatement::query()
+                        ->whereKey($statement->getKey())
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                }
+
+                if (in_array($statement->status, ['approved', 'paid'], true)) {
+                    continue;
+                }
+
+                $claimableUsers[(string) $userId] = true;
+            }
+
+            // Claim every eligible correction into this finalized period. An
+            // approved/paid statement remains immutable, so its corrections
+            // stay unsettled for a later finalization.
+            foreach ($corrections as $correction) {
+                if (! isset($claimableUsers[(string) $correction->user_id])) {
+                    continue;
+                }
+
+                $correction->settled_at = now();
+                $correction->settled_month = $month;
+                $correction->settled_year = $year;
+                $correction->save();
+            }
+
             $statements = PhotographerStatement::query()
                 ->where('month', $month)
                 ->where('year', $year)
@@ -818,19 +962,35 @@ class PayoutCalculationService
                     continue;
                 }
 
-                $stmt->earned_amount_cents = $stmt->pool_earnings_cents + $stmt->delta_surcharge_earnings_cents;
-
-                // Rollover vom Vormonat holen
-                $prevDate = Carbon::create($year, $month, 1)->subMonth();
-                $prevStmt = PhotographerStatement::query()
+                $correctionCents = (int) PayoutCorrection::query()
                     ->where('user_id', $stmt->user_id)
-                    ->where('month', $prevDate->month)
-                    ->where('year', $prevDate->year)
-                    ->where('status', 'rollover')
+                    ->where('settled_month', $month)
+                    ->where('settled_year', $year)
+                    ->sum('amount_cents');
+                $stmt->earned_amount_cents = $stmt->pool_earnings_cents
+                    + $stmt->delta_surcharge_earnings_cents
+                    + $correctionCents;
+
+                // The latest prior statement is the carry boundary, even when its
+                // payable is zero. Lock it so a concurrent finalization cannot
+                // consume stale rollover state.
+                $latestPreviousStatement = PhotographerStatement::query()
+                    ->where('user_id', $stmt->user_id)
+                    ->where(function ($query) use ($year, $month): void {
+                        $query->where('year', '<', $year)
+                            ->orWhere(function ($query) use ($year, $month): void {
+                                $query->where('year', $year)
+                                    ->where('month', '<', $month);
+                            });
+                    })
+                    ->orderByDesc('year')
+                    ->orderByDesc('month')
                     ->lockForUpdate()
                     ->first();
 
-                $stmt->rolled_over_amount_cents = $prevStmt ? $prevStmt->total_payable_cents : 0;
+                $stmt->rolled_over_amount_cents = $latestPreviousStatement?->status === 'rollover'
+                    ? (int) $latestPreviousStatement->total_payable_cents
+                    : 0;
                 $stmt->total_payable_cents = $stmt->earned_amount_cents + $stmt->rolled_over_amount_cents;
 
                 // Auszahlungsschwelle prüfen (50 Euro = 5000 Cents)

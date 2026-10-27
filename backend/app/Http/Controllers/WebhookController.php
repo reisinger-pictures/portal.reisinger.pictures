@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Services\CheckoutRiskService;
 use App\Services\DisputeMailDispatcher;
 use App\Services\PaymentIntentReconciliationService;
+use App\Services\PayoutCalculationService;
 use App\Services\StripePaymentService;
 use App\Support\ActorIdentity;
 use App\Support\StripeWebhookSecret;
@@ -768,11 +769,21 @@ class WebhookController extends Controller
 
             $chargedCents = max(0, (int) $lockedOrder->total_amount);
             $clamped = max(0, min($amountRefundedCents, $chargedCents));
-            $stored = max((int) ($lockedOrder->refunded_amount_cents ?? 0), $clamped);
+            $previous = max(0, (int) ($lockedOrder->refunded_amount_cents ?? 0));
+            $stored = max($previous, $clamped);
 
-            if ($stored !== (int) ($lockedOrder->refunded_amount_cents ?? 0)) {
+            if ($stored > $previous) {
                 $lockedOrder->refunded_amount_cents = $stored;
                 $lockedOrder->save();
+
+                // Keep the cumulative refund write and its correction in one
+                // transaction. A retry can then never observe a stored refund
+                // without the corresponding immutable-month ledger line.
+                app(PayoutCalculationService::class)->recordLateRefundCorrections(
+                    $lockedOrder,
+                    $previous,
+                    $stored,
+                );
             }
 
             return $stored;
