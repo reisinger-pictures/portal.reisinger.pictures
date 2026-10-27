@@ -1101,6 +1101,36 @@ class PayoutCalculationServiceTest extends TestCase
         $this->assertSame(1500, $stmt->delta_surcharge_earnings_cents);
     }
 
+    public function test_calculate_power_user_delta_is_idempotent_when_replayed(): void
+    {
+        $photographer = User::factory()->create();
+        $photo = Photo::factory()->create(['user_id' => $photographer->id]);
+        $order = Order::factory()->paid()->create([
+            'stripe_fee_cents' => 0,
+            'created_at' => '2026-06-10 12:00:00',
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'customer_details' => [
+                'items' => [['photoId' => $photo->id, 'price' => 1000, 'tier' => 'web']],
+            ],
+            'total_net' => 1000, 'total_gross' => 1200, 'tax_rate' => 20.00,
+        ]);
+
+        $this->service->calculatePowerUserDelta(6, 2026);
+        $firstCalculation = PhotographerStatement::where('user_id', $photographer->id)->sole()
+            ->delta_surcharge_earnings_cents;
+
+        $this->service->calculatePowerUserDelta(6, 2026);
+
+        $this->assertSame(500, $firstCalculation);
+        $this->assertSame(
+            $firstCalculation,
+            PhotographerStatement::where('user_id', $photographer->id)->sole()
+                ->delta_surcharge_earnings_cents,
+        );
+    }
+
     // ============================================================
     // finalizeStatements()
     // ============================================================

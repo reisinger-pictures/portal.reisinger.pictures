@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\PayoutChronologyException;
 use App\Http\Resources\PayoutPoolResource;
 use App\Http\Resources\PhotographerStatementResource;
+use App\Models\PayoutCorrection;
 use App\Models\PayoutPool;
 use App\Models\PhotographerStatement;
 use App\Services\PayoutCalculationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PayoutController extends Controller
 {
@@ -26,82 +29,92 @@ class PayoutController extends Controller
 
     public function calculate(Request $request, PayoutCalculationService $service)
     {
-        $request->validate([
+        $validated = $request->validate([
             'month' => 'required|integer|min:1|max:12',
             'year' => 'required|integer|min:2024',
-            'net_pool_cents' => 'required|integer|min:0|max:100000000',
+            'net_pool_cents' => 'sometimes|required|integer|min:0|max:100000000',
         ]);
 
-        return DB::transaction(function () use ($request, $service) {
-            $poolIdentity = [
-                'year' => (int) $request->year,
-                'month' => (int) $request->month,
-            ];
+        try {
+            return DB::transaction(function () use ($validated, $service) {
+                $poolIdentity = [
+                    'year' => (int) $validated['year'],
+                    'month' => (int) $validated['month'],
+                ];
+                $service->assertChronological($poolIdentity['month'], $poolIdentity['year']);
 
-            $blockingStatement = PhotographerStatement::query()
-                ->where(function ($query) use ($poolIdentity): void {
-                    $query->where('year', '>', $poolIdentity['year'])
-                        ->orWhere(function ($query) use ($poolIdentity): void {
-                            $query->where('year', $poolIdentity['year'])
-                                ->where('month', '>', $poolIdentity['month']);
-                        });
-                })
-                ->where('status', '!=', 'draft')
-                ->orderBy('year')
-                ->orderBy('month')
-                ->lockForUpdate()
-                ->first();
+                $existingPool = PayoutPool::query()
+                    ->where($poolIdentity)
+                    ->lockForUpdate()
+                    ->first();
 
-            if ($blockingStatement !== null) {
-                $requestedPeriod = sprintf('%02d/%d', $poolIdentity['month'], $poolIdentity['year']);
-                $blockingPeriod = sprintf('%02d/%d', $blockingStatement->month, $blockingStatement->year);
+                $hasCalculationEvidence = PhotographerStatement::query()
+                    ->where($poolIdentity)
+                    ->exists();
+                if (! $hasCalculationEvidence) {
+                    $hasCalculationEvidence = PayoutCorrection::query()
+                        ->where('settled_month', $poolIdentity['month'])
+                        ->where('settled_year', $poolIdentity['year'])
+                        ->whereNotNull('settled_at')
+                        ->exists();
+                }
 
-                return response()->json([
-                    'message' => "Die Abrechnung für {$requestedPeriod} ist gesperrt: Für den späteren Monat {$blockingPeriod} existiert bereits eine finale Abrechnung. Bitte rechne die Monate chronologisch ab.",
-                ], 422);
-            }
+                if (
+                    (! $hasCalculationEvidence || $existingPool === null)
+                    && ! array_key_exists('net_pool_cents', $validated)
+                ) {
+                    throw ValidationException::withMessages([
+                        'net_pool_cents' => ['The net pool cents field is required.'],
+                    ]);
+                }
 
-            // createOrFirst is the race-safe insert primitive: the V040
-            // natural-key index resolves a concurrent first insert, and the
-            // following row lock serializes the financial update.
-            $pool = PayoutPool::query()->createOrFirst(
-                $poolIdentity,
-                [
-                    'net_pool_cents' => (int) $request->net_pool_cents,
-                    'photographer_share_percent' => 50,
-                ],
-            );
-            $pool = PayoutPool::query()
-                ->whereKey($pool->getKey())
-                ->lockForUpdate()
-                ->firstOrFail();
-            $pool->update([
-                'net_pool_cents' => (int) $request->net_pool_cents,
-                'photographer_share_percent' => 50,
-            ]);
+                $netPoolCents = array_key_exists('net_pool_cents', $validated)
+                    ? (int) $validated['net_pool_cents']
+                    : (int) $existingPool->net_pool_cents;
 
-            // Never destroy the audit trail: approved/paid statements are locked and
-            // must survive a recalculation. Lock the recalculable set before
-            // deleting it so an approval cannot race the delete boundary.
-            $recalculable = PhotographerStatement::query()
-                ->where('year', $poolIdentity['year'])
-                ->where('month', $poolIdentity['month'])
-                ->whereNotIn('status', ['approved', 'paid'])
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-            if ($recalculable->isNotEmpty()) {
-                PhotographerStatement::query()
-                    ->whereKey($recalculable->modelKeys())
-                    ->delete();
-            }
+                // createOrFirst resolves a concurrent first insert through the
+                // V040 natural-key index; the following row lock serializes updates.
+                $pool = PayoutPool::query()->createOrFirst(
+                    $poolIdentity,
+                    [
+                        'net_pool_cents' => $netPoolCents,
+                        'photographer_share_percent' => 50,
+                    ],
+                );
+                $pool = PayoutPool::query()
+                    ->whereKey($pool->getKey())
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $poolUpdates = ['photographer_share_percent' => 50];
+                if (array_key_exists('net_pool_cents', $validated)) {
+                    $poolUpdates['net_pool_cents'] = $netPoolCents;
+                }
+                $pool->update($poolUpdates);
 
-            $service->calculatePoolShares($pool);
-            $service->calculatePowerUserDelta($pool->month, $pool->year);
-            $service->finalizeStatements($pool->month, $pool->year);
+                // Lock all month rows before using the model helper to preserve
+                // approved/paid audit records and remove only recalculable rows.
+                $recalculable = PhotographerStatement::query()
+                    ->where('year', $poolIdentity['year'])
+                    ->where('month', $poolIdentity['month'])
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->reject(fn (PhotographerStatement $statement): bool => $statement->isLocked());
+                if ($recalculable->isNotEmpty()) {
+                    PhotographerStatement::query()
+                        ->whereKey($recalculable->modelKeys())
+                        ->delete();
+                }
 
-            return response()->json(['success' => true]);
-        });
+                $service->calculatePoolShares($pool);
+                $service->calculatePowerUserDelta($pool->month, $pool->year);
+                $service->finalizeStatements($pool->month, $pool->year);
+
+                return response()->json(['success' => true]);
+            });
+        } catch (PayoutChronologyException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 
     public function approveStatement($id)
