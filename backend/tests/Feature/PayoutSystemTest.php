@@ -6,6 +6,7 @@ use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
+use App\Models\PayoutOpenItem;
 use App\Models\PayoutPool;
 use App\Models\Photo;
 use App\Models\PhotographerStatement;
@@ -128,12 +129,20 @@ class PayoutSystemTest extends TestCase
         $prev = $now->copy()->subMonth();
 
         // Rollover Statement aus dem Vormonat (30€)
-        PhotographerStatement::create([
+        $previousStatement = PhotographerStatement::create([
             'user_id' => $photog->id,
             'month' => $prev->month,
             'year' => $prev->year,
             'total_payable_cents' => 3000,
             'status' => 'rollover',
+        ]);
+        PayoutOpenItem::query()->create([
+            'user_id' => $photog->id,
+            'source_type' => 'carry',
+            'source_id' => $previousStatement->id,
+            'origin_month' => $prev->month,
+            'origin_year' => $prev->year,
+            'amount_cents' => 3000,
         ]);
 
         // Aktuelles Statement (25€ Pool Earnings)

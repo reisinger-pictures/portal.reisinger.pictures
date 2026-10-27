@@ -6,6 +6,7 @@ use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
+use App\Models\PayoutOpenItem;
 use App\Models\PayoutPool;
 use App\Models\Photo;
 use App\Models\PhotographerStatement;
@@ -1186,11 +1187,19 @@ class PayoutCalculationServiceTest extends TestCase
 
     public function test_finalize_statements_includes_rollover_from_previous_month(): void
     {
-        // Vormonat (Mai) hat rollover-Statement mit total_payable 3000.
+        // The preceding month's rollover is represented by one open carry item.
         $photographer = User::factory()->create();
-        PhotographerStatement::create([
+        $previous = PhotographerStatement::create([
             'user_id' => $photographer->id, 'month' => 5, 'year' => 2026,
             'status' => 'rollover', 'total_payable_cents' => 3000,
+        ]);
+        PayoutOpenItem::query()->create([
+            'user_id' => $photographer->id,
+            'source_type' => 'carry',
+            'source_id' => $previous->id,
+            'origin_month' => 5,
+            'origin_year' => 2026,
+            'amount_cents' => 3000,
         ]);
         PhotographerStatement::create([
             'user_id' => $photographer->id, 'month' => 6, 'year' => 2026,
@@ -1206,13 +1215,13 @@ class PayoutCalculationServiceTest extends TestCase
         $this->assertSame('pending', $stmt->status); // 6000 >= 5000
     }
 
-    public function test_finalize_statements_ignores_previous_month_with_other_status(): void
+    public function test_finalize_statements_does_not_infer_carry_from_a_prior_statement(): void
     {
-        // Vormonat-Statement hat status 'paid' (nicht 'rollover') → kein Rollover.
+        // Even a rollover statement is not a carry source without a ledger item.
         $photographer = User::factory()->create();
         PhotographerStatement::create([
             'user_id' => $photographer->id, 'month' => 5, 'year' => 2026,
-            'status' => 'paid', 'total_payable_cents' => 99999,
+            'status' => 'rollover', 'total_payable_cents' => 99999,
         ]);
         PhotographerStatement::create([
             'user_id' => $photographer->id, 'month' => 6, 'year' => 2026,
@@ -1243,11 +1252,19 @@ class PayoutCalculationServiceTest extends TestCase
 
     public function test_finalize_statements_handles_year_boundary(): void
     {
-        // Januar 2026 → Vormonat Dezember 2025 (Carbon::subMonth kennt Jahreswechsel).
+        // The ledger origin period compares correctly across a year boundary.
         $photographer = User::factory()->create();
-        PhotographerStatement::create([
+        $previous = PhotographerStatement::create([
             'user_id' => $photographer->id, 'month' => 12, 'year' => 2025,
             'status' => 'rollover', 'total_payable_cents' => 2000,
+        ]);
+        PayoutOpenItem::query()->create([
+            'user_id' => $photographer->id,
+            'source_type' => 'carry',
+            'source_id' => $previous->id,
+            'origin_month' => 12,
+            'origin_year' => 2025,
+            'amount_cents' => 2000,
         ]);
         PhotographerStatement::create([
             'user_id' => $photographer->id, 'month' => 1, 'year' => 2026,
@@ -1261,6 +1278,85 @@ class PayoutCalculationServiceTest extends TestCase
         $this->assertSame(2000, $stmt->rolled_over_amount_cents);
         $this->assertSame(6000, $stmt->total_payable_cents);
         $this->assertSame('pending', $stmt->status);
+    }
+
+    public function test_carry_survives_idle_months_without_statements(): void
+    {
+        $photographer = User::factory()->create();
+        PhotographerStatement::query()->create([
+            'user_id' => $photographer->id,
+            'month' => 5,
+            'year' => 2026,
+            'pool_earnings_cents' => 3000,
+        ]);
+        $this->service->finalizeStatements(5, 2026);
+
+        $this->service->finalizeStatements(6, 2026);
+        $this->service->finalizeStatements(7, 2026);
+
+        $carry = PayoutOpenItem::query()->where('source_type', 'carry')->sole();
+        $this->assertNull($carry->settled_at);
+        $this->assertSame(3000, $carry->amount_cents);
+        $this->assertSame(1, PhotographerStatement::query()
+            ->where('user_id', $photographer->id)
+            ->count());
+
+        PhotographerStatement::query()->create([
+            'user_id' => $photographer->id,
+            'month' => 8,
+            'year' => 2026,
+            'pool_earnings_cents' => 2000,
+        ]);
+        $this->service->finalizeStatements(8, 2026);
+
+        $august = PhotographerStatement::query()
+            ->where('user_id', $photographer->id)
+            ->where('month', 8)
+            ->sole();
+        $this->assertSame(3000, $august->rolled_over_amount_cents);
+        $this->assertSame(5000, $august->total_payable_cents);
+        $this->assertSame('pending', $august->status);
+        $this->assertSame(8, $carry->fresh()->settled_month);
+    }
+
+    public function test_consecutive_rollovers_leave_exactly_one_outstanding_carry(): void
+    {
+        $photographer = User::factory()->create();
+        PhotographerStatement::query()->create([
+            'user_id' => $photographer->id,
+            'month' => 5,
+            'year' => 2026,
+            'pool_earnings_cents' => 3000,
+        ]);
+        $this->service->finalizeStatements(5, 2026);
+
+        PhotographerStatement::query()->create([
+            'user_id' => $photographer->id,
+            'month' => 6,
+            'year' => 2026,
+            'pool_earnings_cents' => 1000,
+        ]);
+        $this->service->finalizeStatements(6, 2026);
+        $this->service->finalizeStatements(6, 2026);
+
+        $june = PhotographerStatement::query()
+            ->where('user_id', $photographer->id)
+            ->where('month', 6)
+            ->sole();
+        $items = PayoutOpenItem::query()
+            ->where('user_id', $photographer->id)
+            ->where('source_type', 'carry')
+            ->orderBy('origin_year')
+            ->orderBy('origin_month')
+            ->get();
+
+        $this->assertSame(4000, $june->total_payable_cents);
+        $this->assertSame(2, $items->count());
+        $this->assertSame(6, $items[0]->settled_month);
+        $this->assertSame(6, $items[1]->origin_month);
+        $this->assertNull($items[1]->settled_at);
+        $this->assertSame(1, $items->whereNull('settled_at')->count());
+        $this->assertSame(4000, $items->whereNull('settled_at')->sole()->amount_cents);
     }
 
     public function test_finalize_statements_no_statements_is_noop(): void

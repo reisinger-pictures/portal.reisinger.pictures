@@ -8,6 +8,7 @@ use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\PayoutCorrection;
+use App\Models\PayoutOpenItem;
 use App\Models\PayoutPool;
 use App\Models\Photo;
 use App\Models\PhotographerStatement;
@@ -684,19 +685,45 @@ class PayoutCalculationService
                 continue;
             }
 
-            PayoutCorrection::query()->createOrFirst(
-                [
-                    'order_id' => (string) $order->getKey(),
-                    'user_id' => (string) $userId,
-                    'closed_month' => $closedMonth,
-                    'closed_year' => $closedYear,
-                    'refund_amount_cents' => $currentRefundCents,
-                ],
-                [
-                    'amount_cents' => $amountCents,
-                    'settled_at' => null,
-                ],
-            );
+            DB::transaction(function () use (
+                $order,
+                $userId,
+                $closedMonth,
+                $closedYear,
+                $currentRefundCents,
+                $amountCents,
+            ): void {
+                $correction = PayoutCorrection::query()->createOrFirst(
+                    [
+                        'order_id' => (string) $order->getKey(),
+                        'user_id' => (string) $userId,
+                        'closed_month' => $closedMonth,
+                        'closed_year' => $closedYear,
+                        'refund_amount_cents' => $currentRefundCents,
+                    ],
+                    [
+                        'amount_cents' => $amountCents,
+                        'settled_at' => null,
+                    ],
+                );
+
+                PayoutOpenItem::query()->createOrFirst(
+                    [
+                        'source_type' => 'refund',
+                        'source_id' => (string) $correction->getKey(),
+                    ],
+                    [
+                        'user_id' => (string) $correction->user_id,
+                        'order_id' => (string) $correction->order_id,
+                        'origin_month' => (int) $correction->closed_month,
+                        'origin_year' => (int) $correction->closed_year,
+                        'amount_cents' => (int) $correction->amount_cents,
+                        'settled_month' => $correction->settled_month,
+                        'settled_year' => $correction->settled_year,
+                        'settled_at' => $correction->settled_at,
+                    ],
+                );
+            }, 3);
         }
     }
 
@@ -878,35 +905,40 @@ class PayoutCalculationService
         DB::transaction(function () use ($month, $year): void {
             $this->assertChronological($month, $year);
 
-            $corrections = PayoutCorrection::query()
+            $openItems = PayoutOpenItem::query()
                 ->whereNull('settled_at')
                 ->where(function ($query) use ($month, $year): void {
-                    $query->where('closed_year', '<', $year)
+                    $query->where('origin_year', '<', $year)
                         ->orWhere(function ($query) use ($month, $year): void {
-                            $query->where('closed_year', $year)
-                                ->where('closed_month', '<', $month);
+                            $query->where('origin_year', $year)
+                                ->where('origin_month', '<', $month);
                         });
                 })
-                ->orderBy('closed_year')
-                ->orderBy('closed_month')
+                ->orderBy('origin_year')
+                ->orderBy('origin_month')
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
 
-            // Recreate a statement that was removed during recalculation when
-            // it has already-booked correction lines. Also include users with
-            // newly claimable lines so a correction can create a zeroed row.
-            $bookedCorrectionUsers = PayoutCorrection::query()
+            // Recreate rows removed during recalculation from items already
+            // settled into this period. A newly claimable refund retains the
+            // established behavior of creating a zeroed statement when needed.
+            // A carry alone does not manufacture statements in otherwise idle
+            // months; it remains open until that photographer has a statement.
+            $bookedItemUsers = PayoutOpenItem::query()
                 ->where('settled_month', $month)
                 ->where('settled_year', $year)
                 ->distinct()
                 ->pluck('user_id');
-            $correctionUsers = $corrections->pluck('user_id')
-                ->merge($bookedCorrectionUsers)
+            $refundUsers = $openItems
+                ->where('source_type', 'refund')
+                ->pluck('user_id');
+            $statementUsers = $openItems->pluck('user_id')
+                ->merge($bookedItemUsers)
                 ->unique();
             $claimableUsers = [];
 
-            foreach ($correctionUsers as $userId) {
+            foreach ($statementUsers as $userId) {
                 $identity = [
                     'user_id' => $userId,
                     'year' => $year,
@@ -921,7 +953,10 @@ class PayoutCalculationService
                     continue;
                 }
 
-                if ($statement === null) {
+                if (
+                    $statement === null
+                    && ($refundUsers->contains($userId) || $bookedItemUsers->contains($userId))
+                ) {
                     $statement = PhotographerStatement::query()->createOrFirst(
                         $identity,
                         [
@@ -937,6 +972,10 @@ class PayoutCalculationService
                         ->firstOrFail();
                 }
 
+                if ($statement === null) {
+                    continue;
+                }
+
                 if ($statement->isLocked()) {
                     continue;
                 }
@@ -944,18 +983,28 @@ class PayoutCalculationService
                 $claimableUsers[(string) $userId] = true;
             }
 
-            // Claim every eligible correction into this finalized period. An
-            // approved/paid statement remains immutable, so its corrections
-            // stay unsettled for a later finalization.
-            foreach ($corrections as $correction) {
-                if (! isset($claimableUsers[(string) $correction->user_id])) {
+            // Claim every eligible ledger item into this finalized period. An
+            // approved/paid statement remains immutable, so its items stay
+            // unsettled for a later finalization.
+            foreach ($openItems as $item) {
+                if (! isset($claimableUsers[(string) $item->user_id])) {
                     continue;
                 }
 
-                $correction->settled_at = now();
-                $correction->settled_month = $month;
-                $correction->settled_year = $year;
-                $correction->save();
+                $item->settled_at = now();
+                $item->settled_month = $month;
+                $item->settled_year = $year;
+                $item->save();
+
+                if ($item->source_type === 'refund') {
+                    PayoutCorrection::query()
+                        ->whereKey($item->source_id)
+                        ->update([
+                            'settled_at' => $item->settled_at,
+                            'settled_month' => $month,
+                            'settled_year' => $year,
+                        ]);
+                }
             }
 
             $statements = PhotographerStatement::query()
@@ -972,35 +1021,22 @@ class PayoutCalculationService
                     continue;
                 }
 
-                $correctionCents = (int) PayoutCorrection::query()
+                $refundCents = (int) PayoutOpenItem::query()
                     ->where('user_id', $stmt->user_id)
+                    ->where('source_type', 'refund')
+                    ->where('settled_month', $month)
+                    ->where('settled_year', $year)
+                    ->sum('amount_cents');
+                $carryCents = (int) PayoutOpenItem::query()
+                    ->where('user_id', $stmt->user_id)
+                    ->where('source_type', 'carry')
                     ->where('settled_month', $month)
                     ->where('settled_year', $year)
                     ->sum('amount_cents');
                 $stmt->earned_amount_cents = $stmt->pool_earnings_cents
                     + $stmt->delta_surcharge_earnings_cents
-                    + $correctionCents;
-
-                // The latest prior statement is the carry boundary, even when its
-                // payable is zero. Lock it so a concurrent finalization cannot
-                // consume stale rollover state.
-                $latestPreviousStatement = PhotographerStatement::query()
-                    ->where('user_id', $stmt->user_id)
-                    ->where(function ($query) use ($year, $month): void {
-                        $query->where('year', '<', $year)
-                            ->orWhere(function ($query) use ($year, $month): void {
-                                $query->where('year', $year)
-                                    ->where('month', '<', $month);
-                            });
-                    })
-                    ->orderByDesc('year')
-                    ->orderByDesc('month')
-                    ->lockForUpdate()
-                    ->first();
-
-                $stmt->rolled_over_amount_cents = $latestPreviousStatement?->status === 'rollover'
-                    ? (int) $latestPreviousStatement->total_payable_cents
-                    : 0;
+                    + $refundCents;
+                $stmt->rolled_over_amount_cents = $carryCents;
                 $stmt->total_payable_cents = $stmt->earned_amount_cents + $stmt->rolled_over_amount_cents;
 
                 // Auszahlungsschwelle prüfen (50 Euro = 5000 Cents)
@@ -1011,6 +1047,28 @@ class PayoutCalculationService
                 }
 
                 $stmt->save();
+
+                $carryIdentity = [
+                    'source_type' => 'carry',
+                    'source_id' => (string) $stmt->getKey(),
+                ];
+                if ($stmt->status === 'rollover' && $stmt->total_payable_cents !== 0) {
+                    PayoutOpenItem::query()->updateOrCreate(
+                        $carryIdentity,
+                        [
+                            'user_id' => (string) $stmt->user_id,
+                            'order_id' => null,
+                            'origin_month' => $month,
+                            'origin_year' => $year,
+                            'amount_cents' => $stmt->total_payable_cents,
+                            'settled_at' => null,
+                            'settled_month' => null,
+                            'settled_year' => null,
+                        ],
+                    );
+                } else {
+                    PayoutOpenItem::query()->where($carryIdentity)->delete();
+                }
             }
         }, 3);
     }
