@@ -1680,6 +1680,10 @@ msgstr "Das Widerrufsrecht erlischt bei Verträgen über die Lieferung digitaler
 msgid "Das Zertifikat des Servers ist selbstsigniert, die Kamera kann seine Vertrauenswürdigkeit deshalb nicht prüfen. Der dafür vorgesehene Schalter liegt nicht im FTP-Konfigurationsfluss, sondern eine Ebene tiefer: Gerät für Verbindung bearbeiten → Gerät wählen → FTP-Server → Vertrauenswürdige Zielserver → Aktivieren."
 msgstr "Das Zertifikat des Servers ist selbstsigniert, die Kamera kann seine Vertrauenswürdigkeit deshalb nicht prüfen. Der dafür vorgesehene Schalter liegt nicht im FTP-Konfigurationsfluss, sondern eine Ebene tiefer: Gerät für Verbindung bearbeiten → Gerät wählen → FTP-Server → Vertrauenswürdige Zielserver → Aktivieren."
 
+#: src/ui/management/KameraEinrichtungContent.tsx
+msgid "Das Zertifikat konnte nicht heruntergeladen werden."
+msgstr "Das Zertifikat konnte nicht heruntergeladen werden."
+
 #: src/ui/components/GalleryHeader.tsx
 #: src/ui/components/Sidebar.tsx
 #: src/ui/PhotoDetailView.tsx
@@ -2028,6 +2032,14 @@ msgstr "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach di
 #: src/ui/Privacy.tsx
 msgid "Die IP-Risikoschlüssel werden als schlüsselabhängiger, nicht umkehrbarer Hash berechnet. In den Limitierungs- und Risikozählern wird ausschließlich der so abgeleitete Schlüssel geführt, nie die rohe IP-Adresse; der Schlüssel lässt sich nicht in eine IP-Adresse zurückrechnen."
 msgstr "Die IP-Risikoschlüssel werden als schlüsselabhängiger, nicht umkehrbarer Hash berechnet. In den Limitierungs- und Risikozählern wird ausschließlich der so abgeleitete Schlüssel geführt, nie die rohe IP-Adresse; der Schlüssel lässt sich nicht in eine IP-Adresse zurückrechnen."
+
+#: src/ui/management/KameraEinrichtungContent.tsx
+msgid "Die Kamera akzeptiert das Zertifikat auch ohne Import über „Zielserver vertrauen\"."
+msgstr "Die Kamera akzeptiert das Zertifikat auch ohne Import über „Zielserver vertrauen\"."
+
+#: src/ui/management/KameraEinrichtungContent.tsx
+msgid "Die Kamera akzeptiert das Zertifikat auch ohne Import über „Zielserver vertrauen“."
+msgstr "Die Kamera akzeptiert das Zertifikat auch ohne Import über „Zielserver vertrauen“."
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Die Kamera importiert ausschließlich eine Stammzertifikatsdatei mit genau diesen Dateinamen. Ein beliebig benanntes cert.pem wird übersprungen, ohne jede Fehlermeldung. Es kann nur ein Zertifikat importiert werden, und die Karte muss vorher eingesteckt sein."
@@ -2601,8 +2613,8 @@ msgstr "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen 
 #~ msgstr "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt — frag den Support danach."
 
 #: src/ui/management/KameraEinrichtungContent.tsx
-msgid "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt."
-msgstr "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt."
+#~ msgid "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt."
+#~ msgstr "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt."
 
 #: src/ui/LicenseTerms.tsx
 msgid "Es gilt österreichisches Recht unter Ausschluss des UN-Kaufrechts. Sollte eine Bestimmung dieser Bedingungen unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt. Gerichtsstand ist, soweit gesetzlich zulässig, der Sitz des Fotografen."
@@ -6098,6 +6110,10 @@ msgstr "Rollover:"
 msgid "Rollover: {rolledOverAmount}"
 msgstr "Rollover: {rolledOverAmount}"
 
+#: src/ui/management/KameraEinrichtungContent.tsx
+msgid "ROOT.PEM herunterladen"
+msgstr "ROOT.PEM herunterladen"
+
 #: src/ui/management/ManagementMetaGalleryView.tsx
 msgid "Sammelansicht aller Fotos. Uploads sind nur in den Untergalerien möglich."
 msgstr "Sammelansicht aller Fotos. Uploads sind nur in den Untergalerien möglich."
@@ -7633,6 +7649,10 @@ msgstr "Zeitpunkt"
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Zeitraum"
 msgstr "Zeitraum"
+
+#: src/ui/management/KameraEinrichtungContent.tsx
+msgid "Zertifikat wird geladen …"
+msgstr "Zertifikat wird geladen …"
 
 #: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Ziel-Galerie"

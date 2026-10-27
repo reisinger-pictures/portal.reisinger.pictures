@@ -1,5 +1,10 @@
 <?php
 
+$sftpGoBaseUrl = env('SFTPGO_BASE_URL', 'http://sftpgo:8080');
+$sftpGoInternalHost = is_string($sftpGoBaseUrl)
+    ? parse_url($sftpGoBaseUrl, PHP_URL_HOST)
+    : null;
+
 return [
 
     /*
@@ -95,6 +100,8 @@ return [
      * anything useful without it.
      */
     'ftp_transport' => [
+        'internal_host' => env('SFTPGO_FTPS_INTERNAL_HOST', is_string($sftpGoInternalHost) ? $sftpGoInternalHost : 'sftpgo'),
+        'internal_ftps_port' => env('SFTPGO_FTPS_INTERNAL_PORT', 989),
         'public_host' => env('FTP_PUBLIC_HOST'),
         'sftp_port' => env('SFTPGO_SFTP_PORT'),
         'ftps_port' => env('SFTPGO_FTPS_PORT'),

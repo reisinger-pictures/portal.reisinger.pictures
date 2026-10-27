@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { FtpConnection } from '../../../logic/ftpConnection';
 import KameraEinrichtungContent from '../KameraEinrichtungContent';
 import { renderWithProviders } from '../../../test-setup';
@@ -57,5 +58,57 @@ describe('KameraEinrichtungContent: reset quota', () => {
 
         expect(text).toContain('Es sind 3 Anforderungen pro Stunde möglich.');
         expect(text).not.toContain('10 Anforderungen');
+    });
+});
+
+describe('KameraEinrichtungContent: FTPS certificate download', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+    });
+
+    it('fetches the authenticated certificate endpoint and saves the server filename', async () => {
+        const certificate = '-----BEGIN CERTIFICATE-----\npublic-certificate\n-----END CERTIFICATE-----\n';
+        const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(certificate, {
+            status: 200,
+            headers: {
+                'Content-Type': 'application/x-pem-file',
+                'Content-Disposition': 'attachment; filename="ROOT.PEM"',
+            },
+        }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const createObjectURL = vi.fn(() => 'blob:root-certificate');
+        const revokeObjectURL = vi.fn();
+        vi.stubGlobal('URL', {createObjectURL, revokeObjectURL});
+        let downloadedFilename: string | null = null;
+        vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+            downloadedFilename = this.download;
+        });
+
+        renderWithProviders(<KameraEinrichtungContent connection={CONNECTION} resetLimitPerHour={10} />);
+
+        expect(screen.getByText('Die Kamera akzeptiert das Zertifikat auch ohne Import über „Zielserver vertrauen“.')).toBeVisible();
+        await userEvent.click(screen.getByRole('button', {name: 'ROOT.PEM herunterladen'}));
+
+        await waitFor(() => expect(downloadedFilename).toBe('ROOT.PEM'));
+        expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/management/ftp/certificate');
+        expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({method: 'GET', credentials: 'include'});
+        expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+        expect(downloadedFilename).toBe('ROOT.PEM');
+        expect(revokeObjectURL).toHaveBeenCalledWith('blob:root-certificate');
+    });
+
+    it('shows a visible German error when the certificate request fails', async () => {
+        const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('Failed to fetch'));
+        vi.stubGlobal('fetch', fetchMock);
+
+        renderWithProviders(<KameraEinrichtungContent connection={CONNECTION} resetLimitPerHour={10} />);
+
+        await userEvent.click(screen.getByRole('button', {name: 'ROOT.PEM herunterladen'}));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+            'Das Zertifikat konnte nicht heruntergeladen werden.',
+        );
     });
 });

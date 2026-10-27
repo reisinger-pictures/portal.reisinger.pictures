@@ -162,12 +162,11 @@ Canon importiert **ausschließlich** eine Stammzertifikatsdatei mit dem Dateinam
 **ein** Zertifikat importiert werden, und die Karte muss vorher eingesteckt sein;
 verwendet wird die Prioritätskarte aus *Einstellung → Aufn.funkt.+Karte/Ordner ausw*.
 
-Das Zertifikat liegt im Container unter `/var/lib/sftpgo/ftps/cert.pem` und wird für
-den Test auf `ROOT.PEM` umbenannt auf die Karte kopiert. **Wie, ist bewusst hier nicht
-festgelegt** — die Prozedur wird erst dokumentiert, wenn der einfache Weg nachweislich
-nicht trägt. Bis dahin: `docker cp` oder Portainer-Dateiverwaltung.
-
-Import laut Handbuch: `FTP-Übertragungseinstellungen` → `Stammzertifikat` →
+Der Import ist optional: Die Kamera akzeptiert das unbekannte Zertifikat bereits über
+`Zielserver vertrauen`; das reicht in der Regel. Nur wenn dieser Weg nicht funktioniert,
+öffne **Management → FTP → Zertifikat herunterladen**. Kopiere die heruntergeladene
+`ROOT.PEM` unverändert auf die Karte. Wähle an der Kamera
+`FTP-Übertragungseinstellungen` → `Stammzertifikat` →
 `Stammzertifikat v. Karte laden` → `OK`.
 
 ---
