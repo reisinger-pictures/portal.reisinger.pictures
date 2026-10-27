@@ -1478,21 +1478,22 @@ Ein Rollenwechsel ohne Änderung der Fotografen-Mitgliedschaft braucht keinen
 Snapshot und verhält sich unverändert; ein unveränderter Rollensatz wird nicht
 blockiert, damit ein Metadaten-Save und ein idempotenter Retry weiterlaufen.
 
-**Was das nicht löst (Stand 2026-10-21, geändert):** Die Reconciliation, die
-hier früher als offen geführt wurde, **existiert**: `reconcileAccount()`
-(P1-M30) schreibt den Zustand, `php artisan ftp:reconcile` ruft sie auf. Der
-Vertrag steht in **§7.16a**. `reconcileAccount()` nimmt denselben per-User-Lock
-wie Passwortwechsel, Slug-Ersatz und Widerruf; nach dem Erwerb lädt es den User
-neu und verwendet keinen vor dem Warten gelesenen Slug oder Status. Ist der Lock
-belegt, liefert die Reconciliation `retryable`, ohne SFTPGo aufzurufen oder
-Status zu schreiben. Ist der User während des Wartens gelöscht worden, wird er
-als `skipped` gemeldet. So kann ein alter SFTPGo-Read keinen nachfolgenden
-Slug-/Widerrufszustand überschreiben. Offen bleibt genau der Teil, den auch §7.16a nicht
-kann: ein SFTPGo-Account, dessen **Name kein `ftp_slug`** ist, wird von keiner
-Reconciliation gefunden — das Portal kennt Konten nur unter dem Slug, den es
-selbst vergeben hat. Ein manuell im SFTPGo angelegtes Konto unter einem
-fremden Namen bleibt für das Portal unsichtbar; sichtbar wird es erst, wenn
-der Slug des Fotografen auf diesen Namen gesetzt wird.
+**Reconciliation (P1-M30, D-60).** `reconcileAccount()` nimmt denselben
+per-User-Lock wie Passwortwechsel, Slug-Ersatz und Widerruf; nach dem Erwerb
+lädt es den User neu und verwendet keinen vor dem Warten gelesenen Slug oder
+Status. Ist der Lock belegt, liefert die Reconciliation `retryable`, ohne
+SFTPGo aufzurufen oder Status zu schreiben. Ist der User während des Wartens
+gelöscht worden, wird er als `skipped` gemeldet. So kann ein alter SFTPGo-Read
+keinen nachfolgenden Slug-/Widerrufszustand überschreiben.
+
+**Die Namensautorität liegt im Portal.** D-60 macht `users.ftp_slug` zur
+einzigen Quelle für den SFTPGo-Kontonamen und das Inbox-Verzeichnis. Ein
+Namenswechsel ist ein Provisionierungslauf über den lock-geschützten
+Slug-Wechselpfad: Der alte Remote-Account wird gelöscht, bevor der neue angelegt
+wird. Die Reconciliation übernimmt keinen Namen, den sie nur in SFTPGo findet.
+Sie listet deshalb die Kamera-Accounts und vergleicht sie mit allen nicht-null
+Portal-Slugs. Ein Kamera-Account ohne beanspruchenden Portal-Slug wird als
+Namensabweichung gemeldet, nicht als neuer Portalzustand.
 
 **Provisionierung ist der Übergang nach `active`.** Die Invariante hält nur,
 wenn der Pfad, der den Account anlegt, den Zustand auch schreibt. Bis V043 tat er
@@ -1575,7 +1576,8 @@ machen (7.5) —, also ist die Reparatur ein **expliziter** Weg:
 `php artisan ftp:reconcile` ruft sie auf. Es gibt bewusst **keinen** HTTP-Pfad
 dafür: die Reconciliation braucht das SFTPGo-Credential, und ein Endpunkt würde
 einen Dienstausfall in einen Request hineinziehen, der mit der Galerie des
-Fotografen nichts zu tun hat. Der Befehl liest **nur** (`GET
+Fotografen nichts zu tun hat. Der Befehl liest die Kontenliste (`GET
+/api/v2/users`) und anschließend die einzelnen Slugs (`GET
 /api/v2/users/{slug}`); er schreibt nichts in SFTPGo und legt damit auch kein
 Kamera-Passwort auf die Leitung.
 
@@ -1599,9 +1601,10 @@ ein SFTPGo-Konto, und ist es nutzbar?" Die Antwort landet in
 | Konto unbekannt (404) | `active` | `revoked` | `ftp_revoked_at`, `ftp_account_error` = `null` |
 | Konto unbekannt (404) | `error` | `pending` | `ftp_account_error` = `null` |
 | Konto unbekannt (404) | `pending` / `revoked` | unverändert | nichts |
+| Konto unbekannt (404), mindestens ein unbeanspruchter Kamera-Account | `active` / `error` | unverändert (mehrdeutige Namensabweichung: Umbenennung oder tatsächlicher Entzug; Betreiber entscheidet) | nichts |
 | nicht erreichbar / nicht konfiguriert / Fehler | beliebig | **unverändert** | `ftp_account_error` = Grund; Ausnahme |
 
-**Fünf Entscheidungen, die die Tabelle trägt:**
+**Sechs Entscheidungen, die die Tabelle trägt:**
 
 1. **`pending` wird nie `revoked`.** `pending` heißt „nie provisioniert" — und
    ist der Zustand, in dem der Fotograf **Zugangsdaten anfordern darf**
@@ -1635,26 +1638,44 @@ ein SFTPGo-Konto, und ist es nutzbar?" Die Antwort landet in
    **kein** Entzug (das Portal hatte nie eines, das es hätte entziehen können),
    sondern wieder der Zustand, in dem Zugangsdaten angefordert werden können.
 
+6. **Ein 404 mit unbeanspruchtem Kamera-Account ist mehrdeutig.** Es kann eine
+   Umbenennung oder ein tatsächlicher Entzug sein. Vor dem Abgleich listet der
+   Befehl einmal alle Kamera-Accounts (SFTPGo-Beschreibung
+   `Portal FTP-Kamera-Zugang`) und vergleicht ihre Namen mit allen gesetzten
+   Portal-Slugs. Ein nicht beanspruchter Kamera-Account plus ein fehlender
+   Account für einen `active`- oder `error`-Slug ist deshalb ein mehrdeutiger
+   Befund. Der Status, `ftp_account_error` und `ftp_revoked_at` bleiben dabei
+   unverändert; der Operator entscheidet, ob es eine Umbenennung oder ein
+   tatsächlicher Entzug ist und welcher Zustand hergestellt werden soll. Auch
+   `pending`-404s werden nicht als Namensdrift gewertet. Lässt sich die Liste
+   nicht abrufen, bricht der Lauf mit `FATAL` ab, bevor ein Einzelkonto
+   abgestimmt wird.
+
 **Was der Befehl meldet:** eine Zeile je Konto — **Slug, Zustand, Grund** — und
 eine zählende Zusammenfassung („N aktiv, N entzogen, N unverändert, N
-abweichend, N erneut abzustimmen, N übersprungen, N fehlgeschlagen, N nicht geprüft"). Kein Name, keine
-E-Mail-Adresse, kein Passwort: das Log eines Laufs überlebt das Terminal, in
-dem er geschrieben wurde, und der Slug ist der Name, unter dem das Konto selbst
-geführt wird. Ein **Dienstausfall beendet den Lauf**, statt jedes weitere Konto
-einmal den Connect-Timeout kosten zu lassen; die nicht geprüften Konten werden
-als solche gezählt und nicht als geprüft.
+abweichend, N Namensabweichungen, N erneut abzustimmen, N übersprungen, N
+fehlgeschlagen, N nicht geprüft"). Zusätzlich gibt es einen eigenen
+Drift-Abschnitt: je unbeanspruchtem Kamera-Account eine Warnung mit Kontoname
+und Home-Verzeichnis sowie je betroffenem `active`-/`error`-Slug eine Warnung,
+die die unbeanspruchten Kontonamen nennt und den mehrdeutigen Befund
+(Umbenennung oder tatsächlicher Entzug) sowie den unveränderten Status klar
+ausweist. Keine Personen- oder Anzeigenamen, keine E-Mail-Adresse, kein
+Passwort: Der technische SFTPGo-Kontoname wird für die Drift-Diagnose genannt.
+Das Log eines Laufs überlebt das Terminal, in dem es geschrieben wurde, und der
+Portal-Slug ist der Kontoname, unter dem das Konto selbst geführt wird. Ein
+**Dienstausfall beendet den Lauf**, statt jedes weitere Konto einmal den
+Connect-Timeout kosten zu lassen; die nicht geprüften Konten werden als solche
+gezählt und nicht als geprüft. Die Drift-Zahl zählt jede Warnung:
+unbeanspruchte Remote-Accounts und fehlende `active`-/`error`-Portal-Slugs.
 
 | Exit-Code | Bedeutung |
 |---|---|
-| `0` | Alle Konten wurden geprüft (ob der Zustand sich änderte oder nicht). Ein Konto mit **unbrauchbarem Namen** (Altwert vor P1-M21) wird *übersprungen* und gezählt, nicht als Fehler gewertet — der Slug wird nicht hinter dem Fotografen umgeschrieben |
-| `1` | Mindestens ein Konto konnte nicht geprüft werden — SFTPGo nicht erreichbar, nicht konfiguriert, mit Fehlerantwort oder der gemeinsame Account-Lock war belegt; **die Zustände dieser Konten wurden nicht verändert** |
+| `0` | Alle Konten wurden geprüft (ob der Zustand sich änderte oder nicht), und es wurde keine Namensabweichung gefunden. Ein Konto mit **unbrauchbarem Namen** (Altwert vor P1-M21) wird *übersprungen* und gezählt, nicht als Fehler gewertet — der Slug wird nicht hinter dem Fotografen umgeschrieben |
+| `1` | Mindestens ein Konto konnte nicht geprüft werden — SFTPGo nicht erreichbar, nicht konfiguriert, mit Fehlerantwort oder der gemeinsame Account-Lock war belegt — **oder** eine Namensabweichung braucht eine Betreiberentscheidung. Drift-Befunde lassen den Status unverändert; bei einem Dienstausfall sind nicht prüfbare Kontostatus ebenfalls unverändert |
 | `2` | `--user` hat niemanden benannt |
 
 **Was die Reconciliation nicht kann:**
 
-- **Sie findet kein Konto, dessen Name kein `ftp_slug` ist.** Das Portal kennt
-  Konten nur unter dem Slug, den es selbst vergeben hat; ein manuell im
-  SFTPGo angelegtes Konto unter einem fremden Namen bleibt unsichtbar.
 - **Sie erzeugt kein Konto und kein Passwort.** Sie korrigiert einen Zustand;
   ein Konto anlegen kann nur der Provisionierungs- oder der Reset-Pfad
   (7.3, P1-M58), ein Passwort nur der Provisionierungs-, der Reset- oder der
@@ -1664,6 +1685,22 @@ als solche gezählt und nicht als geprüft.
 - **Sie läuft nicht von selbst.** Es gibt keinen Scheduler-Eintrag und keinen
   Aufruf aus einem Request: der Zustand wird geprüft, wenn ein Operator es
   verlangt.
+
+**Admin-Endpunkt der Drift-Erkennung** (`openapi/openapi.yaml` v2.7.6, gemessen):
+
+| Zweck | Aufruf |
+|---|---|
+| Kamera-Accounts auflisten | `GET /api/v2/users?limit=500&offset={n}&order=ASC` → 200 JSON-Array `User`; `limit` 1–500 (Default 100), nach Benutzername aufsteigend sortiert |
+
+Die Antwort hat **kein** `total` und keinen Server-Cursor. Der Offset rückt
+deshalb immer um die Anzahl der tatsächlich gelieferten Einträge vor, und die
+Liste endet erst bei einer **leeren** Seite — eine kurze Zwischenseite kann
+damit weder abschneiden noch Einträge überspringen. Aufsteigend sortiert
+gelesen bricht der Client bei jeder sichtbaren Inkonsistenz ab (wiederholter
+Name, nicht aufsteigende Seite, Seite hinter der vorherigen Grenze). Was ohne
+Gesamtzahl unentdeckbar bleibt, ist ein Löschen innerhalb eines bereits
+gelieferten Offsets; der Befehl nennt deshalb die Anzahl der gelesenen Konten,
+und ein Lauf während einer Kontenänderung ist zu wiederholen.
 
 ### 7.16b Selbständerung des Kamera-Passworts (D-51)
 

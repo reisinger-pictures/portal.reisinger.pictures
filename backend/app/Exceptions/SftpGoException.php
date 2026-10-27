@@ -8,11 +8,10 @@ use Throwable;
 /**
  * Failure of a single call against the SFTPGo Admin API (P1-M22).
  *
- * Every factory accepts the account name and the HTTP status only — there is
- * deliberately no factory that takes a camera password. A camera password can
- * therefore not reach a log line, a stack trace or an API response through this
- * exception, which is what `features/infrastructure/19-ftp-upload-pipeline.md`
- * 7.3 ("Passwort-Fluss: erzeugen, anzeigen, verwerfen") requires.
+ * Factories report account names, HTTP status values, and validation/diagnostic
+ * details. The client never passes a camera password to an exception factory,
+ * which is what `features/infrastructure/19-ftp-upload-pipeline.md` 7.3
+ * ("Passwort-Fluss: erzeugen, anzeigen, verwerfen") requires.
  *
  * The status mapping follows the running instance, not a guess: SFTPGo's
  * `getRespStatus` (internal/httpd/api_utils.go, 2.7.6) maps a duplicated key
@@ -36,6 +35,8 @@ class SftpGoException extends RuntimeException
     public const REASON_SERVER_ERROR = 'server_error';
 
     public const REASON_MALFORMED_RESPONSE = 'malformed_response';
+
+    public const REASON_INCONSISTENT_ACCOUNT_LIST = 'inconsistent_account_list';
 
     public function __construct(
         public readonly string $reason,
@@ -124,6 +125,22 @@ class SftpGoException extends RuntimeException
             self::REASON_MALFORMED_RESPONSE,
             "SFTPGo hat fuer FTP-Konto '{$account}' eine unerwartete Antwort geliefert.",
             null,
+        );
+    }
+
+    public static function repeatedAccountListUsername(string $username): self
+    {
+        return new self(
+            self::REASON_INCONSISTENT_ACCOUNT_LIST,
+            "SFTPGo hat eine inkonsistente Kamerakontenliste geliefert: Benutzername '{$username}' wurde mehrfach geliefert.",
+        );
+    }
+
+    public static function accountListOrderViolation(string $firstUsername, string $previousLastUsername): self
+    {
+        return new self(
+            self::REASON_INCONSISTENT_ACCOUNT_LIST,
+            "SFTPGo hat eine inkonsistente Kamerakontenliste geliefert: Der erste Benutzername '{$firstUsername}' ist nicht groesser als '{$previousLastUsername}' am vorherigen Seitenende.",
         );
     }
 }

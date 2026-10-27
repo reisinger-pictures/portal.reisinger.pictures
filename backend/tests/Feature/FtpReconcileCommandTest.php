@@ -98,9 +98,7 @@ class FtpReconcileCommandTest extends TestCase
     {
         $user = $this->photographer('florian', FtpCredentialService::STATUS_ACTIVE);
 
-        Http::fake([
-            'sftpgo.test:8080/api/v2/users*' => fn () => throw new ConnectionException('connection refused'),
-        ]);
+        $this->fakeSftpGo([], [], unreachableUserLookup: true);
 
         $exitCode = Artisan::call('ftp:reconcile');
         $output = Artisan::output();
@@ -118,6 +116,158 @@ class FtpReconcileCommandTest extends TestCase
         $this->assertNotNull($fresh->ftp_account_error);
     }
 
+    public function test_a_failed_camera_account_list_aborts_before_changing_any_user(): void
+    {
+        $user = $this->photographer('florian', FtpCredentialService::STATUS_ACTIVE);
+        Http::fake([
+            'sftpgo.test:8080/api/v2/users*' => function (Request $request) {
+                if (parse_url($request->url(), PHP_URL_PATH) === '/api/v2/users') {
+                    return Http::response(['message' => 'unauthorized'], 401);
+                }
+
+                return Http::response(['message' => 'unexpected request'], 500);
+            },
+        ]);
+
+        $exitCode = Artisan::call('ftp:reconcile');
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('FATAL:', $output);
+        $this->assertStringContainsString('unauthorized', $output);
+        Http::assertSentCount(1);
+
+        $fresh = $user->fresh();
+        $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $fresh->ftp_account_status);
+        $this->assertNull($fresh->ftp_revoked_at);
+        $this->assertNull($fresh->ftp_account_error);
+    }
+
+    public function test_an_unreachable_camera_account_list_aborts_before_changing_any_user(): void
+    {
+        $user = $this->photographer('florian', FtpCredentialService::STATUS_ACTIVE);
+        Http::fake([
+            'sftpgo.test:8080/api/v2/users*' => function (Request $request) {
+                if (parse_url($request->url(), PHP_URL_PATH) === '/api/v2/users') {
+                    throw new ConnectionException('connection refused');
+                }
+
+                return Http::response(['message' => 'unexpected request'], 500);
+            },
+        ]);
+
+        $exitCode = Artisan::call('ftp:reconcile');
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('FATAL:', $output);
+        $this->assertStringContainsString('unreachable', $output);
+        $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $user->fresh()->ftp_account_status);
+        $this->assertNull($user->fresh()->ftp_account_error);
+        $this->assertNull($user->fresh()->ftp_revoked_at);
+    }
+
+    public function test_an_active_404_with_an_orphan_camera_account_is_reported_without_writes(): void
+    {
+        $user = $this->photographer('florian', FtpCredentialService::STATUS_ACTIVE);
+        $user->forceFill(['ftp_account_error' => 'existing diagnostic'])->save();
+        $this->fakeSftpGo([], [
+            $this->cameraAccount('oldname', '/var/www/ftp/oldname'),
+        ]);
+
+        $exitCode = Artisan::call('ftp:reconcile');
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('oldname: unbeanspruchtes Kamera-Konto in /var/www/ftp/oldname', $output);
+        $this->assertStringContainsString('florian: Der Portal-Slug hat kein Konto', $output);
+        $this->assertStringContainsString('unbeanspruchte Kamera-Konten: oldname', $output);
+        $this->assertStringContainsString('mehrdeutig (Umbenennung oder tatsächlicher Entzug)', $output);
+        $this->assertStringContainsString('der Status blieb unverändert', $output);
+        $this->assertStringContainsString('Namensabweichungen: 2', $output);
+
+        $fresh = $user->fresh();
+        $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $fresh->ftp_account_status);
+        $this->assertNull($fresh->ftp_revoked_at);
+        $this->assertSame('existing diagnostic', $fresh->ftp_account_error);
+    }
+
+    public function test_an_active_404_without_an_orphan_camera_account_still_revokes(): void
+    {
+        $user = $this->photographer('florian', FtpCredentialService::STATUS_ACTIVE);
+        $this->fakeSftpGo();
+
+        $exitCode = Artisan::call('ftp:reconcile');
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('florian: revoked (account_missing)', Artisan::output());
+        $this->assertSame(FtpCredentialService::STATUS_REVOKED, $user->fresh()->ftp_account_status);
+        $this->assertNotNull($user->fresh()->ftp_revoked_at);
+    }
+
+    public function test_an_orphan_account_is_reported_even_when_the_portal_account_is_present(): void
+    {
+        $user = $this->photographer('florian', FtpCredentialService::STATUS_PENDING);
+        $this->fakeSftpGo(['florian' => 1], [
+            $this->cameraAccount('florian', '/var/www/ftp/florian'),
+            $this->cameraAccount('unclaimed', '/var/www/ftp/unclaimed'),
+        ]);
+
+        $exitCode = Artisan::call('ftp:reconcile', ['--user' => 'florian']);
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('unclaimed: unbeanspruchtes Kamera-Konto in /var/www/ftp/unclaimed', $output);
+        $this->assertStringContainsString('Namensabweichungen: 1', $output);
+        $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $user->fresh()->ftp_account_status);
+    }
+
+    public function test_a_pending_404_with_an_orphan_does_not_mark_the_pending_user_as_drifted(): void
+    {
+        $user = $this->photographer('florian', FtpCredentialService::STATUS_PENDING);
+        $this->fakeSftpGo([], [
+            $this->cameraAccount('unclaimed', '/var/www/ftp/unclaimed'),
+        ]);
+
+        $exitCode = Artisan::call('ftp:reconcile');
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode, 'The independent orphan account still requires an operator decision.');
+        $this->assertStringContainsString('unclaimed: unbeanspruchtes Kamera-Konto', $output);
+        $this->assertStringNotContainsString('florian: Der Portal-Slug hat kein Konto', $output);
+        $this->assertSame(FtpCredentialService::STATUS_PENDING, $user->fresh()->ftp_account_status);
+        $this->assertNull($user->fresh()->ftp_revoked_at);
+    }
+
+    public function test_the_camera_account_list_is_paged_and_filters_non_camera_users(): void
+    {
+        $user = $this->photographer('florian', FtpCredentialService::STATUS_PENDING);
+        $firstPage = [];
+        for ($index = 0; $index < 500; $index++) {
+            // Zero-padded so the fixture is in the ascending order the live
+            // endpoint guarantees; a lexical sort would otherwise interleave
+            // external-10 before external-2 and trip the consistency guard.
+            $name = 'external-'.str_pad((string) $index, 3, '0', STR_PAD_LEFT);
+            $firstPage[] = [
+                'username' => $name,
+                'home_dir' => '/var/www/ftp/'.$name,
+                'description' => 'Other SFTPGo account',
+            ];
+        }
+        $this->fakeSftpGo(['florian' => 1], [
+            ...$firstPage,
+            $this->cameraAccount('florian', '/var/www/ftp/florian'),
+        ]);
+
+        $exitCode = Artisan::call('ftp:reconcile');
+
+        $this->assertSame(0, $exitCode);
+        $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $user->fresh()->ftp_account_status);
+        Http::assertSentCount(3);
+        Http::assertSent(fn (Request $request): bool => $this->listQuery($request) === ['limit' => '500', 'offset' => '0']);
+        Http::assertSent(fn (Request $request): bool => $this->listQuery($request) === ['limit' => '500', 'offset' => '500']);
+    }
+
     public function test_a_skipped_account_is_not_counted_as_unchecked_after_a_service_wide_failure(): void
     {
         $users = collect([
@@ -128,10 +278,12 @@ class FtpReconcileCommandTest extends TestCase
         [$firstAttempt, $serviceFailure, $notAttempted] = $users->all();
 
         $attemptedSlugs = [];
+        $this->fakeSftpGo();
         $credentials = \Mockery::mock(FtpCredentialService::class);
         $credentials->shouldReceive('reconcileAccount')
             ->twice()
-            ->andReturnUsing(function (User $user) use (&$attemptedSlugs, $firstAttempt): never {
+            ->andReturnUsing(function (User $user, array $orphanAccountNames) use (&$attemptedSlugs, $firstAttempt): never {
+                $this->assertSame([], $orphanAccountNames);
                 $attemptedSlugs[] = $user->ftp_slug;
 
                 if ($user->is($firstAttempt)) {
@@ -166,7 +318,7 @@ class FtpReconcileCommandTest extends TestCase
             ->once()
             ->with(FtpCredentialService::rotationLockKey((string) $user->getKey()), 120)
             ->andReturn($lock);
-        Http::fake();
+        $this->fakeSftpGo();
 
         $exitCode = Artisan::call('ftp:reconcile', ['--user' => 'florian']);
         $output = Artisan::output();
@@ -175,7 +327,8 @@ class FtpReconcileCommandTest extends TestCase
         $this->assertStringContainsString('florian: später erneut abstimmen (rotation_in_progress)', $output);
         $this->assertStringContainsString('1 erneut abzustimmen', $output);
         $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $user->fresh()->ftp_account_status);
-        Http::assertNothingSent();
+        Http::assertSentCount(1);
+        Http::assertNotSent(fn (Request $request): bool => parse_url($request->url(), PHP_URL_PATH) === '/api/v2/users/florian');
     }
 
     public function test_the_command_reconciles_only_the_requested_account(): void
@@ -190,7 +343,9 @@ class FtpReconcileCommandTest extends TestCase
         $this->assertSame(0, $exitCode);
         $this->assertStringContainsString('florian: active', Artisan::output());
 
-        Http::assertSentCount(1);
+        // Two listing pages (one entry + the terminating empty page) and the
+        // user lookup.
+        Http::assertSentCount(2);
         $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $requested->fresh()->ftp_account_status);
         $this->assertSame(
             FtpCredentialService::STATUS_ACTIVE,
@@ -280,7 +435,9 @@ class FtpReconcileCommandTest extends TestCase
         $exitCode = Artisan::call('ftp:reconcile');
 
         $this->assertSame(0, $exitCode);
-        Http::assertSentCount(1);
+        // Two listing pages (one entry + the terminating empty page) and the
+        // photographer's lookup.
+        Http::assertSentCount(2);
         $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $photographer->fresh()->ftp_account_status);
         $this->assertSame(FtpCredentialService::STATUS_ACTIVE, $client->fresh()->ftp_account_status);
     }
@@ -305,11 +462,28 @@ class FtpReconcileCommandTest extends TestCase
      *
      * @param  array<string, int>  $known
      */
-    private function fakeSftpGo(array $known = []): void
+    private function fakeSftpGo(array $known = [], ?array $cameraAccounts = null, bool $unreachableUserLookup = false): void
     {
+        $cameraAccounts ??= array_map(
+            fn (string $username): array => $this->cameraAccount($username, '/var/www/ftp/'.$username),
+            array_keys($known),
+        );
+
         Http::fake([
-            'sftpgo.test:8080/api/v2/users*' => function (Request $request) use ($known) {
-                $account = rawurldecode(basename((string) parse_url($request->url(), PHP_URL_PATH)));
+            'sftpgo.test:8080/api/v2/users*' => function (Request $request) use ($known, $cameraAccounts, $unreachableUserLookup) {
+                $path = (string) parse_url($request->url(), PHP_URL_PATH);
+
+                if ($path === '/api/v2/users') {
+                    $query = $this->listQuery($request);
+
+                    return Http::response(array_slice($cameraAccounts, (int) $query['offset'], (int) $query['limit']));
+                }
+
+                if ($unreachableUserLookup) {
+                    throw new ConnectionException('connection refused');
+                }
+
+                $account = rawurldecode(basename($path));
 
                 if (! array_key_exists($account, $known)) {
                     return Http::response(['message' => 'user not found'], 404);
@@ -326,5 +500,26 @@ class FtpReconcileCommandTest extends TestCase
                 ], 200);
             },
         ]);
+    }
+
+    /** @return array{username: string, home_dir: string, description: string} */
+    private function cameraAccount(string $username, string $homeDir): array
+    {
+        return [
+            'username' => $username,
+            'home_dir' => $homeDir,
+            'description' => 'Portal FTP-Kamera-Zugang',
+        ];
+    }
+
+    /** @return array{limit: string, offset: string} */
+    private function listQuery(Request $request): array
+    {
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+        return [
+            'limit' => (string) ($query['limit'] ?? ''),
+            'offset' => (string) ($query['offset'] ?? ''),
+        ];
     }
 }

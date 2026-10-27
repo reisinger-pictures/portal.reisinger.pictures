@@ -84,6 +84,10 @@ class SftpGoClient
      */
     public const USER_STATUS_ENABLED = 1;
 
+    private const CAMERA_ACCOUNT_PAGE_SIZE = 500;
+
+    private const MAX_CAMERA_ACCOUNT_PAGES = 40;
+
     /**
      * The instance uploads into its home directory only; no virtual folders are
      * configured. The ownership/uid model on the host is P1-M24 and is
@@ -285,6 +289,140 @@ class SftpGoClient
     public function findUser(string $username): array
     {
         return $this->assertJsonObject($this->readUser($username), $username);
+    }
+
+    /**
+     * Lists every camera account, in the shape needed by the reconciliation
+     * command. The Admin API returns a JSON array (not a wrapper object), and
+     * its maximum page size is 500.
+     *
+     * **Consistency.** Offset paging has no server-side cursor and the response
+     * carries no total, so a user created or deleted between two requests can
+     * shift the window. The list is ordered by username and this method fails
+     * closed on every inconsistency it can see: a username that repeats within
+     * or across pages, a page that is not strictly ascending, and a page that
+     * starts at or before the previous page's last username. The offset always
+     * advances by the number of entries the server actually returned and the
+     * listing ends only at an empty page, so a short intermediate page can
+     * neither truncate the list nor make it skip entries. What remains
+     * undetectable without a total is a deletion inside an already returned
+     * offset; the command prints how many accounts it read, so an operator can
+     * tell a short list from a real state, and a run during an account change
+     * is worth repeating.
+     *
+     * @return list<array{username: string, home_dir: string}>
+     */
+    public function listCameraAccounts(): array
+    {
+        $accounts = [];
+        $seenUsernames = [];
+        $offset = 0;
+        $previousPageLastUsername = null;
+
+        for ($page = 0; $page < self::MAX_CAMERA_ACCOUNT_PAGES; $page++) {
+            $response = $this->call(
+                'camera_accounts_list',
+                'camera_accounts',
+                fn (PendingRequest $request) => $request->get($this->usersPath(), [
+                    'limit' => self::CAMERA_ACCOUNT_PAGE_SIZE,
+                    'offset' => $offset,
+                    'order' => 'ASC',
+                ]),
+            );
+
+            try {
+                $users = json_decode($response->body(), false, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                throw SftpGoException::malformedResponse('camera_accounts');
+            }
+
+            if (! is_array($users) || ! array_is_list($users)) {
+                throw SftpGoException::malformedResponse('camera_accounts');
+            }
+
+            $pageUsernames = [];
+
+            foreach ($users as $user) {
+                if (! is_object($user) || get_object_vars($user) === []) {
+                    throw SftpGoException::malformedResponse('camera_accounts');
+                }
+
+                $user = get_object_vars($user);
+                $isCameraAccount = ($user['description'] ?? null) === self::CAMERA_DESCRIPTION;
+                $username = $user['username'] ?? null;
+                $homeDir = $user['home_dir'] ?? null;
+
+                // Every entry is a `User` object, whose username is mandatory and
+                // unique. Skipping one with an unusable name would silently drop
+                // it from the ordering check and from the drift comparison.
+                if (! is_string($username) || $username === '') {
+                    throw SftpGoException::malformedResponse('camera_accounts');
+                }
+
+                if ($isCameraAccount && (! FtpSlug::isValid($username) || ! is_string($homeDir) || $homeDir === '')) {
+                    throw SftpGoException::malformedResponse('camera_accounts');
+                }
+
+                if (array_key_exists($username, $seenUsernames)) {
+                    throw SftpGoException::repeatedAccountListUsername($username);
+                }
+
+                $seenUsernames[$username] = true;
+                $pageUsernames[] = $username;
+
+                if (! $isCameraAccount) {
+                    continue;
+                }
+
+                $accounts[] = [
+                    'username' => $username,
+                    'home_dir' => $homeDir,
+                ];
+            }
+
+            foreach ($pageUsernames as $index => $username) {
+                if ($index === 0) {
+                    continue;
+                }
+
+                $previousUsername = $pageUsernames[$index - 1];
+
+                if (strcmp($username, $previousUsername) <= 0) {
+                    throw SftpGoException::accountListOrderViolation($username, $previousUsername);
+                }
+            }
+
+            if ($pageUsernames !== []) {
+                $firstUsername = $pageUsernames[0];
+
+                if ($previousPageLastUsername !== null && strcmp($firstUsername, $previousPageLastUsername) <= 0) {
+                    throw SftpGoException::accountListOrderViolation($firstUsername, $previousPageLastUsername);
+                }
+
+                $previousPageLastUsername = $pageUsernames[array_key_last($pageUsernames)];
+            }
+
+            // Offset paging without a total has exactly one termination
+            // signal: a page shorter than the requested size. A concurrent
+            // deletion inside an already returned offset can still make such
+            // a page short before the end, which is why the command prints how
+            // many accounts it read (see the docblock).
+            if (count($users) < self::CAMERA_ACCOUNT_PAGE_SIZE) {
+                return $accounts;
+            }
+
+            if ($page === self::MAX_CAMERA_ACCOUNT_PAGES - 1) {
+                throw new SftpGoException(
+                    SftpGoException::REASON_MALFORMED_RESPONSE,
+                    'SFTPGo lieferte mehr als '.self::MAX_CAMERA_ACCOUNT_PAGES
+                        .' Seiten; die Kamerakontenliste überschreitet das sichere Paging-Limit.',
+                );
+            }
+
+            $offset += self::CAMERA_ACCOUNT_PAGE_SIZE;
+        }
+
+        return $accounts;
     }
 
     /**

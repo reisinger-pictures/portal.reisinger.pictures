@@ -7,6 +7,7 @@ use App\Exceptions\FtpCredentialException;
 use App\Exceptions\SftpGoException;
 use App\Models\User;
 use App\Services\FtpCredentialService;
+use App\Services\SftpGoClient;
 use App\Values\FtpAccountReconciliation;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
@@ -18,7 +19,8 @@ use Illuminate\Support\Collection;
  * read path is not allowed to repair it, because a live query in the inbox
  * endpoint would make the UI depend on a service that may be down (7.5). This
  * command is the explicit path: an operator runs it, it asks SFTPGo what it
- * knows about every camera account, and it writes the answer back.
+ * knows about every camera account, compares remote names with portal slugs,
+ * and writes only reconciled account states back.
  *
  * It is a command and not an endpoint on purpose. The reconciliation needs the
  * SFTPGo credential, and a photographer-facing route would put a service
@@ -30,28 +32,32 @@ use Illuminate\Support\Collection;
  *
  * The state transitions are the ones of
  * {@see FtpCredentialService::reconcileAccount()} and are documented there.
- * In short: an account that SFTPGo has (and has enabled) is `active`, one
- * that is gone or disabled is `revoked` with `ftp_revoked_at`, and an account
- * whose state could not be determined keeps its status and gets the reason in
+ * In short: an enabled account becomes `active`; a missing or disabled account
+ * follows the prior-state transition (`active` to `revoked`, `error` to
+ * `pending`, and `pending`/`revoked` unchanged). An unclaimed camera account
+ * makes an `active`/`error` 404 name drift instead: the status,
+ * `ftp_account_error`, and `ftp_revoked_at` remain untouched. An account whose
+ * state could not be determined keeps its status and gets the reason in
  * `ftp_account_error`.
  *
  * ## What it prints
  *
- * One line per account — **slug, resulting status, reason** — and a counting
- * summary. No name, no e-mail address, no password: the log of a run is a
- * file that outlives the terminal it was written in, and the slug is the only
- * identifier the account itself is named by.
+ * One line per account — **slug, resulting status, reason** — a dedicated
+ * name-drift section, and a counting summary. No personal/display name,
+ * e-mail address, or password is logged; technical SFTPGo account names are
+ * included in the drift warnings. The log outlives the terminal it was written
+ * in, and the slug is the identifier the account itself is named by.
  *
  * ## Exit codes
  *
- * - `0` — every account was checked (whether or not its state changed). An
- *   account whose name cannot be used at all (a legacy slug, P1-M21) is
+ * - `0` — every account was checked (whether or not its state changed) and no
+ *   name drift was found. An account whose name cannot be used at all (a legacy slug, P1-M21) is
  *   *skipped*, not failed: it is counted in the summary and named in a warning,
  *   because the slug is not rewritten behind the photographer's back.
- * - `1` — at least one account could not be checked: SFTPGo was unreachable,
- *   not configured, answered with an error, or its account lock was busy. The
- *   states that *were* checked before the failure are written; the rest keep
- *   their status and can be retried later.
+ * - `1` — an account could not be checked, the drift listing failed, an account
+ *   lock was busy, or name drift needs an operator decision. The states that
+ *   *were* checked before an account failure are written; drifted states remain
+ *   untouched.
  * - `2` — the `--user` option named nobody.
  */
 class ReconcileFtpAccounts extends Command
@@ -76,7 +82,7 @@ class ReconcileFtpAccounts extends Command
         SftpGoException::REASON_UNAUTHORIZED,
     ];
 
-    public function handle(FtpCredentialService $credentials): int
+    public function handle(FtpCredentialService $credentials, SftpGoClient $sftpGo): int
     {
         $users = $this->resolveUsers();
 
@@ -84,10 +90,27 @@ class ReconcileFtpAccounts extends Command
             return self::INVALID;
         }
 
+        try {
+            $cameraAccounts = $sftpGo->listCameraAccounts();
+        } catch (SftpGoException $exception) {
+            $this->error(sprintf(
+                'FATAL: SFTPGo-Kamerakonten konnten nicht aufgelistet werden (%s) — Drift-Prüfung abgebrochen; es wurde kein Konto abgestimmt.',
+                $exception->reason,
+            ));
+
+            return self::FAILURE;
+        }
+
+        $portalSlugs = User::query()->whereNotNull('ftp_slug')->pluck('ftp_slug')->all();
+        $portalSlugSet = array_fill_keys($portalSlugs, true);
+        $orphanAccounts = array_values(array_filter(
+            $cameraAccounts,
+            static fn (array $account): bool => ! array_key_exists($account['username'], $portalSlugSet),
+        ));
+        $orphanAccountNames = array_column($orphanAccounts, 'username');
+
         if ($users->isEmpty()) {
             $this->info('Keine Fotografen mit FTP-Kontoname gefunden — es gibt nichts abzustimmen.');
-
-            return self::SUCCESS;
         }
 
         $counters = [
@@ -99,15 +122,17 @@ class ReconcileFtpAccounts extends Command
             'skipped' => 0,
             'failed' => 0,
             'unchecked' => 0,
+            'drift' => count($orphanAccounts),
         ];
 
         $attempted = 0;
+        $driftedUsers = [];
 
         foreach ($users as $user) {
             $attempted++;
 
             try {
-                $result = $credentials->reconcileAccount($user);
+                $result = $credentials->reconcileAccount($user, $orphanAccountNames);
             } catch (FtpCredentialException $exception) {
                 // The account name is unusable (a legacy slug, P1-M21): the
                 // portal cannot ask SFTPGo about it, and the slug is not
@@ -149,7 +174,11 @@ class ReconcileFtpAccounts extends Command
                 $this->warn(sprintf('%s: übersprungen (%s)', $this->label($user), $result->reason));
             }
 
-            if ($result->outcome === FtpAccountReconciliation::OUTCOME_DIVERGENT) {
+            if ($result->outcome === FtpAccountReconciliation::OUTCOME_DIVERGENT
+                && $result->reason === FtpAccountReconciliation::REASON_ACCOUNT_NAME_DRIFT) {
+                $driftedUsers[] = $user;
+                $counters['drift']++;
+            } elseif ($result->outcome === FtpAccountReconciliation::OUTCOME_DIVERGENT) {
                 $this->warn(sprintf(
                     '%s: das Konto existiert in SFTPGo, wurde im Portal aber entzogen — der Status bleibt "revoked". Bitte manuell entscheiden.',
                     $this->label($user),
@@ -158,12 +187,40 @@ class ReconcileFtpAccounts extends Command
         }
 
         $this->newLine();
+        $this->warn(sprintf(
+            'Namensabweichungen (%d), gelesen wurden %d Kamerakonten in SFTPGo:',
+            $counters['drift'],
+            count($cameraAccounts),
+        ));
+
+        foreach ($orphanAccounts as $account) {
+            $this->warn(sprintf(
+                '%s: unbeanspruchtes Kamera-Konto in %s — kein Portal-Slug beansprucht diesen Namen.',
+                $account['username'],
+                $account['home_dir'],
+            ));
+        }
+
+        foreach ($driftedUsers as $user) {
+            $this->warn(sprintf(
+                '%s: Der Portal-Slug hat kein Konto; unbeanspruchte Kamera-Konten: %s. Der Befund ist mehrdeutig (Umbenennung oder tatsächlicher Entzug); der Status blieb unverändert. Bitte manuell entscheiden.',
+                $this->label($user),
+                implode(', ', $orphanAccountNames),
+            ));
+        }
+
+        if ($counters['drift'] === 0) {
+            $this->line('Keine Namensabweichungen gefunden.');
+        }
+
+        $this->newLine();
         $this->info(sprintf(
-            'Reconciliation abgeschlossen: %d aktiv, %d entzogen, %d unverändert, %d abweichend, %d erneut abzustimmen, %d übersprungen, %d fehlgeschlagen, %d nicht geprüft (von %d Konten).',
+            'Reconciliation abgeschlossen: %d aktiv, %d entzogen, %d unverändert, %d abweichend, Namensabweichungen: %d, %d erneut abzustimmen, %d übersprungen, %d fehlgeschlagen, %d nicht geprüft (von %d Konten).',
             $counters[FtpAccountReconciliation::OUTCOME_ACTIVE],
             $counters[FtpAccountReconciliation::OUTCOME_WITHDRAWN],
             $counters[FtpAccountReconciliation::OUTCOME_UNCHANGED],
             $counters[FtpAccountReconciliation::OUTCOME_DIVERGENT],
+            $counters['drift'],
             $counters[FtpAccountReconciliation::OUTCOME_RETRYABLE],
             $counters['skipped'],
             $counters['failed'],
@@ -173,6 +230,12 @@ class ReconcileFtpAccounts extends Command
 
         if ($counters['failed'] > 0 || $counters[FtpAccountReconciliation::OUTCOME_RETRYABLE] > 0) {
             $this->error('Mindestens ein Konto konnte nicht geprüft werden — der Zustand dieser Konten wurde nicht verändert.');
+
+            return self::FAILURE;
+        }
+
+        if ($counters['drift'] > 0) {
+            $this->error('Namensabweichungen gefunden — eine manuelle Entscheidung ist erforderlich.');
 
             return self::FAILURE;
         }
