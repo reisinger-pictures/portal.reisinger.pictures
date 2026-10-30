@@ -1,9 +1,27 @@
 {
   "version": 1,
   "rules": {
+    "gates-untouched": {
+      "value": 0
+    },
     "open-security-findings": {
       "value": 0,
       "reason": "2026-10-25: AUTH-2 and PAY-3 are fixed (RegistrationPrivacyTest, OrderStatusPaidTest), so the counted set is empty again and the ceiling was lowered 2 -> 0. It may only fall from here; any new open critical/high finding turns the gate red."
+    },
+    "plan-status-line": {
+      "value": 0
+    },
+    "rule-file-max-lines": {
+      "value": 121
+    },
+    "rule-file-name": {
+      "value": 0
+    },
+    "rule-file-present": {
+      "value": 1
+    },
+    "unverified-commits": {
+      "value": 676
     }
   }
 }
