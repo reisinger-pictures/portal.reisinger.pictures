@@ -107,3 +107,15 @@ All `.run/*.run.xml` files use `<Emoji> [<Category>] <Name>` for both the filena
 - Before a deploy that touches `base_price` (or any other licence money key), run `./scripts/check-license-pricing.sh` — the script connects to the host over ssh and runs the check in the backend container there. The command resolves the effective prices the way the buy flow resolves them and checks them against the rules the write path applies (`LicenseTermRules::RULES`); it exits 1 on a violation. The production value of `base_price` is **14900** cents — deliberately not the seeder's 8000, which an `upsert` would overwrite — so check it with `--expect=base_price=14900`.
 - The same holds for the seed comparison: `./scripts/check-seeded-settings.sh` reports, from the host, every settings row a `db:seed` would overwrite. The seed is authoritative for the keys it declares, so a seed in production is a decision with consequences — the command makes them visible before the decision (see `backend/AGENTS.md`, "Database Setup Policy").
 - The Content-Security-Policy is served by Caddy on the host and mirrored in `deployment/content-security-policy.txt`; `./scripts/check-csp-policy.sh` compares the mirror with the host and exits 1 on a drift. Run it before a deploy that changes the asset origins, the Stripe integration or the frontend's inline styles — the E2E suite runs without any CSP header and therefore cannot see a policy violation (see [`features/security/content-security-policy.md`](features/security/content-security-policy.md)).
+
+## Gates
+
+Regeln dieser Ebene. Was nur ein Verzeichnis betrifft, gehört in die
+`AGENTS.md` **dieses** Verzeichnisses — sie wird geladen, wenn eine Datei
+daraus gelesen wird.
+
+Ein Plan in `docs/plans/` beginnt mit `**Status:** Plan | In Arbeit | Done |
+Empfehlung, nicht implementiert`.
+
+Die kanonischen Agent-Regeln laufen über `ratchet` (Preset `agent-rules`):
+`ratchet check` vor jedem Commit und in der CI.

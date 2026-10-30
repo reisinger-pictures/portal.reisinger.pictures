@@ -6,6 +6,7 @@
 // (`features/security/2026-10-18-review-closure.md`) stays the human record;
 // this file is its machine-readable view.
 [
+  { "preset": "agent-rules" },
   {
     "name": "portal",
     "rules": {
