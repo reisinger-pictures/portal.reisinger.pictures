@@ -126,7 +126,9 @@ class PayoutSystemTest extends TestCase
         $photog = User::factory()->create();
 
         $now = Carbon::now();
-        $prev = $now->copy()->subMonth();
+        // NoOverflow: on the 31st, `subMonth()` overflows (31 Sep -> 1 Oct) and
+        // lands in the *current* month, colliding with the statement below.
+        $prev = $now->copy()->subMonthNoOverflow();
 
         // Rollover Statement aus dem Vormonat (30€)
         $previousStatement = PhotographerStatement::create([
