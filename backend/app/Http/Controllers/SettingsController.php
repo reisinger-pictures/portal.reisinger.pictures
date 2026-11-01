@@ -252,6 +252,40 @@ class SettingsController extends Controller
     }
 
     /**
+     * Öffentlich **by design** (D-62): die neun Parameter des Paket-Rechners,
+     * damit der Build der statischen Website sie ohne super-admin-Login laden
+     * kann.
+     *
+     * Carries exactly the nine calculator parameters and nothing else — no
+     * licence texts and none of the `price_*`/`mult_*`/`base_price` internals
+     * that stay behind the super-admin gate of {@see getLicenseTerms()}. The
+     * derived prices are already published on the website, so these inputs are
+     * public by construction. Money is projected per key through
+     * {@see moneyInCents()} and stays `null` when the row is absent; the counts
+     * and the multiplier keep the stored string typing.
+     *
+     * The short public TTL is deliberate: the website builds against this
+     * payload, so a cached response may lag a settings change by at most a
+     * minute.
+     */
+    public function getCalculatorTerms(SettingResolver $resolver)
+    {
+        return response()->json([
+            'calc_base_price' => $this->moneyInCents($resolver, 'calc_base_price'),
+            'calc_hourly_rate' => $this->moneyInCents($resolver, 'calc_hourly_rate'),
+            'calc_images_per_hour' => $resolver->get('calc_images_per_hour'),
+            'calc_outdoor_images_per_hour' => $resolver->get('calc_outdoor_images_per_hour'),
+            'calc_flatrate_multiplier' => $resolver->get('calc_flatrate_multiplier'),
+            // The `srp_*` wire names of the same four money keys the full
+            // endpoint serves: the settings rows are unprefixed.
+            'srp_base_price' => $this->moneyInCents($resolver, 'base_price'),
+            'srp_setup_fee' => $this->moneyInCents($resolver, 'setup_fee'),
+            'srp_privacy_fee' => $this->moneyInCents($resolver, 'privacy_fee'),
+            'srp_extra_image_fee' => $this->moneyInCents($resolver, 'extra_image_fee'),
+        ])->header('Cache-Control', 'public, max-age=60');
+    }
+
+    /**
      * Öffentlich; bewusst minimiert auf Lizenz-Modus + Mengenrabatt-Staffel;
      * enthält keine internen Preisparameter.
      *

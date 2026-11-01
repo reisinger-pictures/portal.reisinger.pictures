@@ -86,6 +86,15 @@ Route::get('/settings/license-pricing', [SettingsController::class, 'getLicenseP
 Route::get('/settings/license-catalog', [LicenseCatalogController::class, 'index'])
     ->middleware('throttle:api')
     ->name('api.settings.license-catalog');
+// Öffentlich **by design** (D-62): die Datenbasis des Paket-Rechners, damit der
+// Build der statischen Website sie ohne super-admin-Login laden kann. Enthält
+// ausschliesslich die neun Rechner-Parameter — KEINE Lizenztexte und keine
+// `price_*`/`mult_*`/`base_price`-Interna. Die vollständigen Preisparameter
+// liefert weiterhin nur der super_admin-Endpunkt /settings/license-terms.
+// Gedrosselt wie /settings/license-pricing.
+Route::get('/settings/calculator-terms', [SettingsController::class, 'getCalculatorTerms'])
+    ->middleware('throttle:api')
+    ->name('api.settings.calculator-terms');
 
 if (app()->environment('local', 'testing')) {
     Route::delete('/test/cleanup-user/{id}', function ($id) {

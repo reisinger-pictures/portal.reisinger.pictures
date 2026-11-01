@@ -37,8 +37,12 @@ class LicenseTermsAccessTest extends TestCase
      * Price parameters that must never appear on the public minimized payload.
      * They are asserted missing by name, not by shape, so a newly added internal
      * key is caught if it leaks into this response.
+     *
+     * Public because `CalculatorTermsAccessTest` reuses the list and subtracts
+     * the nine calculator keys that are deliberately public there (D-62): a
+     * newly added internal key is then checked on both public endpoints.
      */
-    private const INTERNAL_PRICE_KEYS = [
+    public const INTERNAL_PRICE_KEYS = [
         'base_price',
         'calc_base_price',
         'calc_hourly_rate',

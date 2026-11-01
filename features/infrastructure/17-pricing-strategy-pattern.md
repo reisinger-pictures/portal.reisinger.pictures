@@ -113,8 +113,8 @@ gallery's `volume_preset_id` when valid, otherwise the brand default preset.
 
 ### 3.2.1 Public pricing endpoint vs. full price parameters
 
-Three endpoints serve this resolution, split by what they may disclose
-(owner decisions D-27/D-28/D-32):
+Four endpoints serve this resolution, split by what they may disclose
+(owner decisions D-27/D-28/D-32/D-62):
 
 - **`GET /api/settings/license-pricing` — public, deliberately minimized.** It
   returns exactly `pricing_strategy` and `volume_pricing`
@@ -145,12 +145,28 @@ Three endpoints serve this resolution, split by what they may disclose
   deliberately public `volume_pricing` from D-28 — the customer must see the
   price they are asked to pay — in contrast to D-27, where the *calculation*
   parameters live.
+- **`GET /api/settings/calculator-terms` — public by design, throttled**
+  (`throttle:api`, owner decision D-62). It returns exactly the nine inputs of
+  the package calculator: `calc_base_price`, `calc_hourly_rate`,
+  `calc_images_per_hour`, `calc_outdoor_images_per_hour`,
+  `calc_flatrate_multiplier`, `srp_base_price`, `srp_setup_fee`,
+  `srp_privacy_fee`, `srp_extra_image_fee`. Money leaves the endpoint as JSON
+  integer cents (the `srp_*` names map to the unprefixed settings keys, as in
+  `license-terms`); counts and the multiplier keep the stored string typing.
+  It carries no licence texts and none of the internal `price_*`/`mult_*`/
+  `term_*` keys under their own names. The four `srp_*` values are the public
+  projection of the unprefixed package-price rows (`base_price`, `setup_fee`,
+  `privacy_fee`, `extra_image_fee`) — the customer-facing package prices, not
+  the licence-calculation internals, which stay behind the super-admin gate.
+  The consumer is the build of the static website, which derives the published
+  package prices from these inputs; the response carries a short
+  `Cache-Control: public, max-age=60`.
 
 The two *pricing* endpoints (`license-pricing`, `license-terms`) resolve the
 gallery through the same shared `SettingsController::resolveLicensePricingContext()`
 and project the preset through `SettingsController::volumePricingPayload()`, so a
 gallery cannot resolve to a different mode or preset depending on which of them is
-called. `license-catalog` does not resolve a gallery at all.
+called. `license-catalog` and `calculator-terms` do not resolve a gallery at all.
 
 ### 3.3 Checkout grouping
 
