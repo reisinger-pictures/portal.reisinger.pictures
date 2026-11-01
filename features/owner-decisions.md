@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-57. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-62. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -173,13 +173,19 @@ Keep Laravel's local-disk `serve` disabled. Authenticated media delivery uses `F
 
 Gate every UI consumer of the full license-terms payload to super-admin users.
 
-### D-31: Website license-terms import
+### D-31: Website license-terms import (superseded by D-62)
 
-The separate website repository imports full license terms by logging in as a super-admin and forwarding the httpOnly `rp_jwt` cookie. Credentials come only from environment variables; plan and deploy that integration in its owning repository.
+The separate website repository used to import full license terms by logging in as a super-admin and forwarding the httpOnly `rp_jwt` cookie. Credentials came only from environment variables.
+
+Superseded on 2026-11-01: the website no longer imports the full terms and never holds portal credentials. It reads the nine package-calculator inputs from the public `calculator-terms` endpoint (D-62); the full parameter set stays super-admin only (D-27).
 
 ### D-32: Public license catalog
 
 `GET /api/settings/license-catalog` remains public and uses `throttle:api`. Its projection contains customer-facing catalog prices only, never internal calculation parameters. See [pricing strategy](infrastructure/17-pricing-strategy-pattern.md).
+
+### D-62: Public calculator terms endpoint
+
+`GET /api/settings/calculator-terms` stays public and uses `throttle:api`. It serves exactly the nine package-calculator inputs (`calc_base_price`, `calc_hourly_rate`, `calc_images_per_hour`, `calc_outdoor_images_per_hour`, `calc_flatrate_multiplier`, `srp_base_price`, `srp_setup_fee`, `srp_privacy_fee`, `srp_extra_image_fee`) to the build of the static website. The inputs are deliberately public because the prices derived from them are published on the website. Two different things stay closed: the **full payload** and its **unprefixed internal keys** (`price_*`, `mult_*`, `term_*`, the complete licence texts) remain `super_admin`-only (D-27), and the endpoint never exposes those. The projection does read the unprefixed settings rows `base_price`, `setup_fee`, `privacy_fee` and `extra_image_fee` — exactly as `getLicenseTerms()` maps them — but only under the four public `srp_*` wire names, which are the customer-facing package prices. See [pricing strategy](infrastructure/17-pricing-strategy-pattern.md).
 
 ### D-33: Dependabot CI secrets
 
