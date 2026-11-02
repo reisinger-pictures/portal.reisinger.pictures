@@ -174,9 +174,8 @@ assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__PORT=989' \
 # Mode 1 is the default here, and the value is deliberately not spelled twice:
 # the same variable feeds the sftpgo binding and the management API, so the UI
 # cannot tell the photographer "explicit" while the daemon runs implicit
-# (P1-M44). The default keeps the binding explicit even when the Portainer GUI
-# env omits the variable, and the second assertion is what holds the two
-# consumers together.
+# (P1-M44). The default keeps the binding explicit when the host .env omits the
+# variable, and the second assertion is what holds the two consumers together.
 assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__TLS_MODE=${SFTPGO_FTPD_TLS_MODE:-1}' \
     'the FTP binding must default to explicit TLS (mode 1); a Canon camera upgrades with AUTH TLS'
 assert_contains "$COMPOSE" '      - SFTPGO_FTPD_TLS_MODE=${SFTPGO_FTPD_TLS_MODE}' \
@@ -254,17 +253,10 @@ assert_contains "$COMPOSE" '      - SFTPGO_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAM
 assert_contains "$COMPOSE" '      - SFTPGO_BASE_URL=${SFTPGO_BASE_URL:-http://sftpgo:8080}' \
     'the backend must reach the sftpgo admin API by service name'
 
-# A ${VAR:?} guard aborts every Portainer deploy, because Portainer resolves the
-# interpolation before it applies the stack environment from the GUI.
-if grep -qE '\$\{[A-Za-z_][A-Za-z_0-9]*:\?' "$COMPOSE"; then
-    fail 'compose uses a ${VAR:?} guard; that blocks the deploy in the Portainer GUI'
-fi
-
-# Secrets stay in the stack environment. An env_file pointing outside the repo
-# reintroduces a second location per host, and Portainer cannot resolve host
-# paths in the web editor anyway.
+# Production values stay in the host .env at the Compose project directory.
+# Do not add env_file: it would introduce a second source of production values.
 if grep -qE '^[[:space:]]*env_file:' "$COMPOSE"; then
-    fail 'compose declares env_file; production secrets come from the Portainer stack environment'
+    fail 'compose declares env_file; production values come from /opt/stacks/portal-reisinger-pictures/.env'
 fi
 
 # Every image reference carries an explicit, non-floating tag (P1-M37).

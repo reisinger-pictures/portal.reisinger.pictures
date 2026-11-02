@@ -231,7 +231,7 @@ The production stack manages **one** credential pair for SFTPGo: `SFTPGO_ADMIN_U
 
 ### D-54: The SFTPGo admin bootstrap stays a compose value
 
-`SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` is a hardcoded value of the versioned compose file, not a stack-env variable. It has no secret relation, and it has to be effective before the first start — without it the `admins` table stays empty and the token answers 401, so a stack that depends on someone remembering the variable would fail closed on every fresh deploy. Owner decision of 2026-10-22: the value stays in the compose file and the cutover checklist is corrected to say so. See [FTP cutover checklist](infrastructure/19-ftp-cutover-checklist.md) §2.
+`SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` is a hardcoded value of the versioned compose file, not a host `.env` variable. It has no secret relation, and it has to be effective before the first start — without it the `admins` table stays empty and the token answers 401, so a stack that depends on someone remembering the variable would fail closed on every fresh deploy. Owner decision of 2026-10-22: the value stays in the compose file and the cutover checklist is corrected to say so. See [FTP cutover checklist](infrastructure/19-ftp-cutover-checklist.md) §2.
 
 ### D-56: Remote FTP revocation remains fail-closed if local persistence fails
 

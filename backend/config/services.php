@@ -68,7 +68,7 @@ return [
     /*
      * SFTPGo Admin-API (P1-M22). The base URL is the in-network address of the
      * service; the API port is deliberately not published (feature doc 7.13).
-     * `SFTPGO_API_KEY` is preferred and comes from the Portainer stack env —
+     * `SFTPGO_API_KEY` is preferred and comes from the host production .env —
      * the versioned compose only carries the placeholder (feature doc 7.7).
      * Without an API key the client falls back to `GET /api/v2/token` with the
      * SFTPGo admin credentials, the same ones

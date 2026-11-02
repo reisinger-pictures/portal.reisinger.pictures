@@ -539,9 +539,11 @@ Gallery assignment is purely explicit via `setTarget()`:
 
 Dafür:
 
-- **Ein `env_file` für den Stack.** `SFTPGO_BASE_URL` und `SFTPGO_API_KEY`
-  liegen neben den bestehenden Variablen in der Portainer-Stack-Env; im
-  versionierten Compose nur die Platzhalter (7.7).
+- **Eine Host-`.env` für den Stack.** `SFTPGO_BASE_URL` und `SFTPGO_API_KEY`
+  liegen neben den bestehenden Variablen in
+  `/opt/stacks/portal-reisinger-pictures/.env`; im versionierten Compose stehen
+  nur Interpolationsnamen (7.7). Compose lädt diese `.env` aus dem
+  Projektverzeichnis automatisch.
 - **Die Admin-API muss nicht nach außen publiziert werden.** `backend` und
   `sftpgo` hängen an `webnet` und sprechen sich über den Service-Namen an
   (`http://sftpgo:8080`). Nur der Kamera-Port wird auf dem Host veröffentlicht.
@@ -967,9 +969,9 @@ die Spur und schwächt **nichts** an der Zurechenbarkeit.
 
 ### 7.7 Credential-Haltung
 
-- `deployment/docker-compose.yml` ist **versioniert** und enthält
-  ausschließlich `${SFTPGO_BASE_URL}` und `${SFTPGO_API_KEY}`. Der Wert gehört
-  in die **Portainer-Stack-Env**. Commit nur Platzhalter — dieselbe
+- `deployment/docker-compose.yml` ist **versioniert** und enthält nur die
+  Interpolationsnamen. Produktionswerte gehören ausschließlich in die Host-`.env`
+  unter `/opt/stacks/portal-reisinger-pictures/.env`, nie ins Repo — dieselbe
   Fehlerklasse wie C1–C4.
 - **Lizenz:** SFTPGo ist AGPL-3.0. Betrieben wird das **offizielle,
   unveränderte** Image; damit haften keine Offenlegungspflichten für das
@@ -1398,20 +1400,20 @@ Messfalle in 7.11).
 - **Der Fotograf-Upload läuft nicht über den Portal-Container.** Die Dateien
   landen direkt auf dem Host-Pfad, den der Backend-Container liest. Ein
   Einbruch ins Portal-Core liefert deshalb **keinen** Dateizugriff.
-- **Kein `${VAR:?}`-Guard im Compose, trotz allem.** Portainer löst die
-  Interpolation ab, **bevor** es die GUI-Umgebung anwendet; ein Guard bricht
-  jeden Deploy ab. SFTPGo ist deshalb fail-*sichtbar* statt fail-closed: ohne
-  Admin-Credentials startet es nicht und schreibt `no admins found, try to create
-  the default one` ins Log, und der Container restartet.
-- **Ein Wertepaar, nicht zwei.** Gepflegt wird `SFTPGO_ADMIN_USERNAME` /
-  `SFTPGO_ADMIN_PASSWORD` aus `.env.production` — dieselben Namen, die
+- **Die Host-`.env` ist die einzige Produktionsquelle.** Docker Compose lädt
+  sie direkt aus `/opt/stacks/portal-reisinger-pictures`; es gibt keine
+  zweite Env-Datei. Ohne Admin-Credentials startet SFTPGo nicht, schreibt
+  `no admins found, try to create the default one` ins Log und der Container
+  restartet sichtbar.
+- **Ein Wertepaar, nicht zwei.** In der Host-`.env` gepflegt werden
+  `SFTPGO_ADMIN_USERNAME` / `SFTPGO_ADMIN_PASSWORD` — dieselben Namen, die
   `config/services.php` für den JWT-Fallback liest. Das Compose mappt sie auf
   SFTPGOs Bootstrap-Namen `SFTPGO_DEFAULT_ADMIN_*`. Vorher las das Compose
   `SFTPGO_DEFAULT_ADMIN_*`, der Backend-Service deklarierte keines der beiden
   Paare, und mit leerem `SFTPGO_API_KEY` wäre die Provisionierung mit 401
   gescheitert, während die Konfiguration korrekt aussah.
   **Bestätigt (Owner 2026-10-22, D-53):** es bleibt bei diesem Wertepaar. Ein
-  zusätzlicher `SFTPGO_API_KEY` in der Stack-Env wird **nicht** gesetzt: der
+   zusätzlicher `SFTPGO_API_KEY` in der Host-`.env` wird **nicht** gesetzt: der
   JWT-Fallback über das Admin-Paar ist der endgültige Weg, ein zweiter
   Mechanismus wäre ein zweiter Fehlerpfad, den jemand pflegen müsste. Der
   API-Key-Platzhalter im Compose bleibt bestehen (er ist der dokumentierte
@@ -1962,9 +1964,9 @@ nur `http://ftp-events:8080/api/internal/ftp/upload-event`.
 
 Seine Caddyfile überträgt `sync.sh` als Einzeldatei nach
 `/home/webadmin/portal/caddy/Caddyfile.ftp-events`, und der Compose-Mount liest
-genau diesen absoluten Host-Pfad — ein relatives Bind-Ziel würde aus Portainer
-gegen dessen eigenes Compose-Verzeichnis aufgelöst und dort als Verzeichnis
-angelegt.
+genau diesen absoluten Host-Pfad — ein relatives Bind-Ziel würde gegen das
+Compose-Projektverzeichnis `/opt/stacks/portal-reisinger-pictures` aufgelöst
+und dort bei fehlender Datei als Verzeichnis angelegt.
 
 `FTP_EVENT_SECRET` hat **keinen** Default: ein leerer Wert muss den Endpunkt
 fail-closed machen, nicht Events ohne Authentifizierung annehmen.
@@ -1983,22 +1985,22 @@ Die beiden Variablen gehören in den Backend-Service von
 - FTP_EVENT_SECRET=${FTP_EVENT_SECRET:-}
 ```
 
-`FTP_EVENT_SECRET` ist ein Secret und gehört in die Portainer-Stack-Env, nie ins
-Repo (dieselbe Klasse wie C1–C4). `FTP_EVENT_URL` darf leer bleiben — der
+`FTP_EVENT_SECRET` ist ein Secret und gehört in die Host-`.env`, nie ins Repo
+(dieselbe Klasse wie C1–C4). `FTP_EVENT_URL` darf leer bleiben — der
 Default aus `config/ftp.php` ist der interne Listener `ftp-events:8080`.
 
 **Eine Compose-Änderung ist ein Recreate, kein Restart (AGENTS.md §13).** Die
 zwei neuen `environment:`-Zeilen werden von `docker restart` **nicht**
 übernommen — sie sind zum Erzeugungszeitpunkt in den Container gebacken. Nach der
-Änderung muss der Stack neu erzeugt werden (Portainer-Stack-Editor-Update), erst
-danach greifen die Variablen. `FTP_EVENT_SECRET` muss daher vor dem Recreate
-gesetzt sein. `sync.sh` allein reicht dafür nicht.
+Änderung muss der Stack mit `./deployment/deploy.sh` aktualisiert werden, erst
+danach greifen die Variablen. `FTP_EVENT_SECRET` muss daher vorher in der
+Host-`.env` gesetzt sein. `sync.sh` allein reicht dafür nicht.
 
 **Live-Verifikation (2026-10-22, Produktion).** Die Kette ist eingerichtet und
 gegen die laufende Instanz geprüft:
 
-- `FTP_EVENT_SECRET` liegt in der Portainer-Stack-Env (64 Hex-Zeichen, auf dem
-  Host erzeugt, nie ausgegeben); der Backend-Container wurde **neu erzeugt**
+- `FTP_EVENT_SECRET` lag in der damaligen Portainer-Stack-Env (64 Hex-Zeichen,
+  auf dem Host erzeugt, nie ausgegeben); der Backend-Container wurde **neu erzeugt**
   (eine Env-Änderung braucht einen Recreate, kein Restart).
 - `php artisan ftp:provision-events` endete mit Exit 0: Event-Aktion
   `portal-ftp-upload` und Event-Regel `portal-ftp-upload-rule` angelegt, beide
@@ -2010,9 +2012,9 @@ gegen die laufende Instanz geprüft:
   `200 unknown_account`. Der Nachweis endet bei `no_target_gallery`, weil in
   Produktion **0 von 1** Usern eine Zielgalerie gesetzt hat — genau die in
   3.4 dokumentierte Grenze „keine Zielgalerie, kein Import".
-- **Secret-Rotation im Zuge der Prüfung:** die erste Provisionierung schrieb
+- **Historische Secret-Rotation im Zuge der Prüfung:** die erste Provisionierung schrieb
   ein Secret, das in einer Diagnoseausgabe im Klartext stand. Es wurde
-  ersetzt (neues Secret in der Stack-Env, Backend neu erzeugen, Aktion und
+  ersetzt (neues Secret in der damaligen Stack-Env, Backend neu erzeugen, Aktion und
   Regel über denselben idempotenten Befehl neu geschrieben) — der
   Header-Wert der Aktion und die Container-Env tragen danach denselben
   64-Zeichen-Wert.

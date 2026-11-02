@@ -30,8 +30,8 @@ lokalen/CI-/E2E-Fixtures oder im `.env.example` vorkommen; es ist kein aktueller
 Produktionsdefault. Es gibt keine hartcodierte persönliche E-Mail im aktuellen
 Runtime-Code. Historische Migrations-Fixtures können einen generischen Wert
 enthalten, sind aber kein Config-Fallback für Seeder oder `admin:update`.
-Produktion setzt die reale E-Mail und das Passwort ausschließlich über
-Portainer/`.env`.
+Produktion setzt die reale E-Mail und das Passwort ausschließlich über die
+Host-Datei `/opt/stacks/portal-reisinger-pictures/.env`.
 
 ### Getrackte Dateien (committed)
 
@@ -43,6 +43,14 @@ Die ausdrücklich erlaubten Dateien sind nicht alle Starter-Templates:
 | `backend/.env.ci`                 | **CI-only Fixture**: wird von den Workflows als `.env` verwendet; enthält Test-/Platzhalterwerte, keine Produktionskonfiguration und kein Developer-Setup |
 | `frontend/.env.example`           | Frontend-Default-Template (`VITE_STRIPE_PUBLIC_KEY` Platzhalter) |
 | `frontend/.env.local.example`     | Frontend-Local-Dev-Template (override `.env`)          |
+| `deployment/production-env.keys`  | Inventar der Produktionsvariablennamen ohne Werte      |
+
+The real production file is host-only at
+`/opt/stacks/portal-reisinger-pictures/.env`, owned by `root:root` with mode
+`0600`. `deployment/deploy.sh` transfers only Compose and never creates or
+overwrites `.env`; include the host file in protected backups. The directory
+name is fixed because it determines the Compose volume namespace. See the
+[Portainer-exit migration plan](../../../strato-vps/docs/plans/portainer-exit.md).
 
 Die einzige Allowlist-Ausnahme neben den `*.example`-Templates ist
 `backend/.env.ci` (`.gitignore:55` → `!.env.ci`); das Ignore-Muster `.env*`
@@ -323,8 +331,9 @@ Reihenfolge ist die Aussage, nicht die Zeilennummer):
 .env                   (gitignored)
 ```
 
-`VITE_*` wird beim Build **eingebacken**; Portainer/`.env.production` im Repo-Root
-erreichen das Bundle also nie — die versorgen nur den Backend-Container. Ein
+`VITE_*` wird beim Build **eingebacken**; die Host-`.env` und lokale
+`.env.production`-Dateien erreichen das Bundle also nie — die Host-`.env`
+versorgt nur den Backend-Container. Ein
 Prod-Build braucht deshalb `frontend/.env.production` mit dem Live-Key. Ohne
 diese Datei trägt das Bundle den Test-Key aus `.env.local` (bzw. `.env`), und
 Stripe.js kann den `client_secret` eines Live-PaymentIntent nicht bestätigen.

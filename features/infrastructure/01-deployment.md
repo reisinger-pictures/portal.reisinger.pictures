@@ -6,12 +6,14 @@ status: active
 
 # Technical Concept: Deployment & Production
 
-## 1. Portainer & Docker Stack
-- The project is deployed as a Docker stack via **Portainer**.
+## 1. Repository-managed Docker Compose Stack
+- `deployment/docker-compose.yml` is the source of truth. `deployment/deploy.sh` transfers only that file to `/opt/stacks/portal-reisinger-pictures/compose.yaml` and runs `docker compose -f /opt/stacks/portal-reisinger-pictures/compose.yaml up -d --wait` on the host. Images are pulled from GHCR; this deploy does not build them.
+- Keep the host project directory named exactly `portal-reisinger-pictures`; Compose uses it as the project/volume namespace. Watchtower remains global and needs no label changes.
+- The real production `.env` is host-only at `/opt/stacks/portal-reisinger-pictures/.env` (`root:root`, mode `0600`). The deploy script never creates or overwrites it and aborts if it is missing. Include it in protected backups. The names-only inventory is [`deployment/production-env.keys`](../../deployment/production-env.keys); the migration plan is [here](../../../strato-vps/docs/plans/portainer-exit.md).
 - **Automated Init:** The initialization logic is embedded directly into the `command` block of the `backend` container. It waits for the database and search services to be ready, then performs the fail-closed migration/seed gate below before starting background workers and PHP-FPM. Missing application keys are **not** generated implicitly during production startup; the container refuses to start without them.
 
 ## 2. Environment Variables
-- All configuration is managed via Portainer environment variables, overriding the `.env` file.
+- Compose reads production values from the host `.env` beside `compose.yaml`; there is no second `env_file` source. Never commit or copy production values into the repository.
 - Key variables include database credentials (`DB_ROOT_PASSWORD`), Meilisearch keys (`MEILI_MASTER_KEY`), and SMTP settings (production sends through the Zoho Mail mailbox via `smtppro.zoho.eu`; the legacy Gmail transport remains only as a code fallback).
 - Production queue/scheduler values are explicit: `QUEUE_CONNECTION=database`, `DB_QUEUE_CONNECTION=DB_CONNECTION`, `DB_QUEUE_RETRY_AFTER=90`, `QUEUE_WORKER_TIMEOUT=60`, and a shared `CACHE_STORE=database` with `DB_CACHE_CONNECTION=DB_CONNECTION` and `DB_CACHE_LOCK_CONNECTION=DB_CACHE_CONNECTION`. The values are validated before background processes start; see [29-production-operations-runbook.md](29-production-operations-runbook.md).
 - Production SMTP requires `MAIL_MAILER=smtp`, `MAIL_SCHEME=smtp|smtps`, `MAIL_REQUIRE_TLS=true`, a host/port, credentials, and a real `MAIL_FROM_ADDRESS`/`MAIL_FROM_NAME`. `MAIL_ENCRYPTION` is ignored by Laravel 13/Symfony and is not a TLS control. Local Mailpit and CI fixtures are intentionally exempt because the policy is production-only.
@@ -80,7 +82,7 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
 
 - **Fail closed:** Missing `APP_KEY`/`JWT_SECRET`/`FILE_ENCRYPTION_KEY`/`ADMIN_EMAIL`/`ADMIN_PASSWORD` aborts the production start (see §9). Blank env values are treated as unset — never silently replaced.
 - **Debug mode:** `APP_DEBUG` defaults to **`false`** (`config/app.php`) and MUST stay `false` in production. Verbose error pages are a local-dev-only opt-in (`.env.example` ships `APP_DEBUG=true`); `deployment/docker-compose.yml` defaults to `${APP_DEBUG:-false}`.
-- **Production secrets are machine-local:** `backend/.env.production` (and `deployment/.env.production`) is **untracked/gitignored**. Only key names and placeholder templates live in the repo — real values (DB, SMTP app password, Stripe live keys) are provided per host via Portainer env / the local env file. Never commit or quote secret values.
+- **Production secrets are machine-local:** `backend/.env.production` (and `deployment/.env.production`) is **untracked/gitignored**. The repo contains development/CI fixtures and production key names only; real production values (DB, SMTP app password, Stripe live keys) are provided through `/opt/stacks/portal-reisinger-pictures/.env` on the host. Never commit or quote secret values.
 
 ## 9. Produktion-Sicherheits-Gatekeeper
 - **Identitäts-Guard:** Der `backend`-Container verweigert den Start, wenn er
@@ -185,9 +187,10 @@ Wenn das `search`-Image in `deployment/docker-compose.yml` auf eine neue Major/M
 
 ```bash
 # 1. Vor dem Deploy: Alte Suchdaten löschen (optional, aber empfohlen)
-docker volume rm portal_search_data
+docker volume rm portal-reisinger-pictures_search_data
 
-# 2. Stack über Portainer neu deployen (oder docker stack deploy)
+# 2. Compose-Datei aus dem Repo übertragen und den Stack aktualisieren
+./deployment/deploy.sh
 #    → scout:sync-index-settings + queue:restart laufen automatisch beim Container-Start
 
 # 3. Nach erfolgreichem Start: Suchindex komplett neu aufbauen
@@ -196,7 +199,7 @@ docker exec portal_backend php artisan app:search-rebuild
 
 Das `app:search-rebuild`-Command flushed alle 5 Indizes (Photo, Gallery, Location, Customer, TextSnippet), synchronisiert die Index-Settings aus `config/scout.php`, importiert alle Daten neu und restartet die Queue-Worker.
 
-**Ohne Volume-Löschung:** Meilisearch migriert bestehende Daten automatisch — in der Praxis stabil, aber bei Major-Upgrades nicht garantiert. Bei Problemen: Volume löschen und rebuild laufen lassen.
+**Ohne Volume-Löschung:** Meilisearch migriert bestehende Daten automatisch — in der Praxis stabil, aber bei Major-Upgrades nicht garantiert. Bei Problemen: das zum Projekt `portal-reisinger-pictures` gehörende Search-Volume nur nach bestätigtem Backup gezielt löschen und den Index rebuilden lassen. Produktions-Stack-Befehle verwenden `/opt/stacks/portal-reisinger-pictures/compose.yaml`; niemals einen anderen Projektnamen verwenden.
 
 **Normale Code-Deploys (kein Meilisearch-Upgrade):** `scout:sync-index-settings` + `queue:restart` laufen bei jedem Container-Start automatisch. Kein manuelles Eingreifen nötig.
 
