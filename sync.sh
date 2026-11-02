@@ -48,12 +48,11 @@ SSH_TARGET="${PORTAL_SSH_TARGET:-root@reisinger.pictures}"
 API_DEST="${PORTAL_API_DEST:-${SSH_TARGET}:${SITES}/api-portal.reisinger.pictures/}"
 WEB_DEST="${PORTAL_WEB_DEST:-${SSH_TARGET}:${SITES}/web-portal.reisinger.pictures/dist/}"
 # Die Caddyfile des ftp-events-Seitendienstes liegt NICHT im websites-Baum,
-# sondern unter einem festen Host-Pfad. Grund: der Stack laeuft aus Portainer,
-# und ein relatives Bind-Ziel in deployment/docker-compose.yml wuerde gegen
-# Portainers eigenes Compose-Verzeichnis aufgeloest (dort existiert die Datei
-# nicht -> Docker legt ein Verzeichnis an -> Caddy-Crashloop). Der Mount dort
-# und dieser Default muessen identisch bleiben; der Regressionstest vergleicht
-# beide.
+# sondern unter einem festen Host-Pfad. Ein relatives Bind-Ziel in
+# deployment/docker-compose.yml würde relativ zum Stack-Verzeichnis
+# /opt/stacks/portal-reisinger-pictures aufgelöst und bei fehlender Datei als
+# Verzeichnis angelegt. Der Mount und dieser Default müssen identisch bleiben;
+# der Regressionstest vergleicht beide.
 CADDY_DEST="${PORTAL_CADDY_DEST:-${SSH_TARGET}:/home/webadmin/portal/caddy/Caddyfile.ftp-events}"
 
 # Connection-Reuse: bei ~13.000 Backend-Dateien sonst ein Handshake pro Datei.
@@ -127,8 +126,8 @@ echo "🎨 Sync: Frontend (dist)..."
 # Einzeldatei, kein Mirror: kein --delete (das Ziel IST die Datei). --mkpath
 # ist Pflicht, weil /home/webadmin/portal/caddy auf einem frischen Host noch
 # nicht existiert; ohne das Flag bricht rsync mit "No such file or directory"
-# ab. Danach muss der Portainer-Stack aktualisiert werden, damit der neue
-# Mount greift (deployment/README.md, FTP-Upload-Events).
+# ab. Nach einer Änderung der Caddyfile den Dienst über das Compose-Projekt
+# unter /opt/stacks/portal-reisinger-pictures neu laden.
 echo "🔐 Sync: Caddyfile fuer den internen FTP-Event-Listener..."
 "$RSYNC_BIN" ./deployment/Caddyfile.ftp-events "$CADDY_DEST" \
   --archive \

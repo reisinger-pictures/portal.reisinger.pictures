@@ -286,8 +286,8 @@ class ProvisionFtpEventsTest extends TestCase
      *
      * `deployment/docker-compose.yml` sets `FTP_EVENT_URL=${FTP_EVENT_URL:-}`, so
      * in the deployed stack the variable is **present** — as an empty string
-     * whenever Portainer holds no value. Laravel's `env()` returns that empty
-     * string instead of the default, so a fix that only touches the `env()`
+     * whenever the production environment has no value. Laravel's `env()`
+     * returns that empty string instead of the default, so a fix that only touches the `env()`
      * default argument would still abort on every deploy. The three unusable
      * shapes are therefore all "not set" and must all resolve to
      * `ProductionOperationsPolicy::FTP_EVENT_URL`.

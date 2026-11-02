@@ -36,7 +36,8 @@ executable preflight and supervisor binaries.
 ## 1. Required production configuration
 
 The following values are passed through `deployment/docker-compose.yml` and
-must be supplied by the host/Portainer environment. The raw-value preflight
+must be supplied by the host file
+`/opt/stacks/portal-reisinger-pictures/.env`. The raw-value preflight
 (`/usr/local/bin/validate-production-env`) runs before any Laravel command, so
 whitespace, fractional numbers, invalid topology, and a missing supervisor
 cannot be hidden by Laravel casts or reach migration/seed. The effective
@@ -65,6 +66,12 @@ migrations, queue workers, the scheduler, or PHP-FPM are started.
 | `MAIL_PASSWORD` | Non-empty SMTP password/API key |
 | `MAIL_FROM_ADDRESS` | Valid, non-placeholder sender address |
 | `MAIL_FROM_NAME` | Non-empty sender name |
+
+The production `.env` is `root:root` mode `0600`, is never stored in this
+repository, and must be included in protected backups. The complete names-only
+inventory is [`deployment/production-env.keys`](../../deployment/production-env.keys).
+Deploy transfers only Compose and aborts if the host file is missing; see the
+[Portainer-exit migration plan](../../../strato-vps/docs/plans/portainer-exit.md).
 
 The same database queue connection is a correctness boundary, not merely a
 performance setting. Invoice and cleanup dispatches use transactional database
@@ -131,12 +138,11 @@ the markers are removed at startup.
 
 ### Container supervision by Watchtower
 
-Watchtower recreates `portal_backend` once a day without a deploy (measured on
-the production host: `Stopping /portal_backend … Creating /portal_backend` on
-2026-10-18, -19, -20 and -21 around 08:00 CEST and on 2026-10-22 at 07:58:42
-CEST; it is **not** a cron job and **not** a systemd timer — `crontab -l` knows
-only `volume-backup.sh`, `update_portainer.sh` and `dind-image-gc.sh`). It also
-recreates `caddy` (2026-10-22, 02:09 CEST).
+Watchtower remains global and keeps its existing coverage; no label changes are
+required. Historical host measurements showed
+daily recreates of `portal_backend` and `caddy` before the migration. Check the
+current runtime state on the host rather than treating those historical
+timestamps as a current schedule.
 
 What a Watchtower recreate touches and what it does not:
 
@@ -151,9 +157,9 @@ What a Watchtower recreate touches and what it does not:
   removed. The line to re-read after the next recreate is
   `docker inspect portal_backend --format "{{.Config.User}} {{.Created}}"`.
 - The **environment is cloned from the running container**, not re-read from
-  the Portainer stack env. A variable added to the stack env afterwards
-  therefore reaches the container only through a compose recreate, and the
-  recreate must use `--no-deps --force-recreate backend`: the `composer_init`
+  `/opt/stacks/portal-reisinger-pictures/.env` by Watchtower. A variable added
+  to that host file therefore reaches the container only through a Compose
+  recreate. Use `--no-deps --force-recreate backend`: the `composer_init`
   service in the same stack fails (`composer install` on a non-writable
   vendor, `deployment/docker-compose.yml:73`) and aborts the `up` run
   before the backend is started.
@@ -165,11 +171,11 @@ Owner decision D-52: Watchtower keeps running for `portal_backend`.
 
 ### Operator checks after a deploy
 
-Run these from the repository root on the target host and retain the output as
-runtime evidence:
+Run these on the production host using the fixed Compose path and retain the
+output as runtime evidence:
 
 ```bash
-docker compose --project-directory "$PWD" -f deployment/docker-compose.yml ps
+docker compose -f /opt/stacks/portal-reisinger-pictures/compose.yaml ps
 docker inspect --format '{{.State.Health.Status}}' portal_backend
 docker logs --since=10m portal_backend
 ```
@@ -323,14 +329,21 @@ this is the runbook for it.
 ### 7.1 Order
 
 1. **Prepare the new value without printing it.** Generate it on the host and
-   write it directly into the target store — the Portainer stack environment —
-   not into a shell command that lands in a history or a session transcript.
+   write it directly into `/opt/stacks/portal-reisinger-pictures/.env` (for
+   example via a protected editor), not into a shell command that lands in a
+   history or a session transcript.
    `openssl rand -base64 48` for a generated key; a passphrase from the owner's
    password manager for `ADMIN_PASSWORD`.
-2. **Recreate or restart the backend container** so the new environment takes
-   effect. A restart is enough when only the value changed; a recreate is
-   required when the Compose environment block itself changed
-   (`deployment/docker-compose.yml`).
+2. **Recreate the backend container** so it reads the new host `.env`. Use the
+   project Compose file and avoid starting dependencies:
+
+   ```bash
+   docker compose -f /opt/stacks/portal-reisinger-pictures/compose.yaml \
+     up -d --no-deps --force-recreate backend
+   ```
+
+   A plain restart keeps the old container environment. For a Compose-file
+   change, deploy with `./deployment/deploy.sh`.
    For `ADMIN_PASSWORD` this step **is** the rotation: the boot flow runs
    `admin:update`, which always re-hashes the configured bootstrap password
    onto the existing admin account (`backend/app/Console/Commands/AdminUpdate.php:33-37`).
@@ -357,4 +370,3 @@ this is the runbook for it.
   its own verification, because a rotation that shares a deploy cannot be
   verified separately — and a failed rotation is then indistinguishable from a
   failed deploy.
-

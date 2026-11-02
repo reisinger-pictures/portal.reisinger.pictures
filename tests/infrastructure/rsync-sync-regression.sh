@@ -22,7 +22,7 @@
 #   8. Die Caddyfile des ftp-events-Seitendienstes wird als EINZELDATEI
 #      uebertragen, inkl. --mkpath (Zielverzeichnis fehlt auf frischem Host)
 #   9. Drift: der Compose-Mount und der sync.sh-Default nennen DENSELBEN
-#      absoluten Host-Pfad (Portainer loest relative Pfade falsch auf)
+#      absoluten Host-Pfad (relative Pfade würden im Stack-Verzeichnis aufgelöst)
 #  10. Rechte und Eigentum, die der Sync WIRKLICH erzeugt (OPS-3): ein zweiter,
 #      echter Lauf ohne --dry-run in ein frisches Ziel muss 0644/0755 liefern,
 #      2775+setgid ausschliesslich unter storage/ und bootstrap/cache/, keinen
@@ -85,11 +85,11 @@ pass 'sync.sh invariants (strict mode, --delete, no --delete-excluded, exclude f
 # ============================================================================
 # 1b. Drift: Compose-Mount und sync.sh-Default muessen identisch sein
 # ============================================================================
-# Der Stack laeuft aus Portainer; ein relatives Bind-Ziel wuerde gegen
-# Portainers eigenes Compose-Verzeichnis aufgeloest und dort als VERZEICHNIS
-# angelegt (Caddy startet dann mit einem Verzeichnis als Config -> Crashloop).
-# Deshalb ist der Mount absolut, und sync.sh legt die Datei unter genau diesem
-# Pfad ab. Zwei Stellen, ein Wert -- hier verglichen.
+# Der Stack liegt unter /opt/stacks/portal-reisinger-pictures; ein relatives
+# Bind-Ziel würde relativ zu diesem Compose-Verzeichnis aufgelöst und dort als
+# VERZEICHNIS angelegt (Caddy startet dann mit einem Verzeichnis als Config ->
+# Crashloop). Deshalb ist der Mount absolut, und sync.sh legt die Datei unter
+# genau diesem Pfad ab. Zwei Stellen, ein Wert -- hier verglichen.
 [[ -f "$COMPOSE_FILE" ]] || fail "compose file not found: $COMPOSE_FILE"
 
 compose_mount="$(sed -n 's#^[[:space:]]*-[[:space:]]*\(.*Caddyfile\.ftp-events\):/etc/caddy/Caddyfile.*$#\1#p' "$COMPOSE_FILE")"

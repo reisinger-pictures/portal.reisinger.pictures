@@ -1,6 +1,6 @@
 # Deployment — was zu tun ist
 
-> **Stand: 2026-09-26.** Ziel-Soll-Zustand für `reisinger.pictures`.
+> **Stand: 2026-11-02.** Ziel-Soll-Zustand für `reisinger.pictures`.
 > Diese Datei ist die **einzige** Anleitung für den Produktions-Deploy.
 >
 > Architektur: `features/infrastructure/19-ftp-upload-pipeline.md`
@@ -12,57 +12,59 @@
 
 | Schritt | Wer | Aufwand |
 |---|---|---|
-| 1. Env-Variablen setzen | Owner | 5 Minuten |
+| 1. Host-`.env` prüfen | Owner, SSH | 2 Minuten |
 | 2. **Firewall: 3 Ports öffnen** | Owner, SSH | **2 Minuten** |
 | 3. Backup + Restore-Test | Owner, SSH | 10 Minuten |
-| 4. `docker compose up -d` | Owner, SSH | 3 Minuten |
+| 4. `deployment/deploy.sh` | Owner | 3 Minuten |
 | 5. Kamera testen | Fotograf | 20 Minuten |
 | 6. `pure-ftpd` abschalten | Owner, SSH | 1 Minute → **schon geschehen (2026-09-27), nur noch Gegenprobe, siehe Schritt 6** |
 
-**Es gibt keinen Hand-Schritt für Ordner, Rechte oder Passwörter.** Das erledigt
-der Stack selbst (Schritt 4).
+Der Stack provisioniert seine Laufzeit-Ordner und -Rechte selbst. Das
+Host-Stack-Verzeichnis und die geschützte Host-`.env` sind Voraussetzungen;
+siehe Abschnitt 1.
 
 ---
 
-## 1. Env-Variablen (Portainer-Stack-Env)
+## 1. Produktionskonfiguration und Secrets
 
-Nicht ins Repo — dieselbe Fehlerklasse wie die Security-Historie C1–C4.
+Portainer ist nicht mehr Teil des Deploy-Wegs. Die Compose-Quelle ist
+`deployment/docker-compose.yml`; `deployment/deploy.sh` überträgt ausschließlich
+diese Datei nach `/opt/stacks/portal-reisinger-pictures/compose.yaml` und führt
+dort `docker compose up -d --wait` aus.
+`./deployment/deploy.sh --dry-run` zeigt die SSH-/rsync-Befehle an, ohne eine
+Verbindung zum Host aufzubauen.
 
-Beim Deploy über den **Web-Editor** schreibt Portainer `stack.env` selbst aus dem
-GUI-Environment. Deshalb steht im Compose **kein `env_file`** und **kein
-`${VAR:?}`-Guard**: Portainer löst die Interpolation ab, bevor die GUI-Umgebung
-angewendet ist, ein Guard bricht jeden Deploy ab.
+Die echte Produktionsdatei liegt **nur auf dem Host** unter
+`/opt/stacks/portal-reisinger-pictures/.env`, gehört `root:root` und hat Modus
+`0600`. Sie enthält die bisher verwendeten Produktionswerte, wird von Hand auf
+dem Host gepflegt, gehört in das geschützte Backup und wird vom Deploy-Skript
+weder erzeugt noch überschrieben. Fehlt sie, bricht `deployment/deploy.sh` vor
+dem rsync mit einer klaren Meldung ab. Das Compose-Projektverzeichnis muss exakt
+`portal-reisinger-pictures` heißen, damit der Volume-Namespace erhalten bleibt.
 
-**Ein Wertepaar, nicht zwei.** SFTPGo liest eigene Bootstrap-Namen
-(`SFTPGO_DEFAULT_ADMIN_*`); gepflegt wird nur das Paar aus `.env.production`,
-das `backend/config/services.php` ohnehin liest. Das Compose mapt es:
+`deployment/production-env.keys` ist die versionierte Inventarliste der von
+Compose verwendeten Variablennamen (ohne Werte). Reale Werte — darunter
+`APP_KEY`, `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, Datenbank-, Stripe-, Mail- und
+SFTPGo-Credentials — gehören ausschließlich in die Host-`.env`, niemals in
+Git, diese Dokumentation oder einen lokalen Deploy-Aufruf. Compose lädt die
+`.env` automatisch aus dem Stack-Verzeichnis; `env_file` wird nicht verwendet.
+Siehe auch das [Portainer-Exit-Runbook](../../strato-vps/docs/plans/portainer-exit.md).
 
-```yaml
-- SFTPGO_DEFAULT_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME}   # sftpgo-Service
-- SFTPGO_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME:-}        # backend, JWT-Fallback
-```
+**Ein SFTPGo-Admin-Wertepaar, nicht zwei.** SFTPGo liest die Bootstrap-Namen
+`SFTPGO_DEFAULT_ADMIN_*`; gepflegt werden `SFTPGO_ADMIN_USERNAME` und
+`SFTPGO_ADMIN_PASSWORD`, die Compose auf Backend und SFTPGo mappt. Fehlen sie,
+startet SFTPGo nicht und schreibt `no admins found, try to create the default
+one` ins Log — sichtbar, nicht still.
 
-In die GUI gehören also nur die beiden neuen Zeilen aus `.env.production`:
-
-```bash
-SFTPGO_ADMIN_USERNAME=sftpgo-admin
-SFTPGO_ADMIN_PASSWORD=<generiertes Passwort>
-```
-
-Fehlen sie, startet SFTPGo nicht und schreibt `no admins found, try to create
-the default one` ins Log — sichtbar, nicht still.
-
-`FTP_UPLOAD_PATH` ist die einzige **optionale** Variable in diesem Block: sie bestimmt
-den Zielordner, den die Kamera beschreibt. `/` (Konto-Wurzel) ist der richtige Wert,
-solange eine Zielgalerie alles nimmt, deshalb steht sie im Compose mit Default
-(`- FTP_UPLOAD_PATH=${FTP_UPLOAD_PATH:-/}`) — fehlt sie in der GUI, bleibt der Upload
-importierbar. Ein Unterordner wie `/shoots/2026-09` muss **identisch** im UI und in der
-Kamera stehen, sonst schreibt die Kamera in einen Ordner, den der Import nie liest.
+`FTP_UPLOAD_PATH` ist optional und bestimmt den Zielordner, den die Kamera
+beschreibt. Compose verwendet `/` als Default. Ein Unterordner muss im UI und
+in der Kamera identisch eingetragen sein, sonst schreibt die Kamera in einen
+Ordner, den der Import nie liest.
 
 ### Stripe (Live) — drei Werte, die zusammenpassen müssen
 
-Der Backend-Container liest drei Stripe-Werte. Sie stehen in `.env.production`
-(lokal, gitignored) und müssen **genauso** in der Portainer-GUI stehen. Alle drei
+Der Backend-Container liest drei Stripe-Werte. Sie stehen in der Host-`.env`
+und müssen zum selben Stripe-Konto gehören. Alle drei
 gehören zum Konto `acct_1UQksN0qxbyNaMES` (Umstellung am 2026-10-15):
 
 | Variable | Form | Herkunft |
@@ -108,21 +110,25 @@ Die Caddyfile dieses Seitendienstes liegt **nicht** neben der Compose-Datei:
 `/home/webadmin/portal/caddy/Caddyfile.ftp-events` (`--mkpath` legt das
 Verzeichnis auf einem frischen Host an), und der Compose-Mount liest **genau
 diesen absoluten Pfad**. Ein relatives `./Caddyfile.ftp-events` wäre hier falsch:
-der Stack läuft aus Portainer, dessen Compose-Datei unter
-`/var/lib/docker/volumes/portainer_data/_data/compose/23/docker-compose.yml`
-liegt; ein relatives Bind-Ziel wird gegen dieses Verzeichnis aufgelöst, die Datei
-fehlt dort, und Docker Compose legt stattdessen ein **Verzeichnis** an — Caddy
-startet dann mit einem Verzeichnis als Konfiguration und läuft in eine
-Restart-Schleife. Deshalb gilt die Reihenfolge **erst syncen, dann den Stack
-aktualisieren**: ein Stack-Update vor dem ersten Sync, der die Datei ablegt,
-startet den Dienst ohne Caddyfile.
+das Compose-Projekt liegt unter
+`/opt/stacks/portal-reisinger-pictures`; ein relatives Bind-Ziel würde gegen
+dieses Verzeichnis aufgelöst. Fehlt dort die Datei, legt Docker Compose ein
+**Verzeichnis** an — Caddy startet dann mit einem Verzeichnis als Konfiguration
+und läuft in eine Restart-Schleife. Deshalb gilt die Reihenfolge **erst syncen,
+dann den Dienst neu laden**: ein Start vor dem ersten Sync würde den Dienst
+ohne Caddyfile starten.
+
+Nach einer Änderung der Caddyfile den Dienst über dasselbe Compose-Projekt neu
+laden:
 
 ```bash
-FTP_EVENT_SECRET=<generiertes Secret>   # Pflicht
-FTP_EVENT_URL=                          # optional; Default = http://ftp-events:8080/api/internal/ftp/upload-event
+ssh root@reisinger.pictures 'docker compose -f /opt/stacks/portal-reisinger-pictures/compose.yaml restart ftp-events'
 ```
 
-`FTP_EVENT_SECRET` gehört in die Portainer-GUI, nie ins Repo (Klasse C1–C4).
+- Required host-`.env` key: `FTP_EVENT_SECRET`
+- Optional host-`.env` key: `FTP_EVENT_URL`
+
+`FTP_EVENT_SECRET` gehört in die Host-`.env`, nie ins Repo (Klasse C1–C4).
 `FTP_EVENT_URL` darf leer bleiben; `config/ftp.php` verwendet dann den internen
 Listener. Das Secret verlässt damit nicht das Docker-Netz. Sobald SFTPGo auf den
 internen Listener umgestellt und ein echter Upload bestätigt ist, wird die
@@ -130,7 +136,7 @@ internen Listener umgestellt und ein echter Upload bestätigt ist, wird die
 
 **Verbindliche Reihenfolge für den Wechsel:**
 
-0. **Vor dem Recreate prüfen, ob `FTP_EVENT_URL` in der Portainer-Stack-Env
+0. **Vor dem Recreate prüfen, ob `FTP_EVENT_URL` in der Host-`.env`
    explizit gesetzt ist.** Die Production-Policy verlangt inzwischen exakt
    `http://ftp-events:8080/api/internal/ftp/upload-event`; sie läuft beim Start
    des Backend-Containers vor dem Supervisor (`ops:validate-production` im
@@ -140,16 +146,18 @@ internen Listener umgestellt und ein echter Upload bestätigt ist, wird die
    (dann greift der interne Default) oder auf den internen Wert setzen:
 
    ```bash
-   docker exec portal_backend printenv FTP_EVENT_URL
+   grep '^FTP_EVENT_URL=' /opt/stacks/portal-reisinger-pictures/.env
    ```
 
    Ein leerer Wert ist der dokumentierte Default und besteht die Policy.
    `FTP_EVENT_SECRET` muss dagegen gesetzt sein, sonst verweigert der Start
-   (siehe unten); prüfen mit
+   (siehe unten); prüfe nur dessen Länge, ohne den Wert auszugeben:
    `docker exec portal_backend printenv FTP_EVENT_SECRET | wc -c` — **0** heißt
    nicht gesetzt.
-1. Den Stack vollständig recreaten/aktualisieren, damit der Dienst `ftp-events`
-   und der neue interne Default gestartet werden.
+
+1. `./deployment/deploy.sh` aus dem Repo ausführen. Das überträgt nur die
+   versionierte Compose-Datei; die Host-`.env` bleibt unverändert. Compose
+   startet damit den Dienst `ftp-events` und übernimmt den internen Default.
 2. Einen echten Upload ausführen und nachweisen, dass das Event den Import
    auslöst. Voraussetzung ist eine **Zielgalerie** am Konto
    (`current_ftp_gallery_id`); ohne sie antwortet der Endpunkt bewusst mit `200
@@ -164,7 +172,7 @@ Backend-Start im `command:`-Block vor dem Supervisor und schreibt dieselbe Aktio
 und Regel erneut; ein manueller Deploy-Schritt ist nicht nötig. Sie arbeitet
 fail-closed: fehlt `FTP_EVENT_SECRET`, verweigert der Start mit
 `FATAL: FTP_EVENT_SECRET ist nicht gesetzt`, daher muss das Secret **vor dem
-Recreate** in der Portainer-Stack-Env stehen. Beim Kaltstart kann SFTPGo noch
+Recreate** in der Host-`.env` stehen. Beim Kaltstart kann SFTPGo noch
 nicht erreichbar sein; dann beendet sich das Backend, und Docker startet es
 erneut, bis die Provisionierung gelingt. Das ist das beabsichtigte fail-closed
 Verhalten, kein Hängen.
@@ -178,8 +186,8 @@ erscheinen:
 docker logs portal_backend 2>&1 | grep -E 'Event-Aktion|Event-Regel'
 ```
 
-> **Produktionsstatus (Stand der Belege):** Die letzte vollständige
-> Live-Verifikation war am 2026-10-22: Secret in der Portainer-Stack-Env gesetzt,
+> **Historischer Produktionsstatus (Stand der Belege):** Die letzte vollständige
+> Live-Verifikation war am 2026-10-22, damals noch mit Portainer: Secret gesetzt,
 > Backend-Container neu erzeugt, Aktion und Regel gegen die Admin-API
 > zurückgelesen, und der Endpunkt antwortete ohne Secret mit **401**. Am
 > 2026-10-25 verschob eine manuelle Provisionierung die gespeicherte Aktion auf
@@ -288,6 +296,11 @@ Lokal im Container ist der Test wertlos — dort ist der Port immer offen.
 
 ## 3. Backup vor dem Cutover
 
+Das geschützte Produktionsbackup muss außerdem
+`/opt/stacks/portal-reisinger-pictures/` einschließlich der echten `.env`
+enthalten. Die `.env` bleibt `root:root` mit Modus `0600`; Backup-Artefakte
+und Restore-Ziel müssen denselben Zugriffsschutz erhalten.
+
 ```bash
 # 1. Backup des gesamten ftp-Baums
 tar czf /root/ftp-backup-$(date +%Y%m%d-%H%M%S).tar.gz -C /home/webadmin/websites ftp
@@ -324,7 +337,7 @@ muss `portal_backend` neu gestartet werden:**
 
 ```bash
 ./sync.sh
-ssh root@reisinger.pictures 'docker restart portal_backend'
+ssh root@reisinger.pictures 'docker compose -f /opt/stacks/portal-reisinger-pictures/compose.yaml restart backend'
 ```
 
 Grund: PHP kompiliert Klassen und hält das Ergebnis im Prozess. Ein rsync
@@ -386,37 +399,22 @@ find "$API/storage" "$API/bootstrap/cache" -type f -exec setfacl -m o::r-- {} +
 
 1. `./sync.sh` — setzt Eigentum und Modi aller übertragenen Dateien, dazu
    `2775` auf `storage/` und `bootstrap/cache/`.
-2. Den Stack in **Portainer** auf die neue Compose-Datei aktualisieren. Die
-   `user:`-Zeile, die der Host tatsächlich startet, steht in der Kopie des
-   Stacks (`/var/lib/docker/volumes/portainer_data/_data/compose/…`), nicht in
-   diesem Repo — ein Sync allein ändert die Identität **nicht**.
-3. `backend` **recreaten**, nicht restarten:
+2. `./deployment/deploy.sh` — überträgt ausschließlich die Compose-Datei und
+   führt auf dem Host `docker compose ... up -d --wait` aus. Die Host-`.env`
+   wird automatisch aus dem Stack-Verzeichnis gelesen und bleibt unangetastet.
+   Ein Code-Sync allein ändert keine Compose-Laufzeitkonfiguration.
+3. Für einen reinen PHP-Code-Sync ohne Compose-Änderung `backend` restarten;
+   bei Änderungen an `command`, `entrypoint`, `environment`, `volumes` oder
+   `user` ist ein Recreate erforderlich:
 
    ```bash
-   # Host-Pfad des Stack-Verzeichnisses. `/data/compose/23` ist der Pfad
-   # INNERHALB des Portainer-Containers und auf dem Host nicht vorhanden; die
-   # Nummer ist die Stack-ID und kann sich aendern, deshalb vorher pruefen:
-   #   docker inspect portal_backend \
-   #     --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}'
-   cd /var/lib/docker/volumes/portainer_data/_data/compose/23/
-   docker compose -p portal-reisinger-pictures --env-file stack.env \
-     up -d --force-recreate backend
+   ssh root@reisinger.pictures 'docker compose -f /opt/stacks/portal-reisinger-pictures/compose.yaml up -d --no-deps --force-recreate backend'
    ```
 
-   `--env-file stack.env` ist **Pflicht**: die `${…}`-Platzhalter der Datei
-   werden von Portainer aus `stack.env` gefuellt, und `docker compose` liest
-   diese Datei nicht von selbst. Ohne sie wird die Umgebung leer — der
-   Start-Guard verweigert dann den Start (`FATAL: FTP_EVENT_SECRET ist nicht
-   gesetzt`), die Seite ist weg. Probe vor dem Recreate:
-   `docker compose -p portal-reisinger-pictures --env-file stack.env config`
-   muss denselben `environment:`-Block zeigen wie
-   `docker inspect portal_backend`.
-
-   `user:` ist Laufzeitkonfiguration des Containers. `docker restart` behält
-   die alte Konfiguration und damit uid 1000 — der Container liefe dann genau
-   in den Zustand, den dieser Deploy beseitigt. `AGENTS.md` §13: recreate statt
-   restart bei Änderungen an `command`, `entrypoint`, `environment`, `volumes`
-   oder `user`.
+   Das Compose-Verzeichnis bestimmt den Projektnamen und den Volume-Namespace;
+   es darf nicht umbenannt werden. `docker compose` liest dort die Host-`.env`.
+   `docker restart` behält alte Laufzeitkonfiguration; `AGENTS.md` §13 verlangt
+   deshalb einen Recreate bei den genannten Compose-Änderungen.
 4. Health: `curl -sS -o /dev/null -w '%{http_code}\n' https://portal.reisinger.pictures/up`
 5. Schreibnachweis — Identität, beide beschreibbaren Bäume und ein echter
    Request:
@@ -439,10 +437,8 @@ find "$API/storage" "$API/bootstrap/cache" -type f -exec setfacl -m o::r-- {} +
 ```bash
 git revert <commit-dieses-changes>   # stellt user: "1000:82" UND F666/D2777 wieder her
 ./sync.sh                            # mit dem alten Skript: alte Modi, alte Ownership
-# Stack in Portainer aktualisieren, dann:
-cd /var/lib/docker/volumes/portainer_data/_data/compose/23/ && \
-  docker compose -p portal-reisinger-pictures --env-file stack.env \
-  up -d --force-recreate backend
+# Compose-Datei aus dem Revert übertragen und Stack aktualisieren:
+./deployment/deploy.sh
 ```
 
 Beide Hälften des Befunds liegen in diesem einen Commit (Identität in der
@@ -479,8 +475,7 @@ echter Lauf erzeugt) und
 Baumeigentümer aus `sync.sh`).
 
 ```bash
-cd /var/lib/docker/volumes/portainer_data/_data/compose/23/
-docker compose -p portal-reisinger-pictures --env-file stack.env up -d
+./deployment/deploy.sh
 ```
 
 Der `backend`-Entrypoint erledigt beim Start **automatisch**, ohne Zutun.

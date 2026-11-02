@@ -15,11 +15,10 @@ services:
     #   das Backup, sonst waeren sie nach 7 Tagen weg.
     # ACHTUNG 1: log_bin ist ein Startparameter -> erfordert Recreate des
     # db-Dienstes, nicht nur Restart.
-    # ACHTUNG 2: Diese Datei ist die Quelle, aber sie laeuft nicht direkt.
-    # Portainer haelt eine eigene Kopie in portainer.db, und ein Stack-Update
-    # ueber die Portainer-UI deployt von dort — es wuerde diese Einstellung
-    # also wieder entfernen. Nach jeder Aenderung an dieser Datei den Stack 23
-    # in Portainer aktualisieren und den db-Dienst recreaten.
+    # ACHTUNG 2: Diese Datei ist die Quelle und wird durch
+    # deployment/deploy.sh nach /opt/stacks/portal-reisinger-pictures/compose.yaml
+    # übertragen. Die Host-.env bleibt dabei unangetastet. Nach Änderungen an
+    # dieser Datei den Stack aus dem Repo deployen.
     command:
       - --log-bin=mariadb-bin
       - --binlog-format=ROW
@@ -111,7 +110,7 @@ services:
       - DB_CONNECTION=${DB_CONNECTION:-mariadb}
       - DB_HOST=db
       # SFTPGo Admin-API (P1-M22). Der Backend provisioniert FTP-Konten ueber
-      # diese URL. Der API-Key kommt aus der Portainer-Stack-Env; ohne ihn
+      # diese URL. Der API-Key kommt aus der Host-.env; ohne ihn
       # faellt der Client auf den JWT-Pfad zurueck, der ebenfalls die
       # Admin-Credentials braucht.
       - SFTPGO_BASE_URL=${SFTPGO_BASE_URL:-http://sftpgo:8080}
@@ -164,7 +163,7 @@ services:
       - ACCOUNTING_EMAIL=${ACCOUNTING_EMAIL}
       # ---
       # E-Mail-Versand (SMTP über das Zoho-Mail-Postfach, seit 2026-10-26)
-      # Konfiguration liegt in .env.production:
+      # Die Produktionswerte liegen in der Host-.env:
       #   MAIL_MAILER=smtp
       #   MAIL_SCHEME=smtp
       #   MAIL_REQUIRE_TLS=true
@@ -223,7 +222,7 @@ services:
       # bei jedem Backend-Start durch `php artisan ftp:provision-events`
       # geschrieben, idempotent und fail-closed (deployment/README.md,
       # 19-ftp-upload-pipeline.md 7.18.1). Das Secret gehoert in die
-      # Portainer-Stack-Env, nie ins Repo (Klasse C1-C4).
+      # Host-.env, nie ins Repo (Klasse C1-C4).
       - FTP_EVENT_URL=${FTP_EVENT_URL:-}
       - FTP_EVENT_SECRET=${FTP_EVENT_SECRET:-}
       - STRIPE_KEY=${STRIPE_KEY}
@@ -347,16 +346,12 @@ services:
   # Backend, damit die Compose-Datei genau eine Identitaet kennt und ein
   # Lesefehler nicht von einer zweiten, zufaelligen uid abhaengt
   # (Owner-Entscheidung 2026-10-25, OPS-3).
-  # Der Caddyfile-Mount ist ABSOLUT, und das ist keine Kosmetik: dieser Stack
-  # laeuft aus Portainer, dessen Compose-Datei unter
-  # /var/lib/docker/volumes/portainer_data/_data/compose/23/docker-compose.yml
-  # liegt. Ein relatives Bind-Ziel wird gegen DIESES Verzeichnis aufgeloest —
-  # dort gibt es die Datei nicht, und Docker Compose legt stattdessen ein
-  # VERZEICHNIS an. Caddy startet dann mit einem Verzeichnis als Konfiguration
-  # und laeuft in eine Restart-Schleife. Deshalb legt sync.sh die Datei unter
-  # dem festen Host-Pfad ab, und der Mount liest genau von dort. Der Pfad hier
-  # und der Default in sync.sh (CADDY_DEST) muessen identisch bleiben — der
-  # Regressionstest tests/infrastructure/rsync-sync-regression.sh prueft das.
+  # Der Caddyfile-Mount ist ABSOLUT: die Datei wird von sync.sh unter dem
+  # festen Host-Pfad abgelegt. Ein relatives Bind-Ziel würde relativ zum
+  # Compose-Projektverzeichnis /opt/stacks/portal-reisinger-pictures aufgelöst
+  # und dort als Verzeichnis angelegt, falls die Datei fehlt. Deshalb liest der
+  # Mount genau den festen Host-Pfad. Dieser und CADDY_DEST in sync.sh müssen
+  # identisch bleiben; tests/infrastructure/rsync-sync-regression.sh prüft das.
   ftp-events:
     image: caddy:2.11-alpine
     container_name: portal_ftp_events
@@ -460,7 +455,7 @@ services:
       # scheitert damit an einem Listener, der von Anfang an TLS erwartet.
       - SFTPGO_FTPD__BINDINGS__0__ADDRESS=0.0.0.0
       - SFTPGO_FTPD__BINDINGS__0__PORT=989
-      # Aus der Stack-Env, damit die Anzeige im Management-UI nicht etwas
+      # Aus der Host-.env, damit die Anzeige im Management-UI nicht etwas
       # behauptet, was der Dienst nicht tut. Default 1 = explizit, weil eine
       # Canon-Kamera direkt nach dem Verbindungsaufbau AUTH TLS sendet
       # (cam.start.canon UG-06_Network_0060).
@@ -498,7 +493,7 @@ services:
       # stehen. Sie sind dasselbe Geheimnis wie SFTPGO_ADMIN_* (backend-Block
       # weiter oben), das backend/config/services.php fuer den JWT-Fallback
       # liest — deshalb hier gemappt statt ein zweites Wertepaar in der
-      # Portainer-GUI zu pflegen. Deklariert wie die 31 anderen
+      # Host-.env zu pflegen. Deklariert wie die 31 anderen
       # Pflicht-Secrets als bare ${VAR}: fehlt der Wert, bricht Compose mit
       # Namensnennung ab, statt SFTPGo mit leerem Admin in eine
       # Restart-Schleife laufen zu lassen ("no admins found" im Log).

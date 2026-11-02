@@ -44,7 +44,7 @@ This directory serves as the single source of truth for all technical concepts, 
 * [06-model-profile-iteration.md](crm/06-model-profile-iteration.md) - **Current SOLL:** Single-Katalog v1 (Bereitschaft/Erfahrung, ohne Erotik), Lifecycle 13+2, Owner-/Admin-Foto- und Zugriffsverträge, verschlüsselte Ablage.
 
 ### ⚙️ Infrastructure
-* [01-deployment.md](infrastructure/01-deployment.md) - Docker, Portainer, and Reverse Proxy.
+* [01-deployment.md](infrastructure/01-deployment.md) - Repo-managed Docker Compose deployment and reverse proxy.
 * [02-email-system.md](infrastructure/02-email-system.md) - Mailpit, Custom Mails, and Opt-ins.
 * [03-accounting-and-lifecycle.md](infrastructure/03-accounting-and-lifecycle.md) - Invoicing, PDFs, and storage cleanup.
 * [04-payout-system.md](infrastructure/04-payout-system.md) - Weighted share pool model, deduplication and statements.

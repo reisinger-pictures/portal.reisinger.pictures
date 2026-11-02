@@ -24,27 +24,30 @@
       Handbetrieb vor dem ersten Slug-Wechsel.
 - [ ] **`pure-ftpd` läuft noch** — nicht vor Kamerabestätigung abschalten
 
-## 2. Docker-Stack (Portainer)
+## 2. Docker-Compose-Stack (Repository)
 
-- [ ] **Compose-Datei aktualisieren** (aus `deployment/docker-compose.yml`)
-- [ ] **In der Portainer-Stack-Env setzen** (Betriebswerte und Geheimnisse,
-      **nicht** ins Repo):
-  - `SFTPGO_BASE_URL=http://sftpgo:8080`
-  - `SFTPGO_DEFAULT_ADMIN_USERNAME=<user>`
-  - `SFTPGO_DEFAULT_ADMIN_PASSWORD=<pass>`
-  - `SFTPGO_API_KEY=<密钥>` — **optional und in Produktion nicht gesetzt**: der
-        JWT-Fallback über das Admin-Wertepaar ist der endgültige Weg
-        (Owner-Entscheidung 2026-10-22, D-53, §7.15). Der Platzhalter im
-        Compose bleibt der dokumentierte Weg, falls SFTPGo den
-        Admin-Zugang abweichend benennt.
-  - `SFTPGO_FTPD_TLS_MODE=<0|1|2>` (Default 1 = implizites TLS)
-  - `SFTPGO_PASV_PORT_START=50000`, `SFTPGO_PASV_PORT_END=50100` (passive
-        FTPS-Range)
-  - `SFTPGO_SFTP_PORT=2222`, `SFTPGO_FTPS_PORT=989` (nur die **Host**-Ports;
-        die Container-Ports sind im Compose festgelegt)
+- [ ] **Host-Verzeichnis vorhanden:** `/opt/stacks/portal-reisinger-pictures`
+      (genau dieser Name erhält den Volume-Namespace).
+- [ ] **Host-`.env` vorhanden und geschützt:**
+      `/opt/stacks/portal-reisinger-pictures/.env`, `root:root`, Modus `0600`;
+      bisherige Betriebswerte und Geheimnisse werden dort gepflegt, niemals im
+      Repo. Die Datei muss im geschützten Backup liegen.
+- [ ] Variablennamen ohne Werte gegen `deployment/production-env.keys` prüfen.
+      Dazu gehören unter anderem `SFTPGO_BASE_URL`, `SFTPGO_ADMIN_USERNAME`,
+      `SFTPGO_ADMIN_PASSWORD`, `SFTPGO_FTPD_TLS_MODE`, `SFTPGO_PASV_PORT_START`,
+      `SFTPGO_PASV_PORT_END`, `SFTPGO_SFTP_PORT` und `SFTPGO_FTPS_PORT`.
+      `SFTPGO_API_KEY` bleibt optional und ist in Produktion nicht gesetzt:
+      der JWT-Fallback über das Admin-Wertepaar ist der endgültige Weg
+      (Owner-Entscheidung 2026-10-22, D-53, §7.15).
+- [ ] **Deploy aus dem Repo:** `./deployment/deploy.sh`. Das Skript überträgt
+      ausschließlich `deployment/docker-compose.yml`, prüft vorher, dass die
+      Host-`.env` existiert, und führt danach `docker compose up -d --wait` aus.
+      Es erzeugt oder überschreibt die `.env` nicht.
+- [ ] Portainer-Migration/Abbau gemäß
+      [`strato-vps/docs/plans/portainer-exit.md`](../../../strato-vps/docs/plans/portainer-exit.md).
 - [ ] **Feste Compose-Werte** (stehen in `deployment/docker-compose.yml` und
-      gehören **nicht** in die Stack-Env — sie haben keinen Secret-Bezug und
-      müssen ohne Pflege eines Stack-Env wirken):
+      gehören **nicht** in die Host-`.env` — sie haben keinen Secret-Bezug und
+      müssen ohne zusätzlichen Host-`.env`-Eintrag wirken):
   - `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` (sonst keine Admins —
         der Wert muss **vor** dem ersten Start wirksam sein, sonst bleibt die
         `admins`-Tabelle leer und der Token antwortet mit 401; D-54)
@@ -117,7 +120,8 @@ ftp:provision-folders` — oder einfach das nächste `up -d`.
 
 ## 5. Cutover (nach Kamerabestätigung)
 
-- [ ] **Portal-Backend neustarten** (picked up neue Env-Variablen)
+- [ ] **Compose-Deploy aus dem Repo** ausführen, damit neue Host-`.env`-Werte
+      durch einen Container-Recreate übernommen werden.
 - [ ] **`pure-ftpd` abschalten** — erst jetzt, nicht vorher
 - [ ] **Erster echter Import** mit Kamera durchführen
 - [ ] **Rollback-Fenster:** beide Zugänge bleiben parallel bestehen, bis ein
@@ -127,7 +131,7 @@ ftp:provision-folders` — oder einfach das nächste `up -d`.
 
 | Symptom | Ursache | Fix |
 |---|---|---|
-| 401 auf `/api/v2/token` | Admin-User nicht erstellt | `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` im **Compose** prüfen (nicht in der Stack-Env) |
+| 401 auf `/api/v2/token` | Admin-User nicht erstellt | `SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true` im **Compose** prüfen (nicht in der Host-`.env`) |
 | `no such table: schema_version` | Volume falsch gemountet oder nicht beschreibbar | `sftpgo_data` → `/var/lib/sftpgo` prüfen |
 | TLS-Handshake erfolgreich, Upload bricht ab | Passive Ports nicht offen | 50000-50100 in Firewall öffnen |
 | `SSL handshake has read 0 bytes` | Dienst nicht erreichbar oder falscher Port | Compose-Log prüfen, Port-Mapping prüfen |
