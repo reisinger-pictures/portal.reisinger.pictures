@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # ==========================================================================
-# e2e-up.sh — Isolierter lokaler E2E-Backend (eigene SQLite-DB + Port 8001)
+# e2e-up.sh — Isolierter lokaler E2E-Backend (eigene PostgreSQL-DB + Port 8001)
 # --------------------------------------------------------------------------
 # Startet einen SEPARATEN Backend-Prozess für lokale Playwright-E2E-Tests,
-# damit die lokale Dev-Instanz (portal.test / database/database.sqlite)
+# damit die lokale Dev-Instanz (portal.test)
 # von E2E-Tests unberührt bleibt.
 #
 # Ablauf (idempotent):
 #   0. PHP-Version gegen backend/composer.json prüfen (scripts/check-php-version.sh)
-#   1. Test-Services starten  (docker-compose.test.yml: Meili 7701 + SFTPGo Admin-API 18081)
+#   1. Test-Services starten  (docker-compose.test.yml: PostgreSQL 5433, Meili 7701 + SFTPGo Admin-API 18081)
 #   2. backend/.env.e2e generieren (aus backend/.env, Secrets werden übernommen)
-#   3. Eigene SQLite-DB anlegen + migrieren + seeden (env=e2e)
+#   3. Eigene PostgreSQL-DB migrieren + seeden (env=e2e)
 #   4. Deterministische E2E-Location-Fixtures laden + Scout-Index aktualisieren
 #   5. php artisan serve auf http://127.0.0.1:8001 (env=e2e, --no-reload)
 #
@@ -27,8 +27,20 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND="$ROOT/backend"
 E2E_ENV="$BACKEND/.env.e2e"
-E2E_DB="$BACKEND/database/database.e2e.sqlite"
 PORT="${E2E_PORT:-8001}"
+readonly E2E_DB_CONNECTION=pgsql
+readonly E2E_DB_HOST=127.0.0.1
+readonly E2E_DB_PORT=5433
+readonly E2E_DB_DATABASE=portal_test_db
+readonly E2E_DB_USERNAME=portal_user
+readonly E2E_DB_PASSWORD=admin
+readonly E2E_POSTGRES_READY_TIMEOUT_SECONDS="${E2E_POSTGRES_READY_TIMEOUT_SECONDS:-60}"
+export DB_CONNECTION="$E2E_DB_CONNECTION"
+export DB_HOST="$E2E_DB_HOST"
+export DB_PORT="$E2E_DB_PORT"
+export DB_DATABASE="$E2E_DB_DATABASE"
+export DB_USERNAME="$E2E_DB_USERNAME"
+export DB_PASSWORD="$E2E_DB_PASSWORD"
 readonly E2E_CHECKOUT_NEW_ACCOUNT_HOURS=0
 readonly E2E_CHECKOUT_LIMIT=1000
 readonly E2E_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
@@ -73,23 +85,48 @@ fail() { printf '[e2e-up] FEHLER: %s\n' "$*" >&2; exit 1; }
 # in Ordnung sind. Siehe scripts/check-php-version.sh.
 "$ROOT/scripts/check-php-version.sh" || fail "PHP-Voraussetzung nicht erfuellt (siehe Meldung oben)."
 
-# --- 1. Test-Services (Meili 7701) ------------------------------------------
+# --- 1. Test-Services (PostgreSQL 5433 + Meili 7701) ------------------------
 # Projektname bewusst NICHT gesetzt: docker-compose.test.yml definiert fixe
-# container_name (portal_search_test) — ein einziger Compose-Projektname
+# container_name (portal_db_test, portal_search_test) — ein einziger Compose-Projektname
 # (Default) verhindert Container-Name-Conflicts zwischen "Start Docker (Test)"
 # und diesem Skript.
 # E2E_SKIP_DOCKER_SERVICES=1 überspringt ausschließlich den Compose-Start aus
-# Schritt 1. Der Readiness-Check läuft in beiden Fällen unverändert gegen 7701,
-# d. h. ein nativ gestarteter Meilisearch mit derselben Version und demselben
-# Master-Key aus docker-compose.test.yml ist ein gültiger Ersatz. Default "0"
-# = bisheriges Verhalten (Docker).
+# Schritt 1. Die Readiness-Checks laufen in beiden Fällen gegen PostgreSQL auf
+# 5433 und Meilisearch auf 7701; nativ gestartete Dienste sind ein gültiger
+# Ersatz. Default "0" = bisheriges Verhalten (Docker).
 readonly E2E_SKIP_DOCKER_SERVICES="${E2E_SKIP_DOCKER_SERVICES:-0}"
 
 if [ "$E2E_SKIP_DOCKER_SERVICES" = "1" ]; then
-    log "E2E_SKIP_DOCKER_SERVICES=1: ueberspringe docker compose (erwartet nativ laufenden Meilisearch auf ${E2E_MEILISEARCH_HEALTH_URL}) ..."
+    log "E2E_SKIP_DOCKER_SERVICES=1: ueberspringe docker compose (erwartet nativ laufendes PostgreSQL auf ${E2E_DB_HOST}:${E2E_DB_PORT} und Meilisearch auf ${E2E_MEILISEARCH_HEALTH_URL}) ..."
 else
     log "Starte Test-Services (docker-compose.test.yml) ..."
     docker compose -f "$ROOT/docker-compose.test.yml" up -d
+fi
+
+log "Warte auf PostgreSQL (bounded readiness check) ..."
+postgres_ready=0
+for _ in $(seq 1 "$E2E_POSTGRES_READY_TIMEOUT_SECONDS"); do
+    if php -r '
+        $dsn = "pgsql:host=".getenv("DB_HOST").";port=".getenv("DB_PORT").";dbname=".getenv("DB_DATABASE");
+        try {
+            new PDO($dsn, getenv("DB_USERNAME"), getenv("DB_PASSWORD"));
+            exit(0);
+        } catch (Throwable $e) {
+            exit(1);
+        }
+    ' >/dev/null 2>&1; then
+        postgres_ready=1
+        break
+    fi
+    sleep 1
+done
+if [ "$postgres_ready" != "1" ]; then
+    log "PostgreSQL readiness diagnostics:"
+    if [ "$E2E_SKIP_DOCKER_SERVICES" != "1" ]; then
+        docker compose -f "$ROOT/docker-compose.test.yml" ps postgres || true
+        docker compose -f "$ROOT/docker-compose.test.yml" logs --no-color --tail 50 postgres || true
+    fi
+    fail "PostgreSQL did not become ready on ${E2E_DB_HOST}:${E2E_DB_PORT} within ${E2E_POSTGRES_READY_TIMEOUT_SECONDS}s; aborting E2E setup."
 fi
 
 log "Warte auf Meilisearch (bounded readiness check) ..."
@@ -145,8 +182,12 @@ set_env() { # key value
 set_env APP_ENV "local"
 set_env APP_URL "http://localhost:${PORT}"
 set_env FRONTEND_URL "http://localhost:4321"
-set_env DB_CONNECTION "sqlite"
-set_env DB_DATABASE "database/database.e2e.sqlite"
+set_env DB_CONNECTION "$E2E_DB_CONNECTION"
+set_env DB_HOST "$E2E_DB_HOST"
+set_env DB_PORT "$E2E_DB_PORT"
+set_env DB_DATABASE "$E2E_DB_DATABASE"
+set_env DB_USERNAME "$E2E_DB_USERNAME"
+set_env DB_PASSWORD "$E2E_DB_PASSWORD"
 set_env ADMIN_EMAIL "admin@example.com"
 set_env ADMIN_PASSWORD "admin"
 set_env MEILISEARCH_HOST "http://127.0.0.1:7701"
@@ -210,9 +251,8 @@ set_env TURNSTILE_ALLOW_DUMMY_TEST_KEYS "true"
 set_env STRIPE_WEBHOOK_SECRET "$E2E_STRIPE_WEBHOOK_SECRET"
 set_env CI "true"
 
-# --- 3. E2E-SQLite-DB anlegen + migrieren + seeden --------------------------
-log "Lege E2E-SQLite-DB an ($E2E_DB) ..."
-touch "$E2E_DB"
+# --- 3. E2E-PostgreSQL-DB migrieren + seeden --------------------------------
+log "Migriere + seede E2E-PostgreSQL-DB ($E2E_DB_DATABASE) ..."
 log "Migriere + seede E2E-DB (env=e2e) ..."
 ( cd "$BACKEND" && env APP_ENV=local CI=true php artisan migrate:fresh --seed --env=e2e )
 
