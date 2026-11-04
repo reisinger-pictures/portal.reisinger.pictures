@@ -52,6 +52,21 @@ assert_contains() {
     grep -Fq -- "$2" "$COMPOSE" || fail "$3"
 }
 
+# The dual-engine production Compose file is deployed before the one-time data
+# copy. Legacy .env files have DB_CONNECTION=mariadb but no host/port or cache
+# engine keys, so their fallback must remain MariaDB until the cutover helper
+# writes the PostgreSQL coordinates atomically.
+assert_contains "$COMPOSE" '      - DB_HOST=${DB_HOST:-db}' \
+    'a legacy production .env without DB_HOST must stay on the MariaDB service during the preparatory deploy'
+assert_contains "$COMPOSE" '      - DB_PORT=${DB_PORT:-3306}' \
+    'a legacy production .env without DB_PORT must stay on the MariaDB port during the preparatory deploy'
+assert_contains "$COMPOSE" '      - DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
+    'the queue database must default to the selected engine before and after cutover'
+assert_contains "$COMPOSE" '      - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
+    'the cache database must default to the selected engine before and after cutover'
+assert_contains "$COMPOSE" '      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
+    'the cache-lock database must default to the selected engine before and after cutover'
+
 # The backend `command:` block: from the folded scalar to the next service-level
 # key. Everything in between is one shell string once Compose is done with it.
 backend_command() {
