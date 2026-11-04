@@ -38,24 +38,14 @@ return new class extends Migration
         // ══════════════════════════════════════════════
 
         // 1a. Drop single-column PRIMARY KEY on settings.key
-        if (DB::connection()->getDriverName() === 'sqlite') {
+        if (Schema::hasIndex('settings', ['key'], 'primary')) {
             Schema::table('settings', fn (Blueprint $t) => $t->dropPrimary(['key']));
-        } else {
-            $hasSettingsPrimary = collect(DB::select('SHOW INDEX FROM `settings`'))
-                ->contains(fn ($i) => $i->Key_name === 'PRIMARY');
-            if ($hasSettingsPrimary) {
-                DB::statement('ALTER TABLE `settings` DROP PRIMARY KEY');
-            }
         }
 
         // 1b. Add brand column to all 12 tables
         foreach (self::BRAND_TABLES as $table) {
             if (! Schema::hasColumn($table, 'brand')) {
-                if (DB::connection()->getDriverName() === 'sqlite') {
-                    Schema::table($table, fn (Blueprint $t) => $t->enum('brand', ['rp', 'srp'])->nullable());
-                } else {
-                    DB::statement("ALTER TABLE `{$table}` ADD COLUMN `brand` ENUM('rp','srp') NULL DEFAULT NULL");
-                }
+                Schema::table($table, fn (Blueprint $t) => $t->enum('brand', ['rp', 'srp'])->nullable());
             }
         }
 
@@ -84,6 +74,11 @@ return new class extends Migration
                                 "DELETE FROM `{$table}` WHERE `key` = ? AND `value` = ? AND rowid = (SELECT rowid FROM `{$table}` WHERE `key` = ? AND `value` = ? LIMIT 1)",
                                 [$dupKey, $survivorValue, $dupKey, $survivorValue]
                             );
+                        } elseif (DB::connection()->getDriverName() === 'pgsql') {
+                            DB::delete(
+                                "DELETE FROM \"{$table}\" WHERE ctid = (SELECT ctid FROM \"{$table}\" WHERE \"key\" = ? AND \"value\" = ? LIMIT 1)",
+                                [$dupKey, $survivorValue]
+                            );
                         } else {
                             DB::statement(
                                 "DELETE FROM `{$table}` WHERE `key` = ? AND `value` = ? LIMIT 1",
@@ -101,26 +96,17 @@ return new class extends Migration
         // 1e. Add brand indexes
         foreach (self::BRAND_TABLES as $table) {
             $indexName = "{$table}_brand_index";
-            if (DB::connection()->getDriverName() === 'sqlite') {
+            if (! Schema::hasIndex($table, $indexName)) {
                 Schema::table($table, fn (Blueprint $t) => $t->index('brand', $indexName));
-            } else {
-                if (! collect(DB::select("SHOW INDEX FROM `{$table}`"))->contains(fn ($i) => $i->Key_name === $indexName)) {
-                    DB::statement("ALTER TABLE `{$table}` ADD INDEX `{$indexName}` (`brand`)");
-                }
             }
         }
 
         // 1f. Add settings.key index + composite unique (key, brand)
-        if (DB::connection()->getDriverName() === 'sqlite') {
+        if (! Schema::hasIndex('settings', 'settings_key_index')) {
             Schema::table('settings', fn (Blueprint $t) => $t->index('key', 'settings_key_index'));
+        }
+        if (! Schema::hasIndex('settings', 'settings_key_brand_unique')) {
             Schema::table('settings', fn (Blueprint $t) => $t->unique(['key', 'brand'], 'settings_key_brand_unique'));
-        } else {
-            if (! collect(DB::select('SHOW INDEX FROM `settings`'))->contains(fn ($i) => $i->Key_name === 'settings_key_index')) {
-                DB::statement('ALTER TABLE `settings` ADD INDEX `settings_key_index` (`key`)');
-            }
-            if (! collect(DB::select('SHOW INDEX FROM `settings`'))->contains(fn ($i) => $i->Key_name === 'settings_key_brand_unique')) {
-                DB::statement('ALTER TABLE `settings` ADD UNIQUE INDEX `settings_key_brand_unique` (`key`, `brand`)');
-            }
         }
 
         // ══════════════════════════════════════════════
@@ -246,6 +232,27 @@ return new class extends Migration
                     'created_at' => $photo->created_at,
                 ]);
             }
+        } elseif (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('
+                INSERT INTO photo_metadata_versions (id, photo_id, user_id, title, headline, description, keywords, location, city, state, country, iso_country, created_at)
+                SELECT
+                    gen_random_uuid() AS id,
+                    p.id AS photo_id,
+                    p.user_id,
+                    p.title,
+                    p.headline,
+                    p.description,
+                    p.keywords,
+                    p.location,
+                    p.city,
+                    p.state,
+                    p.country,
+                    p.iso_country,
+                    p.created_at
+                FROM photos p
+                LEFT JOIN photo_metadata_versions v ON v.photo_id = p.id
+                WHERE v.id IS NULL
+            ');
         } else {
             DB::statement('
                 INSERT INTO photo_metadata_versions (id, photo_id, user_id, title, headline, description, keywords, location, city, state, country, iso_country, created_at)
