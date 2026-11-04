@@ -36,8 +36,11 @@
         <env name="STRIPE_SECRET" value="test-server-side-placeholder"/>
         <env name="STRIPE_CUSTOMERS_ENABLED" value="false"/>
         
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
+        <!-- The database is not pinned here: the suite runs against the engine
+             the application is deployed on. CI provides PostgreSQL through
+             backend/.env.ci; a local run uses backend/.env. Pinning SQLite
+             here made every migration and query pass on an engine that is not
+             the production one. -->
 
         <env name="SCOUT_DRIVER" value="meilisearch"/>
         <env name="MEILISEARCH_HOST" value="http://127.0.0.1:7701"/>
