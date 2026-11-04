@@ -58,7 +58,7 @@ return new class extends Migration
         });
 
         // ── V026 (contract templates) ─────────────────────────────────
-        if (DB::connection()->getDriverName() === 'sqlite') {
+        if (in_array(DB::connection()->getDriverName(), ['sqlite', 'pgsql'], true)) {
             Schema::table('contracts', fn (Blueprint $t) => $t->enum('type', ['contract', 'template'])->default('contract'));
         } else {
             DB::statement("ALTER TABLE contracts ADD COLUMN type ENUM('contract', 'template') NOT NULL DEFAULT 'contract' AFTER closes_at");
@@ -270,6 +270,20 @@ return new class extends Migration
                     }
                     $brand->change();
                 });
+            } elseif (DB::connection()->getDriverName() === 'pgsql') {
+                $constraintName = $table === 'orgs' ? 'tenants_brand_check' : "{$table}_brand_check";
+                DB::statement("ALTER TABLE \"{$table}\" DROP CONSTRAINT \"{$constraintName}\"");
+                DB::statement("ALTER TABLE \"{$table}\" ALTER COLUMN brand TYPE VARCHAR(20)");
+                if ($config['nullable']) {
+                    DB::statement("ALTER TABLE \"{$table}\" ALTER COLUMN brand DROP NOT NULL");
+                } else {
+                    DB::statement("ALTER TABLE \"{$table}\" ALTER COLUMN brand SET NOT NULL");
+                }
+                if ($config['default'] !== null) {
+                    DB::statement("ALTER TABLE \"{$table}\" ALTER COLUMN brand SET DEFAULT '{$config['default']}'");
+                } else {
+                    DB::statement("ALTER TABLE \"{$table}\" ALTER COLUMN brand DROP DEFAULT");
+                }
             } else {
                 DB::statement("ALTER TABLE `{$table}` MODIFY COLUMN `brand` VARCHAR(20) {$nullable}{$default}");
             }
@@ -302,14 +316,26 @@ return new class extends Migration
         }
 
         // Settings: update non-conflicting rows first, then delete conflicting
-        DB::statement("
-            UPDATE settings
-            SET brand = 'rp'
-            WHERE brand = 'srp'
-            AND `key` NOT IN (
-                SELECT `key` FROM (SELECT `key` FROM settings WHERE brand = 'rp') AS rp_keys
-            )
-        ");
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement("
+                UPDATE settings AS srp
+                SET brand = 'rp'
+                WHERE srp.brand = 'srp'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM settings AS rp
+                      WHERE rp.key = srp.key AND rp.brand = 'rp'
+                  )
+            ");
+        } else {
+            DB::statement("
+                UPDATE settings
+                SET brand = 'rp'
+                WHERE brand = 'srp'
+                AND `key` NOT IN (
+                    SELECT `key` FROM (SELECT `key` FROM settings WHERE brand = 'rp') AS rp_keys
+                )
+            ");
+        }
 
         DB::statement("DELETE FROM settings WHERE brand = 'srp'");
 

@@ -52,11 +52,17 @@ return new class extends Migration
         // enum (and rebuild the users table on SQLite) on every replay. The
         // column itself comes from V041, which runs before this file.
         if (Schema::hasColumn('users', 'ftp_account_status') && ! $this->statusAcceptsRevoked()) {
-            Schema::table('users', function (Blueprint $table): void {
-                $table->enum('ftp_account_status', ['pending', 'active', 'error', 'revoked'])
-                    ->default('pending')
-                    ->change();
-            });
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::statement('ALTER TABLE users DROP CONSTRAINT users_ftp_account_status_check');
+                DB::statement("ALTER TABLE users ALTER COLUMN ftp_account_status TYPE VARCHAR(255), ALTER COLUMN ftp_account_status SET DEFAULT 'pending'");
+                DB::statement("ALTER TABLE users ADD CONSTRAINT users_ftp_account_status_check CHECK (ftp_account_status IN ('pending', 'active', 'error', 'revoked'))");
+            } else {
+                Schema::table('users', function (Blueprint $table): void {
+                    $table->enum('ftp_account_status', ['pending', 'active', 'error', 'revoked'])
+                        ->default('pending')
+                        ->change();
+                });
+            }
         }
 
         if (! Schema::hasColumn('users', 'ftp_revoked_at')) {
@@ -91,8 +97,20 @@ return new class extends Migration
             return true;
         }
 
-        return Schema::getConnection()->getDriverName() === 'sqlite'
-            && str_contains($this->sqliteTableSql('users'), "'revoked'");
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            return str_contains($this->sqliteTableSql('users'), "'revoked'");
+        }
+
+        if (Schema::getConnection()->getDriverName() === 'pgsql') {
+            $definition = DB::scalar(
+                'SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = ?::regclass AND conname = ?',
+                ['users', 'users_ftp_account_status_check'],
+            );
+
+            return str_contains((string) $definition, 'revoked');
+        }
+
+        return false;
     }
 
     private function sqliteTableSql(string $table): string
