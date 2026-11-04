@@ -67,7 +67,7 @@ case "$mode" in
         [ "$#" -eq 0 ] || fail "postgres accepts no arguments"
         docker exec php-postgres php -r 'if (! function_exists("pcntl_fork")) { fwrite(STDERR, "ext-pcntl is missing in the CI PHP image\n"); exit(1); } echo "pcntl_fork available\n";'
         docker exec -e DB_CONNECTION -e DB_HOST -e DB_PORT -e DB_DATABASE -e DB_USERNAME -e DB_PASSWORD php-postgres php artisan migrate --force
-        run_logged /tmp/phpunit-postgres.log docker exec -e DB_CONNECTION -e DB_HOST -e DB_PORT -e DB_DATABASE -e DB_USERNAME -e DB_PASSWORD php-postgres php artisan test --no-ansi --filter='ContractSignerIdentityRaceTest|ContractSignerIdentityTest|ContractContentHeartbeatMySqlTest|GuestOrderMigrationContractTest|PayoutNaturalKeyTest'
+        run_logged /tmp/phpunit-postgres.log docker exec -e DB_CONNECTION -e DB_HOST -e DB_PORT -e DB_DATABASE -e DB_USERNAME -e DB_PASSWORD php-postgres php artisan test --no-ansi --filter='ContractSignerIdentityRaceTest|ContractSignerIdentityTest|ContractContentHeartbeatPostgresTest|GuestOrderMigrationContractTest|PayoutNaturalKeyTest'
         ;;
       frontend)
         [ "$#" -eq 0 ] || fail "frontend accepts no arguments"
