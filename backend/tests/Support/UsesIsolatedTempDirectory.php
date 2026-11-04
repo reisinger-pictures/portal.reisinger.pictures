@@ -10,8 +10,8 @@ use Illuminate\Support\Str;
  * Isolates a test class from the shared temp directory.
  *
  * ParaTest runs separate test classes in separate worker processes. The
- * database is isolated per worker through SQLite :memory:, the filesystem is
- * not, so any test that writes into the real storage/app/private/temp shares
+ * database is isolated per worker through PostgreSQL worker databases, while
+ * the filesystem is not, so any test that writes into storage/app/private/temp shares
  * one flat namespace with whatever class happens to run next to it. That is
  * not hypothetical: two import test classes used the same cache file names in
  * the same absolute directory and produced intermittent failures whose symptom

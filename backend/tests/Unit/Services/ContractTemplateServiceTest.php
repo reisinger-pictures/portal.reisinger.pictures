@@ -267,10 +267,9 @@ class ContractTemplateServiceTest extends TestCase
 
     /**
      * The second call represents the loser of two concurrent requests. The
-     * SQLite :memory: test database cannot safely fork two writers, so the
-     * serialized cache/row-lock path is exercised sequentially here. The
-     * model event also proves that the duplicate check and signer insert run
-     * inside the same transaction.
+     * cache/row-lock path is exercised sequentially here rather than by
+     * spawning concurrent requests. The model event also proves that the
+     * duplicate check and signer insert run inside the same transaction.
      */
     public function test_repeated_normalized_email_join_is_serialized_to_one_instance_and_signer(): void
     {

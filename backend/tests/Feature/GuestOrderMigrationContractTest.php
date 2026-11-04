@@ -108,10 +108,10 @@ class GuestOrderMigrationContractTest extends TestCase
         $this->assertSame(1, $this->postgresOwnerConstraintCount());
     }
 
-    public function test_v037_retry_replays_after_partial_schema_ddl_and_trigger_failure(): void
+    public function test_v037_retry_replays_after_partial_schema_ddl_and_guard_failure(): void
     {
-        if (! in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb', 'sqlite'], true)) {
-            $this->markTestSkipped('The V037 retry regression targets the DDL branches with trigger creation.');
+        if (! in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb', 'pgsql', 'sqlite'], true)) {
+            $this->markTestSkipped('The V037 retry regression targets the supported database DDL branches.');
         }
 
         // Model a MariaDB auto-commit boundary: all schema DDL was committed,
@@ -123,9 +123,9 @@ class GuestOrderMigrationContractTest extends TestCase
         $this->assertTrue(Schema::hasIndex('orders', 'orders_guest_fingerprint_lookup_idx'));
         $this->assertTrue(Schema::hasIndex('orders', 'orders_guest_checkout_key_unique', 'unique'));
 
-        // Leave the insert trigger in place to model a failure between the two
-        // trigger statements. The SQLite branch must clean it up as well.
-        DB::statement('DROP TRIGGER IF EXISTS orders_owner_not_both_update');
+        // Remove one part of the database guard to model a partial run: the
+        // trigger on MySQL/MariaDB and SQLite, or the CHECK on PostgreSQL.
+        $this->dropOwnerGuard();
 
         $migration = require database_path('migrations/V037__add_guest_order_ownership.php');
         $migration->up();
@@ -149,8 +149,7 @@ class GuestOrderMigrationContractTest extends TestCase
             $table->dropIndex('orders_guest_fingerprint_lookup_idx');
             $table->dropUnique('orders_guest_checkout_key_unique');
         });
-        DB::statement('DROP TRIGGER IF EXISTS orders_owner_not_both_insert');
-        DB::statement('DROP TRIGGER IF EXISTS orders_owner_not_both_update');
+        $this->dropOwnerGuard();
 
         $migration->up();
 
@@ -190,16 +189,18 @@ class GuestOrderMigrationContractTest extends TestCase
     private function assertDirectInsertRejectsTwoOwners(User $user, string $failureMessage): void
     {
         try {
-            DB::table('orders')->insert([
-                'id' => (string) Str::uuid(),
-                'user_id' => $user->id,
-                'guest_id' => (string) Str::uuid(),
-                'status' => 'pending',
-                'is_quote_request' => false,
-                'total_amount' => 100,
-                'created_at' => now(),
-                'brand' => 'rp',
-            ]);
+            DB::transaction(function () use ($user): void {
+                DB::table('orders')->insert([
+                    'id' => (string) Str::uuid(),
+                    'user_id' => $user->id,
+                    'guest_id' => (string) Str::uuid(),
+                    'status' => 'pending',
+                    'is_quote_request' => false,
+                    'total_amount' => 100,
+                    'created_at' => now(),
+                    'brand' => 'rp',
+                ]);
+            });
             $this->fail($failureMessage);
         } catch (QueryException $exception) {
             $this->assertStringContainsString('orders_owner_not_both', $exception->getMessage());
@@ -214,9 +215,11 @@ class GuestOrderMigrationContractTest extends TestCase
         ]);
 
         try {
-            DB::table('orders')->where('id', $order->id)->update([
-                'guest_id' => (string) Str::uuid(),
-            ]);
+            DB::transaction(function () use ($order): void {
+                DB::table('orders')->where('id', $order->id)->update([
+                    'guest_id' => (string) Str::uuid(),
+                ]);
+            });
             $this->fail($failureMessage);
         } catch (QueryException $exception) {
             $this->assertStringContainsString('orders_owner_not_both', $exception->getMessage());
@@ -250,6 +253,18 @@ class GuestOrderMigrationContractTest extends TestCase
             ['orders_owner_not_both'],
             false,
         );
+    }
+
+    private function dropOwnerGuard(): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_owner_not_both');
+
+            return;
+        }
+
+        DB::statement('DROP TRIGGER IF EXISTS orders_owner_not_both_insert');
+        DB::statement('DROP TRIGGER IF EXISTS orders_owner_not_both_update');
     }
 
     private function sqliteBranch(string $source): string

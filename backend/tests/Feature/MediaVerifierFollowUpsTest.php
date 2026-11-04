@@ -307,7 +307,7 @@ class MediaVerifierFollowUpsTest extends TestCase
                 'type' => 'selection',
             ]);
             // Simulate a legacy row that bypassed the model/service invariant.
-            DB::table('galleries')->whereKey($gallery->id)->update([
+            DB::table('galleries')->where('id', $gallery->id)->update([
                 'is_public' => true,
                 'is_free_download' => true,
             ]);
@@ -495,7 +495,7 @@ class MediaVerifierFollowUpsTest extends TestCase
         ]);
         // Simulate a legacy/direct database write that bypasses the model
         // saving guard.  The type/effective rules must still win.
-        DB::table('galleries')->whereKey($gallery->id)->update([
+        DB::table('galleries')->where('id', $gallery->id)->update([
             'is_public' => true,
             'is_free_download' => true,
         ]);
@@ -535,7 +535,7 @@ class MediaVerifierFollowUpsTest extends TestCase
             'brand' => Brand::B2B,
             'type' => 'selection',
         ]);
-        DB::table('galleries')->whereKey($gallery->id)->update([
+        DB::table('galleries')->where('id', $gallery->id)->update([
             'is_public' => true,
             'is_free_download' => true,
         ]);
@@ -617,7 +617,7 @@ class MediaVerifierFollowUpsTest extends TestCase
             'brand' => Brand::B2B,
             'type' => 'selection',
         ]);
-        DB::table('galleries')->whereKey($gallery->id)->update([
+        DB::table('galleries')->where('id', $gallery->id)->update([
             'is_public' => true,
             'is_free_download' => true,
         ]);

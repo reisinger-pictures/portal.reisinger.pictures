@@ -126,9 +126,10 @@ pnpm test:e2e:failed                        # reproduce the last failed tests
 ```
 
 The default local integration path is the isolated backend started by
-`scripts/e2e-up.sh`, backed by `backend/database/database.e2e.sqlite` and the
-test Meilisearch service. Never point Playwright at the developer's working
-SQLite database. After the normal seed, that setup explicitly runs
+`scripts/e2e-up.sh`, backed by the PostgreSQL 16 test service in
+`docker-compose.test.yml` (`portal_db_test`, host port `5433`) and the test
+Meilisearch service. The E2E database is distinct from the developer's local
+`portal_db`; never point Playwright at that working database. After the normal seed, that setup explicitly runs
 `Database\Seeders\E2ELocationSeeder` from the checked-in
 `backend/database/fixtures/e2e-locations.json` fixture, then flushes and imports
 the `Location` Scout index. This supplies the stable Salzburg/Graz/Linz contract

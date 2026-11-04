@@ -35,8 +35,12 @@ Der Limiter steht als `RateLimiter::for('contract-content', ...)` in `app/Provid
 
 Gemessen gegen **MariaDB 11.4.13-MariaDB-ubu2404** in einem Wegwerf-Container, 40 gleichzeitig hinter einem Start-Gate freigegebene HTTP-Clients, 40 PHP-Server-Worker, `CACHE_STORE=database` (derselbe MariaDB-Server wie die Heartbeat-Zeilen). Reproduktionsbefehl — er druckt Version, Histogramm, Heartbeat-Zahl, Latenzen, Lock-Waits und Log-Scan und räumt Container, Volume und Temp-Dateien auf; Exit **2** = Überschreitung, **1** = Harness-/Nutzungs-/Verfügbarkeitsfehler, **0** = Grenze gehalten:
 
+Die historische Zahl unten ist eine MariaDB-Messung vom 2026-10-18 und kein
+PostgreSQL-Messergebnis. Das aktuelle PostgreSQL-Gegenstück startet eine
+Wegwerf-Datenbank und ist mit folgendem Befehl ausführbar:
+
 ```bash
-cd backend && DOCKER_BIN="$HOME/.rd/bin/docker" ./tests/scripts/contract-content-mariadb-probe.sh
+cd backend && ./tests/scripts/contract-content-postgres-probe.sh
 ```
 
 Das Skript prüft vor dem Burst als Harness-Vorbedingung, dass die Content-Route die Middleware trägt; eine zurückgenommene Route würde sonst als Limiter-Defekt gemeldet.
@@ -114,15 +118,15 @@ Cleanup verified: temporary files are absent.
 
 Ein früherer Beleg („Zählerwerte exakt 1…40, jeder genau einmal") stützte sich auf einen temporären Trace, der **nicht im Baum geblieben ist**. Ohne reproduzierbares Artefakt ist die Zahl entfernt. Die Monotonie des Zählers ist stattdessen deterministisch gepinnt: der Rennsituationstest unten belegt, dass die Middleware den Zähler in genau dem Zustand nicht unbedingt überschreibt, in dem `RateLimiter::hit()` es täte — ein Rücksprung, der die Monotonie bräche, ist damit ausgeschlossen.
 
-**Deterministische Belege ohne Parallelität** (SQLite `:memory:`):
+**Deterministische Belege ohne parallele PHPUnit-Worker** (PostgreSQL CI/lokale Verbindung):
 
 ```bash
 cd backend && php artisan test --filter AtomicThrottleRequestsTest
-cd backend && php artisan test --filter ContractContentHeartbeatMySqlTest
+cd backend && php artisan test --filter ContractContentHeartbeatPostgresTest
 ```
 
 - `AtomicThrottleRequestsTest`: ein Zähler auf der Grenze wird abgelehnt, **bevor** der Handler läuft; die Route trägt die Middleware und nicht mehr `throttle:contract-content`; eine unzählbare Anfrage wird abgelehnt statt zugelassen; ein 429 schreibt keinen Heartbeat. Der Zähler wird nie unbedingt überschrieben, in **zwei** Stufen: ein sequenzieller Lauf mit Gegenbeispiel (`RateLimiter::hit()` schreibt dort unbedingt), und ein Test, der die Rennsituation selbst nachstellt — ein Store meldet das `add()`-Rennen verloren (`add()` → `false`) und liefert beim ersten `increment()` `1`, also genau den Zustand, den `RateLimiter::hit()` mit einem unbedingten `put()` repariert; die Middleware zählt in diesem Zustand korrekt und führt **kein** `put` aus. Gegen die alte Fassung („erst `hit()`, dann entscheiden") wird genau dieser Test rot — belegt am 2026-10-18 durch temporäres Zurücksetzen von `countAttempt()` auf `hit()`.
-- `ContractContentHeartbeatMySqlTest` ist **neu** in dieser Änderung (nicht „unverändert") und läuft ausschließlich sequenziell gegen echtes MySQL/MariaDB: 30×200, der 31. als 429, exakt 30 Heartbeat-Zeilen; auf dem SQLite-Default überspringt er sich selbst (`1 skipped`).
+- `ContractContentHeartbeatPostgresTest` runs the persisted heartbeat contract against PostgreSQL: 30 successful polls, the 31st returns 429, and exactly 30 heartbeat rows remain. It skips on other drivers; the `backend-postgres` CI job treats any skip as a failure. It does not itself measure simultaneous requests; `tests/scripts/contract-content-postgres-probe.sh` is the disposable-database concurrency probe, and `AtomicThrottleRequestsTest` pins the middleware's lost-increment behavior.
 
 **Reichweite der Aussage „ein 429 schreibt keinen Heartbeat".** Belegt ist zweierlei, nicht mehr: (1) deterministisch — nach 30×200 und einem 429 bleiben genau 30 Heartbeat-Zeilen, der Controller läuft für den abgelehnten Request also nicht; (2) in der Parallel-Messung ist die Heartbeat-Zahl in allen vier Läufen gleich der Zahl der 200er. (2) allein belegt **nicht**, dass jeder einzelne 429 ohne Heartbeat blieb — es zeigt, dass keine zusätzlichen Heartbeats entstanden.
 
@@ -296,9 +300,9 @@ POST   /api/contracts/sign/{personal_token}   → submit clickwrap signature (er
 |------|---------|
 | `tests/Feature/Contract/ContractControllerTest.php` | Management API CRUD tests |
 | `tests/Feature/Contract/ContractJoinTest.php` | Public join/sign token flow |
-| `tests/Feature/Contract/ContractSignerIdentityTest.php` | Model identity, direct/template conflicts, raw-writer email/scope/relation guards, non-Unicode MariaDB collation, unique rollback |
+| `tests/Feature/Contract/ContractSignerIdentityTest.php` | Model identity, direct/template conflicts, raw-writer email/scope/relation guards, PostgreSQL case-variant uniqueness, unique rollback |
 | `tests/Feature/Contract/ContractSignerIdentityMigrationTest.php` | V039 schema, deterministic backfill, replay, bounded duplicate report |
-| `tests/Feature/Contract/ContractSignerIdentityRaceTest.php` | Driver-gated real MariaDB/MySQL multi-connection race (skipped on SQLite) |
+| `tests/Feature/Contract/ContractSignerIdentityRaceTest.php` | Driver-gated real PostgreSQL multi-connection race (skipped on other drivers; required by the PostgreSQL CI contract job) |
 | `tests/Feature/Contract/ContractCloseTest.php` | Close → invoice → PDF → mail |
 | `tests/Unit/ContractAuditServiceTest.php` | Audit log unit tests |
 | `src/logic/__tests__/contractPricing.test.ts` | Safe-integer/fixed-point Vitest regressions |

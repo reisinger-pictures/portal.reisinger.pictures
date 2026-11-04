@@ -14,10 +14,10 @@ use Tests\TestCase;
  * lifecycle (§7.16).
  *
  * Two things are load-bearing and neither is visible from the source alone:
- * the enum has to accept `revoked` on SQLite as well — where the closed set is
- * a `CHECK` constraint, not a column type — and a replay of the migration must
- * not disturb existing rows. Tests run on SQLite `:memory:`, so the first is
- * exactly the case that would otherwise break every test boot.
+ * the closed set must accept `revoked` on PostgreSQL, where it is enforced by
+ * a `CHECK` constraint rather than a column type, and a replay of the migration
+ * must not disturb existing rows. The PostgreSQL test database exercises the
+ * target-engine behavior that would otherwise break test boot.
  */
 class FtpAccountRevocationMigrationTest extends TestCase
 {
@@ -30,16 +30,16 @@ class FtpAccountRevocationMigrationTest extends TestCase
         $columns = collect(Schema::getColumns('users'))->keyBy('name');
         $this->assertTrue((bool) $columns['ftp_revoked_at']['nullable']);
 
-        // SQLite reports the enum as a plain varchar, so the widened closed set
-        // is pinned on the migration source; the behavioural test below is what
-        // proves the constraint actually accepts `revoked`.
+        // PostgreSQL reports the status as a varchar, so the widened closed set
+        // is pinned on the migration source; the behavioural test below proves
+        // the database constraint actually accepts `revoked`.
         $source = $this->migrationSource();
         $this->assertStringContainsString("'revoked'", $source);
         $this->assertStringContainsString('ftp_revoked_at', $source);
 
         // MySQL/MariaDB keeps the set as a type and is the only driver where the
         // database itself names the four values.
-        if (DB::connection()->getDriverName() === 'mysql') {
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
             $this->assertStringContainsString(
                 "enum('pending','active','error','revoked')",
                 (string) $columns['ftp_account_status']['type'],
@@ -60,11 +60,10 @@ class FtpAccountRevocationMigrationTest extends TestCase
         $this->assertSame('revoked', $revoked->ftp_account_status);
         $this->assertNotNull($revoked->ftp_revoked_at);
 
-        // The widening must not have *removed* the closed set: on SQLite the
-        // rebuild re-emits the CHECK constraint, and a value outside it is still
-        // a constraint violation. This is the regression guard against a
-        // "widen" that quietly turns the column into free text.
-        if (DB::connection()->getDriverName() === 'sqlite') {
+        // The widening must not have *removed* the closed set: SQLite and
+        // PostgreSQL enforce it with a CHECK constraint, while MySQL/MariaDB
+        // enforce it through the enum type.
+        if (in_array(DB::connection()->getDriverName(), ['pgsql', 'sqlite'], true)) {
             $this->expectException(QueryException::class);
             $user->forceFill(['ftp_account_status' => 'nonsense'])->save();
         }
