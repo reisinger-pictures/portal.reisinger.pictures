@@ -10,7 +10,6 @@ use App\Services\AuthorizationService;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Tests\Support\LockRenderingSQLiteGrammar;
 use Tests\TestCase;
 
 /**
@@ -42,7 +41,7 @@ use Tests\TestCase;
  * same org row lock as this sync and changes a membership under it.
  *
  * The deadlock itself needs two independent database connections; see
- * `tests/scripts/org-sync-deadlock-mariadb-probe.sh` (CI-only, it needs
+ * `tests/scripts/org-sync-deadlock-postgres-probe.sh` (CI-only, it needs
  * Docker). This test pins the contract that makes the cycle impossible: one
  * ascending lock statement over the users table, with the actor inside it.
  *
@@ -61,18 +60,7 @@ class OrgSyncLockOrderTest extends TestCase
 
     private const OTHER_BRAND = 'srp';
 
-    private const LOCK_MARKER = '/* for update */';
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        // The SQLite grammar compiles a row lock to an empty string. This
-        // grammar renders it as a comment, so the executed statements show
-        // which statement carried a lock.
-        $connection = DB::connection();
-        $connection->setQueryGrammar(new LockRenderingSQLiteGrammar($connection));
-    }
+    private const LOCK_MARKER = 'for update';
 
     private function role(UserRole $role): Role
     {

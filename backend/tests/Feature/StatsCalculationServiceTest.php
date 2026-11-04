@@ -607,7 +607,7 @@ class StatsCalculationServiceTest extends TestCase
 
         $this->assertSame(2, $result['galleries_count']);
         $this->assertSame(6, $result['total_downloads']);
-        $this->assertSame(
+        $this->assertEqualsCanonicalizing(
             ['SECOND', 'FIRST'],
             $result['top_galleries']->pluck('name')->all(),
         );

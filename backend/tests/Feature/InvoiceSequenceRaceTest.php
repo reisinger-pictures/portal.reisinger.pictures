@@ -10,10 +10,9 @@ use Tests\TestCase;
  * P0-B10 (MEDIUM) — the first insert of the yearly invoice sequence must be
  * race-safe (no duplicate-key 500 when two requests create the row together).
  *
- * The full concurrent race cannot be reproduced on the SQLite `:memory:` test
- * DB (single connection). These tests cover the create path and the tolerated
- * duplicate-key path (`insertOrIgnore` on an already-existing row), which is
- * the outcome the losing transaction sees.
+ * These sequential tests do not reproduce the full concurrent race. They cover
+ * the create path and the tolerated duplicate-key path (`insertOrIgnore` on an
+ * already-existing row), which is the outcome the losing transaction sees.
  */
 class InvoiceSequenceRaceTest extends TestCase
 {

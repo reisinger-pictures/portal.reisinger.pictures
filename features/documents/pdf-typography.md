@@ -85,8 +85,8 @@ Kompensation gegen Hurenkinder in WYSIWYG-Inhalten. **Nicht regredieren.**
 
 ## 6. Tests
 
-`backend/tests/Feature/PdfTypographyTest.php` (Feature, SQLite `:memory:`,
-läuft ohne laufenden Server):
+`backend/tests/Feature/PdfTypographyTest.php` (Feature, configured PostgreSQL
+test database; it needs no running HTTP application server):
 
 - Data-Provider über alle 3 Templates: gerendertes HTML enthält `orphans: 2`,
   `widows: 2`, die `.editor-content p/li`-`page-break-inside`-Regel, die

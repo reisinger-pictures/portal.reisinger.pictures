@@ -392,16 +392,22 @@ class BrandFilterChainQueryBaselineTest extends TestCase
         // 1. A gallery without a group: its own brand decides.
         $withoutGroup = $this->gallery(['brand' => Brand::B2B, 'gallery_group_id' => null]);
 
-        // 2. A gallery whose group row does not exist. The foreign key
-        //    forbids that state, so the fixture is written with a deferred
-        //    foreign key check; the test transaction is rolled back, so the
-        //    deferred check never runs.
-        DB::statement('PRAGMA defer_foreign_keys = ON');
+        // 2. A gallery whose group row does not exist. This intentionally
+        //    malformed fixture is outside the production FK invariant. SQLite
+        //    can defer the check; PostgreSQL drops it in the test transaction,
+        //    which is rolled back after the test.
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA defer_foreign_keys = ON');
+        } else {
+            DB::statement('ALTER TABLE galleries DROP CONSTRAINT galleries_gallery_group_id_foreign');
+        }
         $missingGroup = $this->gallery([
             'brand' => Brand::B2B,
             'gallery_group_id' => (string) Str::uuid(),
         ]);
-        DB::statement('PRAGMA defer_foreign_keys = OFF');
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA defer_foreign_keys = OFF');
+        }
 
         // 3. A gallery whose parent group has no brand: the chain fails.
         $nullBrandParent = GalleryGroup::factory()->create(['brand' => null]);

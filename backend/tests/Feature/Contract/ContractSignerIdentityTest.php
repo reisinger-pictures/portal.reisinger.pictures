@@ -154,8 +154,8 @@ class ContractSignerIdentityTest extends TestCase
             'brand' => Brand::B2B,
         ]);
 
-        try {
-            DB::table('contract_signers')->insert([
+        $this->assertRawWriteRejected(
+            fn () => DB::table('contract_signers')->insert([
                 'id' => (string) Str::uuid(),
                 'contract_id' => $contract->id,
                 'name' => 'Raw writer',
@@ -167,60 +167,48 @@ class ContractSignerIdentityTest extends TestCase
                 'status' => 'joined',
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
-            $this->fail('Expected the database null-identity guard to reject the insert.');
-        } catch (QueryException $exception) {
-            $this->assertStringContainsString('contract_signer_identity_required', $exception->getMessage());
-        }
+            ]),
+            'contract_signer_identity_required',
+        );
 
         $signer = ContractSigner::factory()->create([
             'contract_id' => $contract->id,
             'email' => 'immutable@example.com',
         ]);
 
-        try {
-            DB::table('contract_signers')
+        $this->assertRawWriteRejected(
+            fn () => DB::table('contract_signers')
                 ->where('id', $signer->id)
-                ->update(['join_scope_key' => 'contract:'.Str::uuid()]);
-            $this->fail('Expected the database identity guard to reject the update.');
-        } catch (QueryException $exception) {
-            $this->assertStringContainsString('contract_signer_identity_immutable', $exception->getMessage());
-        }
+                ->update(['join_scope_key' => 'contract:'.Str::uuid()]),
+            'contract_signer_identity_immutable',
+        );
 
         $otherContract = Contract::factory()->create([
             'status' => 'active',
             'brand' => Brand::B2B,
         ]);
-        try {
-            DB::table('contract_signers')
+        $this->assertRawWriteRejected(
+            fn () => DB::table('contract_signers')
                 ->where('id', $signer->id)
-                ->update(['contract_id' => $otherContract->id]);
-            $this->fail('Expected the database identity guard to reject contract reassignment.');
-        } catch (QueryException $exception) {
-            $this->assertStringContainsString('contract_signer_identity_immutable', $exception->getMessage());
-        }
+                ->update(['contract_id' => $otherContract->id]),
+            'contract_signer_identity_immutable',
+        );
 
-        try {
-            DB::table('contract_signers')
+        $this->assertRawWriteRejected(
+            fn () => DB::table('contract_signers')
                 ->where('id', $signer->id)
-                ->update(['email' => 'changed-raw@example.com']);
-            $this->fail('Expected the database identity guard to reject email mutation.');
-        } catch (QueryException $exception) {
-            $this->assertStringContainsString('contract_signer_identity_immutable', $exception->getMessage());
-        }
+                ->update([
+                    'email' => 'changed-raw@example.com',
+                    'normalized_email' => 'changed-raw@example.com',
+                ]),
+            'contract_signer_identity_immutable',
+        );
     }
 
-    public function test_mariadb_trigger_works_with_a_non_unicode_database_or_server_collation(): void
+    public function test_postgres_accepts_the_canonical_email_and_rejects_a_case_variant(): void
     {
-        $driver = DB::connection()->getDriverName();
-        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
-            $this->markTestSkipped('This collation regression requires MySQL/MariaDB.');
-        }
-
-        $databaseCollation = (string) DB::scalar('SELECT @@collation_database');
-        $serverCollation = (string) DB::scalar('SELECT @@collation_server');
-        if ($databaseCollation === 'utf8mb4_unicode_ci' && $serverCollation === 'utf8mb4_unicode_ci') {
-            $this->markTestSkipped('Run this regression with a non-unicode_ci database or server default.');
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('This assertion verifies PostgreSQL email identity enforcement.');
         }
 
         $contract = Contract::factory()->create([
@@ -229,7 +217,7 @@ class ContractSignerIdentityTest extends TestCase
         ]);
         $this->insertRawSigner(
             $contract,
-            'collation@example.com',
+            'Collation@Example.COM',
             'contract:'.$contract->id,
             'collation@example.com',
         );
@@ -239,6 +227,16 @@ class ContractSignerIdentityTest extends TestCase
             'normalized_email' => 'collation@example.com',
             'join_scope_key' => 'contract:'.$contract->id,
         ]);
+
+        $this->assertRawWriteRejected(
+            fn () => $this->insertRawSigner(
+                $contract,
+                'collation@example.com',
+                'contract:'.$contract->id,
+                'collation@example.com',
+            ),
+            'contract_signers_scope_normalized_email_unique',
+        );
     }
 
     public function test_raw_sql_guards_reject_wrong_email_and_direct_or_template_scope(): void
@@ -289,12 +287,12 @@ class ContractSignerIdentityTest extends TestCase
         $overlongNormalizedEmail = str_repeat('a', 244).'@example.com';
 
         try {
-            $this->insertRawSigner(
+            DB::transaction(fn () => $this->insertRawSigner(
                 $contract,
                 'short@example.com',
                 'contract:'.$contract->id,
                 $overlongNormalizedEmail,
-            );
+            ));
             $this->fail('Expected the normalized-email length guard to reject the insert.');
         } catch (QueryException $exception) {
             if (DB::connection()->getDriverName() === 'sqlite') {
@@ -526,7 +524,7 @@ class ContractSignerIdentityTest extends TestCase
         string $scopeKey,
     ): void {
         try {
-            $this->insertRawSigner($contract, $email, $scopeKey, $normalizedEmail);
+            DB::transaction(fn () => $this->insertRawSigner($contract, $email, $scopeKey, $normalizedEmail));
             $this->fail('Expected the raw signer identity guard to reject the insert.');
         } catch (QueryException $exception) {
             $message = $exception->getMessage();
@@ -535,6 +533,16 @@ class ContractSignerIdentityTest extends TestCase
                     || str_contains($message, 'contract_signer_identity_invalid'),
                 'The raw insert was rejected without a V039 identity error: '.$message,
             );
+        }
+    }
+
+    private function assertRawWriteRejected(callable $write, string $expectedMessage): void
+    {
+        try {
+            DB::transaction($write);
+            $this->fail('Expected the raw SQL guard to reject the write.');
+        } catch (QueryException $exception) {
+            $this->assertStringContainsString($expectedMessage, $exception->getMessage());
         }
     }
 
