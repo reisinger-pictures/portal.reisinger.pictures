@@ -165,7 +165,7 @@ class OrgInviteController extends Controller
                 // accepting this invite, but never across the existing brand
                 // isolation boundary.
                 $user = User::query()
-                    ->where('email', $invite->email)
+                    ->matchingEmail($invite->email)
                     ->lockForUpdate()
                     ->first();
 

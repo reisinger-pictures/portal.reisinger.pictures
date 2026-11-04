@@ -9,6 +9,7 @@ use App\Models\VolumePreset;
 use App\Models\VolumePresetTier;
 use App\Services\CouponService;
 use App\Support\BrandRegistry;
+use Illuminate\Support\Str;
 
 /**
  * Retroactive volume pricing using a configurable volume preset.
@@ -67,7 +68,9 @@ class VolumeLicensingStrategy implements PricingStrategy
         foreach ($items as $item) {
             $itemId = $item['id'] ?? 0;
 
-            $photo = Photo::find($itemId);
+            $photo = is_string($itemId) && Str::isUuid($itemId)
+                ? Photo::find($itemId)
+                : null;
             $galleryId = $photo?->gallery_id ?? null;
 
             if (! empty($item['is_quote'])) {
@@ -171,7 +174,7 @@ class VolumeLicensingStrategy implements PricingStrategy
             }
 
             $photoId = $item['id'] ?? null;
-            if ($photoId !== null && $photoId !== '') {
+            if (is_string($photoId) && Str::isUuid($photoId)) {
                 $photoIds[] = $photoId;
             }
         }

@@ -7,6 +7,7 @@ use App\Models\GalleryGroup;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Bounded, cycle-safe traversal of the gallery-group hierarchy.
@@ -344,7 +345,7 @@ final class GalleryGroupSubtree
     }
 
     /**
-     * Normalize a mixed list of keys into a unique list of non-empty strings.
+     * Normalize a mixed list of keys into unique UUID strings.
      *
      * @param  array<int, mixed>  $ids
      * @return array<int, string>
@@ -363,7 +364,7 @@ final class GalleryGroupSubtree
 
         return array_values(array_unique(array_filter(
             $normalized,
-            static fn (string $id): bool => $id !== ''
+            static fn (string $id): bool => Str::isUuid($id)
         )));
     }
 

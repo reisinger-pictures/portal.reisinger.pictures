@@ -21,11 +21,11 @@ php -r 'echo PHP_VERSION, PHP_EOL;'
 
 ## Database Setup Policy (STRICT)
 
-- After EVERY migration you MUST seed: `php artisan db:seed` (or the `--seed` flag). `migrate`/`migrate:fresh` alone is not enough — without the seed there is no admin user and login/auth are dead.
+- After EVERY migration you MUST seed: `php artisan db:seed` (or the `--seed` flag). `migrate`/`migrate:fresh` alone is not enough — without the seed there is no admin user and login/auth are dead. **Cutover exception:** when migrating the empty PostgreSQL target for the MariaDB-to-PostgreSQL cutover, do not run `DatabaseSeeder` on the target. Populate that target exclusively with `portal:db-copy` from the already-seeded source, following `deployment/migrate-to-postgres.sh` and the CI cutover procedure; the source database remains seeded as usual. Seeding the target separately would introduce rows outside the source dataset and invalidate copy counts and conflict checks.
 - `DatabaseSeeder` is **authoritative** for the settings keys it declares: it `upsert`s its own value on `(key, brand)` and therefore **overwrites those keys in production**. Before `db:seed` in production — and before `php artisan app:seed-if-fresh`, which calls the same seeder — verify whether affected values differ. Keys outside that list are created only when missing. Fields and evidence: [settings key meaning](../features/infrastructure/28-settings-key-meaning.md).
 - **The comparison is a command, not a reading exercise.** `php artisan ops:check-seeded-settings` (on the host: `./scripts/check-seeded-settings.sh`) compares the seeder's **own** values — the constant `DatabaseSeeder::AUTHORITATIVE_SETTINGS`, which the seeder itself writes, not a copy of it — with the values that are stored now, and names every key a seed would overwrite. Exit 1 means at least one value differs; the decision whether to seed stays with the human. The seeder's values are a public constant for exactly this reason: a second list of values could drift and then name the wrong differences.
 - `ADMIN_EMAIL` and a non-empty `ADMIN_PASSWORD` MUST be set before `composer setup`; `composer setup` copies a missing `.env` unasked and ends with `migrate --force --seed`.
-- Local dev DB: SQLite file `backend/database/database.sqlite` (gitignored); no DB container required.
+- Local development and test runs use PostgreSQL configured through `DB_CONNECTION` and the `DB_*` environment variables; no SQLite database file is used as the canonical backend database.
 - `app:seed-if-fresh` is the first-install automation and runs only when the `users` table is empty. Entrypoint order: `migrate --force && app:seed-if-fresh && admin:update`. A deliberate production seed is the manual `php artisan db:seed --force` only, after the verification above. Contract pinned in `backend/tests/Feature/SeedIfFreshCommandTest.php`.
 - E2E locations: `DatabaseSeeder` stays network-free and does not load E2E locations. Fresh E2E databases use `E2ELocationSeeder` plus the Scout location-index commands from `scripts/e2e-up.sh` or `.github/workflows/ci.yml`. Never call `app:import-locations` from the standard seed or production startup.
 
@@ -36,14 +36,13 @@ php -r 'echo PHP_VERSION, PHP_EOL;'
 - A new migration is allowed only when the requirement cannot be met safely with existing tables, indexes and job contracts; document the concrete schema/backfill/rollback decision first.
 - `down()` methods are never executed and may be left empty.
 
-## Backend Parallel Testing (PHP) — SQLite `:memory:`
+## Backend Parallel Testing (PHP) — PostgreSQL
 
-- The canonical test DB is SQLite `:memory:` (from `phpunit.xml`); no DB container, no grants, no worker DBs.
-- `php artisan test --parallel` works out of the box: every `paratest` worker starts its own isolated in-memory DB.
-- `RefreshDatabase` migrates the in-memory DB fresh at each PHPUnit process start, so parallel runs are isolated by nature.
-- The full suite runs in ONE subagent (once), for reproducibility. Scoped runs without worker-DB setup: `php artisan test --filter <TestClass>`.
-- The four `sqlite` tuning keys in `config/database.php` (`busy_timeout`, `journal_mode`, `synchronous`, `transaction_mode`, each overridable via `DB_*`) affect file-backed DBs only; on `:memory:` they are no-ops. The actual fix against `database is locked` is `transaction_mode=IMMEDIATE`. Pinned by `tests/Unit/Support/SqliteConnectionTuningTest.php`.
-- The local **Playwright** run needs no `--workers=1`: measured on 2026-10-21, a full local run with 8 workers and no retries produced **0** `database is locked` in 237 executed tests over 25 minutes. The local full suite is still **not** a gate — it runs all 442 tests against one database inside the 25-minute global timeout, while the CI shards it into six jobs, each with its own database. The CI is the gate; a local run is a quick check of one area.
+- PostgreSQL is the canonical backend test database, configured by `DB_CONNECTION` and the `DB_*` environment variables (`backend/.env.ci` in CI and the local backend environment for developer runs).
+- `php artisan test --parallel` creates a separate PostgreSQL database for each ParaTest worker, using Laravel's test database suffix. The configured database role must be allowed to create databases; never point parallel runs at a database the role cannot safely create and drop worker databases in.
+- `RefreshDatabase` migrates each worker database and isolates test data within that worker. Parallel workers must not share one database.
+- Scoped runs use the configured PostgreSQL connection: `php artisan test --filter <TestClass>`. The filtered command does not create worker databases.
+- The SQLite tuning keys in `config/database.php` (`busy_timeout`, `journal_mode`, `synchronous`, `transaction_mode`, each overridable via `DB_*`) apply only when a test or tool explicitly selects SQLite; they do not affect the PostgreSQL test suite. `tests/Unit/Support/SqliteConnectionTuningTest.php` covers those SQLite-specific options.
 
 ## Backend Test Groups — Smoke and Feature Runs
 
@@ -88,7 +87,7 @@ composer test:feature                         # the same run, with a config:clea
 php artisan test --parallel --testsuite=Feature
 ```
 
-`--testsuite=Feature` runs `tests/Feature` only; the `Unit` suite is `tests/Unit`. The Feature run therefore contains **no** `tests/Unit` coverage — a unit test that breaks is not caught by it. `--parallel` gives every `paratest` worker its own isolated in-memory SQLite database — the parallel rules of the section above apply unchanged, and no worker database has to be prepared. A scoped run without the worker setup is `php artisan test --filter <TestClass>`. The Feature run has the same environment requirements as the full suite: Meilisearch and Mailpit.
+`--testsuite=Feature` runs `tests/Feature` only; the `Unit` suite is `tests/Unit`. The Feature run therefore contains **no** `tests/Unit` coverage — a unit test that breaks is not caught by it. `--parallel` gives every ParaTest worker its own PostgreSQL database; the role must have permission to create those databases. A scoped run without the worker setup is `php artisan test --filter <TestClass>`. The Feature run has the same environment requirements as the full suite: Meilisearch and Mailpit.
 
 The gate `php artisan test` runs **both** suites — `tests/Feature` and `tests/Unit` — and is the only run that covers everything.
 
@@ -99,8 +98,9 @@ SMTP, `127.0.0.1:8025` API). Meilisearch runs as the `search` container of the l
 stack (`docker-compose.test.yml`). **Mailpit is not part of that file** — it is a separate
 process on the developer machine (`brew install mailpit`, then `mailpit` on the command line;
 any container binding 1025 and 8025 serves the same purpose). The CI starts both as workflow
-services (`.github/workflows/ci.yml`, the `backend` and the `e2e` job). The frontend
-development database is a separate SQLite file and needs no container.
+services (`.github/workflows/ci.yml`, the `backend` and the `e2e` job). The backend test
+suite uses PostgreSQL, not a file-backed SQLite database. E2E PostgreSQL is provisioned by
+`docker-compose.test.yml` and published on port `5433` (`127.0.0.1:5433`).
 
 If the Docker daemon is not running, the mail and the search tests fail with connection
 errors (`cURL error 7`, `TransportException`) — **environmental, not defects**: the same

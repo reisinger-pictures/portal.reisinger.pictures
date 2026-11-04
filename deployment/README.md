@@ -15,6 +15,7 @@
 | 1. Host-`.env` prüfen | Owner, SSH | 2 Minuten |
 | 2. **Firewall: 3 Ports öffnen** | Owner, SSH | **2 Minuten** |
 | 3. Backup + Restore-Test | Owner, SSH | 10 Minuten |
+| 3a. PostgreSQL-Cutover (einmalig, D-63) | Owner, SSH | `deployment/migrate-to-postgres.sh`, siehe Abschnitt 3a |
 | 4. `deployment/deploy.sh` | Owner | 3 Minuten |
 | 5. Kamera testen | Fotograf | 20 Minuten |
 | 6. `pure-ftpd` abschalten | Owner, SSH | 1 Minute → **schon geschehen (2026-09-27), nur noch Gegenprobe, siehe Schritt 6** |
@@ -318,6 +319,40 @@ Restore nie geprüft wurde, ist eine Vermutung.
 
 ---
 
+## 3a. Einmaliger PostgreSQL-Cutover (D-63)
+
+Der Wechsel von MariaDB auf PostgreSQL ist ein **eigener, einmaliger Vorgang**,
+kein Nebeneffekt eines Deploys. Er läuft auf dem Host, macht sein Backup selbst
+und schaltet erst nach grüner Verifikation um:
+
+Zuerst wird das PostgreSQL-fähige Image und der Dual-Engine-Compose-Stand
+deployt, während die Host-`.env` weiterhin MariaDB auswählt. Der normale
+Backend-Start migriert damit zunächst die laufende MariaDB auf den aktuellen
+Schema-Stand. Das Cutover-Skript prüft vor dem Backup erneut, dass
+`migrate:status` keine offenen Migrationen meldet; andernfalls bricht es ab.
+Diese Vorbereitung ist nötig, damit Quell- und Zieltabellen dieselbe
+Migrationsfrontier haben.
+
+```bash
+# Hostseitiger Dry-Run (das Skript wird über SSH gestreamt und nicht ins Webroot kopiert):
+ssh root@reisinger.pictures 'bash -s -- --dry-run' < deployment/migrate-to-postgres.sh
+
+# Echt: Backup -> PostgreSQL starten -> migrieren -> kopieren -> verifizieren -> umschalten
+ssh root@reisinger.pictures 'bash -s' < deployment/migrate-to-postgres.sh
+
+# Rollback, falls nach dem Umschalten etwas nicht stimmt:
+ssh root@reisinger.pictures 'bash -s -- --rollback' < deployment/migrate-to-postgres.sh
+```
+
+Die Phasen (BACKUP / PG / MIGRATE / COPY / VERIFY / SWITCH) brechen benannt ab;
+das Skript schaltet nie teilweise um. Der Rollback ist ein `.env`-Flip
+(`DB_CONNECTION=mariadb`, `DB_HOST=db`, `DB_PORT=3306`) — MariaDB bleibt dafür
+unangetastet laufen, ein Restore ist nicht nötig. Der Vertrag, die Invarianten
+des Verifiers und was ausdrücklich **nicht** abgedeckt ist, stehen in
+[`features/infrastructure/30-postgres-cutover.md`](../features/infrastructure/30-postgres-cutover.md).
+
+---
+
 ## 4. Deploy
 
 ### Sync und der Container-Neustart (Pflicht)
@@ -601,6 +636,11 @@ sftpgo
 composer_init
 backend
 ```
+
+Im Compose-Zielstand für D-63 kommt `db_pg` hinzu; `db` (MariaDB) bleibt bis
+zum Ende des Rollback-Fensters im Stack. Die Liste oben ist die Messung vom
+2026-09-27 und bleibt als solche stehen — ein erneutes `config --services`
+zeigt den aktuellen Stand.
 
 Kein `pureftp`. Ein `docker compose down` aus dem Portal-Verzeichnis hätte den
 alten Stack nicht einmal *berührt*.

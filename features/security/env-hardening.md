@@ -81,18 +81,18 @@ CI-Klassifizierung.
 
 ### Test-Fixtures
 
-**Kanonischer PHPUnit-Testbetrieb:** `backend/phpunit.xml` setzt
-`DB_CONNECTION=sqlite` und `DB_DATABASE=:memory:`. Die dort gesetzten
-localhost-Service-Fixtures (`127.0.0.1:7701`, `test_meili_secret`, Mail-Port
-`1025` usw.) sind Test-Konfiguration und keine MySQL/MariaDB-Datenbank.
+**Kanonischer PHPUnit-Testbetrieb:** `backend/phpunit.xml` enthält keine
+SQLite-DB-Pin. Die Verbindung kommt aus `backend/.env` lokal und aus dem
+getrackten `backend/.env.ci` in CI; beides verwendet PostgreSQL. Die dort
+gesetzten localhost-Service-Fixtures (`127.0.0.1:5432`, Meilisearch,
+Mailpit usw.) sind Test-Konfiguration, keine Produktions-Credentials.
 
-`backend/.env.ci` ist ein **getracktes CI-Setup** und enthält in seinem
-allgemeinen Abschnitt MariaDB-Werte für den separaten E2E-Servicebetrieb. Der
-Backend-/PHPUnit-CI-Job kopiert die Datei als `.env`, überschreibt aber die
-Datenbank für PHPUnit durch `phpunit.xml` auf SQLite `:memory:`; der E2E-Job
-passt die Werte separat auf seine MariaDB-/Meilisearch-/Mailpit-Service-Namen
-an. Die alten `127.0.0.1:3307`-/MariaDB-Angaben dürfen daher nicht als
-PHPUnit-Standard beschrieben werden. Siehe `AGENTS.md` §8 (Security Risk
+`backend/.env.ci` ist ein **getracktes CI-Setup** mit PostgreSQL-Fixture-Werten.
+Der Backend-Job kopiert die Datei als `.env` und läuft gegen PostgreSQL 16; der
+E2E-Job passt Hostnamen auf seine PostgreSQL-/Meilisearch-/Mailpit-Service-
+Namen an. Ein eigener `cutover-copy`-Job nutzt zusätzlich kurzlebige MariaDB-
+und PostgreSQL-Services, um den einmaligen Kopierpfad zu prüfen; das ist kein
+alternativer PHPUnit-Teststandard. Siehe `AGENTS.md` §8 (Security Risk
 Register).
 
 ### Code-Fallbacks
@@ -364,9 +364,10 @@ grep -rho 'pk_live_[A-Za-z0-9]\{12\}' frontend/dist/assets | head -1
   `.env`-Vorlage oder als Beweis für sichere lokale Secrets verwendet werden.
   Reproduzierbar mit `git ls-files | grep -E '(^|/)\.env'` — es erscheinen nur
   `backend/.env.ci` und die drei `*.example`-Dateien, kein `.env.encrypted`.
-- **`phpunit.xml`-Credentials:** SQLite-`:memory:` plus localhost-Service-Fixtures,
-  akzeptiert. Die MariaDB-Werte in `.env.ci` gehören zum separaten E2E-Service-
-  betrieb und sind nicht der PHPUnit-Test-DB-Vertrag.
+- **`phpunit.xml`-Credentials:** PostgreSQL-Testservice plus localhost-
+  Service-Fixtures, akzeptiert. `backend/.env.ci` enthält ausdrücklich
+  nicht-produktive PostgreSQL-Zugangsdaten; der separate Cutover-CI-Job nutzt
+  MariaDB nur als Wegwerf-Quelle für `portal:db-copy`.
 - **Stripe-abhängige Checkout/Payout-Tests (2026-07-31):** `OrderCheckoutTest`
   (2 Tests), `PayoutSystemTest` (1 Test) und `Coupon/CheckoutCouponRevalidationTest`
   (3 Tests) benötigen einen **echten** Stripe-Test-Secret-Key, da sie ausgehende

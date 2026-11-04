@@ -17,7 +17,7 @@ Ratings allow gallery guests to rate individual photos (1–5 stars) and leave c
 ### Datenmodell (V038, verifiziert 2026-09-24)
 - `ratings` table: `photo_id`, `user_id` (nullable), `guest_id` (nullable), `guest_name` (nullable), `rating` (tinyInteger), `comment` (nullable), `actor_key` (nullable), no timestamps (`$timestamps = false`)
 - Ein Rating hat entweder `user_id` ODER `guest_id` + `guest_name` (nie beide). `actor_key` is `user:<id>` or `guest:<id>`; ownerless legacy rows keep `NULL`.
-- The historical unique constraint on `(photo_id, user_id, guest_id)` remains, preserving registered-user compatibility. V038 adds the portable unique index `(photo_id, actor_key)`; nullable `actor_key` intentionally permits multiple ownerless legacy rows on both MySQL/MariaDB and SQLite without requiring a partial index.
+- The historical unique constraint on `(photo_id, user_id, guest_id)` remains, preserving registered-user compatibility. V038 adds the unique index `(photo_id, actor_key)`; nullable `actor_key` intentionally permits multiple ownerless legacy rows on PostgreSQL, MariaDB and SQLite without requiring a partial index.
 - V038 normalizes identifiable legacy rows deterministically: duplicate `(photo_id, actor)` rows retain the lexicographically smallest rating UUID, while ownerless rows are retained untouched. The mutation path uses the actor-key index as the durable uniqueness guard.
 
 ## Future

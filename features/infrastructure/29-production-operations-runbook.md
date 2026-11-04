@@ -14,7 +14,10 @@ probe, or scheduler run has been observed. Static policy tests and shell/PHP
 syntax checks are repository evidence only; operators must collect the runtime
 evidence listed below on the target host.
 
-The current deployment uses the provisioned MariaDB service. It does **not**
+The D-63 target deployment uses PostgreSQL 16 (`db_pg`, container
+`portal_db_pg`). Until the one-time host cutover has completed, the existing
+production deployment remains on MariaDB (`db`, container `portal_db`). The
+cutover is not evidenced by a repository deploy. The stack does **not**
 introduce Redis, Horizon, Supervisor, or another external process manager.
 The shell supervisor in `deployment/backend-supervisor.sh` is intentionally
 small and runs inside the existing PHP-FPM container as UID/GID `1002:82`, the
@@ -47,7 +50,7 @@ migrations, queue workers, the scheduler, or PHP-FPM are started.
 | Variable | Required value/constraint |
 |---|---|
 | `APP_ENV` | `production` for the production policy to be active |
-| `DB_CONNECTION` | Explicit application connection, currently `mariadb` |
+| `DB_CONNECTION` | Explicit application connection: `mariadb` before cutover, `pgsql` after verification and switch |
 | `DB_QUEUE_CONNECTION` | Exactly the same value as `DB_CONNECTION` |
 | `QUEUE_CONNECTION` | Exactly `database` |
 | `DB_QUEUE_RETRY_AFTER` | Raw positive integer (no whitespace, no decimal point); currently `90` seconds |
@@ -247,8 +250,9 @@ On an SMTP incident:
 All current scheduled events use both `withoutOverlapping()` and
 `onOneServer()`. `onOneServer()` is only meaningful when the scheduler mutex
 store is shared by all backend replicas. The deployment therefore uses the
-existing MariaDB cache store by default and sets `DB_CACHE_CONNECTION` to the
-same application database connection. `file` and `array` stores are not
+same database engine as the application connection (MariaDB before cutover,
+PostgreSQL after it) as the cache store and sets `DB_CACHE_CONNECTION` to that
+connection. `file` and `array` stores are not
 acceptable for the production `onOneServer` path.
 
 The policy command is intentionally conservative but does not provision a new

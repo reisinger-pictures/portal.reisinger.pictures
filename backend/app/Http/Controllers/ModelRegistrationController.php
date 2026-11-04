@@ -22,6 +22,7 @@ use App\Services\ModelFileStore;
 use App\Services\ModelPhotoPrimaryService;
 use App\Services\ModelQuestionnaire;
 use App\Support\BrandRegistry;
+use App\Support\EmailNormalizer;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -148,7 +149,7 @@ class ModelRegistrationController extends Controller
         // Each person needs a distinct e-mail address within one submission.
         $seenEmails = [];
         foreach ($personsInput as $index => $person) {
-            $email = strtolower((string) ($person['answers']['email'] ?? ''));
+            $email = EmailNormalizer::normalize((string) ($person['answers']['email'] ?? ''));
             if ($email === '') {
                 continue;
             }
@@ -182,10 +183,13 @@ class ModelRegistrationController extends Controller
                 continue;
             }
 
-            $email = strtolower((string) ($person['answers']['email'] ?? ''));
+            $email = EmailNormalizer::normalize((string) ($person['answers']['email'] ?? ''));
             $existing = 0;
             if ($email !== '') {
-                $existingCustomer = Customer::where('brand', $brand)->where('email', $email)->first();
+                $existingCustomer = Customer::query()
+                    ->where('brand', $brand)
+                    ->whereRaw('LOWER(email) = ?', [$email])
+                    ->first();
                 $existing = $existingCustomer?->modelPhotos()->count() ?? 0;
             }
 
@@ -401,10 +405,13 @@ class ModelRegistrationController extends Controller
      */
     private function resolveCustomer(array $answers, string $brand): Customer
     {
-        $email = $answers['email'];
+        $email = EmailNormalizer::normalize((string) $answers['email']);
         $name = trim(($answers['first_name'] ?? '').' '.($answers['last_name'] ?? ''));
 
-        $customer = Customer::where('brand', $brand)->where('email', $email)->first();
+        $customer = Customer::query()
+            ->where('brand', $brand)
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->first();
 
         if (! $customer) {
             return Customer::create([
@@ -619,7 +626,7 @@ class ModelRegistrationController extends Controller
             return;
         }
 
-        $user = User::where('email', $customer->email)->first();
+        $user = User::query()->matchingEmail($customer->email)->first();
 
         if (! $user) {
             $user = User::create([
