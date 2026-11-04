@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\EmailNormalizer;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
@@ -21,6 +22,11 @@ class OrgInvite extends Model
     protected $casts = [
         'expires_at' => 'datetime',
     ];
+
+    public function setEmailAttribute(string $email): void
+    {
+        $this->attributes['email'] = EmailNormalizer::normalize($email);
+    }
 
     public function org()
     {

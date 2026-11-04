@@ -8,9 +8,11 @@ use App\Exceptions\SftpGoException;
 use App\Models\User;
 use App\Services\FtpCredentialService;
 use App\Services\SftpGoClient;
+use App\Support\EmailNormalizer;
 use App\Values\FtpAccountReconciliation;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * Reconciles the cached FTP account status with SFTPGo (P1-M30).
@@ -257,11 +259,15 @@ class ReconcileFtpAccounts extends Command
         $requested = $this->option('user');
 
         if (is_string($requested) && $requested !== '') {
-            $user = User::query()
+            $query = User::query()
                 ->where('ftp_slug', $requested)
-                ->orWhere('id', $requested)
-                ->orWhere('email', $requested)
-                ->first();
+                ->orWhereRaw('LOWER(email) = ?', [EmailNormalizer::normalize($requested)]);
+
+            if (Str::isUuid($requested)) {
+                $query->orWhere('id', $requested);
+            }
+
+            $user = $query->first();
 
             if ($user === null) {
                 $this->error(sprintf(

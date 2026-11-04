@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\EmailNormalizer;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -64,6 +65,7 @@ class ActivationTokenService
      */
     public function issue(string $email): ?string
     {
+        $email = EmailNormalizer::normalize($email);
         $token = Str::random(64);
         $issuedAt = Carbon::now();
 
@@ -80,7 +82,7 @@ class ActivationTokenService
         $expiredBefore = Carbon::now()->subMinutes($this->lifetimeMinutes());
 
         $takenOver = DB::table('password_reset_tokens')
-            ->where('email', $email)
+            ->whereRaw('LOWER(email) = ?', [$email])
             ->where(function ($query) use ($expiredBefore): void {
                 // A NULL `created_at` cannot be proven fresh, so it counts as
                 // expired — otherwise such a row would be unclaimable forever.

@@ -69,9 +69,9 @@
             "@php artisan config:clear --ansi",
             "@php artisan test --parallel --testsuite=Feature"
         ],
-        "test:mariadb": [
+        "test:postgres": [
             "@php artisan config:clear --ansi",
-            "@php -r 'if (! in_array((string) getenv(\"DB_CONNECTION\"), [\"mariadb\", \"mysql\"], true)) { fwrite(STDERR, \"test:mariadb needs DB_CONNECTION=mariadb (or mysql) plus DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME and DB_PASSWORD. Without a real MariaDB the contract signer identity tests only skip.\"); exit(1); }'",
+            "@php -r 'if ((string) getenv(\"DB_CONNECTION\") !== \"pgsql\") { fwrite(STDERR, \"test:postgres needs DB_CONNECTION=pgsql plus DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME and DB_PASSWORD. The contract signer identity tests require real PostgreSQL connections.\"); exit(1); }'",
             "@php artisan test --filter='ContractSignerIdentityRaceTest|ContractSignerIdentityTest'"
         ],
         "post-autoload-dump": [
@@ -86,7 +86,6 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
             "@php artisan migrate --graceful --seed --ansi"
         ],
         "pre-package-uninstall": [

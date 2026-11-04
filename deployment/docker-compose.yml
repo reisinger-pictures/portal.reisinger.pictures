@@ -146,10 +146,13 @@ services:
       - /home/webadmin/websites/ftp:/var/www/ftp:Z
     environment:
       - DB_CONNECTION=${DB_CONNECTION:-pgsql}
-      # Rollback is an env flip, not a compose change: DB_CONNECTION=mariadb,
-      # DB_HOST=db and DB_PORT=3306 select the untouched MariaDB container again.
-      - DB_HOST=${DB_HOST:-db_pg}
-      - DB_PORT=${DB_PORT:-5432}
+      # Compatibility defaults keep a pre-cutover host .env (which has no
+      # DB_HOST/DB_PORT keys and still selects DB_CONNECTION=mariadb) on its
+      # existing database during the preparatory deploy. The cutover script
+      # atomically writes db_pg/5432 when it switches to PostgreSQL; rollback
+      # writes db/3306. New PostgreSQL environments must set both explicitly.
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-3306}
       # SFTPGo Admin-API (P1-M22). Der Backend provisioniert FTP-Konten ueber
       # diese URL. Der API-Key kommt aus der Host-.env; ohne ihn
       # faellt der Client auf den JWT-Pfad zurueck, der ebenfalls die
@@ -180,7 +183,7 @@ services:
       - DB_DATABASE=portal_db
       - DB_USERNAME=portal_user
       - DB_PASSWORD=${DB_PASSWORD}
-      - DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-pgsql}
+      - DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-${DB_CONNECTION:-pgsql}}
       - DB_QUEUE_RETRY_AFTER=${DB_QUEUE_RETRY_AFTER:-90}
       - QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
       - QUEUE_FAILED_DRIVER=${QUEUE_FAILED_DRIVER:-database-uuids}
@@ -228,10 +231,11 @@ services:
       - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
       - MAIL_FROM_NAME=${MAIL_FROM_NAME}
       # Scheduler mutexes must use a store shared by every backend replica.
-      # The provisioned PostgreSQL store is the current production default.
+      # Until cutover, default these connections to the selected application
+      # engine; after the switch DB_CONNECTION selects PostgreSQL.
       - CACHE_STORE=${CACHE_STORE:-database}
-      - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-pgsql}
-      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-pgsql}
+      - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-${DB_CONNECTION:-pgsql}}
+      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-${DB_CONNECTION:-pgsql}}
       - MAKE_WEBHOOK_URL=${MAKE_WEBHOOK_URL}
       - MAKE_API_KEY=${MAKE_API_KEY}
       - MEILISEARCH_HOST=http://search:7700

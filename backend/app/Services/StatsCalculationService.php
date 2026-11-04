@@ -7,6 +7,7 @@ use App\Models\DownloadLog;
 use App\Models\Gallery;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class StatsCalculationService
@@ -99,15 +100,13 @@ class StatsCalculationService
             } : function () {})
             ->count();
 
-        $rawDomainStats = DB::table('download_logs')
+        $domainEmails = DB::table('download_logs')
             ->join('users', 'download_logs.user_id', '=', 'users.id')
             ->when($brand !== null, fn ($q) => $q->whereIn('download_logs.gallery_id', $brandGalleryIds))
             ->where($tierFilterDb)
-            ->selectRaw("substr(users.email, instr(users.email, '@') + 1) as domain, COUNT(*) as count")
-            ->groupBy('domain')
-            ->get();
+            ->pluck('users.email');
 
-        $domainStats = $this->processDomainStats($rawDomainStats);
+        $domainStats = $this->domainStatsForEmails($domainEmails);
 
         $topGalleries = DB::table('download_logs')
             ->select('gallery_name_snapshot as name', DB::raw('COUNT(*) as count'))
@@ -162,16 +161,14 @@ class StatsCalculationService
         $guestDownloads = 0;
         $galleriesCount = 0;
 
-        $rawDomainStats = DB::table('download_logs')
+        $domainEmails = DB::table('download_logs')
             ->join('users', 'download_logs.user_id', '=', 'users.id')
             ->whereIn('download_logs.user_id', $orgUserIds)
             ->when($brand !== null, fn ($q) => $q->whereIn('download_logs.gallery_id', $brandGalleryIds))
             ->where($tierFilterDb)
-            ->selectRaw("substr(users.email, instr(users.email, '@') + 1) as domain, COUNT(*) as count")
-            ->groupBy('domain')
-            ->get();
+            ->pluck('users.email');
 
-        $domainStats = $this->processDomainStats($rawDomainStats);
+        $domainStats = $this->domainStatsForEmails($domainEmails);
 
         $topGalleries = DB::table('download_logs')
             ->select('gallery_name_snapshot as name', DB::raw('COUNT(*) as count'))
@@ -240,15 +237,13 @@ class StatsCalculationService
             } : function () {})
             ->count();
 
-        $rawDomainStats = DB::table('download_logs')
+        $domainEmails = DB::table('download_logs')
             ->join('users', 'download_logs.user_id', '=', 'users.id')
             ->whereIn('download_logs.gallery_id', $galleryIds)
             ->where($tierFilterDb)
-            ->selectRaw("substr(users.email, instr(users.email, '@') + 1) as domain, COUNT(*) as count")
-            ->groupBy('domain')
-            ->get();
+            ->pluck('users.email');
 
-        $domainStats = $this->processDomainStats($rawDomainStats);
+        $domainStats = $this->domainStatsForEmails($domainEmails);
 
         $topGalleries = DB::table('download_logs')
             ->select('gallery_name_snapshot as name', DB::raw('COUNT(*) as count'))
@@ -291,5 +286,35 @@ class StatsCalculationService
         } else {
             return $this->getUserStats($user, $tier, $brand);
         }
+    }
+
+    /**
+     * Derive domains from the same joined download rows on every supported
+     * database. Keeping extraction and grouping in PHP avoids relying on
+     * engine-specific string functions such as MySQL's INSTR().
+     *
+     * @param  Collection<int, string|null>  $emails
+     */
+    private function domainStatsForEmails(Collection $emails): array
+    {
+        $counts = [];
+        foreach ($emails as $email) {
+            $email = (string) $email;
+            $at = strpos($email, '@');
+            $domain = substr($email, ($at === false ? 0 : $at) + 1);
+            if (! array_key_exists($domain, $counts)) {
+                $counts[$domain] = 0;
+            }
+            $counts[$domain]++;
+        }
+
+        $rawStats = collect($counts)->map(
+            static fn (int $count, string $domain): object => (object) [
+                'domain' => $domain,
+                'count' => $count,
+            ],
+        );
+
+        return $this->processDomainStats($rawStats);
     }
 }

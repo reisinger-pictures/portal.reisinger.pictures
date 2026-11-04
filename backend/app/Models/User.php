@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Casts\AsBrand;
 use App\Services\AuthorizationService;
 use App\Services\PurchaseService;
+use App\Support\EmailNormalizer;
 use App\Support\FtpSlug;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -67,6 +68,16 @@ class User extends Authenticatable implements JWTSubject
         });
     }
 
+    public function setEmailAttribute(string $email): void
+    {
+        $this->attributes['email'] = EmailNormalizer::normalize($email);
+    }
+
+    public function scopeMatchingEmail(Builder $query, string $email): Builder
+    {
+        return $query->whereRaw('LOWER(email) = ?', [EmailNormalizer::normalize($email)]);
+    }
+
     /**
      * Retry an insert when the auto-generated `ftp_slug` lost a race against a
      * concurrent insert between the `exists()` check and the INSERT. Only
@@ -79,6 +90,22 @@ class User extends Authenticatable implements JWTSubject
 
         for ($attempt = 0; ; $attempt++) {
             try {
+                $mayGenerateFtpSlug = ! $this->exists
+                    && ($this->ftp_slug_auto_generated
+                        || (empty($this->ftp_slug) && ! empty($this->email)));
+
+                if ($mayGenerateFtpSlug) {
+                    $connection = $this->getConnection();
+
+                    if ($connection->getDriverName() === 'pgsql'
+                        && $connection->transactionLevel() > 0) {
+                        // PostgreSQL marks the current transaction failed after
+                        // a constraint violation. Isolate this retryable insert
+                        // behind a savepoint so the next slug lookup can run.
+                        return $connection->transaction(fn () => parent::save($options));
+                    }
+                }
+
                 return parent::save($options);
             } catch (UniqueConstraintViolationException $e) {
                 if ($attempt >= $maxAttempts
@@ -88,7 +115,10 @@ class User extends Authenticatable implements JWTSubject
                     throw $e;
                 }
 
-                $this->ftp_slug = static::nextAvailableFtpSlug((string) $this->email);
+                $this->ftp_slug = static::nextAvailableFtpSlug(
+                    (string) $this->email,
+                    (string) $this->ftp_slug,
+                );
             }
         }
     }
@@ -105,12 +135,12 @@ class User extends Authenticatable implements JWTSubject
      * references them yet. See App\Support\FtpSlug for the format and for the
      * decision to leave non-conforming legacy values untouched.
      */
-    protected static function nextAvailableFtpSlug(string $email): string
+    protected static function nextAvailableFtpSlug(string $email, ?string $previousSlug = null): string
     {
         $baseSlug = FtpSlug::toValidBase(explode('@', $email)[0]);
         $ftpSlug = $baseSlug;
         $counter = 1;
-        while (static::where('ftp_slug', $ftpSlug)->exists()) {
+        while ($ftpSlug === $previousSlug || static::where('ftp_slug', $ftpSlug)->exists()) {
             $ftpSlug = FtpSlug::withSuffix($baseSlug, (string) $counter);
             $counter++;
         }

@@ -15,6 +15,7 @@ use App\Services\AuthorizationService;
 use App\Services\FtpCredentialService;
 use App\Services\OrgDefaultRolePolicy;
 use App\Support\BrandRegistry;
+use App\Support\EmailNormalizer;
 use App\Support\FtpInboxDirectory;
 use App\Support\FtpSlug;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -50,7 +51,7 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $credentials['email'])->first();
+        $user = User::query()->matchingEmail($credentials['email'])->first();
         if ($user && $user->password && Hash::check($credentials['password'], $user->password)) {
             $authorization = app(AuthorizationService::class);
             if ($authorization->isReservedNullBrandActor($user)) {
@@ -84,6 +85,7 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255',
         ]);
+        $validated['email'] = EmailNormalizer::normalize($validated['email']);
 
         // Resolve the account before anything else. An existing address is not
         // touched at all: no insert, no org/invite handling, no activation
@@ -94,7 +96,7 @@ class AuthController extends Controller
         // naming the collision would restore the oracle this check closes — and
         // account recovery is the `reset-password` path, whose mail goes only to
         // the inbox of an address nobody can take over from here.
-        if (User::where('email', $validated['email'])->exists()) {
+        if (User::query()->matchingEmail($validated['email'])->exists()) {
             return response()->json(self::REGISTRATION_SUCCESS);
         }
 
@@ -127,7 +129,8 @@ class AuthController extends Controller
                     if ($org->auto_join_policy === AutoJoinPolicy::REQUIRES_INVITE) {
                         // No auto-join — user must be invited manually
                         // Still attach if there's a pending invite for this email
-                        $pendingInvite = OrgInvite::where('email', $validated['email'])
+                        $pendingInvite = OrgInvite::query()
+                            ->whereRaw('LOWER(email) = ?', [$validated['email']])
                             ->where('org_id', $org->id)
                             ->where('expires_at', '>', now())
                             ->first();
@@ -184,7 +187,11 @@ class AuthController extends Controller
             'password' => 'required|string|min:8',
         ]);
 
-        $record = DB::table('password_reset_tokens')->where('email', $request->email)->first();
+        $email = EmailNormalizer::normalize((string) $request->input('email'));
+
+        $record = DB::table('password_reset_tokens')
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->first();
 
         // Token expiry: password_reset_tokens.created_at is compared against the
         // configured broker lifetime (config('auth.passwords.users.expire')).
@@ -194,13 +201,13 @@ class AuthController extends Controller
 
         // The system admin reset is disabled, but it must not be distinguishable
         // from any other invalid/expired token (no account-enumeration oracle).
-        $isSystemAdmin = $request->email === config('admin.email');
+        $isSystemAdmin = $email === EmailNormalizer::normalize((string) config('admin.email'));
 
         if ($isSystemAdmin || $expired || ! $record || ! Hash::check($request->token, $record->token)) {
             return response()->json(['error' => 'Der Setup-Link ist ungültig oder abgelaufen.'], 400);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::query()->matchingEmail($email)->first();
         if (! $user) {
             return response()->json(['error' => 'Der Link ist ungültig oder abgelaufen.'], 400);
         }
@@ -225,7 +232,7 @@ class AuthController extends Controller
         $user->password = Hash::make($request->password);
         $user->save();
 
-        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+        DB::table('password_reset_tokens')->whereRaw('LOWER(email) = ?', [$email])->delete();
 
         // Deferred auto-join: after successful password reset (proves email ownership),
         // re-lookup org by domain and apply immediate auto-join if configured.

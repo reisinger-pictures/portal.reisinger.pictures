@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\AsBrand;
 use App\Enums\Brand;
+use App\Support\EmailNormalizer;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -40,6 +41,11 @@ class ModelRegistrationInvite extends Model
         'used_at' => 'datetime',
         'created_at' => 'datetime',
     ];
+
+    public function setEmailAttribute(?string $email): void
+    {
+        $this->attributes['email'] = $email === null ? null : EmailNormalizer::normalize($email);
+    }
 
     public function inviter(): BelongsTo
     {

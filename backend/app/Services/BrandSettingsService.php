@@ -113,8 +113,8 @@ class BrandSettingsService
                 ->where('key', 'like', self::KEY_PREFIX.'%')
                 ->get(['key', 'value']);
         } catch (QueryException $exception) {
-            // Tolerate a missing table (fresh :memory: test DBs without
-            // RefreshDatabase, pre-migration states): no overrides then. The
+            // Tolerate a missing table (fresh test DBs without RefreshDatabase,
+            // pre-migration states): no overrides then. The
             // existence is checked only here and not before the read: the
             // check costs a query, and this read runs on every pricing
             // resolution — a hot path where the table always exists.
