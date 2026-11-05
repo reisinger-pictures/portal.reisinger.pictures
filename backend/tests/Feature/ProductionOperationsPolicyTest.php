@@ -418,10 +418,10 @@ class ProductionOperationsPolicyTest extends TestCase
 
         foreach ([
             'APP_ENV=${APP_ENV:-production}',
-            // PostgreSQL is the production primary now. The engine stays an
-            // environment override so the documented rollback path (flip
-            // DB_CONNECTION/DB_HOST back to the still-running MariaDB service)
-            // keeps working without editing the compose file.
+            // PostgreSQL is the production target; MariaDB stays live until
+            // the verified host cutover. The engine remains an environment
+            // override so rollback can select the still-running MariaDB service
+            // without editing the Compose file.
             'DB_CONNECTION=${DB_CONNECTION:-pgsql}',
             'DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-${DB_CONNECTION:-pgsql}}',
             'DB_QUEUE_RETRY_AFTER=${DB_QUEUE_RETRY_AFTER:-90}',

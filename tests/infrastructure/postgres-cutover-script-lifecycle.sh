@@ -288,6 +288,26 @@ flock -u "$held_lock_fd"
 exec {held_lock_fd}>&-
 assert_lock_released
 
+prepare_case db-url-preflight
+cat >> "$PORTAL_STACK_DIR/.env" <<'ENV'
+DB_URL=mysql://mariadb.invalid/portal
+ENV
+set +e
+"$CUTOVER_SCRIPT" > "$temporary_root/db-url-preflight.log" 2>&1
+db_url_status=$?
+set -e
+[[ "$db_url_status" -ne 0 ]] || fail 'a non-empty DB_URL was accepted for cutover'
+grep -Fq 'A non-empty DB_URL is set in the host .env and would override the DB_* coordinates' "$temporary_root/db-url-preflight.log" \
+    || { cat "$temporary_root/db-url-preflight.log" >&2; fail 'the DB_URL preflight did not name the overriding connection setting'; }
+grep -Fxq 'DB_URL=mysql://mariadb.invalid/portal' "$PORTAL_STACK_DIR/.env" \
+    || fail 'the DB_URL preflight changed the host .env'
+[[ ! -e "$PORTAL_STATE_DIR/in-progress" ]] || fail 'the DB_URL preflight wrote an in-progress marker'
+[[ ! -e "$PORTAL_BACKUP_DIR" ]] || fail 'the DB_URL preflight began backup work before refusing'
+if grep -Fq 'stop backend' "$FAKE_DOCKER_LOG"; then
+    fail 'the DB_URL preflight stopped the live backend before refusing'
+fi
+assert_lock_released
+
 prepare_case explicit-rollback
 "$CUTOVER_SCRIPT" > "$temporary_root/success.log" 2>&1 || {
     cat "$temporary_root/success.log" >&2
