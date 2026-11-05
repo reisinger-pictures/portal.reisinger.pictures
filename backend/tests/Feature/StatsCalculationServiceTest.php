@@ -648,6 +648,25 @@ class StatsCalculationServiceTest extends TestCase
         $this->assertSame($singleBatch['domain_stats'], $manyBatches['domain_stats']);
     }
 
+    public function test_domain_stats_preserve_legacy_email_without_at_sign(): void
+    {
+        $gallery = Gallery::factory()->create();
+        $user = User::factory()->create(['email' => 'legacy-address-without-at-sign']);
+
+        DownloadLog::create([
+            'gallery_id' => $gallery->id,
+            'user_id' => $user->id,
+            'item_type' => 'single_image',
+            'resolution_tier' => 'web',
+        ]);
+
+        $result = $this->service->getAdminStats();
+
+        $this->assertSame([
+            ['domain' => 'legacy-address-without-at-sign', 'count' => 1],
+        ], $result['domain_stats']);
+    }
+
     public function test_domain_stats_are_aggregated_in_bounded_batches(): void
     {
         $gallery = Gallery::factory()->create();
