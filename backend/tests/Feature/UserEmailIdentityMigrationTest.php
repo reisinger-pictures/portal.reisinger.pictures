@@ -38,7 +38,13 @@ class UserEmailIdentityMigrationTest extends TestCase
             $this->migration()->up();
             $this->fail('V053 accepted emails that collide after case folding.');
         } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('duplicate@example.com', $exception->getMessage());
+            $message = $exception->getMessage();
+
+            $this->assertStringContainsString('1 case-insensitive duplicate group(s)', $message);
+            $this->assertStringContainsString('2 user row(s)', $message);
+            $this->assertStringContainsString('Addresses were not logged', $message);
+            $this->assertStringNotContainsString('duplicate@example.com', strtolower($message));
+            $this->assertStringNotContainsString('Duplicate@Example.COM', $message);
         }
 
         $this->assertDatabaseHas('users', [

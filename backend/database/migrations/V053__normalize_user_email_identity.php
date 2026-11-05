@@ -11,20 +11,20 @@ return new class extends Migration
     public function up(): void
     {
         $duplicates = DB::table('users')
-            ->selectRaw('LOWER(email) AS normalized_email, COUNT(*) AS email_count')
+            ->selectRaw('COUNT(*) AS email_count')
             ->groupByRaw('LOWER(email)')
             ->havingRaw('COUNT(*) > 1')
             ->get();
 
         if ($duplicates->isNotEmpty()) {
-            $addresses = $duplicates
-                ->pluck('normalized_email')
-                ->map(static fn (mixed $email): string => (string) $email)
-                ->implode(', ');
+            $duplicateGroups = $duplicates->count();
+            $duplicateRows = (int) $duplicates->sum('email_count');
 
-            throw new RuntimeException(
-                'V053 cannot normalize users.email because case-insensitive duplicates exist: '.$addresses
-            );
+            throw new RuntimeException(sprintf(
+                'V053 cannot normalize users.email: %d case-insensitive duplicate group(s) covering %d user row(s) exist. Addresses were not logged. Resolve the duplicate accounts (keep one canonical address per case-folded value) and rerun the migration; no address was rewritten.',
+                $duplicateGroups,
+                $duplicateRows
+            ));
         }
 
         DB::table('users')->update(['email' => DB::raw('LOWER(email)')]);

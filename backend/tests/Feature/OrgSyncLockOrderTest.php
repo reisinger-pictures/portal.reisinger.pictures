@@ -30,15 +30,18 @@ use Tests\TestCase;
  *
  * The lock set is assembled from an unlocked read of the member set. That set
  * is stable against other *syncs* of the same org (they would have to take
- * the same org row), but not against a member that a non-sync writer adds
- * after that read — such a member is not in the lock set and is therefore not
- * detached by that sync. The trade-off and its bound are recorded in
- * `features/security/2026-10-18-review-closure.md`; none of
- * `OrgInviteController::redeem()`, `UserController::store()` or
- * `AuthController::register()`/`resetPassword()` takes the org row lock, so
- * they change a membership without it. `OrgController::destroy()` is not one
- * of them: since it locks the org row first (D-40 follow-up), it takes the
- * same org row lock as this sync and changes a membership under it.
+ * the same org row), but not against a member that a writer without the
+ * destination org lock adds after that read — such a member is not in the lock
+ * set and is therefore not detached by that sync. The trade-off and its bound
+ * are recorded in `features/security/2026-10-18-review-closure.md`;
+ * `UserController::store()` (org-admin user creation) and
+ * `AuthController::register()` change a membership without taking the org row
+ * lock. `OrgInviteController::redeem()` and the deferred
+ * `AuthController::resetPassword()` auto-join are not in that group: both take
+ * the destination org row lock before the user row, the same org → user order
+ * as this sync, so they serialise with it. `OrgController::destroy()` also is
+ * not one of them: since it locks the org row first (D-40 follow-up), it takes
+ * the same org row lock as this sync and changes a membership under it.
  *
  * The deadlock itself needs two independent database connections; see
  * `tests/scripts/org-sync-deadlock-postgres-probe.sh` (manual, requires

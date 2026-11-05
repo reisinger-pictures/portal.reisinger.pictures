@@ -2,7 +2,7 @@
 # Measure the D-40 org-sync lock order against a disposable PostgreSQL server.
 # The paired syncs must contend (positive control) but must never deadlock.
 # Usage: DOCKER_BIN=... ./tests/scripts/org-sync-deadlock-postgres-probe.sh
-# Overrides: POSTGRES_IMAGE (postgres:15), SCENARIOS (12),
+# Overrides: POSTGRES_IMAGE (postgres:16), SCENARIOS (12),
 # MIN_LOCK_WAIT_SAMPLES (1), SECOND_ACTION (sync|destroy), DOCKER_BIN.
 set -Eeuo pipefail
 
@@ -16,7 +16,7 @@ PATH="$(dirname "$DOCKER"):$PATH"
 export PATH
 "$REPO_DIR/scripts/check-php-version.sh"
 
-POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:15}"
+POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:16}"
 SCENARIOS="${SCENARIOS:-12}"
 MIN_LOCK_WAIT_SAMPLES="${MIN_LOCK_WAIT_SAMPLES:-1}"
 SECOND_ACTION="${SECOND_ACTION:-sync}"
