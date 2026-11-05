@@ -464,6 +464,8 @@ assert_lock_released
 }
 grep -Fq 'the host .env still selects MariaDB' "$temporary_root/pre-switch-rollback.log" \
     || fail 'the pre-switch rollback did not name the MariaDB selection boundary'
+grep -Fq 'No .env backup was recorded; MariaDB connection keys will be normalized to the rollback target.' "$temporary_root/pre-switch-rollback.log" \
+    || fail 'the pre-switch rollback did not disclose that it normalizes MariaDB connection keys'
 assert_mariadb_env
 [[ ! -e "$PORTAL_STATE_DIR/in-progress" ]] || fail 'pre-switch rollback left the in-progress marker behind'
 assert_lock_released
