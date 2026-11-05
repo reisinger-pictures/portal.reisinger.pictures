@@ -213,12 +213,14 @@ assert_lock_released() {
 assert_preflight_refuses_before_downtime() {
     local log_file="$1"
     local expected_message="$2"
+    local scenario="$3"
     local status
+    printf 'Checking preflight refusal scenario: %s\n' "$scenario"
     set +e
     "$CUTOVER_SCRIPT" > "$log_file" 2>&1
     status=$?
     set -e
-    [[ "$status" -ne 0 ]] || fail 'an invalid cutover preflight unexpectedly succeeded'
+    [[ "$status" -ne 0 ]] || fail "invalid cutover preflight unexpectedly succeeded for scenario '$scenario'"
     grep -Fq "$expected_message" "$log_file" \
         || { cat "$log_file" >&2; fail "preflight refusal did not name: $expected_message"; }
     [[ ! -e "$PORTAL_STATE_DIR/in-progress" ]] || fail 'a refused preflight wrote an in-progress marker'
@@ -375,7 +377,8 @@ export FAKE_TARGET_FREE_KIB=0
 export FAKE_PG_CONTAINER_EXISTS=false
 assert_preflight_refuses_before_downtime \
     "$temporary_root/postgres-low-space.log" \
-    'The PostgreSQL target filesystem has less than 3x the current MariaDB data size free.'
+    'The PostgreSQL target filesystem has less than 3x the current MariaDB data size free.' \
+    'low target space with DockerRootDir/volumes present'
 grep -Fxq "$FAKE_DOCKER_ROOT_DIR/volumes" "$FAKE_DF_LOG" \
     || fail 'a not-yet-created PostgreSQL volume did not check the Docker volumes filesystem'
 
@@ -384,7 +387,8 @@ export FAKE_TARGET_FREE_KIB=0
 export FAKE_PG_CONTAINER_EXISTS=false
 assert_preflight_refuses_before_downtime \
     "$temporary_root/postgres-low-space-docker-root-only.log" \
-    'The PostgreSQL target filesystem has less than 3x the current MariaDB data size free.'
+    'The PostgreSQL target filesystem has less than 3x the current MariaDB data size free.' \
+    'low target space with DockerRootDir/volumes absent'
 grep -Fxq "$FAKE_DOCKER_ROOT_DIR" "$FAKE_DF_LOG" \
     || fail 'an absent Docker volumes directory did not fall back to DockerRootDir'
 if grep -Fxq "$FAKE_DOCKER_ROOT_DIR/volumes" "$FAKE_DF_LOG"; then
@@ -396,14 +400,16 @@ for invalid_volume_mode in external driver-options; do
     export FAKE_COMPOSE_VOLUME_MODE="$invalid_volume_mode"
     assert_preflight_refuses_before_downtime \
         "$temporary_root/postgres-invalid-$invalid_volume_mode-volume.log" \
-        'Compose database services do not match the MariaDB/PostgreSQL cutover topology.'
+        'Compose database services do not match the MariaDB/PostgreSQL cutover topology.' \
+        "unsupported target volume: $invalid_volume_mode"
 done
 
 prepare_case postgres-wrong-volume-mount
 export FAKE_PG_MOUNTED_VOLUME_NAME='unrelated_pg_data'
 assert_preflight_refuses_before_downtime \
     "$temporary_root/postgres-wrong-volume-mount.log" \
-    'The existing PostgreSQL container does not mount the Compose target volume.'
+    'The existing PostgreSQL container does not mount the Compose target volume.' \
+    'existing container with mismatched target volume'
 
 prepare_case explicit-rollback
 "$CUTOVER_SCRIPT" > "$temporary_root/success.log" 2>&1 || {
