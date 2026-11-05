@@ -137,7 +137,10 @@ class FtpController extends Controller
 
     public function setTarget(Request $request)
     {
-        $request->validate(['gallery_id' => 'nullable|string|exists:galleries,id']);
+        // `galleries.id` is a UUID column: a value that is not a UUID can never
+        // match, and `exists` would send it to PostgreSQL and fail with
+        // SQLSTATE 22P02 instead of returning the validation error.
+        $request->validate(['gallery_id' => 'nullable|string|uuid|exists:galleries,id']);
         $user = auth('api')->user();
         $svc = app(AuthorizationService::class);
 

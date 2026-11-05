@@ -903,6 +903,35 @@ class StripeWebhookTest extends TestCase
         $response->assertJson(['status' => 'success']);
     }
 
+    /**
+     * A malformed metadata order id is an unknown order, not a database error.
+     *
+     * `orders.id` is a UUID column; the failure branch must reach the same
+     * "unknown order" no-op as the success branch instead of querying it and
+     * answering 500.
+     */
+    public function test_payment_intent_failed_for_malformed_order_id_still_returns_success(): void
+    {
+        $secret = 'whsec_bad_order_failure';
+        Config::set('services.stripe.webhook_secret', $secret);
+
+        $payload = [
+            'id' => 'evt_bad_order_failure',
+            'type' => 'payment_intent.payment_failed',
+            'data' => ['object' => [
+                'id' => 'pi_bad_order_failure',
+                'status' => 'requires_payment_method',
+                'metadata' => ['order_id' => 'non-existent-order-id'],
+                'last_payment_error' => ['type' => 'card_error', 'code' => 'card_declined'],
+            ]],
+        ];
+        [, $signature] = $this->signPayload($secret, $payload);
+
+        $this->postJson('/api/webhooks/stripe', $payload, ['Stripe-Signature' => $signature])
+            ->assertOk()
+            ->assertJson(['status' => 'success']);
+    }
+
     public function test_success_event_claim_is_released_when_the_paid_transition_fails(): void
     {
         $user = User::factory()->create();
