@@ -44,7 +44,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /var/www/html
 COPY backend-supervisor.sh /usr/local/bin/portal-backend-supervisor
 COPY validate-production-env.sh /usr/local/bin/validate-production-env
+COPY wait-for-selected-database.sh /usr/local/bin/portal-wait-for-selected-database
 RUN chmod 0755 /usr/local/bin/portal-backend-supervisor /usr/local/bin/validate-production-env \
+        /usr/local/bin/portal-wait-for-selected-database \
     && mkdir -p /var/www/photos /var/www/ftp \
     && chown -R www-data:www-data /var/www/html /var/www/photos /var/www/ftp
 

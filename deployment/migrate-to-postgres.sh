@@ -4,8 +4,8 @@ set -euo pipefail
 readonly STACK_DIR="${PORTAL_STACK_DIR:-/opt/stacks/portal-reisinger-pictures}"
 readonly COMPOSE_FILE="$STACK_DIR/compose.yaml"
 readonly ENV_FILE="$STACK_DIR/.env"
-readonly BACKUP_DIR="/var/backups/portal"
-readonly STATE_DIR="/var/lib/portal-postgres-cutover"
+readonly BACKUP_DIR="${PORTAL_BACKUP_DIR:-/var/backups/portal}"
+readonly STATE_DIR="${PORTAL_STATE_DIR:-/var/lib/portal-postgres-cutover}"
 readonly MARKER_FILE="$STATE_DIR/in-progress"
 readonly LAST_ENV_BACKUP_FILE="$STATE_DIR/last-env-backup"
 readonly SOURCE_CONTAINER="portal_db"
@@ -23,7 +23,10 @@ Usage: deployment/migrate-to-postgres.sh [--dry-run | --rollback | --help]
 
 Runs on the AlmaLinux production host as root. The stack must be at
 /opt/stacks/portal-reisinger-pictures (or PORTAL_STACK_DIR for a controlled
-test environment). The migration phases are:
+test environment). PORTAL_BACKUP_DIR and PORTAL_STATE_DIR may also be set for
+isolated tests only when PORTAL_STACK_DIR points at that controlled stack; the
+production defaults remain /var/backups/portal and /var/lib/portal-postgres-cutover.
+The migration phases are:
 
   PREFLIGHT  Check the stack, containers, images, free disk, source env, and
              that no unfinished cutover marker exists.
@@ -176,6 +179,13 @@ require_root() {
     [[ "$EUID" -eq 0 ]] || fail 'Run this command as root on the production host.'
 }
 
+validate_test_directory_overrides() {
+    if [[ -n "${PORTAL_BACKUP_DIR:-}" || -n "${PORTAL_STATE_DIR:-}" ]]; then
+        [[ -n "${PORTAL_STACK_DIR:-}" && "$STACK_DIR" != '/opt/stacks/portal-reisinger-pictures' ]] \
+            || fail 'PORTAL_BACKUP_DIR and PORTAL_STATE_DIR are test-only and require PORTAL_STACK_DIR to point at a controlled test stack.'
+    fi
+}
+
 atomic_write_marker() {
     local env_backup="$1"
     local temporary="$MARKER_FILE.tmp"
@@ -300,6 +310,7 @@ patch_host_env_for_mariadb() {
 
 run_rollback() {
     require_root
+    validate_test_directory_overrides
     banner ROLLBACK
     [[ -d "$STACK_DIR" && -f "$COMPOSE_FILE" && -f "$ENV_FILE" ]] \
         || fail 'The host stack directory, compose.yaml, or .env is missing.'
@@ -332,6 +343,7 @@ run_rollback() {
 
 run_cutover() {
     require_root
+    validate_test_directory_overrides
     banner PREFLIGHT
 
     [[ -d "$STACK_DIR" ]] || fail "Stack directory '$STACK_DIR' is missing."
@@ -426,7 +438,7 @@ raise SystemExit(0 if valid else 1)
     [[ -n "$image_data_path" && -d "$image_data_path" ]] || fail 'Could not locate the MariaDB data volume on the host.'
     data_bytes="$(du -sb "$image_data_path" | awk '{print $1}')"
     free_kib="$(df -Pk "$image_data_path" | awk 'END {print $4}')"
-    backup_probe=/var/backups
+    backup_probe="$BACKUP_DIR"
     while [[ ! -e "$backup_probe" ]]; do
         backup_probe="$(dirname "$backup_probe")"
     done

@@ -125,13 +125,9 @@ services:
     container_name: portal_backend
     restart: unless-stopped
     depends_on:
-      # Both engines stay healthy during the cutover window: the backend only
-      # needs the one DB_CONNECTION/DB_HOST selects, but a rollback must be able
-      # to start without the other service having to be brought up first.
-      db:
-        condition: service_healthy
-      db_pg:
-        condition: service_healthy
+      # Database readiness is checked against only DB_CONNECTION by the
+      # container entrypoint. Depending on both engines here would let an
+      # unhealthy, unselected engine block startup and the rollback path.
       search:
         condition: service_healthy
       composer_init:
@@ -364,6 +360,8 @@ services:
       [ -x /usr/local/bin/validate-production-env ] && [ -x /usr/local/bin/portal-backend-supervisor ] || { echo 'FATAL: Production preflight/supervisor is missing. Rebuild portal-base:8.5, push GHCR, update the pinned compose tag, then redeploy. No migration or seed was run.'; exit 1; };
       printenv FTP_EVENT_SECRET | grep -q . || { echo 'FATAL: FTP_EVENT_SECRET ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
       /usr/local/bin/validate-production-env || exit 1;
+      php artisan config:clear || exit 1;
+      /usr/local/bin/portal-wait-for-selected-database || exit 1;
       php artisan cache:clear || exit 1;
       php artisan optimize || exit 1;
       php artisan ops:validate-production || exit 1;
