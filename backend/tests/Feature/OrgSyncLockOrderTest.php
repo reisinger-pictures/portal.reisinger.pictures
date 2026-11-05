@@ -41,7 +41,7 @@ use Tests\TestCase;
  * same org row lock as this sync and changes a membership under it.
  *
  * The deadlock itself needs two independent database connections; see
- * `tests/scripts/org-sync-deadlock-postgres-probe.sh` (CI-only, it needs
+ * `tests/scripts/org-sync-deadlock-postgres-probe.sh` (manual, requires
  * Docker). This test pins the contract that makes the cycle impossible: one
  * ascending lock statement over the users table, with the actor inside it.
  *
