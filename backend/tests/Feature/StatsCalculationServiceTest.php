@@ -10,7 +10,9 @@ use App\Models\Org;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\StatsCalculationService;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class StatsCalculationServiceTest extends TestCase
@@ -611,6 +613,111 @@ class StatsCalculationServiceTest extends TestCase
             ['SECOND', 'FIRST'],
             $result['top_galleries']->pluck('name')->all(),
         );
+    }
+
+    public function test_domain_stats_are_identical_across_batch_sizes(): void
+    {
+        $gallery = Gallery::factory()->create();
+        $alpha = User::factory()->create(['email' => 'alpha@example.com']);
+        $beta = User::factory()->create(['email' => 'beta@example.com']);
+        $gamma = User::factory()->create(['email' => 'gamma@other.test']);
+        $invited = User::factory()->create(['email' => 'guest@invite.local']);
+
+        foreach ([[$alpha, 3], [$beta, 1], [$gamma, 2], [$invited, 1]] as [$downloader, $downloads]) {
+            for ($i = 0; $i < $downloads; $i++) {
+                DownloadLog::create([
+                    'gallery_id' => $gallery->id,
+                    'user_id' => $downloader->id,
+                    'item_type' => 'single_image',
+                    'resolution_tier' => 'web',
+                ]);
+            }
+        }
+
+        $expected = [
+            ['domain' => 'example.com', 'count' => 4],
+            ['domain' => 'other.test', 'count' => 2],
+            ['domain' => 'Benannte Invite Links', 'count' => 1],
+        ];
+
+        $singleBatch = $this->service->getAdminStats();
+        $manyBatches = (new StatsCalculationService(2))->getAdminStats();
+
+        $this->assertSame($expected, $singleBatch['domain_stats']);
+        $this->assertSame($expected, $manyBatches['domain_stats']);
+        $this->assertSame($singleBatch['domain_stats'], $manyBatches['domain_stats']);
+    }
+
+    public function test_domain_stats_are_aggregated_in_bounded_batches(): void
+    {
+        $gallery = Gallery::factory()->create();
+        $downloader = User::factory()->create(['email' => 'batch@example.com']);
+
+        for ($i = 0; $i < 7; $i++) {
+            DownloadLog::create([
+                'gallery_id' => $gallery->id,
+                'user_id' => $downloader->id,
+                'item_type' => 'single_image',
+                'resolution_tier' => 'web',
+            ]);
+        }
+
+        $batchSize = 2;
+        $batchQueries = [];
+
+        DB::listen(function (QueryExecuted $query) use (&$batchQueries): void {
+            if (str_contains($query->sql, 'download_logs') && str_contains($query->sql, 'email')) {
+                $batchQueries[] = $query->sql;
+            }
+        });
+
+        try {
+            $result = (new StatsCalculationService($batchSize))->getAdminStats();
+        } finally {
+            DB::getEventDispatcher()->forget(QueryExecuted::class);
+        }
+
+        $this->assertSame(
+            [['domain' => 'example.com', 'count' => 7]],
+            $result['domain_stats'],
+        );
+
+        // Seven rows need four queries of at most two rows each; a regression to
+        // a single materializing query would fail the count and the limit check.
+        $this->assertGreaterThanOrEqual(4, count($batchQueries));
+        foreach ($batchQueries as $sql) {
+            $this->assertStringEndsWith('limit '.$batchSize, strtolower(trim($sql)));
+        }
+    }
+
+    public function test_user_stats_domain_counts_survive_batching_and_gallery_scope(): void
+    {
+        $user = User::factory()->create();
+        $gallery = Gallery::factory()->create();
+        $foreignGallery = Gallery::factory()->create();
+        $user->galleries()->attach($gallery->id);
+
+        $alpha = User::factory()->create(['email' => 'alpha@example.com']);
+        $beta = User::factory()->create(['email' => 'beta@other.test']);
+        $foreign = User::factory()->create(['email' => 'foreign@excluded.test']);
+
+        foreach ([[$gallery, $alpha, 2], [$gallery, $beta, 1], [$foreignGallery, $foreign, 4]] as [$target, $downloader, $downloads]) {
+            for ($i = 0; $i < $downloads; $i++) {
+                DownloadLog::create([
+                    'gallery_id' => $target->id,
+                    'user_id' => $downloader->id,
+                    'item_type' => 'single_image',
+                    'resolution_tier' => 'web',
+                ]);
+            }
+        }
+
+        $result = (new StatsCalculationService(1))->getUserStats($user);
+
+        $this->assertSame([
+            ['domain' => 'example.com', 'count' => 2],
+            ['domain' => 'other.test', 'count' => 1],
+        ], $result['domain_stats']);
     }
 
     private function createTestDownloadLogs(): void

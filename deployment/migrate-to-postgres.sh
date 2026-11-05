@@ -7,6 +7,7 @@ readonly ENV_FILE="$STACK_DIR/.env"
 readonly BACKUP_DIR="${PORTAL_BACKUP_DIR:-/var/backups/portal}"
 readonly STATE_DIR="${PORTAL_STATE_DIR:-/var/lib/portal-postgres-cutover}"
 readonly MARKER_FILE="$STATE_DIR/in-progress"
+readonly SWITCH_MARKER_FILE="$STATE_DIR/switch-attempted"
 readonly LAST_ENV_BACKUP_FILE="$STATE_DIR/last-env-backup"
 readonly LOCK_FILE="$STATE_DIR/cutover.lock"
 readonly SOURCE_CONTAINER="portal_db"
@@ -19,6 +20,15 @@ ROLLBACK=false
 ACCEPT_POSTGRES_WRITE_LOSS=false
 LOCK_FD=''
 CURRENT_PHASE="PREFLIGHT"
+
+# Laravel resolves its cached configuration through Application::getCachedConfigPath(),
+# which honours APP_CONFIG_CACHE (verified in Laravel 13.30's
+# normalizeCachePath()). Every one-off Artisan process therefore points at a
+# per-run path that cannot exist, so a bootstrap/cache/config.php written before
+# the switch cannot make it use MariaDB while the explicit DB_* variables select
+# PostgreSQL. The live backend's shared cache is never deleted or altered.
+CONFIG_CACHE_OVERRIDE="/tmp/portal-cutover-config-$$-${RANDOM}.php"
+readonly CONFIG_CACHE_OVERRIDE
 
 usage() {
     cat <<'USAGE'
@@ -36,7 +46,8 @@ the lock is held; the lock is released when the process exits.
 The migration phases are:
 
   PREFLIGHT  Check the stack, containers, images, free disk, source env, and
-             that no unfinished cutover marker exists.
+             that neither an unfinished cutover nor a prior switch marker
+             exists.
   BACKUP     Stop the backend to establish a write freeze, then create and
              verify a private MariaDB dump and exact per-table row manifest.
   PG         Start only db_pg (portal_db_pg) and wait for PostgreSQL readiness.
@@ -48,22 +59,28 @@ The migration phases are:
 
   --dry-run  Print the complete plan without requiring the stack or changing
              anything. Safe to run on a development machine.
-  --rollback Restore the saved host .env, select the legacy MariaDB coordinates,
-             and recreate the backend. MariaDB is not restored.
+  --rollback Restore the saved host .env from an active state marker, select
+              the legacy MariaDB coordinates, and recreate the backend. MariaDB
+              is not restored; stale backup pointers are never used.
   --accept-postgres-write-loss
-             Required with --rollback once the host .env selects PostgreSQL.
-             MariaDB is the pre-cutover snapshot and is not updated from
-             PostgreSQL, so PostgreSQL-only writes will not appear in the
-             active MariaDB database after rollback. The PostgreSQL volume is
-             retained for manual reconciliation. While the host .env still
-             selects MariaDB (the switch never happened), --rollback needs no
-             acknowledgement. An automatic rollback on a failed switch health
-             check remains automatic and logs the same boundary.
+             Required with --rollback once a PostgreSQL switch has been
+             attempted, even if the host .env has since been edited back to
+             MariaDB. The root-only switch marker
+             /var/lib/portal-postgres-cutover/switch-attempted records the
+             attempt and the MariaDB .env backup path, and survives a
+             successful cutover. MariaDB is the pre-cutover snapshot and is
+             not updated from PostgreSQL, so PostgreSQL-only writes will not
+             appear in the active MariaDB database after rollback. The
+             PostgreSQL volume is retained for manual reconciliation. A
+             rollback before any switch attempt (no switch marker) needs no
+             acknowledgement. An automatic rollback on a failed switch
+             remains automatic and logs the same boundary.
   --help     Show this help.
 
 The backup is stored under /var/backups/portal with mode 0600. The in-progress
 marker is deliberately left behind after a failure; use --rollback before
-starting a new attempt.
+starting a new attempt. The switch marker is removed only by a successful
+manual or automatic rollback.
 USAGE
 }
 
@@ -81,10 +98,10 @@ PREFLIGHT:
   docker compose -f '$COMPOSE_FILE' config --format json | python3 <read backend image>
   docker image inspect <configured backend image>
   docker compose -f '$COMPOSE_FILE' run --rm --no-deps backend php -r <require pdo_mysql and pdo_pgsql>
-  docker compose -f '$COMPOSE_FILE' run --rm --no-deps backend php artisan list --raw | grep '^portal:db-copy([[:space:]]|$)'
-  test ! -e '$MARKER_FILE'
+  docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan list --raw | grep '^portal:db-copy([[:space:]]|$)'
+  test ! -e '$MARKER_FILE' && test ! -e '$SWITCH_MARKER_FILE'
   python3 <read DB_CONNECTION and optional DB_HOST/DB_PORT privately; use historical Compose defaults when host/port are absent>
-  docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e DB_CONNECTION=mariadb -e DB_HOST=<source> -e DB_PORT=<source> backend php artisan migrate:status --database=mariadb --no-ansi; require no Pending migrations
+  docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e DB_CONNECTION=mariadb -e DB_HOST=<source> -e DB_PORT=<source> -e DB_URL= -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan migrate:status --database=mariadb --no-ansi; require no Pending migrations
   docker inspect -f <MariaDB /var/lib/mysql host mount> '$SOURCE_CONTAINER'
   du -sb <MariaDB data path>; df -Pk <data path and backup filesystem>; require 3x free
   install -d -o root -g root -m 0700 '$STATE_DIR' '$BACKUP_DIR'
@@ -99,23 +116,26 @@ PG:
   docker compose -f '$COMPOSE_FILE' up -d '$TARGET_SERVICE'
   repeat docker exec '$TARGET_CONTAINER' pg_isready -h 127.0.0.1 -p 5432 until ready (timeout 120s)
 MIGRATE:
-  docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e DB_CONNECTION=pgsql -e DB_HOST=db_pg -e DB_PORT=5432 -e DB_URL= backend php artisan migrate --force
+  docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e DB_CONNECTION=pgsql -e DB_HOST=db_pg -e DB_PORT=5432 -e DB_URL= -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan migrate --force
 COPY:
-  docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e DB_CONNECTION=pgsql -e DB_HOST=db_pg -e DB_PORT=5432 -e DB_URL= backend php artisan portal:db-copy --source=mariadb --target=pgsql --source-host=<DB_HOST from .env> --source-port=<DB_PORT from .env> --target-host=db_pg --target-port=5432
+  docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e DB_CONNECTION=pgsql -e DB_HOST=db_pg -e DB_PORT=5432 -e DB_URL= -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan portal:db-copy --source=mariadb --target=pgsql --source-host=<DB_HOST from .env> --source-port=<DB_PORT from .env> --target-host=db_pg --target-port=5432
 VERIFY:
   run portal:db-copy --verify-only against PG
   run php artisan migrate:status --database=pgsql against PG
   run Tinker SELECT 1 and COUNT queries for users, orders, and settings against PG
+  every Artisan command carries the absent APP_CONFIG_CACHE override; every database command also carries DB_URL=
 SWITCH:
-  cp -p '$ENV_FILE' '$ENV_FILE.<UTC>.bak'; atomically set DB_CONNECTION=pgsql, DB_HOST=db_pg, DB_PORT=5432, and queue/cache connection keys to pgsql
+  cp -p '$ENV_FILE' '$ENV_FILE.<UTC>.bak'; write the root-only switch marker '$SWITCH_MARKER_FILE' with that backup path
+  atomically set DB_CONNECTION=pgsql, DB_HOST=db_pg, DB_PORT=5432, and queue/cache connection keys to pgsql
   docker compose -f '$COMPOSE_FILE' up -d --force-recreate '$BACKEND_SERVICE'; wait for healthy
-  if recreation or healthcheck fails: automatic rollback, restore the saved .env and recreate the backend against MariaDB; log that PostgreSQL-only writes remain on the PG volume and are not copied back
+  if recreation or healthcheck fails: automatic rollback, restore the saved .env and recreate the backend against MariaDB; log that PostgreSQL-only writes remain on the PG volume and are not copied back; remove the switch marker
 ROLLBACK:
   acquire the same exclusive host lock '$LOCK_FILE' with flock; fail closed while another run holds it
-  if the host .env selects pgsql: require --accept-postgres-write-loss (MariaDB is the pre-cutover snapshot; PostgreSQL writes are not copied back and remain on the PostgreSQL volume)
-  if the host .env still selects mariadb: no acknowledgement is required
-  restore saved .env; set DB_CONNECTION=mariadb, DB_HOST=db, DB_PORT=3306, and queue/cache connection keys to mariadb
-  docker compose -f '$COMPOSE_FILE' up -d --force-recreate '$BACKEND_SERVICE'; wait for healthy; do not alter MariaDB
+  if the switch marker exists: require --accept-postgres-write-loss even when the host .env now selects mariadb (MariaDB is the pre-cutover snapshot; PostgreSQL writes are not copied back and remain on the PostgreSQL volume)
+  else if the host .env selects pgsql: require --accept-postgres-write-loss
+  else: no acknowledgement is required
+  restore the .env backup named by the switch marker, in-progress marker, or last-env-backup; set DB_CONNECTION=mariadb, DB_HOST=db, DB_PORT=3306, and queue/cache connection keys to mariadb
+  docker compose -f '$COMPOSE_FILE' up -d --force-recreate '$BACKEND_SERVICE'; wait for healthy; do not alter MariaDB; remove the switch marker
 PLAN
 }
 
@@ -126,7 +146,7 @@ fail() {
 
 on_error() {
     local status=$?
-    printf 'FATAL: stopped during %s (exit %s). The in-progress marker, if created, was preserved.\n' \
+    printf 'FATAL: stopped during %s (exit %s). The in-progress and switch markers, if created, were preserved.\n' \
         "$CURRENT_PHASE" "$status" >&2
     exit "$status"
 }
@@ -195,6 +215,23 @@ compose() {
     docker compose --project-directory "$STACK_DIR" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 
+run_backend_artisan() {
+    compose run --rm --no-deps \
+        -e APP_CONFIG_CACHE="$CONFIG_CACHE_OVERRIDE" \
+        "$BACKEND_SERVICE" php artisan "$@"
+}
+
+run_backend_artisan_database() {
+    local connection="$1"
+    local host="$2"
+    local port="$3"
+    shift 3
+    compose run --rm --no-deps \
+        -e DB_CONNECTION="$connection" -e DB_HOST="$host" -e DB_PORT="$port" -e DB_URL= \
+        -e APP_CONFIG_CACHE="$CONFIG_CACHE_OVERRIDE" \
+        "$BACKEND_SERVICE" php artisan "$@"
+}
+
 require_root() {
     [[ "$EUID" -eq 0 ]] || fail 'Run this command as root on the production host.'
 }
@@ -220,26 +257,36 @@ acquire_lock() {
     printf 'Host cutover lock acquired: %s\n' "$LOCK_FILE"
 }
 
-atomic_write_marker() {
-    local env_backup="$1"
-    local temporary="$MARKER_FILE.tmp"
+write_state_marker() {
+    local path="$1"
+    local env_backup="$2"
+    local temporary="$path.tmp"
     {
         printf 'started_at=%s\n' "$RUN_TIMESTAMP"
         printf 'env_backup=%s\n' "$env_backup"
     } > "$temporary"
     chmod 0600 "$temporary"
-    mv -f "$temporary" "$MARKER_FILE"
+    mv -f "$temporary" "$path"
+}
+
+atomic_write_marker() {
+    write_state_marker "$MARKER_FILE" "$1"
 }
 
 save_marker_env_backup() {
+    write_state_marker "$MARKER_FILE" "$1"
+}
+
+write_switch_marker() {
     local env_backup="$1"
-    local temporary="$MARKER_FILE.tmp"
+    local temporary="$SWITCH_MARKER_FILE.tmp"
     {
+        printf 'switch=attempted\n'
         printf 'started_at=%s\n' "$RUN_TIMESTAMP"
         printf 'env_backup=%s\n' "$env_backup"
     } > "$temporary"
     chmod 0600 "$temporary"
-    mv -f "$temporary" "$MARKER_FILE"
+    mv -f "$temporary" "$SWITCH_MARKER_FILE"
 }
 
 restore_env_backup() {
@@ -260,7 +307,7 @@ rollback_failed_switch() {
     patch_host_env_for_mariadb
     compose up -d --force-recreate "$BACKEND_SERVICE"
     wait_for_backend || fail 'Automatic switch rollback restored .env but the backend did not become healthy.'
-    rm -f -- "$MARKER_FILE"
+    rm -f -- "$MARKER_FILE" "$SWITCH_MARKER_FILE" "$LAST_ENV_BACKUP_FILE"
     fail 'The PostgreSQL switch failed and was automatically rolled back to MariaDB.'
 }
 
@@ -353,14 +400,24 @@ run_rollback() {
     docker info >/dev/null 2>&1 || fail 'Docker daemon is not usable.'
     compose version >/dev/null 2>&1 || fail 'docker compose is not usable.'
 
-    local selected_connection
+    local selected_connection switch_attempted=false
     if ! selected_connection="$(read_env_value DB_CONNECTION)"; then
         fail 'DB_CONNECTION must occur exactly once in the host .env before a rollback can select the database.'
+    fi
+    if [[ -f "$SWITCH_MARKER_FILE" ]]; then
+        switch_attempted=true
     fi
 
     case "$selected_connection" in
         mariadb)
-            printf 'Rollback boundary: the host .env still selects MariaDB; the PostgreSQL switch never completed, so no PostgreSQL writes are being discarded.\n'
+            if [[ "$switch_attempted" == true ]]; then
+                if [[ "$ACCEPT_POSTGRES_WRITE_LOSS" != true ]]; then
+                    fail "A PostgreSQL switch was already attempted (state marker '$SWITCH_MARKER_FILE'), even though the host .env now selects MariaDB. MariaDB is the pre-cutover snapshot and is NOT updated from PostgreSQL: PostgreSQL-only writes will not appear in the active MariaDB database after rollback. The PostgreSQL volume remains available for manual reconciliation. Re-run with --rollback --accept-postgres-write-loss to acknowledge this divergence."
+                fi
+                printf 'Rollback boundary: --accept-postgres-write-loss acknowledged for a previously attempted PostgreSQL switch. PostgreSQL-only writes will not appear in the active MariaDB database; the PostgreSQL volume remains available for manual reconciliation.\n'
+            else
+                printf 'Rollback boundary: the host .env still selects MariaDB and no PostgreSQL switch was recorded, so no PostgreSQL writes are being discarded.\n'
+            fi
             ;;
         pgsql)
             if [[ "$ACCEPT_POSTGRES_WRITE_LOSS" != true ]]; then
@@ -374,12 +431,15 @@ run_rollback() {
     esac
 
     local backup=''
-    if [[ -f "$MARKER_FILE" ]]; then
-        backup="$(sed -n 's/^env_backup=//p' "$MARKER_FILE" | head -n 1)"
-    elif [[ -f "$LAST_ENV_BACKUP_FILE" ]]; then
-        backup="$(cat "$LAST_ENV_BACKUP_FILE")"
-    else
-        fail 'No in-progress cutover or saved .env backup is available for rollback.'
+    if [[ -f "$SWITCH_MARKER_FILE" ]]; then
+        backup="$(sed -n 's/^env_backup=//p' "$SWITCH_MARKER_FILE" | head -n 1)"
+    fi
+    if [[ -z "$backup" ]]; then
+        if [[ -f "$MARKER_FILE" ]]; then
+            backup="$(sed -n 's/^env_backup=//p' "$MARKER_FILE" | head -n 1)"
+        else
+            fail 'No in-progress cutover or switch marker is available for rollback; refusing to restore a stale .env backup.'
+        fi
     fi
 
     if [[ -n "$backup" ]]; then
@@ -393,8 +453,8 @@ run_rollback() {
 
     compose up -d --force-recreate "$BACKEND_SERVICE"
     wait_for_backend
-    rm -f -- "$MARKER_FILE"
-    if [[ "$selected_connection" == 'pgsql' ]]; then
+    rm -f -- "$MARKER_FILE" "$SWITCH_MARKER_FILE" "$LAST_ENV_BACKUP_FILE"
+    if [[ "$switch_attempted" == true || "$selected_connection" == 'pgsql' ]]; then
         printf 'Rollback complete. MariaDB was not modified or restored; PostgreSQL-only writes remain on the PostgreSQL volume and are not in the active database.\n'
     else
         printf 'Rollback complete. MariaDB was not modified or restored.\n'
@@ -455,10 +515,11 @@ raise SystemExit(0 if valid else 1)
         }
         echo "Both database PDO drivers are available.\n";
     ' || fail 'The backend image must contain both pdo_mysql and pdo_pgsql before the cutover.'
-    compose run --rm --no-deps "$BACKEND_SERVICE" php artisan list --raw \
+    run_backend_artisan list --raw \
         | grep -Eq '^portal:db-copy([[:space:]]|$)' \
         || fail 'The deployed backend code does not register portal:db-copy; deploy the cutover-capable code first.'
-    [[ ! -e "$MARKER_FILE" ]] || fail "An unfinished cutover marker exists at '$MARKER_FILE'; run --rollback first (add --accept-postgres-write-loss if the host .env already selects PostgreSQL)."
+    [[ ! -e "$MARKER_FILE" ]] || fail "An unfinished cutover marker exists at '$MARKER_FILE'; run --rollback first (add --accept-postgres-write-loss if a PostgreSQL switch was attempted)."
+    [[ ! -e "$SWITCH_MARKER_FILE" ]] || fail "A previous PostgreSQL switch is recorded at '$SWITCH_MARKER_FILE'; run --rollback --accept-postgres-write-loss before starting another cutover, even if the host .env now selects MariaDB."
 
     local source_host source_port source_connection source_host_origin source_port_origin
     if grep -q '^DB_HOST=' "$ENV_FILE"; then
@@ -483,9 +544,8 @@ raise SystemExit(0 if valid else 1)
     printf 'Source port selected from %s.\n' "$source_port_origin"
 
     local source_migration_status
-    source_migration_status="$(compose run --rm --no-deps \
-        -e DB_CONNECTION=mariadb -e DB_HOST="$source_host" -e DB_PORT="$source_port" -e DB_URL= \
-        "$BACKEND_SERVICE" php artisan migrate:status --database=mariadb --no-ansi)" \
+    source_migration_status="$(run_backend_artisan_database mariadb "$source_host" "$source_port" \
+        migrate:status --database=mariadb --no-ansi)" \
         || fail 'Could not read the MariaDB migration status; deploy the PostgreSQL-capable code and retry.'
     if grep -Eq '(^|[[:space:]])Pending([[:space:]]|$)' <<< "$source_migration_status"; then
         fail 'MariaDB has pending migrations. Complete the preparatory MariaDB deployment before the cutover; the copy requires the source at the current migration frontier.'
@@ -565,38 +625,27 @@ raise SystemExit(0 if valid else 1)
     wait_for_postgres
 
     banner MIGRATE
-    compose run --rm --no-deps \
-        -e DB_CONNECTION=pgsql -e DB_HOST=db_pg -e DB_PORT=5432 -e DB_URL= \
-        "$BACKEND_SERVICE" php artisan migrate --force
+    run_backend_artisan_database pgsql db_pg 5432 migrate --force
 
     banner COPY
-    compose run --rm --no-deps \
-        -e DB_CONNECTION=pgsql -e DB_HOST=db_pg -e DB_PORT=5432 -e DB_URL= \
-        "$BACKEND_SERVICE" php artisan portal:db-copy \
+    run_backend_artisan_database pgsql db_pg 5432 portal:db-copy \
         --source=mariadb --target=pgsql \
         --source-host="$source_host" --source-port="$source_port" \
         --target-host=db_pg --target-port=5432
 
     banner VERIFY
-    compose run --rm --no-deps \
-        -e DB_CONNECTION=pgsql -e DB_HOST=db_pg -e DB_PORT=5432 -e DB_URL= \
-        "$BACKEND_SERVICE" php artisan portal:db-copy \
+    run_backend_artisan_database pgsql db_pg 5432 portal:db-copy \
         --source=mariadb --target=pgsql --verify-only \
         --source-host="$source_host" --source-port="$source_port" \
         --target-host=db_pg --target-port=5432
-    compose run --rm --no-deps \
-        -e DB_CONNECTION=pgsql -e DB_HOST=db_pg -e DB_PORT=5432 -e DB_URL= \
-        "$BACKEND_SERVICE" php artisan migrate:status --database=pgsql
-    compose run --rm --no-deps \
-        -e DB_CONNECTION=pgsql -e DB_HOST=db_pg -e DB_PORT=5432 -e DB_URL= \
-        "$BACKEND_SERVICE" php artisan tinker --execute='$db = Illuminate\Support\Facades\DB::connection("pgsql"); $db->select("SELECT 1 AS ready"); foreach (["users", "orders", "settings"] as $table) { $db->table($table)->count(); } echo "Smoke queries passed.\n";'
+    run_backend_artisan_database pgsql db_pg 5432 migrate:status --database=pgsql
+    run_backend_artisan_database pgsql db_pg 5432 tinker --execute='$db = Illuminate\Support\Facades\DB::connection("pgsql"); $db->select("SELECT 1 AS ready"); foreach (["users", "orders", "settings"] as $table) { $db->table($table)->count(); } echo "Smoke queries passed.\n";'
 
     banner SWITCH
     local env_backup="$STACK_DIR/.env.${RUN_TIMESTAMP}.bak"
     cp -p -- "$ENV_FILE" "$env_backup"
     chmod 0600 "$env_backup"
-    printf '%s\n' "$env_backup" > "$LAST_ENV_BACKUP_FILE"
-    chmod 0600 "$LAST_ENV_BACKUP_FILE"
+    write_switch_marker "$env_backup"
     save_marker_env_backup "$env_backup"
     if ! patch_host_env_for_postgres; then
         rollback_failed_switch "$env_backup"

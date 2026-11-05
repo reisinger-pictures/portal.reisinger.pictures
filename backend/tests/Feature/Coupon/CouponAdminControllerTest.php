@@ -90,6 +90,24 @@ class CouponAdminControllerTest extends TestCase
         ]);
     }
 
+    public function test_store_organisation_coupon_rejects_malformed_scope_uuid(): void
+    {
+        $token = $this->superAdminToken();
+
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/coupons', [
+                'code' => 'ORGUUID',
+                'type' => 'fixed',
+                'value' => 100,
+                'scope_type' => 'organisation',
+                'scope_id' => 'not-a-uuid',
+                'active' => true,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('error', 'Org not found for this brand.');
+    }
+
     /**
      * The round trip in both directions: what the admin form reads back must be
      * what it sent. The form divides by 100 to show euros and multiplies by 100

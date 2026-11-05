@@ -13,6 +13,23 @@ use Illuminate\Support\Facades\DB;
 class StatsCalculationService
 {
     /**
+     * Maximum number of joined download rows held in memory at once while the
+     * domain counts are aggregated. Domain extraction stays in PHP so the
+     * query uses no engine-specific string functions (PostgreSQL, MariaDB and
+     * SQLite all serve it); batching bounds the memory instead of materializing
+     * one email per download. The constructor argument exists so tests can
+     * exercise the batch boundaries with a small fixture.
+     */
+    private const DEFAULT_DOMAIN_EMAIL_BATCH_SIZE = 1000;
+
+    private int $domainEmailBatchSize;
+
+    public function __construct(int $domainEmailBatchSize = self::DEFAULT_DOMAIN_EMAIL_BATCH_SIZE)
+    {
+        $this->domainEmailBatchSize = max(1, $domainEmailBatchSize);
+    }
+
+    /**
      * Normalize a brand (enum or raw string) to its stored string value.
      * `null` is unscoped only for a trusted persisted Super-Admin; the actor
      * guard in getStatsForUser() rejects legacy null-brand users.
@@ -100,13 +117,12 @@ class StatsCalculationService
             } : function () {})
             ->count();
 
-        $domainEmails = DB::table('download_logs')
-            ->join('users', 'download_logs.user_id', '=', 'users.id')
-            ->when($brand !== null, fn ($q) => $q->whereIn('download_logs.gallery_id', $brandGalleryIds))
-            ->where($tierFilterDb)
-            ->pluck('users.email');
-
-        $domainStats = $this->domainStatsForEmails($domainEmails);
+        $domainStats = $this->domainStatsForQuery(
+            DB::table('download_logs')
+                ->join('users', 'download_logs.user_id', '=', 'users.id')
+                ->when($brand !== null, fn ($q) => $q->whereIn('download_logs.gallery_id', $brandGalleryIds))
+                ->where($tierFilterDb),
+        );
 
         $topGalleries = DB::table('download_logs')
             ->select('gallery_name_snapshot as name', DB::raw('COUNT(*) as count'))
@@ -161,14 +177,13 @@ class StatsCalculationService
         $guestDownloads = 0;
         $galleriesCount = 0;
 
-        $domainEmails = DB::table('download_logs')
-            ->join('users', 'download_logs.user_id', '=', 'users.id')
-            ->whereIn('download_logs.user_id', $orgUserIds)
-            ->when($brand !== null, fn ($q) => $q->whereIn('download_logs.gallery_id', $brandGalleryIds))
-            ->where($tierFilterDb)
-            ->pluck('users.email');
-
-        $domainStats = $this->domainStatsForEmails($domainEmails);
+        $domainStats = $this->domainStatsForQuery(
+            DB::table('download_logs')
+                ->join('users', 'download_logs.user_id', '=', 'users.id')
+                ->whereIn('download_logs.user_id', $orgUserIds)
+                ->when($brand !== null, fn ($q) => $q->whereIn('download_logs.gallery_id', $brandGalleryIds))
+                ->where($tierFilterDb),
+        );
 
         $topGalleries = DB::table('download_logs')
             ->select('gallery_name_snapshot as name', DB::raw('COUNT(*) as count'))
@@ -237,13 +252,12 @@ class StatsCalculationService
             } : function () {})
             ->count();
 
-        $domainEmails = DB::table('download_logs')
-            ->join('users', 'download_logs.user_id', '=', 'users.id')
-            ->whereIn('download_logs.gallery_id', $galleryIds)
-            ->where($tierFilterDb)
-            ->pluck('users.email');
-
-        $domainStats = $this->domainStatsForEmails($domainEmails);
+        $domainStats = $this->domainStatsForQuery(
+            DB::table('download_logs')
+                ->join('users', 'download_logs.user_id', '=', 'users.id')
+                ->whereIn('download_logs.gallery_id', $galleryIds)
+                ->where($tierFilterDb),
+        );
 
         $topGalleries = DB::table('download_logs')
             ->select('gallery_name_snapshot as name', DB::raw('COUNT(*) as count'))
@@ -289,24 +303,30 @@ class StatsCalculationService
     }
 
     /**
-     * Derive domains from the same joined download rows on every supported
-     * database. Keeping extraction and grouping in PHP avoids relying on
-     * engine-specific string functions such as MySQL's INSTR().
-     *
-     * @param  Collection<int, string|null>  $emails
+     * Aggregate the domain counts of the joined download rows without ever
+     * holding more than one batch of rows in memory. Keeping extraction and
+     * grouping in PHP avoids relying on engine-specific string functions such
+     * as MySQL's INSTR(), and `chunkById()` pages over the primary key so the
+     * query stays valid on PostgreSQL, MariaDB and SQLite alike. The retained
+     * state is one counter per distinct domain, not one entry per download.
      */
-    private function domainStatsForEmails(Collection $emails): array
+    private function domainStatsForQuery(\Illuminate\Database\Query\Builder $query): array
     {
         $counts = [];
-        foreach ($emails as $email) {
-            $email = (string) $email;
-            $at = strpos($email, '@');
-            $domain = substr($email, ($at === false ? 0 : $at) + 1);
-            if (! array_key_exists($domain, $counts)) {
-                $counts[$domain] = 0;
-            }
-            $counts[$domain]++;
-        }
+
+        $query
+            ->select('download_logs.id', 'users.email')
+            ->chunkById(
+                $this->domainEmailBatchSize,
+                function (Collection $rows) use (&$counts): void {
+                    foreach ($rows as $row) {
+                        $domain = $this->domainFromEmail($row->email);
+                        $counts[$domain] = ($counts[$domain] ?? 0) + 1;
+                    }
+                },
+                'download_logs.id',
+                'id',
+            );
 
         $rawStats = collect($counts)->map(
             static fn (int $count, string $domain): object => (object) [
@@ -316,5 +336,18 @@ class StatsCalculationService
         );
 
         return $this->processDomainStats($rawStats);
+    }
+
+    /**
+     * The domain part of an email exactly as the previous PHP grouping derived
+     * it: everything after the first `@`, or the whole value when there is no
+     * `@` (legacy rows can carry such a value).
+     */
+    private function domainFromEmail(mixed $email): string
+    {
+        $email = (string) $email;
+        $at = strpos($email, '@');
+
+        return substr($email, ($at === false ? 0 : $at) + 1);
     }
 }

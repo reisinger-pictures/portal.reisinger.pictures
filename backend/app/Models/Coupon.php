@@ -50,6 +50,14 @@ class Coupon extends Model
 {
     use HasFactory;
 
+    /**
+     * Named ICU nondeterministic collation created by V055. It compares coupon
+     * codes case- and accent-insensitively, and the V055 index applies it to
+     * `RTRIM(code)` so trailing spaces behave like MariaDB's PAD SPACE
+     * `utf8mb4_unicode_ci` column collation.
+     */
+    public const CODE_COLLATION = 'coupons_code_ci';
+
     protected $table = 'coupons';
 
     protected $fillable = [
@@ -111,6 +119,34 @@ class Coupon extends Model
     public function scopeByBrand(Builder $query, Brand|string $brand): Builder
     {
         return $query->where($query->getQuery()->from.'.brand', $brand instanceof Brand ? $brand->value : $brand);
+    }
+
+    /**
+     * Match `coupons.code` with the same equality the active engine uses for
+     * the per-brand unique invariant.
+     *
+     * MariaDB compares through the column's `utf8mb4_unicode_ci` collation,
+     * which ignores case, accents and trailing spaces. PostgreSQL compares
+     * through the ICU nondeterministic collation created by V055 and trims
+     * trailing spaces first, so case, accents and PAD SPACE behaviour fold
+     * exactly as they do in the unique index. SQLite has no such collation;
+     * its V054 `LOWER()` index and this fallback keep the case-only, NO PAD
+     * approximation that SQLite-only tests run against.
+     */
+    public function scopeWhereCodeMatches(Builder $query, string $code): Builder
+    {
+        $baseQuery = $query->getQuery();
+        $driver = $baseQuery->getConnection()->getDriverName();
+        $qualifiedCode = $baseQuery->from.'.code';
+
+        return match ($driver) {
+            'pgsql' => $query->whereRaw(
+                'RTRIM('.$qualifiedCode.') COLLATE "'.self::CODE_COLLATION.'" = RTRIM(?)',
+                [$code],
+            ),
+            'mysql', 'mariadb' => $query->where($qualifiedCode, $code),
+            default => $query->whereRaw('LOWER('.$qualifiedCode.') = LOWER(?)', [$code]),
+        };
     }
 
     public function scopeForCreator(Builder $query, User $user): Builder
