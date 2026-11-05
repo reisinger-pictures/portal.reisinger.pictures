@@ -169,6 +169,7 @@ prepare_case() {
     local create_docker_volumes_dir="${2:-true}"
     local case_root="$temporary_root/$name"
     mkdir -p "$case_root/bin" "$case_root/stack" "$case_root/db-data" "$case_root/pg-data" "$case_root/docker-root"
+    printf 'MariaDB source fixture\n' > "$case_root/db-data/fixture.bin"
     if [[ "$create_docker_volumes_dir" == 'true' ]]; then
         mkdir -p "$case_root/docker-root/volumes"
     fi
