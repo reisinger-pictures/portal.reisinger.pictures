@@ -242,3 +242,18 @@ Der Dry-Run nennt für jede Zeile Benutzer (E-Mail), Gruppe (Name), Einstufung, 
 - Die Queue kann einen SMTP-Transportfehler retryen. Invoice-Mail garantiert deshalb höchstens einen durable Enqueue-Vorgang, nicht exactly-once SMTP-Zustellung. Terminale Jobs bleiben in `failed_jobs` und benötigen eine dokumentierte Operator-Recovery.
 - Mailpit darf ausschließlich als lokales/CI-Testfixture dokumentiert werden. Ein Mailpit-Test ist kein Live-Nachweis für den Produktions-SMTP- oder den Provider-Zustellungsstatus.
 - Die Betriebsprüfung und die Grenzen der Queue-Semantik stehen im [Production Operations Runbook](29-production-operations-runbook.md).
+
+## 7. Activation and reset token identity (D-17)
+
+The `password_reset_tokens` slot is identified case-insensitively by email.
+Issuance stores the `EmailNormalizer` form; claim, takeover, reset lookup and
+consumption use the same case-folded identity. PostgreSQL enforces one slot per
+identity with V057's unique expression index on `LOWER(email)`. MariaDB retains
+its case-insensitive primary-key collation.
+
+V057 preflights case-folded duplicates and aborts without listing email
+addresses, rewriting token rows, or choosing a winning token. It performs no
+backfill: one legacy mixed-case row remains valid and usable, and the unique
+index prevents a second case variant. The cutover copy preserves that row
+verbatim. Repository migrations are not rolled back; switching back to
+MariaDB requires no token-data rewrite and uses its existing primary key.

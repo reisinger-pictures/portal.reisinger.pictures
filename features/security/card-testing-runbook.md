@@ -38,6 +38,14 @@ measurement.
 system are never written to any log. Read §1.4 before building an alert on a
 signal that does not exist.
 
+**Database-engine boundary (D-63):** the SQL examples in this runbook that use
+`portal_db` and `mariadb` are MariaDB-specific. They query the live primary
+before cutover. After the verified PostgreSQL switch, `portal_db` is the
+unchanged MariaDB rollback source, so these commands are for rollback-source
+inspection only and are not evidence about the live application database. Do
+not use them for post-cutover monitoring; query the active PostgreSQL primary
+(`portal_db_pg`) with PostgreSQL-compatible statements instead.
+
 ---
 
 ## 1. Telemetry sources
@@ -89,8 +97,10 @@ non-reversible — see `CheckoutKey.php:10`:
 To correlate a digest with a concrete actor you must fall back to the durable
 `orders` columns (§1.3), not to the cache.
 
-**Reproducing every cache query in this runbook** (the password is read inside
-the container, so nothing sensitive enters your shell history):
+**MariaDB-only cache-query examples in this runbook** (the password is read
+inside the container, so nothing sensitive enters your shell history). The
+same engine boundary above applies to every repeated `portal_db`/`mariadb`
+command below: after cutover these commands inspect only the rollback source.
 
 ```bash
 docker exec -i portal_db sh -lc 'mariadb -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' <<'SQL'

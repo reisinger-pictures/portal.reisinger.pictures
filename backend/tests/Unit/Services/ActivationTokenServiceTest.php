@@ -85,6 +85,45 @@ class ActivationTokenServiceTest extends TestCase
         $this->assertTrue(Hash::check((string) $first, $rowAfterSecond->token));
     }
 
+    public function test_mixed_case_legacy_row_keeps_the_case_insensitive_slot(): void
+    {
+        DB::table('password_reset_tokens')->insert([
+            'email' => 'Model@Example.com',
+            'token' => Hash::make('legacy-token'),
+            'created_at' => Carbon::now(),
+        ]);
+
+        $this->assertNull($this->service->issue(self::EMAIL));
+
+        $row = DB::table('password_reset_tokens')
+            ->whereRaw('LOWER(email) = ?', [self::EMAIL])
+            ->first();
+        $this->assertNotNull($row);
+        $this->assertSame('Model@Example.com', $row->email);
+        $this->assertTrue(Hash::check('legacy-token', $row->token));
+        $this->assertSame(1, DB::table('password_reset_tokens')->count());
+    }
+
+    public function test_expired_mixed_case_legacy_row_can_be_taken_over_in_place(): void
+    {
+        DB::table('password_reset_tokens')->insert([
+            'email' => 'Model@Example.com',
+            'token' => Hash::make('expired-legacy-token'),
+            'created_at' => Carbon::now()->subMinutes(61),
+        ]);
+
+        $token = $this->service->issue(self::EMAIL);
+
+        $this->assertNotNull($token);
+        $row = DB::table('password_reset_tokens')
+            ->whereRaw('LOWER(email) = ?', [self::EMAIL])
+            ->first();
+        $this->assertNotNull($row);
+        $this->assertSame('Model@Example.com', $row->email);
+        $this->assertTrue(Hash::check($token, $row->token));
+        $this->assertSame(1, DB::table('password_reset_tokens')->count());
+    }
+
     public function test_token_is_untouched_one_second_before_the_lifetime_boundary(): void
     {
         $this->insertToken(Carbon::now()->subMinutes(59));
