@@ -64,6 +64,24 @@ preparatory deployment followed by the cutover:
 7. Atomically edit the protected host `.env` and recreate the backend against
    PostgreSQL. MariaDB stays running and untouched.
 
+### Stable identity for photographer group assignments
+
+`photographer_gallery_groups` intentionally permits a null
+`gallery_group_id` after a referenced group is deleted. Its unique
+`(user_id, gallery_group_id)` index therefore is not a complete row identity:
+SQL unique indexes permit multiple rows with the same user and a null group.
+V008 removed the earlier composite primary key to allow that null value, so the
+cutover copier cannot safely keyset-chunk this table by the remaining pair.
+
+V058 adds an auto-generated `bigint id` primary key on both MariaDB and
+PostgreSQL. Existing rows receive distinct generated IDs; no assignments are
+deleted, merged, or rewritten, and the existing nullable group behavior and
+composite unique index remain unchanged. Application pivot relations ignore the
+surrogate ID. The copy carries it verbatim and resets the PostgreSQL sequence
+afterward. If a cutover attempt is abandoned, the additive ID remains on the
+MariaDB source; rollback requires no row rewrite, and repository migrations are
+not rolled back.
+
 Cutover and rollback take one exclusive host lock before any preflight check
 (`flock` on `/var/lib/portal-postgres-cutover/cutover.lock`). A concurrent run
 fails closed with a named error instead of interleaving a second backup, copy,
@@ -143,8 +161,11 @@ The verifier returns success only when all of these checks pass:
   on string order or collation, and a same-count, foreign-key-valid row with a
   wrong non-settings field fails `--verify-only`. Mismatch output names the
   table, column and row key without printing the differing data value. The
-  `--chunk` batch bounds memory and query size, so no production table is loaded
-  whole on either side.
+  `--chunk` batch bounds memory and query size for this column-parity stream.
+  Settings verification is a separate exception: `PostgresCopy::settingRows()`
+  materializes every settings row from both databases before comparing them, so
+  memory use grows with the settings table. The bounded-memory follow-up is
+  tracked in issue #50; the `--chunk` option does not bound this verifier path.
 - **Money and amount sums:** sums are compared exactly for persisted money
   fields in orders, invoice snapshots, products/licensing, coupons, payout
   pools/statements, payout corrections, open items, and payout bookings. The
@@ -201,15 +222,16 @@ MariaDB's production `utf8mb4_unicode_ci` collation is case- and
 accent-insensitive and ignores trailing spaces; PostgreSQL text comparisons and
 ordinary unique indexes are case-sensitive. The application preserves the
 established email identity contract through normalization and a functional
-unique index, and coupon codes through V055's tested ICU collation plus
-`RTRIM()` unique index. Organization domain identity uses V056's `LOWER(domain)`
-lookup and unique expression index, preserving case-insensitive matching. This
-is only case-folding parity: it does not reproduce MariaDB's accent-insensitive
-or trailing-space equivalence for domains. V055 documents that ICU's Unicode
-collation version is an approximation, not byte-for-byte equivalent to
-MariaDB's UCA version. The copy itself never case-folds data or merges
-duplicate rows. Every other collation-dependent business key must have an
-explicit compatibility contract; collisions that remain unhandled block the
+unique index, password-reset token identity through V057's `LOWER(email)`
+unique expression index, and coupon codes through V055's tested ICU collation
+plus `RTRIM()` unique index. Organization domain identity uses V056's
+`LOWER(domain)` lookup and unique expression index, preserving case-insensitive
+matching. This is only case-folding parity: it does not reproduce MariaDB's
+accent-insensitive or trailing-space equivalence for domains. V055 documents
+that ICU's Unicode collation version is an approximation, not byte-for-byte
+equivalent to MariaDB's UCA version. The copy itself never case-folds data or
+merges duplicate rows. Every other collation-dependent business key must have
+an explicit compatibility contract; collisions that remain unhandled block the
 copy on schema/value verification or the target unique index rather than
 choosing a value silently.
 

@@ -77,6 +77,31 @@ class AuthSecurityTest extends TestCase
         $this->assertTrue(Hash::check('newPassword123', $user->fresh()->password));
     }
 
+    public function test_password_reset_accepts_a_mixed_case_legacy_token_row(): void
+    {
+        $email = 'legacy.reset@example.test';
+        $user = User::factory()->create(['email' => $email, 'password' => null, 'brand' => 'rp']);
+        $tokenValue = 'legacy-case-reset-token';
+
+        DB::table('password_reset_tokens')->insert([
+            'email' => 'Legacy.Reset@Example.test',
+            'token' => Hash::make($tokenValue),
+            'created_at' => now(),
+        ]);
+
+        $this->postJson('/api/auth/reset-password', [
+            'email' => $email,
+            'token' => $tokenValue,
+            'password' => 'newPassword123',
+        ])->assertOk();
+
+        $this->assertTrue(Hash::check('newPassword123', $user->fresh()->password));
+        $this->assertSame(
+            0,
+            DB::table('password_reset_tokens')->whereRaw('LOWER(email) = ?', [$email])->count(),
+        );
+    }
+
     public function test_reset_password_does_not_leak_system_admin_identity(): void
     {
         Config::set('admin.email', 'admin@example.com');

@@ -155,7 +155,7 @@ Diese Regeln sind aus Fehlschlägen entstanden, nicht aus Vermutungen. Jede nenn
   PHPUnit, Vitest, Playwright, or other test suites.
 - `sh scripts/gates.sh full <group>` is restricted to GitHub Actions and is
   invoked by the existing parallel CI jobs. Groups are `security`, `backend`,
-  `mariadb`, `frontend`, and `e2e`; the E2E group receives the matrix shard
+  `postgres`, `frontend`, and `e2e`; the E2E group receives the matrix shard
   arguments. CI setup, services, and job-level environment remain in the
   workflow, and each job invokes its group once.
 - The `security` group retains the repository's infrastructure/security
