@@ -1557,13 +1557,15 @@ class PostgresCopy extends Command
             $sequenceTable = $target->getQueryGrammar()->wrapTable(
                 $sequenceInfo->schema_name.'.'.$sequenceInfo->sequence_name,
             );
-            $state = $target->selectOne('SELECT last_value, is_called FROM '.$sequenceTable);
+            $state = $target->selectOne(
+                'SELECT last_value, CASE WHEN is_called THEN 1 ELSE 0 END AS is_called FROM '.$sequenceTable,
+            );
             $increment = $target->selectOne(
                 'SELECT increment_by FROM pg_sequences WHERE schemaname = ? AND sequencename = ?',
                 [$sequenceInfo->schema_name, $sequenceInfo->sequence_name],
             );
             $maximum = $target->table($table)->max('id');
-            $next = (int) $state->last_value + (strtolower((string) $state->is_called) === 't'
+            $next = (int) $state->last_value + ((int) $state->is_called === 1
                 ? (int) ($increment->increment_by ?? 1)
                 : 0);
             $maximumDisplay = $maximum === null ? 'none' : (string) $maximum;

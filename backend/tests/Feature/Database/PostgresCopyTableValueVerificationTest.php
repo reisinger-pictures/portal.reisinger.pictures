@@ -83,6 +83,21 @@ class PostgresCopyTableValueVerificationTest extends TestCase
         }
     }
 
+    public function test_copy_verifies_next_sequence_value_after_explicit_id_insert(): void
+    {
+        $this->createFixtureSchemas();
+        $this->source?->statement(
+            'INSERT INTO sequence_rows (id, label) VALUES (?, ?)',
+            [7, 'copied row'],
+        );
+
+        [$status, $output] = $this->runCommand([]);
+
+        $this->assertSame(Command::SUCCESS, $status, $output);
+        $this->assertStringContainsString('Sequence sequence_rows.id: next=8, max=7.', $output);
+        $this->assertSame(8, (int) DB::table('sequence_rows')->insertGetId(['label' => 'next row']));
+    }
+
     public function test_verify_only_rejects_a_same_count_wrong_value_in_a_copied_non_settings_column(): void
     {
         $this->createFixtureSchemas();
@@ -365,6 +380,11 @@ class PostgresCopyTableValueVerificationTest extends TestCase
                 'id' => ['data_type' => 'int', 'column_type' => 'int(11)'],
                 'payload' => ['data_type' => 'longtext', 'column_type' => 'longtext'],
             ],
+            'sequence_rows' => [
+                'primary_key' => ['id'],
+                'id' => ['data_type' => 'int', 'column_type' => 'int(11)'],
+                'label' => ['data_type' => 'varchar', 'column_type' => 'varchar(255)'],
+            ],
         ];
     }
 
@@ -426,6 +446,13 @@ class PostgresCopyTableValueVerificationTest extends TestCase
         );
         DB::statement(
             'CREATE TABLE '.$target.'.documents (id INTEGER PRIMARY KEY, payload JSONB NOT NULL)',
+        );
+
+        $this->source->statement(
+            'CREATE TABLE '.$source.'.sequence_rows (id INTEGER PRIMARY KEY, label TEXT NOT NULL)',
+        );
+        DB::statement(
+            'CREATE TABLE '.$target.'.sequence_rows (id BIGSERIAL PRIMARY KEY, label TEXT NOT NULL)',
         );
 
         $this->source->statement('SET search_path TO '.$source);
