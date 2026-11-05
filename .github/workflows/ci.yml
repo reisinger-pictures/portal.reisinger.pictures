@@ -413,11 +413,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   cutover-copy:
-    # The one-time cutover (D-63) is a host script plus an artisan command, and
-    # the command is the part that can be tested without the host: migrate a
-    # throwaway MariaDB, copy it into a throwaway PostgreSQL, and let the
-    # verifier decide. Without this job the copy path is only exercised on the
-    # day it matters, against production data, by an operator.
+    # The one-time cutover (D-63) is a host script plus an artisan command. This
+    # job exercises the host lifecycle with a Docker CLI test double and migrates
+    # a throwaway MariaDB into PostgreSQL to run the real copy/verifier path.
     name: Cutover copy (MariaDB -> PostgreSQL)
     runs-on: ubuntu-latest
     defaults:
@@ -459,6 +457,12 @@ jobs:
           --health-retries=10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Exercise production cutover shell lifecycle
+        run: |
+          cd ..
+          bash tests/infrastructure/selected-database-readiness.sh
+          bash tests/infrastructure/compose-entrypoint-contract.sh
+          bash tests/infrastructure/postgres-cutover-script-lifecycle.sh
       - name: Start PHP container (prod image)
         run: |
           docker run -d --name php-cutover \
@@ -524,6 +528,14 @@ jobs:
             php-cutover php artisan migrate --force
           docker exec -e DB_CONNECTION=mariadb -e DB_HOST=127.0.0.1 -e DB_PORT=3307 \
             php-cutover php artisan db:seed --force
+      - name: Make MariaDB settings authoritative for this copy
+        run: |
+          docker exec php-cutover php -r '
+          $source = new PDO("mysql:host=127.0.0.1;port=3307;dbname=portal_test_db;charset=utf8mb4", "portal_user", "admin", [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+          $update = $source->prepare("UPDATE settings SET value = ? WHERE `key` = ?");
+          $update->execute(["source-wins-v1", "term_editorial"]);
+          if ($update->rowCount() < 1) { throw new RuntimeException("Source settings sentinel was not updated."); }
+          '
       - name: Migrate the PostgreSQL target and copy
         run: |
           docker exec \
@@ -538,6 +550,24 @@ jobs:
             --source=mariadb --target=pgsql \
             --source-port=3307 --target-port=5432 \
             --verify-only
+      - name: Assert copied roles and settings match the source
+        run: docker exec -e DB_USERNAME -e DB_PASSWORD -e DB_DATABASE php-cutover php tests/scripts/assert-postgres-copy-parity.php 3307 5432 source-wins-v1
+      - name: Recopy after a source update to prove retries replace stale target rows
+        run: |
+          docker exec php-cutover php -r '
+          $source = new PDO("mysql:host=127.0.0.1;port=3307;dbname=portal_test_db;charset=utf8mb4", "portal_user", "admin", [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+          $update = $source->prepare("UPDATE settings SET value = ? WHERE `key` = ?");
+          $update->execute(["source-wins-v2", "term_editorial"]);
+          if ($update->rowCount() < 1) { throw new RuntimeException("Source settings sentinel was not updated for retry."); }
+          '
+          docker exec php-cutover php artisan portal:db-copy \
+            --source=mariadb --target=pgsql \
+            --source-port=3307 --target-port=5432
+          docker exec php-cutover php artisan portal:db-copy \
+            --source=mariadb --target=pgsql \
+            --source-port=3307 --target-port=5432 \
+            --verify-only
+          docker exec -e DB_USERNAME -e DB_PASSWORD -e DB_DATABASE php-cutover php tests/scripts/assert-postgres-copy-parity.php 3307 5432 source-wins-v2
       - name: The verifier fails closed on a mismatch
         # A verifier that only ever prints PASS proves nothing. One row is
         # removed from the target and the same verify command must exit non-zero
