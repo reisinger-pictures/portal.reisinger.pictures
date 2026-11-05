@@ -21,7 +21,7 @@ class PostgresCopy extends Command
         {--chunk=500 : Rows per stable-key batch}
         {--verify-only : Verify rows and invariants without writing}';
 
-    protected $description = 'Copy MariaDB rows to PostgreSQL and verify cutover invariants.';
+    protected $description = 'Replace PostgreSQL rows with the frozen MariaDB source and verify cutover invariants.';
 
     /** @var list<string> */
     private array $issues = [];
@@ -295,63 +295,90 @@ class PostgresCopy extends Command
         $restoreFailure = null;
 
         try {
-            foreach ($tables as $table) {
-                $columns = $this->sharedColumns[$table] ?? [];
-                $keys = $this->primaryKeys[$table] ?? [];
+            // A copy run replaces the target table set instead of merging into
+            // rows that target migrations or an earlier run left behind. The
+            // transaction makes the reset and every insert atomic: a failed
+            // insert leaves the previous target state intact, and a rerun
+            // starts from a clean table set again.
+            $target->transaction(function () use ($source, $target, $tables, $chunkSize): void {
+                $this->resetTargetRows($target, $tables);
 
-                if ($columns === [] || $keys === []) {
-                    throw new RuntimeException("Cannot copy '{$table}' without shared columns and a primary key.");
-                }
+                foreach ($tables as $table) {
+                    $columns = $this->sharedColumns[$table] ?? [];
+                    $keys = $this->primaryKeys[$table] ?? [];
 
-                $cursor = null;
-                $copied = 0;
-
-                do {
-                    $query = $source->table($table)->select($columns);
-
-                    if (is_array($cursor)) {
-                        $this->applyAfterCursor($query, $keys, $cursor);
+                    if ($columns === [] || $keys === []) {
+                        throw new RuntimeException("Cannot copy '{$table}' without shared columns and a primary key.");
                     }
 
-                    foreach ($keys as $key) {
-                        $query->orderBy($key);
-                    }
+                    $sourceCount = $source->table($table)->count();
+                    $cursor = null;
+                    $copied = 0;
 
-                    $rows = $query->limit($chunkSize)->get();
+                    do {
+                        $query = $source->table($table)->select($columns);
 
-                    if ($rows->isEmpty()) {
-                        break;
-                    }
+                        if (is_array($cursor)) {
+                            $this->applyAfterCursor($query, $keys, $cursor);
+                        }
 
-                    $batch = [];
-                    foreach ($rows as $row) {
-                        $record = [];
+                        foreach ($keys as $key) {
+                            $query->orderBy($key);
+                        }
 
-                        foreach ($columns as $column) {
-                            $targetType = $this->targetColumnType($target, $table, $column);
-                            $record[$column] = $this->normalizer->normalize(
-                                $row->{$column},
-                                $this->sourceColumnMetadata[$table][$column],
-                                $targetType,
+                        $rows = $query->limit($chunkSize)->get();
+
+                        if ($rows->isEmpty()) {
+                            break;
+                        }
+
+                        $batch = [];
+                        foreach ($rows as $row) {
+                            $record = [];
+
+                            foreach ($columns as $column) {
+                                $targetType = $this->targetColumnType($target, $table, $column);
+                                $record[$column] = $this->normalizer->normalize(
+                                    $row->{$column},
+                                    $this->sourceColumnMetadata[$table][$column],
+                                    $targetType,
+                                );
+                            }
+
+                            $batch[] = $record;
+                        }
+
+                        try {
+                            $target->table($table)->insert($batch);
+                        } catch (Throwable $exception) {
+                            throw new RuntimeException(
+                                "Failed to insert source rows into '{$table}': ".$exception->getMessage(),
+                                previous: $exception,
                             );
                         }
 
-                        $batch[] = $record;
+                        $last = $rows->last();
+                        $cursor = [];
+
+                        foreach ($keys as $key) {
+                            $cursor[] = $last->{$key};
+                        }
+
+                        $copied += count($batch);
+                    } while (count($rows) === $chunkSize);
+
+                    $targetCount = $target->table($table)->count();
+
+                    if ($copied !== $sourceCount || $targetCount !== $sourceCount) {
+                        throw new RuntimeException(
+                            "Copying '{$table}' did not reproduce the source rows exactly: "
+                            ."source={$sourceCount}, copied={$copied}, target={$targetCount}.",
+                        );
                     }
 
-                    $target->table($table)->insertOrIgnore($batch);
-                    $last = $rows->last();
-                    $cursor = [];
-
-                    foreach ($keys as $key) {
-                        $cursor[] = $last->{$key};
-                    }
-
-                    $copied += count($batch);
-                } while (count($rows) === $chunkSize);
-
-                $this->line("Copied {$copied} source rows from {$table}.");
-            }
+                    $this->line("Copied {$copied} source rows from {$table}.");
+                }
+            });
         } catch (Throwable $exception) {
             $copyFailure = $exception;
         } finally {
@@ -371,6 +398,85 @@ class PostgresCopy extends Command
 
         if ($copyFailure !== null) {
             throw $copyFailure;
+        }
+    }
+
+    /**
+     * Remove every row from the target tables the copy owns so the run
+     * reconstructs them from the frozen source instead of merging with seed or
+     * stale rows. Foreign-key triggers are disabled by the caller's replica
+     * session role, but the table set is still reset in one statement so the
+     * target's own foreign-key metadata stays consistent.
+     *
+     * @param  list<string>  $tables
+     */
+    private function resetTargetRows(Connection $target, array $tables): void
+    {
+        $this->assertNoExternalForeignKeyReferences($target, $tables);
+
+        if ($tables === []) {
+            return;
+        }
+
+        $grammar = $target->getQueryGrammar();
+        $wrappedTables = array_map(
+            static fn (string $table): string => $grammar->wrapTable($table),
+            $tables,
+        );
+
+        try {
+            $target->statement('TRUNCATE TABLE '.implode(', ', $wrappedTables));
+        } catch (Throwable $exception) {
+            throw new RuntimeException(
+                'Failed to reset target rows for the copied table set: '.$exception->getMessage(),
+                previous: $exception,
+            );
+        }
+
+        $this->line('Reset target rows in '.count($tables).' copied table(s).');
+    }
+
+    /**
+     * A target-only table that references a copied table would keep rows that
+     * point at parents this copier is about to replace. Refuse the run before
+     * touching any data rather than leaving an untruncated table behind.
+     *
+     * @param  list<string>  $tables
+     */
+    private function assertNoExternalForeignKeyReferences(Connection $target, array $tables): void
+    {
+        if ($tables === []) {
+            return;
+        }
+
+        $copied = array_fill_keys($tables, true);
+        $rows = $target->select(
+            'SELECT child_namespace.nspname AS child_schema, child.relname AS child_table, '
+            .'parent_namespace.nspname AS parent_schema, parent.relname AS parent_table '
+            .'FROM pg_constraint AS constraint_definition '
+            .'JOIN pg_class AS child ON child.oid = constraint_definition.conrelid '
+            .'JOIN pg_namespace AS child_namespace ON child_namespace.oid = child.relnamespace '
+            .'JOIN pg_class AS parent ON parent.oid = constraint_definition.confrelid '
+            .'JOIN pg_namespace AS parent_namespace ON parent_namespace.oid = parent.relnamespace '
+            .'WHERE constraint_definition.contype = \'f\' '
+            .'AND parent_namespace.nspname = current_schema()',
+        );
+
+        $external = [];
+        foreach ($rows as $row) {
+            $parent = (string) $row->parent_table;
+            $child = (string) $row->child_table;
+
+            if (isset($copied[$parent]) && ! isset($copied[$child])) {
+                $external[$row->child_schema.'.'.$child.' -> '.$row->parent_schema.'.'.$parent] = true;
+            }
+        }
+
+        if ($external !== []) {
+            throw new RuntimeException(
+                'Cannot reset target rows because tables outside the source set reference copied tables: '
+                .implode(', ', array_keys($external)).'.',
+            );
         }
     }
 
