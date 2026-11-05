@@ -6,7 +6,9 @@ use App\Enums\UserRole;
 use App\Models\Org;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class OrgControllerTest extends TestCase
@@ -79,6 +81,55 @@ class OrgControllerTest extends TestCase
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/orgs', ['name' => 'No Frequency'])
             ->assertStatus(422);
+    }
+
+    public function test_org_domain_uniqueness_ignores_case_and_allows_case_only_self_update(): void
+    {
+        $org = Org::factory()->create(['domain' => 'Acme.Example.com']);
+        $otherOrg = Org::factory()->create(['domain' => 'Other.Example.com']);
+        $token = $this->adminToken();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/orgs', [
+                'name' => 'Duplicate Domain',
+                'domain' => 'acme.example.COM',
+                'invoice_frequency' => 'monthly',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('domain');
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson("/api/management/orgs/{$org->id}", [
+                'name' => $org->name,
+                'domain' => 'ACME.EXAMPLE.COM',
+                'invoice_frequency' => $org->invoice_frequency,
+            ])
+            ->assertOk();
+
+        $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson("/api/management/orgs/{$otherOrg->id}", [
+                'name' => $otherOrg->name,
+                'domain' => 'ACME.EXAMPLE.COM',
+                'invoice_frequency' => $otherOrg->invoice_frequency,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('domain');
+    }
+
+    public function test_database_enforces_case_insensitive_org_domain_uniqueness(): void
+    {
+        Org::factory()->create(['domain' => 'Case.Index.example']);
+
+        try {
+            DB::transaction(function (): void {
+                Org::factory()->create(['domain' => 'case.index.EXAMPLE']);
+            });
+
+            $this->fail('The database accepted case-equivalent organization domains.');
+        } catch (QueryException $exception) {
+            $expectedSqlState = DB::getDriverName() === 'pgsql' ? '23505' : '23000';
+            $this->assertSame($expectedSqlState, $exception->getCode());
+        }
     }
 
     public function test_create_org_validates_invoice_frequency(): void

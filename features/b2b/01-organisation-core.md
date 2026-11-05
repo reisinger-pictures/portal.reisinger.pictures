@@ -68,6 +68,20 @@ Portal admins can configure an organization's default role as `client`, `power_u
 
 `photographer`, `admin`, and `super_admin` are not valid organization defaults. A photographer role is tied to the FTP credential lifecycle, while the global admin roles exceed an organization's scope. An unsupported legacy value resolves to `client` for new assignments and is surfaced for repair. Organization member removal and organization deletion fail closed until the setting is repaired; they must not silently detach an unsupported specialized role. Existing photographer roles are removed only through the lock-aware FTP revocation path.
 
+### 2.5. Domain identity
+
+Organization domains are compared case-insensitively for registration and
+password-reset auto-join, and are unique without regard to case. The spelling
+stored by an administrator is retained; matching and uniqueness do not depend
+on lowercasing the displayed value. PostgreSQL enforces the invariant with a
+unique expression index on `LOWER(domain)`. MariaDB keeps its existing unique
+domain key under the configured case-insensitive collation.
+
+The migration preflights case-folded duplicates and refuses to create the
+PostgreSQL invariant when a collision exists. It does not merge organizations,
+rewrite domain spelling, or choose which row survives; an operator must resolve
+any reported collision before retrying. No domain backfill is required.
+
 ---
 
 ## 3. User-Zuordnung
