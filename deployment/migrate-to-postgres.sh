@@ -446,7 +446,7 @@ run_rollback() {
         restore_env_backup "$backup"
         printf 'Restored the saved host .env; values were not displayed.\n'
     else
-        printf 'No environment switch had been recorded; the host .env was left unchanged.\n'
+        printf 'No .env backup was recorded; MariaDB connection keys will be normalized to the rollback target.\n'
     fi
 
     patch_host_env_for_mariadb
