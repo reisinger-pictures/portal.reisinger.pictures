@@ -548,9 +548,175 @@ class PostgresCopy extends Command
     private function verify(Connection $source, Connection $target, array $sourceTables, array $targetTables): void
     {
         $this->verifyRowCounts($source, $target, $sourceTables);
+        $this->verifySettings($source, $target);
         $this->verifyMoneySums($source, $target);
         $this->verifySequences($target, $targetTables);
         $this->verifyForeignKeys($target);
+    }
+
+    /**
+     * Settings are the deployment's operational contract (prices, licence
+     * terms, bank details). A count and a money sum can agree while a target
+     * row carries the wrong value, so compare every (key, brand) row exactly,
+     * including null values and null brands. Sorting happens in PHP so the
+     * comparison does not depend on the engines' collations.
+     */
+    private function verifySettings(Connection $source, Connection $target): void
+    {
+        if (! isset($this->sourceColumnMetadata['settings'])) {
+            return;
+        }
+
+        $targetExists = $target->selectOne(
+            'SELECT 1 AS present FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?',
+            ['settings'],
+        ) !== null;
+
+        if (! $targetExists) {
+            // verifyRowCounts already names the missing table.
+            return;
+        }
+
+        $sourceRows = $this->settingRows($source);
+        $targetRows = $this->settingRows($target);
+        $sourceCount = count($sourceRows);
+        $targetCount = count($targetRows);
+
+        $this->line("Settings rows: source={$sourceCount}, target={$targetCount}.");
+
+        if ($sourceRows === $targetRows) {
+            $this->line('Settings identities and values: exact match.');
+
+            return;
+        }
+
+        if ($sourceCount !== $targetCount) {
+            $this->recordFailure("Settings row count mismatch: source={$sourceCount}, target={$targetCount}.");
+        }
+
+        $sourceByIdentity = $this->settingsByIdentity($sourceRows);
+        $targetByIdentity = $this->settingsByIdentity($targetRows);
+        $identities = array_keys($sourceByIdentity + $targetByIdentity);
+        sort($identities, SORT_STRING);
+
+        $differences = 0;
+
+        foreach ($identities as $identity) {
+            $inSource = array_key_exists($identity, $sourceByIdentity);
+            $inTarget = array_key_exists($identity, $targetByIdentity);
+
+            if (! $inTarget) {
+                $differences++;
+                $this->recordFailure(
+                    'Settings row exists only in the source: '.$this->describeSetting($sourceByIdentity[$identity]).'.',
+                );
+
+                continue;
+            }
+
+            if (! $inSource) {
+                $differences++;
+                $this->recordFailure(
+                    'Settings row exists only in the target: '.$this->describeSetting($targetByIdentity[$identity]).'.',
+                );
+
+                continue;
+            }
+
+            if ($sourceByIdentity[$identity]['value'] !== $targetByIdentity[$identity]['value']) {
+                $differences++;
+                $this->recordFailure(
+                    'Settings value mismatch for '.$this->describeSetting($sourceByIdentity[$identity])
+                    .': the source and target values differ.',
+                );
+            }
+        }
+
+        if ($differences === 0) {
+            // Only reachable with duplicate (key, brand) identities, which the
+            // production primary key forbids. The sorted row comparison above
+            // still rejects them instead of reporting a false match.
+            $this->recordFailure('Settings row sets differ although every (key, brand) identity has a matching value.');
+        }
+    }
+
+    /**
+     * @return list<array{key: ?string, brand: ?string, value: ?string}>
+     */
+    private function settingRows(Connection $connection): array
+    {
+        $settings = [];
+
+        foreach ($connection->table('settings')->select(['key', 'brand', 'value'])->get() as $row) {
+            $settings[] = [
+                'key' => $row->key === null ? null : (string) $row->key,
+                'brand' => $row->brand === null ? null : (string) $row->brand,
+                'value' => $row->value === null ? null : (string) $row->value,
+            ];
+        }
+
+        usort($settings, fn (array $left, array $right): int => $this->compareSettingRows($left, $right));
+
+        return $settings;
+    }
+
+    /**
+     * @param  array{key: ?string, brand: ?string, value: ?string}  $left
+     * @param  array{key: ?string, brand: ?string, value: ?string}  $right
+     */
+    private function compareSettingRows(array $left, array $right): int
+    {
+        foreach (['key', 'brand', 'value'] as $field) {
+            if ($left[$field] === $right[$field]) {
+                continue;
+            }
+
+            if ($left[$field] === null) {
+                return -1;
+            }
+
+            if ($right[$field] === null) {
+                return 1;
+            }
+
+            $comparison = strcmp($left[$field], $right[$field]);
+            if ($comparison !== 0) {
+                return $comparison;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * @param  list<array{key: ?string, brand: ?string, value: ?string}>  $rows
+     * @return array<string, array{key: ?string, brand: ?string, value: ?string}>
+     */
+    private function settingsByIdentity(array $rows): array
+    {
+        $settings = [];
+
+        foreach ($rows as $row) {
+            $settings[$this->settingIdentity($row)] = $row;
+        }
+
+        return $settings;
+    }
+
+    /** @param array{key: ?string, brand: ?string, value: ?string} $row */
+    private function settingIdentity(array $row): string
+    {
+        return ($row['key'] === null ? "\0" : $row['key'])."\0"
+            .($row['brand'] === null ? "\0" : $row['brand']);
+    }
+
+    /** @param array{key: ?string, brand: ?string, value: ?string} $row */
+    private function describeSetting(array $row): string
+    {
+        $key = $row['key'] === null ? 'NULL' : "'".$row['key']."'";
+        $brand = $row['brand'] === null ? 'NULL' : "'".$row['brand']."'";
+
+        return "key={$key}, brand={$brand}";
     }
 
     /** @param list<string> $tables */
