@@ -129,7 +129,7 @@ Danach den PHP-Prozess neu starten, damit er die Tools findet.
   `backend/.env`. `admin@example.com` steht nur als Beispiel im Template bzw. in
   expliziten E2E-Fixtures; es gibt im aktuellen Runtime-Config keinen
   Admin-Passwort-Fallback.
-- **Datenbank:** PostgreSQL 16 aus `docker-compose.local.yml` (Container `portal_local_db`, `127.0.0.1:5432`, Datenbank `portal_db`, Zugang wie in `backend/.env.example`); Einrichtung via `php artisan migrate:fresh --seed`. Die Engine ist lokal dieselbe wie in Produktion (D-63) — eine Abweichung hier verdeckt genau die Fehler, die die Umstellung sichtbar gemacht hat.
+- **Datenbank:** PostgreSQL 16 aus `docker-compose.local.yml` (Container `portal_local_db`, `127.0.0.1:5432`, Datenbank `portal_db`, Zugang wie in `backend/.env.example`); Einrichtung via `php artisan migrate:fresh --seed`. Lokal läuft damit dieselbe Engine wie das Produktionsziel aus D-63; Produktion bleibt bis zum verifizierten Host-Cutover auf MariaDB.
 
 ### Stripe Webhooks (Lokal Testen)
 Führe `stripe listen --forward-to localhost:8000/api/webhooks/stripe` aus und trage das ausgegebene `STRIPE_WEBHOOK_SECRET` in die `.env` Datei im Backend ein.

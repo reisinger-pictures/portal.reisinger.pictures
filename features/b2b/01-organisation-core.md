@@ -82,6 +82,14 @@ PostgreSQL invariant when a collision exists. It does not merge organizations,
 rewrite domain spelling, or choose which row survives; an operator must resolve
 any reported collision before retrying. No domain backfill is required.
 
+This contract is intentionally case-folding parity, not a byte-for-byte
+replacement for MariaDB `utf8mb4_unicode_ci`: PostgreSQL `LOWER()` does not also
+make accents equivalent or ignore trailing spaces. Domain identity is expected
+to use DNS/IDNA names; those additional MariaDB equivalence classes are outside
+this contract. Rollback does not rewrite data or remove the PostgreSQL index;
+the repository does not execute migration `down()` methods, and the MariaDB
+rollback path continues to use its existing unique key and collation.
+
 ---
 
 ## 3. User-Zuordnung

@@ -18,6 +18,11 @@ Host `.env` files created before this cutover may not contain `DB_HOST` or
 `DB_PORT`: Compose supplied the MariaDB coordinates as defaults. The cutover
 script uses those historical defaults when the keys are absent, then adds
 `DB_HOST` and `DB_PORT` during the switch. These are not new required secrets.
+The host `.env` must not set a non-empty `DB_URL`: Laravel gives it precedence
+over the individual `DB_*` coordinates, so the script refuses before backup if
+it is present rather than claim a switch that the live backend did not make.
+Remove it and provide `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` before
+retrying; an absent or empty `DB_URL` is accepted.
 
 ## One-time cutover contract
 
@@ -197,12 +202,16 @@ accent-insensitive and ignores trailing spaces; PostgreSQL text comparisons and
 ordinary unique indexes are case-sensitive. The application preserves the
 established email identity contract through normalization and a functional
 unique index, and coupon codes through V055's tested ICU collation plus
-`RTRIM()` unique index. V055 documents that ICU's Unicode collation version is
-an approximation, not byte-for-byte equivalent to MariaDB's UCA version. The
-copy itself never case-folds data or merges duplicate rows. Every other
-collation-dependent business key must have an explicit compatibility contract;
-collisions that remain unhandled block the copy on schema/value verification or
-the target unique index rather than choosing a value silently.
+`RTRIM()` unique index. Organization domain identity uses V056's `LOWER(domain)`
+lookup and unique expression index, preserving case-insensitive matching. This
+is only case-folding parity: it does not reproduce MariaDB's accent-insensitive
+or trailing-space equivalence for domains. V055 documents that ICU's Unicode
+collation version is an approximation, not byte-for-byte equivalent to
+MariaDB's UCA version. The copy itself never case-folds data or merges
+duplicate rows. Every other collation-dependent business key must have an
+explicit compatibility contract; collisions that remain unhandled block the
+copy on schema/value verification or the target unique index rather than
+choosing a value silently.
 
 ## Explicitly not handled
 

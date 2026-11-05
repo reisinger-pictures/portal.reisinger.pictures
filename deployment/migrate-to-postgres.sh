@@ -46,8 +46,9 @@ the lock is held; the lock is released when the process exits.
 The migration phases are:
 
   PREFLIGHT  Check the stack, containers, images, free disk, source env, and
-             that neither an unfinished cutover nor a prior switch marker
-             exists.
+              that neither an unfinished cutover nor a prior switch marker
+              exists; require DB_URL to be absent or empty so it cannot override
+              the DB_* coordinates during the live switch.
   BACKUP     Stop the backend to establish a write freeze, then create and
              verify a private MariaDB dump and exact per-table row manifest.
   PG         Start only db_pg (portal_db_pg) and wait for PostgreSQL readiness.
@@ -100,7 +101,7 @@ PREFLIGHT:
   docker compose -f '$COMPOSE_FILE' run --rm --no-deps backend php -r <require pdo_mysql and pdo_pgsql>
   docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan list --raw | grep '^portal:db-copy([[:space:]]|$)'
   test ! -e '$MARKER_FILE' && test ! -e '$SWITCH_MARKER_FILE'
-  python3 <read DB_CONNECTION and optional DB_HOST/DB_PORT privately; use historical Compose defaults when host/port are absent>
+  python3 <require DB_URL absent or empty; read DB_CONNECTION and optional DB_HOST/DB_PORT privately; use historical Compose defaults when host/port are absent>
   docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e DB_CONNECTION=mariadb -e DB_HOST=<source> -e DB_PORT=<source> -e DB_URL= -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan migrate:status --database=mariadb --no-ansi; require no Pending migrations
   docker inspect -f <MariaDB /var/lib/mysql host mount> '$SOURCE_CONTAINER'
   du -sb <MariaDB data path>; df -Pk <data path and backup filesystem>; require 3x free
@@ -477,6 +478,12 @@ run_cutover() {
         command -v "$required_binary" >/dev/null 2>&1 \
             || fail "Required host command '$required_binary' is missing. Install it before starting the cutover."
     done
+
+    local database_url
+    database_url="$(read_env_value DB_URL '')" || fail 'DB_URL must occur at most once in the host .env.'
+    [[ -z "$database_url" ]] \
+        || fail 'A non-empty DB_URL is set in the host .env and would override the DB_* coordinates. Remove DB_URL and configure DB_DATABASE/DB_USERNAME/DB_PASSWORD before retrying.'
+
     docker inspect "$SOURCE_CONTAINER" >/dev/null 2>&1 || fail "MariaDB container '$SOURCE_CONTAINER' is missing."
     [[ "$(docker inspect --format '{{.State.Running}}' "$SOURCE_CONTAINER")" == 'true' ]] \
         || fail "MariaDB container '$SOURCE_CONTAINER' is not running."
