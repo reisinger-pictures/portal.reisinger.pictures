@@ -76,22 +76,29 @@ class ImageController extends Controller
 
         return DB::transaction(function () use ($file, $gallery, $user, $extension, $targetDir, $thumbsDir, $isLrUpload, $lrUuid, $originalName, $request, $meta) {
 
-            $query = Photo::where('gallery_id', $gallery->id);
-            if ($isLrUpload) {
-                $query->where('lr_uuid', $lrUuid);
-            } elseif ($request->boolean('replace')) {
-                // Suchen nach dem Originalnamen im Titel, da Dateiname jetzt UUID ist
-                $query->where('title', $originalName);
-            } else {
-                $query->where('id', 'invalid-id-to-force-create');
-            }
-            try {
-                $existingPhoto = $query->lockForUpdate()->first();
-            } catch (QueryException $e) {
-                if (str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'lock wait timeout')) {
-                    return response()->json(['error' => 'Server ist derzeit überlastet. Bitte versuche es in einigen Sekunden erneut.'], 503);
+            // A fresh upload has no lookup key: a browser upload sends a
+            // `web-`/`ftp-` marker instead of a Lightroom UUID and does not ask
+            // to replace. There is nothing that could identify an existing row,
+            // so the lookup is skipped rather than forced to miss. A sentinel
+            // id here used to reach the UUID column and abort every such upload.
+            $existingPhoto = null;
+            if ($isLrUpload || $request->boolean('replace')) {
+                $query = Photo::where('gallery_id', $gallery->id);
+                if ($isLrUpload) {
+                    $query->where('lr_uuid', $lrUuid);
+                } else {
+                    // Suchen nach dem Originalnamen im Titel, da Dateiname jetzt UUID ist
+                    $query->where('title', $originalName);
                 }
-                throw $e;
+
+                try {
+                    $existingPhoto = $query->lockForUpdate()->first();
+                } catch (QueryException $e) {
+                    if (str_contains($e->getMessage(), 'Deadlock') || str_contains($e->getMessage(), 'lock wait timeout')) {
+                        return response()->json(['error' => 'Server ist derzeit überlastet. Bitte versuche es in einigen Sekunden erneut.'], 503);
+                    }
+                    throw $e;
+                }
             }
 
             // Dateinamen IMMER aus UUID generieren!

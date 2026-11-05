@@ -25,6 +25,14 @@ class OrgInviteController extends Controller
     public function invite(Request $request, $orgId)
     {
         $user = auth('api')->user();
+
+        // `orgs.id` is a UUID column. A malformed route parameter cannot name
+        // an org, so it keeps the existing 404 contract instead of reaching the
+        // database and failing with SQLSTATE 22P02.
+        if (! is_string($orgId) || ! Str::isUuid($orgId)) {
+            abort(404);
+        }
+
         $org = Org::findOrFail($orgId);
 
         if ($this->brandValue($org) === null) {

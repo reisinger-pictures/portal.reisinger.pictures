@@ -30,6 +30,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -215,15 +216,24 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
                 InvoiceSnapshot::factory()->for($winner)->create();
 
                 // Force the same database unique constraint a concurrent
-                // worker would hit after winning the identity race.
-                Order::factory()->create([
-                    'user_id' => $user->id,
-                    'brand' => Brand::B2B,
-                    'status' => 'invoice_created',
-                    'total_amount' => 7500,
-                    'checkout_idempotency_key' => $identity['key'],
-                    'checkout_fingerprint' => $identity['fingerprint'],
-                ]);
+                // worker would hit after winning the identity race. In
+                // production the loser's insert runs inside the creator's
+                // DB::transaction, so PostgreSQL aborts that transaction and
+                // Laravel rolls it back before the exception reaches
+                // executeNonImmediate(). Model that transaction boundary here
+                // as a savepoint; without it the failed INSERT would poison
+                // the test's own surrounding transaction (SQLSTATE 25P02) and
+                // the recovery SELECT could never run.
+                DB::transaction(function () use ($user, $identity): void {
+                    Order::factory()->create([
+                        'user_id' => $user->id,
+                        'brand' => Brand::B2B,
+                        'status' => 'invoice_created',
+                        'total_amount' => 7500,
+                        'checkout_idempotency_key' => $identity['key'],
+                        'checkout_fingerprint' => $identity['fingerprint'],
+                    ]);
+                });
 
                 return response()->json(['unexpected' => true]);
             },
@@ -233,6 +243,30 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
         $this->assertSame(1, Order::query()->count());
         $this->assertSame(1, InvoiceSnapshot::query()->count());
         $this->assertSame(Order::first()->id, $response->getData(true)['order_id']);
+
+        // The aborted loser transaction must leave the connection healthy:
+        // an exact-key replay succeeds instead of failing with 25P02. The
+        // completed invoice is re-finalized through the creator, so this
+        // callback must serve the existing order rather than insert one.
+        $replay = $service->executeNonImmediate(
+            $user,
+            $identity['key'],
+            $identity['fingerprint'],
+            7500,
+            function (?Order $existingOrder): JsonResponse {
+                $this->assertNotNull($existingOrder);
+                $this->assertSame('invoice_created', $existingOrder->status);
+
+                return response()->json([
+                    'success' => true,
+                    'order_id' => $existingOrder->id,
+                ]);
+            },
+        );
+
+        $this->assertSame(200, $replay->status());
+        $this->assertSame(Order::first()->id, $replay->getData(true)['order_id']);
+        $this->assertSame(1, Order::query()->count());
     }
 
     public function test_same_key_with_a_different_invoice_payload_is_a_conflict(): void

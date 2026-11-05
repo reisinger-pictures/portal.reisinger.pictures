@@ -352,8 +352,9 @@ class ContractTemplateServiceTest extends TestCase
             'available_roles' => ['Model'],
         ]);
         $crossed = false;
+        $expiredTimestamp = $this->expiredDatabaseTimestampExpression();
 
-        Contract::retrieved(function (Contract $loadedContract) use ($template, &$crossed): void {
+        Contract::retrieved(function (Contract $loadedContract) use ($template, &$crossed, $expiredTimestamp): void {
             if ($crossed
                 || DB::connection()->transactionLevel() < 1
                 || $loadedContract->getKey() !== $template->getKey()) {
@@ -364,7 +365,7 @@ class ContractTemplateServiceTest extends TestCase
             DB::table('contracts')
                 ->where('id', $template->getKey())
                 ->update([
-                    'expires_at' => DB::raw('CURRENT_TIMESTAMP'),
+                    'expires_at' => DB::raw($expiredTimestamp),
                 ]);
         });
 
@@ -376,12 +377,78 @@ class ContractTemplateServiceTest extends TestCase
             'personal_token' => 'service-crossing-token',
         ]);
 
+        $this->assertTrue($crossed);
         $this->assertFalse($result['created']);
         $this->assertSame(410, $result['status']);
         $this->assertNull($result['instance']);
         $this->assertNull($result['signer']);
         $this->assertDatabaseCount('contracts', 1);
         $this->assertDatabaseCount('contract_signers', 0);
+    }
+
+    /**
+     * The final availability recheck runs after the instance and signer were
+     * inserted. A deadline crossing at that boundary must roll back both rows
+     * instead of committing an orphaned, already expired contract.
+     */
+    public function test_create_instance_rolls_back_both_rows_when_deadline_crosses_after_insert(): void
+    {
+        $template = Contract::factory()->template()->create([
+            'status' => 'active',
+            'expires_at' => now()->addHour(),
+            'available_roles' => ['Model'],
+        ]);
+        $crossed = false;
+        $expiredTimestamp = $this->expiredDatabaseTimestampExpression();
+
+        Contract::created(function (Contract $createdContract) use ($template, &$crossed, $expiredTimestamp): void {
+            if ($crossed
+                || $createdContract->type !== 'contract'
+                || $createdContract->template_id !== $template->getKey()) {
+                return;
+            }
+
+            $crossed = true;
+            DB::table('contracts')
+                ->where('id', $template->getKey())
+                ->update([
+                    'expires_at' => DB::raw($expiredTimestamp),
+                ]);
+        });
+
+        $service = new ContractTemplateService;
+        $result = $service->createInstance($template, [
+            'name' => 'Late Crossing Signer',
+            'email' => 'service-late-crossing@example.com',
+            'roles' => ['Model'],
+            'personal_token' => 'service-late-crossing-token',
+        ]);
+
+        $this->assertTrue($crossed);
+        $this->assertFalse($result['created']);
+        $this->assertSame(410, $result['status']);
+        $this->assertNull($result['instance']);
+        $this->assertNull($result['signer']);
+        $this->assertDatabaseCount('contracts', 1);
+        $this->assertDatabaseHas('contracts', ['id' => $template->getKey()]);
+        $this->assertDatabaseCount('contract_signers', 0);
+    }
+
+    /**
+     * A timestamp column without sub-second precision rounds a value taken
+     * from the database clock: on PostgreSQL a CURRENT_TIMESTAMP with a
+     * fractional part >= .5 is stored as the next whole second. The fixture
+     * must therefore name a deadline unambiguously in the past, not one that
+     * can round forward into the future and flake the test.
+     */
+    private function expiredDatabaseTimestampExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => "clock_timestamp() - INTERVAL '1 second'",
+            'mysql' => 'CURRENT_TIMESTAMP - INTERVAL 1 SECOND',
+            'sqlite' => "datetime('now', '-1 second')",
+            default => 'CURRENT_TIMESTAMP',
+        };
     }
 
     public function test_multiple_instances_from_same_template(): void

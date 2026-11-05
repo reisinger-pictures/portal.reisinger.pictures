@@ -7,6 +7,7 @@ use App\Models\Contract;
 use App\Models\ContractSigner;
 use App\Models\User;
 use App\Support\BrandRegistry;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -14,10 +15,13 @@ use Tests\TestCase;
 /**
  * Deterministic, sequential contract for SEC-20261018-12.
  *
- * Deliberately runs only against a real PostgreSQL database and therefore
- * does not use RefreshDatabase:
- * it must not wipe a database it does not own. Run it against a disposable,
- * already-migrated database:
+ * Deliberately runs only against a real PostgreSQL database and deliberately
+ * does not use RefreshDatabase: it must never migrate:fresh a database it does
+ * not own. DatabaseTransactions is used instead, so the parallel runner still
+ * switches this class to the per-worker database and migrates it once, while
+ * every row this test writes is rolled back at teardown. A filtered run still
+ * expects an already-migrated database (the PostgreSQL contract job migrates
+ * before running it):
  *
  *   DB_CONNECTION=pgsql DB_HOST=127.0.0.1 DB_PORT=<port> \
  *   DB_DATABASE=<db> DB_USERNAME=<user> DB_PASSWORD=<password> \
@@ -33,6 +37,8 @@ use Tests\TestCase;
  */
 class ContractContentHeartbeatPostgresTest extends TestCase
 {
+    use DatabaseTransactions;
+
     public function test_postgres_contract_content_limiter_bounds_heartbeat_writes(): void
     {
         if (DB::connection()->getDriverName() !== 'pgsql') {
