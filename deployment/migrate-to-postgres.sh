@@ -95,7 +95,7 @@ PREFLIGHT:
   command -v python3 gzip sha256sum du df stat install awk grep sed seq flock; fail before downtime if any are missing
   docker inspect '$SOURCE_CONTAINER'; require State.Running=true
   docker compose -f '$COMPOSE_FILE' config --services; require db, db_pg, backend
-  docker compose -f '$COMPOSE_FILE' config --format json | python3 <validate db/db_pg names, images, and volumes>
+  docker compose -f '$COMPOSE_FILE' config --format json | python3 <validate db/db_pg names, images, and local volumes>
   docker compose -f '$COMPOSE_FILE' config --format json | python3 <read backend image>
   docker image inspect <configured backend image>
   docker compose -f '$COMPOSE_FILE' run --rm --no-deps backend php -r <require pdo_mysql and pdo_pgsql>
@@ -104,7 +104,7 @@ PREFLIGHT:
   python3 <require DB_URL absent or empty; read DB_CONNECTION and optional DB_HOST/DB_PORT privately; use historical Compose defaults when host/port are absent>
   docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e DB_CONNECTION=mariadb -e DB_HOST=<source> -e DB_PORT=<source> -e DB_URL= -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan migrate:status --database=mariadb --no-ansi; require no Pending migrations
   docker inspect -f <MariaDB /var/lib/mysql host mount> '$SOURCE_CONTAINER'
-  du -sb <MariaDB data path>; df -Pk <data path and backup filesystem>; require 3x free
+  du -sb <MariaDB data path>; df -Pk <MariaDB, backup, and PostgreSQL target filesystems>; require 3x free on each
   install -d -o root -g root -m 0700 '$STATE_DIR' '$BACKUP_DIR'
 BACKUP:
   docker compose -f '$COMPOSE_FILE' stop '$BACKEND_SERVICE'  # write freeze
@@ -496,9 +496,11 @@ run_cutover() {
 
     compose config --format json | python3 -c '
 import json, sys
-services = json.load(sys.stdin)["services"]
+configuration = json.load(sys.stdin)
+services = configuration["services"]
 source = services["db"]
 target = services["db_pg"]
+target_volume = configuration.get("volumes", {}).get("db_pg_data", {})
 valid = (
     source.get("container_name") == "portal_db"
     and str(source.get("image", "")).startswith("mariadb:11.4")
@@ -506,9 +508,20 @@ valid = (
     and str(target.get("image", "")).startswith("postgres:16")
     and any(volume.get("source") == "db_data" for volume in source.get("volumes", []))
     and any(volume.get("source") == "db_pg_data" for volume in target.get("volumes", []))
+    and target_volume.get("driver") in (None, "local")
+    and not target_volume.get("driver_opts")
+    and not target_volume.get("external", False)
 )
 raise SystemExit(0 if valid else 1)
 ' || fail 'Compose database services do not match the MariaDB/PostgreSQL cutover topology.'
+
+    local target_volume_name
+    target_volume_name="$(compose config --format json | python3 -c '
+import json, sys
+volume = json.load(sys.stdin).get("volumes", {}).get("db_pg_data", {})
+print(volume.get("name", ""))
+')"
+    [[ -n "$target_volume_name" ]] || fail 'Could not resolve the PostgreSQL target volume name from Compose.'
 
     local backend_image
     backend_image="$(compose config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["backend"]["image"])')"
@@ -559,7 +572,8 @@ raise SystemExit(0 if valid else 1)
     fi
     printf 'MariaDB migration status: no pending migrations.\n'
 
-    local source_running image_data_path data_bytes free_kib backup_free_kib backup_probe
+    local source_running image_data_path target_data_path target_volume_mount
+    local data_bytes free_kib backup_free_kib target_free_kib backup_probe
     source_running="$(docker inspect --format '{{.State.Running}}' "$SOURCE_CONTAINER")"
     [[ "$source_running" == 'true' ]] || fail 'MariaDB is not running.'
     image_data_path="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{.Source}}{{end}}{{end}}' "$SOURCE_CONTAINER")"
@@ -571,10 +585,37 @@ raise SystemExit(0 if valid else 1)
         backup_probe="$(dirname "$backup_probe")"
     done
     backup_free_kib="$(df -Pk "$backup_probe" | awk 'END {print $4}')"
-    [[ "$data_bytes" =~ ^[0-9]+$ && "$free_kib" =~ ^[0-9]+$ && "$backup_free_kib" =~ ^[0-9]+$ ]] \
-        || fail 'Could not measure MariaDB data size or free disk space.'
+    if docker inspect "$TARGET_CONTAINER" >/dev/null 2>&1; then
+        target_volume_mount="$(docker inspect --format \
+            '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}|{{.Source}}{{end}}{{end}}' \
+            "$TARGET_CONTAINER")"
+        [[ "$target_volume_mount" == *'|'* ]] || fail 'Could not locate the PostgreSQL target volume mount on the host.'
+        [[ "${target_volume_mount%%|*}" == "$target_volume_name" ]] \
+            || fail 'The existing PostgreSQL container does not mount the Compose target volume.'
+        target_data_path="${target_volume_mount#*|}"
+    else
+        # A not-yet-created default local volume will be stored below DockerRootDir.
+        local docker_root_dir
+        docker_root_dir="$(docker info --format '{{.DockerRootDir}}')" \
+            || fail 'Could not locate DockerRootDir for PostgreSQL target disk preflight.'
+        [[ -n "$docker_root_dir" && -d "$docker_root_dir" ]] \
+            || fail 'DockerRootDir does not identify an existing host directory.'
+        if [[ -d "$docker_root_dir/volumes" ]]; then
+            target_data_path="$docker_root_dir/volumes"
+        else
+            target_data_path="$docker_root_dir"
+        fi
+    fi
+    [[ -n "$target_data_path" && -d "$target_data_path" ]] \
+        || fail 'Could not locate the PostgreSQL target data filesystem on the host.'
+    target_free_kib="$(df -Pk "$target_data_path" | awk 'END {print $4}')"
+    [[ "$data_bytes" =~ ^[0-9]+$ && "$free_kib" =~ ^[0-9]+$ \
+        && "$backup_free_kib" =~ ^[0-9]+$ && "$target_free_kib" =~ ^[0-9]+$ ]] \
+        || fail 'Could not measure MariaDB data size or free space on the MariaDB, backup, or PostgreSQL target filesystem.'
     (( free_kib * 1024 >= data_bytes * 3 )) || fail 'The MariaDB volume filesystem has less than 3x the current MariaDB data size free.'
     (( backup_free_kib * 1024 >= data_bytes * 3 )) || fail 'The backup filesystem has less than 3x the current MariaDB data size free.'
+    (( target_free_kib * 1024 >= data_bytes * 3 )) || fail 'The PostgreSQL target filesystem has less than 3x the current MariaDB data size free.'
+    printf 'Disk preflight: MariaDB, backup, and PostgreSQL target filesystems each meet the 3x source-data free-space threshold.\n'
 
     RUN_TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
     readonly RUN_TIMESTAMP
