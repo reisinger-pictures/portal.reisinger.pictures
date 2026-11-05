@@ -24,8 +24,10 @@ kombinierte Config „Start Alles“: Der Backend-Dienst, die Docker-Services un
 der Vite-Server werden bewusst separat gestartet.
 
 ### 1. Der reguläre Start
-1. Starte **`🐳 [Run] Start Docker (Dev)`**. Das startet ausschließlich den lokalen
-   Meilisearch-Service auf Port `7700` (keine Datenbank und kein Mailpit).
+1. Starte **`🐳 [Run] Start Docker (Dev)`**. Das startet den lokalen
+   PostgreSQL-16-Service auf Port `5432` (Container `portal_local_db`) und den
+   Meilisearch-Service auf Port `7700`. Kein Mailpit — das ist ein optionaler
+   nativer Dienst (siehe unten).
 2. Starte das Backend über deine lokale PHP-Umgebung (PHP 8.5+ via Homebrew):
    `cd backend && php artisan serve` (läuft auf `http://localhost:8000`).
 3. Starte **`⚡ [Run] Frontend: Start Frontend`**. Der Vite-Dev-Server läuft danach
@@ -71,8 +73,8 @@ beiden Docker-Run-Configs automatisch gestartet. Starte ihn bei Bedarf mit
   Docker-Services herunterzufahren. Für die Test-Services gibt es separat
   **`🛑 [Core] Stop Docker (Test)`**.
 * **Achtung:** **`🧨 [Gefahr] DB Reset & Seed`** löscht deine gesamte lokale
-  SQLite-Datenbank (`backend/database/database.sqlite`) unwiderruflich und baut
-  sie mit `migrate:fresh --seed` neu auf.
+  PostgreSQL-Datenbank (Volume `db_data_local`, Datenbank `portal_db`)
+  unwiderruflich und baut sie mit `migrate:fresh --seed` neu auf.
 
 ### Deployment-Sync (optional)
 
@@ -127,23 +129,23 @@ Danach den PHP-Prozess neu starten, damit er die Tools findet.
   `backend/.env`. `admin@example.com` steht nur als Beispiel im Template bzw. in
   expliziten E2E-Fixtures; es gibt im aktuellen Runtime-Config keinen
   Admin-Passwort-Fallback.
-- **Datenbank:** SQLite-Datei `backend/database/database.sqlite` (kein DB-Container; Einrichtung via `php artisan migrate:fresh --seed`)
+- **Datenbank:** PostgreSQL 16 aus `docker-compose.local.yml` (Container `portal_local_db`, `127.0.0.1:5432`, Datenbank `portal_db`, Zugang wie in `backend/.env.example`); Einrichtung via `php artisan migrate:fresh --seed`. Lokal läuft damit dieselbe Engine wie das Produktionsziel aus D-63; Produktion bleibt bis zum verifizierten Host-Cutover auf MariaDB.
 
 ### Stripe Webhooks (Lokal Testen)
 Führe `stripe listen --forward-to localhost:8000/api/webhooks/stripe` aus und trage das ausgegebene `STRIPE_WEBHOOK_SECRET` in die `.env` Datei im Backend ein.
 
-## Lokale E2E-Tests isoliert ausführen (eigene Backend-Instanz + SQLite-DB)
+## Lokale E2E-Tests isoliert ausführen (eigene Backend-Instanz + eigene PostgreSQL-DB)
 
 Für die Playwright-E2E-Suite gibt es lokal einen **isolierten E2E-Backend**
-mit eigener SQLite-DB (`backend/database/database.e2e.sqlite`, gitignored) auf
-Port **8001**. So bleiben die Daten der Dev-Instanz (`portal.test` /
-`backend/database/database.sqlite`) unberührt:
+mit eigener PostgreSQL-DB (Container `portal_db_test`, Datenbank
+`portal_test_db`, Port **5433**) auf Port **8001**. So bleiben die Daten der
+Dev-Instanz (`portal.test` / Datenbank `portal_db`) unberührt:
 
-1. **Backend starten:** Run-Config `🐘 [Run] Start E2E Backend (isoliert)` (oder `bash scripts/e2e-up.sh`) — startet Test-Docker-Services (Meili 7701), generiert `backend/.env.e2e` aus deinem `.env`, migriert + seedet die E2E-DB, lädt die deterministischen Location-Fixtures in den Test-Suchindex und served auf `http://127.0.0.1:8001`.
+1. **Backend starten:** Run-Config `🐘 [Run] Start E2E Backend (isoliert)` (oder `bash scripts/e2e-up.sh`) — startet die Test-Docker-Services aus `docker-compose.test.yml` (PostgreSQL 5433, Meili 7701, SFTPGo-Admin-API), generiert `backend/.env.e2e` aus deinem `.env`, migriert + seedet die E2E-DB, lädt die deterministischen Location-Fixtures in den Test-Suchindex und served auf `http://127.0.0.1:8001`.
 2. **Frontend mit Proxy:** Run-Config `⚡ [Run] Frontend: Start Frontend (E2E Proxy)` (oder `VITE_API_PROXY=http://127.0.0.1:8001 pnpm dev`).
 3. **Tests:** Run-Config `🧪 [Test] Frontend: Playwright (E2E isoliert)` (oder `pnpm test:e2e`).
 
-*Hinweis: Die Dev-Instanz (`portal.test`) bleibt davon völlig unberührt — die E2E-Daten liegen ausschließlich in der e2e-SQLite-DB und dem Test-Search-Container. Mails nutzen das native Homebrew-Mailpit (Ports 1025/8025) — kein Docker-Mailpit-Container.*
+*Hinweis: Die Dev-Instanz (`portal.test`) bleibt davon völlig unberührt — die E2E-Daten liegen ausschließlich in der E2E-PostgreSQL-DB und dem Test-Search-Container. Mails nutzen das native Homebrew-Mailpit (Ports 1025/8025) — kein Docker-Mailpit-Container.*
 
 ### Mailpit (lokal & Tests)
 Das native **Homebrew-Mailpit** (`brew install mailpit`, Service via

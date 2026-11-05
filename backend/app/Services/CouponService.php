@@ -34,9 +34,14 @@ class CouponService
         int|string|array|null $metaGalleryId = null,
         int|string|null $userId = null,
     ): array {
+        // Coupon codes are case- and accent-insensitive per brand, and trailing
+        // spaces are ignored like MariaDB's PAD SPACE collation.
+        // `whereCodeMatches()` selects the engine-native comparison: the V055
+        // ICU collation plus RTRIM on PostgreSQL, the column collation on
+        // MariaDB, and the V054 `LOWER()` approximation on SQLite.
         /** @var Coupon|null $coupon */
         $coupon = Coupon::byBrand($brand)
-            ->where('code', $code)
+            ->whereCodeMatches($code)
             ->first();
 
         if ($coupon === null) {
@@ -69,14 +74,19 @@ class CouponService
         $galleryIds = $this->normalizeScopeIds($galleryId);
         $metaGalleryIds = $this->normalizeScopeIds($metaGalleryId);
 
-        if ($coupon->scope_type === 'gallery' && $coupon->scope_id !== null) {
-            if (! in_array((string) $coupon->scope_id, $galleryIds, true)) {
+        // `coupons.scope_id` is CHAR(36). PostgreSQL blank-pads a shorter
+        // value, while MariaDB's comparison ignored the padding; trim it so a
+        // stored scope id still matches the submitted id on both engines.
+        $couponScopeId = $coupon->scope_id === null ? null : trim((string) $coupon->scope_id);
+
+        if ($coupon->scope_type === 'gallery' && $couponScopeId !== null) {
+            if (! in_array($couponScopeId, $galleryIds, true)) {
                 return [null, 'This coupon is not valid for your selected items.'];
             }
         }
 
-        if ($coupon->scope_type === 'meta_gallery' && $coupon->scope_id !== null) {
-            if (! in_array((string) $coupon->scope_id, $metaGalleryIds, true)) {
+        if ($coupon->scope_type === 'meta_gallery' && $couponScopeId !== null) {
+            if (! in_array($couponScopeId, $metaGalleryIds, true)) {
                 return [null, 'This coupon is not valid for your selected items.'];
             }
         }
@@ -134,7 +144,7 @@ class CouponService
                 return [null, 'This coupon is not valid for your account.'];
             }
 
-            if ((string) $coupon->scope_id !== (string) $userOrg->id) {
+            if ($couponScopeId !== trim((string) $userOrg->id)) {
                 return [null, 'This coupon is not valid for your account.'];
             }
         }

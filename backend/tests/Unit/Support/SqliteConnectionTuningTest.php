@@ -14,7 +14,7 @@ use Tests\TestCase;
  * The regression is not a timing property, so these tests need neither a fork
  * nor a sleep: the pragma readback proves the connector applies the values, and
  * the BEGIN IMMEDIATE probe proves the transaction mode actually takes the write
- * lock. Both run against a real file database, not the `:memory:` test database
+ * lock. Both run against a real file database, not SQLite's in-memory mode
  * where the pragmas are silently a no-op.
  */
 class SqliteConnectionTuningTest extends TestCase

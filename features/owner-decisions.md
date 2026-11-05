@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-62. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-63. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -28,21 +28,35 @@ Assess storage capacity for the deployment host. Developer-machine capacity is n
 
 Keep `API_THROTTLE_LIMIT=1000` in `backend/.env.ci`; document `60` as the production-intended value in `backend/.env.example`. Do not change the production value or application default as part of this CI adjustment.
 
-### D-49: MariaDB in production, SQLite for tests
-Production runs **MariaDB 11.4** (`deployment/docker-compose.yml`, the `mariadb:11.4` service with binlog enabled; `backend/config/database.php` defaults to `mariadb`). The local development database is SQLite (a file), and the canonical test database is SQLite `:memory:` (`backend/phpunit.xml`). This deviates from the `laravel` skill's standard (PostgreSQL, MySQL deprecated) — the deviation is deliberate and recorded here instead of being left implicit.
+### D-49: MariaDB in production, SQLite for tests (superseded by D-63)
 
-The reasons:
+Superseded on 2026-11-04 by D-63. Historical contract: production used MariaDB
+11.4, while local development and PHPUnit used SQLite. The decision intentionally
+accepted engine divergence, MariaDB-specific migration SQL, and tests that did
+not exercise production-database behavior. Its former reasons and consequences
+no longer apply; the current engine contract and cutover boundary are in D-63
+and [PostgreSQL cutover](infrastructure/30-postgres-cutover.md).
 
-- Production already runs MariaDB 11.4. A switch would be a data migration with a cutover window and a rollback risk, and the project has measured no gain that would pay for it.
-- The scheduler mutex and the database queue share the application connection (`DB_QUEUE_CONNECTION` = `DB_CONNECTION`). `onOneServer()` is only meaningful when every replica uses the same store, and the application database already is that store. See [production operations runbook](infrastructure/29-production-operations-runbook.md) §5.
-- The concurrency proof for the contract-signer identity invariant runs only on MySQL/MariaDB: `backend/tests/Feature/Contract/ContractSignerIdentityRaceTest.php` is driver-gated, because SQLite `:memory:` cannot provide independent writer connections. A switch to PostgreSQL would silently skip exactly the tests that prove the invariant.
-- The deadlock behaviour of the org sync is measured on the real engine (`backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh`), not simulated.
-- The migrations use Laravel's portable `json()` column type, but they are **not** engine-neutral: V008, V018 and V019 contain raw MySQL/MariaDB DDL (`MODIFY`, `CHANGE … AFTER`, `ENUM`), V038 relies on MariaDB's case-insensitive collation for the `ratings.actor_key` unique index, and `Contract::databaseNow()` carries a MariaDB-safe alias (`contract_database_now`, `backend/app/Models/Contract.php:262`) that exists precisely because the generic form does not work there. A change of the production engine would therefore also mean **reworking the migrations**, not only the configuration. The engine choice is an operating decision with a known price tag — not a portability trap that can be undone by switching a connection string.
+### D-63: PostgreSQL 16 is the production engine
 
-Consequences:
+**PostgreSQL 16 is the approved production target** replacing D-49. Until the
+host cutover procedure completes, the existing production instance remains on
+MariaDB; the repository must not imply that editing Compose has migrated live
+data. `backend/config/database.php` defaults to `pgsql`, and
+`deployment/docker-compose.yml` provides PostgreSQL as `db_pg` (`portal_db_pg`,
+volume `db_pg_data`) alongside MariaDB as the temporary source/rollback service.
+Local development, CI and PHPUnit use PostgreSQL so they exercise the target
+engine rather than SQLite.
 
-- A PostgreSQL CI job and a live PostgreSQL service are **not** a gap and are not required. The PostgreSQL branch of the guest-order migration is not a target.
-- A change of the production engine is a new owner decision that replaces this one. It needs a migration plan, a cutover window, and a re-run of the driver-gated tests against the new engine.
+Binding consequences:
+
+- The engine is never selected by assumption. `pdo_pgsql` is part of the runtime image (`deployment/Dockerfile`), and every job that runs PHP against a database installs or ships it.
+- A migration must build the schema on PostgreSQL from scratch (`php artisan migrate:fresh`). Driver branches stay explicit: `DB::connection()->getDriverName() === 'pgsql'`, never a silent fallback to MySQL DDL.
+- The migration history V001–V052 was ported in place, not appended to, because the whole schema moved engines in one step. From V053 on, a deployed migration is immutable again.
+- The contract-signer, payout and guest-order invariants are proven on PostgreSQL, not skipped there. A driver-gated test that skips on the production engine is a defect; CI turns such a skip into a red job.
+- Email identity is case-insensitive by construction, not by collation: the application normalises on write, reads with `lower(email)`, and a functional unique index makes the invariant structural. MariaDB's `utf8mb4_unicode_ci` did this implicitly; PostgreSQL does not.
+- Until the cutover is executed, MariaDB remains the live production source. During the transition its driver is also required by the one-time export (`portal:db-copy` source) and the rollback path. Removing the `db` service after the observation window is a separate decision.
+- The cutover itself — freeze, backup, copy, verify, switch, rollback — is a documented, host-executable procedure: `deployment/migrate-to-postgres.sh`, contract in [PostgreSQL cutover](infrastructure/30-postgres-cutover.md). Rollback is an `.env` flip (`DB_CONNECTION=mariadb`, `DB_HOST=db`, `DB_PORT=3306`), not a restore and not a compose revert.
 
 ### D-52: Watchtower keeps supervising `portal_backend`
 
@@ -271,9 +285,9 @@ Re-validate existing gallery grants against the current selection-gallery and su
 
 ### D-40: One sorted lock set in `OrgController::syncUsers`
 
-Lock the org row, the actor row, and the member rows in one sorted set, so that two concurrent syncs moving the same user cannot deadlock each other. The org row lock serialises syncs of one org, not every write to `users.org_id`: the member set is read unlocked before the single lock query, so a member that a non-sync writer adds in that window (invite redemption, org-admin user creation, registration/auto-join) is no longer detached by that sync — it is not written at all, so none of its roles, flatrate or upgrade rights are revoked by the sync. `OrgController::destroy()` takes the same org row lock first and takes its member rows in the same ascending id order, so a destroy and a sync of one org cannot hold the org row and a member row in opposite orders; the destroy still locks its members one statement at a time, and it writes a member's `user_roles` pivot row before that member's `users` row, while the sync takes all of its `users` locks before any pivot write. The proof needs two real database connections; a SQLite-only test cannot establish it.
+Lock the org row, the actor row, and the member rows in one sorted set, so that two concurrent syncs moving the same user cannot deadlock each other. The org row lock serialises syncs of one org, not every write to `users.org_id`: the member set is read unlocked before the single lock query, so a member that a non-sync writer adds in that window is no longer detached by that sync — it is not written at all, so none of its roles, flatrate or upgrade rights are revoked by the sync. The genuine window belongs to writers that do not take the destination org lock: `UserController::store()` (org-admin user creation) and `AuthController::register()`. Invite redemption and the deferred reset auto-join take the destination org row lock before the user row — the same org → user order as the sync — so they serialise with it. `OrgController::destroy()` takes the same org row lock first and takes its member rows in the same ascending id order, so a destroy and a sync of one org cannot hold the org row and a member row in opposite orders; the destroy still locks its members one statement at a time, and it writes a member's `user_roles` pivot row before that member's `users` row, while the sync takes all of its `users` locks before any pivot write. The proof needs two real database connections; a SQLite-only test cannot establish it.
 
-**The proof was made on 2026-10-21** with the disposable-MariaDB probe `backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh` — 60 scenarios, each firing two concurrent syncs over two orgs whose actors are members of each other's org. Result: 120 concurrent syncs, all HTTP 200, **23** InnoDB row-lock waits as the positive control (the transactions really contended) and **0** deadlocks. The **negative control** — the pre-D-40 lock order taken from `61186f6^` — produced **14** deadlocks and **14** HTTP 500 in the same 60 scenarios, so the probe does detect the cycle it exists to detect. The destroy variant of the same measurement (`SECOND_ACTION=destroy`: a concurrent org destroy against a concurrent org sync, with the members' `user_roles` pivot write active) produced **0** deadlocks with **15** row-lock waits: **this shape** forms no cycle. It does **not** show that the destroy's residual pivot order is safe — in this fixture the destroy pivots the member of the second org and the sync pivots the member of the first, so the two pivot sets are disjoint and the pivot order is never load-bearing. Reaching that residual needs a concurrent membership move (a third writer that moves a member between orgs while the destroy runs), which the probe does not model. A sample is not a proof of absence: the run can only show that no cycle appeared in the contended scenarios it executed.
+**The proof was made on 2026-10-21** with the disposable-MariaDB probe — 60 scenarios, each firing two concurrent syncs over two orgs whose actors are members of each other's org. Result: 120 concurrent syncs, all HTTP 200, **23** InnoDB row-lock waits as the positive control (the transactions really contended) and **0** deadlocks. The **negative control** — the pre-D-40 lock order taken from `61186f6^` — produced **14** deadlocks and **14** HTTP 500 in the same 60 scenarios, so the probe does detect the cycle it exists to detect. The destroy variant of the same measurement (`SECOND_ACTION=destroy`: a concurrent org destroy against a concurrent org sync, with the members' `user_roles` pivot write active) produced **0** deadlocks with **15** row-lock waits: **this shape** forms no cycle. It does **not** show that the destroy's residual pivot order is safe — in this fixture the destroy pivots the member of the second org and the sync pivots the member of the first, so the two pivot sets are disjoint and the pivot order is never load-bearing. Reaching that residual needs a concurrent membership move (a third writer that moves a member between orgs while the destroy runs), which the probe does not model. A sample is not a proof of absence: the run can only show that no cycle appeared in the contended scenarios it executed. The MariaDB-specific probe was retired by commit `95f2aef0554249b758df7ea4adf66fbd527faa06` when the current PostgreSQL probe `backend/tests/scripts/org-sync-deadlock-postgres-probe.sh` was added; the historical source is recoverable with `git show 95f2aef0554249b758df7ea4adf66fbd527faa06^:backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh`.
 
 ### D-41: The contact sheet reports omitted photos
 

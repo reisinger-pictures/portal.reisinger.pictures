@@ -1,6 +1,11 @@
 version: '3.8'
 
 services:
+  # Legacy engine during the one-time cutover. It keeps serving the application
+  # until the operator flips DB_CONNECTION/DB_HOST in the host .env, and it stays
+  # running afterwards as the rollback path: rolling back is that same env flip,
+  # not a restore. Remove this service only after the cutover has been stable for
+  # the agreed observation window.
   db:
     image: mariadb:11.4
     container_name: portal_db
@@ -36,6 +41,34 @@ services:
       - db_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      interval: "15s"
+      timeout: 5s
+      retries: 10
+    networks:
+      - portal_internal
+
+  # The PostgreSQL target. A separate container name and a separate volume are
+  # deliberate: the MariaDB container above already owns the name `portal_db`
+  # and the volume `db_data`, so reusing either would point PostgreSQL at an
+  # InnoDB data directory. PostgreSQL PITR is based on a base backup plus
+  # archived WAL segments; WAL archiving and its retention are NOT configured by
+  # this file, so this service alone does not provide PITR.
+  db_pg:
+    image: postgres:16
+    container_name: portal_db_pg
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+    environment:
+      POSTGRES_DB: portal_db
+      POSTGRES_USER: portal_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "portal_user", "-d", "portal_db"]
       interval: "15s"
       timeout: 5s
       retries: 10
@@ -92,8 +125,9 @@ services:
     container_name: portal_backend
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      # Database readiness is checked against only DB_CONNECTION by the
+      # container entrypoint. Depending on both engines here would let an
+      # unhealthy, unselected engine block startup and the rollback path.
       search:
         condition: service_healthy
       composer_init:
@@ -107,8 +141,14 @@ services:
       - /home/webadmin/portal/images:/var/www/photos:Z
       - /home/webadmin/websites/ftp:/var/www/ftp:Z
     environment:
-      - DB_CONNECTION=${DB_CONNECTION:-mariadb}
-      - DB_HOST=db
+      - DB_CONNECTION=${DB_CONNECTION:-pgsql}
+      # Compatibility defaults keep a pre-cutover host .env (which has no
+      # DB_HOST/DB_PORT keys and still selects DB_CONNECTION=mariadb) on its
+      # existing database during the preparatory deploy. The cutover script
+      # atomically writes db_pg/5432 when it switches to PostgreSQL; rollback
+      # writes db/3306. New PostgreSQL environments must set both explicitly.
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-3306}
       # SFTPGo Admin-API (P1-M22). Der Backend provisioniert FTP-Konten ueber
       # diese URL. Der API-Key kommt aus der Host-.env; ohne ihn
       # faellt der Client auf den JWT-Pfad zurueck, der ebenfalls die
@@ -139,7 +179,7 @@ services:
       - DB_DATABASE=portal_db
       - DB_USERNAME=portal_user
       - DB_PASSWORD=${DB_PASSWORD}
-      - DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-mariadb}
+      - DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-${DB_CONNECTION:-pgsql}}
       - DB_QUEUE_RETRY_AFTER=${DB_QUEUE_RETRY_AFTER:-90}
       - QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
       - QUEUE_FAILED_DRIVER=${QUEUE_FAILED_DRIVER:-database-uuids}
@@ -187,10 +227,11 @@ services:
       - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
       - MAIL_FROM_NAME=${MAIL_FROM_NAME}
       # Scheduler mutexes must use a store shared by every backend replica.
-      # The provisioned MariaDB store is the current production default.
+      # Until cutover, default these connections to the selected application
+      # engine; after the switch DB_CONNECTION selects PostgreSQL.
       - CACHE_STORE=${CACHE_STORE:-database}
-      - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-mariadb}
-      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-mariadb}
+      - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-${DB_CONNECTION:-pgsql}}
+      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-${DB_CONNECTION:-pgsql}}
       - MAKE_WEBHOOK_URL=${MAKE_WEBHOOK_URL}
       - MAKE_API_KEY=${MAKE_API_KEY}
       - MEILISEARCH_HOST=http://search:7700
@@ -319,6 +360,8 @@ services:
       [ -x /usr/local/bin/validate-production-env ] && [ -x /usr/local/bin/portal-backend-supervisor ] || { echo 'FATAL: Production preflight/supervisor is missing. Rebuild portal-base:8.5, push GHCR, update the pinned compose tag, then redeploy. No migration or seed was run.'; exit 1; };
       printenv FTP_EVENT_SECRET | grep -q . || { echo 'FATAL: FTP_EVENT_SECRET ist nicht gesetzt. Start verweigert (fail-closed)!'; exit 1; };
       /usr/local/bin/validate-production-env || exit 1;
+      php artisan config:clear || exit 1;
+      /usr/local/bin/portal-wait-for-selected-database || exit 1;
       php artisan cache:clear || exit 1;
       php artisan optimize || exit 1;
       php artisan ops:validate-production || exit 1;
@@ -574,5 +617,6 @@ networks:
 
 volumes:
   db_data:
+  db_pg_data:
   search_data:
   sftpgo_data:

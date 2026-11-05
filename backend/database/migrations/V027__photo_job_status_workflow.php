@@ -21,6 +21,9 @@ return new class extends Migration
     {
         if (DB::connection()->getDriverName() === 'sqlite') {
             Schema::table('photo_jobs', fn (Blueprint $t) => $t->string('status', 20)->default('importiert')->change());
+        } elseif (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE photo_jobs DROP CONSTRAINT photo_jobs_status_check');
+            DB::statement("ALTER TABLE photo_jobs ALTER COLUMN status TYPE VARCHAR(20), ALTER COLUMN status SET DEFAULT 'importiert'");
         } else {
             DB::statement("ALTER TABLE photo_jobs MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'importiert'");
         }
@@ -29,6 +32,8 @@ return new class extends Migration
         DB::statement("UPDATE photo_jobs SET status = 'exportiert' WHERE status = 'veroeffentlicht'");
         if (DB::connection()->getDriverName() === 'sqlite') {
             Schema::table('photo_jobs', fn (Blueprint $t) => $t->enum('status', ['importiert', 'culling', 'bearbeitung', 'exportiert', 'abgebrochen'])->default('importiert')->change());
+        } elseif (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement("ALTER TABLE photo_jobs ADD CONSTRAINT photo_jobs_status_check CHECK (status IN ('importiert', 'culling', 'bearbeitung', 'exportiert', 'abgebrochen'))");
         } else {
             DB::statement("ALTER TABLE photo_jobs MODIFY COLUMN status ENUM('importiert','culling','bearbeitung','exportiert','abgebrochen') NOT NULL DEFAULT 'importiert'");
         }

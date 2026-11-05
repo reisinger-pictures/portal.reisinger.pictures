@@ -278,10 +278,10 @@ class PruneLegacyGroupOptInGrantsCommandTest extends TestCase
         $group = GalleryGroup::factory()->create();
         $goneUserId = (string) Str::uuid();
 
-        // The deferred pragma keeps the foreign key check from firing inside
-        // the test transaction, so the row can outlive its user. The check is
-        // deferred to the commit, and the test transaction is rolled back.
-        DB::statement('PRAGMA defer_foreign_keys = ON');
+        // This intentionally malformed fixture is outside the production FK
+        // invariant. SQLite can defer the check; PostgreSQL drops it within the
+        // test transaction, which is rolled back after the test.
+        $this->allowOrphanUserFixture();
         DB::table('user_gallery_groups')->insert([
             'user_id' => $goneUserId,
             'gallery_group_id' => $group->id,
@@ -329,7 +329,7 @@ class PruneLegacyGroupOptInGrantsCommandTest extends TestCase
         $group = GalleryGroup::factory()->create();
         $goneUserId = (string) Str::uuid();
 
-        DB::statement('PRAGMA defer_foreign_keys = ON');
+        $this->allowOrphanUserFixture();
         DB::table('user_gallery_groups')->insert([
             'user_id' => $goneUserId,
             'gallery_group_id' => $group->id,
@@ -343,6 +343,17 @@ class PruneLegacyGroupOptInGrantsCommandTest extends TestCase
         $this->assertStringContainsString('orphaned', $output);
         $this->assertStringContainsString('cascade on delete', $output);
         $this->assertStringContainsString('foreign key check is deferred', $output);
+    }
+
+    private function allowOrphanUserFixture(): void
+    {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA defer_foreign_keys = ON');
+
+            return;
+        }
+
+        DB::statement('ALTER TABLE user_gallery_groups DROP CONSTRAINT user_gallery_groups_user_id_foreign');
     }
 
     public function test_an_invalid_selection_is_refused(): void

@@ -70,6 +70,56 @@ class CouponServiceTest extends TestCase
         $this->assertSame($coupon->id, $found->id);
     }
 
+    /**
+     * Coupon codes are case-insensitive per brand. MariaDB's collation made
+     * this implicit; on PostgreSQL the lookup has to fold case explicitly or
+     * a customer who types `test10` for a stored `TEST10` gets "not found".
+     * The stored spelling stays untouched.
+     */
+    public function test_finds_coupon_code_case_insensitively(): void
+    {
+        $coupon = Coupon::factory()->create([
+            'brand' => 'rp',
+            'code' => 'SpringSale10',
+            'type' => 'percentage',
+            'value' => 10,
+            'scope_type' => 'global',
+            'active' => true,
+        ]);
+
+        [$found, $error] = $this->service->findValidCoupon('springsale10', Brand::B2B);
+
+        $this->assertNotNull($found);
+        $this->assertNull($error);
+        $this->assertSame($coupon->id, $found->id);
+        $this->assertSame('SpringSale10', $found->code, 'The lookup must not rewrite the stored spelling.');
+    }
+
+    /**
+     * The folded comparison must stay inside the brand. Two brands may own the
+     * same code in different spellings; the lookup may only return the row of
+     * the brand that was asked for.
+     */
+    public function test_case_insensitive_lookup_remains_brand_scoped(): void
+    {
+        $current = Coupon::factory()->create([
+            'brand' => 'rp',
+            'code' => 'BRANDSHARED',
+            'active' => true,
+        ]);
+        Coupon::factory()->create([
+            'brand' => 'test-brand',
+            'code' => 'brandshared',
+            'active' => true,
+        ]);
+
+        [$found, $error] = $this->service->findValidCoupon('brandshared', Brand::B2B);
+
+        $this->assertNotNull($found);
+        $this->assertNull($error);
+        $this->assertSame($current->id, $found->id);
+    }
+
     public function test_rejects_wrong_brand(): void
     {
         Coupon::factory()->create([

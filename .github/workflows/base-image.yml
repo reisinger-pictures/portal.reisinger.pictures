@@ -50,7 +50,6 @@ jobs:
           sbom: true
           build-args: |
             PHP_VERSION=8.5
-            DB_EXT=mysql
           tags: |
             ${{ env.REGISTRY }}/${{ env.OWNER }}/portal-base:8.5
             ${{ env.REGISTRY }}/${{ env.OWNER }}/portal-base:latest

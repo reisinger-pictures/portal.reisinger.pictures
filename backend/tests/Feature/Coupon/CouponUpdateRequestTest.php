@@ -40,4 +40,22 @@ class CouponUpdateRequestTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonPath('error', 'Org not found for this brand.');
     }
+
+    public function test_update_organisation_scope_with_malformed_uuid_returns_422_not_500(): void
+    {
+        $coupon = Coupon::factory()->create(['brand' => 'rp', 'code' => 'UPDORGID', 'active' => true]);
+
+        $admin = User::factory()->create();
+        $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
+        $token = auth('api')->login($admin);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->putJson("/api/management/coupons/{$coupon->id}", [
+                'scope_type' => 'organisation',
+                'scope_id' => 'not-a-uuid',
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('error', 'Org not found for this brand.');
+    }
 }

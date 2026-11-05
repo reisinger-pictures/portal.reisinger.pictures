@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Webhook;
 
@@ -289,7 +290,11 @@ class WebhookController extends Controller
             return response()->json(['status' => 'success']);
         }
 
-        $order = Order::with(['user', 'invoiceSnapshot'])->find($orderId);
+        // `orders.id` is a UUID column; a malformed metadata value cannot name
+        // an order. Treat it like an unknown order and keep the 200 no-op.
+        $order = Str::isUuid($orderId)
+            ? Order::with(['user', 'invoiceSnapshot'])->find($orderId)
+            : null;
         if ($order === null) {
             Log::warning('Stripe Webhook: success for unknown order', [
                 'event_id' => $eventId,
@@ -409,7 +414,9 @@ class WebhookController extends Controller
             return response()->json(['status' => 'success']);
         }
 
-        $order = Order::with('user')->find($orderId);
+        $order = Str::isUuid($orderId)
+            ? Order::with('user')->find($orderId)
+            : null;
         if ($order === null) {
             Log::warning('Stripe Webhook: payment failure for unknown order', $context);
 

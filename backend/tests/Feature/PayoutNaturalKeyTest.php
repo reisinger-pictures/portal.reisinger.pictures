@@ -477,7 +477,11 @@ class PayoutNaturalKeyTest extends TestCase
         ] as [$table, $index]) {
             if (Schema::hasIndex($table, $index)) {
                 Schema::table($table, function ($blueprint) use ($index): void {
-                    $blueprint->dropIndex($index);
+                    if (DB::connection()->getDriverName() === 'pgsql') {
+                        $blueprint->dropUnique($index);
+                    } else {
+                        $blueprint->dropIndex($index);
+                    }
                 });
             }
         }

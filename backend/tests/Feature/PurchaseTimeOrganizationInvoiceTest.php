@@ -159,7 +159,7 @@ class PurchaseTimeOrganizationInvoiceTest extends TestCase
         $order = $this->makeDeliveryNote($user, 2250);
         DB::table('invoice_snapshots')
             ->where('order_id', $order->id)
-            ->update(['customer_details' => '{malformed-json']);
+            ->update(['customer_details' => '"malformed-json"']);
 
         $service = app(InvoiceService::class);
         $this->assertSame(0, $service->countOpenDeliveryNotesForOrg($org));
@@ -178,13 +178,12 @@ class PurchaseTimeOrganizationInvoiceTest extends TestCase
 
         $user->update(['org_id' => $newOrg->id]);
 
-        // This low-level write intentionally simulates corrupted storage. The
-        // supported Eloquent model boundary is covered by the replacement and
-        // removal regressions above; this fixture must not make candidate
-        // selection evaluate SQLite JSON extraction on the malformed value.
+        // A valid JSON scalar is malformed for this object-shaped field while
+        // remaining representable by PostgreSQL's JSON column. This fixture
+        // must not make candidate selection depend on SQLite JSON behavior.
         DB::table('invoice_snapshots')
             ->where('order_id', $order->id)
-            ->update(['customer_details' => '{malformed-json']);
+            ->update(['customer_details' => '"malformed-json"']);
 
         $service = app(InvoiceService::class);
         $this->assertSame(0, $service->countOpenDeliveryNotesForOrg($purchaseOrg));

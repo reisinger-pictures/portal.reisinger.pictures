@@ -92,6 +92,19 @@ When `type = 'percentage'`, an optional `max_items` (unsigned integer) limits th
 - Coupons are brand-isolated. The current configured brand is `rp`; a coupon
   created in another brand context cannot be used in this cart. The old
   `SRP`/`B2B` host distinction is historical.
+- **Coupon codes are case- and accent-insensitive per brand, and trailing
+  spaces are ignored.** A customer may enter `SPRING10`, `spring10`,
+  `Spring10`, or `SPRING10 ` for the same stored code; an accented code such
+  as `Café` also matches `CAFE`. The management duplicate check treats those
+  spellings as one code. The stored spelling is preserved and displayed; only
+  comparison folds case, accents and trailing spaces. This was implicit in
+  MariaDB's `utf8mb4_unicode_ci` collation (PAD SPACE: trailing spaces do not
+  participate in comparison). PostgreSQL compares case-, accent- and
+  trailing-space-sensitively by default, so
+  `CouponService::findValidCoupon()` and both management requests use
+  `Coupon::whereCodeMatches()`, and V055 adds the structural half — the named
+  ICU collation and unique index described in §7. Brand scoping is unchanged:
+  one code per brand, and the same code may still exist in another brand.
 - **Coupon redemption follows strategy capability (current):**
   `VolumeLicensingStrategy` supports coupons; `ScopeLicensingStrategy` does not.
   `CheckoutService` therefore resolves, applies, and increments coupons only for
@@ -269,7 +282,40 @@ Die Pricing-Strategie (`VolumeLicensingStrategy`) darf niemals lautlos auf den C
 | `created_by` | CHAR(36) NULL | UUID of creating user (photographer) |
 | `created_at` / `updated_at` | TIMESTAMP | Laravel timestamps |
 
-Unique: `(brand, code)`
+Unique: `(brand, code)` compared case- and accent-insensitively, with trailing
+spaces ignored. MariaDB enforces this through the PAD SPACE
+`utf8mb4_unicode_ci` column collation of `coupons_brand_code_unique`, and the
+lookup relies on the same field collation. On PostgreSQL V055 creates the named
+ICU nondeterministic collation `coupons_code_ci` (`provider = icu`,
+`locale = 'und-u-ks-level1'`, `deterministic = false`) and the unique index
+`coupons_brand_code_ci_unique ON coupons (brand, RTRIM(code) COLLATE
+"coupons_code_ci")`. The `RTRIM()` preserves MariaDB's PAD SPACE rule:
+`'CODE'` and `'CODE '` are the same code, while leading spaces remain
+significant. V054's weaker `coupons_brand_lower_code_unique ON coupons
+(brand, LOWER(code))` is dropped only after the stronger index exists; its
+case-only schema contract is superseded by V055. The old case-sensitive
+`(brand, code)` index remains on PostgreSQL for exact lookups. SQLite has no
+ICU collation and keeps V054's `LOWER()` index and lookup fallback;
+SQLite-only tests therefore cover the case-only, NO PAD approximation, not
+accent or trailing-space parity. The stored `code` spelling is not rewritten.
+
+**Collation contract (intentional approximation, not byte-for-byte MySQL
+equivalence):** ICU and MariaDB's `utf8mb4_unicode_ci` can use different UCA
+versions and therefore place some characters in different equivalence classes.
+The enforced contract is the one covered by
+`CouponCodeCollationParityTest`: case, accents and trailing spaces fold, brand
+scoping is exact, and the same code remains allowed in another brand. No exact
+MySQL equivalence beyond those tested rules is claimed.
+
+**V055 schema/backfill/rollback decision:** no column is added and no row is
+rewritten. The migration creates the collation and preflights
+`(brand, RTRIM(code) COLLATE "coupons_code_ci")` groups; it aborts with a
+report when a collation-equivalent duplicate already exists, instead of
+deleting, merging or re-casing coupons. An operator decides which spelling
+survives. The stronger index is created before the V054 index is dropped, and
+the migration is replay-safe (`CREATE COLLATION IF NOT EXISTS`, `CREATE UNIQUE
+INDEX IF NOT EXISTS`, `DROP INDEX IF EXISTS`). `down()` is empty because
+`down()` methods are never executed in this repository.
 
 **`coupon_user_usage` table:**
 

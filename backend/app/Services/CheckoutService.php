@@ -19,12 +19,14 @@ use App\Pricing\VolumeLicensingStrategy;
 use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
 use App\Support\PersistedMoney;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class CheckoutService
 {
@@ -665,7 +667,12 @@ class CheckoutService
         $isQuoteRequest = false;
 
         foreach ($items as $item) {
-            $photo = Photo::with('gallery')->findOrFail($item['photoId']);
+            $photoId = $item['photoId'] ?? null;
+            if (! is_string($photoId) || ! Str::isUuid($photoId)) {
+                throw (new ModelNotFoundException)->setModel(Photo::class, [(string) $photoId]);
+            }
+
+            $photo = Photo::with('gallery')->findOrFail($photoId);
             $gallery = $photo->gallery;
             if (! $gallery instanceof Gallery || ! BrandRegistry::galleryTreeMatchesCurrent($gallery)) {
                 throw new HttpResponseException(response()->json(['error' => 'Foto nicht gefunden.'], 404));

@@ -78,10 +78,7 @@ class FtpSlugChangeResetTest extends TestCase
         $svc = new FtpCredentialService($client);
         $password = $svc->provisionAndShow($user);
 
-        $this->assertDatabaseMissing('users', [
-            'id' => $user->id,
-            'ftp_password' => $password,
-        ]);
+        $this->assertArrayNotHasKey('ftp_password', $user->fresh()->getAttributes());
         $this->assertStringNotContainsString($password, json_encode($user->getAttributes()));
     }
 

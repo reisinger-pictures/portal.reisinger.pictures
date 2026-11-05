@@ -418,21 +418,31 @@ class ProductionOperationsPolicyTest extends TestCase
 
         foreach ([
             'APP_ENV=${APP_ENV:-production}',
-            'DB_CONNECTION=${DB_CONNECTION:-mariadb}',
-            'DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-mariadb}',
+            // PostgreSQL is the production target; MariaDB stays live until
+            // the verified host cutover. The engine remains an environment
+            // override so rollback can select the still-running MariaDB service
+            // without editing the Compose file.
+            'DB_CONNECTION=${DB_CONNECTION:-pgsql}',
+            'DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-${DB_CONNECTION:-pgsql}}',
             'DB_QUEUE_RETRY_AFTER=${DB_QUEUE_RETRY_AFTER:-90}',
             'QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}',
             'QUEUE_FAILED_DRIVER=${QUEUE_FAILED_DRIVER:-database-uuids}',
             'QUEUE_WORKER_TIMEOUT=${QUEUE_WORKER_TIMEOUT:-60}',
             'QUEUE_WORKER_RESTART_DELAY=${QUEUE_WORKER_RESTART_DELAY:-5}',
             'CACHE_STORE=${CACHE_STORE:-database}',
-            'DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-mariadb}',
-            'DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-mariadb}',
+            'DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-${DB_CONNECTION:-pgsql}}',
+            'DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-${DB_CONNECTION:-pgsql}}',
             'MAIL_SCHEME=${MAIL_SCHEME}',
             'MAIL_REQUIRE_TLS=${MAIL_REQUIRE_TLS:-true}',
         ] as $environmentLine) {
             $this->assertStringContainsString('- '.$environmentLine, $compose);
         }
+
+        // The MariaDB service remains the rollback path during the cutover
+        // window; only the selected default moved to PostgreSQL.
+        $this->assertStringContainsString('image: mariadb:11.4', $compose);
+        $this->assertStringContainsString('container_name: portal_db', $compose);
+        $this->assertStringContainsString('rolling back is that same env flip', $compose);
 
         $this->assertStringContainsString('/usr/local/bin/validate-production-env || exit 1;', $compose);
         $this->assertStringContainsString('php artisan cache:clear || exit 1;', $compose);

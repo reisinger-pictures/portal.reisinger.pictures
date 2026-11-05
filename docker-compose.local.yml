@@ -1,4 +1,26 @@
 services:
+  # Local development database. The application is deployed on PostgreSQL
+  # (D-63) and the local engine must be the same one, otherwise a query that
+  # works here fails in production. `restart: unless-stopped` plus a named
+  # volume keeps the data across a container recreate.
+  postgres:
+    image: postgres:16
+    container_name: portal_local_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: portal_db
+      POSTGRES_USER: portal_user
+      POSTGRES_PASSWORD: portal_local_password
+    # If a native PostgreSQL already listens on the host's 5432, change the
+    # published port here AND DB_PORT in backend/.env — the two must match.
+    ports: ["5432:5432"]
+    volumes: ["db_data_local:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "portal_user", "-d", "portal_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   search:
     image: getmeili/meilisearch:v1.48.3
     container_name: portal_search_local
@@ -10,4 +32,5 @@ services:
     volumes: ["search_data_local:/meili_data"]
 
 volumes:
+  db_data_local:
   search_data_local:

@@ -6,6 +6,7 @@ use App\Enums\Brand;
 use App\Models\Org;
 use App\Models\User;
 use App\Support\BrandRegistry;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\JWTAuth;
 use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
@@ -68,6 +70,53 @@ class AuthControllerTest extends TestCase
         $user = User::where('email', 'new@user.com')->first();
         $this->assertNotNull($user->password);
         $this->assertTrue(Hash::check('newSecurePassword123', $user->password));
+    }
+
+    public function test_email_identity_is_case_insensitive_for_registration_and_login(): void
+    {
+        Mail::fake();
+
+        $registration = $this->postJson('/api/auth/register', [
+            'name' => 'Case Sensitive User',
+            'email' => 'Foo@X.com',
+        ]);
+        $registration->assertExactJson([
+            'success' => true,
+            'message' => 'Registrierung erfolgreich. Bitte prüfe deine E-Mails.',
+        ]);
+
+        $user = User::query()->whereRaw('LOWER(email) = ?', ['foo@x.com'])->firstOrFail();
+        $user->password = Hash::make('password123');
+        $user->save();
+
+        $login = $this->postJson('/api/auth/login', [
+            'email' => 'foo@x.com',
+            'password' => 'password123',
+        ]);
+        $login->assertOk()->assertCookie('rp_jwt');
+
+        $secondRegistration = $this->postJson('/api/auth/register', [
+            'name' => 'Duplicate Case User',
+            'email' => 'foo@x.com',
+        ]);
+        $secondRegistration->assertExactJson($registration->json());
+        $this->assertSame(1, User::query()->count());
+        $this->assertSame('foo@x.com', $user->fresh()->email);
+    }
+
+    public function test_database_rejects_case_variant_emails_even_for_raw_writes(): void
+    {
+        $user = User::factory()->create(['email' => 'identity@example.com']);
+        $attributes = $user->getAttributes();
+        $attributes['id'] = (string) Str::uuid();
+        $attributes['email'] = 'IDENTITY@EXAMPLE.COM';
+
+        try {
+            DB::transaction(fn () => DB::table('users')->insert($attributes));
+            $this->fail('The database accepted a raw case-variant duplicate email.');
+        } catch (UniqueConstraintViolationException) {
+            $this->assertSame(1, User::query()->count());
+        }
     }
 
     public function test_foreign_brand_registration_rolls_back_user_and_reset_state()

@@ -5,7 +5,7 @@ usage() {
   cat >&2 <<'EOF'
 Usage:
   sh scripts/gates.sh fast
-  sh scripts/gates.sh full <backend|mariadb|frontend|e2e|security> [gate arguments...]
+  sh scripts/gates.sh full <backend|postgres|frontend|e2e|security> [gate arguments...]
 
 `fast` requires frontend dependencies and runs the required local
 `pnpm lint:fix && pnpm build` gate, the required Pint check, and
@@ -63,11 +63,11 @@ case "$mode" in
         docker exec php ./vendor/bin/pint --test
         run_logged /tmp/phpunit.log docker exec php php artisan test --no-ansi --parallel
         ;;
-      mariadb)
-        [ "$#" -eq 0 ] || fail "mariadb accepts no arguments"
-        docker exec php-mariadb php -r 'if (! function_exists("pcntl_fork")) { fwrite(STDERR, "ext-pcntl is missing in the CI PHP image\n"); exit(1); } echo "pcntl_fork available\n";'
-        docker exec -e DB_CONNECTION -e DB_HOST -e DB_PORT -e DB_DATABASE -e DB_USERNAME -e DB_PASSWORD php-mariadb php artisan migrate --force
-        run_logged /tmp/phpunit-mariadb.log docker exec -e DB_CONNECTION -e DB_HOST -e DB_PORT -e DB_DATABASE -e DB_USERNAME -e DB_PASSWORD php-mariadb php artisan test --no-ansi --filter='ContractSignerIdentityRaceTest|ContractSignerIdentityTest|ContractContentHeartbeatMySqlTest'
+      postgres)
+        [ "$#" -eq 0 ] || fail "postgres accepts no arguments"
+        docker exec php-postgres php -r 'if (! function_exists("pcntl_fork")) { fwrite(STDERR, "ext-pcntl is missing in the CI PHP image\n"); exit(1); } echo "pcntl_fork available\n";'
+        docker exec -e DB_CONNECTION -e DB_HOST -e DB_PORT -e DB_DATABASE -e DB_USERNAME -e DB_PASSWORD php-postgres php artisan migrate --force
+        run_logged /tmp/phpunit-postgres.log docker exec -e DB_CONNECTION -e DB_HOST -e DB_PORT -e DB_DATABASE -e DB_USERNAME -e DB_PASSWORD php-postgres php artisan test --no-ansi --filter='ContractSignerIdentityRaceTest|ContractSignerIdentityTest|ContractContentHeartbeatPostgresTest|GuestOrderMigrationContractTest|PayoutNaturalKeyTest'
         ;;
       frontend)
         [ "$#" -eq 0 ] || fail "frontend accepts no arguments"

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\AsBrand;
 use App\Enums\AutoJoinPolicy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,11 @@ class Org extends Model
         'can_purchase_upgrades' => 'boolean',
         'auto_join_policy' => AutoJoinPolicy::class,
     ];
+
+    public function scopeMatchingDomain(Builder $query, string $domain): Builder
+    {
+        return $query->whereRaw('LOWER(domain) = LOWER(?)', [$domain]);
+    }
 
     public function users()
     {

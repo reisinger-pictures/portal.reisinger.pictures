@@ -113,6 +113,19 @@ jobs:
       run:
         working-directory: backend
     services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: portal_test_db
+          POSTGRES_USER: portal_user
+          POSTGRES_PASSWORD: admin
+        options: >-
+          --health-cmd="pg_isready -U portal_user -d portal_test_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
       meilisearch:
         image: getmeili/meilisearch:v1.48.3
         ports:
@@ -142,10 +155,9 @@ jobs:
       # PHP-Tests laufen im tag-gepinnten Prod-Image portal-base (PHP 8.5 +
       # exiftool + alle App-Extensions) - identisch zur Prod-Runtime. Composer
       # kommt wie in Prod aus einem tag-gepinnten offiziellen Image. Die
-      # CI-Env (Meili/Mail/JWT/Admin) steht in backend/.env.ci und wird als
-      # `.env` eingespielt. Die Tests laufen via phpunit.xml auf SQLite
-      # `:memory:` (kein DB-Service noetig). `--network host` -> Dienste bleiben
-      # unter 127.0.0.1:7701/1025 erreichbar (phpunit.xml + .env unveraendert).
+      # CI-Env (PostgreSQL/Meili/Mail/JWT/Admin) steht in backend/.env.ci und
+      # wird als `.env` eingespielt. `--network host` -> Dienste bleiben unter
+      # 127.0.0.1:5432/7701/1025 erreichbar.
       - name: Start PHP container (prod image)
         run: |
           # The pinned prod image runs as `USER www-data` (uid 1000), but the
@@ -164,6 +176,10 @@ jobs:
             ghcr.io/reisinger-pictures/portal-base:8.5 \
             sleep infinity
           until docker exec php php -v > /dev/null 2>&1; do sleep 1; done
+      - name: Install PostgreSQL PDO driver
+        # This is redundant once portal-base is rebuilt from deployment/Dockerfile
+        # with pdo_pgsql included; the pinned image does not have that driver yet.
+        run: docker exec php sh -c 'apt-get update && apt-get install -y libpq-dev && docker-php-ext-install pdo_pgsql'
       - name: Prepare environment
         run: cp .env.ci .env
       - name: Install dependencies
@@ -176,6 +192,40 @@ jobs:
             composer:2.10.3 install --ignore-platform-reqs --no-interaction --optimize-autoloader
       - name: Generate app key
         run: docker exec php php artisan key:generate
+      - name: Wait for PostgreSQL
+        # Use the same PDO driver, host, database and credentials as the test
+        # environment. Bound retries so an unavailable service fails clearly.
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: "5432"
+          DB_DATABASE: portal_test_db
+          DB_USERNAME: portal_user
+          DB_PASSWORD: admin
+        run: |
+          docker exec \
+            -e DB_HOST \
+            -e DB_PORT \
+            -e DB_DATABASE \
+            -e DB_USERNAME \
+            -e DB_PASSWORD \
+            php \
+            php -r '
+          $dsn = "pgsql:host=".getenv("DB_HOST").";port=".getenv("DB_PORT").";dbname=".getenv("DB_DATABASE");
+          $deadline = time() + 120;
+          $last = "no attempt";
+          do {
+              try {
+                  new PDO($dsn, getenv("DB_USERNAME"), getenv("DB_PASSWORD"));
+                  echo "PostgreSQL is reachable on ".getenv("DB_HOST").":".getenv("DB_PORT")."\n";
+                  exit(0);
+              } catch (Throwable $e) {
+                  $last = $e->getMessage();
+                  sleep(1);
+              }
+          } while (time() < $deadline);
+          fwrite(STDERR, "PostgreSQL did not accept connections: ".$last."\n");
+          exit(1);
+          '
       - name: Backend Pint and PHPUnit gate
         # Pint runs in --test mode, so it reports and never rewrites. This is a
         # gate, not a formatter: it fails the build on style, so formatting
@@ -233,83 +283,56 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-  backend-mariadb:
-    # The contract signer identity invariant can only be PROVEN against a real
-    # MariaDB server, and the SQLite test database cannot prove it:
-    #  * ContractSignerIdentityRaceTest needs two independent writer
-    #    connections against one database. SQLite :memory: has exactly one
-    #    connection, so the race cannot happen there.
-    #  * ContractSignerIdentityTest's trigger regression needs a database or
-    #    server collation that differs from utf8mb4_unicode_ci; the default
-    #    MariaDB 11.4 collation is utf8mb4_uca1400_ai_ci.
-    # Both tests mark themselves skipped on SQLite, and phpunit.xml pins the
-    # whole suite to DB_CONNECTION=sqlite / DB_DATABASE=:memory:, so until
-    # this job existed neither test ever ran anywhere.
-    #
-    # On SQLite the two classes together report 11 failures and 2 skips, but
-    # the failures are an artefact, not the gap: the race test overrides
-    # connectionsToTransact() with [], so Laravel never caches the in-memory
-    # PDO and the following class starts against an empty :memory: database
-    # (ContractSignerIdentityTest alone: 11 passed, 1 skipped). The real gap
-    # is the two skipped tests - the race and the collation regression.
-    #
-    # This job is additive by construction: it runs exactly these test classes
-    # against a throwaway MariaDB service, never the full suite, and it changes
-    # no existing job - no other job gets slower, redder or less reliable
-    # because of it. It IS part of the `ci-gate` aggregate (2026-10-22): the
-    # invariant it proves is otherwise proven nowhere, and a gate that does not
-    # include it would let a regression through silently. The aggregate waits
-    # for the longest dependency anyway (the E2E matrix), so the gate does not
-    # get slower.
-    name: Backend (MariaDB identity)
+  backend-postgres:
+    # These driver-gated contracts require a real PostgreSQL service. This
+    # additive job runs only those classes against a throwaway database, and a
+    # skipped test is a red job so the database-specific proof cannot silently
+    # disappear. The aggregate already waits for the E2E matrix, so this adds no
+    # latency to the CI gate.
+    name: Backend (PostgreSQL contracts)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
-    # The database coordinates of the throwaway service. `docker exec -e VAR`
-    # (without a value) copies them from the step environment into the PHP
-    # container, so there is exactly one place that defines them.
     env:
-      DB_CONNECTION: mariadb
+      DB_CONNECTION: pgsql
       DB_HOST: 127.0.0.1
-      DB_PORT: "3307"
+      DB_PORT: "5432"
       DB_DATABASE: portal_test_db
       DB_USERNAME: portal_user
       DB_PASSWORD: admin
     services:
-      # Same image, credentials and health contract as the MariaDB service of
-      # the e2e job. The port mapping is the same 3307:3306 the backend
-      # .env.ci expects, so the PHP container reaches the service on
-      # 127.0.0.1:3307 through --network host.
-      mariadb:
-        image: mariadb:11.4
+      postgres:
+        image: postgres:16
         ports:
-          - 3307:3306
+          - 5432:5432
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: portal_test_db
-          MYSQL_USER: portal_user
-          MYSQL_PASSWORD: admin
+          POSTGRES_DB: portal_test_db
+          POSTGRES_USER: portal_user
+          POSTGRES_PASSWORD: admin
         options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-cmd="pg_isready -U portal_user -d portal_test_db"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Start PHP container (prod image)
-        # Same image and wiring as the backend PHPUnit job: the pinned
-        # portal-base:8.5 (PHP 8.5 + ext-pcntl + ext-pdo_mysql) on the host
-        # network, so 127.0.0.1:3307 (the MariaDB service) is reachable.
+        # The pinned portal-base:8.5 image uses the host network, so the
+        # PostgreSQL service is reachable at 127.0.0.1:5432.
         run: |
-          docker run -d --name php-mariadb \
+          docker run -d --name php-postgres \
             --user root \
             --network host \
             -v "${{ github.workspace }}:/app" \
             -w /app/backend \
             ghcr.io/reisinger-pictures/portal-base:8.5 \
             sleep infinity
-          until docker exec php-mariadb php -v > /dev/null 2>&1; do sleep 1; done
+          until docker exec php-postgres php -v > /dev/null 2>&1; do sleep 1; done
+      - name: Install PostgreSQL PDO driver
+        # This is redundant once portal-base is rebuilt from deployment/Dockerfile
+        # with pdo_pgsql included; the pinned image does not have that driver yet.
+        run: docker exec php-postgres sh -c 'apt-get update && apt-get install -y libpq-dev && docker-php-ext-install pdo_pgsql'
       - name: Prepare environment
         run: cp .env.ci .env
       - name: Install dependencies
@@ -320,14 +343,10 @@ jobs:
             -w /app/backend \
             composer:2.10.3 install --ignore-platform-reqs --no-interaction --optimize-autoloader
       - name: Generate app key
-        run: docker exec php-mariadb php artisan key:generate
-      - name: Wait for MariaDB
-        # A started service container is not necessarily ready to accept the
-        # first query. The wait is bounded (120 seconds) and uses the very
-        # connection the test run uses - PDO, same host, port, database and
-        # credentials - so a service that is reachable but not usable fails
-        # here with a clear cause instead of surfacing as a connection error
-        # in the test run.
+        run: docker exec php-postgres php artisan key:generate
+      - name: Wait for PostgreSQL
+        # The wait is bounded (120 seconds) and tests the same PDO connection
+        # coordinates the migration and test run use.
         run: |
           docker exec \
             -e DB_HOST \
@@ -335,22 +354,22 @@ jobs:
             -e DB_DATABASE \
             -e DB_USERNAME \
             -e DB_PASSWORD \
-            php-mariadb \
+            php-postgres \
             php -r '
-          $dsn = "mysql:host=".getenv("DB_HOST").";port=".getenv("DB_PORT").";dbname=".getenv("DB_DATABASE").";charset=utf8mb4";
+          $dsn = "pgsql:host=".getenv("DB_HOST").";port=".getenv("DB_PORT").";dbname=".getenv("DB_DATABASE");
           $deadline = time() + 120;
           $last = "no attempt";
           do {
               try {
                   new PDO($dsn, getenv("DB_USERNAME"), getenv("DB_PASSWORD"));
-                  echo "MariaDB is reachable on ".getenv("DB_HOST").":".getenv("DB_PORT")."\n";
+                  echo "PostgreSQL is reachable on ".getenv("DB_HOST").":".getenv("DB_PORT")."\n";
                   exit(0);
               } catch (Throwable $e) {
                   $last = $e->getMessage();
                   sleep(1);
               }
           } while (time() < $deadline);
-          fwrite(STDERR, "MariaDB did not accept connections: ".$last."\n");
+          fwrite(STDERR, "PostgreSQL did not accept connections: ".$last."\n");
           exit(1);
           '
       - name: Verify pcntl_fork is available
@@ -359,43 +378,229 @@ jobs:
         # the extension is checked before the run: a missing pcntl_fork must
         # fail the job instead of silently downgrading the proof.
         run: |
-          docker exec php-mariadb php -r 'if (! function_exists("pcntl_fork")) { fwrite(STDERR, "ext-pcntl is missing in the CI PHP image\n"); exit(1); } echo "pcntl_fork available\n";'
-      - name: Migrate and run MariaDB identity tests
-        # V039 (contract signer identity: normalized_email + join_scope_key,
-        # unique index, writer guards) has to run on MariaDB, not only on the
-        # SQLite test database.
-        run: sh ../scripts/gates.sh full mariadb
-      - name: Backend (MariaDB) Test-Summary
-        # A green job that skipped the proof is not a proof: this step turns
-        # a skipped test into a red job, so the MariaDB coverage cannot decay
-        # into a silent no-op.
+          docker exec php-postgres php -r 'if (! function_exists("pcntl_fork")) { fwrite(STDERR, "ext-pcntl is missing in the CI PHP image\n"); exit(1); } echo "pcntl_fork available\n";'
+      - name: Migrate and run PostgreSQL contract tests
+        run: sh ../scripts/gates.sh full postgres
+      - name: Backend (PostgreSQL) Test-Summary
+        # A green job that skipped the proof is not a proof: any skipped test
+        # turns this job red instead of silently removing PostgreSQL coverage.
         if: always()
         run: |
-          if [ ! -f /tmp/phpunit-mariadb.log ]; then
-            echo "::error::The MariaDB test step produced no output - the run did not complete."
+          if [ ! -f /tmp/phpunit-postgres.log ]; then
+            echo "::error::The PostgreSQL test step produced no output - the run did not complete."
             exit 1
           fi
-          CLEAN=$(sed -e 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-mariadb.log 2>/dev/null || true)
+          CLEAN=$(sed -e 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-postgres.log 2>/dev/null || true)
           SUMMARY=$(grep -E '^[[:space:]]*Tests:|OK \(' <<< "$CLEAN" | tail -n 1 || true)
           if [ -z "$SUMMARY" ]; then
-            echo "::error::The MariaDB run produced no PHPUnit summary line."
+            echo "::error::The PostgreSQL run produced no PHPUnit summary line."
             exit 1
           fi
-          echo "MariaDB PHPUnit summary: ${SUMMARY}"
+          echo "PostgreSQL PHPUnit summary: ${SUMMARY}"
           if grep -qi 'skipped' <<< "$CLEAN"; then
-            echo "::error::A contract signer identity test was skipped in the MariaDB run."
+            echo "::error::A PostgreSQL contract test was skipped in the run."
             exit 1
           fi
           {
-            echo "## Backend (MariaDB identity)"
+            echo "## Backend (PostgreSQL contracts)"
             echo ""
             echo "| Metrik | Wert |"
             echo "|---|---|"
-            echo "| Treiber | MariaDB 11.4 |"
-            echo "| Klassen | ContractSignerIdentityRaceTest, ContractSignerIdentityTest |"
+            echo "| Treiber | PostgreSQL 16 |"
+            echo "| Klassen | ContractSignerIdentityRaceTest, ContractSignerIdentityTest, ContractContentHeartbeatPostgresTest, GuestOrderMigrationContractTest, PayoutNaturalKeyTest |"
             echo "| Ergebnis | ✅ PASS |"
             echo "| Summary | $SUMMARY |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  cutover-copy:
+    # The one-time cutover (D-63) is a host script plus an artisan command. This
+    # job exercises the host lifecycle with a Docker CLI test double and migrates
+    # a throwaway MariaDB into PostgreSQL to run the real copy/verifier path.
+    name: Cutover copy (MariaDB -> PostgreSQL)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    # Source coordinates of the throwaway MariaDB. The target coordinates are
+    # passed to the command explicitly, because both connections read the same
+    # DB_USERNAME/DB_PASSWORD and the pgsql default port would otherwise be
+    # taken from this env block.
+    env:
+      DB_CONNECTION: mariadb
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3307"
+      DB_DATABASE: portal_test_db
+      DB_USERNAME: portal_user
+      DB_PASSWORD: admin
+    services:
+      mariadb:
+        image: mariadb:11.4
+        ports:
+          - 3307:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: portal_test_db
+          MYSQL_USER: portal_user
+          MYSQL_PASSWORD: admin
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: portal_test_db
+          POSTGRES_USER: portal_user
+          POSTGRES_PASSWORD: admin
+        options: >-
+          --health-cmd="pg_isready -U portal_user -d portal_test_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Exercise production cutover shell lifecycle
+        run: |
+          cd ..
+          bash tests/infrastructure/selected-database-readiness.sh
+          bash tests/infrastructure/compose-entrypoint-contract.sh
+          bash tests/infrastructure/postgres-cutover-script-lifecycle.sh
+      - name: Start PHP container (prod image)
+        run: |
+          docker run -d --name php-cutover \
+            --user root \
+            --network host \
+            -v "${{ github.workspace }}:/app" \
+            -w /app/backend \
+            ghcr.io/reisinger-pictures/portal-base:8.5 \
+            sleep infinity
+          until docker exec php-cutover php -v > /dev/null 2>&1; do sleep 1; done
+      - name: Install PostgreSQL PDO driver
+        # Redundant once portal-base is rebuilt from deployment/Dockerfile with
+        # pdo_pgsql included. pdo_mysql is already in the pinned image and is
+        # what the source side of the copy needs.
+        run: docker exec php-cutover sh -c 'apt-get update && apt-get install -y libpq-dev && docker-php-ext-install pdo_pgsql'
+      - name: Prepare environment
+        run: cp .env.ci .env
+      - name: Install dependencies
+        run: |
+          docker run --rm \
+            --network host \
+            -v "${{ github.workspace }}:/app" \
+            -w /app/backend \
+            composer:2.10.3 install --ignore-platform-reqs --no-interaction --optimize-autoloader
+      - name: Generate app key
+        run: docker exec php-cutover php artisan key:generate
+      - name: Wait for MariaDB and PostgreSQL
+        # Bounded wait on the exact PDO coordinates the copy uses; a started
+        # service container is not necessarily ready for the first connection.
+        run: |
+          docker exec \
+            -e DB_HOST -e DB_PORT -e DB_DATABASE -e DB_USERNAME -e DB_PASSWORD \
+            php-cutover \
+            php -r '
+          $deadline = time() + 120;
+          foreach (["mysql" => "MariaDB", "pgsql" => "PostgreSQL"] as $driver => $label) {
+              $port = $driver === "mysql" ? getenv("DB_PORT") : "5432";
+              $dsn = $driver.":host=".getenv("DB_HOST").";port=".$port.";dbname=".getenv("DB_DATABASE");
+              $last = "no attempt";
+              while (time() < $deadline) {
+                  try {
+                      new PDO($dsn, getenv("DB_USERNAME"), getenv("DB_PASSWORD"));
+                      echo $label." is reachable on ".getenv("DB_HOST").":".$port."\n";
+                      continue 2;
+                  } catch (Throwable $e) {
+                      $last = $e->getMessage();
+                      sleep(1);
+                  }
+              }
+              fwrite(STDERR, $label." did not accept connections: ".$last."\n");
+              exit(1);
+          }
+          '
+      - name: Build the source schema and seed it
+        # The copy moves rows; the schema on both sides comes from the same
+        # migrations. Seeding gives the verifier real rows to compare (settings,
+        # roles, the bootstrap admin) instead of an empty database that would
+        # make every count trivially equal. `docker exec` does not inherit the
+        # job env, so the MariaDB coordinates are passed explicitly — .env holds
+        # the PostgreSQL defaults.
+        run: |
+          docker exec -e DB_CONNECTION=mariadb -e DB_HOST=127.0.0.1 -e DB_PORT=3307 \
+            php-cutover php artisan migrate --force
+          # This job deliberately starts no Meilisearch service: the copy and
+          # its verifier read database rows only. The seeder creates searchable
+          # models, so pin the collection driver for this command only instead
+          # of letting Scout call a non-existent host. Production seeding keeps
+          # whatever driver the deployed environment selects.
+          docker exec -e DB_CONNECTION=mariadb -e DB_HOST=127.0.0.1 -e DB_PORT=3307 \
+            -e SCOUT_DRIVER=collection \
+            php-cutover php artisan db:seed --force
+      - name: Make MariaDB settings authoritative for this copy
+        run: |
+          docker exec php-cutover php -r '
+          $source = new PDO("mysql:host=127.0.0.1;port=3307;dbname=portal_test_db;charset=utf8mb4", "portal_user", "admin", [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+          $update = $source->prepare("UPDATE settings SET value = ? WHERE `key` = ?");
+          $update->execute(["source-wins-v1", "term_editorial"]);
+          if ($update->rowCount() < 1) { throw new RuntimeException("Source settings sentinel was not updated."); }
+          '
+      - name: Migrate the PostgreSQL target and copy
+        run: |
+          docker exec \
+            -e DB_CONNECTION=pgsql -e DB_HOST=127.0.0.1 -e DB_PORT=5432 \
+            php-cutover php artisan migrate --force
+          docker exec php-cutover php artisan portal:db-copy \
+            --source=mariadb --target=pgsql \
+            --source-port=3307 --target-port=5432
+      - name: Verify the copy
+        run: |
+          docker exec php-cutover php artisan portal:db-copy \
+            --source=mariadb --target=pgsql \
+            --source-port=3307 --target-port=5432 \
+            --verify-only
+      - name: Assert copied roles and settings match the source
+        run: docker exec -e DB_USERNAME -e DB_PASSWORD -e DB_DATABASE php-cutover php tests/scripts/assert-postgres-copy-parity.php 3307 5432 source-wins-v1
+      - name: Recopy after a source update to prove retries replace stale target rows
+        run: |
+          docker exec php-cutover php -r '
+          $source = new PDO("mysql:host=127.0.0.1;port=3307;dbname=portal_test_db;charset=utf8mb4", "portal_user", "admin", [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+          $update = $source->prepare("UPDATE settings SET value = ? WHERE `key` = ?");
+          $update->execute(["source-wins-v2", "term_editorial"]);
+          if ($update->rowCount() < 1) { throw new RuntimeException("Source settings sentinel was not updated for retry."); }
+          '
+          docker exec php-cutover php artisan portal:db-copy \
+            --source=mariadb --target=pgsql \
+            --source-port=3307 --target-port=5432
+          docker exec php-cutover php artisan portal:db-copy \
+            --source=mariadb --target=pgsql \
+            --source-port=3307 --target-port=5432 \
+            --verify-only
+          docker exec -e DB_USERNAME -e DB_PASSWORD -e DB_DATABASE php-cutover php tests/scripts/assert-postgres-copy-parity.php 3307 5432 source-wins-v2
+      - name: The verifier fails closed on a mismatch
+        # A verifier that only ever prints PASS proves nothing. One row is
+        # removed from the target and the same verify command must exit non-zero
+        # and name the table.
+        run: |
+          docker exec php-cutover php -r '
+          $pdo = new PDO("pgsql:host=127.0.0.1;port=5432;dbname=portal_test_db", "portal_user", "admin");
+          $pdo->exec("DELETE FROM settings WHERE ctid IN (SELECT ctid FROM settings LIMIT 1)");
+          echo "removed one row from settings on the target\n";
+          '
+          set +e
+          output=$(docker exec php-cutover php artisan portal:db-copy \
+            --source=mariadb --target=pgsql \
+            --source-port=3307 --target-port=5432 \
+            --verify-only 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -eq 0 ]; then
+            echo "::error::The verifier accepted a target with a missing row."
+            exit 1
+          fi
+          if ! grep -Fq 'Row count mismatch for settings:' <<< "$output"; then
+            echo "::error::The verifier failed, but did not report the missing settings row."
+            exit 1
+          fi
+          echo "Verifier rejected the mismatch with exit code $status"
 
   frontend:
     name: Frontend (Lint, Build, Vitest)
@@ -464,7 +669,7 @@ jobs:
     # Gesamter E2E-Job laeuft im Test-Image portal-e2e (portal-base + Node/
     # pnpm/Composer + Playwright-Chromium vorinstalliert) -> kein Browser-
     # Download und kein apt-Deps-Setup pro Run. Backend & Vite laufen als
-    # Hintergrundprozesse im selben Container; die Daten-Dienste (mariadb/
+    # Hintergrundprozesse im selben Container; die Daten-Dienste (postgres/
     # meili/mailpit) sind per Service-Name erreichbar. Details: features/
     # infrastructure/28-ci-test-image.md.
     container:
@@ -556,17 +761,16 @@ jobs:
       # ist identisch, also aendert die Vorrangregel nichts am Backend.
       FTP_STORAGE_PATH: /tmp/portal-e2e-ftp
     services:
-      mariadb:
-        image: mariadb:11.4
+      postgres:
+        image: postgres:16
         ports:
-          - 3307:3306
+          - 5432:5432
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: portal_test_db
-          MYSQL_USER: portal_user
-          MYSQL_PASSWORD: admin
+          POSTGRES_DB: portal_test_db
+          POSTGRES_USER: portal_user
+          POSTGRES_PASSWORD: admin
         options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-cmd="pg_isready -U portal_user -d portal_test_db"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -600,6 +804,10 @@ jobs:
           SFTPGO_HTTPD__BINDINGS__0__ADDRESS: "0.0.0.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Install PostgreSQL PDO driver
+        # This is redundant once portal-base is rebuilt from deployment/Dockerfile
+        # with pdo_pgsql included; the pinned e2e image does not have it yet.
+        run: apt-get update && apt-get install -y libpq-dev && docker-php-ext-install pdo_pgsql
       - name: Wait for Meilisearch
         # GitHub service containers are started before the job, but their
         # readiness is not guaranteed. Keep Scout setup behind the same bounded
@@ -676,8 +884,8 @@ jobs:
         run: |
           cp .env.ci .env
           sed -i.bak -E \
-            -e 's|^DB_HOST=.*|DB_HOST=mariadb|' \
-            -e 's|^DB_PORT=.*|DB_PORT=3306|' \
+            -e 's|^DB_HOST=.*|DB_HOST=postgres|' \
+            -e 's|^DB_PORT=.*|DB_PORT=5432|' \
             -e 's|^MEILISEARCH_HOST=.*|MEILISEARCH_HOST=http://meilisearch:7700|' \
             -e 's|^MAIL_HOST=.*|MAIL_HOST=mailpit|' \
             -e 's|^FTP_STORAGE_PATH=.*|FTP_STORAGE_PATH=/tmp/portal-e2e-ftp|' \
@@ -692,8 +900,8 @@ jobs:
             echo 'SFTPGO_ADMIN_USERNAME=e2e'
             echo 'SFTPGO_ADMIN_PASSWORD=e2e-sftpgo-admin-2026'
           } >> .env
-          grep -q '^DB_HOST=mariadb$' .env
-          grep -q '^DB_PORT=3306$' .env
+          grep -q '^DB_HOST=postgres$' .env
+          grep -q '^DB_PORT=5432$' .env
           grep -q '^MEILISEARCH_HOST=http://meilisearch:7700$' .env
           grep -q '^MAIL_HOST=mailpit$' .env
           grep -q '^FTP_STORAGE_PATH=/tmp/portal-e2e-ftp$' .env
@@ -860,7 +1068,8 @@ jobs:
       - security-contract
       - ratchet
       - backend
-      - backend-mariadb
+      - backend-postgres
+      - cutover-copy
       - frontend
       - e2e
     runs-on: ubuntu-latest
@@ -870,7 +1079,8 @@ jobs:
           SECURITY_CONTRACT_RESULT: ${{ needs.security-contract.result }}
           RATCHET_RESULT: ${{ needs.ratchet.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
-          BACKEND_MARIADB_RESULT: ${{ needs.backend-mariadb.result }}
+          BACKEND_POSTGRES_RESULT: ${{ needs.backend-postgres.result }}
+          CUTOVER_COPY_RESULT: ${{ needs.cutover-copy.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
         run: |
@@ -878,6 +1088,7 @@ jobs:
           [[ "$SECURITY_CONTRACT_RESULT" == "success" ]]
           [[ "$RATCHET_RESULT" == "success" ]]
           [[ "$BACKEND_RESULT" == "success" ]]
-          [[ "$BACKEND_MARIADB_RESULT" == "success" ]]
+          [[ "$BACKEND_POSTGRES_RESULT" == "success" ]]
+          [[ "$CUTOVER_COPY_RESULT" == "success" ]]
           [[ "$FRONTEND_RESULT" == "success" ]]
           [[ "$E2E_RESULT" == "success" ]]

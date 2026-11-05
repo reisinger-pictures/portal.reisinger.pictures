@@ -36,14 +36,15 @@ notes visible below instead of dropping them.
 | SEC-09 raster dimensions decoded without a pixel budget | P2 | **closed** (verify APPROVED) | `8f322cc`, `ae1a9ef`, `021aeb3` | `ModelFileImageBudgetTest`, `ImageProcessorHardeningTest` |
 | SEC-10 expired galleries expose photo metadata via context endpoint | P2 | **closed** (verify APPROVED) | `8f322cc` | `SearchPhotoContextVisibilityTest` |
 | SEC-11 cancelled unpaid orders retain coupon capacity | P2 | **closed** (verify APPROVED) | `ff8c46f` | `CancelStalePaymentIntentsCommandTest` |
-| SEC-12 contract content GET writes request-proportional audit rows | P2 | **closed** (verify round 2 APPROVED, measured) | `ff8c46f`, `27e46cf` | `ContractContentHeartbeatMySqlTest`, `AtomicThrottleRequestsTest` |
+| SEC-12 contract content GET writes request-proportional audit rows | P2 | **closed** (verify round 2 APPROVED, measured) | `ff8c46f`, `27e46cf` | `ContractContentHeartbeatPostgresTest` (port of historical `ContractContentHeartbeatMySqlTest`), `AtomicThrottleRequestsTest` |
 | SEC-13 contract closure commits before recipient mail is enqueued | P2 | **closed** (verify APPROVED) | `ff8c46f` | `ContractCloseTest` |
 | SEC-14 FTP import buffers unbounded inbox files and batches | P2 | **closed** (verify APPROVED) | `8550c4b`, `b5e1d7f`, `c9ec86b`, `4b87f34` | `FtpImportTest`, `FtpImportBatchTest`, `FtpQuarantineTest`, `FtpImportDefaultsTest`, `FtpStatCacheOrderTest`, `FtpEventEndpointTest`, `ProvisionFtpEventsTest` |
 
 ## Measured evidence (not assertions)
 
 These two findings were the ones where a plausible implementation was **not** enough, so
-their outcome rests on a measurement. Both numbers carry the command that reproduces them.
+their outcome rests on a measurement: SEC-12 on a concurrent database probe, SEC-14 on
+`FtpImportTest`. The historical MariaDB result below is not a PostgreSQL measurement.
 
 ### SEC-12 — the rate limiter did not hold under concurrency
 
@@ -51,8 +52,18 @@ Measured on a disposable `mariadb:11.4` (11.4.13-MariaDB-ubu2404) with 40 simult
 released clients against `GET /api/contracts/sign/{personalToken}`:
 
 ```
+Historical MariaDB probe (the engine at measurement time):
 cd backend && DOCKER_BIN="$HOME/.rd/bin/docker" ./tests/scripts/contract-content-mariadb-probe.sh
 ```
+
+The MariaDB-specific probe source was retired by commit
+`95f2aef0554249b758df7ea4adf66fbd527faa06` when the current PostgreSQL probe was added. Its
+historical source is recoverable with
+`git show 95f2aef0554249b758df7ea4adf66fbd527faa06^:backend/tests/scripts/contract-content-mariadb-probe.sh`;
+the invocation above is the command used at measurement time, not a command runnable at HEAD.
+The current disposable PostgreSQL probe is `backend/tests/scripts/contract-content-postgres-probe.sh`;
+its future output is a separate PostgreSQL measurement and must not be substituted
+for the MariaDB numbers below.
 
 * Before the atomic counter: **32–37** HTTP 200 and 32–37 heartbeat rows against a limit of
   30/minute (four runs).
@@ -114,8 +125,11 @@ Measured with `FtpImportTest`; the batch semantics are the owner decision D-35.
   concurrent syncs over different orgs whose actors are members of each other's org serialise
   instead of deadlocking. The former order (org → actor → members → sorted union) locked the
   actor outside the sorted set and could form that cycle; the database breaks one transaction,
-  no corruption. The two-connection proof runs against a disposable MariaDB
-  (`backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh`, CI-only). `OrgController::destroy()`
+  no corruption. The 2026-10-21 two-connection proof used disposable MariaDB; its historical
+  probe source is recoverable with
+  `git show 95f2aef0554249b758df7ea4adf66fbd527faa06^:backend/tests/scripts/org-sync-deadlock-mariadb-probe.sh`.
+  The current manual PostgreSQL probe is `backend/tests/scripts/org-sync-deadlock-postgres-probe.sh` (requires Docker).
+  `OrgController::destroy()`
   takes the same org row lock first, so the order is **org → users** in that path as well and a
   destroy cannot close a cycle with a sync of the same org. That order is pinned by
   `OrgDestroyLockOrderTest`; the two-connection measurement of the destroy path is still open (it
@@ -126,9 +140,11 @@ Measured with `FtpImportTest`; the batch semantics are the owner decision D-35.
   member's `users` row, while the sync takes **all** of its `users` locks before any pivot write.
   That residual is disclosed in the test's docblock; the test proves the order, not the absence
   of a cycle. **The trade-off:** the org row lock serialises the *syncs* and the
-  *destroy* of one org, not every write to `users.org_id` — none of
-  `OrgInviteController::redeem()`, `UserController::store()`,
-  `AuthController::register()`/`resetPassword()` (membership added) takes it. The member set has to
+  *destroy* of one org, not every write to `users.org_id` — `UserController::store()`
+  (org-admin user creation) and `AuthController::register()` change a membership without taking
+  it. `OrgInviteController::redeem()` and the deferred `AuthController::resetPassword()`
+  auto-join do take it: both lock the destination org row before the user row, the same
+  org → user order as the sync, so they serialise with it. The member set has to
   be known before the single lock query, so it is now read **unlocked** (a consistent read) and the
   membership decision is taken on the locked rows. The set is therefore read *earlier* in the
   transaction than the old

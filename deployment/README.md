@@ -15,6 +15,7 @@
 | 1. Host-`.env` prüfen | Owner, SSH | 2 Minuten |
 | 2. **Firewall: 3 Ports öffnen** | Owner, SSH | **2 Minuten** |
 | 3. Backup + Restore-Test | Owner, SSH | 10 Minuten |
+| 3a. PostgreSQL-Cutover (einmalig, D-63) | Owner, SSH | `deployment/migrate-to-postgres.sh`, siehe Abschnitt 3a |
 | 4. `deployment/deploy.sh` | Owner | 3 Minuten |
 | 5. Kamera testen | Fotograf | 20 Minuten |
 | 6. `pure-ftpd` abschalten | Owner, SSH | 1 Minute → **schon geschehen (2026-09-27), nur noch Gegenprobe, siehe Schritt 6** |
@@ -318,6 +319,80 @@ Restore nie geprüft wurde, ist eine Vermutung.
 
 ---
 
+## 3a. Einmaliger PostgreSQL-Cutover (D-63)
+
+Der Wechsel von MariaDB auf PostgreSQL ist ein **eigener, einmaliger Vorgang**,
+kein Nebeneffekt eines Deploys. Er läuft auf dem Host, macht sein Backup selbst
+und schaltet erst nach grüner Verifikation um:
+
+Zuerst wird das PostgreSQL-fähige Image und der Dual-Engine-Compose-Stand
+deployt, während die Host-`.env` weiterhin MariaDB auswählt. Der normale
+Backend-Start migriert damit zunächst die laufende MariaDB auf den aktuellen
+Schema-Stand. Das Cutover-Skript prüft vor dem Backup erneut, dass
+`migrate:status` keine offenen Migrationen meldet; andernfalls bricht es ab.
+Diese Vorbereitung ist nötig, damit Quell- und Zieltabellen dieselbe
+Migrationsfrontier haben.
+
+Vor dem Stoppen des Backends prüft das Skript, dass auf dem MariaDB-Daten-, dem
+Backup- und dem PostgreSQL-Zieldateisystem jeweils mindestens das Dreifache der
+aktuellen MariaDB-Datenverzeichnisgröße frei ist. Für ein noch nicht angelegtes
+Named Volume wird das Dateisystem des Docker-Verzeichnisses `volumes` geprüft
+(oder das Docker-Root-Dateisystem, falls dieser Unterordner noch nicht existiert).
+Externe oder speziell konfigurierte Zielvolumes werden abgelehnt, statt
+irrtümlich das falsche Dateisystem zu prüfen.
+
+**Vor dem echten Cutover muss außerdem ein laufender PostgreSQL-Backup- und
+Restore-Pfad eingerichtet und getestet sein.** Compose konfiguriert weder WAL-
+Archivierung noch Retention. Das Backup des Cutover-Skripts ist ausschließlich
+ein MariaDB-Quellbackup vor dem Kopieren; es schützt keine PostgreSQL-Schreib-
+vorgänge nach dem Umschalten. Der Vertrag und diese offene Betriebsgrenze stehen
+in [`features/infrastructure/30-postgres-cutover.md`](../features/infrastructure/30-postgres-cutover.md).
+
+```bash
+# Hostseitiger Dry-Run (das Skript wird über SSH gestreamt und nicht ins Webroot kopiert):
+ssh root@reisinger.pictures 'bash -s -- --dry-run' < deployment/migrate-to-postgres.sh
+
+# Echt: Backup -> PostgreSQL starten -> migrieren -> kopieren -> verifizieren -> umschalten
+ssh root@reisinger.pictures 'bash -s' < deployment/migrate-to-postgres.sh
+
+# Rollback NACH dem Umschalten: PostgreSQL-Schreibvorgänge werden nicht nach MariaDB übernommen.
+# MariaDB bleibt auf dem Stand VOR dem Cutover; das PostgreSQL-Volume bleibt zur manuellen Abgleichung erhalten.
+ssh root@reisinger.pictures 'bash -s -- --rollback --accept-postgres-write-loss' < deployment/migrate-to-postgres.sh
+
+# Nur wenn kein PostgreSQL-Switch versucht wurde und das Skript daher keinen
+# `switch-attempted`-Marker hinterlassen hat, genügt:
+ssh root@reisinger.pictures 'bash -s -- --rollback' < deployment/migrate-to-postgres.sh
+```
+
+Die Phasen (BACKUP / PG / MIGRATE / COPY / VERIFY / SWITCH) brechen benannt ab;
+das Skript schaltet nie teilweise um. Cutover und Rollback halten vor der
+Vorprüfung denselben exklusiven Host-Lock
+(`/var/lib/portal-postgres-cutover/cutover.lock`, `flock`). Ein zweiter Lauf
+bricht benannt ab, solange der Lock gehalten wird; der Lock bleibt auch während
+eines automatischen Rollbacks bestehen und wird beim Prozessende freigegeben.
+
+**Der manuelle Rollback ist nach dem Umschalten eine Einbahnstraße.** Sobald ein
+PostgreSQL-Switch versucht wurde, hinterlässt das Skript den root-geschützten
+Marker `/var/lib/portal-postgres-cutover/switch-attempted`; er bleibt auch nach
+erfolgreichem Switch bestehen. `--rollback` verweigert ohne
+`--accept-postgres-write-loss` den Lauf, selbst wenn die Host-`.env` manuell
+wieder auf MariaDB gesetzt wurde. Das Flag bestätigt ausdrücklich, dass
+PostgreSQL-Schreibvorgänge **nicht in den
+aktiven MariaDB-Datenbestand übernommen werden**: MariaDB ist der eingefrorene
+Stand vor dem Cutover, ein Rückfluss von PostgreSQL nach MariaDB existiert
+nicht. Das PostgreSQL-Volume bleibt für eine manuelle Abgleichung erhalten;
+vor einem späteren Kopierlauf muss diese erfolgt sein, weil der Copier das Ziel
+aus MariaDB rekonstruiert. Der `.env`-Flip (`DB_CONNECTION=mariadb`, `DB_HOST=db`, `DB_PORT=3306`)
+stellt nur die MariaDB-Daten wieder her — ein Restore ist dafür nicht nötig,
+weil MariaDB unangetastet weiterläuft. Scheitert die Health-Prüfung direkt beim
+Umschalten, rollt das Skript automatisch zurück und protokolliert dieselbe
+Grenze, ohne eine Bestätigung zu verlangen. Der Vertrag, die Invarianten des
+Verifiers (einschließlich des exakten Vergleichs aller `settings`-Zeilen nach
+`key`, `brand` und `value`) und was ausdrücklich **nicht** abgedeckt ist, stehen
+in [`features/infrastructure/30-postgres-cutover.md`](../features/infrastructure/30-postgres-cutover.md).
+
+---
+
 ## 4. Deploy
 
 ### Sync und der Container-Neustart (Pflicht)
@@ -601,6 +676,11 @@ sftpgo
 composer_init
 backend
 ```
+
+Im Compose-Zielstand für D-63 kommt `db_pg` hinzu; `db` (MariaDB) bleibt bis
+zum Ende des Rollback-Fensters im Stack. Die Liste oben ist die Messung vom
+2026-09-27 und bleibt als solche stehen — ein erneutes `config --services`
+zeigt den aktuellen Stand.
 
 Kein `pureftp`. Ein `docker compose down` aus dem Portal-Verzeichnis hätte den
 alten Stack nicht einmal *berührt*.

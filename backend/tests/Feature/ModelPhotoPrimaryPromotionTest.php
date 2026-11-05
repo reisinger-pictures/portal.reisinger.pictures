@@ -26,9 +26,9 @@ use Tests\TestCase;
 
 /**
  * CR-DATA-006: admin and owner primary-photo promotions share one profile
- * mutex. The test database is SQLite :memory:, so the two request orderings
- * below are the deterministic winner/loser stand-ins for parallel requests;
- * the cache-lock regression still exercises a real shared lock handle.
+ * mutex. The two request orderings below are deterministic winner/loser
+ * stand-ins rather than concurrent requests; the cache-lock regression still
+ * exercises a real shared lock handle.
  */
 class ModelPhotoPrimaryPromotionTest extends TestCase
 {
@@ -272,7 +272,7 @@ class ModelPhotoPrimaryPromotionTest extends TestCase
     {
         $data = $this->profileWithPhotos();
         // A second lock handle on the same shared cache key forces the real
-        // block/wait path; SQLite :memory: cannot provide a second DB writer.
+        // block/wait path through the cache lock.
         $lock = Cache::lock('model-photo-primary:'.$data['profile']->getKey(), 1);
 
         $this->assertTrue($lock->get());

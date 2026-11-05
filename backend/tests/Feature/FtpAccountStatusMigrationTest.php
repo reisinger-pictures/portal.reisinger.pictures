@@ -44,17 +44,19 @@ class FtpAccountStatusMigrationTest extends TestCase
 
         // MySQL/MariaDB is the one driver that keeps the enum as a type, and the
         // only place the closed set is enforced by the database itself.
-        if (DB::connection()->getDriverName() === 'mysql') {
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
             $this->assertStringContainsString(
                 "enum('pending','active','error')",
                 (string) $columns['ftp_account_status']['type'],
             );
         }
 
-        // SQLite reports the default including its quoting, MySQL without it.
+        // Drivers may expose a typed PostgreSQL default expression.
+        $statusDefault = trim((string) $columns['ftp_account_status']['default'], "'\" \t");
+        $statusDefault = preg_replace('/::[A-Za-z ]+$/', '', $statusDefault);
         $this->assertSame(
             'pending',
-            trim((string) $columns['ftp_account_status']['default'], "'\" \t"),
+            trim((string) $statusDefault, "'\" \t"),
             'New users must be provisioned as pending without an explicit write.',
         );
 

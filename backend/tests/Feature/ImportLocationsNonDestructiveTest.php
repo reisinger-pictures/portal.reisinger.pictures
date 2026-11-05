@@ -61,8 +61,8 @@ class ImportLocationsNonDestructiveTest extends TestCase
      * countryInfo.txt and the .part staging files. Sharing one flat absolute
      * namespace produced intermittent failures whose symptom followed the
      * interleaving — a missing cache file in one run, a non-zero import exit
-     * in the next. The database is already isolated per worker via SQLite
-     * :memory:, the filesystem was not.
+     * in the next. The database is already isolated per worker through PostgreSQL
+     * worker databases; the filesystem was not.
      */
     private string $baseDir;
 

@@ -9,6 +9,8 @@ use App\Models\LicenseModifier;
 use App\Models\LicenseUseCase;
 use App\Models\User;
 use App\Support\BrandRegistry;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Str;
 
 class ScopeLicensingStrategy implements PricingStrategy
 {
@@ -73,6 +75,10 @@ class ScopeLicensingStrategy implements PricingStrategy
      */
     private function calculateSingleItem(string $useCaseId, array $modifierIds, string $userFlatrateLevel): array
     {
+        if (! Str::isUuid($useCaseId)) {
+            throw (new ModelNotFoundException)->setModel(LicenseUseCase::class, [$useCaseId]);
+        }
+
         $useCase = LicenseUseCase::findOrFail($useCaseId);
         $this->guardBrand($useCase->brand);
         $basePriceCents = (int) $useCase->base_price;
@@ -89,6 +95,10 @@ class ScopeLicensingStrategy implements PricingStrategy
         $modifierNames = [];
 
         if (! empty($modifierIds)) {
+            $modifierIds = array_values(array_filter(
+                $modifierIds,
+                static fn (mixed $id): bool => is_string($id) && Str::isUuid($id),
+            ));
             $modifiers = LicenseModifier::whereIn('id', $modifierIds)->get();
             foreach ($modifiers as $mod) {
                 $this->guardBrand($mod->brand);
