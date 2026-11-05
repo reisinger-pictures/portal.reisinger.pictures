@@ -109,7 +109,19 @@ JSON
                 printf 'All MariaDB migrations are complete.\n'
             fi
             ;;
-        stop|up)
+        stop)
+            ;;
+        up)
+            if [[ "${FAKE_UP_FAIL_ONCE:-}" == 'true' \
+                && " $* " == *' --force-recreate '* \
+                && ! -e "$FAKE_DOCKER_STATE/up-failed-once" ]]; then
+                if [[ -e "$PORTAL_STATE_DIR/switch-attempted" ]]; then
+                    touch "$FAKE_DOCKER_STATE/switch-marker-seen"
+                fi
+                touch "$FAKE_DOCKER_STATE/up-failed-once"
+                printf 'simulated backend recreate failure\n' >&2
+                exit 1
+            fi
             ;;
         *)
             printf 'unexpected docker compose command: %s %s\n' "$command" "$*" >&2
@@ -145,6 +157,7 @@ ENV
     export FAKE_DB_DATA_DIR="$case_root/db-data"
     export FAKE_HEALTH_MODE=healthy
     export FAKE_DUMP_MODE=ok
+    export FAKE_UP_FAIL_ONCE=''
     export FAKE_LOCK_PROBE=''
     mkdir -p "$FAKE_DOCKER_STATE"
 }
@@ -162,6 +175,84 @@ assert_mariadb_env() {
     grep -Fxq 'DB_QUEUE_CONNECTION=mariadb' "$env_file" || fail 'rollback did not select the MariaDB queue connection'
     grep -Fxq 'DB_CACHE_CONNECTION=mariadb' "$env_file" || fail 'rollback did not select the MariaDB cache connection'
     grep -Fxq 'DB_CACHE_LOCK_CONNECTION=mariadb' "$env_file" || fail 'rollback did not select the MariaDB cache-lock connection'
+}
+
+assert_artisan_config_override() {
+    local log="$1"
+    local line found=0
+    while IFS= read -r line; do
+        [[ "$line" == *'php artisan'* ]] || continue
+        found=$((found + 1))
+        [[ "$line" == *'APP_CONFIG_CACHE=/tmp/portal-cutover-config-'* ]] \
+            || fail "an Artisan invocation lacks the absent APP_CONFIG_CACHE override: $line"
+        [[ "$line" != *'bootstrap/cache/config.php'* ]] \
+            || fail "an Artisan invocation targets the live shared config cache: $line"
+    done < "$log"
+    [[ "$found" -gt 0 ]] || fail 'no Artisan invocation was recorded'
+}
+
+assert_database_command_contract() {
+    local log="$1"
+    local line found=0
+    while IFS= read -r line; do
+        [[ "$line" == *'DB_CONNECTION='* ]] || continue
+        found=$((found + 1))
+        [[ "$line" == *'DB_URL='* ]] || fail "a database command lacks the explicit DB_URL= override: $line"
+        [[ "$line" == *'APP_CONFIG_CACHE=/tmp/portal-cutover-config-'* ]] \
+            || fail "a database command lacks the absent APP_CONFIG_CACHE override: $line"
+    done < "$log"
+    [[ "$found" -gt 0 ]] || fail 'no database command was recorded'
+}
+
+assert_pg_migration_command() {
+    local log="$1"
+    local line found=0
+    while IFS= read -r line; do
+        [[ "$line" == *'php artisan migrate --force'* ]] || continue
+        found=$((found + 1))
+        local expected
+        for expected in \
+            'DB_CONNECTION=pgsql' 'DB_HOST=db_pg' 'DB_PORT=5432' 'DB_URL=' \
+            'APP_CONFIG_CACHE=/tmp/portal-cutover-config-'; do
+            [[ "$line" == *"$expected"* ]] \
+                || fail "the target migration lacks '$expected': $line"
+        done
+    done < "$log"
+    [[ "$found" -eq 1 ]] || fail "expected exactly one target migration command, found $found"
+}
+
+assert_mariadb_status_command() {
+    local log="$1"
+    local line found=0
+    while IFS= read -r line; do
+        [[ "$line" == *'migrate:status --database=mariadb'* ]] || continue
+        found=$((found + 1))
+        [[ "$line" == *'DB_CONNECTION=mariadb'* ]] \
+            || fail "the source migration status does not target MariaDB: $line"
+    done < "$log"
+    [[ "$found" -eq 1 ]] || fail "expected exactly one source migration status command, found $found"
+}
+
+assert_pg_commands_target_db_pg() {
+    local log="$1"
+    local line found=0
+    while IFS= read -r line; do
+        [[ "$line" == *'DB_CONNECTION=pgsql'* ]] || continue
+        found=$((found + 1))
+        [[ "$line" == *'DB_HOST=db_pg'* ]] || fail "a PostgreSQL command does not target db_pg: $line"
+        [[ "$line" == *'DB_PORT=5432'* ]] || fail "a PostgreSQL command does not target port 5432: $line"
+    done < "$log"
+    [[ "$found" -ge 1 ]] || fail 'no PostgreSQL command was recorded'
+}
+
+assert_switch_marker() {
+    local marker="$PORTAL_STATE_DIR/switch-attempted"
+    [[ -f "$marker" ]] || fail 'the successful cutover did not retain the switch marker'
+    [[ "$(stat -c '%a' "$marker")" == '600' ]] || fail 'the switch marker permissions are not 0600'
+    grep -Fxq 'switch=attempted' "$marker" || fail 'the switch marker does not record the switch attempt'
+    local backup
+    backup="$(sed -n 's/^env_backup=//p' "$marker" | head -n 1)"
+    [[ -n "$backup" && -f "$backup" ]] || fail 'the switch marker does not name an existing MariaDB .env backup'
 }
 
 export PORTAL_BACKUP_DIR="$temporary_root/production-override-must-not-be-used/backups"
@@ -219,6 +310,12 @@ grep -Fq $'table\trows' "$PORTAL_BACKUP_DIR"/mariadb-*.manifest.tsv || fail 'bac
 grep -Fq 'portal_db_pg' "$FAKE_DOCKER_LOG" || fail 'the target PostgreSQL container was never checked'
 grep -Fq -- '--accept-postgres-write-loss' "$temporary_root/success.log" \
     || fail 'successful cutover did not name the acknowledged rollback command'
+assert_switch_marker
+assert_artisan_config_override "$FAKE_DOCKER_LOG"
+assert_database_command_contract "$FAKE_DOCKER_LOG"
+assert_pg_migration_command "$FAKE_DOCKER_LOG"
+assert_mariadb_status_command "$FAKE_DOCKER_LOG"
+assert_pg_commands_target_db_pg "$FAKE_DOCKER_LOG"
 assert_lock_released
 
 set +e
@@ -241,6 +338,72 @@ grep -Fq 'PostgreSQL-only writes will not appear in the active MariaDB database'
     || fail 'acknowledged rollback did not log the PostgreSQL write-divergence boundary'
 assert_mariadb_env
 [[ ! -e "$PORTAL_STATE_DIR/in-progress" ]] || fail 'explicit rollback left the in-progress marker behind'
+[[ ! -e "$PORTAL_STATE_DIR/switch-attempted" ]] || fail 'explicit rollback left the switch marker behind'
+[[ ! -e "$PORTAL_STATE_DIR/last-env-backup" ]] || fail 'explicit rollback left the legacy saved-env pointer behind'
+assert_lock_released
+
+# A legacy pointer from an older script version must never make a later,
+# markerless rollback restore an obsolete whole-file .env backup.
+legacy_backup="$PORTAL_STACK_DIR/.env.legacy.bak"
+cp -- "$env_file" "$legacy_backup"
+printf '%s\n' "$legacy_backup" > "$PORTAL_STATE_DIR/last-env-backup"
+sed -i '/^QUEUE_CONNECTION=/a POST_ROLLBACK_SENTINEL=preserve-this-value' "$env_file"
+env_checksum="$(sha256sum "$env_file" | awk '{print $1}')"
+log_lines_before="$(wc -l < "$FAKE_DOCKER_LOG")"
+set +e
+"$CUTOVER_SCRIPT" --rollback > "$temporary_root/repeated-rollback.log" 2>&1
+repeated_rollback_status=$?
+set -e
+[[ "$repeated_rollback_status" -ne 0 ]] || fail 'a markerless repeated rollback unexpectedly succeeded'
+grep -Fq 'refusing to restore a stale .env backup' "$temporary_root/repeated-rollback.log" \
+    || { cat "$temporary_root/repeated-rollback.log" >&2; fail 'a markerless repeated rollback did not refuse the stale backup'; }
+[[ "$(sha256sum "$env_file" | awk '{print $1}')" == "$env_checksum" ]] \
+    || fail 'a markerless repeated rollback reverted unrelated .env changes'
+grep -Fxq 'POST_ROLLBACK_SENTINEL=preserve-this-value' "$env_file" \
+    || fail 'a markerless repeated rollback removed a later .env setting'
+if tail -n +"$((log_lines_before + 1))" "$FAKE_DOCKER_LOG" | grep -Fq 'up -d --force-recreate'; then
+    fail 'a markerless repeated rollback started the backend service'
+fi
+assert_lock_released
+
+prepare_case edited-env-rollback
+"$CUTOVER_SCRIPT" > "$temporary_root/edited-env-cutover.log" 2>&1 || {
+    cat "$temporary_root/edited-env-cutover.log" >&2
+    fail 'the simulated cutover before the edited-env rollback did not complete'
+}
+env_file="$PORTAL_STACK_DIR/.env"
+sed -i 's/^DB_CONNECTION=pgsql$/DB_CONNECTION=mariadb/' "$env_file"
+grep -Fxq 'DB_CONNECTION=mariadb' "$env_file" || fail 'the regression could not edit the host .env back to MariaDB'
+env_checksum="$(sha256sum "$env_file" | awk '{print $1}')"
+marker_checksum="$(sha256sum "$PORTAL_STATE_DIR/switch-attempted" | awk '{print $1}')"
+log_lines_before="$(wc -l < "$FAKE_DOCKER_LOG")"
+set +e
+"$CUTOVER_SCRIPT" --rollback > "$temporary_root/edited-env-unacknowledged-rollback.log" 2>&1
+edited_env_status=$?
+set -e
+[[ "$edited_env_status" -ne 0 ]] || fail 'a rollback after an edited-back MariaDB .env was accepted without acknowledgement'
+grep -Fq 'A PostgreSQL switch was already attempted' "$temporary_root/edited-env-unacknowledged-rollback.log" \
+    || { cat "$temporary_root/edited-env-unacknowledged-rollback.log" >&2; fail 'the refused rollback did not name the recorded switch attempt'; }
+grep -Fq -- '--accept-postgres-write-loss' "$temporary_root/edited-env-unacknowledged-rollback.log" \
+    || { cat "$temporary_root/edited-env-unacknowledged-rollback.log" >&2; fail 'the refused edited-env rollback did not name the acknowledgement flag'; }
+[[ "$(sha256sum "$env_file" | awk '{print $1}')" == "$env_checksum" ]] \
+    || fail 'a refused edited-env rollback modified the host .env'
+[[ "$(sha256sum "$PORTAL_STATE_DIR/switch-attempted" | awk '{print $1}')" == "$marker_checksum" ]] \
+    || fail 'a refused edited-env rollback modified the switch marker'
+if tail -n +"$((log_lines_before + 1))" "$FAKE_DOCKER_LOG" | grep -Fq 'up -d --force-recreate'; then
+    fail 'a refused edited-env rollback started the backend service'
+fi
+assert_lock_released
+
+"$CUTOVER_SCRIPT" --rollback --accept-postgres-write-loss > "$temporary_root/edited-env-acknowledged-rollback.log" 2>&1 || {
+    cat "$temporary_root/edited-env-acknowledged-rollback.log" >&2
+    fail 'the acknowledged rollback after an edited-back MariaDB .env did not complete'
+}
+grep -Fq 'acknowledged for a previously attempted PostgreSQL switch' "$temporary_root/edited-env-acknowledged-rollback.log" \
+    || fail 'the acknowledged edited-env rollback did not name the recorded switch attempt'
+assert_mariadb_env
+[[ ! -e "$PORTAL_STATE_DIR/in-progress" ]] || fail 'the edited-env rollback left the in-progress marker behind'
+[[ ! -e "$PORTAL_STATE_DIR/switch-attempted" ]] || fail 'the edited-env rollback left the switch marker behind'
 assert_lock_released
 
 prepare_case automatic-rollback
@@ -261,8 +424,25 @@ if grep -Fxq 'released' "$FAKE_LOCK_PROBE"; then
 fi
 assert_mariadb_env
 [[ ! -e "$PORTAL_STATE_DIR/in-progress" ]] || fail 'automatic rollback left the in-progress marker behind'
+[[ ! -e "$PORTAL_STATE_DIR/switch-attempted" ]] || fail 'automatic rollback left the switch marker behind'
 [[ "$(cat "$FAKE_DOCKER_STATE/backend-health-count")" == '2' ]] \
     || fail 'automatic rollback did not test PostgreSQL failure and MariaDB recovery health separately'
+assert_lock_released
+
+prepare_case switch-process-failure
+export FAKE_UP_FAIL_ONCE=true
+set +e
+"$CUTOVER_SCRIPT" > "$temporary_root/switch-process-failure.log" 2>&1
+switch_failure_status=$?
+set -e
+[[ "$switch_failure_status" -ne 0 ]] || fail 'a simulated backend recreate failure unexpectedly reported a successful cutover'
+grep -Fq 'automatically rolled back to MariaDB' "$temporary_root/switch-process-failure.log" \
+    || { cat "$temporary_root/switch-process-failure.log" >&2; fail 'the switch process failure did not trigger an automatic rollback'; }
+[[ -e "$FAKE_DOCKER_STATE/switch-marker-seen" ]] \
+    || fail 'the switch marker was not present when the backend recreate failed'
+[[ ! -e "$PORTAL_STATE_DIR/switch-attempted" ]] \
+    || fail 'the automatic rollback after a switch process failure left the switch marker behind'
+assert_mariadb_env
 assert_lock_released
 
 prepare_case pre-switch-rollback
@@ -288,4 +468,4 @@ assert_mariadb_env
 [[ ! -e "$PORTAL_STATE_DIR/in-progress" ]] || fail 'pre-switch rollback left the in-progress marker behind'
 assert_lock_released
 
-echo 'PASS: host cutover backup, host lock, acknowledged rollback, automatic rollback, and pre-switch rollback lifecycle'
+echo 'PASS: host cutover backup, config-cache override, host lock, acknowledged rollback, stale-pointer rejection, edited-env rollback, automatic and switch-process-failure rollback, and pre-switch rollback lifecycle'

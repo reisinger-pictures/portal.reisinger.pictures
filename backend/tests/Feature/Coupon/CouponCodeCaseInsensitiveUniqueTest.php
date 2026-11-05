@@ -10,12 +10,13 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * Pins the V054 database invariant: a coupon code is unique per brand after
- * case folding.
+ * Pins the per-brand case-insensitive database invariant.
  *
- * The application folds case in the customer lookup and in the management
- * duplicate checks. This test proves the schema refuses a case-only duplicate
- * even for a raw write that bypasses both, which is the only guarantee that
+ * The application compares codes through `Coupon::whereCodeMatches()`. V054
+ * introduced the first structural half as a `LOWER(code)` index; V055 replaces
+ * it on PostgreSQL with the stronger ICU collation index and drops the weaker
+ * one. This test still proves that a case-only duplicate is refused even for a
+ * raw write that bypasses the application, which is the guarantee that
  * survives two concurrent requests and a direct import.
  *
  * `RefreshDatabase` runs the real PostgreSQL migration chain, so the index is
@@ -75,9 +76,10 @@ class CouponCodeCaseInsensitiveUniqueTest extends TestCase
      */
     public function test_v054_refuses_case_only_duplicates_without_changing_either_row(): void
     {
-        // Model the pre-V054 state: the functional index is absent, so the
-        // case-sensitive `(brand, code)` unique accepts both spellings.
+        // Model the pre-V054 state: both per-brand code indexes are absent, so
+        // the case-sensitive `(brand, code)` unique accepts both spellings.
         DB::statement('DROP INDEX IF EXISTS coupons_brand_lower_code_unique');
+        DB::statement('DROP INDEX IF EXISTS coupons_brand_code_ci_unique');
 
         $first = Coupon::factory()->create([
             'brand' => 'rp',

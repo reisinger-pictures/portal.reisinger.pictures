@@ -35,7 +35,16 @@ preparatory deployment followed by the cutover:
    until verification succeeds.
 3. Create and validate a mode-0600, gzip-compressed MariaDB dump outside the
    web root, and record exact source row counts in a private manifest.
-4. Start PostgreSQL and run the Laravel migrations to create its schema.
+4. Start PostgreSQL and run the Laravel migrations to create its schema. Every
+   one-off Artisan process receives `APP_CONFIG_CACHE` pointing at a per-run
+   path that does not exist. The database-backed processes (the source
+   `migrate:status` preflight, target `migrate`, copy, verify, `migrate:status`,
+   and Tinker smoke queries) also receive explicit
+   `DB_CONNECTION`/`DB_HOST`/`DB_PORT` and an empty `DB_URL=`. Laravel 13.30
+   resolves `Application::getCachedConfigPath()` through `APP_CONFIG_CACHE`;
+   the absent path makes the process load `config/` fresh, so a
+   `bootstrap/cache/config.php` written before the switch cannot redirect it to
+   MariaDB. The live backend's shared config cache is not deleted or modified.
 5. Run `php artisan portal:db-copy`. It copies source base tables in stable
    primary-key batches and omits only Laravel's `migrations` bookkeeping table.
    Before copying, it clears the matching target tables so migration-provided
@@ -43,9 +52,18 @@ preparatory deployment followed by the cutover:
    override the frozen MariaDB source. A retry rebuilds those target tables from
    the current source; MariaDB is never modified.
 6. Run `php artisan portal:db-copy --verify-only` and the production smoke
-   queries. The switch is permitted only after every check passes.
+   queries. The switch is permitted only after every check passes. The
+   verifier compares every `settings` row exactly by `key`, `brand`, and
+   `value` (including null values and null brands), not just row counts or
+   sums.
 7. Atomically edit the protected host `.env` and recreate the backend against
    PostgreSQL. MariaDB stays running and untouched.
+
+Cutover and rollback take one exclusive host lock before any preflight check
+(`flock` on `/var/lib/portal-postgres-cutover/cutover.lock`). A concurrent run
+fails closed with a named error instead of interleaving a second backup, copy,
+or environment flip. The lock stays held through an automatic rollback and is
+released when the process exits.
 
 Rollback restores the timestamped host `.env`, then explicitly selects
 `DB_CONNECTION=mariadb`, `DB_HOST=db`, and `DB_PORT=3306`. It also sets the
@@ -53,15 +71,44 @@ queue/cache connection keys to `mariadb`, adding them if an older `.env`
 omitted them, before recreating the backend. The host/port keys are added too
 when an older `.env` never contained them, so Compose defaults cannot redirect
 rollback traffic. The MariaDB data and volume remain the pre-cutover source.
-The exact host-side command is:
+
+A manual rollback after the switch abandons PostgreSQL-only writes from the
+active database. The switch writes a root-only `switch-attempted` marker in
+`/var/lib/portal-postgres-cutover` (state directory mode 0700, marker mode
+0600) that records the MariaDB `.env` backup path. It survives a successful
+cutover and is removed only after a successful manual or automatic rollback.
+Whenever that marker exists, `--rollback` refuses to run unless the operator
+passes `--accept-postgres-write-loss`, even if the host `.env` has since been
+edited back to `DB_CONNECTION=mariadb`; the acknowledgement names that those
+writes will not appear in the active MariaDB database. MariaDB is the frozen
+pre-cutover snapshot and no replication copies PostgreSQL writes back into it.
+The PostgreSQL volume remains available for manual reconciliation; reconcile it
+before a later copy because the copier reconstructs the target from MariaDB. If
+no switch was attempted (no marker and the selection is still MariaDB), a
+normal `--rollback` needs no acknowledgement. An automatic rollback on a failed
+switch remains automatic and logs the same boundary. The exact post-switch
+host-side command is:
 
 ```bash
-ssh root@reisinger.pictures 'bash -s -- --rollback' < deployment/migrate-to-postgres.sh
+ssh root@reisinger.pictures 'bash -s -- --rollback --accept-postgres-write-loss' < deployment/migrate-to-postgres.sh
 ```
 
 The command copies rows only. Laravel migrations own the PostgreSQL schema;
 the copy command does not infer types, create tables, alter columns, or migrate
 schema. Source and target columns must agree for copied source data.
+
+## PostgreSQL backup and restore precondition
+
+Compose configures neither WAL archiving nor WAL retention for `db_pg`; the
+`db_pg_data` volume is the only PostgreSQL copy this repository describes. The
+cutover script's gzip dump, checksum, and row manifest back up MariaDB only:
+they are a one-time backup of the MariaDB source for this migration, do not
+dump PostgreSQL, and are not an ongoing PostgreSQL backup. Before
+the PostgreSQL database accepts production writes, an ongoing PostgreSQL backup
+(base backup plus WAL archiving/PITR, or an equivalent tested dump schedule) and
+a tested restore path are required preconditions. This branch does not provide,
+configure, or prove either of them, and a completed cutover would not be
+evidence that such a path exists.
 
 ## Verification invariants
 
@@ -73,6 +120,26 @@ The verifier returns success only when all of these checks pass:
   empty on PostgreSQL, so rows seeded by schema migrations (including roles and
   settings) are replaced by the source rows rather than retained on a unique-key
   conflict.
+- **Exact settings identity and value:** every `settings` row is compared by
+  `(key, brand, value)`, with null values and null brands preserved and a
+  deterministic PHP-side byte ordering that does not depend on either engine's
+  collation. A target row with the right count but the wrong value, or a
+  missing/extra `(key, brand)` identity, fails `--verify-only` and blocks the
+  switch.
+- **Table-wide column parity:** every shared source table is streamed in
+  primary-key batches and each source row is matched to the target row with the
+  same primary key, including composite keys. Every shared column is compared
+  after applying the copy path's `PostgresCopyValueNormalizer` transformation,
+  with target values reduced to a canonical form (numeric scale, timestamp
+  fractional zeros, exact arbitrary-precision JSON numbers and JSON object
+  ordering, boolean and `bytea` representations).
+  Nulls, zero dates and `tinyint(1)` booleans are therefore compared as the
+  transformed target value. Key matching does not depend on the engines agreeing
+  on string order or collation, and a same-count, foreign-key-valid row with a
+  wrong non-settings field fails `--verify-only`. Mismatch output names the
+  table, column and row key without printing the differing data value. The
+  `--chunk` batch bounds memory and query size, so no production table is loaded
+  whole on either side.
 - **Money and amount sums:** sums are compared exactly for persisted money
   fields in orders, invoice snapshots, products/licensing, coupons, payout
   pools/statements, payout corrections, open items, and payout bookings. The
@@ -111,9 +178,11 @@ settings make timestamp reads deterministic but do not persist in either
 database. The backend waits for a Laravel query on only the selected
 `DB_CONNECTION`; an unavailable, unselected engine does not block MariaDB
 startup before cutover or the MariaDB rollback path. The host cutover script's
-backup, switch, explicit rollback, and automatic rollback lifecycle is exercised
-against a Docker CLI test double in CI; the copy itself is tested against real
-MariaDB and PostgreSQL services.
+backup, switch, lock contention, explicit config-cache override, refused and
+acknowledged post-switch rollback, rollback after an operator edits the host
+`.env` back to MariaDB, automatic rollback, switch process failure, and
+pre-switch rollback lifecycle is exercised against a Docker CLI test double in
+CI; the copy itself is tested against real MariaDB and PostgreSQL services.
 
 ## Time and collation hazards
 
@@ -123,13 +192,17 @@ imported elsewhere. The backup pins UTC with `mariadb-dump --tz-utc`, and the
 copy connection pins MariaDB to `+00:00` and PostgreSQL to `UTC` before reading
 or writing timestamps.
 
-MariaDB's production `utf8mb4_unicode_ci` collation is case-insensitive;
-PostgreSQL text comparisons and ordinary unique indexes are case-sensitive.
-This can change equality, lookup, and uniqueness behavior after the switch.
-The copy does not case-fold data or merge case-only duplicates. Case-only
-collisions in unique business keys must be identified and resolved before the
-cutover; a row-count or uniqueness failure blocks the switch rather than
-choosing a value silently.
+MariaDB's production `utf8mb4_unicode_ci` collation is case- and
+accent-insensitive and ignores trailing spaces; PostgreSQL text comparisons and
+ordinary unique indexes are case-sensitive. The application preserves the
+established email identity contract through normalization and a functional
+unique index, and coupon codes through V055's tested ICU collation plus
+`RTRIM()` unique index. V055 documents that ICU's Unicode collation version is
+an approximation, not byte-for-byte equivalent to MariaDB's UCA version. The
+copy itself never case-folds data or merges duplicate rows. Every other
+collation-dependent business key must have an explicit compatibility contract;
+collisions that remain unhandled block the copy on schema/value verification or
+the target unique index rather than choosing a value silently.
 
 ## Explicitly not handled
 
@@ -146,4 +219,9 @@ choosing a value silently.
   lifecycle or must be rebuilt independently.
 - Bidirectional rollback after PostgreSQL accepts production writes. The saved
   MariaDB snapshot is not updated from PostgreSQL; after the first post-switch
-  write, reverting the environment would discard those new writes.
+  write, reverting the environment leaves those new writes on the PostgreSQL
+  volume and absent from the active MariaDB dataset. A manual `--rollback`
+  therefore requires `--accept-postgres-write-loss` once the switch has been
+  attempted (recorded by the `switch-attempted` marker), even if the host `.env`
+  has since been edited back to MariaDB; the flag acknowledges that divergence,
+  it does not copy data back.

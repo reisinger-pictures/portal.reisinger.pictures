@@ -333,6 +333,13 @@ Schema-Stand. Das Cutover-Skript prüft vor dem Backup erneut, dass
 Diese Vorbereitung ist nötig, damit Quell- und Zieltabellen dieselbe
 Migrationsfrontier haben.
 
+**Vor dem echten Cutover muss außerdem ein laufender PostgreSQL-Backup- und
+Restore-Pfad eingerichtet und getestet sein.** Compose konfiguriert weder WAL-
+Archivierung noch Retention. Das Backup des Cutover-Skripts ist ausschließlich
+ein MariaDB-Quellbackup vor dem Kopieren; es schützt keine PostgreSQL-Schreib-
+vorgänge nach dem Umschalten. Der Vertrag und diese offene Betriebsgrenze stehen
+in [`features/infrastructure/30-postgres-cutover.md`](../features/infrastructure/30-postgres-cutover.md).
+
 ```bash
 # Hostseitiger Dry-Run (das Skript wird über SSH gestreamt und nicht ins Webroot kopiert):
 ssh root@reisinger.pictures 'bash -s -- --dry-run' < deployment/migrate-to-postgres.sh
@@ -340,16 +347,41 @@ ssh root@reisinger.pictures 'bash -s -- --dry-run' < deployment/migrate-to-postg
 # Echt: Backup -> PostgreSQL starten -> migrieren -> kopieren -> verifizieren -> umschalten
 ssh root@reisinger.pictures 'bash -s' < deployment/migrate-to-postgres.sh
 
-# Rollback, falls nach dem Umschalten etwas nicht stimmt:
+# Rollback NACH dem Umschalten: PostgreSQL-Schreibvorgänge werden nicht nach MariaDB übernommen.
+# MariaDB bleibt auf dem Stand VOR dem Cutover; das PostgreSQL-Volume bleibt zur manuellen Abgleichung erhalten.
+ssh root@reisinger.pictures 'bash -s -- --rollback --accept-postgres-write-loss' < deployment/migrate-to-postgres.sh
+
+# Nur wenn kein PostgreSQL-Switch versucht wurde und das Skript daher keinen
+# `switch-attempted`-Marker hinterlassen hat, genügt:
 ssh root@reisinger.pictures 'bash -s -- --rollback' < deployment/migrate-to-postgres.sh
 ```
 
 Die Phasen (BACKUP / PG / MIGRATE / COPY / VERIFY / SWITCH) brechen benannt ab;
-das Skript schaltet nie teilweise um. Der Rollback ist ein `.env`-Flip
-(`DB_CONNECTION=mariadb`, `DB_HOST=db`, `DB_PORT=3306`) — MariaDB bleibt dafür
-unangetastet laufen, ein Restore ist nicht nötig. Der Vertrag, die Invarianten
-des Verifiers und was ausdrücklich **nicht** abgedeckt ist, stehen in
-[`features/infrastructure/30-postgres-cutover.md`](../features/infrastructure/30-postgres-cutover.md).
+das Skript schaltet nie teilweise um. Cutover und Rollback halten vor der
+Vorprüfung denselben exklusiven Host-Lock
+(`/var/lib/portal-postgres-cutover/cutover.lock`, `flock`). Ein zweiter Lauf
+bricht benannt ab, solange der Lock gehalten wird; der Lock bleibt auch während
+eines automatischen Rollbacks bestehen und wird beim Prozessende freigegeben.
+
+**Der manuelle Rollback ist nach dem Umschalten eine Einbahnstraße.** Sobald ein
+PostgreSQL-Switch versucht wurde, hinterlässt das Skript den root-geschützten
+Marker `/var/lib/portal-postgres-cutover/switch-attempted`; er bleibt auch nach
+erfolgreichem Switch bestehen. `--rollback` verweigert ohne
+`--accept-postgres-write-loss` den Lauf, selbst wenn die Host-`.env` manuell
+wieder auf MariaDB gesetzt wurde. Das Flag bestätigt ausdrücklich, dass
+PostgreSQL-Schreibvorgänge **nicht in den
+aktiven MariaDB-Datenbestand übernommen werden**: MariaDB ist der eingefrorene
+Stand vor dem Cutover, ein Rückfluss von PostgreSQL nach MariaDB existiert
+nicht. Das PostgreSQL-Volume bleibt für eine manuelle Abgleichung erhalten;
+vor einem späteren Kopierlauf muss diese erfolgt sein, weil der Copier das Ziel
+aus MariaDB rekonstruiert. Der `.env`-Flip (`DB_CONNECTION=mariadb`, `DB_HOST=db`, `DB_PORT=3306`)
+stellt nur die MariaDB-Daten wieder her — ein Restore ist dafür nicht nötig,
+weil MariaDB unangetastet weiterläuft. Scheitert die Health-Prüfung direkt beim
+Umschalten, rollt das Skript automatisch zurück und protokolliert dieselbe
+Grenze, ohne eine Bestätigung zu verlangen. Der Vertrag, die Invarianten des
+Verifiers (einschließlich des exakten Vergleichs aller `settings`-Zeilen nach
+`key`, `brand` und `value`) und was ausdrücklich **nicht** abgedeckt ist, stehen
+in [`features/infrastructure/30-postgres-cutover.md`](../features/infrastructure/30-postgres-cutover.md).
 
 ---
 

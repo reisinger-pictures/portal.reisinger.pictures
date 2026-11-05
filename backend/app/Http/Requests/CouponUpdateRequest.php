@@ -9,6 +9,7 @@ use App\Support\BrandRegistry;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Str;
 
 class CouponUpdateRequest extends FormRequest
 {
@@ -100,12 +101,15 @@ class CouponUpdateRequest extends FormRequest
             if (is_string($code) && $code !== '') {
                 $id = $req->route('id');
 
-                // Case-insensitive per brand, exactly like the store check and
-                // the former MariaDB collation. Excluding the current row by
-                // id keeps a rename to a different spelling of its own code
-                // valid.
+                // Case- and accent-insensitive per brand, with trailing spaces
+                // ignored like MariaDB's PAD SPACE collation, exactly like the
+                // store check. `whereCodeMatches()` selects the engine-native
+                // comparison (V055 ICU collation plus RTRIM on PostgreSQL,
+                // column collation on MariaDB, V054 `LOWER()` fallback on
+                // SQLite). Excluding the current row by id keeps a rename to a
+                // different spelling of its own code valid.
                 $query = Coupon::where('brand', $brandValue)
-                    ->whereRaw('LOWER(code) = LOWER(?)', [$code]);
+                    ->whereCodeMatches($code);
                 if ($id) {
                     $query->where('id', '!=', $id);
                 }
@@ -115,7 +119,10 @@ class CouponUpdateRequest extends FormRequest
             }
 
             if (($data['scope_type'] ?? null) === 'organisation') {
-                $orgExists = Org::where('id', $data['scope_id'] ?? '')->where('brand', $brandValue)->exists();
+                $scopeId = $data['scope_id'] ?? null;
+                $orgExists = is_string($scopeId)
+                    && Str::isUuid($scopeId)
+                    && Org::where('id', $scopeId)->where('brand', $brandValue)->exists();
                 if (! $orgExists) {
                     $validator->errors()->add('scope_id', 'Org not found for this brand.');
                 }

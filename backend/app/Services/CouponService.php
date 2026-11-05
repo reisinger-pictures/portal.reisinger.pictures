@@ -34,13 +34,14 @@ class CouponService
         int|string|array|null $metaGalleryId = null,
         int|string|null $userId = null,
     ): array {
-        // Coupon codes are case-insensitive per brand, matching the former
-        // MariaDB collation. The explicit `LOWER()` keeps that contract on
-        // PostgreSQL, which compares strings case-sensitively, and matches
-        // the functional unique index from V054.
+        // Coupon codes are case- and accent-insensitive per brand, and trailing
+        // spaces are ignored like MariaDB's PAD SPACE collation.
+        // `whereCodeMatches()` selects the engine-native comparison: the V055
+        // ICU collation plus RTRIM on PostgreSQL, the column collation on
+        // MariaDB, and the V054 `LOWER()` approximation on SQLite.
         /** @var Coupon|null $coupon */
         $coupon = Coupon::byBrand($brand)
-            ->whereRaw('LOWER(code) = LOWER(?)', [$code])
+            ->whereCodeMatches($code)
             ->first();
 
         if ($coupon === null) {
