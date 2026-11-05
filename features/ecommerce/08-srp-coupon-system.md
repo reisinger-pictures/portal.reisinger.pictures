@@ -92,6 +92,15 @@ When `type = 'percentage'`, an optional `max_items` (unsigned integer) limits th
 - Coupons are brand-isolated. The current configured brand is `rp`; a coupon
   created in another brand context cannot be used in this cart. The old
   `SRP`/`B2B` host distinction is historical.
+- **Coupon codes are case-insensitive per brand.** A customer may enter
+  `SPRING10`, `spring10` or `Spring10` for the same stored code, and the
+  management duplicate check treats those spellings as one code. The stored
+  spelling is preserved and displayed; only comparison folds case. This was
+  implicit in MariaDB's `utf8mb4_unicode_ci` collation. PostgreSQL compares
+  case-sensitively, so `CouponService::findValidCoupon()` and both management
+  requests compare `LOWER(code)`, and V054 adds the structural half — the
+  functional unique index described in §7. Brand scoping is unchanged: one
+  code per brand, and the same code may still exist in another brand.
 - **Coupon redemption follows strategy capability (current):**
   `VolumeLicensingStrategy` supports coupons; `ScopeLicensingStrategy` does not.
   `CheckoutService` therefore resolves, applies, and increments coupons only for
@@ -269,7 +278,20 @@ Die Pricing-Strategie (`VolumeLicensingStrategy`) darf niemals lautlos auf den C
 | `created_by` | CHAR(36) NULL | UUID of creating user (photographer) |
 | `created_at` / `updated_at` | TIMESTAMP | Laravel timestamps |
 
-Unique: `(brand, code)`
+Unique: `(brand, code)` compared case-insensitively. MariaDB enforces this
+through the column collation of `coupons_brand_code_unique`; on PostgreSQL
+(and SQLite) V054 adds the functional unique index
+`coupons_brand_lower_code_unique ON coupons (brand, LOWER(code))`. The
+existing case-sensitive `(brand, code)` index remains on PostgreSQL for exact
+lookups; an exact duplicate is also a case-only duplicate, so the functional
+index is the stronger invariant. The stored `code` spelling is not rewritten.
+
+**V054 schema/backfill/rollback decision:** no column is added and no row is
+rewritten. The migration preflights `(brand, code)` groups after case folding
+and aborts with a report when a case-only duplicate already exists, instead of
+deleting, merging or re-casing coupons; an operator decides which spelling
+survives. `down()` is empty because `down()` methods are never executed in
+this repository.
 
 **`coupon_user_usage` table:**
 

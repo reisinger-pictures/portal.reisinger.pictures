@@ -37,8 +37,11 @@ preparatory deployment followed by the cutover:
    web root, and record exact source row counts in a private manifest.
 4. Start PostgreSQL and run the Laravel migrations to create its schema.
 5. Run `php artisan portal:db-copy`. It copies source base tables in stable
-   primary-key batches, omits only Laravel's `migrations` bookkeeping table,
-   and uses `insertOrIgnore` so an interrupted copy can be rerun.
+   primary-key batches and omits only Laravel's `migrations` bookkeeping table.
+   Before copying, it clears the matching target tables so migration-provided
+   defaults, partial prior copies, and data left by a rolled-back attempt cannot
+   override the frozen MariaDB source. A retry rebuilds those target tables from
+   the current source; MariaDB is never modified.
 6. Run `php artisan portal:db-copy --verify-only` and the production smoke
    queries. The switch is permitted only after every check passes.
 7. Atomically edit the protected host `.env` and recreate the backend against
@@ -66,7 +69,10 @@ The verifier returns success only when all of these checks pass:
 
 - **Per-table exact row counts:** every source base table except `migrations`
   must exist on the target with the same count. This detects missing inserts,
-  ignored conflicts, and incomplete reruns.
+  ignored conflicts, and incomplete copies. The copy starts each source table
+  empty on PostgreSQL, so rows seeded by schema migrations (including roles and
+  settings) are replaced by the source rows rather than retained on a unique-key
+  conflict.
 - **Money and amount sums:** sums are compared exactly for persisted money
   fields in orders, invoice snapshots, products/licensing, coupons, payout
   pools/statements, payout corrections, open items, and payout bookings. The
@@ -102,7 +108,12 @@ The verifier returns success only when all of these checks pass:
 
 `--verify-only` performs no table or sequence writes. Session-local timezone
 settings make timestamp reads deterministic but do not persist in either
-database.
+database. The backend waits for a Laravel query on only the selected
+`DB_CONNECTION`; an unavailable, unselected engine does not block MariaDB
+startup before cutover or the MariaDB rollback path. The host cutover script's
+backup, switch, explicit rollback, and automatic rollback lifecycle is exercised
+against a Docker CLI test double in CI; the copy itself is tested against real
+MariaDB and PostgreSQL services.
 
 ## Time and collation hazards
 
