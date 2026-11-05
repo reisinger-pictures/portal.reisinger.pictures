@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Measure contract-content limiter behaviour under simultaneous PostgreSQL
 # connections. Usage: DOCKER_BIN=... ./tests/scripts/contract-content-postgres-probe.sh
-# Overrides: POSTGRES_IMAGE (postgres:15), REQUESTS (40), PHP_SERVER_WORKERS,
+# Overrides: POSTGRES_IMAGE (postgres:16), REQUESTS (40), PHP_SERVER_WORKERS,
 # DOCKER_BIN. Exit codes: 0 bound held, 1 harness failure, 2 measured overshoot.
 set -Eeuo pipefail
 
@@ -15,7 +15,7 @@ PATH="$(dirname "$DOCKER"):$PATH"
 export PATH
 "$REPO_DIR/scripts/check-php-version.sh"
 
-POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:15}"
+POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:16}"
 REQUESTS="${REQUESTS:-40}"
 SERVER_WORKERS="${PHP_SERVER_WORKERS:-$REQUESTS}"
 LIMIT_PER_MINUTE=30

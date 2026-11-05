@@ -140,9 +140,11 @@ Measured with `FtpImportTest`; the batch semantics are the owner decision D-35.
   member's `users` row, while the sync takes **all** of its `users` locks before any pivot write.
   That residual is disclosed in the test's docblock; the test proves the order, not the absence
   of a cycle. **The trade-off:** the org row lock serialises the *syncs* and the
-  *destroy* of one org, not every write to `users.org_id` — none of
-  `OrgInviteController::redeem()`, `UserController::store()`,
-  `AuthController::register()`/`resetPassword()` (membership added) takes it. The member set has to
+  *destroy* of one org, not every write to `users.org_id` — `UserController::store()`
+  (org-admin user creation) and `AuthController::register()` change a membership without taking
+  it. `OrgInviteController::redeem()` and the deferred `AuthController::resetPassword()`
+  auto-join do take it: both lock the destination org row before the user row, the same
+  org → user order as the sync, so they serialise with it. The member set has to
   be known before the single lock query, so it is now read **unlocked** (a consistent read) and the
   membership decision is taken on the locked rows. The set is therefore read *earlier* in the
   transaction than the old
