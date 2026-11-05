@@ -110,7 +110,7 @@ class AuthController extends Controller
                 ]);
 
                 $domain = explode('@', $validated['email'])[1] ?? null;
-                $org = $domain ? Org::where('domain', $domain)->first() : null;
+                $org = $domain ? Org::query()->matchingDomain($domain)->first() : null;
 
                 if ($org) {
                     // Brand check: an org without a concrete current-host brand is
@@ -238,7 +238,7 @@ class AuthController extends Controller
         // re-lookup org by domain and apply immediate auto-join if configured.
         $emailParts = explode('@', $user->email);
         $domain = $emailParts[1] ?? null;
-        $org = $domain ? Org::where('domain', $domain)->first() : null;
+        $org = $domain ? Org::query()->matchingDomain($domain)->first() : null;
         $orgBrandMatches = $org && BrandRegistry::resourceMatchesCurrent($org->brand);
         if ($org && $orgBrandMatches && $org->auto_join_policy === AutoJoinPolicy::IMMEDIATE && ! $user->org_id) {
             $user = DB::transaction(function () use ($org, $user): User {

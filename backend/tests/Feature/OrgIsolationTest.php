@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AutoJoinPolicy;
 use App\Enums\Brand;
 use App\Enums\UserRole;
 use App\Models\Org;
+use App\Models\OrgInvite;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -84,7 +86,7 @@ class OrgIsolationTest extends TestCase
 
     public function test_user_is_auto_joined_to_org_based_on_domain()
     {
-        $org = Org::create(['name' => 'B2B Corp', 'domain' => 'b2b-corp.com', 'invoice_frequency' => 'monthly', 'brand' => Brand::B2B]);
+        $org = Org::create(['name' => 'B2B Corp', 'domain' => 'B2B-Corp.COM', 'invoice_frequency' => 'monthly', 'brand' => Brand::B2B]);
 
         // Auto-join is deferred: register should NOT attach org_id
         $res = $this->postJson('/api/auth/register', [
@@ -122,6 +124,32 @@ class OrgIsolationTest extends TestCase
 
         // Prüfen, ob er die Client-Rolle bekommen hat
         $this->assertTrue($user->roles->contains('name', UserRole::CLIENT->value));
+    }
+
+    public function test_registration_domain_lookup_is_case_insensitive_for_pending_invites(): void
+    {
+        $org = Org::create([
+            'name' => 'Invite Corp',
+            'domain' => 'B2B-Invite.COM',
+            'invoice_frequency' => 'monthly',
+            'brand' => Brand::B2B,
+            'auto_join_policy' => AutoJoinPolicy::REQUIRES_INVITE,
+        ]);
+        OrgInvite::create([
+            'email' => 'case.joiner@b2b-invite.com',
+            'org_id' => $org->id,
+            'token' => 'case-insensitive-domain-invite',
+            'expires_at' => now()->addDay(),
+        ]);
+
+        $this->postJson('/api/auth/register', [
+            'name' => 'Case Joiner',
+            'email' => 'case.joiner@b2b-invite.com',
+        ])->assertOk();
+
+        $user = User::query()->matchingEmail('case.joiner@b2b-invite.com')->firstOrFail();
+        $this->assertSame($org->id, $user->org_id);
+        $this->assertDatabaseMissing('org_invites', ['token' => 'case-insensitive-domain-invite']);
     }
 
     public function test_deferred_auto_join_with_subdomain_email()
