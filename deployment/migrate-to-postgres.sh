@@ -8,7 +8,6 @@ readonly BACKUP_DIR="${PORTAL_BACKUP_DIR:-/var/backups/portal}"
 readonly STATE_DIR="${PORTAL_STATE_DIR:-/var/lib/portal-postgres-cutover}"
 readonly MARKER_FILE="$STATE_DIR/in-progress"
 readonly SWITCH_MARKER_FILE="$STATE_DIR/switch-attempted"
-readonly LAST_ENV_BACKUP_FILE="$STATE_DIR/last-env-backup"
 readonly LOCK_FILE="$STATE_DIR/cutover.lock"
 readonly SOURCE_CONTAINER="portal_db"
 readonly TARGET_SERVICE="db_pg"
@@ -308,7 +307,7 @@ rollback_failed_switch() {
     patch_host_env_for_mariadb
     compose up -d --force-recreate "$BACKEND_SERVICE"
     wait_for_backend || fail 'Automatic switch rollback restored .env but the backend did not become healthy.'
-    rm -f -- "$MARKER_FILE" "$SWITCH_MARKER_FILE" "$LAST_ENV_BACKUP_FILE"
+    rm -f -- "$MARKER_FILE" "$SWITCH_MARKER_FILE"
     fail 'The PostgreSQL switch failed and was automatically rolled back to MariaDB.'
 }
 
@@ -454,7 +453,7 @@ run_rollback() {
 
     compose up -d --force-recreate "$BACKEND_SERVICE"
     wait_for_backend
-    rm -f -- "$MARKER_FILE" "$SWITCH_MARKER_FILE" "$LAST_ENV_BACKUP_FILE"
+    rm -f -- "$MARKER_FILE" "$SWITCH_MARKER_FILE"
     if [[ "$switch_attempted" == true || "$selected_connection" == 'pgsql' ]]; then
         printf 'Rollback complete. MariaDB was not modified or restored; PostgreSQL-only writes remain on the PostgreSQL volume and are not in the active database.\n'
     else
