@@ -96,9 +96,16 @@ class CouponUpdateRequest extends FormRequest
 
             $brandValue = BrandRegistry::currentId();
 
-            if (! empty($data['code'])) {
+            $code = $data['code'] ?? null;
+            if (is_string($code) && $code !== '') {
                 $id = $req->route('id');
-                $query = Coupon::where('brand', $brandValue)->where('code', $data['code']);
+
+                // Case-insensitive per brand, exactly like the store check and
+                // the former MariaDB collation. Excluding the current row by
+                // id keeps a rename to a different spelling of its own code
+                // valid.
+                $query = Coupon::where('brand', $brandValue)
+                    ->whereRaw('LOWER(code) = LOWER(?)', [$code]);
                 if ($id) {
                     $query->where('id', '!=', $id);
                 }

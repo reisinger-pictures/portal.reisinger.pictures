@@ -126,9 +126,18 @@ class CouponStoreRequest extends FormRequest
             }
 
             $brandValue = BrandRegistry::currentId();
-            $query = Coupon::where('brand', $brandValue)->where('code', $data['code'] ?? '');
-            if ($query->exists()) {
-                $validator->errors()->add('code', 'A coupon with this code already exists for this brand.');
+            $code = $data['code'] ?? null;
+
+            // Codes are case-insensitive per brand (the former MariaDB
+            // collation behaviour); PostgreSQL compares case-sensitively, so
+            // the duplicate check must fold case explicitly. Brand scoping is
+            // unchanged: the index and this query both include `brand`.
+            if (is_string($code) && $code !== '') {
+                $query = Coupon::where('brand', $brandValue)
+                    ->whereRaw('LOWER(code) = LOWER(?)', [$code]);
+                if ($query->exists()) {
+                    $validator->errors()->add('code', 'A coupon with this code already exists for this brand.');
+                }
             }
 
             if (($data['scope_type'] ?? null) === 'organisation') {
