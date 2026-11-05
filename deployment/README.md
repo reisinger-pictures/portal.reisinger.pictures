@@ -333,6 +333,14 @@ Schema-Stand. Das Cutover-Skript prüft vor dem Backup erneut, dass
 Diese Vorbereitung ist nötig, damit Quell- und Zieltabellen dieselbe
 Migrationsfrontier haben.
 
+Vor dem Stoppen des Backends prüft das Skript, dass auf dem MariaDB-Daten-, dem
+Backup- und dem PostgreSQL-Zieldateisystem jeweils mindestens das Dreifache der
+aktuellen MariaDB-Datenverzeichnisgröße frei ist. Für ein noch nicht angelegtes
+Named Volume wird das Dateisystem des Docker-Verzeichnisses `volumes` geprüft
+(oder das Docker-Root-Dateisystem, falls dieser Unterordner noch nicht existiert).
+Externe oder speziell konfigurierte Zielvolumes werden abgelehnt, statt
+irrtümlich das falsche Dateisystem zu prüfen.
+
 **Vor dem echten Cutover muss außerdem ein laufender PostgreSQL-Backup- und
 Restore-Pfad eingerichtet und getestet sein.** Compose konfiguriert weder WAL-
 Archivierung noch Retention. Das Backup des Cutover-Skripts ist ausschließlich

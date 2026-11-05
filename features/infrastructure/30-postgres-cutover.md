@@ -35,12 +35,18 @@ preparatory deployment followed by the cutover:
    startup apply all pending migrations to MariaDB; confirm `migrate:status`
    has no `Pending` entries. The cutover script repeats this check before the
    backup and refuses to copy a source at an older schema frontier.
-2. Stop application writes and workers. The host runbook script stops the
+2. Before downtime, measure free space on the MariaDB data filesystem, the
+   backup filesystem, and the PostgreSQL target's local-volume filesystem (or
+   Docker's `volumes` filesystem if the target volume has not been created; if
+   that directory is absent, use DockerRootDir's filesystem). Each must have at
+   least three times the current MariaDB data-directory size free; the script
+   refuses before stopping the backend if any measurement fails.
+3. Stop application writes and workers. The host runbook script stops the
    backend service before taking the backup, keeping both engines unchanged
    until verification succeeds.
-3. Create and validate a mode-0600, gzip-compressed MariaDB dump outside the
+4. Create and validate a mode-0600, gzip-compressed MariaDB dump outside the
    web root, and record exact source row counts in a private manifest.
-4. Start PostgreSQL and run the Laravel migrations to create its schema. Every
+5. Start PostgreSQL and run the Laravel migrations to create its schema. Every
    one-off Artisan process receives `APP_CONFIG_CACHE` pointing at a per-run
    path that does not exist. The database-backed processes (the source
    `migrate:status` preflight, target `migrate`, copy, verify, `migrate:status`,
@@ -50,18 +56,18 @@ preparatory deployment followed by the cutover:
    the absent path makes the process load `config/` fresh, so a
    `bootstrap/cache/config.php` written before the switch cannot redirect it to
    MariaDB. The live backend's shared config cache is not deleted or modified.
-5. Run `php artisan portal:db-copy`. It copies source base tables in stable
+6. Run `php artisan portal:db-copy`. It copies source base tables in stable
    primary-key batches and omits only Laravel's `migrations` bookkeeping table.
    Before copying, it clears the matching target tables so migration-provided
    defaults, partial prior copies, and data left by a rolled-back attempt cannot
    override the frozen MariaDB source. A retry rebuilds those target tables from
    the current source; MariaDB is never modified.
-6. Run `php artisan portal:db-copy --verify-only` and the production smoke
+7. Run `php artisan portal:db-copy --verify-only` and the production smoke
    queries. The switch is permitted only after every check passes. The
    verifier compares every `settings` row exactly by `key`, `brand`, and
    `value` (including null values and null brands), not just row counts or
    sums.
-7. Atomically edit the protected host `.env` and recreate the backend against
+8. Atomically edit the protected host `.env` and recreate the backend against
    PostgreSQL. MariaDB stays running and untouched.
 
 ### Stable identity for photographer group assignments
@@ -207,8 +213,10 @@ startup before cutover or the MariaDB rollback path. The host cutover script's
 backup, switch, lock contention, explicit config-cache override, refused and
 acknowledged post-switch rollback, rollback after an operator edits the host
 `.env` back to MariaDB, automatic rollback, switch process failure, and
-pre-switch rollback lifecycle is exercised against a Docker CLI test double in
-CI; the copy itself is tested against real MariaDB and PostgreSQL services.
+pre-switch rollback lifecycle, plus low-target-space and unsupported/mismatched
+target-volume refusals before downtime, are exercised against a Docker CLI test
+double in CI; the copy itself is tested against real MariaDB and PostgreSQL
+services.
 
 ## Time and collation hazards
 

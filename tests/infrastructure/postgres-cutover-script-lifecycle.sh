@@ -13,6 +13,7 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 CUTOVER_SCRIPT="$ROOT_DIR/deployment/migrate-to-postgres.sh"
 temporary_root="$(mktemp -d "${TMPDIR:-/tmp}/portal-cutover-lifecycle.XXXXXX")"
 original_path="$PATH"
+original_df="$(command -v df)"
 trap 'rm -rf -- "$temporary_root"' EXIT
 
 fail() {
@@ -37,13 +38,19 @@ fi
 
 joined=" $* "
 if [[ "${1-}" == 'info' ]]; then
+    if [[ " $* " == *'--format'* ]]; then
+        printf '%s\n' "$FAKE_DOCKER_ROOT_DIR"
+    fi
     exit 0
 fi
 if [[ "${1-}" == 'image' && "${2-}" == 'inspect' ]]; then
     exit 0
 fi
 if [[ "${1-}" == 'inspect' ]]; then
-    if [[ "$joined" == *'portal_backend'* ]]; then
+    if [[ "$joined" == *'portal_db_pg'* ]]; then
+        [[ "${FAKE_PG_CONTAINER_EXISTS:-true}" == 'true' ]] || exit 1
+        printf '%s|%s\n' "$FAKE_PG_MOUNTED_VOLUME_NAME" "$FAKE_PG_DATA_DIR"
+    elif [[ "$joined" == *'portal_backend'* ]]; then
         count=0
         if [[ -f "$FAKE_DOCKER_STATE/backend-health-count" ]]; then
             count="$(cat "$FAKE_DOCKER_STATE/backend-health-count")"
@@ -97,8 +104,13 @@ if [[ "${1-}" == 'compose' ]]; then
             if [[ "${1-}" == '--services' ]]; then
                 printf 'db\ndb_pg\nbackend\n'
             else
-                cat <<'JSON'
-{"services":{"db":{"container_name":"portal_db","image":"mariadb:11.4","volumes":[{"source":"db_data"}]},"db_pg":{"container_name":"portal_db_pg","image":"postgres:16","volumes":[{"source":"db_pg_data"}]},"backend":{"image":"portal/backend:cutover-test"}}}
+                volume_json='{"name":"cutover-test_db_pg_data","driver":"local"}'
+                case "${FAKE_COMPOSE_VOLUME_MODE:-local}" in
+                    external) volume_json='{"name":"cutover-test_db_pg_data","driver":"local","external":true}' ;;
+                    driver-options) volume_json='{"name":"cutover-test_db_pg_data","driver":"local","driver_opts":{"type":"none","o":"bind","device":"/tmp"}}' ;;
+                esac
+                cat <<JSON
+{"services":{"db":{"container_name":"portal_db","image":"mariadb:11.4","volumes":[{"source":"db_data"}]},"db_pg":{"container_name":"portal_db_pg","image":"postgres:16","volumes":[{"source":"db_pg_data"}]},"backend":{"image":"portal/backend:cutover-test"}},"volumes":{"db_data":{"driver":"local"},"db_pg_data":$volume_json}}
 JSON
             fi
             ;;
@@ -136,12 +148,34 @@ exit 2
 DOCKER
 chmod 0755 "$temporary_root/docker"
 
+cat > "$temporary_root/df" <<'DF'
+#!/usr/bin/env bash
+set -euo pipefail
+target_path="${*: -1}"
+printf '%s\n' "$target_path" >> "$FAKE_DF_LOG"
+if [[ "$target_path" == "$FAKE_PG_DATA_DIR" \
+    || "$target_path" == "$FAKE_DOCKER_ROOT_DIR" \
+    || "$target_path" == "$FAKE_DOCKER_ROOT_DIR/volumes" ]]; then
+    printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
+    printf 'fake-target 1048576 0 %s 0%% %s\n' "$FAKE_TARGET_FREE_KIB" "$target_path"
+else
+    exec "$REAL_DF" "$@"
+fi
+DF
+chmod 0755 "$temporary_root/df"
+
 prepare_case() {
     local name="$1"
+    local create_docker_volumes_dir="${2:-true}"
     local case_root="$temporary_root/$name"
-    mkdir -p "$case_root/bin" "$case_root/stack" "$case_root/db-data"
+    mkdir -p "$case_root/bin" "$case_root/stack" "$case_root/db-data" "$case_root/pg-data" "$case_root/docker-root"
+    if [[ "$create_docker_volumes_dir" == 'true' ]]; then
+        mkdir -p "$case_root/docker-root/volumes"
+    fi
     cp -- "$temporary_root/docker" "$case_root/bin/docker"
     chmod 0755 "$case_root/bin/docker"
+    cp -- "$temporary_root/df" "$case_root/bin/df"
+    chmod 0755 "$case_root/bin/df"
     touch "$case_root/stack/compose.yaml"
     cat > "$case_root/stack/.env" <<'ENV'
 DB_CONNECTION=mariadb
@@ -154,7 +188,16 @@ ENV
     export PORTAL_STATE_DIR="$case_root/state"
     export FAKE_DOCKER_LOG="$case_root/docker.log"
     export FAKE_DOCKER_STATE="$case_root/docker-state"
+    export FAKE_DF_LOG="$case_root/df.log"
     export FAKE_DB_DATA_DIR="$case_root/db-data"
+    export FAKE_PG_DATA_DIR="$case_root/pg-data"
+    export FAKE_PG_MOUNTED_VOLUME_NAME='cutover-test_db_pg_data'
+    export FAKE_PG_CONTAINER_EXISTS=true
+    export FAKE_DOCKER_VOLUMES_DIR="$create_docker_volumes_dir"
+    export FAKE_COMPOSE_VOLUME_MODE=local
+    export FAKE_DOCKER_ROOT_DIR="$case_root/docker-root"
+    export FAKE_TARGET_FREE_KIB=1048576
+    export REAL_DF="$original_df"
     export FAKE_HEALTH_MODE=healthy
     export FAKE_DUMP_MODE=ok
     export FAKE_UP_FAIL_ONCE=''
@@ -165,6 +208,25 @@ ENV
 assert_lock_released() {
     flock -n "$PORTAL_STATE_DIR/cutover.lock" true \
         || fail 'the host cutover lock was still held after the script exited'
+}
+
+assert_preflight_refuses_before_downtime() {
+    local log_file="$1"
+    local expected_message="$2"
+    local status
+    set +e
+    "$CUTOVER_SCRIPT" > "$log_file" 2>&1
+    status=$?
+    set -e
+    [[ "$status" -ne 0 ]] || fail 'an invalid cutover preflight unexpectedly succeeded'
+    grep -Fq "$expected_message" "$log_file" \
+        || { cat "$log_file" >&2; fail "preflight refusal did not name: $expected_message"; }
+    [[ ! -e "$PORTAL_STATE_DIR/in-progress" ]] || fail 'a refused preflight wrote an in-progress marker'
+    [[ ! -e "$PORTAL_BACKUP_DIR" ]] || fail 'a refused preflight created the backup directory'
+    if grep -Fq 'stop backend' "$FAKE_DOCKER_LOG"; then
+        fail 'a refused preflight stopped the live backend before refusing'
+    fi
+    assert_lock_released
 }
 
 assert_mariadb_env() {
@@ -308,11 +370,48 @@ if grep -Fq 'stop backend' "$FAKE_DOCKER_LOG"; then
 fi
 assert_lock_released
 
+prepare_case postgres-low-space
+export FAKE_TARGET_FREE_KIB=0
+export FAKE_PG_CONTAINER_EXISTS=false
+assert_preflight_refuses_before_downtime \
+    "$temporary_root/postgres-low-space.log" \
+    'The PostgreSQL target filesystem has less than 3x the current MariaDB data size free.'
+grep -Fxq "$FAKE_DOCKER_ROOT_DIR/volumes" "$FAKE_DF_LOG" \
+    || fail 'a not-yet-created PostgreSQL volume did not check the Docker volumes filesystem'
+
+prepare_case postgres-low-space-docker-root-only false
+export FAKE_TARGET_FREE_KIB=0
+export FAKE_PG_CONTAINER_EXISTS=false
+assert_preflight_refuses_before_downtime \
+    "$temporary_root/postgres-low-space-docker-root-only.log" \
+    'The PostgreSQL target filesystem has less than 3x the current MariaDB data size free.'
+grep -Fxq "$FAKE_DOCKER_ROOT_DIR" "$FAKE_DF_LOG" \
+    || fail 'an absent Docker volumes directory did not fall back to DockerRootDir'
+if grep -Fxq "$FAKE_DOCKER_ROOT_DIR/volumes" "$FAKE_DF_LOG"; then
+    fail 'the missing Docker volumes directory was still used for disk preflight'
+fi
+
+for invalid_volume_mode in external driver-options; do
+    prepare_case "postgres-invalid-$invalid_volume_mode-volume"
+    export FAKE_COMPOSE_VOLUME_MODE="$invalid_volume_mode"
+    assert_preflight_refuses_before_downtime \
+        "$temporary_root/postgres-invalid-$invalid_volume_mode-volume.log" \
+        'Compose database services do not match the MariaDB/PostgreSQL cutover topology.'
+done
+
+prepare_case postgres-wrong-volume-mount
+export FAKE_PG_MOUNTED_VOLUME_NAME='unrelated_pg_data'
+assert_preflight_refuses_before_downtime \
+    "$temporary_root/postgres-wrong-volume-mount.log" \
+    'The existing PostgreSQL container does not mount the Compose target volume.'
+
 prepare_case explicit-rollback
 "$CUTOVER_SCRIPT" > "$temporary_root/success.log" 2>&1 || {
     cat "$temporary_root/success.log" >&2
     fail 'the simulated host cutover did not complete'
 }
+grep -Fxq "$FAKE_PG_DATA_DIR" "$FAKE_DF_LOG" \
+    || fail 'the existing PostgreSQL container did not measure its mounted volume source'
 env_file="$PORTAL_STACK_DIR/.env"
 grep -Fxq 'DB_CONNECTION=pgsql' "$env_file" || fail 'successful cutover did not select PostgreSQL'
 grep -Fxq 'DB_HOST=db_pg' "$env_file" || fail 'successful cutover did not select the PostgreSQL host'
@@ -490,4 +589,4 @@ assert_mariadb_env
 [[ ! -e "$PORTAL_STATE_DIR/in-progress" ]] || fail 'pre-switch rollback left the in-progress marker behind'
 assert_lock_released
 
-echo 'PASS: host cutover backup, config-cache override, host lock, acknowledged rollback, stale-pointer rejection, edited-env rollback, automatic and switch-process-failure rollback, and pre-switch rollback lifecycle'
+echo 'PASS: host cutover backup, config-cache override, disk/volume preflight, host lock, acknowledged rollback, stale-pointer rejection, edited-env rollback, automatic and switch-process-failure rollback, and pre-switch rollback lifecycle'
