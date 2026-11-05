@@ -348,6 +348,6 @@ class StatsCalculationService
         $email = (string) $email;
         $at = strpos($email, '@');
 
-        return substr($email, ($at === false ? 0 : $at) + 1);
+        return substr($email, $at === false ? 0 : $at + 1);
     }
 }
