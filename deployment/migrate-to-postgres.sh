@@ -134,7 +134,7 @@ ROLLBACK:
   if the switch marker exists: require --accept-postgres-write-loss even when the host .env now selects mariadb (MariaDB is the pre-cutover snapshot; PostgreSQL writes are not copied back and remain on the PostgreSQL volume)
   else if the host .env selects pgsql: require --accept-postgres-write-loss
   else: no acknowledgement is required
-  restore the .env backup named by the switch marker, in-progress marker, or last-env-backup; set DB_CONNECTION=mariadb, DB_HOST=db, DB_PORT=3306, and queue/cache connection keys to mariadb
+  restore the .env backup named by the switch or in-progress marker; if neither exists, refuse rather than use a stale backup pointer; set DB_CONNECTION=mariadb, DB_HOST=db, DB_PORT=3306, and queue/cache connection keys to mariadb
   docker compose -f '$COMPOSE_FILE' up -d --force-recreate '$BACKEND_SERVICE'; wait for healthy; do not alter MariaDB; remove the switch marker
 PLAN
 }
