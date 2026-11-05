@@ -44,12 +44,19 @@ return new class extends Migration
 
         // 0b. Rename max_uses → max_uses_global (skip if already done by V018)
         if (Schema::hasColumn('coupons', 'max_uses')) {
-            DB::statement('ALTER TABLE `coupons` CHANGE `max_uses` `max_uses_global` INT UNSIGNED NULL');
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::statement('ALTER TABLE coupons RENAME COLUMN max_uses TO max_uses_global');
+            } else {
+                DB::statement('ALTER TABLE `coupons` CHANGE `max_uses` `max_uses_global` INT UNSIGNED NULL');
+            }
         }
 
         // 0c. Add max_uses_per_account
         if (! Schema::hasColumn('coupons', 'max_uses_per_account')) {
             if (DB::connection()->getDriverName() === 'sqlite') {
+                Schema::table('coupons', fn (Blueprint $t) => $t->unsignedInteger('max_uses_per_account')->nullable());
+            } elseif (DB::connection()->getDriverName() === 'pgsql') {
+                // PostgreSQL has no column-order clause; the column is appended.
                 Schema::table('coupons', fn (Blueprint $t) => $t->unsignedInteger('max_uses_per_account')->nullable());
             } else {
                 DB::statement('ALTER TABLE `coupons` ADD COLUMN `max_uses_per_account` INT UNSIGNED NULL AFTER `max_uses_global`');
@@ -59,6 +66,9 @@ return new class extends Migration
         // 0d. Add created_by (nullable FK to users — uuid, no DB constraint)
         if (! Schema::hasColumn('coupons', 'created_by')) {
             if (DB::connection()->getDriverName() === 'sqlite') {
+                Schema::table('coupons', fn (Blueprint $t) => $t->char('created_by', 36)->nullable());
+            } elseif (DB::connection()->getDriverName() === 'pgsql') {
+                // PostgreSQL has no column-order clause; the column is appended.
                 Schema::table('coupons', fn (Blueprint $t) => $t->char('created_by', 36)->nullable());
             } else {
                 DB::statement('ALTER TABLE `coupons` ADD COLUMN `created_by` CHAR(36) NULL AFTER `active`');
