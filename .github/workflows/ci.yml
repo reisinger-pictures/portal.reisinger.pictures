@@ -526,7 +526,13 @@ jobs:
         run: |
           docker exec -e DB_CONNECTION=mariadb -e DB_HOST=127.0.0.1 -e DB_PORT=3307 \
             php-cutover php artisan migrate --force
+          # This job deliberately starts no Meilisearch service: the copy and
+          # its verifier read database rows only. The seeder creates searchable
+          # models, so pin the collection driver for this command only instead
+          # of letting Scout call a non-existent host. Production seeding keeps
+          # whatever driver the deployed environment selects.
           docker exec -e DB_CONNECTION=mariadb -e DB_HOST=127.0.0.1 -e DB_PORT=3307 \
+            -e SCOUT_DRIVER=collection \
             php-cutover php artisan db:seed --force
       - name: Make MariaDB settings authoritative for this copy
         run: |
