@@ -11,19 +11,25 @@ use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mollie\Api\Http\Requests\CreatePaymentRequest;
 use PHPUnit\Framework\Attributes\Group;
-use Tests\Support\MocksStripeClient;
+use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
 class OrderCheckoutTest extends TestCase
 {
-    use MocksStripeClient;
+    use FakesMollie;
     use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockStripePaymentIntentSuccess();
+        // The checkout is a Mollie checkout; the provider answer is faked so
+        // these tests assert pricing and entitlement, not the provider.
+        $this->configureMollie();
+        $this->fakeMollie([
+            CreatePaymentRequest::class => $this->mollieCreateResponder(),
+        ]);
         Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
         Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
         Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'rp'], ['value' => 'Teststreet 1']);
@@ -31,12 +37,6 @@ class OrderCheckoutTest extends TestCase
         LicenseUseCase::forceCreate(['id' => '11111111-1111-1111-1111-111111111111', 'name' => 'Tageszeitung', 'base_price' => 8000, 'flatrate_tier' => 'print', 'brand' => 'rp']);
         LicenseModifier::forceCreate(['id' => '22222222-2222-2222-2222-222222222222', 'name' => 'Titelseite', 'percent_surcharge' => 100.00, 'is_included_in_flatrate' => true, 'brand' => 'rp']);
         LicenseModifier::forceCreate(['id' => '33333333-3333-3333-3333-333333333333', 'name' => 'Weltweit', 'percent_surcharge' => 50.00, 'is_included_in_flatrate' => false, 'brand' => 'rp']);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->resetStripeHttpClient();
-        parent::tearDown();
     }
 
     #[Group('smoke')]

@@ -4,10 +4,18 @@ topic: custom-quotes-and-stripe
 status: planned
 ---
 
-# Technical Concept: Custom Quotes & Stripe Integration
+# Technical Concept: Custom Quotes & Online Payment
+
+> **Provider status (2026-11-11):** The quotes workflow below is current; the
+> *provider* it names is not. New online payments run through Mollie's hosted
+> checkout and the API accepts `mollie` and `invoice` only — contract and cutover
+> in [`features/infrastructure/30-mollie-payments.md`](../infrastructure/30-mollie-payments.md).
+> Section 2 and the Stripe test cards describe the historical in-page card flow,
+> which no new order enters; Stripe credentials, webhooks and reconciliation stay
+> in place for the existing order history.
 
 > **Decision Log — 2026-07-06 (Architekt-Klärung, final):** A Proactive Quote (Quote-Link) is a
-> **payable fixed-price offer** that runs through the **standard cart checkout flow** (Stripe or
+> **payable fixed-price offer** that runs through the **standard cart checkout flow** (online payment or
 > invoice) — NOT a mere request. The photographer creates the offer including **custom conditions**;
 > the customer receives it by email, adds it to the cart at the locked price, and pays via the normal
 > checkout. The custom conditions are an integral part of the offer and MUST be embedded in the
@@ -26,7 +34,7 @@ Custom Quotes allow dynamic pricing for specialized B2B requirements. This opera
 
 A Proactive Quote is a **payable fixed-price offer** assembled by the photographer (photos +
 locked price + custom conditions) and sent to the client by email. The client adds it to the cart
-and pays through the **standard cart checkout** (Stripe or invoice). The backend MUST honor the
+and pays through the **standard cart checkout** (online payment or invoice). The backend MUST honor the
 locked price — the standard pricing strategies are bypassed for these items.
 
 - **Offer Creation (Photographer):** The photographer defines:
@@ -41,7 +49,7 @@ locked price — the standard pricing strategies are bypassed for these items.
   requests the backend to resolve and validate the token, clears the local cart, and adds the
   photos as **fixed-price display items** that flow through the standard checkout. The displayed
   per-photo split is not payment authority.
-- **Checkout (standard flow):** The client pays via the normal invoice or Stripe cart checkout.
+- **Checkout (standard flow):** The client pays via the normal invoice or hosted online checkout.
   `CheckoutService` verifies the token again, requires a positive token `price`, and uses that
   signed value as the server-authoritative total. The standard volume/use-case strategies are
   bypassed, client-supplied item prices are ignored, and the offer line items plus `rights_text`
@@ -83,5 +91,5 @@ Playwright tests MUST cover these specific Stripe test cards (future expiry, any
 ## 5. B2B & Accounting Rules (Austria)
 - **Fee Calculation:** The business model accounts for B2B corporate card fees (approx. 1.9% + 0.25 € per transaction).
 - **Invoice Generation and Email:** Immediate Stripe invoices are queued after strict success reconciliation (normally `payment_intent.succeeded`; bounded stale-PI cleanup may also reconcile a remotely succeeded PI after the same identity checks). Invoice and delivery-note checkouts queue the invoice/confirmation immediately after checkout; a valid discount that settles the cart at exactly `0` also queues it immediately without creating a PaymentIntent.
-- **Invoice Status:** Only a Stripe-paid invoice may state "Bezahlt via Kreditkarte"; invoice and settled-free orders must not be described as paid by card.
+- **Invoice Status:** Only a provider-confirmed online payment may state "Bezahlt via Kreditkarte"; invoice and settled-free orders must not be described as paid by card.
 - **Tax Law (Kleinunternehmer):** All amounts are strictly Net (e.g., 45.00 €). The invoice MUST include the legal notice: *"Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung"*.

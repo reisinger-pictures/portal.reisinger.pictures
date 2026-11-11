@@ -7,6 +7,7 @@ use App\Http\Middleware\BrandContextMiddleware;
 use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\LicenseUseCase;
+use App\Models\MolliePaymentAttempt;
 use App\Models\Order;
 use App\Models\Photo;
 use App\Models\Setting;
@@ -14,20 +15,25 @@ use App\Models\User;
 use App\Support\BrandRegistry;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Stripe\ApiRequestor;
-use Stripe\HttpClient\ClientInterface;
+use Mollie\Api\Http\Requests\CreatePaymentRequest;
+use Tests\Support\FakesMollie;
 use Tests\Support\MocksStripeClient;
 use Tests\TestCase;
 
 class CheckoutCouponRevalidationTest extends TestCase
 {
+    use FakesMollie;
     use MocksStripeClient;
     use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockStripePaymentIntentSuccess();
+        $this->configureMollie();
+        $this->fakeMollie(
+            [CreatePaymentRequest::class => $this->mollieCreateResponder('open')],
+            retainRequests: true,
+        );
         $this->withoutMiddleware(BrandContextMiddleware::class);
         BrandRegistry::set(Brand::B2B);
 
@@ -170,8 +176,6 @@ class CheckoutCouponRevalidationTest extends TestCase
                 'withdrawal_waived' => true,
             ]);
 
-        $content = $response->getContent();
-        file_put_contents('php://stderr', "STATUS: {$response->status()}\nBODY: {$content}\n");
         $response->assertStatus(200);
         $orderId = $response->json('order_id');
         $this->assertNotNull($orderId);
@@ -191,37 +195,6 @@ class CheckoutCouponRevalidationTest extends TestCase
         $data = $this->createCheckoutData();
         $user = User::factory()->create();
         $token = auth('api')->login($user);
-        $createdPiId = 'pi_finite_coupon';
-        $createdAmount = 0;
-        $createdMetadata = [];
-        $createCalls = 0;
-        $clientMock = $this->createMock(ClientInterface::class);
-        $clientMock->method('request')->willReturnCallback(
-            function (string $method, string $url, array $headers, array $parameters) use (
-                &$createdPiId,
-                &$createdAmount,
-                &$createdMetadata,
-                &$createCalls,
-            ): array {
-                if ($method === 'post') {
-                    $createCalls++;
-                    $createdAmount = (int) ($parameters['amount'] ?? 0);
-                    $createdMetadata = $parameters['metadata'] ?? [];
-                }
-
-                return [json_encode([
-                    'id' => $createdPiId,
-                    'status' => 'requires_payment_method',
-                    'client_secret' => $createdPiId.'_secret',
-                    'amount' => $createdAmount,
-                    'currency' => 'eur',
-                    'created' => time(),
-                    'customer' => $parameters['customer'] ?? null,
-                    'metadata' => $createdMetadata,
-                ]), 200, []];
-            }
-        );
-        ApiRequestor::setHttpClient($clientMock);
 
         $payload = [
             'items' => $data['items'],
@@ -238,16 +211,22 @@ class CheckoutCouponRevalidationTest extends TestCase
         ];
         $first = $this->withHeaders($headers)->postJson('/api/orders/checkout', $payload);
         $first->assertOk();
+        $first->assertJsonStructure(['checkout_url', 'order_id']);
         $order = Order::query()->firstOrFail();
         $this->assertSame(1, $coupon->fresh()->used_count);
+        $this->assertSame(1, MolliePaymentAttempt::query()->forOrder($order)->count());
 
         $second = $this->withHeaders($headers)->postJson('/api/orders/checkout', $payload);
         $second->assertOk();
+        $this->assertSame(
+            $first->json('checkout_url'),
+            $second->json('checkout_url'),
+            'A replay must resume the same hosted checkout link.',
+        );
 
-        $this->assertSame(1, $createCalls);
+        $this->assertSame(1, MolliePaymentAttempt::query()->count());
         $this->assertSame(1, $coupon->fresh()->used_count);
         $this->assertSame(1, Order::query()->count());
-        $this->assertSame($createdPiId, $order->fresh()->stripe_payment_intent_id);
 
         $coupon->update(['active' => false, 'used_count' => 1]);
         $lostKeyHeaders = [
@@ -257,7 +236,7 @@ class CheckoutCouponRevalidationTest extends TestCase
         $lostKeyRetry = $this->withHeaders($lostKeyHeaders)
             ->postJson('/api/orders/checkout', $payload);
         $lostKeyRetry->assertOk();
-        $this->assertSame(1, $createCalls);
+        $this->assertSame(1, MolliePaymentAttempt::query()->count());
         $this->assertSame(1, $coupon->fresh()->used_count);
         $this->assertSame(1, Order::query()->count());
 

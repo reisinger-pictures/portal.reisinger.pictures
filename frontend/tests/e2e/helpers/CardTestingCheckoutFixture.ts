@@ -68,8 +68,8 @@ export interface PaidCartFixture {
 }
 
 /**
- * Put a real browser on the immediate-Stripe checkout path, which is the only
- * path the V036 card-testing gates apply to
+ * Put a real browser on the immediate online-checkout path (Mollie), which is
+ * the only path the V036 card-testing gates apply to
  * (`features/security/card-testing-protection.md` §11).
  *
  * The setup is the one `turnstile-checkout.spec.ts` already proves end to end:
@@ -105,7 +105,7 @@ export async function openPaidCartCheckout(
     await sidebar.navigateTo('Warenkorb');
 
     await expect(main.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible({timeout: 15000});
-    // A positive total is what classifies the request as an immediate Stripe
+    // A positive total is what classifies the request as an immediate online
     // checkout. Assert it here so a later 403/422 is not read as a card-testing
     // gate that fired.
     await expect(main.getByTestId('cart-total')).toBeVisible({timeout: 15000});

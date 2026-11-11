@@ -1075,6 +1075,7 @@ msgstr "Beim nächsten Speichern wird dein Profil auf den aktuellen Fragenkatalo
 msgid "Beitreten & Fortfahren"
 msgstr "Beitreten & Fortfahren"
 
+#: src/ui/client/CheckoutReturnView.tsx
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Beleg"
 msgstr "Beleg"
@@ -1466,8 +1467,8 @@ msgid "Bitte prüfe die markierten Felder."
 msgstr "Bitte prüfe die markierten Felder."
 
 #: src/ui/client/ClientCartView.tsx
-msgid "Bitte schließe die Zahlung ab."
-msgstr "Bitte schließe die Zahlung ab."
+#~ msgid "Bitte schließe die Zahlung ab."
+#~ msgstr "Bitte schließe die Zahlung ab."
 
 #: src/ui/ContractSignView.tsx
 msgid "Bitte Seite neu laden, um den aktualisierten Vertrag zu unterschreiben."
@@ -1480,6 +1481,10 @@ msgstr "Bitte Seite neu laden."
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Bitte überweise den Rechnungsbetrag zeitnah. Gib als Verwendungszweck die Belegnummer an."
 msgstr "Bitte überweise den Rechnungsbetrag zeitnah. Gib als Verwendungszweck die Belegnummer an."
+
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Bitte versuche es erneut. Ist die Zahlung erfolgt, bleibt sie selbstverständlich erhalten."
+msgstr "Bitte versuche es erneut. Ist die Zahlung erfolgt, bleibt sie selbstverständlich erhalten."
 
 #: src/ui/ContractJoinView.tsx
 msgid "Bitte wähle eine Rolle"
@@ -1818,6 +1823,10 @@ msgstr "Dein WLAN; bei einem Fehlschlag „Offline konfigurieren\" wählen"
 #~ msgid "Deine Berechtigung erlaubt keine Upgrade-Käufe."
 #~ msgstr "Deine Berechtigung erlaubt keine Upgrade-Käufe."
 
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Deine Bestellung ist bezahlt. Die Rechnung wurde per E-Mail versendet."
+msgstr "Deine Bestellung ist bezahlt. Die Rechnung wurde per E-Mail versendet."
+
 #: src/ui/OrgInviteView.tsx
 msgid "Deine Bestellungen können über die Organisation abgerechnet werden"
 msgstr "Deine Bestellungen können über die Organisation abgerechnet werden"
@@ -1935,8 +1944,12 @@ msgid "Der passive Bereich <0>{pasvValue}</0> muss in der Firewall freigeschalte
 msgstr "Der passive Bereich <0>{pasvValue}</0> muss in der Firewall freigeschaltet sein — er wird nur von FTPS benötigt, SFTP kommt mit einem einzigen Port aus."
 
 #: src/ui/client/ClientCartView.tsx
-msgid "Der Rabatt macht diese Bestellung kostenlos. Eine Stripe-Zahlung ist nicht erforderlich."
-msgstr "Der Rabatt macht diese Bestellung kostenlos. Eine Stripe-Zahlung ist nicht erforderlich."
+msgid "Der Rabatt macht diese Bestellung kostenlos. Eine Online-Zahlung ist nicht erforderlich."
+msgstr "Der Rabatt macht diese Bestellung kostenlos. Eine Online-Zahlung ist nicht erforderlich."
+
+#: src/ui/client/ClientCartView.tsx
+#~ msgid "Der Rabatt macht diese Bestellung kostenlos. Eine Stripe-Zahlung ist nicht erforderlich."
+#~ msgstr "Der Rabatt macht diese Bestellung kostenlos. Eine Stripe-Zahlung ist nicht erforderlich."
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "Der Rabatt wird auf den serverberechneten Warenkorb angewendet."
@@ -1982,6 +1995,14 @@ msgstr "Der Upload funktioniert, aber der Import findet nichts, weil die Datei i
 msgid "Der Upload kam nicht an"
 msgstr "Der Upload kam nicht an"
 
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Der Zahlungsstatus konnte nicht geladen werden"
+msgstr "Der Zahlungsstatus konnte nicht geladen werden"
+
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Der Zahlungsvorgang konnte nicht eindeutig abgeschlossen werden. Bitte wende dich an den Support, damit die Zahlung geprüft wird."
+msgstr "Der Zahlungsvorgang konnte nicht eindeutig abgeschlossen werden. Bitte wende dich an den Support, damit die Zahlung geprüft wird."
+
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Detaillierte Auswertungen (Bild-Bewertungen)"
 msgstr "Detaillierte Auswertungen (Bild-Bewertungen)"
@@ -2008,6 +2029,10 @@ msgstr "Details..."
 #: src/ui/Privacy.tsx
 msgid "Die Aufbewahrung der IP-bezogenen Bestell- und Sicherheitsdaten richtet sich je nach Datenkategorie nach der geltenden Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten. Die IP-Risikoschlüssel laufen mit dem jeweiligen konfigurierten Limitierungsfenster ab. Die konkrete Frist und die zugrunde liegende Zuordnung teilt der Betreiber auf Anfrage mit."
 msgstr "Die Aufbewahrung der IP-bezogenen Bestell- und Sicherheitsdaten richtet sich je nach Datenkategorie nach der geltenden Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten. Die IP-Risikoschlüssel laufen mit dem jeweiligen konfigurierten Limitierungsfenster ab. Die konkrete Frist und die zugrunde liegende Zuordnung teilt der Betreiber auf Anfrage mit."
+
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Die Bestätigung ist noch nicht eingetroffen. Der Zahlungsvorgang bleibt erhalten; bitte prüfe den Status in Kürze erneut."
+msgstr "Die Bestätigung ist noch nicht eingetroffen. Der Zahlungsvorgang bleibt erhalten; bitte prüfe den Status in Kürze erneut."
 
 #: src/ui/LicenseTerms.tsx
 msgid "Die Darstellung der Produkte im Portal stellt kein bindendes Angebot dar. Mit dem Klicken auf „Zahlungspflichtig bestellen“ gibt der Kunde ein bindendes Angebot zum Abschluss des Vertrages ab. Der Vertrag kommt mit der Bestätigung der Bestellung durch den Fotografen bzw. mit der Aussendung der Bestellbestätigung zustande."
@@ -2110,20 +2135,32 @@ msgid "Die Werte für die Kamera"
 msgstr "Die Werte für die Kamera"
 
 #: src/ui/client/ClientCartView.tsx
-msgid "Die Zahlung ist noch nicht als bezahlt bestätigt. Der Warenkorb bleibt erhalten."
-msgstr "Die Zahlung ist noch nicht als bezahlt bestätigt. Der Warenkorb bleibt erhalten."
+#~ msgid "Die Zahlung ist noch nicht als bezahlt bestätigt. Der Warenkorb bleibt erhalten."
+#~ msgstr "Die Zahlung ist noch nicht als bezahlt bestätigt. Der Warenkorb bleibt erhalten."
 
 #: src/ui/client/ClientCartView.tsx
-msgid "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten. Bitte später erneut prüfen; dabei wird der bestehende Zahlungsvorgang wiederverwendet."
-msgstr "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten. Bitte später erneut prüfen; dabei wird der bestehende Zahlungsvorgang wiederverwendet."
+msgid "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten."
+msgstr "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten."
+
+#: src/ui/client/ClientCartView.tsx
+#~ msgid "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten. Bitte später erneut prüfen; dabei wird der bestehende Zahlungsvorgang wiederverwendet."
+#~ msgstr "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten. Bitte später erneut prüfen; dabei wird der bestehende Zahlungsvorgang wiederverwendet."
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Die Zahlung wird derzeit geprüft. Bitte später erneut prüfen."
 msgstr "Die Zahlung wird derzeit geprüft. Bitte später erneut prüfen."
 
 #: src/ui/client/ClientCartView.tsx
-msgid "Die Zahlung wird geprüft. Der Warenkorb bleibt für die Wiederherstellung erhalten."
-msgstr "Die Zahlung wird geprüft. Der Warenkorb bleibt für die Wiederherstellung erhalten."
+#~ msgid "Die Zahlung wird geprüft. Der Warenkorb bleibt für die Wiederherstellung erhalten."
+#~ msgstr "Die Zahlung wird geprüft. Der Warenkorb bleibt für die Wiederherstellung erhalten."
+
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Die Zahlung wurde nicht abgeschlossen"
+msgstr "Die Zahlung wurde nicht abgeschlossen"
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Die Zahlungsseite konnte nicht sicher geöffnet werden. Bitte wende dich an den Support."
+msgstr "Die Zahlungsseite konnte nicht sicher geöffnet werden. Bitte wende dich an den Support."
 
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Die Zugangsdaten konnten nicht erneuert werden."
@@ -2265,6 +2302,10 @@ msgstr "Du hast bisher noch keine Abrechnungen erhalten."
 #: src/ui/management/ManagementDashboard.tsx
 msgid "Du hast noch keine eigenen Galerien oder Bilder."
 msgstr "Du hast noch keine eigenen Galerien oder Bilder."
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Du wirst zur sicheren Zahlungsseite unseres Zahlungsdienstleisters weitergeleitet und kehrst danach hierher zurück."
+msgstr "Du wirst zur sicheren Zahlungsseite unseres Zahlungsdienstleisters weitergeleitet und kehrst danach hierher zurück."
 
 #: src/ui/OrgInviteView.tsx
 msgid "Du wurdest eingeladen, der Organisation <0>{orgName}</0> beizutreten."
@@ -2565,6 +2606,10 @@ msgstr "Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
 msgid "Ermöglicht dem Empfänger dieses Links das Ändern von IPTC Titeln und Beschreibungen."
 msgstr "Ermöglicht dem Empfänger dieses Links das Ändern von IPTC Titeln und Beschreibungen."
 
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Erneut prüfen"
+msgstr "Erneut prüfen"
+
 #: src/ui/client/components/StripeCheckoutForm.tsx
 #: src/ui/components/ErrorBoundary.tsx
 #: src/ui/components/ErrorMessage.tsx
@@ -2609,8 +2654,12 @@ msgid "Erweiterte Rechte als Angebot beim Fotografen anfragen"
 msgstr "Erweiterte Rechte als Angebot beim Fotografen anfragen"
 
 #: src/ui/LicenseTerms.tsx
-msgid "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Kreditkarte (über den Zahlungsdienstleister Stripe) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
-msgstr "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Kreditkarte (über den Zahlungsdienstleister Stripe) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
+#~ msgid "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Kreditkarte (über den Zahlungsdienstleister Stripe) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
+#~ msgstr "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Kreditkarte (über den Zahlungsdienstleister Stripe) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
+
+#: src/ui/LicenseTerms.tsx
+msgid "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Online-Zahlung (über den Zahlungsdienstleister Mollie) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
+msgstr "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Online-Zahlung (über den Zahlungsdienstleister Mollie) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
 
 #: src/ui/KameraEinrichtung.tsx
 #~ msgid "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt — frag den Support danach."
@@ -2627,6 +2676,10 @@ msgstr "Es gilt österreichisches Recht unter Ausschluss des UN-Kaufrechts. Soll
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren."
 msgstr "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren."
+
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Es wurde nichts belastet. Du kannst die Bestellung erneut bezahlen."
+msgstr "Es wurde nichts belastet. Du kannst die Bestellung erneut bezahlen."
 
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Exportiert"
@@ -4107,8 +4160,8 @@ msgid "Kostenpflichtig"
 msgstr "Kostenpflichtig"
 
 #: src/ui/client/ClientCartView.tsx
-msgid "Kreditkarte (Stripe)"
-msgstr "Kreditkarte (Stripe)"
+#~ msgid "Kreditkarte (Stripe)"
+#~ msgstr "Kreditkarte (Stripe)"
 
 #: src/App.tsx
 msgid "Kritischer Fehler"
@@ -5369,6 +5422,10 @@ msgstr "Online-Verbot (Privacy Fee)"
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Online-Verbot:"
 msgstr "Online-Verbot:"
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Online-Zahlung"
+msgstr "Online-Zahlung"
 
 #: src/ui/management/components/invoice/InvoiceItemsTable.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
@@ -7344,6 +7401,10 @@ msgstr "Weiter →"
 msgid "Weiter als {inviteName}"
 msgstr "Weiter als {inviteName}"
 
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Weiter zur Zahlung"
+msgstr "Weiter zur Zahlung"
+
 #: src/ui/ModelRegistrationView.tsx
 msgid "Weitere Person hinzufügen"
 msgstr "Weitere Person hinzufügen"
@@ -7444,6 +7505,10 @@ msgstr "Willkommen zurück, {userName}!"
 #: src/ui/ModelRegistrationView.tsx
 msgid "Willkommen! Bitte erfasse alle Personen des Acts."
 msgstr "Willkommen! Bitte erfasse alle Personen des Acts."
+
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Wir warten auf die Bestätigung des Zahlungsdienstleisters. Das dauert in der Regel nur wenige Sekunden."
+msgstr "Wir warten auf die Bestätigung des Zahlungsdienstleisters. Das dauert in der Regel nur wenige Sekunden."
 
 #: src/ui/management/components/ManualDocumentHeader.tsx
 msgid "Wird automatisch befüllt..."
@@ -7573,9 +7638,13 @@ msgstr "z.B. Werbung, Standard, Event"
 msgid "Zahlbar sofort nach Erhalt der Rechnung."
 msgstr "Zahlbar sofort nach Erhalt der Rechnung."
 
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Zahlung"
+msgstr "Zahlung"
+
 #: src/ui/client/ClientCartView.tsx
-msgid "Zahlung abschließen"
-msgstr "Zahlung abschließen"
+#~ msgid "Zahlung abschließen"
+#~ msgstr "Zahlung abschließen"
 
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Zahlung ausständig (Kauf auf Rechnung)"
@@ -7585,29 +7654,45 @@ msgstr "Zahlung ausständig (Kauf auf Rechnung)"
 #~ msgid "Zahlung bei Stripe erfolgreich, aber das lokale Webhook-Event fehlt."
 #~ msgstr "Zahlung bei Stripe erfolgreich, aber das lokale Webhook-Event fehlt."
 
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Zahlung erfolgreich"
+msgstr "Zahlung erfolgreich"
+
 #: src/ui/client/ClientCartView.tsx
 #~ msgid "Zahlung erfolgreich!"
 #~ msgstr "Zahlung erfolgreich!"
 
 #: src/ui/client/ClientCartView.tsx
-msgid "Zahlung erfolgreich! Rechnung wurde versendet."
-msgstr "Zahlung erfolgreich! Rechnung wurde versendet."
+#~ msgid "Zahlung erfolgreich! Rechnung wurde versendet."
+#~ msgstr "Zahlung erfolgreich! Rechnung wurde versendet."
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Zahlung erneut prüfen"
 msgstr "Zahlung erneut prüfen"
 
 #: src/ui/client/ClientCartView.tsx
-msgid "Zahlung fehlgeschlagen — bitte versuche es erneut."
-msgstr "Zahlung fehlgeschlagen — bitte versuche es erneut."
+#~ msgid "Zahlung fehlgeschlagen — bitte versuche es erneut."
+#~ msgstr "Zahlung fehlgeschlagen — bitte versuche es erneut."
 
 #: src/ui/client/components/StripeCheckoutForm.tsx
 msgid "Zahlung fehlgeschlagen."
 msgstr "Zahlung fehlgeschlagen."
 
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Zahlung noch nicht bestätigt"
+msgstr "Zahlung noch nicht bestätigt"
+
 #: src/ui/client/components/StripeCheckoutForm.tsx
 msgid "Zahlung unvollständig — bitte erneut versuchen."
 msgstr "Zahlung unvollständig — bitte erneut versuchen."
+
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Zahlung wird geprüft"
+msgstr "Zahlung wird geprüft"
+
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Zahlung wird manuell geprüft"
+msgstr "Zahlung wird manuell geprüft"
 
 #: src/ui/client/components/StripeCheckoutForm.tsx
 msgid "Zahlung wird verifiziert..."
@@ -7628,6 +7713,10 @@ msgstr "Zahlungspflichtig bestellen"
 #: src/ui/management/components/ProjectModal.tsx
 msgid "Zahlungsstatus"
 msgstr "Zahlungsstatus"
+
+#: src/ui/client/ClientCartView.tsx
+msgid "Zahlungsstatus prüfen"
+msgstr "Zahlungsstatus prüfen"
 
 #: src/ui/management/components/ManualDocumentHeader.tsx
 msgid "Zahlungsziel / Fälligkeitstext"
@@ -7681,6 +7770,14 @@ msgstr "Zielordner"
 #: src/ui/Privacy.tsx
 msgid "Zu den in dieser Erklärung genannten Kennungen und Signalen sind die technischen Angaben vollständig beschrieben. Die zugehörigen Rechtsgrundlagen, die konkreten Aufbewahrungsfristen sowie die Regeln zu Löschung und Anonymisierung sind noch nicht abschließend festgelegt; der Betreiber teilt sie Ihnen auf Anfrage und mit der finalen Fassung dieser Erklärung mit."
 msgstr "Zu den in dieser Erklärung genannten Kennungen und Signalen sind die technischen Angaben vollständig beschrieben. Die zugehörigen Rechtsgrundlagen, die konkreten Aufbewahrungsfristen sowie die Regeln zu Löschung und Anonymisierung sind noch nicht abschließend festgelegt; der Betreiber teilt sie Ihnen auf Anfrage und mit der finalen Fassung dieser Erklärung mit."
+
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Zu dieser Zahlung fehlt die Bestellreferenz. Bitte öffne deine Einkäufe, um den Status zu prüfen."
+msgstr "Zu dieser Zahlung fehlt die Bestellreferenz. Bitte öffne deine Einkäufe, um den Status zu prüfen."
+
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Zu meinen Einkäufen"
+msgstr "Zu meinen Einkäufen"
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "zuerst „Vertrauenswürdige Zielserver\" auf Aktivieren"
@@ -7754,6 +7851,10 @@ msgstr "Zur eindeutigen Zuordnung speichern wir die Stripe Customer-ID des Porta
 #: src/ui/KameraEinrichtung.tsx
 #~ msgid "Zurück zum FTP Inbox"
 #~ msgstr "Zurück zum FTP Inbox"
+
+#: src/ui/client/CheckoutReturnView.tsx
+msgid "Zurück zum Warenkorb"
+msgstr "Zurück zum Warenkorb"
 
 #: src/ui/client/ClientCartView.tsx
 #: src/ui/ContractSignView.tsx

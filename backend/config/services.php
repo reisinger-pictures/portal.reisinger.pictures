@@ -46,6 +46,22 @@ return [
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
     ],
 
+    /*
+     * Mollie is the online-payment provider for new orders (issue #53). The
+     * key is server-only; test/live mode comes from its `test_`/`live_`
+     * prefix. `method` is the single explicitly allowed payment method: an
+     * unset or malformed value disables payment creation (no method is
+     * guessed). `webhook_url` must be the externally reachable HTTPS endpoint
+     * in the deployed environment; the local fallback is the API route.
+     */
+    'mollie' => [
+        'key' => env('MOLLIE_KEY'),
+        'method' => env('MOLLIE_PAYMENT_METHOD'),
+        'webhook_url' => env('MOLLIE_WEBHOOK_URL'),
+        'idempotency_window_minutes' => max(5, (int) env('MOLLIE_IDEMPOTENCY_WINDOW_MINUTES', 60)),
+        'max_attempts' => max(1, (int) env('MOLLIE_MAX_ATTEMPTS', 5)),
+    ],
+
     'turnstile' => [
         'site_key' => env('TURNSTILE_SITE_KEY'),
         'secret' => env('TURNSTILE_SECRET'),

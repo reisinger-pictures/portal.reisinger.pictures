@@ -15,20 +15,18 @@ import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 
 import {t} from "@lingui/core/macro";
 import {Trans} from "@lingui/react/macro";
-import {Elements} from '@stripe/react-stripe-js';
 import PageLayout from '../components/PageLayout';
 
-import {stripePromise} from '../../logic/stripe';
 import {
     clearCheckoutSession,
     createCheckoutCartMarker,
     loadOrCreateCheckoutSession,
     replaceCheckoutSession
 } from '../../logic/checkoutSession';
-import {StripeCheckoutForm} from './components/StripeCheckoutForm';
 import {CartItemList} from './components/CartItemList';
 import {TurnstileWidget} from './components/TurnstileWidget';
 import CouponInput from './components/CouponInput';
+import {assignLocation, isHostedCheckoutUrl} from '../../logic/hostedCheckout';
 
 // Schema-Factory (kein module-scope `t` — siehe frontend/AGENTS.md, Lingui-Regel)
 const createCheckoutSchema = () => z.object({
@@ -162,33 +160,19 @@ export default function ClientCartView() {
         && effectiveCouponDiscount >= totalAmount;
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const redirectStatus = searchParams.get('redirect_status');
-    const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
-    const [checkoutBilling, setCheckoutBilling] = useState<{line1: string; postalCode: string; city: string} | null>(null);
-    const [paymentRecoveryPending, setPaymentRecoveryPending] = useState(() => redirectStatus === 'succeeded');
+    const [paymentRecoveryPending, setPaymentRecoveryPending] = useState(false);
     const [turnstileRequired, setTurnstileRequired] = useState(false);
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
     const [turnstileWidgetVersion, setTurnstileWidgetVersion] = useState(0);
     const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? '';
 
-    const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'invoice'>('stripe');
+    const [paymentMethod, setPaymentMethod] = useState<'mollie' | 'invoice'>('mollie');
     const cartMarker = createCheckoutCartMarker(items, quoteToken);
 
     const checkoutSchema = createCheckoutSchema();
 
-    useEffect(() => {
-        if (!redirectStatus) return;
-        if (redirectStatus === 'succeeded') {
-            showToast('info', t`Die Zahlung wird geprüft. Der Warenkorb bleibt für die Wiederherstellung erhalten.`);
-            navigate('/cart', {replace: true});
-        } else {
-            showToast('error', t`Zahlung fehlgeschlagen — bitte versuche es erneut.`);
-            navigate('/cart', {replace: true});
-        }
-    }, [redirectStatus, showToast, navigate]);
-
-    const isImmediateStripeCheckout = !hasQuotes && paymentMethod === 'stripe' && netTotalAmount > 0;
+    const isImmediateOnlineCheckout = !hasQuotes && paymentMethod === 'mollie' && netTotalAmount > 0;
 
     const getCheckoutRecovery = () => (
         userId && items.length > 0
@@ -200,11 +184,11 @@ export default function ClientCartView() {
         if (userId) replaceCheckoutSession(userId, cartMarker);
     };
 
-    const handlePaymentMethodChange = (method: 'stripe' | 'invoice') => {
+    const handlePaymentMethodChange = (method: 'mollie' | 'invoice') => {
         if (paymentRecoveryPending) return;
         setPaymentMethod(method);
-        const nextIsImmediateStripe = !hasQuotes && method === 'stripe' && netTotalAmount > 0;
-        if (!nextIsImmediateStripe) {
+        const nextIsImmediateOnline = !hasQuotes && method === 'mollie' && netTotalAmount > 0;
+        if (!nextIsImmediateOnline) {
             setTurnstileRequired(false);
             setTurnstileToken(null);
             setTurnstileWidgetVersion(version => version + 1);
@@ -304,16 +288,16 @@ export default function ClientCartView() {
             showToast('error', t`Bitte bestätige den Verzicht auf das Widerrufsrecht.`);
             return;
         }
-        if (turnstileRequired && !isImmediateStripeCheckout) {
+        if (turnstileRequired && !isImmediateOnlineCheckout) {
             setTurnstileRequired(false);
             setTurnstileToken(null);
             setTurnstileWidgetVersion(version => version + 1);
         }
-        if (isImmediateStripeCheckout && turnstileRequired && !turnstileSiteKey) {
+        if (isImmediateOnlineCheckout && turnstileRequired && !turnstileSiteKey) {
             showToast('error', t`Die Sicherheitsprüfung ist nicht konfiguriert. Bitte wende dich an den Support.`);
             return;
         }
-        if (isImmediateStripeCheckout && turnstileRequired && !turnstileToken) {
+        if (isImmediateOnlineCheckout && turnstileRequired && !turnstileToken) {
             showToast('info', t`Bitte bestätige zuerst die Sicherheitsprüfung.`);
             return;
         }
@@ -321,7 +305,7 @@ export default function ClientCartView() {
         const checkoutRecovery = getCheckoutRecovery();
         if (!checkoutRecovery) return;
 
-        const turnstileTokenForRequest = isImmediateStripeCheckout && turnstileRequired ? turnstileToken : null;
+        const turnstileTokenForRequest = isImmediateOnlineCheckout && turnstileRequired ? turnstileToken : null;
         try {
             const payload: Record<string, unknown> = {
                 items,
@@ -342,29 +326,28 @@ export default function ClientCartView() {
                 headers: {'Idempotency-Key': checkoutRecovery.idempotencyKey}
             });
 
+            if (response.checkout_url) {
+                // The hosted checkout is the only payment UI. The cart and the
+                // checkout identity stay intact: returning without paying
+                // resumes this same attempt instead of creating a second one.
+                if (!isHostedCheckoutUrl(response.checkout_url)) {
+                    showToast('error', t`Die Zahlungsseite konnte nicht sicher geöffnet werden. Bitte wende dich an den Support.`);
+                    return;
+                }
+                setPendingOrderId(response.order_id ?? null);
+                setTurnstileToken(null);
+                assignLocation(response.checkout_url);
+                return;
+            }
+
             if (response.payment_pending) {
-                // The remote PI may already be succeeded while the signed
-                // webhook is still catching up. Keep the recovery session and
-                // poll/retry the order status instead of treating it as a new
-                // actionable payment.
+                // The provider state is not final yet. Keep the recovery session
+                // and let the customer re-check the order on the return view.
                 setPaymentRecoveryPending(true);
                 setTurnstileRequired(false);
                 setTurnstileToken(null);
-                setClientSecret(null);
                 setPendingOrderId(response.order_id ?? null);
-                setCheckoutBilling(null);
                 showToast('info', t`Die Zahlung wird derzeit geprüft. Bitte später erneut prüfen.`);
-            } else if (response.requires_action && response.client_secret) {
-                setPaymentRecoveryPending(false);
-                setTurnstileRequired(false);
-                setTurnstileToken(null);
-                setClientSecret(response.client_secret);
-                if (response.order_id) setPendingOrderId(response.order_id);
-                // Billing-Adresse an Stripe übergeben: Stripe sammelt sonst eine
-                // PLZ mit US-Default-Country -> "Postleitzahl ist ungültig" für
-                // österreichische PLZ wie 1010 (CI-reproduzierbar, lokal nicht).
-                setCheckoutBilling({line1: data.billing_street, postalCode: data.billing_zip, city: data.billing_city});
-                showToast('info', t`Bitte schließe die Zahlung ab.`);
             } else if (response.success) {
                 setPaymentRecoveryPending(false);
                 setTurnstileRequired(false);
@@ -390,7 +373,7 @@ export default function ClientCartView() {
             if (isIdempotencyConflict(error)) {
                 rotateCheckoutRecovery();
             }
-            if (isImmediateStripeCheckout && isTurnstileRequiredError(error)) {
+            if (isImmediateOnlineCheckout && isTurnstileRequiredError(error)) {
                 setTurnstileRequired(true);
                 if (turnstileSiteKey) {
                     showToast('info', t`Bitte bestätige die Sicherheitsprüfung und versuche es erneut.`);
@@ -446,35 +429,6 @@ export default function ClientCartView() {
                         </div>
 
                         <div className="lg:col-span-2">
-                            {clientSecret ? (
-                                <div
-                                    className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm sticky top-24">
-                                    <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
-                                        <span className="iconify mdi--credit-card text-primary"></span> <Trans>Zahlung abschließen</Trans>
-                                    </h2>
-                                    <Elements stripe={stripePromise} options={{clientSecret}}>
-                                        <StripeCheckoutForm orderId={pendingOrderId!} defaultEmail={user?.email}
-                                                            defaultName={user?.billing_name || user?.name}
-                                                            billingAddress={checkoutBilling ?? undefined}
-                                                            onSuccess={(serverPaid) => {
-                                                                if (!serverPaid) {
-                                                                    setClientSecret(null);
-                                                                    setPendingOrderId(null);
-                                                                    setCheckoutBilling(null);
-                                                                    setPaymentRecoveryPending(true);
-                                                                    showToast('info', t`Die Zahlung ist noch nicht als bezahlt bestätigt. Der Warenkorb bleibt erhalten.`);
-                                                                    return;
-                                                                }
-                                                                setPaymentRecoveryPending(false);
-                                                                if (userId) clearCheckoutSession(userId);
-                                                                showToast('success', t`Zahlung erfolgreich! Rechnung wurde versendet.`);
-                                                                clearCart();
-                                                                mutateUser();
-                                                                navigate('/orders');
-                                                            }}/>
-                                    </Elements>
-                                </div>
-                            ) : (
                                 <form id="checkout-form" onSubmit={handleSubmit(onCheckout)}
                                       className="bg-base-100 p-6 rounded-box border border-base-300 shadow-sm sticky top-24" noValidate>
                                     <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
@@ -486,7 +440,13 @@ export default function ClientCartView() {
                                         <div role="status"
                                              className="alert alert-info mb-6">
                                             <span className="iconify mdi--refresh text-xl"></span>
-                                            <span><Trans>Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten. Bitte später erneut prüfen; dabei wird der bestehende Zahlungsvorgang wiederverwendet.</Trans></span>
+                                            <span>
+                                                <Trans>Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten.</Trans>
+                                                {pendingOrderId && (
+                                                    <Link to={`/checkout/return?order_id=${encodeURIComponent(pendingOrderId)}`}
+                                                          className="link link-primary ml-1"><Trans>Zahlungsstatus prüfen</Trans></Link>
+                                                )}
+                                            </span>
                                         </div>
                                     )}
 
@@ -549,15 +509,18 @@ export default function ClientCartView() {
                                                 className="label-text text-sm font-bold"><Trans>Zahlungsart</Trans></span></label>
                                             <div
                                                 className="flex flex-col gap-3 bg-base-200 p-4 rounded-box border border-base-300">
-                                                <label className="cursor-pointer flex items-center gap-3" htmlFor="checkout-payment-stripe">
-                                                    <input id="checkout-payment-stripe" type="radio" name="payment_method" value="stripe" required aria-label={t`Kreditkarte (Stripe)`}
+                                                <label className="cursor-pointer flex items-center gap-3" htmlFor="checkout-payment-mollie">
+                                                    <input id="checkout-payment-mollie" type="radio" name="payment_method" value="mollie" required aria-label={t`Online-Zahlung`}
                                                            className="radio radio-primary"
-                                                           checked={paymentMethod === 'stripe'}
+                                                           checked={paymentMethod === 'mollie'}
                                                            disabled={paymentRecoveryPending}
-                                                           onChange={() => handlePaymentMethodChange('stripe')}/>
+                                                           onChange={() => handlePaymentMethodChange('mollie')}/>
                                                     <span className="font-bold flex items-center gap-2"><span
-                                                        className="iconify mdi--credit-card"></span> <Trans>Kreditkarte (Stripe)</Trans></span>
+                                                        className="iconify mdi--credit-card"></span> <Trans>Online-Zahlung</Trans></span>
                                                 </label>
+                                                <p className="text-sm opacity-70 pl-8">
+                                                    <Trans>Du wirst zur sicheren Zahlungsseite unseres Zahlungsdienstleisters weitergeleitet und kehrst danach hierher zurück.</Trans>
+                                                </p>
                                                 {(user?.roles?.includes(UserRole.CLIENT) || isPowerUser || isAdmin) && (
                                                     <label className="cursor-pointer flex items-center gap-3" htmlFor="checkout-payment-invoice">
                                                         <input id="checkout-payment-invoice" type="radio" name="payment_method" value="invoice" required aria-label={t`Kauf auf Rechnung`}
@@ -575,7 +538,7 @@ export default function ClientCartView() {
 
                                     {isFreeCheckout && (
                                          <div role="status" className="alert alert-success mb-6">
-                                             <Trans>Der Rabatt macht diese Bestellung kostenlos. Eine Stripe-Zahlung ist nicht erforderlich.</Trans>
+                                             <Trans>Der Rabatt macht diese Bestellung kostenlos. Eine Online-Zahlung ist nicht erforderlich.</Trans>
                                          </div>
                                      )}
 
@@ -599,7 +562,7 @@ export default function ClientCartView() {
                                         )}
                                     </div>
 
-                                    {isImmediateStripeCheckout && turnstileRequired && !turnstileSiteKey && (
+                                    {isImmediateOnlineCheckout && turnstileRequired && !turnstileSiteKey && (
                                         <div role="alert"
                                              className="alert alert-error mb-6">
                                             <span className="iconify mdi--alert-circle text-xl"></span>
@@ -607,7 +570,7 @@ export default function ClientCartView() {
                                         </div>
                                     )}
 
-                                    {isImmediateStripeCheckout && turnstileRequired && turnstileSiteKey && (
+                                    {isImmediateOnlineCheckout && turnstileRequired && turnstileSiteKey && (
                                         <section aria-labelledby="checkout-turnstile-heading"
                                                  className="rounded-box border border-base-300 bg-base-200 p-4 mb-6 space-y-3">
                                             <h3 id="checkout-turnstile-heading" className="font-bold">
@@ -633,13 +596,12 @@ export default function ClientCartView() {
                                     <button
                                         type="submit"
                                         className="btn btn-primary w-full btn-lg"
-                                        disabled={items.length === 0 || isSubmitting || (isImmediateStripeCheckout && turnstileRequired && (!turnstileSiteKey || !turnstileToken))}
+                                        disabled={items.length === 0 || isSubmitting || (isImmediateOnlineCheckout && turnstileRequired && (!turnstileSiteKey || !turnstileToken))}
                                     >
                                         {isSubmitting ? <span
                                             className="loading loading-spinner"></span> : paymentRecoveryPending ? <Trans>Zahlung erneut prüfen</Trans> : (hasQuotes ? <Trans>Unverbindlich anfragen</Trans> : isFreeCheckout ? <Trans>Kostenlos bestellen</Trans> : <Trans>Zahlungspflichtig bestellen</Trans>)}
                                     </button>
                                 </form>
-                            )}
                         </div>
                     </div>
                 )}

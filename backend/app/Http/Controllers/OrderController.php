@@ -3,8 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\OrderResource;
+use App\Models\MolliePaymentAttempt;
 use App\Models\Order;
 use App\Services\AuthorizationService;
+use App\Services\MollieCheckoutService;
+use App\Services\MolliePaymentException;
+use App\Services\MolliePaymentService;
 use App\Services\StripePaymentService;
 use App\Support\ActorIdentity;
 use Illuminate\Http\Request;
@@ -39,6 +43,76 @@ class OrderController extends Controller
             'invoice_number' => $order->invoiceSnapshot?->invoice_number,
             'total_amount' => (int) $order->total_amount,
             'currency' => 'eur',
+        ]);
+    }
+
+    /**
+     * Owner-scoped payment state for the German return view.
+     *
+     * A verified provider fetch is the only thing that can turn the order
+     * paid here; the query string and the return redirect are presentation
+     * only. A provider outage leaves the order untouched and reports the
+     * last known state.
+     */
+    public function paymentStatus(
+        string $id,
+        MolliePaymentService $mollie,
+        MollieCheckoutService $mollieCheckout,
+    ) {
+        $user = auth('api')->user();
+        $order = Order::query()
+            ->ownedBy($user)
+            ->with('invoiceSnapshot')
+            ->findOrFail($id);
+
+        if ($order->status === 'paid') {
+            return $this->paymentStatusResponse($order, null);
+        }
+
+        $attempt = MolliePaymentAttempt::query()
+            ->forOrder($order)
+            ->orderByDesc('generation')
+            ->first();
+
+        if ($attempt === null) {
+            return $this->paymentStatusResponse($order, null);
+        }
+
+        if ($attempt->mollie_payment_id !== null && $mollie->isConfigured()) {
+            try {
+                $payment = $mollie->getPayment($attempt->mollie_payment_id);
+                $mollieCheckout->applyVerifiedPayment($attempt, $payment);
+            } catch (MolliePaymentException $exception) {
+                Log::warning('order.payment_status.lookup_failed', [
+                    'order_id' => (string) $order->getKey(),
+                    'attempt_id' => (string) $attempt->getKey(),
+                    'reason' => $exception->reason,
+                ]);
+            }
+        }
+
+        $order->refresh();
+        $attempt->refresh();
+
+        return $this->paymentStatusResponse($order, $attempt);
+    }
+
+    private function paymentStatusResponse(Order $order, ?MolliePaymentAttempt $attempt)
+    {
+        $active = $attempt !== null && in_array($attempt->status, [
+            MolliePaymentAttempt::STATUS_OPEN,
+            MolliePaymentAttempt::STATUS_PENDING,
+            MolliePaymentAttempt::STATUS_AUTHORIZED,
+        ], true);
+
+        return response()->json([
+            'order_id' => (string) $order->getKey(),
+            'status' => $order->status,
+            'invoice_number' => $order->invoiceSnapshot?->invoice_number,
+            'payment_status' => $attempt?->status,
+            'payment_ambiguous' => $attempt?->status === MolliePaymentAttempt::STATUS_AMBIGUOUS,
+            'retryable' => $attempt?->isRetryable() ?? false,
+            'checkout_url' => $active ? $attempt->checkout_url : null,
         ]);
     }
 
@@ -105,6 +179,16 @@ class OrderController extends Controller
 
     private function cancelOpenPaymentIntent(Order $order): ?string
     {
+        $stripeError = $this->cancelOpenStripePaymentIntent($order);
+        if ($stripeError !== null) {
+            return $stripeError;
+        }
+
+        return $this->cancelOpenMolliePayment($order);
+    }
+
+    private function cancelOpenStripePaymentIntent(Order $order): ?string
+    {
         $paymentIntentId = $order->stripe_payment_intent_id;
         if (! is_string($paymentIntentId) || trim($paymentIntentId) === '') {
             return null;
@@ -154,6 +238,88 @@ class OrderController extends Controller
     }
 
     /**
+     * Cancel the latest Mollie attempt when it is in a state the provider can
+     * still cancel. An unidentified or non-cancelable attempt fails closed:
+     * the order must not become `cancelled` while money could still arrive.
+     */
+    private function cancelOpenMolliePayment(Order $order): ?string
+    {
+        $attempt = MolliePaymentAttempt::query()
+            ->forOrder($order)
+            ->orderByDesc('generation')
+            ->first();
+
+        if ($attempt === null) {
+            return null;
+        }
+
+        if ($attempt->isPaid()) {
+            return 'Die Bestellung ist bereits bezahlt. Eine Stornierung ist kein Erstattungsweg.';
+        }
+
+        $paymentId = $attempt->mollie_payment_id;
+        if (! is_string($paymentId) || $paymentId === '') {
+            if (in_array($attempt->status, [
+                MolliePaymentAttempt::STATUS_CREATING,
+                MolliePaymentAttempt::STATUS_AMBIGUOUS,
+            ], true)) {
+                return 'Für diese Bestellung liegt ein ungeklärter Mollie-Zahlungsversuch vor. Bitte zuerst abstimmen; der Bestellstatus wurde nicht geändert.';
+            }
+
+            return null;
+        }
+
+        $mollie = app(MolliePaymentService::class);
+        $mollieCheckout = app(MollieCheckoutService::class);
+
+        try {
+            $payment = $mollie->getPayment($paymentId);
+            $status = $payment['status'] ?? null;
+
+            if ($status === MolliePaymentAttempt::STATUS_PAID) {
+                return 'Die Bestellung ist bereits bezahlt. Eine Stornierung ist kein Erstattungsweg.';
+            }
+
+            if (in_array($status, [
+                MolliePaymentAttempt::STATUS_CANCELED,
+                MolliePaymentAttempt::STATUS_FAILED,
+                MolliePaymentAttempt::STATUS_EXPIRED,
+            ], true)) {
+                $mollieCheckout->applyVerifiedPayment($attempt, $payment);
+
+                return null;
+            }
+
+            if (($payment['is_cancelable'] ?? false) !== true) {
+                return 'Die Mollie-Zahlung kann in ihrem aktuellen Status nicht storniert werden. Der Bestellstatus wurde nicht geändert; bitte die Zahlung in Mollie prüfen.';
+            }
+
+            $result = $mollie->cancelPayment($paymentId);
+            if (($result['status'] ?? null) !== MolliePaymentAttempt::STATUS_CANCELED) {
+                Log::warning('order.cancel.mollie_payment_not_cancelled', [
+                    'order_id' => (string) $order->getKey(),
+                    'payment_id' => $paymentId,
+                    'payment_status' => $result['status'] ?? null,
+                ]);
+
+                return 'Die Stornierung konnte bei Mollie nicht abgeschlossen werden. Der Bestellstatus wurde nicht geändert.';
+            }
+
+            $mollieCheckout->applyVerifiedPayment($attempt->refresh(), $result);
+        } catch (MolliePaymentException $exception) {
+            Log::warning('order.cancel.mollie_payment_not_cancelled', [
+                'order_id' => (string) $order->getKey(),
+                'payment_id' => $paymentId,
+                'reason' => $exception->reason,
+            ]);
+
+            return 'Die Stornierung konnte bei Mollie nicht abgeschlossen werden. Der Bestellstatus wurde nicht geändert.';
+        }
+
+        return null;
+    }
+
+    /**
      * Guard for the transition to `paid`.
      *
      * `paid` is download-eligible (PurchaseService::DOWNLOAD_ELIGIBLE_STATUSES),
@@ -195,14 +361,11 @@ class OrderController extends Controller
             ];
         }
 
-        // No invoice and no Stripe intent: nothing confirms a payment, so the
-        // status write would be a pure access grant.
+        // No invoice and no provider payment: nothing confirms a payment, so
+        // the status write would be a pure access grant.
         $paymentIntentId = $order->stripe_payment_intent_id;
         if (! is_string($paymentIntentId) || trim($paymentIntentId) === '') {
-            return [
-                'status' => 422,
-                'error' => 'paid kann nur aus der Rechnungskette oder bei einer von Stripe bestätigten Zahlung gesetzt werden.',
-            ];
+            return $this->molliePaidTransitionVerification($order);
         }
 
         $paymentIntentId = trim($paymentIntentId);
@@ -235,6 +398,69 @@ class OrderController extends Controller
         return [
             'status' => 422,
             'error' => 'paid kann nur aus der Rechnungskette oder bei einer von Stripe bestätigten Zahlung gesetzt werden.',
+        ];
+    }
+
+    /**
+     * Verify the Mollie attempt before an admin write grants `paid` access.
+     *
+     * The attempt's own paid state is only trusted after it was set by the
+     * verified provider transition; an attempt with a provider id is re-read
+     * so a locally stale state can never be the proof.
+     *
+     * @return array{status: int, error: string}|null
+     */
+    private function molliePaidTransitionVerification(Order $order): ?array
+    {
+        $attempt = MolliePaymentAttempt::query()
+            ->forOrder($order)
+            ->orderByDesc('generation')
+            ->first();
+
+        if ($attempt === null) {
+            return [
+                'status' => 422,
+                'error' => 'paid kann nur aus der Rechnungskette oder bei einer vom Zahlungsanbieter bestätigten Zahlung gesetzt werden.',
+            ];
+        }
+
+        if ($attempt->isPaid()) {
+            return null;
+        }
+
+        $paymentId = $attempt->mollie_payment_id;
+        if (! is_string($paymentId) || $paymentId === '') {
+            return [
+                'status' => 422,
+                'error' => 'paid kann nur aus der Rechnungskette oder bei einer vom Zahlungsanbieter bestätigten Zahlung gesetzt werden.',
+            ];
+        }
+
+        $mollie = app(MolliePaymentService::class);
+
+        try {
+            $payment = $mollie->getPayment($paymentId);
+            if (($payment['status'] ?? null) === MolliePaymentAttempt::STATUS_PAID
+                && ($payment['amount_cents'] ?? null) === (int) $attempt->amount_cents
+                && strtoupper((string) ($payment['currency'] ?? '')) === 'EUR') {
+                return null;
+            }
+        } catch (MolliePaymentException $exception) {
+            Log::warning('order.paid.mollie_lookup_failed', [
+                'order_id' => (string) $order->getKey(),
+                'attempt_id' => (string) $attempt->getKey(),
+                'reason' => $exception->reason,
+            ]);
+
+            return [
+                'status' => 502,
+                'error' => 'Die Zahlung konnte bei Mollie nicht geprüft werden. Der Bestellstatus wurde nicht geändert.',
+            ];
+        }
+
+        return [
+            'status' => 422,
+            'error' => 'paid kann nur aus der Rechnungskette oder bei einer vom Zahlungsanbieter bestätigten Zahlung gesetzt werden.',
         ];
     }
 

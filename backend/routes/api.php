@@ -28,6 +28,7 @@ use App\Http\Controllers\ModelInviteController;
 use App\Http\Controllers\ModelManagementController;
 use App\Http\Controllers\ModelProfileAccessController;
 use App\Http\Controllers\ModelRegistrationController;
+use App\Http\Controllers\MollieWebhookController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrgController;
@@ -126,6 +127,12 @@ if (app()->environment('local', 'testing')) {
 // the counting primitive is the count-first one.
 Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe'])->name('api.webhooks.stripe')->middleware(AtomicThrottleRequests::class.':10,1');
 
+// Mollie posts only the payment id here; the controller fetches the payment
+// with the server credential before any transition. The budget is wider than
+// the Stripe ingress because one checkout can produce several legitimate
+// state notifications, and the endpoint is idempotent and provider-fetched.
+Route::post('/webhooks/mollie', [MollieWebhookController::class, 'handle'])->name('api.webhooks.mollie')->middleware(AtomicThrottleRequests::class.':60,1');
+
 // D-36: SFTPGo posts one filesystem event per uploaded file here; the endpoint
 // resolves the account and enqueues the background import. Deliberately outside
 // `throttle:api`: an ordinary shooting is a burst of dozens of events within a
@@ -219,6 +226,7 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::post('/photos/{id}/revert/{versionId}', [PhotoController::class, 'revertMetadata'])->name('api.photos.revert');
     Route::post('/orders/checkout', [CheckoutController::class, 'checkout'])->name('api.orders.checkout');
     Route::get('/orders/{id}', [OrderController::class, 'show'])->name('api.orders.show');
+    Route::get('/orders/{id}/payment-status', [OrderController::class, 'paymentStatus'])->name('api.orders.payment-status');
     Route::get('/orders', [OrderController::class, 'index'])->name('api.orders.index');
     Route::get('/orders/{id}/invoice', [InvoiceDownloadController::class, 'downloadInvoice'])->name('api.orders.invoice');
     Route::middleware('throttle:'.config('app.throttle_zip_download', 3).',1')->get('/orders/{id}/download-zip', [PhotoDownloadController::class, 'downloadOrderZip'])->name('api.orders.download-zip');

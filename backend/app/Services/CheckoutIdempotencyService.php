@@ -62,6 +62,17 @@ class CheckoutIdempotencyService
      */
     public function findPositiveStripeOrderByKey(User $user, string $key): ?Order
     {
+        return $this->findPositiveOnlineOrderByKey($user, $key, 'stripe');
+    }
+
+    /**
+     * Find only the exact-key, positive-value online order of one provider
+     * that may safely be resumed before coupon revalidation. Invoice, quote,
+     * free and legacy orders do not enter this fast path, and a provider never
+     * resumes another provider's claim.
+     */
+    public function findPositiveOnlineOrderByKey(User $user, string $key, string $paymentMethod): ?Order
+    {
         $query = Order::query()
             ->ownedBy($user)
             ->with('invoiceSnapshot')
@@ -70,6 +81,7 @@ class CheckoutIdempotencyService
             ->where('is_quote_request', false)
             ->where('total_amount', '>', 0)
             ->whereNotNull('checkout_fingerprint');
+        $this->scopeToProvider($query, $paymentMethod);
         // A positive immediate claim is actionable only inside the active
         // host brand. Legacy null-brand rows must not be promoted into a
         // current-brand replay; the resolver applies the same fail-closed rule
@@ -86,6 +98,18 @@ class CheckoutIdempotencyService
      * revalidation can block a lost-key recovery.
      */
     public function findPositiveStripeOrderByFingerprint(
+        User $user,
+        Request $request,
+        string $paymentMethod,
+    ): ?Order {
+        return $this->findPositiveOnlineOrderByFingerprint($user, $request, $paymentMethod);
+    }
+
+    /**
+     * Find a positive online order of one provider by recomputing the
+     * canonical fingerprint with each persisted server total.
+     */
+    public function findPositiveOnlineOrderByFingerprint(
         User $user,
         Request $request,
         string $paymentMethod,
@@ -107,6 +131,7 @@ class CheckoutIdempotencyService
             ->latest('id')
             ->limit(50);
         $query->where('brand', $brand);
+        $this->scopeToProvider($query, $paymentMethod);
 
         foreach ($query->get() as $order) {
             $fingerprint = $this->fingerprint(
@@ -169,7 +194,7 @@ class CheckoutIdempotencyService
         // Validate the opaque key before doing any exact-key lookup.
         $seed = $this->identify($request, $user, null, $paymentMethod);
         $candidate = $this->findOrderForIdentity($user, $seed['key'], '', false);
-        if ($candidate === null || $this->isImmediateStripeClaim($candidate)) {
+        if ($candidate === null || $this->isImmediateOnlineClaim($candidate)) {
             return null;
         }
 
@@ -183,7 +208,7 @@ class CheckoutIdempotencyService
                 $identity['fingerprint'],
                 function () use ($user, $identity, $finalizer): ?JsonResponse {
                     $order = $this->findOrderForIdentity($user, $identity['key'], $identity['fingerprint'], false);
-                    if ($order === null || $this->isImmediateStripeClaim($order)) {
+                    if ($order === null || $this->isImmediateOnlineClaim($order)) {
                         return null;
                     }
 
@@ -359,6 +384,104 @@ class CheckoutIdempotencyService
     }
 
     /**
+     * Execute a positive-value online checkout whose provider state lives in a
+     * dedicated attempt ledger (Mollie).
+     *
+     * The order identity (owner, brand, key, fingerprint, persisted amount) is
+     * the only replay boundary. How an existing pending order is resumed is
+     * decided by the provider service, never by this resolver.
+     *
+     * @param  Closure(?Order): JsonResponse  $creator
+     */
+    public function executeOnline(
+        User $user,
+        string $key,
+        string $fingerprint,
+        int $amountCents,
+        string $paymentMethod,
+        Closure $creator,
+        bool $allowFingerprintFallback = true,
+    ): JsonResponse {
+        try {
+            return $this->withIdentityLocks(
+                $user,
+                $key,
+                $fingerprint,
+                function () use ($user, $key, $fingerprint, $amountCents, $paymentMethod, $creator, $allowFingerprintFallback): JsonResponse {
+                    $order = $this->findOrderForIdentity($user, $key, $fingerprint, $allowFingerprintFallback);
+
+                    if ($order === null) {
+                        try {
+                            return $creator(null);
+                        } catch (UniqueConstraintViolationException $exception) {
+                            $claimedOrder = $this->findOrderForIdentity($user, $key, $fingerprint, false);
+                            if ($claimedOrder === null) {
+                                if ($this->hasOwnedKeyOutsideCurrentBrand($user, $key)) {
+                                    return $this->conflict('Dieser Checkout-Versuch gehört zu einer anderen Marke.');
+                                }
+
+                                throw $exception;
+                            }
+
+                            return $this->resolveOnlineOrder(
+                                $claimedOrder,
+                                $fingerprint,
+                                $amountCents,
+                                $paymentMethod,
+                                $creator,
+                            );
+                        }
+                    }
+
+                    return $this->resolveOnlineOrder($order, $fingerprint, $amountCents, $paymentMethod, $creator);
+                },
+            );
+        } catch (LockTimeoutException) {
+            return response()->json([
+                'error' => 'Ein identischer Checkout läuft bereits. Bitte versuche es in wenigen Sekunden erneut.',
+            ], 409);
+        }
+    }
+
+    /**
+     * @param  Closure(?Order): JsonResponse  $creator
+     */
+    private function resolveOnlineOrder(
+        Order $order,
+        string $fingerprint,
+        int $amountCents,
+        string $paymentMethod,
+        Closure $creator,
+    ): JsonResponse {
+        if (! $this->positiveOnlineOrderMatchesActiveBrand($order)
+            || ! is_string($order->checkout_fingerprint)
+            || ! hash_equals($order->checkout_fingerprint, $fingerprint)
+            || (int) $order->total_amount !== $amountCents) {
+            return $this->conflict('Dieser Checkout-Versuch wurde bereits mit anderen Daten verwendet.');
+        }
+
+        if ($order->status === 'paid') {
+            return $this->successfulReplay($order);
+        }
+
+        if ($order->status !== 'pending_payment') {
+            return $this->conflict('Dieser Checkout-Versuch ist bereits abgeschlossen. Bitte aktualisiere den Warenkorb und versuche es erneut.');
+        }
+
+        // A PaymentIntent claim belongs exclusively to the Stripe state
+        // machine, and a Mollie attempt ledger exclusively to Mollie. A resume
+        // must never reinterpret the other provider's claim.
+        if ($paymentMethod !== 'stripe' && $order->stripe_payment_intent_id !== null) {
+            return $this->conflict('Dieser Checkout-Versuch ist bereits abgeschlossen. Bitte aktualisiere den Warenkorb und versuche es erneut.');
+        }
+        if ($paymentMethod !== 'mollie' && $order->molliePaymentAttempts()->exists()) {
+            return $this->conflict('Dieser Checkout-Versuch ist bereits abgeschlossen. Bitte aktualisiere den Warenkorb und versuche es erneut.');
+        }
+
+        return $creator($order);
+    }
+
+    /**
      * @param  Closure(?Order): JsonResponse  $creator
      */
     private function resolveNonImmediateExistingOrder(
@@ -443,7 +566,7 @@ class CheckoutIdempotencyService
         int $amountCents,
         ?Closure $creator,
     ): ?JsonResponse {
-        if (! $this->positiveStripeOrderMatchesActiveBrand($order)
+        if (! $this->positiveOnlineOrderMatchesActiveBrand($order)
             || ! hash_equals((string) $order->checkout_fingerprint, $fingerprint)) {
             return $this->conflict('Dieser Checkout-Versuch wurde bereits mit anderen Daten verwendet.');
         }
@@ -648,7 +771,25 @@ class CheckoutIdempotencyService
         return $query->where('brand', $currentBrand);
     }
 
-    private function positiveStripeOrderMatchesActiveBrand(Order $order): bool
+    /**
+     * A provider never resumes the other provider's claim. An order with a
+     * Stripe PaymentIntent is Stripe state; a Mollie attempt row is Mollie
+     * state. Historical rows without either link keep the pre-V053 behaviour.
+     */
+    private function scopeToProvider(Builder $query, string $paymentMethod): Builder
+    {
+        if ($paymentMethod === 'mollie') {
+            return $query->whereNull('stripe_payment_intent_id');
+        }
+
+        if ($paymentMethod === 'stripe') {
+            return $query->whereDoesntHave('molliePaymentAttempts');
+        }
+
+        return $query->whereRaw('1 = 0');
+    }
+
+    private function positiveOnlineOrderMatchesActiveBrand(Order $order): bool
     {
         $currentBrand = BrandRegistry::currentIdOrNull();
         $orderBrand = BrandRegistry::normalizeId($order->brand);
@@ -692,14 +833,15 @@ class CheckoutIdempotencyService
             ->exists();
     }
 
-    private function isImmediateStripeClaim(Order $order): bool
+    private function isImmediateOnlineClaim(Order $order): bool
     {
         if ((bool) $order->is_quote_request || (int) $order->total_amount <= 0) {
             return false;
         }
 
         return $order->status === 'pending_payment'
-            || ($order->status === 'paid' && $order->stripe_payment_intent_id !== null);
+            || ($order->status === 'paid'
+                && ($order->stripe_payment_intent_id !== null || $order->molliePaymentAttempts()->exists()));
     }
 
     private function findOrderForIdentity(

@@ -232,6 +232,15 @@ services:
       - STRIPE_CHECKOUT_ENABLED=${STRIPE_CHECKOUT_ENABLED:-true}
       - STRIPE_STALE_PAYMENT_INTENT_HOURS=${STRIPE_STALE_PAYMENT_INTENT_HOURS:-2}
       - STRIPE_CUSTOMERS_ENABLED=${STRIPE_CUSTOMERS_ENABLED:-true}
+      # Mollie ist der Anbieter fuer neue Online-Zahlungen (Issue #53). Fehlt
+      # MOLLIE_KEY oder MOLLIE_PAYMENT_METHOD, verweigert der Checkout die
+      # Zahlungserstellung (503) statt auf Stripe zurueckzufallen. Das Webhook
+      # muss von Mollie aus ueber HTTPS erreichbar sein.
+      - MOLLIE_KEY=${MOLLIE_KEY:-}
+      - MOLLIE_PAYMENT_METHOD=${MOLLIE_PAYMENT_METHOD:-}
+      - MOLLIE_WEBHOOK_URL=${MOLLIE_WEBHOOK_URL:-}
+      - MOLLIE_IDEMPOTENCY_WINDOW_MINUTES=${MOLLIE_IDEMPOTENCY_WINDOW_MINUTES:-60}
+      - MOLLIE_MAX_ATTEMPTS=${MOLLIE_MAX_ATTEMPTS:-5}
       - PROXY_DELIVERY_HEADER=${PROXY_DELIVERY_HEADER}
       - PHOTO_STORAGE_PATH=${PHOTO_STORAGE_PATH}
       - AI_ENABLED=${AI_ENABLED}

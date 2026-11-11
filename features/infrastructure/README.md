@@ -27,3 +27,4 @@
 * [Volume-Licensing-Presets](27-volume-licensing-presets.md)
 * [CI/test image](28-ci-test-image.md)
 * [Production operations runbook](29-production-operations-runbook.md)
+* [Mollie payments](30-mollie-payments.md) - checkout contract, attempt ledger (V053), webhook/reconciliation, customer return UI, cutover gates

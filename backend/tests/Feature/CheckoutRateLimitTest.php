@@ -20,12 +20,13 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
-use Tests\Support\MocksStripeClient;
+use Mollie\Api\Http\Requests\CreatePaymentRequest;
+use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
 class CheckoutRateLimitTest extends TestCase
 {
-    use MocksStripeClient;
+    use FakesMollie;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -183,7 +184,12 @@ class CheckoutRateLimitTest extends TestCase
 
         $proxyIp = '198.51.100.44';
         $clientIp = '203.0.113.44';
-        $this->mockStripePaymentIntentSuccess();
+        // A new online checkout is a Mollie checkout; the provider answer is
+        // faked so this test asserts the quota buckets, not the provider.
+        $this->configureMollie();
+        $this->fakeMollie([
+            CreatePaymentRequest::class => $this->mollieCreateResponder(),
+        ]);
 
         try {
             $response = $this
@@ -218,7 +224,7 @@ class CheckoutRateLimitTest extends TestCase
             $this->assertSame(0, RateLimiter::attempts(CheckoutKey::ip($proxyIp, 'checkout-quota-day')));
             $this->assertSame(0, RateLimiter::attempts(CheckoutKey::ip($proxyIp, 'checkout-risk-attempt')));
         } finally {
-            $this->resetStripeHttpClient();
+            $this->disablesMollie();
         }
     }
 

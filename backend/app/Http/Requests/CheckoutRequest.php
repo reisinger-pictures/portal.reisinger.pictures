@@ -27,7 +27,7 @@ class CheckoutRequest extends FormRequest
             'billing_street' => 'required|string|max:255',
             'billing_zip' => 'required|string|max:20',
             'billing_city' => 'required|string|max:255',
-            'payment_method' => 'nullable|string|in:stripe,invoice',
+            'payment_method' => 'nullable|string|in:mollie,invoice',
             'turnstile_token' => 'nullable|string|max:2048',
             'quote_message' => 'nullable|string',
             'withdrawal_waived' => 'required|boolean',

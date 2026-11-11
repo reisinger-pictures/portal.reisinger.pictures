@@ -1,19 +1,20 @@
 import { expect, test } from '@playwright/test';
 import { AuthHelper } from '../helpers/AuthHelper';
-import { CreditCardHelper } from '../helpers/CreditCardHelper';
 import { E2ESessionHelper } from '../helpers/E2ESessionHelper';
 import { FormHelper } from '../helpers/FormHelper';
 import { GalleryHelper } from '../helpers/GalleryHelper';
 import { PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock } from '../helpers/GlobalSettingsLock';
+import { MOLLIE_PROVIDER_SKIP_REASON, mollieCheckoutConfigured } from '../helpers/MollieE2E';
 import { ModalHelper } from '../helpers/ModalHelper';
 import { SidebarHelper } from '../helpers/SidebarHelper';
-import { StripeHelper } from '../helpers/StripeHelper';
 import { UploadHelper } from '../helpers/UploadHelper';
 import {browserAuthHeaders} from '../helpers/BrowserAuthHeaders';
 
 test.describe('Quote Checkout Workflow', () => {
-    // CI-Flakiness-Schutz: Stripe-API ist von CI-Runner-IPs zeitweise nicht
-    // erreichbar (Rate-Limit / ApiConnection). Local passen diese Tests stabil.
+    // A quote checkout is a new online payment and therefore ends on Mollie's
+    // hosted page: the journey needs a configured test account, and the
+    // fulfilment half (provider confirmation, invoice, paid order) is covered by
+    // the backend fakes, not by a browser that cannot complete a hosted payment.
     test.describe.configure({ retries: 2 });
 
     let helper: E2ESessionHelper;
@@ -32,9 +33,8 @@ test.describe('Quote Checkout Workflow', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Client completes Stripe checkout with quote token', { tag: ['@feature:quote', '@regression'] }, async ({ page, request }) => {
-        // The UI waits for the same owner-scoped order status poll (up to 60s)
-        // that production uses before reporting a successful payment.
+    test('Client submits a quote checkout to the hosted provider checkout', { tag: ['@feature:quote', '@regression'] }, async ({ page, request }) => {
+        test.skip(!mollieCheckoutConfigured(), MOLLIE_PROVIDER_SKIP_REASON);
         test.setTimeout(120000);
         const auth = new AuthHelper(page);
         const modal = new ModalHelper(page);
@@ -126,6 +126,14 @@ test.describe('Quote Checkout Workflow', () => {
 
         await expect(page.getByRole('button', { name: 'Zahlungspflichtig bestellen' })).toBeEnabled({ timeout: 5000 });
 
+        await page.route('https://www.mollie.com/**', async route => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'text/html',
+                body: '<!doctype html><html lang="de"><head><title>Mollie Test-Zahlungsseite</title></head><body><h1>Mollie Test-Zahlungsseite</h1></body></html>',
+            });
+        });
+
         const checkoutPromise = page.waitForResponse(res => res.url().includes('/api/orders/checkout') && res.request().method() === 'POST');
         await page.getByRole('button', { name: 'Zahlungspflichtig bestellen' }).click();
 
@@ -136,68 +144,11 @@ test.describe('Quote Checkout Workflow', () => {
         const orderId: string = checkoutData.order_id;
         expect(orderId).toBeTruthy();
 
-        // --- 5. Stripe-Zahlung (Visa 4242) ---
-        const main = page.getByRole('main');
-        await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({ timeout: 15000 });
-
-        const stripeFrames = await StripeHelper.resolveStripeIframes(page);
-
-        await StripeHelper.fillStripeForm(page, CreditCardHelper.successVisa, stripeFrames);
-        await expect(page.getByRole('button', { name: 'Jetzt bezahlen' })).toBeEnabled({ timeout: 10000 });
-        const payButton = page.getByRole('button', { name: 'Jetzt bezahlen' });
-        const paidOrderResponsePromise = page.waitForResponse(async response => {
-            const responseUrl = new URL(response.url());
-            if (responseUrl.pathname !== `/api/orders/${orderId}` || response.request().method() !== 'GET') {
-                return false;
-            }
-            if (!response.ok()) return false;
-
-            const order: unknown = await response.json();
-            return typeof order === 'object'
-                && order !== null
-                && (order as { status?: unknown }).status === 'paid';
-        }, { timeout: 60000 });
-        await payButton.evaluate(el => (el as HTMLButtonElement).click());
-
-        // The disposable E2E stack does not deliver webhooks, so the real order
-        // still has to be moved through the management API and the browser keeps
-        // polling the actual order resource; the polling/refresh contract itself
-        // remains covered by StripeCheckoutForm Vitest.
-        //
-        // That route is not a status override any more: since the PAY-3 guard it
-        // accepts `paid` only from the invoice chain or when Stripe reports this
-        // order's PaymentIntent as `succeeded`. The payment above is real, so the
-        // guard passes as soon as Stripe has settled it — which is asynchronous
-        // even though the iframe already returned. The PUT is therefore repeated
-        // until the guard confirms the payment; its 422 means "not settled yet",
-        // not "not allowed". Nothing is asserted away: the route still verifies
-        // the payment against Stripe on every attempt. Any other rejection (e.g.
-        // the fail-closed 502 when Stripe cannot be reached) is retried too, but
-        // never accepted: the bounded window ends in a failure that carries the
-        // last status and body.
-        let lastPaidAttempt = '';
-        await expect(async () => {
-            const paidResponse = await request.put(`/api/management/orders/${orderId}/status`, {
-                data: {status: 'paid'},
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    Cookie: helper.getAdminToken(), ...browserAuthHeaders(helper.getAdminToken()),
-                },
-            });
-            lastPaidAttempt = `${paidResponse.status()} ${await paidResponse.text()}`;
-            expect(
-                paidResponse.status(),
-                `Der Bestellstatus wurde nicht auf paid gesetzt: ${lastPaidAttempt}`,
-            ).toBe(200);
-        }).toPass({timeout: 45000, intervals: [1000, 2000, 3000]});
-
-        // Stripe confirmation precedes the server-authoritative paid state.
-        // Wait for the authenticated status poll before checking the success toast.
-        await paidOrderResponsePromise;
-        await expect(page.getByRole('alert').filter({hasText: /Zahlung erfolgreich/i})).toBeVisible({ timeout: 15000 });
-
-        await expect(page).toHaveURL(/.*\/orders/, { timeout: 15000 });
-        await expect(page.getByRole('main').getByRole('heading', {name: 'Meine Einkäufe & Lizenzen'})).toBeVisible();
+        // --- 5. Weiterleitung zur gehosteten Zahlungsseite -------------------
+        // Ein Angebot mit Festpreis ist eine sofortige Online-Zahlung. Die
+        // Zahlung findet ausschließlich auf der Seite des Zahlungsdienstleisters
+        // statt; der Browser verlässt dafür die SPA (Top-Level-Navigation).
+        expect(checkoutData.checkout_url).toMatch(/^https:\/\/www\.mollie\.com\//);
+        await expect(page).toHaveURL(/^https:\/\/www\.mollie\.com\//, { timeout: 20000 });
     });
 });

@@ -98,6 +98,34 @@ Drei Fallen, alle drei belegt:
 Gegenprobe nach dem Deploy: im Dashboard beim Endpunkt **„Send test webhook"** →
 **HTTP 200** heißt Signatur stimmt, **400** heißt der `whsec` passt nicht.
 
+> **Status 2026-11-11:** Stripe ist für **neue** Online-Zahlungen abgelöst
+> (Issue #53). Die Werte bleiben nur für historische Bestellungen lesbar; es
+> gibt keinen Parallelbetrieb und keinen Rückfall auf Stripe. Neue Zahlungen
+> laufen über Mollie (nächster Abschnitt).
+
+### Mollie (Live) — Anbieter für neue Online-Zahlungen
+
+Der Backend-Container liest vier Werte aus der Host-`.env`
+(Contract: `features/infrastructure/30-mollie-payments.md`):
+
+| Variable | Form | Bedeutung |
+|---|---|---|
+| `MOLLIE_KEY` | `live_…` / `test_…` | serverseitiger API-Key; sein Präfix wählt den Modus |
+| `MOLLIE_PAYMENT_METHOD` | z. B. `creditcard` | genau eine freigeschaltete Methode; leer = Checkout bleibt aus |
+| `MOLLIE_WEBHOOK_URL` | `https://…/api/webhooks/mollie` | von Mollie aus erreichbar; leer nutzt `APP_URL` |
+| `MOLLIE_IDEMPOTENCY_WINDOW_MINUTES` | `60` | Fenster, in dem ein hängengebliebenes Create wiederholt werden darf |
+
+Fehlt `MOLLIE_KEY` oder `MOLLIE_PAYMENT_METHOD`, antwortet der Checkout mit
+**503** und legt keine Zahlung an — fail closed, kein Stripe-Fallback. Vor der
+Live-Freigabe sind Kontofreischaltung, Methode und Gebühren zu entscheiden
+(Issue #54) und ein Testmodus-Durchlauf nachzuweisen (Issue #55).
+
+Das Webhook-Ziel muss über HTTPS erreichbar sein; Mollie sendet nur die
+Payment-ID, den Status holt das Backend authentifiziert nach. Keine
+IP-Allowlist, kein Embedding — der Kunde wird auf die gehostete Seite
+weitergeleitet. Deshalb braucht die CSP keine neuen `script`/`frame`/`connect`
+Quellen.
+
 ### FTP-Upload-Events (D-36) — interner Listener und Provisionierung
 
 Der automatische FTP-Import wird von einem SFTPGo-**Filesystem-Event** ausgelöst.

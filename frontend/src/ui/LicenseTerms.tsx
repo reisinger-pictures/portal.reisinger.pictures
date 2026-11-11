@@ -30,7 +30,7 @@ export default function LicenseTerms() {
 
                     <h2 className="text-2xl font-bold mt-8 mb-4"><Trans>4. Preise und Zahlungsbedingungen</Trans></h2>
                     <p>
-                        <Trans>Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Kreditkarte (über den Zahlungsdienstleister Stripe) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt.</Trans>
+                        <Trans>Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Online-Zahlung (über den Zahlungsdienstleister Mollie) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt.</Trans>
                     </p>
 
                     <h2 className="text-2xl font-bold mt-8 mb-4"><Trans>5. Lieferung digitaler Inhalte</Trans></h2>

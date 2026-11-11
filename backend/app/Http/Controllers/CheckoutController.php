@@ -33,7 +33,7 @@ class CheckoutController extends Controller
             return response()->json(['error' => __('messages.upgrade_not_allowed')], 403);
         }
 
-        $paymentMethod = $request->payment_method ?? 'stripe';
+        $paymentMethod = $request->payment_method ?? 'mollie';
         if ($paymentMethod === 'invoice' && Gate::denies('purchase-on-invoice')) {
             return response()->json(['error' => 'Kauf auf Rechnung nicht erlaubt.'], 403);
         }

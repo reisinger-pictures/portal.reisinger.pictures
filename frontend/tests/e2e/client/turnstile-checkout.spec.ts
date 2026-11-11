@@ -6,6 +6,7 @@ import {FormHelper} from '../helpers/FormHelper';
 import {GalleryHelper} from '../helpers/GalleryHelper';
 import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
 import {ModalHelper} from '../helpers/ModalHelper';
+import {MOLLIE_PROVIDER_SKIP_REASON, mollieCheckoutConfigured} from '../helpers/MollieE2E';
 import {SidebarHelper} from '../helpers/SidebarHelper';
 import {UploadHelper} from '../helpers/UploadHelper';
 import type {TurnstileRenderOptions} from '../../../src/ui/client/components/TurnstileWidget';
@@ -56,6 +57,7 @@ test.describe('Risk-triggered Turnstile checkout', () => {
     test('third checkout attempt renders Turnstile and submits its one-time token', {
         tag: ['@regression', '@feature:client:checkout', '@feature:card-testing']
     }, async ({page, request}) => {
+        test.skip(!mollieCheckoutConfigured(), MOLLIE_PROVIDER_SKIP_REASON);
         await page.addInitScript(({token, statusText}: TurnstileInitScriptArgument) => {
             const render = (container: HTMLElement | string, options: TurnstileRenderOptions): string => {
                 const element = typeof container === 'string'
@@ -130,7 +132,7 @@ test.describe('Risk-triggered Turnstile checkout', () => {
                 billing_street: 'Teststraße 42',
                 billing_zip: '1010',
                 billing_city: 'Wien',
-                payment_method: 'stripe',
+                payment_method: 'mollie',
                 quote_message: '',
                 withdrawal_waived: true,
                 coupon_code: null
@@ -187,6 +189,17 @@ test.describe('Risk-triggered Turnstile checkout', () => {
             await expect(turnstileStatus).toHaveText(TURNSTILE_TEST_STATUS);
             await expect(checkoutButton).toBeEnabled({timeout: 15000});
 
+            // The accepted attempt leaves the SPA for the provider's hosted
+            // checkout. The page is stubbed so the navigation stays inside the
+            // test; what matters here is that the risk gate no longer answers.
+            await page.route('https://www.mollie.com/**', async route => {
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'text/html',
+                    body: '<!doctype html><html lang="de"><head><title>Mollie Test-Zahlungsseite</title></head><body><h1>Mollie Test-Zahlungsseite</h1></body></html>',
+                });
+            });
+
             const verifiedRequestPromise = page.waitForRequest(request => (
                 request.url().includes('/api/orders/checkout') && request.method() === 'POST'
             ));
@@ -203,8 +216,9 @@ test.describe('Risk-triggered Turnstile checkout', () => {
             expect(verifiedRequest.headers()['idempotency-key']).toBe(initialRequest.headers()['idempotency-key']);
             const verifiedPayload = verifiedRequest.postDataJSON() as Record<string, unknown>;
             expect(verifiedPayload.turnstile_token).toBe(TURNSTILE_TEST_TOKEN);
-            await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({timeout: 15000});
-            await expect(main.getByRole('heading', {name: 'Sicherheitsprüfung'})).toHaveCount(0);
+            const verifiedBody = await verifiedResponse.json() as {checkout_url?: string};
+            expect(verifiedBody.checkout_url).toMatch(/^https:\/\/www\.mollie\.com\//);
+            await expect(page).toHaveURL(/^https:\/\/www\.mollie\.com\//, {timeout: 20000});
         });
     });
 });

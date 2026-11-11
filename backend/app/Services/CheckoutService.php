@@ -39,6 +39,8 @@ class CheckoutService
 
     private StripePaymentService $stripePayment;
 
+    private MollieCheckoutService $mollieCheckout;
+
     private CouponService $couponService;
 
     private CheckoutEligibilityService $checkoutEligibility;
@@ -60,9 +62,11 @@ class CheckoutService
         ?CheckoutIdempotencyService $checkoutIdempotency = null,
         ?StripeCheckoutKillSwitch $checkoutKillSwitch = null,
         ?InvoiceMailDispatcher $invoiceMailDispatcher = null,
+        ?MollieCheckoutService $mollieCheckout = null,
     ) {
         $this->strategy = $strategy;
         $this->stripePayment = $stripePayment ?? app(StripePaymentService::class);
+        $this->mollieCheckout = $mollieCheckout ?? app(MollieCheckoutService::class);
         $this->couponService = $couponService ?? app(CouponService::class);
         $this->checkoutEligibility = $checkoutEligibility ?? app(CheckoutEligibilityService::class);
         $this->checkoutRisk = $checkoutRisk ?? app(CheckoutRiskService::class);
@@ -136,6 +140,103 @@ class CheckoutService
             $isPotentialImmediateStripe = ! $isQuoteRequest
                 && $paymentMethod === 'stripe'
                 && ! ($org && $org->invoice_frequency !== 'immediate');
+            // New online payments are Mollie-only. `stripe` is not accepted by
+            // CheckoutRequest anymore; the retained Stripe branch above exists
+            // only for the historical regression suite and never for a new API
+            // checkout.
+            $isPotentialImmediateMollie = ! $isQuoteRequest
+                && $paymentMethod === 'mollie'
+                && ! ($org && $org->invoice_frequency !== 'immediate');
+
+            // An exact-key or lost-key positive-value order can be resumed
+            // before coupon revalidation. New carts, including carts that later
+            // become free through a 100% discount, must be priced before the
+            // account-age gate is applied.
+            if ($isPotentialImmediateMollie) {
+                $providedKey = trim((string) $request->header('Idempotency-Key', ''));
+                $preflight = null;
+                $exactKeyMatch = false;
+                $existingOrder = null;
+                if ($providedKey !== '') {
+                    // Validate the key before any exact-key lookup.
+                    $preflight = $this->checkoutIdempotency->identify(
+                        $request,
+                        $user,
+                        null,
+                        $paymentMethod,
+                    );
+                    $existingOrder = $this->checkoutIdempotency
+                        ->findPositiveOnlineOrderByKey($user, $preflight['key'], $paymentMethod);
+                    $exactKeyMatch = $existingOrder !== null
+                        && (string) $existingOrder->checkout_idempotency_key === $preflight['key'];
+                }
+
+                if ($existingOrder === null) {
+                    // Recompute the fingerprint with each persisted server
+                    // total; the client amount is never used for this lookup.
+                    // The bounded user/brand-scoped query prevents coupon
+                    // expiry/max-use from stranding a lost-key recovery.
+                    $existingOrder = $this->checkoutIdempotency
+                        ->findPositiveOnlineOrderByFingerprint($user, $request, $paymentMethod);
+                }
+
+                if ($existingOrder !== null) {
+                    $this->checkoutEligibility->assertImmediateStripeAllowed($user);
+                    $persistedAmount = (int) $existingOrder->total_amount;
+                    $identity = $this->checkoutIdempotency->identify(
+                        $request,
+                        $user,
+                        $persistedAmount,
+                        $paymentMethod,
+                    );
+
+                    return $this->checkoutIdempotency->executeOnline(
+                        $user,
+                        $identity['key'],
+                        $identity['fingerprint'],
+                        $persistedAmount,
+                        $paymentMethod,
+                        function (?Order $order) use (
+                            $request,
+                            $user,
+                            $persistedAmount,
+                            $identity,
+                            $quoteTokenPayload,
+                        ): JsonResponse {
+                            if ($order === null) {
+                                return response()->json([
+                                    'error' => 'Der Checkout konnte nicht sicher fortgesetzt werden.',
+                                ], 503);
+                            }
+
+                            // These checks run only when the existing attempt
+                            // actually needs new work; a paid replay or a
+                            // resume of an open attempt returns before this
+                            // closure.
+                            $this->checkoutKillSwitch->assertEnabled();
+                            $this->checkoutRisk->assertCheckoutQuotaAllowed($request, $user);
+                            $this->checkoutRisk->assertImmediateStripeAllowed($request, $user);
+
+                            return $this->createImmediateMollieOrderAndRespond(
+                                $order,
+                                $request,
+                                $user,
+                                null,
+                                0,
+                                $persistedAmount,
+                                false,
+                                [],
+                                null,
+                                true,
+                                $identity['key'],
+                                $identity['fingerprint'],
+                                $quoteTokenPayload,
+                            );
+                        },
+                        ! $exactKeyMatch,
+                    );
+                }
+            }
 
             // An exact-key or lost-key positive-value order can be resumed
             // before coupon revalidation. New carts, including carts that later
@@ -310,6 +411,47 @@ class CheckoutService
 
             $isImmediateStripe = $isPotentialImmediateStripe
                 && $totalNetCents > 0;
+
+            $isImmediateMollie = $isPotentialImmediateMollie
+                && $totalNetCents > 0;
+
+            if ($isImmediateMollie) {
+                $this->checkoutEligibility->assertImmediateStripeAllowed($user);
+                $amountCents = $totalNetCents;
+                $identity = $this->checkoutIdempotency->identify(
+                    $request,
+                    $user,
+                    $amountCents,
+                    $paymentMethod,
+                );
+
+                $this->checkoutKillSwitch->assertEnabled();
+                $this->checkoutRisk->assertCheckoutQuotaAllowed($request, $user);
+                $this->checkoutRisk->assertImmediateStripeAllowed($request, $user);
+
+                return $this->checkoutIdempotency->executeOnline(
+                    $user,
+                    $identity['key'],
+                    $identity['fingerprint'],
+                    $amountCents,
+                    $paymentMethod,
+                    fn (?Order $existingOrder) => $this->createImmediateMollieOrderAndRespond(
+                        $existingOrder,
+                        $request,
+                        $user,
+                        $appliedCoupon,
+                        $couponDiscountCents,
+                        $totalNetCents,
+                        $isQuoteRequest,
+                        $lineItems,
+                        $customConditions,
+                        $withdrawalWaived,
+                        $identity['key'],
+                        $identity['fingerprint'],
+                        $quoteTokenPayload,
+                    ),
+                );
+            }
 
             if ($isImmediateStripe) {
                 $this->checkoutEligibility->assertImmediateStripeAllowed($user);
@@ -1335,6 +1477,102 @@ class CheckoutService
             $order->checkout_idempotency_key,
             $order->checkout_fingerprint,
         );
+    }
+
+    /**
+     * Persist the order + invoice snapshot, then create or resume its Mollie
+     * payment. The provider call happens strictly after the snapshot commit:
+     * the persisted gross is the only amount the provider is told.
+     */
+    private function createImmediateMollieOrderAndRespond(
+        ?Order $existingOrder,
+        $request,
+        $user,
+        $appliedCoupon,
+        int $couponDiscountCents,
+        int $totalNetCents,
+        bool $isQuoteRequest,
+        array $lineItems,
+        null|string|array $customConditions,
+        bool $withdrawalWaived,
+        string $checkoutIdempotencyKey,
+        string $checkoutFingerprint,
+        ?array $quoteTokenPayload = null,
+    ): JsonResponse {
+        $order = $existingOrder;
+        if ($order !== null) {
+            $persistedKey = $order->checkout_idempotency_key;
+            $persistedFingerprint = $order->checkout_fingerprint;
+            if (! is_string($persistedKey) || $persistedKey === ''
+                || ! is_string($persistedFingerprint) || $persistedFingerprint === '') {
+                return $this->checkoutStateConflict('Die Checkout-Identität ist unvollständig.');
+            }
+            $checkoutIdempotencyKey = $persistedKey;
+            $checkoutFingerprint = $persistedFingerprint;
+        }
+
+        if ($order === null && $quoteTokenPayload !== null) {
+            // A lost-key recovery can race with the idempotency transition. If
+            // this call has to create the order, rebuild its immutable line
+            // items from the signed token instead of accepting the empty arrays
+            // used by the replay-only path above.
+            $quotePhotos = $this->assertQuotePhotosAuthorized(
+                $user,
+                $quoteTokenPayload['photos'],
+                $quoteTokenPayload['brand'],
+            );
+            $lineItems = $this->buildQuoteLineItems($quoteTokenPayload, $quotePhotos);
+            $customConditions = $quoteTokenPayload['rights_text'] ?? null;
+        }
+
+        if ($order === null) {
+            $order = DB::transaction(function () use ($request, $user, $appliedCoupon, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems, $customConditions, $withdrawalWaived, $checkoutIdempotencyKey, $checkoutFingerprint, $quoteTokenPayload) {
+                if ($quoteTokenPayload !== null) {
+                    $this->assertQuotePhotosAuthorized(
+                        $user,
+                        $quoteTokenPayload['photos'],
+                        $quoteTokenPayload['brand'],
+                    );
+                }
+
+                $user->update($request->only(['billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city']));
+
+                $appliedCouponId = null;
+                if ($appliedCoupon !== null) {
+                    [$lockedCoupon, $couponError] = $this->couponService->lockAndRevalidateCoupon($appliedCoupon, $user->id);
+                    if ($lockedCoupon === null) {
+                        throw new HttpResponseException(response()->json(['error' => $couponError], 422));
+                    }
+                    $appliedCouponId = $lockedCoupon->id;
+                }
+
+                $order = $this->createOrder(
+                    $user,
+                    $totalNetCents,
+                    $isQuoteRequest,
+                    'mollie',
+                    $appliedCouponId,
+                    $couponDiscountCents,
+                    $withdrawalWaived,
+                    $checkoutIdempotencyKey,
+                    $checkoutFingerprint,
+                    1,
+                    $request->ip(),
+                );
+
+                $this->createInvoiceSnapshot($order, $request, $user, $lineItems, $totalNetCents, $customConditions, $withdrawalWaived);
+
+                return $order;
+            });
+        } else {
+            $order->loadMissing('invoiceSnapshot');
+        }
+
+        // The first trusted checkout IP is payment evidence; capture it before
+        // the provider call so a retry never replaces it.
+        $this->captureOrderIpIfMissing($order, $request);
+
+        return $this->mollieCheckout->startOrResume($order);
     }
 
     /**

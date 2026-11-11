@@ -548,7 +548,22 @@ export interface InvoiceCustomerDetails {
 
 export interface InvoiceSnapshot { id?: string; invoice_number: string; total_gross: string | number; total_net: string | number; tax_rate: number; created_at: string; customer_details: string | InvoiceCustomerDetails; }
 export interface Order { id: string; user_id?: string; status: string; is_quote_request: boolean | number; total_net?: string | number; total_gross?: string | number; tax_rate: number; payment_method?: string; billing_name?: string; billing_company?: string; billing_street?: string; billing_zip?: string; billing_city?: string; created_at: string; updated_at: string; user?: { id?: string; name?: string; email?: string; }; invoice_snapshot?: InvoiceSnapshot; items?: OrderItem[]; }
-export interface CheckoutResponse { success?: boolean; payment_pending?: boolean; requires_action?: boolean; client_secret?: string; invoice_number?: string | null; order_id?: string; status?: string; poll_url?: string; }
+export interface CheckoutResponse { success?: boolean; payment_pending?: boolean; requires_action?: boolean; client_secret?: string; checkout_url?: string | null; invoice_number?: string | null; order_id?: string; status?: string; poll_url?: string; }
+
+/**
+ * Owner-scoped payment state of one order. `status` is the order status,
+ * `payment_status` the last verified provider attempt. The UI trusts `paid`
+ * only when the server reports it; the redirect parameters are presentation.
+ */
+export interface OrderPaymentStatus {
+    order_id: string;
+    status: string;
+    invoice_number?: string | null;
+    payment_status?: string | null;
+    payment_ambiguous?: boolean;
+    retryable?: boolean;
+    checkout_url?: string | null;
+}
 export interface RedeemInviteResponse { full_path?: string; message?: string; requires_mail_verification?: boolean; }
 export interface SendMailResponse { success: boolean; notified_count: number; }
 export interface TestEmailResponse { success: boolean; sent_to: string; }
