@@ -10,7 +10,7 @@ text is mirrored here in one machine-readable place, so it can be reviewed
 without access to the host:
 
 ```
-default-src 'self'; script-src 'self' https://js.stripe.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://*.stripe.com https://challenges.cloudflare.com; frame-src 'self' https://js.stripe.com https://*.stripe.com https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'
+default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'
 ```
 
 The authoritative copy is [`deployment/content-security-policy.txt`](../../deployment/content-security-policy.txt) — the file, not this prose. The canonical source stays the Caddy volume of `proxy-stack`; this repository holds a **readable mirror** plus a drift check (see below).
@@ -20,15 +20,30 @@ The authoritative copy is [`deployment/content-security-policy.txt`](../../deplo
 | Directive | Why the application needs it |
 |---|---|
 | `default-src 'self'` | Everything is served from the portal's own origin (the SPA and the API are same-origin, see [`csrf-strategy.md`](csrf-strategy.md)). |
-| `script-src 'self' https://js.stripe.com https://challenges.cloudflare.com` | Stripe.js is loaded from Stripe's CDN — the checkout iframe and the card testing path need it. The Cloudflare origin carries the Turnstile widget script, which the risk-based challenge loads (the challenge itself is off in production, D-55). |
+| `script-src 'self' https://challenges.cloudflare.com` | The portal serves its own bundle only. The Cloudflare origin carries the Turnstile widget script, which the risk-based challenge loads (the challenge itself is off in production, D-55). Stripe.js is no longer loaded anywhere — new online payments use Mollie's hosted page, which is a top-level navigation, not an embedded script (D-63, #60). |
 | `style-src 'self' 'unsafe-inline'` | React's inline `style` attributes and imperative style writes need it: `frontend/src/ui/components/KanbanBoard.tsx:58`, `frontend/src/ui/components/WysiwygEditor.tsx:339`, `frontend/src/logic/brandRegistry.ts:45`. Tailwind compiles at build time and injects no runtime style. |
 | `img-src 'self' data: https:` | `data:` for the generated previews (the watermark preview is a `data:` URI). The galleries deliver same-origin via `/api/media/…` (`backend/app/Models/Photo.php:177`), so the `https:` allowance has **no consumer in the code** — it is a leftover that the portal does not need and does not use. |
 | `font-src 'self'` | The portal serves its own fonts; no third-party font host. |
-| `connect-src 'self' https://*.stripe.com https://challenges.cloudflare.com` | The API calls Stripe (payment intents, card testing) — same-origin for everything else. The Cloudflare origin is the challenge's own network traffic. |
-| `frame-src 'self' https://js.stripe.com https://*.stripe.com https://challenges.cloudflare.com` | The Stripe payment iframe, the 3DS/SCA challenge frames and the Turnstile frame. |
+| `connect-src 'self' https://challenges.cloudflare.com` | Every API call is same-origin, including the Mollie checkout create and the return-page status read. The Cloudflare origin is the challenge's own network traffic. No browser code talks to a payment provider directly any more. |
+| `frame-src 'self' https://challenges.cloudflare.com` | The Turnstile frame. The Stripe card iframe and its 3DS/SCA frames are gone with the frontend integration. |
 | `object-src 'none'` | No plugins, no `<object>`, no `<embed>`. |
 | `base-uri 'self'` | A `<base>` tag may not redirect the relative URLs. |
 | `form-action 'self'` | Forms may only post to the portal's own origin — no form-action hijacking into a third party. |
+
+## Stripe origins removed (2026-11-16, #60)
+
+Once the frontend carried no Stripe code, the three Stripe origins in the policy
+became dead allowances that only widened what an injected script could load. They
+are gone: `js.stripe.com` from `script-src` and `frame-src`, `*.stripe.com` from
+`connect-src` and `frame-src`. Mollie needs **no** new origin — the portal sends
+the customer to Mollie's hosted page as a top-level navigation and reads the
+payment status server-side, so nothing is framed, scripted or fetched from the
+provider in the browser.
+
+Measured after the rollout: the served header, the mirror and the Caddyfile agree
+(`./scripts/check-csp-policy.sh` exit 0), and loading `/`, `/impressum` and
+`/widerruf` in a real browser produces no `Refused to …` console entry — only the
+401s of the unauthenticated API probes a guest always makes.
 
 ## Other policies in this repository
 
