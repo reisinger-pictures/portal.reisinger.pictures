@@ -28,6 +28,8 @@ use App\Http\Controllers\ModelInviteController;
 use App\Http\Controllers\ModelManagementController;
 use App\Http\Controllers\ModelProfileAccessController;
 use App\Http\Controllers\ModelRegistrationController;
+use App\Http\Controllers\MolliePaymentCheckController;
+use App\Http\Controllers\MollieWebhookController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrgController;
@@ -43,7 +45,6 @@ use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\StatsController;
-use App\Http\Controllers\StripeKeyCheckController;
 use App\Http\Controllers\TextSnippetController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VolumePresetController;
@@ -51,10 +52,12 @@ use App\Http\Controllers\WebhookController;
 use App\Http\Middleware\AtomicThrottleRequests;
 use App\Models\DownloadLog;
 use App\Models\InvoiceSnapshot;
+use App\Models\MolliePaymentAttempt;
 use App\Models\Order;
 use App\Models\PhotographerStatement;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 // AIS-3: the `ai-generate` limiter is registered in AppServiceProvider, not
@@ -100,14 +103,22 @@ if (app()->environment('local', 'testing')) {
     Route::delete('/test/cleanup-user/{id}', function ($id) {
         $user = User::find($id);
         if ($user) {
-            PhotographerStatement::where('user_id', $id)->delete();
-            $orderIds = Order::where('user_id', $id)->pluck('id');
-            if ($orderIds->isNotEmpty()) {
-                InvoiceSnapshot::whereIn('order_id', $orderIds)->delete();
-                Order::whereIn('id', $orderIds)->delete();
-            }
-            DownloadLog::where('user_id', $id)->delete();
-            $user->delete();
+            DB::transaction(function () use ($id, $user) {
+                PhotographerStatement::where('user_id', $id)->delete();
+                $orderIds = Order::where('user_id', $id)->pluck('id');
+                if ($orderIds->isNotEmpty()) {
+                    // A payment attempt pins its order with `on delete
+                    // restrict`. Deleting the snapshot before the order (and
+                    // failing here) is what used to leave a paid order behind
+                    // without its invoice evidence, so the attempt goes first
+                    // and the whole teardown is atomic.
+                    MolliePaymentAttempt::whereIn('order_id', $orderIds)->delete();
+                    InvoiceSnapshot::whereIn('order_id', $orderIds)->delete();
+                    Order::whereIn('id', $orderIds)->delete();
+                }
+                DownloadLog::where('user_id', $id)->delete();
+                $user->delete();
+            });
         }
 
         return response()->json(['success' => true]);
@@ -125,6 +136,12 @@ if (app()->environment('local', 'testing')) {
 // it decides (SEC-20261018-12). The budget and the key are unchanged; only
 // the counting primitive is the count-first one.
 Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe'])->name('api.webhooks.stripe')->middleware(AtomicThrottleRequests::class.':10,1');
+
+// Mollie posts only the payment id here; the controller fetches the payment
+// with the server credential before any transition. The budget is wider than
+// the Stripe ingress because one checkout can produce several legitimate
+// state notifications, and the endpoint is idempotent and provider-fetched.
+Route::post('/webhooks/mollie', [MollieWebhookController::class, 'handle'])->name('api.webhooks.mollie')->middleware(AtomicThrottleRequests::class.':60,1');
 
 // D-36: SFTPGo posts one filesystem event per uploaded file here; the endpoint
 // resolves the account and enqueues the background import. Deliberately outside
@@ -218,7 +235,9 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::get('/photos/{id}/versions', [PhotoController::class, 'getVersions'])->name('api.photos.versions');
     Route::post('/photos/{id}/revert/{versionId}', [PhotoController::class, 'revertMetadata'])->name('api.photos.revert');
     Route::post('/orders/checkout', [CheckoutController::class, 'checkout'])->name('api.orders.checkout');
+    Route::get('/payment-methods', [CheckoutController::class, 'paymentMethods'])->name('api.payment-methods');
     Route::get('/orders/{id}', [OrderController::class, 'show'])->name('api.orders.show');
+    Route::get('/orders/{id}/payment-status', [OrderController::class, 'paymentStatus'])->name('api.orders.payment-status');
     Route::get('/orders', [OrderController::class, 'index'])->name('api.orders.index');
     Route::get('/orders/{id}/invoice', [InvoiceDownloadController::class, 'downloadInvoice'])->name('api.orders.invoice');
     Route::middleware('throttle:'.config('app.throttle_zip_download', 3).',1')->get('/orders/{id}/download-zip', [PhotoDownloadController::class, 'downloadOrderZip'])->name('api.orders.download-zip');
@@ -311,9 +330,10 @@ Route::middleware(['auth:api', 'management'])->group(function () {
         // Super-Admin SMTP-Verbindungstest: sendet eine Test-Mail an die eigene Adresse.
         Route::post('/management/settings/test-email', [MailController::class, 'sendTest'])->name('api.management.settings.test-email');
 
-        // Super-Admin Stripe-Selbsttest: prüft lokalen Key-Modus, Frontend-Bundle-Modus,
-        // Balance, Konto-Freigaben und Webhook-Endpunkt (fünf stabile Befunde).
-        Route::post('/management/settings/stripe-check', [StripeKeyCheckController::class, 'check'])->name('api.management.settings.stripe-check');
+        // Super-Admin Mollie-Selbsttest: prüft Schlüssel-Modus, Webhook-URL,
+        // Methodenliste, eine authentifizierte Kontoabfrage und die
+        // serverseitige Zahlungsbereitschaft (fünf stabile Befunde).
+        Route::post('/management/settings/mollie-check', [MolliePaymentCheckController::class, 'check'])->name('api.management.settings.mollie-check');
     });
 
     Route::get('/management/settings/system', [SettingsController::class, 'getSystemInfo'])->name('api.management.settings.system');

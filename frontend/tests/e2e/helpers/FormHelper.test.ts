@@ -1,12 +1,6 @@
 import type { Page } from '@playwright/test';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('./StripeHelper', () => ({
-    StripeHelper: {
-        fillStripeForm: vi.fn(),
-    },
-}));
-
 import { FormHelper } from './FormHelper';
 import type { ModalHelper } from './ModalHelper';
 

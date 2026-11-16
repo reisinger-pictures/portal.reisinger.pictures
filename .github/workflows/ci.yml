@@ -621,10 +621,12 @@ jobs:
         # (job env above). The booleans carry presence only, so no secret
         # value can reach the log. A missing STRIPE_KEY (publishable) or
         # STRIPE_WEBHOOK_SECRET used to pass this preflight and fail later
-        # without a cause: the publishable key feeds the Vite build (the
-        # VITE_STRIPE_PUBLIC_KEY secret falls back to STRIPE_KEY), the
-        # webhook secret feeds the Stripe self-test, and only the secret key
-        # was used by the balance probe that follows.
+        # without a cause: the key pair feeds the historical Stripe
+        # self-test (`local_key_mode`), the webhook secret feeds the same
+        # check, and only the secret key was used by the balance probe that
+        # follows. Stripe takes no new payments; these values keep the
+        # historical order surface testable, and no frontend key is injected
+        # any more (Mollie's hosted checkout needs none).
         env:
           STRIPE_SECRET_SET: ${{ secrets.STRIPE_SECRET != '' }}
           STRIPE_KEY_SET: ${{ secrets.STRIPE_KEY != '' }}
@@ -769,9 +771,6 @@ jobs:
           timeout 60s bash -c 'until curl -sf http://localhost:4321/ > /dev/null; do sleep 1; done'
         env:
           VITE_API_PROXY: http://127.0.0.1:8000
-          # Publik-Key = VITE_STRIPE_PUBLIC_KEY, sonst Fallback auf STRIPE_KEY
-          # (pk_test - Zuordnung entspricht backend/.env, siehe oben)
-          VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY || secrets.STRIPE_KEY }}
           # Matched with the official always-pass backend dummy key above.
           VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
       - name: Run E2E tests

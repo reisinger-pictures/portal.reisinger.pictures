@@ -1,4 +1,4 @@
-import {expect, type Page, type Request, type Response} from '@playwright/test';
+import {expect, type Page, type Request, type Response, type Route} from '@playwright/test';
 import {AuthHelper} from './AuthHelper';
 import {E2ESessionHelper} from './E2ESessionHelper';
 import {FormHelper} from './FormHelper';
@@ -9,10 +9,37 @@ import {UploadHelper} from './UploadHelper';
 
 export const CHECKOUT_PATH = '/api/orders/checkout';
 
-/** A `Request` and the `Response` that answered it, captured as one pair. */
+/** The stub document that stands in for Mollie's hosted checkout page. */
+const HOSTED_CHECKOUT_STUB =
+    '<!doctype html><html lang="de"><head><title>Mollie Test-Zahlungsseite</title></head><body><h1>Mollie Test-Zahlungsseite</h1></body></html>';
+
+/**
+ * Answer the hosted-checkout navigation with a local stub page, so the redirect
+ * stays inside the test and the `toHaveURL` assertion is deterministic.
+ *
+ * The stub is deliberately not the source of the checkout answer: see
+ * `submitAndReadCheckout()` for how the body is captured.
+ */
+export async function stubHostedCheckout(page: Page): Promise<void> {
+    await page.route('https://www.mollie.com/**', async route => {
+        await route.fulfill({status: 200, contentType: 'text/html', body: HOSTED_CHECKOUT_STUB});
+    });
+}
+
+/** A `Request`, the `Response` that answered it, and its already-read body. */
 export interface CheckoutAnswer {
     request: Request;
     response: Response;
+    /**
+     * The response body as text.
+     *
+     * A successful checkout navigates the top-level document to the hosted
+     * provider page, and Playwright then refuses to serve the body of the
+     * response that caused the navigation ("No resource with given identifier
+     * found"). The body is therefore captured at the network layer, before the
+     * browser can leave the page — see `submitAndReadCheckout()`.
+     */
+    body: string;
 }
 
 export const isCheckoutRequest = (candidate: Request): boolean =>
@@ -28,14 +55,37 @@ export const isCheckoutResponse = (candidate: Response): boolean =>
  * under assertion is provably the one belonging to the status under assertion —
  * the two are separate round-trips to a shared endpoint and pairing them by
  * order alone would be a guess.
+ *
+ * The body is captured through a transparent pass-through: the route fetches
+ * the real request, reads the real answer body, and hands that same answer back
+ * to the browser with `route.fulfill({response})`. It is not a mock — status,
+ * headers and body are the server's — it only reads the body before the
+ * navigation the answer triggers can destroy it.
  */
 export async function submitAndReadCheckout(page: Page, click: () => Promise<void>): Promise<CheckoutAnswer> {
-    const requestPromise = page.waitForRequest(isCheckoutRequest);
-    const responsePromise = page.waitForResponse(isCheckoutResponse);
-    await click();
-    const [request, response] = await Promise.all([requestPromise, responsePromise]);
+    let captured: string | null = null;
+    const record = async (route: Route): Promise<void> => {
+        const answer = await route.fetch();
+        captured = await answer.text();
+        await route.fulfill({response: answer});
+    };
+    await page.route(`**${CHECKOUT_PATH}`, record);
 
-    return {request, response};
+    try {
+        const requestPromise = page.waitForRequest(isCheckoutRequest);
+        const responsePromise = page.waitForResponse(isCheckoutResponse);
+        await click();
+        const response = await responsePromise;
+        const request = await requestPromise;
+
+        if (captured === null) {
+            throw new Error(`The checkout answer with status ${response.status()} was not recorded.`);
+        }
+
+        return {request, response, body: captured};
+    } finally {
+        await page.unroute(`**${CHECKOUT_PATH}`, record);
+    }
 }
 
 /**
@@ -68,8 +118,8 @@ export interface PaidCartFixture {
 }
 
 /**
- * Put a real browser on the immediate-Stripe checkout path, which is the only
- * path the V036 card-testing gates apply to
+ * Put a real browser on the immediate online-checkout path (Mollie), which is
+ * the only path the V036 card-testing gates apply to
  * (`features/security/card-testing-protection.md` §11).
  *
  * The setup is the one `turnstile-checkout.spec.ts` already proves end to end:
@@ -105,7 +155,7 @@ export async function openPaidCartCheckout(
     await sidebar.navigateTo('Warenkorb');
 
     await expect(main.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible({timeout: 15000});
-    // A positive total is what classifies the request as an immediate Stripe
+    // A positive total is what classifies the request as an immediate online
     // checkout. Assert it here so a later 403/422 is not read as a card-testing
     // gate that fired.
     await expect(main.getByTestId('cart-total')).toBeVisible({timeout: 15000});

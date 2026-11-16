@@ -40,16 +40,53 @@ describe('Privacy', () => {
         }
     });
 
+    it('names Mollie as the provider of new online payments and what the portal sends', () => {
+        const { container } = renderPrivacy();
+        const text = container.textContent ?? '';
+
+        // The provider of a new online payment, named with its legal entity.
+        expect(text).toContain('Mollie B.V.');
+        // The transmitted data is an exhaustive list, not a vague "payment data".
+        for (const sent of [
+            'Zahlungsbetrag',
+            'Währung',
+            'Bestell- und Vorgangsreferenz',
+            'gewählte Zahlungsart',
+            'Rücksprung-',
+            'Webhook-Adresse',
+        ]) {
+            expect(text, `the Mollie data transfer does not name "${sent}"`).toContain(sent);
+        }
+        // The two references are named precisely enough that a reader can tell
+        // they are identifiers and carry no personal data (review #58, point 9).
+        expect(text).toContain('die Kennung der Bestellung');
+        expect(text).toContain('die laufende Nummer des Zahlungsversuchs');
+        expect(text).toContain('sie enthalten weder Name noch Adresse, Kartendaten oder Rechnungsdaten');
+        // The provider-side payment id is stored and disclosed as such.
+        expect(text).toContain('die von Mollie vergebene Zahlungs-ID (Payment-ID)');
+        expect(text).toContain('Diese Kennung ist eine Zahlungs- und Kontrollinformation, keine Kartendaten');
+        // The customer leaves the portal, so no card or billing data is forwarded.
+        expect(text).toContain('gehostete Checkout-Seite');
+        expect(text).toContain('nicht über das Portal an Mollie übermittelt');
+        // paybybank/eps are approved at the customer's bank.
+        expect(text).toContain('erfolgt die Freigabe bei der Bank des Kunden');
+        // The page must not present Stripe as the active provider any more.
+        expect(text).not.toContain('Stripe ist der eingesetzte Zahlungsdienstleister');
+    });
+
     it('states how the defense stores, derives and bounds its signals', () => {
         const { container } = renderPrivacy();
         const text = container.textContent ?? '';
 
         // The IP risk key is a keyed one-way hash; the limiter never sees a raw IP.
         expect(text).toContain('schlüsselabhängiger, nicht umkehrbarer Hash');
-        // The Stripe Customer is created lazily and survives a portal account
-        // deletion on Stripe's side, so a reader is told about the mapping.
+        // The Stripe paragraphs are history: the customer is told for which
+        // orders they still apply and that no new Stripe customer is created.
+        expect(text).toContain('vor der Umstellung auf Mollie');
+        expect(text).toContain('Für diese historischen Stripe-Bestellungen');
         expect(text).toContain('erst mit der ersten zahlungspflichtigen Bestellung');
         expect(text).toContain('nicht automatisch im Stripe-Dashboard gelöscht');
+        expect(text).toContain('Für neue Bestellungen wird kein Stripe-Kundenkonto mehr angelegt');
         // The account-age/attempt gates read the account creation date and the
         // user ID; that was undocumented before and is the reason a reader can
         // connect the quota with its own account.

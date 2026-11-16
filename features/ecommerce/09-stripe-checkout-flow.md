@@ -1,6 +1,16 @@
 # Stripe Checkout Flow — State Machine & Webhook Architecture
 
-> **Status:** Current SOLL (reviewed 2026-09-24). Legacy `SRP` wording below is
+> **Status:** Superseded for new online payments (2026-11-11). New positive-value
+> immediate orders are created and paid through Mollie's hosted checkout
+> ([`features/infrastructure/30-mollie-payments.md`](../infrastructure/30-mollie-payments.md));
+> the HTTP checkout accepts `mollie` and `invoice` only, and the Stripe create
+> branch is unreachable from the API. What remains current in this document is
+> the order state machine, the invoice/collective/free paths, and the historical
+> Stripe webhook, reconciliation and dispute machinery that keeps existing orders
+> readable. Where it says "Stripe PaymentIntent", read "the provider attempt of
+> the order" for anything created after the Mollie switch.
+>
+> **Status (historical):** Current SOLL (reviewed 2026-09-24). Legacy `SRP` wording below is
 > retained only where it names an old compatibility key; the live pricing modes
 > are scope and volume licensing.
 > Describes the complete checkout lifecycle from cart to order fulfillment via Stripe Payment Intents.
@@ -102,7 +112,7 @@ limited to positive-value immediate Stripe:
 
 ### 2.3 Frontend Confirmation
 
-For an actionable response, the frontend uses `@stripe/react-stripe-js` to confirm the payment with `stripe.confirmCardPayment(client_secret)`. The `client_secret` is used directly with Stripe.js — the secret key never leaves the server. A `payment_pending` recovery response has no client secret; the frontend preserves the checkout recovery session and polls the order while strict success reconciliation is pending.
+For an actionable response, the frontend used to confirm the payment with `@stripe/react-stripe-js` (`stripe.confirmCardPayment(client_secret)`). That integration is removed ([#58](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/58)); no new order reaches it, and an order that still carries a historical `client_secret` is read through the server-side order and payment-status endpoints. The `client_secret` was used directly with Stripe.js — the secret key never leaves the server. A `payment_pending` recovery response has no client secret; the checkout recovery session is preserved and the order is polled while strict success reconciliation is pending.
 
 ### 2.4 Payment → Webhook → Order
 

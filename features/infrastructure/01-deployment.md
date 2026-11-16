@@ -76,7 +76,8 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
 | `APP_KEY` | `config/app.php` | `env('APP_KEY')` |
 | `JWT_SECRET` | `config/jwt.php` | `env('JWT_SECRET')` |
 | `FILE_ENCRYPTION_KEY` | File-Encryption config/provider | `env('FILE_ENCRYPTION_KEY')`, separate from `APP_KEY` |
-| `STRIPE_KEY` / `STRIPE_SECRET` / `STRIPE_WEBHOOK_SECRET` | `config/services.php` | `env(...)`, no `production ? null :` guard |
+| `STRIPE_KEY` / `STRIPE_SECRET` / `STRIPE_WEBHOOK_SECRET` | `config/services.php` | `env(...)`, no `production ? null :` guard; historical orders only |
+| `MOLLIE_KEY` / `MOLLIE_PAYMENT_METHODS` / `MOLLIE_WEBHOOK_URL` (`MOLLIE_PAYMENT_METHOD` is the deprecated single-value fallback) | `config/services.php` | `env(...)`, server-only, list in display order; payment creation needs the key, a non-empty allowlist and a usable HTTPS webhook URL, otherwise it fails closed |
 | `DB_PASSWORD` | `config/database.php` | `env('DB_PASSWORD')` |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `config/admin.php` | `env(...)`, required, no fallback |
 

@@ -7,6 +7,7 @@ import ClientCartView from '../client/ClientCartView';
 import { useCart } from '../../logic/CartContext';
 import type {CartContextType, VolumeLicensingResult} from '../../logic/CartContext';
 import { useAuth } from '../../logic/useAuth';
+import { useMolliePaymentMethods } from '../../logic/useMolliePaymentMethods';
 import { apiMutate, type ApiError } from '../../api';
 import { checkoutSessionStorageKey } from '../../logic/checkoutSession';
 
@@ -14,11 +15,12 @@ import { checkoutSessionStorageKey } from '../../logic/checkoutSession';
 // Mocks — external modules
 // --------------------------------------------------------------------------
 
-const {mockShowToast, mockSearchParams, mockFormState, mockReset} = vi.hoisted(() => ({
+const {mockShowToast, mockSearchParams, mockFormState, mockReset, mockAssignLocation} = vi.hoisted(() => ({
     mockShowToast: vi.fn(),
     mockSearchParams: {value: ''},
     mockFormState: {isDirty: false},
     mockReset: vi.fn(),
+    mockAssignLocation: vi.fn(),
 }));
 
 // Keep real router components, mock useNavigate and useSearchParams
@@ -31,15 +33,13 @@ vi.mock('react-router-dom', async () => {
     };
 });
 
-vi.mock('../../logic/stripe', () => ({
-    stripePromise: Promise.resolve({}),
-}));
-
-vi.mock('@stripe/react-stripe-js', () => ({
-    Elements: ({ children }: { children: React.ReactNode }) => (
-        <div data-testid="stripe-elements">{children}</div>
-    ),
-}));
+vi.mock('../../logic/hostedCheckout', async () => {
+    const actual = await vi.importActual<typeof import('../../logic/hostedCheckout')>('../../logic/hostedCheckout');
+    return {
+        ...actual,
+        assignLocation: mockAssignLocation,
+    };
+});
 
 vi.mock('../../api', () => ({
     apiMutate: vi.fn(),
@@ -63,6 +63,10 @@ vi.mock('../../logic/useAuth', () => ({
     useAuth: vi.fn(),
 }));
 
+vi.mock('../../logic/useMolliePaymentMethods', () => ({
+    useMolliePaymentMethods: vi.fn(),
+}));
+
 vi.mock('../../logic/useLicensingMode', () => ({
     useLicensingMode: () => 'scope_licensing',
 }));
@@ -81,15 +85,6 @@ vi.mock('../../logic/usePermissions', () => ({
 vi.mock('../components/PageLayout', () => ({
     default: ({ children }: { children: React.ReactNode }) => (
         <div data-testid="page-layout">{children}</div>
-    ),
-}));
-
-vi.mock('../client/components/StripeCheckoutForm', () => ({
-    StripeCheckoutForm: ({onSuccess}: {onSuccess: (confirmed: boolean) => void}) => (
-        <div data-testid="stripe-checkout-form">
-            <button type="button" onClick={() => onSuccess(true)}>Stripe-Zahlung bestätigen</button>
-            <button type="button" onClick={() => onSuccess(false)}>Stripe-Verarbeitung melden</button>
-        </div>
     ),
 }));
 
@@ -195,6 +190,7 @@ const mockCartItems = [
 ];
 
 function setupDefaultMocks() {
+    vi.mocked(useMolliePaymentMethods).mockReturnValue(['creditcard']);
     vi.mocked(useAuth).mockReturnValue({
         user: mockUser,
         isLoading: false,
@@ -381,7 +377,6 @@ describe('ClientCartView', () => {
 
         // No item list or checkout form should appear
         expect(screen.queryByTestId('cart-item-list')).not.toBeInTheDocument();
-        expect(screen.queryByTestId('stripe-elements')).not.toBeInTheDocument();
         expect(screen.queryByText('Rechnungsadresse')).not.toBeInTheDocument();
     });
 
@@ -425,9 +420,65 @@ describe('ClientCartView', () => {
         expect(screen.getByLabelText('PLZ')).toHaveAttribute('required');
         expect(screen.getByLabelText('Ort')).toHaveAttribute('required');
         expect(screen.getByLabelText('Land')).toBeDisabled();
-        expect(screen.getByRole('radio', {name: 'Kreditkarte (Stripe)'})).toHaveAttribute('required');
+        expect(screen.getByRole('radio', {name: 'Online-Zahlung'})).toHaveAttribute('required');
         expect(screen.getByRole('checkbox', {name: /allgemeinen geschäftsbedingungen/i})).toHaveAttribute('required');
         expect(screen.getByRole('checkbox', {name: /widerrufsrecht/i})).toHaveAttribute('required');
+    });
+
+    it('renders the allowed Mollie methods, preselects the first and sends the selection', async () => {
+        const user = userEvent.setup();
+        vi.mocked(useMolliePaymentMethods).mockReturnValue(['paybybank', 'eps', 'creditcard']);
+        setCartWithItems();
+        vi.mocked(apiMutate).mockResolvedValue({
+            success: true,
+            payment_pending: true,
+            checkout_url: 'https://www.mollie.com/checkout/select-method/tr_method',
+            order_id: 'ord_method',
+        });
+
+        renderCartView();
+
+        expect(screen.getByRole('radio', {name: 'Pay by Bank'})).toBeChecked();
+        expect(screen.getByRole('radio', {name: 'EPS-Überweisung'})).not.toBeChecked();
+        expect(screen.getByRole('radio', {name: 'Kreditkarte'})).not.toBeChecked();
+
+        await user.click(screen.getByRole('radio', {name: 'EPS-Überweisung'}));
+        await user.click(screen.getByRole('button', {name: /zahlungspflichtig bestellen/i}));
+
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(1));
+        const payload = vi.mocked(apiMutate).mock.calls[0][2] as Record<string, unknown>;
+        expect(payload.payment_method).toBe('mollie');
+        expect(payload.mollie_method).toBe('eps');
+    });
+
+    it('renders one online option without a method choice when exactly one method is allowed', async () => {
+        const user = userEvent.setup();
+        vi.mocked(useMolliePaymentMethods).mockReturnValue(['creditcard']);
+        setCartWithItems();
+        vi.mocked(apiMutate).mockResolvedValue({success: true, invoice_number: 'INV-SINGLE'});
+
+        renderCartView();
+
+        expect(screen.getByRole('radio', {name: 'Online-Zahlung'})).toBeInTheDocument();
+        expect(screen.queryByText('Zahlungsart wählen')).not.toBeInTheDocument();
+        expect(screen.queryByRole('radio', {name: 'Kreditkarte'})).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', {name: /zahlungspflichtig bestellen/i}));
+
+        await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(1));
+        const payload = vi.mocked(apiMutate).mock.calls[0][2] as Record<string, unknown>;
+        expect(payload.mollie_method).toBe('creditcard');
+    });
+
+    it('ignores an unknown method id from the endpoint', async () => {
+        vi.mocked(useMolliePaymentMethods).mockReturnValue(['mystery-method', 'paybybank', 'eps']);
+        setCartWithItems();
+
+        renderCartView();
+
+        expect(screen.queryByRole('radio', {name: 'mystery-method'})).not.toBeInTheDocument();
+        expect(screen.getByRole('radio', {name: 'Pay by Bank'})).toBeChecked();
+        expect(screen.getByRole('radio', {name: 'EPS-Überweisung'})).not.toBeChecked();
     });
 
     it('preserves dirty billing and consent fields during auth revalidation', () => {
@@ -520,49 +571,55 @@ describe('ClientCartView', () => {
     });
 
     // ------------------------------------------------------------------
-    // Stripe Elements (clientSecret flow)
+    // Hosted Mollie checkout (top-level redirect)
     // ------------------------------------------------------------------
 
-    it('shows Stripe Elements after checkout returns a client secret', async () => {
+    it('redirects to the hosted checkout returned by the API and keeps the cart', async () => {
         const user = userEvent.setup();
-
-        // Provide cart items so the submit button is enabled
-        vi.mocked(useCart).mockReturnValue({
-            items: mockCartItems,
-            quoteToken: null,
-            setQuoteToken: vi.fn(),
-            removeFromCart: vi.fn(),
-            totalAmount: 4000,
-            clearCart: vi.fn(),
-            addToCart: vi.fn(),
-            itemCount: 2,
-            unresolvedItemCount: 0,
-        });
-
-        // Checkout endpoint returns requires_action → triggers clientSecret
+        const cart = setCartWithItems();
         vi.mocked(apiMutate).mockResolvedValue({
-            requires_action: true,
-            client_secret: 'cs_test_live_123',
+            success: true,
+            payment_pending: true,
+            checkout_url: 'https://www.mollie.com/checkout/select-method/tr_redirect123',
             order_id: 'ord_abc',
-            success: false,
+            status: 'pending_payment',
         });
 
         renderCartView();
-
-        // Click the submit button to run the onCheckout callback
         await user.click(
             screen.getByRole('button', { name: /zahlungspflichtig bestellen/i }),
         );
 
-        // After the async checkout handler runs, the component should
-        // swap the billing form for Stripe Elements
-        await waitFor(() => {
-            expect(screen.getByTestId('stripe-elements')).toBeInTheDocument();
-        });
-        expect(screen.getByTestId('stripe-checkout-form')).toBeInTheDocument();
+        await waitFor(() => expect(mockAssignLocation).toHaveBeenCalledWith(
+            'https://www.mollie.com/checkout/select-method/tr_redirect123',
+        ));
+        // The payment happens on the provider page; the cart must survive a
+        // return without payment so the same attempt can be resumed.
+        expect(cart.clearCart).not.toHaveBeenCalled();
+        expect(sessionStorage.getItem(checkoutSessionStorageKey(mockUser.id)))
+            .toContain(idempotencyKeyForCall(0));
+        // No in-page payment step: the cart stays usable behind the redirect.
+        expect(screen.getByRole('button', {name: /zahlungspflichtig bestellen/i})).toBeInTheDocument();
+    });
 
-        // The billing-address form must be replaced
-        expect(screen.queryByText('Rechnungsadresse')).not.toBeInTheDocument();
+    it('refuses a checkout URL outside the provider host and never navigates', async () => {
+        const user = userEvent.setup();
+        setCartWithItems();
+        vi.mocked(apiMutate).mockResolvedValue({
+            success: true,
+            payment_pending: true,
+            checkout_url: 'https://evil.example/checkout',
+            order_id: 'ord_abc',
+        });
+
+        renderCartView();
+        await user.click(screen.getByRole('button', {name: /zahlungspflichtig bestellen/i}));
+
+        await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith(
+            'error',
+            'Die Zahlungsseite konnte nicht sicher geöffnet werden. Bitte wende dich an den Support.',
+        ));
+        expect(mockAssignLocation).not.toHaveBeenCalled();
     });
 
     it('keeps recovery non-destructive and reuses its key for a remotely succeeded payment', async () => {
@@ -573,7 +630,6 @@ describe('ClientCartView', () => {
             success: true,
             payment_pending: true,
             requires_action: false,
-            client_secret: 'cs_stale_remote_succeeded',
             order_id: 'ord_pending_webhook',
             status: 'pending_payment',
             poll_url: '/api/orders/ord_pending_webhook',
@@ -587,7 +643,7 @@ describe('ClientCartView', () => {
             'info',
             'Die Zahlung wird derzeit geprüft. Bitte später erneut prüfen.',
         );
-        expect(screen.queryByTestId('stripe-checkout-form')).not.toBeInTheDocument();
+        expect(mockAssignLocation).not.toHaveBeenCalled();
         expect(cart.clearCart).not.toHaveBeenCalled();
 
         const originalKey = idempotencyKeyForCall(0);
@@ -600,48 +656,41 @@ describe('ClientCartView', () => {
         expect(idempotencyKeyForCall(1)).toBe(originalKey);
         expect(sessionStorage.getItem(checkoutSessionStorageKey(mockUser.id))).toContain(originalKey);
         expect(screen.getByRole('status')).toHaveTextContent('Die Zahlung ist noch nicht als bezahlt bestätigt');
-        expect(screen.queryByTestId('stripe-checkout-form')).not.toBeInTheDocument();
         expect(cart.clearCart).not.toHaveBeenCalled();
     });
 
-    it('clears persisted checkout recovery after confirmed Stripe payment', async () => {
+    it('clears persisted checkout recovery after a verified paid replay', async () => {
         const user = userEvent.setup();
         const cart = setCartWithItems();
         vi.mocked(apiMutate).mockResolvedValue({
-            requires_action: true,
-            client_secret: 'cs_test_paid',
+            success: true,
             order_id: 'ord_paid',
-            success: true
+            status: 'paid',
+            invoice_number: 'P-2026-0001',
         });
 
         renderCartView();
         await user.click(screen.getByRole('button', {name: /zahlungspflichtig bestellen/i}));
-        await screen.findByTestId('stripe-checkout-form');
-        expect(sessionStorage.getItem(checkoutSessionStorageKey(mockUser.id))).toContain(idempotencyKeyForCall(0));
 
-        await user.click(screen.getByRole('button', {name: 'Stripe-Zahlung bestätigen'}));
-
+        await waitFor(() => expect(cart.clearCart).toHaveBeenCalledTimes(1));
         expect(sessionStorage.getItem(checkoutSessionStorageKey(mockUser.id))).toBeNull();
-        expect(cart.clearCart).toHaveBeenCalledTimes(1);
+        expect(mockShowToast).toHaveBeenCalledWith('success', 'Bestellung erfolgreich! (Beleg: P-2026-0001)');
     });
 
-    it('retains cart and idempotency recovery when the local paid state is delayed', async () => {
+    it('retains cart and idempotency recovery while the provider state is pending', async () => {
         const user = userEvent.setup();
         const cart = setCartWithItems();
         vi.mocked(apiMutate).mockResolvedValue({
-            requires_action: true,
-            client_secret: 'cs_test_delayed_webhook',
+            success: true,
+            payment_pending: true,
             order_id: 'ord_delayed_webhook',
-            success: true
+            status: 'pending_payment',
         });
 
         renderCartView();
         await user.click(screen.getByRole('button', {name: /zahlungspflichtig bestellen/i}));
-        await screen.findByTestId('stripe-checkout-form');
         const originalKey = idempotencyKeyForCall(0);
-        expect(sessionStorage.getItem(checkoutSessionStorageKey(mockUser.id))).toContain(originalKey);
-
-        await user.click(screen.getByRole('button', {name: 'Stripe-Verarbeitung melden'}));
+        await waitFor(() => expect(sessionStorage.getItem(checkoutSessionStorageKey(mockUser.id))).toContain(originalKey));
 
         expect(screen.getByRole('status')).toHaveTextContent('noch nicht als bezahlt bestätigt');
         expect(sessionStorage.getItem(checkoutSessionStorageKey(mockUser.id))).toContain(originalKey);
@@ -653,7 +702,6 @@ describe('ClientCartView', () => {
 
         await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(2));
         expect(idempotencyKeyForCall(1)).toBe(originalKey);
-        expect(screen.getByTestId('stripe-checkout-form')).toBeInTheDocument();
         expect(cart.clearCart).not.toHaveBeenCalled();
     });
 
@@ -922,7 +970,7 @@ describe('ClientCartView', () => {
         expect(screen.queryByTestId('coupon-input')).not.toBeInTheDocument();
     });
 
-    it('uses a full discount for free checkout without opening Stripe Elements', async () => {
+    it('uses a full discount for free checkout without a hosted checkout redirect', async () => {
         const user = userEvent.setup();
         vi.mocked(useCart).mockReturnValue({
             items: mockCartItems,
@@ -965,7 +1013,8 @@ describe('ClientCartView', () => {
         await waitFor(() => expect(apiMutate).toHaveBeenCalledTimes(2));
         const payload = vi.mocked(apiMutate).mock.calls[1][2] as Record<string, unknown>;
         expect(payload.coupon_code).toBe('FREE100');
-        expect(screen.queryByTestId('stripe-checkout-form')).not.toBeInTheDocument();
+        // A zero-total order never reaches a provider checkout.
+        expect(mockAssignLocation).not.toHaveBeenCalled();
     });
 
     it('does not offer or submit a coupon for a signed quote cart', async () => {
@@ -1174,10 +1223,10 @@ describe('ClientCartView', () => {
         vi.mocked(apiMutate)
             .mockRejectedValueOnce(createApiError(500, {}))
             .mockResolvedValueOnce({
-                requires_action: true,
-                client_secret: 'cs_test_remount_recovery',
+                success: true,
+                payment_pending: true,
                 order_id: 'ord_remount_recovery',
-                success: true
+                status: 'pending_payment',
             });
 
         const firstRender = renderCartView();
@@ -1366,7 +1415,7 @@ describe('ClientCartView', () => {
         expect(idempotencyKeyForCall(2)).toBe(idempotencyKeyForCall(0));
     });
 
-    it('resets the idempotency key after a terminal non-Stripe success', async () => {
+    it('resets the idempotency key after a terminal non-provider success', async () => {
         const user = userEvent.setup();
         setCartWithItems();
         vi.mocked(apiMutate)

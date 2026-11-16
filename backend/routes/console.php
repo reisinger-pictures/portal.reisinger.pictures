@@ -32,6 +32,9 @@ Schedule::command('app:import-locations')->weeklyOn(1, '03:30')->withoutOverlapp
 // Stripe: cancel incomplete PaymentIntents abandoned by abandoned checkouts
 Schedule::command('stripe:cancel-stale-payment-intents')->hourly()->withoutOverlapping()->onOneServer();
 
+// Mollie: converge open attempts; the webhook stays the normal authority.
+Schedule::command('mollie:reconcile-payments')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+
 // Model-Lifecycle: Reminder-Mails T+12/13/14 Monate (idempotent, brand-aware)
 Schedule::command('app:process-model-lifecycle')->dailyAt('07:00')->withoutOverlapping()->onOneServer();
 

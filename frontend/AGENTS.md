@@ -91,7 +91,7 @@ Agenten MÜSSEN Playwright-Locators über Landmarks (`main`, `aside`, `footer`) 
 * Initialer Seitenaufruf bei Gästen (`/`)
 * Route-Guard-Tests (direkter URL-Zugriff testen)
 * Brand-Isolation-Tests (Cross-Domain-Navigation)
-* Stripe-Redirect-Simulation (return_url nach Zahlung)
+* Hosted-Checkout-Return-Simulation (return_url nach Zahlung)
 
 Navigation MUSS via `sidebar.navigateTo()`, Klicks im UI oder API-Aufrufe erfolgen. localStorage-Injektion + page.goto('/cart') ist verboten — Cart-Items MÜSSEN via API hinzugefügt werden.
 

@@ -218,7 +218,7 @@ test.describe('Cart pricing and coupon integration', () => {
         await expect(main.getByRole('button', {name: 'In den Warenkorb'})).toBeEnabled();
     });
 
-    test('fixed, percentage, and 100% coupons show server-priced net totals; 100% skips Stripe', {tag: ['@feature:client:coupon', '@feature:client:checkout', '@regression']}, async ({page}) => {
+    test('fixed, percentage, and 100% coupons show server-priced net totals; 100% never reaches a provider checkout', {tag: ['@feature:client:coupon', '@feature:client:checkout', '@regression']}, async ({page}) => {
         test.setTimeout(120000);
         const suffix = Math.random().toString(36).substring(2, 8).toUpperCase();
         const preset = await helper.createVolumePreset({
@@ -318,12 +318,15 @@ test.describe('Cart pricing and coupon integration', () => {
             success?: boolean;
             order_id?: string;
             client_secret?: string;
+            checkout_url?: string | null;
         };
         expect(checkoutData).toMatchObject({success: true});
         expect(checkoutData.order_id).toBeTruthy();
         expect(checkoutData.client_secret).toBeUndefined();
+        // A zero-total order must not hand off to a payment provider: no hosted
+        // checkout URL is returned and the customer lands on the order list.
+        expect(checkoutData.checkout_url).toBeUndefined();
         await expect(page).toHaveURL(/\/orders/);
-        await expect(page.getByTestId('stripe-checkout-form')).toHaveCount(0);
     });
 
     test('a signed quote excludes the volume coupon input and payload', {tag: ['@feature:client:quote', '@feature:client:coupon', '@regression']}, async ({page, request}) => {

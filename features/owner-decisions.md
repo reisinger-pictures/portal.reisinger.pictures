@@ -147,15 +147,15 @@ Documentation-only changes may skip the full CI pipeline. Keep `paths` with `'**
 
 ### D-24: Frontend Stripe publishable key
 
-The production frontend key belongs in gitignored `frontend/.env.production`; the test key remains in `frontend/.env.local` with `frontend/.env` as its test-key default. Do not rename `.env.local`. The build gate requires a live key and rejects a test key when `.env.production` declares a production build; CI without a declared key is allowed; an undeclared local build must not contain a test key; `STRIPE_TEST_BUILD=true` is allowed only without `.env.production`. See [environment and secret hardening](security/env-hardening.md).
+**Retired 2026-11-16 (#58):** no Stripe key reaches the frontend any more, so there is no publishable key to place, no build gate to require a live one, and no `STRIPE_TEST_BUILD` switch. The ranking it relied on — a declared production build must not carry a test value — survives for the other `VITE_*` values that still ship in a bundle. New online payments run through Mollie ([D-63](#d-63-mollie-collects-the-payment-the-portal-issues-the-invoice-and-offers-only-non-bnpl-methods)). See [environment and secret hardening](security/env-hardening.md).
 
 ### D-25: Live Stripe secret rotation
 
 Keep the live Stripe keys unrotated under the owner's accepted provider-ZDR decision. This does not permit exposing or committing those values. See [environment and secret hardening](security/env-hardening.md).
 
-### D-26: Stripe self-test coverage
+### D-26: Mollie self-test coverage
 
-`POST /api/management/settings/stripe-check` always returns five strict checks. E2E asserts only the four environment-deterministic checks; test webhook-endpoint branches in PHPUnit, not by mocking the internal endpoint in E2E. See [environment and secret hardening](security/env-hardening.md).
+`POST /api/management/settings/mollie-check` always returns five strict checks: `key_mode`, `webhook_url`, `methods`, `account`, `readiness`. E2E asserts only the environment-independent contract — the card exists for a super-admin and is absent for a normal admin, nothing runs before the click, the five findings appear in the documented order with a valid status and a non-empty message, and the key value never reaches the page. Provider- and webhook-dependent statuses are tested in PHPUnit against the faked SDK seam, not by mocking the internal endpoint in E2E. See [environment and secret hardening](security/env-hardening.md) and [Mollie payments](infrastructure/30-mollie-payments.md).
 
 ### D-27: Full license terms access
 
@@ -189,7 +189,7 @@ Superseded on 2026-11-01: the website no longer imports the full terms and never
 
 ### D-33: Dependabot CI secrets
 
-Store the required Stripe **test-mode** values (`STRIPE_SECRET`, `STRIPE_KEY`, `STRIPE_WEBHOOK_SECRET`, `VITE_STRIPE_PUBLIC_KEY`) in Dependabot secrets, not only Actions secrets. The Dependabot branch push is the authoritative CI run; skip the duplicate E2E matrix on its `pull_request` event so the matrix runs once per PR. Treat the test values as visible to checked-out PR code.
+Store the required Stripe **test-mode** values (`STRIPE_SECRET`, `STRIPE_KEY`, `STRIPE_WEBHOOK_SECRET`) in Dependabot secrets, not only Actions secrets. The Dependabot branch push is the authoritative CI run; skip the duplicate E2E matrix on its `pull_request` event so the matrix runs once per PR. Treat the test values as visible to checked-out PR code.
 
 ### D-34: CI evidence for auto-merged Dependabot heads
 
@@ -298,3 +298,11 @@ A gallery notification opt-in is a subscription, never a grant. It lives in its 
 ### D-46: The group notification subscription has its own table
 
 A group notification opt-in is a subscription, never a grant, exactly like the gallery opt-in in D-45. It lives in its own table (`group_notification_subscriptions`) and no longer writes into `user_gallery_groups`, the pivot that carries the client group grant — a group grant covers the whole subtree of the group, so an opt-in stored there produced a grant over the subtree and outlived the membership that justified it. A subscription must not create access and must not keep a group reachable after the membership that justified it was revoked; it is also not part of the grant, so it must not be destroyed together with the grant. The legacy rows that carried the opt-in flag are ambiguous — the flag cannot separate an opt-in-only row from a real grant that was additionally subscribed to — so the migration moves the subscription state and does not delete pivot rows; the remainder stays a documented residual that the owner clears deliberately with `notifications:prune-legacy-group-opt-in-grants`. That command lists every flagged row with its verdict and deletes nothing in its dry run. `--apply` deletes **all** candidate rows unless the operator selects them: `--only=<user_id>:<gallery_group_id>` (repeatable) or `--only-ids=<file>` restricts the deletion to the verified rows, and a selected row that is no longer a candidate is reported and kept. A selected pair that matches no flagged row is reported as `unmatched` and ends the run with a non-zero exit code, so a typo in an id cannot look like a successful repair. A candidate is not proof of an opt-in-only row — the same shape is produced by a real grant that was additionally subscribed to — so every candidate must be verified individually or repaired by hand before it is removed. The grant reader stays untouched: the legacy rows keep granting until the owner removes them deliberately. The preferences endpoint keeps its response shape and lists a subscription without a grant so that it stays revocable, but the name of a group the caller can no longer reach is not disclosed. See [email system & notifications](infrastructure/02-email-system.md), [IDOR protection](auth/01-roles-and-access.md) and [AD-10](tech/07-architectural-decisions.md).
+
+### D-63: Mollie collects the payment; the portal issues the invoice and offers only non-BNPL methods
+
+Mollie is a payment collector, nothing else. The portal writes the `invoice_snapshots` row (number, positions, licence conditions, withdrawal consent) **before** the provider call, renders the invoice from `resources/views/pdf/invoice.blade.php` through `InvoiceService`, and enqueues the invoice mail only after a verified `paid`. The create request therefore carries no order lines, no billing address and no customer data beyond what the chosen method itself requires. This excludes the BNPL and instalment families (Klarna, in3, Billie, Riverty): they require order lines and issue their own customer document, which the portal cannot control. Their ids are rejected when the method list is configured, not merely documented.
+
+`MOLLIE_WEBHOOK_URL` is mandatory in **every** environment: it must be set, HTTPS and reachable from Mollie, because Mollie validates it at create time and refuses an unreachable URL. A missing or unusable value disables payment creation (`503`, no attempt, no fallback to `APP_URL`) in local, testing and production alike. Local payment testing therefore needs a public HTTPS tunnel; without one the provider-dependent E2E specs skip by name.
+
+The allowed methods are an explicit portal-side allowlist (`MOLLIE_PAYMENT_METHODS`), not an account setting: the portal shows the allowed list, the customer picks one, and exactly that one method is sent as Mollie's single `method` field. This keeps the decision in the repository and prevents a Dashboard setting from silently enabling a method that issues its own invoice. Only methods that are demonstrably cheaper than credit card are added, and a payment that cannot issue order lines is never offered. An empty allowlist disables online payment creation. There is still one online payment option and no provider selector. See [Mollie payments](infrastructure/30-mollie-payments.md) and issues #53, #54, #55, #57.

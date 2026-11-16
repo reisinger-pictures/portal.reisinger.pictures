@@ -150,4 +150,12 @@ class Order extends Model
     {
         return $this->hasMany(DownloadLog::class);
     }
+
+    /**
+     * The append-only Mollie payment attempt ledger for this order.
+     */
+    public function molliePaymentAttempts(): HasMany
+    {
+        return $this->hasMany(MolliePaymentAttempt::class);
+    }
 }

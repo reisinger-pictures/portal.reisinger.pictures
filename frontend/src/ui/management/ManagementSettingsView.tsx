@@ -9,28 +9,13 @@ import {fetcher, SystemInfo} from '../../api';
 import {useState} from 'react';
 import {useBillingDetails} from '../../logic/useLicenseTerms';
 import {usePermissions} from '../../logic/usePermissions';
-import {apiMutate, TestEmailResponse, StripeCheckResponse, StripeCheckFinding, StripeCheckStatus} from '../../api';
+import {apiMutate, TestEmailResponse, MollieCheckResponse, MollieCheckFinding, MollieCheckStatus} from '../../api';
 import {useUI} from '../components/UIContext';
 import CalculatorSettingsCard from './components/CalculatorSettingsCard';
 
 declare const __APP_BUILD_TIME__: string;
 
-/**
- * Derive the test/live mode from a raw Stripe publishable key. The rule mirrors
- * the backend's `StripeKeyMode::fromKey()`: the mode token must sit *directly*
- * behind the prefix, so a `_live_` buried in the random portion (e.g.
- * `pk_test_x_live_y`) does not flip the answer. Keeping both sides on the same
- * anchored expression is what makes this comparison honest.
- */
-const STRIPE_KEY_MODE_PATTERN = /^(pk|sk|rk)_(test|live)(?:_|$)/i;
-
-const deriveBundleMode = (key: string | undefined): 'test' | 'live' | null => {
-    const match = key?.match(STRIPE_KEY_MODE_PATTERN);
-    if (!match) return null;
-    return match[2].toLowerCase() === 'live' ? 'live' : 'test';
-};
-
-const STRIPE_CHECK_STATUS_STYLES: Record<StripeCheckStatus, { icon: string; text: string }> = {
+const MOLLIE_CHECK_STATUS_STYLES: Record<MollieCheckStatus, { icon: string; text: string }> = {
     ok: { icon: 'mdi--check-circle', text: 'text-success' },
     warn: { icon: 'mdi--alert-circle-outline', text: 'text-warning' },
     fail: { icon: 'mdi--alert-circle', text: 'text-error' }
@@ -43,23 +28,21 @@ export default function ManagementSettingsView() {
     const {data: sysInfo} = useSWR<SystemInfo>('/api/management/settings/system', fetcher);
     const {showToast} = useUI();
     const [sendingTestMail, setSendingTestMail] = useState(false);
-    const [stripeChecking, setStripeChecking] = useState(false);
-    const [stripeResults, setStripeResults] = useState<StripeCheckFinding[] | null>(null);
+    const [mollieChecking, setMollieChecking] = useState(false);
+    const [mollieResults, setMollieResults] = useState<MollieCheckFinding[] | null>(null);
 
-    const handleStripeCheck = async () => {
+    const handleMollieCheck = async () => {
         if (!isSuperAdmin) return;
-        setStripeChecking(true);
+        setMollieChecking(true);
         try {
-            const data = await apiMutate<StripeCheckResponse>('/api/management/settings/stripe-check', 'POST', {
-                bundle_mode: deriveBundleMode(import.meta.env.VITE_STRIPE_PUBLIC_KEY)
-            });
-            setStripeResults(data.checks);
+            const data = await apiMutate<MollieCheckResponse>('/api/management/settings/mollie-check', 'POST', {});
+            setMollieResults(data.checks);
         } catch (err: unknown) {
-            setStripeResults(null);
-            const stripeError = err instanceof Error ? err.message : t`Unbekannter Fehler`;
-            showToast('error', t`Fehler beim Stripe-Verbindungstest: ${stripeError}`);
+            setMollieResults(null);
+            const mollieError = err instanceof Error ? err.message : t`Unbekannter Fehler`;
+            showToast('error', t`Fehler beim Mollie-Verbindungstest: ${mollieError}`);
         }
-        setStripeChecking(false);
+        setMollieChecking(false);
     };
 
     const handleSendTestMail = async () => {
@@ -132,34 +115,34 @@ export default function ManagementSettingsView() {
             )}
 
             {isSuperAdmin && (
-                <div className="card bg-base-100 border border-base-300 shadow-sm" data-testid="stripe-check-card">
+                <div className="card bg-base-100 border border-base-300 shadow-sm" data-testid="mollie-check-card">
                     <div className="card-body">
-                        <h2 className="card-title text-xl"><Trans>Stripe-Verbindungstest</Trans></h2>
-                        <p className="text-sm opacity-70"><Trans>Prüft die Stripe-Konfiguration (Schlüssel-Modus, Bundle-Modus,
-                            Balance, Konto und Webhook) direkt über die Stripe-API — nur bei explizitem Klick.</Trans></p>
+                        <h2 className="card-title text-xl"><Trans>Mollie-Verbindungstest</Trans></h2>
+                        <p className="text-sm opacity-70"><Trans>Prüft die Mollie-Konfiguration (Schlüssel-Modus, Webhook-URL,
+                            Methodenliste, Konto und Zahlungsbereitschaft) — nur bei explizitem Klick.</Trans></p>
                         <div className="card-actions justify-end">
                             <button
                                 className="btn btn-primary"
-                                data-testid="stripe-check-button"
-                                disabled={stripeChecking}
-                                onClick={handleStripeCheck}
+                                data-testid="mollie-check-button"
+                                disabled={mollieChecking}
+                                onClick={handleMollieCheck}
                             >
-                                {stripeChecking
+                                {mollieChecking
                                     ? <span className="loading loading-spinner"></span>
                                     : <Trans>Verbindung testen</Trans>}
                             </button>
                         </div>
-                        {stripeResults && (
+                        {mollieResults && (
                             <ul className="mt-2 flex flex-col gap-1">
-                                {stripeResults.map((finding) => (
+                                {mollieResults.map((finding) => (
                                     <li
                                         key={finding.key}
                                         className="flex items-center gap-2 text-sm"
-                                        data-testid="stripe-check-result"
+                                        data-testid="mollie-check-result"
                                         data-key={finding.key}
                                         data-status={finding.status}
                                     >
-                                        <span className={`iconify ${STRIPE_CHECK_STATUS_STYLES[finding.status].icon} ${STRIPE_CHECK_STATUS_STYLES[finding.status].text}`}></span>
+                                        <span className={`iconify ${MOLLIE_CHECK_STATUS_STYLES[finding.status].icon} ${MOLLIE_CHECK_STATUS_STYLES[finding.status].text}`}></span>
                                         <span>{finding.message}</span>
                                     </li>
                                 ))}

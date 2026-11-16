@@ -1,9 +1,11 @@
 import {expect, test} from '@playwright/test';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
+import {MOLLIE_PROVIDER_SKIP_REASON, mollieCheckoutConfigured} from '../helpers/MollieE2E';
 import {
     fillPaidCheckoutForm,
     openPaidCartCheckout,
+    stubHostedCheckout,
     submitAndReadCheckout,
     type CheckoutAnswer,
 } from '../helpers/CardTestingCheckoutFixture';
@@ -20,6 +22,7 @@ const IDENTITY_CONFLICT_MESSAGE = 'Dieser Checkout-Versuch wurde bereits mit and
 
 interface CheckoutBody {
     order_id?: string;
+    checkout_url?: string;
     idempotency_conflict?: boolean;
 }
 
@@ -33,8 +36,8 @@ interface CheckoutBody {
  * looks at Stripe: no PaymentIntent id, no Radar state, no provider response.
  */
 const readOrderId = async (answer: CheckoutAnswer): Promise<string> => {
-    const body = await answer.response.json() as CheckoutBody;
-    expect(body.order_id, `Checkout answer carried no order_id: ${JSON.stringify(body)}`).toBeTruthy();
+    const body = JSON.parse(answer.body) as CheckoutBody;
+    expect(body.order_id, `Checkout answer carried no order_id: ${answer.body}`).toBeTruthy();
 
     return String(body.order_id);
 };
@@ -42,7 +45,7 @@ const readOrderId = async (answer: CheckoutAnswer): Promise<string> => {
 test.describe('Card-testing checkout identity', () => {
     // The retry contract needs several real checkout round-trips per test. The
     // sibling `turnstile-checkout.spec.ts` allows two retries for the same
-    // reason (a real Stripe API call per test); local runs pass
+    // reason (a real Mollie API call per test); local runs pass
     // `--retries=0` so a flake cannot hide behind a retry.
     test.describe.configure({retries: 2});
 
@@ -60,9 +63,10 @@ test.describe('Card-testing checkout identity', () => {
         if (helper) await helper.teardown();
     });
 
-    test('a retry after a page reload reuses the pending order instead of opening a second one', {
+    test('a retry after returning from the provider reuses the pending payment instead of opening a second one', {
         tag: ['@regression', '@feature:client:checkout', '@feature:card-testing']
     }, async ({page}) => {
+        test.skip(!mollieCheckoutConfigured(), MOLLIE_PROVIDER_SKIP_REASON);
         // The gallery carries no own `licensing_mode`, so the brand default decides
         // how it is priced (scope licence vs. volume tier). The brand-settings spec
         // writes that mode, so this spec takes the same lock and cannot observe a
@@ -70,6 +74,7 @@ test.describe('Card-testing checkout identity', () => {
         await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
             await openPaidCartCheckout(page, helper, photographer, buyer);
         });
+        await stubHostedCheckout(page);
         const main = page.getByRole('main');
         const checkoutButton = main.getByRole('button', {name: 'Zahlungspflichtig bestellen'});
 
@@ -78,16 +83,20 @@ test.describe('Card-testing checkout identity', () => {
         const first = await submitAndReadCheckout(page, async () => {
             await checkoutButton.click();
         });
-        expect(first.response.status(), await first.response.text()).toBe(200);
+        expect(first.response.status(), first.body).toBe(200);
         const firstOrderId = await readOrderId(first);
-        await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({timeout: 15000});
+        const firstCheckoutUrl = (JSON.parse(first.body) as CheckoutBody).checkout_url;
+        expect(firstCheckoutUrl).toMatch(/^https:\/\/www\.mollie\.com\//);
+        await expect(page).toHaveURL(/^https:\/\/www\.mollie\.com\//, {timeout: 15000});
+        expect(page.url()).toBe(firstCheckoutUrl);
 
-        // A refresh is the ordinary way a customer comes back to an unfinished
+        // Coming back is the ordinary way a customer returns to an unfinished
         // checkout, and it is the one interruption the browser cannot resume
-        // from memory: `clientSecret` is React state, the cart is in
-        // `localStorage` and the checkout identity is in `sessionStorage`. The
-        // remount has to find both, or the retry becomes a second purchase.
-        await page.reload();
+        // from memory: the payment state lives on the provider's page, the cart
+        // is in `localStorage` and the checkout identity is in
+        // `sessionStorage`. Back on the cart both have to be found again, or the
+        // retry becomes a second purchase.
+        await page.goBack();
         await expect(main.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible({timeout: 15000});
         await expect(main.getByTestId('cart-total')).toBeVisible({timeout: 15000});
         // The form comes back from the user profile, not from the failed
@@ -99,7 +108,7 @@ test.describe('Card-testing checkout identity', () => {
         const replay = await submitAndReadCheckout(page, async () => {
             await checkoutButton.click();
         });
-        expect(replay.response.status(), await replay.response.text()).toBe(200);
+        expect(replay.response.status(), replay.body).toBe(200);
         const replayOrderId = await readOrderId(replay);
 
         // 1. One checkout identity across the interruption: the same opaque
@@ -110,18 +119,23 @@ test.describe('Card-testing checkout identity', () => {
         expect(replay.request.headers()['idempotency-key']).toBe(firstKey);
 
         // 2. …and therefore no second order. A distinct id here would mean the
-        //    retry was treated as a new purchase, which on the immediate-Stripe
-        //    path is a second PaymentIntent for one cart.
+        //    retry was treated as a new purchase, which on the immediate-online
+        //    path is a second Mollie payment for one cart.
         expect(replayOrderId).toBe(firstOrderId);
 
-        // 3. The customer is back at the payment step with the same pending
-        //    order, not on an empty cart and not at an error.
-        await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({timeout: 15000});
+        // 3. The resume reuses the persisted attempt, so the customer lands on
+        //    the same hosted payment: no second provider payment, no empty cart,
+        //    no error. A fresh link would be a second charge waiting to happen.
+        const replayCheckoutUrl = (JSON.parse(replay.body) as CheckoutBody).checkout_url;
+        expect(replayCheckoutUrl).toBe(firstCheckoutUrl);
+        await expect(page).toHaveURL(/^https:\/\/www\.mollie\.com\//, {timeout: 15000});
+        expect(page.url()).toBe(firstCheckoutUrl);
     });
 
     test('a reused key with changed billing data surfaces the conflict and the next attempt gets a new key', {
         tag: ['@regression', '@feature:client:checkout', '@feature:card-testing']
     }, async ({page}) => {
+        test.skip(!mollieCheckoutConfigured(), MOLLIE_PROVIDER_SKIP_REASON);
         const CHANGED_NAME = 'Card Testing E2E Geändert';
 
         // The gallery carries no own `licensing_mode`, so the brand default decides
@@ -131,6 +145,7 @@ test.describe('Card-testing checkout identity', () => {
         await withGlobalSettingsLock(PRICING_STRATEGY_SETTINGS_LOCK, async () => {
             await openPaidCartCheckout(page, helper, photographer, buyer);
         });
+        await stubHostedCheckout(page);
         const main = page.getByRole('main');
         const checkoutButton = main.getByRole('button', {name: 'Zahlungspflichtig bestellen'});
 
@@ -139,10 +154,11 @@ test.describe('Card-testing checkout identity', () => {
         const first = await submitAndReadCheckout(page, async () => {
             await checkoutButton.click();
         });
-        expect(first.response.status(), await first.response.text()).toBe(200);
+        expect(first.response.status(), first.body).toBe(200);
         const firstOrderId = await readOrderId(first);
         const firstKey = first.request.headers()['idempotency-key'];
         expect(firstKey).toBeTruthy();
+        await expect(page).toHaveURL(/^https:\/\/www\.mollie\.com\//, {timeout: 15000});
 
         // Same cart, same session, one billing field changed. The browser's
         // recovery key is tied to the cart marker only
@@ -151,8 +167,8 @@ test.describe('Card-testing checkout identity', () => {
         // additionally hashes the billing block into the canonical fingerprint
         // (`fingerprint()`: `'billing_name' => $request->input('billing_name'),`).
         // Same key, different fingerprint is the identity-mismatch case the
-        // contract answers with `409`, never with a second PaymentIntent.
-        await page.reload();
+        // contract answers with `409`, never with a second provider payment.
+        await page.goBack();
         await expect(main.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible({timeout: 15000});
         await fillPaidCheckoutForm(page, CHANGED_NAME);
         await expect(main.getByLabel('Vor- & Nachname')).toHaveValue(CHANGED_NAME);
@@ -162,7 +178,7 @@ test.describe('Card-testing checkout identity', () => {
             await checkoutButton.click();
         });
         expect(conflict.response.status()).toBe(409);
-        const conflictBody = await conflict.response.json() as CheckoutBody;
+        const conflictBody = JSON.parse(conflict.body) as CheckoutBody;
         expect(conflictBody.idempotency_conflict).toBe(true);
         // The conflicting attempt really did reuse the key; otherwise this test
         // would be asserting the wrong thing.
@@ -189,12 +205,12 @@ test.describe('Card-testing checkout identity', () => {
         const recovery = await submitAndReadCheckout(page, async () => {
             await checkoutButton.click();
         });
-        expect(recovery.response.status(), await recovery.response.text()).toBe(200);
+        expect(recovery.response.status(), recovery.body).toBe(200);
         const recoveryOrderId = await readOrderId(recovery);
         const recoveryKey = recovery.request.headers()['idempotency-key'];
         expect(recoveryKey).toBeTruthy();
         expect(recoveryKey).not.toBe(firstKey);
         expect(recoveryOrderId).not.toBe(firstOrderId);
-        await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({timeout: 15000});
+        await expect(page).toHaveURL(/^https:\/\/www\.mollie\.com\//, {timeout: 15000});
     });
 });

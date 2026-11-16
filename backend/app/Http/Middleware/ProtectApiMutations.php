@@ -13,6 +13,32 @@ class ProtectApiMutations
 
     private const CSRF_HEADER = 'X-XSRF-TOKEN';
 
+    /**
+     * Server-to-server callbacks: no browser, no cookie, no CSRF token. They
+     * authenticate themselves — Stripe by signature, the FTP event by its
+     * shared secret, Mollie by re-reading the payment with the server
+     * credential.
+     *
+     * @var array<int, string>
+     */
+    private const TRUSTED_INGRESS_PATHS = [
+        'api/webhooks/stripe',
+        'api/webhooks/mollie',
+        'api/internal/ftp/upload-event',
+    ];
+
+    /**
+     * Paths whose provider posts a form body instead of JSON. Mollie's classic
+     * webhook sends `application/x-www-form-urlencoded` with a single `id`,
+     * which the JSON/multipart boundary rejects with 415 — measured on a real
+     * test payment whose webhook Mollie retried and gave up on.
+     *
+     * @var array<int, string>
+     */
+    private const FORM_ENCODED_PATHS = [
+        'api/webhooks/mollie',
+    ];
+
     /** @var array<int, string> */
     private const MULTIPART_PATHS = [
         'api/management/upload',
@@ -33,8 +59,7 @@ class ProtectApiMutations
                 return response()->json(['error' => 'Unsupported mutation content type.'], 415);
             }
 
-            $isTrustedIngress = $request->is('api/webhooks/stripe')
-                || $request->is('api/internal/ftp/upload-event');
+            $isTrustedIngress = $this->matchesPath($request, self::TRUSTED_INGRESS_PATHS);
 
             if (! $isTrustedIngress && ! $this->hasAllowedOrigin($request)) {
                 return response()->json(['error' => 'Cross-origin mutation rejected.'], 403);
@@ -71,11 +96,29 @@ class ProtectApiMutations
             return true;
         }
 
+        if ($contentType === 'application/x-www-form-urlencoded') {
+            return $this->matchesPath($request, self::FORM_ENCODED_PATHS);
+        }
+
         if ($contentType !== 'multipart/form-data') {
             return false;
         }
 
         foreach (self::MULTIPART_PATHS as $path) {
+            if ($request->is($path)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<int, string>  $paths
+     */
+    private function matchesPath(Request $request, array $paths): bool
+    {
+        foreach ($paths as $path) {
             if ($request->is($path)) {
                 return true;
             }

@@ -61,15 +61,18 @@ beschreibt. Compose verwendet `/` als Default. Ein Unterordner muss im UI und
 in der Kamera identisch eingetragen sein, sonst schreibt die Kamera in einen
 Ordner, den der Import nie liest.
 
-### Stripe (Live) — drei Werte, die zusammenpassen müssen
+### Stripe (Live) — drei Werte der historischen Fläche
 
-Der Backend-Container liest drei Stripe-Werte. Sie stehen in der Host-`.env`
-und müssen zum selben Stripe-Konto gehören. Alle drei
+Neue Online-Zahlungen laufen über Mollies gehostete Checkout-Seite
+([D-63](../features/owner-decisions.md#d-63-mollie-collects-the-payment-the-portal-issues-the-invoice-and-offers-only-non-bnpl-methods));
+Stripe bleibt für die Historie im Einsatz (alte Payment Intents, Erstattungen,
+Disputes) und nimmt keine neuen Zahlungen an. Die drei Stripe-Werte bleiben
+deshalb in der Host-`.env` und müssen zum selben Stripe-Konto gehören. Alle drei
 gehören zum Konto `acct_1UQksN0qxbyNaMES` (Umstellung am 2026-10-15):
 
 | Variable | Form | Herkunft |
 |---|---|---|
-| `STRIPE_KEY` | `pk_live_…` | Publishable Key — wird beim Build ins Frontend-Bundle gebacken |
+| `STRIPE_KEY` | `pk_live_…` | Publishable Key — wird nicht mehr ins Frontend-Bundle gebacken, das Frontend lädt kein Stripe.js mehr |
 | `STRIPE_SECRET` | `rk_live_…` | eingeschränkter Live-Key (Least Privilege) |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` | Signatur-Secret des Live-Endpunkts `we_1UQlhS0qxbyNaMESN5PNyhlM` |
 
@@ -97,6 +100,58 @@ Drei Fallen, alle drei belegt:
 
 Gegenprobe nach dem Deploy: im Dashboard beim Endpunkt **„Send test webhook"** →
 **HTTP 200** heißt Signatur stimmt, **400** heißt der `whsec` passt nicht.
+
+> **Status 2026-11-11:** Stripe ist für **neue** Online-Zahlungen abgelöst
+> (Issue #53). Die Werte bleiben nur für historische Bestellungen lesbar; es
+> gibt keinen Parallelbetrieb und keinen Rückfall auf Stripe. Neue Zahlungen
+> laufen über Mollie (nächster Abschnitt).
+
+### Mollie (Live) — Anbieter für neue Online-Zahlungen
+
+Der Backend-Container liest die Mollie-Werte aus der Host-`.env`
+(Contract: `features/infrastructure/30-mollie-payments.md`):
+
+| Variable | Form | Bedeutung |
+|---|---|---|
+| `MOLLIE_KEY` | `live_…` / `test_…` | serverseitiger API-Key; sein Präfix wählt den Modus |
+| `MOLLIE_PAYMENT_METHODS` | z. B. `paybybank,eps,creditcard` | Portal-Allowlist in Anzeigereihenfolge; der erste Eintrag ist der Default |
+| `MOLLIE_PAYMENT_METHOD` | z. B. `creditcard` | **deprecated**, nur Fallback wenn `MOLLIE_PAYMENT_METHODS` leer ist |
+| `MOLLIE_WEBHOOK_URL` | `https://…/api/webhooks/mollie` | **Pflicht** in jeder Umgebung, muss HTTPS-förmig sein; die Erreichbarkeit prüft Mollie beim Anlegen |
+| `MOLLIE_IDEMPOTENCY_WINDOW_MINUTES` | `60` | Fenster, in dem ein hängengebliebenes Create wiederholt werden darf |
+
+Eine leere Liste, ein ungültiger oder ein BNPL-Eintrag (`klarna`, `in3`,
+`billie`, `riverty`, `voucher`, `giftcard`) deaktiviert die **gesamte** Liste
+und damit die Zahlungsanlage; der Eintrag wird nie stillschweigend entfernt.
+Fehlt `MOLLIE_KEY`, ist die Liste leer oder fehlt eine HTTPS-förmige
+`MOLLIE_WEBHOOK_URL`, antwortet der Checkout mit **503** und legt weder
+Bestellung noch Zahlung an — fail closed, kein Stripe-Fallback. Vor der Live-Freigabe sind
+Kontofreischaltung, Methode und Gebühren zu entscheiden (Issue #54) und ein
+Testmodus-Durchlauf nachzuweisen (Issue #55).
+
+Das Webhook-Ziel muss über HTTPS erreichbar sein; Mollie sendet nur die
+Payment-ID, den Status holt das Backend authentifiziert nach. Keine
+IP-Allowlist, kein Embedding — der Kunde wird auf die gehostete Seite
+weitergeleitet. Deshalb braucht die CSP keine neuen `script`/`frame`/`connect`
+Quellen.
+
+Ist `MOLLIE_WEBHOOK_URL` leer, fehlt sie oder ist sie kein HTTPS-Ziel, legt
+der Checkout **gar keine Zahlung** an und verbraucht auch keine
+Rechnungsnummer: der Wert wird nur auf Vorhandensein und Schema geprüft, ein
+fehlender oder reiner HTTP-Wert wird deshalb schon vorher mit **503**
+abgewiesen (Log-Grund `webhook_url_missing` bzw. `webhook_url_invalid`). Es
+gibt keinen `APP_URL`-Fallback.
+
+Ob die URL tatsächlich erreichbar ist, kann der Checkout nicht prüfen — das
+beweist erst Mollie beim Anlegen der Zahlung. Eine formal gültige, aber
+veraltete `https://<alter-tunnel>/…`-URL passiert die Vorprüfung; Mollie
+antwortet dann mit **422**, es wird ein Versuch angelegt und der Kunde erhält
+trotzdem eine **503**. Eine unerreichbare oder veraltete URL ist damit kein
+stiller Erfolg, aber auch keine Vorab-Garantie: sie zeigt sich als
+Provider-Fehler im Log (`reason: rejected`) und muss am Host korrigiert werden.
+
+Die Regel gilt auch lokal: für Testläufe mit echter Zahlungsanlage ist ein
+öffentlicher HTTPS-Tunnel nötig, sonst überspringen sich die vier
+Provider-E2E-Specs namentlich.
 
 ### FTP-Upload-Events (D-36) — interner Listener und Provisionierung
 

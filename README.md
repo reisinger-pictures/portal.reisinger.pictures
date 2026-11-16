@@ -129,8 +129,27 @@ Danach den PHP-Prozess neu starten, damit er die Tools findet.
   Admin-Passwort-Fallback.
 - **Datenbank:** SQLite-Datei `backend/database/database.sqlite` (kein DB-Container; Einrichtung via `php artisan migrate:fresh --seed`)
 
-### Stripe Webhooks (Lokal Testen)
-Führe `stripe listen --forward-to localhost:8000/api/webhooks/stripe` aus und trage das ausgegebene `STRIPE_WEBHOOK_SECRET` in die `.env` Datei im Backend ein.
+### Mollie-Webhooks (Lokal Testen)
+Neue Online-Zahlungen laufen über Mollies gehostete Checkout-Seite: das Portal
+legt die Zahlung an, gibt die `checkout_url` zurück und der Browser wechselt
+dorthin. Der Webhook bleibt trotzdem **Pflicht in jeder Umgebung** und muss eine
+öffentliche HTTPS-URL sein:
+
+- `MOLLIE_WEBHOOK_URL` in `backend/.env` auf eine öffentliche HTTPS-URL setzen,
+  die auf den lokalen Backend-Port zeigt (z. B. ein Tunnel auf
+  `http://127.0.0.1:8000`).
+- `localhost` und reines `http://` werden abgelehnt: Mollie prüft die
+  Erreichbarkeit beim Anlegen der Zahlung und antwortet mit HTTP 422; ohne
+  gültige URL antwortet der Checkout mit **503** und legt keine Bestellung an.
+- Ohne Tunnel überspringen sich die vier providerabhängigen E2E-Specs namentlich.
+
+Variablen, Cutover und Betrieb: `deployment/README.md`, Abschnitt „Mollie (Live)",
+und `features/infrastructure/30-mollie-payments.md#cutover-and-operations`.
+
+Der historische Stripe-Webhook (`POST /api/webhooks/stripe`) bleibt
+serverseitig für Altbestellungen erreichbar. Das ist kein lokaler
+Entwickler-Workflow mehr — Stripe nimmt keine neuen Zahlungen an, und das
+Stripe-CLI ist global entfernt.
 
 ## Lokale E2E-Tests isoliert ausführen (eigene Backend-Instanz + SQLite-DB)
 

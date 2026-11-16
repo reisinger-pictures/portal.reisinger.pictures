@@ -46,8 +46,25 @@ test.describe('Rechtliche Seiten (AGB & Widerruf) (G)', () => {
 
         await expect(main.getByRole('heading', { name: '4. Zahlungsabwicklung und Betrugsprävention' })).toBeVisible();
 
+        // The current provider for new online payments, with what is sent and
+        // what is deliberately not sent.
+        const mollieParagraph = main.locator('p').filter({
+            hasText: 'Für neue Online-Zahlungen ist die Mollie B.V.'
+        });
+        await expect(mollieParagraph).toBeVisible();
+        await expect(mollieParagraph).toContainText('Bestell- und Vorgangsreferenz');
+        await expect(mollieParagraph).toContainText('die Kennung der Bestellung');
+        await expect(mollieParagraph).toContainText('die laufende Nummer des Zahlungsversuchs');
+        await expect(mollieParagraph).toContainText('von Mollie gehostete Checkout-Seite');
+
+        const molliePaymentIdParagraph = main.locator('p').filter({
+            hasText: 'Für jede über Mollie abgewickelte Zahlung speichern wir die von Mollie vergebene Zahlungs-ID'
+        });
+        await expect(molliePaymentIdParagraph).toBeVisible();
+        await expect(molliePaymentIdParagraph).toContainText('keine Kartendaten');
+
         const paymentIdentifiersParagraph = main.locator('p').filter({
-            hasText: 'Zur eindeutigen Zuordnung speichern wir die Stripe Customer-ID'
+            hasText: 'Für diese historischen Stripe-Bestellungen speichern wir die Stripe Customer-ID'
         });
         await expect(paymentIdentifiersParagraph).toBeVisible();
         await expect(paymentIdentifiersParagraph).toContainText('Stripe Customer-ID');
@@ -55,7 +72,7 @@ test.describe('Rechtliche Seiten (AGB & Widerruf) (G)', () => {
         await expect(paymentIdentifiersParagraph).toContainText('Checkout-Fingerprint-Hash');
 
         const paymentTelemetryParagraph = main.locator('p').filter({
-            hasText: 'Bei fehlgeschlagenen Zahlungen verarbeiten wir begrenzte PaymentIntent-Fehler-/Decline-Telemetrie'
+            hasText: 'Bei fehlgeschlagenen historischen Stripe-Zahlungen verarbeiten wir begrenzte PaymentIntent-Fehler-/Decline-Telemetrie'
         });
         await expect(paymentTelemetryParagraph).toBeVisible();
         await expect(paymentTelemetryParagraph).toContainText('PaymentIntent-Fehler-/Decline-Telemetrie');
@@ -68,7 +85,7 @@ test.describe('Rechtliche Seiten (AGB & Widerruf) (G)', () => {
         await expect(checkoutSessionParagraph).toContainText('Sitzungsspeicher');
 
         const paymentProcessorParagraph = main.locator('p').filter({
-            hasText: 'Stripe ist der eingesetzte Zahlungsdienstleister und Zahlungsprozessor'
+            hasText: 'bleibt Stripe der damalige Zahlungsdienstleister und Zahlungsprozessor'
         });
         await expect(paymentProcessorParagraph).toBeVisible();
         await expect(paymentProcessorParagraph).toContainText('Zahlungsprozessor');

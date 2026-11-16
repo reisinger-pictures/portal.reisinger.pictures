@@ -135,7 +135,7 @@ class WithdrawalConsentTest extends TestCase
                 'billing_street' => 'Str 1',
                 'billing_zip' => '1234',
                 'billing_city' => 'City',
-                'payment_method' => 'stripe',
+                'payment_method' => 'mollie',
                 'withdrawal_waived' => false,
             ]);
 
@@ -294,7 +294,7 @@ class WithdrawalConsentTest extends TestCase
             'billing_street' => 'Str 1',
             'billing_zip' => '1234',
             'billing_city' => 'City',
-            'payment_method' => 'stripe',
+            'payment_method' => 'mollie',
             'withdrawal_waived' => true,
         ], $overrides);
     }

@@ -51,12 +51,10 @@ class InfrastructureSupplyChainPolicyTest extends TestCase
 
     /**
      * The Stripe test secrets the E2E job injects and the preflight has to
-     * guard.
-     *
-     * All three are read during an E2E run: the secret key by the balance
-     * probe, the publishable key by the Vite build (`VITE_STRIPE_PUBLIC_KEY`
-     * falls back to `STRIPE_KEY`, so guarding `STRIPE_KEY` covers it) and the
-     * webhook secret by the Stripe self-test (`local_key_mode`).
+     * guard. Stripe takes no new payments (D-63), so these values only serve
+     * the historical order/webhook surface; the preflight still requires them
+     * because the job injects them and an unset secret must fail loudly rather
+     * than surface later as a transport error.
      */
     private const E2E_STRIPE_TEST_SECRETS = [
         'STRIPE_KEY',

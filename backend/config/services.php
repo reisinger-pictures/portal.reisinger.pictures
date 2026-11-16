@@ -1,9 +1,26 @@
 <?php
 
+use App\Support\MollieMethodList;
+
 $sftpGoBaseUrl = env('SFTPGO_BASE_URL', 'http://sftpgo:8080');
 $sftpGoInternalHost = is_string($sftpGoBaseUrl)
     ? parse_url($sftpGoBaseUrl, PHP_URL_HOST)
     : null;
+
+/*
+ * `MOLLIE_PAYMENT_METHODS` is the portal-side allowlist: its format is a
+ * comma-separated list, parsed here so a cached config keeps the same shape.
+ * Values are trimmed, lowercased and emptied entries dropped; order is the
+ * customer-visible order and the first entry is the default. The deprecated
+ * single `MOLLIE_PAYMENT_METHOD` is only a fallback for environments that
+ * predate the list. Format and BNPL validation deliberately live in
+ * `MolliePaymentService`, which fails closed for the whole list when one
+ * entry is not allowed.
+ */
+$mollieMethods = MollieMethodList::resolve(
+    env('MOLLIE_PAYMENT_METHODS'),
+    env('MOLLIE_PAYMENT_METHOD'),
+);
 
 return [
 
@@ -44,6 +61,23 @@ return [
         'key' => env('STRIPE_KEY'),
         'secret' => env('STRIPE_SECRET'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+
+    /*
+     * Mollie is the online-payment provider for new orders (issue #53). The
+     * key is server-only; test/live mode comes from its `test_`/`live_`
+     * prefix. `methods` is the explicit portal-side allowlist; an empty,
+     * malformed or BNPL-containing list disables payment creation (no method
+     * is guessed). `webhook_url` is mandatory in every environment and must be
+     * an HTTPS endpoint Mollie can reach; there is no fallback, and a missing
+     * or plain-HTTP value disables payment creation.
+     */
+    'mollie' => [
+        'key' => env('MOLLIE_KEY'),
+        'methods' => $mollieMethods,
+        'webhook_url' => env('MOLLIE_WEBHOOK_URL'),
+        'idempotency_window_minutes' => max(5, (int) env('MOLLIE_IDEMPOTENCY_WINDOW_MINUTES', 60)),
+        'max_attempts' => max(1, (int) env('MOLLIE_MAX_ATTEMPTS', 5)),
     ],
 
     'turnstile' => [

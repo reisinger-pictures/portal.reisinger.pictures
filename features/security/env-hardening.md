@@ -41,7 +41,7 @@ Die ausdrücklich erlaubten Dateien sind nicht alle Starter-Templates:
 | --------------------------------- | ------------------------------------------------------ |
 | `backend/.env.example`            | Dev-Template mit Platzhaltern (APP, DB, Mail, Scout, Stripe, AI, JWT, File Encryption) |
 | `backend/.env.ci`                 | **CI-only Fixture**: wird von den Workflows als `.env` verwendet; enthält Test-/Platzhalterwerte, keine Produktionskonfiguration und kein Developer-Setup |
-| `frontend/.env.example`           | Frontend-Default-Template (`VITE_STRIPE_PUBLIC_KEY` Platzhalter) |
+| `frontend/.env.example`           | Frontend-Default-Template (`VITE_TURNSTILE_SITE_KEY`-Platzhalter; kein Zahlungs-Key) |
 | `frontend/.env.local.example`     | Frontend-Local-Dev-Template (override `.env`)          |
 | `deployment/production-env.keys`  | Inventar der Produktionsvariablennamen ohne Werte      |
 
@@ -101,7 +101,16 @@ Register).
 `STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET` sind verpflichtend über
 Env-Variablen zu setzen. Tests verwenden `Config::set(...)` mit Mock-Werten.
 
-### Stripe-Test-Key: aus dem Dashboard, nicht aus der CLI (2026-10-15)
+### Stripe-Test-Key: aus dem Dashboard, nicht aus der CLI (2026-10-15) — historisch
+
+> **Historisch (retired 2026-11-16).** Die Sektion belegt einen Incident vom
+> 2026-10-15 und bleibt als Evidenz stehen. Die Handlungsanweisung gilt nicht
+> mehr: das Stripe-CLI ist global entfernt, Stripe nimmt keine neuen Zahlungen
+> mehr an (D-63, Mollie hosted checkout), und einen Frontend-Bundle-Key gibt es
+> nicht mehr ([#58](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/58)).
+> Mollie braucht keinen Bundle-Key; seine Konfiguration ist serverseitig und im
+> [Mollie-Vertrag](../infrastructure/30-mollie-payments.md) festgehalten. Wer hier
+> `stripe login` nachliest, folgt einem überholten Ablauf.
 
 `stripe login` legt in `~/.config/stripe/config.toml` einen **eigenen** Test-Key
 ab — nicht den Standard-Key des Kontos. Er trägt ein Ablaufdatum
@@ -111,7 +120,7 @@ die E2E-Kette ab 2026-10-12 rot gemacht; seit dem 2026-10-15 ist sie grün
 (Run `38738659755`, 11/11 Jobs), der Key-Tausch als Ursache bestätigt. Die
 Ursache sah wie ein Testfehler aus, war aber ein abgelaufener Key.
 
-Deshalb gilt für `backend/.env` und die GitHub-Secrets:
+Damals galt für `backend/.env` und die GitHub-Secrets:
 
 - **Test-Secret aus dem Dashboard** (Testmodus → API keys → Secret key). Er
   trägt kein Ablaufdatum; gemessen sind CLI-Key und Dashboard-Key zwei
@@ -125,103 +134,95 @@ Deshalb gilt für `backend/.env` und die GitHub-Secrets:
   „Validate Stripe API key (read + write)". Er schlägt beim ersten Lauf nach
   einer nicht weitergereichten Rotation fehl — laut, nicht still.
 
-## Super-Admin Stripe-Selbsttest `POST /api/management/settings/stripe-check`
+## Super-Admin Mollie-Selbsttest `POST /api/management/settings/mollie-check`
 
-Dauerhafter SOLL-Zustand. Der Endpunkt bündelt fünf reine Diagnosen, mit denen ein
-Super-Admin die Stripe-Verdrahtung prüft, ohne Repo oder Host öffnen zu müssen. Er
-adressiert die D-24-Klasse (falscher Modus / fehlender `VITE_STRIPE_PUBLIC_KEY` im
-Bundle) als *sichtbaren Befund* statt als stillen Deploy-Fehler.
+Der Endpunkt bündelt fünf reine Diagnosen über die Mollie-Verdrahtung, ohne Repo
+oder Host öffnen zu müssen. Er beantwortet die Frage, die ein Betreiber
+tatsächlich hat: *kann diese Installation gerade eine Zahlung annehmen, und in
+welchem Modus?* (Owner Decision
+[D-63](../owner-decisions.md#d-63-mollie-collects-the-payment-the-portal-issues-the-invoice-and-offers-only-non-bnpl-methods);
+Konfigurationsvertrag: [Mollie payments](../infrastructure/30-mollie-payments.md)).
+Er ersetzt den Stripe-Selbsttest aus
+[#59](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/59):
+Stripe nimmt keine neuen Zahlungen mehr an, und die frühere D-24-Klasse
+(falscher Modus / fehlender Zahlungs-Key im Frontend-Bundle) ist mit
+[#58](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/58)
+entfallen — Mollies gehostete Checkout-Seite lädt ihre eigene Seite, das Bundle
+trägt keinen Provider-Key. Die Modus-Prüfung des Schlüssels leistet jetzt
+`key_mode`.
 
 **Route.** `backend/routes/api.php` — im `Route::middleware(['super_admin'])`-Block,
 direkt neben dem SMTP-Nachbarn mit dem Namen `api.management.settings.test-email`;
-eigener Name `api.management.settings.stripe-check`. Kette: äußerer
+eigener Name `api.management.settings.mollie-check`. Kette: äußerer
 `['auth:api', 'management']`-Group, dann `SuperAdminMiddleware`. Gast → **401**
 (`auth:api`), Nicht-Super-Admin → **403** (`SuperAdminMiddleware::handle` prüft
 `AuthorizationService::isSuperAdmin`), Fotograf → **403** (schon die
-`ManagementMiddleware`, denn `settings/stripe-check` ist nicht in ihrer
+`ManagementMiddleware`, denn `settings/mollie-check` ist nicht in ihrer
 Prefix-Allowlist).
 
-**Request.** `{"bundle_mode": "test"|"live"|null}`. `bundle_mode` ist
-`nullable|in:test,live`, inline validiert in `StripeKeyCheckController::check`.
-`null` oder fehlend ist **kein** 422, sondern der Befund der Prüfung 2 — genau die
-Fehlerklasse „kein `VITE_STRIPE_PUBLIC_KEY` im Bundle", die der Selbsttest sichtbar
-machen soll.
+**Request.** Kein Body. Das Frontend sendet `{}`; es gibt keinen Modus-Parameter
+und keine Nutzereingabe, die den Befund verändern könnte.
 
 **Response 200.** Immer `{"checks":[…]}`, stabile Reihenfolge, jedes Element
 `{"key","status","message"}` mit deutscher `message`. Außer Authentifizierung gibt
-es **keinen** Stripe-Fehlerpfad: selbst ein fehlgeschlagener Stripe-Aufruf — oder
-ein Client, der sich mit der konfigurierten Umgebung gar nicht erst bauen lässt —
-wird zur `fail`-Meldung. `status`: `ok` = geprüft und korrekt, `warn` = auffällig, aber
-nicht blockierend, `fail` = kaputt/inkonsistent.
+es **keinen** Provider-Fehlerpfad: jeder fehlgeschlagene Mollie-Aufruf — und jede
+fehlende oder kaputte Konfiguration — wird zur `fail`-Meldung, nie zum 500.
+`status`: `ok` = geprüft und korrekt, `warn` = auffällig, aber nicht blockierend,
+`fail` = kaputt/inkonsistent.
 
 | # | `key` | Prüft | warum `warn` statt `fail` |
 |---|-------|-------|---------------------------|
-| 1 | `local_key_mode` | `STRIPE_KEY` und `STRIPE_SECRET` tragen denselben Modus, dieser entspricht dem Soll-Modus, `STRIPE_WEBHOOK_SECRET` ist gesetzt (Env oder — nur in `local`/`testing` — das Tunnel-Artefakt, beides über `App\Support\StripeWebhookSecret`). Rein lokal, kein Netz. | — (jeder Verstoß ist `fail`) |
-| 2 | `frontend_bundle_mode` | `bundle_mode` gleich dem Modus des Server-`STRIPE_KEY`; `null` heißt „Schlüssel fehlt im Bundle". Es wird nur der Modus verglichen, nie ein Key-Wert. | — |
-| 3 | `stripe_balance` | `$stripe->balance->retrieve()`, gültig und `livemode` gleich Soll-Modus. Ein Stripe-Code (z. B. `api_key_expired`, `more_permissions_required`) wird wörtlich durchgereicht, nicht verflacht. | — |
-| 4 | `stripe_account` | `$stripe->accounts->retrieve()`; sobald das Konto abrufbar ist, steht die `id` (`acct_…`) in der Meldung. | Nicht gesetzte `charges_enabled`/`payouts_enabled`/`details_submitted` sind `warn`, weil Zahlungen trotzdem gehen können. |
-| 5 | `stripe_webhook_endpoint` | `$stripe->webhookEndpoints->all(['limit' => 100])`; gesuchte URL wird **so** gebaut, wie die App sie sonst baut (`rtrim(BrandRegistry::frontendUrl(), '/').'/api/webhooks/stripe'`). Kein Endpunkt / nicht `enabled` → `fail`; `enabled`, aber Events aus `StripeKeyCheckService::REQUIRED_WEBHOOK_EVENTS` fehlen → `warn` (fehlende benannt). | Fehlende Events bremsen die Verarbeitung, blockieren aber keine Zahlung. |
+| 1 | `key_mode` | Ist `MOLLIE_KEY` gesetzt, und welchen Modus trägt sein Präfix (`test`/`live`, über `MolliePaymentService::mode()`)? Rein lokal, kein Netz. Ein fehlender oder unkenntlicher Schlüssel ist ein Befund, keine Exception. | — (jeder Verstoß ist `fail`) |
+| 2 | `webhook_url` | Ist `MOLLIE_WEBHOOK_URL` gesetzt, HTTPS und mit Host (`MolliePaymentService::webhookUrlIssue()`)? Die Prüfung ist in **jedem** Environment Pflicht; ein fehlender oder reiner HTTP-Wert deaktiviert die Zahlungsanlage mit `503`. Die konfigurierte URL wird berichtet — eine URL ist kein Secret. | — (jeder Verstoß ist `fail`) |
+| 3 | `methods` | Die aufgelöste Allowlist aus `MOLLIE_PAYMENT_METHODS` (bzw. dem deprecated Einzelwert): nicht leer, jede ID gültig und keine BNPL-/Ratenzahlungsfamilie (`FORBIDDEN_PAYMENT_METHODS`). Eine kaputte Liste leert die **ganze** Liste und armt dasselbe `503`. Die Meldung nennt die ID. | — (jeder Verstoß ist `fail`) |
+| 4 | `account` | Genau **ein** authentifizierter Provider-Aufruf über `MolliePaymentService::account()` (aktuelles Profil, `GET /v2/profiles/me` über das SDK). Berichtet Profil-ID, Modus und Status. Der Profil-Modus ist rein informativ: Mollie meldet dort auch für einen Test-Schlüssel `live` (gemessen 2026-11-16), deshalb entscheidet allein der Status. | Ein erreichbares, aber unverifiziertes Profil bremst die Live-Annahme, blockiert die Diagnose aber nicht: `warn`. `blocked` ist `fail`. |
+| 5 | `readiness` | Genau der Boolean, den der Checkout-Gate benutzt: `canCreatePayment()` (Key **und** brauchbare Webhook-URL **und** ≥1 zugelassene Methode). Bei `fail` nennt die Meldung den Grund aus `configurationIssue()`. | — (der Gate ist binär) |
 
-Die fünf Ereignisse, auf die der Checkout-/Dispute-Flow angewiesen ist:
-`payment_intent.succeeded`, `payment_intent.payment_failed`,
-`charge.dispute.created`, `charge.dispute.closed`, `charge.refunded`.
+**Kein Key-Material in der Antwort.** Der Schlüsselwert wird nie gedruckt — auch
+nicht in `key_mode`, das nur den Modus nennt. Zusätzlich laufen alle aufgebauten
+Meldungen durch `MolliePaymentCheckService::redactSecrets()`, das
+`test_…`/`live_…`-Muster entfernt; der Adapter (`MolliePaymentException`) trägt
+ohnehin nur ein geschlossenes `reason`-Vokabular und keinen Provider-Text. Die
+Profil-ID (`pfl_…`) ist ausdrücklich erlaubt und gewollt — der Admin soll sehen,
+*welches* Profil verdrahtet ist. Ein abgelehnter Schlüssel wird zu
+`request_failed` (Schlüssel ungültig/abgelaufen/ohne Berechtigung), nicht zum
+Rohfehler von Mollie.
 
-Die Event-Auswahl wird im Stripe-Dashboard gepflegt, nicht in diesem Repository:
-kein Code, keine Migration und kein Deploy legt sie an oder ändert sie. Prüfung 5
-meldet eine fehlende Auswahl deshalb nur als `warn`; die Korrektur ist eine
-Dashboard-Aktion am Endpunkt `…/api/webhooks/stripe`. Die Code-Seite der Prüfung
-ist die Konstante `StripeKeyCheckService::REQUIRED_WEBHOOK_EVENTS`; sie muss
-dieselbe Ereignismenge abdecken wie der Flow, sonst meldet die Prüfung eine
-fehlende Dashboard-Auswahl nicht.
+**Naht & Tests.** `MolliePaymentCheckService::__construct(MolliePaymentService $mollie)`
+injiziert die bestehende Adapter-Naht; die Tests fälschen über
+`Tests\Support\FakesMollie` und den SDK-eigenen `MockMollieClient` einen
+deterministischen Provider statt Netz zu rühren. Die Modus-Ableitung bleibt im
+Adapter (`mode()`), die Provider-Aufruf- und Exception-Abbildung ebenfalls. Gepinnt
+in `MolliePaymentCheckControllerTest`: super_admin 200 / normaler Admin 403 / Gast
+401 / Fotograf 403, je ein Fall für fehlenden Schlüssel (kein 500), fehlenden und
+reinen HTTP-Webhook, denylistete und leere und ungültige Methodenliste,
+Provider-401 (`account` `fail`, `key_mode` weiter `ok`), unverifiziertes Profil
+(`warn`), gesunde Konfiguration (alle `ok`, `readiness` `ok`) und ein
+Canary-Test, der einen erkennbaren `test_…`-Schlüssel in die Config legt und
+belegt, dass er in keiner Antwort auftaucht.
 
-**Soll-Modus aus APP_ENV.** `StripeKeyMode::fromEnvironment()` bildet
-`config('app.env')` ab: `production` → `live`, alles andere (`local`, `testing`, …)
-→ `test`. **Keine** zusätzliche Setting-Zeile, **kein** neues Env. Den Modus eines
-einzelnen Keys leitet `StripeKeyMode::fromKey()` rein aus dem Token direkt hinter
-dem Präfix ab (`pk`/`sk`/`rk` × `_test_`/`_live_`); ein `_test_`/`_live_` im
-Zufallsanteil zählt **nicht**, unbekanntes Präfix, leerer Wert oder `null` ergeben
-`null`. Beides sind reine Funktionen ohne `config()`-Zugriff — die Config liest der
-Aufrufer (`StripeKeyCheckService`), damit der Config-Cache nicht durch `env()`
-unterlaufen wird.
+**E2E.** Die Suite `frontend/tests/e2e/admin/settings/mollie-check.spec.ts` prüft
+nur, was jede Umgebung garantiert: die Karte existiert für den Super-Admin und
+fehlt für einen normalen Admin, nichts läuft vor dem Klick, alle fünf Befunde
+erscheinen in fester Reihenfolge mit nicht-leerer Meldung und einem Status aus
+`ok|warn|fail`, und der Schlüsselwert steht nirgends auf der Seite. Die
+provider- und umgebungsabhängigen Status werden **nicht** assertiert:
+`backend/.env.e2e` lässt `MOLLIE_WEBHOOK_URL` bewusst leer (kein öffentlicher
+Tunnel), also sind `webhook_url` und `readiness` dort legitim `fail`, und
+`account` ist eine echte Netzabfrage. Die Zweige jedes Befunds leben in PHPUnit.
+`scripts/e2e-up.sh` setzt deshalb keinen Stripe-Dummy mehr
+(`E2E_STRIPE_WEBHOOK_SECRET` ist entfallen): der frühere Wert existierte nur für
+Prüfung 1 des alten Selbsttests.
 
-**Kein Key-Material in der Antwort.** Niemals `sk_…`/`pk_…`/`rk_…`/`whsec_…`-Werte.
-Die Konto-ID (`acct_…`) und die Webhook-Endpunkt-ID (`we_…`) sind ausdrücklich
-erlaubt und gewollt — ein Admin soll sehen, *welches* Konto verdrahtet ist. Da
-Stripe einen fehlerhaften/abgelaufenen Key u. U. maskiert (`sk_test_…***`) im
-Fehlertext spiegelt, läuft jede übernommene Stripe-Fehlermeldung vor dem
-Rausschreiben durch `StripeKeyCheckService::describeStripeError()` →
-`redactSecrets()`, das Key-Fragmente auf `***entfernt***` reduziert.
+**Historischer Stripe-Webhook.** Der Altbestand bleibt erreichbar: der
+Stripe-Webhook unter `/api/webhooks/stripe` verifiziert weiterhin mit
+`App\Support\StripeWebhookSecret::resolve()` — `STRIPE_WEBHOOK_SECRET` aus der Env,
+in `local`/`testing` als Fallback das Tunnel-Artefakt. `isTunnelFallback()` hatte
+seit dem Mollie-Selbsttest keinen Aufrufer mehr und ist entfernt; der
+Ingress-Pfad ist unverändert.
 
-**Naht & Tests.** `StripeKeyCheckService::__construct(?StripeClient $stripe = null)`
-übernimmt 1:1 das Muster von `StripePaymentService`: ein injizierbarer
-`StripeClient`, damit die Tests über die `Stripe\ApiRequestor::setHttpClient()`-Naht
- deterministisch faken (Helper `MocksStripeClient::mockStripeApi`) statt Netz zu
-rühren. Der Client wird **erst beim Bedarf** aufgelöst (je Netz-Prüfung, nicht im
-Konstruktor): mit fehlendem oder leerem `STRIPE_SECRET` wirft `new StripeClient(…)`
-selbst, und genau diese Fehlkonfiguration soll der Endpunkt diagnostizieren — sie
-wird deshalb wie jeder andere Stripe-Fehler zur `fail`-Meldung, nicht zum 500.
-Prüflogik lebt vollständig im Service, der Controller hält nur Validierung
-und Aufruf. Gepinnt: `StripeKeyModeTest` (Grenzfälle der Modus-Ableitung) und
-`StripeKeyCheckControllerTest` (super_admin 200 / normaler Admin 403 / Gast 401 /
-Fotograf 403, plus je ein Fall pro Befund inkl. `bundle_mode: null`, abgelaufener
-Key, fehlender/disabled/event-unvollständiger Endpunkt, Konto ohne
-`charges_enabled`, ein Stripe-Fehler auf dem Konto- und dem Endpunkt-Pfad sowie
-ein gar nicht baubarer Client; `assertNoSecretMaterial()` prüft jede Befund-Antwort
-auf fehlende `sk_`/`pk_`/`whsec_`-Werte).
-
-**Prüfung 5 bleibt in jedem Environment streng** — fehlender Endpunkt ist überall
-`fail`, nicht umgebungsabhängig. Der E2E-Lauf prüft deshalb nur die vier
-umgebungsdeterministischen Befunde (im Test-Modus existiert kein adressierbarer
-Live-Endpunkt); die Zweige der Prüfung 5 leben in PHPUnit
-(`StripeKeyCheckControllerTest`). Eine dieser vier, `local_key_mode`, hängt neben
-Env und Key-Modus zusätzlich an einem nicht-leeren `STRIPE_WEBHOOK_SECRET`:
-`scripts/e2e-up.sh` setzt dafür einen Dummy (`E2E_STRIPE_WEBHOOK_SECRET`), weil
-`backend/.env` den Wert bewusst leer lässt (Tunnel-Fallback) und ein kalter Lauf
-sonst rot wäre.
-
-**Verifikation** (aus `backend/`): `php artisan test --filter StripeKeyCheck` für
-den Feature-Test, `php artisan test --filter StripeKeyMode` für die pure
-Modus-Ableitung, `./vendor/bin/pint --test` für die Formatierung.
+**Verifikation** (aus `backend/`): `php artisan test --filter MolliePaymentCheck`
+für den Feature-Test und `./vendor/bin/pint --test` für die Formatierung.
 
 ## File Encryption at Rest (2026-09-19)
 
@@ -313,9 +314,13 @@ und ist daher schon gar kein Setup-Ersatz.
 ```bash
 cd frontend
 cp .env.example .env           # oder: cp .env.local.example .env.local
-# VITE_STRIPE_PUBLIC_KEY eintragen
 pnpm install
 ```
+
+Das Frontend kennt nur `VITE_TURNSTILE_SITE_KEY`; einen Zahlungs-Key gibt es
+nicht mehr. Mollie wird ausschließlich serverseitig konfiguriert
+(`MOLLIE_KEY`, `MOLLIE_PAYMENT_METHODS`, `MOLLIE_WEBHOOK_URL` in `backend/.env`,
+Vertrag: [Mollie payments](../infrastructure/30-mollie-payments.md)).
 
 **Welche Datei gewinnt — und warum das für den Deploy zählt.** Vite lädt
 `.env.local` in **allen** Modi, und `pnpm build` läuft als mode=production. Die
@@ -326,27 +331,24 @@ Reihenfolge ist die Aussage, nicht die Zeilennummer):
 
 ```
 .env.production.local  (gitignored)  ← optionaler lokaler Override; höchste Stufe
-.env.production        (gitignored)  ← der Live-Key gehört HIERHIN
+.env.production        (gitignored)  ← Werte, die nur der Live-Build tragen darf
 .env.local             (gitignored)  ← Dev-Override; schlägt `.env` in ALLEN Modi
 .env                   (gitignored)
 ```
 
 `VITE_*` wird beim Build **eingebacken**; die Host-`.env` und lokale
 `.env.production`-Dateien erreichen das Bundle also nie — die Host-`.env`
-versorgt nur den Backend-Container. Ein
-Prod-Build braucht deshalb `frontend/.env.production` mit dem Live-Key. Ohne
-diese Datei trägt das Bundle den Test-Key aus `.env.local` (bzw. `.env`), und
-Stripe.js kann den `client_secret` eines Live-PaymentIntent nicht bestätigen.
+versorgt nur den Backend-Container. Die Regel bleibt für jeden
+`VITE_*`-Wert gültig (heute nur Turnstile), ist aber keine Zahlungsregel mehr.
 
-**Beleg (2026-10-15, gemessen):** `assets/ClientCartView-3L6eh2lZ.js` der
+**Historisch (2026-10-15, gemessen):** `assets/ClientCartView-3L6eh2lZ.js` der
 Live-Seite und dasselbe Chunk im lokalen `frontend/dist/` hatten identische
 `md5` (`67b769fd0dbc1c4f293410433d3d8f9d`) und enthielten beide
 `pk_test_51TJyXb0zjsh…`, während der Backend-Container
-`STRIPE_SECRET=sk_live_…` führte. Prüfzeile nach jedem Build:
-
-```bash
-grep -rho 'pk_live_[A-Za-z0-9]\{12\}' frontend/dist/assets | head -1
-```
+`STRIPE_SECRET=sk_live_…` führte. Dieser Beleg ist der Grund, warum die
+Rangfolge oben dokumentiert bleibt — der damalige Live-Key-Bundle-Check
+(`grep -rho 'pk_live_…' frontend/dist/assets` nach jedem Build) ist mit #58
+entfallen: das Bundle trägt keinen Zahlungs-Key mehr, den man prüfen könnte.
 
 ## Verbleibendes Risiko (akzeptiert)
 

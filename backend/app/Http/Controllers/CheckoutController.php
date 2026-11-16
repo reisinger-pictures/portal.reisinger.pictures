@@ -4,14 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CheckoutRequest;
 use App\Services\CheckoutService;
+use App\Services\MolliePaymentService;
 use App\Services\SettingResolver;
 use App\Support\ActorIdentity;
 use Illuminate\Support\Facades\Gate;
 
 class CheckoutController extends Controller
 {
-    public function checkout(CheckoutRequest $request, CheckoutService $checkoutService, SettingResolver $resolver)
-    {
+    public function checkout(
+        CheckoutRequest $request,
+        CheckoutService $checkoutService,
+        SettingResolver $resolver,
+        MolliePaymentService $mollie,
+    ) {
         $user = auth('api')->user();
         if (! ActorIdentity::isRegistered($user)) {
             return response()->json([
@@ -33,9 +38,20 @@ class CheckoutController extends Controller
             return response()->json(['error' => __('messages.upgrade_not_allowed')], 403);
         }
 
-        $paymentMethod = $request->payment_method ?? 'stripe';
+        $paymentMethod = $request->payment_method ?? 'mollie';
         if ($paymentMethod === 'invoice' && Gate::denies('purchase-on-invoice')) {
             return response()->json(['error' => 'Kauf auf Rechnung nicht erlaubt.'], 403);
+        }
+
+        if ($paymentMethod === 'mollie') {
+            // Normalise the backward-compatible default before the checkout
+            // identity is computed: an older client sends no `mollie_method`,
+            // and a retry must map to the same fingerprint as the explicit
+            // first allowlist entry.
+            $selected = $request->input('mollie_method');
+            if (! is_string($selected) || $selected === '') {
+                $request->merge(['mollie_method' => $mollie->paymentMethods()[0] ?? null]);
+            }
         }
 
         $hasQuotesOnly = collect($request->items)->every(fn ($i) => isset($i['isQuote']) && $i['isQuote']);
@@ -44,5 +60,15 @@ class CheckoutController extends Controller
         }
 
         return $checkoutService->processCheckout($request, $user, $paymentMethod);
+    }
+
+    /**
+     * The customer-visible Mollie allowlist for the cart. Read-only: no
+     * credential and no provider call. Invalid configuration answers with an
+     * empty list, which the checkout then refuses with `503`.
+     */
+    public function paymentMethods(MolliePaymentService $mollie)
+    {
+        return response()->json(['methods' => $mollie->paymentMethods()]);
     }
 }

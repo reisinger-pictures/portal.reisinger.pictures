@@ -1,7 +1,5 @@
 import {Page} from '@playwright/test';
-import {CreditCard} from './CreditCardHelper';
 import {ModalHelper} from './ModalHelper';
-import {StripeHelper} from './StripeHelper';
 
 export interface FillGalleryModalParams {
     name?: string;
@@ -114,9 +112,5 @@ export class FormHelper {
         if (params.name) await main.getByRole('textbox', {name: /^Dein Name/}).fill(params.name);
         if (params.ftpSlug) await main.getByRole('textbox', {name: /^FTP Upload Ordner \(Slug\)/}).fill(params.ftpSlug);
         if (params.copyright) await main.getByRole('textbox', {name: /^Standard-Urheber \(IPTC Copyright\)/}).fill(params.copyright);
-    }
-
-    async fillStripeForm(_stripeFrame: unknown, card: CreditCard) {
-        await StripeHelper.fillStripeForm(this.page, card);
     }
 }

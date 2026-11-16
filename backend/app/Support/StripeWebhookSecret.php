@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Http\Controllers\WebhookController;
-use App\Services\StripeKeyCheckService;
 
 /**
  * Single source of truth for resolving the Stripe webhook signing secret.
@@ -14,10 +13,9 @@ use App\Services\StripeKeyCheckService;
  * a production-like host with an unset env var, so the fallback is gated on
  * the `local`/`testing` environment *and* the file's existence.
  *
- * Both the ingress ({@see WebhookController}) and the
- * super-admin self-test ({@see StripeKeyCheckService}) resolve
- * the secret through this class, so the rule lives in exactly one place
- * instead of drifting between the two callers.
+ * Only the historical Stripe webhook ingress ({@see WebhookController})
+ * resolves the secret through this class. Stripe takes no new payments
+ * (owner decision D-63), so the former diagnostic caller is gone.
  */
 final class StripeWebhookSecret
 {
@@ -64,14 +62,5 @@ final class StripeWebhookSecret
     public static function resolve(): ?string
     {
         return self::fromEnvironment() ?? self::fromTunnelArtifact();
-    }
-
-    /**
-     * True when the effective secret comes from the tunnel artifact rather
-     * than configuration. Callers use it to name the source in diagnostics.
-     */
-    public static function isTunnelFallback(): bool
-    {
-        return self::fromEnvironment() === null && self::fromTunnelArtifact() !== null;
     }
 }

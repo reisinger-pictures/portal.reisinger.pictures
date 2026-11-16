@@ -1,11 +1,14 @@
 import {expect, test, type Route} from '@playwright/test';
 import {E2ESessionHelper} from '../helpers/E2ESessionHelper';
 import {PRICING_STRATEGY_SETTINGS_LOCK, withGlobalSettingsLock} from '../helpers/GlobalSettingsLock';
+import {MOLLIE_PROVIDER_SKIP_REASON, mollieCheckoutConfigured} from '../helpers/MollieE2E';
 import {
     CHECKOUT_BILLING,
     CHECKOUT_PATH,
     fillPaidCheckoutForm,
+    isCheckoutResponse,
     openPaidCartCheckout,
+    stubHostedCheckout,
     submitAndReadCheckout,
 } from '../helpers/CardTestingCheckoutFixture';
 
@@ -46,6 +49,7 @@ test.describe('Card-testing checkout quota denial', () => {
     test('a quota-denied checkout shows the honest busy message and the retry lands on the same order', {
         tag: ['@regression', '@feature:client:checkout', '@feature:card-testing']
     }, async ({page}) => {
+        test.skip(!mollieCheckoutConfigured(), MOLLIE_PROVIDER_SKIP_REASON);
         // The gallery carries no own `licensing_mode`, so the brand default decides
         // how it is priced (scope licence vs. volume tier). The brand-settings spec
         // writes that mode, so this spec takes the same lock and cannot observe a
@@ -61,15 +65,23 @@ test.describe('Card-testing checkout quota denial', () => {
         // Starting from a real order is what makes step 4 mean something: a
         // denial answered before any order exists could not be distinguished
         // from a denial that silently threw one away.
+        // A successful checkout redirects the top-level page to the provider's
+        // hosted checkout. The page is stubbed so the navigation is
+        // deterministic and stays inside the test; the assertion is the
+        // redirect itself, not the provider's HTML.
+        await stubHostedCheckout(page);
+
         await fillPaidCheckoutForm(page);
         await expect(checkoutButton).toBeEnabled({timeout: 15000});
         const first = await submitAndReadCheckout(page, async () => {
             await checkoutButton.click();
         });
-        expect(first.response.status(), await first.response.text()).toBe(200);
-        const firstBody = await first.response.json() as {order_id?: string};
+        expect(first.response.status(), first.body).toBe(200);
+        const firstBody = JSON.parse(first.body) as {order_id?: string; checkout_url?: string};
         expect(firstBody.order_id).toBeTruthy();
-        await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({timeout: 15000});
+        expect(firstBody.checkout_url).toMatch(/^https:\/\/www\.mollie\.com\//);
+        await expect(page).toHaveURL(/^https:\/\/www\.mollie\.com\//, {timeout: 15000});
+        expect(page.url()).toBe(firstBody.checkout_url);
 
         // --- Attempt 2: the dedicated checkout quota denies it ----------------
         //
@@ -105,15 +117,20 @@ test.describe('Card-testing checkout quota denial', () => {
         };
         await page.route(`**${CHECKOUT_PATH}`, denyWithQuota);
 
-        await page.reload();
+        // Back to the shop the way a customer does it. The cart is restored from
+        // its own storage and the checkout identity from `sessionStorage`, so
+        // the second attempt is the same purchase.
+        await page.goBack();
         await expect(main.getByRole('heading', {name: 'Dein Warenkorb'})).toBeVisible({timeout: 15000});
         await fillPaidCheckoutForm(page);
         await expect(checkoutButton).toBeEnabled({timeout: 15000});
-        const denied = await submitAndReadCheckout(page, async () => {
-            await checkoutButton.click();
-        });
-        expect(denied.response.status()).toBe(429);
-        expect(denied.response.headers()['retry-after']).toBe(QUOTA_RETRY_AFTER_SECONDS);
+        const deniedResponsePromise = page.waitForResponse(isCheckoutResponse);
+        await checkoutButton.click();
+        const deniedResponse = await deniedResponsePromise;
+        expect(deniedResponse.status()).toBe(429);
+        expect(deniedResponse.headers()['retry-after']).toBe(QUOTA_RETRY_AFTER_SECONDS);
+        // The denial's body is not read here: the status, the header and the
+        // rendered toast below are the quota contract.
 
         // 1. The honest message reaches the customer. A toast filtered by that
         //    exact text is the assertion: a generic fallback, an empty toast or
@@ -138,8 +155,8 @@ test.describe('Card-testing checkout quota denial', () => {
         const retry = await submitAndReadCheckout(page, async () => {
             await checkoutButton.click();
         });
-        expect(retry.response.status(), await retry.response.text()).toBe(200);
-        const retryBody = await retry.response.json() as {order_id?: string};
+        expect(retry.response.status(), retry.body).toBe(200);
+        const retryBody = JSON.parse(retry.body) as {order_id?: string; checkout_url?: string};
 
         // 4. A denied attempt costs the customer nothing. The 429 is a
         //    recoverable answer, so the browser keeps its checkout identity
@@ -152,6 +169,10 @@ test.describe('Card-testing checkout quota denial', () => {
         expect(deniedIdempotencyKeys).toHaveLength(1);
         expect(retry.request.headers()['idempotency-key']).toBe(deniedIdempotencyKeys[0]);
         expect(retryBody.order_id).toBe(firstBody.order_id);
-        await expect(main.getByRole('heading', {name: 'Zahlung abschließen'})).toBeVisible({timeout: 15000});
+        // The same order resumes its own hosted payment instead of opening a
+        // second one: the provider link is the persisted attempt's link.
+        expect(retryBody.checkout_url).toBe(firstBody.checkout_url);
+        await expect(page).toHaveURL(/^https:\/\/www\.mollie\.com\//, {timeout: 15000});
+        expect(page.url()).toBe(firstBody.checkout_url);
     });
 });

@@ -35,6 +35,7 @@ const LicenseTerms = lazy(() => import('./ui/LicenseTerms'));
 const Widerrufsbelehrung = lazy(() => import('./ui/Widerrufsbelehrung'));
 const ClientNotificationsView = lazy(() => import('./ui/client/ClientNotificationsView'));
 const ClientCartView = lazy(() => import('./ui/client/ClientCartView'));
+const CheckoutReturnView = lazy(() => import('./ui/client/CheckoutReturnView'));
 const ClientOrdersView = lazy(() => import('./ui/client/ClientOrdersView'));
 
 interface ProtectedRouteProps { children: React.ReactNode; requiredFeature?: 'b2b' }
@@ -143,6 +144,7 @@ export default function App() {
                             <Route path="/widerruf" element={<ErrorBoundary><Widerrufsbelehrung/></ErrorBoundary>}/>
                             <Route path="/notifications" element={<ProtectedRoute><ErrorBoundary><ClientNotificationsView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/cart" element={<ProtectedRoute><ErrorBoundary><ClientCartView/></ErrorBoundary></ProtectedRoute>}/>
+                            <Route path="/checkout/return" element={<ProtectedRoute><ErrorBoundary><CheckoutReturnView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/orders" element={<ProtectedRoute><ErrorBoundary><ClientOrdersView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/my-models" element={<ProtectedRoute><ErrorBoundary><MyModelsView/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/orgs" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ManagementOrgsView/></ErrorBoundary></ProtectedRoute>}/>

@@ -12,6 +12,7 @@ use App\Pricing\ScopeLicensingStrategy;
 use App\Pricing\VolumeLicensingStrategy;
 use App\Services\AuthorizationService;
 use App\Services\CouponService;
+use App\Services\MolliePaymentService;
 use App\Services\PricingStrategyResolver;
 use App\Services\VolumePresetService;
 use App\Support\ActorIdentity;
@@ -110,6 +111,11 @@ class AppServiceProvider extends ServiceProvider
                 default => new ScopeLicensingStrategy,
             };
         });
+
+        // Mollie: the SDK client must never be built by the container without
+        // the configured server key. Bind the adapter explicitly so its lazy
+        // `client()` remains the only place an SDK client is constructed.
+        $this->app->bind(MolliePaymentService::class, fn (): MolliePaymentService => new MolliePaymentService);
 
         // One authorization service instance per request (and per queue job).
         //

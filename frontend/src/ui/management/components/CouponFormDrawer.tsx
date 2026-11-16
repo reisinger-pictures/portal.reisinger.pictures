@@ -15,7 +15,7 @@ export interface Coupon {
     max_items?: number;
     /** Photo-package: number of photos (N). */
     package_quantity?: number;
-    /** Photo-package: flat price Y in cents (Stripe-conform). */
+    /** Photo-package: flat price Y in integer cents (the unit every provider call uses). */
     package_price_cents?: number;
     scope_type: 'global' | 'gallery' | 'meta_gallery' | 'photographer' | 'organisation';
     scope_id?: string;
