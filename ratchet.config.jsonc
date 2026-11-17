@@ -21,6 +21,18 @@
           "severities": ["critical", "high"],
           "statuses": ["open", "in-progress"]
         }
+      },
+      "unverified-commits": {
+        "class": "a commit with no verification evidence",
+        "incident": "the 667 historical commits without a `Verify:` footer are outside the enforcement window; from 2026-11-17 on, every new commit must carry one",
+        "unit": "commits without a `Verify:` footer",
+        "direction": "ceiling",
+        "tier": "fast",
+        "description": "counts commits since 2026-11-17 whose message has no `Verify:` line. The ceiling of 20 gives the current task room to amend/push its own commits, but no older commit can re-enter the window.",
+        "count": {
+          "agent_rule": "unverified-commits",
+          "since": "2026-11-17"
+        }
       }
     }
   }
