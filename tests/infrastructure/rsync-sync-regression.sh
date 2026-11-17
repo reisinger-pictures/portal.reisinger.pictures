@@ -114,7 +114,6 @@ require_rule() {
     grep -Fxq -- "$1" "$EXCLUDE_FILE" || fail "missing exclude rule: $1"
 }
 
-require_rule '/storage/app/private/stripe_secret.txt'
 require_rule '/storage/app/private/'
 require_rule '.env'
 require_rule '.env.*'
@@ -156,7 +155,6 @@ cp "$SYNC_SCRIPT" "$EXCLUDE_FILE" "$PROJECT/"
 printf 'source-app\n'          > "$PROJECT/backend/app/keep.txt"
 printf 'source-index\n'        > "$PROJECT/backend/index.php"
 printf 'source-env\n'          > "$PROJECT/backend/.env.testing"
-printf 'local-stripe-secret\n' > "$PROJECT/backend/storage/app/private/stripe_secret.txt"
 printf 'source-proof\n'        > "$PROJECT/backend/storage/app/private/model-age-proofs/source-only/proof.jpg"
 printf 'local-temp\n'          > "$PROJECT/backend/storage/app/private/temp/download.tmp"
 printf 'source-vendor\n'       > "$PROJECT/backend/vendor/pkg/autoload.php"
@@ -173,7 +171,6 @@ printf 'frontend-asset\n'      > "$PROJECT/frontend/dist/assets/app-NEW.js"
 printf ':8080 {\n\trespond 404\n}\n' > "$PROJECT/deployment/Caddyfile.ftp-events"
 
 # Ziel (was schon auf dem Server liegt)
-printf 'destination-secret\n'  > "$DEST/api-portal.reisinger.pictures/storage/app/private/stripe_secret.txt"
 printf 'destination-proof\n'   > "$DEST/api-portal.reisinger.pictures/storage/app/private/model-age-proofs/destination-only/proof.jpg"
 printf 'destination-vendor\n'  > "$DEST/api-portal.reisinger.pictures/vendor/pkg/autoload.php"
 printf 'destination-log\n'     > "$DEST/api-portal.reisinger.pictures/storage/logs/laravel.log"
@@ -227,7 +224,6 @@ assert_not_transferred() {
 
 for entry in \
     '.env.testing' \
-    'storage/app/private/stripe_secret.txt' \
     'storage/app/private/model-age-proofs/source-only/proof.jpg' \
     'storage/app/private/temp/download.tmp' \
     'vendor/pkg/autoload.php' \
@@ -245,10 +241,9 @@ pass 'backend sync transfers no secrets, no dependencies, no local SQLite'
 
 # --- 4./5. Private Storage: weder Upload noch Loeschung --------------------
 # Erfasst JEDE Itemize-Zeile (Transfer oder Loeschung), die private Storage
-# oder das Stripe-Secret beruehrt. Destination-only Dateien (Modell-
-# Altersnachweise, stripe_secret.txt) duerfen weder hochgeladen noch entfernt
-# werden -- das ist der wichtigste Guard dieses Tests.
-private_hits="$(grep -E 'storage/app/private|stripe_secret\.txt' "$API_OUT" || true)"
+# beruehrt. Destination-only Dateien (Modell-Altersnachweise) duerfen weder
+# hochgeladen noch entfernt werden -- das ist der wichtigste Guard dieses Tests.
+private_hits="$(grep -E 'storage/app/private' "$API_OUT" || true)"
 if [[ -n "$private_hits" ]]; then
     fail "backend sync touched private storage (upload or delete):
 $private_hits"
@@ -344,8 +339,6 @@ $(tail -20 "$TMP_ROOT/real.out")"
     || fail 'the runtime-tree step transferred a local log file into the destination'
 [[ ! -e "$REAL_DEST/api-portal.reisinger.pictures/bootstrap/cache/config.php" ]] \
     || fail 'the runtime-tree step transferred a local cache file into the destination'
-[[ ! -e "$REAL_DEST/api-portal.reisinger.pictures/storage/app/private/stripe_secret.txt" ]] \
-    || fail 'the real sync uploaded the local stripe secret'
 [[ ! -e "$REAL_DEST/api-portal.reisinger.pictures/database.sqlite" ]] \
     || fail 'the real sync uploaded the local SQLite database'
 

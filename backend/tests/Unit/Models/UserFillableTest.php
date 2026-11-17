@@ -6,11 +6,12 @@ use App\Models\User;
 use Tests\TestCase;
 
 /**
- * AUTH-4: `stripe_customer_id` is a billing identifier owned by the Stripe
- * customer service, which writes it via `forceFill()`. Keeping it in
- * `$fillable` widened the mass-assignment surface for no benefit (a future
- * `->update($request->validated())` path could have pointed an account at
- * another Stripe customer and affected payment-intent ownership matching).
+ * AUTH-4: `stripe_customer_id` is a historical billing-identifier column.
+ * Keeping it in `$fillable` would widen the mass-assignment surface for no
+ * benefit (a `->update($request->validated())` path could have pointed an
+ * account at another billing identity). The payment integration that once
+ * wrote it is gone; the column and its uniqueness constraint stay as
+ * historical schema.
  */
 class UserFillableTest extends TestCase
 {

@@ -42,10 +42,13 @@ unsafe:
    no `Content-Type` and an empty body (body-less `DELETE`, zero-payload `POST`)
    is allowed, while a request with no `Content-Type` but a non-empty body is
    still rejected with `415`.
-5. Stripe webhook ingress is exempt from browser-origin and cookie-token checks
-   because Stripe authenticates it with `Stripe-Signature`; the secret-gated
-   internal FTP event ingress is similarly exempt because it authenticates its
-   caller with `FTP_EVENT_SECRET`. Both still require JSON content.
+5. The payment-provider webhook ingress is exempt from browser-origin and
+   cookie-token checks because the provider does not authenticate with a browser
+   session: Mollie's classic webhook carries only an untrusted payment id that the
+   server re-fetches with its own server credential, so the request body is input,
+   never authority. The secret-gated internal FTP event ingress is similarly
+   exempt because it authenticates its caller with `FTP_EVENT_SECRET`. Both still
+   require JSON content.
 
 ## CSRF token protocol
 

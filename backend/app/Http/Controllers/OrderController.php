@@ -9,7 +9,6 @@ use App\Services\AuthorizationService;
 use App\Services\MollieCheckoutService;
 use App\Services\MolliePaymentException;
 use App\Services\MolliePaymentService;
-use App\Services\StripePaymentService;
 use App\Support\ActorIdentity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -154,7 +153,7 @@ class OrderController extends Controller
 
         $order = $query->findOrFail($id);
         if ($request->status === 'cancelled') {
-            $error = $this->cancelOpenPaymentIntent($order);
+            $error = $this->cancelOpenPayment($order);
             if ($error !== null) {
                 return response()->json(['error' => $error], 502);
             }
@@ -177,64 +176,9 @@ class OrderController extends Controller
         return response()->json(['success' => true]);
     }
 
-    private function cancelOpenPaymentIntent(Order $order): ?string
+    private function cancelOpenPayment(Order $order): ?string
     {
-        $stripeError = $this->cancelOpenStripePaymentIntent($order);
-        if ($stripeError !== null) {
-            return $stripeError;
-        }
-
         return $this->cancelOpenMolliePayment($order);
-    }
-
-    private function cancelOpenStripePaymentIntent(Order $order): ?string
-    {
-        $paymentIntentId = $order->stripe_payment_intent_id;
-        if (! is_string($paymentIntentId) || trim($paymentIntentId) === '') {
-            return null;
-        }
-
-        $paymentIntentId = trim($paymentIntentId);
-        // Resolved lazily: the Stripe client is built eagerly in the service
-        // constructor and throws without a secret, which must not break the
-        // customer read paths that share this controller.
-        $stripePayment = app(StripePaymentService::class);
-
-        try {
-            $paymentIntent = $stripePayment->retrievePaymentIntent($paymentIntentId);
-            $status = $paymentIntent['status'] ?? null;
-
-            if ($status === 'succeeded') {
-                return 'Die Bestellung ist bereits bezahlt. Eine Stornierung kann nicht über Stripe durchgeführt werden; eine Stornierung ist kein Erstattungsweg.';
-            }
-
-            if ($status !== 'canceled') {
-                $result = $stripePayment->cancelPaymentIntent($paymentIntentId);
-
-                // Fail closed: the order must not be marked cancelled unless
-                // Stripe actually reports the intent as canceled.
-                if (($result['status'] ?? null) !== 'canceled') {
-                    Log::warning('order.cancel.payment_intent_not_cancelled', [
-                        'order_id' => (string) $order->getKey(),
-                        'payment_intent_id' => $paymentIntentId,
-                        'payment_intent_status' => $result['status'] ?? null,
-                    ]);
-
-                    return 'Die Stornierung konnte bei Stripe nicht abgeschlossen werden. Der Bestellstatus wurde nicht geändert.';
-                }
-            }
-        } catch (\Throwable $exception) {
-            Log::warning('order.cancel.payment_intent_not_cancelled', [
-                'order_id' => (string) $order->getKey(),
-                'payment_intent_id' => $paymentIntentId,
-                'exception_class' => $exception::class,
-                'exception_message' => $this->safeStripeExceptionMessage($exception),
-            ]);
-
-            return 'Die Stornierung konnte bei Stripe nicht abgeschlossen werden. Der Bestellstatus wurde nicht geändert.';
-        }
-
-        return null;
     }
 
     /**
@@ -326,8 +270,8 @@ class OrderController extends Controller
      * so an unrestricted admin write would grant paid access without any
      * payment. The transition is therefore allowed only from states that do not
      * turn an unpaid order into an accessible one. `refunded` and `disputed` are
-     * rejected unconditionally: the Stripe intent stays `succeeded` after a
-     * refund, so the intent alone cannot prove that the money is still there.
+     * rejected unconditionally: a refunded or charged-back payment proves that
+     * the money is no longer there, so a status flip cannot re-establish it.
      *
      * @return array{status: int, error: string}|null null when the transition is allowed
      */
@@ -348,57 +292,20 @@ class OrderController extends Controller
             return null;
         }
 
-        // Terminal states are never reopened by a status flip. A refunded
-        // PaymentIntent stays `succeeded` in Stripe, so the intent alone cannot
-        // prove that the money is still there; a refunded order needs a new
-        // payment, and a won dispute is restored by the `charge.dispute.closed`
-        // webhook, not by this route. Rejected before the lookup on purpose: no
-        // Stripe call is made for these states.
+        // Terminal states are never reopened by a status flip. A refunded or
+        // charged-back order needs a new payment; it is rejected before the
+        // provider lookup on purpose, so no provider call is made for these
+        // states.
         if (in_array($order->status, ['refunded', 'disputed'], true)) {
             return [
                 'status' => 422,
-                'error' => 'Eine zurückgezahlte oder bestrittene Bestellung kann nicht über den Bestellstatus wieder auf paid gesetzt werden: Der Stripe-Zahlungsstatus bleibt nach einer Erstattung auf succeeded und belegt nicht, dass das Geld noch vorhanden ist. Eine Erstattung erfordert eine neue Zahlung; ein gewonnener Disput wird über den Webhook wiederhergestellt.',
+                'error' => 'Eine zurückgezahlte oder bestrittene Bestellung kann nicht über den Bestellstatus wieder auf paid gesetzt werden: Der Zahlungsstatus belegt nach einer Erstattung nicht, dass das Geld noch vorhanden ist. Eine Erstattung erfordert eine neue Zahlung.',
             ];
         }
 
         // No invoice and no provider payment: nothing confirms a payment, so
         // the status write would be a pure access grant.
-        $paymentIntentId = $order->stripe_payment_intent_id;
-        if (! is_string($paymentIntentId) || trim($paymentIntentId) === '') {
-            return $this->molliePaidTransitionVerification($order);
-        }
-
-        $paymentIntentId = trim($paymentIntentId);
-        // Resolved lazily: the Stripe client is built eagerly in the service
-        // constructor and throws without a secret, which must not break the
-        // customer read paths that share this controller.
-        $stripePayment = app(StripePaymentService::class);
-
-        try {
-            $paymentIntent = $stripePayment->retrievePaymentIntent($paymentIntentId);
-            if (($paymentIntent['status'] ?? null) === 'succeeded') {
-                return null;
-            }
-        } catch (\Throwable $exception) {
-            // Fail closed: without a Stripe answer the payment is unproven, and
-            // a 422 would suggest the request itself was wrong.
-            Log::warning('order.paid.payment_intent_lookup_failed', [
-                'order_id' => (string) $order->getKey(),
-                'payment_intent_id' => $paymentIntentId,
-                'exception_class' => $exception::class,
-                'exception_message' => $this->safeStripeExceptionMessage($exception),
-            ]);
-
-            return [
-                'status' => 502,
-                'error' => 'Die Zahlung konnte bei Stripe nicht geprüft werden. Der Bestellstatus wurde nicht geändert.',
-            ];
-        }
-
-        return [
-            'status' => 422,
-            'error' => 'paid kann nur aus der Rechnungskette oder bei einer von Stripe bestätigten Zahlung gesetzt werden.',
-        ];
+        return $this->molliePaidTransitionVerification($order);
     }
 
     /**
@@ -462,22 +369,6 @@ class OrderController extends Controller
             'status' => 422,
             'error' => 'paid kann nur aus der Rechnungskette oder bei einer vom Zahlungsanbieter bestätigten Zahlung gesetzt werden.',
         ];
-    }
-
-    private function safeStripeExceptionMessage(\Throwable $exception): string
-    {
-        $message = $exception->getMessage();
-        $stripeSecret = config('services.stripe.secret');
-        if (is_string($stripeSecret) && $stripeSecret !== '') {
-            $message = str_replace($stripeSecret, '[REDACTED_STRIPE_SECRET]', $message);
-        }
-
-        $message = preg_replace('/\b(?:sk|rk)_(?:test|live)_[A-Za-z0-9_-]+\b/i', '[REDACTED_STRIPE_SECRET]', $message) ?? '';
-        $message = preg_replace('/\bpi_[A-Za-z0-9_-]+_secret_[A-Za-z0-9_-]+\b/i', '[REDACTED_CLIENT_SECRET]', $message) ?? '';
-        $message = preg_replace('/\bclient[_-]?secret\s*[:=]\s*["\']?[^"\'\s,;]+/i', 'client_secret=[REDACTED]', $message) ?? '';
-        $message = preg_replace('/\bauthorization\s*:\s*bearer\s+\S+/i', 'Authorization: Bearer [REDACTED]', $message) ?? '';
-
-        return mb_substr($message, 0, 500, 'UTF-8');
     }
 
     private function clearPurchasedCache(Order $order): void

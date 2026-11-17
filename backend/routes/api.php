@@ -48,7 +48,6 @@ use App\Http\Controllers\StatsController;
 use App\Http\Controllers\TextSnippetController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VolumePresetController;
-use App\Http\Controllers\WebhookController;
 use App\Http\Middleware\AtomicThrottleRequests;
 use App\Models\DownloadLog;
 use App\Models\InvoiceSnapshot;
@@ -132,15 +131,9 @@ if (app()->environment('local', 'testing')) {
 
 }
 
-// D-38: the webhook ingress is a security-relevant path, so it counts before
-// it decides (SEC-20261018-12). The budget and the key are unchanged; only
-// the counting primitive is the count-first one.
-Route::post('/webhooks/stripe', [WebhookController::class, 'handleStripe'])->name('api.webhooks.stripe')->middleware(AtomicThrottleRequests::class.':10,1');
-
 // Mollie posts only the payment id here; the controller fetches the payment
-// with the server credential before any transition. The budget is wider than
-// the Stripe ingress because one checkout can produce several legitimate
-// state notifications, and the endpoint is idempotent and provider-fetched.
+// with the server credential before any transition. The endpoint is
+// idempotent and provider-fetched.
 Route::post('/webhooks/mollie', [MollieWebhookController::class, 'handle'])->name('api.webhooks.mollie')->middleware(AtomicThrottleRequests::class.':60,1');
 
 // D-36: SFTPGo posts one filesystem event per uploaded file here; the endpoint

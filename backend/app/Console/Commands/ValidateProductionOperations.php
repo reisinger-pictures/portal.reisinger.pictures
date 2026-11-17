@@ -71,20 +71,19 @@ class ValidateProductionOperations extends Command
      */
     private function effectiveCheckoutLimits(): array
     {
-        $switch = config('app.stripe.checkout_enabled');
+        $switch = config('checkout.enabled');
 
         return [
             'checkout_enabled' => is_bool($switch) ? ($switch ? 'on' : 'off') : 'invalid',
             'user_per_hour' => (int) config('app.checkout_throttle_user_per_hour'),
             'ip_per_hour' => (int) config('app.checkout_throttle_ip_per_hour'),
             'ip_per_day' => (int) config('app.checkout_throttle_ip_per_day'),
-            'new_account_hours' => (int) config('app.stripe.checkout_new_account_hours'),
+            'new_account_hours' => (int) config('checkout.new_account_hours'),
             'turnstile_user_per_hour' => (int) config('app.turnstile_user_threshold_per_hour'),
             'turnstile_ip_per_hour' => (int) config('app.turnstile_ip_threshold_per_hour'),
             'turnstile_failure_user_per_hour' => (int) config('app.turnstile_failure_user_threshold_per_hour'),
             'turnstile_failure_ip_per_hour' => (int) config('app.turnstile_failure_ip_threshold_per_hour'),
             'turnstile_failure_window_seconds' => (int) config('app.turnstile_failure_window_seconds'),
-            'stale_payment_intent_hours' => (int) config('app.stripe.stale_payment_intent_hours'),
         ];
     }
 

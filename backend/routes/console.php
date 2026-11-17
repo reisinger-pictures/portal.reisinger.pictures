@@ -29,9 +29,6 @@ Schedule::command('app:cleanup-temp')->dailyAt('02:30')->withoutOverlapping()->o
 // weder den Seed-Gate blockieren noch bei jedem Container-Neustart laufen.
 Schedule::command('app:import-locations')->weeklyOn(1, '03:30')->withoutOverlapping()->onOneServer();
 
-// Stripe: cancel incomplete PaymentIntents abandoned by abandoned checkouts
-Schedule::command('stripe:cancel-stale-payment-intents')->hourly()->withoutOverlapping()->onOneServer();
-
 // Mollie: converge open attempts; the webhook stays the normal authority.
 Schedule::command('mollie:reconcile-payments')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
 

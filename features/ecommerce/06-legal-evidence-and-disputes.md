@@ -6,20 +6,20 @@ status: active
 
 # Technical Concept: Legal Evidence & Dispute Handling
 
-## 1. The "Evidence Package" (Stripe Disputes)
+## 1. The "Evidence Package" (payment-provider disputes)
 When a customer purchases digital goods, they must explicitly waive their right of withdrawal (\`withdrawal_waived\` flag). 
-If a customer initiates a chargeback (Dispute) via Stripe, the photographer must provide evidence that the digital goods were delivered.
+If a customer initiates a chargeback (Dispute) with the payment provider — Mollie is the only provider (D-63) — the photographer must provide evidence that the digital goods were delivered.
 
 **The Evidence Package consists of:**
 1. **The Invoice (PDF):** Generated automatically and stored immutably in \`invoice_snapshots\`. Contains the IP address of the buyer at the time of checkout.
 2. **The Audit Log:** The \`download_logs\` table tracks exactly when the specific user (or their guest session) downloaded the files (single images or ZIPs).
-3. **The Webhook Confirmation:** The \`Order\` status transitioning from \`pending_payment\` to \`paid\`, triggered by Stripe's \`payment_intent.succeeded\`.
+3. **The Payment Confirmation:** The \`Order\` status transitioning from \`pending_payment\` to \`paid\`, applied only after a verified provider \`paid\` status (webhook or reconciliation), not from a redirect parameter.
 
 ## 2. Access Control During Disputes
-When a Stripe webhook triggers \`charge.dispute.created\`, the system reacts immediately to mitigate further damages:
-- **Lockout:** The order status is changed to \`disputed\`.
+When a verified provider chargeback/refund status arrives, the system reacts immediately to mitigate further damages:
+- **Lockout:** The order status is changed to \`disputed\` (or \`refunded\` for a full refund).
 - **Download Prevention:** The \`DownloadController\` actively checks the order status. If the status is \`disputed\`, \`refunded\`, or \`cancelled\`, all ZIP and high-res single-image downloads associated with this order are blocked (HTTP 403 Forbidden).
-- **Notification:** The internal accounting team is notified via email about the dispute so they can manually gather the Evidence Package and upload it to the Stripe Dashboard.
+- **Notification:** The internal accounting team is notified via email about the dispute so they can manually gather the Evidence Package and upload it to the provider's dashboard.
 
 ## 3. Rücktrittsrechts-Compliance (übernommener SOLL-Zustand)
 
@@ -39,4 +39,4 @@ Der Shop verkauft ausschließlich digitale Inhalte; Kaufverträge erfordern dahe
 
 ## Related
 - [Licensing and downloads](02-licensing-and-downloads.md) — download_logs / invoice_snapshots origin
-- [Stripe checkout flow](09-stripe-checkout-flow.md) — server-side checkout enforcement and payment confirmation
+- [Retired Stripe checkout flow](09-stripe-checkout-flow.md) — historical record of the removed provider flow; current payments: [Mollie payments](../infrastructure/30-mollie-payments.md)

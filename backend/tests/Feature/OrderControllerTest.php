@@ -50,7 +50,6 @@ class OrderControllerTest extends TestCase
             'user_id' => $user->id,
             'status' => 'pending_payment',
             'total_amount' => 5000,
-            'stripe_payment_intent_id' => 'pi_private_status',
         ]);
         InvoiceSnapshot::create([
             'order_id' => $order->id,
@@ -73,7 +72,7 @@ class OrderControllerTest extends TestCase
             'currency' => 'eur',
         ]);
         $response->assertJsonMissingPath('client_secret');
-        $response->assertJsonMissingPath('stripe_payment_intent_id');
+        $response->assertJsonMissingPath('mollie_payment_id');
     }
 
     public function test_user_cannot_read_another_users_order_status(): void

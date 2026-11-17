@@ -17,13 +17,11 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mollie\Api\Http\Requests\CreatePaymentRequest;
 use Tests\Support\FakesMollie;
-use Tests\Support\MocksStripeClient;
 use Tests\TestCase;
 
 class CheckoutCouponRevalidationTest extends TestCase
 {
     use FakesMollie;
-    use MocksStripeClient;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -48,7 +46,6 @@ class CheckoutCouponRevalidationTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->resetStripeHttpClient();
         BrandRegistry::set(null);
         parent::tearDown();
     }

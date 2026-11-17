@@ -321,7 +321,7 @@ class PurchaseTimeOrganizationInvoiceTest extends TestCase
         ]);
 
         $checkout = new CheckoutService(new ScopeLicensingStrategy);
-        $response = $checkout->processCheckout($request, $user, 'stripe');
+        $response = $checkout->processCheckout($request, $user, 'invoice');
 
         $this->assertSame(200, $response->status());
         $order = Order::query()->sole();

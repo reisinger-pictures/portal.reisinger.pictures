@@ -256,7 +256,7 @@ describe('ManagementOrdersView', () => {
         expect(screen.queryByText(/\(optional\)/i)).not.toBeInTheDocument();
     });
 
-    // A refused Stripe cancellation answers 502 with a German `error` in the
+    // A refused order cancellation answers 502 with a German `error` in the
     // JSON body while the order keeps its status. The bare `catch` used to
     // swallow it and the admin only saw the generic text, so the same action
     // was retried unchanged.
@@ -264,7 +264,7 @@ describe('ManagementOrdersView', () => {
         const user = userEvent.setup();
         const showToast = vi.fn();
         const mutate = vi.fn();
-        const serverMessage = 'Die Bestellung ist bereits bezahlt. Eine Stornierung kann nicht über Stripe durchgeführt werden; eine Stornierung ist kein Erstattungsweg.';
+        const serverMessage = 'Die Bestellung ist bereits bezahlt. Eine Stornierung kann nicht mehr durchgeführt werden; eine Stornierung ist kein Erstattungsweg.';
 
         vi.mocked(useSWR).mockReturnValue({
             data: mockOrders,

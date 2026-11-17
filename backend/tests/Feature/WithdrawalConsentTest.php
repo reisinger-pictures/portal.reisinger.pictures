@@ -20,7 +20,6 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
-use Tests\Support\MocksStripeClient;
 use Tests\TestCase;
 
 /**
@@ -30,7 +29,6 @@ use Tests\TestCase;
  */
 class WithdrawalConsentTest extends TestCase
 {
-    use MocksStripeClient;
     use RefreshDatabase;
 
     private CheckoutService $service;
@@ -38,7 +36,6 @@ class WithdrawalConsentTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockStripePaymentIntentSuccess();
         $this->service = new CheckoutService(new ScopeLicensingStrategy);
         Mail::fake();
 
@@ -54,12 +51,6 @@ class WithdrawalConsentTest extends TestCase
             'flatrate_tier' => 'print',
             'brand' => 'rp',
         ]);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->resetStripeHttpClient();
-        parent::tearDown();
     }
 
     // ------------------------------------------------------------------

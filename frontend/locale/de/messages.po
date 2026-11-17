@@ -13,10 +13,6 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/logic/utils.ts
-#~ msgid "--- €"
-#~ msgstr "--- €"
-
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "— bleibt bestehen"
 msgstr "— bleibt bestehen"
@@ -70,25 +66,6 @@ msgstr "[PLZ, Ort]"
 msgid "{0, plural, one {# Nutzer} other {# Nutzer}}"
 msgstr "{0, plural, one {# Nutzer} other {# Nutzer}}"
 
-#. placeholder {0}: group.nextTierCount
-#. placeholder {1}: group.nextTierLabel
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "{0, plural, one {Noch # Bild} other {Noch # Bilder}} bis {1}"
-#~ msgstr "{0, plural, one {Noch # Bild} other {Noch # Bilder}} bis {1}"
-
-#. placeholder {0}: group.items.filter(item => !item.isQuote).length
-#. placeholder {1}: formatMoney(group.pricePerItemCents ?? 0)
-#. placeholder {2}: group.tierIndex
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "{0} Bilder × {1} (Tier {2})"
-#~ msgstr "{0} Bilder × {1} (Tier {2})"
-
-#. placeholder {0}: formatMoney(groupPrice)
-#. placeholder {1}: group.tierIndex
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "{0} pro Bild (Tier {1})"
-#~ msgstr "{0} pro Bild (Tier {1})"
-
 #: src/ui/ContractSignView.tsx
 msgid "{age} Jahre (geb. {birthDateLabel})"
 msgstr "{age} Jahre (geb. {birthDateLabel})"
@@ -114,24 +91,8 @@ msgid "{groupCount} Gruppen, {galleryCount} Galerien"
 msgstr "{groupCount} Gruppen, {galleryCount} Galerien"
 
 #: src/ui/client/components/CartItemList.tsx
-#~ msgid "{groupNextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {groupNextTierLabel}"
-#~ msgstr "{groupNextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {groupNextTierLabel}"
-
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "{groupPayableCount} Bilder × {groupTotalPriceText} (Tier {groupTotalTierIndex})"
-#~ msgstr "{groupPayableCount} Bilder × {groupTotalPriceText} (Tier {groupTotalTierIndex})"
-
-#: src/ui/client/components/CartItemList.tsx
 msgid "{groupPayableCount} Bilder × {groupTotalPriceText} € (Tier {groupTotalTierIndex})"
 msgstr "{groupPayableCount} Bilder × {groupTotalPriceText} € (Tier {groupTotalTierIndex})"
-
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "{groupPriceText} pro Bild (Tier {groupTierIndex})"
-#~ msgstr "{groupPriceText} pro Bild (Tier {groupTierIndex})"
-
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
-#~ msgstr "{itemCount} Bilder × {pricePerItemStr} (Tier {tierNum})"
 
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "{legacyRoleName} · {legacyRoleId} (ungültig)"
@@ -148,10 +109,6 @@ msgstr "{nextCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {nextLa
 #: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "{nextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis zum nächsten Rabatt:"
 msgstr "{nextTierCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis zum nächsten Rabatt:"
-
-#: src/ui/client/components/CouponInput.tsx
-#~ msgid "{packageQuantity} Fotos für {packagePriceText}"
-#~ msgstr "{packageQuantity} Fotos für {packagePriceText}"
 
 #: src/ui/client/components/CouponInput.tsx
 msgid "{packageQuantity} Fotos für {packagePriceText} €"
@@ -173,25 +130,13 @@ msgstr "{photoCount} Bilder"
 msgid "{price} € pro Bild"
 msgstr "{price} € pro Bild"
 
-#: src/logic/useVolumeLicensing.ts
-#~ msgid "{price}€ pro Bild"
-#~ msgstr "{price}€ pro Bild"
-
 #: src/ui/management/ManagementMetaGalleryView.tsx
 msgid "{pricePerItem} € pro Bild (Tier {tierIndex})"
 msgstr "{pricePerItem} € pro Bild (Tier {tierIndex})"
 
-#: src/ui/management/ManagementMetaGalleryView.tsx
-#~ msgid "{pricePerItem} pro Bild (Tier {tierIndex})"
-#~ msgstr "{pricePerItem} pro Bild (Tier {tierIndex})"
-
 #: src/ui/client/components/CartItemList.tsx
 msgid "{pricePerItemStr} € pro Bild (Tier {tierNum})"
 msgstr "{pricePerItemStr} € pro Bild (Tier {tierNum})"
-
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "{pricePerItemStr} pro Bild (Tier {tierNum})"
-#~ msgstr "{pricePerItemStr} pro Bild (Tier {tierNum})"
 
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "{progress}% abgeschlossen"
@@ -237,14 +182,6 @@ msgstr "/ 100.000 Zeichen (HTML)"
 msgid "← Zurück"
 msgstr "← Zurück"
 
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "+ {upgradePriceFormatted}"
-#~ msgstr "+ {upgradePriceFormatted}"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "+ {upgradePriceFormatted} €"
-#~ msgstr "+ {upgradePriceFormatted} €"
-
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "+ das einmal angezeigte Passwort"
 msgstr "+ das einmal angezeigte Passwort"
@@ -261,18 +198,6 @@ msgstr "< 50€ (Übertrag ins nächste Monat)"
 msgid "1 Datei liegt im Quarantäne-Ordner"
 msgstr "1 Datei liegt im Quarantäne-Ordner"
 
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "1 Jahr (x1)"
-#~ msgstr "1 Jahr (x1)"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "1 Jahr:"
-#~ msgstr "1 Jahr:"
-
-#: src/ui/Privacy.tsx
-#~ msgid "1. Automatische Datenerfassung und IP-Adressen"
-#~ msgstr "1. Automatische Datenerfassung und IP-Adressen"
-
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "1. Das Konto anlegen — es gibt noch keins"
 msgstr "1. Das Konto anlegen — es gibt noch keins"
@@ -284,10 +209,6 @@ msgstr "1. Geltungsbereich"
 #: src/ui/Privacy.tsx
 msgid "1. IP-Adressen und technische Protokolle"
 msgstr "1. IP-Adressen und technische Protokolle"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "1. Nutzungsart"
-#~ msgstr "1. Nutzungsart"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "1. Typ / Grundhonorar"
@@ -304,10 +225,6 @@ msgstr "11. Schlussbestimmungen"
 #: src/ui/Privacy.tsx
 msgid "2. Cookies und Authentifizierung"
 msgstr "2. Cookies und Authentifizierung"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "2. Nutzungsdauer"
-#~ msgstr "2. Nutzungsdauer"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "2. Optionale Zuschläge"
@@ -336,10 +253,6 @@ msgstr "3. Zustandekommen des Vertrages"
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "4. Drei stille Fehler"
 msgstr "4. Drei stille Fehler"
-
-#: src/ui/Privacy.tsx
-#~ msgid "4. Ihre Rechte"
-#~ msgstr "4. Ihre Rechte"
 
 #: src/ui/LicenseTerms.tsx
 msgid "4. Preise und Zahlungsbedingungen"
@@ -392,10 +305,6 @@ msgstr "Ab"
 #: src/logic/useVolumeLicensing.ts
 msgid "Ab {minQuantity} Bildern {price} € pro Bild"
 msgstr "Ab {minQuantity} Bildern {price} € pro Bild"
-
-#: src/logic/useVolumeLicensing.ts
-#~ msgid "Ab {minQuantity} Bildern {price}€ pro Bild"
-#~ msgstr "Ab {minQuantity} Bildern {price}€ pro Bild"
 
 #: src/ui/components/ModalDialogShell.tsx
 #: src/ui/components/UIProvider.tsx
@@ -827,22 +736,6 @@ msgstr "Auf Standard zurücksetzen"
 msgid "Auf X günstigste Bilder beschränken"
 msgstr "Auf X günstigste Bilder beschränken"
 
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Auflösung: Original"
-#~ msgstr "Auflösung: Original"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Auflösung: Print"
-#~ msgstr "Auflösung: Print"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Auflösung: Web"
-#~ msgstr "Auflösung: Web"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Auflösungs-Preise (€)"
-#~ msgstr "Auflösungs-Preise (€)"
-
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Aufnahmedatum"
 msgstr "Aufnahmedatum"
@@ -854,18 +747,6 @@ msgstr "Aufschlag"
 #: src/ui/management/components/LicenseCatalogSettings.tsx
 msgid "Aufschlag (%)"
 msgstr "Aufschlag (%)"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Aufschlag: Kommerziell"
-#~ msgstr "Aufschlag: Kommerziell"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Aufschlag: Unbegrenzte Dauer"
-#~ msgstr "Aufschlag: Unbegrenzte Dauer"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Aufschlag: Weltweit"
-#~ msgstr "Aufschlag: Weltweit"
 
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Auftrag aktualisiert"
@@ -886,10 +767,6 @@ msgstr "Auftrag gelöscht"
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Auftrag löschen?"
 msgstr "Auftrag löschen?"
-
-#: src/ui/Privacy.tsx
-#~ msgid "Aus Gründen der Datensparsamkeit und zur Einhaltung der DSGVO protokollieren wir"
-#~ msgstr "Aus Gründen der Datensparsamkeit und zur Einhaltung der DSGVO protokollieren wir"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 #: src/ui/photographer/PhotographerPayoutsView.tsx
@@ -1051,14 +928,6 @@ msgstr "Beauftragt"
 msgid "Bedeutung"
 msgstr "Bedeutung"
 
-#: src/ui/Privacy.tsx
-msgid "Bei fehlgeschlagenen historischen Stripe-Zahlungen verarbeiten wir begrenzte PaymentIntent-Fehler-/Decline-Telemetrie: eine begrenzte Anzahl von Fehlversuchen, den Zeitpunkt des letzten Fehlers und einen bereinigten, gekürzten Decline-Code. Zur Vermeidung doppelter Verarbeitung wird anhand der Stripe-Event-ID eine kurzlebige technische Event-ID-Deduplizierung durchgeführt."
-msgstr "Bei fehlgeschlagenen historischen Stripe-Zahlungen verarbeiten wir begrenzte PaymentIntent-Fehler-/Decline-Telemetrie: eine begrenzte Anzahl von Fehlversuchen, den Zeitpunkt des letzten Fehlers und einen bereinigten, gekürzten Decline-Code. Zur Vermeidung doppelter Verarbeitung wird anhand der Stripe-Event-ID eine kurzlebige technische Event-ID-Deduplizierung durchgeführt."
-
-#: src/ui/Privacy.tsx
-#~ msgid "Bei fehlgeschlagenen Zahlungen verarbeiten wir begrenzte PaymentIntent-Fehler-/Decline-Telemetrie: eine begrenzte Anzahl von Fehlversuchen, den Zeitpunkt des letzten Fehlers und einen bereinigten, gekürzten Decline-Code. Zur Vermeidung doppelter Verarbeitung wird anhand der Stripe-Event-ID eine kurzlebige technische Event-ID-Deduplizierung durchgeführt."
-#~ msgstr "Bei fehlgeschlagenen Zahlungen verarbeiten wir begrenzte PaymentIntent-Fehler-/Decline-Telemetrie: eine begrenzte Anzahl von Fehlversuchen, den Zeitpunkt des letzten Fehlers und einen bereinigten, gekürzten Decline-Code. Zur Vermeidung doppelter Verarbeitung wird anhand der Stripe-Event-ID eine kurzlebige technische Event-ID-Deduplizierung durchgeführt."
-
 #: src/ui/LicenseTerms.tsx
 msgid "Bei Verträgen über die Lieferung digitaler Inhalte im Sinne des § 18 Abs. 1 Z 11 des österreichischen Fern- und Auswärtsgeschäfte-Gesetzes (FAGG) erlischt das Rücktrittsrecht vorzeitig, wenn der Kunde bei der Bestellung ausdrücklich zugestimmt hat, dass die Ausführung des Vertrages – nämlich der sofortige Download der Fotos – vor Ablauf der Widerrufsfrist beginnt, und wenn der Kunde zur Kenntnis genommen hat, dass er durch diese Zustimmung sein Rücktrittsrecht verliert."
 msgstr "Bei Verträgen über die Lieferung digitaler Inhalte im Sinne des § 18 Abs. 1 Z 11 des österreichischen Fern- und Auswärtsgeschäfte-Gesetzes (FAGG) erlischt das Rücktrittsrecht vorzeitig, wenn der Kunde bei der Bestellung ausdrücklich zugestimmt hat, dass die Ausführung des Vertrages – nämlich der sofortige Download der Fotos – vor Ablauf der Widerrufsfrist beginnt, und wenn der Kunde zur Kenntnis genommen hat, dass er durch diese Zustimmung sein Rücktrittsrecht verliert."
@@ -1074,10 +943,6 @@ msgstr "Beide Protokolle sind eingerichtet. SFTP ist der einfachere Weg: ein Por
 #: src/ui/management/ManagementContractView.tsx
 msgid "Beigetreten"
 msgstr "Beigetreten"
-
-#: src/ui/Privacy.tsx
-#~ msgid "Beim Checkout speichern wir die zum Zeitpunkt der Bestellung ermittelte IP-Adresse zusammen mit der Bestellung. Sie dient der Zahlungsabwicklung, der Betrugsprävention sowie der Nachvollziehbarkeit von Transaktionen und ist an die gesetzlichen Aufbewahrungsfristen gebunden. In den separaten Audit- und Download-Logs der Fotografen wird keine vollständige IP-Adresse gespeichert."
-#~ msgstr "Beim Checkout speichern wir die zum Zeitpunkt der Bestellung ermittelte IP-Adresse zusammen mit der Bestellung. Sie dient der Zahlungsabwicklung, der Betrugsprävention sowie der Nachvollziehbarkeit von Transaktionen und ist an die gesetzlichen Aufbewahrungsfristen gebunden. In den separaten Audit- und Download-Logs der Fotografen wird keine vollständige IP-Adresse gespeichert."
 
 #: src/ui/Privacy.tsx
 msgid "Beim Checkout speichern wir die zum Zeitpunkt der Bestellung ermittelte IP-Adresse zusammen mit der Bestellung. Sie wird für die Zahlungsabwicklung, die Betrugs- und Missbrauchsprävention sowie die Nachvollziehbarkeit der Transaktion verarbeitet. In den separaten Audit- und Download-Logs der Fotografen wird keine vollständige IP-Adresse gespeichert."
@@ -1246,6 +1111,10 @@ msgstr "Bestellung erfolgreich! (Beleg: {invoiceNumber})"
 msgid "Bestellungen & Anfragen"
 msgstr "Bestellungen & Anfragen"
 
+#: src/ui/Privacy.tsx
+msgid "Bestellungen aus der Zeit vor der Umstellung auf Mollie wurden über den damaligen Zahlungsdienstleister abgewickelt; an ihn werden für neue Bestellungen keine Daten mehr übermittelt."
+msgstr "Bestellungen aus der Zeit vor der Umstellung auf Mollie wurden über den damaligen Zahlungsdienstleister abgewickelt; an ihn werden für neue Bestellungen keine Daten mehr übermittelt."
+
 #: src/ui/client/components/CartItemList.tsx
 msgid "Bester Rabatt aktiv"
 msgstr "Bester Rabatt aktiv"
@@ -1253,10 +1122,6 @@ msgstr "Bester Rabatt aktiv"
 #: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "Bester Rabatt aktiv — {bestPrice} € pro Bild"
 msgstr "Bester Rabatt aktiv — {bestPrice} € pro Bild"
-
-#: src/ui/client/components/VolumeLicensingCard.tsx
-#~ msgid "Bester Rabatt aktiv — {bestPrice} pro Bild"
-#~ msgstr "Bester Rabatt aktiv — {bestPrice} pro Bild"
 
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Bestimmt, welche Auflösungen direkt ohne Checkout geladen werden können."
@@ -1498,10 +1363,6 @@ msgstr "Bitte mindestens eine Option wählen."
 msgid "Bitte prüfe die markierten Felder."
 msgstr "Bitte prüfe die markierten Felder."
 
-#: src/ui/client/ClientCartView.tsx
-#~ msgid "Bitte schließe die Zahlung ab."
-#~ msgstr "Bitte schließe die Zahlung ab."
-
 #: src/ui/ContractSignView.tsx
 msgid "Bitte Seite neu laden, um den aktualisierten Vertrag zu unterschreiben."
 msgstr "Bitte Seite neu laden, um den aktualisierten Vertrag zu unterschreiben."
@@ -1666,14 +1527,6 @@ msgid "das einmal angezeigte Passwort"
 msgstr "das einmal angezeigte Passwort"
 
 #: src/ui/Privacy.tsx
-#~ msgid "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig und wird von uns nicht gespeichert."
-#~ msgstr "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig und wird von uns nicht gespeichert."
-
-#: src/ui/Privacy.tsx
-#~ msgid "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei, sofern verfügbar, als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig und wird von uns nicht gespeichert."
-#~ msgstr "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei, sofern verfügbar, als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig und wird von uns nicht gespeichert."
-
-#: src/ui/Privacy.tsx
 msgid "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei, sofern verfügbar, als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig; das Token und die vollständige Siteverify-Antwort werden von uns nicht gespeichert."
 msgstr "Das einmalig erzeugte Prüftoken wird zur serverseitigen Siteverify-Prüfung an Cloudflare übermittelt. Die Antwort wird auf die Action \"checkout\", den Nutzerbezug (cData) und den zugelassenen Hostname geprüft; die Remote-IP wird dabei, sofern verfügbar, als \"remoteip\" an Cloudflare übermittelt. Das Token ist nur einmal gültig; das Token und die vollständige Siteverify-Antwort werden von uns nicht gespeichert."
 
@@ -1767,14 +1620,6 @@ msgstr "Datum / Zeit"
 msgid "Dauer (Min.)"
 msgstr "Dauer (Min.)"
 
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Dauer: 1 Jahr"
-#~ msgstr "Dauer: 1 Jahr"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Dauer: Unbegrenzt"
-#~ msgstr "Dauer: Unbegrenzt"
-
 #: src/ui/management/components/BrandSettingsCard.tsx
 msgid "DB-Einstellung"
 msgstr "DB-Einstellung"
@@ -1850,10 +1695,6 @@ msgstr "Dein Warenkorb ist leer."
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Dein WLAN; bei einem Fehlschlag „Offline konfigurieren\" wählen"
 msgstr "Dein WLAN; bei einem Fehlschlag „Offline konfigurieren\" wählen"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Deine Berechtigung erlaubt keine Upgrade-Käufe."
-#~ msgstr "Deine Berechtigung erlaubt keine Upgrade-Käufe."
 
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Deine Bestellung ist bezahlt. Die Rechnung wurde per E-Mail versendet."
@@ -1963,10 +1804,6 @@ msgstr "Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzule
 msgid "Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzulegen."
 msgstr "Der Nutzer erhält eine E-Mail mit einem Link, um sein Passwort festzulegen."
 
-#: src/ui/Privacy.tsx
-#~ msgid "der Nutzer oder Gäste in unseren Audit- und Download-Logs. Webserver-Logs werden, sofern sie IP-Adressen enthalten, automatisch nach wenigen Tagen rotiert und gelöscht."
-#~ msgstr "der Nutzer oder Gäste in unseren Audit- und Download-Logs. Webserver-Logs werden, sofern sie IP-Adressen enthalten, automatisch nach wenigen Tagen rotiert und gelöscht."
-
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular bereit (Anhang I B zum Fern- und Auswärtsgeschäfte-Gesetz, FAGG). Sie können den Widerruf formlos erklären – etwa per E-Mail an den auf dem Portal angegebenen Kontakt. Das Muster-Widerrufsformular verlangt lediglich die Angabe des Vertrags, die Mitteilung über Ihren Entschluss zum Widerruf sowie Ihren Namen und Ihre Anschrift. Zur Wahrung der Widerrufsfrist genügt die rechtzeitige Absendung der Erklärung."
 msgstr "Der österreichische Gesetzgeber stellt ein Muster-Widerrufsformular bereit (Anhang I B zum Fern- und Auswärtsgeschäfte-Gesetz, FAGG). Sie können den Widerruf formlos erklären – etwa per E-Mail an den auf dem Portal angegebenen Kontakt. Das Muster-Widerrufsformular verlangt lediglich die Angabe des Vertrags, die Mitteilung über Ihren Entschluss zum Widerruf sowie Ihren Namen und Ihre Anschrift. Zur Wahrung der Widerrufsfrist genügt die rechtzeitige Absendung der Erklärung."
@@ -1978,10 +1815,6 @@ msgstr "Der passive Bereich <0>{pasvValue}</0> muss in der Firewall freigeschalt
 #: src/ui/client/ClientCartView.tsx
 msgid "Der Rabatt macht diese Bestellung kostenlos. Eine Online-Zahlung ist nicht erforderlich."
 msgstr "Der Rabatt macht diese Bestellung kostenlos. Eine Online-Zahlung ist nicht erforderlich."
-
-#: src/ui/client/ClientCartView.tsx
-#~ msgid "Der Rabatt macht diese Bestellung kostenlos. Eine Stripe-Zahlung ist nicht erforderlich."
-#~ msgstr "Der Rabatt macht diese Bestellung kostenlos. Eine Stripe-Zahlung ist nicht erforderlich."
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "Der Rabatt wird auf den serverberechneten Warenkorb angewendet."
@@ -2135,18 +1968,6 @@ msgid "Die Rollen wurden inzwischen geändert. Der Dialog wurde geschlossen – 
 msgstr "Die Rollen wurden inzwischen geändert. Der Dialog wurde geschlossen – bitte erneut öffnen und die Rechte erneut speichern."
 
 #: src/ui/management/FtpConnectionRows.tsx
-#~ msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera eingerichtet werden kann."
-#~ msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Bitte kontaktiere den Support, damit die Kamera eingerichtet werden kann."
-
-#: src/ui/management/FtpConnectionRows.tsx
-#~ msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Den Kamera-Zugang kannst du trotzdem einrichten — im Dashboard unter FTP Inbox → Kamera-Konto, die Anleitung dazu öffnest du über „Anleitung öffnen\"."
-#~ msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Den Kamera-Zugang kannst du trotzdem einrichten — im Dashboard unter FTP Inbox → Kamera-Konto, die Anleitung dazu öffnest du über „Anleitung öffnen\"."
-
-#: src/ui/management/FtpConnectionRows.tsx
-#~ msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Ohne diese Angaben lässt sich die Kamera nicht einrichten."
-#~ msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Ohne diese Angaben lässt sich die Kamera nicht einrichten."
-
-#: src/ui/management/FtpConnectionRows.tsx
 msgid "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Wie du die Kamera einrichtest, erklärt die Anleitung — im Dashboard unter FTP Inbox über „Anleitung öffnen\"."
 msgstr "Die Server-Konfiguration ist unvollständig, daher lassen sich hier keine Verbindungsdaten anzeigen. Wie du die Kamera einrichtest, erklärt die Anleitung — im Dashboard unter FTP Inbox über „Anleitung öffnen\"."
 
@@ -2167,24 +1988,12 @@ msgid "Die Werte für die Kamera"
 msgstr "Die Werte für die Kamera"
 
 #: src/ui/client/ClientCartView.tsx
-#~ msgid "Die Zahlung ist noch nicht als bezahlt bestätigt. Der Warenkorb bleibt erhalten."
-#~ msgstr "Die Zahlung ist noch nicht als bezahlt bestätigt. Der Warenkorb bleibt erhalten."
-
-#: src/ui/client/ClientCartView.tsx
 msgid "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten."
 msgstr "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten."
 
 #: src/ui/client/ClientCartView.tsx
-#~ msgid "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten. Bitte später erneut prüfen; dabei wird der bestehende Zahlungsvorgang wiederverwendet."
-#~ msgstr "Die Zahlung ist noch nicht als bezahlt bestätigt. Warenkorb und Checkout-Wiederherstellung bleiben erhalten. Bitte später erneut prüfen; dabei wird der bestehende Zahlungsvorgang wiederverwendet."
-
-#: src/ui/client/ClientCartView.tsx
 msgid "Die Zahlung wird derzeit geprüft. Bitte später erneut prüfen."
 msgstr "Die Zahlung wird derzeit geprüft. Bitte später erneut prüfen."
-
-#: src/ui/client/ClientCartView.tsx
-#~ msgid "Die Zahlung wird geprüft. Der Warenkorb bleibt für die Wiederherstellung erhalten."
-#~ msgstr "Die Zahlung wird geprüft. Der Warenkorb bleibt für die Wiederherstellung erhalten."
 
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Die Zahlung wurde nicht abgeschlossen"
@@ -2226,10 +2035,6 @@ msgstr "Diese drei Fälle erzeugen keine Fehlermeldung in der Kamera. Sie sehen 
 msgid "Diese Einladung ist ungültig oder abgelaufen."
 msgstr "Diese Einladung ist ungültig oder abgelaufen."
 
-#: src/ui/Privacy.tsx
-msgid "Diese Fehlertelemetrie schreibt ausschließlich das signierte und eindeutig zuordenbare Zahlungsereignis von Stripe; ein Fehlversuch, der nur in Ihrem Browser sichtbar wird, verändert diese Werte nicht. Der Zähler der Fehlversuche ist nach oben begrenzt, und der Decline-Code wird auf Ziffern, Buchstaben und wenige Trennzeichen beschränkt sowie auf 64 Zeichen gekürzt."
-msgstr "Diese Fehlertelemetrie schreibt ausschließlich das signierte und eindeutig zuordenbare Zahlungsereignis von Stripe; ein Fehlversuch, der nur in Ihrem Browser sichtbar wird, verändert diese Werte nicht. Der Zähler der Fehlversuche ist nach oben begrenzt, und der Decline-Code wird auf Ziffern, Buchstaben und wenige Trennzeichen beschränkt sowie auf 64 Zeichen gekürzt."
-
 #: src/ui/components/GalleryModal.tsx
 msgid "Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!"
 msgstr "Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt kann nicht rückgängig gemacht werden!"
@@ -2237,10 +2042,6 @@ msgstr "Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt k
 #: src/ui/Privacy.tsx
 msgid "Diese Plattform verwendet sogenannte \"HttpOnly\"-Cookies, um angemeldete Benutzer sicher zu authentifizieren. Diese Cookies speichern einen Authentifizierungs-Token (JWT) und sind für die technische Funktion des Portals (Zugriff auf private Galerien, Speichern von Bewertungen) zwingend erforderlich. Sie können nicht durch clientseitige Skripte (JavaScript) ausgelesen werden."
 msgstr "Diese Plattform verwendet sogenannte \"HttpOnly\"-Cookies, um angemeldete Benutzer sicher zu authentifizieren. Diese Cookies speichern einen Authentifizierungs-Token (JWT) und sind für die technische Funktion des Portals (Zugriff auf private Galerien, Speichern von Bewertungen) zwingend erforderlich. Sie können nicht durch clientseitige Skripte (JavaScript) ausgelesen werden."
-
-#: src/ui/Privacy.tsx
-msgid "Dieselbe Zuordnung aus Checkout-Fingerprint und einer zufälligen Checkout-Kennung Ihres Browsers wird auch für Bestellungen gespeichert, die über Rechnung oder Lieferschein abgerechnet werden. Sie dient dort allein dazu, einen wiederholten Absendevorgang von einer bewusst neuen Bestellung zu unterscheiden."
-msgstr "Dieselbe Zuordnung aus Checkout-Fingerprint und einer zufälligen Checkout-Kennung Ihres Browsers wird auch für Bestellungen gespeichert, die über Rechnung oder Lieferschein abgerechnet werden. Sie dient dort allein dazu, einen wiederholten Absendevorgang von einer bewusst neuen Bestellung zu unterscheiden."
 
 #: src/ui/management/components/PhotographerTeamModal.tsx
 msgid "Dieser Bereich ist aktuell für <0>alle Fotografen</0> freigegeben. Du musst keine expliziten Zuweisungen vornehmen."
@@ -2294,10 +2095,6 @@ msgstr "Dokument wurde erstellt."
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "Download"
 msgstr "Download"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Download startet..."
-#~ msgstr "Download startet..."
 
 #: src/ui/management/components/ManagementGalleryActions.tsx
 msgid "Downloads"
@@ -2411,14 +2208,6 @@ msgstr "Eher nicht"
 #: src/ui/components/ManagementPageShell.tsx
 msgid "Ein Fehler ist aufgetreten."
 msgstr "Ein Fehler ist aufgetreten."
-
-#: src/ui/Privacy.tsx
-msgid "Ein Kundenkonto bei Stripe entstand nicht bei der Registrierung, sondern erst mit der ersten zahlungspflichtigen Bestellung; für weitere Bestellungen wurde es wiederverwendet. Im Portal ist dazu ausschließlich die Kennung hinterlegt. Mit dem Löschen eines Portalkontos durch den Betreiber entfällt diese Zuordnung im Portal; das bei Stripe angelegte Kundenkonto wird dabei nicht automatisch im Stripe-Dashboard gelöscht. Für neue Bestellungen wird kein Stripe-Kundenkonto mehr angelegt."
-msgstr "Ein Kundenkonto bei Stripe entstand nicht bei der Registrierung, sondern erst mit der ersten zahlungspflichtigen Bestellung; für weitere Bestellungen wurde es wiederverwendet. Im Portal ist dazu ausschließlich die Kennung hinterlegt. Mit dem Löschen eines Portalkontos durch den Betreiber entfällt diese Zuordnung im Portal; das bei Stripe angelegte Kundenkonto wird dabei nicht automatisch im Stripe-Dashboard gelöscht. Für neue Bestellungen wird kein Stripe-Kundenkonto mehr angelegt."
-
-#: src/ui/Privacy.tsx
-#~ msgid "Ein Kundenkonto bei Stripe wird nicht bei der Registrierung angelegt, sondern erst mit der ersten zahlungspflichtigen Bestellung; für weitere Bestellungen wird es wiederverwendet. Im Portal ist dazu ausschließlich die Kennung hinterlegt. Mit dem Löschen eines Portalkontos durch den Betreiber entfällt diese Zuordnung im Portal; das bei Stripe angelegte Kundenkonto wird dabei nicht automatisch im Stripe-Dashboard gelöscht."
-#~ msgstr "Ein Kundenkonto bei Stripe wird nicht bei der Registrierung angelegt, sondern erst mit der ersten zahlungspflichtigen Bestellung; für weitere Bestellungen wird es wiederverwendet. Im Portal ist dazu ausschließlich die Kennung hinterlegt. Mit dem Löschen eines Portalkontos durch den Betreiber entfällt diese Zuordnung im Portal; das bei Stripe angelegte Kundenkonto wird dabei nicht automatisch im Stripe-Dashboard gelöscht."
 
 #: src/ui/components/ErrorBoundary.tsx
 msgid "Ein unerwarteter Fehler ist aufgetreten"
@@ -2693,20 +2482,8 @@ msgid "Erweiterte Rechte als Angebot beim Fotografen anfragen"
 msgstr "Erweiterte Rechte als Angebot beim Fotografen anfragen"
 
 #: src/ui/LicenseTerms.tsx
-#~ msgid "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Kreditkarte (über den Zahlungsdienstleister Stripe) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
-#~ msgstr "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Kreditkarte (über den Zahlungsdienstleister Stripe) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
-
-#: src/ui/LicenseTerms.tsx
 msgid "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Online-Zahlung (über den Zahlungsdienstleister Mollie) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
 msgstr "Es gelten die zum Zeitpunkt der Bestellung auf dem Portal ausgewiesenen Preise. Die Zahlung erfolgt wahlweise per Online-Zahlung (über den Zahlungsdienstleister Mollie) oder auf Rechnung. Der Kaufpreis ist mit Bestellung fällig. Die Rechnung wird elektronisch übermittelt."
-
-#: src/ui/KameraEinrichtung.tsx
-#~ msgid "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt — frag den Support danach."
-#~ msgstr "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt — frag den Support danach."
-
-#: src/ui/management/KameraEinrichtungContent.tsx
-#~ msgid "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt."
-#~ msgstr "Es gibt einen Fallback über ein Stammzertifikat für Kameras, die mit „Vertrauenswürdige Zielserver\" keine Verbindung aufnehmen. Die Vorgehensweise dafür ist bewusst noch nicht festgelegt und wird erst dokumentiert, wenn der einfache Weg nachweislich nicht trägt."
 
 #: src/ui/LicenseTerms.tsx
 msgid "Es gilt österreichisches Recht unter Ausschluss des UN-Kaufrechts. Sollte eine Bestimmung dieser Bedingungen unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt. Gerichtsstand ist, soweit gesetzlich zulässig, der Sitz des Fotografen."
@@ -2750,10 +2527,6 @@ msgstr "Fashion / Editorial"
 msgid "Favoriten"
 msgstr "Favoriten"
 
-#: src/logic/useInvoiceDraft.ts
-#~ msgid "Fehler"
-#~ msgstr "Fehler"
-
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Fehler bei der Berechnung"
 msgstr "Fehler bei der Berechnung"
@@ -2770,18 +2543,9 @@ msgstr "Fehler bei der Stadt-Validierung für \"{detectedCity}\"."
 msgid "Fehler beim Absenden."
 msgstr "Fehler beim Absenden."
 
-#: src/logic/usePdfExtraction.ts
-#: src/logic/useProjectPdfDrop.ts
-#~ msgid "Fehler beim Auslesen."
-#~ msgstr "Fehler beim Auslesen."
-
 #: src/ui/OrgInviteView.tsx
 msgid "Fehler beim Beitreten."
 msgstr "Fehler beim Beitreten."
-
-#: src/ui/InviteView.tsx
-#~ msgid "Fehler beim Beitritt."
-#~ msgstr "Fehler beim Beitritt."
 
 #: src/ui/ModelProfileAccessView.tsx
 msgid "Fehler beim Bestätigen."
@@ -2988,10 +2752,6 @@ msgstr "Fehler beim Speichern einiger Einträge"
 msgid "Fehler beim Speichern."
 msgstr "Fehler beim Speichern."
 
-#: src/ui/management/ManagementSettingsView.tsx
-#~ msgid "Fehler beim Stripe-Verbindungstest: {stripeError}"
-#~ msgstr "Fehler beim Stripe-Verbindungstest: {stripeError}"
-
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Fehler beim Umschalten"
 msgstr "Fehler beim Umschalten"
@@ -3114,14 +2874,6 @@ msgstr "Folgen des Widerrufs"
 msgid "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind {resetLimitPerHour} Anforderungen pro Stunde möglich."
 msgstr "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind {resetLimitPerHour} Anforderungen pro Stunde möglich."
 
-#: src/ui/management/KameraEinrichtungContent.tsx
-#~ msgid "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
-#~ msgstr "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Kamera-Zugang einrichten\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
-
-#: src/ui/KameraEinrichtung.tsx
-#~ msgid "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Neues Kamera-Passwort\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
-#~ msgstr "Fordere die Zugangsdaten an: im Dashboard unter<0> FTP Inbox → Kamera-Konto</0> auf<1> „Neues Kamera-Passwort\"</1> klicken. Es sind drei Anforderungen pro Stunde möglich."
-
 #: src/ui/client/DeliveryView.tsx
 msgid "Format"
 msgstr "Format"
@@ -3238,14 +2990,6 @@ msgid "Für {unresolvedItemCount} Artikel ist der Preis noch nicht verfügbar. D
 msgstr "Für {unresolvedItemCount} Artikel ist der Preis noch nicht verfügbar. Die Summe wird beim Bezahlen verbindlich berechnet."
 
 #: src/ui/Privacy.tsx
-msgid "Für Bestellungen, die vor der Umstellung auf Mollie mit Karte über Stripe bezahlt wurden, bleibt Stripe der damalige Zahlungsdienstleister und Zahlungsprozessor; Erstattungen und Rückbuchungen dieser Bestellungen werden weiterhin über Stripe nachvollzogen. Die damals für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale wurden für die Zahlungsabwicklung, 3D-Secure und die Betrugs- und Risikoerkennung genutzt. Die weitere Verarbeitung durch Stripe richtet sich nach den Datenschutzhinweisen von Stripe."
-msgstr "Für Bestellungen, die vor der Umstellung auf Mollie mit Karte über Stripe bezahlt wurden, bleibt Stripe der damalige Zahlungsdienstleister und Zahlungsprozessor; Erstattungen und Rückbuchungen dieser Bestellungen werden weiterhin über Stripe nachvollzogen. Die damals für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale wurden für die Zahlungsabwicklung, 3D-Secure und die Betrugs- und Risikoerkennung genutzt. Die weitere Verarbeitung durch Stripe richtet sich nach den Datenschutzhinweisen von Stripe."
-
-#: src/ui/Privacy.tsx
-#~ msgid "Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete IP-Risikoschlüssel zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten."
-#~ msgstr "Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete IP-Risikoschlüssel zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten."
-
-#: src/ui/Privacy.tsx
 msgid "Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete Risikoschlüssel (IP-Risikoschlüssel) zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten."
 msgstr "Für den Checkout-Missbrauchsschutz werden aus der IP-Adresse abgeleitete Risikoschlüssel (IP-Risikoschlüssel) zur Überwachung und Limitierung von Versuchen verwendet. Diese Schlüssel dienen nicht als seitenübergreifendes Browser-Fingerprinting. Webserver-Logs können technisch bedingt IP-Adressen enthalten."
 
@@ -3254,24 +2998,8 @@ msgid "Für den gewählten Kontaktweg fehlt die hinterlegte Angabe."
 msgstr "Für den gewählten Kontaktweg fehlt die hinterlegte Angabe."
 
 #: src/ui/Privacy.tsx
-#~ msgid "Für die sofortige Kartenzahlung prüft das Portal zusätzlich serverseitig das Erstellungsdatum Ihres Portalkontos sowie die Anzahl Ihrer Checkout-Versuche und der Versuche Ihrer IP-Adresse. Dafür werden Ihre Konto-ID, Ihr Kontoerstellungsdatum und der oben beschriebene IP-Risikoschlüssel verwendet; die Prüfung entscheidet, ob ein Zahlungsvorgang mit Stripe begonnen wird. Für Bestellungen per Rechnung, Lieferschein oder Angebot gilt diese Prüfung nicht."
-#~ msgstr "Für die sofortige Kartenzahlung prüft das Portal zusätzlich serverseitig das Erstellungsdatum Ihres Portalkontos sowie die Anzahl Ihrer Checkout-Versuche und der Versuche Ihrer IP-Adresse. Dafür werden Ihre Konto-ID, Ihr Kontoerstellungsdatum und der oben beschriebene IP-Risikoschlüssel verwendet; die Prüfung entscheidet, ob ein Zahlungsvorgang mit Stripe begonnen wird. Für Bestellungen per Rechnung, Lieferschein oder Angebot gilt diese Prüfung nicht."
-
-#: src/ui/Privacy.tsx
-#~ msgid "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht."
-#~ msgstr "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht."
-
-#: src/ui/Privacy.tsx
-#~ msgid "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht. Der Eintrag ist dem angemeldeten Portalkonto zugeordnet und wird ersetzt, sobald sich der Warenkorb ändert."
-#~ msgstr "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch ein Stripe Client Secret oder eine PaymentIntent-ID und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht. Der Eintrag ist dem angemeldeten Portalkonto zugeordnet und wird ersetzt, sobald sich der Warenkorb ändert."
-
-#: src/ui/Privacy.tsx
 msgid "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch Zahlungsdaten des Zahlungsdienstleisters und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht. Der Eintrag ist dem angemeldeten Portalkonto zugeordnet und wird ersetzt, sobald sich der Warenkorb ändert."
 msgstr "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch Zahlungsdaten des Zahlungsdienstleisters und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht. Der Eintrag ist dem angemeldeten Portalkonto zugeordnet und wird ersetzt, sobald sich der Warenkorb ändert."
-
-#: src/ui/Privacy.tsx
-msgid "Für diese historischen Stripe-Bestellungen speichern wir die Stripe Customer-ID des Portalkontos und die PaymentIntent-ID des Zahlungsvorgangs. Diese Kennungen sind Zahlungs- und Kontrollinformationen, keine Kartendaten. Für die technische Absicherung wird außerdem der Checkout-Fingerprint-Hash aus dem serverseitig kanonisierten Checkout-Kontext verwendet; er ist kein Browser-Fingerprint und wird nicht für seitenübergreifendes Tracking verwendet."
-msgstr "Für diese historischen Stripe-Bestellungen speichern wir die Stripe Customer-ID des Portalkontos und die PaymentIntent-ID des Zahlungsvorgangs. Diese Kennungen sind Zahlungs- und Kontrollinformationen, keine Kartendaten. Für die technische Absicherung wird außerdem der Checkout-Fingerprint-Hash aus dem serverseitig kanonisierten Checkout-Kontext verwendet; er ist kein Browser-Fingerprint und wird nicht für seitenübergreifendes Tracking verwendet."
 
 #: src/ui/Privacy.tsx
 msgid "Für eine sofortige Online-Zahlung prüft das Portal zusätzlich serverseitig das Erstellungsdatum Ihres Portalkontos sowie die Anzahl Ihrer Checkout-Versuche und der Versuche Ihrer IP-Adresse. Dafür werden Ihre Konto-ID, Ihr Kontoerstellungsdatum und der oben beschriebene IP-Risikoschlüssel verwendet; die Prüfung entscheidet, ob ein Zahlungsvorgang begonnen wird. Für Bestellungen per Rechnung, Lieferschein oder Angebot gilt diese Prüfung nicht."
@@ -3281,25 +3009,25 @@ msgstr "Für eine sofortige Online-Zahlung prüft das Portal zusätzlich servers
 msgid "Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Die Kamera kann FTPS damit nicht aushandeln — nutze stattdessen SFTP."
 msgstr "Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Die Kamera kann FTPS damit nicht aushandeln — nutze stattdessen SFTP."
 
-#: src/ui/KameraEinrichtung.tsx
-#~ msgid "Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Frage den Support nach der Einrichtung, bevor du FTPS verwendest."
-#~ msgstr "Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Frage den Support nach der Einrichtung, bevor du FTPS verwendest."
-
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 msgid "Für Galerie:"
 msgstr "Für Galerie:"
+
+#: src/ui/Privacy.tsx
+msgid "Für jede Bestellung speichern wir außerdem eine Zuordnung aus einem Checkout-Fingerprint-Hash und einer zufälligen Checkout-Kennung Ihres Browsers. Der Checkout-Fingerprint-Hash wird serverseitig aus dem kanonisierten Checkout-Kontext berechnet; er ist kein Browser-Fingerprint und wird nicht für seitenübergreifendes Tracking verwendet. Diese Zuordnung dient allein dazu, einen wiederholten Absendevorgang von einer bewusst neuen Bestellung zu unterscheiden."
+msgstr "Für jede Bestellung speichern wir außerdem eine Zuordnung aus einem Checkout-Fingerprint-Hash und einer zufälligen Checkout-Kennung Ihres Browsers. Der Checkout-Fingerprint-Hash wird serverseitig aus dem kanonisierten Checkout-Kontext berechnet; er ist kein Browser-Fingerprint und wird nicht für seitenübergreifendes Tracking verwendet. Diese Zuordnung dient allein dazu, einen wiederholten Absendevorgang von einer bewusst neuen Bestellung zu unterscheiden."
 
 #: src/ui/Privacy.tsx
 msgid "Für jede über Mollie abgewickelte Zahlung speichern wir die von Mollie vergebene Zahlungs-ID (Payment-ID) des jeweiligen Zahlungsversuchs. Diese Kennung ist eine Zahlungs- und Kontrollinformation, keine Kartendaten; sie ordnet den Vorgang bei Mollie der Bestellung zu und dient der Nachvollziehbarkeit von Zahlung, Erstattung und Rückbuchung. Der geprüfte Zahlungsstatus wird erst übernommen, nachdem Betrag und Währung des bei Mollie abgerufenen Vorgangs mit der Bestellung übereinstimmen."
 msgstr "Für jede über Mollie abgewickelte Zahlung speichern wir die von Mollie vergebene Zahlungs-ID (Payment-ID) des jeweiligen Zahlungsversuchs. Diese Kennung ist eine Zahlungs- und Kontrollinformation, keine Kartendaten; sie ordnet den Vorgang bei Mollie der Bestellung zu und dient der Nachvollziehbarkeit von Zahlung, Erstattung und Rückbuchung. Der geprüfte Zahlungsstatus wird erst übernommen, nachdem Betrag und Währung des bei Mollie abgerufenen Vorgangs mit der Bestellung übereinstimmen."
 
 #: src/ui/Privacy.tsx
-msgid "Für neue Online-Zahlungen ist die Mollie B.V. in Amsterdam (Niederlande) der eingesetzte Zahlungsdienstleister. Das Portal übermittelt an Mollie ausschließlich den Zahlungsbetrag, die Währung, eine Bestell- und Vorgangsreferenz, die gewählte Zahlungsart sowie die Rücksprung- und die Webhook-Adresse. Die Bestellreferenz ist die Kennung der Bestellung, die Vorgangsreferenz die laufende Nummer des Zahlungsversuchs; sie enthalten weder Name noch Adresse, Kartendaten oder Rechnungsdaten. Für die Zahlung wechselt der Kunde auf die von Mollie gehostete Checkout-Seite; Kartendaten und Rechnungsdaten werden dabei nicht über das Portal an Mollie übermittelt, sondern auf der Seite von Mollie eingegeben. Bei Zahlungsarten wie paybybank oder eps erfolgt die Freigabe bei der Bank des Kunden. Die weitere Verarbeitung durch Mollie richtet sich nach den Datenschutzhinweisen von Mollie."
-msgstr "Für neue Online-Zahlungen ist die Mollie B.V. in Amsterdam (Niederlande) der eingesetzte Zahlungsdienstleister. Das Portal übermittelt an Mollie ausschließlich den Zahlungsbetrag, die Währung, eine Bestell- und Vorgangsreferenz, die gewählte Zahlungsart sowie die Rücksprung- und die Webhook-Adresse. Die Bestellreferenz ist die Kennung der Bestellung, die Vorgangsreferenz die laufende Nummer des Zahlungsversuchs; sie enthalten weder Name noch Adresse, Kartendaten oder Rechnungsdaten. Für die Zahlung wechselt der Kunde auf die von Mollie gehostete Checkout-Seite; Kartendaten und Rechnungsdaten werden dabei nicht über das Portal an Mollie übermittelt, sondern auf der Seite von Mollie eingegeben. Bei Zahlungsarten wie paybybank oder eps erfolgt die Freigabe bei der Bank des Kunden. Die weitere Verarbeitung durch Mollie richtet sich nach den Datenschutzhinweisen von Mollie."
+msgid "Für jeden Online-Zahlungsversuch speichern wir zusätzlich die laufende Nummer des Versuchs, den gewählten Zahlungsweg, den Betrag und die Währung des Vorgangs sowie den von Mollie gemeldeten Zahlungsstatus. Die Anzahl der Versuche je Bestellung ist begrenzt; einen bereits gemeldeten Status verarbeiten wir anhand der von Mollie vergebenen Zahlungs-ID nur einmal."
+msgstr "Für jeden Online-Zahlungsversuch speichern wir zusätzlich die laufende Nummer des Versuchs, den gewählten Zahlungsweg, den Betrag und die Währung des Vorgangs sowie den von Mollie gemeldeten Zahlungsstatus. Die Anzahl der Versuche je Bestellung ist begrenzt; einen bereits gemeldeten Status verarbeiten wir anhand der von Mollie vergebenen Zahlungs-ID nur einmal."
 
 #: src/ui/Privacy.tsx
-#~ msgid "Für neue Online-Zahlungen ist die Mollie B.V. in Amsterdam (Niederlande) der eingesetzte Zahlungsdienstleister. Das Portal übermittelt an Mollie ausschließlich den Zahlungsbetrag, die Währung, eine Bestellreferenz, die gewählte Zahlungsart sowie die Rücksprung- und die Webhook-Adresse. Für die Zahlung wechselt der Kunde auf die von Mollie gehostete Checkout-Seite; Kartendaten und Rechnungsdaten werden dabei nicht über das Portal an Mollie übermittelt, sondern auf der Seite von Mollie eingegeben. Bei Zahlungsarten wie paybybank oder eps erfolgt die Freigabe bei der Bank des Kunden. Die weitere Verarbeitung durch Mollie richtet sich nach den Datenschutzhinweisen von Mollie."
-#~ msgstr "Für neue Online-Zahlungen ist die Mollie B.V. in Amsterdam (Niederlande) der eingesetzte Zahlungsdienstleister. Das Portal übermittelt an Mollie ausschließlich den Zahlungsbetrag, die Währung, eine Bestellreferenz, die gewählte Zahlungsart sowie die Rücksprung- und die Webhook-Adresse. Für die Zahlung wechselt der Kunde auf die von Mollie gehostete Checkout-Seite; Kartendaten und Rechnungsdaten werden dabei nicht über das Portal an Mollie übermittelt, sondern auf der Seite von Mollie eingegeben. Bei Zahlungsarten wie paybybank oder eps erfolgt die Freigabe bei der Bank des Kunden. Die weitere Verarbeitung durch Mollie richtet sich nach den Datenschutzhinweisen von Mollie."
+msgid "Für neue Online-Zahlungen ist die Mollie B.V. in Amsterdam (Niederlande) der eingesetzte Zahlungsdienstleister. Das Portal übermittelt an Mollie ausschließlich den Zahlungsbetrag, die Währung, eine Bestell- und Vorgangsreferenz, die gewählte Zahlungsart sowie die Rücksprung- und die Webhook-Adresse. Die Bestellreferenz ist die Kennung der Bestellung, die Vorgangsreferenz die laufende Nummer des Zahlungsversuchs; sie enthalten weder Name noch Adresse, Kartendaten oder Rechnungsdaten. Für die Zahlung wechselt der Kunde auf die von Mollie gehostete Checkout-Seite; Kartendaten und Rechnungsdaten werden dabei nicht über das Portal an Mollie übermittelt, sondern auf der Seite von Mollie eingegeben. Bei Zahlungsarten wie paybybank oder eps erfolgt die Freigabe bei der Bank des Kunden. Die weitere Verarbeitung durch Mollie richtet sich nach den Datenschutzhinweisen von Mollie."
+msgstr "Für neue Online-Zahlungen ist die Mollie B.V. in Amsterdam (Niederlande) der eingesetzte Zahlungsdienstleister. Das Portal übermittelt an Mollie ausschließlich den Zahlungsbetrag, die Währung, eine Bestell- und Vorgangsreferenz, die gewählte Zahlungsart sowie die Rücksprung- und die Webhook-Adresse. Die Bestellreferenz ist die Kennung der Bestellung, die Vorgangsreferenz die laufende Nummer des Zahlungsversuchs; sie enthalten weder Name noch Adresse, Kartendaten oder Rechnungsdaten. Für die Zahlung wechselt der Kunde auf die von Mollie gehostete Checkout-Seite; Kartendaten und Rechnungsdaten werden dabei nicht über das Portal an Mollie übermittelt, sondern auf der Seite von Mollie eingegeben. Bei Zahlungsarten wie paybybank oder eps erfolgt die Freigabe bei der Bank des Kunden. Die weitere Verarbeitung durch Mollie richtet sich nach den Datenschutzhinweisen von Mollie."
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/PhotographerTeamModal.tsx
@@ -3439,10 +3167,6 @@ msgstr "Gesamtbetrag"
 msgid "Gesamtbetrag: {totalFormatted}"
 msgstr "Gesamtbetrag: {totalFormatted}"
 
-#: src/ui/management/components/invoice/InvoiceTotalSummary.tsx
-#~ msgid "Gesamtbetrag: {totalFormatted} €"
-#~ msgstr "Gesamtbetrag: {totalFormatted} €"
-
 #: src/ui/client/components/CartItemList.tsx
 msgid "Gesamtsumme"
 msgstr "Gesamtsumme"
@@ -3465,17 +3189,9 @@ msgstr "Geschlossener Monat:"
 msgid "Gespeichert!"
 msgstr "Gespeichert!"
 
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Gesperrt"
-#~ msgstr "Gesperrt"
-
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Geteiltes Flatrate-Budget (Cent)"
 msgstr "Geteiltes Flatrate-Budget (Cent)"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Gilt für Redaktionell, 1 Jahr, Web."
-#~ msgstr "Gilt für Redaktionell, 1 Jahr, Web."
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/ManagementCouponsView.tsx
@@ -3674,12 +3390,8 @@ msgid "Im Frontend verstecken"
 msgstr "Im Frontend verstecken"
 
 #: src/ui/Privacy.tsx
-#~ msgid "Im Portal speichern wir keine rohen Stripe-Fehlerobjekte, Kartendaten wie PAN oder CVC, Client-Secrets oder den vollständigen Zahlungsdatensatz. Die genannten Daten werden für die Zahlungsabwicklung, die Erkennung und Begrenzung automatisierter Kartentests und die Nachvollziehbarkeit von Transaktionen verarbeitet. Die jeweils zutreffende Rechtsgrundlage und die Aufbewahrung ergeben sich je nach Datenkategorie aus der geltenden Datenschutz- und Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten."
-#~ msgstr "Im Portal speichern wir keine rohen Stripe-Fehlerobjekte, Kartendaten wie PAN oder CVC, Client-Secrets oder den vollständigen Zahlungsdatensatz. Die genannten Daten werden für die Zahlungsabwicklung, die Erkennung und Begrenzung automatisierter Kartentests und die Nachvollziehbarkeit von Transaktionen verarbeitet. Die jeweils zutreffende Rechtsgrundlage und die Aufbewahrung ergeben sich je nach Datenkategorie aus der geltenden Datenschutz- und Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten."
-
-#: src/ui/Privacy.tsx
-msgid "Im Portal speichern wir keine rohen Stripe-Fehlerobjekte, Kartendaten wie PAN oder CVC, Client-Secrets oder den vollständigen Zahlungsdatensatz. Für neue Online-Zahlungen werden Kartendaten ausschließlich auf der Seite von Mollie eingegeben und erreichen das Portal nicht. Die genannten Daten werden für die Zahlungsabwicklung, die Erkennung und Begrenzung automatisierter Kartentests und die Nachvollziehbarkeit von Transaktionen verarbeitet. Die jeweils zutreffende Rechtsgrundlage und die Aufbewahrung ergeben sich je nach Datenkategorie aus der geltenden Datenschutz- und Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten."
-msgstr "Im Portal speichern wir keine rohen Stripe-Fehlerobjekte, Kartendaten wie PAN oder CVC, Client-Secrets oder den vollständigen Zahlungsdatensatz. Für neue Online-Zahlungen werden Kartendaten ausschließlich auf der Seite von Mollie eingegeben und erreichen das Portal nicht. Die genannten Daten werden für die Zahlungsabwicklung, die Erkennung und Begrenzung automatisierter Kartentests und die Nachvollziehbarkeit von Transaktionen verarbeitet. Die jeweils zutreffende Rechtsgrundlage und die Aufbewahrung ergeben sich je nach Datenkategorie aus der geltenden Datenschutz- und Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten."
+msgid "Im Portal speichern wir keine Kartendaten wie PAN oder CVC und keinen vollständigen Zahlungsdatensatz des Anbieters. Kartendaten werden ausschließlich auf der Seite von Mollie eingegeben und erreichen das Portal nicht. Die genannten Daten werden für die Zahlungsabwicklung, die Erkennung und Begrenzung automatisierter Kartentests und die Nachvollziehbarkeit von Transaktionen verarbeitet. Die jeweils zutreffende Rechtsgrundlage und die Aufbewahrung ergeben sich je nach Datenkategorie aus der geltenden Datenschutz- und Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten."
+msgstr "Im Portal speichern wir keine Kartendaten wie PAN oder CVC und keinen vollständigen Zahlungsdatensatz des Anbieters. Kartendaten werden ausschließlich auf der Seite von Mollie eingegeben und erreichen das Portal nicht. Die genannten Daten werden für die Zahlungsabwicklung, die Erkennung und Begrenzung automatisierter Kartentests und die Nachvollziehbarkeit von Transaktionen verarbeitet. Die jeweils zutreffende Rechtsgrundlage und die Aufbewahrung ergeben sich je nach Datenkategorie aus der geltenden Datenschutz- und Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten."
 
 #: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "Im Warenkorb"
@@ -3794,10 +3506,6 @@ msgstr "Instanzen"
 msgid "Intern"
 msgstr "Intern"
 
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "International (Weltweit)"
-#~ msgstr "International (Weltweit)"
-
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "IPTC Metadaten"
 msgstr "IPTC Metadaten"
@@ -3829,10 +3537,6 @@ msgstr "Jeder Account benötigt eine Brand-Zuweisung (U-02)."
 #: src/ui/management/ManagementContractView.tsx
 msgid "Jeder Unterzeichner erhält eine eigene Instanz"
 msgstr "Jeder Unterzeichner erhält eine eigene Instanz"
-
-#: src/ui/client/components/StripeCheckoutForm.tsx
-#~ msgid "Jetzt bezahlen"
-#~ msgstr "Jetzt bezahlen"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Join-Link"
@@ -4032,10 +3736,6 @@ msgstr "Keine Gutscheincodes gefunden. Lege den ersten Gutscheincode an."
 msgid "Keine Gutscheincodes vorhanden."
 msgstr "Keine Gutscheincodes vorhanden."
 
-#: src/ui/Privacy.tsx
-#~ msgid "keine IP-Adressen"
-#~ msgstr "keine IP-Adressen"
-
 #: src/ui/management/ManagementCustomersView.tsx
 msgid "Keine Kunden gefunden."
 msgstr "Keine Kunden gefunden."
@@ -4173,14 +3873,6 @@ msgstr "Kommentare"
 msgid "Kommerziell"
 msgstr "Kommerziell"
 
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Kommerziell (x3)"
-#~ msgstr "Kommerziell (x3)"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Kommerziell:"
-#~ msgstr "Kommerziell:"
-
 #: src/ui/management/components/LicenseCatalogSettings.tsx
 msgid "Kommerzielle Lizenz"
 msgstr "Kommerzielle Lizenz"
@@ -4245,10 +3937,6 @@ msgstr "Kostenpflichtig"
 #: src/logic/mollieMethods.ts
 msgid "Kreditkarte"
 msgstr "Kreditkarte"
-
-#: src/ui/client/ClientCartView.tsx
-#~ msgid "Kreditkarte (Stripe)"
-#~ msgstr "Kreditkarte (Stripe)"
 
 #: src/App.tsx
 msgid "Kritischer Fehler"
@@ -4356,14 +4044,6 @@ msgstr "Lädt..."
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Land"
 msgstr "Land"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Längste Kante max. 2560px"
-#~ msgstr "Längste Kante max. 2560px"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Längste Kante max. 4000px"
-#~ msgstr "Längste Kante max. 4000px"
 
 #: src/ui/management/ManagementSettingsView.tsx
 msgid "Laravel"
@@ -4485,10 +4165,6 @@ msgstr "Lizenz (Auflösung)"
 msgid "Lizenz wählen"
 msgstr "Lizenz wählen"
 
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Lizenz-Einstellungen speichern"
-#~ msgstr "Lizenz-Einstellungen speichern"
-
 #: src/ui/management/components/PricingSettingsTabs.tsx
 msgid "Lizenz-Katalog"
 msgstr "Lizenz-Katalog"
@@ -4496,14 +4172,6 @@ msgstr "Lizenz-Katalog"
 #: src/ui/management/components/LicenseCatalogSettings.tsx
 msgid "Lizenz-Katalog (RSV Modell)"
 msgstr "Lizenz-Katalog (RSV Modell)"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Lizenzbedingungen gespeichert"
-#~ msgstr "Lizenzbedingungen gespeichert"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Lizenzen & Preise"
-#~ msgstr "Lizenzen & Preise"
 
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Lizenzierte Bilder als ZIP herunterladen"
@@ -4659,10 +4327,6 @@ msgstr "Maximal 5 Fotos pro Person. Standardmäßig intern; nur öffentliche Fot
 #: src/ui/management/components/CalculatorSettingsCard.tsx
 msgid "Maximal 900%"
 msgstr "Maximal 900%"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Maximale Originalauflösung"
-#~ msgstr "Maximale Originalauflösung"
 
 #: src/ui/components/Sidebar.tsx
 msgid "Medien"
@@ -5107,10 +4771,6 @@ msgstr "Name:"
 msgid "name@beispiel.de"
 msgstr "name@beispiel.de"
 
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "National (Inland)"
-#~ msgstr "National (Inland)"
-
 #: src/logic/modelRegistration.ts
 #: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/components/ShootingCalculatorModal.tsx
@@ -5150,10 +4810,6 @@ msgstr "Neue Galerie"
 #: src/ui/components/GalleryGroupModal.tsx
 msgid "Neue Meta-Galerie erstellen"
 msgstr "Neue Meta-Galerie erstellen"
-
-#: src/ui/management/ManagementOrgDetailView.tsx
-#~ msgid "Neue Nutzer, die künftig per Domain-Auto-Join beitreten oder von einem Organisationsadministrator angelegt werden, erhalten diese Rolle. Sie können damit Nutzer in dieser Organisation verwalten. Bestehende Nutzer bleiben unverändert."
-#~ msgstr "Neue Nutzer, die künftig per Domain-Auto-Join beitreten oder von einem Organisationsadministrator angelegt werden, erhalten diese Rolle. Sie können damit Nutzer in dieser Organisation verwalten. Bestehende Nutzer bleiben unverändert."
 
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Neue Nutzer, die künftig per Domain-Auto-Join beitreten, von einem Organisationsadministrator angelegt oder per Einladung aufgenommen werden, erhalten diese Rolle. Das gilt auch für bereits bestehende Accounts, die per Einladung beitreten. Mit der Rolle „Organisationsadministrator“ können sie Nutzer in dieser Organisation verwalten. Bereits bestehende Mitglieder bleiben unverändert."
@@ -5432,14 +5088,6 @@ msgstr "Nutzer-Zugriff verwalten"
 msgid "Nutzerrechte gespeichert."
 msgstr "Nutzerrechte gespeichert."
 
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Nutzung: Kommerziell"
-#~ msgstr "Nutzung: Kommerziell"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Nutzung: Redaktionell"
-#~ msgstr "Nutzung: Redaktionell"
-
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Nutzungsrechte"
 msgstr "Nutzungsrechte"
@@ -5614,14 +5262,6 @@ msgstr "Organisationsadministrator"
 msgid "Original"
 msgstr "Original"
 
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Original (Cover)"
-#~ msgstr "Original (Cover)"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Original + Kommerziell + Unbegrenzt + Weltweit:"
-#~ msgstr "Original + Kommerziell + Unbegrenzt + Weltweit:"
-
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Original Master-File (4.00x)"
 msgstr "Original Master-File (4.00x)"
@@ -5691,10 +5331,6 @@ msgstr "Paket-Rechner Konfiguration"
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Pärchen"
 msgstr "Pärchen"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Passe die Rechtstexte an, die dem Kunden beim Checkout angezeigt werden, und definiere den Basispreis für Bildverkäufe."
-#~ msgstr "Passe die Rechtstexte an, die dem Kunden beim Checkout angezeigt werden, und definiere den Basispreis für Bildverkäufe."
 
 #: src/ui/management/FtpConnectionRows.tsx
 msgid "Passiver Bereich (Firewall)"
@@ -5854,22 +5490,6 @@ msgstr "Preis / Stück"
 msgid "Preis wird geladen…"
 msgstr "Preis wird geladen…"
 
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Preis-Faktoren (Zuschläge in %)"
-#~ msgstr "Preis-Faktoren (Zuschläge in %)"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Preis: Original"
-#~ msgstr "Preis: Original"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Preis: Print"
-#~ msgstr "Preis: Print"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Preis: Web"
-#~ msgstr "Preis: Web"
-
 #: src/ui/management/components/PricingSettingsTabs.tsx
 msgid "Preise & Lizenzen"
 msgstr "Preise & Lizenzen"
@@ -5889,10 +5509,6 @@ msgstr "Preisstrategie"
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Preisstruktur (retroaktiv)"
 msgstr "Preisstruktur (retroaktiv)"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Preisvorschau für Kunden ohne Flatrate"
-#~ msgstr "Preisvorschau für Kunden ohne Flatrate"
 
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Preset bearbeiten"
@@ -5917,14 +5533,6 @@ msgstr "Primärfarbe (Hex)"
 #: src/ui/client/DeliveryView.tsx
 msgid "Print (A4)"
 msgstr "Print (A4)"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Print (bis A4)"
-#~ msgstr "Print (bis A4)"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Print + Kommerziell + 1 Jahr:"
-#~ msgstr "Print + Kommerziell + 1 Jahr:"
 
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Print bis 4000px (2.00x)"
@@ -6092,10 +5700,6 @@ msgstr "Prüfe…"
 msgid "Prüft die Mollie-Konfiguration (Schlüssel-Modus, Webhook-URL, Methodenliste, Konto und Zahlungsbereitschaft) — nur bei explizitem Klick."
 msgstr "Prüft die Mollie-Konfiguration (Schlüssel-Modus, Webhook-URL, Methodenliste, Konto und Zahlungsbereitschaft) — nur bei explizitem Klick."
 
-#: src/ui/management/ManagementSettingsView.tsx
-#~ msgid "Prüft die Stripe-Konfiguration (Schlüssel-Modus, Bundle-Modus, Balance, Konto und Webhook) direkt über die Stripe-API — nur bei explizitem Klick."
-#~ msgstr "Prüft die Stripe-Konfiguration (Schlüssel-Modus, Bundle-Modus, Balance, Konto und Webhook) direkt über die Stripe-API — nur bei explizitem Klick."
-
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Qualität"
 msgstr "Qualität"
@@ -6107,10 +5711,6 @@ msgstr "Qualität wählen"
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Quartal (Sammelrechnung)"
 msgstr "Quartal (Sammelrechnung)"
-
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "Rabatt"
-#~ msgstr "Rabatt"
 
 #: src/ui/management/components/ProductBatchTable.tsx
 msgid "Rabatt (%)"
@@ -6174,10 +5774,6 @@ msgstr "Rechnung"
 msgid "Rechnung als PDF herunterladen"
 msgstr "Rechnung als PDF herunterladen"
 
-#: src/ui/client/components/StripeCheckoutForm.tsx
-#~ msgid "Rechnung als PDF öffnen"
-#~ msgstr "Rechnung als PDF öffnen"
-
 #: src/ui/management/ManagementOrgsView.tsx
 msgid "Rechnung: {invoiceFrequency}"
 msgstr "Rechnung: {invoiceFrequency}"
@@ -6203,14 +5799,6 @@ msgstr "Rechnungsempfänger"
 #: src/ui/management/components/UserTable.tsx
 msgid "Rechte (Gruppen / Galerien)"
 msgstr "Rechte (Gruppen / Galerien)"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Redaktionell (x1)"
-#~ msgstr "Redaktionell (x1)"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Redaktionell:"
-#~ msgstr "Redaktionell:"
 
 #: src/ui/ModelRegistrationView.tsx
 msgid "Registrierung abgeschlossen. Dein Einladungslink ist damit verbraucht."
@@ -6404,16 +5992,8 @@ msgid "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. FTPS verwendet imp
 msgstr "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. FTPS verwendet implizites TLS — in der Kamera dafür „Implizites FTP über TLS\" wählen. Der passive Bereich muss in der Firewall freigeschaltet sein."
 
 #: src/ui/management/ManagementFtpInbox.tsx
-#~ msgid "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt — bitte den Support kontaktieren, bevor du FTPS in der Kamera einrichtest."
-#~ msgstr "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt — bitte den Support kontaktieren, bevor du FTPS in der Kamera einrichtest."
-
-#: src/ui/management/ManagementFtpInbox.tsx
 msgid "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Ohne diesen Modus kann die Kamera FTPS nicht aushandeln — nutze daher SFTP."
 msgstr "SFTP läuft über Port {sftp}, FTPS über Port {ftps}. Für FTPS ist kein Verschlüsselungsmodus hinterlegt. Ohne diesen Modus kann die Kamera FTPS nicht aushandeln — nutze daher SFTP."
-
-#: src/ui/management/ManagementFtpInbox.tsx
-#~ msgid "SFTP läuft über Port 2222, FTPS über Port 989. FTPS verwendet explizites TLS (AUTH TLS) — in der Kamera muss dafür „Explizites FTP über TLS\" gewählt werden. Der passive Bereich muss in der Firewall freigeschaltet sein."
-#~ msgstr "SFTP läuft über Port 2222, FTPS über Port 989. FTPS verwendet explizites TLS (AUTH TLS) — in der Kamera muss dafür „Explizites FTP über TLS\" gewählt werden. Der passive Bereich muss in der Firewall freigeschaltet sein."
 
 #: src/ui/management/FtpConnectionRows.tsx
 msgid "SFTP-Port"
@@ -6430,14 +6010,6 @@ msgstr "Shares gesamt:"
 #: src/ui/components/Sidebar.tsx
 msgid "Shop-Bestellungen"
 msgstr "Shop-Bestellungen"
-
-#: src/ui/client/components/StripeCheckoutForm.tsx
-#~ msgid "Sicherer Zahlungsdienst nicht verfügbar"
-#~ msgstr "Sicherer Zahlungsdienst nicht verfügbar"
-
-#: src/ui/client/components/StripeCheckoutForm.tsx
-#~ msgid "Sicherer Zahlungsdienst wird geladen..."
-#~ msgstr "Sicherer Zahlungsdienst wird geladen..."
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Sicherheitsprüfung"
@@ -6465,10 +6037,6 @@ msgstr "Sie bleiben erhalten und werden nicht gelöscht."
 msgid "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten."
 msgstr "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten."
 
-#: src/ui/Privacy.tsx
-#~ msgid "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten. Bitte wenden Sie sich hierfür an den verantwortlichen Fotografen oder Administrator dieses Portals."
-#~ msgstr "Sie haben das Recht auf Auskunft, Berichtigung, Löschung oder Einschränkung der Verarbeitung Ihrer gespeicherten Daten. Bitte wenden Sie sich hierfür an den verantwortlichen Fotografen oder Administrator dieses Portals."
-
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses."
 msgstr "Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses."
@@ -6489,10 +6057,6 @@ msgstr "Sofort (automatisch)"
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Sofort (Einzelrechnung)"
 msgstr "Sofort (Einzelrechnung)"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Sofort Download"
-#~ msgstr "Sofort Download"
 
 #: src/logic/mollieMethods.ts
 msgid "Sofortige Bezahlung über dein Online-Banking."
@@ -6725,18 +6289,6 @@ msgstr "Straße:"
 #: src/ui/Impressum.tsx
 msgid "Streitbeilegung"
 msgstr "Streitbeilegung"
-
-#: src/ui/Privacy.tsx
-#~ msgid "Stripe ist der eingesetzte Zahlungsdienstleister und Zahlungsprozessor für die sofortige Kartenzahlung. Die für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale werden für die Zahlungsabwicklung, 3D-Secure und die Betrugs- und Risikoerkennung genutzt. Die weitere Verarbeitung durch Stripe richtet sich nach den Datenschutzhinweisen von Stripe."
-#~ msgstr "Stripe ist der eingesetzte Zahlungsdienstleister und Zahlungsprozessor für die sofortige Kartenzahlung. Die für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale werden für die Zahlungsabwicklung, 3D-Secure und die Betrugs- und Risikoerkennung genutzt. Die weitere Verarbeitung durch Stripe richtet sich nach den Datenschutzhinweisen von Stripe."
-
-#: src/ui/client/components/StripeCheckoutForm.tsx
-#~ msgid "Stripe konnte nicht geladen werden. Bitte versuche es erneut oder öffne die Rechnung als Ausweichoption."
-#~ msgstr "Stripe konnte nicht geladen werden. Bitte versuche es erneut oder öffne die Rechnung als Ausweichoption."
-
-#: src/ui/management/ManagementSettingsView.tsx
-#~ msgid "Stripe-Verbindungstest"
-#~ msgstr "Stripe-Verbindungstest"
 
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Studentenrabatt (33%)"
@@ -7006,14 +6558,6 @@ msgstr "Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (den Betreiber dieses 
 msgid "unbegrenzt"
 msgstr "unbegrenzt"
 
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Unbegrenzt (x2)"
-#~ msgstr "Unbegrenzt (x2)"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Unbegrenzt:"
-#~ msgstr "Unbegrenzt:"
-
 #: src/ui/components/PhotoHistoryModal.tsx
 #: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/components/RecipientFormSection.tsx
@@ -7087,14 +6631,6 @@ msgstr "Ungültiger Wert."
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Unique DLs:"
 msgstr "Unique DLs:"
-
-#: src/ui/Privacy.tsx
-#~ msgid "Unmittelbare Kartenzahlungen werden über Stripe abgewickelt. Dabei werden die für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale zur Durchführung der Zahlung, für 3D-Secure und zur Betrugs- und Risikoerkennung genutzt. Stripe kann dabei auch IP-bezogene und weitere Geräte- und Aktivitätssignale auswerten; die konkrete Verarbeitung richtet sich nach den Datenschutzhinweisen von Stripe."
-#~ msgstr "Unmittelbare Kartenzahlungen werden über Stripe abgewickelt. Dabei werden die für die Zahlung erforderlichen Bestell- und Zahlungsdaten sowie von Stripe verarbeitete Geräte-, Browser-, Netzwerk- und Aktivitätssignale zur Durchführung der Zahlung, für 3D-Secure und zur Betrugs- und Risikoerkennung genutzt. Stripe kann dabei auch IP-bezogene und weitere Geräte- und Aktivitätssignale auswerten; die konkrete Verarbeitung richtet sich nach den Datenschutzhinweisen von Stripe."
-
-#: src/ui/Privacy.tsx
-#~ msgid "Unsere eigenen Sicherheitsprüfungen verarbeiten Portal-Kennung, Kontoalter, Checkout- und Bestellkennung, Zeitpunkte sowie begrenzte Fehler- und Idempotenzinformationen, um Zahlungsversuche eindeutig zuzuordnen und automatisierte Kartentests zu erkennen. Diese Daten dienen der Vertragserfüllung, unserem berechtigten Interesse an der Betrugsprävention und der Erfüllung gesetzlicher Nachweis- und Aufbewahrungspflichten. Kartendaten wie PAN oder CVC speichern wir nicht."
-#~ msgstr "Unsere eigenen Sicherheitsprüfungen verarbeiten Portal-Kennung, Kontoalter, Checkout- und Bestellkennung, Zeitpunkte sowie begrenzte Fehler- und Idempotenzinformationen, um Zahlungsversuche eindeutig zuzuordnen und automatisierte Kartentests zu erkennen. Diese Daten dienen der Vertragserfüllung, unserem berechtigten Interesse an der Betrugsprävention und der Erfüllung gesetzlicher Nachweis- und Aufbewahrungspflichten. Kartendaten wie PAN oder CVC speichern wir nicht."
 
 #: src/ui/Impressum.tsx
 msgid "Unternehmensgegenstand"
@@ -7201,10 +6737,6 @@ msgstr "Verbraucher haben bei Verträgen über digitale Inhalte und Fotoprodukte
 #: src/ui/LicenseTerms.tsx
 msgid "Verbrauchern steht ein gesetzliches Widerrufsrecht zu. Die Details, insbesondere die 14-tägige Widerrufsfrist sowie die Bedingungen für das vorzeitige Erlöschen des Rücktrittsrechts bei digitalen Inhalten, sind in der"
 msgstr "Verbrauchern steht ein gesetzliches Widerrufsrecht zu. Die Details, insbesondere die 14-tägige Widerrufsfrist sowie die Bedingungen für das vorzeitige Erlöschen des Rücktrittsrechts bei digitalen Inhalten, sind in der"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Verbreitungsraum (Gebiet)"
-#~ msgstr "Verbreitungsraum (Gebiet)"
 
 #: src/ui/management/ManagementProjectsBoard.tsx
 #: src/ui/photographer/PhotographerProductionBoard.tsx
@@ -7407,18 +6939,9 @@ msgstr "Volume-Pricing"
 msgid "Volumen-Summe"
 msgstr "Volumen-Summe"
 
-#. placeholder {0}: volumeGroup.tierIndex
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "Volumenpreis (Tier {0})"
-#~ msgstr "Volumenpreis (Tier {0})"
-
 #: src/ui/client/components/CartItemList.tsx
 msgid "Volumenpreis (Tier {tierNum})"
 msgstr "Volumenpreis (Tier {tierNum})"
-
-#: src/ui/client/components/CartItemList.tsx
-#~ msgid "Volumenpreis (Tier {volumeTierIndex})"
-#~ msgstr "Volumenpreis (Tier {volumeTierIndex})"
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Vor dem Test existiert bewusst kein FTP-Konto. Dein FTP-Ordner-Slug ist nur der Name; in SFTPGo wird nichts angelegt, bis die Zugangsdaten angefordert werden. Ein Konto vorab zu provisionieren hieße, Zugangsdaten zu erzeugen, die niemand kennt."
@@ -7451,10 +6974,6 @@ msgstr "Vorschlag:"
 #: src/ui/client/SelectionView.tsx
 msgid "Wähle deine Favoriten aus."
 msgstr "Wähle deine Favoriten aus."
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Wähle die gewünschte Auflösung für das Bild <0>{photoTitle}</0>."
-#~ msgstr "Wähle die gewünschte Auflösung für das Bild <0>{photoTitle}</0>."
 
 #: src/ui/components/Sidebar.tsx
 msgid "Warenkorb"
@@ -7491,18 +7010,6 @@ msgstr "Web / Social-Media bis 2560px (1.00x)"
 #: src/ui/client/DeliveryView.tsx
 msgid "Web & Social"
 msgstr "Web & Social"
-
-#: src/ui/client/components/LicenseSelectorModal.tsx
-#~ msgid "Web & Social Media"
-#~ msgstr "Web & Social Media"
-
-#: src/ui/management/components/LicenseSettingsCard.tsx
-#~ msgid "Web + Redaktionell + 1 Jahr:"
-#~ msgstr "Web + Redaktionell + 1 Jahr:"
-
-#: src/ui/Privacy.tsx
-#~ msgid "Webserver-Logs können technisch bedingt IP-Adressen enthalten. Sie werden nach wenigen Tagen rotiert und gelöscht. Für den Missbrauchsschutz werden checkoutbezogene IP-Angaben zusätzlich in einer pseudonymisierten, rotierbaren Form zur zeitlich begrenzten Limitierung von Versuchen verarbeitet."
-#~ msgstr "Webserver-Logs können technisch bedingt IP-Adressen enthalten. Sie werden nach wenigen Tagen rotiert und gelöscht. Für den Missbrauchsschutz werden checkoutbezogene IP-Angaben zusätzlich in einer pseudonymisierten, rotierbaren Form zur zeitlich begrenzten Limitierung von Versuchen verarbeitet."
 
 #: src/ui/Impressum.tsx
 msgid "Website: [Domain]"
@@ -7548,10 +7055,6 @@ msgstr "Wenig"
 #: src/ui/Privacy.tsx
 msgid "Wenn Cloudflare Turnstile für das Portal konfiguriert ist, kann bei einem erhöhten Risiko eine zusätzliche Sicherheitsprüfung angezeigt werden. Cloudflare ist dabei der eingesetzte Sicherheitsprozessor. Cloudflare verarbeitet technisch notwendige Geräte- und Aktivitätssignale; je nach Konfiguration können hierfür Cookies oder vergleichbare Technologien verwendet werden."
 msgstr "Wenn Cloudflare Turnstile für das Portal konfiguriert ist, kann bei einem erhöhten Risiko eine zusätzliche Sicherheitsprüfung angezeigt werden. Cloudflare ist dabei der eingesetzte Sicherheitsprozessor. Cloudflare verarbeitet technisch notwendige Geräte- und Aktivitätssignale; je nach Konfiguration können hierfür Cookies oder vergleichbare Technologien verwendet werden."
-
-#: src/ui/Privacy.tsx
-#~ msgid "Wenn Cloudflare Turnstile für das Portal konfiguriert ist, kann bei einem erhöhten Risiko eine zusätzliche Sicherheitsprüfung angezeigt werden. Cloudflare verarbeitet dabei technisch notwendige Geräte- und Aktivitätssignale; je nach Konfiguration können hierfür Daten in Cookies oder vergleichbaren Technologien gespeichert werden. Das einmalig erzeugte Prüftoken wird zur serverseitigen Verifikation an Cloudflare übermittelt, ist nur einmal gültig und wird von uns nicht gespeichert. Ohne aktivierte Konfiguration wird Turnstile nicht geladen."
-#~ msgstr "Wenn Cloudflare Turnstile für das Portal konfiguriert ist, kann bei einem erhöhten Risiko eine zusätzliche Sicherheitsprüfung angezeigt werden. Cloudflare verarbeitet dabei technisch notwendige Geräte- und Aktivitätssignale; je nach Konfiguration können hierfür Daten in Cookies oder vergleichbaren Technologien gespeichert werden. Das einmalig erzeugte Prüftoken wird zur serverseitigen Verifikation an Cloudflare übermittelt, ist nur einmal gültig und wird von uns nicht gespeichert. Ohne aktivierte Konfiguration wird Turnstile nicht geladen."
 
 #: src/ui/Privacy.tsx
 msgid "Wenn Sie Bilder aus unseren Galerien herunterladen, dokumentieren wir diesen Vorgang in einer internen Datenbank (Audit-Log), um den Zugriff auf unsere urheberrechtlich geschützten Werke nachvollziehen zu können. Dabei speichern wir Ihren Namen (sofern angegeben) und den Zeitpunkt des Downloads."
@@ -7765,41 +7268,17 @@ msgstr "Zahlbar sofort nach Erhalt der Rechnung."
 msgid "Zahlung"
 msgstr "Zahlung"
 
-#: src/ui/client/ClientCartView.tsx
-#~ msgid "Zahlung abschließen"
-#~ msgstr "Zahlung abschließen"
-
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Zahlung ausständig (Kauf auf Rechnung)"
 msgstr "Zahlung ausständig (Kauf auf Rechnung)"
-
-#: src/ui/client/ClientCartView.tsx
-#~ msgid "Zahlung bei Stripe erfolgreich, aber das lokale Webhook-Event fehlt."
-#~ msgstr "Zahlung bei Stripe erfolgreich, aber das lokale Webhook-Event fehlt."
 
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Zahlung erfolgreich"
 msgstr "Zahlung erfolgreich"
 
 #: src/ui/client/ClientCartView.tsx
-#~ msgid "Zahlung erfolgreich!"
-#~ msgstr "Zahlung erfolgreich!"
-
-#: src/ui/client/ClientCartView.tsx
-#~ msgid "Zahlung erfolgreich! Rechnung wurde versendet."
-#~ msgstr "Zahlung erfolgreich! Rechnung wurde versendet."
-
-#: src/ui/client/ClientCartView.tsx
 msgid "Zahlung erneut prüfen"
 msgstr "Zahlung erneut prüfen"
-
-#: src/ui/client/ClientCartView.tsx
-#~ msgid "Zahlung fehlgeschlagen — bitte versuche es erneut."
-#~ msgstr "Zahlung fehlgeschlagen — bitte versuche es erneut."
-
-#: src/ui/client/components/StripeCheckoutForm.tsx
-#~ msgid "Zahlung fehlgeschlagen."
-#~ msgstr "Zahlung fehlgeschlagen."
 
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Zahlung noch nicht bestätigt"
@@ -7809,10 +7288,6 @@ msgstr "Zahlung noch nicht bestätigt"
 msgid "Zahlung per Überweisung; die Freigabe dauert einige Tage."
 msgstr "Zahlung per Überweisung; die Freigabe dauert einige Tage."
 
-#: src/ui/client/components/StripeCheckoutForm.tsx
-#~ msgid "Zahlung unvollständig — bitte erneut versuchen."
-#~ msgstr "Zahlung unvollständig — bitte erneut versuchen."
-
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Zahlung wird geprüft"
 msgstr "Zahlung wird geprüft"
@@ -7820,10 +7295,6 @@ msgstr "Zahlung wird geprüft"
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Zahlung wird manuell geprüft"
 msgstr "Zahlung wird manuell geprüft"
-
-#: src/ui/client/components/StripeCheckoutForm.tsx
-#~ msgid "Zahlung wird verifiziert..."
-#~ msgstr "Zahlung wird verifiziert..."
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Zahlungsart"
@@ -7974,14 +7445,6 @@ msgstr "Zuordnung"
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Zuordnung aufheben"
 msgstr "Zuordnung aufheben"
-
-#: src/ui/Privacy.tsx
-#~ msgid "Zur eindeutigen Zuordnung speichern wir die Stripe Customer-ID des Portalkontos und die PaymentIntent-ID des Zahlungsvorgangs. Diese Kennungen sind Zahlungs- und Kontrollinformationen, keine Kartendaten. Für die technische Absicherung wird außerdem der Checkout-Fingerprint-Hash aus dem serverseitig kanonisierten Checkout-Kontext verwendet; er ist kein Browser-Fingerprint und wird nicht für seitenübergreifendes Tracking verwendet."
-#~ msgstr "Zur eindeutigen Zuordnung speichern wir die Stripe Customer-ID des Portalkontos und die PaymentIntent-ID des Zahlungsvorgangs. Diese Kennungen sind Zahlungs- und Kontrollinformationen, keine Kartendaten. Für die technische Absicherung wird außerdem der Checkout-Fingerprint-Hash aus dem serverseitig kanonisierten Checkout-Kontext verwendet; er ist kein Browser-Fingerprint und wird nicht für seitenübergreifendes Tracking verwendet."
-
-#: src/ui/KameraEinrichtung.tsx
-#~ msgid "Zurück zum FTP Inbox"
-#~ msgstr "Zurück zum FTP Inbox"
 
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Zurück zum Warenkorb"

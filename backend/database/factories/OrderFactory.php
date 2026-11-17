@@ -50,7 +50,6 @@ class OrderFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'status' => 'paid',
-            'stripe_fee_cents' => $this->faker->numberBetween(50, 500),
         ]);
     }
 }

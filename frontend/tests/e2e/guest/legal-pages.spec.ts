@@ -63,20 +63,18 @@ test.describe('Rechtliche Seiten (AGB & Widerruf) (G)', () => {
         await expect(molliePaymentIdParagraph).toBeVisible();
         await expect(molliePaymentIdParagraph).toContainText('keine Kartendaten');
 
-        const paymentIdentifiersParagraph = main.locator('p').filter({
-            hasText: 'Für diese historischen Stripe-Bestellungen speichern wir die Stripe Customer-ID'
+        const paymentAttemptParagraph = main.locator('p').filter({
+            hasText: 'Für jeden Online-Zahlungsversuch speichern wir zusätzlich die laufende Nummer des Versuchs'
         });
-        await expect(paymentIdentifiersParagraph).toBeVisible();
-        await expect(paymentIdentifiersParagraph).toContainText('Stripe Customer-ID');
-        await expect(paymentIdentifiersParagraph).toContainText('PaymentIntent-ID');
-        await expect(paymentIdentifiersParagraph).toContainText('Checkout-Fingerprint-Hash');
+        await expect(paymentAttemptParagraph).toBeVisible();
+        await expect(paymentAttemptParagraph).toContainText('den von Mollie gemeldeten Zahlungsstatus');
+        await expect(paymentAttemptParagraph).toContainText('Die Anzahl der Versuche je Bestellung ist begrenzt');
 
-        const paymentTelemetryParagraph = main.locator('p').filter({
-            hasText: 'Bei fehlgeschlagenen historischen Stripe-Zahlungen verarbeiten wir begrenzte PaymentIntent-Fehler-/Decline-Telemetrie'
+        const checkoutFingerprintParagraph = main.locator('p').filter({
+            hasText: 'Für jede Bestellung speichern wir außerdem eine Zuordnung aus einem Checkout-Fingerprint-Hash'
         });
-        await expect(paymentTelemetryParagraph).toBeVisible();
-        await expect(paymentTelemetryParagraph).toContainText('PaymentIntent-Fehler-/Decline-Telemetrie');
-        await expect(paymentTelemetryParagraph).toContainText('Event-ID-Deduplizierung');
+        await expect(checkoutFingerprintParagraph).toBeVisible();
+        await expect(checkoutFingerprintParagraph).toContainText('kein Browser-Fingerprint');
 
         const checkoutSessionParagraph = main.locator('p').filter({
             hasText: 'Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser'
@@ -84,11 +82,8 @@ test.describe('Rechtliche Seiten (AGB & Widerruf) (G)', () => {
         await expect(checkoutSessionParagraph).toBeVisible();
         await expect(checkoutSessionParagraph).toContainText('Sitzungsspeicher');
 
-        const paymentProcessorParagraph = main.locator('p').filter({
-            hasText: 'bleibt Stripe der damalige Zahlungsdienstleister und Zahlungsprozessor'
-        });
-        await expect(paymentProcessorParagraph).toBeVisible();
-        await expect(paymentProcessorParagraph).toContainText('Zahlungsprozessor');
+        // No other payment provider is named anywhere on the page.
+        await expect(main).not.toContainText('Stripe');
 
         await expect(main.getByRole('heading', { name: '5. Cloudflare Turnstile' })).toBeVisible();
         await expect(main.getByText(/Sicherheitsprozessor/)).toBeVisible();

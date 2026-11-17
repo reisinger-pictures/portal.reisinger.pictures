@@ -35,10 +35,11 @@ The authoritative copy is [`deployment/content-security-policy.txt`](../../deplo
 Once the frontend carried no Stripe code, the three Stripe origins in the policy
 became dead allowances that only widened what an injected script could load. They
 are gone: `js.stripe.com` from `script-src` and `frame-src`, `*.stripe.com` from
-`connect-src` and `frame-src`. Mollie needs **no** new origin — the portal sends
-the customer to Mollie's hosted page as a top-level navigation and reads the
-payment status server-side, so nothing is framed, scripted or fetched from the
-provider in the browser.
+`connect-src` and `frame-src`. Stripe is now removed completely (no account, no
+credential, no code), so no provider origin is needed at all. Mollie needs **no**
+new origin — the portal sends the customer to Mollie's hosted page as a top-level
+navigation and reads the payment status server-side, so nothing is framed,
+scripted or fetched from the provider in the browser.
 
 Measured after the rollout: the served header, the mirror and the Caddyfile agree
 (`./scripts/check-csp-policy.sh` exit 0), and loading `/`, `/impressum` and
@@ -68,9 +69,10 @@ below proves that host and repository say the same thing (exit 0 measured
 after the rollout). The challenge itself stays **off**: the production
 configuration has no `TURNSTILE_SITE_KEY` and no `TURNSTILE_SECRET`, so the
 risk-based branch does not run. The remaining conditions of the rollout
-contract — the Stripe dashboard checks, the data-protection approval for
-Cloudflare as a processor, and the siteverify check — are unaffected by the
-policy change; the policy was the one purely technical prerequisite.
+contract — the payment-provider dashboard checks for the provider in use (today
+Mollie, D-63), the data-protection approval for Cloudflare as a processor, and
+the siteverify check — are unaffected by the policy change; the policy was the
+one purely technical prerequisite.
 
 ## The E2E suite is structurally blind for CSP violations
 

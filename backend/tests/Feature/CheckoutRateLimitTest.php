@@ -5,13 +5,13 @@ namespace Tests\Feature;
 use App\Contracts\PricingStrategy;
 use App\Models\Gallery;
 use App\Models\LicenseUseCase;
+use App\Models\MolliePaymentAttempt;
 use App\Models\Order;
 use App\Models\Photo;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\CheckoutRiskService;
 use App\Services\CheckoutService;
-use App\Services\StripePaymentService;
 use App\Support\CheckoutKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -158,7 +158,6 @@ class CheckoutRateLimitTest extends TestCase
             'app.checkout_throttle_user_per_hour' => 100,
             'app.checkout_throttle_ip_per_hour' => 100,
             'app.checkout_throttle_ip_per_day' => 100,
-            'app.stripe.customers_enabled' => false,
             'services.turnstile.site_key' => 'site-key',
             'services.turnstile.secret' => 'server-secret',
             'app.turnstile_user_threshold_per_hour' => 100,
@@ -255,12 +254,11 @@ class CheckoutRateLimitTest extends TestCase
                 'couponType' => $discountCents > 0 ? 'fixed' : null,
             ];
         });
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('createPaymentIntent');
+        $this->fakeMollie([], retainRequests: true);
         $risk = $this->createMock(CheckoutRiskService::class);
         $risk->expects($this->never())->method('assertCheckoutQuotaAllowed');
-        $risk->expects($this->never())->method('assertImmediateStripeAllowed');
-        $service = new CheckoutService($strategy, $stripe, null, null, $risk);
+        $risk->expects($this->never())->method('assertImmediateCheckoutAllowed');
+        $service = new CheckoutService($strategy, null, null, $risk);
 
         $base = [
             'billing_name' => 'Test',
@@ -272,7 +270,7 @@ class CheckoutRateLimitTest extends TestCase
         $quote = Request::create('/', 'POST', $base + [
             'items' => [['photoId' => $photo->id, 'isQuote' => true]],
         ]);
-        $this->assertSame(200, $service->processCheckout($quote, $user, 'stripe')->status());
+        $this->assertSame(200, $service->processCheckout($quote, $user, 'invoice')->status());
 
         $invoice = Request::create('/', 'POST', $base + [
             'items' => [['photoId' => $photo->id, 'tier' => 'web']],
@@ -284,7 +282,8 @@ class CheckoutRateLimitTest extends TestCase
         $free = Request::create('/', 'POST', $base + [
             'items' => [['photoId' => $photo->id, 'tier' => 'web']],
         ]);
-        $this->assertSame(200, $service->processCheckout($free, $user, 'stripe')->status());
+        $this->assertSame(200, $service->processCheckout($free, $user, 'mollie')->status());
+        $this->assertSame(0, MolliePaymentAttempt::count());
     }
 
     private function requestFromIp(string $ip): Request

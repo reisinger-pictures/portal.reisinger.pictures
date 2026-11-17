@@ -18,7 +18,6 @@ use App\Models\User;
 use App\Services\CheckoutService;
 use App\Services\CouponService;
 use App\Services\PurchaseService;
-use App\Services\StripePaymentService;
 use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -282,122 +281,12 @@ class PaymentFindingsRegressionTest extends TestCase
         $this->assertFalse($purchaseService->hasPurchasedPhoto($user, $photoId, 'original'));
     }
 
-    public function test_late_dispute_does_not_regress_a_refunded_order(): void
-    {
-        $order = Order::factory()->create([
-            'status' => 'refunded',
-            'stripe_payment_intent_id' => 'pi-terminal-refunded',
-        ]);
-        $secret = 'whsec-terminal-refunded';
-        Config::set('services.stripe.webhook_secret', $secret);
-
-        $this->sendSignedStripeEvent([
-            'id' => 'evt-terminal-refunded',
-            'type' => 'charge.dispute.created',
-            'data' => ['object' => ['payment_intent' => 'pi-terminal-refunded']],
-        ], $secret)->assertOk();
-
-        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'refunded']);
-        Mail::assertNothingSent();
-    }
-
-    public function test_dispute_and_refund_events_do_not_mutate_cancelled_orders(): void
-    {
-        $disputeOrder = Order::factory()->create([
-            'status' => 'cancelled',
-            'stripe_payment_intent_id' => 'pi-terminal-cancelled-dispute',
-        ]);
-        $refundOrder = Order::factory()->create([
-            'status' => 'cancelled',
-            'stripe_payment_intent_id' => 'pi-terminal-cancelled-refund',
-        ]);
-        $secret = 'whsec-terminal-cancelled';
-        Config::set('services.stripe.webhook_secret', $secret);
-
-        $this->sendSignedStripeEvent([
-            'id' => 'evt-terminal-cancelled-dispute',
-            'type' => 'charge.dispute.created',
-            'data' => ['object' => ['payment_intent' => 'pi-terminal-cancelled-dispute']],
-        ], $secret)->assertOk();
-        $this->sendSignedStripeEvent([
-            'id' => 'evt-terminal-cancelled-refund',
-            'type' => 'charge.refunded',
-            'data' => ['object' => [
-                'payment_intent' => 'pi-terminal-cancelled-refund',
-                'refunded' => true,
-            ]],
-        ], $secret)->assertOk();
-
-        $this->assertDatabaseHas('orders', ['id' => $disputeOrder->id, 'status' => 'cancelled']);
-        $this->assertDatabaseHas('orders', ['id' => $refundOrder->id, 'status' => 'cancelled']);
-        Mail::assertNothingSent();
-    }
-
-    public function test_dispute_and_refund_events_do_not_mutate_pending_quote_orders_but_terminate_pending_payments(): void
-    {
-        $quoteOrder = Order::factory()->create([
-            'status' => 'pending',
-            'is_quote_request' => true,
-            'stripe_payment_intent_id' => 'pi-terminal-pending-dispute',
-        ]);
-        $paymentOrder = Order::factory()->create([
-            'status' => 'pending_payment',
-            'stripe_payment_intent_id' => 'pi-terminal-pending-refund',
-        ]);
-        $secret = 'whsec-terminal-pending';
-        Config::set('services.stripe.webhook_secret', $secret);
-
-        $this->sendSignedStripeEvent([
-            'id' => 'evt-terminal-pending-dispute',
-            'type' => 'charge.dispute.created',
-            'data' => ['object' => ['payment_intent' => 'pi-terminal-pending-dispute']],
-        ], $secret)->assertOk();
-        $this->sendSignedStripeEvent([
-            'id' => 'evt-terminal-pending-refund',
-            'type' => 'charge.refunded',
-            'data' => ['object' => [
-                'payment_intent' => 'pi-terminal-pending-refund',
-                'refunded' => true,
-            ]],
-        ], $secret)->assertOk();
-
-        // A pending quote request is not a payment: the dispute must not touch
-        // it. A pending PaymentIntent, by contrast, is terminated by the
-        // verified event so that a later success cannot restore access.
-        $this->assertDatabaseHas('orders', ['id' => $quoteOrder->id, 'status' => 'pending']);
-        $this->assertDatabaseHas('orders', ['id' => $paymentOrder->id, 'status' => 'refunded']);
-        Mail::assertNothingSent();
-    }
-
-    public function test_full_refund_can_complete_a_disputed_order(): void
-    {
-        $order = Order::factory()->create([
-            'status' => 'disputed',
-            'stripe_payment_intent_id' => 'pi-disputed-refund',
-        ]);
-        $secret = 'whsec-disputed-refund';
-        Config::set('services.stripe.webhook_secret', $secret);
-
-        $this->sendSignedStripeEvent([
-            'id' => 'evt-disputed-refund',
-            'type' => 'charge.refunded',
-            'data' => ['object' => [
-                'payment_intent' => 'pi-disputed-refund',
-                'refunded' => true,
-            ]],
-        ], $secret)->assertOk();
-
-        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'refunded']);
-    }
-
-    public function test_zero_value_invoice_coupon_checkout_is_settled_paid_without_stripe(): void
+    public function test_zero_value_invoice_coupon_checkout_is_settled_paid_without_a_provider(): void
     {
         [$user, $photo, $coupon] = $this->zeroValueCheckoutFixtures('FREE-INVOICE');
         $strategy = $this->zeroValueStrategy($photo, $coupon);
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('createPaymentIntent');
 
-        $response = (new CheckoutService($strategy, $stripe))->processCheckout(
+        $response = (new CheckoutService($strategy))->processCheckout(
             $this->checkoutRequest($photo, $coupon->code),
             $user,
             'invoice',
@@ -408,7 +297,6 @@ class PaymentFindingsRegressionTest extends TestCase
         $this->assertNotNull($order);
         $this->assertSame(0, $order->total_amount);
         $this->assertSame('paid', $order->status);
-        $this->assertNull($order->stripe_payment_intent_id);
         $this->assertSame(1, $coupon->fresh()->used_count);
         Mail::assertQueued(InvoiceMail::class);
     }
@@ -424,10 +312,8 @@ class PaymentFindingsRegressionTest extends TestCase
         $user->org()->associate($org)->save();
 
         $strategy = $this->zeroValueStrategy($photo, $coupon);
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('createPaymentIntent');
 
-        $response = (new CheckoutService($strategy, $stripe))->processCheckout(
+        $response = (new CheckoutService($strategy))->processCheckout(
             $this->checkoutRequest($photo, $coupon->code),
             $user,
             'invoice',
@@ -520,17 +406,6 @@ class PaymentFindingsRegressionTest extends TestCase
             'billing_city' => 'Vienna',
             'withdrawal_waived' => true,
             'coupon_code' => $couponCode,
-        ]);
-    }
-
-    private function sendSignedStripeEvent(array $payload, string $secret)
-    {
-        $body = json_encode($payload, JSON_THROW_ON_ERROR);
-        $timestamp = time();
-        $signature = hash_hmac('sha256', $timestamp.'.'.$body, $secret);
-
-        return $this->postJson('/api/webhooks/stripe', $payload, [
-            'Stripe-Signature' => 't='.$timestamp.',v1='.$signature,
         ]);
     }
 }

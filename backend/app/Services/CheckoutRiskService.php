@@ -33,9 +33,9 @@ class CheckoutRiskService
 
     /**
      * Apply the dedicated checkout quota only after the request has been
-     * classified as an immediate positive-value Stripe checkout. Exact
+     * classified as an immediate positive-value online checkout. Exact
      * idempotent replays return before this method and therefore do not
-     * consume the PI-attempt budget; the API throttle remains independent.
+     * consume the payment-attempt budget; the API throttle remains independent.
      */
     public function assertCheckoutQuotaAllowed(Request $request, User $user): void
     {
@@ -68,12 +68,12 @@ class CheckoutRiskService
     }
 
     /**
-     * Record a failure only after the webhook has passed strict identity
-     * validation and the bounded order telemetry update. The customer IP for
-     * this counter is the persisted checkout/order snapshot. The webhook
-     * request IP is Stripe ingress and must never be used as a customer signal.
-     * Cache failures are deliberately best-effort so they cannot cause a
-     * payment retry to increment the durable order counter twice.
+     * Record a failure only after the provider callback has passed strict
+     * identity validation and the bounded order telemetry update. The customer
+     * IP for this counter is the persisted checkout/order snapshot. The webhook
+     * request IP is provider ingress and must never be used as a customer
+     * signal. Cache failures are deliberately best-effort so they cannot cause
+     * a payment retry to increment the durable order counter twice.
      */
     public function recordVerifiedPaymentFailure(Order $order): void
     {
@@ -98,17 +98,17 @@ class CheckoutRiskService
     }
 
     /**
-     * Gate an immediate, positive-value Stripe PaymentIntent checkout.
+     * Gate an immediate, positive-value online checkout.
      *
      * CheckoutService must call this only after determining that the request is
      * not a quote, invoice/Lieferschein, or settled free order, immediately
-     * before creating the Stripe PaymentIntent.
+     * before creating the provider payment.
      *
      * The current call counts toward both hourly counters. With the default
      * user threshold of 3, calls one and two pass, while call three and every
      * later call in that hour require Turnstile.
      */
-    public function assertImmediateStripeAllowed(Request $request, User $user): void
+    public function assertImmediateCheckoutAllowed(Request $request, User $user): void
     {
         if (! $this->turnstile->isEnabled()) {
             return;

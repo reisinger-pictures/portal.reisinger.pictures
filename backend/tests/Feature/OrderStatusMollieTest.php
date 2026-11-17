@@ -292,7 +292,6 @@ class OrderStatusMollieTest extends TestCase
             'brand' => Brand::B2B,
             'status' => 'pending_payment',
             'total_amount' => 5000,
-            'stripe_payment_intent_id' => null,
         ]);
 
         if ($attemptStatus === null) {

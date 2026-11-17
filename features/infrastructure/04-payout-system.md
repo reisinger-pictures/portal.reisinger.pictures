@@ -17,7 +17,7 @@ The system remunerates photographers based on actual usage (downloads) by end cu
 * **Unique Downloads & Deduplication:** One identified image per end customer and pool month counts a maximum of **1x**.
   * *The "Best Share" Rule:* Single-image, gallery-ZIP, and mixed-gallery order-ZIP logs contribute to one ledger keyed by customer + photo + pool month. If a customer downloads the same identified image several times under different conditions (e.g., 1x ZIP Web-Res, 1x single High-Res), only that photo's **highest share value** is used. The ZIP tier does not raise other photos in the same archive, and a ZIP/single overlap does not count the photo twice.
 * **Exclusion of Free Downloads:** Downloads from galleries where `is_free_download = true` are strictly ignored and generate **0 shares**.
-* **Power-User Surcharge (Delta Logic):** If a flat-rate customer pays an explicit surcharge for a download, this net delta (after Stripe fees) is distributed *directly* to the photographer, independently of the share pool.
+* **Power-User Surcharge (Delta Logic):** If a flat-rate customer pays an explicit surcharge for a download, this net delta (after the provider-neutral fee reserve described below) is distributed *directly* to the photographer, independently of the share pool.
 * **Sleeper Customers:** Flat-rate revenues from customers without downloads remain 100% with the platform.
 * **Arrears & closed statements:** A month's payout is calculated after that month closes, one month in arrears. `approved` and `paid` statements are immutable. A later refund is booked as an explicit negative correction in the next finalized statement after the originating period, never by changing the closed statement.
 
@@ -34,7 +34,7 @@ The system remunerates photographers based on actual usage (downloads) by end cu
 * `id` (UUID, Primary)
 * `month`, `year` (Integer)
 * `product_id` (UUID, Foreign Key)
-* `gross_amount_cents`, `stripe_fee_cents`, `net_pool_cents` (Integer)
+* `gross_amount_cents`, `stripe_fee_cents` (legacy column name from the former provider), `net_pool_cents` (Integer)
 * `photographer_share_percent` (Integer)
 * `total_unique_downloads` (Integer - Statistical)
 * `total_shares` (Decimal 12,4 — see §1.1, `V011__payout_system.php:21`)
@@ -272,10 +272,12 @@ whole-cart percentage coupons apply across all eligible photo lines. The map is
 stripped by `InvoiceSnapshot::customerDetailsForPresentation()` and therefore
 never appears in the customer-facing invoice representation.
 
-`calculatePowerUserDelta()` uses this map when present. The order-level Stripe
-fee is first apportioned to the photo-backed portion of `total_net`, then split
-across those photo revenues; only the remaining net, after that fee, receives
-the photographer share. This makes photographer attribution follow actual coupon
+`calculatePowerUserDelta()` uses this map when present. The provider-neutral
+fee reserve (`PayoutCalculationService::PAYMENT_FEE_RESERVE_RATE = 0.04`, 4% of
+the snapshot net) is first apportioned to the photo-backed portion of
+`total_net`, then split across those photo revenues; only the remaining net,
+after that reserve, receives the photographer share. This makes photographer
+attribution follow actual coupon
 coverage: a coupon for one photo does not reduce every photographer's revenue,
 and shares and revenue cannot exceed the collectible amount.
 
@@ -285,9 +287,11 @@ A partial refund changes nothing for the customer — the order keeps its status
 and the download access — but it reduces what the photographer is paid. That is
 an owner decision (2026-10-25), not an inference from the revenue split.
 
-`charge.refunded` stores the charge's cumulative `amount_refunded` in
-`orders.refunded_amount_cents` (clamped to `0 … total_amount`, and monotonic
-under a replayed older event). The monthly calculation allocates that amount
+The verified Mollie payment event (webhook or status observation) stores the
+payment's cumulative `amount_refunded` in `orders.refunded_amount_cents` via
+`MollieCheckoutService::applyMonetaryReversal()` (clamped to `0 …
+total_amount`, monotonic under a replayed older event). The monthly calculation
+allocates that amount
 proportionally across the order's photo revenues — the same
 `allocateCentsProportionally()` used by the discount fallback — and subtracts it
 **before** fee proration and the share split. An open month's recalculation

@@ -157,8 +157,8 @@ class AtomicRateLimitConversionTest extends TestCase
         $service = app(CheckoutRiskService::class);
 
         // Below the threshold: the fast path stays open, no challenge needed.
-        $service->assertImmediateStripeAllowed($request, $user);
-        $service->assertImmediateStripeAllowed($request, $user);
+        $service->assertImmediateCheckoutAllowed($request, $user);
+        $service->assertImmediateCheckoutAllowed($request, $user);
 
         $this->assertSame(
             2,
@@ -171,7 +171,7 @@ class AtomicRateLimitConversionTest extends TestCase
 
         // The third attempt reaches the user threshold and needs the challenge.
         $this->assertDenied(
-            fn () => $service->assertImmediateStripeAllowed($request, $user),
+            fn () => $service->assertImmediateCheckoutAllowed($request, $user),
             403,
             ['turnstile_required' => true]
         );
@@ -207,7 +207,7 @@ class AtomicRateLimitConversionTest extends TestCase
         $request = $this->requestFromIp('198.51.100.73');
         $service = app(CheckoutRiskService::class);
 
-        $service->assertImmediateStripeAllowed($request, $user);
+        $service->assertImmediateCheckoutAllowed($request, $user);
 
         $this->assertSame(
             1,
@@ -262,7 +262,7 @@ class AtomicRateLimitConversionTest extends TestCase
         );
 
         $this->assertDenied(
-            fn () => $service->assertImmediateStripeAllowed($this->requestFromIp('198.51.100.74'), $user),
+            fn () => $service->assertImmediateCheckoutAllowed($this->requestFromIp('198.51.100.74'), $user),
             403,
             ['turnstile_required' => true]
         );
@@ -374,55 +374,55 @@ class AtomicRateLimitConversionTest extends TestCase
     }
 
     /**
-     * The route guard of the Stripe webhook path: the route carries the
+     * The route guard of the Mollie webhook path: the route carries the
      * count-first middleware and no longer the racy framework one.
      *
      * Regression: both assertions turn red when the route is reverted to
-     * `throttle:10,1`.
+     * `throttle:60,1`.
      */
-    public function test_the_stripe_webhook_route_uses_the_count_first_middleware(): void
+    public function test_the_mollie_webhook_route_uses_the_count_first_middleware(): void
     {
-        $route = app('router')->getRoutes()->getByName('api.webhooks.stripe');
+        $route = app('router')->getRoutes()->getByName('api.webhooks.mollie');
 
         $this->assertNotNull($route);
 
         $middleware = $route->gatherMiddleware();
 
-        $this->assertContains(AtomicThrottleRequests::class.':10,1', $middleware);
+        $this->assertContains(AtomicThrottleRequests::class.':60,1', $middleware);
         $this->assertNotContains(
-            'throttle:10,1',
+            'throttle:60,1',
             $middleware,
             'The racy framework middleware must not remain on this route.'
         );
     }
 
     /**
-     * The atomicity proof of the Stripe webhook path: the positional budget
+     * The atomicity proof of the Mollie webhook path: the positional budget
      * counts the request exactly once and never repairs the counter blindly.
      *
      * Regression: the `assertSame([], $store->puts, …)` assertion turns red
      * when the counting is replaced by `RateLimiter::hit()`.
      */
-    public function test_the_stripe_webhook_route_counter_is_counted_once_and_never_written_blindly(): void
+    public function test_the_mollie_webhook_route_counter_is_counted_once_and_never_written_blindly(): void
     {
         $store = $this->lostAddRaceStore();
         $repository = new Repository($store);
         $limiter = new CacheRateLimiter($repository);
         $middleware = new AtomicThrottleRequests($limiter, $repository);
-        $request = Request::create('/api/webhooks/stripe', 'POST');
-        $request->setRouteResolver(fn () => new Route(['POST'], '/api/webhooks/stripe', []));
+        $request = Request::create('/api/webhooks/mollie', 'POST');
+        $request->setRouteResolver(fn () => new Route(['POST'], '/api/webhooks/mollie', []));
 
         $response = $middleware->handle(
             $request,
             fn () => response('handler ran'),
-            '10',
+            '60',
             '1'
         );
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('10', (string) $response->headers->get('X-RateLimit-Limit'));
+        $this->assertSame('60', (string) $response->headers->get('X-RateLimit-Limit'));
         $this->assertSame(
-            '9',
+            '59',
             (string) $response->headers->get('X-RateLimit-Remaining'),
             'The request is counted exactly once.'
         );

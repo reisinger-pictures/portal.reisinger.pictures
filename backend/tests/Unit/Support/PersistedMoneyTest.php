@@ -88,7 +88,7 @@ class PersistedMoneyTest extends TestCase
         );
     }
 
-    public function test_negative_coupon_discount_and_negative_stripe_fee_are_rejected_before_insert(): void
+    public function test_negative_coupon_discount_and_refunded_amount_are_rejected_before_insert(): void
     {
         try {
             Order::create([
@@ -105,9 +105,9 @@ class PersistedMoneyTest extends TestCase
             Order::create([
                 'status' => 'pending',
                 'total_amount' => 100,
-                'stripe_fee_cents' => -1,
+                'refunded_amount_cents' => -1,
             ]);
-            $this->fail('Expected the stripe fee guard to reject a negative value.');
+            $this->fail('Expected the refunded amount guard to reject a negative value.');
         } catch (InvalidArgumentException) {
             // expected
         }

@@ -10,6 +10,7 @@ use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
 use App\Models\LicenseModifier;
 use App\Models\LicenseUseCase;
+use App\Models\MolliePaymentAttempt;
 use App\Models\Order;
 use App\Models\Org;
 use App\Models\Photo;
@@ -20,29 +21,30 @@ use App\Pricing\ScopeLicensingStrategy;
 use App\Services\CheckoutService;
 use App\Services\PayoutCalculationService;
 use App\Services\PurchaseService;
-use App\Services\StripePaymentService;
 use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Mollie\Api\Exceptions\RetryableNetworkRequestException;
+use Mollie\Api\Http\Requests\CreatePaymentRequest;
 use PHPUnit\Framework\Attributes\Group;
-use Stripe\ApiRequestor;
-use Stripe\HttpClient\ClientInterface;
+use Tests\Support\FakesMollie;
 use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
 
 #[Group('mailpit')]
 class CheckoutServiceTest extends TestCase
 {
-    use MailpitAssertions, RefreshDatabase;
+    use FakesMollie, MailpitAssertions, RefreshDatabase;
 
     private CheckoutService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->configureMollie();
         $this->service = new CheckoutService(new ScopeLicensingStrategy);
 
         Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
@@ -52,12 +54,6 @@ class CheckoutServiceTest extends TestCase
 
     protected function tearDown(): void
     {
-        // Prozessglobalen Stripe-Client zurücksetzen, damit andere Tests nicht verunreinigt werden
-        try {
-            ApiRequestor::setHttpClient(null);
-        } catch (\Throwable $e) {
-            // ignore
-        }
         BrandRegistry::reset();
         parent::tearDown();
     }
@@ -83,48 +79,35 @@ class CheckoutServiceTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // 1. Stripe-Erfolgspfad
+    // 1. Mollie-Erfolgspfad
     // ------------------------------------------------------------------
-    public function test_process_checkout_stripe_path_returns_client_secret_and_pending_payment(): void
+    public function test_process_checkout_mollie_path_returns_a_hosted_checkout_and_pending_payment(): void
     {
         [$user, $photo, $useCase] = $this->setupPaidItem();
 
-        $clientMock = $this->createMock(ClientInterface::class);
-        $clientMock->expects($this->once())->method('request')->willReturnCallback(function ($method, $absUrl, $headers, $params, $hasFile) {
-            return [json_encode([
-                'id' => 'pi_test_123',
-                'status' => 'requires_payment_method',
-                'client_secret' => 'sec_test_123',
-                'amount' => (int) ($params['amount'] ?? 0),
-                'currency' => $params['currency'] ?? 'eur',
-                'created' => time(),
-                'customer' => $params['customer'] ?? null,
-                'metadata' => $params['metadata'] ?? [],
-            ]), 200, []];
-        });
-        ApiRequestor::setHttpClient($clientMock);
+        $this->fakeMollie([
+            CreatePaymentRequest::class => $this->mollieCreateResponder('open'),
+        ], retainRequests: true);
 
-        try {
-            $response = $this->service->processCheckout(
-                $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
-                $user,
-                'stripe'
-            );
+        $service = new CheckoutService(new ScopeLicensingStrategy);
 
-            $this->assertEquals(200, $response->status());
-            $payload = $response->getData(true);
-            $this->assertTrue($payload['requires_action']);
-            $this->assertSame('sec_test_123', $payload['client_secret']);
-            $this->assertSame(Order::first()->id, $payload['order_id']);
+        $response = $service->processCheckout(
+            $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
+            $user,
+            'mollie'
+        );
 
-            $order = Order::first();
-            $this->assertNotNull($order);
-            $this->assertEquals('pending_payment', $order->status);
-            $this->assertSame('pi_test_123', $order->stripe_payment_intent_id);
-            $this->assertNotNull($order->ip_address);
-        } finally {
-            ApiRequestor::setHttpClient(null);
-        }
+        $this->assertEquals(200, $response->status());
+        $payload = $response->getData(true);
+        $this->assertTrue($payload['payment_pending']);
+        $this->assertNotEmpty($payload['checkout_url']);
+        $this->assertSame(Order::first()->id, $payload['order_id']);
+
+        $order = Order::first();
+        $this->assertNotNull($order);
+        $this->assertEquals('pending_payment', $order->status);
+        $this->assertNotNull($order->ip_address);
+        $this->assertSame(MolliePaymentAttempt::STATUS_OPEN, MolliePaymentAttempt::query()->sole()->status);
     }
 
     // ------------------------------------------------------------------
@@ -143,7 +126,7 @@ class CheckoutServiceTest extends TestCase
                 'Anfrage für Verlag'
             ),
             $user,
-            'stripe'
+            'invoice'
         );
 
         $this->assertEquals(200, $response->status());
@@ -173,7 +156,7 @@ class CheckoutServiceTest extends TestCase
         $response = $this->service->processCheckout(
             $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
             $user,
-            'stripe'
+            'invoice'
         );
 
         $this->assertEquals(200, $response->status());
@@ -227,7 +210,7 @@ class CheckoutServiceTest extends TestCase
         $response = $this->service->processCheckout(
             $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
             $user,
-            'stripe'
+            'invoice'
         );
         $this->assertEquals(403, $response->status());
         $this->assertSame('Zugriff verweigert', $response->getData(true)['error']);
@@ -254,7 +237,7 @@ class CheckoutServiceTest extends TestCase
         $response = $this->service->processCheckout(
             $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
             $user,
-            'stripe'
+            'invoice'
         );
 
         $this->assertEquals(403, $response->status());
@@ -277,7 +260,7 @@ class CheckoutServiceTest extends TestCase
         $response = $this->service->processCheckout(
             $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'original']]),
             $user,
-            'stripe'
+            'invoice'
         );
 
         $this->assertEquals(400, $response->status());
@@ -297,7 +280,7 @@ class CheckoutServiceTest extends TestCase
             $this->service->processCheckout(
                 $this->makeRequest([['photoId' => 'nonexistent-id', 'useCaseId' => $useCase->id, 'tier' => 'web']]),
                 $user,
-                'stripe'
+                'invoice'
             );
             $this->fail('Expected ModelNotFoundException was not thrown.');
         } catch (ModelNotFoundException $e) {
@@ -309,7 +292,7 @@ class CheckoutServiceTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // 9. invoice_frequency 'immediate' + Org -> Stripe-Pfad (KEIN Lieferschein)
+    // 9. invoice_frequency 'immediate' + Org -> Online-Zahlung (KEIN Lieferschein)
     // ------------------------------------------------------------------
     public function test_process_checkout_org_with_immediate_invoice_frequency_does_not_create_lieferschein(): void
     {
@@ -318,36 +301,23 @@ class CheckoutServiceTest extends TestCase
         $user->org_id = $org->id;
         $user->save();
 
-        $clientMock = $this->createMock(ClientInterface::class);
-        $clientMock->expects($this->once())->method('request')->willReturnCallback(function ($method, $absUrl, $headers, $params, $hasFile) {
-            return [json_encode([
-                'id' => 'pi_test_imm',
-                'status' => 'requires_payment_method',
-                'client_secret' => 'sec_test_imm',
-                'amount' => (int) ($params['amount'] ?? 0),
-                'currency' => $params['currency'] ?? 'eur',
-                'created' => time(),
-                'customer' => $params['customer'] ?? null,
-                'metadata' => $params['metadata'] ?? [],
-            ]), 200, []];
-        });
-        ApiRequestor::setHttpClient($clientMock);
+        $this->fakeMollie([
+            CreatePaymentRequest::class => $this->mollieCreateResponder('open'),
+        ], retainRequests: true);
 
-        try {
-            $response = $this->service->processCheckout(
-                $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
-                $user,
-                'stripe'
-            );
+        $service = new CheckoutService(new ScopeLicensingStrategy);
 
-            $this->assertEquals(200, $response->status());
-            $order = Order::first();
-            // immediate -> kein Lieferschein -> Stripe-Pfad -> pending_payment
-            $this->assertEquals('pending_payment', $order->status);
-            $this->assertSame('pi_test_imm', $order->stripe_payment_intent_id);
-        } finally {
-            ApiRequestor::setHttpClient(null);
-        }
+        $response = $service->processCheckout(
+            $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
+            $user,
+            'mollie'
+        );
+
+        $this->assertEquals(200, $response->status());
+        $order = Order::first();
+        // immediate -> kein Lieferschein -> Online-Zahlung -> pending_payment
+        $this->assertEquals('pending_payment', $order->status);
+        $this->assertSame(MolliePaymentAttempt::STATUS_OPEN, MolliePaymentAttempt::query()->sole()->status);
     }
 
     // ------------------------------------------------------------------
@@ -360,7 +330,7 @@ class CheckoutServiceTest extends TestCase
         $response = $this->service->processCheckout(
             $this->makeRequest([]),
             $user,
-            'stripe'
+            'invoice'
         );
 
         $this->assertEquals(400, $response->status());
@@ -368,39 +338,43 @@ class CheckoutServiceTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // 11. Stripe-Fehler nach abgeschlossener Transaktion:
-    //     Order/Snapshot bleiben erhalten, nur kein PaymentIntent.
+    // 11. Anbieterfehler nach abgeschlossener Transaktion:
+    //     Order/Snapshot bleiben erhalten, kein Zahlungslink.
     // ------------------------------------------------------------------
-    public function test_process_checkout_stripe_failure_keeps_order_and_snapshot(): void
+    public function test_process_checkout_mollie_failure_keeps_order_and_snapshot(): void
     {
         [$user, $photo, $useCase] = $this->setupPaidItem();
 
-        // Stripe-Client wirft Exception — passiert NACH dem DB::transaction-Commit
-        $clientMock = $this->createMock(ClientInterface::class);
-        $clientMock->expects($this->once())->method('request')->willThrowException(new \RuntimeException('Stripe down'));
-        ApiRequestor::setHttpClient($clientMock);
+        // Ein echter Transportfehler — passiert NACH dem DB::transaction-Commit.
+        $this->fakeMollie([
+            CreatePaymentRequest::class => function ($pendingRequest) {
+                throw new RetryableNetworkRequestException($pendingRequest, 'timeout');
+            },
+        ]);
 
-        try {
-            $response = $this->service->processCheckout(
-                $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
-                $user,
-                'stripe'
-            );
+        $service = new CheckoutService(new ScopeLicensingStrategy);
 
-            $this->assertEquals(502, $response->status());
-            $this->assertSame('Die Zahlung konnte nicht verarbeitet werden. Bitte versuche es später erneut.', $response->getData(true)['error']);
-        } finally {
-            ApiRequestor::setHttpClient(null);
-        }
+        $response = $service->processCheckout(
+            $this->makeRequest([['photoId' => $photo->id, 'useCaseId' => $useCase->id, 'tier' => 'web']]),
+            $user,
+            'mollie'
+        );
 
-        // Order/Snapshot sind erhalten, da die DB-Transaktion vor dem Stripe-Call committed wurde
+        $this->assertEquals(503, $response->status());
+        $this->assertArrayNotHasKey('checkout_url', $response->getData(true));
+
+        // Order/Snapshot sind erhalten, die Transaktion wurde vor dem
+        // Anbieter-Call committed; der Versuch bleibt unaufgelöst.
         $this->assertSame(1, Order::count());
         $this->assertSame(1, InvoiceSnapshot::count());
 
         $order = Order::first();
         $this->assertNotNull($order);
         $this->assertEquals('pending_payment', $order->status);
-        $this->assertNull($order->stripe_payment_intent_id);
+
+        $attempt = MolliePaymentAttempt::query()->sole();
+        $this->assertSame(MolliePaymentAttempt::STATUS_CREATING, $attempt->status);
+        $this->assertNull($attempt->mollie_payment_id);
     }
 
     // ------------------------------------------------------------------
@@ -459,7 +433,7 @@ class CheckoutServiceTest extends TestCase
                 'Bitte um Angebot für Print-Ausgabe'
             ),
             $user,
-            'stripe'
+            'invoice'
         );
 
         $this->assertEquals(200, $response->status());
@@ -668,13 +642,14 @@ class CheckoutServiceTest extends TestCase
 
             $order->forceFill([
                 'status' => 'paid',
-                'stripe_fee_cents' => 0,
                 'created_at' => '2026-06-10 12:00:00',
             ])->save();
             app(PayoutCalculationService::class)->calculatePowerUserDelta(6, 2026);
 
-            $this->assertSame(250, PhotographerStatement::where('user_id', $photographerA->id)->sole()->delta_surcharge_earnings_cents);
-            $this->assertSame(500, PhotographerStatement::where('user_id', $photographerB->id)->sole()->delta_surcharge_earnings_cents);
+            // 1501-cent net, 4 % reserve (60) prorated over 500/1001 → 19/41:
+            // (500-19)/2 = 240 and (1001-41)/2 = 480.
+            $this->assertSame(240, PhotographerStatement::where('user_id', $photographerA->id)->sole()->delta_surcharge_earnings_cents);
+            $this->assertSame(480, PhotographerStatement::where('user_id', $photographerB->id)->sole()->delta_surcharge_earnings_cents);
         } finally {
             BrandRegistry::reset();
         }
@@ -873,7 +848,7 @@ class CheckoutServiceTest extends TestCase
 
     // ------------------------------------------------------------------
     // 16. 100%-Coupon -> Warenkorb auf 0 -> kostenlose, settled Order
-    //     (kein Stripe-Call), Download freigeschaltet.
+    //     (keine Anbieter-Zahlung), Download freigeschaltet.
     // ------------------------------------------------------------------
     public function test_process_checkout_with_full_discount_creates_settled_free_order(): void
     {
@@ -905,13 +880,12 @@ class CheckoutServiceTest extends TestCase
                 'couponType' => 'fixed',
             ]);
 
-            // Amount 0 must never produce a PaymentIntent.
-            $stripe = $this->createMock(StripePaymentService::class);
-            $stripe->expects($this->never())->method('createPaymentIntent');
+            // Ein Betrag von 0 darf niemals eine Anbieter-Zahlung erzeugen.
+            $client = $this->fakeMollie([], retainRequests: true);
 
             Mail::fake();
 
-            $this->service = new CheckoutService($strategy, $stripe);
+            $this->service = new CheckoutService($strategy);
 
             $response = $this->service->processCheckout(
                 $this->makeRequest(
@@ -922,7 +896,7 @@ class CheckoutServiceTest extends TestCase
                     ['coupon_code' => 'ZERO60']
                 ),
                 $user,
-                'stripe'
+                'mollie'
             );
 
             $this->assertEquals(200, $response->status());
@@ -931,7 +905,8 @@ class CheckoutServiceTest extends TestCase
             $this->assertNotNull($order);
             $this->assertSame(0, $order->total_amount);
             $this->assertSame('paid', $order->status);
-            $this->assertNull($order->stripe_payment_intent_id);
+            $this->assertSame(0, MolliePaymentAttempt::count());
+            $this->assertSame([], $client->getHttpClient()->recorded());
             $this->assertSame(1, InvoiceSnapshot::count());
             $this->assertSame(
                 [0, 0],

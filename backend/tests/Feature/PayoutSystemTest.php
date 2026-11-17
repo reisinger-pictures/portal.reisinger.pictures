@@ -117,7 +117,7 @@ class PayoutSystemTest extends TestCase
 
         $stmt = PhotographerStatement::where('user_id', $photog->id)->first();
 
-        // Assert: 1000 Cents - 40 Cents Fee = 960 Netto -> 50% Share = 480 Cents (4,80€)
+        // Assert: 1000 Cents - 4 % Reserve (40 Cents) = 960 Netto -> 50% Share = 480 Cents (4,80 €)
         $this->assertEquals(480, $stmt->delta_surcharge_earnings_cents);
     }
 

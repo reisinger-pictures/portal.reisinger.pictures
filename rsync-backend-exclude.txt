@@ -46,16 +46,11 @@ storage/framework/testing/
 storage/framework/views/
 storage/app/public/
 
-# --- Private Storage: KRITISK ----------------------------------------------
-# Runtime-private storage ist deployment-owned, nicht code-owned:
-#   - darf nicht hochgeladen werden (stripe_secret.txt!)
-#   - und darf vor allem NICHT geloescht werden, weil die Dateien nur auf dem
-#     Server existieren (Modell-Altersnachweise, Watermark, hochgeladene
-#     Dateien). Ohne diese Excludes wuerde --delete Produktivdaten vernichten.
-# Beide Regeln bleiben bewusst bestehen: die Verzeichnisregel schuetzt den
-# Inhalt, die Dateiregel dokumentiert explizit das Stripe-Secret.
-# Reihenfolge wie in der rclone-Fassung: Datei zuerst, dann Verzeichnis.
-/storage/app/private/stripe_secret.txt
+# --- Private Storage: KRITISCH ----------------------------------------------
+# Runtime-private storage ist deployment-owned, nicht code-owned und darf
+# deshalb weder hochgeladen noch geloescht werden: die Dateien existieren nur
+# auf dem Server (Modell-Altersnachweise, Watermark, hochgeladene Dateien).
+# Ohne diese Regel wuerde --delete Produktivdaten vernichten.
 /storage/app/private/
 
 # --- Build-Artefakte --------------------------------------------------------

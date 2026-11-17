@@ -6,6 +6,7 @@ use App\Enums\Brand;
 use App\Mail\InvoiceMail;
 use App\Models\Coupon;
 use App\Models\Gallery;
+use App\Models\MolliePaymentAttempt;
 use App\Models\Order;
 use App\Models\Photo;
 use App\Models\Setting;
@@ -14,26 +15,28 @@ use App\Pricing\VolumeLicensingStrategy;
 use App\Services\CheckoutService;
 use App\Services\CouponService;
 use App\Services\PurchaseService;
-use App\Services\StripePaymentService;
 use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
 /**
  * End-to-end regression for the "free order" decision:
  * a 100%-off coupon reduces the cart to exactly 0, which must be fulfilled
- * without a Stripe PaymentIntent and must grant download access.
+ * without any provider payment and must grant download access.
  */
 class FreeOrderCheckoutTest extends TestCase
 {
+    use FakesMollie;
     use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->configureMollie();
         BrandRegistry::set(Brand::B2B);
 
         Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
@@ -60,7 +63,7 @@ class FreeOrderCheckoutTest extends TestCase
         ], $extra));
     }
 
-    public function test_full_percentage_coupon_creates_paid_download_eligible_order_without_stripe(): void
+    public function test_full_percentage_coupon_creates_paid_download_eligible_order_without_a_provider_payment(): void
     {
         $coupon = Coupon::factory()->percentage(100)->create([
             'brand' => Brand::B2B->value,
@@ -77,17 +80,16 @@ class FreeOrderCheckoutTest extends TestCase
         $preset = app(VolumePresetService::class)->resolveDefaultForBrand(Brand::B2B);
         $strategy = new VolumeLicensingStrategy($preset, app(CouponService::class));
 
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('createPaymentIntent');
+        $client = $this->fakeMollie([], retainRequests: true);
 
         Mail::fake();
 
-        $service = new CheckoutService($strategy, $stripe, app(CouponService::class));
+        $service = new CheckoutService($strategy, app(CouponService::class));
 
         $response = $service->processCheckout(
             $this->makeRequest([['photoId' => $photo->id, 'tier' => 'volume']], ['coupon_code' => 'FREE100']),
             $user,
-            'stripe'
+            'mollie'
         );
 
         $this->assertSame(200, $response->status());
@@ -97,7 +99,8 @@ class FreeOrderCheckoutTest extends TestCase
         $this->assertSame(0, $order->total_amount);
         $this->assertSame('paid', $order->status);
         $this->assertSame($coupon->id, $order->coupon_id);
-        $this->assertNull($order->stripe_payment_intent_id);
+        $this->assertSame(0, MolliePaymentAttempt::count());
+        $this->assertSame([], $client->getHttpClient()->recorded());
 
         $coupon->refresh();
         $this->assertSame(1, $coupon->used_count);

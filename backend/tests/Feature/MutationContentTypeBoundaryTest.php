@@ -31,7 +31,6 @@ class MutationContentTypeBoundaryTest extends TestCase
     public function test_a_form_encoded_body_is_still_rejected_elsewhere(): void
     {
         $this->post('/api/orders/checkout', ['items' => []])->assertStatus(415);
-        $this->post('/api/webhooks/stripe', ['id' => 'evt_1'])->assertStatus(415);
     }
 
     public function test_the_json_contract_is_unchanged(): void

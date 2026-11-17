@@ -77,6 +77,10 @@ cd backend && DOCKER_BIN="$HOME/.rd/bin/docker" ./tests/scripts/contract-content
     `coupon-validate`),
   * the **Stripe webhook route** (`POST /api/webhooks/stripe`, positional `10,1`).
 
+  The two Stripe-named identifiers above (`assertImmediateStripeAllowed()`, the webhook
+  route) were removed with the Stripe withdrawal (#60, D-63); they state the 2026-10-18
+  scope, and the surviving rule is the count-first pattern itself.
+
   All four count before they decide through the shared primitive
   `App\Support\AtomicRateCounter` (the same primitive `AtomicThrottleRequests` uses), keep the
   framework key shape, and never write the counter blindly. Every converted path carries its own

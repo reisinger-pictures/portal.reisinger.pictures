@@ -187,7 +187,7 @@ set_env FTP_EVENT_URL "http://host.docker.internal:${PORT}/api/internal/ftp/uplo
 # Checkout defense overrides for the isolated E2E backend. The account-age
 # gate and dedicated checkout limiters stay test-only; the risk thresholds
 # still allow the Turnstile checkout spec to exercise its third-attempt path.
-set_env STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS "$E2E_CHECKOUT_NEW_ACCOUNT_HOURS"
+set_env CHECKOUT_NEW_ACCOUNT_HOURS "$E2E_CHECKOUT_NEW_ACCOUNT_HOURS"
 set_env CHECKOUT_THROTTLE_USER_PER_HOUR "$E2E_CHECKOUT_LIMIT"
 set_env CHECKOUT_THROTTLE_IP_PER_HOUR "$E2E_CHECKOUT_LIMIT"
 set_env CHECKOUT_THROTTLE_IP_PER_DAY "$E2E_CHECKOUT_LIMIT"
@@ -236,7 +236,7 @@ log "E2E-Tests:            pnpm test:e2e (Mailpit 8025 = Helper-Default)"
 exec env \
     APP_ENV=local \
     CI=true \
-    STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS="$E2E_CHECKOUT_NEW_ACCOUNT_HOURS" \
+    CHECKOUT_NEW_ACCOUNT_HOURS="$E2E_CHECKOUT_NEW_ACCOUNT_HOURS" \
     CHECKOUT_THROTTLE_USER_PER_HOUR="$E2E_CHECKOUT_LIMIT" \
     CHECKOUT_THROTTLE_IP_PER_HOUR="$E2E_CHECKOUT_LIMIT" \
     CHECKOUT_THROTTLE_IP_PER_DAY="$E2E_CHECKOUT_LIMIT" \

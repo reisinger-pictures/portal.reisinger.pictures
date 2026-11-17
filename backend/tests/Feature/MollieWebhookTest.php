@@ -3,11 +3,17 @@
 namespace Tests\Feature;
 
 use App\Mail\InvoiceMail;
+use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
 use App\Models\MolliePaymentAttempt;
 use App\Models\Order;
+use App\Models\PayoutCorrection;
+use App\Models\PayoutOpenItem;
+use App\Models\Photo;
+use App\Models\PhotographerStatement;
 use App\Models\User;
 use App\Services\MolliePaymentService;
+use App\Services\PayoutCalculationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -253,7 +259,9 @@ class MollieWebhookTest extends TestCase
 
         $this->post('/api/webhooks/mollie', ['id' => $attempt->mollie_payment_id])->assertOk();
 
-        $this->assertSame('refunded', $order->fresh()->status);
+        $fresh = $order->fresh();
+        $this->assertSame('refunded', $fresh->status);
+        $this->assertSame(5000, $fresh->refunded_amount_cents);
     }
 
     public function test_a_partial_refund_keeps_access(): void
@@ -265,7 +273,50 @@ class MollieWebhookTest extends TestCase
 
         $this->post('/api/webhooks/mollie', ['id' => $attempt->mollie_payment_id])->assertOk();
 
-        $this->assertSame('paid', $order->fresh()->status);
+        $fresh = $order->fresh();
+        $this->assertSame('paid', $fresh->status);
+        $this->assertSame(1000, $fresh->refunded_amount_cents);
+    }
+
+    public function test_a_replayed_refund_webhook_books_exactly_one_correction_on_a_closed_statement(): void
+    {
+        [$order, $attempt, $photographer] = $this->paidPayoutOrderWithAttempt();
+
+        $payouts = app(PayoutCalculationService::class);
+        $payouts->calculatePowerUserDelta(6, 2026);
+        $payouts->finalizeStatements(6, 2026);
+        PhotographerStatement::query()
+            ->where('user_id', $photographer->id)
+            ->where('month', 6)
+            ->where('year', 2026)
+            ->sole()
+            ->update(['status' => 'approved']);
+
+        $this->fakeFetch($this->paymentFor($attempt, 'paid', [
+            'amountRefunded' => ['value' => '10.00', 'currency' => 'EUR'],
+        ]));
+
+        // Mollie repeats a webhook until it receives a 2xx answer. Both
+        // deliveries carry the same cumulative refund, so only the first one
+        // may move money.
+        $this->post('/api/webhooks/mollie', ['id' => $attempt->mollie_payment_id])->assertOk();
+        $this->post('/api/webhooks/mollie', ['id' => $attempt->mollie_payment_id])->assertOk();
+
+        $fresh = $order->fresh();
+        $this->assertSame(1000, $fresh->refunded_amount_cents);
+        $this->assertSame('paid', $fresh->status);
+
+        // 5000-cent order, 4 % reserve (200) → booked share 2400. A 1000-cent
+        // refund removes 2400 * 1000 / 5000 = 480 cents from the closed month.
+        $corrections = PayoutCorrection::query()->get();
+        $this->assertCount(1, $corrections);
+        $correction = $corrections->sole();
+        $this->assertSame((string) $photographer->id, (string) $correction->user_id);
+        $this->assertSame(-480, $correction->amount_cents);
+        $this->assertSame(1000, $correction->refund_amount_cents);
+        $this->assertSame(6, $correction->closed_month);
+        $this->assertSame(2026, $correction->closed_year);
+        $this->assertSame(1, PayoutOpenItem::query()->where('source_type', 'refund')->count());
     }
 
     public function test_a_chargeback_marks_the_order_disputed(): void
@@ -323,6 +374,52 @@ class MollieWebhookTest extends TestCase
         $attempt->update(['status' => MolliePaymentAttempt::STATUS_PAID, 'paid_at' => now()]);
 
         return [$order, $attempt->fresh()];
+    }
+
+    /**
+     * A paid order whose snapshot names a real photo, so the payout side can
+     * book the order and a late-refund correction has a closed statement to
+     * land against.
+     *
+     * @return array{0: Order, 1: MolliePaymentAttempt, 2: User}
+     */
+    private function paidPayoutOrderWithAttempt(): array
+    {
+        $photographer = User::factory()->create();
+        $gallery = Gallery::factory()->create();
+        $photo = Photo::factory()->create([
+            'gallery_id' => $gallery->id,
+            'user_id' => $photographer->id,
+        ]);
+
+        $user = User::factory()->create();
+        $order = Order::factory()->paid()->create([
+            'user_id' => $user->id,
+            'status' => 'paid',
+            'total_amount' => 5000,
+            'created_at' => '2026-06-10 12:00:00',
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'invoice_number' => 'P-2026-'.str_pad((string) (InvoiceSnapshot::query()->count() + 1), 4, '0', STR_PAD_LEFT),
+            'customer_details' => [
+                'name' => 'Tester',
+                'email' => 'buyer@example.test',
+                'items' => [['photoId' => $photo->id, 'tier' => 'original', 'price' => 5000]],
+                InvoiceSnapshot::PAYOUT_PHOTO_REVENUE_KEY => ['0' => 5000],
+            ],
+            'total_net' => 5000,
+            'total_gross' => 5000,
+            'tax_rate' => 0,
+        ]);
+
+        $attempt = $this->createAttempt($order, 'tr_refundclosed1234');
+        $attempt->update([
+            'status' => MolliePaymentAttempt::STATUS_PAID,
+            'paid_at' => now(),
+        ]);
+
+        return [$order, $attempt->fresh(), $photographer];
     }
 
     private function createSnapshot(Order $order): void

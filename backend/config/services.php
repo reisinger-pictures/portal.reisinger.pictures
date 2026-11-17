@@ -57,12 +57,6 @@ return [
         ],
     ],
 
-    'stripe' => [
-        'key' => env('STRIPE_KEY'),
-        'secret' => env('STRIPE_SECRET'),
-        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
-    ],
-
     /*
      * Mollie is the online-payment provider for new orders (issue #53). The
      * key is server-only; test/live mode comes from its `test_`/`live_`

@@ -1,19 +1,23 @@
-# Stripe Checkout Flow — State Machine & Webhook Architecture
+# Stripe Checkout Flow — State Machine & Webhook Architecture (retired provider)
 
-> **Status:** Superseded for new online payments (2026-11-11). New positive-value
-> immediate orders are created and paid through Mollie's hosted checkout
-> ([`features/infrastructure/30-mollie-payments.md`](../infrastructure/30-mollie-payments.md));
-> the HTTP checkout accepts `mollie` and `invoice` only, and the Stripe create
-> branch is unreachable from the API. What remains current in this document is
-> the order state machine, the invoice/collective/free paths, and the historical
-> Stripe webhook, reconciliation and dispute machinery that keeps existing orders
-> readable. Where it says "Stripe PaymentIntent", read "the provider attempt of
-> the order" for anything created after the Mollie switch.
+> **Status: retired (2026-11-17).** Stripe is removed completely — no account, no
+> credential, no SDK, no webhook route, no reconciliation command (D-63). New
+> positive-value immediate orders are created and paid through Mollie's hosted
+> checkout ([`features/infrastructure/30-mollie-payments.md`](../infrastructure/30-mollie-payments.md));
+> the HTTP checkout accepts `mollie` and `invoice` only. **What is still current in
+> this document is only the order state machine and the invoice/collective/free
+> paths.** Everything else — PaymentIntent creation, the Stripe webhook and its
+> signature verification, dispute/refund events, stale-PaymentIntent cleanup,
+> Stripe fees and reconciliation — is a historical record of the removed provider
+> and is not an instruction. Where the text says "Stripe PaymentIntent", read
+> "the provider payment attempt of the order"; for anything created today that is
+> a Mollie attempt.
 >
-> **Status (historical):** Current SOLL (reviewed 2026-09-24). Legacy `SRP` wording below is
+> **Status (historical):** Current SOLL as reviewed on 2026-09-24. Legacy `SRP` wording below is
 > retained only where it names an old compatibility key; the live pricing modes
 > are scope and volume licensing.
-> Describes the complete checkout lifecycle from cart to order fulfillment via Stripe Payment Intents.
+> Describes the checkout lifecycle from cart to order fulfillment as it was built
+> on Stripe Payment Intents.
 > References: `features/ecommerce/03-custom-quotes-and-stripe.md`, `features/security/card-testing-protection.md`, `features/infrastructure/16-srp-volume-pricing.md`, `features/infrastructure/17-pricing-strategy-pattern.md`.
 
 ## 1. Order State Machine

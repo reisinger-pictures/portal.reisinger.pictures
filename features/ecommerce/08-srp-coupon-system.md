@@ -155,7 +155,7 @@ Volume-Preisberechnung angewendet.
 Coupon-Erweiterung; der aktuelle Migrations-Stand steht ausschließlich in
 `features/tech/07-architectural-decisions.md` (AD-2).
 Tabelle `coupons` erweitern um `package_quantity INT UNSIGNED NULL` (N) und
-`package_price_cents INT NULL` (Y, Stripe-konform). `Coupon::$fillable` + `$casts` ergänzen.
+`package_price_cents INT NULL` (Y, integer cents). `Coupon::$fillable` + `$casts` ergänzen.
 Für `photo_package` sind `value` und `max_items` **ungenutzt** (bleiben NULL/0). `down()` darf leer bleiben.
 
 **Validation (`CouponStoreRequest` / `CouponUpdateRequest`):** `type → in:fixed,percentage,photo_package`;
@@ -258,7 +258,7 @@ Die Pricing-Strategie (`VolumeLicensingStrategy`) darf niemals lautlos auf den C
 | `value` | DECIMAL(10,2) NOT NULL | **Unit depends on `type`** (§1): Euro for `fixed`, percentage points for `percentage`, unused for `photo_package`. Not cents — see the documented exception above |
 | `max_items` | INT UNSIGNED NULL | When type=percentage: limit discount to X cheapest items (NULL = entire cart) |
 | `package_quantity` | INT UNSIGNED NULL | When type=photo_package: N (number of photos included in the bundle) |
-| `package_price_cents` | INT NULL | When type=photo_package: flat price Y € in **integer cents** (Stripe-conform). **Achtung, Schreibpfad:** der Admin-Write-Pfad erwartet hier tatsächlich **Euro** und multipliziert mit 100 — `CouponAdminController::normalizePackagePrice()` (`backend/app/Http/Controllers/CouponAdminController.php:105-106`) macht `(int) round((float) $validated['package_price_cents'] * 100)`. Ein Feldname, der die Einheit im Speicher nennt, und ein Schreibpfad, der eine andere erwartet |
+| `package_price_cents` | INT NULL | When type=photo_package: flat price Y € in **integer cents** (provider-conform). **Achtung, Schreibpfad:** der Admin-Write-Pfad erwartet hier tatsächlich **Euro** und multipliziert mit 100 — `CouponAdminController::normalizePackagePrice()` (`backend/app/Http/Controllers/CouponAdminController.php:105-106`) macht `(int) round((float) $validated['package_price_cents'] * 100)`. Ein Feldname, der die Einheit im Speicher nennt, und ein Schreibpfad, der eine andere erwartet |
 | `scope_type` | ENUM('global','gallery','meta_gallery','photographer','organisation') NOT NULL DEFAULT 'global' | Scope type |
 | `scope_id` | CHAR(36) NULL | Target ID (galleries / gallery_groups / tenants) |
 | `max_uses_global` | INT UNSIGNED NULL | Global usage limit (NULL = unlimited) |

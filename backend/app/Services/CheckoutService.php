@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Contracts\PricingStrategy;
-use App\Mail\CustomMail;
 use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\InvoiceSequence;
@@ -24,7 +23,6 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class CheckoutService
 {
@@ -37,8 +35,6 @@ class CheckoutService
 
     protected $strategy;
 
-    private StripePaymentService $stripePayment;
-
     private MollieCheckoutService $mollieCheckout;
 
     private CouponService $couponService;
@@ -49,29 +45,27 @@ class CheckoutService
 
     private CheckoutIdempotencyService $checkoutIdempotency;
 
-    private StripeCheckoutKillSwitch $checkoutKillSwitch;
+    private CheckoutKillSwitch $checkoutKillSwitch;
 
     private InvoiceMailDispatcher $invoiceMailDispatcher;
 
     public function __construct(
         PricingStrategy $strategy,
-        ?StripePaymentService $stripePayment = null,
         ?CouponService $couponService = null,
         ?CheckoutEligibilityService $checkoutEligibility = null,
         ?CheckoutRiskService $checkoutRisk = null,
         ?CheckoutIdempotencyService $checkoutIdempotency = null,
-        ?StripeCheckoutKillSwitch $checkoutKillSwitch = null,
+        ?CheckoutKillSwitch $checkoutKillSwitch = null,
         ?InvoiceMailDispatcher $invoiceMailDispatcher = null,
         ?MollieCheckoutService $mollieCheckout = null,
     ) {
         $this->strategy = $strategy;
-        $this->stripePayment = $stripePayment ?? app(StripePaymentService::class);
         $this->mollieCheckout = $mollieCheckout ?? app(MollieCheckoutService::class);
         $this->couponService = $couponService ?? app(CouponService::class);
         $this->checkoutEligibility = $checkoutEligibility ?? app(CheckoutEligibilityService::class);
         $this->checkoutRisk = $checkoutRisk ?? app(CheckoutRiskService::class);
-        $this->checkoutIdempotency = $checkoutIdempotency ?? new CheckoutIdempotencyService($this->stripePayment);
-        $this->checkoutKillSwitch = $checkoutKillSwitch ?? app(StripeCheckoutKillSwitch::class);
+        $this->checkoutIdempotency = $checkoutIdempotency ?? app(CheckoutIdempotencyService::class);
+        $this->checkoutKillSwitch = $checkoutKillSwitch ?? app(CheckoutKillSwitch::class);
         $this->invoiceMailDispatcher = $invoiceMailDispatcher ?? app(InvoiceMailDispatcher::class);
     }
 
@@ -79,10 +73,10 @@ class CheckoutService
     {
         try {
             // A transient guest has no durable account, billing identity, or
-            // Stripe Customer mapping. Do not turn one into a shadow user or
+            // provider customer mapping. Do not turn one into a shadow user or
             // let the old null-user path create an ownerless checkout. Guest
-            // Stripe checkout remains explicitly unsupported until that flow
-            // has a verified, guest-safe payment/receipt contract.
+            // checkout remains explicitly unsupported until that flow has a
+            // verified, guest-safe payment/receipt contract.
             if (! $user instanceof User || ! ActorIdentity::isRegistered($user)) {
                 return response()->json([
                     'error' => 'Der Checkout ist für Gäste derzeit nicht verfügbar. Bitte melde dich mit einem Portal-Konto an.',
@@ -137,13 +131,6 @@ class CheckoutService
 
             $withdrawalWaived = ! $isQuoteRequest && $request->boolean('withdrawal_waived');
             $org = $user->org;
-            $isPotentialImmediateStripe = ! $isQuoteRequest
-                && $paymentMethod === 'stripe'
-                && ! ($org && $org->invoice_frequency !== 'immediate');
-            // New online payments are Mollie-only. `stripe` is not accepted by
-            // CheckoutRequest anymore; the retained Stripe branch above exists
-            // only for the historical regression suite and never for a new API
-            // checkout.
             $isPotentialImmediateMollie = ! $isQuoteRequest
                 && $paymentMethod === 'mollie'
                 && ! ($org && $org->invoice_frequency !== 'immediate');
@@ -181,7 +168,7 @@ class CheckoutService
                 }
 
                 if ($existingOrder !== null) {
-                    $this->checkoutEligibility->assertImmediateStripeAllowed($user);
+                    $this->checkoutEligibility->assertImmediateCheckoutAllowed($user);
                     $persistedAmount = (int) $existingOrder->total_amount;
                     $identity = $this->checkoutIdempotency->identify(
                         $request,
@@ -211,104 +198,16 @@ class CheckoutService
 
                             // These checks run only when the existing attempt
                             // actually needs new work; a paid replay or a
-                            // resume of an open attempt returns before this
-                            // closure.
-                            $this->checkoutKillSwitch->assertEnabled();
-                            $this->checkoutRisk->assertCheckoutQuotaAllowed($request, $user);
-                            $this->checkoutRisk->assertImmediateStripeAllowed($request, $user);
-
-                            return $this->createImmediateMollieOrderAndRespond(
-                                $order,
-                                $request,
-                                $user,
-                                null,
-                                0,
-                                $persistedAmount,
-                                false,
-                                [],
-                                null,
-                                true,
-                                $identity['key'],
-                                $identity['fingerprint'],
-                                $quoteTokenPayload,
-                            );
-                        },
-                        ! $exactKeyMatch,
-                    );
-                }
-            }
-
-            // An exact-key or lost-key positive-value order can be resumed
-            // before coupon revalidation. New carts, including carts that later
-            // become free through a 100% discount, must be priced before the
-            // account-age gate is applied.
-            if ($isPotentialImmediateStripe) {
-                $providedKey = trim((string) $request->header('Idempotency-Key', ''));
-                $preflight = null;
-                $exactKeyMatch = false;
-                $existingOrder = null;
-                if ($providedKey !== '') {
-                    // Validate the key before any exact-key lookup.
-                    $preflight = $this->checkoutIdempotency->identify(
-                        $request,
-                        $user,
-                        null,
-                        $paymentMethod,
-                    );
-                    $existingOrder = $this->checkoutIdempotency
-                        ->findPositiveStripeOrderByKey($user, $preflight['key']);
-                    $exactKeyMatch = $existingOrder !== null
-                        && (string) $existingOrder->checkout_idempotency_key === $preflight['key'];
-                }
-
-                if ($existingOrder === null) {
-                    // Recompute the fingerprint with each persisted server
-                    // total; the client amount is never used for this lookup.
-                    // The bounded user/brand-scoped query prevents coupon
-                    // expiry/max-use from stranding a lost-key recovery.
-                    $existingOrder = $this->checkoutIdempotency
-                        ->findPositiveStripeOrderByFingerprint($user, $request, $paymentMethod);
-                }
-
-                if ($existingOrder !== null) {
-                    // This is a known positive-value Stripe order, so the
-                    // normal account-age admission gate applies before its
-                    // replay/resume path.
-                    $this->checkoutEligibility->assertImmediateStripeAllowed($user);
-                    $persistedAmount = (int) $existingOrder->total_amount;
-                    $identity = $this->checkoutIdempotency->identify(
-                        $request,
-                        $user,
-                        $persistedAmount,
-                        $paymentMethod,
-                    );
-
-                    return $this->checkoutIdempotency->execute(
-                        $user,
-                        $identity['key'],
-                        $identity['fingerprint'],
-                        $persistedAmount,
-                        function (?Order $order) use (
-                            $request,
-                            $user,
-                            $persistedAmount,
-                            $identity,
-                            $quoteTokenPayload,
-                        ): JsonResponse {
-                            if ($order === null) {
-                                return response()->json([
-                                    'error' => 'Der Checkout konnte nicht sicher fortgesetzt werden.',
-                                ], 503);
+                            // resume of a known hosted link is answered from
+                            // the persisted attempt without consuming the
+                            // admission budget.
+                            if (! $this->mollieCheckout->replayNeedsNoProviderWork($order)) {
+                                $this->checkoutKillSwitch->assertEnabled();
+                                $this->checkoutRisk->assertCheckoutQuotaAllowed($request, $user);
+                                $this->checkoutRisk->assertImmediateCheckoutAllowed($request, $user);
                             }
 
-                            // These checks run only when the exact/lost-key
-                            // order actually needs a new/ambiguous PI. Reusable
-                            // and paid orders return before this closure.
-                            $this->checkoutKillSwitch->assertEnabled();
-                            $this->checkoutRisk->assertCheckoutQuotaAllowed($request, $user);
-                            $this->checkoutRisk->assertImmediateStripeAllowed($request, $user);
-
-                            return $this->createImmediateStripeOrderAndRespond(
+                            return $this->createImmediateMollieOrderAndRespond(
                                 $order,
                                 $request,
                                 $user,
@@ -409,14 +308,11 @@ class CheckoutService
                 return response()->json(['error' => 'Warenkorb hat keinen Wert.'], 400);
             }
 
-            $isImmediateStripe = $isPotentialImmediateStripe
-                && $totalNetCents > 0;
-
             $isImmediateMollie = $isPotentialImmediateMollie
                 && $totalNetCents > 0;
 
             if ($isImmediateMollie) {
-                $this->checkoutEligibility->assertImmediateStripeAllowed($user);
+                $this->checkoutEligibility->assertImmediateCheckoutAllowed($user);
                 $amountCents = $totalNetCents;
                 $identity = $this->checkoutIdempotency->identify(
                     $request,
@@ -427,7 +323,7 @@ class CheckoutService
 
                 $this->checkoutKillSwitch->assertEnabled();
                 $this->checkoutRisk->assertCheckoutQuotaAllowed($request, $user);
-                $this->checkoutRisk->assertImmediateStripeAllowed($request, $user);
+                $this->checkoutRisk->assertImmediateCheckoutAllowed($request, $user);
 
                 return $this->checkoutIdempotency->executeOnline(
                     $user,
@@ -436,54 +332,6 @@ class CheckoutService
                     $amountCents,
                     $paymentMethod,
                     fn (?Order $existingOrder) => $this->createImmediateMollieOrderAndRespond(
-                        $existingOrder,
-                        $request,
-                        $user,
-                        $appliedCoupon,
-                        $couponDiscountCents,
-                        $totalNetCents,
-                        $isQuoteRequest,
-                        $lineItems,
-                        $customConditions,
-                        $withdrawalWaived,
-                        $identity['key'],
-                        $identity['fingerprint'],
-                        $quoteTokenPayload,
-                    ),
-                );
-            }
-
-            if ($isImmediateStripe) {
-                $this->checkoutEligibility->assertImmediateStripeAllowed($user);
-                $amountCents = (int) round($totalNetCents);
-                $identity = $this->checkoutIdempotency->identify(
-                    $request,
-                    $user,
-                    $amountCents,
-                    $paymentMethod,
-                );
-                $replayResponse = $this->checkoutIdempotency->replay(
-                    $user,
-                    $identity['key'],
-                    $identity['fingerprint'],
-                    $amountCents,
-                );
-                if ($replayResponse !== null) {
-                    // Exact replays are resolved before the dedicated PI-attempt
-                    // budget; the API throttle still applies at the route.
-                    return $replayResponse;
-                }
-
-                $this->checkoutKillSwitch->assertEnabled();
-                $this->checkoutRisk->assertCheckoutQuotaAllowed($request, $user);
-                $this->checkoutRisk->assertImmediateStripeAllowed($request, $user);
-
-                return $this->checkoutIdempotency->execute(
-                    $user,
-                    $identity['key'],
-                    $identity['fingerprint'],
-                    $amountCents,
-                    fn (?Order $existingOrder) => $this->createImmediateStripeOrderAndRespond(
                         $existingOrder,
                         $request,
                         $user,
@@ -526,9 +374,9 @@ class CheckoutService
 
     /**
      * Persist and answer an invoice, settled-free, delivery-note, or reactive
-     * quote checkout under the same browser key claim used by Stripe checkout.
-     * The V036 identity namespace is intentionally shared, while no
-     * Stripe-specific admission, quota, kill-switch, or customer/PI work is
+     * quote checkout under the same browser key claim used by the immediate
+     * online checkout. The V036 identity namespace is intentionally shared,
+     * while no admission, quota, kill-switch, or provider-payment work is
      * introduced on this branch. Exact-key replay is safe; a lost browser key
      * is intentionally a new-order boundary.
      */
@@ -611,7 +459,6 @@ class CheckoutService
                         $withdrawalWaived,
                         $identity['key'],
                         $identity['fingerprint'],
-                        1,
                         $request->ip(),
                     );
 
@@ -1332,7 +1179,6 @@ class CheckoutService
         bool $withdrawalWaived = false,
         ?string $checkoutIdempotencyKey = null,
         ?string $checkoutFingerprint = null,
-        int $paymentIntentGeneration = 1,
         ?string $requestIp = null,
     ): Order {
         $org = $user->org;
@@ -1346,7 +1192,6 @@ class CheckoutService
             'brand' => BrandRegistry::current()?->value ?? BrandRegistry::currentId(),
             'total_amount' => $totalNetCents,
             'is_quote_request' => $isQuoteRequest,
-            'payment_intent_generation' => $paymentIntentGeneration,
         ];
         if ($checkoutIdempotencyKey !== null) {
             $orderData['checkout_idempotency_key'] = $checkoutIdempotencyKey;
@@ -1370,113 +1215,6 @@ class CheckoutService
         }
 
         return Order::create($orderData);
-    }
-
-    private function createImmediateStripeOrderAndRespond(
-        ?Order $existingOrder,
-        $request,
-        $user,
-        $appliedCoupon,
-        int $couponDiscountCents,
-        int $totalNetCents,
-        bool $isQuoteRequest,
-        array $lineItems,
-        null|string|array $customConditions,
-        bool $withdrawalWaived,
-        string $checkoutIdempotencyKey,
-        string $checkoutFingerprint,
-        ?array $quoteTokenPayload = null,
-    ): JsonResponse {
-        $order = $existingOrder;
-        if ($order !== null) {
-            $persistedKey = $order->checkout_idempotency_key;
-            $persistedFingerprint = $order->checkout_fingerprint;
-            if (! is_string($persistedKey) || $persistedKey === ''
-                || ! is_string($persistedFingerprint) || $persistedFingerprint === '') {
-                return $this->checkoutStateConflict('Die Checkout-Identität ist unvollständig.');
-            }
-            // A fingerprint fallback may arrive with a new client key. Stripe
-            // metadata and the deterministic API key must remain bound to the
-            // original order identity, never to that recovery handle.
-            $checkoutIdempotencyKey = $persistedKey;
-            $checkoutFingerprint = $persistedFingerprint;
-        }
-
-        if ($order === null && $quoteTokenPayload !== null) {
-            // A lost-key recovery can race with the idempotency transition. If
-            // this call has to create the order, rebuild its immutable line
-            // items from the signed token instead of accepting the empty arrays
-            // used by the replay-only path above.
-            $quotePhotos = $this->assertQuotePhotosAuthorized(
-                $user,
-                $quoteTokenPayload['photos'],
-                $quoteTokenPayload['brand'],
-            );
-            $lineItems = $this->buildQuoteLineItems($quoteTokenPayload, $quotePhotos);
-            $customConditions = $quoteTokenPayload['rights_text'] ?? null;
-        }
-
-        if ($order === null) {
-            $order = DB::transaction(function () use ($request, $user, $appliedCoupon, $couponDiscountCents, $totalNetCents, $isQuoteRequest, $lineItems, $customConditions, $withdrawalWaived, $checkoutIdempotencyKey, $checkoutFingerprint, $quoteTokenPayload) {
-                if ($quoteTokenPayload !== null) {
-                    $this->assertQuotePhotosAuthorized(
-                        $user,
-                        $quoteTokenPayload['photos'],
-                        $quoteTokenPayload['brand'],
-                    );
-                }
-
-                $user->update($request->only(['billing_name', 'billing_company', 'billing_street', 'billing_zip', 'billing_city']));
-
-                $appliedCouponId = null;
-                if ($appliedCoupon !== null) {
-                    [$lockedCoupon, $couponError] = $this->couponService->lockAndRevalidateCoupon($appliedCoupon, $user->id);
-                    if ($lockedCoupon === null) {
-                        throw new HttpResponseException(response()->json(['error' => $couponError], 422));
-                    }
-                    $appliedCouponId = $lockedCoupon->id;
-                }
-
-                $order = $this->createOrder(
-                    $user,
-                    $totalNetCents,
-                    $isQuoteRequest,
-                    'stripe',
-                    $appliedCouponId,
-                    $couponDiscountCents,
-                    $withdrawalWaived,
-                    $checkoutIdempotencyKey,
-                    $checkoutFingerprint,
-                    1,
-                    $request->ip(),
-                );
-
-                $this->createInvoiceSnapshot($order, $request, $user, $lineItems, $totalNetCents, $customConditions, $withdrawalWaived);
-
-                return $order;
-            });
-        } else {
-            // CheckoutIdempotencyService has already performed the locked,
-            // conditional generation transition for a replaced PI. A null-PI
-            // resume is likewise rechecked under that lock before this method
-            // is called. Never reopen a paid or cancelled order here.
-            $order->loadMissing('invoiceSnapshot');
-        }
-
-        $lockedOrder = $this->lockPendingOrderForPaymentCreate($order);
-        if ($lockedOrder instanceof JsonResponse) {
-            return $lockedOrder;
-        }
-        $order = $lockedOrder;
-
-        return $this->createImmediateStripeResponse(
-            $order,
-            $request,
-            $user,
-            (int) round($totalNetCents),
-            $order->checkout_idempotency_key,
-            $order->checkout_fingerprint,
-        );
     }
 
     /**
@@ -1567,7 +1305,6 @@ class CheckoutService
                     $withdrawalWaived,
                     $checkoutIdempotencyKey,
                     $checkoutFingerprint,
-                    1,
                     $request->ip(),
                 );
 
@@ -1591,182 +1328,12 @@ class CheckoutService
         );
     }
 
-    /**
-     * Re-check the order under a row lock immediately before the creator can
-     * start a Stripe create. The generation transition in the idempotency
-     * service is not sufficient by itself: a webhook or administrator may
-     * win after that transition. A paid order is returned as a safe replay;
-     * closed or changed orders never get a new actionable PI.
-     */
-    private function lockPendingOrderForPaymentCreate(Order $order): Order|JsonResponse
-    {
-        $expectedGeneration = (int) $order->payment_intent_generation;
-        $expectedPaymentIntentId = $order->stripe_payment_intent_id;
-        $result = DB::transaction(function () use ($order, $expectedGeneration, $expectedPaymentIntentId): array {
-            $lockedOrder = Order::query()
-                ->with(['invoiceSnapshot', 'user'])
-                ->lockForUpdate()
-                ->find($order->getKey());
-
-            if ($lockedOrder === null) {
-                return ['response' => $this->checkoutStateConflict('Der Checkout existiert nicht mehr.')];
-            }
-            if ($lockedOrder->status === 'paid') {
-                return ['response' => $this->paidOrderReplayResponse($lockedOrder)];
-            }
-            if ($lockedOrder->status !== 'pending_payment'
-                || $lockedOrder->stripe_payment_intent_id !== $expectedPaymentIntentId
-                || (int) $lockedOrder->payment_intent_generation !== $expectedGeneration) {
-                return ['response' => $this->checkoutStateConflict('Der Checkout hat sich zwischenzeitlich geändert.')];
-            }
-
-            $conditionalPending = Order::query()
-                ->whereKey($lockedOrder->getKey())
-                ->where('status', 'pending_payment')
-                ->where('payment_intent_generation', $expectedGeneration)
-                ->when(
-                    $expectedPaymentIntentId === null,
-                    fn ($query) => $query->whereNull('stripe_payment_intent_id'),
-                    fn ($query) => $query->where('stripe_payment_intent_id', $expectedPaymentIntentId),
-                )
-                ->exists();
-            if (! $conditionalPending) {
-                return ['response' => $this->checkoutStateConflict('Der Checkout hat sich zwischenzeitlich geändert.')];
-            }
-
-            return ['order' => $lockedOrder];
-        });
-
-        if (isset($result['response'])) {
-            return $result['response'];
-        }
-
-        return $result['order'];
-    }
-
-    private function paidOrderReplayResponse(Order $order): JsonResponse
-    {
-        return response()->json([
-            'success' => true,
-            'order_id' => $order->getKey(),
-            'invoice_number' => $order->invoiceSnapshot?->invoice_number,
-        ]);
-    }
-
     private function checkoutStateConflict(string $message): JsonResponse
     {
         return response()->json([
             'error' => $message,
             'idempotency_conflict' => true,
         ], 409);
-    }
-
-    private function createImmediateStripeResponse(
-        Order $order,
-        $request,
-        $user,
-        int $totalNetCents,
-        ?string $checkoutIdempotencyKey = null,
-        ?string $checkoutFingerprint = null,
-    ): JsonResponse {
-        $this->checkoutKillSwitch->assertEnabled();
-
-        try {
-            // Capture the first trusted checkout IP before contacting Stripe.
-            // A retry must never replace this evidence with a later request IP.
-            $this->captureOrderIpIfMissing($order, $request);
-
-            $generation = max(1, (int) $order->payment_intent_generation);
-            $customerService = app(StripeCustomerService::class);
-            $customerId = $customerService->getOrCreateCustomer($user, [
-                'name' => $request->input('billing_name') ?: $user->name,
-                'address' => [
-                    'line1' => $request->input('billing_street'),
-                    'postal_code' => $request->input('billing_zip'),
-                    'city' => $request->input('billing_city'),
-                    'country' => 'AT',
-                ],
-            ]);
-
-            // Customer creation is outside the row lock. Re-check the
-            // conditional pending state once more before the PI request.
-            $lockedOrder = $this->lockPendingOrderForPaymentCreate($order);
-            if ($lockedOrder instanceof JsonResponse) {
-                return $lockedOrder;
-            }
-            $order = $lockedOrder;
-            $generation = (int) $order->payment_intent_generation;
-
-            $paymentResult = $this->stripePayment->createPaymentIntent(
-                $totalNetCents,
-                $order->id,
-                $user->email,
-                $customerId,
-                $generation,
-                $user->getKey(),
-                $user->created_at?->getTimestamp(),
-                $checkoutIdempotencyKey,
-                $checkoutFingerprint,
-            );
-
-            $this->assertValidPaymentIntentResponse(
-                $paymentResult,
-                $order,
-                $user,
-                $totalNetCents,
-                $generation,
-                $customerId,
-            );
-
-            $clientSecret = trim((string) $paymentResult['client_secret']);
-            $expectedPaymentIntentId = $order->stripe_payment_intent_id;
-            $query = Order::query()
-                ->whereKey($order->getKey())
-                ->where('status', 'pending_payment')
-                ->where('payment_intent_generation', $generation);
-            if ($expectedPaymentIntentId === null || $expectedPaymentIntentId === '') {
-                $query->whereNull('stripe_payment_intent_id');
-            } else {
-                $query->where('stripe_payment_intent_id', $expectedPaymentIntentId);
-            }
-
-            $updated = $query->update([
-                'stripe_payment_intent_id' => $paymentResult['id'],
-            ]);
-            if ($updated !== 1) {
-                throw new \RuntimeException('The order changed while the PaymentIntent was being persisted.');
-            }
-            $order->refresh();
-        } catch (\Throwable $e) {
-            // A create request can time out after Stripe accepted it. Keep the
-            // order pending and retain its generation so the same checkout
-            // key can safely retry the deterministic Stripe idempotency key.
-            Log::error('Stripe payment failed for order {order_id}', [
-                'order_id' => $order->id,
-                'exception_class' => $e::class,
-            ]);
-
-            // Accounting notification is best-effort. It must never turn the
-            // intentionally retryable payment failure into a different 500.
-            try {
-                Mail::to(BrandRegistry::configOrDefault()->accountingEmail)->queue(new CustomMail('Zahlungsfehler', 'Bestellung '.$order->id.' konnte nicht bezahlt werden. Ein technischer Fehler ist aufgetreten. Bitte kontaktieren Sie den Support.'));
-            } catch (\Throwable $mailException) {
-                Log::warning('Stripe payment accounting mail failed', [
-                    'order_id' => $order->id,
-                    'exception_class' => $mailException::class,
-                ]);
-            }
-
-            return response()->json(['error' => 'Die Zahlung konnte nicht verarbeitet werden. Bitte versuche es später erneut.'], 502);
-        }
-
-        return response()->json([
-            'success' => true,
-            'requires_action' => true,
-            'client_secret' => $clientSecret,
-            'order_id' => $order->id,
-            'invoice_number' => $order->invoiceSnapshot?->invoice_number,
-        ]);
     }
 
     private function captureOrderIpIfMissing(Order $order, $request): void
@@ -1781,143 +1348,6 @@ class CheckoutService
             ->whereNull('ip_address')
             ->update(['ip_address' => $ip]);
         $order->refresh();
-    }
-
-    /**
-     * Validate the complete, server-owned PaymentIntent create response before
-     * it can become an actionable client response or local PI linkage.
-     *
-     * @param  array<string, mixed>  $paymentResult
-     */
-    private function assertValidPaymentIntentResponse(
-        array $paymentResult,
-        Order $order,
-        $user,
-        int $totalNetCents,
-        int $generation,
-        ?string $expectedCustomerId,
-    ): void {
-        $id = $paymentResult['id'] ?? null;
-        $clientSecret = $paymentResult['client_secret'] ?? null;
-        $status = $paymentResult['status'] ?? null;
-        $amount = $paymentResult['amount'] ?? null;
-        $currency = $paymentResult['currency'] ?? null;
-
-        if (! is_string($id) || trim($id) === ''
-            || ! is_string($clientSecret) || trim($clientSecret) === ''
-            || ! is_string($status) || ! in_array($status, [
-                'requires_payment_method',
-                'requires_confirmation',
-                'requires_action',
-                'processing',
-                'requires_capture',
-            ], true)
-            || ! $this->isIntegerValue($amount)
-            || (int) $amount !== $totalNetCents
-            || ! $this->isPositiveIntegerValue($paymentResult['created'] ?? null)
-            || ! is_string($currency)
-            || strtolower(trim($currency)) !== 'eur') {
-            throw new \RuntimeException('Stripe PaymentIntent response failed checkout validation.');
-        }
-
-        $metadata = $paymentResult['metadata'] ?? [];
-        $isLegacyOrder = $order->checkout_idempotency_key === null
-            && $order->checkout_fingerprint === null;
-        $expectedMetadata = [
-            'order_id' => (string) $order->getKey(),
-            'amount_cents' => (string) $totalNetCents,
-            'currency' => 'eur',
-        ];
-        if (! $isLegacyOrder) {
-            $expectedMetadata += [
-                'portal_user_id' => (string) $user->getKey(),
-                'account_created_at' => $user->created_at?->getTimestamp() === null
-                    ? null
-                    : (string) $user->created_at->getTimestamp(),
-                'checkout_idempotency_key' => (string) $order->checkout_idempotency_key,
-                'checkout_fingerprint' => (string) $order->checkout_fingerprint,
-                'generation' => (string) $generation,
-            ];
-        }
-
-        foreach ($expectedMetadata as $key => $expected) {
-            if ($expected === null || $this->metadataString($metadata, $key) !== $expected) {
-                throw new \RuntimeException('Stripe PaymentIntent response metadata failed checkout validation.');
-            }
-        }
-
-        $mappedCustomer = is_string($user->stripe_customer_id) && $user->stripe_customer_id !== ''
-            ? $user->stripe_customer_id
-            : null;
-        $returnedCustomer = $this->customerId($paymentResult['customer'] ?? null);
-        if (! $isLegacyOrder) {
-            if ($mappedCustomer === null) {
-                if (app()->environment('production')
-                    || $expectedCustomerId !== null
-                    || $returnedCustomer !== null) {
-                    throw new \RuntimeException('Stripe PaymentIntent response customer failed checkout validation.');
-                }
-            } elseif ($expectedCustomerId === null
-                || $returnedCustomer === null
-                || ! hash_equals($mappedCustomer, $expectedCustomerId)
-                || ! hash_equals($mappedCustomer, $returnedCustomer)) {
-                throw new \RuntimeException('Stripe PaymentIntent response customer failed checkout validation.');
-            }
-        } elseif ($mappedCustomer !== null
-            && $returnedCustomer !== null
-            && ! hash_equals($mappedCustomer, $returnedCustomer)) {
-            throw new \RuntimeException('Stripe PaymentIntent response customer failed checkout validation.');
-        }
-    }
-
-    private function isIntegerValue(mixed $value): bool
-    {
-        return is_int($value)
-            || (is_string($value) && preg_match('/^\d+$/', trim($value)) === 1);
-    }
-
-    private function isPositiveIntegerValue(mixed $value): bool
-    {
-        return is_int($value) && $value > 0;
-    }
-
-    private function metadataString(mixed $metadata, string $key): ?string
-    {
-        $value = null;
-        if (is_array($metadata)) {
-            $value = $metadata[$key] ?? null;
-        } elseif ($metadata instanceof \ArrayAccess && $metadata->offsetExists($key)) {
-            $value = $metadata[$key];
-        } elseif (is_object($metadata) && isset($metadata->{$key})) {
-            $value = $metadata->{$key};
-        }
-
-        if (! is_scalar($value)) {
-            return null;
-        }
-
-        $value = trim((string) $value);
-
-        return $value !== '' ? $value : null;
-    }
-
-    private function customerId(mixed $value): ?string
-    {
-        if (is_array($value)) {
-            $value = $value['id'] ?? null;
-        } elseif ($value instanceof \ArrayAccess && $value->offsetExists('id')) {
-            $value = $value['id'];
-        } elseif (is_object($value) && isset($value->id)) {
-            $value = $value->id;
-        }
-
-        if (! is_scalar($value)) {
-            return null;
-        }
-
-        $value = trim((string) $value);
-
-        return $value !== '' ? $value : null;
     }
 
     /**
@@ -2102,7 +1532,7 @@ class CheckoutService
         }
 
         // A €0 order fully covered by a valid discount (100%-off coupon / free
-        // package) is already settled. Stripe must never be called with amount 0.
+        // package) is already settled. No provider payment is created for it.
         if ($totalNetCents === 0) {
             return $this->respondForSettledFreeOrder($order, $user);
         }
@@ -2116,15 +1546,18 @@ class CheckoutService
             return response()->json(['success' => true, 'order_id' => $order->id, 'invoice_number' => $snapshot->invoice_number]);
         }
 
-        return $this->createImmediateStripeResponse($order, $request, $user, (int) round($totalNetCents));
+        // A positive online checkout never reaches the non-immediate path; the
+        // immediate Mollie branch handles it before persistence. Refuse instead
+        // of persisting an order nothing would settle.
+        return $this->checkoutStateConflict('Diese Zahlungsart ist nicht verfügbar. Bitte aktualisiere den Warenkorb und versuche es erneut.');
     }
 
     /**
      * Fulfil a €0 order that was fully covered by a valid discount.
      *
-     * No payment is due, so no PaymentIntent is created. The order is moved to a
-     * settled, download-eligible status (unless the Org invoice/Lieferschein flow
-     * already assigned one) and the usual invoice/confirmation is sent.
+     * No payment is due, so no provider payment is created. The order is moved
+     * to a settled, download-eligible status (unless the Org invoice/Lieferschein
+     * flow already assigned one) and the usual invoice/confirmation is sent.
      */
     private function respondForSettledFreeOrder(Order $order, $user): JsonResponse
     {

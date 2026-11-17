@@ -6,6 +6,35 @@ status: approved-soll
 
 # Card-Testing Protection
 
+> **Current contract (2026-11-17): Stripe is removed; Mollie is the only
+> payment provider.** There is no Stripe account, no Stripe credential and no
+> Stripe code left (D-63, [Mollie payments](../infrastructure/30-mollie-payments.md)).
+> What remains in force from this document is the provider-neutral part of the
+> defense:
+>
+> - the server-side kill switch `CHECKOUT_ENABLED` (default `true`),
+> - the minimum account age `CHECKOUT_NEW_ACCOUNT_HOURS` (default `24`),
+> - the three dedicated checkout quotas (`CHECKOUT_THROTTLE_USER_PER_HOUR`,
+>   `CHECKOUT_THROTTLE_IP_PER_HOUR`, `CHECKOUT_THROTTLE_IP_PER_DAY`),
+> - the checkout identity namespace (`checkout_idempotency_key`,
+>   `checkout_fingerprint`, the stable `409` conflict rule),
+> - the bounded number of provider payment attempts per order and generation,
+> - the optional, risk-triggered Cloudflare Turnstile challenge.
+>
+> The payment surface is Mollie's hosted checkout page: no card number, no
+> client secret and no provider key reaches the browser.
+>
+> **Retired (history, not the desired state):** §2 (Stripe Customer mapping,
+> PaymentIntent columns and failure telemetry), §4 (pending-PaymentIntent
+> reuse), §5 (stale-PaymentIntent cleanup), §6 (Stripe webhook identity), §8
+> (Stripe.js) and §9 (Stripe Dashboard, Radar and 3DS) describe the removed
+> Stripe contract and stay only as the record of what was built and measured —
+> the same holds for the runbook signals that read Stripe objects. §1 and §3
+> state the same threat model in Stripe vocabulary; their rules survive in
+> provider-neutral form (the list above). Where the sections below still say
+> "PaymentIntent", "Stripe Customer" or "Stripe.js", read the retired contract;
+> the in-force rule is the list above.
+
 ## Status
 
 **Independent review on 2026-10-22: APPROVED WITH CONDITIONS.** A separate
@@ -22,18 +51,17 @@ owner together with that stack, and Turnstile stays switched off until it is
 made.
 
 The remaining findings were closed on 2026-10-22: an unparseable
-`STRIPE_CHECKOUT_ENABLED` is no longer coerced into a silent `false` (the
+`CHECKOUT_ENABLED` is no longer coerced into a silent `false` (the
 configuration keeps it distinguishable, so the kill switch fails closed **and**
 logs it), the account-age message no longer promises a retry "in wenigen
 Minuten" (the policy is 24 hours), the effective limits are printed by the
 boot-time production check (`ops:validate-production`), and this document
 names no migration number of its own.
 
-What remains with the owner is unchanged: the Stripe-dashboard checklist, the
-Turnstile configuration in production, the monitoring-alarm test, the DPO
-review, and the live proof of the kill switch. Their contracts are the
-checklist and monitoring in §9, the required controls in §10, and the kill
-switch in §3.0.1.
+What remains with the owner is unchanged: the Turnstile configuration in
+production, the monitoring-alarm test, the DPO review, and the live proof of the
+kill switch. Their contracts are the checklist and monitoring in §9, the
+required controls in §10, and the kill switch in §3.0.1.
 
 **Approved SOLL architecture (2026-09-23).** This document is the
 implementation contract for the checkout/card-testing defense. V036 and the
@@ -46,8 +74,10 @@ restated here. Operational rollout and final review are governed by §12
 ran on, not a claim about every uncommitted change. The existing
 checkout flow in
 [`features/ecommerce/09-stripe-checkout-flow.md`](../ecommerce/09-stripe-checkout-flow.md)
-remains the reference for order states and Stripe integration; the rules below
-take precedence where they add idempotency, identity, or abuse controls.
+remains the reference for the order state machine; its Stripe provider flow is
+retired ([Mollie payments](../infrastructure/30-mollie-payments.md)), and the
+rules below take precedence where they add idempotency, identity, or abuse
+controls.
 
 ### Current-tree verification (2026-09-29, read-only, HEAD `59de6a9`)
 
@@ -252,13 +282,14 @@ code.
 
 #### 3.0.1 Incident-response kill switch
 
-`STRIPE_CHECKOUT_ENABLED` is a server-only configuration flag (default `true`).
-When it is `false`, only a positive-value immediate Stripe checkout that would
-need a new or ambiguous PaymentIntent is blocked with a generic retryable `503`
-before Customer or PaymentIntent creation. Exact replays of an already usable
-pending PI remain readable, while invoice, quote, Lieferschein, and settled-free
-paths are unaffected. No client field can override this flag. Invalid runtime
-configuration fails closed and is logged without request or payment data.
+`CHECKOUT_ENABLED` is a server-only configuration flag (default `true`).
+When it is `false`, only a positive-value immediate online checkout that would
+need a new or ambiguous provider payment attempt is blocked with a generic
+retryable `503` before the provider is called. Exact replays of an already
+usable pending attempt remain readable, while invoice, quote, Lieferschein, and
+settled-free paths are unaffected. No client field can override this flag.
+Invalid runtime configuration fails closed and is logged without request or
+payment data.
 
 ## 3.1 Dedicated per-user/per-IP limits
 
@@ -268,10 +299,10 @@ route-level buckets are independent: a user bucket cannot be bypassed by
 changing IP, and an IP bucket protects multiple users behind one address.
 
 **Where the quota is enforced:** after the request is classified as an
-immediate positive-value Stripe checkout, the service enforces the quota
+immediate positive-value online checkout, the service enforces the quota
 (`CheckoutRiskService::assertCheckoutQuotaAllowed()`), not a route-level
 `throttle:` middleware — the buckets belong to the checkout, not to the route,
-and an exact idempotent replay must not consume the PaymentIntent budget. The
+and an exact idempotent replay must not consume the provider-attempt budget. The
 named limiter registration exists as the declared contract; the runtime
 enforcement is the service, and both read the same limits.
 
@@ -291,9 +322,9 @@ The initial approved policy is:
 
 | Bucket | Checkout operation | Limit | Window/configuration |
 | --- | --- | ---: | --- |
-| Authenticated user | Immediate Stripe checkout requests/PI attempts | 5 | per hour / `CHECKOUT_THROTTLE_USER_PER_HOUR` |
-| Client IP | Immediate Stripe checkout requests/PI attempts | 10 | per hour / `CHECKOUT_THROTTLE_IP_PER_HOUR` |
-| Client IP | Immediate Stripe checkout requests/PI attempts | 30 | per day / `CHECKOUT_THROTTLE_IP_PER_DAY` |
+| Authenticated user | Immediate online checkout requests/provider attempts | 5 | per hour / `CHECKOUT_THROTTLE_USER_PER_HOUR` |
+| Client IP | Immediate online checkout requests/provider attempts | 10 | per hour / `CHECKOUT_THROTTLE_IP_PER_HOUR` |
+| Client IP | Immediate online checkout requests/provider attempts | 30 | per day / `CHECKOUT_THROTTLE_IP_PER_DAY` |
 
 The values are configuration, not magic numbers in a controller. Missing
 configuration uses these safe defaults and is visible in health/metrics
@@ -305,21 +336,21 @@ The limiter is race-safe across web workers and uses the trusted client IP
 resolved by the application. It is intentionally conservative at the request
 boundary: an exact idempotent replay may consume an HTTP budget, but the
 idempotency layer below still guarantees that it cannot create a second
-PaymentIntent. A key reused with a different fingerprint is a conflict and is
+provider payment. A key reused with a different fingerprint is a conflict and is
 counted as suspicious in risk metrics.
 
 ### 3.2 Minimum account age for immediate checkout
 
-Immediate Stripe checkout requires an activated account that is at least
-`STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS` old (initial default: **24 hours**),
+Immediate online checkout requires an activated account that is at least
+`CHECKOUT_NEW_ACCOUNT_HOURS` old (initial default: **24 hours**),
 measured against `users.created_at` in UTC. This check is server-side and
-applies before Stripe Customer or PaymentIntent creation.
+applies before a provider payment is created.
 
-The policy is deliberately limited to immediate Stripe checkout. It must not
+The policy is deliberately limited to immediate online checkout. It must not
 silently turn a legitimate invoice, quote, support, or free-order path into a
-Stripe attempt. If the business later needs an exception, it must be an
+provider attempt. If the business later needs an exception, it must be an
 explicit, audited policy rather than a hidden client flag. A global kill switch
-for immediate Stripe checkout remains available for incident response.
+for immediate online checkout remains available for incident response.
 
 ## 4. Persistent, idempotent reuse of pending PaymentIntents
 
@@ -654,10 +685,12 @@ before production rollout. The following data is processed for fraud
 prevention, payment execution, and evidence:
 
 - portal user ID, account creation time, brand, and checkout/order ID;
-- Stripe Customer ID and PaymentIntent ID (identifiers, not card data);
+- the provider payment ID and the payment-attempt reference (identifiers, not
+  card data);
 - the canonical checkout fingerprint hash;
 - the existing order IP snapshot and a keyed IP hash used for rate limiting;
-- coarse PaymentIntent failure/decline codes and bounded event IDs;
+- the chosen payment method, the amount/currency snapshot and the provider
+  payment status of each bounded attempt;
 - Cloudflare Turnstile verification outcome, action, hostname, and possibly
   the trusted remote IP required for Siteverify;
 - timestamps, generation, and user-agent/device risk signals only when strictly
@@ -669,7 +702,7 @@ prevention, payment execution, and evidence:
   performance for completing a purchase, legitimate security interests for
   fraud prevention, and legal/accounting obligations for transaction evidence.
   Legal/DPO review is required for the final wording and retention periods.
-- Name Stripe and Cloudflare as processors/sub-processors where applicable and
+- Name Mollie and Cloudflare as processors/sub-processors where applicable and
   maintain the required DPAs, transfer assessments, and processor settings.
 - Do not store PAN, CVC, magnetic-stripe data, a client secret, a raw Turnstile
   token, or a full Siteverify response. Do not send card data to Cloudflare or
@@ -686,28 +719,29 @@ prevention, payment execution, and evidence:
 - Rotate or erase keyed IP hashes when the risk key is retired. Do not use the
   checkout fingerprint as a cross-site advertising or browser-tracking
   identifier.
-- Restrict telemetry and Stripe identifiers to staff/support roles that need
+- Restrict telemetry and provider identifiers to staff/support roles that need
   them, log access, and keep exports free of unnecessary personal data.
 
 ## 11. API and state contracts
 
-The V036 PaymentIntent-abuse contract remains deliberately scoped to a
-**positive-value immediate Stripe checkout**: after server-side validation and
+The V036 provider-abuse contract remains deliberately scoped to a
+**positive-value immediate online checkout**: after server-side validation and
 pricing, the request is not a reactive quote request (a cart item flagged
-`isQuote`), selects Stripe rather than invoice/Lieferschein settlement, and has
-a server-calculated total greater than zero. The V036 minimum-account-age,
-dedicated checkout quota, kill-switch, Stripe Customer/PaymentIntent, and
-Turnstile contracts apply to that classified path.
+`isQuote`), selects the online payment method rather than invoice/Lieferschein
+settlement, and has a server-calculated total greater than zero. The V036
+minimum-account-age, dedicated checkout quota, kill-switch, bounded
+provider-attempt and Turnstile contracts apply to that classified path.
 
 The V036 **checkout identity namespace**, however, is intentionally shared by
 all new authenticated checkout orders: invoice, delivery-note/Lieferschein,
-settled-free, reactive quote, and positive-value immediate Stripe. This broader
-namespace is an approved product decision, not an expansion of the card-testing
-or PaymentIntent gates. Non-immediate paths use the same owner/brand/key/
-fingerprint validation and terminal-order conflict rules, but never create a
-PaymentIntent and do not receive the immediate-only age, quota, kill-switch,
-Customer, PI, or Turnstile checks. Pre-identity legacy rows may remain null;
-there is no additional migration to backfill them (the current migration state is stated in `features/tech/07-architectural-decisions.md`, AD-2).
+settled-free, reactive quote, and positive-value immediate online payment. This
+broader namespace is an approved product decision, not an expansion of the
+card-testing or provider-attempt gates. Non-immediate paths use the same
+owner/brand/key/fingerprint validation and terminal-order conflict rules, but
+never create a provider payment and do not receive the immediate-only age,
+quota, kill-switch or Turnstile checks. Pre-identity legacy rows may remain
+null; there is no additional migration to backfill them (the current migration
+state is stated in `features/tech/07-architectural-decisions.md`, AD-2).
 
 The browser checkout client sends an opaque `Idempotency-Key` on every checkout
 request. Header presence is not a global replay guarantee. For non-immediate
@@ -718,40 +752,39 @@ The immediate-Stripe path may use its separately authorized same-user/active-
 brand fingerprint recovery after validating the remote PI. Neither path may
 claim replay safety when its recovery identity is unavailable.
 
-Within the positive-value immediate Stripe scope, the implementation must
-preserve these externally visible contracts:
+Within the positive-value immediate online-payment scope, the implementation
+must preserve these externally visible contracts:
 
-- a valid matching key/fingerprint replay returns the same order/PI;
-- mismatch returns a stable `409` conflict without creating a PI;
+- a valid matching key/fingerprint replay returns the same order/attempt;
+- mismatch returns a stable `409` conflict without creating a provider payment;
 - account-age and checkout-quota rejections are generic and do not reveal risk
   data;
 - Turnstile is represented by a server decision (`required` or `not_required`),
   never by trusting a client boolean;
-- only the strict success webhook may make an order `paid`;
-- `payment_intent.payment_failed` may add bounded telemetry but may not grant
-  access or fulfillment;
-- stale cleanup is observable, idempotent, and race-safe.
+- only the verified provider status (webhook or reconciliation) may make an
+  order `paid`;
+- a failed provider status may add bounded telemetry but may not grant access or
+  fulfillment;
+- reconciliation is observable, idempotent, and race-safe.
 
-A client cannot override the Stripe Customer, order ID, amount, currency,
-fingerprint, generation, user ID, or IP identity. Server responses must avoid
-returning raw decline/provider details that are useful for card testing. The
-signed webhook remains the normal authority for fulfillment. A bounded stale
-cleanup may additionally reconcile a remote `succeeded` PI only after retrieving
-the PI by the order's stored identifier and passing the same strict identity,
-amount, received-amount, customer, and generation checks; it must never create
-or substitute a PI. A signed success event for an order whose local PI link is
-still null may bind that event PI under the same locked conditional transition.
+A client cannot override the order ID, amount, currency, fingerprint,
+generation, user ID, provider payment method, or IP identity. Server responses
+must avoid returning raw decline/provider details that are useful for card
+testing. The verified provider status is the normal authority for fulfillment: a
+reconciliation pass may apply a remote `paid` state only after retrieving the
+payment by the attempt's stored identifier and passing the same strict identity,
+amount and currency checks; it must never create or substitute a payment.
 
 ## 12. Rollout and acceptance
 
-1. Ship the separate V036 migration and backfill only safe nullable fields;
-   do not create Stripe Customers for historical users in bulk.
-2. Deploy telemetry and cleanup in observe-only mode, compare the new limits
-   with positive-value immediate Stripe traffic, and verify that this scoped
-   path creates no duplicate PIs.
-3. Keep `STRIPE_CHECKOUT_ENABLED` under server-side configuration control and
-   verify the disabled response blocks only new or ambiguous PaymentIntent
-   attempts on that in-scope path.
+1. Ship the separate V036 migration and backfill only safe nullable fields; do
+   not create provider customer records for historical users in bulk.
+2. Deploy telemetry and reconciliation in observe-only mode, compare the new
+   limits with positive-value immediate online traffic, and verify that this
+   scoped path creates no duplicate provider payments.
+3. Keep `CHECKOUT_ENABLED` under server-side configuration control and verify
+   the disabled response blocks only new or ambiguous provider attempts on that
+   in-scope path.
 4. Enable minimum account age and dedicated checkout quotas for the in-scope
    path, then enable risk-based Turnstile only after its Dashboard, CSP,
    privacy, and Siteverify checks pass. Verify that invoice/Lieferschein,
@@ -760,22 +793,21 @@ still null may bind that event PI under the same locked conditional transition.
    verification* above (the three PHPUnit feature tests, `TurnstileWidget.test.tsx`,
    and `turnstile-checkout.spec.ts`), followed by the full backend suite and
    frontend lint/build.
-6. Review Radar, 3DS, webhook identity mismatches, and failure telemetry before
-   declaring the feature live. Roll back configuration before rolling back
-   durable identifiers; never delete a PI or order merely to make a dashboard
-   look clean.
+6. Review provider status reconciliations, webhook identity mismatches, and
+   failure telemetry before declaring the feature live. Roll back configuration
+   before rolling back durable identifiers; never delete a payment attempt or
+   order merely to make a dashboard look clean.
 
 Rollout acceptance must also verify that the browser key is present on all
 checkout submissions and that every new authenticated order persists the
 server-validated V036 key/fingerprint identity, including invoice,
 delivery-note, settled-free, and reactive-quote paths. The non-immediate paths
-must not acquire the immediate-Stripe PI-abuse gates. Their replay guarantee is
+must not acquire the immediate provider-abuse gates. Their replay guarantee is
 exact-key only; a lost browser key is an accepted, tested new-order boundary,
 not a claimed replay. Persistent deduplication after key loss would require a
 separate durable browser-session/recovery contract and is not implied by this
 rollout.
 
 The feature is complete only when the migration, scoped server enforcement,
-cleanup, webhook identity checks, optional Turnstile behavior, Stripe.js
-loading, privacy updates, operational checklist, and all required tests are
-verified.
+reconciliation, webhook identity checks, optional Turnstile behavior, privacy
+updates, operational checklist, and all required tests are verified.

@@ -181,8 +181,9 @@ enforced separately by `tests/infrastructure/verify-image-freshness.sh`
   authentication/authorization, status/failure fixtures, and configuration
   responses under `/api/*`; use real backend/test fixtures or component/
   integration tests for those states. Only an explicitly documented external
-  provider/widget boundary (for example Stripe.js or Turnstile) may be replaced
-  as an external integration stub, and it must not seed application storage.
+  provider/widget boundary (for example Turnstile or a documented provider
+  widget) may be replaced as an external integration stub, and it must not seed
+  application storage.
 - CI never uploads Playwright HTML reports, `test-results`, traces, screenshots,
   or videos. They can contain browser storage, cookies, request data, or PII.
   CI uses the list reporter and retains only a sanitized step summary. Local
@@ -190,16 +191,17 @@ enforced separately by `tests/infrastructure/verify-image-freshness.sh`
 
 ## Card-testing and Turnstile flow
 
-The `@feature:card-testing` E2E flow exercises the risk-triggered Turnstile
+The `@feature:card-testing` E2E flow (the tag name is legacy; the specs cover
+checkout risk gating, not a card form) exercises the risk-triggered Turnstile
 path with documented test/dummy values and can be selected with
 `npx playwright test --grep @feature:card-testing`. Turnstile is **fail-closed
 only while it is active**, meaning both the site key and secret are configured
 and a challenge is required. In that state a missing/invalid token or
-verification failure rejects the checkout and no PaymentIntent is created. If
+verification failure rejects the checkout and no payment attempt is created. If
 the configuration is missing, Turnstile is intentionally inactive and the other
-checkout controls (validation, account age, limits, idempotency, and Stripe
-identity checks) still apply. Missing configuration must not be described as a
-Turnstile failure.
+checkout controls (validation, account age, limits, idempotency, and the
+payment-attempt identity checks) still apply. Missing configuration must not be
+described as a Turnstile failure.
 
 ## Shard maintenance
 

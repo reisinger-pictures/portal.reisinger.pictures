@@ -251,4 +251,5 @@ source are shown as a read-only hint. Full contract:
 - [`21-brand-config-driven.md`](21-brand-config-driven.md) — current single-brand
   configuration and the boundary between config and DB settings.
 - [`../ecommerce/09-stripe-checkout-flow.md`](../ecommerce/09-stripe-checkout-flow.md)
-  — checkout/order state machine.
+  — checkout/order state machine (the document's provider section is retired;
+  online payments run through [Mollie](30-mollie-payments.md)).

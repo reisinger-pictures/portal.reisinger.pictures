@@ -11,11 +11,12 @@ import {
 } from '../helpers/CardTestingCheckoutFixture';
 
 /**
- * The body `CheckoutIdempotencyService::resolveExistingOrder()` sends when a
- * browser key is reused with a different canonical fingerprint, quoted from
- * `backend/app/Services/CheckoutIdempotencyService.php`:
+ * The body that answers a reused browser key with a different canonical
+ * fingerprint, quoted from `backend/app/Services/CheckoutIdempotencyService.php`:
+ * the fast path `findPositiveOnlineOrderByKey()` selects the persisted claim and
+ * `resolveOnlineOrder()` compares fingerprint and amount against it —
  *   return $this->conflict('Dieser Checkout-Versuch wurde bereits mit anderen Daten verwendet.');
- * and the flag that identifies it, from the same file:
+ * with the flag that identifies it, from the same file:
  *   'idempotency_conflict' => true,
  */
 const IDENTITY_CONFLICT_MESSAGE = 'Dieser Checkout-Versuch wurde bereits mit anderen Daten verwendet.';

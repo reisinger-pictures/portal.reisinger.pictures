@@ -141,15 +141,19 @@ dorthin. Der Webhook bleibt trotzdem **Pflicht in jeder Umgebung** und muss eine
 - `localhost` und reines `http://` werden abgelehnt: Mollie prüft die
   Erreichbarkeit beim Anlegen der Zahlung und antwortet mit HTTP 422; ohne
   gültige URL antwortet der Checkout mit **503** und legt keine Bestellung an.
-- Ohne Tunnel überspringen sich die vier providerabhängigen E2E-Specs namentlich.
+- Ohne Tunnel werden die drei providerabhängigen E2E-Specs
+  (`card-testing-quota-denied`, `quote-checkout`, `turnstile-checkout`)
+  namentlich übersprungen. `card-testing-idempotency` ist davon unabhängig: die
+  Spec prüft die Portal-Identität (Konflikt und Resume) und stubbt die Seite des
+  Anbieters.
 
 Variablen, Cutover und Betrieb: `deployment/README.md`, Abschnitt „Mollie (Live)",
 und `features/infrastructure/30-mollie-payments.md#cutover-and-operations`.
 
-Der historische Stripe-Webhook (`POST /api/webhooks/stripe`) bleibt
-serverseitig für Altbestellungen erreichbar. Das ist kein lokaler
-Entwickler-Workflow mehr — Stripe nimmt keine neuen Zahlungen an, und das
-Stripe-CLI ist global entfernt.
+Einen Stripe-Webhook gibt es nicht mehr: Route, Controller und Secret-Resolver
+wurden mit dem Stripe-Ausbau entfernt, Altbestellungen werden also nicht mehr
+über einen Webhook fortgeschrieben. Auch das Stripe-CLI ist global entfernt —
+das ist kein Workflow mehr, weder lokal noch im Betrieb.
 
 ## Lokale E2E-Tests isoliert ausführen (eigene Backend-Instanz + SQLite-DB)
 

@@ -61,9 +61,9 @@ class InvoiceSnapshot extends Model
     public const MAIL_DISPATCH_KEY = '_invoice_mail_dispatch';
 
     /**
-     * Durable, per-order enqueue claim for the time-critical chargeback /
-     * dispute notification. Kept separate from the invoice-mail claim so the
-     * two independent messages have independent at-most-once enqueue slots.
+     * Historical per-order enqueue claim of the former chargeback/dispute
+     * notification. No new snapshot writes it; it is still hidden from the
+     * public presentation so already persisted evidence stays internal.
      */
     public const DISPUTE_MAIL_DISPATCH_KEY = '_dispute_mail_dispatch';
 
@@ -91,24 +91,6 @@ class InvoiceSnapshot extends Model
     {
         $details = is_array($this->customer_details) ? $this->customer_details : [];
         $details[self::MAIL_DISPATCH_KEY] = [
-            'state' => 'claimed',
-            'claimed_at' => now()->toISOString(),
-        ];
-
-        $this->forceFill(['customer_details' => $details])->save();
-    }
-
-    public function disputeMailDispatchClaimed(): bool
-    {
-        $details = $this->customer_details;
-
-        return is_array($details) && array_key_exists(self::DISPUTE_MAIL_DISPATCH_KEY, $details);
-    }
-
-    public function claimDisputeMailDispatch(): void
-    {
-        $details = is_array($this->customer_details) ? $this->customer_details : [];
-        $details[self::DISPUTE_MAIL_DISPATCH_KEY] = [
             'state' => 'claimed',
             'claimed_at' => now()->toISOString(),
         ];

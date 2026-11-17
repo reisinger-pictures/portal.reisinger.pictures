@@ -20,7 +20,6 @@ class CardTestingSchemaTest extends TestCase
         $this->assertTrue(Schema::hasColumns('orders', [
             'checkout_idempotency_key',
             'checkout_fingerprint',
-            'payment_intent_generation',
             'payment_failure_count',
             'last_payment_failure_at',
             'last_payment_decline_code',
@@ -30,7 +29,6 @@ class CardTestingSchemaTest extends TestCase
         $order = Order::factory()->create([
             'checkout_idempotency_key' => 'checkout-key',
             'checkout_fingerprint' => hash('sha256', 'stable-checkout-fingerprint'),
-            'payment_intent_generation' => 4,
             'payment_failure_count' => 3,
             'last_payment_failure_at' => $failureAt,
             'last_payment_decline_code' => 'do_not_honor',
@@ -38,7 +36,6 @@ class CardTestingSchemaTest extends TestCase
 
         $this->assertSame('checkout-key', $order->checkout_idempotency_key);
         $this->assertSame(64, strlen($order->checkout_fingerprint));
-        $this->assertSame(4, $order->payment_intent_generation);
         $this->assertSame(3, $order->payment_failure_count);
         $this->assertTrue($order->last_payment_failure_at->equalTo($failureAt));
         $this->assertSame('do_not_honor', $order->last_payment_decline_code);
@@ -116,7 +113,11 @@ class CardTestingSchemaTest extends TestCase
         $this->assertTrue($recentUser->created_at->greaterThan(now()->subHour()));
         $this->assertNull($order->checkout_idempotency_key);
         $this->assertNull($order->checkout_fingerprint);
-        $this->assertSame(1, $order->payment_intent_generation);
+        // `payment_intent_generation` is a historical online-payment column
+        // with a database default. It is not part of the model defaults any
+        // more, so assert the persisted value instead of the in-memory one.
+        $order->refresh();
+        $this->assertSame(1, (int) $order->payment_intent_generation);
         $this->assertSame(0, $order->payment_failure_count);
         $this->assertNull($order->last_payment_failure_at);
         $this->assertNull($order->last_payment_decline_code);

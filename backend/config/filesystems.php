@@ -57,8 +57,8 @@ return [
             'root' => storage_path('app/private'),
             // `serve => false` removes the unauthenticated `GET|PUT /storage/{path}`
             // route Laravel registers for a serving local disk. With `true` that
-            // route exposed everything under `storage/app/private` — including
-            // `stripe_secret.txt` — to anonymous callers.
+            // route exposed everything under `storage/app/private` to anonymous
+            // callers.
             'serve' => false,
             'throw' => false,
             'report' => false,

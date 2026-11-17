@@ -189,7 +189,7 @@ grep -qF -- '--relative' <<<"$runtime_block" \
 grep -qF -- "--exclude='*'" <<<"$runtime_block" \
     || fail 'the runtime-tree step must exclude every file (--exclude=*)'
 if grep -qF -- '--delete' <<<"$runtime_block"; then
-    fail 'the runtime-tree step must never delete: private storage (model age proofs, stripe secret) lives there'
+    fail 'the runtime-tree step must never delete: private storage (model age proofs) lives there'
 fi
 if grep -qF -- '"$CHMOD"' <<<"$runtime_block"; then
     fail 'the runtime-tree step must not re-apply the 0755/0644 default; it would undo the 2775 mode'

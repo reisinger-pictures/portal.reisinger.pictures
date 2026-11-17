@@ -20,6 +20,16 @@ use Illuminate\Support\Str;
 
 class PayoutCalculationService
 {
+    /**
+     * Historical payment-fee reserve deducted before the photographer share is
+     * split. This is deliberately provider-neutral: the portal no longer
+     * records a per-order fee from a payment provider, and the rate describes
+     * the 4% reserve the payout calculation has always applied. Keeping it as
+     * a named constant preserves the established 48% payout instead of
+     * silently lifting the share to 50%.
+     */
+    private const PAYMENT_FEE_RESERVE_RATE = 0.04;
+
     public function getShareMultiplier($tier)
     {
         return match ($tier) {
@@ -900,8 +910,8 @@ class PayoutCalculationService
     }
 
     /**
-     * Apply the same proportional refund, fee and share split used by the
-     * monthly calculation, returning each photographer's share and the
+     * Apply the same proportional refund, fee-reserve and share split used by
+     * the monthly calculation, returning each photographer's share and the
      * order's remaining photo-backed revenue used as its refund basis.
      *
      * @param  EloquentCollection<string, Photo>  $photos
@@ -1001,7 +1011,7 @@ class PayoutCalculationService
         }
 
         // A refund is allocated to photo revenue in the same proportion as the
-        // normal split, before fee proration and the photographer share.
+        // normal split, before fee-reserve proration and the photographer share.
         $refundCents = min(max(0, $refundCents), array_sum($photoRevenue));
         if ($refundCents > 0) {
             $refundAllocations = $this->allocateCentsProportionally($refundCents, $photoRevenue);
@@ -1019,10 +1029,13 @@ class PayoutCalculationService
             ]);
         }
 
-        $stripeFeePercent = config('services.stripe.fee_percent', 0.04);
-        $feeCents = max(0, (int) ($order->stripe_fee_cents
-            ?? round($snapshotNet * max(0, (float) $stripeFeePercent))));
-        $feeCents = min($feeCents, $snapshotNet);
+        // The reserve is calculated on the order's net snapshot total and
+        // distributed over the photo revenue in the same proportion as the
+        // split. It is a historical payout reserve, not a provider fee.
+        $feeCents = min(
+            $snapshotNet,
+            max(0, (int) round($snapshotNet * self::PAYMENT_FEE_RESERVE_RATE)),
+        );
         $photoFeeCents = $snapshotNet > 0
             ? min(
                 $totalPhotoRevenue,

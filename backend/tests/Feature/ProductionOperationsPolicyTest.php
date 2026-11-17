@@ -238,7 +238,7 @@ class ProductionOperationsPolicyTest extends TestCase
             'app.checkout_throttle_user_per_hour' => 5,
             'app.checkout_throttle_ip_per_hour' => 10,
             'app.checkout_throttle_ip_per_day' => 30,
-            'app.stripe.checkout_new_account_hours' => 24,
+            'checkout.new_account_hours' => 24,
         ]);
 
         try {

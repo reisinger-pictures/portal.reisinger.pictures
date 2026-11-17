@@ -12,7 +12,7 @@ class PayoutPool extends Model
 
     protected $fillable = [
         'month', 'year', 'product_id', 'gross_amount_cents',
-        'stripe_fee_cents', 'net_pool_cents', 'photographer_share_percent',
+        'net_pool_cents', 'photographer_share_percent',
         'total_unique_downloads', 'total_shares', 'value_per_share_cents',
     ];
 
@@ -20,7 +20,6 @@ class PayoutPool extends Model
         'month' => 'integer',
         'year' => 'integer',
         'gross_amount_cents' => 'integer',
-        'stripe_fee_cents' => 'integer',
         'net_pool_cents' => 'integer',
         'photographer_share_percent' => 'integer',
         'total_unique_downloads' => 'integer',

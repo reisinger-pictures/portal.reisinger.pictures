@@ -186,7 +186,6 @@ class PayoutLockedStatementsTest extends TestCase
         $photographer = User::factory()->create();
         $photo = Photo::factory()->create(['user_id' => $photographer->id]);
         $order = Order::factory()->paid()->create([
-            'stripe_fee_cents' => 0,
             'created_at' => '2026-05-10 12:00:00',
         ]);
         InvoiceSnapshot::query()->create([

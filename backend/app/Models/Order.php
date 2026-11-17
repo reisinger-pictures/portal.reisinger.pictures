@@ -41,7 +41,6 @@ class Order extends Model
     ];
 
     protected $attributes = [
-        'payment_intent_generation' => 1,
         'payment_failure_count' => 0,
     ];
 
@@ -51,16 +50,13 @@ class Order extends Model
         'status',
         'brand',
         'total_amount',
-        'stripe_fee_cents',
         'refunded_amount_cents',
         'coupon_id',
         'coupon_discount_cents',
         'is_quote_request',
         'ip_address',
-        'stripe_payment_intent_id',
         'checkout_idempotency_key',
         'checkout_fingerprint',
-        'payment_intent_generation',
         'payment_failure_count',
         'last_payment_failure_at',
         'last_payment_decline_code',
@@ -72,10 +68,8 @@ class Order extends Model
     protected $casts = [
         'guest_id' => 'string',
         'total_amount' => 'integer',
-        'stripe_fee_cents' => 'integer',
         'refunded_amount_cents' => 'integer',
         'coupon_discount_cents' => 'integer',
-        'payment_intent_generation' => 'integer',
         'payment_failure_count' => 'integer',
         'last_payment_failure_at' => 'datetime',
         'is_quote_request' => 'boolean',
@@ -122,7 +116,6 @@ class Order extends Model
             // Nullable legacy columns may stay null, but a present value must
             // never be negative or exceed the persisted money ceiling.
             PersistedMoney::assertFitsCents($order->coupon_discount_cents, 'orders.coupon_discount_cents');
-            PersistedMoney::assertFitsCents($order->stripe_fee_cents, 'orders.stripe_fee_cents');
 
             // Transition guard: a persisted legacy status must not break saves
             // that do not touch the status column (e.g. payment-failure

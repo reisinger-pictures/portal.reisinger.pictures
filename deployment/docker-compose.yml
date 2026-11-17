@@ -203,6 +203,13 @@ services:
       - CHECKOUT_THROTTLE_IP_PER_HOUR=${CHECKOUT_THROTTLE_IP_PER_HOUR:-10}
       - CHECKOUT_THROTTLE_IP_PER_DAY=${CHECKOUT_THROTTLE_IP_PER_DAY:-30}
       - CHECKOUT_IDEMPOTENCY_TTL_MINUTES=${CHECKOUT_IDEMPOTENCY_TTL_MINUTES:-30}
+      # Provider-neutrale Checkout-Schalter (frueher an STRIPE_* gebunden). Der
+      # Kill-Switch CHECKOUT_ENABLED und die Mindest-Kontoalter-Pruefung sind
+      # keine Anbieter-Credentials: sie bleiben in der Host-.env pflegbar, haben
+      # aber einen Default und blockieren den Start nicht. Sie stehen auch im
+      # Inventar (deployment/production-env.keys).
+      - CHECKOUT_ENABLED=${CHECKOUT_ENABLED:-true}
+      - CHECKOUT_NEW_ACCOUNT_HOURS=${CHECKOUT_NEW_ACCOUNT_HOURS:-24}
       - TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
       - TURNSTILE_SECRET=${TURNSTILE_SECRET:-}
       - TURNSTILE_ALLOWED_HOSTNAMES=${TURNSTILE_ALLOWED_HOSTNAMES:-}
@@ -225,21 +232,18 @@ services:
       # Host-.env, nie ins Repo (Klasse C1-C4).
       - FTP_EVENT_URL=${FTP_EVENT_URL:-}
       - FTP_EVENT_SECRET=${FTP_EVENT_SECRET:-}
-      - STRIPE_KEY=${STRIPE_KEY}
-      - STRIPE_SECRET=${STRIPE_SECRET}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-      - STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS=${STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS:-24}
-      - STRIPE_CHECKOUT_ENABLED=${STRIPE_CHECKOUT_ENABLED:-true}
-      - STRIPE_STALE_PAYMENT_INTENT_HOURS=${STRIPE_STALE_PAYMENT_INTENT_HOURS:-2}
-      - STRIPE_CUSTOMERS_ENABLED=${STRIPE_CUSTOMERS_ENABLED:-true}
-      # Mollie ist der Anbieter fuer neue Online-Zahlungen (Issue #53). Der
-      # Checkout verweigert die Zahlungserstellung (503) statt auf Stripe
-      # zurueckzufallen, wenn MOLLIE_KEY fehlt, MOLLIE_PAYMENT_METHODS (samt
-      # Fallback MOLLIE_PAYMENT_METHOD) leer oder ungueltig ist oder
-      # MOLLIE_WEBHOOK_URL keine HTTPS-URL ist; die Erreichbarkeit der URL
-      # prueft erst Mollie beim Anlegen. Eine Variable, die in dieser Liste
-      # fehlt, kommt im Container nie an — die Allowlist aus #57 gehoert
-      # deshalb hierher.
+      # Mollie ist der EINZIGE Zahlungsanbieter (D-63). Es gibt kein
+      # Stripe-Konto und kein Stripe-Credential mehr: weder ein Key noch ein
+      # Webhook-Secret wird hier oder in der Host-.env erwartet. Der
+      # Provider-Key ist serverseitig und gehoert NICHT ins Frontend-Bundle —
+      # das Frontend navigiert nur auf Mollies gehostete Checkout-Seite.
+      # Der Checkout verweigert die Zahlungserstellung (503) statt auf einen
+      # Ersatzanbieter auszuweichen, wenn MOLLIE_KEY fehlt,
+      # MOLLIE_PAYMENT_METHODS (samt Fallback MOLLIE_PAYMENT_METHOD) leer oder
+      # ungueltig ist oder MOLLIE_WEBHOOK_URL keine HTTPS-URL ist; die
+      # Erreichbarkeit der URL prueft erst Mollie beim Anlegen. Eine Variable,
+      # die in dieser Liste fehlt, kommt im Container nie an — die Allowlist
+      # aus #57 gehoert deshalb hierher.
       - MOLLIE_KEY=${MOLLIE_KEY:-}
       - MOLLIE_PAYMENT_METHODS=${MOLLIE_PAYMENT_METHODS:-}
       - MOLLIE_PAYMENT_METHOD=${MOLLIE_PAYMENT_METHOD:-}

@@ -9,6 +9,7 @@ use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
 use App\Models\LicenseUseCase;
+use App\Models\MolliePaymentAttempt;
 use App\Models\Order;
 use App\Models\Org;
 use App\Models\Photo;
@@ -21,7 +22,6 @@ use App\Services\CheckoutService;
 use App\Services\CouponService;
 use App\Services\InvoiceMailDispatcher;
 use App\Services\OfferTokenService;
-use App\Services\StripePaymentService;
 use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
@@ -31,6 +31,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -166,12 +167,12 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
         $first = $service->processCheckout(
             $this->checkoutRequest($photo, $useCase, self::KEY),
             $user,
-            'stripe',
+            'invoice',
         );
         $second = $service->processCheckout(
             $this->checkoutRequest($photo, $useCase, self::KEY),
             $user,
-            'stripe',
+            'invoice',
         );
 
         $this->assertSame(200, $first->status());
@@ -387,11 +388,11 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
         $service = $this->freeService();
         $request = $this->freeRequest($photo, $coupon->code, self::KEY);
 
-        $first = $service->processCheckout($request, $user, 'stripe');
+        $first = $service->processCheckout($request, $user, 'invoice');
         $second = $service->processCheckout(
             $this->freeRequest($photo, $coupon->code, self::KEY),
             $user,
-            'stripe',
+            'invoice',
         );
 
         $this->assertSame(200, $first->status());
@@ -413,12 +414,12 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
         $service = $this->freeService();
         $request = $this->freeRequest($photo, $coupon->code, self::KEY);
 
-        $first = $service->processCheckout($request, $user, 'stripe');
+        $first = $service->processCheckout($request, $user, 'invoice');
         $coupon->update(['active' => false]);
         $retry = $service->processCheckout(
             $this->freeRequest($photo, $coupon->code, self::KEY),
             $user,
-            'stripe',
+            'invoice',
         );
 
         $this->assertSame(200, $first->status());
@@ -436,7 +437,7 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
         $first = $service->processCheckout(
             $this->freeRequest($photo, $coupon->code, self::KEY),
             $user,
-            'stripe',
+            'invoice',
         );
 
         Order::query()->update(['status' => 'invoice_created']);
@@ -444,7 +445,7 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
         $retry = $service->processCheckout(
             $this->freeRequest($photo, $coupon->code, self::KEY),
             $user,
-            'stripe',
+            'invoice',
         );
 
         $this->assertSame(200, $first->status());
@@ -462,13 +463,13 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
         Mail::fake();
         [$user, $photo, $coupon] = $this->freeFixture();
         $service = $this->freeService();
-        $service->processCheckout($this->freeRequest($photo, $coupon->code, self::KEY), $user, 'stripe');
+        $service->processCheckout($this->freeRequest($photo, $coupon->code, self::KEY), $user, 'invoice');
         Order::query()->update(['status' => 'refunded']);
 
         $response = $service->processCheckout(
             $this->freeRequest($photo, $coupon->code, self::KEY),
             $user,
-            'stripe',
+            'invoice',
         );
 
         $this->assertSame(409, $response->status());
@@ -483,8 +484,8 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
         $service = $this->service();
         $request = $this->quoteRequest($photo, self::KEY);
 
-        $first = $service->processCheckout($request, $user, 'stripe');
-        $second = $service->processCheckout($this->quoteRequest($photo, self::KEY), $user, 'stripe');
+        $first = $service->processCheckout($request, $user, 'invoice');
+        $second = $service->processCheckout($this->quoteRequest($photo, self::KEY), $user, 'invoice');
 
         $this->assertSame(200, $first->status());
         $this->assertSame(200, $second->status());
@@ -502,13 +503,13 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
         Mail::fake();
         [$user, $photo] = $this->quoteFixture();
         $service = $this->service();
-        $service->processCheckout($this->quoteRequest($photo, self::KEY), $user, 'stripe');
+        $service->processCheckout($this->quoteRequest($photo, self::KEY), $user, 'invoice');
         Order::query()->update(['status' => 'cancelled']);
 
         $response = $service->processCheckout(
             $this->quoteRequest($photo, self::KEY),
             $user,
-            'stripe',
+            'invoice',
         );
 
         $this->assertSame(409, $response->status());
@@ -570,24 +571,37 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
         Mail::assertQueued(InvoiceMail::class, 1);
     }
 
-    public function test_delivery_note_classification_cannot_replay_a_payment_intent_claim(): void
+    public function test_delivery_note_classification_cannot_replay_an_online_payment_attempt(): void
     {
         Mail::fake();
         [$user, $photo, $useCase] = $this->invoiceFixture();
         $request = $this->checkoutRequest($photo, $useCase, self::KEY);
         $idempotency = app(CheckoutIdempotencyService::class);
-        $identity = $idempotency->identify($request, $user, 7500, 'stripe');
+        $identity = $idempotency->identify($request, $user, 7500, 'invoice');
         $order = Order::factory()->create([
             'user_id' => $user->id,
             'brand' => Brand::B2B,
             'status' => 'paid',
             'total_amount' => 7500,
             'is_quote_request' => false,
-            'stripe_payment_intent_id' => 'pi_non_immediate_claim',
             'checkout_idempotency_key' => $identity['key'],
             'checkout_fingerprint' => $identity['fingerprint'],
         ]);
         InvoiceSnapshot::factory()->for($order)->create();
+        MolliePaymentAttempt::create([
+            'order_id' => (string) $order->id,
+            'generation' => 1,
+            'idempotency_key' => (string) Str::uuid(),
+            'mollie_payment_id' => 'tr_non_immediate_claim',
+            'mode' => 'test',
+            'credential_fingerprint' => hash('sha256', 'mollie-key|test_'.str_repeat('a', 30)),
+            'amount_cents' => 7500,
+            'currency' => 'EUR',
+            'status' => MolliePaymentAttempt::STATUS_PAID,
+            'checkout_url' => 'https://www.mollie.com/checkout/select-method/tr_non_immediate_claim',
+            'snapshot' => ['gross_cents' => 7500, 'currency' => 'EUR'],
+            'paid_at' => now(),
+        ]);
         $org = Org::query()->create([
             'name' => 'Changed Classification GmbH',
             'invoice_frequency' => 'monthly',
@@ -596,7 +610,7 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
         $user->org()->associate($org);
         $user->save();
 
-        $response = $this->service()->processCheckout($request, $user, 'stripe');
+        $response = $this->service()->processCheckout($request, $user, 'invoice');
 
         $this->assertSame(409, $response->status());
         $this->assertTrue($response->getData(true)['idempotency_conflict']);
@@ -739,12 +753,8 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
 
     private function service(?InvoiceMailDispatcher $invoiceMailDispatcher = null): CheckoutService
     {
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('createPaymentIntent');
-
         return new CheckoutService(
             new ScopeLicensingStrategy,
-            $stripe,
             app(CouponService::class),
             null,
             null,
@@ -756,13 +766,10 @@ class CheckoutNonImmediateIdempotencyTest extends TestCase
 
     private function freeService(): CheckoutService
     {
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('createPaymentIntent');
         $preset = app(VolumePresetService::class)->resolveDefaultForBrand(Brand::B2B);
 
         return new CheckoutService(
             new VolumeLicensingStrategy($preset, app(CouponService::class)),
-            $stripe,
             app(CouponService::class),
         );
     }

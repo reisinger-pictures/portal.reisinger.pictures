@@ -39,7 +39,7 @@ Die ausdrücklich erlaubten Dateien sind nicht alle Starter-Templates:
 
 | Datei                             | Klassifizierung und Zweck                              |
 | --------------------------------- | ------------------------------------------------------ |
-| `backend/.env.example`            | Dev-Template mit Platzhaltern (APP, DB, Mail, Scout, Stripe, AI, JWT, File Encryption) |
+| `backend/.env.example`            | Dev-Template mit Platzhaltern (APP, DB, Mail, Scout, Mollie, AI, JWT, File Encryption) |
 | `backend/.env.ci`                 | **CI-only Fixture**: wird von den Workflows als `.env` verwendet; enthält Test-/Platzhalterwerte, keine Produktionskonfiguration und kein Developer-Setup |
 | `frontend/.env.example`           | Frontend-Default-Template (`VITE_TURNSTILE_SITE_KEY`-Platzhalter; kein Zahlungs-Key) |
 | `frontend/.env.local.example`     | Frontend-Local-Dev-Template (override `.env`)          |
@@ -97,9 +97,12 @@ Register).
 
 ### Code-Fallbacks
 
-`backend/config/services.php` hat **keinen** Stripe-Test-Key-Fallback mehr.
-`STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET` sind verpflichtend über
-Env-Variablen zu setzen. Tests verwenden `Config::set(...)` mit Mock-Werten.
+`backend/config/services.php` hat **keinen** hartcodierten Payment-Key-Fallback.
+Der einzige Zahlungsanbieter ist Mollie (D-63): `MOLLIE_KEY` kommt ausschließlich
+aus `env(...)`, Test- und Live-Modus wählt das Präfix des Schlüssels. Es gibt
+keinen Stripe-Block, kein Stripe-SDK und keinen Stripe-Webhook mehr, also auch
+kein `STRIPE_*`-Env, das gesetzt werden müsste. Tests verwenden `Config::set(...)`
+mit Mock-Werten bzw. faken das SDK am Service-Seam.
 
 ### Stripe-Test-Key: aus dem Dashboard, nicht aus der CLI (2026-10-15) — historisch
 
@@ -144,7 +147,8 @@ welchem Modus?* (Owner Decision
 Konfigurationsvertrag: [Mollie payments](../infrastructure/30-mollie-payments.md)).
 Er ersetzt den Stripe-Selbsttest aus
 [#59](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/59):
-Stripe nimmt keine neuen Zahlungen mehr an, und die frühere D-24-Klasse
+Stripe ist vollständig ausgebaut — kein Konto, kein Credential, kein Code —, und
+die frühere D-24-Klasse
 (falscher Modus / fehlender Zahlungs-Key im Frontend-Bundle) ist mit
 [#58](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/58)
 entfallen — Mollies gehostete Checkout-Seite lädt ihre eigene Seite, das Bundle
@@ -214,12 +218,12 @@ Tunnel), also sind `webhook_url` und `readiness` dort legitim `fail`, und
 (`E2E_STRIPE_WEBHOOK_SECRET` ist entfallen): der frühere Wert existierte nur für
 Prüfung 1 des alten Selbsttests.
 
-**Historischer Stripe-Webhook.** Der Altbestand bleibt erreichbar: der
-Stripe-Webhook unter `/api/webhooks/stripe` verifiziert weiterhin mit
-`App\Support\StripeWebhookSecret::resolve()` — `STRIPE_WEBHOOK_SECRET` aus der Env,
-in `local`/`testing` als Fallback das Tunnel-Artefakt. `isTunnelFallback()` hatte
-seit dem Mollie-Selbsttest keinen Aufrufer mehr und ist entfernt; der
-Ingress-Pfad ist unverändert.
+**Retired (Historie, kein Soll-Zustand):** Bis zum Stripe-Ausstieg blieb der
+Altbestand über den Stripe-Webhook `/api/webhooks/stripe` erreichbar, der mit
+`App\Support\StripeWebhookSecret::resolve()` und `STRIPE_WEBHOOK_SECRET` prüfte
+und in `local`/`testing` auf das Tunnel-Artefakt `storage/app/private/stripe_secret.txt`
+zurückfiel. Mit dem Stripe-Ausbau entfallen Route, Secret-Auflösung, SDK und
+dieses Artefakt; die Historie bleibt hier nur als Beleg.
 
 **Verifikation** (aus `backend/`): `php artisan test --filter MolliePaymentCheck`
 für den Feature-Test und `./vendor/bin/pint --test` für die Formatierung.
@@ -293,7 +297,7 @@ cp .env.example .env
 # In .env mindestens setzen:
 # ADMIN_EMAIL=<lokale Admin-Adresse>
 # ADMIN_PASSWORD=<nicht leeres lokales Passwort>
-# Danach die übrigen benötigten JWT-, File-Encryption-, DB-, Mail- und Stripe-Werte.
+# Danach die übrigen benötigten JWT-, File-Encryption-, DB-, Mail- und Mollie-Werte.
 php artisan key:generate
 php artisan jwt:secret
 # Generate FILE_ENCRYPTION_KEY and paste the output into .env:
@@ -339,7 +343,22 @@ Reihenfolge ist die Aussage, nicht die Zeilennummer):
 `VITE_*` wird beim Build **eingebacken**; die Host-`.env` und lokale
 `.env.production`-Dateien erreichen das Bundle also nie — die Host-`.env`
 versorgt nur den Backend-Container. Die Regel bleibt für jeden
-`VITE_*`-Wert gültig (heute nur Turnstile), ist aber keine Zahlungsregel mehr.
+`VITE_*`-Wert gültig (heute nur Turnstile), ist aber keine Zahlungsregel mehr:
+der Mollie-Key ist serverseitig und wird nie an das Frontend übergeben.
+
+**Gegenprobe nach dem Build** (dieselbe Zeile wie in
+[`deployment/README.md`](../../deployment/README.md), Abschnitt „Sync und der
+Container-Neustart"): sie muss leer bleiben, also weder einen Provider-Key noch
+einen Live-Credential-Wert im Bundle zeigen —
+
+```bash
+cd frontend && pnpm lint:fix && pnpm build
+grep -rIlE 'MOLLIE_KEY|pk_live_|sk_live_|rk_live_|whsec_' dist | head
+```
+
+Die Muster für Live-Credentials bleiben im Scan, weil sie auch historische
+Artefakte in einem beliebigen Checkout finden sollen; im Bundle darf keines
+davon auftauchen.
 
 **Historisch (2026-10-15, gemessen):** `assets/ClientCartView-3L6eh2lZ.js` der
 Live-Seite und dasselbe Chunk im lokalen `frontend/dist/` hatten identische
@@ -369,17 +388,13 @@ entfallen: das Bundle trägt keinen Zahlungs-Key mehr, den man prüfen könnte.
 - **`phpunit.xml`-Credentials:** SQLite-`:memory:` plus localhost-Service-Fixtures,
   akzeptiert. Die MariaDB-Werte in `.env.ci` gehören zum separaten E2E-Service-
   betrieb und sind nicht der PHPUnit-Test-DB-Vertrag.
-- **Stripe-abhängige Checkout/Payout-Tests (2026-07-31):** `OrderCheckoutTest`
-  (2 Tests), `PayoutSystemTest` (1 Test) und `Coupon/CheckoutCouponRevalidationTest`
-  (3 Tests) benötigen einen **echten** Stripe-Test-Secret-Key, da sie ausgehende
-  `PaymentIntent`-Calls an die Stripe-API auslösen. Mit Platzhalter
-  `sk_test_<your_stripe_secret_key>` (im `backend/.env.example`) schlagen sie mit HTTP 401
-  fehl. Ein Mock ist nur über Container-Binding (`StripePaymentService`/`CheckoutService`)
-  möglich — payment-kritisch, außerhalb des Email-Template-Scopes. **Akzeptiert,**
-  bis ein gültiger `STRIPE_SECRET` in der lokalen `.env` hinterlegt oder die
-  Service-Mock-Strategie etabliert ist. Nachweis: Analyse vom 2026-07-31,
-  71 vorbestehende Fehler auf 6 reduziert (Rest vorbestehend, Root Cause
-  `BrandConfig::__construct` fehlende Parameter-Defaults — gefixt).
+- **Stripe-abhängige Checkout/Payout-Tests:** ✅ **erledigt durch den
+  Stripe-Ausbau.** Der Befund von 2026-07-31 (Tests brauchten einen echten
+  `STRIPE_SECRET`, weil sie ausgehende `PaymentIntent`-Calls auslösten) gilt
+  nicht mehr: es gibt keinen Stripe-Client und keinen Key. Zahlungs-Tests laufen
+  gegen das gefakte Mollie-SDK bzw. gegen `MolliePaymentService` als Seam und
+  brauchen keine Provider-Credentials. Der Befund bleibt als Historie stehen,
+  weil er die damalige Entscheidung gegen ein Service-Mock dokumentiert.
 - **C1/C2 (`APP_KEY`/`JWT_SECRET` Fallbacks):** ✅ RESOLVED (2026-07-21) — Schlüssel rotiert.
   Deployment-Guard in `deployment/docker-compose.yml` prüft nun generisch auf leere Werte
   statt auf konkrete Strings — keine erneute Exposition über das Repository möglich.

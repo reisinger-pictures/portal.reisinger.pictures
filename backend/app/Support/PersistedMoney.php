@@ -20,9 +20,9 @@ final class PersistedMoney
     /**
      * Validate a value before it is written to a persisted money column.
      *
-     * Nullable legacy columns (for example `orders.stripe_fee_cents`) may
-     * still be null, but a present value must be a non-negative integral
-     * number of cents within the shared signed-INT ceiling.
+     * Nullable legacy columns may still be null, but a present value must be a
+     * non-negative integral number of cents within the shared signed-INT
+     * ceiling.
      */
     public static function assertFitsCents(mixed $value, string $field): void
     {

@@ -106,9 +106,9 @@ Keep domain editing state distinct from generic shell state in `TextSnippetModal
 
 The current policy has no age-proof deletion path or retention limit. Do not introduce one without a new owner decision.
 
-### D-16: Stripe-related personal data documentation
+### D-16: Payment-related personal data documentation
 
-Document the technical handling of Stripe customer/payment-intent IDs, IP addresses and hashes, fingerprints, failure codes, and Turnstile data. Legal purpose, lawful basis, retention, and deletion/anonymization remain an explicit DPO/legal-owner decision; do not invent those terms.
+Document the technical handling of the payment- and fraud-defense identifiers — the provider payment ID, the payment-attempt reference, the checkout fingerprint, IP addresses and hashes, the payment status, and Turnstile data. Legal purpose, lawful basis, retention, and deletion/anonymization remain an explicit DPO/legal-owner decision; do not invent those terms. Originally scoped to the Stripe customer/payment-intent identifiers; with D-63 the same documentation duty applies to Mollie's payment and attempt identifiers.
 
 ### D-17: Duplicate mail and prompt-injection policies
 
@@ -137,7 +137,7 @@ Owner decision of 2026-10-22: **keep it that way.** The alternatives are not tak
 
 The Content-Security-Policy of the portal allows `https://challenges.cloudflare.com` in `script-src`, `frame-src` and `connect-src`. Owner decision of 2026-10-22: the policy is extended **now**, because it is the one check of the card-testing rollout contract that is purely technical, and without it a switched-on challenge would leave the checkout button permanently disabled for every risk-flagged attempt.
 
-Turnstile itself stays **off**: no `TURNSTILE_SITE_KEY` and no `TURNSTILE_SECRET` in production, so the challenge branch does not run. The extension is the precondition, not the activation; the remaining conditions of the contract — the Stripe dashboard checks, the data-protection approval for Cloudflare as a processor, and the siteverify check — are still open. The card-testing protection therefore keeps working without the challenge: the attempt limits, the account age and the Stripe-side rules are what enforce the contract today. See [content security policy](security/content-security-policy.md) and [card-testing protection](security/card-testing-protection.md) §12.
+Turnstile itself stays **off**: no `TURNSTILE_SITE_KEY` and no `TURNSTILE_SECRET` in production, so the challenge branch does not run. The extension is the precondition, not the activation; the remaining conditions of the contract — the provider-dashboard checks for the payment provider in use (today Mollie, [D-63](#d-63-mollie-collects-the-payment-the-portal-issues-the-invoice-and-offers-only-non-bnpl-methods)), the data-protection approval for Cloudflare as a processor, and the siteverify check — are still open. The card-testing protection therefore keeps working without the challenge: the attempt limits, the account age and the provider-side rules are what enforce the contract today. See [content security policy](security/content-security-policy.md) and [card-testing protection](security/card-testing-protection.md) §12.
 
 ## CI and pricing/API access
 
@@ -151,7 +151,11 @@ Documentation-only changes may skip the full CI pipeline. Keep `paths` with `'**
 
 ### D-25: Live Stripe secret rotation
 
-Keep the live Stripe keys unrotated under the owner's accepted provider-ZDR decision. This does not permit exposing or committing those values. See [environment and secret hardening](security/env-hardening.md).
+**Retired 2026-11-17:** there is no Stripe account and no Stripe credential any
+more (D-63), so there is nothing to rotate and no provider-ZDR decision left to
+carry. The rule that produced the decision — a provider secret is never exposed
+or committed, and a secret that is no longer needed is removed rather than kept
+"in case" — stays in force. See [environment and secret hardening](security/env-hardening.md).
 
 ### D-26: Mollie self-test coverage
 
@@ -189,7 +193,14 @@ Superseded on 2026-11-01: the website no longer imports the full terms and never
 
 ### D-33: Dependabot CI secrets
 
-Store the required Stripe **test-mode** values (`STRIPE_SECRET`, `STRIPE_KEY`, `STRIPE_WEBHOOK_SECRET`) in Dependabot secrets, not only Actions secrets. The Dependabot branch push is the authoritative CI run; skip the duplicate E2E matrix on its `pull_request` event so the matrix runs once per PR. Treat the test values as visible to checked-out PR code.
+**Retired 2026-11-17:** the three Stripe **test-mode** values this decision
+distributed (`STRIPE_SECRET`, `STRIPE_KEY`, `STRIPE_WEBHOOK_SECRET`) no longer
+exist — Stripe is removed (D-63), and no payment credential is injected into CI
+at all. The surviving half stays in force: the Dependabot branch push is the
+authoritative CI run, and the duplicate E2E matrix is skipped on its
+`pull_request` event so the matrix runs once per PR. For any future secret this
+rule still applies: put it in Dependabot secrets as well, not only in Actions
+secrets, and treat it as visible to checked-out PR code.
 
 ### D-34: CI evidence for auto-merged Dependabot heads
 

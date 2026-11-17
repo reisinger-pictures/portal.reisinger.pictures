@@ -5,17 +5,17 @@ namespace App\Services;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Log;
 
-class StripeCheckoutKillSwitch
+class CheckoutKillSwitch
 {
     public function enabled(): bool
     {
-        $configured = config('app.stripe.checkout_enabled', true);
+        $configured = config('checkout.enabled', true);
         if (! is_bool($configured)) {
-            Log::error('Invalid STRIPE_CHECKOUT_ENABLED configuration; checkout is fail-closed.', [
+            Log::error('Invalid CHECKOUT_ENABLED configuration; checkout is fail-closed.', [
                 'configuration_type' => get_debug_type($configured),
                 // The raw flag is not a secret, and naming it is what makes the
                 // typo (for example "flase") findable in the environment.
-                'configured_value' => env('STRIPE_CHECKOUT_ENABLED'),
+                'configured_value' => env('CHECKOUT_ENABLED'),
             ]);
 
             return false;

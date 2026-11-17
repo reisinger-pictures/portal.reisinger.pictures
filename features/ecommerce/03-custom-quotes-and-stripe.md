@@ -6,13 +6,15 @@ status: planned
 
 # Technical Concept: Custom Quotes & Online Payment
 
-> **Provider status (2026-11-11):** The quotes workflow below is current; the
+> **Provider status (2026-11-17):** The quotes workflow below is current; the
 > *provider* it names is not. New online payments run through Mollie's hosted
 > checkout and the API accepts `mollie` and `invoice` only — contract and cutover
 > in [`features/infrastructure/30-mollie-payments.md`](../infrastructure/30-mollie-payments.md).
-> Section 2 and the Stripe test cards describe the historical in-page card flow,
-> which no new order enters; Stripe credentials, webhooks and reconciliation stay
-> in place for the existing order history.
+> Section 2 and the test-card list are **retired history**: they describe the
+> removed in-page card flow, which no new order entered or enters. Stripe is gone
+> entirely (no account, no credential, no SDK, no webhook route), so nothing on
+> this page is an instruction — the current payment contract is the Mollie
+> document.
 
 > **Decision Log — 2026-07-06 (Architekt-Klärung, final):** A Proactive Quote (Quote-Link) is a
 > **payable fixed-price offer** that runs through the **standard cart checkout flow** (online payment or
@@ -68,14 +70,29 @@ locked price — the standard pricing strategies are bypassed for these items.
 
 
 
-## 2. Stripe Payment Architecture (One-Off Payments)
-The system uses the modern **Payment Intents API** for secure, one-off transactions (Fallback for B2B credit cards).
-- **Backend (Laravel):** Uses the `stripe/stripe-php` SDK. It calculates the authoritative price (or verifies the signed quote-token price), creates a PaymentIntent with server-owned identity metadata and a generation-aware Stripe idempotency key, and returns a client secret for an actionable PI. A remotely succeeded PI awaiting strict success reconciliation returns the non-destructive `payment_pending` recovery response instead. The secret key (`sk_test_...`) never leaves the server.
-- **Frontend (React, historical):** The in-page card flow used `@stripe/react-stripe-js` and `@stripe/stripe-js`, collected card details via Stripe Elements and confirmed the payment directly with Stripe using the public key (`pk_test_...`). No new order enters this flow, and the frontend Stripe integration is removed ([#58](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/58)).
+## 2. Payment Architecture (One-Off Payments)
+
+**Retired (history, not the desired state).** This section described the Stripe
+Payment Intents flow: the `stripe/stripe-php` SDK, an actionable PaymentIntent
+client secret, a Stripe webhook endpoint secret (`whsec_…`) and a
+generation-aware Stripe idempotency key. Stripe is removed completely — no
+account, no credential, no SDK, no webhook route. The current payment contract is
+Mollie's hosted checkout: one provider payment attempt per order and generation,
+an immutable amount/currency snapshot written before the provider call, and a
+verified `paid` status from the webhook or the reconciliation command
+([Mollie payments](../infrastructure/30-mollie-payments.md), D-63).
 
 ## 3. Local Testing & Webhooks
-- **Stripe CLI (historical only):** Forwarding events with `stripe listen --forward-to localhost:8000/api/webhooks/stripe` only helps to replay and trace **existing** Stripe orders. It is not part of developing a new payment: new online payments run through Mollie's hosted checkout, which needs no CLI and reports to `MOLLIE_WEBHOOK_URL` ([Mollie payments](../infrastructure/30-mollie-payments.md)).
-- **Webhook Security:** The backend MUST verify incoming webhook signatures using the endpoint secret (`whsec_...`) provided by the Stripe CLI. After verification, V036 success reconciliation also requires the persisted PI identity, checkout key/fingerprint/generation, amount/currency/received amount, and Customer mapping; `metadata.order_id` alone is insufficient. Clearly pre-V036 orders retain only the explicit legacy compatibility rules in `features/security/card-testing-protection.md`.
+
+A portal-side payment CLI is not part of the setup. Mollie needs no local
+listener: the webhook target is `MOLLIE_WEBHOOK_URL`, which is mandatory in every
+environment and must be a reachable HTTPS URL — locally that means a public
+HTTPS tunnel, and without one the provider-dependent E2E specs skip by name.
+
+**Retired:** the Stripe CLI (`stripe listen --forward-to
+localhost:8000/api/webhooks/stripe`) and the `whsec_…` signature check belonged to
+the removed Stripe webhook; the tunnel artifact `storage/app/private/stripe_secret.txt`
+no longer exists.
 
 ## 4. E2E Testing Guidelines (Credit Cards) — historical
 Historical, and no longer a rule. It described the Stripe Elements form that [#58](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/58) removed: the provider's hosted page now collects the card number, so a portal-side card fixture has nothing to type into and no spec uses these numbers. Mollie documents its own test cards for the hosted page. The list is kept only as a record of what the removed Stripe specs pinned:
@@ -90,6 +107,6 @@ Historical, and no longer a rule. It described the Stripe Elements form that [#5
 
 ## 5. B2B & Accounting Rules (Austria)
 - **Fee Calculation:** The business model accounts for B2B corporate card fees (approx. 1.9% + 0.25 € per transaction).
-- **Invoice Generation and Email:** Immediate Stripe invoices are queued after strict success reconciliation (normally `payment_intent.succeeded`; bounded stale-PI cleanup may also reconcile a remotely succeeded PI after the same identity checks). Invoice and delivery-note checkouts queue the invoice/confirmation immediately after checkout; a valid discount that settles the cart at exactly `0` also queues it immediately without creating a PaymentIntent.
+- **Invoice Generation and Email:** Immediate online-payment invoices are queued after a verified `paid` (webhook or reconciliation). Invoice and delivery-note checkouts queue the invoice/confirmation immediately after checkout; a valid discount that settles the cart at exactly `0` also queues it immediately without creating a provider payment.
 - **Invoice Status:** Only a provider-confirmed online payment may state "Bezahlt via Kreditkarte"; invoice and settled-free orders must not be described as paid by card.
 - **Tax Law (Kleinunternehmer):** All amounts are strictly Net (e.g., 45.00 €). The invoice MUST include the legal notice: *"Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung"*.

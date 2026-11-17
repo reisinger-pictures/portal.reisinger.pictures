@@ -144,7 +144,7 @@ durchgereicht in `SettingsController.php:338` und `VolumePresetController.php:38
 `4500`–`45000` in `V010__rsv_licensing.php:35-38`),
 `orders.total_amount` und `invoice_snapshots.total_net` / `.total_gross`
 (dieselbe Variable `$totalNetCents` in `CheckoutService.php:1047` und `:1594`,
-die als `amount` an Stripe geht, `:317`, und gegen die zurückgeprüft wird,
+die als `amount` an den Zahlungsanbieter geht, `:317`, und gegen die zurückgeprüft wird,
 `:1404`), Offer-Token-`price` (`OfferTokenService.php:78,122` `int` /
 `is_int`), Vertrags-Positionen und -Rabatte
 (`../ecommerce/10-digital-contracts.md:65`), `products.price` in seinen

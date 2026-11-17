@@ -241,9 +241,6 @@ export SCOUT_DRIVER=collection
 export BCRYPT_ROUNDS=4
 export QUEUE_CONNECTION=sync
 export MAIL_MAILER=log
-export STRIPE_SECRET='disposable-probe-placeholder'
-export STRIPE_KEY='disposable-probe-placeholder'
-export STRIPE_WEBHOOK_SECRET='disposable-probe-placeholder'
 export JWT_SECRET='disposable-org-sync-deadlock-probe-jwt-secret'
 export FILE_ENCRYPTION_KEY='base64:VFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFQ='
 export ADMIN_EMAIL="org-sync-probe-$suffix@example.test"

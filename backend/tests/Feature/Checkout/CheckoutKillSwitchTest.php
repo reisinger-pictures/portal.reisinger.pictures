@@ -6,36 +6,43 @@ use App\Enums\Brand;
 use App\Models\Coupon;
 use App\Models\Gallery;
 use App\Models\LicenseUseCase;
+use App\Models\MolliePaymentAttempt;
 use App\Models\Order;
 use App\Models\Photo;
 use App\Models\User;
 use App\Pricing\ScopeLicensingStrategy;
 use App\Pricing\VolumeLicensingStrategy;
+use App\Services\CheckoutKillSwitch;
 use App\Services\CheckoutService;
 use App\Services\CouponService;
-use App\Services\StripeCheckoutKillSwitch;
-use App\Services\StripePaymentService;
 use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Mollie\Api\Fake\MockMollieClient;
+use Mollie\Api\Http\Requests\CreatePaymentRequest;
+use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
 class CheckoutKillSwitchTest extends TestCase
 {
+    use FakesMollie;
     use RefreshDatabase;
+
+    private MockMollieClient $mollieClient;
 
     protected function setUp(): void
     {
         parent::setUp();
         BrandRegistry::set(Brand::B2B);
-        config([
-            'app.stripe.checkout_enabled' => true,
-            'app.stripe.customers_enabled' => false,
-        ]);
+        config(['checkout.enabled' => true]);
         Mail::fake();
+        $this->configureMollie();
+        $this->mollieClient = $this->fakeMollie(
+            [CreatePaymentRequest::class => $this->mollieCreateResponder('open')],
+        );
     }
 
     protected function tearDown(): void
@@ -44,18 +51,15 @@ class CheckoutKillSwitchTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_disabled_switch_blocks_positive_stripe_checkout_before_any_order_or_pi_creation(): void
+    public function test_disabled_switch_blocks_positive_online_checkout_before_any_order_or_payment_creation(): void
     {
-        config(['app.stripe.checkout_enabled' => false]);
+        config(['checkout.enabled' => false]);
         [$user, $photo, $useCase] = $this->checkoutData();
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('createPaymentIntent');
-        $service = new CheckoutService(new ScopeLicensingStrategy, $stripe);
 
-        $response = $service->processCheckout(
+        $response = (new CheckoutService(new ScopeLicensingStrategy))->processCheckout(
             $this->request($photo, $useCase, 'kill-switch-disabled-0001'),
             $user,
-            'stripe',
+            'mollie',
         );
 
         $this->assertSame(503, $response->getStatusCode());
@@ -64,59 +68,60 @@ class CheckoutKillSwitchTest extends TestCase
         $this->assertSame(0, Order::query()->count());
     }
 
-    public function test_enabled_switch_allows_a_valid_positive_stripe_checkout(): void
+    public function test_resuming_an_open_mollie_hosted_link_ignores_the_kill_switch(): void
+    {
+        $client = $this->fakeMollie(
+            [CreatePaymentRequest::class => $this->mollieCreateResponder('open')],
+            retainRequests: true,
+        );
+        [$user, $photo, $useCase] = $this->checkoutData();
+        $key = 'kill-switch-resume-0001';
+        $service = new CheckoutService(new ScopeLicensingStrategy);
+
+        $first = $service->processCheckout($this->request($photo, $useCase, $key), $user, 'mollie');
+        $this->assertSame(200, $first->getStatusCode());
+        $this->assertTrue($first->getData(true)['payment_pending']);
+        $this->assertCount(1, $this->mollieRecordedIdempotencyKeys($client));
+
+        $order = Order::query()->sole();
+        config(['checkout.enabled' => false]);
+
+        // A customer returning to a still-open hosted link must not be stopped
+        // by the kill switch: the persisted attempt already exists, so `resume`
+        // needs no new provider work and no admission budget.
+        $resumed = $service->processCheckout($this->request($photo, $useCase, $key), $user, 'mollie');
+
+        $this->assertSame(200, $resumed->getStatusCode());
+        $this->assertTrue($resumed->getData(true)['payment_pending']);
+        $this->assertSame((string) $order->id, $resumed->getData(true)['order_id']);
+        $this->assertSame(1, Order::query()->count());
+        $this->assertSame(1, MolliePaymentAttempt::query()->count());
+        $this->assertCount(1, $this->mollieRecordedIdempotencyKeys($client));
+    }
+
+    public function test_enabled_switch_allows_a_valid_positive_online_checkout(): void
     {
         [$user, $photo, $useCase] = $this->checkoutData();
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('createPaymentIntent')
-            ->willReturnCallback(function (int $amount, string $orderId, string $email, ?string $customerId, int $generation, int|string $userId, int|string|null $accountCreatedAt, ?string $key, ?string $fingerprint): array {
-                $order = Order::query()->findOrFail($orderId);
 
-                return [
-                    'id' => 'pi_kill_switch_enabled',
-                    'status' => 'requires_payment_method',
-                    'client_secret' => 'pi_kill_switch_enabled_secret',
-                    'amount' => $amount,
-                    'amount_received' => null,
-                    'currency' => 'eur',
-                    'created' => time(),
-                    'customer' => $customerId,
-                    'metadata' => [
-                        'order_id' => (string) $order->id,
-                        'portal_user_id' => (string) $userId,
-                        'account_created_at' => (string) $accountCreatedAt,
-                        'checkout_idempotency_key' => (string) $key,
-                        'checkout_fingerprint' => (string) $fingerprint,
-                        'generation' => (string) $generation,
-                        'amount_cents' => (string) $amount,
-                        'currency' => 'eur',
-                    ],
-                ];
-            });
-        $service = new CheckoutService(new ScopeLicensingStrategy, $stripe);
-
-        $response = $service->processCheckout(
+        $response = (new CheckoutService(new ScopeLicensingStrategy))->processCheckout(
             $this->request($photo, $useCase, 'kill-switch-enabled-0001'),
             $user,
-            'stripe',
+            'mollie',
         );
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertDatabaseHas('orders', [
-            'id' => $response->getData(true)['order_id'],
-            'status' => 'pending_payment',
-            'stripe_payment_intent_id' => 'pi_kill_switch_enabled',
-        ]);
+        $this->assertTrue($response->getData(true)['payment_pending']);
+
+        $order = Order::query()->sole();
+        $this->assertSame('pending_payment', $order->status);
+        $this->assertSame(1, MolliePaymentAttempt::query()->where('order_id', $order->id)->count());
     }
 
     public function test_disabled_switch_does_not_block_invoice_or_quote_paths(): void
     {
-        config(['app.stripe.checkout_enabled' => false]);
+        config(['checkout.enabled' => false]);
         [$user, $photo, $useCase] = $this->checkoutData();
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('createPaymentIntent');
-        $service = new CheckoutService(new ScopeLicensingStrategy, $stripe);
+        $service = new CheckoutService(new ScopeLicensingStrategy);
 
         $invoice = $service->processCheckout(
             $this->request($photo, $useCase, 'kill-switch-invoice-0001'),
@@ -126,7 +131,7 @@ class CheckoutKillSwitchTest extends TestCase
         $quote = $service->processCheckout(
             $this->request($photo, $useCase, 'kill-switch-quote-0001', true),
             $user,
-            'stripe',
+            'mollie',
         );
 
         $this->assertSame(200, $invoice->getStatusCode());
@@ -135,14 +140,11 @@ class CheckoutKillSwitchTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => $quote->getData(true)['order_id'], 'status' => 'pending']);
     }
 
-    public function test_non_stripe_invoice_checkout_captures_the_first_checkout_ip(): void
+    public function test_non_online_invoice_checkout_captures_the_first_checkout_ip(): void
     {
         [$user, $photo, $useCase] = $this->checkoutData();
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('createPaymentIntent');
-        $service = new CheckoutService(new ScopeLicensingStrategy, $stripe);
 
-        $response = $service->processCheckout(
+        $response = (new CheckoutService(new ScopeLicensingStrategy))->processCheckout(
             $this->request($photo, $useCase, 'invoice-ip-capture-0001', false, null, '198.51.100.81'),
             $user,
             'invoice',
@@ -155,12 +157,9 @@ class CheckoutKillSwitchTest extends TestCase
         ]);
     }
 
-    public function test_recent_account_with_a_full_discount_free_cart_skips_stripe_admission_and_pi_creation(): void
+    public function test_recent_account_with_a_full_discount_free_cart_skips_admission_and_payment_creation(): void
     {
-        config([
-            'app.stripe.checkout_enabled' => true,
-            'app.stripe.checkout_new_account_hours' => 24,
-        ]);
+        config(['checkout.new_account_hours' => 24]);
         $user = User::factory()->create(['created_at' => now()]);
         $gallery = Gallery::factory()->create(['is_public' => true]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
@@ -175,38 +174,33 @@ class CheckoutKillSwitchTest extends TestCase
             'code' => 'FREE100',
             'active' => true,
         ]);
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('createPaymentIntent');
         $strategy = new VolumeLicensingStrategy(
             app(VolumePresetService::class)->ensureDefaultPresetForBrand(Brand::B2B),
             app(CouponService::class),
         );
-        $service = new CheckoutService($strategy, $stripe);
 
-        $response = $service->processCheckout(
+        $response = (new CheckoutService($strategy))->processCheckout(
             $this->request($photo, $useCase, 'recent-free-cart-0001', false, 'FREE100'),
             $user,
-            'stripe',
+            'mollie',
         );
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertDatabaseHas('orders', [
-            'id' => $response->getData(true)['order_id'],
-            'status' => 'paid',
-            'stripe_payment_intent_id' => null,
-        ]);
+        $order = Order::query()->sole();
+        $this->assertSame('paid', $order->status);
+        $this->assertSame(0, $order->molliePaymentAttempts()->count());
     }
 
     public function test_invalid_switch_configuration_fails_closed(): void
     {
-        config(['app.stripe.checkout_enabled' => 'not-a-boolean']);
+        config(['checkout.enabled' => 'not-a-boolean']);
         Log::spy();
-        $switch = app(StripeCheckoutKillSwitch::class);
+        $switch = app(CheckoutKillSwitch::class);
 
         $this->assertFalse($switch->enabled());
         Log::shouldHaveReceived('error')
             ->once()
-            ->withArgs(fn (string $message, array $context): bool => str_contains($message, 'STRIPE_CHECKOUT_ENABLED')
+            ->withArgs(fn (string $message, array $context): bool => str_contains($message, 'CHECKOUT_ENABLED')
                 && ($context['configuration_type'] ?? null) === 'string');
     }
 
@@ -217,23 +211,23 @@ class CheckoutKillSwitchTest extends TestCase
         // coerce an unparseable value into a silent `false`: FILTER_NULL_ON_
         // FAILURE keeps `null` distinguishable, and the switch treats every
         // non-boolean as invalid.
-        putenv('STRIPE_CHECKOUT_ENABLED=flase');
-        $_ENV['STRIPE_CHECKOUT_ENABLED'] = 'flase';
-        $_SERVER['STRIPE_CHECKOUT_ENABLED'] = 'flase';
+        putenv('CHECKOUT_ENABLED=flase');
+        $_ENV['CHECKOUT_ENABLED'] = 'flase';
+        $_SERVER['CHECKOUT_ENABLED'] = 'flase';
 
         try {
-            $shipped = require base_path('config/app.php');
+            $shipped = require base_path('config/checkout.php');
 
-            $this->assertNull($shipped['stripe']['checkout_enabled']);
+            $this->assertNull($shipped['enabled']);
         } finally {
-            putenv('STRIPE_CHECKOUT_ENABLED');
-            unset($_ENV['STRIPE_CHECKOUT_ENABLED'], $_SERVER['STRIPE_CHECKOUT_ENABLED']);
+            putenv('CHECKOUT_ENABLED');
+            unset($_ENV['CHECKOUT_ENABLED'], $_SERVER['CHECKOUT_ENABLED']);
         }
 
-        config(['app.stripe.checkout_enabled' => null]);
+        config(['checkout.enabled' => null]);
         Log::spy();
 
-        $this->assertFalse(app(StripeCheckoutKillSwitch::class)->enabled());
+        $this->assertFalse(app(CheckoutKillSwitch::class)->enabled());
         Log::shouldHaveReceived('error')->once();
     }
 

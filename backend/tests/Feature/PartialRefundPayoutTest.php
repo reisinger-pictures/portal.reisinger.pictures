@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Resources\PhotographerStatementResource;
 use App\Models\Gallery;
 use App\Models\InvoiceSnapshot;
+use App\Models\MolliePaymentAttempt;
 use App\Models\Order;
 use App\Models\PayoutCorrection;
 use App\Models\PayoutOpenItem;
@@ -12,12 +13,12 @@ use App\Models\PayoutOrderBooking;
 use App\Models\Photo;
 use App\Models\PhotographerStatement;
 use App\Models\User;
+use App\Services\MollieCheckoutService;
 use App\Services\PayoutCalculationService;
-use App\Services\PurchaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -25,17 +26,21 @@ use Tests\TestCase;
  *
  * A partial refund does not change anything for the customer — the order stays
  * `paid` and keeps its download access — but it does change what the
- * photographer is paid. `orders.refunded_amount_cents` carries Stripe's
- * cumulative `amount_refunded`, and the payout calculation subtracts that
- * amount from the photo revenue in the same proportion as the revenue split.
- * A refund after statement close is carried as an explicit negative correction
- * into the next finalization after the originating period.
+ * photographer is paid. `orders.refunded_amount_cents` carries the cumulative
+ * refunded amount, and the payout calculation subtracts that amount from the
+ * photo revenue in the same proportion as the revenue split. A refund after
+ * statement close is carried as an explicit negative correction into the next
+ * finalization after the originating period.
+ *
+ * The provider ingestion is exercised through the Mollie ingress seam
+ * (`MollieCheckoutService::applyVerifiedPayment()`), which is the same path a
+ * verified Mollie webhook takes: it writes the cumulative
+ * `orders.refunded_amount_cents` and hands the newly observed amount to the
+ * payout side (`recordLateRefundCorrections`) in one transaction.
  */
 class PartialRefundPayoutTest extends TestCase
 {
     use RefreshDatabase;
-
-    private const WEBHOOK_SECRET = 'whsec_partial_refund_payout';
 
     private PayoutCalculationService $service;
 
@@ -43,7 +48,6 @@ class PartialRefundPayoutTest extends TestCase
     {
         parent::setUp();
         $this->service = new PayoutCalculationService;
-        Config::set('services.stripe.webhook_secret', self::WEBHOOK_SECRET);
         Cache::flush();
         Mail::fake();
     }
@@ -54,7 +58,6 @@ class PartialRefundPayoutTest extends TestCase
      * @return array{0: User, 1: Photo, 2: Order}
      */
     private function makePaidOrder(
-        string $paymentIntent,
         int $priceCents = 5000,
         string $createdAt = '2026-06-10 12:00:00',
     ): array {
@@ -67,9 +70,7 @@ class PartialRefundPayoutTest extends TestCase
 
         $order = Order::factory()->paid()->create([
             'status' => 'paid',
-            'stripe_fee_cents' => 0,
             'total_amount' => $priceCents,
-            'stripe_payment_intent_id' => $paymentIntent,
             'created_at' => $createdAt,
         ]);
 
@@ -86,7 +87,27 @@ class PartialRefundPayoutTest extends TestCase
             'tax_rate' => 0,
         ]);
 
+        $this->createPaidAttempt($order, $priceCents);
+
         return [$photographer, $photo, $order];
+    }
+
+    private function createPaidAttempt(Order $order, int $amountCents): MolliePaymentAttempt
+    {
+        return MolliePaymentAttempt::create([
+            'order_id' => (string) $order->id,
+            'generation' => 1,
+            'idempotency_key' => (string) Str::uuid(),
+            'mollie_payment_id' => 'tr_refund'.Str::lower(Str::random(10)),
+            'mode' => 'test',
+            'credential_fingerprint' => hash('sha256', 'mollie-key|test_'.str_repeat('a', 30)),
+            'amount_cents' => $amountCents,
+            'currency' => 'EUR',
+            'status' => MolliePaymentAttempt::STATUS_PAID,
+            'checkout_url' => 'https://www.mollie.com/checkout/select-method/tr_refund',
+            'snapshot' => ['gross_cents' => $amountCents, 'currency' => 'EUR'],
+            'paid_at' => now(),
+        ]);
     }
 
     private function approveJuneStatement(User $photographer): PhotographerStatement
@@ -114,85 +135,31 @@ class PartialRefundPayoutTest extends TestCase
     }
 
     /**
-     * @param  array<string, mixed>  $charge
+     * Deliver a verified refund observation through the real Mollie ingress
+     * seam. The cumulative provider amount is exactly what
+     * `MolliePaymentService::safePayment()` exposes as
+     * `amount_refunded_cents`; a full refund also transitions the order.
      */
-    private function postRefundEvent(array $charge, string $eventId): void
+    private function applyRefund(Order $order, int $cumulativeRefundCents): void
     {
-        $payloadData = [
-            'id' => $eventId,
-            'type' => 'charge.refunded',
-            'data' => ['object' => $charge],
-        ];
-        $payload = json_encode($payloadData);
-        $timestamp = time();
-        $signature = hash_hmac('sha256', "{$timestamp}.{$payload}", self::WEBHOOK_SECRET);
+        $attempt = MolliePaymentAttempt::query()
+            ->where('order_id', (string) $order->id)
+            ->sole();
 
-        $this->postJson('/api/webhooks/stripe', $payloadData, [
-            'Stripe-Signature' => "t={$timestamp},v1={$signature}",
-        ])->assertStatus(200);
-    }
-
-    public function test_partial_refund_is_stored_and_keeps_paid_status_and_download_access(): void
-    {
-        [, , $order] = $this->makePaidOrder('pi_partial_persisted', 5000);
-
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_partial_persisted',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 1500,
-        ], 'evt_partial_persisted');
-
-        $fresh = $order->fresh();
-        $this->assertSame(1500, $fresh->refunded_amount_cents);
-        $this->assertSame('paid', $fresh->status, 'A partial refund must not revoke the order status.');
-        $this->assertTrue(
-            app(PurchaseService::class)->isOrderDownloadEligible($fresh),
-            'A partial refund must not revoke download access.',
-        );
-    }
-
-    public function test_full_refund_is_stored_and_transitions_to_refunded(): void
-    {
-        [, , $order] = $this->makePaidOrder('pi_full_persisted', 5000);
-
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_full_persisted',
-            'refunded' => true,
-            'amount' => 5000,
-            'amount_refunded' => 5000,
-        ], 'evt_full_persisted');
-
-        $fresh = $order->fresh();
-        $this->assertSame(5000, $fresh->refunded_amount_cents);
-        $this->assertSame('refunded', $fresh->status);
-        $this->assertFalse(app(PurchaseService::class)->isOrderDownloadEligible($fresh));
-    }
-
-    public function test_replayed_older_event_does_not_lower_the_stored_refunded_amount(): void
-    {
-        [, , $order] = $this->makePaidOrder('pi_partial_replay', 5000);
-
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_partial_replay',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 1500,
-        ], 'evt_replay_newer');
-
-        $this->assertSame(1500, $order->fresh()->refunded_amount_cents);
-
-        // Stripe's amount_refunded is cumulative. An older/replayed event with
-        // a smaller running total must not undo the newer refund.
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_partial_replay',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 800,
-        ], 'evt_replay_older');
-
-        $this->assertSame(1500, $order->fresh()->refunded_amount_cents);
-        $this->assertSame('paid', $order->fresh()->status);
+        app(MollieCheckoutService::class)->applyVerifiedPayment($attempt, [
+            'id' => $attempt->mollie_payment_id,
+            'status' => 'paid',
+            'mode' => $attempt->mode,
+            'amount_cents' => (int) $attempt->amount_cents,
+            'currency' => 'EUR',
+            'amount_refunded_cents' => min($cumulativeRefundCents, (int) $order->total_amount),
+            'amount_charged_back_cents' => 0,
+            'metadata' => [
+                'order_id' => (string) $order->id,
+                'attempt_id' => (string) $attempt->id,
+                'generation' => (string) $attempt->generation,
+            ],
+        ]);
     }
 
     public function test_partial_refund_reduces_each_photographers_statement_in_revenue_proportion(): void
@@ -202,15 +169,16 @@ class PartialRefundPayoutTest extends TestCase
         $photoA = Photo::factory()->create(['user_id' => $photographerA->id]);
         $photoB = Photo::factory()->create(['user_id' => $photographerB->id]);
 
-        // Fixture arithmetic: two photo lines of 1000 and 2000 cents, an
-        // order-level fee of 0, and a 600-cent partial refund.
+        // Fixture arithmetic: two photo lines of 1000 and 2000 cents, a
+        // 3000-cent net snapshot, and a 600-cent partial refund.
         $lineA = 1000;
         $lineB = 2000;
         $refundCents = 600;
+        // The historical 4 % payment reserve of the 3000-cent net.
+        $reserveCents = 120;
 
         $order = Order::factory()->paid()->create([
             'status' => 'paid',
-            'stripe_fee_cents' => 0,
             'total_amount' => $lineA + $lineB,
             'refunded_amount_cents' => $refundCents,
             'created_at' => '2026-06-10 12:00:00',
@@ -232,11 +200,23 @@ class PartialRefundPayoutTest extends TestCase
         $this->service->calculatePowerUserDelta(6, 2026);
 
         // The 600 cents are borne in the revenue ratio 1000:2000, i.e. 200 on
-        // A and 400 on B; the photographer share is 50% of what remains.
+        // A and 400 on B, leaving 800 and 1600 cents of photo revenue. The
+        // reserve is prorated over that remainder in the same ratio (96 cents
+        // in total, 32 and 64 cents), so each photographer keeps 48 % of the
+        // remaining line revenue: 384 and 768 cents.
         $refundOnA = intdiv($refundCents * $lineA, $lineA + $lineB);
         $refundOnB = $refundCents - $refundOnA;
-        $expectedA = intdiv($lineA - $refundOnA, 2);
-        $expectedB = intdiv($lineB - $refundOnB, 2);
+        $remainingA = $lineA - $refundOnA;
+        $remainingB = $lineB - $refundOnB;
+        $remainingTotal = $remainingA + $remainingB;
+        $photoReserveCents = min(
+            $remainingTotal,
+            intdiv($reserveCents * $remainingTotal, $lineA + $lineB),
+        );
+        $reserveOnA = intdiv($photoReserveCents * $remainingA, $remainingTotal);
+        $reserveOnB = $photoReserveCents - $reserveOnA;
+        $expectedA = intdiv($remainingA - $reserveOnA, 2);
+        $expectedB = intdiv($remainingB - $reserveOnB, 2);
 
         $this->assertSame(
             $expectedA,
@@ -255,7 +235,6 @@ class PartialRefundPayoutTest extends TestCase
 
         $order = Order::factory()->paid()->create([
             'status' => 'paid',
-            'stripe_fee_cents' => 0,
             'total_amount' => 1000,
             'created_at' => '2026-06-10 12:00:00',
         ]);
@@ -275,9 +254,10 @@ class PartialRefundPayoutTest extends TestCase
         $this->service->calculatePowerUserDelta(6, 2026);
 
         // Regression guard: a paid order without a refund still pays exactly
-        // 50% of the full photo revenue (1000 → 500).
+        // 48% of the full photo revenue (4 % reserve on 1000 leaves 960, half
+        // of it is 480).
         $this->assertSame(
-            500,
+            480,
             PhotographerStatement::where('user_id', $photographer->id)->sole()->delta_surcharge_earnings_cents,
         );
         $this->assertSame(0, $order->fresh()->refunded_amount_cents);
@@ -285,19 +265,13 @@ class PartialRefundPayoutTest extends TestCase
 
     public function test_refund_above_order_total_is_clamped_and_never_creates_negative_revenue(): void
     {
-        [, , $order] = $this->makePaidOrder('pi_over_refund', 3000);
+        [, , $order] = $this->makePaidOrder(3000);
 
-        // A partial refund whose running total exceeds the recorded order
-        // total: the stored value is clamped to total_amount.
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_over_refund',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 9000,
-        ], 'evt_over_refund');
+        // A cumulative refund above the recorded order total is clamped to
+        // total_amount.
+        $this->applyRefund($order, 9000);
 
         $this->assertSame(3000, $order->fresh()->refunded_amount_cents);
-        $this->assertSame('paid', $order->fresh()->status);
 
         $this->service->calculatePowerUserDelta(6, 2026);
 
@@ -309,21 +283,16 @@ class PartialRefundPayoutTest extends TestCase
 
     public function test_partial_refund_cannot_be_booked_into_an_already_approved_statement(): void
     {
-        [$photographer, , $order] = $this->makePaidOrder('pi_late_partial');
+        [$photographer, , $order] = $this->makePaidOrder();
         $statement = $this->approveJuneStatement($photographer);
         $bookedTotal = $statement->total_payable_cents;
 
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_late_partial',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 1500,
-        ], 'evt_late_partial');
+        $this->applyRefund($order, 1500);
 
         $correction = PayoutCorrection::query()->sole();
         $this->assertSame((string) $order->id, (string) $correction->order_id);
         $this->assertSame((string) $photographer->id, (string) $correction->user_id);
-        $this->assertSame(-750, $correction->amount_cents);
+        $this->assertSame(-720, $correction->amount_cents);
         $this->assertSame(6, $correction->closed_month);
         $this->assertSame(2026, $correction->closed_year);
         $this->assertNull($correction->settled_month);
@@ -332,7 +301,7 @@ class PartialRefundPayoutTest extends TestCase
         $refundItem = PayoutOpenItem::query()->sole();
         $this->assertSame('refund', $refundItem->source_type);
         $this->assertSame((string) $correction->id, (string) $refundItem->source_id);
-        $this->assertSame(-750, $refundItem->amount_cents);
+        $this->assertSame(-720, $refundItem->amount_cents);
         $this->assertSame(6, $refundItem->origin_month);
         $this->assertSame(2026, $refundItem->origin_year);
         $this->assertNull($refundItem->settled_at);
@@ -347,8 +316,8 @@ class PartialRefundPayoutTest extends TestCase
             ->where('month', 7)
             ->where('year', 2026)
             ->sole();
-        $this->assertSame(-750, $nextStatement->earned_amount_cents);
-        $this->assertSame(-750, $nextStatement->total_payable_cents);
+        $this->assertSame(-720, $nextStatement->earned_amount_cents);
+        $this->assertSame(-720, $nextStatement->total_payable_cents);
         $this->assertSame(7, $correction->fresh()->settled_month);
         $this->assertSame(2026, $correction->fresh()->settled_year);
         $this->assertNotNull($correction->fresh()->settled_at);
@@ -358,7 +327,7 @@ class PartialRefundPayoutTest extends TestCase
 
         $resource = (new PhotographerStatementResource($nextStatement))->resolve(request());
         $this->assertSame(1, count($resource['corrections']));
-        $this->assertSame(-750, $resource['corrections'][0]['amount_cents']);
+        $this->assertSame(-720, $resource['corrections'][0]['amount_cents']);
         $this->assertSame(6, $resource['corrections'][0]['closed_month']);
         $this->assertSame(7, $resource['corrections'][0]['settled_month']);
         $this->assertSame(2026, $resource['corrections'][0]['settled_year']);
@@ -368,16 +337,11 @@ class PartialRefundPayoutTest extends TestCase
 
     public function test_late_full_refund_reverses_the_share_booked_in_the_closed_month(): void
     {
-        [$photographer, , $order] = $this->makePaidOrder('pi_late_full');
+        [$photographer, , $order] = $this->makePaidOrder();
         $statement = $this->approveJuneStatement($photographer);
         $bookedShare = $statement->delta_surcharge_earnings_cents;
 
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_late_full',
-            'refunded' => true,
-            'amount' => 5000,
-            'amount_refunded' => 5000,
-        ], 'evt_late_full');
+        $this->applyRefund($order, 5000);
 
         $this->assertSame('refunded', $order->fresh()->status);
         $this->assertSame(-$bookedShare, PayoutCorrection::query()->sole()->amount_cents);
@@ -395,18 +359,13 @@ class PartialRefundPayoutTest extends TestCase
 
     public function test_late_full_refund_uses_the_booked_share_after_the_photo_is_deleted(): void
     {
-        [$photographer, $photo, $order] = $this->makePaidOrder('pi_late_full_deleted_photo');
+        [$photographer, $photo, $order] = $this->makePaidOrder();
         $statement = $this->approveJuneStatement($photographer);
         $bookedShare = $statement->delta_surcharge_earnings_cents;
 
         $photo->delete();
 
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_late_full_deleted_photo',
-            'refunded' => true,
-            'amount' => 5000,
-            'amount_refunded' => 5000,
-        ], 'evt_late_full_deleted_photo');
+        $this->applyRefund($order, 5000);
 
         $this->assertDatabaseHas('payout_corrections', [
             'order_id' => $order->id,
@@ -417,65 +376,46 @@ class PartialRefundPayoutTest extends TestCase
 
     public function test_late_partial_refund_uses_the_booking_basis_and_caps_at_the_booked_share(): void
     {
-        [$photographer, $photo, $order] = $this->makePaidOrder('pi_late_partial_booking');
+        [$photographer, $photo, $order] = $this->makePaidOrder();
         $statement = $this->approveJuneStatement($photographer);
         $bookedShare = $statement->delta_surcharge_earnings_cents;
         $photo->delete();
 
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_late_partial_booking',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 1500,
-        ], 'evt_late_partial_booking_1500');
+        $this->applyRefund($order, 1500);
 
         $firstCorrection = PayoutCorrection::query()->sole();
-        $this->assertSame(-750, $firstCorrection->amount_cents);
+        $this->assertSame(-720, $firstCorrection->amount_cents);
 
-        // This is still delivered as a partial-refund event, but its cumulative
-        // amount exceeds the charge and is clamped to the full booked share.
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_late_partial_booking',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 9000,
-        ], 'evt_late_partial_booking_over_total');
+        // The provider reports a cumulative refund above the charge; it is
+        // clamped to the charged amount, so this is a full reversal: the
+        // corrections cap at the booked share and the order turns `refunded`.
+        $this->applyRefund($order, 9000);
 
         $this->assertSame(2, PayoutCorrection::query()->count());
         $this->assertSame(-$bookedShare, (int) PayoutCorrection::query()->sum('amount_cents'));
         $this->assertSame(-$bookedShare, (int) PayoutOpenItem::query()->where('source_type', 'refund')->sum('amount_cents'));
-        $this->assertSame('paid', $order->fresh()->status);
+        $this->assertSame('refunded', $order->fresh()->status);
     }
 
     public function test_late_full_refund_after_a_partial_one_reverses_only_the_remaining_booked_share(): void
     {
-        [$photographer] = $this->makePaidOrder('pi_late_partial_then_full');
+        [$photographer, , $order] = $this->makePaidOrder();
         $statement = $this->approveJuneStatement($photographer);
         $bookedShare = $statement->delta_surcharge_earnings_cents;
 
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_late_partial_then_full',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 1500,
-        ], 'evt_late_partial_then_full_partial');
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_late_partial_then_full',
-            'refunded' => true,
-            'amount' => 5000,
-            'amount_refunded' => 5000,
-        ], 'evt_late_partial_then_full_full');
+        $this->applyRefund($order, 1500);
+        $this->applyRefund($order, 5000);
 
         $corrections = PayoutCorrection::query()->orderBy('refund_amount_cents')->get();
         $this->assertCount(2, $corrections);
-        $this->assertSame(-750, $corrections[0]->amount_cents);
-        $this->assertSame(-($bookedShare - 750), $corrections[1]->amount_cents);
+        $this->assertSame(-720, $corrections[0]->amount_cents);
+        $this->assertSame(-($bookedShare - 720), $corrections[1]->amount_cents);
         $this->assertSame(-$bookedShare, (int) $corrections->sum('amount_cents'));
     }
 
     public function test_month_recalculation_upserts_bookings_idempotently_and_replaces_changed_values(): void
     {
-        [$photographer, , $order] = $this->makePaidOrder('pi_booking_recalculation', 4000);
+        [$photographer, , $order] = $this->makePaidOrder(4000);
 
         $this->service->calculatePowerUserDelta(6, 2026);
         $booking = PayoutOrderBooking::query()->sole();
@@ -492,7 +432,8 @@ class PartialRefundPayoutTest extends TestCase
         ]);
         $this->assertSame((string) $order->id, (string) $booking->order_id);
         $this->assertSame((string) $photographer->id, (string) $booking->user_id);
-        $this->assertSame(2000, $booking->share_cents);
+        // 4000 cents minus the 4 % reserve (160) leaves 3840, half is 1920.
+        $this->assertSame(1920, $booking->share_cents);
         $this->assertSame(4000, $booking->photo_revenue_cents);
         $this->assertSame(0, $booking->refunded_cents);
         $this->assertNotNull($booking->statement_id);
@@ -514,14 +455,15 @@ class PartialRefundPayoutTest extends TestCase
 
         $updatedBooking = PayoutOrderBooking::query()->sole();
         $this->assertSame((string) $booking->id, (string) $updatedBooking->id);
-        $this->assertSame(1500, $updatedBooking->share_cents);
+        // 3000 cents minus the 4 % reserve (120) leaves 2880, half is 1440.
+        $this->assertSame(1440, $updatedBooking->share_cents);
         $this->assertSame(3000, $updatedBooking->photo_revenue_cents);
         $this->assertSame(1, PayoutOrderBooking::query()->count());
     }
 
     public function test_locked_statement_booking_is_not_changed_by_month_recalculation(): void
     {
-        [$photographer, $photo, $order] = $this->makePaidOrder('pi_locked_booking');
+        [$photographer, $photo, $order] = $this->makePaidOrder();
         $statement = $this->approveJuneStatement($photographer);
         $booking = PayoutOrderBooking::query()->sole();
         $originalBooking = $booking->only([
@@ -548,7 +490,7 @@ class PartialRefundPayoutTest extends TestCase
 
     public function test_pre_v052_order_without_a_booking_uses_current_photo_recomputation(): void
     {
-        [$photographer, $photo, $order] = $this->makePaidOrder('pi_legacy_without_booking');
+        [$photographer, $photo, $order] = $this->makePaidOrder();
         $this->approveJuneStatement($photographer);
 
         // Removing the row models a statement booked before V052. Its stored
@@ -556,12 +498,7 @@ class PartialRefundPayoutTest extends TestCase
         PayoutOrderBooking::query()->where('order_id', $order->id)->delete();
         $photo->delete();
 
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_legacy_without_booking',
-            'refunded' => true,
-            'amount' => 5000,
-            'amount_refunded' => 5000,
-        ], 'evt_legacy_without_booking');
+        $this->applyRefund($order, 5000);
 
         $this->assertSame(0, PayoutCorrection::query()->count());
         $this->assertSame(0, PayoutOpenItem::query()->where('source_type', 'refund')->count());
@@ -569,22 +506,17 @@ class PartialRefundPayoutTest extends TestCase
 
     public function test_negative_correction_carries_across_a_missing_statement_month(): void
     {
-        [$photographer] = $this->makePaidOrder('pi_late_gap_missing');
+        [$photographer, , $order] = $this->makePaidOrder();
         $this->approveJuneStatement($photographer);
 
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_late_gap_missing',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 1500,
-        ], 'evt_late_gap_missing');
+        $this->applyRefund($order, 1500);
         $this->service->finalizeStatements(7, 2026);
         $julyCarry = PayoutOpenItem::query()
             ->where('source_type', 'carry')
             ->where('origin_month', 7)
             ->where('origin_year', 2026)
             ->sole();
-        $this->assertSame(-750, $julyCarry->amount_cents);
+        $this->assertSame(-720, $julyCarry->amount_cents);
         $this->assertNull($julyCarry->settled_at);
 
         $this->assertDatabaseMissing('photographer_statements', [
@@ -608,10 +540,10 @@ class PartialRefundPayoutTest extends TestCase
             ->where('month', 9)
             ->where('year', 2026)
             ->sole();
-        $this->assertSame(-750, $september->rolled_over_amount_cents);
-        $this->assertSame(-750, $september->total_payable_cents);
+        $this->assertSame(-720, $september->rolled_over_amount_cents);
+        $this->assertSame(-720, $september->total_payable_cents);
         $this->assertSame(9, $julyCarry->fresh()->settled_month);
-        $this->assertSame(-750, PayoutOpenItem::query()
+        $this->assertSame(-720, PayoutOpenItem::query()
             ->where('source_type', 'carry')
             ->where('origin_month', 9)
             ->where('origin_year', 2026)
@@ -621,22 +553,17 @@ class PartialRefundPayoutTest extends TestCase
 
     public function test_zero_balance_after_negative_correction_stops_the_older_rollover(): void
     {
-        [$photographer] = $this->makePaidOrder('pi_late_gap_zero');
+        [$photographer, , $order] = $this->makePaidOrder();
         $this->approveJuneStatement($photographer);
 
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_late_gap_zero',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 1500,
-        ], 'evt_late_gap_zero');
+        $this->applyRefund($order, 1500);
         $this->service->finalizeStatements(7, 2026);
 
         PhotographerStatement::query()->create([
             'user_id' => $photographer->id,
             'month' => 8,
             'year' => 2026,
-            'pool_earnings_cents' => 750,
+            'pool_earnings_cents' => 720,
             'delta_surcharge_earnings_cents' => 0,
         ]);
         $this->service->finalizeStatements(8, 2026);
@@ -646,7 +573,7 @@ class PartialRefundPayoutTest extends TestCase
             ->where('month', 8)
             ->where('year', 2026)
             ->sole();
-        $this->assertSame(-750, $august->rolled_over_amount_cents);
+        $this->assertSame(-720, $august->rolled_over_amount_cents);
         $this->assertSame(0, $august->total_payable_cents);
         $this->assertDatabaseMissing('payout_open_items', [
             'user_id' => $photographer->id,
@@ -683,7 +610,7 @@ class PartialRefundPayoutTest extends TestCase
 
     public function test_zero_balance_after_positive_rollover_stops_the_older_rollover(): void
     {
-        [$photographer, , $order] = $this->makePaidOrder('pi_positive_rollover_zero');
+        [$photographer, , $order] = $this->makePaidOrder();
         PhotographerStatement::query()->create([
             'user_id' => $photographer->id,
             'month' => 6,
@@ -694,7 +621,7 @@ class PartialRefundPayoutTest extends TestCase
             'user_id' => $photographer->id,
             'month' => 7,
             'year' => 2026,
-            'pool_earnings_cents' => 750,
+            'pool_earnings_cents' => 720,
             'delta_surcharge_earnings_cents' => 0,
         ]);
         $this->service->finalizeStatements(7, 2026);
@@ -703,7 +630,7 @@ class PartialRefundPayoutTest extends TestCase
             'order_id' => $order->id,
             'user_id' => $photographer->id,
             'refund_amount_cents' => 1500,
-            'amount_cents' => -750,
+            'amount_cents' => -720,
             'closed_month' => 6,
             'closed_year' => 2026,
         ]);
@@ -714,7 +641,7 @@ class PartialRefundPayoutTest extends TestCase
             'order_id' => $order->id,
             'origin_month' => 6,
             'origin_year' => 2026,
-            'amount_cents' => -750,
+            'amount_cents' => -720,
         ]);
         PhotographerStatement::query()->create([
             'user_id' => $photographer->id,
@@ -730,7 +657,7 @@ class PartialRefundPayoutTest extends TestCase
             ->where('month', 8)
             ->where('year', 2026)
             ->sole();
-        $this->assertSame(750, $august->rolled_over_amount_cents);
+        $this->assertSame(720, $august->rolled_over_amount_cents);
         $this->assertSame(0, $august->total_payable_cents);
 
         PhotographerStatement::query()->create([
@@ -751,25 +678,19 @@ class PartialRefundPayoutTest extends TestCase
         $this->assertSame(0, $september->total_payable_cents);
     }
 
-    public function test_replayed_webhook_and_recalculation_book_a_correction_once(): void
+    public function test_replayed_refund_and_recalculation_book_a_correction_once(): void
     {
-        [$photographer] = $this->makePaidOrder('pi_late_replay');
+        [$photographer, , $order] = $this->makePaidOrder();
         $this->approveJuneStatement($photographer);
-        $charge = [
-            'payment_intent' => 'pi_late_replay',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 1500,
-        ];
 
-        $this->postRefundEvent($charge, 'evt_late_replay');
-        $this->postRefundEvent($charge, 'evt_late_replay');
+        $this->applyRefund($order, 1500);
+        $this->applyRefund($order, 1500);
         $this->assertSame(1, PayoutCorrection::query()->count());
         $this->assertSame(1, PayoutOpenItem::query()->where('source_type', 'refund')->count());
 
         $this->service->finalizeStatements(7, 2026);
         $this->service->finalizeStatements(7, 2026);
-        $this->assertSame(-750, PhotographerStatement::query()
+        $this->assertSame(-720, PhotographerStatement::query()
             ->where('user_id', $photographer->id)
             ->where('month', 7)
             ->where('year', 2026)
@@ -787,7 +708,7 @@ class PartialRefundPayoutTest extends TestCase
         $this->service->calculatePowerUserDelta(7, 2026);
         $this->service->finalizeStatements(7, 2026);
 
-        $this->assertSame(-750, PhotographerStatement::query()
+        $this->assertSame(-720, PhotographerStatement::query()
             ->where('user_id', $photographer->id)
             ->where('month', 7)
             ->where('year', 2026)
@@ -802,7 +723,7 @@ class PartialRefundPayoutTest extends TestCase
 
     public function test_late_correction_never_mutates_an_approved_statement(): void
     {
-        [$photographer] = $this->makePaidOrder('pi_immutable_approved');
+        [$photographer, , $order] = $this->makePaidOrder();
         $statement = $this->approveJuneStatement($photographer);
         $original = $statement->only([
             'status',
@@ -813,12 +734,7 @@ class PartialRefundPayoutTest extends TestCase
             'total_payable_cents',
         ]);
 
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_immutable_approved',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 1500,
-        ], 'evt_immutable_approved');
+        $this->applyRefund($order, 1500);
         $this->service->calculatePowerUserDelta(6, 2026);
         $this->service->finalizeStatements(6, 2026);
 
@@ -829,7 +745,7 @@ class PartialRefundPayoutTest extends TestCase
 
     public function test_correction_created_after_next_month_finalized_is_claimed_by_following_finalize(): void
     {
-        [$photographer] = $this->makePaidOrder('pi_correction_waits');
+        [$photographer, , $order] = $this->makePaidOrder();
         $this->approveJuneStatement($photographer);
 
         $otherPhotographer = User::factory()->create();
@@ -842,12 +758,7 @@ class PartialRefundPayoutTest extends TestCase
         ]);
         $this->service->finalizeStatements(7, 2026);
 
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_correction_waits',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 1500,
-        ], 'evt_correction_waits');
+        $this->applyRefund($order, 1500);
 
         $correction = PayoutCorrection::query()->sole();
         $this->assertNull($correction->settled_at);
@@ -866,28 +777,23 @@ class PartialRefundPayoutTest extends TestCase
             ->where('month', 8)
             ->where('year', 2026)
             ->sole();
-        $this->assertSame(-750, $august->earned_amount_cents);
-        $this->assertSame(-750, $august->total_payable_cents);
+        $this->assertSame(-720, $august->earned_amount_cents);
+        $this->assertSame(-720, $august->total_payable_cents);
         $this->assertSame(8, $correction->fresh()->settled_month);
         $this->assertSame(2026, $correction->fresh()->settled_year);
         $this->assertNotNull($correction->fresh()->settled_at);
 
         $this->service->finalizeStatements(8, 2026);
-        $this->assertSame(-750, $august->fresh()->earned_amount_cents);
-        $this->assertSame(-750, $august->fresh()->total_payable_cents);
+        $this->assertSame(-720, $august->fresh()->earned_amount_cents);
+        $this->assertSame(-720, $august->fresh()->total_payable_cents);
         $this->assertSame(1, PayoutCorrection::query()->count());
     }
 
     public function test_correction_skips_approved_statement_and_is_claimed_in_the_following_period(): void
     {
-        [$photographer] = $this->makePaidOrder('pi_correction_approved_month');
+        [$photographer, , $order] = $this->makePaidOrder();
         $this->approveJuneStatement($photographer);
-        $this->postRefundEvent([
-            'payment_intent' => 'pi_correction_approved_month',
-            'refunded' => false,
-            'amount' => 5000,
-            'amount_refunded' => 1500,
-        ], 'evt_correction_approved_month');
+        $this->applyRefund($order, 1500);
 
         $approvedJuly = PhotographerStatement::query()->create([
             'user_id' => $photographer->id,
@@ -928,8 +834,8 @@ class PartialRefundPayoutTest extends TestCase
             ->where('month', 8)
             ->where('year', 2026)
             ->sole();
-        $this->assertSame(-750, $august->earned_amount_cents);
-        $this->assertSame(-750, $august->total_payable_cents);
+        $this->assertSame(-720, $august->earned_amount_cents);
+        $this->assertSame(-720, $august->total_payable_cents);
         $this->assertSame(8, $correction->fresh()->settled_month);
         $this->assertSame(2026, $correction->fresh()->settled_year);
         $this->assertNotNull($correction->fresh()->settled_at);

@@ -131,18 +131,6 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
-    'stripe' => [
-        // FILTER_NULL_ON_FAILURE keeps an unparseable value distinguishable from
-        // a deliberate `false`: `STRIPE_CHECKOUT_ENABLED=flase` must not be
-        // coerced into `false` without a trace. The kill switch treats every
-        // non-boolean as invalid, fails closed and logs it
-        // (StripeCheckoutKillSwitch::enabled()).
-        'checkout_enabled' => filter_var(env('STRIPE_CHECKOUT_ENABLED', true), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE),
-        'customers_enabled' => filter_var(env('STRIPE_CUSTOMERS_ENABLED', true), FILTER_VALIDATE_BOOL),
-        'stale_payment_intent_hours' => max(1, (int) env('STRIPE_STALE_PAYMENT_INTENT_HOURS', 2)),
-        'checkout_new_account_hours' => max(0, (int) env('STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS', 24)),
-    ],
-
     'throttle_auth' => env('AUTH_THROTTLE_LIMIT', 5),
     'throttle_api' => (int) env('API_THROTTLE_LIMIT', 120),
     'throttle_model_registration' => (int) env('MODEL_REGISTRATION_THROTTLE_LIMIT', 10),

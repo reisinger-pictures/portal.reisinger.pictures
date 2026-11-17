@@ -6,7 +6,6 @@ use App\Enums\Brand;
 use App\Mail\ModelProfileReminderMail;
 use App\Models\ModelAccessToken;
 use App\Models\ModelProfile;
-use App\Services\DisputeMailDispatcher;
 use App\Services\InvoiceMailDispatcher;
 use App\Services\ModelFileStore;
 use App\Services\ModelProfileEraser;
@@ -42,7 +41,7 @@ use RuntimeException;
  * Ausdrücklich **keine** Exactly-once-Zusage für SMTP: ein Worker darf nach
  * einem Transportfehler erneut zustellen. Garantiert ist hier nur, dass
  * *eingereiht* wird — und zwar höchstens einmal. Das Muster ist dasselbe wie in
- * `InvoiceMailDispatcher::queueOnce()` und `DisputeMailDispatcher::queueOnce()`,
+ * `InvoiceMailDispatcher::queueOnce()`,
  * samt derselben Queue-Voraussetzung (siehe
  * {@see ProcessModelLifecycle::assertTransactionalQueueIsUsable()}).
  */
@@ -195,8 +194,7 @@ class ProcessModelLifecycle extends Command
      * `sync` driver or a separate queue connection would let a rolled-back
      * attempt still deliver the mail and a retry deliver a second one — exactly
      * the duplicate this class now prevents. This mirrors
-     * {@see InvoiceMailDispatcher::queueOnce()} and
-     * {@see DisputeMailDispatcher::queueOnce()}: enforced in every
+     * {@see InvoiceMailDispatcher::queueOnce()}: enforced in every
      * non-local environment, not only in production. Local/test keep the inline
      * driver for developer ergonomics.
      *

@@ -57,7 +57,7 @@ class CheckoutRiskTurnstileTest extends TestCase
             Cache::flush();
             Http::fake();
 
-            app(CheckoutRiskService::class)->assertImmediateStripeAllowed($request, $user);
+            app(CheckoutRiskService::class)->assertImmediateCheckoutAllowed($request, $user);
             Http::assertNothingSent();
         }
 
@@ -75,8 +75,8 @@ class CheckoutRiskTurnstileTest extends TestCase
         $service = app(CheckoutRiskService::class);
         Http::fake();
 
-        $service->assertImmediateStripeAllowed($this->makeRequest(), $user);
-        $service->assertImmediateStripeAllowed($this->makeRequest(), $user);
+        $service->assertImmediateCheckoutAllowed($this->makeRequest(), $user);
+        $service->assertImmediateCheckoutAllowed($this->makeRequest(), $user);
 
         Http::assertNothingSent();
     }
@@ -87,7 +87,7 @@ class CheckoutRiskTurnstileTest extends TestCase
         $user = User::factory()->create();
 
         $this->assertDenied(
-            fn () => app(CheckoutRiskService::class)->assertImmediateStripeAllowed($this->makeRequest(), $user),
+            fn () => app(CheckoutRiskService::class)->assertImmediateCheckoutAllowed($this->makeRequest(), $user),
             403,
             ['turnstile_required' => true]
         );
@@ -102,7 +102,7 @@ class CheckoutRiskTurnstileTest extends TestCase
             '*siteverify' => Http::response($this->validVerification($user)),
         ]);
 
-        app(CheckoutRiskService::class)->assertImmediateStripeAllowed(
+        app(CheckoutRiskService::class)->assertImmediateCheckoutAllowed(
             $this->makeRequest($token, '198.51.100.20'),
             $user
         );
@@ -129,7 +129,7 @@ class CheckoutRiskTurnstileTest extends TestCase
         Log::spy();
 
         $this->assertDenied(
-            fn () => app(CheckoutRiskService::class)->assertImmediateStripeAllowed(
+            fn () => app(CheckoutRiskService::class)->assertImmediateCheckoutAllowed(
                 $this->makeRequest('invalid-token'),
                 $user
             ),
@@ -166,7 +166,7 @@ class CheckoutRiskTurnstileTest extends TestCase
         Log::spy();
 
         $this->assertDenied(
-            fn () => app(CheckoutRiskService::class)->assertImmediateStripeAllowed(
+            fn () => app(CheckoutRiskService::class)->assertImmediateCheckoutAllowed(
                 $this->makeRequest('invalid-token'),
                 $user
             ),
@@ -186,7 +186,7 @@ class CheckoutRiskTurnstileTest extends TestCase
         ]);
 
         $this->assertUnavailable(
-            fn () => app(CheckoutRiskService::class)->assertImmediateStripeAllowed(
+            fn () => app(CheckoutRiskService::class)->assertImmediateCheckoutAllowed(
                 $this->makeRequest('token'),
                 $user
             )
@@ -204,11 +204,11 @@ class CheckoutRiskTurnstileTest extends TestCase
         $service = app(CheckoutRiskService::class);
         Http::fake();
 
-        $service->assertImmediateStripeAllowed($this->makeRequest(), $user);
-        $service->assertImmediateStripeAllowed($this->makeRequest(), $user);
+        $service->assertImmediateCheckoutAllowed($this->makeRequest(), $user);
+        $service->assertImmediateCheckoutAllowed($this->makeRequest(), $user);
 
         $this->assertDenied(
-            fn () => $service->assertImmediateStripeAllowed($this->makeRequest(), $user),
+            fn () => $service->assertImmediateCheckoutAllowed($this->makeRequest(), $user),
             403
         );
     }
@@ -228,11 +228,11 @@ class CheckoutRiskTurnstileTest extends TestCase
         $thirdUser = User::factory()->create();
         $ip = '198.51.100.30';
 
-        $service->assertImmediateStripeAllowed($this->makeRequest(null, $ip), $firstUser);
-        $service->assertImmediateStripeAllowed($this->makeRequest(null, $ip), $secondUser);
+        $service->assertImmediateCheckoutAllowed($this->makeRequest(null, $ip), $firstUser);
+        $service->assertImmediateCheckoutAllowed($this->makeRequest(null, $ip), $secondUser);
 
         $this->assertDenied(
-            fn () => $service->assertImmediateStripeAllowed($this->makeRequest(null, $ip), $thirdUser),
+            fn () => $service->assertImmediateCheckoutAllowed($this->makeRequest(null, $ip), $thirdUser),
             403
         );
     }
@@ -259,7 +259,7 @@ class CheckoutRiskTurnstileTest extends TestCase
         $service->recordVerifiedPaymentFailure($order);
 
         $this->assertDenied(
-            fn () => $service->assertImmediateStripeAllowed($this->makeRequest(null, '198.51.100.31'), $user),
+            fn () => $service->assertImmediateCheckoutAllowed($this->makeRequest(null, '198.51.100.31'), $user),
             403,
             ['turnstile_required' => true]
         );
@@ -280,7 +280,7 @@ class CheckoutRiskTurnstileTest extends TestCase
             ])),
         ]);
 
-        app(CheckoutRiskService::class)->assertImmediateStripeAllowed(
+        app(CheckoutRiskService::class)->assertImmediateCheckoutAllowed(
             $this->makeRequest('token'),
             $user
         );

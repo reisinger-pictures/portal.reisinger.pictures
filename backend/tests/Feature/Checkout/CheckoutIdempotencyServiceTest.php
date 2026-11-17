@@ -7,7 +7,7 @@ use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\CheckoutIdempotencyService;
-use App\Services\StripePaymentService;
+use App\Support\BrandRegistry;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -15,9 +15,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Stripe\HttpClient\CurlClient;
 use Tests\TestCase;
 
+/**
+ * The identity layer is provider-independent: it owns the browser key, the
+ * canonical fingerprint, the persisted amount and the identity locks. Provider
+ * state (the Mollie attempt ledger) is resolved by the provider service, not
+ * here.
+ */
 class CheckoutIdempotencyServiceTest extends TestCase
 {
     use RefreshDatabase;
@@ -29,74 +34,89 @@ class CheckoutIdempotencyServiceTest extends TestCase
         config(['app.checkout_idempotency_ttl_minutes' => 30]);
     }
 
-    public function test_same_key_and_payload_reuses_pending_payment_intent(): void
+    protected function tearDown(): void
     {
-        $user = User::factory()->create();
-        $order = $this->pendingOrder($user, 'checkout-key-0001', str_repeat('a', 64));
-        InvoiceSnapshot::factory()->for($order)->create();
-
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->with('pi_pending')
-            ->willReturn($this->intent('pi_pending', $order));
-        $stripe->expects($this->never())->method('cancelPaymentIntent');
-
-        $service = new CheckoutIdempotencyService($stripe);
-        $response = $service->execute(
-            $user,
-            'checkout-key-0001',
-            str_repeat('a', 64),
-            4000,
-            fn () => $this->fail('Creator must not run for a reusable pending PaymentIntent.'),
-        );
-
-        $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('pi_pending_secret', $response->getData(true)['client_secret']);
-        $this->assertSame($order->id, $response->getData(true)['order_id']);
+        BrandRegistry::reset();
+        parent::tearDown();
     }
 
-    public function test_null_brand_positive_payment_intent_claim_fails_closed(): void
+    public function test_null_brand_positive_claim_fails_closed(): void
     {
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $request = Request::create('/', 'POST', [
             'items' => [['photoId' => 'null-brand-photo']],
             'billing_name' => 'Tester',
         ]);
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('retrievePaymentIntent');
-        $service = new CheckoutIdempotencyService($stripe);
-        $identity = $service->identify($request, $user, 4000, 'stripe');
+        $service = new CheckoutIdempotencyService;
+        $identity = $service->identify($request, $user, 4000, 'mollie');
         $order = Order::factory()->create([
             'user_id' => $user->id,
             'brand' => null,
             'status' => 'pending_payment',
             'total_amount' => 4000,
-            'stripe_payment_intent_id' => 'pi_null_brand',
             'checkout_idempotency_key' => $identity['key'],
             'checkout_fingerprint' => $identity['fingerprint'],
         ]);
         InvoiceSnapshot::factory()->for($order)->create();
 
-        $this->assertNull($service->findPositiveStripeOrderByKey($user, $identity['key']));
-        $this->assertNull($service->findPositiveStripeOrderByFingerprint($user, $request, 'stripe'));
+        $this->assertNull($service->findPositiveOnlineOrderByKey($user, $identity['key'], 'mollie'));
+        $this->assertNull($service->findPositiveOnlineOrderByFingerprint($user, $request, 'mollie'));
 
-        $response = $service->replay(
+        $response = $service->executeOnline(
             $user,
             $identity['key'],
             $identity['fingerprint'],
             4000,
+            'mollie',
+            fn () => $this->fail('A null-brand claim must never be resumed.'),
         );
 
-        $this->assertNotNull($response);
         $this->assertSame(409, $response->getStatusCode());
-        $this->assertSame('pi_null_brand', $order->fresh()->stripe_payment_intent_id);
         $this->assertSame('pending_payment', $order->fresh()->status);
+        $this->assertSame($identity['key'], $order->fresh()->checkout_idempotency_key);
     }
 
-    public function test_identity_lock_lease_covers_the_full_stripe_timeout_budget(): void
+    public function test_a_legacy_foreign_provider_order_is_not_recognised_as_a_mollie_claim(): void
     {
-        $user = User::factory()->create();
+        BrandRegistry::set(Brand::B2B);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $request = Request::create('/', 'POST', [
+            'items' => [['photoId' => 'legacy-foreign-photo']],
+            'billing_name' => 'Tester',
+        ]);
+        $service = new CheckoutIdempotencyService;
+        $identity = $service->identify($request, $user, 4000, 'mollie');
+
+        // A historical pending order of the removed provider: the surviving
+        // marker column is the only thing that distinguishes it from a Mollie
+        // claim, and it must never be adopted by a new Mollie attempt.
+        $legacy = $this->pendingOrder($user, $identity['key'], $identity['fingerprint']);
+        $legacy->forceFill(['stripe_payment_intent_id' => 'pi_old'])->save();
+
+        $this->assertNull($service->findPositiveOnlineOrderByKey($user, $identity['key'], 'mollie'));
+        $this->assertNull($service->findPositiveOnlineOrderByFingerprint($user, $request, 'mollie'));
+
+        // Control: an otherwise identical row without the legacy marker is a
+        // Mollie claim.
+        $mollieOrder = $this->pendingOrder($user, 'mollie-current-key-0001', str_repeat('d', 64));
+
+        $this->assertSame(
+            $mollieOrder->id,
+            $service->findPositiveOnlineOrderByKey($user, 'mollie-current-key-0001', 'mollie')?->id,
+        );
+
+        // The invoice scope is the mirror image: a row without a Mollie attempt
+        // remains claimable as a non-immediate order.
+        $this->assertSame(
+            $legacy->id,
+            $service->findPositiveOnlineOrderByKey($user, $identity['key'], 'invoice')?->id,
+        );
+    }
+
+    public function test_identity_lock_lease_covers_the_full_provider_timeout_budget(): void
+    {
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $lockTtls = [];
         $lock = $this->createMock(Lock::class);
         $lock->expects($this->exactly(2))
@@ -111,18 +131,20 @@ class CheckoutIdempotencyServiceTest extends TestCase
                 return $lock;
             });
 
-        $service = new CheckoutIdempotencyService($this->createMock(StripePaymentService::class));
-        $response = $service->execute(
+        $service = new CheckoutIdempotencyService;
+        $response = $service->executeOnline(
             $user,
             'checkout-lock-timeout-budget-0001',
             str_repeat('a', 64),
             4000,
+            'mollie',
             fn () => response()->json(['success' => true]),
         );
 
-        $expectedTtl = CurlClient::DEFAULT_TIMEOUT * 4 + 30;
+        // Four sequential provider requests at the 80s HTTP timeout, plus a
+        // 30s safety margin.
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame([$expectedTtl, $expectedTtl], $lockTtls);
+        $this->assertSame([350, 350], $lockTtls);
     }
 
     public function test_identity_lock_timeout_is_retryable_without_running_the_creator(): void
@@ -137,7 +159,7 @@ class CheckoutIdempotencyServiceTest extends TestCase
             ->once()
             ->andReturn($lock);
 
-        $service = new CheckoutIdempotencyService($this->createMock(StripePaymentService::class));
+        $service = new CheckoutIdempotencyService;
         $response = $service->executeNonImmediate(
             $user,
             'checkout-lock-timeout-0001',
@@ -156,7 +178,7 @@ class CheckoutIdempotencyServiceTest extends TestCase
         $key = 'checkout-unique-race-0001';
         $fingerprint = str_repeat('b', 64);
         $creatorCalls = 0;
-        $service = new CheckoutIdempotencyService($this->createMock(StripePaymentService::class));
+        $service = new CheckoutIdempotencyService;
 
         $response = $service->executeNonImmediate(
             $user,
@@ -197,30 +219,23 @@ class CheckoutIdempotencyServiceTest extends TestCase
         $this->assertSame($key, Order::query()->value('checkout_idempotency_key'));
     }
 
-    public function test_immediate_unique_constraint_race_reloads_and_replays_winning_pending_claim(): void
+    public function test_online_unique_constraint_race_reloads_and_resumes_the_winning_claim(): void
     {
+        BrandRegistry::set(Brand::B2B);
+
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $key = 'checkout-immediate-race-0001';
         $fingerprint = str_repeat('d', 64);
         $creatorCalls = 0;
         $winner = null;
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->with('pi_immediate_race')
-            ->willReturnCallback(function (string $paymentIntentId) use (&$winner): array {
-                $this->assertInstanceOf(Order::class, $winner);
+        $service = new CheckoutIdempotencyService;
 
-                return $this->intent($paymentIntentId, $winner);
-            });
-        $stripe->expects($this->never())->method('cancelPaymentIntent');
-        $service = new CheckoutIdempotencyService($stripe);
-
-        $response = $service->execute(
+        $response = $service->executeOnline(
             $user,
             $key,
             $fingerprint,
             4000,
+            'mollie',
             function (?Order $existingOrder) use (&$creatorCalls, &$winner, $user, $key, $fingerprint): JsonResponse {
                 $creatorCalls++;
                 if ($existingOrder !== null) {
@@ -234,11 +249,9 @@ class CheckoutIdempotencyServiceTest extends TestCase
                     'brand' => Brand::B2B,
                     'status' => 'pending_payment',
                     'total_amount' => 4000,
-                    'stripe_payment_intent_id' => 'pi_immediate_race',
                     'checkout_idempotency_key' => $key,
                     'checkout_fingerprint' => $fingerprint,
                 ]);
-                InvoiceSnapshot::factory()->for($winner)->create();
 
                 throw new UniqueConstraintViolationException(
                     'sqlite',
@@ -250,28 +263,27 @@ class CheckoutIdempotencyServiceTest extends TestCase
         );
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame(1, $creatorCalls);
+        $this->assertSame(2, $creatorCalls);
         $this->assertSame($winner?->id, $response->getData(true)['order_id']);
-        $this->assertSame('pi_immediate_race_secret', $response->getData(true)['client_secret']);
         $this->assertSame(1, Order::query()->count());
     }
 
-    public function test_immediate_unique_constraint_race_reloads_and_returns_a_fingerprint_conflict(): void
+    public function test_online_unique_constraint_race_reloads_and_returns_a_fingerprint_conflict(): void
     {
+        BrandRegistry::set(Brand::B2B);
+
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $key = 'checkout-immediate-race-0002';
         $fingerprint = str_repeat('e', 64);
         $creatorCalls = 0;
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('retrievePaymentIntent');
-        $stripe->expects($this->never())->method('cancelPaymentIntent');
-        $service = new CheckoutIdempotencyService($stripe);
+        $service = new CheckoutIdempotencyService;
 
-        $response = $service->execute(
+        $response = $service->executeOnline(
             $user,
             $key,
             $fingerprint,
             4000,
+            'mollie',
             function (?Order $existingOrder) use (&$creatorCalls, $user, $key): JsonResponse {
                 $creatorCalls++;
                 if ($existingOrder !== null) {
@@ -279,14 +291,13 @@ class CheckoutIdempotencyServiceTest extends TestCase
                 }
 
                 // The winning row has a different canonical checkout intent;
-                // the unique-key race must become a deterministic 409, never
-                // a new Stripe operation or an unsafe replay.
+                // the unique-key race must become a deterministic 409, never a
+                // provider operation or an unsafe replay.
                 Order::factory()->create([
                     'user_id' => $user->id,
                     'brand' => Brand::B2B,
                     'status' => 'pending_payment',
                     'total_amount' => 4000,
-                    'stripe_payment_intent_id' => 'pi_immediate_conflict',
                     'checkout_idempotency_key' => $key,
                     'checkout_fingerprint' => str_repeat('f', 64),
                 ]);
@@ -306,70 +317,22 @@ class CheckoutIdempotencyServiceTest extends TestCase
         $this->assertSame(1, Order::query()->count());
     }
 
-    public function test_v036_replay_rejects_missing_portal_user_metadata(): void
-    {
-        $user = User::factory()->create(['stripe_customer_id' => 'cus_replay_expected']);
-        $order = $this->pendingOrder($user, 'checkout-key-missing-user', str_repeat('a', 64));
-        InvoiceSnapshot::factory()->for($order)->create();
-        $intent = $this->intent('pi_pending', $order);
-        $intent['customer'] = 'cus_replay_expected';
-        unset($intent['metadata']['portal_user_id']);
-
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->willReturn($intent);
-        $service = new CheckoutIdempotencyService($stripe);
-        $response = $service->replay(
-            $user,
-            'checkout-key-missing-user',
-            str_repeat('a', 64),
-            4000,
-        );
-
-        $this->assertNotNull($response);
-        $this->assertSame(409, $response->getStatusCode());
-    }
-
-    public function test_v036_replay_rejects_a_customer_that_is_not_the_mapped_user_customer(): void
-    {
-        $user = User::factory()->create(['stripe_customer_id' => 'cus_replay_expected']);
-        $order = $this->pendingOrder($user, 'checkout-key-wrong-customer', str_repeat('a', 64));
-        InvoiceSnapshot::factory()->for($order)->create();
-        $intent = $this->intent('pi_pending', $order);
-        $intent['customer'] = 'cus_replay_attacker';
-
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->willReturn($intent);
-        $service = new CheckoutIdempotencyService($stripe);
-        $response = $service->replay(
-            $user,
-            'checkout-key-wrong-customer',
-            str_repeat('a', 64),
-            4000,
-        );
-
-        $this->assertNotNull($response);
-        $this->assertSame(409, $response->getStatusCode());
-    }
-
     public function test_same_key_with_different_payload_returns_conflict(): void
     {
-        $user = User::factory()->create();
+        BrandRegistry::set(Brand::B2B);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $order = $this->pendingOrder($user, 'checkout-key-0002', str_repeat('a', 64));
         InvoiceSnapshot::factory()->for($order)->create();
 
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('retrievePaymentIntent');
-        $service = new CheckoutIdempotencyService($stripe);
+        $service = new CheckoutIdempotencyService;
 
-        $response = $service->execute(
+        $response = $service->executeOnline(
             $user,
             'checkout-key-0002',
             str_repeat('b', 64),
             4000,
+            'mollie',
             fn () => $this->fail('Creator must not run for an idempotency conflict.'),
         );
 
@@ -377,22 +340,23 @@ class CheckoutIdempotencyServiceTest extends TestCase
         $this->assertTrue($response->getData(true)['idempotency_conflict']);
     }
 
-    public function test_paid_order_replays_success_without_stripe_call(): void
+    public function test_paid_order_replays_success_without_a_creator_call(): void
     {
-        $user = User::factory()->create();
+        BrandRegistry::set(Brand::B2B);
+
+        $user = User::factory()->create(['brand' => Brand::B2B]);
         $order = $this->pendingOrder($user, 'checkout-key-0003', str_repeat('a', 64));
         $snapshot = InvoiceSnapshot::factory()->for($order)->create();
         $order->update(['status' => 'paid']);
 
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('retrievePaymentIntent');
-        $service = new CheckoutIdempotencyService($stripe);
+        $service = new CheckoutIdempotencyService;
 
-        $response = $service->execute(
+        $response = $service->executeOnline(
             $user,
             'checkout-key-0003',
             str_repeat('a', 64),
             4000,
+            'mollie',
             fn () => $this->fail('Creator must not run for a paid order.'),
         );
 
@@ -401,285 +365,36 @@ class CheckoutIdempotencyServiceTest extends TestCase
         $this->assertSame($snapshot->invoice_number, $response->getData(true)['invoice_number']);
     }
 
-    public function test_stale_cancelable_intent_is_canceled_and_replaced_on_same_order(): void
+    public function test_lost_key_fallback_discovers_the_pending_order_by_fingerprint(): void
     {
-        $user = User::factory()->create();
-        $order = $this->pendingOrder($user, 'checkout-key-0004', str_repeat('a', 64));
-        InvoiceSnapshot::factory()->for($order)->create();
-        $created = now()->subHours(2)->getTimestamp();
+        BrandRegistry::set(Brand::B2B);
 
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->exactly(2))
-            ->method('retrievePaymentIntent')
-            ->willReturn($this->intent('pi_pending', $order, $created));
-        $stripe->expects($this->once())
-            ->method('cancelPaymentIntent')
-            ->with('pi_pending')
-            ->willReturn(['id' => 'pi_pending', 'status' => 'canceled']);
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $fingerprint = str_repeat('c', 64);
+        $order = $this->pendingOrder($user, 'old-checkout-key', $fingerprint);
+        $order->update(['created_at' => now()->subHours(2)]);
+        $order->refresh();
 
-        $service = new CheckoutIdempotencyService($stripe);
-        $newKey = 'checkout-key-after-stale-session-loss';
-        $this->assertNull($service->replay(
+        $service = new CheckoutIdempotencyService;
+        $resumed = null;
+
+        $response = $service->executeOnline(
             $user,
-            $newKey,
-            str_repeat('a', 64),
+            'new-auto-key',
+            $fingerprint,
             4000,
-        ));
-        $replacementOrder = null;
-        $response = $service->execute(
-            $user,
-            $newKey,
-            str_repeat('a', 64),
-            4000,
-            function (Order $existingOrder) use (&$replacementOrder) {
-                $replacementOrder = $existingOrder;
+            'mollie',
+            function (?Order $existingOrder) use (&$resumed): JsonResponse {
+                $resumed = $existingOrder;
 
-                return response()->json([
-                    'success' => true,
-                    'requires_action' => true,
-                    'client_secret' => 'pi_replacement_secret',
-                    'order_id' => $existingOrder->id,
-                    'invoice_number' => $existingOrder->invoiceSnapshot->invoice_number,
-                ]);
+                return response()->json(['order_id' => $existingOrder?->id]);
             },
         );
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame($order->id, $replacementOrder?->id);
-        $this->assertSame(2, $order->fresh()->payment_intent_generation);
-        $this->assertSame('checkout-key-0004', $order->fresh()->checkout_idempotency_key);
-        $this->assertSame(str_repeat('a', 64), $order->fresh()->checkout_fingerprint);
-    }
-
-    public function test_replacement_does_not_reopen_an_order_paid_while_cancellation_is_in_flight(): void
-    {
-        $user = User::factory()->create();
-        $order = $this->pendingOrder($user, 'checkout-key-race-paid', str_repeat('d', 64));
-        InvoiceSnapshot::factory()->for($order)->create();
-        $intent = $this->intent('pi_pending', $order, now()->subHours(2)->getTimestamp());
-
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->willReturn($intent);
-        $stripe->expects($this->once())
-            ->method('cancelPaymentIntent')
-            ->with('pi_pending')
-            ->willReturnCallback(function () use ($order): array {
-                Order::query()->whereKey($order->getKey())->update(['status' => 'paid']);
-
-                return ['id' => 'pi_pending', 'status' => 'canceled'];
-            });
-
-        $service = new CheckoutIdempotencyService($stripe);
-        $response = $service->execute(
-            $user,
-            'checkout-key-race-paid',
-            str_repeat('d', 64),
-            4000,
-            fn () => $this->fail('A paid order must not be reopened for replacement.'),
-        );
-
-        $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('paid', $order->fresh()->status);
-        $this->assertSame('pi_pending', $order->fresh()->stripe_payment_intent_id);
-        $this->assertSame(1, $order->fresh()->payment_intent_generation);
-    }
-
-    public function test_replacement_rejects_a_cancel_response_for_another_payment_intent(): void
-    {
-        $user = User::factory()->create();
-        $order = $this->pendingOrder($user, 'checkout-key-race-cancel-id', str_repeat('e', 64));
-        InvoiceSnapshot::factory()->for($order)->create();
-
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->willReturn($this->intent('pi_pending', $order, now()->subHours(2)->getTimestamp()));
-        $stripe->expects($this->once())
-            ->method('cancelPaymentIntent')
-            ->willReturn(['id' => 'pi_other', 'status' => 'canceled']);
-
-        $service = new CheckoutIdempotencyService($stripe);
-        $response = $service->execute(
-            $user,
-            'checkout-key-race-cancel-id',
-            str_repeat('e', 64),
-            4000,
-            fn () => $this->fail('An invalid cancellation response must not create a replacement.'),
-        );
-
-        $this->assertSame(502, $response->getStatusCode());
-        $this->assertSame('pending_payment', $order->fresh()->status);
-        $this->assertSame('pi_pending', $order->fresh()->stripe_payment_intent_id);
-        $this->assertSame(1, $order->fresh()->payment_intent_generation);
-    }
-
-    public function test_replacement_rejects_a_cancel_response_that_is_not_canceled(): void
-    {
-        $user = User::factory()->create();
-        $order = $this->pendingOrder($user, 'checkout-key-race-cancel-status', str_repeat('f', 64));
-        InvoiceSnapshot::factory()->for($order)->create();
-
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->willReturn($this->intent('pi_pending', $order, now()->subHours(2)->getTimestamp()));
-        $stripe->expects($this->once())
-            ->method('cancelPaymentIntent')
-            ->willReturn(['id' => 'pi_pending', 'status' => 'requires_payment_method']);
-
-        $service = new CheckoutIdempotencyService($stripe);
-        $response = $service->execute(
-            $user,
-            'checkout-key-race-cancel-status',
-            str_repeat('f', 64),
-            4000,
-            fn () => $this->fail('A non-canceled cancellation response must not create a replacement.'),
-        );
-
-        $this->assertSame(502, $response->getStatusCode());
-        $this->assertSame('pending_payment', $order->fresh()->status);
-        $this->assertSame('pi_pending', $order->fresh()->stripe_payment_intent_id);
-        $this->assertSame(1, $order->fresh()->payment_intent_generation);
-    }
-
-    public function test_null_payment_intent_retry_never_reopens_a_paid_order(): void
-    {
-        $user = User::factory()->create();
-        $order = $this->pendingOrder($user, 'checkout-key-null-paid', str_repeat('1', 64));
-        $order->update(['stripe_payment_intent_id' => null, 'status' => 'paid']);
-        InvoiceSnapshot::factory()->for($order)->create();
-
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('retrievePaymentIntent');
-        $service = new CheckoutIdempotencyService($stripe);
-        $response = $service->execute(
-            $user,
-            'checkout-key-null-paid',
-            str_repeat('1', 64),
-            4000,
-            fn () => $this->fail('A paid null-PI order must not be reopened.'),
-        );
-
-        $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('paid', $order->fresh()->status);
-        $this->assertNull($order->fresh()->stripe_payment_intent_id);
-    }
-
-    public function test_pending_intent_without_created_timestamp_is_retryable_without_cancel(): void
-    {
-        $user = User::factory()->create();
-        $order = $this->pendingOrder($user, 'checkout-key-missing-created', str_repeat('a', 64));
-        InvoiceSnapshot::factory()->for($order)->create();
-
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->willReturn(array_replace(
-                $this->intent('pi_pending', $order, null, 'requires_payment_method'),
-                ['created' => null, 'client_secret' => null],
-            ));
-        $stripe->expects($this->never())->method('cancelPaymentIntent');
-
-        $service = new CheckoutIdempotencyService($stripe);
-        $response = $service->replay(
-            $user,
-            'checkout-key-after-session-storage-loss',
-            str_repeat('a', 64),
-            4000,
-        );
-
-        $this->assertNotNull($response);
-        $this->assertSame(502, $response->getStatusCode());
-        $this->assertSame(1, $order->fresh()->payment_intent_generation);
-        $this->assertSame('pi_pending', $order->fresh()->stripe_payment_intent_id);
-    }
-
-    public function test_v036_stale_intent_with_missing_identity_metadata_is_rejected(): void
-    {
-        $user = User::factory()->create();
-        $order = $this->pendingOrder($user, 'checkout-key-missing-metadata', str_repeat('c', 64));
-        InvoiceSnapshot::factory()->for($order)->create();
-        $intent = $this->intent('pi_pending', $order, now()->subHours(2)->getTimestamp());
-        $intent['metadata'] = [];
-
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->with('pi_pending')
-            ->willReturn($intent);
-        $stripe->expects($this->never())->method('cancelPaymentIntent');
-
-        $service = new CheckoutIdempotencyService($stripe);
-        $response = $service->replay(
-            $user,
-            'checkout-key-missing-metadata',
-            str_repeat('c', 64),
-            4000,
-        );
-
-        $this->assertNotNull($response);
-        $this->assertSame(409, $response->getStatusCode());
-        $this->assertTrue($response->getData(true)['idempotency_conflict']);
-        $this->assertSame(1, $order->fresh()->payment_intent_generation);
-    }
-
-    public function test_null_payment_intent_retry_preserves_original_checkout_identity(): void
-    {
-        $user = User::factory()->create();
-        $order = $this->pendingOrder($user, 'checkout-key-null-pi', str_repeat('b', 64));
-        $order->update(['stripe_payment_intent_id' => null]);
-        InvoiceSnapshot::factory()->for($order)->create();
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->never())->method('retrievePaymentIntent');
-        $service = new CheckoutIdempotencyService($stripe);
-        $newKey = 'checkout-key-new-after-null-pi';
-
-        $this->assertNull($service->replay($user, $newKey, str_repeat('b', 64), 4000));
-        $response = $service->execute(
-            $user,
-            $newKey,
-            str_repeat('b', 64),
-            4000,
-            fn (Order $existingOrder) => response()->json(['order_id' => $existingOrder->id]),
-        );
-
-        $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('checkout-key-null-pi', $order->fresh()->checkout_idempotency_key);
-        $this->assertSame(str_repeat('b', 64), $order->fresh()->checkout_fingerprint);
-    }
-
-    public function test_fulfilled_remote_intent_returns_a_non_destructive_recovery_response(): void
-    {
-        $user = User::factory()->create();
-        $order = $this->pendingOrder($user, 'checkout-key-0005', str_repeat('a', 64));
-        InvoiceSnapshot::factory()->for($order)->create();
-
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->willReturn($this->intent('pi_pending', $order, now()->getTimestamp(), 'succeeded'));
-        $stripe->expects($this->never())->method('cancelPaymentIntent');
-
-        $service = new CheckoutIdempotencyService($stripe);
-        $response = $service->execute(
-            $user,
-            'checkout-key-0005',
-            str_repeat('a', 64),
-            4000,
-            fn () => $this->fail('Creator must not run while the remote PaymentIntent is fulfilled.'),
-        );
-        $payload = $response->getData(true);
-
-        $this->assertSame(200, $response->getStatusCode());
-        $this->assertTrue($payload['payment_pending']);
-        $this->assertFalse($payload['requires_action']);
-        $this->assertArrayNotHasKey('client_secret', $payload);
-        $this->assertSame($order->id, $payload['order_id']);
-        $this->assertSame('pending_payment', $payload['status']);
-        $this->assertSame('/api/orders/'.$order->id, $payload['poll_url']);
-        $this->assertSame('pending_payment', $order->fresh()->status);
+        $this->assertSame($order->id, $resumed?->id);
+        $this->assertSame('old-checkout-key', $order->fresh()->checkout_idempotency_key);
+        $this->assertSame($fingerprint, $order->fresh()->checkout_fingerprint);
     }
 
     public function test_identity_is_stable_for_reordered_items_and_falls_back_when_header_is_missing(): void
@@ -710,42 +425,13 @@ class CheckoutIdempotencyServiceTest extends TestCase
             'withdrawal_waived' => true,
         ]);
 
-        $service = new CheckoutIdempotencyService($this->createMock(StripePaymentService::class));
+        $service = new CheckoutIdempotencyService;
         $first = $service->identify($requestA, $user);
         $second = $service->identify($requestB, $user);
 
         $this->assertSame($first, $second);
         $this->assertSame('auto-'.$first['fingerprint'], $first['key']);
         $this->assertSame(64, strlen($first['fingerprint']));
-    }
-
-    public function test_lost_key_fallback_discovers_an_old_order_with_a_freshly_replaced_pi(): void
-    {
-        $user = User::factory()->create();
-        $fingerprint = str_repeat('c', 64);
-        $order = $this->pendingOrder($user, 'old-checkout-key', $fingerprint);
-        Order::query()->whereKey($order->getKey())->update([
-            'created_at' => now()->subHours(2),
-            'stripe_payment_intent_id' => 'pi_fresh_replacement',
-            'payment_intent_generation' => 2,
-        ]);
-        $order->refresh();
-
-        $stripe = $this->createMock(StripePaymentService::class);
-        $stripe->expects($this->once())
-            ->method('retrievePaymentIntent')
-            ->with('pi_fresh_replacement')
-            ->willReturn($this->intent('pi_fresh_replacement', $order, now()->getTimestamp(), 'requires_action'));
-        $stripe->expects($this->never())->method('cancelPaymentIntent');
-
-        $service = new CheckoutIdempotencyService($stripe);
-        $response = $service->replay($user, 'new-auto-key', $fingerprint, 4000);
-
-        $this->assertNotNull($response);
-        $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('pi_fresh_replacement_secret', $response->getData(true)['client_secret']);
-        $this->assertSame('old-checkout-key', $order->fresh()->checkout_idempotency_key);
-        $this->assertSame($fingerprint, $order->fresh()->checkout_fingerprint);
     }
 
     public function test_payment_method_is_part_of_the_checkout_fingerprint(): void
@@ -756,12 +442,12 @@ class CheckoutIdempotencyServiceTest extends TestCase
             'billing_name' => 'Test User',
             'withdrawal_waived' => true,
         ]);
-        $service = new CheckoutIdempotencyService($this->createMock(StripePaymentService::class));
+        $service = new CheckoutIdempotencyService;
 
-        $stripe = $service->identify($request, $user, 4000, 'stripe');
+        $mollie = $service->identify($request, $user, 4000, 'mollie');
         $invoice = $service->identify($request, $user, 4000, 'invoice');
 
-        $this->assertNotSame($stripe['fingerprint'], $invoice['fingerprint']);
+        $this->assertNotSame($mollie['fingerprint'], $invoice['fingerprint']);
     }
 
     public function test_server_calculated_amount_is_part_of_the_fingerprint(): void
@@ -772,7 +458,7 @@ class CheckoutIdempotencyServiceTest extends TestCase
             'billing_name' => 'Test User',
             'withdrawal_waived' => true,
         ]);
-        $service = new CheckoutIdempotencyService($this->createMock(StripePaymentService::class));
+        $service = new CheckoutIdempotencyService;
 
         $first = $service->identify($request, $user, 4000);
         $second = $service->identify($request, $user, 5000);
@@ -788,32 +474,8 @@ class CheckoutIdempotencyServiceTest extends TestCase
             'brand' => Brand::B2B,
             'status' => 'pending_payment',
             'total_amount' => 4000,
-            'stripe_payment_intent_id' => 'pi_pending',
             'checkout_idempotency_key' => $key,
             'checkout_fingerprint' => $fingerprint,
-            'payment_intent_generation' => 1,
         ]);
-    }
-
-    private function intent(string $id, Order $order, ?int $created = null, string $status = 'requires_payment_method'): array
-    {
-        return [
-            'id' => $id,
-            'status' => $status,
-            'client_secret' => $id.'_secret',
-            'amount' => $order->total_amount,
-            'currency' => 'eur',
-            'created' => $created ?? now()->getTimestamp(),
-            'metadata' => [
-                'order_id' => (string) $order->id,
-                'portal_user_id' => (string) $order->user_id,
-                'account_created_at' => (string) $order->user->created_at->getTimestamp(),
-                'checkout_idempotency_key' => (string) $order->checkout_idempotency_key,
-                'checkout_fingerprint' => (string) $order->checkout_fingerprint,
-                'generation' => (string) $order->payment_intent_generation,
-                'amount_cents' => (string) $order->total_amount,
-                'currency' => 'eur',
-            ],
-        ];
     }
 }

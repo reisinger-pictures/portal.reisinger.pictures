@@ -15,8 +15,8 @@ use Tests\TestCase;
 /**
  * P0-B1 (CRITICAL) — only settled order statuses may grant media downloads.
  *
- * Regression: a `pending_payment` order (Stripe intent created, not confirmed)
- * must not pass `PurchaseService::hasPurchasedPhoto()` nor the
+ * Regression: a `pending_payment` order (online payment started, not
+ * confirmed) must not pass `PurchaseService::hasPurchasedPhoto()` nor the
  * `/orders/{id}/download-zip` gate, while a `paid` order still does.
  */
 class PurchasePendingPaymentAccessTest extends TestCase

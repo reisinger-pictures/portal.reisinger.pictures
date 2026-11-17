@@ -1,11 +1,26 @@
 ---
 title: Card-Testing Monitoring & Operations Runbook
 status: active
-scope: backend/app/Services/CheckoutRiskService.php, backend/app/Http/Controllers/WebhookController.php, backend/app/Services/PaymentIntentReconciliationService.php, backend/app/Services/CheckoutIdempotencyService.php, backend/app/Console/Commands/CancelStalePaymentIntents.php, backend/config/app.php, backend/database/migrations/V036__card_testing_defenses.php
+scope: backend/app/Services/CheckoutRiskService.php, backend/app/Services/CheckoutIdempotencyService.php, backend/config/app.php, backend/database/migrations/V036__card_testing_defenses.php
 related: features/security/card-testing-protection.md
 ---
 
 # Card-Testing Monitoring & Operations Runbook
+
+> **Current contract (2026-11-17): Stripe is removed; Mollie is the only
+> payment provider** (D-63, [Mollie payments](../infrastructure/30-mollie-payments.md)).
+> In force are the provider-neutral signals: the checkout admission denials, the
+> dedicated user/IP quotas, the account-age rejections, the checkout-identity
+> (`409`) conflicts, the optional Turnstile outcomes, and the kill switch
+> `CHECKOUT_ENABLED`.
+>
+> **Retired (history, not the desired state):** the Stripe-object signals — S1
+> (new PaymentIntent rate), S2 (idempotent-replay via PI), S5 (Stripe webhook
+> identity/quarantine), S6 (stale-PaymentIntent sweep) — and the Stripe Radar /
+> 3DS / Stripe.js references describe the removed Stripe contract. They stay
+> only as the record of what was built and measured. Line anchors into backend
+> files that the Stripe removal deleted are historical anchors, not current
+> ones; the command of record for a live number is the one that still runs.
 
 This is the operator-facing half of [`card-testing-protection.md`](./card-testing-protection.md).
 That document is the SOLD state (design, data model, defence order); this one is
@@ -13,10 +28,11 @@ the runbook: **where each signal is emitted, what number triggers a decision,
 the command that reproduces that number, and what the operator does next.**
 
 It implements the monitoring checklist items from
-`card-testing-protection.md` § "Monitoring and response": new-PI rate,
-idempotent-replay rate, user/IP 429s, failure-code velocity, webhook identity
-mismatches, quarantined events, stale-PI cleanup counts, account-age rejections
-and Turnstile outcomes.
+`card-testing-protection.md` § "Monitoring and response": checkout-admission
+denials, idempotent-replay rate, user/IP 429s, account-age rejections and
+Turnstile outcomes. The Stripe-specific items of the original checklist
+(new-PI rate, failure-code velocity, webhook identity mismatches, stale-PI
+cleanup) are retired with the provider.
 
 ---
 
@@ -172,6 +188,10 @@ rather than pretending otherwise.
 
 ### S1 — New PaymentIntent rate
 
+> **Retired (Stripe removed, D-63):** this signal measured Stripe PaymentIntent
+> creation. There is no PaymentIntent any more; the payment attempt ledger
+> (`mollie_payment_attempts`) is the current record. Kept as history.
+
 **Where it is emitted.** There is no application log line for a *successful*
 PaymentIntent creation. The durable emit is the conditional write of the PI id
 onto the order — `backend/app/Services/CheckoutService.php:1477-1479`:
@@ -290,6 +310,10 @@ ORDER  BY new_payment_intents DESC;
    automated run.
 
 ### S2 — Idempotent-replay rate
+
+> **Retired (Stripe removed, D-63):** the identity half (same key, different
+> fingerprint → `409`) is still enforced and observable through the checkout
+> admission path; the PI-retrieval half of this signal is history.
 
 **What a replay is.** A client retry with the same `Idempotency-Key` resolves
 back to the existing order instead of creating a new PI. The client key is
@@ -503,6 +527,17 @@ comparison at `CheckoutRiskService.php:59` in test form.
 
 ### S4 — Failure velocity
 
+> **Retired evidence (Stripe removed, D-63):** the emit sites quoted below lived
+> in the Stripe webhook controller (`WebhookController.php`), which no longer
+> exists. The surviving, provider-neutral signal is the pair of cache buckets
+> `checkout-failure` (user and customer IP) plus the durable `orders` columns
+> `payment_failure_count`, `last_payment_failure_at` and
+> `last_payment_decline_code`; the verified provider callback feeds them after
+> its identity check. Grepping `Stripe Webhook: card payment attempt failed`
+> therefore finds nothing for orders created after the cutover — treat the SQL
+> and the effective-limits output as the commands of record, and the quoted
+> code as the record of what was built.
+
 **Where it is emitted.** Two places, and only after a fully verified failure.
 
 The durable per-order telemetry is written in the locked transaction,
@@ -642,6 +677,12 @@ docker logs portal_backend --since 24h 2>&1 \
    not a warning: check the cache store first (§1.2).
 
 ### S5 — Webhook identity mismatch / quarantine
+
+> **Retired (Stripe removed, D-63):** the Stripe webhook and its signature
+> identity checks are gone. The Mollie webhook treats its body as an untrusted
+> payment id and re-fetches the payment with the server credential, so the
+> equivalent mismatch signal is the Mollie reconciliation's ambiguous/unknown
+> report (`mollie:reconcile-payments`), not this section.
 
 **First, the honest definition of "quarantine" in this codebase.** There is no
 quarantine table, flag or queue. A mismatching event is *ignored*: the order
@@ -822,7 +863,12 @@ replay telemetry is understated.
 
 ### S6 — Stale PaymentIntent sweep (cleanup counts)
 
-**Where it is emitted.** The command is scheduled hourly —
+> **Retired (Stripe removed, D-63):** the `stripe:cancel-stale-payment-intents`
+> command no longer exists. Stale Mollie attempts are reported by
+> `mollie:reconcile-payments` (ambiguous and duplicate-paid attempts); it never
+> creates or replaces a payment. Kept as history.
+
+**Where it is emitted.** The command was scheduled hourly —
 `backend/routes/console.php:33`:
 `Schedule::command('stripe:cancel-stale-payment-intents')->hourly()->withoutOverlapping()->onOneServer();`
 and its signature is
@@ -918,28 +964,30 @@ counts.
 
 ### S7 — Account-age rejections
 
-**Where it is emitted.** `backend/app/Services/CheckoutEligibilityService.php:12-19`:
+**Where it is emitted.** `backend/app/Services/CheckoutEligibilityService.php`:
 
 ```php
-if ($user->password === null || $user->created_at === null) {
-    throw $this->denied();
-}
+public function assertImmediateCheckoutAllowed(User $user): void
+{
+    if ($user->password === null || $user->created_at === null) {
+        throw $this->denied();
+    }
 
-$minimumAgeHours = max(0, (int) config('app.stripe.checkout_new_account_hours', 24));
-if ($user->created_at->isAfter(now()->subHours($minimumAgeHours))) {
-    throw $this->denied();
+    $minimumAgeHours = max(0, (int) config('checkout.new_account_hours', 24));
+    if ($user->created_at->isAfter(now()->subHours($minimumAgeHours))) {
+        throw $this->denied();
+    }
 }
 ```
 
-**Code-enforced bound.** `backend/config/app.php:138`:
-`'checkout_new_account_hours' => max(0, (int) env('STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS', 24)),`
+**Code-enforced bound.** `backend/config/checkout.php`:
+`'new_account_hours' => max(0, (int) env('CHECKOUT_NEW_ACCOUNT_HOURS', 24)),`
 — floor 0, default **24 hours**. The response is a `403` with
-`'error' => 'Der Account ist noch nicht lange genug aktiviert. Bitte versuche den Checkout in wenigen Minuten erneut.'`
-(`CheckoutEligibilityService.php:25`).
+`'error' => 'Der Account ist noch nicht lange genug aktiviert. Bitte versuche den Checkout später erneut.'`
+(no retry-in-minutes promise, because the hold is a day).
 
-Called on the immediate-Stripe path at
-`backend/app/Services/CheckoutService.php:177` and `:316`
-(`$this->checkoutEligibility->assertImmediateStripeAllowed($user);`).
+Called on every immediate checkout path, from `CheckoutService`, through
+`$this->checkoutEligibility->assertImmediateCheckoutAllowed($user);`.
 
 **There is no log line** — see §1.4. This is therefore an *inference*, not a
 measurement, and the runbook says so rather than inventing a counter.
@@ -957,10 +1005,11 @@ SQL
 ```
 
 The 24 h is the config default; substitute the deployed value, which you can
-read without guessing:
+read without guessing (the boot-time production check prints the effective
+limits, including `new_account_hours`):
 
 ```bash
-docker exec portal_backend php artisan tinker --execute="echo config('app.stripe.checkout_new_account_hours'), PHP_EOL;"
+docker exec portal_backend php artisan ops:validate-production
 ```
 
 **Reproducing command — does the age rule correlate with failures?** The join is
@@ -971,16 +1020,16 @@ docker exec -i portal_db sh -lc 'mariadb -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$M
 SELECT u.id, u.created_at, o.id AS order_id, o.payment_failure_count, o.last_payment_decline_code
 FROM   orders o
 JOIN   users u ON u.id = o.user_id
-WHERE  o.stripe_payment_intent_id IS NOT NULL
+WHERE  o.payment_failure_count > 0
 AND    u.created_at > NOW() - INTERVAL 24 HOUR
 ORDER  BY o.created_at DESC
 LIMIT  50;
 SQL
 ```
 
-If accounts inside the window still have orders with a PI, they got through a
-path that is not the immediate-Stripe one, or the window is 0 in the deployed
-config. Resolve that before drawing a conclusion.
+If accounts inside the window already carry a failed provider attempt, they got
+through a path that is not the immediate-checkout gate, or the window is 0 in
+the deployed config. Resolve that before drawing a conclusion.
 
 **Operator action.**
 1. A growing `accounts_inside_window` is normal sign-up behaviour, not an alert.
@@ -989,7 +1038,7 @@ config. Resolve that before drawing a conclusion.
    Confirm the deployed value first (§above), then escalate as S4.
 3. Support reports "checkout says the account is too new" → this is a deliberate
    24-hour anti-card-testing hold, not a bug. Do not shorten
-   `STRIPE_CHECKOUT_NEW_ACCOUNT_HOURS` for one customer; the floor is `0` and
+   `CHECKOUT_NEW_ACCOUNT_HOURS` for one customer; the floor is `0` and
    the value is global.
 
 ### S8 — Turnstile outcomes
@@ -1000,9 +1049,9 @@ returns; the only observable traces are the counter keys and the HTTP response.
 **Code-enforced bounds.**
 - The gate is skipped entirely when either credential is missing —
   `backend/app/Services/TurnstileService.php:31-40` (`isEnabled()` returns
-  `false`), which makes `CheckoutRiskService::assertImmediateStripeAllowed`
+  `false`), which makes `CheckoutRiskService::assertImmediateCheckoutAllowed`
   return before touching any counter
-  (`backend/app/Services/CheckoutRiskService.php:113-115`:
+  (`backend/app/Services/CheckoutRiskService.php:111-115`:
   `if (! $this->turnstile->isEnabled()) {` … `return;` … `}`). **If Turnstile is
   unconfigured, there is no per-attempt signal at all** — verify it is enabled
   before interpreting S8:
@@ -1207,28 +1256,27 @@ Non-negotiable when following this runbook:
 
 The kill switch is the one control that stops new checkout attempts without
 touching the money path. It is a **server-side configuration flag**, not a
-request field: `STRIPE_CHECKOUT_ENABLED` (default `true`) reaches the code
-through `backend/config/app.php:135`
-(`filter_var(env('STRIPE_CHECKOUT_ENABLED', true), FILTER_VALIDATE_BOOL)`) and
-is read by `StripeCheckoutKillSwitch::enabled()`.
+request field: `CHECKOUT_ENABLED` (default `true`) reaches the code through
+`backend/config/app.php` as a validated boolean (`FILTER_NULL_ON_FAILURE`, so an
+unparseable value stays distinguishable) and is enforced by the checkout
+admission service before a provider payment is created.
 
 ### 6.1 What it blocks and what it does not
 
-`StripeCheckoutKillSwitch::assertEnabled()` answers a `503` with
-`Retry-After: 60` and a generic German body ("Der Checkout ist vorübergehend
-nicht verfügbar. Bitte versuche es später erneut.") **before** a Customer or a
-PaymentIntent is created — but only on the immediate Stripe checkout path that
-would need a **new or ambiguous** PaymentIntent.
+The guard answers a `503` with `Retry-After: 60` and a generic German body ("Der
+Checkout ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.")
+**before** the provider is called — but only on the immediate online-payment
+path that would need a **new or ambiguous** payment attempt.
 
 | Flow | With the switch off |
 |---|---|
-| Immediate Stripe checkout, new or ambiguous PI | **blocked** — 503, no Customer, no PI |
-| Exact replay of an already usable pending PI | still readable |
+| Immediate online checkout, new or ambiguous payment attempt | **blocked** — 503, no provider call |
+| Exact replay of an already created pending attempt | still readable |
 | Invoice, quote, Lieferschein, settled-free | unaffected |
 
 No client field can override the flag. An invalid runtime value (not a bool)
-is **fail-closed**: `enabled()` returns `false` and logs
-`Invalid STRIPE_CHECKOUT_ENABLED configuration; checkout is fail-closed.` with
+is **fail-closed**: the guard returns `false` and logs
+`Invalid CHECKOUT_ENABLED configuration; checkout is fail-closed.` with
 the configuration type only — no request or payment data.
 
 ### 6.2 Flipping it in production
@@ -1236,8 +1284,8 @@ the configuration type only — no request or payment data.
 The flag is read from the environment, so a change needs the container to pick
 up the new value:
 
-1. Set `STRIPE_CHECKOUT_ENABLED=false` in the backend's environment on the
-   host, where the other `STRIPE_*` values live — **not** in the repository.
+1. Set `CHECKOUT_ENABLED=false` in the backend's environment on the host
+   (`/opt/stacks/portal-reisinger-pictures/.env`) — **not** in the repository.
 2. Restart the backend container (`docker restart portal_backend`) so the
    runtime configuration is re-read. Recreate instead of restart when the
    environment block itself changed (`deployment/docker-compose.yml`).
@@ -1247,24 +1295,24 @@ up the new value:
    (`TurnstileService::rejectUnavailable()`, §3/S8), not the switch; the global
    API limiter answers `429`, not `503`.
 4. To re-enable: set the value back to `true`, restart, and verify that the
-   checkout path creates a PaymentIntent again.
+   checkout path creates a provider payment again.
 
-The switch does **not** cancel existing PaymentIntents, does not touch orders
+The switch does **not** cancel existing provider payments, does not touch orders
 in flight, and does not change the invoice, quote, Lieferschein or settled-free
 paths. It stops the entry, nothing else.
 
 ### 6.3 Rollback order
 
 The rule from `card-testing-protection.md` §12.6: **roll back configuration
-before durable identifiers, and never delete a PaymentIntent or an order merely
-to make a dashboard look clean.**
+before durable identifiers, and never delete a payment attempt or an order
+merely to make a dashboard look clean.**
 
 | Order | Action | Why |
 |---|---|---|
-| 1 | Kill switch on (`STRIPE_CHECKOUT_ENABLED=false`) | stops new attempts at the entry, before anything is written |
-| 2 | Configuration back (thresholds, Turnstile enablement, Radar rules) | reversible, no data involved |
+| 1 | Kill switch on (`CHECKOUT_ENABLED=false`) | stops new attempts at the entry, before anything is written |
+| 2 | Configuration back (thresholds, Turnstile enablement, method allowlist) | reversible, no data involved |
 | 3 | Deployment back (the previous image) | the code path returns to the known state |
-| 4 | **Only if** the incident requires it: reconcile the affected PaymentIntents with `stripe:cancel-stale-payment-intents` (S6) and check the webhook quarantine (S5) | durable identifiers are the last resort — deleting a PI or an order loses the evidence an incident review needs |
+| 4 | **Only if** the incident requires it: reconcile the affected payment attempts (`mollie:reconcile-payments`, Mollie dashboard) | durable identifiers are the last resort — deleting an attempt or an order loses the evidence an incident review needs |
 
 A rollback that starts at step 4 leaves new attempts running while the old
 identifiers are being cleaned up; the two together make the incident harder to

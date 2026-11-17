@@ -26,11 +26,10 @@ describe('Privacy', () => {
         renderPrivacy();
 
         for (const identifier of [
-            'Stripe Customer-ID',
-            'PaymentIntent-ID',
             'Checkout-Fingerprint-Hash',
             'IP-Risikoschlüssel',
-            'Decline-Code',
+            'Payment-ID',
+            'Zahlungsstatus',
             'Sicherheitsprozessor',
         ]) {
             expect(
@@ -70,8 +69,8 @@ describe('Privacy', () => {
         expect(text).toContain('nicht über das Portal an Mollie übermittelt');
         // paybybank/eps are approved at the customer's bank.
         expect(text).toContain('erfolgt die Freigabe bei der Bank des Kunden');
-        // The page must not present Stripe as the active provider any more.
-        expect(text).not.toContain('Stripe ist der eingesetzte Zahlungsdienstleister');
+        // Mollie is the only payment provider; no other provider is named.
+        expect(text).not.toMatch(/Stripe/i);
     });
 
     it('states how the defense stores, derives and bounds its signals', () => {
@@ -80,19 +79,24 @@ describe('Privacy', () => {
 
         // The IP risk key is a keyed one-way hash; the limiter never sees a raw IP.
         expect(text).toContain('schlüsselabhängiger, nicht umkehrbarer Hash');
-        // The Stripe paragraphs are history: the customer is told for which
-        // orders they still apply and that no new Stripe customer is created.
+        // Payments before the switch are described in the past tense and without
+        // any further data transfer.
         expect(text).toContain('vor der Umstellung auf Mollie');
-        expect(text).toContain('Für diese historischen Stripe-Bestellungen');
-        expect(text).toContain('erst mit der ersten zahlungspflichtigen Bestellung');
-        expect(text).toContain('nicht automatisch im Stripe-Dashboard gelöscht');
-        expect(text).toContain('Für neue Bestellungen wird kein Stripe-Kundenkonto mehr angelegt');
+        expect(text).toContain('keine Daten mehr übermittelt');
+        // Every payment attempt is disclosed with its bounded counter and its
+        // provider status, processed once per provider payment id.
+        expect(text).toContain('die laufende Nummer des Versuchs');
+        expect(text).toContain('Die Anzahl der Versuche je Bestellung ist begrenzt');
+        expect(text).toContain('den von Mollie gemeldeten Zahlungsstatus');
+        // The checkout fingerprint is server-derived and not cross-site tracking.
+        expect(text).toContain('serverseitig aus dem kanonisierten Checkout-Kontext');
+        expect(text).toContain('kein Browser-Fingerprint');
         // The account-age/attempt gates read the account creation date and the
         // user ID; that was undocumented before and is the reason a reader can
         // connect the quota with its own account.
         expect(text).toContain('das Erstellungsdatum Ihres Portalkontos');
-        // Only the signed, identity-matched webhook writes the bounded telemetry.
-        expect(text).toContain('ausschließlich das signierte und eindeutig zuordenbare Zahlungsereignis');
+        // Neither provider payload nor card data is kept in the portal.
+        expect(text).toContain('keinen vollständigen Zahlungsdatensatz des Anbieters');
         // The checkout session entry is bound to the signed-in account.
         expect(text).toContain('Der Eintrag ist dem angemeldeten Portalkonto zugeordnet');
         // Neither token, nor Siteverify response, nor the outcome is kept.

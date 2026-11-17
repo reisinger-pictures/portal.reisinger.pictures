@@ -919,37 +919,12 @@ class PayoutCalculationServiceTest extends TestCase
     // calculatePowerUserDelta()
     // ============================================================
 
-    public function test_calculate_power_user_delta_uses_db_stripe_fee_when_present(): void
+    public function test_calculate_power_user_delta_uses_the_fee_reserve_and_half_of_the_attributed_photo_revenue(): void
     {
         $photographer = User::factory()->create();
         $photo = Photo::factory()->create(['user_id' => $photographer->id]);
-        // price 1000, stripe_fee 100 → net 900 → 50% = 450 cents.
+        // Historische 4 % Zahlungsmittel-Reserve: (1000 - 40) * 50 % = 480 Cents.
         $order = Order::factory()->paid()->create([
-            'stripe_fee_cents' => 100,
-            'created_at' => '2026-06-10 12:00:00',
-        ]);
-        InvoiceSnapshot::create([
-            'order_id' => $order->id,
-            'customer_details' => [
-                'items' => [['photoId' => $photo->id, 'price' => 1000, 'tier' => 'web']],
-            ],
-            'total_net' => 1000, 'total_gross' => 1200, 'tax_rate' => 20.00,
-        ]);
-
-        $this->service->calculatePowerUserDelta(6, 2026);
-
-        $stmt = PhotographerStatement::where('user_id', $photographer->id)->first();
-        $this->assertSame(450, $stmt->delta_surcharge_earnings_cents);
-    }
-
-    public function test_calculate_power_user_delta_falls_back_to_percent_when_fee_null(): void
-    {
-        // REVIEW: config('services.stripe.fee_percent') existiert nicht → Default 0.04.
-        // price 1000, fee = round(1000*0.04) = 40 → net 960 → 50% = 480 cents.
-        $photographer = User::factory()->create();
-        $photo = Photo::factory()->create(['user_id' => $photographer->id]);
-        $order = Order::factory()->paid()->create([
-            'stripe_fee_cents' => null,
             'created_at' => '2026-06-10 12:00:00',
         ]);
         InvoiceSnapshot::create([
@@ -1081,7 +1056,6 @@ class PayoutCalculationServiceTest extends TestCase
         $photographer = User::factory()->create();
         $photo = Photo::factory()->create(['user_id' => $photographer->id]);
         $order = Order::factory()->paid()->create([
-            'stripe_fee_cents' => 0,
             'created_at' => '2026-06-10 12:00:00',
         ]);
         InvoiceSnapshot::create([
@@ -1098,8 +1072,8 @@ class PayoutCalculationServiceTest extends TestCase
         $this->service->calculatePowerUserDelta(6, 2026);
 
         $stmt = PhotographerStatement::where('user_id', $photographer->id)->sole();
-        // (1000-0)*0.5 + (2000-0)*0.5 = 500 + 1000 = 1500 cents
-        $this->assertSame(1500, $stmt->delta_surcharge_earnings_cents);
+        // (1000-40)*0.5 + (2000-80)*0.5 = 480 + 960 = 1440 cents
+        $this->assertSame(1440, $stmt->delta_surcharge_earnings_cents);
     }
 
     public function test_calculate_power_user_delta_is_idempotent_when_replayed(): void
@@ -1107,7 +1081,6 @@ class PayoutCalculationServiceTest extends TestCase
         $photographer = User::factory()->create();
         $photo = Photo::factory()->create(['user_id' => $photographer->id]);
         $order = Order::factory()->paid()->create([
-            'stripe_fee_cents' => 0,
             'created_at' => '2026-06-10 12:00:00',
         ]);
         InvoiceSnapshot::create([
@@ -1124,7 +1097,7 @@ class PayoutCalculationServiceTest extends TestCase
 
         $this->service->calculatePowerUserDelta(6, 2026);
 
-        $this->assertSame(500, $firstCalculation);
+        $this->assertSame(480, $firstCalculation);
         $this->assertSame(
             $firstCalculation,
             PhotographerStatement::where('user_id', $photographer->id)->sole()

@@ -78,7 +78,6 @@ class MollieCheckoutTest extends TestCase
         $order = Order::query()->sole();
         $this->assertSame('pending_payment', $order->status);
         $this->assertSame(3000, (int) $order->total_amount);
-        $this->assertNull($order->stripe_payment_intent_id);
         $this->assertNotNull($order->ip_address);
         $this->assertNotNull(InvoiceSnapshot::query()->where('order_id', $order->id)->first());
 
@@ -112,7 +111,6 @@ class MollieCheckoutTest extends TestCase
             ->assertJsonStructure(['checkout_url']);
 
         $this->assertSame(1, MolliePaymentAttempt::query()->count());
-        $this->assertNull(Order::query()->sole()->stripe_payment_intent_id);
     }
 
     public function test_stripe_is_no_longer_an_accepted_payment_method(): void
@@ -424,7 +422,7 @@ class MollieCheckoutTest extends TestCase
 
     public function test_checkout_kill_switch_blocks_a_mollie_payment_before_any_order(): void
     {
-        config(['app.stripe.checkout_enabled' => false]);
+        config(['checkout.enabled' => false]);
         [$user, $photo] = $this->createCheckoutItem();
 
         $this->checkout($user, $photo)

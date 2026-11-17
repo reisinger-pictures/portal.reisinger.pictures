@@ -19,7 +19,7 @@ class PurchaseService
      *
      * This is an allow-list on purpose: only orders whose payment/fulfilment has
      * been settled may grant full-resolution downloads. In particular
-     * `pending_payment` (Stripe PaymentIntent created, not yet confirmed) and
+     * `pending_payment` (online payment started, not yet confirmed) and
      * `pending` (quote request, no payment) must never grant access — a blacklist
      * would silently grant access for every status added in the future.
      *

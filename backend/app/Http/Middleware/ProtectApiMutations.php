@@ -15,14 +15,12 @@ class ProtectApiMutations
 
     /**
      * Server-to-server callbacks: no browser, no cookie, no CSRF token. They
-     * authenticate themselves — Stripe by signature, the FTP event by its
-     * shared secret, Mollie by re-reading the payment with the server
-     * credential.
+     * authenticate themselves — the FTP event by its shared secret, Mollie by
+     * re-reading the payment with the server credential.
      *
      * @var array<int, string>
      */
     private const TRUSTED_INGRESS_PATHS = [
-        'api/webhooks/stripe',
         'api/webhooks/mollie',
         'api/internal/ftp/upload-event',
     ];

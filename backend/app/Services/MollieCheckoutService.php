@@ -36,12 +36,50 @@ class MollieCheckoutService
 
     private readonly InvoiceMailDispatcher $invoiceMailDispatcher;
 
+    private readonly PayoutCalculationService $payoutCalculation;
+
     public function __construct(
         ?MolliePaymentService $mollie = null,
         ?InvoiceMailDispatcher $invoiceMailDispatcher = null,
+        ?PayoutCalculationService $payoutCalculation = null,
     ) {
         $this->mollie = $mollie ?? app(MolliePaymentService::class);
         $this->invoiceMailDispatcher = $invoiceMailDispatcher ?? app(InvoiceMailDispatcher::class);
+        $this->payoutCalculation = $payoutCalculation ?? app(PayoutCalculationService::class);
+    }
+
+    /**
+     * Whether answering this order needs no provider work at all: either the
+     * attempt was already verified paid, or its hosted link is persisted and
+     * can be handed out again.
+     *
+     * Admission controls (checkout quota, Turnstile, kill switch) exist to
+     * price and create payments. An exact replay must therefore not consume
+     * that budget; a `creating` attempt, a retryable attempt, or an order
+     * without an attempt still needs new provider work and keeps the controls.
+     */
+    public function replayNeedsNoProviderWork(Order $order): bool
+    {
+        $latest = MolliePaymentAttempt::query()
+            ->forOrder($order)
+            ->orderByDesc('generation')
+            ->first();
+
+        if ($latest === null) {
+            return false;
+        }
+
+        if ($latest->isPaid()) {
+            return true;
+        }
+
+        return in_array($latest->status, [
+            MolliePaymentAttempt::STATUS_OPEN,
+            MolliePaymentAttempt::STATUS_PENDING,
+            MolliePaymentAttempt::STATUS_AUTHORIZED,
+        ], true)
+            && is_string($latest->checkout_url)
+            && $latest->checkout_url !== '';
     }
 
     /**
@@ -800,9 +838,16 @@ class MollieCheckoutService
     }
 
     /**
-     * A refund or chargeback is a positive provider fact that revokes access.
-     * Only full reversal changes the order; partial refunds keep access and are
-     * left to the existing payout/refund handling.
+     * Persist a verified refund or chargeback fact.
+     *
+     * A refund is payout evidence, not a status fact: a partial refund keeps
+     * the order paid and downloadable, while a full refund or chargeback is
+     * terminal. The cumulative refunded amount and the matching negative
+     * correction for an already-closed statement are written in one
+     * transaction. Repeated webhook deliveries are idempotent twice over: the
+     * stored amount is monotonic, so a replay with the same cumulative value
+     * takes the no-op branch, and the correction ledger's key is
+     * (order, photographer, closed period, refund amount).
      *
      * @param  array<string, mixed>  $payment
      */
@@ -821,13 +866,19 @@ class MollieCheckoutService
             $amount > 0 && $refunded >= $amount => 'refunded',
             default => null,
         };
-        if ($target === null) {
+        if ($target === null && $refunded <= 0) {
             return;
         }
 
-        DB::transaction(function () use ($attempt, $target): void {
+        DB::transaction(function () use ($attempt, $target, $refunded): void {
             $lockedOrder = Order::query()->lockForUpdate()->find($attempt->order_id);
             if ($lockedOrder === null) {
+                return;
+            }
+
+            $this->recordRefundedAmount($lockedOrder, $refunded);
+
+            if ($target === null) {
                 return;
             }
 
@@ -851,6 +902,37 @@ class MollieCheckoutService
                 ->where('status', $lockedOrder->status)
                 ->update(['status' => $target]);
         });
+    }
+
+    /**
+     * Store the cumulative refunded amount and its late-refund correction.
+     *
+     * Callers hold the order row lock. The stored value never decreases, so an
+     * older or replayed provider observation cannot undo a newer refund, and
+     * the correction runs only when the stored cumulative amount grows.
+     */
+    private function recordRefundedAmount(Order $lockedOrder, int $amountRefundedCents): void
+    {
+        $chargedCents = max(0, (int) $lockedOrder->total_amount);
+        $clamped = max(0, min($amountRefundedCents, $chargedCents));
+        $previous = max(0, (int) ($lockedOrder->refunded_amount_cents ?? 0));
+        $stored = max($previous, $clamped);
+
+        if ($stored <= $previous) {
+            return;
+        }
+
+        $lockedOrder->refunded_amount_cents = $stored;
+        $lockedOrder->save();
+
+        // Keep the cumulative refund write and its correction in one
+        // transaction. A retry can then never observe a stored refund without
+        // the corresponding immutable-month ledger line.
+        $this->payoutCalculation->recordLateRefundCorrections(
+            $lockedOrder,
+            $previous,
+            $stored,
+        );
     }
 
     private function markAmbiguous(MolliePaymentAttempt $attempt): void

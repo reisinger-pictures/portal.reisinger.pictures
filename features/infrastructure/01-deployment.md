@@ -76,14 +76,14 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
 | `APP_KEY` | `config/app.php` | `env('APP_KEY')` |
 | `JWT_SECRET` | `config/jwt.php` | `env('JWT_SECRET')` |
 | `FILE_ENCRYPTION_KEY` | File-Encryption config/provider | `env('FILE_ENCRYPTION_KEY')`, separate from `APP_KEY` |
-| `STRIPE_KEY` / `STRIPE_SECRET` / `STRIPE_WEBHOOK_SECRET` | `config/services.php` | `env(...)`, no `production ? null :` guard; historical orders only |
-| `MOLLIE_KEY` / `MOLLIE_PAYMENT_METHODS` / `MOLLIE_WEBHOOK_URL` (`MOLLIE_PAYMENT_METHOD` is the deprecated single-value fallback) | `config/services.php` | `env(...)`, server-only, list in display order; payment creation needs the key, a non-empty allowlist and a usable HTTPS webhook URL, otherwise it fails closed |
+| `MOLLIE_KEY` / `MOLLIE_PAYMENT_METHODS` / `MOLLIE_WEBHOOK_URL` (`MOLLIE_PAYMENT_METHOD` is the deprecated single-value fallback) | `config/services.php` | `env(...)`, server-only, list in display order; payment creation needs the key, a non-empty allowlist and a usable HTTPS webhook URL, otherwise it fails closed. Mollie is the only payment provider (D-63); there is no Stripe config key and no Stripe credential |
+| `CHECKOUT_ENABLED` / `CHECKOUT_NEW_ACCOUNT_HOURS` | `config/checkout.php` | `env(...)` with the defaults `true` / `24`; provider-neutral checkout kill switch and minimum account age, no credential |
 | `DB_PASSWORD` | `config/database.php` | `env('DB_PASSWORD')` |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `config/admin.php` | `env(...)`, required, no fallback |
 
 - **Fail closed:** Missing `APP_KEY`/`JWT_SECRET`/`FILE_ENCRYPTION_KEY`/`ADMIN_EMAIL`/`ADMIN_PASSWORD` aborts the production start (see §9). Blank env values are treated as unset — never silently replaced.
 - **Debug mode:** `APP_DEBUG` defaults to **`false`** (`config/app.php`) and MUST stay `false` in production. Verbose error pages are a local-dev-only opt-in (`.env.example` ships `APP_DEBUG=true`); `deployment/docker-compose.yml` defaults to `${APP_DEBUG:-false}`.
-- **Production secrets are machine-local:** `backend/.env.production` (and `deployment/.env.production`) is **untracked/gitignored**. The repo contains development/CI fixtures and production key names only; real production values (DB, SMTP app password, Stripe live keys) are provided through `/opt/stacks/portal-reisinger-pictures/.env` on the host. Never commit or quote secret values.
+- **Production secrets are machine-local:** `backend/.env.production` (and `deployment/.env.production`) is **untracked/gitignored**. The repo contains development/CI fixtures and production key names only; real production values (DB, SMTP app password, Mollie live key, `FTP_EVENT_SECRET`) are provided through `/opt/stacks/portal-reisinger-pictures/.env` on the host. Never commit or quote secret values. The provider-neutral checkout switches `CHECKOUT_ENABLED` and `CHECKOUT_NEW_ACCOUNT_HOURS` are names in the same inventory (`deployment/production-env.keys`), not secrets: they carry a default and block nothing at start.
 
 ## 9. Produktion-Sicherheits-Gatekeeper
 - **Identitäts-Guard:** Der `backend`-Container verweigert den Start, wenn er

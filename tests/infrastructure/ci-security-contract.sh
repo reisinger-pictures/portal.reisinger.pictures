@@ -956,7 +956,7 @@ done
 if grep -Eiq '(^|[[:space:]])(md5sum|sha1sum|printenv|fingerprint|set[[:space:]]+-x)([[:space:]]|$)' "$workflow_code"; then
     fail 'CI contains a key-fingerprint/debug-logging command'
 fi
-if grep -Eiq '(^|[[:space:]])(echo|printf).*(APP_KEY|JWT_SECRET|STRIPE_SECRET|STRIPE_KEY|STRIPE_WEBHOOK_SECRET|ADMIN_PASSWORD|AI_API_KEY|MAKE_API_KEY).*(\$\{|\$)' "$workflow_code"; then
+if grep -Eiq '(^|[[:space:]])(echo|printf).*(APP_KEY|JWT_SECRET|ADMIN_PASSWORD|AI_API_KEY|MAKE_API_KEY).*(\$\{|\$)' "$workflow_code"; then
     fail 'CI may echo an interpolated secret value'
 fi
 

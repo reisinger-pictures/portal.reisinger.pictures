@@ -13,7 +13,7 @@
 # about an already published artifact, so this script reads each artifact's own
 # config back from the registry and fails when its runtime user is root.
 #
-# Both images are checked. portal-e2e receives CI secrets (Stripe/JWT/Admin) and
+# Both images are checked. portal-e2e receives CI secrets (JWT/Admin) and
 # was previously unpinned by any gate; a typo or a stale digest was undetectable.
 # It is consumed only by .github/workflows/ci.yml (the e2e job `container:`).
 #

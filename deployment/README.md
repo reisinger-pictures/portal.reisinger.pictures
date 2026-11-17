@@ -44,7 +44,7 @@ dem rsync mit einer klaren Meldung ab. Das Compose-Projektverzeichnis muss exakt
 
 `deployment/production-env.keys` ist die versionierte Inventarliste der von
 Compose verwendeten Variablennamen (ohne Werte). Reale Werte — darunter
-`APP_KEY`, `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, Datenbank-, Stripe-, Mail- und
+`APP_KEY`, `JWT_SECRET`, `FILE_ENCRYPTION_KEY`, Datenbank-, Mail-, Mollie- und
 SFTPGo-Credentials — gehören ausschließlich in die Host-`.env`, niemals in
 Git, diese Dokumentation oder einen lokalen Deploy-Aufruf. Compose lädt die
 `.env` automatisch aus dem Stack-Verzeichnis; `env_file` wird nicht verwendet.
@@ -61,50 +61,31 @@ beschreibt. Compose verwendet `/` als Default. Ein Unterordner muss im UI und
 in der Kamera identisch eingetragen sein, sonst schreibt die Kamera in einen
 Ordner, den der Import nie liest.
 
-### Stripe (Live) — drei Werte der historischen Fläche
+### Zahlungen — Mollie ist der einzige Anbieter
 
-Neue Online-Zahlungen laufen über Mollies gehostete Checkout-Seite
+Es gibt **kein Stripe-Konto und kein Stripe-Credential** mehr. Die Host-`.env`
+führt weder einen Publishable Key noch ein Secret oder ein Webhook-Secret, und
+weder der Deploy-Ablauf noch das Frontend-Bundle kennt einen Stripe-Wert: der
+Provider-Key (`MOLLIE_KEY`) ist serverseitig und wird nicht ins Bundle
+gebacken. Neue Online-Zahlungen laufen ausschließlich über Mollies gehostete
+Checkout-Seite
 ([D-63](../features/owner-decisions.md#d-63-mollie-collects-the-payment-the-portal-issues-the-invoice-and-offers-only-non-bnpl-methods));
-Stripe bleibt für die Historie im Einsatz (alte Payment Intents, Erstattungen,
-Disputes) und nimmt keine neuen Zahlungen an. Die drei Stripe-Werte bleiben
-deshalb in der Host-`.env` und müssen zum selben Stripe-Konto gehören. Alle drei
-gehören zum Konto `acct_1UQksN0qxbyNaMES` (Umstellung am 2026-10-15):
+es gibt keinen Parallelbetrieb und keinen Rückfall auf einen anderen Anbieter.
 
-| Variable | Form | Herkunft |
+> **Retired (Historie, kein Soll-Zustand):** Bis 2026-11-11 lagen hier drei
+> Stripe-Werte (`STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`) für die
+> damalige Kartenzahlung sowie ein Build-Schritt, der den Publishable Key ins
+> Frontend-Bundle schrieb. Mit #58 und D-63 entfielen Key, Webhook-Endpunkt,
+> Bundle-Schritt und die zugehörigen Verhaltens-Schalter. Belege und
+> Herleitung: [`features/security/env-hardening.md`](../features/security/env-hardening.md).
+
+Die beiden verhaltensrelevanten Checkout-Schalter sind anbieternneutral und
+haben einen Default, blockieren den Start also nicht:
+
+| Variable | Default | Bedeutung |
 |---|---|---|
-| `STRIPE_KEY` | `pk_live_…` | Publishable Key — wird nicht mehr ins Frontend-Bundle gebacken, das Frontend lädt kein Stripe.js mehr |
-| `STRIPE_SECRET` | `rk_live_…` | eingeschränkter Live-Key (Least Privilege) |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_…` | Signatur-Secret des Live-Endpunkts `we_1UQlhS0qxbyNaMESN5PNyhlM` |
-
-Der Endpunkt `we_1UQlhS0qxbyNaMESN5PNyhlM` zeigt auf
-`https://portal.reisinger.pictures/api/webhooks/stripe` und abonniert genau die
-vier Events, die `WebhookController::handleStripe` verarbeitet:
-`payment_intent.succeeded`, `payment_intent.payment_failed`,
-`charge.dispute.created`, `charge.refunded`.
-
-Gemessen am 2026-10-15 mit dem eingeschränkten Key (Testobjekte wieder entfernt):
-`paymentIntents->create`/`->cancel` und `customers->create`/`->delete` laufen —
-die gemessene Fläche ist also breiter als die genutzte. Serverseitig genutzt wird
-`stripe->paymentIntents->create`/`->retrieve`/`->cancel` und `stripe->customers->create`
-(`customers->delete` ruft `backend/app` nirgends auf).
-
-Drei Fallen, alle drei belegt:
-
-- **`pk_live` und `sk_live`/`rk_live` müssen zum selben Konto gehören.** Ein
-  gemischtes Paar fällt erst beim Bezahlen auf, nicht beim Start.
-- **Stripe gibt ein Signatur-Secret nur beim Anlegen aus.** `GET
-  /v1/webhook_endpoints` liefert es **nicht** zurück (gemessen) — danach ist es
-  nur im Dashboard sichtbar bzw. dort zu rollen.
-- **Keine öffentliche Key-API.** `GET /v1/api_keys` und `/v1/restricted_keys`
-  antworten **404**; Rechte und Rollen von Keys gibt es nur im Dashboard.
-
-Gegenprobe nach dem Deploy: im Dashboard beim Endpunkt **„Send test webhook"** →
-**HTTP 200** heißt Signatur stimmt, **400** heißt der `whsec` passt nicht.
-
-> **Status 2026-11-11:** Stripe ist für **neue** Online-Zahlungen abgelöst
-> (Issue #53). Die Werte bleiben nur für historische Bestellungen lesbar; es
-> gibt keinen Parallelbetrieb und keinen Rückfall auf Stripe. Neue Zahlungen
-> laufen über Mollie (nächster Abschnitt).
+| `CHECKOUT_ENABLED` | `true` | Kill-Switch für die Zahlungsanlage; `false` stoppt neue Versuche am Einstieg |
+| `CHECKOUT_NEW_ACCOUNT_HOURS` | `24` | Mindestalter eines Portalkontos in Stunden für eine sofortige Online-Zahlung |
 
 ### Mollie (Live) — Anbieter für neue Online-Zahlungen
 
@@ -124,7 +105,8 @@ Eine leere Liste, ein ungültiger oder ein BNPL-Eintrag (`klarna`, `in3`,
 und damit die Zahlungsanlage; der Eintrag wird nie stillschweigend entfernt.
 Fehlt `MOLLIE_KEY`, ist die Liste leer oder fehlt eine HTTPS-förmige
 `MOLLIE_WEBHOOK_URL`, antwortet der Checkout mit **503** und legt weder
-Bestellung noch Zahlung an — fail closed, kein Stripe-Fallback. Vor der Live-Freigabe sind
+Bestellung noch Zahlung an — fail closed, kein Fallback auf einen anderen
+Anbieter. Vor der Live-Freigabe sind
 Kontofreischaltung, Methode und Gebühren zu entscheiden (Issue #54) und ein
 Testmodus-Durchlauf nachzuweisen (Issue #55).
 
@@ -150,7 +132,7 @@ stiller Erfolg, aber auch keine Vorab-Garantie: sie zeigt sich als
 Provider-Fehler im Log (`reason: rejected`) und muss am Host korrigiert werden.
 
 Die Regel gilt auch lokal: für Testläufe mit echter Zahlungsanlage ist ein
-öffentlicher HTTPS-Tunnel nötig, sonst überspringen sich die vier
+öffentlicher HTTPS-Tunnel nötig, sonst überspringen sich die drei
 Provider-E2E-Specs namentlich.
 
 ### FTP-Upload-Events (D-36) — interner Listener und Provisionierung
@@ -377,14 +359,15 @@ Restore nie geprüft wurde, ist eine Vermutung.
 
 ### Sync und der Container-Neustart (Pflicht)
 
-Das Frontend wird **vor** dem Sync gebaut, und der Build braucht den Live-Key
-in `frontend/.env.production` (nicht in `.env`, das von `.env.local` überstimmt
-wird — Herleitung in `features/security/env-hardening.md`, Abschnitt
-„Frontend"). Prüfzeile direkt nach dem Build:
+Das Frontend wird **vor** dem Sync gebaut. Der Build braucht **keinen**
+Zahlungsanbieter-Key: `MOLLIE_KEY` ist serverseitig, das Frontend navigiert nur
+auf Mollies gehostete Checkout-Seite. Prüfzeile direkt nach dem Build — sie muss
+leer bleiben, also weder einen Provider-Key noch einen Live-Credential-Wert im
+Bundle zeigen:
 
 ```bash
 cd frontend && pnpm lint:fix && pnpm build
-grep -rho 'pk_live_[A-Za-z0-9]\{12\}' dist/assets | head -1   # muss den Live-Key zeigen
+grep -rIlE 'MOLLIE_KEY|pk_live_|sk_live_|rk_live_|whsec_' dist | head   # muss leer sein
 ```
 
 `sync.sh` kopiert Code, nichts mehr. **Nach jedem Sync mit PHP-Änderungen
