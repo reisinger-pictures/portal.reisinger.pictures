@@ -36,7 +36,7 @@ The bounded `mollie:reconcile-payments` command retrieves known nonterminal atte
 
 The existing order columns cannot safely represent more than one provider attempt, distinguish an unknown remote create from a completed create, retain a payment ID after a replacement attempt, or enforce provider-ID uniqueness. V053 therefore adds only `mollie_payment_attempts`, rather than repurposing the Stripe PaymentIntent column or widening an order row with a single Mollie ID. It has a restrictive FK to `orders`, a unique `(order_id, generation)` key, unique attempt and idempotency UUIDs, and a unique nullable provider payment ID. Its snapshot is immutable after insert; mutable status/URL/payment-ID/reconciliation timestamps are the only application-managed updates.
 
-There is no backfill: the table is exclusively for newly-created Mollie attempts and all Stripe history stays in the existing order/payment-intent records. The migration's rollback is intentionally empty; dropping an attempt ledger could erase financial reconciliation evidence. Rolling application code back leaves the additive table unused and does not alter invoice, order, or Stripe data.
+There is no backfill: the table is exclusively for newly-created Mollie attempts. The Stripe provider columns stay in the schema as empty historical columns — no production row carries a Stripe value (measured below, 2026-11-17). The migration's rollback is intentionally empty; dropping an attempt ledger could erase financial reconciliation evidence. Rolling application code back leaves the additive table unused and does not alter invoice, order, or Stripe data.
 
 ## Customer UI contract
 
@@ -48,14 +48,48 @@ The cart and its checkout identity survive the redirect: returning without payin
 
 Stripe is removed: no account, no credential, no `stripe/stripe-php` package,
 no webhook route, no reconciliation command and no Stripe config key. There is
-no parallel operation of two providers and no provider selector. Historical
-order rows keep their stored provider identifiers as accounting evidence, but
-nothing reads them for a new payment and no code path can create a Stripe
-PaymentIntent any more. The owner confirmed that the Stripe flow was never used
+no parallel operation of two providers and no provider selector. The schema
+keeps the historical provider columns, but no production row carries a value.
+None is read as a payment value; the one remaining read is a `whereNull`
+scope that keeps a new Mollie claim from adopting a legacy Stripe order
+(`CheckoutIdempotencyService::scopeToProvider()`). No code path can create a
+Stripe PaymentIntent any more. The owner confirmed that the Stripe flow was never used
 and that no Stripe payment is open, so no drain of pending Stripe payments was
 required and no money path depends on the removed code.
 
-Before live activation, the owner must confirm Mollie account activation and the supported payment methods for the Austrian business, verify current transaction fees and any optional charges, configure separate test/live credentials, set the fee-approved method list in `MOLLIE_PAYMENT_METHODS`, and perform an authorized Mollie test-mode smoke. The Mollie Dashboard must not be used to enable a method that the repository allowlist does not contain; BNPL ids are rejected even if the Dashboard offers them. The removed Stripe side needs no drain step and keeps only its historical order records. The deploy/restart and live cutover require separate authorization. Missing Mollie configuration disables Mollie payment creation; no fallback to another provider or client-side payment is allowed.
+Measured on the production stack on 2026-11-17 (read-only, via SSH on the host):
+
+```sh
+docker exec portal_db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mariadb -uroot portal_db \
+  -N -e "SELECT CONCAT(\"orders=\", COUNT(*)) FROM orders; \
+         SELECT CONCAT(\"users=\", COUNT(*)) FROM users; \
+         SELECT CONCAT(\"mollie_payment_attempts=\", COUNT(*)) FROM mollie_payment_attempts; \
+         SELECT CONCAT(\"orders.stripe_payment_intent_id=\", COUNT(*)) FROM orders WHERE CHAR_LENGTH(COALESCE(stripe_payment_intent_id, \"\")) > 0; \
+         SELECT CONCAT(\"orders.stripe_fee_cents=\", COUNT(*)) FROM orders WHERE COALESCE(stripe_fee_cents, 0) <> 0; \
+         SELECT CONCAT(\"users.stripe_customer_id=\", COUNT(*)) FROM users WHERE CHAR_LENGTH(COALESCE(stripe_customer_id, \"\")) > 0; \
+         SELECT CONCAT(\"payout_pools.stripe_fee_cents=\", COUNT(*)) FROM payout_pools WHERE COALESCE(stripe_fee_cents, 0) <> 0;"'
+```
+
+Result: `orders=0`, `users=1`, `mollie_payment_attempts=0`, and all four
+Stripe-column counts `0` (`COUNT(*)` returns `0` even on an empty table). No
+production row carries a Stripe customer id, PaymentIntent id or Stripe fee;
+the columns remain in the schema as historical empty columns (AD-2). This answers the data half of issue #2: there is nothing to
+disclose as historical Stripe personal data. The remaining question there —
+whether the new Mollie-only privacy text is sufficient — is a legal
+confirmation, not a code finding; it stays with #2. The production migration
+frontier is recorded only in AD-2; no number is copied here.
+
+Before live activation, the owner must confirm Mollie account activation and
+the supported payment methods for the Austrian business, verify current
+transaction fees and any optional charges, configure separate test/live
+credentials, set the fee-approved method list in `MOLLIE_PAYMENT_METHODS`, and
+perform an authorized Mollie test-mode smoke. The Mollie Dashboard must not be
+used to enable a method that the repository allowlist does not contain; BNPL
+ids are rejected even if the Dashboard offers them. The removed Stripe side
+needs no drain step and leaves the historical columns in place, empty.
+The deploy/restart and live cutover require separate authorization. Missing
+Mollie configuration disables Mollie payment creation; no fallback to another
+provider or client-side payment is allowed.
 
 The webhook URL is mandatory in every environment and must be an HTTPS URL; it is checked for presence and scheme when the payment is created, and its reachability is proven only by Mollie at that point: a missing, blank, malformed or plain-HTTP value disables payment creation (`503`, no order, no invoice number, no attempt) instead of degrading to no webhook. Do not IP-allowlist Mollie webhooks. The API key is server-only and test/live keys are selected explicitly; never log a key, request/response body, email, or payment payload. The customer redirect uses `BrandRegistry::frontendUrl()` for the order's persisted brand and an owner-scoped status lookup. It is validated as HTTPS (HTTP is allowed only in local/testing), and the returned Mollie checkout URL is accepted only from the HTTPS Mollie checkout host. The flow is a top-level navigation, not an embedded frame, so it requires no new CSP script, frame, or connect origin; the provider origins the previous integration needed (Stripe) were already removed once the frontend stopped loading Stripe.js (#60, [`../security/content-security-policy.md`](../security/content-security-policy.md)).
 

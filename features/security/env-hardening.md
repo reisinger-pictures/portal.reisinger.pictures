@@ -114,6 +114,16 @@ mit Mock-Werten bzw. faken das SDK am Service-Seam.
 > Mollie braucht keinen Bundle-Key; seine Konfiguration ist serverseitig und im
 > [Mollie-Vertrag](../infrastructure/30-mollie-payments.md) festgehalten. Wer hier
 > `stripe login` nachliest, folgt einem überholten Ablauf.
+>
+> Ergänzend am 2026-11-17 in der Produktions-DB gemessen: keine einzige Zeile
+> trägt einen Stripe-Kunden-, PaymentIntent- oder Gebührenwert
+> (`orders`/`users`/`payout_pools` alle 0 in den betreffenden Spalten, bei
+> `orders=0`). Es gibt also nicht nur keinen Stripe-Code mehr, sondern auch
+> keine Stripe-Personendaten in den Beständen. Ob der neue Mollie-only-Text
+> datenschutzrechtlich ausreicht, ist die offene juristische Frage in
+> [Issue #2](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/2)
+> und keine Code-Änderung. Befehl und Zahlen:
+> [`30-mollie-payments.md`](../infrastructure/30-mollie-payments.md).
 
 `stripe login` legt in `~/.config/stripe/config.toml` einen **eigenen** Test-Key
 ab — nicht den Standard-Key des Kontos. Er trägt ein Ablaufdatum

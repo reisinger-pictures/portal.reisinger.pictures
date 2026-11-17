@@ -279,7 +279,12 @@ the snapshot net) is first apportioned to the photo-backed portion of
 after that reserve, receives the photographer share. This makes photographer
 attribution follow actual coupon
 coverage: a coupon for one photo does not reduce every photographer's revenue,
-and shares and revenue cannot exceed the collectible amount.
+and shares and revenue cannot exceed the collectible amount. The 4 % is a
+provider-neutral reserve applied to every current order, not a fee reported by
+a provider; no code reads a stored `stripe_fee_cents` value any more. Measured
+2026-11-17: zero production rows in `orders` or `payout_pools` carry a non-zero
+`stripe_fee_cents` (command and numbers in
+[30-mollie-payments.md](30-mollie-payments.md)); no live row carries one today.
 
 ### Refunds in the payout
 

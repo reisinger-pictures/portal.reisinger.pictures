@@ -79,6 +79,16 @@ es gibt keinen Parallelbetrieb und keinen Rückfall auf einen anderen Anbieter.
 > Bundle-Schritt und die zugehörigen Verhaltens-Schalter. Belege und
 > Herleitung: [`features/security/env-hardening.md`](../features/security/env-hardening.md).
 
+**Ist-Stand (kein Historieneintrag):** Am 2026-11-17 read-only in der
+Produktions-DB gemessen: `orders=0`, `users=1`, `mollie_payment_attempts=0` und
+alle vier Stripe-Spalten ohne belegte Werte (`stripe_customer_id`,
+`stripe_payment_intent_id`, zweimal `stripe_fee_cents`). Es gab also keine
+Stripe-Zahlung und keine historischen Stripe-Kennungen, die fortgeschrieben
+werden müssten; ob der Mollie-Text in der Datenschutzerklärung genügt, bleibt
+[juristischer Manual-Check #2](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/2).
+Befehl und Zahlen:
+[`features/infrastructure/30-mollie-payments.md`](../features/infrastructure/30-mollie-payments.md).
+
 Die beiden verhaltensrelevanten Checkout-Schalter sind anbieternneutral und
 haben einen Default, blockieren den Start also nicht:
 
