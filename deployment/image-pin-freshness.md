@@ -67,7 +67,7 @@ refreshes the artifact every consumer follows:
   (and `latest`), where the version is the **lower bound of the
   `@playwright/test` range** in `frontend/package.json` — the extraction strips
   the `^` and does not read the resolved lockfile version, so the range floor
-  must equal the resolved version. `ci.yml` pins that version tag (`1.64.1`
+  must equal the resolved version. `ci.yml` pins that version tag (`1.65.1`
   today); that consuming pin is a **fourth** place carrying the same number,
   next to the range itself, the `ARG PLAYWRIGHT_VERSION` default in
   `deployment/Dockerfile.e2e` and the extraction in `e2e-image.yml`. Because

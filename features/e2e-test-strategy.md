@@ -149,7 +149,7 @@ matrix database runs the same explicit, offline location-fixture seeder and Scou
 import before the backend server starts.
 
 The E2E job runs in the tag-pinned `ghcr.io/reisinger-pictures/portal-e2e`
-image (the concrete version tag `1.64.1` is maintained in `ci.yml`; the job
+image (the concrete version tag `1.65.1` is maintained in `ci.yml`; the job
 never pulls `latest`) and installs the current application dependencies on the
 mounted workspace. That tag is the **resolved** `@playwright/test` version from
 `frontend/pnpm-lock.yaml` (`e2e-image.yml` reads the lockfile, not the range

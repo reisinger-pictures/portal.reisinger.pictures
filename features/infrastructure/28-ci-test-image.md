@@ -2,7 +2,7 @@
 
 **Status:** Implementiert (Dockerfile und Rebuild-Workflow vorhanden; der
 E2E-Job in `ci.yml` nutzt das Image). Die hier dokumentierte Tag-Referenz
-(`portal-e2e:1.64.1`, nie `latest`) ist eine Konfigurationsangabe, kein
+(`portal-e2e:1.65.1`, nie `latest`) ist eine Konfigurationsangabe, kein
 Nachweis, dass das veröffentlichte GHCR-Image frisch gebaut oder aktuell
 verfügbar ist. Das Alter des Artefakts hinter dem Tag wird maschinell geprüft
 (`tests/infrastructure/verify-image-freshness.sh`, INFRA-10); die
@@ -34,7 +34,7 @@ aktuellen Commits werden weiterhin im Job installiert.
 2. **`.github/workflows/e2e-image.yml`** baut das Image bei Änderungen an
    `deployment/Dockerfile.e2e`, dem Workflow selbst oder
    `frontend/pnpm-lock.yaml` auf `main` sowie wöchentlich und manuell. Es
-   publiziert `:latest` und einen versionsgebundenen Tag (`portal-e2e:1.64.1`,
+   publiziert `:latest` und einen versionsgebundenen Tag (`portal-e2e:1.65.1`,
    aus der aufgelösten Lockfile-Version); `ci.yml` pinnt im `container:`-Feld genau
    diesen versionsgebundenen Tag, nie `latest`. Gepinnt wird nicht mehr über
    `@sha256`: ein Digest-Pin friert ein Image auf einen Build ein und brauchte
@@ -61,7 +61,7 @@ aktuellen Commits werden weiterhin im Job installiert.
    Reihenfolge bleibt Betreiber-Verantwortung. `workflow_dispatch` baut gegen
    den committeten Stand des Refs, nicht gegen den Working Tree.
 3. Der **`e2e`-Job in `ci.yml`** läuft im Test-Image
-   (`ghcr.io/reisinger-pictures/portal-e2e:1.64.1`, der in `ci.yml` gepinnte
+   (`ghcr.io/reisinger-pictures/portal-e2e:1.65.1`, der in `ci.yml` gepinnte
    versionsgebundene Tag):
    - `composer install` → `php artisan key:generate` →
      `php artisan migrate --force` → `php artisan db:seed --force` →
@@ -106,9 +106,9 @@ das Image eingebacken hat:
 
 | Stelle | Rolle |
 |---|---|
-| `frontend/pnpm-lock.yaml`, `importers → devDependencies."@playwright/test"` | die **aufgelöste** Version (`1.64.1`) — die Quelle |
-| `frontend/package.json`, `devDependencies."@playwright/test"` | die **Range** (`^1.64.1`) — die Deklaration, kein Pin |
-| `deployment/Dockerfile.e2e`, `ARG PLAYWRIGHT_VERSION=1.64.1` | Default für **lokale** Builds; CI überschreibt ihn per `build-args` |
+| `frontend/pnpm-lock.yaml`, `importers → devDependencies."@playwright/test"` | die **aufgelöste** Version (`1.65.1`) — die Quelle |
+| `frontend/package.json`, `devDependencies."@playwright/test"` | die **Range** (`^1.65.1`) — die Deklaration, kein Pin |
+| `deployment/Dockerfile.e2e`, `ARG PLAYWRIGHT_VERSION=1.65.1` | Default für **lokale** Builds; CI überschreibt ihn per `build-args` |
 | `.github/workflows/ci.yml`, `container.image` | der **Konsument** — der Teil, den man vergisst |
 
 **Die Regel, die den Wert bestimmt (Stand 2026-10-21):** die aufgelöste
@@ -118,7 +118,7 @@ nicht die Untergrenze der Range aus dem Manifest:
 ```bash
 grep -A2 -E "^[[:space:]]+'@playwright/test':[[:space:]]*$" frontend/pnpm-lock.yaml \
   | sed -n 's/^[[:space:]]*version:[[:space:]]*\([0-9][0-9.]*\).*/\1/p' | head -n1
-# 1.64.1
+# 1.65.1
 ```
 
 **Warum die Range-Untergrenze die falsche Quelle war.** Dependabot (npm,
@@ -232,7 +232,7 @@ Für eine kontrollierte Rückkehr auf einen Runner-Host kann der E2E-Job
 alternative Host-Semantik und den im Image enthaltenen Browser-cache nutzen:
 
 ```bash
-PORTAL_E2E_IMAGE='ghcr.io/reisinger-pictures/portal-e2e:1.64.1'  # Tag aus ci.yml `container.image`
+PORTAL_E2E_IMAGE='ghcr.io/reisinger-pictures/portal-e2e:1.65.1'  # Tag aus ci.yml `container.image`
 docker create --name pw-cache "$PORTAL_E2E_IMAGE"
 docker cp pw-cache:/ms-playwright "$HOME/ms-playwright"
 docker rm pw-cache
