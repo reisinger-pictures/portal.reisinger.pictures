@@ -469,13 +469,13 @@ jobs:
     # infrastructure/28-ci-test-image.md.
     container:
       # Concrete tag, never `latest` (P1-M45). e2e-image.yml publishes
-      # portal-e2e:<playwright-version> (1.64.1 today, derived from the
+      # portal-e2e:<playwright-version> (1.65.1 today, derived from the
       # RESOLVED version in frontend/pnpm-lock.yaml) plus `latest`; this
       # consumer follows the version tag. verify-image-freshness.sh fails once
       # that artifact is older than 14 days, so a workflow that silently
       # stopped rebuilding is detected; the pin itself is checked against the
       # lockfile by verify-playwright-version.sh.
-      image: ghcr.io/reisinger-pictures/portal-e2e:1.64.1
+      image: ghcr.io/reisinger-pictures/portal-e2e:1.65.1
       # INFRA-2: the runner mounts the host workspace at $GITHUB_WORKSPACE and
       # runs steps inside this container. Dockerfile.e2e ends in
       # `USER www-data` (uid 1000), so without this override actions/checkout,
