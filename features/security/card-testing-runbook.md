@@ -21,6 +21,9 @@ related: features/security/card-testing-protection.md
 > only as the record of what was built and measured. Line anchors into backend
 > files that the Stripe removal deleted are historical anchors, not current
 > ones; the command of record for a live number is the one that still runs.
+> V054 dropped those Stripe columns after they were measured empty (AD-2), so
+> SQL below that selects `stripe_payment_intent_id` or `stripe_customer_id` is
+> historical and no longer runs in production.
 
 This is the operator-facing half of [`card-testing-protection.md`](./card-testing-protection.md).
 That document is the SOLD state (design, data model, defence order); this one is

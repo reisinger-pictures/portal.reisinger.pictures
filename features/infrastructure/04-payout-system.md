@@ -34,7 +34,7 @@ The system remunerates photographers based on actual usage (downloads) by end cu
 * `id` (UUID, Primary)
 * `month`, `year` (Integer)
 * `product_id` (UUID, Foreign Key)
-* `gross_amount_cents`, `stripe_fee_cents` (legacy column name from the former provider), `net_pool_cents` (Integer)
+* `gross_amount_cents`, `net_pool_cents` (Integer). The former `stripe_fee_cents` column was empty in production and was dropped in V054 (AD-2); payout uses the provider-neutral 4 % reserve below instead.
 * `photographer_share_percent` (Integer)
 * `total_unique_downloads` (Integer - Statistical)
 * `total_shares` (Decimal 12,4 — see §1.1, `V011__payout_system.php:21`)
@@ -281,10 +281,10 @@ attribution follow actual coupon
 coverage: a coupon for one photo does not reduce every photographer's revenue,
 and shares and revenue cannot exceed the collectible amount. The 4 % is a
 provider-neutral reserve applied to every current order, not a fee reported by
-a provider; no code reads a stored `stripe_fee_cents` value any more. Measured
-2026-11-17: zero production rows in `orders` or `payout_pools` carry a non-zero
-`stripe_fee_cents` (command and numbers in
-[30-mollie-payments.md](30-mollie-payments.md)); no live row carries one today.
+a provider. The former `stripe_fee_cents` columns were measured empty on
+2026-11-17 and dropped in V054 (AD-2; evidence and command in
+[30-mollie-payments.md](30-mollie-payments.md)), so no stored provider fee can
+disagree with the constant.
 
 ### Refunds in the payout
 

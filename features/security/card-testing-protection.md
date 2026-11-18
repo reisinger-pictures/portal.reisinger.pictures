@@ -24,6 +24,11 @@ status: approved-soll
 > The payment surface is Mollie's hosted checkout page: no card number, no
 > client secret and no provider key reaches the browser.
 >
+> V054 dropped the retired Stripe columns (`users.stripe_customer_id`,
+> `orders.stripe_payment_intent_id`, `orders.stripe_fee_cents`,
+> `payout_pools.stripe_fee_cents`) after they were measured empty (AD-2).
+> Line anchors into V007/V011/V012/V036 that name them are historical.
+>
 > **Retired (history, not the desired state):** §2 (Stripe Customer mapping,
 > PaymentIntent columns and failure telemetry), §4 (pending-PaymentIntent
 > reuse), §5 (stale-PaymentIntent cleanup), §6 (Stripe webhook identity), §8

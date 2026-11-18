@@ -119,7 +119,8 @@ mit Mock-Werten bzw. faken das SDK am Service-Seam.
 > trägt einen Stripe-Kunden-, PaymentIntent- oder Gebührenwert
 > (`orders`/`users`/`payout_pools` alle 0 in den betreffenden Spalten, bei
 > `orders=0`). Es gibt also nicht nur keinen Stripe-Code mehr, sondern auch
-> keine Stripe-Personendaten in den Beständen. Ob der neue Mollie-only-Text
+> keine Stripe-Personendaten in den Beständen — V054 hat die leeren Spalten
+> daraufhin entfernt (AD-2). Ob der neue Mollie-only-Text
 > datenschutzrechtlich ausreicht, ist die offene juristische Frage in
 > [Issue #2](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/2)
 > und keine Code-Änderung. Befehl und Zahlen:

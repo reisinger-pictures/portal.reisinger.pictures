@@ -579,13 +579,12 @@ class CheckoutIdempotencyService
     private function scopeToProvider(Builder $query, string $paymentMethod): Builder
     {
         if ($paymentMethod === 'mollie') {
-            // `orders.stripe_payment_intent_id` is the historical marker of an
-            // order whose payment belonged to the removed provider. AD-2 keeps
-            // the column for data compatibility, and this is the one remaining
-            // read of it: a new Mollie claim must never adopt a legacy
-            // foreign-provider order (for example a `pending_payment` row that
-            // predates the Mollie attempt ledger).
-            return $query->whereNull('stripe_payment_intent_id');
+            // Mollie is the only online provider. The retired Stripe marker was
+            // dropped in V054, and no other provider can create an online claim,
+            // so every positive pending order is a Mollie claim. The Mollie
+            // attempt ledger — not a stored provider id — separates the online
+            // state machine from the non-immediate (invoice) scope below.
+            return $query;
         }
 
         if ($paymentMethod === 'invoice') {

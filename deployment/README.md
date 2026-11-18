@@ -83,8 +83,11 @@ es gibt keinen Parallelbetrieb und keinen Rückfall auf einen anderen Anbieter.
 Produktions-DB gemessen: `orders=0`, `users=1`, `mollie_payment_attempts=0` und
 alle vier Stripe-Spalten ohne belegte Werte (`stripe_customer_id`,
 `stripe_payment_intent_id`, zweimal `stripe_fee_cents`). Es gab also keine
-Stripe-Zahlung und keine historischen Stripe-Kennungen, die fortgeschrieben
-werden müssten; ob der Mollie-Text in der Datenschutzerklärung genügt, bleibt
+Stripe-Zahlung und keine historischen Stripe-Kennungen. Deshalb hat die in
+[AD-2](../features/tech/07-architectural-decisions.md) verzeichnete Migration
+die leeren Spalten samt Indizes entfernt; sie wird mit dem nächsten Deploy
+wirksam und ist danach per `migrate:status` zu prüfen. Ob
+der Mollie-Text in der Datenschutzerklärung genügt, bleibt
 [juristischer Manual-Check #2](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/2).
 Befehl und Zahlen:
 [`features/infrastructure/30-mollie-payments.md`](../features/infrastructure/30-mollie-payments.md).

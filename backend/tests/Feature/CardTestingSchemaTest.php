@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Order;
 use App\Models\User;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -16,7 +15,6 @@ class CardTestingSchemaTest extends TestCase
 
     public function test_migration_backed_card_testing_fields_are_mass_assignable_and_cast(): void
     {
-        $this->assertTrue(Schema::hasColumn('users', 'stripe_customer_id'));
         $this->assertTrue(Schema::hasColumns('orders', [
             'checkout_idempotency_key',
             'checkout_fingerprint',
@@ -41,15 +39,11 @@ class CardTestingSchemaTest extends TestCase
         $this->assertSame('do_not_honor', $order->last_payment_decline_code);
     }
 
-    public function test_payment_intent_and_stale_selection_indexes_are_migration_backed(): void
+    public function test_stale_selection_index_is_migration_backed(): void
     {
-        $paymentIndexes = collect(Schema::getIndexes('orders'))
+        $indexes = collect(Schema::getIndexes('orders'))
             ->keyBy('name')
-            ->only([
-                'orders_stripe_payment_intent_idx',
-                'orders_pending_stale_idx',
-            ])
-            ->sortKeys()
+            ->only(['orders_pending_stale_idx'])
             ->map(fn (array $index): array => [
                 'columns' => $index['columns'],
                 'unique' => $index['unique'],
@@ -60,35 +54,25 @@ class CardTestingSchemaTest extends TestCase
                 'columns' => ['status', 'created_at', 'id'],
                 'unique' => false,
             ],
-            'orders_stripe_payment_intent_idx' => [
-                'columns' => ['stripe_payment_intent_id'],
-                'unique' => false,
-            ],
-        ], $paymentIndexes->all());
+        ], $indexes->all());
     }
 
-    public function test_v036_rerun_is_a_noop_and_recovers_a_partial_index_commit(): void
+    public function test_v054_drop_is_a_noop_when_rerun(): void
     {
-        $migration = require database_path('migrations/V036__card_testing_defenses.php');
-
-        // RefreshDatabase already applied V036 once. Model the MariaDB
-        // auto-commit boundary where all columns are committed but a later
-        // index statement failed: a retry must tolerate the columns and only
-        // recreate what is missing.
-        Schema::table('users', function (Blueprint $table): void {
-            $table->dropUnique('users_stripe_customer_id_unique');
-        });
-        Schema::table('orders', function (Blueprint $table): void {
-            $table->dropIndex('orders_stripe_payment_intent_idx');
-            $table->dropUnique('orders_user_id_checkout_idempotency_key_unique');
-        });
-
+        // V036's re-run recovery of the Stripe columns is obsolete: V054 drops
+        // them. The replacement contract is that re-running the drop stays a
+        // no-op while the card-testing columns and indexes survive.
+        $migration = require database_path('migrations/V054__drop_stripe_provider_columns.php');
         $migration->up();
-        // A second, fully satisfied retry must be a pure no-op.
         $migration->up();
 
-        $this->assertTrue(Schema::hasColumn('users', 'stripe_customer_id'));
-        $this->assertTrue(Schema::hasIndex('users', 'users_stripe_customer_id_unique', 'unique'));
+        $this->assertFalse(Schema::hasColumn('users', 'stripe_customer_id'));
+        $this->assertFalse(Schema::hasIndex('users', 'users_stripe_customer_id_unique', 'unique'));
+        $this->assertFalse(Schema::hasColumn('orders', 'stripe_payment_intent_id'));
+        $this->assertFalse(Schema::hasIndex('orders', 'orders_stripe_payment_intent_idx'));
+        $this->assertFalse(Schema::hasColumn('orders', 'stripe_fee_cents'));
+        $this->assertFalse(Schema::hasColumn('payout_pools', 'stripe_fee_cents'));
+
         $this->assertTrue(Schema::hasColumns('orders', [
             'checkout_idempotency_key',
             'checkout_fingerprint',
@@ -98,7 +82,6 @@ class CardTestingSchemaTest extends TestCase
             'last_payment_decline_code',
         ]));
         $this->assertTrue(Schema::hasIndex('orders', 'orders_user_id_checkout_idempotency_key_unique', 'unique'));
-        $this->assertTrue(Schema::hasIndex('orders', 'orders_stripe_payment_intent_idx'));
         $this->assertTrue(Schema::hasIndex('orders', 'orders_user_fingerprint_lookup_idx'));
         $this->assertTrue(Schema::hasIndex('orders', 'orders_pending_stale_idx'));
     }
@@ -121,15 +104,6 @@ class CardTestingSchemaTest extends TestCase
         $this->assertSame(0, $order->payment_failure_count);
         $this->assertNull($order->last_payment_failure_at);
         $this->assertNull($order->last_payment_decline_code);
-    }
-
-    public function test_stripe_customer_id_is_unique(): void
-    {
-        User::factory()->create(['stripe_customer_id' => 'cus_unique']);
-
-        $this->expectException(UniqueConstraintViolationException::class);
-
-        User::factory()->create(['stripe_customer_id' => 'cus_unique']);
     }
 
     public function test_checkout_idempotency_key_is_unique_per_user(): void

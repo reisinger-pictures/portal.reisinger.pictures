@@ -36,7 +36,7 @@ The bounded `mollie:reconcile-payments` command retrieves known nonterminal atte
 
 The existing order columns cannot safely represent more than one provider attempt, distinguish an unknown remote create from a completed create, retain a payment ID after a replacement attempt, or enforce provider-ID uniqueness. V053 therefore adds only `mollie_payment_attempts`, rather than repurposing the Stripe PaymentIntent column or widening an order row with a single Mollie ID. It has a restrictive FK to `orders`, a unique `(order_id, generation)` key, unique attempt and idempotency UUIDs, and a unique nullable provider payment ID. Its snapshot is immutable after insert; mutable status/URL/payment-ID/reconciliation timestamps are the only application-managed updates.
 
-There is no backfill: the table is exclusively for newly-created Mollie attempts. The Stripe provider columns stay in the schema as empty historical columns — no production row carries a Stripe value (measured below, 2026-11-17). The migration's rollback is intentionally empty; dropping an attempt ledger could erase financial reconciliation evidence. Rolling application code back leaves the additive table unused and does not alter invoice, order, or Stripe data.
+There is no backfill: the table is exclusively for newly-created Mollie attempts. The Stripe provider columns were **dropped in V054** (AD-2) after the 2026-11-17 measurement below proved them empty; they are no longer part of the schema. V053's rollback is intentionally empty; dropping an attempt ledger could erase financial reconciliation evidence. Rolling application code back leaves the additive table unused and does not alter invoice or order data.
 
 ## Customer UI contract
 
@@ -48,16 +48,17 @@ The cart and its checkout identity survive the redirect: returning without payin
 
 Stripe is removed: no account, no credential, no `stripe/stripe-php` package,
 no webhook route, no reconciliation command and no Stripe config key. There is
-no parallel operation of two providers and no provider selector. The schema
-keeps the historical provider columns, but no production row carries a value.
-None is read as a payment value; the one remaining read is a `whereNull`
-scope that keeps a new Mollie claim from adopting a legacy Stripe order
-(`CheckoutIdempotencyService::scopeToProvider()`). No code path can create a
-Stripe PaymentIntent any more. The owner confirmed that the Stripe flow was never used
+no parallel operation of two providers and no provider selector. The retired
+Stripe columns were dropped in V054 (AD-2); with no stored provider marker and
+no other online provider, every positive pending order is a Mollie claim.
+`CheckoutIdempotencyService::scopeToProvider()` uses the Mollie attempt ledger,
+not a provider id, to keep an online claim out of the non-immediate scope. No
+code path can create a Stripe PaymentIntent any more. The owner confirmed that the Stripe flow was never used
 and that no Stripe payment is open, so no drain of pending Stripe payments was
 required and no money path depends on the removed code.
 
-Measured on the production stack on 2026-11-17 (read-only, via SSH on the host):
+Measured on the production stack on 2026-11-17, **before V054 dropped the columns**
+(read-only, via SSH on the host):
 
 ```sh
 docker exec portal_db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mariadb -uroot portal_db \
@@ -72,12 +73,27 @@ docker exec portal_db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mariadb -uroot por
 
 Result: `orders=0`, `users=1`, `mollie_payment_attempts=0`, and all four
 Stripe-column counts `0` (`COUNT(*)` returns `0` even on an empty table). No
-production row carries a Stripe customer id, PaymentIntent id or Stripe fee;
-the columns remain in the schema as historical empty columns (AD-2). This answers the data half of issue #2: there is nothing to
-disclose as historical Stripe personal data. The remaining question there —
-whether the new Mollie-only privacy text is sufficient — is a legal
-confirmation, not a code finding; it stays with #2. The production migration
-frontier is recorded only in AD-2; no number is copied here.
+production row carries a Stripe customer id, PaymentIntent id or Stripe fee,
+which is why V054 dropped the four columns (AD-2). This answers the data half
+of issue #2: there is nothing to disclose as historical Stripe personal data.
+The remaining question there — whether the new Mollie-only privacy text is
+sufficient — is a legal confirmation, not a code finding; it stays with #2.
+
+The command above is the **pre-drop** evidence and cannot be re-run once the
+drop migration is deployed. Verify the post-drop state instead — the frontier
+migration recorded in AD-2 shows `Ran`, and no matching columns remain:
+
+```sh
+docker exec portal_backend sh -c 'php artisan migrate:status | grep -i pending'
+docker exec portal_db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mariadb -uroot portal_db \
+  -N -e "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS \
+         WHERE TABLE_SCHEMA = \"portal_db\" \
+           AND COLUMN_NAME IN (\"stripe_customer_id\", \"stripe_payment_intent_id\", \"stripe_fee_cents\");"'
+```
+
+The expected output is empty from both commands. The production migration
+**frontier** is recorded only in AD-2; the V054 references above are
+schema-decision anchors, not a frontier copy.
 
 Before live activation, the owner must confirm Mollie account activation and
 the supported payment methods for the Austrian business, verify current
@@ -86,7 +102,8 @@ credentials, set the fee-approved method list in `MOLLIE_PAYMENT_METHODS`, and
 perform an authorized Mollie test-mode smoke. The Mollie Dashboard must not be
 used to enable a method that the repository allowlist does not contain; BNPL
 ids are rejected even if the Dashboard offers them. The removed Stripe side
-needs no drain step and leaves the historical columns in place, empty.
+needs no drain step: its four columns were measured empty and dropped in V054
+(AD-2), so nothing remains to drain or to keep.
 The deploy/restart and live cutover require separate authorization. Missing
 Mollie configuration disables Mollie payment creation; no fallback to another
 provider or client-side payment is allowed.

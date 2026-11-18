@@ -11,7 +11,9 @@
 > Stripe fees and reconciliation — is a historical record of the removed provider
 > and is not an instruction. Where the text says "Stripe PaymentIntent", read
 > "the provider payment attempt of the order"; for anything created today that is
-> a Mollie attempt.
+> a Mollie attempt. V054 dropped the Stripe columns named below after they were
+> measured empty (AD-2), so every column-level rule in this document is
+> historical too.
 >
 > **Status (historical):** Current SOLL as reviewed on 2026-09-24. Legacy `SRP` wording below is
 > retained only where it names an old compatibility key; the live pricing modes

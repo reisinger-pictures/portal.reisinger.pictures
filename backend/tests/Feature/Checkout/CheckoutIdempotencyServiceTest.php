@@ -4,6 +4,7 @@ namespace Tests\Feature\Checkout;
 
 use App\Enums\Brand;
 use App\Models\InvoiceSnapshot;
+use App\Models\MolliePaymentAttempt;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\CheckoutIdempotencyService;
@@ -15,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -76,42 +78,45 @@ class CheckoutIdempotencyServiceTest extends TestCase
         $this->assertSame($identity['key'], $order->fresh()->checkout_idempotency_key);
     }
 
-    public function test_a_legacy_foreign_provider_order_is_not_recognised_as_a_mollie_claim(): void
+    public function test_mollie_is_the_only_online_provider_and_the_attempt_ledger_separates_scopes(): void
     {
         BrandRegistry::set(Brand::B2B);
 
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $request = Request::create('/', 'POST', [
-            'items' => [['photoId' => 'legacy-foreign-photo']],
+            'items' => [['photoId' => 'mollie-only-photo']],
             'billing_name' => 'Tester',
         ]);
         $service = new CheckoutIdempotencyService;
         $identity = $service->identify($request, $user, 4000, 'mollie');
 
-        // A historical pending order of the removed provider: the surviving
-        // marker column is the only thing that distinguishes it from a Mollie
-        // claim, and it must never be adopted by a new Mollie attempt.
-        $legacy = $this->pendingOrder($user, $identity['key'], $identity['fingerprint']);
-        $legacy->forceFill(['stripe_payment_intent_id' => 'pi_old'])->save();
-
-        $this->assertNull($service->findPositiveOnlineOrderByKey($user, $identity['key'], 'mollie'));
-        $this->assertNull($service->findPositiveOnlineOrderByFingerprint($user, $request, 'mollie'));
-
-        // Control: an otherwise identical row without the legacy marker is a
-        // Mollie claim.
-        $mollieOrder = $this->pendingOrder($user, 'mollie-current-key-0001', str_repeat('d', 64));
+        // No stored provider marker exists any more: every positive pending
+        // order is a Mollie claim, because Mollie is the only online provider.
+        $order = $this->pendingOrder($user, $identity['key'], $identity['fingerprint']);
 
         $this->assertSame(
-            $mollieOrder->id,
-            $service->findPositiveOnlineOrderByKey($user, 'mollie-current-key-0001', 'mollie')?->id,
+            $order->id,
+            $service->findPositiveOnlineOrderByKey($user, $identity['key'], 'mollie')?->id,
+        );
+        $this->assertSame(
+            $order->id,
+            $service->findPositiveOnlineOrderByFingerprint($user, $request, 'mollie')?->id,
         );
 
-        // The invoice scope is the mirror image: a row without a Mollie attempt
-        // remains claimable as a non-immediate order.
-        $this->assertSame(
-            $legacy->id,
-            $service->findPositiveOnlineOrderByKey($user, $identity['key'], 'invoice')?->id,
-        );
+        // The attempt ledger, not a provider column, keeps an online claim out
+        // of the non-immediate (invoice) scope.
+        MolliePaymentAttempt::create([
+            'order_id' => (string) $order->id,
+            'generation' => 1,
+            'idempotency_key' => (string) Str::uuid(),
+            'mode' => 'test',
+            'credential_fingerprint' => hash('sha256', 'mollie-key|test'),
+            'amount_cents' => 4000,
+            'status' => MolliePaymentAttempt::STATUS_OPEN,
+            'snapshot' => ['gross_cents' => 4000, 'currency' => 'EUR'],
+        ]);
+
+        $this->assertNull($service->findPositiveOnlineOrderByKey($user, $identity['key'], 'invoice'));
     }
 
     public function test_identity_lock_lease_covers_the_full_provider_timeout_budget(): void
