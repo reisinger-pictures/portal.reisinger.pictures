@@ -35,7 +35,7 @@ final class BoundFileEncryptionTest extends TestCase
         app()->forgetInstance('file.encrypter');
         FileEncrypter::clearResolvedInstances();
 
-        $this->binding = new BoundFileEncryption();
+        $this->binding = new BoundFileEncryption;
     }
 
     public function test_roundtrip_with_matching_context_returns_exact_bytes(): void
