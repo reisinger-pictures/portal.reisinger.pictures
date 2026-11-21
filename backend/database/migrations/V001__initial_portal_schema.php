@@ -88,7 +88,8 @@ return new class extends Migration
         });
 
         Schema::create('gallery_groups', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->uuid('id');
+            $table->primary('id');
             $table->foreignUuid('parent_id')->nullable()->constrained('gallery_groups')->onDelete('set null');
             $table->string('name');
             $table->string('slug')->unique();

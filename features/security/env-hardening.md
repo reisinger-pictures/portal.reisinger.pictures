@@ -396,9 +396,11 @@ entfallen: das Bundle trägt keinen Zahlungs-Key mehr, den man prüfen könnte.
   `.env`-Vorlage oder als Beweis für sichere lokale Secrets verwendet werden.
   Reproduzierbar mit `git ls-files | grep -E '(^|/)\.env'` — es erscheinen nur
   `backend/.env.ci` und die drei `*.example`-Dateien, kein `.env.encrypted`.
-- **`phpunit.xml`-Credentials:** SQLite-`:memory:` plus localhost-Service-Fixtures,
-  akzeptiert. Die MariaDB-Werte in `.env.ci` gehören zum separaten E2E-Service-
-  betrieb und sind nicht der PHPUnit-Test-DB-Vertrag.
+- **`phpunit.xml`-Credentials:** Die Testsuite läuft gegen den in `backend/.env.ci`
+  definierten PostgreSQL-Testservice (`DB_CONNECTION=pgsql`) plus localhost-
+  Service-Fixtures, akzeptiert. Die Zugangsdaten sind ausdrücklich nicht-
+  produktiv. MariaDB wird nur noch als Wegwerf-Quelle für den Cutover-Job
+  (`portal:db-copy`) verwendet und ist nicht der PHPUnit-Test-DB-Vertrag.
 - **Stripe-abhängige Checkout/Payout-Tests:** ✅ **erledigt durch den
   Stripe-Ausbau.** Der Befund von 2026-07-31 (Tests brauchten einen echten
   `STRIPE_SECRET`, weil sie ausgehende `PaymentIntent`-Calls auslösten) gilt

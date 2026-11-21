@@ -13,17 +13,15 @@ use Tests\TestCase;
  * Pins the V046 schema change: `gallery_groups.slug` is unique per
  * `(brand, slug)` instead of globally unique.
  *
- * `RefreshDatabase` runs the real migration chain on SQLite (`:memory:`), so
- * these assertions exercise the migrated schema rather than a hand-built
- * fixture. The companion drop of `gallery_groups_slug_unique` is covered
- * implicitly: the cross-brand insert would fail while the old single-column
- * unique still existed.
+ * `RefreshDatabase` runs the real migration chain on the canonical PostgreSQL
+ * test database, so these assertions exercise the migrated schema rather than
+ * a hand-built fixture. The companion drop of `gallery_groups_slug_unique` is
+ * covered implicitly: the cross-brand insert would fail while the old
+ * single-column unique still existed.
  *
- * SQLite proves the index shape and the database-level rejection. Production
- * runs MySQL/MariaDB, which receives the same DDL through Laravel's schema
- * grammar (`unique(['brand', 'slug'], 'gallery_groups_brand_slug_unique')`);
- * the V046 migration checks index existence driver-neutrally. No MySQL run is
- * performed by this test — that is an admitted gap, not a proven claim.
+ * PostgreSQL proves the index shape and database-level rejection. V046 checks
+ * index existence through Laravel's schema API; this test does not exercise a
+ * separate database driver.
  */
 class GalleryGroupSlugPerBrandUniqueTest extends TestCase
 {

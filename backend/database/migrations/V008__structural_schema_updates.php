@@ -38,8 +38,10 @@ return new class extends Migration
         // 3. invoice_sequences: year zum PK
         if (DB::connection()->getDriverName() === 'sqlite') {
             // No-op: MariaDB-only syntax. On SQLite the column is already BIGINT (AUTOINCREMENT).
-        } else {
+        } elseif (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
             DB::statement('ALTER TABLE invoice_sequences MODIFY id BIGINT UNSIGNED NOT NULL');
+        } else {
+            // PostgreSQL drops this legacy id column below, so no type change is needed.
         }
 
         if (DB::connection()->getDriverName() === 'sqlite') {

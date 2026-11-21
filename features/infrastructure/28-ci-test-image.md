@@ -78,8 +78,8 @@ aktuellen Commits werden weiterhin im Job installiert.
      Test-Setup-Schritt; `DatabaseSeeder` und der Produktionsstart importieren
      keine GeoNames-Daten. Der wöchentliche, gelockte Produktionsimport bleibt
      davon unabhängig.
-   - Datenbank und Such-/Maildienste werden im Container-Modus über ihre
-     Service-Namen erreicht (`mariadb`, `meilisearch`, `mailpit`); die
+   - PostgreSQL-Datenbank und Such-/Maildienste werden im Container-Modus über
+     ihre Service-Namen erreicht (`postgres`, `meilisearch`, `mailpit`); die
      `.env`-Overrides werden nur im E2E-Job vorgenommen. `backend/.env.ci`
      bleibt für den separaten Backend-/PHPUnit-Job unverändert.
    - Auch der Backend-/PHPUnit-Job ruft nach dem Checkout dasselbe

@@ -430,7 +430,11 @@ class MollieWebhookTest extends TestCase
             'customer_details' => [
                 'name' => 'Tester',
                 'email' => 'buyer@example.test',
-                'items' => [['photoId' => 'photo-1', 'tier' => 'web', 'price' => 5000]],
+                // Valid UUID that names no photo: on PostgreSQL the photos.id
+                // column is a real uuid type, so a string like "photo-1" would
+                // fail the whereIn() lookup with a type error before the refund
+                // logic can treat the photo as absent (as it did on MariaDB).
+                'items' => [['photoId' => '00000000-0000-0000-0000-000000000002', 'tier' => 'web', 'price' => 5000]],
             ],
             'total_net' => 5000,
             'total_gross' => 5000,

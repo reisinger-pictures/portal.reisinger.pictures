@@ -201,7 +201,7 @@ class InviteController extends Controller
         $guestId = (string) Str::uuid();
 
         if ($guestEmail) {
-            $realUser = User::where('email', $guestEmail)->first();
+            $realUser = User::query()->matchingEmail($guestEmail)->first();
             if ($realUser) {
                 return response()->json(['error' => 'Diese E-Mail ist bereits mit einem Passwort registriert. Bitte logge dich regulär ein.'], 403);
             }

@@ -68,6 +68,31 @@ class CouponCheckoutControllerTest extends TestCase
         $response->assertJsonMissingPath('coupon.scope_type');
     }
 
+    /**
+     * The customer-facing validate endpoint keeps the MariaDB contract: the
+     * code is matched case-insensitively and the stored spelling is returned.
+     */
+    public function test_validate_coupon_is_case_insensitive_and_returns_the_stored_spelling(): void
+    {
+        Coupon::factory()->percentage(10)->create([
+            'brand' => 'test-brand',
+            'code' => 'Spring10',
+            'active' => true,
+        ]);
+
+        $user = User::factory()->create();
+        $token = auth('api')->login($user);
+
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/coupons/validate', [
+                'code' => 'spring10',
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('valid', true);
+        $response->assertJsonPath('coupon.code', 'Spring10');
+    }
+
     public function test_validate_coupon_returns_invalid_for_nonexistent(): void
     {
         $user = User::factory()->create();

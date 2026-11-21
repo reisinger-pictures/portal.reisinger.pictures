@@ -4,6 +4,7 @@ namespace Tests\Feature\Coupon;
 
 use App\Enums\UserRole;
 use App\Http\Middleware\BrandContextMiddleware;
+use App\Models\Coupon;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\BrandRegistry;
@@ -87,6 +88,24 @@ class CouponAdminControllerTest extends TestCase
             'package_quantity' => 10,
             'package_price_cents' => 4000,
         ]);
+    }
+
+    public function test_store_organisation_coupon_rejects_malformed_scope_uuid(): void
+    {
+        $token = $this->superAdminToken();
+
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/coupons', [
+                'code' => 'ORGUUID',
+                'type' => 'fixed',
+                'value' => 100,
+                'scope_type' => 'organisation',
+                'scope_id' => 'not-a-uuid',
+                'active' => true,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('error', 'Org not found for this brand.');
     }
 
     /**
@@ -221,5 +240,90 @@ class CouponAdminControllerTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJsonPath('error', 'Value is required for fixed and percentage coupons.');
+    }
+
+    public function test_store_rejects_case_variant_duplicate_code_with_the_existing_422_error(): void
+    {
+        $token = $this->superAdminToken();
+        $headers = ['Authorization' => "Bearer $token"];
+        $payload = [
+            'type' => 'percentage',
+            'value' => 10,
+            'scope_type' => 'global',
+            'active' => true,
+        ];
+
+        $this->withHeaders($headers)
+            ->postJson('/api/management/coupons', ['code' => 'SpringSale', ...$payload])
+            ->assertStatus(201);
+
+        $duplicate = $this->withHeaders($headers)
+            ->postJson('/api/management/coupons', ['code' => 'springsale', ...$payload]);
+
+        $duplicate->assertStatus(422);
+        $duplicate->assertJsonPath('error', 'A coupon with this code already exists for this brand.');
+        $this->assertSame(1, Coupon::query()->whereRaw('LOWER(code) = ?', ['springsale'])->count());
+    }
+
+    public function test_update_rejects_case_variant_duplicate_but_allows_its_own_spelling(): void
+    {
+        $token = $this->superAdminToken();
+        $headers = ['Authorization' => "Bearer $token"];
+        $payload = [
+            'type' => 'percentage',
+            'value' => 10,
+            'scope_type' => 'global',
+            'active' => true,
+        ];
+
+        $first = $this->withHeaders($headers)
+            ->postJson('/api/management/coupons', ['code' => 'FirstCode', ...$payload])
+            ->assertStatus(201)
+            ->json('coupon');
+        $second = $this->withHeaders($headers)
+            ->postJson('/api/management/coupons', ['code' => 'SecondCode', ...$payload])
+            ->assertStatus(201)
+            ->json('coupon');
+
+        $duplicate = $this->withHeaders($headers)
+            ->putJson("/api/management/coupons/{$second['id']}", ['code' => 'firstcode']);
+
+        $duplicate->assertStatus(422);
+        $duplicate->assertJsonPath('error', 'A coupon with this code already exists for this brand.');
+        $this->assertDatabaseHas('coupons', ['id' => $second['id'], 'code' => 'SecondCode']);
+
+        // Renaming a coupon to another spelling of its own code must stay
+        // valid: the duplicate check excludes the row being updated.
+        $own = $this->withHeaders($headers)
+            ->putJson("/api/management/coupons/{$first['id']}", ['code' => 'firstcode']);
+
+        $own->assertStatus(200);
+        $own->assertJsonPath('coupon.code', 'firstcode');
+    }
+
+    public function test_store_allows_a_code_that_exists_only_in_another_brand(): void
+    {
+        Coupon::factory()->create([
+            'brand' => 'other-brand',
+            'code' => 'BRANDSHARED',
+            'active' => true,
+        ]);
+
+        $token = $this->superAdminToken();
+
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson('/api/management/coupons', [
+                'code' => 'brandshared',
+                'type' => 'percentage',
+                'value' => 10,
+                'scope_type' => 'global',
+                'active' => true,
+            ]);
+
+        $response->assertStatus(201);
+        $this->assertSame(
+            2,
+            Coupon::query()->whereRaw('LOWER(code) = ?', ['brandshared'])->count(),
+        );
     }
 }

@@ -3,9 +3,6 @@
 ARG PHP_VERSION=8.5
 FROM php:${PHP_VERSION}-fpm
 
-# Database driver: mysql (default) or pgsql
-ARG DB_EXT=mysql
-
 # Runtime identity. The image's own user is www-data 1000:1000 (the CI and E2E
 # jobs override it with `--user root` for the mounted workspace). Production
 # does not use it: deployment/docker-compose.yml runs every service that writes
@@ -33,13 +30,13 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libwebp-dev \
     libzip-dev \
+    libpq-dev \
     libimage-exiftool-perl \
     imagemagick \
     --no-install-recommends \
-    && if [ "${DB_EXT}" = "pgsql" ]; then apt-get install -y --no-install-recommends libpq-dev; fi \
     && docker-php-ext-configure intl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install -j$(nproc) intl gd zip exif pdo_${DB_EXT} pcntl bcmath \
+    && docker-php-ext-install -j$(nproc) intl gd zip exif pdo_mysql pdo_pgsql pcntl bcmath \
     && rm -r /var/lib/apt/lists/* \
     && groupmod --gid "${RUNTIME_GID}" www-data \
     && usermod --uid "${RUNTIME_UID}" --gid "${RUNTIME_GID}" www-data
@@ -47,7 +44,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /var/www/html
 COPY backend-supervisor.sh /usr/local/bin/portal-backend-supervisor
 COPY validate-production-env.sh /usr/local/bin/validate-production-env
+COPY wait-for-selected-database.sh /usr/local/bin/portal-wait-for-selected-database
 RUN chmod 0755 /usr/local/bin/portal-backend-supervisor /usr/local/bin/validate-production-env \
+        /usr/local/bin/portal-wait-for-selected-database \
     && mkdir -p /var/www/photos /var/www/ftp \
     && chown -R www-data:www-data /var/www/html /var/www/photos /var/www/ftp
 

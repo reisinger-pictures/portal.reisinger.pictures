@@ -612,8 +612,9 @@ class ContractJoinTest extends TestCase
             'brand' => Brand::B2B,
         ]);
         $crossed = false;
+        $expiredTimestamp = $this->expiredDatabaseTimestampExpression();
 
-        ContractSigner::creating(function () use ($contract, &$crossed): void {
+        ContractSigner::creating(function () use ($contract, $expiredTimestamp, &$crossed): void {
             if ($crossed) {
                 return;
             }
@@ -622,7 +623,7 @@ class ContractJoinTest extends TestCase
             DB::table('contracts')
                 ->where('id', $contract->getKey())
                 ->update([
-                    'expires_at' => DB::raw('CURRENT_TIMESTAMP'),
+                    'expires_at' => DB::raw($expiredTimestamp),
                 ]);
         });
 
@@ -648,8 +649,9 @@ class ContractJoinTest extends TestCase
             'brand' => Brand::B2B,
         ]);
         $crossed = false;
+        $expiredTimestamp = $this->expiredDatabaseTimestampExpression();
 
-        ContractSigner::creating(function () use ($template, &$crossed): void {
+        ContractSigner::creating(function () use ($template, $expiredTimestamp, &$crossed): void {
             if ($crossed) {
                 return;
             }
@@ -658,7 +660,7 @@ class ContractJoinTest extends TestCase
             DB::table('contracts')
                 ->where('id', $template->getKey())
                 ->update([
-                    'expires_at' => DB::raw('CURRENT_TIMESTAMP'),
+                    'expires_at' => DB::raw($expiredTimestamp),
                 ]);
         });
 
@@ -916,8 +918,8 @@ class ContractJoinTest extends TestCase
 
         // A competing request reaches the same cache-lock identity even when
         // case and surrounding whitespace differ. Holding that exact lock for
-        // one second exercises Laravel's supported block/wait path without an
-        // unsafe second SQLite :memory: writer.
+        // one second exercises Laravel's supported block/wait path through the
+        // shared cache lock.
         $lockKey = Contract::joinLockKey($contract->getKey(), '  ANNA@EXAMPLE.COM  ');
         $lock = Cache::lock($lockKey, 1);
         $this->assertTrue($lock->get());
@@ -1599,8 +1601,9 @@ class ContractJoinTest extends TestCase
     private function crossDeadlineWhenLocked(Contract $contract, string $column): void
     {
         $crossed = false;
+        $expiredTimestamp = $this->expiredDatabaseTimestampExpression();
 
-        Contract::retrieved(function (Contract $loadedContract) use ($contract, $column, &$crossed): void {
+        Contract::retrieved(function (Contract $loadedContract) use ($contract, $column, $expiredTimestamp, &$crossed): void {
             if ($crossed
                 || DB::connection()->transactionLevel() < 1
                 || $loadedContract->getKey() !== $contract->getKey()) {
@@ -1611,9 +1614,19 @@ class ContractJoinTest extends TestCase
             DB::table('contracts')
                 ->where('id', $contract->getKey())
                 ->update([
-                    $column => DB::raw('CURRENT_TIMESTAMP'),
+                    $column => DB::raw($expiredTimestamp),
                 ]);
         });
+    }
+
+    private function expiredDatabaseTimestampExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => "clock_timestamp() - INTERVAL '1 second'",
+            'mysql' => 'CURRENT_TIMESTAMP - INTERVAL 1 SECOND',
+            'sqlite' => "datetime('now', '-1 second')",
+            default => 'CURRENT_TIMESTAMP',
+        };
     }
 
     private function useIsolatedDatabaseQueue(): void

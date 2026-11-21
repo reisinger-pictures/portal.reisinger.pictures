@@ -43,7 +43,7 @@ status: active
   `pnpm test:e2e:grep @feature:<name>`. A feature grep is not a reason to run
   untagged tests; untagged legacy tests remain part of the full suite only.
 - **Trace Viewer & Debugging:** CI never records or uploads Playwright traces, reports, screenshots, videos, or `test-results`, because browser storage and request data can contain credentials or PII. For local debugging, opt in with `PW_TRACE=1` and inspect the trace/report only on the local machine (`npx playwright show-report`).
-- **Test Parallelism & Isolation (CRITICAL):** The default local E2E setup is the isolated backend from `scripts/e2e-up.sh` with `backend/database/database.e2e.sqlite`; CI uses its own test services and database. Tests MUST be isolated and non-destructive and must never be pointed at the developer's working database.
+- **Test Parallelism & Isolation (CRITICAL):** The default local E2E setup is the isolated backend from `scripts/e2e-up.sh` with the PostgreSQL test service from `docker-compose.test.yml` (`portal_db_test`, host port `5433`); CI uses its own PostgreSQL service and database. Tests MUST be isolated and non-destructive and must never be pointed at the developer's working `portal_db`.
   - **Bounded Meilisearch readiness (CR-TEST-012):** The local Compose harness and every CI job with live Scout access (backend PHPUnit and E2E) MUST invoke `scripts/wait-for-meilisearch.sh` before Scout operations. The helper validates positive bounded intervals (total wait at most 300 seconds, retry interval at most 30 seconds, and each HTTP request at most 30 seconds), caps the request and sleep to the remaining wall-clock deadline, and fails setup when the health endpoint does not become available. The E2E job uses the service DNS endpoint `http://meilisearch:7700/health`; the host-networked backend and local Compose harness use `http://127.0.0.1:7701/health`, and the local harness prints Compose diagnostics after a bounded failure.
   - Never share or hardcode specific user emails, gallery names, or order IDs.
   - Always use highly dynamic identifiers (e.g., `Math.random().toString(36)`).
@@ -155,7 +155,7 @@ Diese Regeln sind aus Fehlschlägen entstanden, nicht aus Vermutungen. Jede nenn
   PHPUnit, Vitest, Playwright, or other test suites.
 - `sh scripts/gates.sh full <group>` is restricted to GitHub Actions and is
   invoked by the existing parallel CI jobs. Groups are `security`, `backend`,
-  `mariadb`, `frontend`, and `e2e`; the E2E group receives the matrix shard
+  `postgres`, `frontend`, and `e2e`; the E2E group receives the matrix shard
   arguments. CI setup, services, and job-level environment remain in the
   workflow, and each job invokes its group once.
 - The `security` group retains the repository's infrastructure/security

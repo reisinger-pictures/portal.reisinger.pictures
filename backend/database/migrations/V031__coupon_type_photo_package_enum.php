@@ -25,6 +25,14 @@ return new class extends Migration
             return;
         }
 
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE coupons DROP CONSTRAINT coupons_type_check');
+            DB::statement('ALTER TABLE coupons ALTER COLUMN type TYPE VARCHAR(255)');
+            DB::statement("ALTER TABLE coupons ADD CONSTRAINT coupons_type_check CHECK (type IN ('fixed', 'percentage', 'free_items', 'photo_package'))");
+
+            return;
+        }
+
         DB::statement(
             "ALTER TABLE `coupons` MODIFY `type` ENUM('fixed', 'percentage', 'free_items', 'photo_package') NOT NULL"
         );

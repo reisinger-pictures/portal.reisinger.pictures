@@ -12,6 +12,7 @@ use App\Services\AuthorizationService;
 use App\Services\InvoiceService;
 use App\Services\OrgDefaultRolePolicy;
 use App\Support\BrandRegistry;
+use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -88,7 +89,7 @@ class OrgController extends Controller
         $defaultRolePolicy = app(OrgDefaultRolePolicy::class);
         $request->validate([
             'name' => 'required|string|max:255',
-            'domain' => 'nullable|string|max:255|unique:orgs,domain',
+            'domain' => ['nullable', 'string', 'max:255', $this->uniqueOrgDomainRule()],
             'invoice_frequency' => 'required|in:immediate,monthly,quarterly',
             'default_flatrate_level' => 'nullable|in:none,web,print,original',
             'shared_flatrate_cents' => 'nullable|integer|min:0',
@@ -134,7 +135,7 @@ class OrgController extends Controller
         $defaultRolePolicy = app(OrgDefaultRolePolicy::class);
         $request->validate([
             'name' => 'required|string|max:255',
-            'domain' => 'nullable|string|max:255|unique:orgs,domain,'.$id,
+            'domain' => ['nullable', 'string', 'max:255', $this->uniqueOrgDomainRule($id)],
             'invoice_frequency' => 'required|in:immediate,monthly,quarterly',
             'default_flatrate_level' => 'nullable|in:none,web,print,original',
             'shared_flatrate_cents' => 'nullable|integer|min:0',
@@ -511,6 +512,24 @@ class OrgController extends Controller
         }
 
         return response()->json($result);
+    }
+
+    private function uniqueOrgDomainRule(?string $ignoreOrgId = null): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($ignoreOrgId): void {
+            if (! is_string($value)) {
+                return;
+            }
+
+            $query = Org::query()->matchingDomain($value);
+            if ($ignoreOrgId !== null) {
+                $query->where('id', '!=', $ignoreOrgId);
+            }
+
+            if ($query->exists()) {
+                $fail(__('validation.unique', ['attribute' => $attribute]));
+            }
+        };
     }
 
     /**

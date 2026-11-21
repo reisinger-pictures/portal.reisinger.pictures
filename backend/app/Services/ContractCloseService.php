@@ -273,7 +273,7 @@ class ContractCloseService
         }
 
         return User::query()
-            ->where('email', $email)
+            ->matchingEmail($email)
             ->where('brand', $brandId)
             ->value('id');
     }

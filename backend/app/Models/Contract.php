@@ -219,7 +219,7 @@ class Contract extends Model
      */
     public function scopePubliclyAvailableAtDatabaseTime($query)
     {
-        $databaseNow = DB::raw('CURRENT_TIMESTAMP');
+        $databaseNow = DB::raw(static::databaseTimestampSql());
 
         $query->where('status', 'active')
             ->where(function (Builder $query) use ($databaseNow): void {
@@ -259,9 +259,19 @@ class Contract extends Model
         // be used as an unquoted result alias. Keep this read portable across
         // MariaDB and SQLite; otherwise every public join/check path fails
         // with a 500 before validation or persistence runs.
-        $row = DB::selectOne('SELECT CURRENT_TIMESTAMP AS contract_database_now');
+        $row = DB::selectOne('SELECT '.static::databaseTimestampSql().' AS contract_database_now');
 
         return Carbon::parse($row->contract_database_now, 'UTC');
+    }
+
+    private static function databaseTimestampSql(): string
+    {
+        // PostgreSQL's CURRENT_TIMESTAMP is fixed at transaction start. These
+        // availability checks run again inside locked transactions, so use its
+        // wall clock to observe a deadline crossed during the transaction.
+        return DB::connection()->getDriverName() === 'pgsql'
+            ? 'clock_timestamp()'
+            : 'CURRENT_TIMESTAMP';
     }
 
     public function isPubliclyAvailableAtDatabaseTime(): bool

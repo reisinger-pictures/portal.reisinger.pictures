@@ -25,7 +25,7 @@ class AdminUpdate extends Command
             return self::FAILURE;
         }
 
-        $admin = User::firstOrNew(['email' => $email]);
+        $admin = User::query()->matchingEmail($email)->first() ?? new User(['email' => $email]);
         if (! $admin->exists) {
             $admin->name = 'Admin';
         }
