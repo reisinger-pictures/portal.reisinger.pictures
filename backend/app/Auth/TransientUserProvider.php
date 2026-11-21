@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\AuthorizationService;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
 class TransientUserProvider extends EloquentUserProvider
@@ -49,6 +50,15 @@ class TransientUserProvider extends EloquentUserProvider
                 return $user;
             }
 
+            return null;
+        }
+
+        // `users.id` is a UUID column and only `guest_` subjects are synthetic.
+        // A detached offer token carries `sub: offer`; it is a credential for
+        // its own public flow and must never resolve to a user. Keeping every
+        // non-UUID identifier out of the query also prevents SQLSTATE 22P02
+        // from turning such a request into a 500.
+        if (! is_string($identifier) || ! Str::isUuid($identifier)) {
             return null;
         }
 

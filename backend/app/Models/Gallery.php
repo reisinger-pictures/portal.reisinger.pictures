@@ -189,9 +189,24 @@ class Gallery extends Model
         return $this->hasMany(Photo::class)->orderBy('id', 'desc');
     }
 
+    /**
+     * The photo with the greatest id in this gallery.
+     *
+     * `latestOfMany()` expresses that as `MAX(photos.id)`, which PostgreSQL
+     * cannot evaluate on a UUID column (`function max(uuid) does not exist`).
+     * The correlated scalar subquery below selects the same row — the greatest
+     * id — without an aggregate, so the eager and lazy semantics are unchanged
+     * and both database engines can run it.
+     */
     public function latestPhoto()
     {
-        return $this->hasOne(Photo::class)->latestOfMany();
+        return $this->hasOne(Photo::class)->where('photos.id', '=', function ($query) {
+            $query->select('newest.id')
+                ->from('photos as newest')
+                ->whereColumn('newest.gallery_id', 'photos.gallery_id')
+                ->orderByDesc('newest.id')
+                ->limit(1);
+        });
     }
 
     public function galleryGroup()

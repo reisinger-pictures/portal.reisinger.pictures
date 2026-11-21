@@ -11,6 +11,10 @@ return new class extends Migration
     {
         if (DB::connection()->getDriverName() === 'sqlite') {
             Schema::table('contract_audit_logs', fn (Blueprint $t) => $t->enum('action', ['opened', 'heartbeat', 'signed', 'modified'])->change());
+        } elseif (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE contract_audit_logs DROP CONSTRAINT contract_audit_logs_action_check');
+            DB::statement('ALTER TABLE contract_audit_logs ALTER COLUMN action TYPE VARCHAR(255)');
+            DB::statement("ALTER TABLE contract_audit_logs ADD CONSTRAINT contract_audit_logs_action_check CHECK (action IN ('opened', 'heartbeat', 'signed', 'modified'))");
         } else {
             DB::statement("ALTER TABLE contract_audit_logs MODIFY COLUMN action ENUM('opened', 'heartbeat', 'signed', 'modified') NOT NULL");
         }

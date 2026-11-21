@@ -117,7 +117,7 @@
       "severity": "high",
       "status": "fixed",
       "status_since": "2026-10-18",
-      "regression_test": "ContractContentHeartbeatMySqlTest, AtomicThrottleRequestsTest",
+      "regression_test": "ContractContentHeartbeatPostgresTest, AtomicThrottleRequestsTest",
       "path": "features/security/2026-10-18-review-closure.md",
       "note": "closed in ff8c46f and 27e46cf"
     },

@@ -17,6 +17,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class AuthorizationService
 {
@@ -1525,6 +1526,10 @@ class AuthorizationService
             return true;
         }
 
+        if (! Str::isUuid($galleryId)) {
+            return false;
+        }
+
         $gallery = Gallery::find($galleryId);
         if (! $gallery) {
             return false;
@@ -1581,6 +1586,10 @@ class AuthorizationService
 
         if ($this->isCrossBrandSuperAdmin($user)) {
             return true;
+        }
+
+        if (! Str::isUuid($galleryId)) {
+            return false;
         }
 
         $gallery = Gallery::find($galleryId);

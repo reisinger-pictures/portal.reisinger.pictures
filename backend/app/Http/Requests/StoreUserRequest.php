@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\User;
 use App\Services\AuthorizationService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
@@ -26,7 +27,15 @@ class StoreUserRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
+            'email' => [
+                'required',
+                'email',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (is_string($value) && User::query()->matchingEmail($value)->exists()) {
+                        $fail(__('validation.unique', ['attribute' => $attribute]));
+                    }
+                },
+            ],
         ];
     }
 

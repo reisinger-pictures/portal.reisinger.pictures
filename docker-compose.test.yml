@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:16
+    container_name: portal_db_test
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: portal_test_db
+      POSTGRES_USER: portal_user
+      POSTGRES_PASSWORD: admin
+    ports: ["5433:5432"]
+    volumes: ["db_data_test:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "portal_user", "-d", "portal_test_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   search:
     image: getmeili/meilisearch:v1.48.3
     container_name: portal_search_test
@@ -37,4 +53,5 @@ services:
     ports: ["127.0.0.1:18081:8080"]
 
 volumes:
+  db_data_test:
   search_data_test:

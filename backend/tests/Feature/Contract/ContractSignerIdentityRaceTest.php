@@ -19,18 +19,18 @@ class ContractSignerIdentityRaceTest extends TestCase
         return [];
     }
 
-    public function test_mariadb_or_mysql_multi_connection_race_has_one_canonical_winner(): void
+    public function test_postgres_multi_connection_race_has_one_canonical_winner(): void
     {
         $driver = DB::connection()->getDriverName();
-        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
-            $this->markTestSkipped('This race requires a real MariaDB/MySQL connection; SQLite :memory: cannot provide independent writer connections.');
+        if ($driver !== 'pgsql') {
+            $this->markTestSkipped('This race requires independent PostgreSQL connections.');
         }
 
         if (! function_exists('pcntl_fork')) {
-            $this->markTestSkipped('This race requires pcntl_fork to coordinate two independent database connections.');
+            $this->fail('This race requires pcntl_fork to coordinate two independent database connections.');
         }
 
-        $connectionConfig = config('database.connections.'.$driver);
+        $connectionConfig = config('database.connections.pgsql');
         config([
             'database.connections.contract_identity_race_a' => $connectionConfig,
             'database.connections.contract_identity_race_b' => $connectionConfig,
@@ -42,7 +42,7 @@ class ContractSignerIdentityRaceTest extends TestCase
             'status' => 'active',
         ]);
         $scopeKey = 'contract:'.$contract->id;
-        $email = 'mariadb-race@example.com';
+        $email = 'postgres-race@example.com';
         $barrierDirectory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'portal-contract-race-'.Str::uuid();
         mkdir($barrierDirectory, 0700, true);
         $goFile = $barrierDirectory.DIRECTORY_SEPARATOR.'go';
@@ -52,7 +52,7 @@ class ContractSignerIdentityRaceTest extends TestCase
             foreach (['a', 'b'] as $worker) {
                 $pid = pcntl_fork();
                 if ($pid === -1) {
-                    $this->fail('Unable to fork the MariaDB/MySQL race worker.');
+                    $this->fail('Unable to fork the PostgreSQL race worker.');
                 }
 
                 if ($pid === 0) {
@@ -136,7 +136,7 @@ class ContractSignerIdentityRaceTest extends TestCase
             DB::connection($connectionName)->table('contract_signers')->insert([
                 'id' => (string) Str::uuid(),
                 'contract_id' => $contractId,
-                'name' => 'MariaDB race signer',
+                'name' => 'PostgreSQL race signer',
                 'email' => $email,
                 'normalized_email' => $email,
                 'join_scope_key' => $scopeKey,
@@ -180,6 +180,6 @@ class ContractSignerIdentityRaceTest extends TestCase
             usleep(1000);
         } while (microtime(true) < $deadline);
 
-        $this->fail('Timed out waiting for MariaDB/MySQL race workers.');
+        $this->fail('Timed out waiting for PostgreSQL race workers.');
     }
 }

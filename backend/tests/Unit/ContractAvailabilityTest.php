@@ -53,11 +53,12 @@ class ContractAvailabilityTest extends TestCase
 
     public function test_database_clock_read_uses_a_mariadb_safe_alias(): void
     {
-        // SQLite accepts the old alias, so assert the portable SQL contract
-        // explicitly while keeping the default PHPUnit run self-contained.
+        // Match on the result alias rather than on a driver-specific clock
+        // expression: PostgreSQL reads clock_timestamp(), MariaDB and SQLite
+        // read CURRENT_TIMESTAMP. The alias is the portable contract.
         $clockQueries = [];
         DB::listen(function (QueryExecuted $query) use (&$clockQueries): void {
-            if (str_contains(strtoupper($query->sql), 'CURRENT_TIMESTAMP')) {
+            if (str_contains(strtoupper($query->sql), 'AS CONTRACT_DATABASE_NOW')) {
                 $clockQueries[] = $query->sql;
             }
         });
@@ -74,6 +75,13 @@ class ContractAvailabilityTest extends TestCase
             'AS current_time',
             $clockQueries[0],
         );
+        // PostgreSQL's CURRENT_TIMESTAMP is fixed at transaction start, so the
+        // locked-operation read must use its wall clock instead.
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $this->assertStringContainsStringIgnoringCase('clock_timestamp()', $clockQueries[0]);
+        } else {
+            $this->assertStringContainsStringIgnoringCase('CURRENT_TIMESTAMP', $clockQueries[0]);
+        }
     }
 
     public function test_instance_cannot_outlive_a_parent_with_an_earlier_deadline(): void

@@ -11,6 +11,7 @@ use App\Services\AuthorizationService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 class AIController extends Controller
 {
@@ -42,8 +43,11 @@ class AIController extends Controller
             return response()->json(['error' => 'Keine Berechtigung für KI-Generierung.'], 403);
         }
 
+        // `photos.id` is a UUID column. A non-UUID value cannot name a photo,
+        // and querying it would fail at the database instead of reaching the
+        // opaque 403 / validation contract below.
         $photoId = $request->input('photo_id');
-        $photo = is_string($photoId) && $photoId !== ''
+        $photo = is_string($photoId) && Str::isUuid($photoId)
             ? Photo::with('gallery')->find($photoId)
             : null;
 
@@ -65,7 +69,10 @@ class AIController extends Controller
         }
 
         $request->validate([
-            'photo_id' => 'required|string|exists:photos,id',
+            // `uuid` keeps a malformed id out of the `exists` query; the
+            // broad-capability path gets 422, while target-scoped-only actors
+            // retain the opaque 403 above.
+            'photo_id' => 'required|string|uuid|exists:photos,id',
             'global_context' => 'nullable|string|max:1000',
             'specific_context' => 'nullable|string|max:1000',
             'session_id' => 'nullable|string|max:128',

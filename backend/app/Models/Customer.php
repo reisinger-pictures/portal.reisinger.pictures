@@ -6,6 +6,7 @@ use App\Casts\AsBrand;
 use App\Enums\Brand;
 use App\Observers\CustomerObserver;
 use App\Support\BrandRegistry;
+use App\Support\EmailNormalizer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -38,6 +39,11 @@ class Customer extends Model
         'birthdate' => 'date:Y-m-d',
         'is_model' => 'boolean',
     ];
+
+    public function setEmailAttribute(?string $email): void
+    {
+        $this->attributes['email'] = $email === null ? null : EmailNormalizer::normalize($email);
+    }
 
     /**
      * Scope to the current brand (host-derived). See spec §3.3 / §3.4.

@@ -244,15 +244,12 @@ class ContractControllerTest extends TestCase
         ]);
 
         $response->assertStatus(201);
-        $this->assertDatabaseHas('contracts', [
-            'status' => 'draft',
-            'items' => json_encode([[
-                'type' => 'item',
-                'description' => 'Grenzwert',
-                'qty' => 1,
-                'price' => $boundary,
-            ]]),
-        ]);
+        $this->assertSame([[
+            'type' => 'item',
+            'description' => 'Grenzwert',
+            'qty' => 1,
+            'price' => $boundary,
+        ]], Contract::query()->where('status', 'draft')->sole()->items);
     }
 
     public function test_store_rejects_persisted_money_overflow_without_persistence(): void
@@ -366,22 +363,20 @@ class ContractControllerTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('contract.items.0.price', 8000);
         $response->assertJsonPath('contract.discounts.0.price', 500);
-        $this->assertDatabaseHas('contracts', [
-            'id' => $contract->id,
-            'items' => json_encode([[
-                'type' => 'item',
-                'description' => 'Aktualisierte Leistung',
-                'notes' => '',
-                'qty' => 1,
-                'price' => 8000,
-            ]]),
-            'discounts' => json_encode([[
-                'type' => 'discount_fixed',
-                'description' => 'Rabatt',
-                'notes' => '',
-                'price' => 500,
-            ]]),
-        ]);
+        $stored = $contract->fresh();
+        $this->assertSame([[
+            'type' => 'item',
+            'description' => 'Aktualisierte Leistung',
+            'notes' => '',
+            'qty' => 1,
+            'price' => 8000,
+        ]], $stored->items);
+        $this->assertSame([[
+            'type' => 'discount_fixed',
+            'description' => 'Rabatt',
+            'notes' => '',
+            'price' => 500,
+        ]], $stored->discounts);
     }
 
     public function test_update_fails_closed_when_a_legacy_mixed_snapshot_would_be_reordered(): void
@@ -524,10 +519,7 @@ class ContractControllerTest extends TestCase
         ]);
 
         $response->assertStatus(200);
-        $this->assertDatabaseHas('contracts', [
-            'id' => $contract->id,
-            'available_roles' => json_encode(['Model', 'Fotograf']),
-        ]);
+        $this->assertSame(['Model', 'Fotograf'], $contract->fresh()->available_roles);
     }
 
     public function test_cannot_update_active_contract_with_signed_signer(): void

@@ -11,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -118,7 +119,12 @@ class ImportFtpBatch implements ShouldQueue
 
     public function handle(FtpInboxImporter $importer): void
     {
-        $user = User::query()->find($this->userId);
+        // `users.id` is a UUID column. A malformed payload id cannot name an
+        // account, so it takes the same visible exit as a deleted account
+        // instead of failing the query with SQLSTATE 22P02.
+        $user = Str::isUuid($this->userId)
+            ? User::query()->find($this->userId)
+            : null;
 
         if ($user === null) {
             // The account was deleted between the event and the run. Nothing to

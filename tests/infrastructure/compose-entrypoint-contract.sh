@@ -52,6 +52,43 @@ assert_contains() {
     grep -Fq -- "$2" "$COMPOSE" || fail "$3"
 }
 
+# The dual-engine production Compose file is deployed before the one-time data
+# copy. Legacy .env files have DB_CONNECTION=mariadb but no host/port or cache
+# engine keys, so their fallback must remain MariaDB until the cutover helper
+# writes the PostgreSQL coordinates atomically.
+assert_contains "$COMPOSE" '      - DB_HOST=${DB_HOST:-db}' \
+    'a legacy production .env without DB_HOST must stay on the MariaDB service during the preparatory deploy'
+assert_contains "$COMPOSE" '      - DB_PORT=${DB_PORT:-3306}' \
+    'a legacy production .env without DB_PORT must stay on the MariaDB port during the preparatory deploy'
+assert_contains "$COMPOSE" '      - DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
+    'the queue database must default to the selected engine before and after cutover'
+assert_contains "$COMPOSE" '      - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
+    'the cache database must default to the selected engine before and after cutover'
+assert_contains "$COMPOSE" '      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
+    'the cache-lock database must default to the selected engine before and after cutover'
+
+backend_dependencies() {
+    awk '
+        /^  backend:$/ { in_backend = 1; next }
+        in_backend && /^  [a-z_]+:$/ { exit }
+        in_backend && /^    depends_on:$/ { in_dependencies = 1; next }
+        in_dependencies && /^    [a-z_]+:/ { in_dependencies = 0 }
+        in_dependencies { print }
+    ' "$COMPOSE"
+}
+
+DEPENDENCIES="$(backend_dependencies)"
+if grep -Eq '^      (db|db_pg):$' <<< "$DEPENDENCIES"; then
+    fail 'the backend must not wait for the unselected database engine; the entrypoint probes DB_CONNECTION directly'
+fi
+assert_contains "$COMPOSE" '      /usr/local/bin/portal-wait-for-selected-database || exit 1;' \
+    'the backend must fail closed until the selected database accepts a Laravel query'
+grep -Fq 'COPY wait-for-selected-database.sh /usr/local/bin/portal-wait-for-selected-database' \
+    "$ROOT_DIR/deployment/Dockerfile" \
+    || fail 'the selected-database readiness guard is not included in the production image'
+[[ -x "$ROOT_DIR/deployment/wait-for-selected-database.sh" ]] \
+    || fail 'the selected-database readiness helper is not executable'
+
 # The backend `command:` block: from the folded scalar to the next service-level
 # key. Everything in between is one shell string once Compose is done with it.
 backend_command() {
@@ -64,6 +101,10 @@ backend_command() {
 
 CMD_BLOCK="$(backend_command)"
 [[ -n "$CMD_BLOCK" ]] || fail 'the backend command block could not be located in the compose file'
+config_clear_line="$(grep -nF 'php artisan config:clear || exit 1;' <<< "$CMD_BLOCK" | cut -d: -f1)"
+readiness_line="$(grep -nF '/usr/local/bin/portal-wait-for-selected-database || exit 1;' <<< "$CMD_BLOCK" | cut -d: -f1)"
+[[ -n "$config_clear_line" && -n "$readiness_line" && "$config_clear_line" -lt "$readiness_line" ]] \
+    || fail 'the Laravel config cache must be cleared before probing the DB_CONNECTION-selected engine'
 
 # --- 1. no comment may survive into the folded command ----------------------
 if grep -q '#' <<<"$CMD_BLOCK"; then

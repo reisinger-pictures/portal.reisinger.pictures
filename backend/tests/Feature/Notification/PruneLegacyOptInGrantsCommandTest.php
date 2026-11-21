@@ -203,10 +203,14 @@ class PruneLegacyOptInGrantsCommandTest extends TestCase
         $gallery = Gallery::factory()->create(['type' => 'delivery']);
         $goneUserId = (string) Str::uuid();
 
-        // The deferred pragma keeps the foreign key check from firing inside
-        // the test transaction, so the row can outlive its user. The check is
-        // deferred to the commit, and the test transaction is rolled back.
-        DB::statement('PRAGMA defer_foreign_keys = ON');
+        // This intentionally malformed fixture is outside the production FK
+        // invariant. SQLite can defer the check; PostgreSQL drops it within the
+        // test transaction, which is rolled back after the test.
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA defer_foreign_keys = ON');
+        } else {
+            DB::statement('ALTER TABLE user_galleries DROP CONSTRAINT user_galleries_user_id_foreign');
+        }
         DB::table('user_galleries')->insert([
             'user_id' => $goneUserId,
             'gallery_id' => $gallery->id,

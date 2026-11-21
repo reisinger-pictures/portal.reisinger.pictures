@@ -129,7 +129,7 @@ class FtpSlugChangePasswordTest extends TestCase
         // Show-once means show-once *and* nowhere else. Now that the value is in
         // the response it is worth pinning that the response is the only place
         // it exists — a copy in a column or a cache entry would be a second one.
-        $this->assertDatabaseMissing('users', ['id' => $photographer->id, 'ftp_password' => $shown]);
+        $this->assertArrayNotHasKey('ftp_password', $photographer->fresh()->getAttributes());
         $this->assertStringNotContainsString(
             $shown,
             (string) json_encode($photographer->fresh()?->getAttributes(), JSON_THROW_ON_ERROR),

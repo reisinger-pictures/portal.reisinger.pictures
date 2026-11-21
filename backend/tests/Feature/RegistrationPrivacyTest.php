@@ -185,17 +185,32 @@ class RegistrationPrivacyTest extends TestCase
         // Simulate the loser of two concurrent registrations: both requests pass
         // the existence check, then the competing request inserts the row just
         // before this one's INSERT reaches the unique index on `users.email`.
-        // The raw insert deliberately bypasses the model so it cannot recurse
-        // into the listener below.
+        // PostgreSQL needs the competing commit to be on another connection:
+        // an insert made inside the losing attempt's savepoint would correctly
+        // roll back together with its failed generated-slug insert.
         $competitorInserted = false;
-        User::creating(function () use (&$competitorInserted, $email): void {
+        $raceConnectionName = null;
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $raceConnectionName = 'registration_race';
+            config([
+                'database.connections.'.$raceConnectionName => config(
+                    'database.connections.'.DB::getDefaultConnection(),
+                ),
+            ]);
+            DB::purge($raceConnectionName);
+        }
+
+        User::creating(function () use (&$competitorInserted, $email, $raceConnectionName): void {
             if ($competitorInserted) {
                 return;
             }
 
             $competitorInserted = true;
 
-            DB::table('users')->insert([
+            $connection = $raceConnectionName === null
+                ? DB::connection()
+                : DB::connection($raceConnectionName);
+            $connection->table('users')->insert([
                 'id' => (string) Str::uuid(),
                 'email' => $email,
                 'name' => 'Concurrent registrant',
@@ -204,7 +219,18 @@ class RegistrationPrivacyTest extends TestCase
             ]);
         });
 
-        $response = $this->register('Race Loser', $email);
+        try {
+            $response = $this->register('Race Loser', $email);
+        } finally {
+            if ($raceConnectionName !== null) {
+                DB::connection($raceConnectionName)
+                    ->table('users')
+                    ->where('email', $email)
+                    ->where('name', 'Concurrent registrant')
+                    ->delete();
+                DB::purge($raceConnectionName);
+            }
+        }
 
         $this->assertTrue($competitorInserted, 'The simulated competitor must have inserted the address.');
         $response->assertOk();
@@ -219,9 +245,8 @@ class RegistrationPrivacyTest extends TestCase
             fn (ActivateAccountMail $mail): bool => $mail->hasTo($email)
         );
 
-        // The competitor's row lived in this transaction as well and is rolled
-        // back with it; the assertion documents that the losing request wrote
-        // nothing of its own.
+        // The competitor fixture is cleaned up on its independent connection;
+        // the losing request's transaction must leave no user row behind.
         $this->assertDatabaseMissing('users', ['email' => $email]);
     }
 

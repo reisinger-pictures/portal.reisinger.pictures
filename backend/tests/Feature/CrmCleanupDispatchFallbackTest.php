@@ -351,8 +351,18 @@ class CrmCleanupDispatchFallbackTest extends TestCase
         Log::spy();
 
         $thrown = null;
+        $customerId = null;
         try {
-            app(CustomerSearchSyncService::class)->defer('customer-1');
+            // The production caller defers search sync inside its business
+            // transaction. PostgreSQL aborts that transaction when the intent
+            // INSERT fails, so the caller's rollback is the boundary that
+            // restores the connection; model it as the savepoint it is when
+            // the test itself already runs in the RefreshDatabase transaction.
+            DB::transaction(function () use (&$customerId): void {
+                $customer = Customer::factory()->create();
+                $customerId = (string) $customer->getKey();
+                app(CustomerSearchSyncService::class)->defer($customer);
+            });
         } catch (Throwable $exception) {
             $thrown = $exception;
         }
@@ -362,9 +372,10 @@ class CrmCleanupDispatchFallbackTest extends TestCase
         // path, and the failure is audited as critical.
         $this->assertInstanceOf(QueryException::class, $thrown);
         $this->assertDatabaseCount('jobs', 0);
+        $this->assertDatabaseCount('customers', 0);
         Log::shouldHaveReceived('critical')
             ->with('customer.search_sync.fallback_failed', Mockery::on(
-                static fn (array $context): bool => $context['customer_id'] === 'customer-1'
+                static fn (array $context): bool => $context['customer_id'] === $customerId
                     && isset($context['exception'])
             ))
             ->once();

@@ -25,7 +25,7 @@ use Tests\TestCase;
  *
  * The measured defect was a non-atomic check-then-increment in
  * `ThrottleRequests::handleRequest()`; the real concurrency evidence lives in
- * tests/scripts/contract-content-mariadb-probe.sh. This file pins the part that
+ * tests/scripts/contract-content-postgres-probe.sh. This file pins the part that
  * can be proven without parallelism:
  *
  *  - the decision uses the counter after this request was counted, so a counter
