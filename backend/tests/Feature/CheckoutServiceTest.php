@@ -278,7 +278,11 @@ class CheckoutServiceTest extends TestCase
 
         try {
             $this->service->processCheckout(
-                $this->makeRequest([['photoId' => 'nonexistent-id', 'useCaseId' => $useCase->id, 'tier' => 'web']]),
+                // A syntactically valid UUID that is not in the table: on
+                // PostgreSQL the photos.id column is a real uuid type, so a
+                // placeholder like "nonexistent-id" would raise a type error
+                // before the intended ModelNotFoundException.
+                $this->makeRequest([['photoId' => '00000000-0000-0000-0000-000000000000', 'useCaseId' => $useCase->id, 'tier' => 'web']]),
                 $user,
                 'invoice'
             );
