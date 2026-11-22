@@ -132,6 +132,9 @@ export interface EurPlanYear {
     private_use_cents: number;
     business_use_cents: number;
     status: string;
+    /** #34: present once the year-end booking created a journal entry. */
+    eur_entry_id?: number | null;
+    booked_at?: string | null;
 }
 
 export interface EurAsset {
@@ -147,13 +150,53 @@ export interface EurAsset {
     degressive_rate: number | null;
     status: string;
     years: EurPlanYear[];
+    /** #34 P5.4: private/mixed-use investment shown in its own view. */
+    is_private_investment?: boolean;
+    category?: string | null;
+    /** #34 P5.3: a permanent switch to linear is recorded here. */
+    switched_to_linear_at?: string | null;
+    switch_reason?: string | null;
+}
+
+/** #34 P5.2: AfA category suggested from the pinned reference catalogue. */
+export interface EurSuggestedCategory {
+    type: string;
+    e1a: string | null;
+    share_percent: number | null;
 }
 
 export interface EurAssetComparison {
     linear: {year: number; method: string; depreciation_cents: number; book_value_cents: number}[];
     degressive: {year: number; method: string; depreciation_cents: number; book_value_cents: number}[];
+    /** #34 P5.2: first acquisition year side by side, amounts already in cents. */
+    first_year: {
+        linear_cents: number;
+        degressive_cents: number;
+        linear_business_cents: number;
+        degressive_business_cents: number;
+    };
+    suggested_category: EurSuggestedCategory;
     switch_recommended_year: number | null;
     switch_advantage_cents: number;
+}
+
+/** #34 P5.2: a new asset is created from the confirmed category suggestion. */
+export interface EurCreateAssetPayload {
+    name: string;
+    invoice_no: string;
+    supplier: string;
+    purchase_date: string;
+    cost_cents: number;
+    useful_life_years: number;
+    business_share: number;
+    method: 'linear' | 'degressiv';
+    degressive_rate: number | null;
+    category: string;
+    is_private_investment: boolean;
+}
+
+export function createEurAsset(payload: EurCreateAssetPayload): Promise<{asset: EurAsset}> {
+    return apiMutate('/api/management/eur/assets', 'POST', payload);
 }
 
 export interface EurSettings {
@@ -563,6 +606,10 @@ export async function fetchEurComparison(params: {
     useful_life_years: number;
     degressive_rate: number;
     acquisition_month: number;
+    /** #34 P5.2: name drives the category suggestion from the reference catalogue. */
+    name?: string;
+    /** #34 P5.4: business share in 5-% steps (50–100). */
+    business_share?: number;
 }): Promise<EurAssetComparison> {
     const query = new URLSearchParams({
         cost_cents: String(params.cost_cents),
@@ -570,8 +617,23 @@ export async function fetchEurComparison(params: {
         degressive_rate: String(params.degressive_rate),
         acquisition_month: String(params.acquisition_month),
     });
+    if (params.name) query.set('name', params.name);
+    if (params.business_share !== undefined) query.set('business_share', String(params.business_share));
 
     return fetcher<EurAssetComparison>(`/api/management/eur/assets/compare?${query.toString()}`);
+}
+
+/** #34 P5.5: idempotent year-end booking of an asset's business depreciation. */
+export function bookEurAssetDepreciation(id: number, year: number): Promise<{
+    entry: {id: number; receipt_no: string | null; business_amount_cents: number};
+    already_booked: boolean;
+}> {
+    return apiMutate(`/api/management/eur/assets/${id}/book-depreciation`, 'POST', {year});
+}
+
+/** #34 P5.3: one-time, reasoned switch from degressive to linear. */
+export function switchEurAssetToLinear(id: number, year: number, reason: string): Promise<{asset: EurAsset}> {
+    return apiMutate(`/api/management/eur/assets/${id}/switch-to-linear`, 'POST', {year, reason});
 }
 
 export type EurVatKz = '000' | '016' | '057' | '070' | '072' | '073' | '008' | '125' | 'zahllast';

@@ -8,6 +8,7 @@ const createRoleLabels = (): Record<UserRole, string> => ({
     [UserRole.PHOTOGRAPHER]: t`Fotograf`,
     [UserRole.ORG_ADMIN]: t`Organisationsadministrator`,
     [UserRole.CUSTOMER_MANAGER]: t`Kundenbetreuer`,
+    [UserRole.ACCOUNTING]: t`Buchhaltung`,
     [UserRole.POWER_USER]: t`Power-User`,
     [UserRole.CLIENT]: t`Kunde`,
 });

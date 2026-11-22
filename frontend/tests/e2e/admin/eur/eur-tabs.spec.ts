@@ -55,6 +55,23 @@ test.describe('EAR cockpit navigation', () => {
         }
     });
 
+    test('Anlagen-Tab zeigt die AfA-Anzeige mit Privatfilter', { tag: ['@feature:eur'] }, async ({ page }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        await auth.login(superAdmin.email, superAdmin.password);
+        await sidebar.navigateTo('EA Rechnung');
+
+        const main = page.getByRole('main');
+        await page.getByRole('tab', { name: 'Anlagen', exact: true }).click();
+
+        // D-10: Panel-Inhalte bleiben auf das main-Landmark gescopt.
+        await expect(main.getByRole('heading', { name: 'Anlagen und Abschreibung' })).toBeVisible();
+        const panel = main.getByTestId('eur-assets-panel');
+        await expect(panel.getByRole('button', { name: 'Alle Anlagen' })).toBeVisible();
+        await expect(panel.getByRole('button', { name: 'Privateinlagen' })).toBeVisible();
+    });
+
     test('Monatssteuerung legt Monat und Jahr idempotent an', { tag: ['@feature:eur'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

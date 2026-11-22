@@ -482,7 +482,8 @@ steuerliche Richtigkeit der ODS-Regeln selbst.
 | EUE-088 USt-Block 2 | behoben | `7789b6a7` · `EurVatController::declarations()` nutzt `year_totals` |
 | EUE-119/120/122 Auswertungen | behoben | `7789b6a7` · `EurAnalyticsController::{byIncomeType,byExpenseType,paymentReconciliation}`, `EurAnalyticsApiTest.php` |
 | EUE-033/048 Anteil aus Art | behoben | `7789b6a7` · `EurEntryDialog::selectKind()`, `EurEntryDialog.test.tsx` |
-| EUE-035/036/042/043/127 Zeilenchecks | behoben | `7789b6a7` · `JournalRules::checks()` (MONTH/RECEIPT/WEB, `ok=false`), `EurEntriesPanel.tsx` ⚠-Spalte |
+| EUE-035/036/042/043 Zeilenchecks | behoben | `7789b6a7` · `JournalRules::checks()` (MONTH/RECEIPT/WEB, `ok=false`), `EurEntriesPanel.tsx` ⚠-Spalte |
+| EUE-127 Zeilenchecks | teilweise | `7789b6a7` · `JournalRules::checks()` und `EurEntriesPanel.tsx` ⚠-Spalte; die §6-Empfehlung `data.hint` im Panel-Kopf ist nicht umgesetzt, weil `EurEntriesResponse` kein `hint` enthält (offen) |
 | EUE-124 USt-Zeilen Monat/PDF | behoben | `7789b6a7` · `MonthStatement::vat`, `EurPdfService`, `EurMonthPanel.tsx` |
 | Signatur-Button „PDF signieren" | behoben (Label) | `7789b6a7` · „PDF herunterladen"; **QES-Kette weiterhin offen** |
 

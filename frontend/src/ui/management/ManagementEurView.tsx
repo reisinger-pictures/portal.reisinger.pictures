@@ -26,6 +26,7 @@ import {
 } from '../../logic/useEur';
 import EurAnalyticsPanel from './eur/EurAnalyticsPanel';
 import EurApplicationsPanel from './eur/EurApplicationsPanel';
+import EurAssetsPanel from './eur/EurAssetsPanel';
 import EurDepreciationPanel from './eur/EurDepreciationPanel';
 import EurDocumentsPanel from './eur/EurDocumentsPanel';
 import EurEntriesPanel from './eur/EurEntriesPanel';
@@ -603,7 +604,8 @@ export default function ManagementEurView() {
 
                     {tab === 'anlagen' && (
                         <>
-                            <EurDepreciationPanel/>
+                            <EurAssetsPanel year={year}/>
+                            <EurDepreciationPanel year={year}/>
                             <div className="rounded-box border border-base-300 bg-base-100 p-5">
                                 <h2 className="text-xl font-semibold"><Trans>Geringwertige Wirtschaftsgüter</Trans></h2>
                                 <p className="mt-1"><Trans>Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen.</Trans></p>

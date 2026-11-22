@@ -103,7 +103,7 @@ Werte erzeugen einen Hinweis mit Lösungsweg statt eines Fehlers.
 ### Anlagen (#34)
 
 `GET /eur/assets?private=1` liefert nur Privateinlagen. `GET /eur/assets/compare`
-akzeptiert zusätzlich `business_share` und `name` und liefert
+akzeptiert zusätzlich `business_share` (50–100 in 5-%-Schritten) und `name` und liefert
 `first_year: {linear_cents, degressive_cents, linear_business_cents,
 degressive_business_cents}` sowie `suggested_category` aus dem gepinnten
 Katalog (keine hartcodierte Kategorie). Neue Anlagegüter übernehmen den

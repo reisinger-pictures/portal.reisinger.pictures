@@ -444,6 +444,10 @@ msgid "Abschluss"
 msgstr "Abschluss"
 
 #: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Abschreibung"
+msgstr "Abschreibung"
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
 msgid "Abschreibung vergleichen"
 msgstr "Abschreibung vergleichen"
 
@@ -492,6 +496,18 @@ msgstr "Admin Download"
 msgid "Administrator"
 msgstr "Administrator"
 
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "AfA {year}"
+msgstr "AfA {year}"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "AfA buchen"
+msgstr "AfA buchen"
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "AfA-Kategorie"
+msgstr "AfA-Kategorie"
+
 #: src/ui/components/Sidebar.tsx
 #: src/ui/Impressum.tsx
 #: src/ui/LicenseTerms.tsx
@@ -510,6 +526,7 @@ msgstr "Akt & Boudoir"
 
 #: src/ui/components/PhotoHistoryModal.tsx
 #: src/ui/management/components/InviteModal.tsx
+#: src/ui/management/eur/EurAssetsPanel.tsx
 #: src/ui/management/eur/EurDocumentsPanel.tsx
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Aktion"
@@ -573,6 +590,10 @@ msgstr "Aktuelles Kamera-Passwort"
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Alle"
 msgstr "Alle"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Alle Anlagen"
+msgstr "Alle Anlagen"
 
 #: src/ui/Impressum.tsx
 msgid "Alle auf dieser Website veröffentlichten Bilder, Grafiken, Texte und sonstigen Werke unterliegen dem Urheberrecht des jeweiligen Fotografen bzw. Medieninhabers. Jede Verwendung, Vervielfältigung oder Weitergabe – auch auszugsweise – bedarf der vorherigen schriftlichen Zustimmung des Rechteinhabers."
@@ -791,9 +812,17 @@ msgstr "Angebotsdetails"
 msgid "Angebotstext (Einleitung)"
 msgstr "Angebotstext (Einleitung)"
 
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Anlagegut"
+msgstr "Anlagegut"
+
 #: src/ui/management/ManagementEurView.tsx
 msgid "Anlagen"
 msgstr "Anlagen"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Anlagen und Abschreibung"
+msgstr "Anlagen und Abschreibung"
 
 #: src/ui/management/ManagementEurView.tsx
 msgid "Anlagenverzeichnis als PDF"
@@ -819,6 +848,10 @@ msgstr "Anonyme Gäste"
 msgid "Anonymer Gast"
 msgstr "Anonymer Gast"
 
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Anschaffung"
+msgstr "Anschaffung"
+
 #: src/ui/management/ManagementEurView.tsx
 #~ msgid "Anschaffungen bis 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
 #~ msgstr "Anschaffungen bis 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
@@ -826,6 +859,10 @@ msgstr "Anonymer Gast"
 #: src/ui/management/ManagementEurView.tsx
 msgid "Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
 msgstr "Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Anschaffungsjahr im Vergleich"
+msgstr "Anschaffungsjahr im Vergleich"
 
 #: src/ui/management/eur/EurDepreciationPanel.tsx
 msgid "Anschaffungskosten (€)"
@@ -842,6 +879,10 @@ msgstr "Anschrift"
 #: src/ui/client/ClientDashboard.tsx
 msgid "Ansehen"
 msgstr "Ansehen"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Ansicht"
+msgstr "Ansicht"
 
 #: src/ui/management/eur/EurEntriesPanel.tsx
 msgid "Anteil"
@@ -1171,6 +1212,10 @@ msgstr "Beauftragt"
 msgid "Bedeutung"
 msgstr "Bedeutung"
 
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Begründung"
+msgstr "Begründung"
+
 #: src/ui/LicenseTerms.tsx
 msgid "Bei Verträgen über die Lieferung digitaler Inhalte im Sinne des § 18 Abs. 1 Z 11 des österreichischen Fern- und Auswärtsgeschäfte-Gesetzes (FAGG) erlischt das Rücktrittsrecht vorzeitig, wenn der Kunde bei der Bestellung ausdrücklich zugestimmt hat, dass die Ausführung des Vertrages – nämlich der sofortige Download der Fotos – vor Ablauf der Widerrufsfrist beginnt, und wenn der Kunde zur Kenntnis genommen hat, dass er durch diese Zustimmung sein Rücktrittsrecht verliert."
 msgstr "Bei Verträgen über die Lieferung digitaler Inhalte im Sinne des § 18 Abs. 1 Z 11 des österreichischen Fern- und Auswärtsgeschäfte-Gesetzes (FAGG) erlischt das Rücktrittsrecht vorzeitig, wenn der Kunde bei der Bestellung ausdrücklich zugestimmt hat, dass die Ausführung des Vertrages – nämlich der sofortige Download der Fotos – vor Ablauf der Widerrufsfrist beginnt, und wenn der Kunde zur Kenntnis genommen hat, dass er durch diese Zustimmung sein Rücktrittsrecht verliert."
@@ -1362,6 +1407,7 @@ msgid "Bestätige die einmalige Prüfung, um den Checkout fortzusetzen."
 msgstr "Bestätige die einmalige Prüfung, um den Checkout fortzusetzen."
 
 #: src/ui/components/UIProvider.tsx
+#: src/ui/management/eur/EurAssetsPanel.tsx
 msgid "Bestätigen"
 msgstr "Bestätigen"
 
@@ -1441,6 +1487,10 @@ msgstr "Betrag in €"
 msgid "Betreff"
 msgstr "Betreff"
 
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Betriebl. Anteil"
+msgstr "Betriebl. Anteil"
+
 #: src/ui/management/eur/EurEntriesPanel.tsx
 #: src/ui/management/eur/EurMonthPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
@@ -1478,9 +1528,9 @@ msgstr "Betriebliche Einnahmen {monthIncomeLabel} und Ausgaben {monthExpenseLabe
 msgid "Betrieblicher Anteil"
 msgstr "Betrieblicher Anteil"
 
-#: src/ui/management/ManagementEurView.tsx
-#~ msgid "Betriebsanteil"
-#~ msgstr "Betriebsanteil"
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Betriebsanteil"
+msgstr "Betriebsanteil"
 
 #: src/ui/management/eur/EurEntryDialog.tsx
 #: src/ui/management/eur/EurTravelPanel.tsx
@@ -1521,6 +1571,10 @@ msgstr "Bezahlung mit einer hinterlegten Karte."
 #: src/logic/mollieMethods.ts
 msgid "Bezahlung über dein PayPal-Konto."
 msgstr "Bezahlung über dein PayPal-Konto."
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Bezeichnung"
+msgstr "Bezeichnung"
 
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "BIC"
@@ -1785,6 +1839,7 @@ msgstr "Brand-Standard"
 msgid "Brand-Zuweisung"
 msgstr "Brand-Zuweisung"
 
+#: src/ui/management/components/UserTable.tsx
 #: src/ui/management/ManagementEurView.tsx
 msgid "Buchhaltung"
 msgstr "Buchhaltung"
@@ -2109,6 +2164,10 @@ msgid "Degressiv"
 msgstr "Degressiv"
 
 #: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Degressiv anlegen"
+msgstr "Degressiv anlegen"
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
 msgid "Degressiver Satz (%)"
 msgstr "Degressiver Satz (%)"
 
@@ -2405,6 +2464,10 @@ msgstr "Details zur Lizenz..."
 #: src/ui/management/components/LicenseCatalogSettings.tsx
 msgid "Details..."
 msgstr "Details..."
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Die Abschreibung wird je Jahr direkt angezeigt. Gebuchte Jahre bleiben unverändert; der Wechsel zur linearen AfA ist einmalig und dauerhaft."
+msgstr "Die Abschreibung wird je Jahr direkt angezeigt. Gebuchte Jahre bleiben unverändert; der Wechsel zur linearen AfA ist einmalig und dauerhaft."
 
 #: src/ui/management/eur/EurApplicationsPanel.tsx
 msgid "Die Anträge konnten nicht geladen werden. Prüfen Sie Ihre Verbindung und laden Sie die Liste erneut."
@@ -3027,6 +3090,14 @@ msgstr "Endgültig löschen"
 #: src/ui/ModelRegistrationView.tsx
 msgid "Entfernen"
 msgstr "Entfernen"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Entnahme bei hohem Privatanteil prüfen (EUE-055)"
+msgstr "Entnahme bei hohem Privatanteil prüfen (EUE-055)"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Entnahme prüfen"
+msgstr "Entnahme prüfen"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Entwurf"
@@ -3752,6 +3823,10 @@ msgstr "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bi
 msgid "Für diese Angaben ist kein Wechsel zur linearen Methode vorteilhaft."
 msgstr "Für diese Angaben ist kein Wechsel zur linearen Methode vorteilhaft."
 
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Für diese Ansicht sind keine Anlagen erfasst."
+msgstr "Für diese Ansicht sind keine Anlagen erfasst."
+
 #: src/ui/management/eur/EurAnalyticsPanel.tsx
 msgid "Für diese Auswertung liegen noch keine Daten vor. Erfassen Sie zuerst Buchungen im Journal."
 msgstr "Für diese Auswertung liegen noch keine Daten vor. Erfassen Sie zuerst Buchungen im Journal."
@@ -3906,6 +3981,10 @@ msgstr "Geändert von"
 #: src/ui/management/eur/EurHoursPanel.tsx
 msgid "Geben Sie einen positiven Zeitwert an; der Tag ist optional."
 msgstr "Geben Sie einen positiven Zeitwert an; der Tag ist optional."
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Gebucht"
+msgstr "Gebucht"
 
 #: src/ui/management/components/CustomerModal.tsx
 #: src/ui/management/ManagementContractView.tsx
@@ -4115,6 +4194,10 @@ msgstr "Gutscheincodes sind deaktiviert"
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Gutschrift erstellt (Bitte Rechnung legen)"
 msgstr "Gutschrift erstellt (Bitte Rechnung legen)"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "GWG"
+msgstr "GWG"
 
 #: src/ui/Impressum.tsx
 msgid "Haftungsausschluss"
@@ -4397,7 +4480,6 @@ msgstr "ISO"
 msgid "Ja"
 msgstr "Ja"
 
-#: src/ui/management/eur/EurDepreciationPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Jahr"
@@ -5098,6 +5180,10 @@ msgstr "Letzte Bestätigung"
 msgid "Letzte Bestätigung:"
 msgstr "Letzte Bestätigung:"
 
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Lieferant"
+msgstr "Lieferant"
+
 #: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Lightroom-Katalog"
 msgstr "Lightroom-Katalog"
@@ -5105,6 +5191,14 @@ msgstr "Lightroom-Katalog"
 #: src/ui/management/eur/EurDepreciationPanel.tsx
 msgid "Linear"
 msgstr "Linear"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Linear (fest)"
+msgstr "Linear (fest)"
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Linear anlegen"
+msgstr "Linear anlegen"
 
 #: src/ui/components/WysiwygEditor.tsx
 msgid "Link einfügen"
@@ -5465,6 +5559,10 @@ msgstr "Metadaten-Vorgaben"
 #: src/ui/management/components/GalleryMetadataDefaultsModal.tsx
 msgid "Metadaten-Vorgaben gespeichert"
 msgstr "Metadaten-Vorgaben gespeichert"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Methode"
+msgstr "Methode"
 
 #: src/ui/management/eur/EurMonthPanel.tsx
 msgid "Mindestbeitrag Pensionsversicherung FSVG"
@@ -5854,6 +5952,10 @@ msgstr "Netzwerkfehler: Rabattcode konnte nicht geprüft werden."
 #: src/ui/client/components/SelectionFilterBar.tsx
 msgid "Neu"
 msgstr "Neu"
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Neue Anlagegüter werden mit beiden Verfahren verglichen. Die vorgeschlagene AfA-Kategorie können Sie bestätigen oder ändern."
+msgstr "Neue Anlagegüter werden mit beiden Verfahren verglichen. Die vorgeschlagene AfA-Kategorie können Sie bestätigen oder ändern."
 
 #: src/ui/management/eur/EurEntryDialog.tsx
 msgid "Neue Buchung"
@@ -6257,6 +6359,7 @@ msgstr "offen"
 #: src/ui/management/components/PhotographerTeamModal.tsx
 #: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/eur/EurApplicationsPanel.tsx
+#: src/ui/management/eur/EurAssetsPanel.tsx
 #: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Offen"
 msgstr "Offen"
@@ -6643,6 +6746,7 @@ msgid "Portrait"
 msgstr "Portrait"
 
 #: src/ui/ContractSignView.tsx
+#: src/ui/management/eur/EurDepreciationPanel.tsx
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Position"
 msgstr "Position"
@@ -6722,6 +6826,7 @@ msgstr "Print bis 4000px (2.00x)"
 msgid "Privacy-Fee"
 msgstr "Privacy-Fee"
 
+#: src/ui/management/eur/EurAssetsPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
 msgid "Privat"
 msgstr "Privat"
@@ -6734,10 +6839,20 @@ msgstr "Privat (Nur mit Link / Passwort)"
 msgid "Privat erzwingen (Nur mit Link / Passwort)"
 msgstr "Privat erzwingen (Nur mit Link / Passwort)"
 
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Privat- oder Mischnutzung"
+msgstr "Privat- oder Mischnutzung"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+#: src/ui/management/eur/EurDepreciationPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
 msgid "Privatanteil"
 msgstr "Privatanteil"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Privateinlagen"
+msgstr "Privateinlagen"
 
 #: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "pro Bild"
@@ -7019,6 +7134,10 @@ msgstr "Rechnungsdetails"
 msgid "Rechnungsempfänger"
 msgstr "Rechnungsempfänger"
 
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Rechnungsnummer"
+msgstr "Rechnungsnummer"
+
 #: src/ui/management/components/UserTable.tsx
 msgid "Rechte (Gruppen / Galerien)"
 msgstr "Rechte (Gruppen / Galerien)"
@@ -7101,6 +7220,7 @@ msgstr "Reportage-Aufschlag"
 msgid "Reportage-Paket (+{reportageSurchargePercent}% Aufschlag)"
 msgstr "Reportage-Paket (+{reportageSurchargePercent}% Aufschlag)"
 
+#: src/ui/management/eur/EurDepreciationPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
 msgid "Restbuchwert"
 msgstr "Restbuchwert"
@@ -7168,6 +7288,7 @@ msgstr "Sammelrechnung erstellen"
 msgid "Sammelrechnung erstellen?"
 msgstr "Sammelrechnung erstellen?"
 
+#: src/ui/management/eur/EurAssetsPanel.tsx
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Satz"
 msgstr "Satz"
@@ -7607,6 +7728,7 @@ msgstr "Statistiken & Audit-Logs"
 #: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/components/RatingStatusModal.tsx
 #: src/ui/management/eur/EurApplicationsPanel.tsx
+#: src/ui/management/eur/EurAssetsPanel.tsx
 #: src/ui/management/eur/EurDocumentsPanel.tsx
 #: src/ui/management/eur/EurSignaturePanel.tsx
 #: src/ui/management/ManagementContractView.tsx
@@ -8309,8 +8431,8 @@ msgid "Vergleich berechnen"
 msgstr "Vergleich berechnen"
 
 #: src/ui/management/eur/EurDepreciationPanel.tsx
-msgid "Vergleicht die lineare und die degressive Abschreibung für ein Anlagegut. Der Wechsel zur linearen Methode ist einmalig und nur mit Begründung möglich."
-msgstr "Vergleicht die lineare und die degressive Abschreibung für ein Anlagegut. Der Wechsel zur linearen Methode ist einmalig und nur mit Begründung möglich."
+#~ msgid "Vergleicht die lineare und die degressive Abschreibung für ein Anlagegut. Der Wechsel zur linearen Methode ist einmalig und nur mit Begründung möglich."
+#~ msgstr "Vergleicht die lineare und die degressive Abschreibung für ein Anlagegut. Der Wechsel zur linearen Methode ist einmalig und nur mit Begründung möglich."
 
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Vermietungsergebnis (E1B)"
@@ -9029,6 +9151,10 @@ msgstr "Zu den in dieser Erklärung genannten Kennungen und Signalen sind die te
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Zu dieser Zahlung fehlt die Bestellreferenz. Bitte öffne deine Einkäufe, um den Status zu prüfen."
 msgstr "Zu dieser Zahlung fehlt die Bestellreferenz. Bitte öffne deine Einkäufe, um den Status zu prüfen."
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Zu linear wechseln"
+msgstr "Zu linear wechseln"
 
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Zu meinen Einkäufen"

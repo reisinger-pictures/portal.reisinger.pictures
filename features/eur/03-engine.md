@@ -105,6 +105,10 @@ acht Kennzahlen und die Zahllast:
   dem zweiten Jahr, Vergleich beider Methoden. Die DEG-Regeln sind eine
   Produkterweiterung außerhalb des 131er-Floors
   ([D-67](../owner-decisions.md#d-67-degressive-afa-is-an-in-scope-product-extension-outside-the-131-rule-floor)).
+- Der Betriebsanteil von Anlagegütern liegt in 5-%-Schritten zwischen 50 % und
+  100 % (P5.4). Die Jahresabschlussbuchung bucht ausschließlich die bereits im
+  AfA-Plan enthaltenen `business_use_cents` und ist über
+  `eur_asset_years.eur_entry_id` idempotent (P5.5).
 
 ## Vorbehalt
 
