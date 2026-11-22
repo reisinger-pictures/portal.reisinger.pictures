@@ -7,6 +7,7 @@ on:
       - 'deployment/Dockerfile'
       - 'deployment/backend-supervisor.sh'
       - 'deployment/validate-production-env.sh'
+      - 'deployment/wait-for-selected-database.sh'
       - '.github/workflows/base-image.yml'
   schedule:
     - cron: '0 1 * * *'

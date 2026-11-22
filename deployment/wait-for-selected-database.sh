@@ -14,6 +14,9 @@ esac
 attempt=1
 while [ "$attempt" -le 60 ]; do
     if php -r '
+        # php -r does not load the Composer autoloader; without it the Laravel
+        # Application class is missing and this readiness check can never pass.
+        require "vendor/autoload.php";
         $app = require "bootstrap/app.php";
         $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
         \Illuminate\Support\Facades\DB::connection()->select("SELECT 1");
