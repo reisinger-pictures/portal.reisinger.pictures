@@ -405,7 +405,10 @@ export default function ManagementEurView() {
                 </div>
             </header>
 
-            <div className="sticky top-0 z-10 border-b border-warning/30 bg-warning/10">
+            {/* Not sticky: the tab bar below must stay clickable when a tall
+                panel (e.g. the asset view) scrolls the page down. A sticky
+                banner at top-0 covers the tabs and swallows their clicks. */}
+            <div className="border-b border-warning/30 bg-warning/10">
                 <div className="max-w-7xl mx-auto px-4 md:px-8 py-2 text-sm">
                     <Trans>Betriebsanteil-Hilfe: Geben Sie den betrieblichen Anteil in 5-%-Schritten von 0 % bis 100 % an. Der Privatanteil ergibt sich aus 100 % abzüglich des Betriebsanteils.</Trans>
                 </div>

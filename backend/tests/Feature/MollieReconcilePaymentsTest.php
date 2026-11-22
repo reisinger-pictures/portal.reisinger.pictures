@@ -201,7 +201,10 @@ class MollieReconcilePaymentsTest extends TestCase
             'customer_details' => [
                 'name' => 'Tester',
                 'email' => 'buyer@example.test',
-                'items' => [['photoId' => 'photo-1', 'tier' => 'web', 'price' => 5000]],
+                // The snapshot feeds Photo::whereIn('id', ...); on PostgreSQL
+                // the id column is a real uuid, so a synthetic id would abort
+                // the verified-payment path with a 22P02 cast error.
+                'items' => [['photoId' => (string) Str::uuid(), 'tier' => 'web', 'price' => 5000]],
             ],
             'total_net' => 5000,
             'total_gross' => 5000,
@@ -245,7 +248,10 @@ class MollieReconcilePaymentsTest extends TestCase
             'customer_details' => [
                 'name' => 'Tester',
                 'email' => 'buyer@example.test',
-                'items' => [['photoId' => 'photo-1', 'tier' => 'web', 'price' => 5000]],
+                // The snapshot feeds Photo::whereIn('id', ...); on PostgreSQL
+                // the id column is a real uuid, so a synthetic id would abort
+                // the verified-payment path with a 22P02 cast error.
+                'items' => [['photoId' => (string) Str::uuid(), 'tier' => 'web', 'price' => 5000]],
             ],
             'total_net' => 5000,
             'total_gross' => 5000,

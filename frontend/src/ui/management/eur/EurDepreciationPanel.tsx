@@ -58,19 +58,23 @@ export default function EurDepreciationPanel({ year }: Props) {
     const month = Number(form.acquisitionMonth);
     const businessShare = Number(form.businessShare);
 
-    const isValid = form.name.trim() !== '' && form.invoiceNo.trim() !== '' && form.supplier.trim() !== ''
-        && Number.isFinite(costCents) && costCents > 0
+    // Comparing is a calculator and needs only the calculation inputs. The
+    // asset identity fields are required for the separate create action;
+    // coupling them would disable the calculator for an empty new-item form.
+    const canCompare = Number.isFinite(costCents) && costCents > 0
         && Number.isInteger(usefulLife) && usefulLife >= 2 && usefulLife <= 99
         && Number.isInteger(rate) && rate >= 100 && rate <= 3000
         && Number.isInteger(month) && month >= 1 && month <= 12
         && BUSINESS_SHARES.includes(businessShare);
+    const canCreate = canCompare && form.name.trim() !== '' && form.invoiceNo.trim() !== ''
+        && form.supplier.trim() !== '' && category.trim() !== '';
 
     const update = (key: keyof FormState, value: string | boolean) => {
         setForm((current) => ({...current, [key]: value}));
     };
 
     const compare = async () => {
-        if (!isValid || isLoading) return;
+        if (!canCompare || isLoading) return;
         setIsLoading(true);
         setError(null);
         try {
@@ -93,7 +97,7 @@ export default function EurDepreciationPanel({ year }: Props) {
     };
 
     const create = async (method: 'linear' | 'degressiv') => {
-        if (!result || category.trim() === '' || isCreating) return;
+        if (!result || !canCreate || isCreating) return;
         setIsCreating(true);
         setError(null);
         try {
@@ -191,7 +195,7 @@ export default function EurDepreciationPanel({ year }: Props) {
                 </label>
 
                 <div className="mt-4">
-                    <button type="button" className="btn btn-primary btn-sm" onClick={() => void compare()} disabled={!isValid || isLoading}>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => void compare()} disabled={!canCompare || isLoading}>
                         <Trans>Vergleich berechnen</Trans>
                     </button>
                 </div>
@@ -252,11 +256,11 @@ export default function EurDepreciationPanel({ year }: Props) {
                                     onChange={(event) => setCategory(event.target.value)} required />
                             </label>
                             <div className="mt-2 flex flex-wrap gap-2">
-                                <button type="button" className="btn btn-primary btn-sm" disabled={isCreating || category.trim() === ''}
+                                <button type="button" className="btn btn-primary btn-sm" disabled={isCreating || !canCreate}
                                     onClick={() => void create('linear')}>
                                     <Trans>Linear anlegen</Trans>
                                 </button>
-                                <button type="button" className="btn btn-outline btn-sm" disabled={isCreating || category.trim() === ''}
+                                <button type="button" className="btn btn-outline btn-sm" disabled={isCreating || !canCreate}
                                     onClick={() => void create('degressiv')}>
                                     <Trans>Degressiv anlegen</Trans>
                                 </button>
