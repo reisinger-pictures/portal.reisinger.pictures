@@ -744,9 +744,15 @@ class MollieCheckoutService
                 $lockedAttempt->mollie_payment_id ??= $paymentId;
                 $lockedAttempt->status = MolliePaymentAttempt::STATUS_PAID;
                 $lockedAttempt->paid_at = now();
-                $lockedAttempt->last_reconciled_at = now();
-                $lockedAttempt->save();
             }
+
+            // Every verified provider read — including a re-read of an
+            // already-paid attempt during refund reconciliation (#3) — counts
+            // as an observation. Without this the interval throttle never
+            // advances and the five-minute run would re-read paid attempts
+            // forever. The invoice-mail claim below stays queueOnce().
+            $lockedAttempt->last_reconciled_at = now();
+            $lockedAttempt->save();
 
             if ($lockedOrder->status === 'paid') {
                 return 'already_paid';

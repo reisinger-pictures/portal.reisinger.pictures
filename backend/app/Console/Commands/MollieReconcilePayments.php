@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\MolliePaymentAttempt;
+use App\Models\Order;
 use App\Services\MollieCheckoutService;
 use App\Services\MolliePaymentException;
 use App\Services\MolliePaymentService;
@@ -44,6 +45,7 @@ class MollieReconcilePayments extends Command
         $cutoff = now()->subMinutes($minutes);
 
         $this->settlePaidAttempts($mollieCheckout, $limit);
+        $refundsFound = $this->reconcilePaidAttemptsForRefunds($mollie, $mollieCheckout, $limit);
 
         $attempts = MolliePaymentAttempt::query()
             ->needsReconciliation()
@@ -106,13 +108,69 @@ class MollieReconcilePayments extends Command
         }
 
         $this->info(sprintf(
-            'Mollie reconciliation: %d inspected, %d settled, %d marked ambiguous.',
+            'Mollie reconciliation: %d inspected, %d settled, %d marked ambiguous, %d late refunds recorded.',
             $inspected,
             $settled,
             $ambiguous,
+            $refundsFound,
         ));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Issue #3: a verified paid attempt is otherwise never re-read, so a late
+     * refund or chargeback that arrived without a webhook (and without anyone
+     * opening the order) kept `refunded_amount_cents = 0` and overpaid the
+     * photographer. Re-read paid attempts within a bounded window and feed the
+     * fact through the same `applyVerifiedPayment()` seam as the webhook: the
+     * refund write and its late-refund correction stay idempotent there.
+     */
+    private function reconcilePaidAttemptsForRefunds(
+        MolliePaymentService $mollie,
+        MollieCheckoutService $mollieCheckout,
+        int $limit,
+    ): int {
+        $windowDays = max(1, (int) config('services.mollie.refund_reconcile_window_days', 90));
+        $intervalDays = max(1, (int) config('services.mollie.refund_reconcile_interval_days', 3));
+
+        $paidAttempts = MolliePaymentAttempt::query()
+            ->needsRefundReconciliation($windowDays, $intervalDays)
+            ->orderBy('last_reconciled_at')
+            ->orderBy('created_at')
+            ->limit($limit)
+            ->get();
+
+        $refundsFound = 0;
+
+        foreach ($paidAttempts as $attempt) {
+            $before = (int) (Order::query()->find($attempt->order_id)?->refunded_amount_cents ?? 0);
+
+            try {
+                $payment = $mollie->getPayment($attempt->mollie_payment_id);
+            } catch (Throwable $exception) {
+                Log::warning('mollie.reconcile.refund_lookup_failed', [
+                    'attempt_id' => (string) $attempt->getKey(),
+                    'exception_class' => $exception::class,
+                ]);
+
+                continue;
+            }
+
+            $mollieCheckout->applyVerifiedPayment($attempt, $payment);
+
+            $after = (int) (Order::query()->find($attempt->order_id)?->refunded_amount_cents ?? 0);
+            if ($after > $before) {
+                $refundsFound++;
+                Log::info('mollie.reconcile.late_refund_recorded', [
+                    'attempt_id' => (string) $attempt->getKey(),
+                    'order_id' => (string) $attempt->order_id,
+                    'refunded_amount_cents' => $after,
+                ]);
+            }
+        }
+
+        return $refundsFound;
     }
 
     private function settlePaidAttempts(MollieCheckoutService $mollieCheckout, int $limit): void

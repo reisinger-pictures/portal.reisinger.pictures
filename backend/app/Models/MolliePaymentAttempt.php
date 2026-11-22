@@ -130,6 +130,27 @@ class MolliePaymentAttempt extends Model
         ]);
     }
 
+    /**
+     * Attempts already verified paid whose provider can still report a late
+     * refund or chargeback. Read again within a bounded window and at most once
+     * per interval; a paid order is otherwise never re-read, so a refund that
+     * arrived without a webhook would stay invisible (issue #3).
+     */
+    public function scopeNeedsRefundReconciliation(
+        Builder $query,
+        int $windowDays,
+        int $intervalDays,
+    ): Builder {
+        return $query
+            ->where('status', self::STATUS_PAID)
+            ->whereNotNull('mollie_payment_id')
+            ->where('created_at', '>=', now()->subDays($windowDays))
+            ->where(function (Builder $query) use ($intervalDays): void {
+                $query->whereNull('last_reconciled_at')
+                    ->orWhere('last_reconciled_at', '<=', now()->subDays($intervalDays));
+            });
+    }
+
     public function isActive(): bool
     {
         return in_array($this->status, self::ACTIVE_STATUSES, true);

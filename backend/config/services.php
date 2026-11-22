@@ -72,6 +72,11 @@ return [
         'webhook_url' => env('MOLLIE_WEBHOOK_URL'),
         'idempotency_window_minutes' => max(5, (int) env('MOLLIE_IDEMPOTENCY_WINDOW_MINUTES', 60)),
         'max_attempts' => max(1, (int) env('MOLLIE_MAX_ATTEMPTS', 5)),
+        // Issue #3: re-read paid attempts for late refunds/chargebacks that
+        // arrived without a webhook. Bounded to a 90-day window and throttled
+        // to once per interval so the five-minute run does not hammer Mollie.
+        'refund_reconcile_window_days' => max(1, (int) env('MOLLIE_REFUND_RECONCILE_WINDOW_DAYS', 90)),
+        'refund_reconcile_interval_days' => max(1, (int) env('MOLLIE_REFUND_RECONCILE_INTERVAL_DAYS', 3)),
     ],
 
     'turnstile' => [

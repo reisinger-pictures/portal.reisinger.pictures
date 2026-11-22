@@ -117,6 +117,49 @@ class MollieReconcilePaymentsTest extends TestCase
         $this->assertSame([], $client->getHttpClient()->recorded());
     }
 
+    public function test_a_late_refund_is_recorded_without_a_webhook_or_an_order_visit(): void
+    {
+        // Issue #3: a verified paid attempt is otherwise never re-read, so a
+        // refund that arrives without a webhook stays invisible and overpays
+        // the photographer. The reconcile run must read the provider fact and
+        // record it exactly once through applyVerifiedPayment().
+        [$order, $attempt] = $this->paidOrderWithAttempt();
+        $this->fakeFetch($this->paymentFor($attempt, 'paid', [
+            'amountRefunded' => ['value' => '50.00', 'currency' => 'EUR'],
+        ]));
+
+        $this->artisan('mollie:reconcile-payments', ['--minutes' => 0])
+            ->assertExitCode(0)
+            ->expectsOutputToContain('1 late refunds recorded');
+
+        $fresh = $order->fresh();
+        $this->assertSame(5000, $fresh->refunded_amount_cents);
+        $this->assertSame('refunded', $fresh->status);
+
+        // A second run reads nothing: the verified read advanced the
+        // reconciliation timestamp, so no duplicate correction is booked.
+        $this->artisan('mollie:reconcile-payments', ['--minutes' => 0])
+            ->assertExitCode(0)
+            ->expectsOutputToContain('0 late refunds recorded');
+        $this->assertSame(5000, $order->fresh()->refunded_amount_cents);
+    }
+
+    public function test_a_recently_reconciled_paid_attempt_is_not_reread(): void
+    {
+        // Issue #3: the interval throttle must hold — an attempt observed
+        // moments ago is not fetched again by the five-minute run.
+        [$order, $attempt] = $this->paidOrderWithAttempt();
+        $attempt->last_reconciled_at = now();
+        $attempt->save();
+        $client = $this->fakeMollie([], retainRequests: true);
+
+        $this->artisan('mollie:reconcile-payments', ['--minutes' => 0])
+            ->assertExitCode(0);
+
+        $this->assertSame([], $client->getHttpClient()->recorded());
+        $this->assertSame(0, (int) $order->fresh()->refunded_amount_cents);
+    }
+
     public function test_a_broken_method_list_does_not_block_settling_a_collected_payment(): void
     {
         // The creation gate needs a method list and a webhook; settling money
@@ -137,6 +180,50 @@ class MollieReconcilePaymentsTest extends TestCase
     private function fakeFetch(MockResponse $response): void
     {
         $this->fakeMollie([GetPaymentRequest::class => $response], retainRequests: true);
+    }
+
+    /**
+     * An already-paid order with a verified paid attempt — the state the late
+     * refund reconciliation (#3) starts from.
+     *
+     * @return array{0: Order, 1: MolliePaymentAttempt}
+     */
+    private function paidOrderWithAttempt(): array
+    {
+        $user = User::factory()->create();
+        $order = Order::factory()->create([
+            'user_id' => $user->id,
+            'status' => 'paid',
+            'total_amount' => 5000,
+        ]);
+        InvoiceSnapshot::create([
+            'order_id' => $order->id,
+            'customer_details' => [
+                'name' => 'Tester',
+                'email' => 'buyer@example.test',
+                'items' => [['photoId' => 'photo-1', 'tier' => 'web', 'price' => 5000]],
+            ],
+            'total_net' => 5000,
+            'total_gross' => 5000,
+            'tax_rate' => 0,
+        ]);
+        $attempt = MolliePaymentAttempt::create([
+            'order_id' => (string) $order->id,
+            'generation' => 1,
+            'idempotency_key' => (string) Str::uuid(),
+            'mollie_payment_id' => 'tr_reconcile12345',
+            'mode' => 'test',
+            'credential_fingerprint' => hash('sha256', 'mollie-key|test_'.str_repeat('a', 30)),
+            'amount_cents' => 5000,
+            'currency' => 'EUR',
+            'status' => MolliePaymentAttempt::STATUS_PAID,
+            'checkout_url' => 'https://www.mollie.com/checkout/select-method/tr_reconcile12345',
+            'snapshot' => ['gross_cents' => 5000, 'currency' => 'EUR'],
+            'paid_at' => now()->subDays(5),
+            'last_reconciled_at' => now()->subDays(5),
+        ]);
+
+        return [$order, $attempt];
     }
 
     /**
