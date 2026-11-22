@@ -142,6 +142,10 @@ export interface BillingDetails {
     company_city: string;
     company_country: string;
     company_email: string;
+    steuernummer: string;
+    finanzamt: string;
+    uid: string;
+    rechtsform: string;
 }
 
 export interface BillingDetailsPayload {
@@ -153,6 +157,10 @@ export interface BillingDetailsPayload {
     company_city?: string;
     company_country?: string;
     company_email?: string;
+    steuernummer?: string;
+    finanzamt?: string;
+    uid?: string;
+    rechtsform?: string;
 }
 
 export function useBillingDetails() {

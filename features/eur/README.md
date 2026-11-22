@@ -16,6 +16,18 @@ Verträge und den unveränderlichen, versionierten Dokumentenstand.
 - Zeit: ganzzahlige Minuten.
 - Wirtschaftsjahr: ausschließlich 2026.
 
+## Mandantenfähigkeit
+
+- Die Buchhaltung ist für mehrere Brands ausgelegt und richtet sich nach dem Brand-Kontext des Portals; es gibt keine fest verdrahtete Einzel-Buchhaltung.
+- Alle späteren Buchhaltungsdaten werden brand-scoped gespeichert und abgefragt; fremde Brand-IDs sind nicht zugreifbar (404).
+- Die Unternehmensdaten der EÜR-Ansicht stammen ausschließlich aus den brand-scoped Einstellungen (`/api/settings/billing-details`); es gibt keine zweite Firmendatenquelle.
+
+## Nutzeransicht
+
+- Die Buchhaltung ist ein eigener Menüpunkt in der bestehenden App-Shell (Route `/eur`) mit einem expliziten Weg zurück ins Portal; keine zweite App-Shell.
+- Die Ansicht zeigt ausschließlich fachlich nützliche Informationen: Unternehmensdaten aus den Einstellungen, die Grenze für geringwertige Wirtschaftsgüter und den betrieblichen Anteil. Technische Hinweise zur Paritätsprüfung sind kein Teil der Nutzeransicht.
+- Die EÜR-spezifischen Firmenfelder (Steuernummer, Finanzamt, UID, Rechtsform) werden in den Einstellungen gepflegt und in der Ansicht angezeigt; fehlende Werte erscheinen als Platzhalter.
+
 ## Grenzen
 
 - Die Clean-Room-Basis selbst liegt nicht in diesem Repository.

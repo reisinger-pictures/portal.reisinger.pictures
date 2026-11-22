@@ -24,6 +24,7 @@ import ManagementCustomersView from './ManagementCustomersView';
 import ManagementProductsView from './ManagementProductsView';
 import ManagementTextSnippetsView from './ManagementTextSnippetsView';
 import ManagementPayoutsView from './ManagementPayoutsView';
+import ManagementEurView from './ManagementEurView';
 import ManagementCouponsView from './ManagementCouponsView';
 import ManagementModelsView from './ManagementModelsView';
 import ManagementContractView from './ManagementContractView';
@@ -62,6 +63,7 @@ function DashboardView({
                 {currentView === 'admin-products' && <ManagementProductsView/>}
                 {currentView === 'admin-snippets' && <ManagementTextSnippetsView/>}
                 {currentView === 'admin-payouts' && <ManagementPayoutsView/>}
+                {currentView === 'eur' && <ManagementEurView/>}
                 {currentView === 'admin-coupons' && <ManagementCouponsView/>}
                 {currentView === 'admin-models' && <ManagementModelsView/>}
                 {currentView === 'admin-contracts' && <ManagementContractView/>}
@@ -85,7 +87,7 @@ export default function ManagementDashboard() {
     const pathView = location.pathname.replace('/', '');
     const currentView = pathView || 'structure';
     const {canAccessB2BFeatures, isSuperAdmin, isPhotographer} = usePermissions();
-    const isB2BView = ['admin-orders', 'admin-manual-invoice', 'admin-manual-offer', 'admin-customers', 'admin-products', 'admin-snippets', 'admin-payouts', 'admin-contracts', 'admin-projects', 'boards', 'admin-models'].includes(currentView);
+    const isB2BView = ['admin-orders', 'admin-manual-invoice', 'admin-manual-offer', 'admin-customers', 'admin-products', 'admin-snippets', 'admin-payouts', 'eur', 'admin-contracts', 'admin-projects', 'boards', 'admin-models'].includes(currentView);
 
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const {user} = useAuth();

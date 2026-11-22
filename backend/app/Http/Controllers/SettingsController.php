@@ -418,6 +418,12 @@ class SettingsController extends Controller
             'company_city' => $resolver->get('company_city', ''),
             'company_country' => $resolver->get('company_country', ''),
             'company_email' => $resolver->get('company_email', 'hello@reisinger.pictures'),
+            // Company details used by the EÜR view. Same brand-scoped settings
+            // store as the Impressum fields above, so there is no second source.
+            'steuernummer' => $resolver->get('steuernummer', ''),
+            'finanzamt' => $resolver->get('finanzamt', ''),
+            'uid' => $resolver->get('uid', ''),
+            'rechtsform' => $resolver->get('rechtsform', ''),
         ]);
     }
 
@@ -470,6 +476,10 @@ class SettingsController extends Controller
             'company_city' => 'nullable|string',
             'company_country' => 'nullable|string',
             'company_email' => 'nullable|string',
+            'steuernummer' => 'nullable|string|max:64',
+            'finanzamt' => 'nullable|string|max:128',
+            'uid' => 'nullable|string|max:64',
+            'rechtsform' => 'nullable|string|max:128',
         ]);
 
         foreach ($validated as $key => $value) {

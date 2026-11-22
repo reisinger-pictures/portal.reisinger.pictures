@@ -20,6 +20,10 @@ const createBillingDetailsSchema = () => z.object({
     company_city: z.string().min(2, t`Mindestens 2 Zeichen`),
     company_country: z.string().optional().or(z.literal('')),
     company_email: z.string().email(t`Ungültige E-Mail`).optional().or(z.literal('')),
+    steuernummer: z.string().max(64).optional().or(z.literal('')),
+    finanzamt: z.string().max(128).optional().or(z.literal('')),
+    uid: z.string().max(64).optional().or(z.literal('')),
+    rechtsform: z.string().max(128).optional().or(z.literal('')),
 });
 
 type BillingFormValues = z.infer<ReturnType<typeof createBillingDetailsSchema>>;
@@ -28,6 +32,7 @@ const EMPTY_DEFAULTS: BillingFormValues = {
     bank_holder: '', bank_iban: '', bank_bic: '',
     company_street: '', company_zip: '', company_city: '',
     company_country: '', company_email: '',
+    steuernummer: '', finanzamt: '', uid: '', rechtsform: '',
 };
 
 /**
@@ -62,6 +67,10 @@ export default function BillingDetailsCard() {
                 company_city: billingDetails.company_city ?? '',
                 company_country: billingDetails.company_country ?? '',
                 company_email: billingDetails.company_email ?? '',
+                steuernummer: billingDetails.steuernummer ?? '',
+                finanzamt: billingDetails.finanzamt ?? '',
+                uid: billingDetails.uid ?? '',
+                rechtsform: billingDetails.rechtsform ?? '',
             });
         }
     }, [billingDetails, isLoading, reset, isDirty]);
@@ -168,6 +177,43 @@ export default function BillingDetailsCard() {
                                    placeholder={t`BIC`}
                                    disabled={!canEdit}
                                    {...register('bank_bic')} />
+                        </div>
+                    </div>
+
+                    <div className="divider"><Trans>Angaben für die Buchhaltung (EÜR)</Trans></div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold"><Trans>Steuernummer</Trans></span></label>
+                            <input type="text"
+                                   className="input input-bordered"
+                                   placeholder={t`z. B. 12/345/67890`}
+                                   disabled={!canEdit}
+                                   {...register('steuernummer')} />
+                        </div>
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold"><Trans>Finanzamt</Trans></span></label>
+                            <input type="text"
+                                   className="input input-bordered"
+                                   placeholder={t`Zuständiges Finanzamt`}
+                                   disabled={!canEdit}
+                                   {...register('finanzamt')} />
+                        </div>
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold"><Trans>UID-Nummer</Trans></span></label>
+                            <input type="text"
+                                   className="input input-bordered"
+                                   placeholder={t`ATU...`}
+                                   disabled={!canEdit}
+                                   {...register('uid')} />
+                        </div>
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold"><Trans>Rechtsform</Trans></span></label>
+                            <input type="text"
+                                   className="input input-bordered"
+                                   placeholder={t`z. B. Einzelunternehmen`}
+                                   disabled={!canEdit}
+                                   {...register('rechtsform')} />
                         </div>
                     </div>
 

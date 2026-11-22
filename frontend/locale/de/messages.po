@@ -262,6 +262,10 @@ msgstr "4. Preise und Zahlungsbedingungen"
 msgid "4. Zahlungsabwicklung und Betrugsprävention"
 msgstr "4. Zahlungsabwicklung und Betrugsprävention"
 
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "5 Szenarien / 19 Paritätsvektoren"
+#~ msgstr "5 Szenarien / 19 Paritätsvektoren"
+
 #: src/ui/Privacy.tsx
 msgid "5. Cloudflare Turnstile"
 msgstr "5. Cloudflare Turnstile"
@@ -482,6 +486,10 @@ msgstr "Aktuell sind keine privaten Galerien für dich freigeschaltet."
 msgid "Aktuelle Ziel-Galerie"
 msgstr "Aktuelle Ziel-Galerie"
 
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "Aktueller Brand-Kontext: {portalName}"
+#~ msgstr "Aktueller Brand-Kontext: {portalName}"
+
 #: src/ui/ModelProfileAccessView.tsx
 msgid "Aktueller Manager"
 msgstr "Aktueller Manager"
@@ -613,6 +621,10 @@ msgstr "Anforderungen des Kunden:"
 msgid "Anfrage"
 msgstr "Anfrage"
 
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "Angaben für die Buchhaltung (EÜR)"
+msgstr "Angaben für die Buchhaltung (EÜR)"
+
 #: src/ui/management/ManagementOrdersView.tsx
 #: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Angebot"
@@ -695,6 +707,14 @@ msgstr "Anonyme Gäste"
 msgid "Anonymer Gast"
 msgstr "Anonymer Gast"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
+msgstr "Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Anschrift"
+msgstr "Anschrift"
+
 #: src/ui/client/ClientDashboard.tsx
 msgid "Ansehen"
 msgstr "Ansehen"
@@ -723,6 +743,10 @@ msgstr "Art"
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "AT..."
 msgstr "AT..."
+
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "ATU..."
+msgstr "ATU..."
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Auf Anfrage"
@@ -772,6 +796,10 @@ msgstr "Auftrag löschen?"
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Ausbezahlt"
 msgstr "Ausbezahlt"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Ausgaben können einen betrieblichen Anteil von 0 % (privat) bis 100 % (betrieblich) haben."
+msgstr "Ausgaben können einen betrieblichen Anteil von 0 % (privat) bis 100 % (betrieblich) haben."
 
 #: src/logic/modelRegistration.ts
 msgid "Aussehen & Maße"
@@ -852,6 +880,10 @@ msgstr "Automatischer Refresh für Besucher alle 10 Sekunden."
 msgid "Backend:"
 msgstr "Backend:"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "Bald finden Sie hier Ihre Buchungen, Belege und Auswertungen. Die Buchhaltung ist noch im Aufbau."
+msgstr "Bald finden Sie hier Ihre Buchungen, Belege und Auswertungen. Die Buchhaltung ist noch im Aufbau."
+
 #: src/logic/mollieMethods.ts
 msgid "Bancontact"
 msgstr "Bancontact"
@@ -871,6 +903,10 @@ msgstr "Bankdaten speichern"
 #: src/logic/mollieMethods.ts
 msgid "Banküberweisung"
 msgstr "Banküberweisung"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Bankverbindung"
+msgstr "Bankverbindung"
 
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "Bankverbindung & Impressum"
@@ -1139,9 +1175,17 @@ msgstr "Betrag"
 msgid "Betrag in €"
 msgstr "Betrag in €"
 
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "Beträge in ganzen Cent, Zeiten in ganzen Minuten"
+#~ msgstr "Beträge in ganzen Cent, Zeiten in ganzen Minuten"
+
 #: src/ui/management/components/EmailComposerModal.tsx
 msgid "Betreff"
 msgstr "Betreff"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Betriebsanteil"
+msgstr "Betriebsanteil"
 
 #: src/ui/client/SelectionView.tsx
 msgid "Bewertung konnte nicht gespeichert werden."
@@ -1407,6 +1451,11 @@ msgstr "Brand-Standard"
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Brand-Zuweisung"
 msgstr "Brand-Zuweisung"
+
+#: src/ui/components/Sidebar.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Buchhaltung (EÜR)"
+msgstr "Buchhaltung (EÜR)"
 
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Bundesland"
@@ -1983,6 +2032,10 @@ msgstr "Die Sicherheitsprüfung konnte nicht geladen werden. Bitte versuche es e
 msgid "Die Telefonnummer ist zu lang."
 msgstr "Die Telefonnummer ist zu lang."
 
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "Die vollständige Buchhaltungs-UI entsteht in Folgetickets. Die Parität ist über die gepinnte Fixture der Clean-Room-Basis abgesichert."
+#~ msgstr "Die vollständige Buchhaltungs-UI entsteht in Folgetickets. Die Parität ist über die gepinnte Fixture der Clean-Room-Basis abgesichert."
+
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Die Werte für die Kamera"
 msgstr "Die Werte für die Kamera"
@@ -2018,6 +2071,10 @@ msgstr "Dies ist eine LIVE Galerie. Sobald der Fotograf Bilder hochlädt, ersche
 #: src/ui/LicenseTerms.tsx
 msgid "Diese Allgemeinen Geschäftsbedingungen (AGB) und Lizenzbedingungen gelten für sämtliche über dieses Portal angebotenen Fotoprodukte und digitalen Inhalte (im Folgenden „Download-Dateien“) sowie für alle Verträge, die über dieses Portal geschlossen werden."
 msgstr "Diese Allgemeinen Geschäftsbedingungen (AGB) und Lizenzbedingungen gelten für sämtliche über dieses Portal angebotenen Fotoprodukte und digitalen Inhalte (im Folgenden „Download-Dateien“) sowie für alle Verträge, die über dieses Portal geschlossen werden."
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Diese Angaben stammen aus Ihren Einstellungen und können dort geändert werden."
+msgstr "Diese Angaben stammen aus Ihren Einstellungen und können dort geändert werden."
 
 #: src/ui/LicenseTerms.tsx
 msgid "Diese Bedingungen regeln das Vertragsverhältnis zwischen dem Betreiber dieses Portals (im Folgenden „Fotograf“) und dem Kunden bei der Bestellung von Bildern, Lizenzpaketen und sonstigen digitalen Inhalten. Entgegenstehende oder abweichende Bedingungen des Kunden werden nicht anerkannt, sofern der Fotograf ihrer Geltung nicht ausdrücklich schriftlich zugestimmt hat."
@@ -2169,6 +2226,7 @@ msgid "E-Mail der eingeladenen Person"
 msgstr "E-Mail der eingeladenen Person"
 
 #: src/ui/management/components/BillingDetailsCard.tsx
+#: src/ui/management/ManagementEurView.tsx
 msgid "E-Mail für Rückfragen"
 msgstr "E-Mail für Rückfragen"
 
@@ -2807,6 +2865,11 @@ msgstr "Fett"
 msgid "Filter zurücksetzen"
 msgstr "Filter zurücksetzen"
 
+#: src/ui/management/components/BillingDetailsCard.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Finanzamt"
+msgstr "Finanzamt"
+
 #: src/ui/Impressum.tsx
 msgid "finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen."
 msgstr "finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen."
@@ -2824,6 +2887,10 @@ msgstr "Firma"
 #: src/ui/ContractSignView.tsx
 msgid "Firma:"
 msgstr "Firma:"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Firmenname"
+msgstr "Firmenname"
 
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "Firmenname / Kontoinhaber"
@@ -3137,6 +3204,10 @@ msgstr "Geburtsdatum"
 msgid "Gehört zu diesem Act eine Person oder mehrere?"
 msgstr "Gehört zu diesem Act eine Person oder mehrere?"
 
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "Geltender Vertrag"
+#~ msgstr "Geltender Vertrag"
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Geltungsbereich"
 msgstr "Geltungsbereich"
@@ -3144,6 +3215,10 @@ msgstr "Geltungsbereich"
 #: src/ui/management/components/InviteModal.tsx
 msgid "Generieren"
 msgstr "Generieren"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Geringwertige Wirtschaftsgüter"
+msgstr "Geringwertige Wirtschaftsgüter"
 
 #: src/logic/modelRegistration.ts
 msgid "Gerne"
@@ -3383,6 +3458,10 @@ msgstr "iDEAL"
 #: src/ui/client/components/SelectionFilterBar.tsx
 msgid "Ignoriert"
 msgstr "Ignoriert"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Ihre Buchhaltung für {portalName}"
+msgstr "Ihre Buchhaltung für {portalName}"
 
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/GalleryModal.tsx
@@ -3727,6 +3806,10 @@ msgstr "Keine Fotos hinterlegt."
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Keine generelle Nachricht"
 msgstr "Keine generelle Nachricht"
+
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "Keine Gleitkomma-Beträge und keine Betrags-Eingabefelder: Hier werden keine Geldbeträge gespeichert oder übergeben."
+#~ msgstr "Keine Gleitkomma-Beträge und keine Betrags-Eingabefelder: Hier werden keine Geldbeträge gespeichert oder übergeben."
 
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Keine Gutscheincodes gefunden. Lege den ersten Gutscheincode an."
@@ -5800,6 +5883,11 @@ msgstr "Rechnungsempfänger"
 msgid "Rechte (Gruppen / Galerien)"
 msgstr "Rechte (Gruppen / Galerien)"
 
+#: src/ui/management/components/BillingDetailsCard.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Rechtsform"
+msgstr "Rechtsform"
+
 #: src/ui/ModelRegistrationView.tsx
 msgid "Registrierung abgeschlossen. Dein Einladungslink ist damit verbraucht."
 msgstr "Registrierung abgeschlossen. Dein Einladungslink ist damit verbraucht."
@@ -6257,6 +6345,11 @@ msgstr "Status gespeichert"
 msgid "Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG."
 msgstr "Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG."
 
+#: src/ui/management/components/BillingDetailsCard.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Steuernummer"
+msgstr "Steuernummer"
+
 #: src/logic/modelRegistration.ts
 msgid "Stock-Fotos"
 msgstr "Stock-Fotos"
@@ -6546,6 +6639,11 @@ msgstr "Uhr"
 msgid "UID"
 msgstr "UID"
 
+#: src/ui/management/components/BillingDetailsCard.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "UID-Nummer"
+msgstr "UID-Nummer"
+
 #: src/ui/management/ManagementDashboard.tsx
 msgid "um den Rechnungs- und Bestellprozess zu aktivieren."
 msgstr "um den Rechnungs- und Bestellprozess zu aktivieren."
@@ -6631,6 +6729,14 @@ msgstr "Ungültiger Wert."
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Unique DLs:"
 msgstr "Unique DLs:"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Unternehmensdaten"
+msgstr "Unternehmensdaten"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Unternehmensdaten bearbeiten"
+msgstr "Unternehmensdaten bearbeiten"
 
 #: src/ui/Impressum.tsx
 msgid "Unternehmensgegenstand"
@@ -7161,10 +7267,22 @@ msgstr "Wird nicht in Suchergebnissen oder Feeds gelistet."
 msgid "Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben aber erhalten)."
 msgstr "Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben aber erhalten)."
 
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "Wirtschaftsjahr 2026"
+#~ msgstr "Wirtschaftsjahr 2026"
+
 #: src/ui/components/Sidebar.tsx
 #: src/ui/management/ManagementBoardsView.tsx
 msgid "Workflow"
 msgstr "Workflow"
+
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "z. B. 12/345/67890"
+msgstr "z. B. 12/345/67890"
+
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "z. B. Einzelunternehmen"
+msgstr "z. B. Einzelunternehmen"
 
 #: src/ui/management/components/ModelInviteDialog.tsx
 msgid "z. B. WhatsApp-Kontakt Anna"
@@ -7446,6 +7564,10 @@ msgstr "Zuordnung"
 msgid "Zuordnung aufheben"
 msgstr "Zuordnung aufheben"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "Zurück zum Portal"
+msgstr "Zurück zum Portal"
+
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Zurück zum Warenkorb"
 msgstr "Zurück zum Warenkorb"
@@ -7515,6 +7637,10 @@ msgstr "Zuschläge (Aufschläge in %)"
 #: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Zuständig"
 msgstr "Zuständig"
+
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "Zuständiges Finanzamt"
+msgstr "Zuständiges Finanzamt"
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Zustimmung erforderlich"

@@ -97,6 +97,13 @@ export const uiReviewConfig: UiReviewConfig = {
             note: 'Admin landing after login (ManagementDashboard, currentView "structure").',
         },
         {
+            name: 'eur',
+            path: '/eur',
+            states: ['filled'],
+            auth: 'admin',
+            note: 'EÜR module landing via its own menu entry: contract facts (WJ 2026, 5 Szenarien / 19 Vektoren, Cent/Minuten) and the explicit "Zurück zum Portal" link. Static page, no data seed required.',
+        },
+        {
             name: 'projects-board',
             path: '/admin-projects',
             states: ['filled'],

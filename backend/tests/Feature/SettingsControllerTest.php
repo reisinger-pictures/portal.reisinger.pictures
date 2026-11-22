@@ -216,6 +216,10 @@ class SettingsControllerTest extends TestCase
     {
         Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test GmbH']);
         Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT11 2222 3333 4444 5555']);
+        Setting::updateOrCreate(['key' => 'steuernummer', 'brand' => 'rp'], ['value' => '12/345/67890']);
+        Setting::updateOrCreate(['key' => 'finanzamt', 'brand' => 'rp'], ['value' => 'Finanzamt Linz']);
+        Setting::updateOrCreate(['key' => 'uid', 'brand' => 'rp'], ['value' => 'ATU12345678']);
+        Setting::updateOrCreate(['key' => 'rechtsform', 'brand' => 'rp'], ['value' => 'Einzelunternehmen']);
 
         $token = $this->clientToken();
 
@@ -223,7 +227,11 @@ class SettingsControllerTest extends TestCase
             ->getJson('/api/settings/billing-details')
             ->assertStatus(200)
             ->assertJsonPath('bank_holder', 'Test GmbH')
-            ->assertJsonPath('bank_iban', 'AT11 2222 3333 4444 5555');
+            ->assertJsonPath('bank_iban', 'AT11 2222 3333 4444 5555')
+            ->assertJsonPath('steuernummer', '12/345/67890')
+            ->assertJsonPath('finanzamt', 'Finanzamt Linz')
+            ->assertJsonPath('uid', 'ATU12345678')
+            ->assertJsonPath('rechtsform', 'Einzelunternehmen');
     }
 
     public function test_non_admin_cannot_update_license_terms(): void
@@ -259,10 +267,18 @@ class SettingsControllerTest extends TestCase
                 'bank_holder' => 'Berechtigt GmbH',
                 'bank_iban' => 'AT99 8888 7777 6666 5555',
                 'company_city' => 'Wien',
+                'steuernummer' => '12/345/67890',
+                'finanzamt' => 'Finanzamt Wien',
+                'uid' => 'ATU12345678',
+                'rechtsform' => 'GmbH',
             ])
             ->assertStatus(200);
 
         $this->assertDatabaseHas('settings', ['key' => 'bank_holder', 'value' => 'Berechtigt GmbH']);
+        $this->assertDatabaseHas('settings', ['key' => 'steuernummer', 'value' => '12/345/67890']);
+        $this->assertDatabaseHas('settings', ['key' => 'finanzamt', 'value' => 'Finanzamt Wien']);
+        $this->assertDatabaseHas('settings', ['key' => 'uid', 'value' => 'ATU12345678']);
+        $this->assertDatabaseHas('settings', ['key' => 'rechtsform', 'value' => 'GmbH']);
     }
 
     public function test_admin_can_read_system_info(): void
