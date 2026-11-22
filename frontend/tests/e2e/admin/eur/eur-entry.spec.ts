@@ -22,46 +22,51 @@ test.describe('EÜR sub-application', () => {
 
         await auth.login(superAdmin.email, superAdmin.password);
 
-        await sidebar.navigateTo('Buchhaltung (EÜR)');
+        await sidebar.navigateTo('EA Rechnung');
 
         const main = page.getByRole('main');
-        await expect(main.getByRole('heading', { name: /EÜR ·/, level: 1 })).toBeVisible();
-        await expect(main.getByRole('tablist')).toBeVisible();
+        await expect(page).toHaveURL(/\/steuern/);
+        await expect(page.getByRole('heading', { name: /Einnahmen Ausgaben Rechnung ·/, level: 1 })).toBeVisible();
+        await expect(page.getByRole('tablist')).toBeVisible();
         await expect(main.getByRole('heading', { name: 'Übersicht 2026' })).toBeVisible();
 
         // Stammdaten: gepinnte Kataloge und Reise-Pauschale Inland.
-        await main.getByRole('tab', { name: 'Einstellungen' }).click();
+        await page.getByRole('tab', { name: 'Einstellungen' }).click();
         await expect(main.getByRole('heading', { name: 'Stammdaten und Kataloge' })).toBeVisible();
         await expect(main).toContainText('Inland: 30,00 € Tag und 17,00 € Nächtigung.');
         await expect(main.getByRole('heading', { name: 'Feiertage' })).toBeVisible();
 
-        // Buchung anlegen.
-        await main.getByRole('tab', { name: 'Buchungen' }).click();
-        await main.getByLabel('Monat').selectOption({ label: 'Mai' });
-        await main.getByLabel('Art').selectOption({ label: 'Software' });
-        await main.getByLabel('Betrag (€)').fill('100');
-        await main.getByLabel('Betriebsanteil (%)').fill('60');
-        await main.getByRole('button', { name: 'Buchung speichern' }).click();
+        // Buchung anlegen (Dialog aus der Liste öffnen).
+        await page.getByRole('tab', { name: 'Buchungen' }).click();
+        await main.getByRole('button', { name: '+ Buchung' }).click();
+        const dialog = main.getByRole('dialog', { name: 'Neue Buchung' });
+        await expect(dialog).toBeVisible();
+        await dialog.getByLabel('Monat').selectOption({ label: 'Mai' });
+        await dialog.getByLabel('Art').selectOption({ label: 'Software' });
+        await dialog.getByLabel('Betrag (€)').fill('100');
+        await dialog.getByLabel('Betriebsanteil (%)').fill('60');
+        await dialog.getByRole('button', { name: 'Buchung speichern' }).click();
+        await expect(dialog).toHaveCount(0);
 
         await expect(main.getByRole('cell', { name: 'Software' })).toBeVisible();
         await expect(main.getByRole('cell', { name: '60 %' })).toBeVisible();
         await expect(main.getByRole('cell', { name: '60,00 €' })).toBeVisible();
 
         // Reisen: Kilometer, Tagesgeld und Nächtigung.
-        await main.getByRole('tab', { name: 'Reisen' }).click();
+        await page.getByRole('tab', { name: 'Reisen' }).click();
         await main.getByRole('button', { name: 'Reisekosten berechnen' }).click();
         await expect(main).toContainText('Kilometergeld');
         await expect(main.getByText('50,00 €')).toBeVisible();
 
         // Umsatzsteuer: acht Kennzahlen und Zahllast.
-        await main.getByRole('tab', { name: 'USt' }).click();
+        await page.getByRole('tab', { name: 'USt' }).click();
         await main.getByLabel('Kleinunternehmer-Umsatz (€)').fill('1000');
         await main.getByRole('button', { name: 'Kennzahlen berechnen' }).click();
         await expect(main.getByRole('cell', { name: 'KZ 016' })).toBeVisible();
         await expect(main.getByRole('cell', { name: '1.000,00 €' }).first()).toBeVisible();
 
         // Anlagen: DEG-012 mit dem dokumentierten Beispiel.
-        await main.getByRole('tab', { name: 'Anlagen' }).click();
+        await page.getByRole('tab', { name: 'Anlagen' }).click();
         await main.getByLabel('Anschaffungskosten (€)').fill('20000');
         await main.getByLabel('Nutzungsdauer (Jahre)').fill('10');
         await main.getByLabel('Degressiver Satz (%)').fill('30');
@@ -75,7 +80,7 @@ test.describe('EÜR sub-application', () => {
         await main.getByRole('link', { name: 'Zurück zum Portal' }).click();
 
         await expect(page).toHaveURL('/');
-        await expect(main.getByRole('heading', { name: /EÜR ·/, level: 1 })).toHaveCount(0);
-        await expect(page.getByRole('complementary').getByRole('link', { name: 'Buchhaltung (EÜR)' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: /Einnahmen Ausgaben Rechnung ·/, level: 1 })).toHaveCount(0);
+        await expect(page.getByRole('complementary').getByRole('link', { name: 'EA Rechnung' })).toBeVisible();
     });
 });

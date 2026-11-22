@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Eur;
 
 use App\Eur\Domain\TravelCalculator;
 use App\Eur\Parity\RuleValues;
+use App\Eur\Reference\EurYear;
 use App\Eur\Reference\ReferenceTables;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -24,7 +25,7 @@ class EurTravelController extends Controller
         $travel = $tables->travel();
 
         $data = $request->validate([
-            'year' => 'required|integer|in:2026',
+            'year' => ['required', 'integer', Rule::in(EurYear::SUPPORTED)],
             'vehicle' => ['required', 'string', Rule::in(array_column($tables->vehicleTypes(), 'name'))],
             'kilometres' => 'required|integer|min:0|max:100000',
             'passengers' => 'nullable|integer|min:0|max:6',
@@ -44,12 +45,13 @@ class EurTravelController extends Controller
         $withReceipts = (bool) $data['with_receipts'];
         $share = (int) $data['business_share'];
 
-        $drive = $calculator->kilometreAllowanceCents($data['vehicle'], $kilometres, $passengers);
-        $daily = $calculator->dailyAllowancesCents($data['country'], $days, $meals, $withReceipts);
+        $year = (int) $data['year'];
+        $drive = $calculator->kilometreAllowanceCents($data['vehicle'], $kilometres, $passengers, $year);
+        $daily = $calculator->dailyAllowancesCents($data['country'], $days, $meals, $withReceipts, $year);
         $total = $drive + $daily['day_cents'] + $daily['night_cents'];
 
         return response()->json([
-            'year' => 2026,
+            'year' => (int) $data['year'],
             'kilometres' => $kilometres,
             'kilometre_cents' => $drive,
             'day_cents' => $daily['day_cents'],

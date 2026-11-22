@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Eur;
 
+use App\Eur\Reference\EurYear;
 use App\Http\Controllers\Controller;
 use App\Models\EurAsset;
 use App\Models\EurAssetYear;
 use App\Models\EurEntry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * EÜR · Übersicht — Summen aus Buchungen und Anlagen.
@@ -20,7 +22,7 @@ class EurSummaryController extends Controller
     public function show(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'year' => 'nullable|integer|in:2026',
+            'year' => ['nullable', 'integer', Rule::in(EurYear::SUPPORTED)],
         ]);
 
         $year = (int) ($data['year'] ?? 2026);

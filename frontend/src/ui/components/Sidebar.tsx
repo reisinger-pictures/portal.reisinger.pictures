@@ -93,7 +93,7 @@ export default function Sidebar(props: SidebarProps) {
                                 )}
                                 <li><Link to="/admin-orders" className={props.currentView === 'admin-orders' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--receipt-text-check text-lg"></span> <Trans>Shop-Bestellungen</Trans></Link></li>
                                 <li><Link to="/admin-payouts" className={props.currentView === 'admin-payouts' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--cash-multiple text-lg"></span> <Trans>Payouts & Abrechnung</Trans></Link></li>
-                                <li><Link to="/eur" className={props.currentView === 'eur' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--calculator text-lg"></span> <Trans>Buchhaltung (EÜR)</Trans></Link></li>
+                                <li><Link to="/steuern" className={props.currentView === 'steuern' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--calculator text-lg"></span> <Trans>EA Rechnung</Trans></Link></li>
                                 {isSuperAdmin && (
                                     <>
                                         <li><Link to="/admin-manual-offer" className={props.currentView === 'admin-manual-offer' ? 'active' : ''} onClick={props.onCloseMobile}><span className="mdi--file-chart-outline text-lg"></span> <Trans>Manuelles Angebot</Trans></Link></li>

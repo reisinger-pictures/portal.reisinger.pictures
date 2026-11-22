@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import {apiMutate, fetcher} from '../api';
+import {apiMutate, apiUpload, fetcher} from '../api';
 
 /**
  * EÜR · API-Vertrag der Buchhaltung.
@@ -124,6 +124,168 @@ export interface EurSettings {
     kleinunternehmer: boolean;
 }
 
+/** `GET /eur/years` — supported years and warnings for unsupported ones. */
+export interface EurYearWarning {
+    year: number;
+    code: string;
+    warning: string;
+    supported: boolean;
+}
+
+export interface EurYearsResponse {
+    default_year: number;
+    supported: number[];
+    warnings: EurYearWarning[];
+}
+
+/** `GET /eur/month` — a line's type E/A/WEB/FR. */
+export interface EurMonthLine {
+    type: 'E' | 'A' | 'WEB' | 'FR';
+    day: number | null;
+    description: string;
+    amount_cents: number;
+    business_amount_cents: number;
+    vat_kind: string | null;
+    receipt_no: string | null;
+    warnings: string[];
+    hints: string[];
+}
+
+export interface EurMonthCheck {
+    code: string;
+    ok: boolean;
+    message: string;
+    hint: string;
+}
+
+export interface EurMonthTotals {
+    income_cents: number;
+    expense_cents: number;
+    warehouse_cents: number;
+    vat_cents: number;
+    hours_minutes: number;
+}
+
+export interface EurMonthData {
+    year: number;
+    month: number;
+    lines: EurMonthLine[];
+    totals: EurMonthTotals;
+    checks: EurMonthCheck[];
+    social_insurance: {amounts_cents: Record<string, number>; rates_per_10000: Record<string, number>};
+    income_tax: {profit_cents: number; tax_cents: number};
+    report: {status: string; closed_at: string | null};
+    signature: {status: string; provider: string | null; is_test: boolean};
+}
+
+/** `GET/POST /eur/documents` — metadata; the storage path never leaves the server. */
+export interface EurDocument {
+    id: number;
+    year: number;
+    month: number | null;
+    receipt_no: string | null;
+    original_name: string;
+    mime_type: string | null;
+    size_bytes: number;
+    status: string;
+}
+
+export interface EurDocumentsResponse {
+    documents: EurDocument[];
+}
+
+export interface EurDocumentResponse {
+    document: EurDocument;
+}
+
+/** `GET/POST /eur/hours` — time is always whole minutes. */
+export interface EurHour {
+    id: number;
+    year: number;
+    month: number;
+    day: number | null;
+    minutes: number;
+    project: string | null;
+    description: string | null;
+}
+
+export interface EurHoursResponse {
+    hours: EurHour[];
+    total_minutes: number;
+}
+
+/** `GET/POST /eur/warehouse` — amounts are always whole cents. */
+export interface EurWarehouseEntry {
+    id: number;
+    year: number;
+    month: number;
+    day: number | null;
+    description: string;
+    amount_cents: number;
+    receipt_no: string | null;
+}
+
+export interface EurWarehouseResponse {
+    entries: EurWarehouseEntry[];
+    total_cents: number;
+}
+
+/** `GET/POST /eur/applications` — status open|done. */
+export interface EurApplication {
+    id: number;
+    year: number;
+    type: string;
+    subject: string;
+    status: 'open' | 'done';
+    note: string | null;
+}
+
+export interface EurApplicationsResponse {
+    applications: EurApplication[];
+}
+
+/** `GET/POST /eur/signatures` — test providers are flagged with is_test. */
+export interface EurSignature {
+    id: number;
+    year: number;
+    month: number;
+    eur_document_id: number | null;
+    provider: string;
+    status: string;
+    signed_at: string | null;
+    note: string | null;
+}
+
+export interface EurSignaturesResponse {
+    signatures: EurSignature[];
+}
+
+export interface EurSignatureResponse {
+    signature: EurSignature;
+    is_test: boolean;
+}
+
+/** `GET /eur/analytics` — by customer/project/month; the client does not recalculate. */
+export interface EurAnalyticsRow {
+    name: string;
+    revenue_cents: number;
+    cost_cents: number;
+    margin_cents: number;
+}
+
+export interface EurAnalyticsMonth {
+    month: number;
+    income_cents: number;
+    expense_cents: number;
+    profit_cents: number;
+}
+
+export interface EurAnalytics {
+    by_customer: EurAnalyticsRow[];
+    by_project: EurAnalyticsRow[];
+    by_month: EurAnalyticsMonth[];
+}
+
 const SWR_OPTIONS = {revalidateOnFocus: false} as const;
 
 export function useEurReference() {
@@ -144,6 +306,40 @@ export function useEurSettings() {
 
 export function useEurAssets() {
     return useSWR<{assets: EurAsset[]}>('/api/management/eur/assets', fetcher, SWR_OPTIONS);
+}
+
+export function useEurYears() {
+    return useSWR<EurYearsResponse>('/api/management/eur/years', fetcher, SWR_OPTIONS);
+}
+
+export function useEurMonth(year = 2026, month = 1) {
+    return useSWR<EurMonthData>(`/api/management/eur/month?year=${year}&month=${month}`, fetcher, SWR_OPTIONS);
+}
+
+export function useEurDocuments(year = 2026) {
+    return useSWR<EurDocumentsResponse>(`/api/management/eur/documents?year=${year}`, fetcher, SWR_OPTIONS);
+}
+
+export function useEurHours(year = 2026, month?: number) {
+    const suffix = month === undefined ? '' : `&month=${month}`;
+    return useSWR<EurHoursResponse>(`/api/management/eur/hours?year=${year}${suffix}`, fetcher, SWR_OPTIONS);
+}
+
+export function useEurWarehouse(year = 2026, month?: number) {
+    const suffix = month === undefined ? '' : `&month=${month}`;
+    return useSWR<EurWarehouseResponse>(`/api/management/eur/warehouse?year=${year}${suffix}`, fetcher, SWR_OPTIONS);
+}
+
+export function useEurApplications(year = 2026) {
+    return useSWR<EurApplicationsResponse>(`/api/management/eur/applications?year=${year}`, fetcher, SWR_OPTIONS);
+}
+
+export function useEurSignatures(year = 2026) {
+    return useSWR<EurSignaturesResponse>(`/api/management/eur/signatures?year=${year}`, fetcher, SWR_OPTIONS);
+}
+
+export function useEurAnalytics(year = 2026) {
+    return useSWR<EurAnalytics>(`/api/management/eur/analytics?year=${year}`, fetcher, SWR_OPTIONS);
 }
 
 export interface EurEntryPayload {
@@ -232,6 +428,8 @@ export async function calculateEurTravel(payload: EurTravelPayload): Promise<Eur
     return apiMutate<EurTravelResult>('/api/management/eur/travel/calc', 'POST', payload);
 }
 
+export type EurIncomeTaxMode = 'total' | 'business' | 'rental' | 'forecast';
+
 export interface EurIncomeTaxResult {
     year: number;
     profit_cents: number;
@@ -240,11 +438,101 @@ export interface EurIncomeTaxResult {
     income_tax_cents: number;
     tax_free_threshold_cents: number;
     stages: EurTaxStage[];
+    mode?: EurIncomeTaxMode;
+    e1a?: string | null;
+    e1b?: string | null;
+    deductions_cents?: number;
 }
 
-export async function calculateEurIncomeTax(profitCents: number): Promise<EurIncomeTaxResult> {
-    return apiMutate<EurIncomeTaxResult>('/api/management/eur/est/calc', 'POST', {
-        year: 2026,
+export interface EurIncomeTaxOptions {
+    year?: number;
+    mode?: EurIncomeTaxMode;
+    e1a?: string | null;
+    e1b?: string | null;
+}
+
+export async function calculateEurIncomeTax(
+    profitCents: number,
+    options: EurIncomeTaxOptions = {},
+): Promise<EurIncomeTaxResult> {
+    const payload: Record<string, number | string | null> = {
+        year: options.year ?? 2026,
         profit_cents: profitCents,
-    });
+    };
+    if (options.mode !== undefined) payload.mode = options.mode;
+    if (options.e1a !== undefined) payload.e1a = options.e1a;
+    if (options.e1b !== undefined) payload.e1b = options.e1b;
+
+    return apiMutate<EurIncomeTaxResult>('/api/management/eur/est/calc', 'POST', payload);
+}
+
+/** Closes a month idempotently; the second call also returns 200. */
+export async function closeEurMonth(payload: {year: number; month: number; note?: string}): Promise<void> {
+    await apiMutate('/api/management/eur/month/close', 'POST', payload);
+}
+
+/** Uploads a receipt as multipart/form-data. The storage path stays server-side. */
+export async function uploadEurDocument(payload: {
+    file: File;
+    year: number;
+    month?: number;
+    receipt_no?: string;
+}): Promise<EurDocumentResponse> {
+    const body = new FormData();
+    body.append('file', payload.file);
+    body.append('year', String(payload.year));
+    if (payload.month !== undefined) body.append('month', String(payload.month));
+    if (payload.receipt_no !== undefined) body.append('receipt_no', payload.receipt_no);
+
+    return apiUpload<EurDocumentResponse>('/api/management/eur/documents', body);
+}
+
+export function eurDocumentDownloadUrl(id: number): string {
+    return `/api/management/eur/documents/${id}/download`;
+}
+
+export async function deleteEurDocument(id: number): Promise<void> {
+    await apiMutate(`/api/management/eur/documents/${id}`, 'DELETE');
+}
+
+export async function createEurHour(payload: {
+    year: number;
+    month: number;
+    day?: number | null;
+    minutes: number;
+    project?: string | null;
+    description?: string | null;
+}): Promise<void> {
+    await apiMutate('/api/management/eur/hours', 'POST', payload);
+}
+
+export async function createEurWarehouse(payload: {
+    year: number;
+    month: number;
+    day?: number | null;
+    description: string;
+    amount_cents: number;
+    receipt_no?: string | null;
+}): Promise<void> {
+    await apiMutate('/api/management/eur/warehouse', 'POST', payload);
+}
+
+export async function createEurApplication(payload: {
+    year: number;
+    type: string;
+    subject: string;
+    note?: string | null;
+}): Promise<void> {
+    await apiMutate('/api/management/eur/applications', 'POST', payload);
+}
+
+export async function createEurSignature(payload: {
+    year: number;
+    month: number;
+    eur_document_id?: number | null;
+    provider: string;
+    status?: string;
+    note?: string | null;
+}): Promise<EurSignatureResponse> {
+    return apiMutate<EurSignatureResponse>('/api/management/eur/signatures', 'POST', payload);
 }

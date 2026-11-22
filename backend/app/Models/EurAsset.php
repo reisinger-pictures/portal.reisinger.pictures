@@ -21,7 +21,8 @@ class EurAsset extends Model
     protected $fillable = [
         'brand', 'name', 'invoice_no', 'supplier', 'purchase_date', 'cost_cents',
         'useful_life_years', 'business_share', 'method', 'degressive_rate',
-        'status', 'disposed_on', 'disposal_proceeds_cents', 'notes',
+        'category', 'is_private_investment', 'switched_to_linear_at',
+        'switch_reason', 'status', 'disposed_on', 'disposal_proceeds_cents', 'notes',
     ];
 
     protected $casts = [
@@ -32,6 +33,10 @@ class EurAsset extends Model
         'useful_life_years' => 'integer',
         'business_share' => 'integer',
         'degressive_rate' => 'integer',
+        'is_private_investment' => 'boolean',
+        'switched_to_linear_at' => 'datetime',
+        'is_private_investment' => 'boolean',
+        'switched_to_linear_at' => 'datetime',
         'disposal_proceeds_cents' => 'integer',
     ];
 

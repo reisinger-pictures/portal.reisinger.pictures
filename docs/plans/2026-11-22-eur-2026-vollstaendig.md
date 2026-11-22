@@ -1,12 +1,12 @@
 # EÜR 2026 vollständig: Umsetzungsplan
 
-**Status:** Plan
+**Status:** In Arbeit
 
 ## 1. Auftrag und Ausgangslage
 
 Ziel ist eine vollständige EÜR für das Wirtschaftsjahr 2026 mit
-jahresabhängigen Regeln (2024–2026), als eigenständige Buchhaltungsansicht im
-Portal. Grundlage sind der gepinnte Regelkatalog, die abgeleiteten
+jahresabhängigen Regeln (2024–2026), als eigenständige Ansicht „Einnahmen Ausgaben Rechnung" unter `/steuern`
+im Portal. Grundlage sind der gepinnte Regelkatalog, die abgeleiteten
 Anforderungsdokumente und die Referenz-Screenshots der eigenen Firma.
 
 ### Gemessener Stand des Portals (Arbeitsbaum, HEAD `554da4f3`)
@@ -143,6 +143,11 @@ ein Commit, unabhängiges Review, Push, CI grün. Erst danach neue Phasen.
 - Anlagen: Jahresabschluss, „alle offenen AfA buchen" idempotent, GWG,
   Privatanteil, Begründung, Detailansicht, DEG-Vergleich.
 - Tests: Grenzwerte, Halbjahr, Wechsel einmalig, Idempotenz.
+- Erweiterung laut [#34](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/34):
+  degressive Abschreibung als Anzeige statt Rechner, Neuware-Vergleich beider
+  Verfahren mit Kategorievorschlag, dauerhaft gesperrter Rückwechsel auf
+  degressiv, Anlagenverzeichnis für Privateinlagen und Jahresabschlussbuchung
+  der betrieblichen AfA (P5.1–P5.6).
 
 ### P6 — Auswertungen, Anträge, Signatur, PDF
 

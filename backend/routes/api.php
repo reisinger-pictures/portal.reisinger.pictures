@@ -9,14 +9,22 @@ use App\Http\Controllers\ContractJoinController;
 use App\Http\Controllers\CouponAdminController;
 use App\Http\Controllers\CouponCheckoutController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\Eur\EurAnalyticsController;
+use App\Http\Controllers\Eur\EurApplicationController;
 use App\Http\Controllers\Eur\EurAssetController;
+use App\Http\Controllers\Eur\EurDocumentController;
 use App\Http\Controllers\Eur\EurEntryController;
+use App\Http\Controllers\Eur\EurHourController;
 use App\Http\Controllers\Eur\EurIncomeTaxController;
+use App\Http\Controllers\Eur\EurMonthController;
 use App\Http\Controllers\Eur\EurReferenceController;
 use App\Http\Controllers\Eur\EurSettingsController;
+use App\Http\Controllers\Eur\EurSignatureController;
 use App\Http\Controllers\Eur\EurSummaryController;
 use App\Http\Controllers\Eur\EurTravelController;
 use App\Http\Controllers\Eur\EurVatController;
+use App\Http\Controllers\Eur\EurWarehouseController;
+use App\Http\Controllers\Eur\EurYearsController;
 use App\Http\Controllers\FileDeliveryController;
 use App\Http\Controllers\FtpController;
 use App\Http\Controllers\FtpCredentialController;
@@ -310,7 +318,27 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/eur/assets', [EurAssetController::class, 'store'])->name('api.management.eur.assets.store');
     Route::get('/management/eur/assets/{id}/plan', [EurAssetController::class, 'plan'])->name('api.management.eur.assets.plan');
     Route::post('/management/eur/assets/{id}/switch-to-linear', [EurAssetController::class, 'switchToLinear'])->name('api.management.eur.assets.switch');
+    Route::post('/management/eur/assets/{id}/book-depreciation', [EurAssetController::class, 'bookDepreciation'])->name('api.management.eur.assets.book-depreciation');
     Route::delete('/management/eur/assets/{id}', [EurAssetController::class, 'destroy'])->name('api.management.eur.assets.destroy');
+    // EÜR · Buchhaltungsansicht: Jahre, Monat/Abschluss, Belege, Stunden,
+    // Wareneingang, Anträge, Signaturen und Auswertungen. Alle brand-scoped.
+    Route::get('/management/eur/years', [EurYearsController::class, 'index'])->name('api.management.eur.years');
+    Route::get('/management/eur/month', [EurMonthController::class, 'show'])->name('api.management.eur.month.show');
+    Route::post('/management/eur/month/close', [EurMonthController::class, 'close'])->name('api.management.eur.month.close');
+    Route::get('/management/eur/documents', [EurDocumentController::class, 'index'])->name('api.management.eur.documents.index');
+    Route::post('/management/eur/documents', [EurDocumentController::class, 'store'])->name('api.management.eur.documents.store');
+    Route::get('/management/eur/documents/{id}/download', [EurDocumentController::class, 'download'])->name('api.management.eur.documents.download');
+    Route::delete('/management/eur/documents/{id}', [EurDocumentController::class, 'destroy'])->name('api.management.eur.documents.destroy');
+    Route::get('/management/eur/hours', [EurHourController::class, 'index'])->name('api.management.eur.hours.index');
+    Route::post('/management/eur/hours', [EurHourController::class, 'store'])->name('api.management.eur.hours.store');
+    Route::get('/management/eur/warehouse', [EurWarehouseController::class, 'index'])->name('api.management.eur.warehouse.index');
+    Route::post('/management/eur/warehouse', [EurWarehouseController::class, 'store'])->name('api.management.eur.warehouse.store');
+    Route::get('/management/eur/applications', [EurApplicationController::class, 'index'])->name('api.management.eur.applications.index');
+    Route::post('/management/eur/applications', [EurApplicationController::class, 'store'])->name('api.management.eur.applications.store');
+    Route::patch('/management/eur/applications/{id}', [EurApplicationController::class, 'updateStatus'])->name('api.management.eur.applications.status');
+    Route::get('/management/eur/signatures', [EurSignatureController::class, 'index'])->name('api.management.eur.signatures.index');
+    Route::post('/management/eur/signatures', [EurSignatureController::class, 'store'])->name('api.management.eur.signatures.store');
+    Route::get('/management/eur/analytics', [EurAnalyticsController::class, 'index'])->name('api.management.eur.analytics');
     // R-01: Billing-/Impressum-Konfiguration ist ein Super-Admin-Anliegen (s. isImpressumMissing-
     // Gate im Frontend) → zusätzlich super_admin-gesichert. Lesen (GET /settings/billing-details)
     // bleibt auth:api, da Klienten die Bankdaten für "Kauf auf Rechnung" brauchen.

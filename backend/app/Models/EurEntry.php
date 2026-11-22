@@ -19,15 +19,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EurEntry extends Model
 {
     protected $fillable = [
-        'brand', 'year', 'month', 'direction', 'kind_type', 'e1a_code',
-        'business_share', 'amount_cents', 'business_amount_cents', 'vat_kind',
-        'payment_method', 'eur_project_id', 'eur_customer_id', 'receipt_no', 'note',
+        'brand', 'year', 'month', 'day', 'direction', 'kind_type', 'category',
+        'description', 'e1a_code', 'business_share', 'amount_cents',
+        'business_amount_cents', 'vat_kind', 'payment_method', 'eur_project_id',
+        'eur_customer_id', 'receipt_no', 'note',
     ];
 
     protected $casts = [
         'brand' => AsBrand::class,
         'year' => 'integer',
         'month' => 'integer',
+        'day' => 'integer',
         'business_share' => 'integer',
         'amount_cents' => 'integer',
         'business_amount_cents' => 'integer',

@@ -27,8 +27,45 @@
 | `eur_asset_years` | AfA- und Privatnutzungsplan je Jahr | Jahr, Methode, AfA in Cent, Restbuchwert in Cent, Privatanteil, Status |
 | `eur_audit_logs` | Audit | Aktion, Akteur, Objekt; keine Dateiinhalte und keine Secrets |
 
-Die Migration ist `backend/database/migrations/V061__create_eur_bookkeeping_schema.php`.
-Sie ist additiv und enthält keinen Backfill.
+Die Migrationen sind additiv und enthalten keinen Backfill; der aktuelle Stand
+steht ausschließlich in
+[`features/tech/07-architectural-decisions.md`](../tech/07-architectural-decisions.md#ad-2).
+
+### Schema-Entscheidung V062 (Journal, Belege, Monat)
+
+**Schema.** `eur_entries` erhält nullable `day`, `category`, `description`;
+bestehende Zeilen bleiben ohne Tagesdatum gültig (Monat bleibt Pflichtfeld).
+Neu: `eur_documents` (Belegmetadaten, Prüfsumme, privater Pfad), `eur_hours`
+(Minuten), `eur_warehouse_entries` (Wareneingang in Cent), `eur_applications`
+(Anträge), `eur_signatures` (Signaturstatus) und `eur_monthly_reports`
+(Monatsstatus, eindeutig je Brand/Jahr/Monat). Alle Tabellen tragen `brand`,
+Geld ist `*_cents`, Zeit `minutes`; es gibt keine Float-Spalten.
+
+**Backfill.** Keiner. Bestehende Buchungen haben kein Tagesdatum; die Anzeige
+zeigt dann nur den Monat. Ein Monatsbericht entsteht erst beim Abschluss.
+
+**Rollback.** `down()` ist nach Repository-Policy leer. Der additive Weg
+lässt bestehende Buchungen unverändert; neue Tabellen sind unabhängig.
+
+### Schema-Entscheidung V063 (#34)
+
+**Schema.** `eur_assets` erhält `category` (nullable, Kategorievorschlag aus
+dem Referenzkatalog), `is_private_investment` (bool, default false für die
+Privateinlagen-Ansicht), `switched_to_linear_at` (timestamp, nullable) und
+`switch_reason` (text, nullable). `eur_asset_years` erhält `eur_entry_id`
+(nullable FK auf `eur_entries`) und `booked_at` (timestamp, nullable) für die
+idempotente Jahresabschlussbuchung.
+
+**Backfill.** Keiner. Bestehende Anlagegüter bleiben ohne Kategorie und ohne
+Wechselmarkierung; die Ableitung aus vorhandenen Jahreszeilen (`method=linear`)
+bleibt als Lesefallback erhalten. Bereits gebuchte AfA-Jahre werden nicht
+nachträglich verbucht.
+
+**Rollback.** `down()` ist leer. Die neuen Spalten sind nullable; ein Entfernen
+würde nur Kategorie, Wechselgrund und Buchungsverknüpfung verlieren, nicht die
+AfA-Plane selbst. Ein Rückwechsel auf degressiv bleibt fachlich gesperrt, weil
+es keinen Schreibpfad gibt, der `method` nach einem Wechsel wieder auf
+`degressiv` setzt.
 
 ## Beziehungen
 

@@ -16,7 +16,7 @@ class EurAssetYear extends Model
     protected $fillable = [
         'brand', 'eur_asset_id', 'year', 'method', 'depreciation_cents',
         'book_value_cents', 'private_use_percent', 'private_use_cents',
-        'business_use_cents', 'status',
+        'business_use_cents', 'status', 'eur_entry_id', 'booked_at',
     ];
 
     protected $casts = [
@@ -27,6 +27,8 @@ class EurAssetYear extends Model
         'private_use_percent' => 'integer',
         'private_use_cents' => 'integer',
         'business_use_cents' => 'integer',
+        'eur_entry_id' => 'integer',
+        'booked_at' => 'datetime',
     ];
 
     public function asset(): BelongsTo

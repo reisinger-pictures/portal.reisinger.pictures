@@ -285,9 +285,26 @@ class EurApiTest extends TestCase
         $token = $this->tokenFor(UserRole::ADMIN->value);
 
         $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/vat/calc', [
-            'year' => 2025,
+            'year' => 2027,
             'month' => 5,
         ])->assertUnprocessable();
+    }
+
+    public function test_supported_years_are_accepted_by_summary_and_vat(): void
+    {
+        $token = $this->tokenFor(UserRole::ADMIN->value);
+
+        foreach ([2024, 2025, 2026] as $year) {
+            $this->withHeaders($this->bearer($token))
+                ->getJson('/api/management/eur/summary?year='.$year)
+                ->assertOk()
+                ->assertJsonPath('year', $year);
+
+            $this->withHeaders($this->bearer($token))
+                ->postJson('/api/management/eur/vat/calc', ['year' => $year, 'month' => 5])
+                ->assertOk()
+                ->assertJsonPath('year', $year);
+        }
     }
 
     public function test_travel_calculation_uses_pinned_rates_and_the_business_share(): void

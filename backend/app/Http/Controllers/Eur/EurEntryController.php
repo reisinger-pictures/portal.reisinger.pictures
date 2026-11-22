@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Eur;
 
+use App\Eur\Domain\JournalRules;
+use App\Eur\Reference\EurYear;
 use App\Eur\Support\Share;
 use App\Http\Controllers\Controller;
 use App\Models\EurAuditLog;
@@ -9,9 +11,10 @@ use App\Models\EurCustomer;
 use App\Models\EurEntry;
 use App\Models\EurProject;
 use App\Support\BrandRegistry;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 /**
  * EÜR · Buchungen (Einnahmen und Ausgaben).
@@ -26,7 +29,7 @@ class EurEntryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'year' => 'nullable|integer',
+            'year' => $this->yearRule(false),
             'month' => 'nullable|integer|min:1|max:12',
             'direction' => 'nullable|in:income,expense',
         ]);
@@ -95,10 +98,13 @@ class EurEntryController extends Controller
     private function validateEntry(Request $request, ?EurEntry $entry): array
     {
         $data = $request->validate([
-            'year' => ['required', 'integer', Rule::in([2026])],
+            'year' => $this->yearRule(true),
             'month' => 'required|integer|min:1|max:12',
+            'day' => 'nullable|integer|min:1|max:31',
             'direction' => 'required|in:income,expense',
             'kind_type' => 'required|string|max:190',
+            'category' => 'nullable|string|max:190',
+            'description' => 'nullable|string|max:190',
             'e1a_code' => 'nullable|string|max:8',
             'business_share' => 'required|integer|min:0|max:100|multiple_of:5',
             'amount_cents' => 'required|integer|min:0',
@@ -160,8 +166,11 @@ class EurEntryController extends Controller
             'id' => (int) $entry->id,
             'year' => (int) $entry->year,
             'month' => (int) $entry->month,
+            'day' => $entry->day === null ? null : (int) $entry->day,
             'direction' => $entry->direction,
             'kind_type' => $entry->kind_type,
+            'category' => $entry->category,
+            'description' => $entry->description,
             'e1a_code' => $entry->e1a_code,
             'business_share' => (int) $entry->business_share,
             'amount_cents' => (int) $entry->amount_cents,
@@ -172,6 +181,27 @@ class EurEntryController extends Controller
             'customer' => $entry->customer?->name,
             'receipt_no' => $entry->receipt_no,
             'note' => $entry->note,
+            'checks' => class_exists(JournalRules::class)
+                ? JournalRules::checks(array_merge($entry->toArray(), ['kind' => $entry->direction]))
+                : [],
+        ];
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function yearRule(bool $required): array
+    {
+        return [
+            $required ? 'required' : 'nullable',
+            'integer',
+            function (string $attribute, mixed $value, Closure $fail): void {
+                try {
+                    EurYear::assert((int) $value);
+                } catch (InvalidArgumentException) {
+                    $fail(EurYear::warning((int) $value)['warning']);
+                }
+            },
         ];
     }
 }

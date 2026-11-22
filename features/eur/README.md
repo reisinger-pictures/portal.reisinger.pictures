@@ -27,7 +27,7 @@ Verträge und den unveränderlichen, versionierten Dokumentenstand.
 
 ## Nutzeransicht
 
-- Die Buchhaltung ist ein eigener Menüpunkt in der bestehenden App-Shell (Route `/eur`) mit einem expliziten Weg zurück ins Portal; keine zweite App-Shell.
+- Die Buchhaltung ist ein eigener Menüpunkt in der bestehenden App-Shell (Route `/steuern`, Alias `/eur`) mit einem expliziten Weg zurück ins Portal; keine zweite App-Shell.
 - Die Ansicht zeigt ausschließlich fachlich nützliche Informationen: Unternehmensdaten aus den Einstellungen, die Grenze für geringwertige Wirtschaftsgüter und den betrieblichen Anteil. Technische Hinweise zur Paritätsprüfung sind kein Teil der Nutzeransicht.
 - Die EÜR-spezifischen Firmenfelder (Steuernummer, Finanzamt, UID, Rechtsform) werden in den Einstellungen gepflegt und in der Ansicht angezeigt; fehlende Werte erscheinen als Platzhalter.
 
@@ -35,11 +35,11 @@ Verträge und den unveränderlichen, versionierten Dokumentenstand.
 
 - Referenzdaten, Einstellungen, Buchungen, Anlagen/AfA, DEG-Vergleich, USt und
   Reisen sind über die EÜR-API angebunden.
-- Die UI ist eine eigenständige Buchhaltungsansicht unter `/eur` mit eigener
-  Monatsleiste, Monats- und Jahresübersicht, Tabs und Rücksprung ins Portal.
-  Die vollständige Abdeckung aller in der UI-Anforderung genannten
-  Sonderansichten (Belege, Wareneingang, Auswertungen, Anträge, Signatur)
-  bleibt offene Arbeit und ist in Issue #31 dokumentiert.
+- Die UI ist eine eigenständige Buchhaltungsansicht unter `/steuern` (Alias `/eur`) mit eigener
+  Monatsleiste, Monats- und Jahresübersicht, 12 Tabs und Rücksprung ins Portal.
+  Belege, Wareneingang, Auswertungen, Anträge und Signatur sind als eigene
+  Tabs und Panels umgesetzt. Offen bleiben PDF-Erzeugung, OCR, echte
+  QES-Signaturkette und die Filter der Jahresübersicht (Issue #31).
 
 ## Grenzen
 

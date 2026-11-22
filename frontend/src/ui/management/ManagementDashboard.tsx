@@ -63,7 +63,7 @@ function DashboardView({
                 {currentView === 'admin-products' && <ManagementProductsView/>}
                 {currentView === 'admin-snippets' && <ManagementTextSnippetsView/>}
                 {currentView === 'admin-payouts' && <ManagementPayoutsView/>}
-                {currentView === 'eur' && <ManagementEurView/>}
+                {currentView === 'steuern' && <ManagementEurView/>}
                 {currentView === 'admin-coupons' && <ManagementCouponsView/>}
                 {currentView === 'admin-models' && <ManagementModelsView/>}
                 {currentView === 'admin-contracts' && <ManagementContractView/>}
@@ -87,7 +87,7 @@ export default function ManagementDashboard() {
     const pathView = location.pathname.replace('/', '');
     const currentView = pathView || 'structure';
     const {canAccessB2BFeatures, isSuperAdmin, isPhotographer} = usePermissions();
-    const isB2BView = ['admin-orders', 'admin-manual-invoice', 'admin-manual-offer', 'admin-customers', 'admin-products', 'admin-snippets', 'admin-payouts', 'eur', 'admin-contracts', 'admin-projects', 'boards', 'admin-models'].includes(currentView);
+    const isB2BView = ['admin-orders', 'admin-manual-invoice', 'admin-manual-offer', 'admin-customers', 'admin-products', 'admin-snippets', 'admin-payouts', 'steuern', 'admin-contracts', 'admin-projects', 'boards', 'admin-models'].includes(currentView);
 
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const {user} = useAuth();
@@ -103,7 +103,7 @@ export default function ManagementDashboard() {
 
     // Die Buchhaltung ist eine eigenständige Sub-Applikation: eigene Ansicht
     // ohne Portal-Sidebar und Suche, mit explizitem Rücksprung ins Portal.
-    if (currentView === 'eur') {
+    if (currentView === 'steuern') {
         return <ManagementEurView/>;
     }
 

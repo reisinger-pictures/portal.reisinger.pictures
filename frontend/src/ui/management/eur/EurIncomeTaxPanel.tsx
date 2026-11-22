@@ -96,7 +96,7 @@ export default function EurIncomeTaxPanel({defaultProfitCents = 0}: Props) {
                                     <tr key={`${stage.from_cents}-${stage.rate_per_10000}`}>
                                         <td>{index + 1}</td>
                                         <td className="text-right">{cents(stage.from_cents)}</td>
-                                        <td className="text-right">{stage.to_cents === null ? 'offen' : cents(stage.to_cents)}</td>
+                                        <td className="text-right">{stage.to_cents === null ? <Trans>offen</Trans> : cents(stage.to_cents)}</td>
                                         <td className="text-right">{formatPercent(stage.rate_per_10000 / 100)}</td>
                                     </tr>
                                 ))}

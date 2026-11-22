@@ -4,7 +4,20 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { useBrand } from '../../../logic/useBrand';
 import { useBillingDetails } from '../../../logic/useLicenseTerms';
-import { useEurEntries, useEurReference, useEurSettings, useEurSummary } from '../../../logic/useEur';
+import {
+    useEurAnalytics,
+    useEurApplications,
+    useEurDocuments,
+    useEurEntries,
+    useEurHours,
+    useEurMonth,
+    useEurReference,
+    useEurSettings,
+    useEurSignatures,
+    useEurSummary,
+    useEurWarehouse,
+    useEurYears,
+} from '../../../logic/useEur';
 import { renderWithProviders } from '../../../test-setup';
 import ManagementEurView from '../ManagementEurView';
 
@@ -18,11 +31,27 @@ vi.mock('../../../logic/useLicenseTerms', async (importOriginal) => {
 });
 
 vi.mock('../../../logic/useEur', () => ({
+    useEurYears: vi.fn(),
     useEurReference: vi.fn(),
     useEurSettings: vi.fn(),
     useEurSummary: vi.fn(),
     useEurEntries: vi.fn(),
+    useEurMonth: vi.fn(),
+    useEurDocuments: vi.fn(),
+    useEurHours: vi.fn(),
+    useEurWarehouse: vi.fn(),
+    useEurApplications: vi.fn(),
+    useEurSignatures: vi.fn(),
+    useEurAnalytics: vi.fn(),
     createEurEntry: vi.fn(),
+    closeEurMonth: vi.fn(),
+    uploadEurDocument: vi.fn(),
+    deleteEurDocument: vi.fn(),
+    eurDocumentDownloadUrl: vi.fn(() => '/api/management/eur/documents/1/download'),
+    createEurHour: vi.fn(),
+    createEurWarehouse: vi.fn(),
+    createEurApplication: vi.fn(),
+    createEurSignature: vi.fn(),
     fetchEurComparison: vi.fn(),
     calculateEurVat: vi.fn(),
     calculateEurTravel: vi.fn(),
@@ -87,6 +116,28 @@ const summary = {
     profit_cents: 85000,
 };
 
+const monthData = {
+    year: 2026,
+    month: 5,
+    lines: [{
+        type: 'A', day: 5, description: 'Software', amount_cents: 10000,
+        business_amount_cents: 10000, vat_kind: null, receipt_no: null,
+        warnings: [], hints: ['Prüfen Sie die Belegnummer.'],
+    }],
+    totals: {income_cents: 0, expense_cents: 10000, warehouse_cents: 0, vat_cents: 0, hours_minutes: 90},
+    checks: [{
+        code: 'BE-ART', ok: false, message: 'Beleg fehlt', hint: 'Ergänzen Sie den Beleg im Tab Belege.',
+    }],
+    social_insurance: {amounts_cents: {max_bgl: 808500}, rates_per_10000: {kv_satz: 680}},
+    income_tax: {profit_cents: 85000, tax_cents: 0},
+    report: {status: 'open', closed_at: null},
+    signature: {status: 'none', provider: null, is_test: false},
+};
+
+function swrResult<R>(data: unknown): R {
+    return {data, error: undefined, isLoading: false, mutate: vi.fn()} as unknown as R;
+}
+
 function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summaryData?: typeof summary; noSummary?: boolean; noBilling?: boolean} = {}) {
     vi.mocked(useBrand).mockReturnValue({
         brand: 'test-brand',
@@ -105,94 +156,156 @@ function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summ
         isLoading: false,
         updateBillingDetails: vi.fn(),
     });
-    vi.mocked(useEurReference).mockReturnValue({
-        data: reference,
-        error: undefined,
-        isLoading: false,
-        mutate: vi.fn(),
-    } as unknown as ReturnType<typeof useEurReference>);
-    vi.mocked(useEurSettings).mockReturnValue({
-        data: {business_year: 2026, default_business_share: 100, sv_mode: 'gsvg', kleinunternehmer: false},
-        error: undefined,
-        isLoading: false,
-        mutate: vi.fn(),
-    } as unknown as ReturnType<typeof useEurSettings>);
-    vi.mocked(useEurSummary).mockReturnValue({
-        data: overrides.noSummary ? undefined : (overrides.summaryData ?? summary),
-        error: overrides.noSummary ? new Error('boom') : undefined,
-        isLoading: false,
-        mutate: vi.fn(),
-    } as unknown as ReturnType<typeof useEurSummary>);
-    vi.mocked(useEurEntries).mockReturnValue({
-        data: {
-            entries: [{
-                id: 1, year: 2026, month: 5, direction: 'expense' as const, kind_type: 'Software',
-                e1a_code: '9190', business_share: 100, amount_cents: 10000, business_amount_cents: 10000,
-                vat_kind: null, payment_method: null, project: null, customer: null, receipt_no: null, note: null,
-            }],
-            totals: {income_cents: 0, expense_cents: 10000},
-        },
-        error: undefined,
-        isLoading: false,
-        mutate: vi.fn(),
-    } as unknown as ReturnType<typeof useEurEntries>);
+    vi.mocked(useEurYears).mockReturnValue(swrResult<ReturnType<typeof useEurYears>>({default_year: 2026, supported: [2024, 2025, 2026], warnings: []}));
+    vi.mocked(useEurReference).mockReturnValue(swrResult<ReturnType<typeof useEurReference>>(reference));
+    vi.mocked(useEurSettings).mockReturnValue(swrResult<ReturnType<typeof useEurSettings>>({business_year: 2026, default_business_share: 100, sv_mode: 'gsvg', kleinunternehmer: false}));
+    vi.mocked(useEurSummary).mockReturnValue(
+        overrides.noSummary
+            ? ({data: undefined, error: new Error('boom'), isLoading: false, mutate: vi.fn()} as unknown as ReturnType<typeof useEurSummary>)
+            : swrResult<ReturnType<typeof useEurSummary>>(overrides.summaryData ?? summary),
+    );
+    vi.mocked(useEurEntries).mockReturnValue(swrResult<ReturnType<typeof useEurEntries>>({
+        entries: [{
+            id: 1, year: 2026, month: 5, direction: 'expense' as const, kind_type: 'Software',
+            e1a_code: '9190', business_share: 100, amount_cents: 10000, business_amount_cents: 10000,
+            vat_kind: null, payment_method: null, project: null, customer: null, receipt_no: null, note: null,
+        }],
+        totals: {income_cents: 0, expense_cents: 10000},
+    }));
+    vi.mocked(useEurMonth).mockReturnValue(swrResult<ReturnType<typeof useEurMonth>>(monthData));
+    vi.mocked(useEurDocuments).mockReturnValue(swrResult<ReturnType<typeof useEurDocuments>>({documents: []}));
+    vi.mocked(useEurHours).mockReturnValue(swrResult<ReturnType<typeof useEurHours>>({hours: [], total_minutes: 0}));
+    vi.mocked(useEurWarehouse).mockReturnValue(swrResult<ReturnType<typeof useEurWarehouse>>({entries: [], total_cents: 0}));
+    vi.mocked(useEurApplications).mockReturnValue(swrResult<ReturnType<typeof useEurApplications>>({applications: []}));
+    vi.mocked(useEurSignatures).mockReturnValue(swrResult<ReturnType<typeof useEurSignatures>>({signatures: []}));
+    vi.mocked(useEurAnalytics).mockReturnValue(swrResult<ReturnType<typeof useEurAnalytics>>({by_customer: [], by_project: [], by_month: []}));
 }
 
-function renderView() {
+function renderView(initialEntry = '/steuern') {
     return renderWithProviders(
-        <MemoryRouter initialEntries={['/eur']}>
-            <main>
-                <ManagementEurView/>
-            </main>
+        <MemoryRouter initialEntries={[initialEntry]}>
+            <ManagementEurView/>
         </MemoryRouter>,
     );
 }
 
+const main = () => within(screen.getByRole('main', {name: 'Buchhaltung'}));
+
 describe('ManagementEurView', () => {
-    it('shows the standalone cockpit with the month overview and the booking tab by default', () => {
+    it('shows the standalone cockpit with all twelve tabs, the year selector and the booking tab by default', () => {
         mockHooks();
 
         renderView();
 
-        const main = within(screen.getByRole('main'));
+        const view = main();
 
-        expect(main.getByRole('heading', { name: 'EÜR · Test-Portal', level: 1 })).toBeVisible();
-        expect(main.getByRole('tablist')).toBeVisible();
-        expect(main.getByRole('heading', { name: /Jänner 2026|Buchungen/ })).toBeVisible();
-        expect(main.getByRole('heading', { name: 'Buchungen', level: 2 })).toBeVisible();
-        expect(main.getByRole('heading', { name: 'Übersicht 2026' })).toBeVisible();
-        expect(main.getByRole('link', { name: 'Zurück zum Portal' })).toHaveAttribute('href', '/');
+        expect(screen.getByRole('heading', {name: 'Einnahmen Ausgaben Rechnung · Test-Portal', level: 1})).toBeVisible();
+        expect(screen.getByRole('tablist')).toBeVisible();
+        expect(screen.getAllByRole('tab')).toHaveLength(12);
+        expect(screen.getByRole('combobox', {name: 'Jahr'})).toHaveValue('2026');
+        expect(screen.getByText(/Wirtschaftsjahr 2026/)).toBeVisible();
+        expect(view.getByRole('heading', {name: 'Buchungen', level: 2})).toBeVisible();
+        expect(view.getByRole('heading', {name: 'Übersicht 2026'})).toBeVisible();
+        expect(screen.getByRole('link', {name: 'Zurück zum Portal'})).toHaveAttribute('href', '/');
     });
 
-    it('switches between the sub-application tabs', async () => {
+    it('falls back to 2026 when the year parameter is unknown', () => {
+        mockHooks();
+
+        renderView('/steuern?jahr=1999');
+
+        expect(screen.getByRole('combobox', {name: 'Jahr'})).toHaveValue('2026');
+        expect(screen.getByText(/Wirtschaftsjahr 2026/)).toBeVisible();
+    });
+
+    it('uses a supported year parameter for the header and the selector', () => {
+        mockHooks();
+
+        renderView('/steuern?jahr=2024');
+
+        expect(screen.getByRole('combobox', {name: 'Jahr'})).toHaveValue('2024');
+        expect(screen.getByText(/Wirtschaftsjahr 2024/)).toBeVisible();
+    });
+
+    it('places the tab row above the month rail and the month KPIs', () => {
         mockHooks();
 
         renderView();
 
-        const main = within(screen.getByRole('main'));
+        const tablist = screen.getByRole('tablist');
+        const monthRail = screen.getByRole('heading', {name: 'Monate'});
+        expect(tablist.compareDocumentPosition(monthRail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(screen.getByText('Monatsübersicht')).toBeVisible();
+    });
 
-        await userEvent.click(main.getByRole('tab', { name: 'Einstellungen' }));
-        expect(main.getByRole('heading', { name: 'Unternehmensdaten', level: 2 })).toBeVisible();
-        expect(main.getByText('Musterfoto GmbH')).toBeVisible();
-        expect(main.getByText('742')).toBeVisible();
-        expect(main.getByRole('heading', { name: 'Stammdaten und Kataloge', level: 2 })).toBeVisible();
-        expect(main.getByText('Inland: 30,00 € Tag und 17,00 € Nächtigung.')).toBeVisible();
+    it('opens the booking dialog from the header and from the list and closes it again', async () => {
+        mockHooks();
 
-        await userEvent.click(main.getByRole('tab', { name: 'Anlagen' }));
-        expect(main.getByRole('heading', { name: 'Abschreibung vergleichen', level: 2 })).toBeVisible();
-        expect(main.getByText(/unter 1.000 €/)).toBeVisible();
+        renderView();
 
-        await userEvent.click(main.getByRole('tab', { name: 'Steuer' }));
-        expect(main.getByRole('heading', { name: 'Einkommensteuer', level: 2 })).toBeVisible();
+        const view = main();
 
-        await userEvent.click(main.getByRole('tab', { name: 'USt' }));
-        expect(main.getByRole('heading', { name: 'Umsatzsteuer', level: 2 })).toBeVisible();
+        await userEvent.click(screen.getAllByRole('button', {name: '+ Buchung'})[0]!);
+        const dialog = screen.getByRole('dialog', {name: 'Neue Buchung'});
+        expect(dialog).toBeVisible();
+        expect(within(dialog).getByLabelText('Betrag (€)')).toBeVisible();
+        expect(within(dialog).getByRole('button', {name: 'Buchung speichern'})).toBeDisabled();
+        await userEvent.click(within(dialog).getByRole('button', {name: 'Abbrechen'}));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-        await userEvent.click(main.getByRole('tab', { name: 'Reisen' }));
-        expect(main.getByRole('heading', { name: 'Reisekosten', level: 2 })).toBeVisible();
+        await userEvent.click(view.getByRole('button', {name: '+ Buchung'}));
+        expect(screen.getByRole('dialog', {name: 'Neue Buchung'})).toBeVisible();
+    });
 
-        await userEvent.click(main.getByRole('tab', { name: 'Monat' }));
-        expect(main.getByText('Zeilen des Monats aus dem Buchungsjournal.')).toBeVisible();
+    it('opens every tab and shows its German heading', async () => {
+        mockHooks();
+
+        renderView();
+
+        const view = main();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'Wareneingang'}));
+        expect(view.getByRole('heading', {name: 'Wareneingang', level: 2})).toBeVisible();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'Belege'}));
+        expect(view.getByRole('heading', {name: 'Belege', level: 2})).toBeVisible();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'Anlagen'}));
+        expect(view.getByRole('heading', {name: 'Abschreibung vergleichen', level: 2})).toBeVisible();
+        expect(view.getByText(/unter 1.000 €/)).toBeVisible();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'Monat'}));
+        expect(view.getByRole('heading', {name: 'Monatsabschluss', level: 2})).toBeVisible();
+        expect(view.getByRole('heading', {name: 'Stundenbuch', level: 2})).toBeVisible();
+        expect(view.getByText('💡 Ergänzen Sie den Beleg im Tab Belege.')).toBeVisible();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'Auswertungen'}));
+        expect(view.getByRole('heading', {name: 'Auswertungen', level: 2})).toBeVisible();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'Reisen'}));
+        expect(view.getByRole('heading', {name: 'Reisekosten', level: 2})).toBeVisible();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'Steuer'}));
+        expect(view.getByRole('heading', {name: 'Einkommensteuer', level: 2})).toBeVisible();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'USt'}));
+        expect(view.getByRole('heading', {name: 'Umsatzsteuer', level: 2})).toBeVisible();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'Anträge'}));
+        expect(view.getByRole('heading', {name: 'Anträge', level: 2})).toBeVisible();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'Signatur'}));
+        expect(view.getByRole('heading', {name: 'Signatur', level: 2})).toBeVisible();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'Einstellungen'}));
+        expect(view.getByRole('heading', {name: 'Unternehmensdaten', level: 2})).toBeVisible();
+        expect(view.getByText('Musterfoto GmbH')).toBeVisible();
+        expect(view.getByText('742')).toBeVisible();
+        expect(view.getByRole('heading', {name: 'Stammdaten und Kataloge', level: 2})).toBeVisible();
+        expect(view.getByText('Inland: 30,00 € Tag und 17,00 € Nächtigung.')).toBeVisible();
+
+        await userEvent.click(screen.getByRole('tab', {name: 'Buchungen'}));
+        expect(view.getByRole('heading', {name: 'Buchungen', level: 2})).toBeVisible();
     });
 
     it('shows a placeholder instead of technical or empty internals when settings are missing', async () => {
@@ -200,11 +313,11 @@ describe('ManagementEurView', () => {
 
         renderView();
 
-        const main = within(screen.getByRole('main'));
-        await userEvent.click(main.getByRole('tab', { name: 'Einstellungen' }));
-        expect(main.getAllByText('—').length).toBeGreaterThan(0);
-        expect(main.queryByText(/Paritätsvektoren/)).not.toBeInTheDocument();
-        expect(main.queryByText(/Cent/)).not.toBeInTheDocument();
+        const view = main();
+        await userEvent.click(screen.getByRole('tab', {name: 'Einstellungen'}));
+        expect(view.getAllByText('—').length).toBeGreaterThan(0);
+        expect(view.queryByText(/Paritätsvektoren/)).not.toBeInTheDocument();
+        expect(view.queryByText(/Cent/)).not.toBeInTheDocument();
     });
 
     it('offers a concrete solution action when the summary cannot be loaded', () => {
@@ -212,8 +325,8 @@ describe('ManagementEurView', () => {
 
         renderView();
 
-        const main = within(screen.getByRole('main'));
-        expect(main.getByRole('heading', { name: 'Übersicht nicht verfügbar' })).toBeVisible();
-        expect(main.getByRole('button', { name: 'Erneut laden' })).toBeVisible();
+        const view = main();
+        expect(view.getByRole('heading', {name: 'Übersicht nicht verfügbar'})).toBeVisible();
+        expect(view.getByRole('button', {name: 'Erneut laden'})).toBeVisible();
     });
 });

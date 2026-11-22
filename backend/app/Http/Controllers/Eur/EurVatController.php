@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Eur;
 
 use App\Eur\Domain\VatCalculator;
+use App\Eur\Reference\EurYear;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * EÜR · Umsatzsteuer (EUE-082 … EUE-088) — Monatsauswertung.
@@ -18,7 +20,7 @@ class EurVatController extends Controller
     public function calculate(Request $request, VatCalculator $calculator): JsonResponse
     {
         $data = $request->validate([
-            'year' => 'required|integer|in:2026',
+            'year' => ['required', 'integer', Rule::in(EurYear::SUPPORTED)],
             'month' => 'required|integer|min:1|max:12',
             'small_business_income_cents' => 'nullable|integer|min:0',
             'reverse_charge_cents' => 'nullable|integer|min:0',
@@ -47,7 +49,7 @@ class EurVatController extends Controller
         ]);
 
         return response()->json([
-            'year' => 2026,
+            'year' => (int) $data['year'],
             'month' => (int) $data['month'],
             'kz' => $result,
         ]);
