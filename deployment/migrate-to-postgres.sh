@@ -98,7 +98,7 @@ PREFLIGHT:
   docker compose -f '$COMPOSE_FILE' config --format json | python3 <read backend image>
   docker image inspect <configured backend image>
   docker compose -f '$COMPOSE_FILE' run --rm --no-deps backend php -r <require pdo_mysql and pdo_pgsql>
-  docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan list --raw | grep '^portal:db-copy([[:space:]]|$)'
+  docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan list --raw | grep -E '^portal:db-copy([[:space:]]|$)' >/dev/null
   test ! -e '$MARKER_FILE' && test ! -e '$SWITCH_MARKER_FILE'
   python3 <require DB_URL absent or empty; read DB_CONNECTION and optional DB_HOST/DB_PORT privately; use historical Compose defaults when host/port are absent>
   docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e DB_CONNECTION=mariadb -e DB_HOST=<source> -e DB_PORT=<source> -e DB_URL= -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan migrate:status --database=mariadb --no-ansi; require no Pending migrations
@@ -534,8 +534,11 @@ print(volume.get("name", ""))
         }
         echo "Both database PDO drivers are available.\n";
     ' || fail 'The backend image must contain both pdo_mysql and pdo_pgsql before the cutover.'
+    # Kein `grep -q`: unter `set -o pipefail` beendet -q die Pipe nach dem
+    # ersten Treffer, artisan bekommt SIGPIPE und die Pipeline gilt als
+    # fehlgeschlagen, obwohl der Befehl vorhanden ist. grep liest daher bis EOF.
     run_backend_artisan list --raw \
-        | grep -Eq '^portal:db-copy([[:space:]]|$)' \
+        | grep -E '^portal:db-copy([[:space:]]|$)' >/dev/null \
         || fail 'The deployed backend code does not register portal:db-copy; deploy the cutover-capable code first.'
     [[ ! -e "$MARKER_FILE" ]] || fail "An unfinished cutover marker exists at '$MARKER_FILE'; run --rollback first (add --accept-postgres-write-loss if a PostgreSQL switch was attempted)."
     [[ ! -e "$SWITCH_MARKER_FILE" ]] || fail "A previous PostgreSQL switch is recorded at '$SWITCH_MARKER_FILE'; run --rollback --accept-postgres-write-loss before starting another cutover, even if the host .env now selects MariaDB."
