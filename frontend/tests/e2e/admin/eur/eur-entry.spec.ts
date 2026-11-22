@@ -48,9 +48,13 @@ test.describe('EÜR sub-application', () => {
         await dialog.getByRole('button', { name: 'Buchung speichern' }).click();
         await expect(dialog).toHaveCount(0);
 
-        await expect(main.getByRole('cell', { name: 'Software' })).toBeVisible();
-        await expect(main.getByRole('cell', { name: '60 %' })).toBeVisible();
-        await expect(main.getByRole('cell', { name: '60,00 €' })).toBeVisible();
+        // EUR entries are brand-scoped; a super-admin shares the default brand
+        // with the parallel Mobile project, so scope to the newest matching row
+        // instead of relying on a single table-wide cell.
+        const bookedRow = main.getByRole('row').filter({ hasText: 'Software' }).first();
+        await expect(bookedRow.getByRole('cell', { name: 'Software' })).toBeVisible();
+        await expect(bookedRow.getByRole('cell', { name: '60 %' })).toBeVisible();
+        await expect(bookedRow.getByRole('cell', { name: '60,00 €' })).toBeVisible();
 
         // Reisen: Kilometer, Tagesgeld und Nächtigung.
         await page.getByRole('tab', { name: 'Reisen' }).click();
@@ -77,7 +81,7 @@ test.describe('EÜR sub-application', () => {
         await expect(main).toContainText('258,04 €');
         await expect(main.getByRole('cell', { name: '6.000,00 €' })).toBeVisible();
 
-        await main.getByRole('link', { name: 'Zurück zum Portal' }).click();
+        await page.getByRole('banner').getByRole('link', { name: 'Zurück zum Portal' }).click();
 
         await expect(page).toHaveURL('/');
         await expect(page.getByRole('heading', { name: /Einnahmen Ausgaben Rechnung ·/, level: 1 })).toHaveCount(0);

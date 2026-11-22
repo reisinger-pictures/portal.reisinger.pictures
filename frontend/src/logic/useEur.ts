@@ -288,6 +288,12 @@ export interface EurAnalytics {
     by_month: EurAnalyticsMonth[];
 }
 
+/** German month names, indexed 0..11, shared by the EÜR cockpit panels. */
+export const EUR_MONTHS = [
+    'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
+    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+] as const;
+
 const SWR_OPTIONS = {revalidateOnFocus: false} as const;
 
 export function useEurReference() {

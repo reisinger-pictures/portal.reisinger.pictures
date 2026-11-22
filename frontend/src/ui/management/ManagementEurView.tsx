@@ -5,7 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { formatEuro } from '../../logic/formatCurrency';
 import { useBrand } from '../../logic/useBrand';
 import { useBillingDetails } from '../../logic/useLicenseTerms';
-import { useEurEntries, useEurReference, useEurSettings, useEurSummary, useEurYears } from '../../logic/useEur';
+import { EUR_MONTHS as MONTHS, useEurEntries, useEurReference, useEurSettings, useEurSummary, useEurYears } from '../../logic/useEur';
 import EurAnalyticsPanel from './eur/EurAnalyticsPanel';
 import EurApplicationsPanel from './eur/EurApplicationsPanel';
 import EurDepreciationPanel from './eur/EurDepreciationPanel';
@@ -49,11 +49,6 @@ function tabLabel(id: TabId): ReactNode {
 
 const YEARS = [2024, 2025, 2026];
 const DEFAULT_YEAR = 2026;
-
-const MONTHS = [
-    'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
-    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
-];
 
 const euro = (cents: number): string => formatEuro(cents / 100);
 const display = (value: string | undefined): string => (value && value.trim() !== '' ? value : '—');
@@ -114,10 +109,18 @@ export default function ManagementEurView() {
     const activeYears = years.data?.active_years ?? [];
     const currentYear = new Date().getFullYear();
     // Ein Jahr erscheint nur, wenn es Buchungen gibt oder es das laufende Jahr ist.
-    const visibleYears = YEARS.filter((value) => activeYears.includes(value) || value === currentYear);
+    // Die API liefert die Werte; YEARS/DEFAULT_YEAR bleiben der Offline-Fallback.
+    const supportedYears = years.data?.supported ?? YEARS;
+    const defaultYear = years.data?.default_year ?? DEFAULT_YEAR;
+    const visibleYears = supportedYears.filter((value) => activeYears.includes(value) || value === currentYear);
 
     const requestedYear = Number(searchParams.get('jahr'));
-    const year = visibleYears.includes(requestedYear) ? requestedYear : DEFAULT_YEAR;
+    // Fällt der API-Default aus dem sichtbaren Bereich, gilt das laufende Jahr
+    // bzw. das erste sichtbare Jahr — nie eine Jahreszahl ohne Auswahloption.
+    const fallbackYear = visibleYears.includes(defaultYear)
+        ? defaultYear
+        : (visibleYears.includes(currentYear) ? currentYear : (visibleYears[0] ?? defaultYear));
+    const year = visibleYears.includes(requestedYear) ? requestedYear : fallbackYear;
 
     const reference = useEurReference();
     const settings = useEurSettings();
@@ -218,6 +221,7 @@ export default function ManagementEurView() {
                 <aside className="lg:col-span-1">
                     <div className="rounded-box border border-base-300 bg-base-100 p-4">
                         <h2 className="font-semibold uppercase text-sm opacity-70"><Trans>Monate</Trans></h2>
+                        <p className="text-xs opacity-60"><Trans>Es werden nur Monate mit Buchungen angezeigt.</Trans></p>
                         <div className="mt-3 space-y-2">
                             {monthsWithEntries.length === 0 && (
                                 <p className="text-sm opacity-70"><Trans>Noch keine Buchungen. Legen Sie im Tab Buchungen die erste an.</Trans></p>

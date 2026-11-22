@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
-import { createEurEntry, type EurReference } from '../../../logic/useEur';
+import { createEurEntry, EUR_MONTHS as MONTHS, type EurReference } from '../../../logic/useEur';
+import { useFocusTrap } from '../../../logic/useFocusTrap';
 
 interface Props {
     year: number;
@@ -28,12 +29,16 @@ const INITIAL: FormState = {
     receiptNo: '',
 };
 
-const MONTHS = [
-    'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
-    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
-];
+// The reference table stores descriptive labels such as
+// "9190 - Provisionen und Lizenzen", but `e1a_code` only accepts up to 8
+// characters. Keep the leading KZ digits, mirroring EurAssetController.
+const kzFromE1a = (e1a: string | null | undefined): string | null => {
+    const match = e1a?.match(/^\d+/);
+    return match ? match[0] : null;
+};
 
 export default function EurEntryDialog({year, reference, onClose, onCreated}: Props) {
+    const dialogRef = useFocusTrap<HTMLDivElement>(true, {onEscape: onClose});
     const [form, setForm] = useState<FormState>(INITIAL);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
@@ -66,7 +71,7 @@ export default function EurEntryDialog({year, reference, onClose, onCreated}: Pr
                 month: Number(form.month),
                 direction: form.direction,
                 kind_type: form.kindType,
-                e1a_code: kind?.e1a ?? null,
+                e1a_code: kzFromE1a(kind?.e1a),
                 business_share: share,
                 amount_cents: amountCents,
                 receipt_no: form.receiptNo === '' ? null : form.receiptNo,
@@ -82,7 +87,7 @@ export default function EurEntryDialog({year, reference, onClose, onCreated}: Pr
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div role="dialog" aria-modal="true" aria-labelledby="eur-entry-dialog-title"
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="eur-entry-dialog-title"
                 className="w-full max-w-2xl rounded-box bg-base-100 p-6 shadow-xl">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
