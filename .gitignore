@@ -23,6 +23,9 @@ backend/.env.local
 # Backend - Private storage
 backend/storage/app/private/
 
+# EÜR: lokales Anlieferungspaket der Clean-Room-Übergabe (nicht versioniert)
+/handoff/
+
 # Data
 /db_data/
 /search_data/

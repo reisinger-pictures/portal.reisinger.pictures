@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "name": "ku-online-cleanroom-handoff",
+  "business_year": 2026,
+  "source_commit": "ea79335f20da42ea6849be2d609e08fbeefe6c2f",
+  "description": "Pinned clean-room documents and parity vectors for portal development",
+  "handoff_sha256": "ab2fe206c8418015774051b98b45aaa0c4542aec88996ca0b2805bbd0e8ad5a8",
+  "files": [
+    {
+      "path": "business-rules/domain-rules.json",
+      "name": "domain-rules.json",
+      "sha256": "ed9226e545e5d6c6342e5c3ebfada5eb505791569d3c1ef500d6deb78222eac9",
+      "bytes": 228827
+    },
+    {
+      "path": "business-rules/domain-rules.schema.json",
+      "name": "domain-rules.schema.json",
+      "sha256": "dd46a6064c54ad757d50dfdb0432b0bb0a95e21755f8da3e3a92c5c77b967660",
+      "bytes": 4358
+    },
+    {
+      "path": "business-rules/rules.json",
+      "name": "rules.json",
+      "sha256": "d761e7d0b2bfb43fbd5cb6fab69a5945ef690a11efab79bd446755a46efe2090",
+      "bytes": 95940
+    },
+    {
+      "path": "business-rules/DOMAIN.md",
+      "name": "DOMAIN.md",
+      "sha256": "559d59995fb35a33b45dc6e7132cdd191cf05a91f5829989b2012dac554cfd95",
+      "bytes": 90164
+    },
+    {
+      "path": "verification/fixtures/cleanroom-parity-2026.json",
+      "name": "cleanroom-parity-2026.json",
+      "sha256": "fec99f677183efcaad671f99a5bce790c7d070249408e9261cbf5b6a4150ab52",
+      "bytes": 11733
+    },
+    {
+      "path": "verification/cleanroom-parity.md",
+      "name": "cleanroom-parity.md",
+      "sha256": "0a0b90ae9e2da732e0663aa0df5b2a14278014d577116caf5357bea08c0d0f09",
+      "bytes": 5580
+    },
+    {
+      "path": "verification/ods-rule-verification.md",
+      "name": "ods-rule-verification.md",
+      "sha256": "da37ca613b2debbcb1a2949a4ac0a32481613644f77676e034d2b9a6256f6ebe",
+      "bytes": 9808
+    },
+    {
+      "path": "verification/ods-coverage-matrix.md",
+      "name": "ods-coverage-matrix.md",
+      "sha256": "3d1746694663dbebfd20266cdad46cbb3a294a5b2a237dda892ba478d6340a6d",
+      "bytes": 14516
+    },
+    {
+      "path": "verification/ods-evidence-by-sheet.md",
+      "name": "ods-evidence-by-sheet.md",
+      "sha256": "0e83581382e7bc9031ce7b0a9d754aad265b37b8628d12067aab9a15fed3416c",
+      "bytes": 40324
+    },
+    {
+      "path": "verification/re-verification.md",
+      "name": "re-verification.md",
+      "sha256": "4cc521018cfe6931fbda7defb046ea93d246b5b6e299d9f2558a9493e167b084",
+      "bytes": 15992
+    }
+  ],
+  "file_count": 10
+}

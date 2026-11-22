@@ -1,0 +1,1840 @@
+{
+  "method": "clean-room: derived solely from workbook formulas, defined names, data validations, conditional formatting and cached values",
+  "rules": [
+    {
+      "category": "B01 Grundlagen & Wirtschaftsjahr",
+      "evidence": "Datenvalidierung Liste '2024,2025,2026' für D2; definierter Name set_wirtschaftsjahr = Einstellungen!$D$2; Bezeichnung C2='WIRTSCHAFTSJAHR'; B2 = IF(D2=\"\",\"\",\"❯\").",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-001",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!D2; Einstellungen!B2",
+      "statement": "Das Wirtschaftsjahr wird zentral festgelegt und steuert alle jahresabhängigen Konstanten, Formeln und Überschriften.",
+      "title": "Wirtschaftsjahr als zentrale Steuerungsgröße"
+    },
+    {
+      "category": "B01 Grundlagen & Wirtschaftsjahr",
+      "evidence": "D1 = IF(set_wirtschaftsjahr>2026, '⚠ Die Tabelle nicht offiziell mit ' & set_wirtschaftsjahr & ' kompatibel. ... auf die neueste Version der Tabelle umsteigen.', IF(set_wirtschaftsjahr<2024, ..., '')).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-002",
+      "regeltyp": "Validierung",
+      "source": "Einstellungen!D1",
+      "statement": "Es wird eine Kompatibilitätswarnung angezeigt und der Nutzer wird gebeten, auf die neueste Version zu aktualisieren.",
+      "title": "Warnung bei zu neuem Wirtschaftsjahr"
+    },
+    {
+      "category": "B01 Grundlagen & Wirtschaftsjahr",
+      "evidence": "D1 = IF(set_wirtschaftsjahr>2026, ..., IF(set_wirtschaftsjahr<2024, '⚠ Die Tabelle nicht offiziell mit ' & set_wirtschaftsjahr & ' kompatibel. Kontaktieren Sie uns für den Zugang zu einer älteren Version (Kauf der Lifetime-Lizenz erforderlich).', '')).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-003",
+      "regeltyp": "Validierung",
+      "source": "Einstellungen!D1",
+      "statement": "Es erscheint die Warnung, dass für ältere Jahre eine ältere Version (Lifetime-Lizenz) nötig ist.",
+      "title": "Warnung bei zu altem Wirtschaftsjahr"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_firmenname=D3, set_anschrift=D4, set_plz_ort=D5, set_uid=D6, set_branchenkennzahl=D7 (Validierung 11.0–990.0). E1A!C6 zeigt die Kennzahl oder den Hinweis 'im Blatt Einstellungen hinterlegen'; Monat!H4:H7 spiegeln die Werte.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-004",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!D3; Einstellungen!D7; E1A!C6; Monat!H4",
+      "statement": "Firmenname, Anschrift, PLZ/Ort, UID und ÖNACE-Branchenkennzahl werden zentral hinterlegt und in E1A und Monatsauswertung übernommen.",
+      "title": "Firmenstammdaten und Branchenkennzahl"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_zahlarten=H3:H12; set_zahlarten_startsaldo=I3:I12; ZA!E13 = N(INDEX(set_zahlarten_startsaldo,MATCH($B7,set_zahlarten,0),0)) + Zuflüsse − Abflüsse.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-005",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!H3; Einstellungen!H4; ZA!E13",
+      "statement": "Die Zahlarten (Bankkonto, Bar) bilden die Dropdowns in E/A/WEB und liefern den Startsaldo für den Zahlartenabgleich.",
+      "title": "Zahlarten mit Startsaldo"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_projekte=L3:L22; Datenvalidierung E!K3:K1000, A!J3:J1000, AV!L3:L50, FR!J3:J102, WEB!L3:L100, Stunden!E3:E199 = set_projekte; Projekte!E1 = UPPER(INDEX(set_projekte,1,0)).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-006",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!L3; Einstellungen!L4; Einstellungen!L5; Projekte!E1",
+      "statement": "Projekte (Hauptprojekt, Nebenprojekt, Vermietung) steuern die Dropdowns in E, A, AV, FR, WEB und Stunden sowie die Projekte-Auswertung.",
+      "title": "Projektliste als Auswahl- und Auswertungsdimension"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "Einstellungen!P3:P152 = set_a_arten (Dropdown-Quelle); Q3:Q152 = set_a_e1a_arten enthält statische Literale wie '9100 - Waren'. Die TRIM/INDEX-Formeln, die diese Kennzahlen aus e1a_ausgaben_kz erzeugen, stehen in N3:N25 (z. B. N3 = TRIM(INDEX(e1a_ausgaben_kz,1,1))&' - '&TRIM(INDEX(e1a_ausgaben_kz,1,2))); N3:N30 ist zugleich set_est_ausgaben (Validierungsquelle). A!O3 = IFERROR(IF(INDEX(set_a_e1a_arten,MATCH(K3,set_a_arten,0))=\"\",\"9230 - Übrige Betriebsausgaben\",...),\"\").",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-007",
+      "regeltyp": "Zuordnung",
+      "source": "Einstellungen!P3; Einstellungen!Q3; Einstellungen!N3; A!O3",
+      "statement": "Jede Ausgaben-Art wird über der hinterlegten Kennzahlzuordnung für Ausgaben einer E1A-Kennzahl zugeordnet; fehlt die Zuordnung, gilt der Fallback 9230.",
+      "title": "Zuordnung der Ausgaben-Arten zu E1A-Kennzahlen"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "Einstellungen!Z3:Z152 = set_e_arten; AA3:AA152 = set_e_e1a_arten enthält statische Literale (z. B. AA3='9040 - Betriebseinnahmen'); die TRIM/INDEX-Formeln stehen in X3:X6 (9040/9050/9060/9090), X7 erzeugt 'E1B 9460 - Mieteinnahmen'. X3:X7 ist zugleich set_est_einnahmen (Validierungsquelle). E!O3 = IFERROR(IF(INDEX(set_e_e1a_arten,MATCH(L3,set_e_arten,0))=\"\",\"9040 - Betriebseinnahmen\",INDEX(set_e_e1a_arten,MATCH(L3,set_e_arten,0))),\"\").",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-008",
+      "regeltyp": "Zuordnung",
+      "source": "Einstellungen!Z3; Einstellungen!AA3; Einstellungen!X3; E!O3",
+      "statement": "Jede Einnahmen-Art wird über der hinterlegten Kennzahlzuordnung für Einnahmen einer E1A-Kennzahl zugeordnet; fehlt die Zuordnung, gilt 9040.",
+      "title": "Zuordnung der Einnahmen-Arten zu E1A-Kennzahlen"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "Einstellungen!R3:R152 = set_a_ba, Datenvalidierung decimal 0.0–1.0; A!P3 = INDEX(set_a_ba,MATCH(K3,set_a_arten,0),0); A!Q3 = L3 * IF(P3=\"\",1,P3). GST-Text '0 %,100 %' auf AB3:AB152 für Einnahmen-Anteile.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-009",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!R3; A!P3; A!Q3",
+      "statement": "Pro Ausgaben-Art kann ein Fixes Betriebsanteil hinterlegt werden (z. B. 60 % bei Laptop/Drucker 40 % privat, 50 % bei Geschäftsessen und Klimaticket, 0 bei Unternehmer-Lohn und privaten Ausgaben).",
+      "title": "Betriebliche Anteile der Ausgaben-Arten"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_a_ust_arten=Einstellungen!AC3:AC9 = 'Reverse Charge 20 %', 'Reverse Charge 13 %', 'Reverse Charge 10 %', 'IG-Erwerb 20 %', 'IG-Erwerb 10 %', 'IG-Erwerb 13 %', 'IG-Erwerb 4.9 %'; Validierung A!M3:M1000 = set_a_ust_arten.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-010",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!AC3; Einstellungen!AC7; A!M3",
+      "statement": "Sieben USt-Arten stehen zur Verfügung; sie steuern Vorsteuer, Reverse Charge und innergemeinschaftliche Erwerbe.",
+      "title": "Umsatzsteuer-Arten der Eingangsrechnungen"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_transportmittel=U3:U17; set_transportmittel_typen=V3:V17 (Validierung 'PKW oder Kombi,Motorrad,Fahrrad oder E-Bike,Andere'); set_fahrzeuge=U3:U7; FR!Y3 = IFERROR(IF(INDEX(set_transportmittel_typen,MATCH(N3,set_transportmittel,0),0)=\"\",\"Andere\",INDEX(set_transportmittel_typen,MATCH(N3,set_transportmittel,0),0)),\"\"); Einstellungen!T3 = IF(U3=\"\",\"\",IF(V3=\"\",\"⚠\",\"❯\")) meldet einen fehlenden Transportmittel-Typ.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-011",
+      "regeltyp": "Zuordnung",
+      "source": "Einstellungen!U3; Einstellungen!V3; Einstellungen!T3; FR!Y3",
+      "statement": "Das Transportmittel wird einem Fahrzeugtyp zugeordnet, der die Kilometergeldberechnung bestimmt. Die Kategorie 'Andere' gilt nur, wenn die Zuordnung im Stammdatensatz leer ist; ein unbekanntes Transportmittel bleibt ohne Zuordnung.",
+      "title": "Transportmittel und Fahrzeugtypen"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "H69=DATE(j,1,1), H70=DATE(j,1,6), H71=DATE(j,3,22+MOD(19*MOD(j,19)+24,30)+MOD(2*MOD(j,4)+4*MOD(j,7)+6*MOD(19*MOD(j,19)+24,30)+5,7)+1) (Ostersonntag), H73=+39 (Christi Himmelfahrt), H74=+50 (Pfingstmontag), H75=+60 (Fronleichnam), H76=DATE(j,8,15), H77=DATE(j,10,26), H78=DATE(j,11,1), H79=DATE(j,12,8), H80=DATE(j,12,25), H81=DATE(j,12,26); set_feiertage=H69:H88; FR!AV3 nutzt NETWORKDAYS(...,set_feiertage).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-012",
+      "regeltyp": "Berechnung",
+      "source": "Einstellungen!H69; Einstellungen!H71; Einstellungen!H81; FR!AV3",
+      "statement": "13 gesetzliche Feiertage werden aus dem Wirtschaftsjahr berechnet; die beweglichen Feiertage folgen der Osterformel (Gauß/Meeus).",
+      "title": "Feiertage des Wirtschaftsjahres"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_reisen_laender=C58:C231; set_reisen_verpfelgungspauschalen=D58:D231; set_reisen_naechtigungen=E58:E231; FR!AM3 = INDEX(set_reisen_verpfelgungspauschalen,MATCH(T3,set_reisen_laender,0),0); FR!AQ3 = INDEX(set_reisen_naechtigungen,MATCH(T3,set_reisen_laender,0),0).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-013",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!C58; Einstellungen!D58; Einstellungen!E58; Einstellungen!C231",
+      "statement": "Für 174 Länder/Regionen sind Tages- und Nächtigungspauschalen hinterlegt; für Österreich gelten im unterstützten Zeitraum 26,4/15 Euro (2024) bzw. 30/17 Euro (ab 2025).",
+      "title": "Reiseverpflegungspauschalen je Land"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_sv_bgl_max=Einstellungen!I57 = IF(j=2026,8085,IF(j=2025,7525,IF(j=2024,7070,IF(j=2023,6825,'?')))); Ü!AA9 = MIN(SUM(AA7:AA8),set_sv_bgl_max*12); Ü!Y10 = IF(set_sv_bgl_max*12=ue_sv_bmg,'Wow! Maximale Beitragsgrundlage erreicht.','').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-014",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!I57; Ü!AA9; Ü!Y10",
+      "statement": "Die monatliche Beitragsgrundlage wird auf das jahresabhängige Maximum begrenzt; bei Erreichen erscheint ein Hinweis.",
+      "title": "Maximale SV-Beitragsgrundlage"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_sv_kv_satz=Einstellungen!I58 = IF(j=2026,6.8%,IF(j=2025,6.8%,IF(j=2024,6.8%,IF(j=2023,6.8%,'?')))); Ü!Z14 = IF(OR(Jungunternehmer='Ja',SV-Modis='Nur Unfallversicherung'),'-',set_sv_kv_satz); Ü!AA14 = MAX(ue_sv_bmg*ue_sv_kv_satz,set_sv_kv_min_beitrag*12).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-015",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!I58; Ü!Z14",
+      "statement": "Der KV-Satz beträgt in allen unterstützten Jahren 6,8 % und wird mit der Beitragsgrundlage multipliziert.",
+      "title": "Krankenversicherungssatz"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_sv_kv_min_beitrag=Einstellungen!I59 = IF(j=2026,37.47,IF(j=2025,37.47,IF(j=2024,35.45,IF(j=2023,34.06,'?')))); Ü!AA14 nutzt MAX(BMG*KV%,I59*12); Ü!AA13 nutzt I59/I58*12*SVS%.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-016",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!I59; Ü!AA14",
+      "statement": "Der monatliche Mindest-KV-Beitrag ist jahresabhängig (2024 35,45 €, 2025/2026 37,47 €).",
+      "title": "Mindest-KV-Beitrag"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_sv_gsvg_pv_min_beitrag=I60, set_sv_gsvg_ns_pv_min_beitrag=I61, beide = IF(j=2026,101.95,IF(j=2025,101.95,IF(j=2024,95.91,IF(j=2023,92.67,'?')))); Ü!AA15 = MAX(BMG*PV%, mind*12).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-017",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!I60; Einstellungen!I61; Ü!AA15",
+      "statement": "Der monatliche Mindestbeitrag der GSVG-PV ist jahresabhängig (2024 95,91 €, 2025/2026 101,95 €).",
+      "title": "Mindest-GSVG-Pensionsversicherungsbeitrag"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_sv_fsvg_pv_min_beitrag=I62 = IF(j=2026,110.22,IF(j=2025,110.22,IF(j=2024,103.69,IF(j=2023,100.18,'?')))); Ü!AA15 = MAX(BMG*20%,I62*12) bei FSVG.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-018",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!I62; Ü!AA15",
+      "statement": "Der monatliche Mindestbeitrag der FSVG-PV ist jahresabhängig (2024 103,69 €, 2025/2026 110,22 €).",
+      "title": "Mindest-FSVG-Pensionsversicherungsbeitrag"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_sv_gsvg_pv_satz=I63 = IF(j=2026,18.5%,IF(j=2025,18.5%,IF(j=2024,18.5%,IF(j=2023,18.5%,'?')))); Ü!Z15 = IF(SV-Modis='Nur Unfallversicherung','-',IF(SV-Modis='Freiberufliche (FSVG)',set_sv_fsvg_pv_satz,set_sv_gsvg_pv_satz)).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-019",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!I63; Ü!Z15",
+      "statement": "Der PV-Satz beträgt 18,5 % (konstant 2023–2026).",
+      "title": "GSVG-Pensionsversicherungssatz"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_sv_fsvg_pv_satz=I64 = IF(j=2026,20%,IF(j=2025,20%,IF(j=2024,20%,IF(j=2023,20%,'?')))); Ü!Z15 wählt diesen Satz bei FSVG.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-020",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!I64; Ü!Z15",
+      "statement": "Der PV-Satz beträgt 20 % (konstant 2023–2026).",
+      "title": "FSVG-Pensionsversicherungssatz"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_sv_svs_satz=I65 = IF(j=2026,1.53%,IF(j=2025,1.53%,IF(j=2024,1.53%,IF(j=2023,1.53%,'?')))); Ü!Z13 = IF(OR(ue_sv_modus='Freiberufliche (FSVG)',ue_sv_modus='Nur Unfallversicherung'),'-',set_sv_svs_satz).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-021",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!I65; Ü!Z13",
+      "statement": "Der SVS-Satz beträgt 1,53 % (konstant 2023–2026) und wird bei FSVG/UV ausgesetzt.",
+      "title": "Selbständigenvorsorge-Satz"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "set_sv_uv=I66 = IF(j=2026,12.95,IF(j=2025,12.07,IF(j=2024,11.35,IF(j=2023,10.97,'?')))); Ü!AA12 = set_sv_uv*12; Ü!I12 = IF(ue_sv_modus='Nur Unfallversicherung',set_sv_uv,SUM(set_sv_uv,...)).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-022",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!I66; Ü!AA12",
+      "statement": "Die jährliche UV-Pauschale ist jahresabhängig (2024 11,35 €, 2025 12,07 €, 2026 12,95 €).",
+      "title": "Unfallversicherungspauschale"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "Einstellungen!N3:N30 enthält 28 Zeilen, aber nur 27 unterschiedliche Kennzahlen (9135 kommt doppelt vor: N8 E1A, N26 E1B); E1A!C17:C38 listet die 22 E1A-Kennzahlen, E1B!C10:C15 die sechs E1B-Kennzahlen 9500/9135/9510/9520/9521/9530; E1A!E33 = Pflichtversicherungen (9225).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-023",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!N3; Einstellungen!N19; Einstellungen!N30; E1A!C17; E1B!C10; E1A!C38",
+      "statement": "Die 27 unterschiedlichen Kennzahlen 9100–9230 sowie E1B 9500–9530 bilden den Kontenplan; 9135 ist sowohl E1A- als auch E1B-Kennzahl, 9225 (Pflichtversicherungen) und 9275 (Arbeitszimmer) sind Sonderfälle.",
+      "title": "E1A-Kennzahlenkatalog Ausgaben"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "X3:X7 in Einstellungen = '9040 - Betriebseinnahmen', '9050 - Freie Dienstverträge', '9060 - Erlös abgeg. Anlagegüter', '9090 - Übrige Betriebseinnahmen', 'E1B 9460 - Mieteinnahmen'; E1A!C11:C14 übernimmt sie.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-024",
+      "regeltyp": "Parameter",
+      "source": "Einstellungen!X3; Einstellungen!X7; E1A!C11",
+      "statement": "Die Kennzahlen 9040, 9050, 9060 und 9090 sowie E1B 9460 bilden den Einnahmen-Kontenplan.",
+      "title": "E1A-Kennzahlenkatalog Einnahmen"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "Einstellungen!H1 = IF(SUMPRODUCT(N(COUNTIF(set_zahlarten,set_zahlarten)>1))>0,'⚠ Zahlarten: Bitte eines der Duplikate in den Zeilen' & CONCATENATE(...) & ' entfernen','').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-025",
+      "regeltyp": "Validierung",
+      "source": "Einstellungen!H1; Einstellungen!H3",
+      "statement": "Doppelte Zahlarten werden mit ⚠ und Zeilennummer angemahnt.",
+      "title": "Duplikatwarnung Zahlarten"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "Einstellungen!L1 = IF(SUMPRODUCT(N(COUNTIF(set_projekte,set_projekte)>1))>0,'⚠ Projekte: Bitte eines der Duplikate in den Zeilen' & CONCATENATE(...),'').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-026",
+      "regeltyp": "Validierung",
+      "source": "Einstellungen!L1",
+      "statement": "Doppelte Projekte werden mit ⚠ und Zeilennummer angemahnt.",
+      "title": "Duplikatwarnung Projekte"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "Einstellungen!P1 = IF(SUMPRODUCT(N(COUNTIF(set_a_arten,set_a_arten)>1))>0,'⚠ Ausgaben-Arten: Bitte Duplikate entfernen:' & CONCATENATE(IF((COUNTIF(...)>1)*(MATCH(set_a_arten,set_a_arten,0)=ROW(...)-MIN(ROW(...))+1),' ['&set_a_arten&']','')),'').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-027",
+      "regeltyp": "Validierung",
+      "source": "Einstellungen!P1",
+      "statement": "Doppelte Ausgaben-Arten werden mit ⚠ und expliziter Aufzählung angemahnt.",
+      "title": "Duplikatwarnung Ausgaben-Arten"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "Einstellungen!Z1 = IF(SUMPRODUCT(N(COUNTIF(set_e_arten,set_e_arten)>1))>0,'⚠ Einnahmen-Arten: Bitte eines der Duplikate in den Zeilen' & CONCATENATE(...),'').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-028",
+      "regeltyp": "Validierung",
+      "source": "Einstellungen!Z1",
+      "statement": "Doppelte Einnahmen-Arten werden mit ⚠ und Zeilennummer angemahnt.",
+      "title": "Duplikatwarnung Einnahmen-Arten"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "Einstellungen!O3:O152 = IF(P3=\"\",\"\",IF(SUM(COUNTIF(a_ausgaben_arten,P3),COUNTIF(av_ausgaben_arten,P3),COUNTIF(web_ausgaben_arten,P3))=0,'❯',IF(...>99,'99+',SUM(...)))); Y3:Y152 analog mit COUNTIF(e_einnahmen_arten,Z3) und '999+'.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-029",
+      "regeltyp": "Validierung",
+      "source": "Einstellungen!O3; Einstellungen!Y3",
+      "statement": "Neben jeder Art wird angezeigt, wie oft sie in den Journalen verwendet wird: '❯' entspricht keiner Verwendung, die Zahl ist die Anzahl der Verwendungen, '99+' bzw. '999+' entspricht sehr häufig.",
+      "title": "Verwendungsanzeige je Art (❯ / 99+)"
+    },
+    {
+      "category": "B02 Stammdaten & Kontenplan",
+      "evidence": "Einstellungen!R3:R50 decimal 0.0–1.0; E!G3:G1000, AV!H3:H50 und WEB!G3:G100 haben Tag decimal 1.0–31.0 (A!G und das Reiseblatt haben keine Tagesvalidierung; A!B3 meldet nur '• Tag fehlt'); AV!O3:O50 decimal 2.0–99.0; FR!O3:O102 decimal 0.0–10.0; FR!V3:V102 Liste '1 Mahlzeit,2 Mahlzeiten'; E1A!E39 decimal 0.0–300.0; E1A!E40 decimal 25.0–1200.0; Monat!P5 Liste 'OFF,Jänner,...,Dezember'.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-030",
+      "regeltyp": "Validierung",
+      "source": "Einstellungen!R3; E!G3; AV!O3; FR!O3; E1A!E39; E1A!E40; Monat!P5",
+      "statement": "Datenvalidierungen begrenzen Anteile auf 0–1, Tage auf 1–31 (nur in E, AV und WEB — nicht im A-Blatt und nicht im Reiseblatt), Nutzungsjahre auf 2–99, Mitfahrer auf 0–10, Mahlzeiten auf '1/2 Mahlzeiten', die Arbeitsplatzpauschale auf 25–1200 € und die Branchenkennzahl auf 11–990.",
+      "title": "Zulässige Wertebereiche der Eingabefelder"
+    },
+    {
+      "category": "B03 Einnahmen",
+      "evidence": "E!Q3 = IF(M3=\"\",\"\",M3*IF(P3=\"\",1,P3)); E!P3 = IF(OR(M3=\"\",L3=\"\",COUNTIF(set_e_arten,L3)=0),\"\",IF(INDEX(set_e_ba,MATCH(L3,set_e_arten,0),0)=\"\",\"\",INDEX(set_e_ba,MATCH(L3,set_e_arten,0),0))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-031",
+      "regeltyp": "Berechnung",
+      "source": "E!M3; E!P3; E!Q3",
+      "statement": "Die betriebliche Einnahme in Q ergibt sich aus Brutto mal dem (optionalen) betrieblichen Anteil; ohne Anteil gilt 1.",
+      "title": "Betriebliche Einnahme aus Bruttobetrag und Betriebsanteil"
+    },
+    {
+      "category": "B03 Einnahmen",
+      "evidence": "E!O3 = IF(OR(L3=\"\",M3=\"\",P3=0),\"\",IFERROR(IF(INDEX(set_e_e1a_arten,MATCH(L3,set_e_arten,0))=\"\",\"9040 - Betriebseinnahmen\",INDEX(set_e_e1a_arten,MATCH(L3,set_e_arten,0))),\"\")).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-032",
+      "regeltyp": "Zuordnung",
+      "source": "E!O3; E!L3",
+      "statement": "Die Kennzahl wird aus der hinterlegten Zuordnung der Einnahmenarten ermittelt; ohne Zuordnung gilt die Kennzahl 9040 für Betriebseinnahmen.",
+      "title": "Einnahmen-Kennzahl mit Fallback 9040"
+    },
+    {
+      "category": "B03 Einnahmen",
+      "evidence": "Aus Einstellungen!AB3:AB152: 'Private Einnahme' und 'Private Einzahlung' haben Anteil 0; E!O3 setzt die Kennzahl nur, wenn P3<>0.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-033",
+      "regeltyp": "Zuordnung",
+      "source": "Einstellungen!AB3; E!O3",
+      "statement": "Der Betriebsanteil ist 0, die Buchung erscheint nicht in den betrieblichen Einnahmen und nicht in E1A.",
+      "title": "Private Einnahmen sind nicht betrieblich"
+    },
+    {
+      "category": "B03 Einnahmen",
+      "evidence": "E!O3 liefert 'E1B 9460 - Mieteinnahmen'; E1B!E7 = IF(SUMIF(e_est_kennzahlen,'E1B*',e_betriebseinnahmen)=0,'',SUMIF(e_est_kennzahlen,'E1B*',e_betriebseinnahmen)); Ü!U12 = SUM(e1b_einnahmen)-SUM(e1b_werbungskosten).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-034",
+      "regeltyp": "Zuordnung",
+      "source": "E!O3; E1B!E7; Ü!U12",
+      "statement": "Der Betrag wird in der Mieteinnahmen in der Vermietungsaufstellung und in der Vermietungs-Ergebnisermittlung des Vermietungsergebnisses in der Übersicht erfasst, nicht bei den Betriebseinnahmen.",
+      "title": "Mieteinnahmen werden im Formular E1B erfasst"
+    },
+    {
+      "category": "B03 Einnahmen",
+      "evidence": "E!D3 = IF(OR(M3=\"\",P3=0),\"\",1); E!D4 = IF(OR(M4=\"\",P4=0),\"\",IF(ROW()=3,1,IF(D3<>\"\",D3+1,COUNTIFS(M$3:M3,\"<>\",P$3:P3,\"<>0\")+1))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-035",
+      "regeltyp": "Berechnung",
+      "source": "E!D3; E!D4",
+      "statement": "Eine fortlaufende Nummer wird nur für tatsächliche Buchungen vergeben; leere Zeilen werden übersprungen.",
+      "title": "Laufende Nummern im Einnahmenjournal"
+    },
+    {
+      "category": "B03 Einnahmen",
+      "evidence": "E!B3 = IF(M3=\"\",\"\",CONCATENATE(IF(AND(E3=\"\",Q3<>0),'• Belegnummer fehlt.'&CHAR(10),''),IF(AND(G3=\"\",Q3<>0),'• Tag fehlt.'&CHAR(10),''),IF(F3='','⚠ Monat fehlt.',IF(ISNA(MATCH(F3,{Jänner...Dezember},0)),'⚠ Ungültiger Monat.','')),IF(L3='','⚠ Einnahmen-Art fehlt.',IF(COUNTIF(set_e_arten,L3)>1,'⚠ ... mehrfach vorhanden.',IF(COUNTIF(set_e_arten,L3)=0,'⚠ ... nicht definiert.',''))))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-036",
+      "regeltyp": "Validierung",
+      "source": "E!B3; E!F3",
+      "statement": "Fehlende Belegnummer/Tag/Monat oder eine undefinierte/mehrfach definierte Art erzeugt ⚠-Hinweise in Spalte B; der Hinweis 'Belegnummer fehlt' ist nur ein Bullet (•).",
+      "title": "Plausibilitätsprüfung Einnahmenzeile"
+    },
+    {
+      "category": "B03 Einnahmen",
+      "evidence": "Datenvalidierung E!F3:F1000/A!F3:F1000/AV!G3:G50/WEB!F3:F100 = 'Jänner,...,Dezember'; Tag E!G3:G1000/AV!H3:H50/WEB!G3:G100 decimal 1.0–31.0 (A!G ohne Validierung; das Reiseblatt hat weder Monats- noch Tagesvalidierung); Formelchecks '⚠ Ungültiger Monat.' in E!B3 und A!B3 sowie '• Tag fehlt' in A!B3.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-037",
+      "regeltyp": "Validierung",
+      "source": "E!F3; E!G3; A!B3",
+      "statement": "Monate müssen einem der zwölf Namen entsprechen; eine Tagesbereichsvalidierung (1–31) existiert in E, AV und WEB, nicht aber im A-Blatt oder im Reiseblatt (im A-Blatt wird nur ein fehlender Tag gemeldet).",
+      "title": "Monats- und Tagesvalidierung in E/A/AV/WEB"
+    },
+    {
+      "category": "B04 Ausgaben & Vorsteuer",
+      "evidence": "A!Q3 = IF(L3=\"\",\"\",L3*IF(P3=\"\",1,P3)); A!P3 = IF(OR(K3=\"\",J3=\"\",COUNTIF(set_a_arten,J3)=0),\"\",IF(INDEX(set_a_ba,MATCH(J3,set_a_arten,0),0)=\"\",\"\",INDEX(set_a_ba,MATCH(J3,set_a_arten,0),0))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-038",
+      "regeltyp": "Berechnung",
+      "source": "A!L3; A!P2; A!Q2; A!Q3",
+      "statement": "Die betriebliche Ausgabe ergibt sich aus dem Betrag mal dem hinterlegten betrieblichen Anteil; ohne Anteil gilt der volle Betrag. Es gibt keine 'VST'-USt-Art und keine Vorsteuer-Spalte in den aktiven Zeilen.",
+      "title": "Betriebliche Ausgabe aus Betrag und Betriebsanteil"
+    },
+    {
+      "category": "B04 Ausgaben & Vorsteuer",
+      "evidence": "A!R3 = IF(OR(L3=\"\",M3=\"\"),\"\",IF(M3='IG-Erwerb 20 %',L3*0.2,IF(M3='IG-Erwerb 10 %',L3*0.1,IF(M3='IG-Erwerb 13 %',L3*0.13,IF(M3='IG-Erwerb 4.9 %',L3*0.049,''))))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-039",
+      "regeltyp": "Berechnung",
+      "source": "A!R3; A!M3",
+      "statement": "Die IG-Erwerb-Vorsteuer wird mit dem jeweiligen Steuersatz (20/10/13/4,9 %) auf den Nettobetrag berechnet.",
+      "title": "Vorsteuer aus innergemeinschaftlichen Erwerben"
+    },
+    {
+      "category": "B04 Ausgaben & Vorsteuer",
+      "evidence": "A!S3 = IF(OR(L3=\"\",M3=\"\"),\"\",IF(M3='Reverse Charge 20 %',L3*0.2,IF(M3='Reverse Charge 10 %',L3*0.1,IF(M3='Reverse Charge 13 %',L3*0.13,'')))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-040",
+      "regeltyp": "Berechnung",
+      "source": "A!S3; A!M3",
+      "statement": "Die Steuerschuld aus Reverse Charge wird analog mit 20/10/13 % berechnet.",
+      "title": "USt aus Reverse Charge"
+    },
+    {
+      "category": "B04 Ausgaben & Vorsteuer",
+      "evidence": "A!O3 = IF(OR(L3=\"\",K3=\"\",P3=0),\"\",IFERROR(IF(INDEX(set_a_e1a_arten,MATCH(K3,set_a_arten,0))=\"\",\"9230 - Übrige Betriebsausgaben\",INDEX(set_a_e1a_arten,MATCH(K3,set_a_arten,0))),\"\")).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-041",
+      "regeltyp": "Zuordnung",
+      "source": "A!O3; A!K3",
+      "statement": "Die Kennzahl kommt aus der hinterlegten Zuordnung der Ausgabenarten; ohne Zuordnung gilt die Kennzahl 9230 für übrige Betriebsausgaben.",
+      "title": "Ausgaben-Kennzahl mit Fallback 9230"
+    },
+    {
+      "category": "B04 Ausgaben & Vorsteuer",
+      "evidence": "A!B3 = IF(L3=\"\",\"\",CONCATENATE(IF(AND(E3=\"\",NOT(P3=0)),'• Belegnummer fehlt! Jede Betriebsausgabe muss durch einen Beleg beweisbar sein.'&CHAR(10),''), ... IF(O3=\"\",\"\",IF(ue_sv_modus='Freiberufliche (FSVG)','',IF(COUNTIF(O3,'9100*')>0,IF(OR(E3=\"\",COUNTIF(web_belegnummern,E3)=0),'• Wareneinkauf? Kein Eintrag im WEB gefunden.','',''),''))), IF(M3<>\"\",IF(ISNA(MATCH(M3,{Reverse Charge...;IG-Erwerb...},0)),'⚠ Umsatzsteuer-Art existiert nicht.','',''),''))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-042",
+      "regeltyp": "Validierung",
+      "source": "A!B3; A!E3",
+      "statement": "Fehlende Belegnummer erzeugt den Hinweis auf die Beweispflicht, fehlender Monat/Tag/Art oder eine undefinierte Art erzeugt ⚠; bei FSVG entfällt der WEB-Abgleich.",
+      "title": "Belegpflicht und Plausibilitätsprüfung Ausgaben"
+    },
+    {
+      "category": "B04 Ausgaben & Vorsteuer",
+      "evidence": "A!B3: IF(COUNTIF(O3,'9100*')>0, IF(OR(E3=\"\",COUNTIF(web_belegnummern,E3)=0),'• Wareneinkauf? Kein Eintrag im WEB gefunden.'&CHAR(10),''),'') — nur wenn ue_sv_modus<>'Freiberufliche (FSVG)'.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-043",
+      "regeltyp": "Abgleich",
+      "source": "A!B3; WEB!E3",
+      "statement": "Für Wareneinkäufe wird geprüft, ob die Belegnummer im WEB vorkommt; sonst erscheint ein Hinweis.",
+      "title": "Wareneinkauf muss im Wareneingangsbuch stehen"
+    },
+    {
+      "category": "B04 Ausgaben & Vorsteuer",
+      "evidence": "A!D3 = IF(OR(L3=\"\",P3=0),\"\",1); A!D4 = IF(OR(L4=\"\",P4=0),\"\",IF(ROW()=3,1,IF(D3<>\"\",D3+1,COUNTIFS(L$3:L3,\"<>\",P$3:P3,\"<>0\")+1))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-044",
+      "regeltyp": "Berechnung",
+      "source": "A!D3; A!D4",
+      "statement": "Fortlaufende Nummerierung nur für tatsächliche Buchungen.",
+      "title": "Laufende Nummern im Ausgabenjournal"
+    },
+    {
+      "category": "B04 Ausgaben & Vorsteuer",
+      "evidence": "WEB!P3 = IF(OR(M3=\"\",N3=\"\",COUNTIF(set_a_arten,M3)=0),\"\",IF(INDEX(set_a_ba,MATCH(M3,set_a_arten,0),0)=\"\",\"\",INDEX(set_a_ba,MATCH(M3,set_a_arten,0),0))); WEB!Q3 = IF(OR(N3=\"\",COUNTIF(E3,'WE*')=0),\"\",N3*IF(P3=\"\",1,P3)).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-045",
+      "regeltyp": "Berechnung",
+      "source": "WEB!P3; WEB!Q3; WEB!N3",
+      "statement": "Der betriebliche Anteil wird aus der hinterlegten Zuordnung der Ausgabenarten entnommen; der Betrag wird nur bei Belegnummern mit dem Präfix 'WE' gebildet.",
+      "title": "Wareneingangsbuch: Betrag und Betriebsanteil"
+    },
+    {
+      "category": "B04 Ausgaben & Vorsteuer",
+      "evidence": "WEB!B3: IF(AND(COUNTIF(E3,'WE*')=0,COUNTIF(a_belegnummern,''&E3)),'• Betr. Ausgabe im A-Blatt unter #'&INDEX(a_laufende_nummern,MATCH(E3,a_belegnummern,0))&' zu finden',''); IF(AND(COUNTIF(E3,'WE*')=0,E3=\"\"),'• Belegnummer aus A-Blatt fehlt noch!',''); IF(...=0,'⚠ Belegnummer im A-Blatt nicht gefunden','').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-046",
+      "regeltyp": "Abgleich",
+      "source": "WEB!B3; A!E3; A!D3",
+      "statement": "Die WEB-Prüfung verweist auf die passende Ausgabe im A-Blatt und meldet fehlende oder unbekannte Belegnummern.",
+      "title": "Abgleich WEB ↔ Ausgabenjournal"
+    },
+    {
+      "category": "B04 Ausgaben & Vorsteuer",
+      "evidence": "WEB!B3 = IF(N3=\"\",\"\",CONCATENATE(IF(F3=\"\",'⚠ Monat fehlt',IF(ISNA(MATCH(F3,{Jänner...},0)),'⚠ Ungültiger Monat.','')),IF(G3=\"\",'⚠ Tag fehlt',''),IF(H3=\"\",'⚠ Lieferant fehlt',''),IF(I3=\"\",'⚠ Warenbezeichnung fehlt',''), IF(AND(COUNTIF(E3,'WE*'),M3=\"\"),'⚠ Ausgaben-Art fehlt',...))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-047",
+      "regeltyp": "Validierung",
+      "source": "WEB!B3; WEB!H3; WEB!I3",
+      "statement": "Monat, Tag, Lieferant und Warenbezeichnung sind Pflicht; die Ausgaben-Art muss definiert und eindeutig sein.",
+      "title": "WEB-Plausibilität und Artvalidierung"
+    },
+    {
+      "category": "B04 Ausgaben & Vorsteuer",
+      "evidence": "Einstellungen!R-Spalte: 'Unternehmer-Lohn' und 'Private Ausgaben' haben Anteil 0; A!P3 übernimmt 0, A!Q3 = L3*0 = 0.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-048",
+      "regeltyp": "Zuordnung",
+      "source": "Einstellungen!R3; A!Q3",
+      "statement": "Der Betriebsanteil ist 0; die Ausgabe wird nicht als Betriebsausgabe und nicht in E1A übernommen.",
+      "title": "Private Ausgaben sind vom Abzug ausgeschlossen"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!S3 = IF(F3=j, ROUND(N3/O3*IF(ISNA(MATCH(G3,{Juli...Dezember},0)),1,0.5),2), ...). Bei Folgejahren greift die Konsistenzprüfung gegen die Vorjahres-AfA.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-049",
+      "regeltyp": "Berechnung",
+      "source": "AV!S3; AV!N3; AV!O3; AV!G3",
+      "statement": "Die AfA im laufenden Jahr ist Kosten/Nutzungsjahre, bei Anschaffung in der zweiten Jahreshälfte nur die Hälfte (Halbjahresregel); bei 0 Nutzungsjahren entfällt sie.",
+      "title": "Lineare Abschreibung und Halbjahresregel"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!T3 = IF(N3=\"\",\"\",IF(O3=0,IF(Q3=\"\",N3,Q3),IF(ISNUMBER(S3),ROUND(MAX(IF(Q3=\"\",N3-S3,IF(AND(Q3<1,Q3>=0),Q3,Q3-S3)),0.01),2),''))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-050",
+      "regeltyp": "Berechnung",
+      "source": "AV!T3; AV!Q3",
+      "statement": "Der Restbuchwert ist Anschaffungskosten minus AfA, mindestens 0,01 €; bei 0 Nutzungsjahren bleibt er bei den Kosten.",
+      "title": "Restbuchwertberechnung"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!B3: IF(AND(F3=j,N3<>\"\",N3<1000),'• Unter GWG-Grenze (1000€) - evtl. sofort im A-Blatt erfassen'&CHAR(10),'').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-051",
+      "regeltyp": "Grenzwert",
+      "source": "AV!B3; AV!N3",
+      "statement": "Ein Hinweis empfiehlt die sofortige Erfassung im A-Blatt statt im Anlagenverzeichnis.",
+      "title": "Geringwertige Wirtschaftsgüter (GWG)"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!O3:O50 decimal 2.0–99.0; AV!B3: IF(NOT(O3>0),'⚠ Nutzungsjahre fehlen',IF(O3=1,'• Anlagegüter sind entweder nicht abnutzbar (0) oder haben mind. 2 Jahre Nutzungsjahre.','')).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-052",
+      "regeltyp": "Validierung",
+      "source": "AV!O3; AV!B3",
+      "statement": "Nutzungsjahre sind Pflicht und auf 2–99 begrenzt; der Wert 1 löst den Hinweis aus, dass Güter nicht abnutzbar (0) oder mindestens 2 Jahre zu erfassen sind.",
+      "title": "Nutzungsjahre für Anlagegüter"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!B3: IF(AND(ISNUMBER(S3),S3>1),IF(AND(ISERR(SEARCH('9130',V3)),ISERR(SEARCH('9135',V3)),ISERR(SEARCH('9134',V3)),ISERR(SEARCH('9500',V3))),'⚠ Ausgaben-Art muss zu einer AfA-Kennzahl zugeordnet sein',''),'').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-053",
+      "regeltyp": "Validierung",
+      "source": "AV!B3; AV!V3",
+      "statement": "Die zugeordnete E1A-Kennzahl muss eine AfA-Kennzahl (9130, 9135, 9134 oder 9500) enthalten.",
+      "title": "AfA-Kennzahl ist erforderlich"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!B3: IF(AND(F3=j,INDEX(set_a_ba,MATCH(M3,set_a_arten,0),0)<0.5,INDEX(...)<>\"\"),'⚠ Gehört nicht ins Anlagenverzeichnis da der betriebliche Anteil der AUSGABEN-ART unter < 50 % (Privatvermögen) liegt.','').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-054",
+      "regeltyp": "Grenzwert",
+      "source": "AV!B3; AV!M3",
+      "statement": "Das Gut gilt als Privatvermögen und darf nicht ins Anlagenverzeichnis; es erscheint eine Warnung.",
+      "title": "Mindestbetriebsanteil 50 % im Anlagenverzeichnis"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!B3: IF(AND(F3=j,bet<1,bet<>\"\",COUNTIF(e_belegnummern,''&E3)=0),'• Die AUSGABEN-ART hat einen Privatanteil ('&bet*100&'%). Im Tabellenblatt E ist unter der Belegnummer '&E3&' keine Buchung einer ''Entnahme'' ('&ROUND(S3*(1-bet),2)&'€) zu finden.','') — S3 = Brutto-Kosten.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-055",
+      "regeltyp": "Abgleich",
+      "source": "AV!B3; E!E3; AV!S3",
+      "statement": "Der Privatanteil muss als 'Entnahme' im E-Blatt unter derselben Belegnummer gebucht sein; anderenfalls erscheint ein Hinweis mit dem Betrag.",
+      "title": "Privatanteil erfordert Entnahme im E-Blatt"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!B3: IF(AND(F3<>j,P3<>\"\",Q3<>\"\",O3>0,NOT(ABS(P3-IFERROR(IF(AND(j-F3=1,MONAT in H2),P3/O3*2,P3/O3),0))<=0.01)),'⚠ Abschreibung '&(j-1)&' passt nicht zu Kosten/Nutzungsjahre (erwartet: '&ROUND(...,2)&'€)','').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-056",
+      "regeltyp": "Abgleich",
+      "source": "AV!B3; AV!P3",
+      "statement": "Die Vorjahres-AfA wird gegen die erwartete AfA (Kosten/Nutzungsjahre, ggf. Halbjahresregel) geprüft und Abweichungen gemeldet.",
+      "title": "AfA-Plausibilität gegen Kosten/Nutzungsjahre"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!B3: IF(AND(F3=j,P3<>\"\"),'⚠ Abschreibung '&(j-1)&' entfernen',''); IF(AND(F3<>j,F3<>\"\",Q3=\"\"),'⚠ Restbuchwert '&(j-1)&' fehlt',''); IF(AND(...,NOT(ROUND(IF(j-F3=1 ... ,P3*2*O3-P3,...),0)=ROUND(Q3,0))),'⚠ Restbuchwert '&(j-1)&' stimmt nicht (Differenz: '&...&')','').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-057",
+      "regeltyp": "Abgleich",
+      "source": "AV!B3; AV!P3; AV!Q3",
+      "statement": "Fehlende oder veraltete Vorjahreswerte (AfA/Restbuchwert) werden als ⚠ gemeldet; der Restbuchwert wird auf Plausibilität gegen die Formel geprüft.",
+      "title": "Vorjahreskonsistenz Restbuchwert und AfA"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!B3: IF(AND(F3<>\"\",F3>j),'⚠ Jahr liegt in der Zukunft'&CHAR(10),'').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-058",
+      "regeltyp": "Validierung",
+      "source": "AV!B3; AV!F3",
+      "statement": "Ein Anschaffungsjahr größer als das Wirtschaftsjahr erzeugt eine Warnung.",
+      "title": "Jahr eines Anlageguts darf nicht in der Zukunft liegen"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!B3: IF(E3=\"\",'⚠ Belegnummer fehlt. Die Rechnung muss leicht auffindbar sein.',''), IF(F3=\"\",'⚠ Jahr fehlt',''), IF(G3=\"\",'⚠ Monat fehlt',''), IF(ISBLANK(H3),'• Tag fehlt',''), IF(OR(N3<>\"\",P3<>\"\",Q3<>\"\"),IF(J3=\"\",'• Bezeichnung fehlt',''),'').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-059",
+      "regeltyp": "Validierung",
+      "source": "AV!B3; AV!E3; AV!J3",
+      "statement": "Belegnummer, Jahr, Monat, Tag und Bezeichnung sind Pflicht; fehlende Werte erzeugen ⚠-Hinweise.",
+      "title": "Anlagen-Plausibilität Belegnummer/Datum/Bezeichnung"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!D3 = IF(S3=\"\",\"\",1); AV!D4 = IF(S4=\"\",\"\",IF(ROW()=3,1,IF(D3<>\"\",D3+1,COUNTIFS(S$3:S4,\"<>\")+1))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-060",
+      "regeltyp": "Berechnung",
+      "source": "AV!D3; AV!D4",
+      "statement": "Die laufende Nummer wird nur für tatsächliche Einträge vergeben.",
+      "title": "Laufende Nummern im Anlagenverzeichnis"
+    },
+    {
+      "category": "B05 Anlagenverzeichnis & AfA",
+      "evidence": "AV!V3 = IF(OR(M3=\"\",COUNTIF(set_a_arten,M3)=0),\"\",IF(INDEX(set_a_e1a_arten,MATCH(M3,set_a_arten,0))=\"\",\"9130 - Anlagegüter\",INDEX(set_a_e1a_arten,MATCH(M3,set_a_arten,0)))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-061",
+      "regeltyp": "Zuordnung",
+      "source": "AV!V3; AV!M3",
+      "statement": "Die Kennzahl wird aus der hinterlegten Zuordnung der Ausgabenarten übernommen; ohne Zuordnung gilt die Kennzahl 9130 für Anlagegüter.",
+      "title": "AfA-Kennzahlzuordnung im Anlagenverzeichnis"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!AB3: IF(Y3='PKW oder Kombi', IF(j>=2025,0.5,0.42) + IF(O3=\"\",0,MIN(O3,6))*IF(j>=2025,0.15,0.05), ...); FR!AC3 = AA3*AB3.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-062",
+      "regeltyp": "Berechnung",
+      "source": "FR!AB3; FR!AC3",
+      "statement": "Der Satz ist 0,42 €/km (2024) bzw. 0,50 €/km (2025+); pro Mitfahrer kommen 0,05 € (2024) bzw. 0,15 € (2025+) hinzu, höchstens 6 Mitfahrer.",
+      "title": "Kilometergeld PKW/Kombi"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!AB3: IF(Y3='Motorrad', IF(j>=2026,0.25,IF(j=2025,IF(OR(F3=\"\",MONTH(F3)>6),0.25,0.5),0.24)) + IF(O3=\"\",0,MIN(O3,1))*IF(j>=2025,0.15,0.05), ...).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-063",
+      "regeltyp": "Berechnung",
+      "source": "FR!AB3",
+      "statement": "2024: 0,24 €/km; 2025: 0,50 €/km im ersten Halbjahr, 0,25 €/km ab Juli; 2026: 0,25 €/km. Mitfahrerzuschlag wie beim PKW (max 1).",
+      "title": "Kilometergeld Motorrad"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!AB3: IF(Y3='Fahrrad oder E-Bike', IF(j>=2026,0.25,IF(j=2025,IF(OR(F3=\"\",MONTH(F3)>6),0.25,0.5),0.38)),'').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-064",
+      "regeltyp": "Berechnung",
+      "source": "FR!AB3",
+      "statement": "2024: 0,38 €/km; 2025: 0,50 €/km im ersten Halbjahr, 0,25 €/km ab Juli; 2026: 0,25 €/km.",
+      "title": "Kilometergeld Fahrrad/E-Bike"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!Z3: IF(Y3='Fahrrad oder E-Bike',IF(j<=2024,1500,3000),IF(OR(Y3='PKW oder Kombi',Y3='Motorrad'),30000,'')); Z4 zieht bereits verbuchte Kilometer per SUMIF ab; AA3 = IF($Z3=\"\",\"\",MIN($Z3,MAX(0,IF(AND($Q3=\"\",$P3=\"\"),$R3,N($Q3)-N($P3))))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-065",
+      "regeltyp": "Grenzwert",
+      "source": "FR!Z3; FR!Z4; FR!AA3",
+      "statement": "PKW und Motorrad zusammen sind auf 30.000 km gedeckelt; Fahrrad/E-Bike auf 1.500 km (2024) bzw. 3.000 km (2025+).",
+      "title": "Kilometer-Kontingente"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!AB3 nutzt MIN(O3,6) bei PKW und MIN(O3,1) bei Motorrad; FR!B3 warnt '⚠ Maximal 6 MITFAHRER bei PKW und Kombi möglich.' bzw. '⚠ Maximal 1 MITFAHRER bei Motorrad möglich.' und '⚠ MITFAHRER sollte bei diesem Transportmittel leer oder 0 sein.'",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-066",
+      "regeltyp": "Grenzwert",
+      "source": "FR!AB3; FR!B3; FR!O3",
+      "statement": "Bei PKW/Kombi sind höchstens 6, beim Motorrad höchstens 1 Mitfahrer zulässig; bei anderen Transportmitteln muss das Feld leer oder 0 sein.",
+      "title": "Mitfahrerbegrenzung je Transportmittel"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!B3: IF(AND(P3=\"\",Q3=\"\",R3=\"\"),'⚠ ANFANG-KM und END-KM oder alternativ DISTANZ (KM) angeben',''); IF(AND(NOT(R3=\"\"),OR(NOT(P3=\"\"),NOT(Q3=\"\"))),'⚠ Entweder Anfang-/Endestand ODER Distanz angeben',''); AA3 nutzt R3 wenn P/Q leer, sonst N(Q3)-N(P3).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-067",
+      "regeltyp": "Validierung",
+      "source": "FR!P3; FR!Q3; FR!R3; FR!B3; FR!AA3",
+      "statement": "Entweder Anfangs- und Endkilometerstand ODER die Distanz ist anzugeben; beides gleichzeitig ist ein Fehler.",
+      "title": "Entfernung: KM-Stand oder Distanz"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!AN3 = MAX(SUM(AL3*IF(V3='1 Mahlzeit',IF(T3='Österreich',AM3-(AM3/2),AM3),IF(V3='2 Mahlzeiten',IF(T3='Österreich',0,AM3-(AM3*2/3)),AM3))),0); AM3 = INDEX(set_reisen_verpfelgungspauschalen,MATCH(T3,set_reisen_laender,0),0).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-068",
+      "regeltyp": "Berechnung",
+      "source": "FR!AN3; FR!AM3; FR!V3",
+      "statement": "Das Tag-Geld wird anteilig für zwölf Monate berechnet. Bei einer Mahlzeit im Inland wird die halbe Pauschale angesetzt, im Ausland die volle Pauschale; bei zwei Mahlzeiten im Inland entfällt das Tag-Geld, im Ausland bleibt ein Drittel der Pauschale.",
+      "title": "Tagesgeld und Mahlzeitenabzug"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!AQ3 = IF(AP3=\"\",\"\",IF(AND(W3=0,W3<>\"\"),IF(T3='Österreich',IF(j<2024,4.4,4.5),5.85),INDEX(set_reisen_naechtigungen,MATCH(T3,set_reisen_laender,0),0))); AR3 = AQ3*AP3.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-069",
+      "regeltyp": "Berechnung",
+      "source": "FR!AQ3; FR!AR3",
+      "statement": "Im Inland beträgt die Pauschale vor 2024 4,4 Euro und ab 2024 4,5 Euro, im Ausland 5,85 Euro; ansonsten gilt die Ländertabelle.",
+      "title": "Nächtigungspauschale bei fehlenden Belegen"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!AF3 = SUM($AI3,N($AJ2>0)); FR!AG3 = SUM($AI3,N($AJ2>0)) — die beiden Zähler sind in Zeile 3 identisch. Die kumulierten SUMIFS/COUNTIFS mit 35-Tage-Fenster (5-Tage-Regel) stehen in FR!AF4, die ohne Zeitfenster (15-Tage-Regel) in FR!AG4; AH3 liefert den Reisestatus; AL3 begrenzt die Zwölftel auf 5×12 bzw. 15×12 abzüglich bereits verbuchter Zwölftel.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-070",
+      "regeltyp": "Berechnung",
+      "source": "FR!AF3; FR!AG3; FR!AH3; FR!AL3; FR!AF4; FR!AG4",
+      "statement": "Ab dem 5. Tag entfällt das Tagesgeld, ab dem 15. Tag auch das Nächtigungsgeld; der Reisestatus weist dies aus.",
+      "title": "5-/15-Tage-Regel für Diäten"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!AH3: IF(OR(AND(AI3<>\"\",AI3>0),AJ3>=3),'Hin-Rückfahrt',IF(AE3>=3,'Hin-Rückfahrt','Nein (Unter 3 Stunden)')); AT3 = IF(AH3='Hin-Rückfahrt',0,...); die Hinfahrt muss bei einer Einzelzeile mindestens 50 km betragen (AH3: 'Nein (HINFAHRT < 25 km)' bei R<50 und Q-P<50); bei verketteten Hin-/Rückfahrten gilt kumulativ < 25 km (AH4 mit COUNTIFS). B4 prüft, dass Veranlassung und Einsatzort bei Hin-/Rückfahrt leer bleiben.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-071",
+      "regeltyp": "Zuordnung",
+      "source": "FR!AH3; FR!B4; FR!AT3",
+      "statement": "Die Zeilen werden als 'Hin-Rückfahrt' markiert; dafür entfällt das Tagesgeld und die Veranlassung/Einsatzort bleiben leer.",
+      "title": "Hin- und Rückfahrt-Regel"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!AW3 = CONCATENATE(ROUND(SUMIF(beleg,BT),0),' : ',MAX(0,ROUND(SUMIF(beleg,PT),0))); FR!AX3 = IF(BT/(BT+MAX(0,PT))>=90%,100%,IF(...<10%,0%,...)); FR!BA3 = IF(AND($S3=\"\",$AC3=\"\"),\"\",IF($K3=\"Privat\",0,SUM($S3,$AC3)*IF($AX3=\"\",1,$AX3))); FR!BD3 = SUM(BA3,BB3,BC3).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-072",
+      "regeltyp": "Berechnung",
+      "source": "FR!AW3; FR!AX3; FR!BA3; FR!BD3",
+      "statement": "Der Betriebsanteil wird aus dem Verhältnis der betrieblichen zur gesamten Reisezeit gebildet; liegt er unter zehn Prozent, wird er mit null Prozent berücksichtigt, liegt er bei mindestens neunzig Prozent, mit einhundert Prozent.",
+      "title": "Betriebsanteil der Reisekosten (BT/PT)"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!BA3 = IF(AND(S3=\"\",AC3=\"\"),\"\",IF(K3='Privat',0,SUM(S3,AC3)*IF(AX3=\"\",1,AX3))); AH3 = IF(K3='Privat','Nein (VERANLASSUNG: Privat)',...); AT3 = IF(K3='Privat',0,...).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-073",
+      "regeltyp": "Berechnung",
+      "source": "FR!BA3; FR!AH3; FR!AT3",
+      "statement": "Die betriebliche Ausgabe und alle anteiligen Kosten werden auf 0 gesetzt; die Reise wird als 'Nein (VERANLASSUNG: Privat)' markiert.",
+      "title": "Private Veranlassung schließt Abzug aus"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!AV3 = ... MAX(0,NETWORKDAYS(IF(G3<=TIME(12,0,0),F3,F3+1),IF(I3>TIME(12,0,0),IF(H3=\"\",F3,H3),IF(H3=\"\",F3,H3-1)),set_feiertage)).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-074",
+      "regeltyp": "Berechnung",
+      "source": "FR!AV3; Einstellungen!H69",
+      "statement": "Die Anzahl der Werktage wird mit NETWORKDAYS inklusive der jahresabhängigen Feiertagsliste berechnet.",
+      "title": "Werktage unter Berücksichtigung der Feiertage"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!B3 = IF(ISNUMBER(F3),IF(YEAR(F3)<>j,'⚠ Jahr im START DATUM stimmt nicht mit Wirtschaftsjahr (Einstellungen) überein','',''),'⚠ Ungültiges START DATUM'); analog für H3/END DATUM.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-075",
+      "regeltyp": "Validierung",
+      "source": "FR!B3; FR!F3; FR!H3",
+      "statement": "Weicht das Jahr vom eingestellten Wirtschaftsjahr ab, erscheint eine Warnung; ungültige Datumswerte werden ebenfalls gemeldet.",
+      "title": "Reisejahr muss dem Wirtschaftsjahr entsprechen"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!B4: IF(AND(G3<>\"\",I3=\"\"),'⚠ END ZEIT fehlt',''); IF(AND(G3<>\"\",I3<>\"\",OR(F3=H3,AND(F3<>\"\",H3=\"\")),(I3-G3)<0),'⚠ END ZEIT kann nicht vor/gleich START ZEIT sein bei gleichem Datum.',''); IF(AND(E4=E3,OR((SUM(F4,G4)-SUM(IF(H3<>\"\",H3,F3),I3))*24*60<0,...>2)),'• START DATUM und START ZEIT sollte bei mehrteiligen Reise dort fortsetzen...','').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-076",
+      "regeltyp": "Validierung",
+      "source": "FR!B4; FR!G3; FR!I3",
+      "statement": "Ende darf nicht vor oder gleich Start liegen (bei gleichem Datum); bei mehrteiligen Reisen soll die nächste Zeile dort fortsetzen, wo die vorherige endete (Toleranz 0–2 Minuten).",
+      "title": "Zeitliche Konsistenz einer Reise"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!B3: IF(E3=\"\",'⚠ BELEGNUMMER durch Referenz auf das Fahrtenbuch, Reisekostenabrechnung oder andere Belege ist verpflichtend',''); FR!B4: IF(AND(E3<>E4,COUNTIF(E$3:E4,E4)>0),'⚠ BELEGNUMMER bereits für andere Reise vorhanden. Zeilen einer zusammengehörigen Reise sollten hintereinander sein.','').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-077",
+      "regeltyp": "Validierung",
+      "source": "FR!B3; FR!B4; FR!E3",
+      "statement": "Die Belegnummer muss als Referenz auf Fahrtenbuch/Reisekostenabrechnung gesetzt sein; doppelte Belegnummern für verschiedene Reisen werden gemeldet.",
+      "title": "Belegnummer einer Reise ist verpflichtend"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!B4: IF(AND(T4=\"\",OR(S4<>\"\",W4<>\"\",AL4<>\"\",AQ4<>\"\")),'⚠ LAND / REGION auswählen',''); IF(AND(N4=\"\",OR(...)),'⚠ TRANSPORTMITTEL auswählen',''); IF(N4<>\"\",IF(Y4=\"\",'⚠ TRANSPORTMITTEL nicht im Tabellenblatt Einstellungen gefunden.',''),'').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-078",
+      "regeltyp": "Validierung",
+      "source": "FR!B4; FR!T3; FR!N3",
+      "statement": "Land/Region und Transportmittel müssen gewählt und im Stammdatensatz definiert sein.",
+      "title": "Land/Region und Transportmittel sind Pflicht"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!B4: IF(AND(OR(K4<>\"\",U4<>\"\"),OR(AND(E4<>E3,E4=E5),AND(E4<>E5,E4=E3))),'⚠ VERANLASSUNG und EINSATZORT / GEBIET müssen für die Zeilen der Hin- oder Rückreise LEER bleiben.','').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-079",
+      "regeltyp": "Validierung",
+      "source": "FR!B4; FR!K3; FR!U3",
+      "statement": "Veranlassung und Einsatzort dürfen nur in einer Zeile der Reise stehen und müssen bei Hin-/Rückfahrtzeilen leer bleiben.",
+      "title": "Veranlassung und Einsatzort bei Hin-/Rückfahrt"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!AE3 = IF(E3=\"\",0,SUMIFS(fr_stunden,fr_belege,E3)) mit fr_stunden=Stunden!F:F und fr_belege=FR!E:E; AH3 nutzt AE3>=3.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-080",
+      "regeltyp": "Abgleich",
+      "source": "FR!AE3; Stunden!F3; FR!AH3",
+      "statement": "Die Insgesamt geleisteten Stunden des Belegs werden aus dem Stundenblatt summiert und fließen in die 3-Stunden-Regel ein.",
+      "title": "Arbeitsstunden einer Reise aus Stundenbuch"
+    },
+    {
+      "category": "B06 Reise- & Fahrtkosten",
+      "evidence": "FR!BA3 = IF(AND(S3=\"\",AC3=\"\"),\"\",IF(K3='Privat',0,SUM(S3,AC3)*IF(AX3=\"\",1,AX3))); BB3 = IF(AN3=\"\",\"\",AN3); BC3 = IF(AR3=\"\",\"\",AR3); BD3 = IF(AND(BA3=\"\",BB3=\"\",BC3=\"\"),\"\",SUM(BA3,BB3,BC3)); fr_betriebsausgaben=FR!$BD:$BD; Ü!F12/F13 addieren SUMIF(fr_monate,Monat,fr_betriebsausgaben); Projekte nutzt SUMIFS(fr_betriebsausgaben,fr_projekte,...,fr_monate,...).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-081",
+      "regeltyp": "Berechnung",
+      "source": "FR!BA3; FR!BB3; FR!BC3; FR!BD3; Ü!F12",
+      "statement": "Die betriebliche Reiseausgabe ist die Summe aus Fahrt (BA), Tag (BB) und Nacht (BC); alle Zeilen ergeben fr_betriebsausgaben, das in die Monats- und Jahresausgaben und in die Projekte-Auswertung einfließt.",
+      "title": "Gesamte Reisekosten und Weiterleitung in die Auswertungen"
+    },
+    {
+      "category": "B07 Umsatzsteuer",
+      "evidence": "UST!D5='000', D6='016', D7='057', D10='070', D11='072', D12='073', D13='008', D14='125'; D5/D10 sind Gesamt-/Zwischensummen, D6/D7/D11:D14 werden aus E/A-Blatt gespeist.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-082",
+      "regeltyp": "Zuordnung",
+      "source": "UST!D5; UST!D6; UST!D7; UST!D10; UST!D14; UST!D11; UST!D12; UST!D13",
+      "statement": "Die Zeilen des Formulars werden mit festen Kennzahlen belegt: 000 Gesamtbetrag, 016 Kleinunternehmer, 057 Reverse Charge, 070 IG-Erwerbe, 072/073/008/125 die vier IG-Steuersätze.",
+      "title": "Kennzahlen der Umsatzsteuervoranmeldung"
+    },
+    {
+      "category": "B07 Umsatzsteuer",
+      "evidence": "UST!E6 = IF(SUMIFS(e_betriebseinnahmen,e_monate,E$4)=0,'',SUMIFS(e_betriebseinnahmen,e_monate,E$4)); E5 übernimmt E6 als Gesamtbetrag der Bemessungsgrundlage.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-083",
+      "regeltyp": "Berechnung",
+      "source": "UST!E6; UST!E5",
+      "statement": "Die Betriebseinnahmen des Monats werden als Kleinunternehmer-Umsatz (§ 6 Abs. 1 Z 27 UStG) ausgewiesen.",
+      "title": "Kleinunternehmer-Umsätze (KZ 016)"
+    },
+    {
+      "category": "B07 Umsatzsteuer",
+      "evidence": "UST!E7 = IF(SUMIFS(a_ust_rc,a_ust_arten,'Reverse Charge*',a_monate,E$4)=0,'',ROUNDDOWN(SUMIFS(a_ust_rc,a_ust_arten,'Reverse Charge*',a_monate,E$4),2)).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-084",
+      "regeltyp": "Berechnung",
+      "source": "UST!E7; A!S3",
+      "statement": "Die Reverse-Charge-Steuer aus dem A-Blatt wird auf zwei Nachkommastellen abgerundet in KZ 057 übernommen.",
+      "title": "Reverse Charge in der USt-Voranmeldung (KZ 057)"
+    },
+    {
+      "category": "B07 Umsatzsteuer",
+      "evidence": "UST!E11 = IF(SUMIFS(a_brutto,a_ust_arten,'IG-Erwerb 20 %',a_monate,E$4)=0,'',ROUNDDOWN(SUMIFS(...),2)); E12/E13/E14 analog für 10 %/13 %/4.9 %; E10 = SUM(E11:E14) als KZ 070.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-085",
+      "regeltyp": "Berechnung",
+      "source": "UST!E11; UST!E14; UST!E10",
+      "statement": "Die IG-Erwerbe werden je Steuersatz (20 %, 10 %, 13 %, 4,9 %) auf KZ 072, 073, 008 und 125 verteilt und auf zwei Stellen abgerundet.",
+      "title": "Innergemeinschaftliche Erwerbe nach Steuersatz"
+    },
+    {
+      "category": "B07 Umsatzsteuer",
+      "evidence": "UST!E20 = IF(AND(E7=\"\",E11=\"\",E12=\"\",E13=\"\",E14=\"\"),'',SUM(E7,N(E11)*0.2,N(E12)*0.1,N(E13)*0.13,N(E14)*0.049)).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-086",
+      "regeltyp": "Berechnung",
+      "source": "UST!E20; UST!C20",
+      "statement": "Die Zahllast ist Reverse Charge plus die IG-Erwerb-Bemessungsgrundlagen multipliziert mit 20 %, 10 %, 13 % und 4,9 %.",
+      "title": "Österreichische Umsatzsteuer-Zahllast"
+    },
+    {
+      "category": "B07 Umsatzsteuer",
+      "evidence": "UST!H5 = IF(SUM(E5:G5)=0,'',SUM(E5:G5)); H6/H7/H10/H20 analog; M5=SUM(J5:L5), S5=SUM(P5:R5), X5=SUM(U5:W5).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-087",
+      "regeltyp": "Berechnung",
+      "source": "UST!H5; UST!X5; UST!E4",
+      "statement": "Die Monatswerte werden zu Quartalssummen addiert (H/M/S/X), sofern nicht alle leer sind.",
+      "title": "Quartalsaggregation der USt"
+    },
+    {
+      "category": "B07 Umsatzsteuer",
+      "evidence": "UST!C2 = UPPER('1. Umsatzsteuervoranmeldung'); UST!AB2 = UPPER('2. Umsatzsteuererklärung'); UST!AD4 = set_wirtschaftsjahr.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-088",
+      "regeltyp": "Parameter",
+      "source": "UST!C2; UST!AB2",
+      "statement": "Das Blatt enthält zwei Bereiche: '1. Umsatzsteuervoranmeldung' und '2. Umsatzsteuererklärung' mit gleicher Kennzahlenstruktur.",
+      "title": "Erste und zweite USt-Erklärung"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "Ü!R17 = IF(j=2024,12816,IF(j=2025,13308,IF(j=2026,13539,'?'))); S17 = IF(N(j)<=2026,20%,'?'); U17 = (MAX(ue_gesamteinkommen-R17,0)-MAX(ue_gesamteinkommen-R18,0))*S17.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-089",
+      "regeltyp": "Parameter",
+      "source": "Ü!R17; Ü!S17; Ü!U17",
+      "statement": "Der erste Steuersatz beträgt 20 % bis zur jahresabhängigen Grenze 12.816 € (2024) / 13.308 € (2025) / 13.539 € (2026).",
+      "title": "Einkommensteuertarif Stufe 1 (20 %)"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "Ü!R18 = IF(j=2024,20818,IF(j=2025,21617,IF(j=2026,21992,'?'))); S18 = IF(OR(j=2024,j=2025,j=2026),30%,'?'); U18 = (MAX(Einkommen-R18,0)-MAX(Einkommen-R19,0))*S18.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-090",
+      "regeltyp": "Parameter",
+      "source": "Ü!R18; Ü!S18; Ü!U18",
+      "statement": "Der zweite Steuersatz beträgt 30 % von der Grenze Stufe 1 bis 20.818 € (2024) / 21.617 € (2025) / 21.992 € (2026).",
+      "title": "Einkommensteuertarif Stufe 2 (30 %)"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "Ü!R19 = IF(j=2024,34513,IF(j=2025,35836,IF(j=2026,36458,'?'))); S19 = IF(OR(j=2024,j=2025,j=2026),40%,'?'); U19 = (MAX(Einkommen-R19,0)-MAX(Einkommen-R20,0))*S19.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-091",
+      "regeltyp": "Parameter",
+      "source": "Ü!R19; Ü!S19",
+      "statement": "Der dritte Steuersatz beträgt 40 % bis 34.513 € (2024) / 35.836 € (2025) / 36.458 € (2026).",
+      "title": "Einkommensteuertarif Stufe 3 (40 %)"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "Ü!R20 = IF(j=2024,66612,IF(j=2025,69166,IF(j=2026,70365,'?'))); S20 = IF(j<=2026,48%,'?'); U20 = (MAX(Einkommen-R20,0)-MAX(Einkommen-R21,0))*S20.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-092",
+      "regeltyp": "Parameter",
+      "source": "Ü!R20; Ü!S20",
+      "statement": "Der vierte Steuersatz beträgt 48 % bis 66.612 € (2024) / 69.166 € (2025) / 70.365 € (2026).",
+      "title": "Einkommensteuertarif Stufe 4 (48 %)"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "Ü!R21 = IF(j=2024,99266,IF(j=2025,103072,IF(j=2026,104859,'?'))); S21 = IF(j<=2026,50%,'?'); U21 = MAX(ue_gesamteinkommen-R21,0)*S21.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-093",
+      "regeltyp": "Parameter",
+      "source": "Ü!R21; Ü!S21; Ü!U21",
+      "statement": "Der fünfte Steuersatz beträgt 50 % oberhalb von 99.266 € (2024) / 103.072 € (2025) / 104.859 € (2026).",
+      "title": "Einkommensteuertarif Stufe 5 (50 %)"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "U17=(MAX(E-R17,0)-MAX(E-R18,0))*20%; U18=(MAX(E-R18,0)-MAX(E-R19,0))*30%; U19=(MAX(E-R19,0)-MAX(E-R20,0))*40%; U20=(MAX(E-R20,0)-MAX(E-R21,0))*48%; U21=MAX(E-R21,0)*50%; U23=SUM(U17:U21).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-094",
+      "regeltyp": "Berechnung",
+      "source": "Ü!U17; Ü!U21; Ü!U23",
+      "statement": "Die Steuer wird stufenweise aus den jeweiligen Einkommensanteilen berechnet; die Summe der fünf Stufen ergibt die Einkommensteuer.",
+      "title": "Progressionsberechnung der Einkommensteuer"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "Ü!U14 = IF(modus='Nur Betrieb',N(U10)+N(U11),IF(modus='Nur Vermietung',N(U11)+N(U12)+N(U13),N(U10)+N(U11)+N(U12)+N(U13))); U10 = Gewinn minus Grundfreibetrag; U11 = KZ 245; U12 = E1B-Ergebnis; U13 = Prognose Vermietung.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-095",
+      "regeltyp": "Berechnung",
+      "source": "Ü!R5; Ü!U14; Ü!U10",
+      "statement": "Je nach Modus ('Gesamt', 'Nur Betrieb', 'Nur Vermietung') werden betriebliche Einkünfte, Vermietung, nichtselbständige Einkünfte und prognostizierte Werte addiert.",
+      "title": "Gesamteinkommen nach Rechenmodus"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "E1A!J6 = IF(set_wirtschaftsjahr<2024,30000,33000); definierter Name e1a_grundfreibetrag_grenze=E1A!$J$6.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-096",
+      "regeltyp": "Parameter",
+      "source": "E1A!J6",
+      "statement": "Die Grenze beträgt 30.000 € vor 2024 und 33.000 € ab 2024; im unterstützten Zeitraum immer 33.000 €.",
+      "title": "Höchstgrenze des Grundfreibetrags im Formular E1A"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "E1A!J7 = IF(set_wirtschaftsjahr>=2022,15%,13%); definierter Name e1a_grundfreibetrag_satz=E1A!$J$7.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-097",
+      "regeltyp": "Parameter",
+      "source": "E1A!J7",
+      "statement": "Der Satz beträgt 13 % vor 2022 und 15 % ab 2022; im unterstützten Zeitraum immer 15 %.",
+      "title": "Prozentsatz des Grundfreibetrags im Formular E1A"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "E1A!K4 = SUM(e1a_betriebseinnahmen)-SUM(e1a_betriebsausgaben); K5 = MAX(MIN(K4*e1a_grundfreibetrag_satz,e1a_grundfreibetrag_grenze*e1a_grundfreibetrag_satz),0); K9 = N(K4)-N(K5). Ü!U9 = MAX(MIN(SUM(U7:U8)*satz,grenze*satz),0); U10 = SUM(U7:U8)-N(U9).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-098",
+      "regeltyp": "Berechnung",
+      "source": "E1A!K4; E1A!K5; Ü!U9; Ü!U10",
+      "statement": "Der Grundfreibetrag entspricht dem kleineren Wert aus 15 Prozent des Gewinns und 15 Prozent von 33.000 Euro, mindestens null; er wird vom Gewinn abgezogen.",
+      "title": "Grundfreibetragsberechnung E1A und Übersicht"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "E1A!E11 = SUM(e_betriebseinnahmen)-SUM(E12:E14)-SUMIF(e_est_kennzahlen,'E1B*',...); E17 = SUMIF(a_est_kennzahlen,'9100*',a_betriebsausgaben)+SUM(web_betriebsausgaben); E20 = A+AV; E24 = A(9160*)+SUM(fr_betriebsausgaben); E38 = SUM(A,AV,WEB,FR)-SUM(E17:E37)-E1B-Ausstattung.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-099",
+      "regeltyp": "Berechnung",
+      "source": "E1A!E11; E1A!E17; E1A!E24; E1A!E38",
+      "statement": "Die Beträge je Kennzahl werden per SUMIF aus den Journalen geholt; 9100 enthält zusätzlich das WEB, 9160 die Reisekosten, 9130/9134/9135 das Anlagenverzeichnis; die Restsumme landet in 9230.",
+      "title": "E1A-Einnahmen und -Ausgaben je Kennzahl"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "E1B!E7 = SUMIF(e_est_kennzahlen,'E1B*',e_betriebseinnahmen); E10 = SUMIF(av_est_kennzahlen,'E1B 9500*',av_betriebsausgaben); E12:E14 = SUMIF(a_est_kennzahlen,'E1B <KZ>*',a_betriebsausgaben); E15 = SUMIF(a_est_kennzahlen,'E1B*',a_betriebsausgaben)+SUMIF(av_est_kennzahlen,'E1B*',av_betriebsausgaben)-SUM(E10:E14); E18 = SUM(e1b_einnahmen)-SUM(e1b_werbungskosten), wobei e1b_werbungskosten=E1B!$E$10:$E$15.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-100",
+      "regeltyp": "Berechnung",
+      "source": "E1B!E7; E1B!E10; E1B!E15; E1B!E18",
+      "statement": "Mieteinnahmen und Werbungskosten je Kennzahl werden aus den Einnahmen-, Ausgaben- und Anlagenjournalen aggregiert; der Überschuss der Mieteinnahmen über die Werbungskosten ergibt das Vermietungsergebnis.",
+      "title": "E1B Vermietung und Verpachtung"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "E1A!C40 = IF(E32<>\"\" AND E32<>0,'',IF(E40='','',IF(AND(E40<=1200,E40>300),'9217',IF(E40<=300,'9215','')))); D40 zeigt 'Kleines/Großes Arbeitsplatzpauschale' oder 'Falscher Betrag'; Validierung E40 decimal 25.0–1200.0.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-101",
+      "regeltyp": "Berechnung",
+      "source": "E1A!C40; E1A!D40; E1A!E40",
+      "statement": "Bis 300 € gilt die kleine Pauschale KZ 9215, von über 300 bis 1.200 € die große KZ 9217; bei Zusage von 9275 (Arbeitszimmer) ist der Wert zu löschen.",
+      "title": "Arbeitsplatzpauschale (E1A 9215/9217)"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "E1A!C39 = IF(AND($E32<>\"\",$E32<>0),\"\",IF($E39=\"\",\"\",\"9216 \")); E1A!D39 zeigt bei gesetztem 9275 oder bei E40>300 nur einen Warnhinweis ('Wert löschen …'), löscht C39 aber nicht; Validierung E39 decimal 0.0–300.0.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-102",
+      "regeltyp": "Validierung",
+      "source": "E1A!C39; E1A!D39; E1A!E39",
+      "statement": "Ergonomisches Mobiliar wird mit KZ 9216 ausgewiesen. Unterdrückt wird die Kennzahl nur, wenn die Arbeitszimmerpauschale 9275 erfasst ist oder kein Betrag für ergonomisches Mobiliar eingetragen wurde. Die große Arbeitsplatzpauschale 9217 unterdrückt die Kennzahl nicht; in diesem Fall erscheint lediglich ein Warnhinweis.",
+      "title": "Ergonomisches Mobiliar (E1A 9216)"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "Ü!U11 = 'NICHTSELBSTÄNDIGE EINKÜNFTE (KZ 245)' (Eingabe); U27 = SUM((MAX(U11-R17,0)-MAX(U11-R18,0))*S17, ... , MAX(U11-R21,0)*S21); U25 = SUM((MAX(U11+U12-R17,0)-...)*..., ...) - U27; U24 = IF(modus='Nur Bruttolohn','',N(U23)-N(U25)-N(U27)); R26 = '- EINKOMMENSTEUER-VORAUSZAHLUNG'; R28 = '- BEZAHLTE LOHNSTEUER (KZ 260)'; U29 = IF(N(U26)+N(U28)=0,ue_est,ue_est-N(U26)-N(U28)).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-103",
+      "regeltyp": "Berechnung",
+      "source": "Ü!U11; Ü!U24; Ü!U25; Ü!U27; Ü!R26; Ü!R28; Ü!U29",
+      "statement": "Die Einkommensteuer wird per Progressionsrechnung auf nichtselbständige Einkünfte, auf Vermietung und auf den Betrieb aufgeteilt; die Einkommensteuer-Vorauszahlung und die bezahlte Lohnsteuer werden abgezogen.",
+      "title": "Est-Aufteilung und Vorauszahlungen"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "Ü!U5 = 'Ja/Nein' (Validierung); R5 = 'Gesamt/Nur Betrieb/Nur Vermietung' (Validierung); U4 = 'PROGNOSE'; U8 = IF(AND(U5='Ja',modus<>'Nur Vermietung'),(SUM(e1a_betriebseinnahmen)-SUM(e1a_betriebsausgaben))/SUMPRODUCT((ue_gewinn_pro_monat<>\"\")*1)*12-(SUM(...)),''); U13 analog für Vermietung; die Verteilung der Steuer auf die Monate erfolgt in J12/K12; I13 ist die EST/SV-Basis, I15 die Prognose und I16 die Verlustbasis.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-104",
+      "regeltyp": "Wahlrecht",
+      "source": "Ü!U5; Ü!R5; Ü!U8; Ü!U13; Ü!J12; Ü!K12",
+      "statement": "Mit Prognose werden weitere betriebliche/ Vermietungsgewinne aufs Jahr hochgerechnet; die Modi bestimmen, welche Einkünfte in die Übersicht einfließen.",
+      "title": "Prognose- und Rechenmodi"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "Ü!R24/R25 = IF(OR(modus='Nur Bruttolohn',modus='Nur andere Gewinne',...),'',...); U24 = IF(modus='Nur Bruttolohn','',...); AA8 = IF(modus='Nur andere Gewinne',0,N(e1a_9225)); N4 = IF(modus='Nur andere Gewinne','','REINGEWINN/H').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-105",
+      "regeltyp": "Wahlrecht",
+      "source": "Ü!R5; Ü!AA8; Ü!N4",
+      "statement": "Bestimmte Zeilen der Übersicht und die SV-Beiträge werden ausgeblendet bzw. auf 0 gesetzt.",
+      "title": "Bruttolohn- und andere-Gewinne-Modi"
+    },
+    {
+      "category": "B08 Einkommensteuer & Grundfreibetrag",
+      "evidence": "Ü!Y17 = IF(modus='Mit Prognose','PROGNOSTIZIERTE SV-BEITRÄGE',IF(modus='Nur andere Gewinne','FÜR ANDERE EINKÜNFTE ZU ZAHLENDE SV-BEITRÄGE','= ZU ZAHLENDE SV-BEITRÄGE')); R24 = IF(OR(modus='Nur Bruttolohn',modus='Nur andere Gewinne',modus='Nur Vermietung'),'',...); R25 = IF(OR(modus='Nur Bruttolohn',modus='Nur andere Gewinne'),'',...); U24/U25 = IF(modus='Nur Bruttolohn','',...); AA8 = IF(modus='Nur andere Gewinne',0,N(e1a_9225)); I13 verzweigt auf die Prognoseeinstellung U5 (Ja/Nein), N4 auf den Modus 'Nur andere Gewinne'.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-106",
+      "regeltyp": "Wahlrecht",
+      "source": "Ü!R5; Ü!Y17; Ü!R24; Ü!R25; Ü!AA8",
+      "statement": "Die Auswahl des Rechenmodus bietet nur die Werte 'Gesamt', 'Nur Betrieb' und 'Nur Vermietung'. In der Berechnung werden jedoch zusätzlich die Varianten 'Mit Prognose', 'Nur Bruttolohn' und 'Nur andere Gewinne' unterschieden; diese steuern die Sichtbarkeit von Zeilen und die Behandlung der Sozialversicherung.",
+      "title": "Zusätzliche Rechenmodi in den Übersichtsformeln"
+    },
+    {
+      "category": "B09 Sozialversicherung",
+      "evidence": "Y5 Datenvalidierung 'Gewerbetreibende (GSVG),Neue Selbständige (GSVG),Freiberufliche (FSVG),Nur Unfallversicherung'; definierter Name ue_sv_modus=Ü!$Y$5; Z13 setzt die SVS auf '-' bei FSVG/UV, Z15 setzt die PV nur bei UV auf '-' und wählt bei FSVG den 20-Prozent-Satz (I64), Z14 setzt die KV auf '-' bei Jungunternehmer/UV.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-107",
+      "regeltyp": "Wahlrecht",
+      "source": "Ü!Y5; Ü!Z13; Ü!Z15; Einstellungen!I64",
+      "statement": "Vier Modi bestimmen die SV-Beiträge: Gewerbetreibende (GSVG), Neue Selbständige (GSVG), Freiberufliche (FSVG) und Nur Unfallversicherung.",
+      "title": "Sozialversicherungsmodus"
+    },
+    {
+      "category": "B09 Sozialversicherung",
+      "evidence": "AA5 Datenvalidierung 'Ja,Nein' (Wert 'Ja'); ue_sv_jungunternehmer=Ü!$AA$5; Z14 = IF(OR(AA5='Ja',SV-Modus='Nur Unfallversicherung'),'-',set_sv_kv_satz); AA14 = IF(modus='Nur Unfallversicherung','',IF(ue_sv_kv_satz='-',set_sv_kv_min_beitrag*12,MAX(BMG*KV%,MindestKV*12))) → 37,47×12 = 449,64. Z13 = IF(OR(modus='Freiberufliche (FSVG)',modus='Nur Unfallversicherung'),'-',set_sv_svs_satz) ohne Jungunternehmer-Bedingung → 0,0153; AA13 = IF(ue_sv_svs_satz='-','',IF(ue_sv_kv_satz='-',set_sv_kv_min_beitrag/set_sv_kv_satz*12*ue_sv_svs_satz,MAX(ue_sv_bmg*ue_sv_svs_satz,set_sv_kv_min_beitrag/set_sv_kv_satz*12*ue_sv_svs_satz))) = 101,169 (MAX-basiert). PV (Z15/AA15) hat keine Jungunternehmer-Ausnahme.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-108",
+      "regeltyp": "Wahlrecht",
+      "source": "Ü!AA5; Ü!Z14; Ü!AA14; Ü!Z13; Ü!AA13",
+      "statement": "Bei Jungunternehmern wird nur der KV-Satz in der Anzeige auf '-' gesetzt; der Mindest-KV-Beitrag wird dennoch bezahlt. SVS und PV sind von der Jungunternehmer-Regelung nicht betroffen. Nur der Modus 'Nur Unfallversicherung' lässt KV, SVS und PV gemeinsam leer; bei freiberuflicher Tätigkeit entfällt zusätzlich die SVS.",
+      "title": "Jungunternehmer-Regelung"
+    },
+    {
+      "category": "B09 Sozialversicherung",
+      "evidence": "AA7 = ue_est_bmg (=Ü!U10); AA8 = IF(modus='Nur andere Gewinne',0,N(e1a_9225)); AA9 = MIN(SUM(AA7:AA8),set_sv_bgl_max*12); definierter Name ue_sv_bmg=Ü!$AA$9.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-109",
+      "regeltyp": "Berechnung",
+      "source": "Ü!AA7; Ü!AA8; Ü!AA9",
+      "statement": "Die Beitragsgrundlage ist das Betriebseinkommen zuzüglich der bereits gezahlten SV-Beiträge (9225), gedeckelt mit dem Zwölffachen der jahresabhängigen Maximal-Beitragsgrundlage; bei 'Nur andere Gewinne' entfällt der 9225-Zuschlag.",
+      "title": "SV-Beitragsgrundlage und Deckelung"
+    },
+    {
+      "category": "B09 Sozialversicherung",
+      "evidence": "AA14 = IF(ue_sv_modus='Nur Unfallversicherung','',IF(ue_sv_kv_satz='-',set_sv_kv_min_beitrag*12,MAX(ue_sv_bmg*ue_sv_kv_satz,set_sv_kv_min_beitrag*12))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-110",
+      "regeltyp": "Berechnung",
+      "source": "Ü!AA14; Einstellungen!I58; Einstellungen!I59",
+      "statement": "Der KV-Beitrag entspricht dem höheren Wert aus 6,8 Prozent der Beitragsgrundlage und dem zwölffachen Mindest-KV-Beitrag. Bei Jungunternehmern wird nur der Satz als Strich angezeigt, dennoch wird der Mindest-KV von 449,64 Euro bezahlt. Nur bei der Versicherungsart 'Nur Unfallversicherung' entfällt der KV-Beitrag.",
+      "title": "Krankenversicherungsbeitrag"
+    },
+    {
+      "category": "B09 Sozialversicherung",
+      "evidence": "AA15 = IF(ue_sv_pv_satz='-','',MAX(ue_sv_bmg*ue_sv_pv_satz,IF(modus='Freiberufliche (FSVG)',set_sv_fsvg_pv_min_beitrag*12,IF(modus='Neue Selbständige (GSVG)',set_sv_gsvg_ns_pv_min_beitrag*12,set_sv_gsvg_pv_min_beitrag*12)))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-111",
+      "regeltyp": "Berechnung",
+      "source": "Ü!AA15; Ü!Z15; Einstellungen!I63; Einstellungen!I64",
+      "statement": "Der PV-Beitrag ist dem höheren Wert aus Beitragsgrundlage × PV-Satz, modusabhängiger Mindestbeitrag × 12); der Satz ist 18,5 % (GSVG) bzw. 20 % (FSVG).",
+      "title": "Pensionsversicherungsbeitrag"
+    },
+    {
+      "category": "B09 Sozialversicherung",
+      "evidence": "AA12 = set_sv_uv*12; AA13 = IF(ue_sv_svs_satz='-','',IF(ue_sv_kv_satz='-',set_sv_kv_min_beitrag/set_sv_kv_satz*12*ue_sv_svs_satz,MAX(ue_sv_bmg*ue_sv_svs_satz,set_sv_kv_min_beitrag/set_sv_kv_satz*12*ue_sv_svs_satz))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-112",
+      "regeltyp": "Berechnung",
+      "source": "Ü!AA12; Ü!AA13; Einstellungen!I65",
+      "statement": "Die Unfallversicherung ist eine Jahrespauschale. Die Selbständigenvorsorge entspricht dem höheren Wert aus 1,53 Prozent der Beitragsgrundlage und dem aus dem Mindest-KV-Beitrag abgeleiteten Mindestbeitrag. Sie wird nur bei freiberuflicher Tätigkeit oder der Versicherungsart 'Nur Unfallversicherung' ausgesetzt; die Jungunternehmer-Einstellung hat darauf keinen Einfluss.",
+      "title": "Selbständigenvorsorge und Unfallversicherung"
+    },
+    {
+      "category": "B09 Sozialversicherung",
+      "evidence": "Ü!I12 = IF(ue_sv_modus='Nur Unfallversicherung',set_sv_uv,SUM(set_sv_uv,IF(ue_sv_svs_satz='-',0,set_sv_kv_min_beitrag/set_sv_kv_satz*ue_sv_svs_satz),set_sv_kv_min_beitrag,IF(modus='Freiberufler (FSVG)',set_sv_fsvg_pv_min_beitrag,IF(modus='Neue Selbständige (GSVG)',set_sv_gsvg_ns_pv_min_beitrag,set_sv_gsvg_pv_min_beitrag)))).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-113",
+      "regeltyp": "Berechnung",
+      "source": "Ü!I12; Ü!AA17",
+      "statement": "Für die Monate ohne Einkommen werden Mindestbeiträge (UV, SVS, KV, PV) als Sockel angesetzt.",
+      "title": "Mindestbeiträge bei fehlenden Einkünften"
+    },
+    {
+      "category": "B09 Sozialversicherung",
+      "evidence": "AA17 = SUM(AA12:AA15); AA18 = IF(AA17=\"\",\"\",AA17/12); definierte Namen ue_sv=Ü!$AA$17 und ue_svbeitrag=Ü!$AA$18.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-114",
+      "regeltyp": "Berechnung",
+      "source": "Ü!AA17; Ü!AA18; Ü!Y17",
+      "statement": "Die Summe der vier Beiträge ergibt die jährlichen SV-Beiträge; die Division durch 12 liefert den Monatsbetrag.",
+      "title": "Gesamt- und Monats-SV-Beiträge"
+    },
+    {
+      "category": "B09 Sozialversicherung",
+      "evidence": "Ü!AA8 = IF(modus='Nur andere Gewinne',0,N(e1a_9225)); e1a_9225=E1A!$E$33; E1A!E33 = SUMIF(a_est_kennzahlen,'9225*',a_betriebsausgaben); in Ü!F12 werden 9225-Beträge aus den Ausgaben herausgerechnet.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-115",
+      "regeltyp": "Abgleich",
+      "source": "Ü!AA8; E1A!E33; Ü!F12",
+      "statement": "Bereits bezahlte SV-Beiträge (KZ 9225) werden bei der Ermittlung der Beitragsgrundlage zu den Einkünften addiert; in der Übersicht werden sie außerdem aus den Ausgaben herausgerechnet. Bei der Versicherungsart 'Nur Unfallversicherung' unterbleibt das Herausrechnen aus den Ausgaben; der Modus 'Nur andere Gewinne' lässt lediglich den Zuschlag zur Beitragsgrundlage entfallen, das Herausrechnen bleibt bestehen.",
+      "title": "SV-Beiträge in der Einnahmen-Ausgaben-Rechnung"
+    },
+    {
+      "category": "B09 Sozialversicherung",
+      "evidence": "Ü!Y5 Datenvalidierung 'Gewerbetreibende (GSVG),Neue Selbständige (GSVG),Freiberufliche (FSVG),Nur Unfallversicherung'; Ü!Z15 und Ü!AA15 prüfen auf 'Freiberufliche (FSVG)' und verwenden set_sv_fsvg_pv_satz bzw. set_sv_fsvg_pv_min_beitrag*12; Ü!I12 = IF(ue_sv_modus='Freiberufler (FSVG)',set_sv_fsvg_pv_min_beitrag,IF(ue_sv_modus='Neue Selbständige (GSVG)',set_sv_gsvg_ns_pv_min_beitrag,set_sv_gsvg_pv_min_beitrag)) — der String-Unterschied 'Freiberufliche' gegenüber 'Freiberufler' führt zum GSVG-Fallback.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-131",
+      "regeltyp": "Validierung",
+      "source": "Ü!Y5; Ü!I12; Ü!Z15; Ü!AA15",
+      "statement": "Die Auswahlliste für die Sozialversicherungsart und die Formeln für die Pensionsversicherung verwenden die Bezeichnung 'Freiberufliche (FSVG)'. Die Formel für den monatlichen Mindestbeitrag prüft dagegen auf 'Freiberufler (FSVG)' und findet diese Bezeichnung nicht. Infolgedessen greift der FSVG-Zweig nicht und der GSVG-Mindestbeitrag wird angesetzt: 95,91 Euro statt 103,69 Euro im Jahr 2024 bzw. 101,95 Euro statt 110,22 Euro ab 2025 — eine Abweichung von 7,78 bzw. 8,27 Euro pro Monat. Dieser Ist-Zustand ist als Workbook-Defekt dokumentiert.",
+      "title": "Konsistenz der SV-Modusstrings"
+    },
+    {
+      "category": "B10 Auswertungen & Abgleich",
+      "evidence": "Monat!P5 Datenvalidierung 'OFF,Jänner,...,Dezember'; m_monat=Monat!$P$5; P7 = IF(OR(m_monat='',m_monat='OFF'),'💡 Rechenaufwendige Kalkulation: Bitte nach Verwendung wieder auf OFF setzten!',''); alle INDEX/SMALL-Formeln prüfen OR(m_monat='OFF',m_monat='').",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-116",
+      "regeltyp": "Validierung",
+      "source": "Monat!P5; Monat!P7; Monat!A404",
+      "statement": "Der Schalter 'OFF' deaktiviert die rechenaufwendige Monatsansicht; bei OFF erscheint ein 💡-Hinweis, die Ansicht wieder abzuschalten.",
+      "title": "Monatsblatt-Schalter"
+    },
+    {
+      "category": "B10 Auswertungen & Abgleich",
+      "evidence": "Monat!J13 = SUMIFS(a_betriebsausgaben,a_monate,m_monat); J14 = SUMIFS(web_betriebsausgaben,web_monate,m_monat); J15 = SUMIFS(av_betriebsausgaben,av_monate,m_monat,av_jahre,j)+IF(m_monat='Jänner',SUMIFS(av_betriebsausgaben,av_jahre,'< '&j),0); J16 = SUMIFS(fr_betriebsausgaben,fr_monate,m_monat); J20 = SUMIFS(e_betriebseinnahmen,e_monate,m_monat); J23 = N(J20)-N(J17).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-117",
+      "regeltyp": "Berechnung",
+      "source": "Monat!J13; Monat!J16; Monat!J20; Monat!O29",
+      "statement": "Die Monatsansicht zieht Einnahmen, Ausgaben (A/AV/WEB/FR/USt) und Stunden des gewählten Monats per SUMIFS/INDEX zusammen.",
+      "title": "Monatsübersicht Gewinn und Stunden"
+    },
+    {
+      "category": "B10 Auswertungen & Abgleich",
+      "evidence": "Monat!A254 = IF(OR(m_monat='OFF',m_monat=''),'',IFERROR(SMALL(IF(e_laufende_nummern<>\"\",IF(e_monate=m_monat,ROW(e_laufende_nummern),''),''),ROW($AE1)),'')); A104 nutzt ROUNDUP(ROW($AE1)/2,0) für WEB; A54 berücksichtigt im Jänner auch Vorjahres-Anlagen; anschließend INDEX der Spalten (D404/F404 usw.).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-118",
+      "regeltyp": "Berechnung",
+      "source": "Monat!A254; Monat!A104; Monat!A54; Monat!D404",
+      "statement": "Die Zeilen der Einnahmen-, Ausgaben-, Anlagen- und Reisejournale werden über eine aufwendige Auswahlformel in die Monatsansicht übernommen; Einträge des Wareneingangsbuchs werden paarweise zusammengefasst.",
+      "title": "Zeilenfilter der Monatsansicht"
+    },
+    {
+      "category": "B10 Auswertungen & Abgleich",
+      "evidence": "BE-ART!E3 = IF(SUMIFS(e_betriebseinnahmen,e_einnahmen_arten,$C3,e_monate,E$2)=0,'',SUMIFS(...)); Q3 = SUM(E3:P3); E153 = SUM(E3:E152); Q153 = SUM(Q3:Q152); Q154 = IF(Q$153='','',IF(ROUND(SUM(e_betriebseinnahmen),1)=ROUND(Q$153,1),'✓✓','Fehler ('&...&'€)')); C3 blendet Arten mit Anteil 0 aus.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-119",
+      "regeltyp": "Berechnung",
+      "source": "BE-ART!E3; BE-ART!Q154; BE-ART!E154",
+      "statement": "Eine Matrix zeigt die Einnahmen je Art und Monat; Summen und ein ✓✓-Abgleich gegen das E-Blatt stellen die Vollständigkeit sicher.",
+      "title": "Betriebseinnahmen nach Art (BE-ART)"
+    },
+    {
+      "category": "B10 Auswertungen & Abgleich",
+      "evidence": "BA-ART!E3 = IF(AND(SUMIFS(a_betriebsausgaben,a_ausgaben_arten,$C3,a_monate,E$2)=0,SUMIFS(av,...)=0,SUMIFS(web,...)=0),'',SUM(...)); E153 = SUMIFS(fr_betriebsausgaben,fr_monate,E$2); Q154 = SUM(Q3:Q153); Q155 = IF(ROUND(SUM(a,av,web,fr),1)=ROUND(Q$154,1),'✓✓','Fehler (...)'); C3 blendet Arten mit Anteil 0 aus.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-120",
+      "regeltyp": "Berechnung",
+      "source": "BA-ART!E3; BA-ART!E153; BA-ART!Q155",
+      "statement": "Eine Matrix summiert die Ausgaben aus den Journalen je Art und Monat; FR-Kosten kommen als eigene Zeile hinzu; ✓✓ vergleicht mit der Gesamtsumme.",
+      "title": "Betriebsausgaben nach Art (BA-ART)"
+    },
+    {
+      "category": "B10 Auswertungen & Abgleich",
+      "evidence": "Projekte!E3 = IF(SUMIFS(e_betriebseinnahmen,e_projekte,E$1,e_monate,$B3)=0,'',SUMIFS(...)); E10 = SUM(A-9225, WEB, FR); E4 = SUMIFS(av, av_jahre<j) + ...; D5 = N(D3)-N(D4); D7 = D5/D6; D78 = SUM(h_stunden)-SUM(E78:X78); D75/D77 = Summenzeilen; E78 = SUMIFS(h_stunden,h_projekte,E$1).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-121",
+      "regeltyp": "Berechnung",
+      "source": "Projekte!E3; Projekte!E10; Projekte!D5; Projekte!D78",
+      "statement": "Für jedes Projekt und jeden Monat werden Einnahmen, Ausgaben (inkl. Vorjahres-AfA und 9225-Bereinigung) und Arbeitsstunden ausgewiesen; Differenz- und Prozentzeilen ergänzen die Auswertung.",
+      "title": "Projekte-Auswertung"
+    },
+    {
+      "category": "B10 Auswertungen & Abgleich",
+      "evidence": "ZA!E7 = IF(SUMIFS(e_brutto,e_zahlarten,$B7,e_monate,E$1,e_brutto,'>0')=0 AND SUMIFS(a_brutto,a_zahlarten,$B7,a_monate,E$1,a_brutto,'<0')=0,'',SUMIFS(e...)-SUMIFS(a...)); E10 = ... + web_preise (WE*); E13 = N(INDEX(set_zahlarten_startsaldo,MATCH($B7,set_zahlarten,0),0)) + SUM(E7:E7)+SUM(E8:E8)-SUM(E10:E10)-SUM(E11:E11); E14 = ✓/✓✓-Prüfung mit Delta-Anzeige.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-122",
+      "regeltyp": "Abgleich",
+      "source": "ZA!E7; ZA!E10; ZA!E13; ZA!E14",
+      "statement": "Für jede Zahlart und jeden Monat werden Ein- und Ausflüsse aus E/A/WEB gegenübergestellt; ✓/✓✓ bestätigen die Übereinstimmung mit Saldo und Startsaldo.",
+      "title": "Zahlarten-Abgleich (ZA)"
+    },
+    {
+      "category": "B10 Auswertungen & Abgleich",
+      "evidence": "Stunden!C3:C199 = Monatsliste (Validierung); E3:E199 = set_projekte; F3:F199 = Stunden; h_stunden=Stunden!$F:$F, h_monate=Stunden!$C:$C, h_projekte=Stunden!$E:$E; FR!AE3 = SUMIFS(fr_stunden,fr_belege,E3); Ü!M12 = SUMIFS(h_stunden,h_monate,$C12); Monat/Projekte nutzen SUMIFS(h_stunden,...).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-123",
+      "regeltyp": "Berechnung",
+      "source": "Stunden!C3; Stunden!F3; Ü!M12",
+      "statement": "Stunden werden je Monat und Projekt erfasst und speisen die Projekte-Auswertung, die Reise-3-Stunden-Regel und die Monatsübersicht.",
+      "title": "Stundenbuch und Zwölfteleinheiten"
+    },
+    {
+      "category": "B10 Auswertungen & Abgleich",
+      "evidence": "Monat!O29 = IF(OR(m_monat='OFF',m_monat=''),'',INDEX(ust_daten,MATCH($M29,ust_kennzahlen,0),MATCH(m_monat,ust_monate,0))); ust_daten=UST!$E$5:$X$13, ust_kennzahlen=UST!$D$5:$D$13, ust_monate=UST!$E$4:$X$4.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-124",
+      "regeltyp": "Berechnung",
+      "source": "Monat!O29; UST!D5; UST!E4",
+      "statement": "Die Werte der UST-Voranmeldung werden über ust_daten/ust_kennzahlen/ust_monate in die Monatsansicht übernommen.",
+      "title": "USt-Zeilen in der Monatsansicht"
+    },
+    {
+      "category": "B10 Auswertungen & Abgleich",
+      "evidence": "Ü!I12 = IF(ue_sv_modus='Nur Unfallversicherung',set_sv_uv,SUM(set_sv_uv,IF(ue_sv_svs_satz='-',0,set_sv_kv_min_beitrag/set_sv_kv_satz*ue_sv_svs_satz),set_sv_kv_min_beitrag,IF(modus='Freiberufler (FSVG)',set_sv_fsvg_pv_min_beitrag,IF(modus='Neue Selbständige (GSVG)',set_sv_gsvg_ns_pv_min_beitrag,set_sv_gsvg_pv_min_beitrag)))) (cached 160,80); I13 = SUM($U$24,N($U$25),ue_sv)-$I$12*IF($U$5='Ja',12,12-COUNTIF(ue_gewinn_pro_monat,\"\")); I14 = ABS(MIN(ue_gewinn_pro_monat)); I16 = SUM(IF(ue_gewinn_pro_monat=\"\",IF($U$5='Ja',$I$15+$I$14,0),ue_gewinn_pro_monat+$I$14)) (Array).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-125",
+      "regeltyp": "Berechnung",
+      "source": "Ü!I12; Ü!I13; Ü!I14; Ü!I16",
+      "statement": "Der monatliche Mindest-SV-Beitrag (UV, SVS-Minimum, KV-Minimum, PV-Minimum je nach Modus) und die aus den Monatsgewinnen abgeleitete Verlustbasis werden für die EST+SV-Zuordnung bereitgestellt.",
+      "title": "Monatlicher Mindest-SV-Sockel und Verlustbasis"
+    },
+    {
+      "category": "B10 Auswertungen & Abgleich",
+      "evidence": "Ü!J12 = IF(modus='Nur Vermietung',...,(IF(AND($U$5='Ja',$G12=\"\"),$I$15,N($G12))+$I$14)/$I$16*$I$13+$I$12) (anteilige EST+SV); K12 = IF(modus='Nur Vermietung',IF(AND($G12='',$U$5='Nein'),'',IF(SUM(ue_gewinn_pro_monat)=0,'',(...)/(SUM(ue_gewinn_pro_monat)+$I$14*12)*($U$23-$U$27))),IF($I$16=0,...,(IF(AND($U$5='Ja',$G12=''),$I$15,N($G12))+$I$14)/$I$16*$I$13+$I$12)) → N($G12)-N($J12) (Reingewinn, cached -219,60); N5 = K5/M5 (Reingewinn pro Stunde); M12 = SUMIFS(h_stunden,h_monate,$C12).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-126",
+      "regeltyp": "Berechnung",
+      "source": "Ü!J12; Ü!K12; Ü!N5; Ü!M12; Ü!I16",
+      "statement": "Je Monat wird die anteilige Einkommensteuer samt SV aus der Jahressteuer abgeleitet; der Reingewinn ist Bruttoergebnis minus dieser Belastung; daraus ergibt sich der Reingewinn pro Stunde.",
+      "title": "Monatliche EST+SV und Reingewinn"
+    },
+    {
+      "category": "B11 Validierung & Plausibilität",
+      "evidence": "Bedingte Formatierung containsText mit Formel NOT(ISERROR(SEARCH('⚠',B3))) für E!B3:B1000, A!B3:B1000, AV!B3:B50, FR!B3:B102, WEB!B3:B100; zusätzlich notContainsBlanks LEN(TRIM(B3))>0. Monat!P7 beginsWith '💡'.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-127",
+      "regeltyp": "Validierung",
+      "source": "E!B3; A!B3; FR!B3; Monat!P7; WEB!B3; AV!B3",
+      "statement": "Alle Zeilenchecks der Journale und Stammdatenblätter stehen in Spalte B und werden farblich hervorgehoben, wenn sie einen ⚠-Hinweis enthalten; im Monatsblatt wird der 💡-Hinweis in der Kopfzeile hervorgehoben.",
+      "title": "Warnindikator ⚠ in den Zeilenchecks"
+    },
+    {
+      "category": "B11 Validierung & Plausibilität",
+      "evidence": "Bedingte Formatierung colorScale in Ü!E7:E10, F7:F10, G7:G10, E12:E23, F12:F23, G12:G23, N7:N10 und N12:N23; BE-ART!E3:P152, Q3:Q152, R3:R152; BA-ART!E3:P153, Q3:Q153, R3:R153; Projekte zeilenweise D3:Y3 bis D79:X79; ZA!E14:P14, E23:P23, …, E95:P95 containsText '✓' (disjunkte Zeilen).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-128",
+      "regeltyp": "Validierung",
+      "source": "Ü!E7; BE-ART!Q3; ZA!E14; Ü!E12; Ü!N7; Projekte!D3; BA-ART!E3",
+      "statement": "Zahlenbereiche in der Übersicht und den Auswertungen werden als Farbskala dargestellt; ✓-Symbole in der Zuordnung werden hervorgehoben.",
+      "title": "Farbliche Hervorhebung der Auswertungen"
+    },
+    {
+      "category": "B11 Validierung & Plausibilität",
+      "evidence": "BE-ART!E154/Q154: IF(ROUND(SUMIFS(e_betriebseinnahmen,...),1)=ROUND(E$153,1),'✓','Fehler ('&...&'€)'); BA-ART!E155/Q155 analog für a+av+web+fr; E1A!E38/E1B!E15 als Restgrößen; ZA!E14: ✓/✓✓ oder 'E-Fehler Δ'/'A-Fehler Δ'.",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-129",
+      "regeltyp": "Abgleich",
+      "source": "BE-ART!E154; BA-ART!E155; ZA!E14; E1A!E38",
+      "statement": "Summen über die Journal-Beträge werden mit den Summen der Auswertungen bzw. der Steuererklärung verglichen; Abweichungen werden als 'Fehler (Δ €)' angezeigt.",
+      "title": "Vollständigkeitsabgleich der Journale"
+    },
+    {
+      "category": "B11 Validierung & Plausibilität",
+      "evidence": "A!D1001 = 'Ebenso viele Einnahmen erwünscht' und E!E1001 = 'Gratulation zu so vielen Einnahmen!' kennzeichnen die Footer-Zeile. Die dortigen '20/10/13/5 % VST'- und '10 %-Vorsteuer'-Formeln haben keine Entsprechung in den aktiven Spaltenüberschriften (A!P2='BTR. ANTEIL', A!Q2='BTR. AUSGABE', A!R2='UST ERWERB', A!S2='UST RC') und nicht in der Validierung set_a_ust_arten (AC3:AC9).",
+      "gueltigkeit_jahre": [
+        2024,
+        2025,
+        2026
+      ],
+      "id": "EUE-130",
+      "regeltyp": "Validierung",
+      "source": "A!D1001; A!P1001; E!E1001; Einstellungen!AC3",
+      "statement": "Die Formeln in der letzten Zeile der Journalblätter sind veraltete Relikte mit verschobener Spaltenbedeutung und dürfen nicht als fachliche Regeln extrahiert werden; maßgeblich sind die regulären Buchungszeilen.",
+      "title": "Footer-Zeile 1001 enthält keine gültigen Regeln"
+    }
+  ],
+  "source": "lokale Ausgangsmappe"
+}

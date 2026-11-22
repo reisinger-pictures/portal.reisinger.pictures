@@ -1,0 +1,451 @@
+{
+  "schema_version": 1,
+  "generated_by": "tools/cleanroom_parity.py extract",
+  "oracle": {
+    "source": "business-rules/domain-rules.json",
+    "year": 2026,
+    "description": "Independent authoritative rule catalogue. Rule constants must match a 2026 parameter; scenario-only values are marked no-rule-constant.",
+    "matched": 12,
+    "unmatched": 7,
+    "mismatch": 0,
+    "checks": [
+      {
+        "verify": "sv.maxBglMonthCents",
+        "rule": "EUE-014",
+        "cell": "Einstellungen!I57",
+        "parameter": "maximale Beitragsgrundlage",
+        "oracle_value": 8085,
+        "canonical": 808500,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "sv.kvNum",
+        "rule": "EUE-015",
+        "cell": "Einstellungen!I58",
+        "parameter": "KV-Satz",
+        "oracle_value": "6,8 %",
+        "canonical": 68,
+        "unit": "per-mille",
+        "status": "matched"
+      },
+      {
+        "verify": "sv.minKvMonthCents",
+        "rule": "EUE-016",
+        "cell": "Einstellungen!I59",
+        "parameter": "Mindest-KV-Beitrag",
+        "oracle_value": 37.47,
+        "canonical": 3747,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "sv.minPvGsvgMonthCents",
+        "rule": "EUE-017",
+        "cell": "Einstellungen!I60",
+        "parameter": "Mindest-GSVG-PV",
+        "oracle_value": 101.95,
+        "canonical": 10195,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "sv.minPvGsvgMonthCents",
+        "rule": "EUE-017",
+        "cell": "Einstellungen!I61",
+        "parameter": "Mindest-GSVG-PV",
+        "oracle_value": 101.95,
+        "canonical": 10195,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "sv.minPvFsvgMonthCents",
+        "rule": "EUE-018",
+        "cell": "Einstellungen!I62",
+        "parameter": "Mindest-FSVG-PV",
+        "oracle_value": 110.22,
+        "canonical": 11022,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "sv.pvGsvgNum",
+        "rule": "EUE-019",
+        "cell": "Einstellungen!I63",
+        "parameter": "GSVG-PV-Satz",
+        "oracle_value": "18,5 %",
+        "canonical": 185,
+        "unit": "per-mille",
+        "status": "matched"
+      },
+      {
+        "verify": "sv.pvFsvgNum",
+        "rule": "EUE-020",
+        "cell": "Einstellungen!I64",
+        "parameter": "FSVG-PV-Satz",
+        "oracle_value": "20 %",
+        "canonical": 200,
+        "unit": "per-mille",
+        "status": "matched"
+      },
+      {
+        "verify": "sv.svsNum",
+        "rule": "EUE-021",
+        "cell": "Einstellungen!I65",
+        "parameter": "SVS-Satz",
+        "oracle_value": "1,53 %",
+        "canonical": 153,
+        "unit": "per-10000",
+        "status": "matched"
+      },
+      {
+        "verify": "sv.uvCents",
+        "rule": "EUE-022",
+        "cell": "Einstellungen!I66",
+        "parameter": "UV-Pauschale",
+        "oracle_value": 12.95,
+        "canonical": 1295,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "est.grundfreibetragLimitCents",
+        "rule": "EUE-096",
+        "cell": "E1A!J6",
+        "parameter": "Grundfreibetrag Grenze",
+        "oracle_value": 33000,
+        "canonical": 3300000,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "est.grundfreibetragNum",
+        "rule": "EUE-097",
+        "cell": "E1A!J7",
+        "parameter": "Grundfreibetrag Satz",
+        "oracle_value": "15 %",
+        "canonical": 15,
+        "unit": "percent",
+        "status": "matched"
+      },
+      {
+        "verify": "money.businessShare100Cents",
+        "rule": "SCENARIO",
+        "cell": "A!Q3",
+        "parameter": null,
+        "oracle_value": null,
+        "canonical": 5880,
+        "unit": "cents",
+        "status": "no-rule-constant"
+      },
+      {
+        "verify": "totals.expensesCents",
+        "rule": "SCENARIO",
+        "cell": "Ü!F5",
+        "parameter": null,
+        "oracle_value": null,
+        "canonical": 5880,
+        "unit": "cents",
+        "status": "no-rule-constant"
+      },
+      {
+        "verify": "totals.profitCents",
+        "rule": "SCENARIO",
+        "cell": "Ü!G5",
+        "parameter": null,
+        "oracle_value": null,
+        "canonical": -5880,
+        "unit": "cents",
+        "status": "no-rule-constant"
+      },
+      {
+        "verify": "e1a.resultCents",
+        "rule": "SCENARIO",
+        "cell": "E1A!K4",
+        "parameter": null,
+        "oracle_value": null,
+        "canonical": -5880,
+        "unit": "cents",
+        "status": "no-rule-constant"
+      },
+      {
+        "verify": "analytics.expenseCents",
+        "rule": "SCENARIO",
+        "cell": "BA-ART!E18",
+        "parameter": null,
+        "oracle_value": null,
+        "canonical": 5880,
+        "unit": "cents",
+        "status": "no-rule-constant"
+      },
+      {
+        "verify": "analytics.paymentCents",
+        "rule": "SCENARIO",
+        "cell": "ZA!E10",
+        "parameter": null,
+        "oracle_value": null,
+        "canonical": 5880,
+        "unit": "cents",
+        "status": "no-rule-constant"
+      },
+      {
+        "verify": "time.threeHoursMinutes",
+        "rule": "SCENARIO",
+        "cell": "Projekte!D78",
+        "parameter": null,
+        "oracle_value": null,
+        "canonical": 180,
+        "unit": "minutes",
+        "status": "no-rule-constant"
+      }
+    ]
+  },
+  "basis": {
+    "path": "local/input.ods",
+    "sha256": "cf5060fb11aab96d692f44a1a0c6da1c583388322a110fbb15c943d817e90790",
+    "business_year": 2026
+  },
+  "units": {
+    "money": "clean-room basis / EUR float -> canonical integer cents (x100)",
+    "time": "clean-room basis / hours float -> canonical integer minutes (x60)"
+  },
+  "scenarios": [
+    {
+      "id": "sv-constants-2026",
+      "title": "SV-Konstanten 2026 (Einstellungen!I57:I66)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "I57",
+          "reference_value": 8085.0,
+          "canonical": 808500,
+          "unit": "cents",
+          "verify": "sv.maxBglMonthCents",
+          "rule": "EUE-014"
+        },
+        {
+          "sheet": "Einstellungen",
+          "cell": "I58",
+          "reference_value": 0.068,
+          "canonical": 68,
+          "unit": "per-mille",
+          "verify": "sv.kvNum",
+          "rule": "EUE-015"
+        },
+        {
+          "sheet": "Einstellungen",
+          "cell": "I59",
+          "reference_value": 37.47,
+          "canonical": 3747,
+          "unit": "cents",
+          "verify": "sv.minKvMonthCents",
+          "rule": "EUE-016"
+        },
+        {
+          "sheet": "Einstellungen",
+          "cell": "I60",
+          "reference_value": 101.95,
+          "canonical": 10195,
+          "unit": "cents",
+          "verify": "sv.minPvGsvgMonthCents",
+          "rule": "EUE-017"
+        },
+        {
+          "sheet": "Einstellungen",
+          "cell": "I61",
+          "reference_value": 101.95,
+          "canonical": 10195,
+          "unit": "cents",
+          "verify": "sv.minPvGsvgMonthCents",
+          "rule": "EUE-017"
+        },
+        {
+          "sheet": "Einstellungen",
+          "cell": "I62",
+          "reference_value": 110.22,
+          "canonical": 11022,
+          "unit": "cents",
+          "verify": "sv.minPvFsvgMonthCents",
+          "rule": "EUE-018"
+        },
+        {
+          "sheet": "Einstellungen",
+          "cell": "I63",
+          "reference_value": 0.185,
+          "canonical": 185,
+          "unit": "per-mille",
+          "verify": "sv.pvGsvgNum",
+          "rule": "EUE-019"
+        },
+        {
+          "sheet": "Einstellungen",
+          "cell": "I64",
+          "reference_value": 0.2,
+          "canonical": 200,
+          "unit": "per-mille",
+          "verify": "sv.pvFsvgNum",
+          "rule": "EUE-020"
+        },
+        {
+          "sheet": "Einstellungen",
+          "cell": "I65",
+          "reference_value": 0.0153,
+          "canonical": 153,
+          "unit": "per-10000",
+          "verify": "sv.svsNum",
+          "rule": "EUE-021"
+        },
+        {
+          "sheet": "Einstellungen",
+          "cell": "I66",
+          "reference_value": 12.95,
+          "canonical": 1295,
+          "unit": "cents",
+          "verify": "sv.uvCents",
+          "rule": "EUE-022"
+        }
+      ]
+    },
+    {
+      "id": "est-constants-2026",
+      "title": "Einkommensteuer-Konstanten 2026 (E1A!J6:J7)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "E1A",
+          "cell": "J6",
+          "reference_value": 33000.0,
+          "canonical": 3300000,
+          "unit": "cents",
+          "verify": "est.grundfreibetragLimitCents",
+          "rule": "EUE-096"
+        },
+        {
+          "sheet": "E1A",
+          "cell": "J7",
+          "reference_value": 0.15,
+          "canonical": 15,
+          "unit": "percent",
+          "verify": "est.grundfreibetragNum",
+          "rule": "EUE-097"
+        }
+      ]
+    },
+    {
+      "id": "business-share-100",
+      "title": "Betriebsanteil 100 % (Ausgaben!L3 -> Q3)",
+      "inputs": [
+        {
+          "sheet": "A",
+          "cell": "L3",
+          "value": 58.8
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "A",
+          "cell": "Q3",
+          "reference_value": 58.8,
+          "canonical": 5880,
+          "unit": "cents",
+          "verify": "money.businessShare100Cents",
+          "rule": "SCENARIO"
+        }
+      ]
+    },
+    {
+      "id": "expense-totals-2026",
+      "title": "End-to-End: Ausgabe 58,80 in Summen und E1A",
+      "inputs": [
+        {
+          "sheet": "A",
+          "cell": "L3",
+          "value": 58.8
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Ü",
+          "cell": "F5",
+          "reference_value": 58.8,
+          "canonical": 5880,
+          "unit": "cents",
+          "verify": "totals.expensesCents",
+          "rule": "SCENARIO"
+        },
+        {
+          "sheet": "Ü",
+          "cell": "G5",
+          "reference_value": -58.8,
+          "canonical": -5880,
+          "unit": "cents",
+          "verify": "totals.profitCents",
+          "rule": "SCENARIO"
+        },
+        {
+          "sheet": "E1A",
+          "cell": "K4",
+          "reference_value": -58.8,
+          "canonical": -5880,
+          "unit": "cents",
+          "verify": "e1a.resultCents",
+          "rule": "SCENARIO"
+        },
+        {
+          "sheet": "BA-ART",
+          "cell": "E18",
+          "reference_value": 58.8,
+          "canonical": 5880,
+          "unit": "cents",
+          "verify": "analytics.expenseCents",
+          "rule": "SCENARIO"
+        },
+        {
+          "sheet": "ZA",
+          "cell": "E10",
+          "reference_value": 58.8,
+          "canonical": 5880,
+          "unit": "cents",
+          "verify": "analytics.paymentCents",
+          "rule": "SCENARIO"
+        }
+      ]
+    },
+    {
+      "id": "hours-to-minutes",
+      "title": "Zeitmenge: 3 h Eingabe -> 180 Minuten kanonisch",
+      "inputs": [
+        {
+          "sheet": "Stunden",
+          "cell": "F3",
+          "value": 3.0
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Projekte",
+          "cell": "D78",
+          "reference_value": 3.0,
+          "canonical": 180,
+          "unit": "minutes",
+          "verify": "time.threeHoursMinutes",
+          "rule": "SCENARIO"
+        }
+      ]
+    }
+  ]
+}

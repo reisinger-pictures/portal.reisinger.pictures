@@ -34,6 +34,10 @@ This directory serves as the single source of truth for all technical concepts, 
 * [07-psychological-pricing.md](ecommerce/07-psychological-pricing.md) - Psychological price rounding (intentionally inexact discounts) — desired-behavior invariant.
 * [08-srp-coupon-system.md](ecommerce/08-srp-coupon-system.md) - SRP coupon/discount code system, schema, API, role-based permissions.
 
+### 🧾 EÜR
+* [README.md](eur/README.md) - Geltende Einheiten und Grenzen der Clean-Room-basierten EÜR-Integration.
+* [01-cleanroom-handoff.md](eur/01-cleanroom-handoff.md) - Fixture-Version, Update-Erkennung über MANIFEST.json, Abnahmevorbehalte.
+
 ### 🖼️ Gallery Management
 * [01-core-architecture.md](gallery/01-core-architecture.md) - Selection vs. Delivery workflows.
 * [02-ratings-feature.md](gallery/02-ratings-feature.md) - Photo ratings (stars + comments) in selection galleries.
