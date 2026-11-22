@@ -3,6 +3,8 @@
 // Deliberately SEPARATE from the standard playwright.config.ts: this set only
 // captures screenshots and must never run inside the normal E2E suite
 // (`playwright test` / CI). Run it with `pnpm test:screenshots`.
+// Video is intentionally OFF here — demo recordings are their own category
+// (see tests/video/README.md and playwright.video.config.ts).
 import { defineConfig, devices } from '@playwright/test';
 import { SCREENSHOTS_BASE_URL, SCREENSHOT_OUTPUT_DIR } from './tests/screenshots/harness';
 

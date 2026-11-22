@@ -32,7 +32,7 @@ export default tseslint.config(
   },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['tests/e2e/**/*.ts'],
+    files: ['tests/e2e/**/*.ts', 'tests/video/**/*.ts'],
     languageOptions: {
       ecmaVersion: 2020,
       globals: {
