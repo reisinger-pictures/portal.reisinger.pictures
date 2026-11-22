@@ -27,11 +27,40 @@ function lineTypeLabel(type: EurMonthLine['type']): ReactNode {
     }
 }
 
+/** Shared, catalogued labels for every social-insurance key the month endpoint returns. */
 function svLabel(key: string): ReactNode {
     switch (key) {
         case 'max_bgl': return <Trans>Maximale Beitragsgrundlage</Trans>;
         case 'kv_min': return <Trans>Krankenversicherung Mindestbeitrag</Trans>;
-        default: return key;
+        case 'gsvg_pv_min': return <Trans>Mindestbeitrag Pensionsversicherung GSVG</Trans>;
+        case 'fsvg_pv_min': return <Trans>Mindestbeitrag Pensionsversicherung FSVG</Trans>;
+        case 'gsvg_ns_pv_min': return <Trans>Mindestbeitrag Pensionsversicherung GSVG (Neue Selbständige)</Trans>;
+        case 'uv_pauschale': return <Trans>Unfallversicherung Pauschale</Trans>;
+        case 'kv_satz': return <Trans>Krankenversicherungssatz</Trans>;
+        case 'gsvg_pv_satz': return <Trans>Pensionsversicherungssatz GSVG</Trans>;
+        case 'fsvg_pv_satz': return <Trans>Pensionsversicherungssatz FSVG</Trans>;
+        case 'svs_satz': return <Trans>Satz der Selbständigenvorsorge</Trans>;
+        default: return <Trans>Sonstiger Wert</Trans>;
+    }
+}
+
+/** `report.status` is `open` or `closed` (DB default `open`). */
+function reportStatusLabel(status: string): string {
+    switch (status) {
+        case 'open': return t`offen`;
+        case 'closed': return t`abgeschlossen`;
+        default: return t`unbekannt`;
+    }
+}
+
+/** `signature.status` is `none`, `pending`, `signed` or `failed`. */
+function signatureStatusLabel(status: string): string {
+    switch (status) {
+        case 'none': return t`keine`;
+        case 'pending': return t`ausstehend`;
+        case 'signed': return t`vorhanden`;
+        case 'failed': return t`fehlgeschlagen`;
+        default: return t`unbekannt`;
     }
 }
 
@@ -93,8 +122,8 @@ export default function EurMonthPanel({year, month, onMonthChange}: Props) {
     const totals = data.totals;
     const amounts = Object.entries(data.social_insurance.amounts_cents);
     const rates = Object.entries(data.social_insurance.rates_per_10000);
-    const reportStatus = data.report.status;
-    const signatureStatus = data.signature.status;
+    const reportStatus = reportStatusLabel(data.report.status);
+    const signatureStatus = signatureStatusLabel(data.signature.status);
 
     return (
         <div className="card bg-base-100 border border-base-300 shadow-sm">
@@ -221,7 +250,7 @@ export default function EurMonthPanel({year, month, onMonthChange}: Props) {
                     ))}
                     {rates.map(([key, value]) => (
                         <div key={key} className="rounded-box border border-base-300 p-3">
-                            <dt className="text-xs opacity-60">{key}</dt>
+                            <dt className="text-xs opacity-60">{svLabel(key)}</dt>
                             <dd className="font-semibold">{formatPercent(value)}</dd>
                         </div>
                     ))}

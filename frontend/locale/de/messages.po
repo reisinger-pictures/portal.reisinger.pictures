@@ -21,6 +21,10 @@ msgstr "— bleibt bestehen"
 msgid "— keine Verbindung zum FTP-Server"
 msgstr "— keine Verbindung zum FTP-Server"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "· {portalName}"
+msgstr "· {portalName}"
+
 #: src/ui/management/ManagementModelsView.tsx
 msgid "„Beste Übereinstimmung\" gewichtet Lust stärker als Erfahrung."
 msgstr "„Beste Übereinstimmung\" gewichtet Lust stärker als Erfahrung."
@@ -370,6 +374,10 @@ msgstr "Abgebrochen"
 #: src/ui/management/components/ModelInviteDialog.tsx
 msgid "Abgelaufen"
 msgstr "Abgelaufen"
+
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "abgeschlossen"
+msgstr "abgeschlossen"
 
 #: src/ui/components/GalleryModal.tsx
 msgid "Ablaufdatum"
@@ -953,6 +961,10 @@ msgstr "Aussehen & Maße"
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Ausständig / Angebot"
 msgstr "Ausständig / Angebot"
+
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "ausstehend"
+msgstr "ausstehend"
 
 #: src/ui/management/components/ModelDetailModal.tsx
 msgid "Ausstehend"
@@ -1905,6 +1917,10 @@ msgstr "Dashboard"
 msgid "Datei"
 msgstr "Datei"
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Datei auswählen"
+msgstr "Datei auswählen"
+
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Dateiname"
 msgstr "Dateiname"
@@ -2744,13 +2760,13 @@ msgstr "Einnahme"
 msgid "Einnahmen"
 msgstr "Einnahmen"
 
-#: src/ui/components/Sidebar.tsx
-#~ msgid "Einnahmen Ausgaben Rechnung"
-#~ msgstr "Einnahmen Ausgaben Rechnung"
+#: src/ui/management/ManagementEurView.tsx
+msgid "Einnahmen Ausgaben Rechnung"
+msgstr "Einnahmen Ausgaben Rechnung"
 
 #: src/ui/management/ManagementEurView.tsx
-msgid "Einnahmen Ausgaben Rechnung · {portalName}"
-msgstr "Einnahmen Ausgaben Rechnung · {portalName}"
+#~ msgid "Einnahmen Ausgaben Rechnung · {portalName}"
+#~ msgstr "Einnahmen Ausgaben Rechnung · {portalName}"
 
 #: src/ui/management/ManagementEurView.tsx
 msgid "Einnahmen betrieblich"
@@ -3298,6 +3314,10 @@ msgstr "Fehler: {createError}"
 msgid "Fehler: {emailError}"
 msgstr "Fehler: {emailError}"
 
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "fehlgeschlagen"
+msgstr "fehlgeschlagen"
+
 #: src/ui/management/eur/EurReferencePanel.tsx
 msgid "Feiertage"
 msgstr "Feiertage"
@@ -3491,6 +3511,10 @@ msgstr "Freitext..."
 #: src/ui/management/components/BrandSettingsCard.tsx
 msgid "Frontend-URL"
 msgstr "Frontend-URL"
+
+#: src/ui/management/eur/EurOverviewPanel.tsx
+msgid "FSVG"
+msgstr "FSVG"
 
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "FTP Inbox"
@@ -3827,6 +3851,10 @@ msgstr "Gruppe"
 msgid "Gruppen"
 msgstr "Gruppen"
 
+#: src/ui/management/eur/EurOverviewPanel.tsx
+msgid "GSVG"
+msgstr "GSVG"
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Gültig bis"
@@ -4144,6 +4172,7 @@ msgstr "ISO"
 #: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 #: src/ui/management/components/UserTable.tsx
+#: src/ui/management/eur/EurOverviewPanel.tsx
 msgid "Ja"
 msgstr "Ja"
 
@@ -4277,6 +4306,7 @@ msgstr "Kein Rabatt (0%)"
 msgid "Kein Zugriff auf dieses Board."
 msgstr "Kein Zugriff auf dieses Board."
 
+#: src/ui/management/eur/EurMonthPanel.tsx
 #: src/ui/management/eur/EurTravelPanel.tsx
 msgid "keine"
 msgstr "keine"
@@ -4327,6 +4357,10 @@ msgstr "Keine Coupons für diese Galerie-Gruppe."
 #: src/ui/management/components/GalleryCouponsTab.tsx
 msgid "Keine Coupons für diese Galerie."
 msgstr "Keine Coupons für diese Galerie."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Keine Datei ausgewählt"
+msgstr "Keine Datei ausgewählt"
 
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Keine Daten vorhanden."
@@ -4610,6 +4644,10 @@ msgstr "Kostenpflichtig"
 #: src/ui/management/eur/EurMonthPanel.tsx
 msgid "Krankenversicherung Mindestbeitrag"
 msgstr "Krankenversicherung Mindestbeitrag"
+
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "Krankenversicherungssatz"
+msgstr "Krankenversicherungssatz"
 
 #: src/logic/mollieMethods.ts
 msgid "Kreditkarte"
@@ -5170,6 +5208,18 @@ msgstr "Metadaten-Vorgaben"
 msgid "Metadaten-Vorgaben gespeichert"
 msgstr "Metadaten-Vorgaben gespeichert"
 
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "Mindestbeitrag Pensionsversicherung FSVG"
+msgstr "Mindestbeitrag Pensionsversicherung FSVG"
+
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "Mindestbeitrag Pensionsversicherung GSVG"
+msgstr "Mindestbeitrag Pensionsversicherung GSVG"
+
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "Mindestbeitrag Pensionsversicherung GSVG (Neue Selbständige)"
+msgstr "Mindestbeitrag Pensionsversicherung GSVG (Neue Selbständige)"
+
 #: src/ui/management/components/CalculatorSettingsCard.tsx
 msgid "Mindestens 1 Bild"
 msgstr "Mindestens 1 Bild"
@@ -5518,6 +5568,7 @@ msgstr "name@beispiel.de"
 #: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 #: src/ui/management/components/UserTable.tsx
+#: src/ui/management/eur/EurOverviewPanel.tsx
 msgid "Nein"
 msgstr "Nein"
 
@@ -5822,6 +5873,10 @@ msgstr "Notiere das Passwort sofort. Es wird genau einmal angezeigt, nicht gespe
 msgid "Notiz"
 msgstr "Notiz"
 
+#: src/ui/management/eur/EurOverviewPanel.tsx
+msgid "NS_GSVG"
+msgstr "NS_GSVG"
+
 #: src/ui/components/WysiwygEditor.tsx
 msgid "Nummerierte Liste"
 msgstr "Nummerierte Liste"
@@ -5856,6 +5911,10 @@ msgstr "Nur Super-Admins können diese Einstellungen bearbeiten."
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Nur Super-Admins können inaktive Profile sehen. Der Status-Filter wurde zurückgesetzt."
 msgstr "Nur Super-Admins können inaktive Profile sehen. Der Status-Filter wurde zurückgesetzt."
+
+#: src/ui/management/eur/EurOverviewPanel.tsx
+msgid "nur Unfallversicherung"
+msgstr "nur Unfallversicherung"
 
 #: src/ui/management/components/CreateUserModal.tsx
 msgid "Nutzer angelegt! Eine E-Mail zur Einrichtung wurde verschickt."
@@ -5906,6 +5965,7 @@ msgid "oder auf den Button klicken, um Dateien auszuwählen"
 msgstr "oder auf den Button klicken, um Dateien auszuwählen"
 
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
+#: src/ui/management/eur/EurMonthPanel.tsx
 msgid "offen"
 msgstr "offen"
 
@@ -6203,6 +6263,14 @@ msgstr "PayPal"
 #: src/ui/management/ManagementManualInvoiceView.tsx
 msgid "PDF Generieren"
 msgstr "PDF Generieren"
+
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "Pensionsversicherungssatz FSVG"
+msgstr "Pensionsversicherungssatz FSVG"
+
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "Pensionsversicherungssatz GSVG"
+msgstr "Pensionsversicherungssatz GSVG"
 
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Per SFTP findest du die Dateien hier:"
@@ -6776,6 +6844,10 @@ msgstr "Sammelrechnung erstellen?"
 msgid "Satz"
 msgstr "Satz"
 
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "Satz der Selbständigenvorsorge"
+msgstr "Satz der Selbständigenvorsorge"
+
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Schlagworte eingeben (Komma/Enter)..."
 msgstr "Schlagworte eingeben (Komma/Enter)..."
@@ -6989,6 +7061,10 @@ msgstr "Sonderanfrage (Angebot)"
 #: src/ui/management/eur/EurApplicationsPanel.tsx
 msgid "Sonstiger Antrag"
 msgstr "Sonstiger Antrag"
+
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "Sonstiger Wert"
+msgstr "Sonstiger Wert"
 
 #: src/logic/modelRegistration.ts
 msgid "Sonstiges"
@@ -7649,9 +7725,14 @@ msgstr "Umsatzsteuer-Arten"
 msgid "unbegrenzt"
 msgstr "unbegrenzt"
 
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "unbekannt"
+msgstr "unbekannt"
+
 #: src/ui/components/PhotoHistoryModal.tsx
 #: src/ui/management/components/ProjectModal.tsx
 #: src/ui/management/components/RecipientFormSection.tsx
+#: src/ui/management/eur/EurOverviewPanel.tsx
 #: src/ui/management/ManagementPayoutsView.tsx
 #: src/ui/management/ManagementProjectsBoard.tsx
 #: src/ui/photographer/PhotographerProductionBoard.tsx
@@ -7675,6 +7756,10 @@ msgstr "Unbenannt"
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Unbenanntes Model"
 msgstr "Unbenanntes Model"
+
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "Unfallversicherung Pauschale"
+msgstr "Unfallversicherung Pauschale"
 
 #: src/ui/components/UIProvider.tsx
 #: src/ui/management/components/CouponFormDrawer.tsx
@@ -8073,6 +8158,10 @@ msgstr "Vorgaben..."
 #: src/ui/management/eur/EurApplicationsPanel.tsx
 msgid "Vorgänge wie Ausgleich oder Fristverlängerung bleiben hier übersichtlich erfasst."
 msgstr "Vorgänge wie Ausgleich oder Fristverlängerung bleiben hier übersichtlich erfasst."
+
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "vorhanden"
+msgstr "vorhanden"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Vorlage"

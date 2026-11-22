@@ -277,4 +277,19 @@
     .label:has(input[type="checkbox"]) .label-text {
         min-width: 0;
     }
+
+    /* daisyUI dims inactive tabs with `color-mix(in oklab, var(--color-base-content) 50%, transparent)`,
+       which measures ~3.41:1 on white — below the 4.5:1 WCAG AA minimum for the 14px tab
+       labels. Use the solid theme foreground instead: 18.10:1 on base-100 and 16.16:1 on
+       base-200 in rp-light, 16.18:1 / 14.89:1 in rp-dark. The rule is scoped to the EUR
+       tablist so every other portal view keeps daisyUI's default tab styling. Active tabs
+       keep their raised background/box-shadow and are bolded here so they stay distinct
+       from the now full-contrast inactive labels. */
+    .eur-tabs > .tab:not(.tab-active) {
+        color: var(--color-base-content);
+    }
+
+    .eur-tabs > .tab.tab-active {
+        font-weight: 700;
+    }
 }

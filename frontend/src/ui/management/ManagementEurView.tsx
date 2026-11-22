@@ -175,7 +175,7 @@ export default function ManagementEurView() {
                         </div>
                         <div>
                             <p className="text-xs uppercase tracking-wide opacity-60"><Trans>Buchhaltung</Trans></p>
-                            <h1 className="text-2xl md:text-3xl font-bold"><Trans>Einnahmen Ausgaben Rechnung · {portalName}</Trans></h1>
+                            <h1 className="text-2xl md:text-3xl font-bold"><Trans>Einnahmen Ausgaben Rechnung</Trans>{' '}<span className="whitespace-nowrap"><Trans>· {portalName}</Trans></span></h1>
                             <p className="text-sm opacity-70">{display(billingDetails?.bank_holder)} · <Trans>Wirtschaftsjahr {year}</Trans></p>
                         </div>
                     </div>
@@ -201,7 +201,7 @@ export default function ManagementEurView() {
             </header>
 
             <div className="max-w-7xl mx-auto px-4 md:px-8 pt-4">
-                <div role="tablist" className="tabs tabs-box bg-base-100">
+                <div role="tablist" className="tabs tabs-box eur-tabs bg-base-100">
                     {TABS.map((id) => (
                         <button
                             key={id}
@@ -263,11 +263,11 @@ export default function ManagementEurView() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-5">
                             <div className="rounded-box border border-base-300 p-4">
                                 <div className="text-sm opacity-60"><Trans>Einnahmen betrieblich</Trans></div>
-                                <div className="text-2xl font-bold text-success">{euro(monthIncome)}</div>
+                                <div className="text-2xl font-bold text-emerald-700">{euro(monthIncome)}</div>
                             </div>
                             <div className="rounded-box border border-base-300 p-4">
                                 <div className="text-sm opacity-60"><Trans>Ausgaben betrieblich</Trans></div>
-                                <div className="text-2xl font-bold text-error">{euro(monthExpense)}</div>
+                                <div className="text-2xl font-bold text-rose-700">{euro(monthExpense)}</div>
                             </div>
                             <div className="rounded-box border border-base-300 p-4">
                                 <div className="text-sm opacity-60"><Trans>Gewinn</Trans></div>
