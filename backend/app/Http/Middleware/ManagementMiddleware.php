@@ -60,6 +60,15 @@ class ManagementMiddleware
             }
         }
 
+        if ($svc->isAccounting($user)) {
+            // Buchhaltungspersonal darf ausschließlich die EAR-Buchhaltungs-API
+            // nutzen (issue #11). Settings-Änderungen bleiben super_admin-
+            // exklusiv (eigene Middleware an der Route).
+            if ($request->is('api/management/eur*')) {
+                $isAllowed = true;
+            }
+        }
+
         if (! $isAllowed) {
             return response()->json(['error' => 'Zutritt verweigert. Keine ausreichenden Berechtigungen.'], 403);
         }

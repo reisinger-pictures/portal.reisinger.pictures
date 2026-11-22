@@ -4,6 +4,7 @@ import {GalleryGroup} from './useGalleries';
 
 export enum UserRole {
     SUPER_ADMIN = 'super_admin',
+    ACCOUNTING = 'accounting',
     ADMIN = 'admin',
     PHOTOGRAPHER = 'photographer',
     ORG_ADMIN = 'org_admin',

@@ -17,6 +17,7 @@ status: active
 Roles are strictly separated.
 - **Super Admin (`is_super_admin`):** Highest privilege level. Can manage billing details, system settings, payouts, watermark SVG, license catalog, and Org-wide configurations. Has implicit access to all galleries and resources without explicit permission checks. Used in `infrastructure/10-frontend-brand-tenant-isolation.md` for Org-unrestricted access.
 - **Admin (`is_admin`):** Broad management access. Manages users, roles, and global settings (watermark). Can view statistics for ALL galleries across the system. Does **not** have implicit super-user access to private galleries or files.
+- **Accounting (`accounting`):** Bookkeeping staff with access restricted to the EAR endpoints (`/api/management/eur/*`). Has no access to gallery, billing, user or other management areas; EAR settings changes remain `super_admin`-only. `super_admin` holds this capability implicitly (like the admin capability). Not an org-delegable role — bookkeeping is a studio capability, not a customer-account permission. See [Roles & RBAC](03-roles-and-rbac.md).
 - **Photographer (`is_photographer`):** Operational user. Can create/edit/delete galleries, upload photos, manage metadata, send invites, and view statistics ONLY for their *own* galleries or when they are added to a specific gallery.
 - **Client (`is_client`):** Standard registered user. Has explicit access to specific galleries. 
   - In *Selection Galleries*: Can view, rate, and comment.

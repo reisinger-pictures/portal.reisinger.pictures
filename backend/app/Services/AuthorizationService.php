@@ -1402,6 +1402,7 @@ class AuthorizationService
     {
         return match ($roleName) {
             UserRole::SUPER_ADMIN->value => 100,
+            UserRole::ACCOUNTING->value => 80,
             UserRole::ADMIN->value => 80,
             UserRole::ORG_ADMIN->value => 60,
             UserRole::PHOTOGRAPHER->value => 50,
@@ -1447,6 +1448,21 @@ class AuthorizationService
         }
 
         return $user->roles()->whereIn('name', [UserRole::ADMIN->value, UserRole::SUPER_ADMIN->value])->exists();
+    }
+
+    /**
+     * EAR bookkeeping staff. A Super Admin holds this capability implicitly
+     * (issue #11), just as it holds the admin capability implicitly. It is not
+     * an org-delegable role: bookkeeping is a studio capability, not a customer
+     * account permission.
+     */
+    public function isAccounting(User $user): bool
+    {
+        if ($this->isTransientGuest($user) || $this->isReservedNullBrandActor($user)) {
+            return false;
+        }
+
+        return $user->roles()->whereIn('name', [UserRole::ACCOUNTING->value, UserRole::SUPER_ADMIN->value])->exists();
     }
 
     public function isPhotographer(User $user): bool
