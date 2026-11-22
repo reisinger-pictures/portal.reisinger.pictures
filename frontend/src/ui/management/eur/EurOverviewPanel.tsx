@@ -1,8 +1,20 @@
+import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { formatEuro } from '../../../logic/formatCurrency';
 import type { EurSettings, EurSummary } from '../../../logic/useEur';
 
 const cents = (value: number): string => formatEuro(value / 100);
+
+/** Mode codes stay uppercase abbreviations; the phrase is never uppercased. */
+function svModeLabel(mode: string | undefined): string {
+    switch (mode) {
+        case 'uv_only': return t`nur Unfallversicherung`;
+        case 'gsvg': return t`GSVG`;
+        case 'ns_gsvg': return t`NS_GSVG`;
+        case 'fsvg': return t`FSVG`;
+        default: return mode ? mode.toUpperCase() : t`Unbekannt`;
+    }
+}
 
 interface Props {
     summary?: EurSummary;
@@ -52,8 +64,8 @@ export default function EurOverviewPanel({summary, settings, isLoading, error, o
     const assetCount = summary.asset_count;
     const defaultShare = settings?.default_business_share;
     const svMode = settings?.sv_mode;
-    const svLabel = svMode === 'uv_only' ? 'nur Unfallversicherung' : svMode?.toUpperCase();
-    const kleinunternehmerLabel = settings?.kleinunternehmer ? 'Ja' : 'Nein';
+    const svLabel = svModeLabel(svMode);
+    const kleinunternehmerLabel = settings?.kleinunternehmer ? t`Ja` : t`Nein`;
 
     return (
         <div className="card bg-base-100 border border-base-300 shadow-sm">

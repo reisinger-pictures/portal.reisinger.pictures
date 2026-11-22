@@ -88,7 +88,9 @@ export default function EurAnalyticsPanel({year}: Props) {
     }
 
     const data = analytics.data;
-    const hasMonths = data.by_month.length > 0;
+    const hasMonths = data.by_month.some(
+        (month) => month.income_cents !== 0 || month.expense_cents !== 0 || month.profit_cents !== 0,
+    );
 
     return (
         <div className="card bg-base-100 border border-base-300 shadow-sm">

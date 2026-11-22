@@ -90,12 +90,21 @@ export default function ManagementDashboard() {
     const isB2BView = ['admin-orders', 'admin-manual-invoice', 'admin-manual-offer', 'admin-customers', 'admin-products', 'admin-snippets', 'admin-payouts', 'steuern', 'admin-contracts', 'admin-projects', 'boards', 'admin-models'].includes(currentView);
 
     const [isSearchFocused, setIsSearchFocused] = useState(false);
-    const {user} = useAuth();
+    const {user, isLoading: authLoading} = useAuth();
     const {billingDetails, isLoading: termsLoading} = useBillingDetails();
     const isImpressumMissing = isSuperAdmin && !termsLoading && (!billingDetails?.bank_holder || !billingDetails?.company_street || !billingDetails?.company_zip || !billingDetails?.company_city || !billingDetails?.bank_iban);
     const {results: personalFeed, isLoading: feedLoading} = useSearch('', true);
 
     const [teamModalNode, setTeamModalNode] = useState<Gallery | GalleryGroup | null>(null);
+
+    // `canAccessB2BFeatures` is derived from `useAuth().user`, which is still null
+    // while the /api/auth/me request is in flight. Without this guard the B2B
+    // redirect fires before the standalone /steuern view can mount and bounces
+    // the user to the portal home. Hold a neutral spinner until auth resolves;
+    // a genuinely unauthorized user is still redirected once loading finishes.
+    if (isB2BView && authLoading) {
+        return <span className="loading loading-spinner text-primary" role="status"/>;
+    }
 
     if (isB2BView && !canAccessB2BFeatures) {
         return <Navigate to="/" replace/>;

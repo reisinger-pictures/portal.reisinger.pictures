@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import {
@@ -25,6 +25,7 @@ export default function EurDocumentsPanel({year, month}: Props) {
     const [receiptNo, setReceiptNo] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const fileInputId = useId();
 
     const submit = async () => {
         if (!file || isSaving) return;
@@ -143,11 +144,22 @@ export default function EurDocumentsPanel({year, month}: Props) {
 
                 <h3 className="font-semibold"><Trans>Beleg hochladen</Trans></h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <label className="form-control">
+                    <div className="form-control">
                         <span className="label-text"><Trans>Datei</Trans></span>
-                        <input type="file" className="file-input file-input-bordered w-full"
+                        <input
+                            id={fileInputId}
+                            type="file"
+                            className="peer sr-only"
                             onChange={(event) => setFile(event.target.files?.[0] ?? null)} required/>
-                    </label>
+                        <label
+                            htmlFor={fileInputId}
+                            className="btn btn-outline btn-sm w-full cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-primary">
+                            <Trans>Datei auswählen</Trans>
+                        </label>
+                        <span className="text-sm opacity-70 mt-1" aria-live="polite">
+                            {file ? file.name : <Trans>Keine Datei ausgewählt</Trans>}
+                        </span>
+                    </div>
                     <label className="form-control">
                         <span className="label-text"><Trans>Belegnummer</Trans></span>
                         <input type="text" className="input input-bordered"
