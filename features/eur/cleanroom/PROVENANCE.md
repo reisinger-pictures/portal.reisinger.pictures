@@ -26,6 +26,14 @@ Prüfsummen überein:
 | `ui-requirements.md` | `03718141…` |
 | `vat-requirements.md` | `0b22b22f…` |
 
+Das Artefakt `artifacts/verification/e1a-ausfuellhilfe.md` (Ausfüllhilfe je
+Kennzahl, Abschnitt 3) wurde am 2026-11-22 ebenfalls byte-exakt aus
+`ku-online/verification/e1a-ausfuellhilfe.md` übernommen. Es war zum
+Kopierzeitpunkt noch nicht committet; seine SHA-256 ist
+`d46a7f02fc53c083569befc158fc00a177c12f32a970619196365efe3861e37c`. Es folgt
+demselben Muster wie die acht Anforderungsdokumente und ist mit der bewussten
+Erhöhung auf `artifact_version 2026.3` in das Manifest aufgenommen.
+
 Die Prüfsummen und Byte-Anzahlen stehen in [`MANIFEST.json`](MANIFEST.json) unter
 `artifacts`; `artifact_count`, `artifact_version` und `artifact_source_commit` sind
 Teil des Manifests. Eine inhaltliche Änderung eines Artefakts lässt
