@@ -463,3 +463,33 @@ steuerliche Richtigkeit der ODS-Regeln selbst.
   Suite ausgeführt (Host-Auflage: schwere E2E-Suiten laufen in der CI).
 - Bewertungen stützen sich auf den oben genannten Arbeitsbaum; nachfolgende
   Commits können einzelne Zeilen verändern.
+
+## 7. Nachverfolgung (2026-11-22, kein Bestandteil der Ursprungsprüfung)
+
+> Die Abschnitte 1–6 sind ein unveränderter Snapshot des geprüften Stands
+> `043826ba`. Die folgende Tabelle ist die spätere Statuszuordnung und nennt
+> für jeden inzwischen behobenen Befund den Nachweis. Bewertungen im Präsens
+> in den Abschnitten 1–6 sind daher nicht mehr als aktueller Zustand zu lesen.
+
+| Befund | Status heute | Nachweis (Commit / Datei / Test) |
+|---|---|---|
+| EUE-068 1 Mahlzeit Ausland | behoben | `7789b6a7` · `TravelCalculator.php` Faktor `'1'` · `TravelCalculatorTest.php` |
+| EUE-071 Hin-/Rückfahrt | behoben | `7789b6a7` · `isTravelLeg()` `minutes >= 180`, AE3 via `ledgerMinutes` |
+| EUE-063/064 2025 km-Sätze | behoben | `7789b6a7` · `TravelCalculator::kilometreRateCents()` → `YearTables`, 422 statt 500 |
+| EUE-089…093 Jahr-Parameter | behoben | `7789b6a7` · `IncomeTaxTariff::forYear()`, `EurIncomeTaxApiTest.php` |
+| EUE-095/104/115 Steuerpfade | behoben | `7789b6a7` · `EurTaxStatementService::rentalForecast()`, `EurOverviewService::excludeBookedSvFromExpenses()` |
+| EUE-108 Jungunternehmer | behoben | `7789b6a7` · `jungunternehmer` in Settings-Validierung, `kv_rate_hidden` exponiert |
+| EUE-088 USt-Block 2 | behoben | `7789b6a7` · `EurVatController::declarations()` nutzt `year_totals` |
+| EUE-119/120/122 Auswertungen | behoben | `7789b6a7` · `EurAnalyticsController::{byIncomeType,byExpenseType,paymentReconciliation}`, `EurAnalyticsApiTest.php` |
+| EUE-033/048 Anteil aus Art | behoben | `7789b6a7` · `EurEntryDialog::selectKind()`, `EurEntryDialog.test.tsx` |
+| EUE-035/036/042/043/127 Zeilenchecks | behoben | `7789b6a7` · `JournalRules::checks()` (MONTH/RECEIPT/WEB, `ok=false`), `EurEntriesPanel.tsx` ⚠-Spalte |
+| EUE-124 USt-Zeilen Monat/PDF | behoben | `7789b6a7` · `MonthStatement::vat`, `EurPdfService`, `EurMonthPanel.tsx` |
+| Signatur-Button „PDF signieren" | behoben (Label) | `7789b6a7` · „PDF herunterladen"; **QES-Kette weiterhin offen** |
+
+Weiterhin offen und bewusst nicht in `7789b6a7`: Trust-/QES-Kette inkl. `/verify`
+und echtem CMS, OCR/Tesseract im Upload-Pfad, scope-Tokens/Idempotency-Key/pdfsig
+der Integrations-API, EUE-045/047 WEB-Datenmodell, EUE-053…061 Anlagen-Warnungen,
+die Verdrahtung der Unit-Inseln (`kilometreQuota`, `distance()`, `isPrivateTrip()`,
+`workingDays()`, `sumMinutesForVoucher()`), EUE-004/023/025…029 Stammdaten,
+EUE-131 sowie die Evidenz-Korrekturen in `rule-coverage.json` und
+`degressive-afa-coverage.json`. Issue #51 bleibt aus diesen Gründen offen.
