@@ -4,17 +4,26 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Eur;
 
+use App\Eur\Domain\MonthStatement;
 use App\Eur\Reference\EurYear;
 use App\Exceptions\DocumentContextMismatchException;
 use App\Http\Controllers\Controller;
+use App\Models\EurAsset;
 use App\Models\EurAuditLog;
 use App\Models\EurDocument;
 use App\Models\EurEntry;
+use App\Models\EurHour;
+use App\Models\EurMonthlyReport;
+use App\Models\EurSignature;
+use App\Models\EurWarehouseEntry;
+use App\Services\Eur\EurPdfFingerprintService;
+use App\Services\Eur\EurPdfService;
 use App\Support\BoundFileEncryption;
 use App\Support\BrandRegistry;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -27,9 +36,15 @@ use Throwable;
  * unter `eur/{brand}/{sha256}`. Die Verschlüsselung läuft über
  * {@see BoundFileEncryption}: Context sind Brand und die eigene Dokument-ID,
  * der Download gibt nur nach erfolgreicher Prüfung Klartext zurück. Die
- * JSON-Antwort enthält nur Metadaten — niemals `storage_path` oder eine
- * öffentliche URL. Der Download ist authentifiziert und brand-scoped; eine
+ * JSON-Antwort enthält nur Metadaten — niemals den `storage_path` des
+ * Ursprungsbelegs oder eine öffentliche URL. Der Download ist authentifiziert und brand-scoped; eine
  * fremde ID ist ein 404.
+ *
+ * Die Berichtigungs-PDFs werden unsigned erzeugt, extern signiert und mit
+ * einer Inhaltsbindung wieder eingeliefert. Das ist CONTENT-IDENTITY (gleiche
+ * Ursprungsbytes), keine qualifizierte elektronische Signatur: kein CMS,
+ * kein PAdES, keine Trust-Prüfung; `pdfsig` ist im Deployment-Image nicht
+ * installiert und wird nicht aufgerufen.
  */
 class EurDocumentController extends Controller
 {
@@ -40,7 +55,16 @@ class EurDocumentController extends Controller
         'image/jpeg' => 'jpeg',
     ];
 
-    public function __construct(private readonly BoundFileEncryption $encryption) {}
+    /** @var list<string> */
+    private const CORRECTION_KINDS = ['monthly', 'eigenbeleg', 'assets'];
+
+    private const SIGNED_MAX_KILOBYTES = 10240;
+
+    public function __construct(
+        private readonly BoundFileEncryption $encryption,
+        private readonly EurPdfService $pdf,
+        private readonly EurPdfFingerprintService $fingerprints,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -146,6 +170,175 @@ class EurDocumentController extends Controller
         return response()->json(['document' => $this->serialize($document, [])], 201);
     }
 
+    /**
+     * Berichtigungs-PDF erzeugen und mit Inhaltsmarker als `unsigned` ablegen.
+     *
+     * Der jwt-Hash bindet die PDF-Bytes VOR dem Marker; die Zeile speichert
+     * weiterhin den Hash der kompletten (markierten) Datei.
+     */
+    public function createCorrection(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'kind' => ['required', 'string', 'in:'.implode(',', self::CORRECTION_KINDS)],
+            'year' => ['required', 'integer', ...$this->yearRule()],
+            'month' => 'nullable|integer|min:1|max:12',
+        ]);
+
+        $kind = (string) $data['kind'];
+        $year = (int) $data['year'];
+        $month = isset($data['month']) ? (int) $data['month'] : null;
+
+        if (in_array($kind, ['monthly', 'eigenbeleg'], true) && $month === null) {
+            abort(422, 'Für diesen Beleg ist ein Monat erforderlich.');
+        }
+
+        $pdfBytes = $this->correctionPdf($kind, $year, $month);
+        $brand = BrandRegistry::currentId();
+        $marker = $this->fingerprints->issueMarker($brand, $kind, $year, $month, hash('sha256', $pdfBytes));
+        $markedBytes = $this->fingerprints->appendMarker($pdfBytes, $marker);
+        $markedSha256 = hash('sha256', $markedBytes);
+        $storagePath = sprintf('eur/%s/%s.pdf', $brand, $markedSha256);
+
+        $document = EurDocument::create([
+            'brand' => $brand,
+            'year' => $year,
+            'month' => $month,
+            'original_name' => $this->correctionFilename($kind, $year, $month),
+            'storage_path' => $storagePath,
+            'mime_type' => 'application/pdf',
+            'size_bytes' => strlen($markedBytes),
+            'sha256' => $markedSha256,
+            'status' => 'unsigned',
+        ]);
+
+        try {
+            $this->encryption->store($storagePath, $markedBytes, $brand, (string) $document->id);
+        } catch (Throwable $e) {
+            $document->delete();
+            throw $e;
+        }
+
+        $this->audit('correction_created', $document);
+
+        return response()->json(['document' => $this->serialize($document, [])], 201);
+    }
+
+    /**
+     * Extern signierte PDF wieder einliefern.
+     *
+     * Zwei Prüfungen müssen bestehen: die Upload-Bytes beginnen mit den exakten
+     * gespeicherten Bytes (damit eine neu erzeugte Datei mit kopiertem Marker
+     * scheitert), und der Marker bindet Brand/Art/Jahr/Monat sowie den Hash der
+     * Ursprungsbytes. Keine Signatur-, CMS- oder Trust-Prüfung.
+     */
+    public function storeSigned(Request $request, int $id): JsonResponse
+    {
+        $document = EurDocument::forCurrentBrand()->findOrFail($id);
+        $file = $request->file('file');
+
+        if (! $file instanceof UploadedFile || ! $file->isValid()
+            || $file->getMimeType() !== 'application/pdf'
+            || $file->getSize() > self::SIGNED_MAX_KILOBYTES * 1024) {
+            return $this->signedRejection(
+                'Bitte laden Sie eine gültige PDF-Datei mit maximal 10 MB hoch.',
+                'Prüfen Sie Dateityp und Dateigröße und wählen Sie die extern signierte PDF-Datei erneut aus.',
+            );
+        }
+
+        $brand = BrandRegistry::currentId();
+
+        try {
+            $originalBytes = $this->encryption->read(
+                $document->storage_path,
+                $brand,
+                (string) $document->id,
+            );
+        } catch (DocumentContextMismatchException) {
+            abort(404, 'Belegdatei nicht gefunden');
+        }
+
+        $uploadedBytes = $file->getContent();
+        $prefix = substr($uploadedBytes, 0, strlen($originalBytes));
+
+        if (! str_starts_with($uploadedBytes, $originalBytes) || ! hash_equals($originalBytes, $prefix)) {
+            return $this->signedRejection(
+                'Die hochgeladene Datei enthält nicht den unveränderten Beleg aus diesem Portal.',
+                'Laden Sie genau die PDF-Datei hoch, die Sie aus diesem Portal heruntergeladen und extern signiert haben.',
+            );
+        }
+
+        if (! $this->fingerprints->verify(
+            $originalBytes,
+            $brand,
+            (int) $document->year,
+            $document->month === null ? null : (int) $document->month,
+        )) {
+            return $this->signedRejection(
+                'Der Beleg-Marker fehlt, wurde verändert oder gehört zu einem anderen Beleg.',
+                'Laden Sie die aus diesem Portal heruntergeladene, extern signierte PDF-Datei unverändert wieder hoch.',
+            );
+        }
+
+        $signedSha256 = hash('sha256', $uploadedBytes);
+        $signedPath = sprintf('eur/%s/signed/%d/%s.pdf', $brand, (int) $document->id, $signedSha256);
+
+        try {
+            $this->encryption->store($signedPath, $uploadedBytes, $brand, (string) $document->id);
+        } catch (Throwable $e) {
+            if (Storage::disk('local')->exists($signedPath)) {
+                Storage::disk('local')->delete($signedPath);
+            }
+
+            throw $e;
+        }
+
+        // Die Ursprungszeile (Bytes, Pfad, Prüfsumme) bleibt unverändert.
+        $document->update([
+            'signed_storage_path' => $signedPath,
+            'signed_sha256' => $signedSha256,
+            'signed_mime_type' => 'application/pdf',
+            'signed_size_bytes' => strlen($uploadedBytes),
+            'signed_at' => now(),
+            'status' => 'signed',
+        ]);
+
+        $this->audit('signed_uploaded', $document);
+
+        return response()->json(['document' => $this->serialize($document, [])]);
+    }
+
+    /** Signierte Fassung brand-scoped ausliefern (Content-Identity, keine QES). */
+    public function downloadSigned(int $id): StreamedResponse
+    {
+        $document = EurDocument::forCurrentBrand()->findOrFail($id);
+        $path = $document->signed_storage_path;
+
+        if ($path === null || ! Storage::disk('local')->exists($path)) {
+            abort(404, 'Signierte Belegdatei nicht gefunden');
+        }
+
+        try {
+            $plain = $this->encryption->read($path, BrandRegistry::currentId(), (string) $document->id);
+        } catch (DocumentContextMismatchException) {
+            abort(404, 'Signierte Belegdatei nicht gefunden');
+        }
+
+        $filename = sprintf(
+            'signierter-beleg-%d-%s-%d.pdf',
+            (int) $document->year,
+            $document->month === null ? '00' : str_pad((string) (int) $document->month, 2, '0', STR_PAD_LEFT),
+            (int) $document->id,
+        );
+
+        return response()->streamDownload(
+            static function () use ($plain): void {
+                echo $plain;
+            },
+            $filename,
+            ['Content-Type' => 'application/pdf'],
+        );
+    }
+
     public function download(int $id): StreamedResponse
     {
         $document = EurDocument::forCurrentBrand()->findOrFail($id);
@@ -190,6 +383,76 @@ class EurDocumentController extends Controller
         return response()->json(['success' => true]);
     }
 
+    private function correctionPdf(string $kind, int $year, ?int $month): string
+    {
+        return match ($kind) {
+            'monthly' => $this->pdf->monthly($this->monthStatement($year, (int) $month)),
+            'eigenbeleg' => $this->pdf->eigenbeleg(
+                $year,
+                (int) $month,
+                'Extern zu signierender Eigenbeleg',
+                0,
+            ),
+            'assets' => $this->pdf->assets($year, $this->assetRows()),
+        };
+    }
+
+    /** @return array<string, mixed> */
+    private function monthStatement(int $year, int $month): array
+    {
+        $entries = EurEntry::forCurrentBrand()->where('year', $year)->where('month', $month)->get();
+        $warehouse = EurWarehouseEntry::forCurrentBrand()->where('year', $year)->where('month', $month)->get();
+        $hours = EurHour::forCurrentBrand()->where('year', $year)->where('month', $month)->get();
+        $report = EurMonthlyReport::forCurrentBrand()->where('year', $year)->where('month', $month)->first();
+        $signature = EurSignature::forCurrentBrand()->where('year', $year)->where('month', $month)->first();
+
+        return MonthStatement::build(
+            $year,
+            $month,
+            $entries->map(static function (EurEntry $entry): array {
+                $row = $entry->toArray();
+                $row['kind'] = $entry->direction;
+
+                return $row;
+            })->all(),
+            $warehouse->toArray(),
+            $hours->toArray(),
+            [
+                'report_status' => $report?->status,
+                'closed_at' => $report?->closed_at?->toIso8601String(),
+                'signature_status' => $signature?->status,
+                'signature_provider' => $signature?->provider,
+            ],
+        );
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function assetRows(): array
+    {
+        return EurAsset::forCurrentBrand()->with('years')->orderBy('name')->get()
+            ->map(static function (EurAsset $asset): array {
+                $row = $asset->toArray();
+                $row['years'] = $asset->years->map(static fn ($year): array => $year->toArray())->values()->all();
+
+                return $row;
+            })->all();
+    }
+
+    private function correctionFilename(string $kind, int $year, ?int $month): string
+    {
+        return sprintf(
+            'Berichtigung-%s-%d-%s.pdf',
+            $kind,
+            $year,
+            $month === null ? '00' : str_pad((string) $month, 2, '0', STR_PAD_LEFT),
+        );
+    }
+
+    private function signedRejection(string $error, string $action): JsonResponse
+    {
+        return response()->json(['error' => $error, 'action' => $action], 422);
+    }
+
     /**
      * @param  array<string, list<int>>  $entriesByReceipt
      * @return array<string, mixed>
@@ -210,6 +473,14 @@ class EurDocumentController extends Controller
             'size_bytes' => (int) $document->size_bytes,
             'sha256' => $document->sha256,
             'status' => $document->status,
+            // Signierte Fassung: Pfad auf dem privaten Disk, keine öffentliche URL.
+            'signed_storage_path' => $document->signed_storage_path,
+            'signed_sha256' => $document->signed_sha256,
+            'signed_mime_type' => $document->signed_mime_type,
+            'signed_size_bytes' => $document->signed_size_bytes === null
+                ? null
+                : (int) $document->signed_size_bytes,
+            'signed_at' => $document->signed_at?->toIso8601String(),
         ];
     }
 

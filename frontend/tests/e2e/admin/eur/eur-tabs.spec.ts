@@ -29,25 +29,34 @@ test.describe('EAR cockpit navigation', () => {
         await expect(page.getByRole('tablist')).toBeVisible();
 
         // Reihenfolge und heading-Texte entsprechen TABS/tabLabel in ManagementEurView.tsx.
-        const tabLandmarks: { tab: string; heading: string }[] = [
-            { tab: 'Buchungen', heading: 'Buchungen' },
-            { tab: 'Wareneingang', heading: 'Wareneingang' },
-            { tab: 'Belege', heading: 'Belege' },
-            { tab: 'Anlagen', heading: 'Abschreibung vergleichen' },
-            { tab: 'Monat', heading: 'Monatsabschluss' },
-            { tab: 'Auswertungen', heading: 'Auswertungen' },
-            { tab: 'Reisen', heading: 'Reisekosten' },
-            { tab: 'Steuer', heading: 'Einkommensteuer' },
-            { tab: 'USt', heading: 'Umsatzsteuer' },
-            { tab: 'Anträge', heading: 'Anträge' },
-            { tab: 'Signatur', heading: 'Signatur' },
-            { tab: 'Einstellungen', heading: 'Unternehmensdaten' },
+        const tabLandmarks: { id: string; tab: string; heading: string }[] = [
+            { id: 'buchungen', tab: 'Buchungen', heading: 'Buchungen' },
+            { id: 'wareneingang', tab: 'Wareneingang', heading: 'Wareneingang' },
+            { id: 'belege', tab: 'Belege', heading: 'Belege' },
+            { id: 'anlagen', tab: 'Anlagen', heading: 'Abschreibung vergleichen' },
+            { id: 'monat', tab: 'Monat', heading: 'Monatsabschluss' },
+            { id: 'auswertungen', tab: 'Auswertungen', heading: 'Auswertungen' },
+            { id: 'reisen', tab: 'Reisen', heading: 'Reisekosten' },
+            { id: 'steuer', tab: 'Steuer', heading: 'Einkommensteuer' },
+            { id: 'ust', tab: 'USt', heading: 'Umsatzsteuer' },
+            { id: 'antraege', tab: 'Anträge', heading: 'Anträge' },
+            { id: 'signatur', tab: 'Signatur', heading: 'Signatur' },
+            { id: 'einstellungen', tab: 'Einstellungen', heading: 'Unternehmensdaten' },
         ];
 
-        for (const { tab, heading } of tabLandmarks) {
+        for (const { id, tab, heading } of tabLandmarks) {
             await test.step(`Tab ${tab}`, async () => {
                 const tabButton = page.getByRole('tab', { name: tab, exact: true });
+                // The Anlagen panel is tall; after its heading assertion the
+                // page can still be settling at a lower scroll position. Bring
+                // the tab back into view so the click cannot land on a neighbour
+                // in the 12-tab strip (deterministic "Monat" miss seen in CI).
+                await tabButton.scrollIntoViewIfNeeded();
                 await tabButton.click();
+                // The tab is URL-driven (selectTab → `bereich`). Waiting for the
+                // URL first both proves the click registered and gives React a
+                // reliable point to re-render before checking aria-selected.
+                await expect(page).toHaveURL(new RegExp(`bereich=${id}(?:&|$)`));
                 await expect(tabButton).toHaveAttribute('aria-selected', 'true');
                 // D-10: Panel-Inhalte bleiben auf das main-Landmark gescopt.
                 await expect(main.getByRole('heading', { name: heading, exact: true })).toBeVisible();

@@ -336,6 +336,11 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/eur/month/create-year', [EurMonthController::class, 'createYear'])->name('api.management.eur.month.create-year');
     Route::get('/management/eur/documents', [EurDocumentController::class, 'index'])->name('api.management.eur.documents.index');
     Route::post('/management/eur/documents', [EurDocumentController::class, 'store'])->name('api.management.eur.documents.store');
+    // Berichtigungs-PDFs: unsigned erzeugen, extern signieren, mit Inhaltsbindung
+    // wieder einliefern. Content-Identity, keine QES (kein CMS/PAdES, kein pdfsig).
+    Route::post('/management/eur/documents/corrections', [EurDocumentController::class, 'createCorrection'])->name('api.management.eur.documents.corrections');
+    Route::post('/management/eur/documents/{id}/signed', [EurDocumentController::class, 'storeSigned'])->name('api.management.eur.documents.signed');
+    Route::get('/management/eur/documents/{id}/signed/download', [EurDocumentController::class, 'downloadSigned'])->name('api.management.eur.documents.signed.download');
     Route::get('/management/eur/documents/{id}/download', [EurDocumentController::class, 'download'])->name('api.management.eur.documents.download');
     Route::delete('/management/eur/documents/{id}', [EurDocumentController::class, 'destroy'])->name('api.management.eur.documents.destroy');
     Route::get('/management/eur/hours', [EurHourController::class, 'index'])->name('api.management.eur.hours.index');

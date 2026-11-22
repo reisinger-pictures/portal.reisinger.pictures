@@ -323,6 +323,12 @@ export interface EurDocument {
     mime_type: string | null;
     size_bytes: number;
     status: string;
+    /** SHA-256 of our original PDF — the anchor of the content binding. */
+    sha256: string;
+    signed_at: string | null;
+    signed_sha256: string | null;
+    signed_storage_path: string | null;
+    signed_size_bytes: number | null;
 }
 
 export interface EurDocumentsResponse {
@@ -787,6 +793,37 @@ export async function uploadEurDocument(payload: {
 
 export function eurDocumentDownloadUrl(id: number): string {
     return `/api/management/eur/documents/${id}/download`;
+}
+
+/** Kinds of unsigned correction PDF the accounting engine can produce. */
+export type EurCorrectionKind = 'monthly' | 'eigenbeleg' | 'assets';
+
+export interface EurCorrectionPayload {
+    kind: EurCorrectionKind;
+    year: number;
+    /** Relevant for `monthly` and `eigenbeleg`; ignored for `assets`. */
+    month?: number;
+}
+
+/** `POST /eur/documents/corrections` — creates an unsigned PDF for external signing. */
+export function createEurCorrectionDocument(payload: EurCorrectionPayload): Promise<EurDocumentResponse> {
+    return apiMutate<EurDocumentResponse>('/api/management/eur/documents/corrections', 'POST', payload);
+}
+
+/**
+ * `POST /eur/documents/{id}/signed` — multipart upload of the externally
+ * signed PDF. On 422 the parsed JSON body carries `error` and `action` on the
+ * thrown `ApiError.info`; the UI reads those through a narrow type guard.
+ */
+export function uploadSignedEurDocument(id: number, file: File): Promise<EurDocumentResponse> {
+    const body = new FormData();
+    body.append('file', file);
+    return apiUpload<EurDocumentResponse>(`/api/management/eur/documents/${id}/signed`, body);
+}
+
+/** Authenticated link to the signed PDF bytes. */
+export function eurDocumentSignedDownloadUrl(id: number): string {
+    return `/api/management/eur/documents/${id}/signed/download`;
 }
 
 export async function deleteEurDocument(id: number): Promise<void> {

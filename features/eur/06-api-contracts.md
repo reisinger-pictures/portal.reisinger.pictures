@@ -6,6 +6,16 @@ ganze Prozent in 5-%-Schritten. Ein fremder Datensatz ist ein 404, eine
 ungültige Eingabe ein 422. Alle Antworten enthalten keine Paritäts- oder
 Technikdetails.
 
+**Abgrenzung zur gepinnten OpenAPI:** Das Handoff-Artefakt
+`prototype/docs/openapi.yaml` beschreibt eine Server-to-Server-Integrations-API,
+die das Portal nicht implementiert und nicht produktiv nutzt. Es ist
+Übergabeinformation, nicht der Portal-Vertrag ([D-71](../owner-decisions.md#d-71-the-pinned-openapi-contract-is-reference-information-not-a-portal-api-contract)).
+Token-Scopes, `Idempotency-Key`, `409`, `429`/`Retry-After`, Ratenlimit und
+`POST /integrations/invoices` sind daher keine Portal-Anforderungen. Der
+Betriebsanteil wird an der Portal-Grenze zwischen Katalog (0.0–1.0) und API
+(0–100) explizit konvertiert; die Engine wird serverseitig gerufen, niemals vom
+Browser.
+
 ## Jahr
 
 `GET /eur/years`

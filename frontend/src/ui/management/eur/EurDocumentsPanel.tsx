@@ -2,11 +2,18 @@ import { useId, useState } from 'react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import {
+    createEurCorrectionDocument,
     deleteEurDocument,
     eurDocumentDownloadUrl,
+    eurDocumentSignedDownloadUrl,
+    EUR_MONTHS,
     importEurEntries,
     uploadEurDocument,
+    uploadSignedEurDocument,
     useEurDocuments,
+    type EurCorrectionKind,
+    type EurCorrectionPayload,
+    type EurDocument,
     type EurImportResult,
 } from '../../../logic/useEur';
 
@@ -21,6 +28,83 @@ const formatSize = (bytes: number): string => {
     return `${Math.round(bytes / (1024 * 1024))} MB`;
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** The two German strings of a 422 response; kept separate from generic network failures. */
+interface SignedUploadFailure {
+    error: string;
+    action: string;
+}
+
+/** Reads `{error, action}` from the thrown `ApiError.info` without narrowing to `any`. */
+const readSignedUploadFailure = (cause: unknown): SignedUploadFailure | null => {
+    const info = isRecord(cause) && 'info' in cause ? cause.info : cause;
+    if (!isRecord(info)) return null;
+    const {error, action} = info;
+    if (typeof error !== 'string' || typeof action !== 'string') return null;
+    return {error, action};
+};
+
+const hasSignedVersion = (document: EurDocument): boolean =>
+    typeof document.signed_sha256 === 'string' && document.signed_sha256.length > 0;
+
+interface SignedCellProps {
+    document: EurDocument;
+    uploaded: EurDocument | undefined;
+    failure: SignedUploadFailure | undefined;
+    busy: boolean;
+    onUpload: (id: number, file: File) => void;
+}
+
+function SignedCell({document, uploaded, failure, busy, onUpload}: SignedCellProps) {
+    const signedInputId = `eur-signed-upload-${document.id}`;
+
+    if (hasSignedVersion(uploaded ?? document)) {
+        return (
+            <a className="btn btn-ghost btn-xs" href={eurDocumentSignedDownloadUrl(document.id)}>
+                <Trans>Signiertes PDF herunterladen</Trans>
+            </a>
+        );
+    }
+
+    if (document.status !== 'unsigned') {
+        return <span className="opacity-70">—</span>;
+    }
+
+    return (
+        <div className="form-control">
+            <span className="label-text"><Trans>Signiertes PDF hochladen</Trans></span>
+            <input
+                id={signedInputId}
+                type="file"
+                accept="application/pdf,.pdf"
+                className="peer sr-only"
+                aria-label={t`Signiertes PDF hochladen`}
+                onChange={(event) => {
+                    const chosen = event.target.files?.[0];
+                    if (chosen) onUpload(document.id, chosen);
+                }}
+                disabled={busy}
+                required
+            />
+            <label htmlFor={signedInputId}
+                   className="btn btn-outline btn-xs cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-primary">
+                <Trans>Signiertes PDF auswählen</Trans>
+            </label>
+            {busy && (
+                <span className="text-xs opacity-70"><Trans>Inhaltsprüfung läuft …</Trans></span>
+            )}
+            {failure && (
+                <div className="alert alert-error mt-2" role="alert">
+                    <span>{failure.error}</span>
+                    <span>{failure.action}</span>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function EurDocumentsPanel({year, month}: Props) {
     const documents = useEurDocuments(year);
     const [file, setFile] = useState<File | null>(null);
@@ -32,6 +116,14 @@ export default function EurDocumentsPanel({year, month}: Props) {
     const [csvMessage, setCsvMessage] = useState<string | null>(null);
     const [csvError, setCsvError] = useState<string | null>(null);
     const [csvResult, setCsvResult] = useState<EurImportResult | null>(null);
+    const [correctionKind, setCorrectionKind] = useState<EurCorrectionKind>('monthly');
+    const [correctionMonth, setCorrectionMonth] = useState(month);
+    const [isCreatingCorrection, setIsCreatingCorrection] = useState(false);
+    const [correctionDocId, setCorrectionDocId] = useState<number | null>(null);
+    const [correctionError, setCorrectionError] = useState<string | null>(null);
+    const [signedErrors, setSignedErrors] = useState<Record<number, SignedUploadFailure>>({});
+    const [signedDocs, setSignedDocs] = useState<Record<number, EurDocument>>({});
+    const [signedBusyId, setSignedBusyId] = useState<number | null>(null);
     const fileInputId = useId();
     const csvInputId = useId();
 
@@ -84,6 +176,52 @@ export default function EurDocumentsPanel({year, month}: Props) {
             setCsvError(t`Der CSV-Import ist fehlgeschlagen. Prüfen Sie die Datei und versuchen Sie es erneut.`);
         } finally {
             setIsImporting(false);
+        }
+    };
+
+    const createCorrection = async () => {
+        if (isCreatingCorrection) return;
+        setIsCreatingCorrection(true);
+        setCorrectionError(null);
+        setCorrectionDocId(null);
+
+        try {
+            const payload: EurCorrectionPayload = correctionKind === 'assets'
+                ? {kind: 'assets', year}
+                : {kind: correctionKind, year, month: correctionMonth};
+            const {document} = await createEurCorrectionDocument(payload);
+            setCorrectionDocId(document.id);
+            void documents.mutate();
+        } catch {
+            setCorrectionError(t`Das Korrektur-PDF konnte nicht erstellt werden. Prüfen Sie die Auswahl und versuchen Sie es erneut.`);
+        } finally {
+            setIsCreatingCorrection(false);
+        }
+    };
+
+    const uploadSigned = async (id: number, fileToUpload: File) => {
+        if (signedBusyId !== null) return;
+        setSignedBusyId(id);
+        setSignedErrors((previous) => {
+            const next = {...previous};
+            delete next[id];
+            return next;
+        });
+
+        try {
+            const {document} = await uploadSignedEurDocument(id, fileToUpload);
+            setSignedDocs((previous) => ({...previous, [id]: document}));
+            void documents.mutate();
+        } catch (cause) {
+            setSignedErrors((previous) => ({
+                ...previous,
+                [id]: readSignedUploadFailure(cause) ?? {
+                    error: t`Die Inhaltsprüfung des signierten PDFs ist fehlgeschlagen.`,
+                    action: t`Signieren Sie unser Original-PDF erneut und laden Sie es noch einmal hoch.`,
+                },
+            }));
+        } finally {
+            setSignedBusyId(null);
         }
     };
 
@@ -140,6 +278,7 @@ export default function EurDocumentsPanel({year, month}: Props) {
                                     <th><Trans>Monat</Trans></th>
                                     <th><Trans>Größe</Trans></th>
                                     <th><Trans>Status</Trans></th>
+                                    <th><Trans>Signatur</Trans></th>
                                     <th><Trans>Aktion</Trans></th>
                                 </tr>
                             </thead>
@@ -151,6 +290,15 @@ export default function EurDocumentsPanel({year, month}: Props) {
                                         <td>{document.month ?? '—'}</td>
                                         <td>{formatSize(document.size_bytes)}</td>
                                         <td>{document.status}</td>
+                                        <td>
+                                            <SignedCell
+                                                document={document}
+                                                uploaded={signedDocs[document.id]}
+                                                failure={signedErrors[document.id]}
+                                                busy={signedBusyId === document.id}
+                                                onUpload={(id, chosen) => void uploadSigned(id, chosen)}
+                                            />
+                                        </td>
                                         <td>
                                             <div className="flex flex-wrap gap-1">
                                                 <a className="btn btn-ghost btn-xs" href={eurDocumentDownloadUrl(document.id)}>
@@ -253,6 +401,55 @@ export default function EurDocumentsPanel({year, month}: Props) {
                             <li key={`${index}-${message}`}>{message}</li>
                         ))}
                     </ul>
+                )}
+
+                <div className="divider my-4"/>
+
+                <h3 className="font-semibold"><Trans>Korrektur-PDF</Trans></h3>
+                <p className="text-sm opacity-70">
+                    <Trans>Erstellen Sie ein unsigniertes PDF für einen Monatsbericht, Eigenbeleg oder das Anlagenverzeichnis. Signieren Sie die Datei extern und laden Sie sie anschließend in der Zeile des Dokuments wieder hoch.</Trans>
+                </p>
+                <p className="text-sm opacity-70 mt-1">
+                    <Trans>Die Inhaltsprüfung vergleicht den SHA-256-Hash der hochgeladenen Datei mit dem unseres ursprünglichen PDFs. Damit wird geprüft, ob es die signierte Version genau dieses Dokuments ist – keine qualifizierte elektronische Signatur.</Trans>
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2 items-end">
+                    <label className="form-control">
+                        <span className="label-text"><Trans>Art des Korrektur-PDF</Trans></span>
+                        <select className="select select-bordered" value={correctionKind} required
+                            onChange={(event) => setCorrectionKind(event.target.value as EurCorrectionKind)}>
+                            <option value="monthly"><Trans>Monatsbericht</Trans></option>
+                            <option value="eigenbeleg"><Trans>Eigenbeleg</Trans></option>
+                            <option value="assets"><Trans>Anlagenverzeichnis</Trans></option>
+                        </select>
+                    </label>
+                    <label className="form-control">
+                        <span className="label-text"><Trans>Monat des Korrektur-PDF</Trans></span>
+                        <select className="select select-bordered" value={correctionMonth}
+                            disabled={correctionKind === 'assets'}
+                            required={correctionKind !== 'assets'}
+                            onChange={(event) => setCorrectionMonth(Number(event.target.value))}>
+                            {EUR_MONTHS.map((name, index) => (
+                                <option key={name} value={index + 1}>{name}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <div>
+                        <button type="button" className="btn btn-primary btn-sm"
+                            onClick={() => void createCorrection()} disabled={isCreatingCorrection}>
+                            <Trans>Korrektur-PDF erstellen</Trans>
+                        </button>
+                    </div>
+                </div>
+
+                {correctionDocId !== null && (
+                    <p className="alert alert-success mt-3" role="status">
+                        <a className="link" href={eurDocumentDownloadUrl(correctionDocId)}>
+                            <Trans>Unsigniertes Korrektur-PDF herunterladen</Trans>
+                        </a>
+                    </p>
+                )}
+                {correctionError && (
+                    <p className="alert alert-error mt-3" role="alert">{correctionError}</p>
                 )}
             </div>
         </div>

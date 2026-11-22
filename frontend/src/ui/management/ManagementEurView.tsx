@@ -282,22 +282,32 @@ export default function ManagementEurView() {
     const monthPrivateLabel = euro(monthPrivate);
     const signatureStatusText = signatureStatusLabel(signatureStatus);
 
+    // Functional updater form, as in every other management view: a captured
+    // `searchParams` snapshot can be stale when several URL-driven controls are
+    // clicked in quick succession (CI showed a tab staying unselected under
+    // load). Updating from `prev` makes each write independent of render timing.
     const selectTab = (id: TabId) => {
-        const next = new URLSearchParams(searchParams);
-        next.set('bereich', id);
-        setSearchParams(next, {replace: true});
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous);
+            next.set('bereich', id);
+            return next;
+        }, {replace: true});
     };
 
     const selectYear = (value: number) => {
-        const next = new URLSearchParams(searchParams);
-        next.set('jahr', String(value));
-        setSearchParams(next, {replace: true});
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous);
+            next.set('jahr', String(value));
+            return next;
+        }, {replace: true});
     };
 
     const selectMonth = (value: number) => {
-        const next = new URLSearchParams(searchParams);
-        next.set('monat', String(value));
-        setSearchParams(next, {replace: true});
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous);
+            next.set('monat', String(value));
+            return next;
+        }, {replace: true});
     };
 
     const reloadAll = () => {

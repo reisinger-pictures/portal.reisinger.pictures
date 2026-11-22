@@ -67,6 +67,36 @@ AfA-Plane selbst. Ein Rückwechsel auf degressiv bleibt fachlich gesperrt, weil
 es keinen Schreibpfad gibt, der `method` nach einem Wechsel wieder auf
 `degressiv` setzt.
 
+### Schema-Entscheidung — signierte Fassung eines Belegs
+
+**Schema.** `eur_documents` erhält fünf nullable Spalten für die extern
+signierte Fassung: `signed_storage_path` (255), `signed_sha256` (64),
+`signed_mime_type` (40), `signed_size_bytes` (bigint) und `signed_at`
+(timestamp). Die Additionsreihenfolge steht in der AD-2-Frontier.
+Der private Pfad der signierten Datei wird verschlüsselt auf dem `local`-Disk
+gehalten; die Antwort des Uploads enthält ihn als Metadatum, niemals eine
+öffentliche URL. Die ursprünglichen Spalten
+(`storage_path`, `sha256`, `size_bytes`, `mime_type`, `original_name`) bleiben
+beim Signatur-Upload unverändert. Der Status wechselt von `unsigned` nach
+`signed`.
+
+**Backfill.** Keiner. Bestehende Belege bleiben ohne signierte Fassung; es
+gibt keine automatische Ersetzung durch Altdaten und keine Annahme, ein
+vorhandenes `eur_signatures`-Zeichen sei eine hochgeladene Datei.
+
+**Rollback.** `down()` ist nach Repository-Policy leer. Die neuen Spalten sind
+nullable; ein Entfernen würde nur die signierte Fassung und ihre Metadaten
+verlieren, nicht den ursprünglichen Beleg oder seine Audithistorie.
+
+**Grenze der Aussage.** Die geprüfte Bindung ist CONTENT-IDENTITY: Der Marker
+im unsigned PDF trägt einen signierten JWT-Hash der Ursprungsbytes; beim
+Wiedereingang müssen die Upload-Bytes mit den gespeicherten Bytes beginnen und
+der Marker muss Marke, Art, Jahr, Monat und diesen Hash binden. Das ist keine
+qualifizierte elektronische Signatur, keine CMS-/PAdES-Validierung und keine
+Vertrauensprüfung; `pdfsig` ist im Deployment-Image nicht installiert und wird
+nicht aufgerufen. Ein erfolgreicher Upload besagt nur, dass die geprüfte Datei
+auf demselben Inhalt beruht.
+
 ## Beziehungen
 
 - Buchung → genau ein Kunde und optional ein Projekt; Reise analog.

@@ -79,7 +79,9 @@ test.describe('EAR sub-application', () => {
 
         await expect(main).toContainText('Empfohlener Wechsel zur linearen Abschreibung: Jahr 8');
         await expect(main).toContainText('258,04 €');
-        await expect(main.getByRole('cell', { name: '6.000,00 €' })).toBeVisible();
+        // The first-year comparison table renders the degressive amount twice
+        // (annual depreciation and the year's degressive row).
+        await expect(main.getByRole('cell', { name: '6.000,00 €' }).first()).toBeVisible();
 
         await page.getByRole('banner').getByRole('link', { name: 'Zurück zum Portal' }).click();
 

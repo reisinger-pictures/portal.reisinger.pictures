@@ -824,6 +824,10 @@ msgstr "Anlagen"
 msgid "Anlagen und Abschreibung"
 msgstr "Anlagen und Abschreibung"
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Anlagenverzeichnis"
+msgstr "Anlagenverzeichnis"
+
 #: src/ui/management/ManagementEurView.tsx
 msgid "Anlagenverzeichnis als PDF"
 msgstr "Anlagenverzeichnis als PDF"
@@ -945,6 +949,10 @@ msgstr "Art"
 #: src/ui/management/eur/EurEntryDialog.tsx
 msgid "Art auswählen und Betrag sowie Betriebsanteil in 5-%-Schritten angeben."
 msgstr "Art auswählen und Betrag sowie Betriebsanteil in 5-%-Schritten angeben."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Art des Korrektur-PDF"
+msgstr "Art des Korrektur-PDF"
 
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "AT..."
@@ -2035,6 +2043,10 @@ msgstr "Das Konto steht noch auf „pending\""
 msgid "Das Konto wurde entfernt, als die Fotografen-Rolle wegfiel. Die Kamera kann sich nicht mehr anmelden, bis das Konto erneut angelegt wird."
 msgstr "Das Konto wurde entfernt, als die Fotografen-Rolle wegfiel. Die Kamera kann sich nicht mehr anmelden, bis das Konto erneut angelegt wird."
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Das Korrektur-PDF konnte nicht erstellt werden. Prüfen Sie die Auswahl und versuchen Sie es erneut."
+msgstr "Das Korrektur-PDF konnte nicht erstellt werden. Prüfen Sie die Auswahl und versuchen Sie es erneut."
+
 #: src/ui/ResetPassword.tsx
 msgid "Das Passwort muss mindestens 8 Zeichen lang sein."
 msgstr "Das Passwort muss mindestens 8 Zeichen lang sein."
@@ -2537,6 +2549,14 @@ msgstr "Die gespeicherte Standardrolle „{legacyRoleName}“ (ID {legacyRoleId}
 msgid "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen."
 msgstr "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen."
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Die Inhaltsprüfung des signierten PDFs ist fehlgeschlagen."
+msgstr "Die Inhaltsprüfung des signierten PDFs ist fehlgeschlagen."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Die Inhaltsprüfung vergleicht den SHA-256-Hash der hochgeladenen Datei mit dem unseres ursprünglichen PDFs. Damit wird geprüft, ob es die signierte Version genau dieses Dokuments ist – keine qualifizierte elektronische Signatur."
+msgstr "Die Inhaltsprüfung vergleicht den SHA-256-Hash der hochgeladenen Datei mit dem unseres ursprünglichen PDFs. Damit wird geprüft, ob es die signierte Version genau dieses Dokuments ist – keine qualifizierte elektronische Signatur."
+
 #: src/ui/Privacy.tsx
 msgid "Die IP-Risikoschlüssel werden als schlüsselabhängiger, nicht umkehrbarer Hash berechnet. In den Limitierungs- und Risikozählern wird ausschließlich der so abgeleitete Schlüssel geführt, nie die rohe IP-Adresse; der Schlüssel lässt sich nicht in eine IP-Adresse zurückrechnen."
 msgstr "Die IP-Risikoschlüssel werden als schlüsselabhängiger, nicht umkehrbarer Hash berechnet. In den Limitierungs- und Risikozählern wird ausschließlich der so abgeleitete Schlüssel geführt, nie die rohe IP-Adresse; der Schlüssel lässt sich nicht in eine IP-Adresse zurückrechnen."
@@ -2862,6 +2882,10 @@ msgstr "Eher ja"
 #: src/logic/modelRegistration.ts
 msgid "Eher nicht"
 msgstr "Eher nicht"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Eigenbeleg"
+msgstr "Eigenbeleg"
 
 #: src/ui/management/ManagementEurView.tsx
 msgid "Eigenbeleg erfassen"
@@ -3242,6 +3266,10 @@ msgstr "Erstelle einen kopierbaren Einladungslink und teile ihn z. B. per WhatsA
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Erstellen"
 msgstr "Erstellen"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Erstellen Sie ein unsigniertes PDF für einen Monatsbericht, Eigenbeleg oder das Anlagenverzeichnis. Signieren Sie die Datei extern und laden Sie sie anschließend in der Zeile des Dokuments wieder hoch."
+msgstr "Erstellen Sie ein unsigniertes PDF für einen Monatsbericht, Eigenbeleg oder das Anlagenverzeichnis. Signieren Sie die Datei extern und laden Sie sie anschließend in der Zeile des Dokuments wieder hoch."
 
 #: src/ui/management/components/ModelInviteDialog.tsx
 #: src/ui/management/ManagementContractView.tsx
@@ -4433,6 +4461,10 @@ msgstr "Inhalt (HTML)"
 msgid "Inhalt ist erforderlich"
 msgstr "Inhalt ist erforderlich"
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Inhaltsprüfung läuft …"
+msgstr "Inhaltsprüfung läuft …"
+
 #: src/ui/management/components/LicenseCatalogSettings.tsx
 msgid "Inkludiert"
 msgstr "Inkludiert"
@@ -4949,6 +4981,14 @@ msgstr "Kopiert!"
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Korrektur Bestellung"
 msgstr "Korrektur Bestellung"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Korrektur-PDF"
+msgstr "Korrektur-PDF"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Korrektur-PDF erstellen"
+msgstr "Korrektur-PDF erstellen"
 
 #: src/ui/management/eur/EurAnalyticsPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
@@ -5735,6 +5775,10 @@ msgstr "Monat"
 msgid "Monat abschließen"
 msgstr "Monat abschließen"
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Monat des Korrektur-PDF"
+msgstr "Monat des Korrektur-PDF"
+
 #: src/ui/management/ManagementEurView.tsx
 msgid "Monat nicht signiert"
 msgstr "Monat nicht signiert"
@@ -5759,6 +5803,10 @@ msgstr "Monatliche Kennzahlen und Zahllast. Leere Felder bleiben leer und werden
 #: src/ui/management/eur/EurMonthPanel.tsx
 msgid "Monatsabschluss"
 msgstr "Monatsabschluss"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Monatsbericht"
+msgstr "Monatsbericht"
 
 #: src/ui/management/eur/EurMonthPanel.tsx
 msgid "Monatsdaten nicht verfügbar"
@@ -7453,6 +7501,7 @@ msgstr "Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen dies
 msgid "siehe den Hinweis zum Stammzertifikat unten"
 msgstr "siehe den Hinweis zum Stammzertifikat unten"
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
 #: src/ui/management/eur/EurSignaturePanel.tsx
 #: src/ui/management/ManagementEurView.tsx
 msgid "Signatur"
@@ -7487,9 +7536,25 @@ msgstr "Signaturen nicht verfügbar"
 msgid "Signaturen werden geladen …"
 msgstr "Signaturen werden geladen …"
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Signieren Sie unser Original-PDF erneut und laden Sie es noch einmal hoch."
+msgstr "Signieren Sie unser Original-PDF erneut und laden Sie es noch einmal hoch."
+
 #: src/ui/management/eur/EurSignaturePanel.tsx
 msgid "Signiert am"
 msgstr "Signiert am"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Signiertes PDF auswählen"
+msgstr "Signiertes PDF auswählen"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Signiertes PDF herunterladen"
+msgstr "Signiertes PDF herunterladen"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Signiertes PDF hochladen"
+msgstr "Signiertes PDF hochladen"
 
 #: src/ui/management/ManagementSettingsView.tsx
 msgid "SMTP-Verbindungstest"
@@ -8299,6 +8364,10 @@ msgstr "Ungültiger Wert."
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Unique DLs:"
 msgstr "Unique DLs:"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Unsigniertes Korrektur-PDF herunterladen"
+msgstr "Unsigniertes Korrektur-PDF herunterladen"
 
 #: src/ui/management/ManagementEurView.tsx
 msgid "Unternehmensdaten"
