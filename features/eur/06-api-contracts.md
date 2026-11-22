@@ -1,4 +1,4 @@
-# EÜR · API-Vertrag für die Buchhaltungsansicht
+# EAR · API-Vertrag für die Buchhaltungsansicht
 
 Alle Endpunkte liegen unter `/api/management/eur/*`, sind authentifiziert und
 brand-scoped. Geld ist immer ganzzahlige Cent, Zeit ganze Minuten, Anteile

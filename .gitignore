@@ -23,7 +23,7 @@ backend/.env.local
 # Backend - Private storage
 backend/storage/app/private/
 
-# EÜR: lokales Anlieferungspaket der Clean-Room-Übergabe (nicht versioniert)
+# EAR: lokales Anlieferungspaket der Clean-Room-Übergabe (nicht versioniert)
 /handoff/
 
 # Data

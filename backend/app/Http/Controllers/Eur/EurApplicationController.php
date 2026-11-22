@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 use InvalidArgumentException;
 
 /**
- * EÜR · Anträge (Portal #27).
+ * EAR · Anträge (Portal #27).
  *
  * Ein Antrag ist ein fachlicher Vorgang mit dem Status `open` oder `done`.
  * Der Status kann separat per PATCH geändert werden; beide Schreibwege

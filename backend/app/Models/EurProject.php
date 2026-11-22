@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * EÜR · Projekt (EUE-121) mit optionaler Kundenzuordnung.
+ * EAR · Projekt (EUE-121) mit optionaler Kundenzuordnung.
  */
 class EurProject extends Model
 {

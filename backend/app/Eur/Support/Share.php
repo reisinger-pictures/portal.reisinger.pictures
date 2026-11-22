@@ -8,7 +8,7 @@ use App\Eur\Parity\Money;
 use InvalidArgumentException;
 
 /**
- * EÜR · Betriebsanteil anwenden.
+ * EAR · Betriebsanteil anwenden.
  *
  * Der Anteil ist eine ganze Prozentzahl in 5-%-Schritten (0–100). Die
  * Multiplikation bleibt ganzzahlig; gerundet wird einmal kaufmännisch auf

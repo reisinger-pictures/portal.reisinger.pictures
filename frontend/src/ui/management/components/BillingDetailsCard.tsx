@@ -182,7 +182,7 @@ export default function BillingDetailsCard() {
                         </div>
                     </div>
 
-                    <div className="divider"><Trans>Angaben für die Buchhaltung (EÜR)</Trans></div>
+                    <div className="divider"><Trans>Angaben für die Buchhaltung (EAR)</Trans></div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="form-control">

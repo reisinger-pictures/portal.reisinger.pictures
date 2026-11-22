@@ -7,7 +7,7 @@ namespace App\Eur\Reference;
 use InvalidArgumentException;
 
 /**
- * EÜR · Feiertage (EUE-012) — österreichische Feiertage je Jahr.
+ * EAR · Feiertage (EUE-012) — österreichische Feiertage je Jahr.
  *
  * Die beweglichen Feiertage werden über die Osterformel (Meeus/Jones/Butcher,
  * rein ganzzahlig) abgeleitet. Die festen Feiertage stehen als Kalenderdaten,

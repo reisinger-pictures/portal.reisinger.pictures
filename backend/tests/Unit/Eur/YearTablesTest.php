@@ -11,7 +11,7 @@ use App\Eur\Reference\YearTables;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
-/** EÜR · Jahresabhängige Tabellen 2024–2026 (EUE-001 … EUE-022, EUE-062 … EUE-098). */
+/** EAR · Jahresabhängige Tabellen 2024–2026 (EUE-001 … EUE-022, EUE-062 … EUE-098). */
 class YearTablesTest extends TestCase
 {
     public function test_tariff_limits_are_year_specific(): void

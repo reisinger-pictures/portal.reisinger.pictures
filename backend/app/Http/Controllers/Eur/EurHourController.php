@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 use InvalidArgumentException;
 
 /**
- * EÜR · Stundenbuch (Portal #27).
+ * EAR · Stundenbuch (Portal #27).
  *
  * Zeit ist ausschließlich ganze Minuten; eine Buchung benötigt eine Dezimal-
  * position > 0. Ein 5-%-Anteil ist hier nicht relevant (der Gesamtstunden-

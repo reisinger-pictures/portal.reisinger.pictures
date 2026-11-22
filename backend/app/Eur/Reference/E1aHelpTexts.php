@@ -7,7 +7,7 @@ namespace App\Eur\Reference;
 use RuntimeException;
 
 /**
- * EÜR · Ausfüllhilfe je Kennzahl.
+ * EAR · Ausfüllhilfe je Kennzahl.
  *
  * Einzige Quelle ist das gepinnte Artefakt
  * `features/eur/cleanroom/artifacts/verification/e1a-ausfuellhilfe.md`,

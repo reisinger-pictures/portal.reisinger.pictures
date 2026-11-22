@@ -11,7 +11,7 @@ use App\Eur\Reference\YearTables;
 use InvalidArgumentException;
 
 /**
- * EÜR · Monatsansicht (EUE-116, EUE-117, EUE-118, EUE-124, EUE-129).
+ * EAR · Monatsansicht (EUE-116, EUE-117, EUE-118, EUE-124, EUE-129).
  *
  * Orchestriert die reinen Fachdienste zu einer Monatsansicht aus einfachen
  * Arrays: Zeilen E/A/WEB/FR, Summen, Vollständigkeitsprüfungen, SV-Werte aus
@@ -96,6 +96,7 @@ final class MonthStatement
             'lines' => $lines,
             'totals' => $totals,
             'checks' => $checks,
+            'e1_by_code' => E1Statement::byCode($monthEntries, $year),
             'social_insurance' => [
                 'amounts_cents' => YearTables::socialInsuranceAmountsCents($year),
                 'rates_per_10000' => YearTables::socialInsuranceRatesPer10000($year),

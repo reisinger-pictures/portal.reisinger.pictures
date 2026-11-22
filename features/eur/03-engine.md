@@ -1,4 +1,4 @@
-# EÜR-Rechenkern: Verträge je Fachbereich
+# EAR-Rechenkern: Verträge je Fachbereich
 
 **Status:** gültig für Wirtschaftsjahr 2026
 

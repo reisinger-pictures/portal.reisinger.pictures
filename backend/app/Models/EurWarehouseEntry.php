@@ -7,7 +7,7 @@ use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
-/** EÜR · Wareneingang; Beträge sind ganzzahlige Cent. */
+/** EAR · Wareneingang; Beträge sind ganzzahlige Cent. */
 class EurWarehouseEntry extends Model
 {
     protected $fillable = [

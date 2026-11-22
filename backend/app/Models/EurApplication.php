@@ -7,7 +7,7 @@ use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
-/** EÜR · Antrag als fachlicher Vorgang. */
+/** EAR · Antrag als fachlicher Vorgang. */
 class EurApplication extends Model
 {
     protected $fillable = [

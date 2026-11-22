@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * EÜR · Jahresplan eines Anlageguts (AfA, Restbuchwert, Privatnutzung).
+ * EAR · Jahresplan eines Anlageguts (AfA, Restbuchwert, Privatnutzung).
  */
 class EurAssetYear extends Model
 {

@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Eur;
 
 use App\Eur\Reference\EurYear;
+use App\Exceptions\DocumentContextMismatchException;
 use App\Http\Controllers\Controller;
 use App\Models\EurAuditLog;
 use App\Models\EurDocument;
+use App\Models\EurEntry;
+use App\Support\BoundFileEncryption;
 use App\Support\BrandRegistry;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -15,14 +18,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 /**
- * EÜR · Belege (Portal #27).
+ * EA Rechnung · Belege (Portal #27).
  *
- * Dateien liegen ausschließlich auf dem privaten `local`-Disk unter
- * `eur/{brand}/{sha256}`. Die JSON-Antwort enthält nur Metadaten — niemals
- * `storage_path` oder einen öffentlichen URL. Der Download ist authentifiziert
- * und brand-scoped; eine fremde ID ist ein 404.
+ * Dateien liegen ausschließlich verschlüsselt auf dem privaten `local`-Disk
+ * unter `eur/{brand}/{sha256}`. Die Verschlüsselung läuft über
+ * {@see BoundFileEncryption}: Context sind Brand und die eigene Dokument-ID,
+ * der Download gibt nur nach erfolgreicher Prüfung Klartext zurück. Die
+ * JSON-Antwort enthält nur Metadaten — niemals `storage_path` oder eine
+ * öffentliche URL. Der Download ist authentifiziert und brand-scoped; eine
+ * fremde ID ist ein 404.
  */
 class EurDocumentController extends Controller
 {
@@ -32,6 +39,8 @@ class EurDocumentController extends Controller
         'image/png' => 'png',
         'image/jpeg' => 'jpeg',
     ];
+
+    public function __construct(private readonly BoundFileEncryption $encryption) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -52,8 +61,30 @@ class EurDocumentController extends Controller
 
         $documents = $query->orderByDesc('year')->orderByDesc('month')->orderByDesc('id')->get();
 
+        // Lesende Zuordnung über die Belegnummer: es gibt keine eigene
+        // Fremdschlüsselspalte in `eur_entries`, daher bleibt dies eine
+        // read-only Look-up ohne Migration. Fremde Brands fallen durch den
+        // brand-scoped Query heraus.
+        $receiptNumbers = $documents->pluck('receipt_no')
+            ->filter(static fn (mixed $value): bool => is_string($value) && $value !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        $entriesByReceipt = [];
+        if ($receiptNumbers !== []) {
+            $entriesByReceipt = EurEntry::forCurrentBrand()
+                ->whereIn('receipt_no', $receiptNumbers)
+                ->get(['id', 'receipt_no'])
+                ->groupBy('receipt_no')
+                ->map(static fn ($rows) => $rows->pluck('id')->map(static fn (mixed $id): int => (int) $id)->values()->all())
+                ->all();
+        }
+
         return response()->json([
-            'documents' => $documents->map(fn (EurDocument $document): array => $this->serialize($document))->values(),
+            'documents' => $documents
+                ->map(fn (EurDocument $document): array => $this->serialize($document, $entriesByReceipt))
+                ->values(),
         ]);
     }
 
@@ -76,7 +107,7 @@ class EurDocumentController extends Controller
         $existing = EurDocument::forCurrentBrand()->where('sha256', $sha256)->first();
 
         if ($existing !== null) {
-            return response()->json(['document' => $this->serialize($existing)]);
+            return response()->json(['document' => $this->serialize($existing, [])]);
         }
 
         $extension = self::EXTENSIONS[$file->getMimeType()] ?? null;
@@ -86,7 +117,6 @@ class EurDocumentController extends Controller
         }
 
         $storagePath = sprintf('eur/%s/%s.%s', $brand, $sha256, $extension);
-        Storage::disk('local')->put($storagePath, $content);
 
         $document = EurDocument::create([
             'brand' => $brand,
@@ -101,9 +131,19 @@ class EurDocumentController extends Controller
             'status' => 'uploaded',
         ]);
 
+        // Die ID muss aus der Datenbank stammen: sie ist Teil der im
+        // Chiffre-Envelope gebundenen Contexts. Schlägt die Verschlüsselung
+        // fehl, bleibt kein halb angelegter Datensatz zurück.
+        try {
+            $this->encryption->store($storagePath, $content, $brand, (string) $document->id);
+        } catch (Throwable $e) {
+            $document->delete();
+            throw $e;
+        }
+
         $this->audit('uploaded', $document);
 
-        return response()->json(['document' => $this->serialize($document)], 201);
+        return response()->json(['document' => $this->serialize($document, [])], 201);
     }
 
     public function download(int $id): StreamedResponse
@@ -114,8 +154,22 @@ class EurDocumentController extends Controller
             abort(404, 'Belegdatei nicht gefunden');
         }
 
-        return Storage::disk('local')->download(
-            $document->storage_path,
+        try {
+            $plain = $this->encryption->read(
+                $document->storage_path,
+                BrandRegistry::currentId(),
+                (string) $document->id,
+            );
+        } catch (DocumentContextMismatchException) {
+            // Fehlgeschlagene Bindung ist kein Download-Fehler mit Inhalt:
+            // kein Klartext, kein Context, keine unterscheidbare Meldung.
+            abort(404, 'Belegdatei nicht gefunden');
+        }
+
+        return response()->streamDownload(
+            static function () use ($plain): void {
+                echo $plain;
+            },
             $document->original_name,
             ['Content-Type' => $document->mime_type],
         );
@@ -137,9 +191,10 @@ class EurDocumentController extends Controller
     }
 
     /**
+     * @param  array<string, list<int>>  $entriesByReceipt
      * @return array<string, mixed>
      */
-    private function serialize(EurDocument $document): array
+    private function serialize(EurDocument $document, array $entriesByReceipt): array
     {
         // `storage_path` wird bewusst nicht ausgeliefert.
         return [
@@ -147,6 +202,9 @@ class EurDocumentController extends Controller
             'year' => (int) $document->year,
             'month' => $document->month === null ? null : (int) $document->month,
             'receipt_no' => $document->receipt_no,
+            'linked_entry_ids' => $document->receipt_no !== null
+                ? ($entriesByReceipt[$document->receipt_no] ?? [])
+                : [],
             'original_name' => $document->original_name,
             'mime_type' => $document->mime_type,
             'size_bytes' => (int) $document->size_bytes,

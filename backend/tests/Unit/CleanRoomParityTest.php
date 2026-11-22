@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 /**
- * EÜR · Parität — 19 datengetriebene Vektoren aus der gepinnten Fixture.
+ * EAR · Parität — 19 datengetriebene Vektoren aus der gepinnten Fixture.
  *
  * Framework-/DB-frei (PHPUnit\Framework\TestCase, NICHT Tests\TestCase).
  * Expected Values und Inputs kommen ausschließlich aus der Fixture; es gibt

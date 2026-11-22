@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * EÜR · Anlagegut (EUE-049 … EUE-061, DEG-001 … DEG-015).
+ * EAR · Anlagegut (EUE-049 … EUE-061, DEG-001 … DEG-015).
  *
  * Kosten in ganzen Cent, Nutzungsdauer in Jahren, Betriebsanteil als ganze
  * Prozentzahl (50–100, 5-%-Schritte). Die Methode ist linear oder degressiv;

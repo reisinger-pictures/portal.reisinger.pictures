@@ -9,7 +9,7 @@ use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * EÜR · Einkommensteuertarif (EUE-089 … EUE-098).
+ * EAR · Einkommensteuertarif (EUE-089 … EUE-098).
  *
  * Die Stufen kommen aus dem gepinnten Referenzartefakt. Die erste Grenze ist
  * die steuerfreie Schwelle; jede weitere Stufe rechnet den Anteil des

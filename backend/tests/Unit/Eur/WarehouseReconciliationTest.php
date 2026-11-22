@@ -7,7 +7,7 @@ namespace Tests\Unit\Eur;
 use App\Eur\Domain\WarehouseReconciliation;
 use PHPUnit\Framework\TestCase;
 
-/** EÜR · Wareneingang ↔ Ausgabenabgleich (EUE-045 … EUE-047, EUE-129). */
+/** EAR · Wareneingang ↔ Ausgabenabgleich (EUE-045 … EUE-047, EUE-129). */
 class WarehouseReconciliationTest extends TestCase
 {
     /** EUE-045 */

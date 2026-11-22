@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * EÜR · Belegmetadaten. Die Datei liegt ausschließlich im privaten Storage;
+ * EAR · Belegmetadaten. Die Datei liegt ausschließlich im privaten Storage;
  * der Pfad wird nie öffentlich ausgeliefert.
  */
 class EurDocument extends Model

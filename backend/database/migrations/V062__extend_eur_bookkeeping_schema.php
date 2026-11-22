@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * EÜR · Journal-Details, Belege, Stunden, Wareneingang, Anträge und Monate.
+ * EAR · Journal-Details, Belege, Stunden, Wareneingang, Anträge und Monate.
  *
  * Schema-/Backfill-/Rollback-Entscheidung:
  * features/eur/04-data-model.md, Abschnitt „Schema-Entscheidung V062“.

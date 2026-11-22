@@ -1,8 +1,8 @@
-import useSWR from 'swr';
+import useSWR, {mutate as globalMutate} from 'swr';
 import {apiMutate, apiUpload, fetcher} from '../api';
 
 /**
- * EÜR · API-Vertrag der Buchhaltung.
+ * EAR · API-Vertrag der Buchhaltung.
  *
  * Alle Geldwerte sind ganzzahlige Cent (`*_cents`), Anteile ganze Prozent in
  * 5-%-Schritten, Sätze Basispunkte (1/10000). Die Umrechnung in Euro passiert
@@ -51,6 +51,37 @@ export interface EurReference {
     };
 }
 
+/** One row of the monthly social-insurance overview. All amounts are cents. */
+export interface EurSvMonthly {
+    month: number;
+    kv_cents: number;
+    pv_cents: number;
+    svs_cents: number;
+    uv_cents: number;
+}
+
+/** A labelled "weitere Versicherungen" block with its monthly amount in cents. */
+export interface EurInsuranceBlock {
+    label: string;
+    monthly_cents: number;
+}
+
+/** AfA card: booked business depreciation, private share and remaining book value. */
+export interface EurAfaCard {
+    booking_cents: number;
+    private_cents: number;
+    residual_cents: number;
+}
+
+/** One customer/project profitability row of the annual overview. */
+export interface EurByCustomer {
+    customer: string;
+    project: string;
+    revenue_cents: number;
+    cost_cents: number;
+    margin_cents: number;
+}
+
 export interface EurSummary {
     year: number;
     entry_count: number;
@@ -59,6 +90,13 @@ export interface EurSummary {
     expense_cents: number;
     afa_cents: number;
     profit_cents: number;
+    /** Additive fields from the completed EAR summary contract; optional so older payloads stay renderable. */
+    sv_monthly?: EurSvMonthly[];
+    insurance_blocks?: EurInsuranceBlock[];
+    afa_card?: EurAfaCard;
+    by_customer?: EurByCustomer[];
+    open_documents?: number;
+    signature_status?: string;
 }
 
 export interface EurEntry {
@@ -168,6 +206,53 @@ export interface EurMonthTotals {
     hours_minutes: number;
 }
 
+/** Aggregated business amounts for one E1A/E1B code (additive contract shape). */
+export interface EurE1CodeAmounts {
+    income_cents: number;
+    expense_cents: number;
+}
+
+/**
+ * The month endpoint currently delivers grouped nets (`{E1A: {code: cents},
+ * E1B: {code: cents}}`), while the additive contract describes per-code
+ * income/expense objects. Both are accepted and normalised by `e1ByCodeRows`.
+ */
+export type EurE1ByCode = Record<string, EurE1CodeAmounts | Record<string, number>>;
+
+/** One normalised row of the E1A/E1B per-code table. */
+export interface EurE1DisplayRow {
+    code: string;
+    income_cents: number | null;
+    expense_cents: number | null;
+    total_cents: number | null;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** Flattens both E1A/E1B delivery shapes into display rows without recalculating anything. */
+export function e1ByCodeRows(source: EurE1ByCode | undefined): EurE1DisplayRow[] {
+    if (!source) return [];
+    const rows: EurE1DisplayRow[] = [];
+
+    for (const [code, value] of Object.entries(source)) {
+        if (!isRecord(value)) continue;
+        if (typeof value.income_cents === 'number' || typeof value.expense_cents === 'number') {
+            const income = typeof value.income_cents === 'number' ? value.income_cents : 0;
+            const expense = typeof value.expense_cents === 'number' ? value.expense_cents : 0;
+            rows.push({code, income_cents: income, expense_cents: expense, total_cents: null});
+            continue;
+        }
+        for (const [subCode, amount] of Object.entries(value)) {
+            if (typeof amount === 'number') {
+                rows.push({code: `${code} ${subCode}`, income_cents: null, expense_cents: null, total_cents: amount});
+            }
+        }
+    }
+
+    return rows;
+}
+
 export interface EurMonthData {
     year: number;
     month: number;
@@ -178,6 +263,8 @@ export interface EurMonthData {
     income_tax: {profit_cents: number; tax_cents: number};
     report: {status: string; closed_at: string | null};
     signature: {status: string; provider: string | null; is_test: boolean};
+    /** Keyed by E1A/E1B code (e.g. `9040`, `E1B 9460`); optional for older payloads. */
+    e1_by_code?: EurE1ByCode;
 }
 
 /** `GET/POST /eur/documents` — metadata; the storage path never leaves the server. */
@@ -288,13 +375,26 @@ export interface EurAnalytics {
     by_month: EurAnalyticsMonth[];
 }
 
-/** German month names, indexed 0..11, shared by the EÜR cockpit panels. */
+/** German month names, indexed 0..11, shared by the EAR cockpit panels. */
 export const EUR_MONTHS = [
     'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
     'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
 ] as const;
 
 const SWR_OPTIONS = {revalidateOnFocus: false} as const;
+
+/**
+ * Revalidates every EAR SWR key after a write. The cockpit derives its month
+ * list, totals and overview from several independent endpoints; a single write
+ * must refresh all of them without the caller knowing each URL.
+ */
+export async function revalidateEur(): Promise<void> {
+    await globalMutate(
+        (key) => typeof key === 'string' && key.startsWith('/api/management/eur/'),
+        undefined,
+        {revalidate: true},
+    );
+}
 
 export function useEurReference() {
     return useSWR<EurReference>('/api/management/eur/reference', fetcher, SWR_OPTIONS);
@@ -374,6 +474,87 @@ export async function saveEurSettings(payload: {
     await apiMutate('/api/management/eur/settings', 'PUT', payload);
 }
 
+/** `POST /eur/months` — idempotent creation of a single monthly report. */
+export interface EurMonthCreateResult {
+    year: number;
+    month: number;
+    created: boolean;
+    report: {status: string; closed_at: string | null};
+}
+
+export async function createEurMonth(payload: {year: number; month: number}): Promise<EurMonthCreateResult> {
+    return apiMutate<EurMonthCreateResult>('/api/management/eur/months', 'POST', payload);
+}
+
+/** `POST /eur/months/year` — idempotent creation of all monthly reports of a year. */
+export interface EurYearCreateResult {
+    year: number;
+    created: number | boolean;
+    months: {year: number; month: number; status: string}[];
+}
+
+export async function createEurYear(payload: {year: number}): Promise<EurYearCreateResult> {
+    return apiMutate<EurYearCreateResult>('/api/management/eur/months/year', 'POST', payload);
+}
+
+/** `POST /eur/entries/import` — multipart CSV import into a single month. */
+export interface EurImportResult {
+    created: number;
+    skipped: number;
+    errors: string[];
+}
+
+export async function importEurEntries(payload: {file: File; year: number; month: number}): Promise<EurImportResult> {
+    const body = new FormData();
+    body.append('file', payload.file);
+    body.append('year', String(payload.year));
+    body.append('month', String(payload.month));
+
+    return apiUpload<EurImportResult>('/api/management/eur/entries/import', body);
+}
+
+/** `POST /eur/eigenbelege` — creates a business receipt entry directly. */
+export interface EurEigenbelegPayload {
+    year: number;
+    month: number;
+    day: number;
+    description: string;
+    amount_cents: number;
+    business_share: number;
+}
+
+export interface EurEigenbelegResponse {
+    entry: EurEntry;
+}
+
+export async function createEurEigenbeleg(payload: EurEigenbelegPayload): Promise<EurEigenbelegResponse> {
+    return apiMutate<EurEigenbelegResponse>('/api/management/eur/eigenbelege', 'POST', payload);
+}
+
+/** PDF endpoints are plain authenticated links; no fetch+blob detour needed. */
+export function eurPdfMonthUrl(year: number, month: number): string {
+    return `/api/management/eur/pdf/month?year=${year}&month=${month}`;
+}
+
+export function eurPdfEigenbelegUrl(
+    year: number,
+    month: number,
+    description: string,
+    amountCents: number,
+): string {
+    const query = new URLSearchParams({
+        year: String(year),
+        month: String(month),
+        description,
+        amount_cents: String(amountCents),
+    });
+    return `/api/management/eur/pdf/eigenbeleg?${query.toString()}`;
+}
+
+export function eurPdfAssetsUrl(year: number): string {
+    return `/api/management/eur/pdf/assets?year=${year}`;
+}
+
 export async function fetchEurComparison(params: {
     cost_cents: number;
     useful_life_years: number;
@@ -392,10 +573,29 @@ export async function fetchEurComparison(params: {
 
 export type EurVatKz = '000' | '016' | '057' | '070' | '072' | '073' | '008' | '125' | 'zahllast';
 
+/** One USt declaration block as delivered by the declaration service. */
+export interface EurVatDeclarationBlock {
+    key: string;
+    title: string;
+    text: string;
+    title_upper?: string;
+    title_cell?: string;
+    year_cell?: string;
+    wirtschaftsjahr?: number;
+    source?: string;
+    kz?: Record<string, number | null>;
+    zahllast_cents?: number | null;
+}
+
+/** Both delivery shapes are rendered: two plain strings or two structured blocks. */
+export type EurVatErklaerung = string[] | Record<string, EurVatDeclarationBlock>;
+
 export interface EurVatResult {
     year: number;
     month: number;
     kz: Record<EurVatKz, number | null>;
+    /** The two USt declaration blocks (Voranmeldung / Erklärung); optional for older payloads. */
+    erklaerung?: EurVatErklaerung;
 }
 
 export interface EurVatPayload {
@@ -438,6 +638,25 @@ export async function calculateEurTravel(payload: EurTravelPayload): Promise<Eur
 
 export type EurIncomeTaxMode = 'total' | 'business' | 'rental' | 'forecast';
 
+/** Classification of the E1A lump-sum allowances (a non-money block). */
+export interface EurSteuerbilanzPauschalen {
+    e40_code: string | null;
+    e40_label: string | null;
+    e39_code: string | null;
+    e39_label: string | null;
+}
+
+/** Named figures of the tax balance sheet; keys are defined by the EAR engine. */
+export interface EurSteuerbilanz {
+    betriebliche_einnahmen_cents?: number;
+    betriebliche_ausgaben_cents?: number;
+    gewinn_cents?: number;
+    steuerlicher_gewinn_cents?: number;
+    afa_cents?: number;
+    pauschalen?: EurSteuerbilanzPauschalen;
+    [key: string]: unknown;
+}
+
 export interface EurIncomeTaxResult {
     year: number;
     profit_cents: number;
@@ -450,6 +669,12 @@ export interface EurIncomeTaxResult {
     e1a?: string | null;
     e1b?: string | null;
     deductions_cents?: number;
+    /** Additional KZ values (245, 260, U13, U26, E40, E39) from the calculation. */
+    kz?: Record<string, number>;
+    steuerbilanz?: EurSteuerbilanz;
+    /** Optional fallbacks when the month endpoint is not consulted for E1A/E1B rows. */
+    e1_by_code?: EurE1ByCode;
+    e1a_e1b?: EurE1ByCode;
 }
 
 export interface EurIncomeTaxOptions {

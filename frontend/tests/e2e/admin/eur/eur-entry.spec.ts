@@ -3,7 +3,7 @@ import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
 
-test.describe('EÜR sub-application', () => {
+test.describe('EAR sub-application', () => {
     let helper: E2ESessionHelper;
     let superAdmin = { email: '', password: '' };
 
@@ -16,7 +16,7 @@ test.describe('EÜR sub-application', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Super-Admin moves through the EÜR tabs, books an entry, calculates travel and VAT and compares the depreciation', { tag: ['@feature:eur'] }, async ({ page }) => {
+    test('Super-Admin moves through the EAR tabs, books an entry, calculates travel and VAT and compares the depreciation', { tag: ['@feature:eur'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 

@@ -7,7 +7,7 @@ use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
-/** EÜR · Monatsabschluss; je Brand/Jahr/Monat genau ein Datensatz. */
+/** EAR · Monatsabschluss; je Brand/Jahr/Monat genau ein Datensatz. */
 class EurMonthlyReport extends Model
 {
     protected $fillable = [

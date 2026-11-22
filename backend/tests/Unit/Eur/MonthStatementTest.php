@@ -8,7 +8,7 @@ use App\Eur\Domain\MonthStatement;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
-/** EÜR · Monatsansicht (EUE-116, EUE-117, EUE-118, EUE-124, EUE-129). */
+/** EAR · Monatsansicht (EUE-116, EUE-117, EUE-118, EUE-124, EUE-129). */
 class MonthStatementTest extends TestCase
 {
     /** @return list<array<string, mixed>> */

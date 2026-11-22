@@ -7,7 +7,7 @@ use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
-/** EÜR · Stundenbuch; Zeit ist ausschließlich ganze Minuten. */
+/** EAR · Stundenbuch; Zeit ist ausschließlich ganze Minuten. */
 class EurHour extends Model
 {
     protected $fillable = [

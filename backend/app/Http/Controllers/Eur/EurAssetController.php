@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
- * EÜR · Anlagegüter und AfA (EUE-049 … EUE-061, DEG-001 … DEG-015).
+ * EAR · Anlagegüter und AfA (EUE-049 … EUE-061, DEG-001 … DEG-015).
  *
  * Der Jahresplan wird serverseitig aus dem gepinnten Regelkatalog berechnet
  * und als `eur_asset_years` festgehalten. Ein Wechsel zur linearen AfA ist

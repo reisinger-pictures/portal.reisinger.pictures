@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Eur\Parity;
 
 /**
- * EÜR · Parität — minimale Wertekette für Summen und Auswertungen.
+ * EAR · Parität — minimale Wertekette für Summen und Auswertungen.
  *
  * Eingaben und Ausgaben sind ausschließlich ganze Cent. Die Klasse ist
  * framework- und datenbankfrei und speichert unveränderliche Werte.

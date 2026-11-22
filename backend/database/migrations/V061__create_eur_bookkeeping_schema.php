@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * EÜR · Buchhaltungs-Datenmodell (Portal #27).
+ * EAR · Buchhaltungs-Datenmodell (Portal #27).
  *
  * Schema: Buchungen (`eur_entries`), Kunden/Projekte, Anlagegüter
  * (`eur_assets`) und deren Jahresplan (`eur_asset_years`) sowie ein

@@ -21,7 +21,7 @@ use Illuminate\Http\Request;
 use InvalidArgumentException;
 
 /**
- * EÜR · Monatsansicht und Monatsabschluss (Portal #27).
+ * EA Rechnung · Monatsansicht und Monatsabschluss (Portal #27).
  *
  * Die reine Domäne `MonthStatement` baut die Antwort aus den übergebenen
  * Arrays; der Controller liefert ausschließlich Daten und kümmert sich um
@@ -82,6 +82,69 @@ class EurMonthController extends Controller
         return response()->json(array_replace($this->defaults($year, $month), $payload));
     }
 
+    /**
+     * Idempotent Anlage eines einzelnen Monats (Portal #31 / P7).
+     *
+     * Ein bereits vorhandener, ggf. abgeschlossener Monat bleibt unberührt:
+     * `updateOrCreate` findet ihn anhand des Brand-/Jahr-/Monat-Schlüssels und
+     * überschreibt weder Status noch Note noch Abschlusszeit.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'year' => $this->yearRule(true),
+            'month' => 'required|integer|min:1|max:12',
+        ]);
+
+        $year = (int) $data['year'];
+        $month = (int) $data['month'];
+
+        $report = EurMonthlyReport::updateOrCreate($this->reportKeys($year, $month), []);
+        $created = $report->wasRecentlyCreated;
+
+        if ($created) {
+            // Datenbank-Defaults (status='open') stehen erst nach dem Refresh
+            // im Modell — die Antwort soll denselben Vertrag wie close() haben.
+            $report->refresh();
+        }
+
+        return response()->json([
+            'year' => $year,
+            'month' => $month,
+            'created' => $created,
+            'report' => $this->serializeReport($report),
+        ]);
+    }
+
+    /** Idempotent Anlage aller zwölf Monate eines Wirtschaftsjahres. */
+    public function createYear(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'year' => $this->yearRule(true),
+        ]);
+
+        $year = (int) $data['year'];
+        $created = 0;
+        $months = [];
+
+        for ($month = 1; $month <= 12; $month++) {
+            $report = EurMonthlyReport::updateOrCreate($this->reportKeys($year, $month), []);
+
+            if ($report->wasRecentlyCreated) {
+                $created++;
+                $report->refresh();
+            }
+
+            $months[] = $this->serializeReport($report);
+        }
+
+        return response()->json([
+            'year' => $year,
+            'created' => $created,
+            'months' => $months,
+        ]);
+    }
+
     public function close(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -122,15 +185,35 @@ class EurMonthController extends Controller
         }
 
         return response()->json([
-            'report' => [
-                'id' => (int) $report->id,
-                'year' => (int) $report->year,
-                'month' => (int) $report->month,
-                'status' => $report->status,
-                'note' => $report->note,
-                'closed_at' => $report->closed_at?->toIso8601String(),
-            ],
+            'report' => $this->serializeReport($report),
         ]);
+    }
+
+    /**
+     * @return array{brand: string, year: int, month: int}
+     */
+    private function reportKeys(int $year, int $month): array
+    {
+        return [
+            'brand' => BrandRegistry::currentId(),
+            'year' => $year,
+            'month' => $month,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeReport(EurMonthlyReport $report): array
+    {
+        return [
+            'id' => (int) $report->id,
+            'year' => (int) $report->year,
+            'month' => (int) $report->month,
+            'status' => $report->status,
+            'note' => $report->note,
+            'closed_at' => $report->closed_at?->toIso8601String(),
+        ];
     }
 
     /**
@@ -245,9 +328,9 @@ class EurMonthController extends Controller
     /**
      * @return array<int, mixed>
      */
-    private function yearRule(): array
+    private function yearRule(bool $required = false): array
     {
-        return ['nullable', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
+        return [$required ? 'required' : 'nullable', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
             try {
                 EurYear::assert((int) $value);
             } catch (InvalidArgumentException) {

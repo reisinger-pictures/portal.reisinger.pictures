@@ -8,7 +8,7 @@ use App\Eur\Domain\VatReturnService;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
-/** EÜR · USt-Voranmeldung aus Buchungen (EUE-082 … EUE-088). */
+/** EAR · USt-Voranmeldung aus Buchungen (EUE-082 … EUE-088). */
 class VatReturnServiceTest extends TestCase
 {
     /** @return list<array<string, mixed>> */

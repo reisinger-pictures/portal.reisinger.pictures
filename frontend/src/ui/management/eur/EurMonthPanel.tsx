@@ -4,6 +4,7 @@ import { Trans } from '@lingui/react/macro';
 import { formatEuro, formatPercent } from '../../../logic/formatCurrency';
 import {
     closeEurMonth,
+    e1ByCodeRows,
     EUR_MONTHS as MONTHS,
     useEurMonth,
     type EurMonthLine,
@@ -263,6 +264,40 @@ export default function EurMonthPanel({year, month, onMonthChange}: Props) {
                         <dd className="font-semibold text-primary">{cents(data.income_tax.tax_cents)}</dd>
                     </div>
                 </dl>
+
+                {e1ByCodeRows(data.e1_by_code).length > 0 && (
+                    <>
+                        <div className="divider my-4"/>
+
+                        <h3 className="font-semibold"><Trans>E1A/E1B je Kennzahl</Trans></h3>
+                        <div className="overflow-x-auto mt-2">
+                            <table className="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th><Trans>Kennzahl</Trans></th>
+                                        <th className="text-right"><Trans>Einnahmen</Trans></th>
+                                        <th className="text-right"><Trans>Ausgaben</Trans></th>
+                                        <th className="text-right"><Trans>Saldo</Trans></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {e1ByCodeRows(data.e1_by_code).map((row) => (
+                                        <tr key={row.code}>
+                                            <td className="font-mono">{row.code}</td>
+                                            <td className="text-right">{row.income_cents === null ? '—' : cents(row.income_cents)}</td>
+                                            <td className="text-right">{row.expense_cents === null ? '—' : cents(row.expense_cents)}</td>
+                                            <td className="text-right">
+                                                {row.total_cents !== null
+                                                    ? cents(row.total_cents)
+                                                    : cents((row.income_cents ?? 0) - (row.expense_cents ?? 0))}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )}
 
                 <div className="divider my-4"/>
 

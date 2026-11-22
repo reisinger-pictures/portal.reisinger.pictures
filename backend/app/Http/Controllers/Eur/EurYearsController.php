@@ -10,7 +10,7 @@ use App\Models\EurEntry;
 use Illuminate\Http\JsonResponse;
 
 /**
- * EÜR · Unterstützte Wirtschaftsjahre (EUE-001 … EUE-003).
+ * EAR · Unterstützte Wirtschaftsjahre (EUE-001 … EUE-003).
  *
  * Der Endpunkt ist die einzige Quelle für Default, supported-Menge und die
  * Warnhinweise zu Jahren außerhalb des Supports. Es werden bewusst Beispiele

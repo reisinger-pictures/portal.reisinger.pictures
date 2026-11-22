@@ -41,6 +41,7 @@ class ProtectApiMutations
     private const MULTIPART_PATHS = [
         'api/management/upload',
         'api/management/eur/documents',
+        'api/management/eur/entries/import',
         'api/management/settings/watermark',
         'api/management/invoices/extract-offer',
         'api/model-registration/*',
