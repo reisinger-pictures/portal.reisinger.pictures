@@ -391,8 +391,11 @@ services:
       "
     networks:
       portal_internal:
+      # Kein fester webnet-IP: Caddy erreicht das Backend ueber den DNS-Namen
+      # `portal_backend`. Ein fester IP wuerde jeden Einmalcontainer
+      # (`docker compose run`, Cutover/Migrationen) mit "Address already in use"
+      # scheitern lassen, weil er denselben Platz beansprucht.
       webnet:
-        ipv4_address: 172.18.0.31
 
   # Interner HTTP-Pfad fuer das SFTPGo-Upload-Event (OPS-1).
   # backend spricht nur PHP-FPM/FastCGI auf Port 9000; SFTPGo haengt nur an
