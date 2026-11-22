@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * EÜR · Buchung (Einnahme oder Ausgabe) eines Monats.
+ * EAR · Buchung (Einnahme oder Ausgabe) eines Monats.
  *
  * Geld ist ausschließlich in ganzen Cent gespeichert; der Betriebsanteil ist
  * eine ganze Prozentzahl in 5-%-Schritten. Der betriebliche Betrag wird beim

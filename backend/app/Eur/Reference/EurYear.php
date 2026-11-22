@@ -7,7 +7,7 @@ namespace App\Eur\Reference;
 use InvalidArgumentException;
 
 /**
- * EÜR · Wirtschaftsjahr (EUE-001 … EUE-003).
+ * EAR · Wirtschaftsjahr (EUE-001 … EUE-003).
  *
  * Einziger Gültigkeitsbereich sind 2024–2026; 2026 ist der Default. Ein
  * unbekanntes Jahr wird abgewiesen, nie still auf einen Default abgebildet.

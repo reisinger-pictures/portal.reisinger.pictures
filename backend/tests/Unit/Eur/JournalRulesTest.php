@@ -7,7 +7,7 @@ namespace Tests\Unit\Eur;
 use App\Eur\Domain\JournalRules;
 use PHPUnit\Framework\TestCase;
 
-/** EÜR · Journal-Zeilenprüfung (EUE-032 … EUE-042). */
+/** EAR · Journal-Zeilenprüfung (EUE-032 … EUE-042). */
 class JournalRulesTest extends TestCase
 {
     /** EUE-032/041 */

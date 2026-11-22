@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Eur\Reference;
 
 /**
- * EÜR · Jahresabhängige Tabellen 2024–2026.
+ * EAR · Jahresabhängige Tabellen 2024–2026.
  *
  * Werte stammen aus den abgeleiteten Anforderungen und dem Regelkatalog,
  * ausschließlich in ganzen Cent und exakten Brüchen. Kein Float im Rechenpfad.

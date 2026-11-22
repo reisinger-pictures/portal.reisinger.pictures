@@ -5,7 +5,7 @@ namespace Tests\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * EÜR · Clean-Room-Übergabe — Update-Erkennung über MANIFEST.json.
+ * EAR · Clean-Room-Übergabe — Update-Erkennung über MANIFEST.json.
  *
  * Framework-/DB-frei (PHPUnit\Framework\TestCase, NICHT Tests\TestCase).
  * Der gepinnte Dokumentenstand ist schreibgeschützt; jede inhaltliche Änderung

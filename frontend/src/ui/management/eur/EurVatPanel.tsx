@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { formatEuro } from '../../../logic/formatCurrency';
 import { calculateEurVat, EUR_MONTHS as MONTHS, type EurVatKz, type EurVatResult } from '../../../logic/useEur';
@@ -80,6 +81,12 @@ export default function EurVatPanel() {
             setIsLoading(false);
         }
     };
+
+    const erklaerung = result?.erklaerung;
+    const declarationTexts = Array.isArray(erklaerung) ? erklaerung : [];
+    const declarationBlocks = erklaerung && !Array.isArray(erklaerung)
+        ? Object.entries(erklaerung).filter(([, block]) => typeof block.text === 'string')
+        : [];
 
     return (
         <div className="card bg-base-100 border border-base-300 shadow-sm">
@@ -177,6 +184,7 @@ export default function EurVatPanel() {
                 )}
 
                 {result && (
+                    <>
                     <div className="mt-6 overflow-x-auto">
                         <table className="table table-sm">
                             <thead>
@@ -200,6 +208,39 @@ export default function EurVatPanel() {
                             </tbody>
                         </table>
                     </div>
+
+                    {(declarationTexts.length > 0 || declarationBlocks.length > 0) && (
+                        <div className="mt-6 space-y-3">
+                            <h3 className="font-semibold"><Trans>Erklärungen</Trans></h3>
+                            {declarationTexts.map((block, index) => {
+                                const blockNumber = index + 1;
+                                return (
+                                <div key={index} className="rounded-box border border-base-300 p-4">
+                                    <h4 className="font-medium">
+                                        {index === 0
+                                            ? <Trans>1. Umsatzsteuervoranmeldung</Trans>
+                                            : index === 1
+                                                ? <Trans>2. Umsatzsteuererklärung</Trans>
+                                                : t`Erklärungsblock ${blockNumber}`}
+                                    </h4>
+                                    <p className="text-sm whitespace-pre-line mt-2">{block}</p>
+                                </div>
+                                );
+                            })}
+                            {declarationBlocks.map(([key, block]) => (
+                                <div key={key} className="rounded-box border border-base-300 p-4">
+                                    <h4 className="font-medium">{block.title}</h4>
+                                    <p className="text-sm mt-2">{block.text}</p>
+                                    {block.zahllast_cents !== null && block.zahllast_cents !== undefined && (
+                                        <p className="text-sm mt-1">
+                                            <Trans>Zahllast</Trans>: {cents(block.zahllast_cents)}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    </>
                 )}
             </div>
         </div>

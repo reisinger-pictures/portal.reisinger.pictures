@@ -9,7 +9,7 @@ use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * EÜR · Sozialversicherungswerte (EUE-014 … EUE-022, EUE-109 … EUE-114).
+ * EAR · Sozialversicherungswerte (EUE-014 … EUE-022, EUE-109 … EUE-114).
  *
  * Die Tabelle `sv_werte` wird an dieser einen Lesegrenze in ganze Cent bzw.
  * Basispunkte übersetzt. Die Werte sind jahresabhängig gepinnt; ein anderes
@@ -17,6 +17,12 @@ use RuntimeException;
  */
 final class SocialInsurance
 {
+    /** Modus "Nur Unfallversicherung": nur die UV-Pauschale (EUE-107/112/114). */
+    public const MODE_UV_ONLY = 'uv_only';
+
+    /** Jungunternehmer: nur die KV-Satz-Anzeige entfällt (EUE-108/110). */
+    public const MODE_JUNGUNTERNEHMER = 'jungunternehmer';
+
     /** @var array<string, int> */
     private array $amountsCents = [];
 
@@ -97,23 +103,57 @@ final class SocialInsurance
         return $this->minimumHealthMonthlyCents() * 12;
     }
 
-    /** Mindest-PV-Beitrag je Monat, modusabhängig (EUE-017/018/111). */
+    /**
+     * Mindest-PV-Beitrag je Monat, modusabhängig (EUE-017/018/111).
+     *
+     * EUE-107/110/111/112: der Modus "Nur Unfallversicherung" lässt KV, SVS
+     * und PV gemeinsam leer — es bleibt nur die UV-Pauschale. EUE-108 stellt
+     * ausdrücklich klar, dass die Jungunternehmer-Regelung *keine*
+     * Pensionsausnahme ist ("PV (Z15/AA15) hat keine Jungunternehmer-Ausnahme");
+     * der Mindestbeitrag bleibt damit der des GSVG-Basismodus. Es wird
+     * kein neuer Betrag erfunden, sondern der gepinnte Wert der Tabelle
+     * gelesen. Ein unbekannter Modus wird abgewiesen (kein stiller Default).
+     */
     public function minimumPensionMonthlyCents(string $mode): int
     {
         $key = match ($mode) {
             'fsvg' => 'fsvg_pv_min',
             'ns_gsvg' => 'gsvg_ns_pv_min',
-            'gsvg' => 'gsvg_pv_min',
+            'gsvg', self::MODE_JUNGUNTERNEHMER => 'gsvg_pv_min',
+            self::MODE_UV_ONLY => null,
             default => throw new InvalidArgumentException(sprintf('Unbekannter SV-Modus "%s".', $mode)),
         };
 
-        return $this->amountCents($key);
+        return $key === null ? 0 : $this->amountCents($key);
+    }
+
+    /**
+     * Gepinnter UV-Monatsbetrag (EUE-022/112).
+     *
+     * Der Tabellenwert `uv_pauschale` ist der Monatswert, aus dem die
+     * Jahrespauschale als `uv_pauschale × 12` gebildet wird (Beleg AA12).
+     * Der Name `accidentYearlyCents()` bleibt aus Kompatibilitätsgründen
+     * erhalten; diese Methode benennt die Leserichtung explizit.
+     */
+    public function accidentMonthlyCents(): int
+    {
+        return $this->amountCents('uv_pauschale');
     }
 
     /** Jährliche Unfallversicherungspauschale (EUE-022/112). */
     public function accidentYearlyCents(): int
     {
         return $this->amountCents('uv_pauschale');
+    }
+
+    /**
+     * EUE-107/108: nur der UV-Modus lässt KV, SVS und PV gemeinsam entfallen.
+     * Bei Jungunternehmern wird lediglich der KV-Satz in der Anzeige zum
+     * Strich; Mindest-KV, SVS und PV werden weiterhin bezahlt.
+     */
+    public function isFlatRateOnlyMode(string $mode): bool
+    {
+        return $mode === self::MODE_UV_ONLY;
     }
 
     public function healthRatePer10000(): int

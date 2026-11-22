@@ -12,7 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Gemeinsame Auth-/Brand-Helfer für die EÜR-Buchhaltungs-API-Tests.
+ * Gemeinsame Auth-/Brand-Helfer für die EAR-Buchhaltungs-API-Tests.
  *
  * Spiegelt die Helfer aus Tests\Feature\EurApiTest (dort privat), damit die
  * fokussierten Tests dieselbe Rolle/Brand-Konstellation nutzen.

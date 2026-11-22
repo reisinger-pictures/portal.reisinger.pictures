@@ -10,7 +10,7 @@ use App\Eur\Reference\TravelAllowances;
 use InvalidArgumentException;
 
 /**
- * EÜR · Reise- und Fahrtkosten (EUE-062 … EUE-081).
+ * EAR · Reise- und Fahrtkosten (EUE-062 … EUE-081).
  *
  * Kilometergeld, Mitfahrerzuschlag, Kontingente und Zeitgrenzen kommen aus dem
  * gepinnten Regelkatalog; Tag-/Nächtigungssätze aus der Ländertabelle. Alle

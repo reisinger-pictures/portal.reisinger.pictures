@@ -9,7 +9,7 @@ use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * EÜR · Parität — Jahreskonstanten aus dem gepinnten Regelkatalog.
+ * EAR · Parität — Jahreskonstanten aus dem gepinnten Regelkatalog.
  *
  * Es gibt keine zweite Regelquelle im Portal: die Werte werden zur Laufzeit
  * aus dem unveränderlichen Katalog der Clean-Room-Basis gelesen. Regeltexte,

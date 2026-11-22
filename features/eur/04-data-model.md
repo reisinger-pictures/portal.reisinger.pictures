@@ -1,4 +1,4 @@
-# EÜR-Datenmodell und Persistenz
+# EAR-Datenmodell und Persistenz
 
 **Status:** gültig für Wirtschaftsjahr 2026
 
@@ -79,7 +79,7 @@ es keinen Schreibpfad gibt, der `method` nach einem Wechsel wieder auf
 
 ## API-Vertrag
 
-Alle EÜR-Endpunkte liegen unter `/api/management/eur/*`, sind authentifiziert
+Alle EAR-Endpunkte liegen unter `/api/management/eur/*`, sind authentifiziert
 und auf die Management-Rollen begrenzt. Geld geht als ganzzahlige Cent über
 die Leitung, Anteile als ganze Prozent, Sätze als Basispunkte. Antworten sind
 brand-scoped; ein fremder Datensatz liefert 404, eine ungültige Eingabe 422.

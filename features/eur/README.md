@@ -1,4 +1,4 @@
-# EÜR-Integration
+# EAR-Integration
 
 Die Einnahmen-Ausgaben-Rechnung wird im Portal aus den abgeleiteten Dokumenten
 der Clean-Room-Basis implementiert. Dieses Verzeichnis enthält die portal-eigenen
@@ -23,18 +23,18 @@ Verträge und den unveränderlichen, versionierten Dokumentenstand.
 
 - Die Buchhaltung ist für mehrere Brands ausgelegt und richtet sich nach dem Brand-Kontext des Portals; es gibt keine fest verdrahtete Einzel-Buchhaltung.
 - Alle späteren Buchhaltungsdaten werden brand-scoped gespeichert und abgefragt; fremde Brand-IDs sind nicht zugreifbar (404).
-- Die Unternehmensdaten der EÜR-Ansicht stammen ausschließlich aus den brand-scoped Einstellungen (`/api/settings/billing-details`); es gibt keine zweite Firmendatenquelle.
+- Die Unternehmensdaten der EAR-Ansicht stammen ausschließlich aus den brand-scoped Einstellungen (`/api/settings/billing-details`); es gibt keine zweite Firmendatenquelle.
 
 ## Nutzeransicht
 
 - Die Buchhaltung ist ein eigener Menüpunkt in der bestehenden App-Shell (Route `/steuern`, Alias `/eur`) mit einem expliziten Weg zurück ins Portal; keine zweite App-Shell.
 - Die Ansicht zeigt ausschließlich fachlich nützliche Informationen: Unternehmensdaten aus den Einstellungen, die Grenze für geringwertige Wirtschaftsgüter und den betrieblichen Anteil. Technische Hinweise zur Paritätsprüfung sind kein Teil der Nutzeransicht.
-- Die EÜR-spezifischen Firmenfelder (Steuernummer, Finanzamt, UID, Rechtsform) werden in den Einstellungen gepflegt und in der Ansicht angezeigt; fehlende Werte erscheinen als Platzhalter.
+- Die EAR-spezifischen Firmenfelder (Steuernummer, Finanzamt, UID, Rechtsform) werden in den Einstellungen gepflegt und in der Ansicht angezeigt; fehlende Werte erscheinen als Platzhalter.
 
 ## Umfang
 
 - Referenzdaten, Einstellungen, Buchungen, Anlagen/AfA, DEG-Vergleich, USt und
-  Reisen sind über die EÜR-API angebunden.
+  Reisen sind über die EAR-API angebunden.
 - Die UI ist eine eigenständige Buchhaltungsansicht unter `/steuern` (Alias `/eur`) mit eigener
   Monatsleiste, Monats- und Jahresübersicht, 12 Tabs und Rücksprung ins Portal.
   Belege, Wareneingang, Auswertungen, Anträge und Signatur sind als eigene

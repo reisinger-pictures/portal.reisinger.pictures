@@ -14,7 +14,7 @@ use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
 /**
- * EÜR · Auswertungen (Portal #27).
+ * EAR · Auswertungen (Portal #27).
  *
  * Alle Summen sind ganze Cent und entstehen aus dem betrieblichen Betrag, der
  * bereits an der Schreibgrenze berechnet wurde. Es gibt keine Float-Summe und

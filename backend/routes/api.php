@@ -13,10 +13,12 @@ use App\Http\Controllers\Eur\EurAnalyticsController;
 use App\Http\Controllers\Eur\EurApplicationController;
 use App\Http\Controllers\Eur\EurAssetController;
 use App\Http\Controllers\Eur\EurDocumentController;
+use App\Http\Controllers\Eur\EurEigenbelegController;
 use App\Http\Controllers\Eur\EurEntryController;
 use App\Http\Controllers\Eur\EurHourController;
 use App\Http\Controllers\Eur\EurIncomeTaxController;
 use App\Http\Controllers\Eur\EurMonthController;
+use App\Http\Controllers\Eur\EurPdfController;
 use App\Http\Controllers\Eur\EurReferenceController;
 use App\Http\Controllers\Eur\EurSettingsController;
 use App\Http\Controllers\Eur\EurSignatureController;
@@ -300,7 +302,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     // Volume-Presets lesen ist für alle Management-Rollen (Gallery-Zuordnung); Schreiben nur Super-Admin (unten).
     Route::get('/management/settings/volume-presets', [VolumePresetController::class, 'index'])->name('api.management.settings.volume-presets.index');
 
-    // EÜR (Portal #22–#30): Referenzdaten, Buchungen, Anlagen, Übersicht.
+    // EAR (Portal #22–#30): Referenzdaten, Buchungen, Anlagen, Übersicht.
     // Alle Antworten sind brand-scoped; Geld ist ganzzahlige Cent.
     Route::get('/management/eur/reference', [EurReferenceController::class, 'show'])->name('api.management.eur.reference');
     Route::get('/management/eur/help-texts', [EurReferenceController::class, 'helpTexts'])->name('api.management.eur.help-texts');
@@ -309,6 +311,8 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/eur/summary', [EurSummaryController::class, 'show'])->name('api.management.eur.summary');
     Route::get('/management/eur/entries', [EurEntryController::class, 'index'])->name('api.management.eur.entries.index');
     Route::post('/management/eur/entries', [EurEntryController::class, 'store'])->name('api.management.eur.entries.store');
+    Route::post('/management/eur/entries/import', [EurEntryController::class, 'import'])->name('api.management.eur.entries.import');
+    Route::post('/management/eur/eigenbelege', [EurEigenbelegController::class, 'store'])->name('api.management.eur.eigenbelege.store');
     Route::put('/management/eur/entries/{id}', [EurEntryController::class, 'update'])->name('api.management.eur.entries.update');
     Route::delete('/management/eur/entries/{id}', [EurEntryController::class, 'destroy'])->name('api.management.eur.entries.destroy');
     Route::get('/management/eur/assets', [EurAssetController::class, 'index'])->name('api.management.eur.assets.index');
@@ -321,11 +325,15 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/eur/assets/{id}/switch-to-linear', [EurAssetController::class, 'switchToLinear'])->name('api.management.eur.assets.switch');
     Route::post('/management/eur/assets/{id}/book-depreciation', [EurAssetController::class, 'bookDepreciation'])->name('api.management.eur.assets.book-depreciation');
     Route::delete('/management/eur/assets/{id}', [EurAssetController::class, 'destroy'])->name('api.management.eur.assets.destroy');
-    // EÜR · Buchhaltungsansicht: Jahre, Monat/Abschluss, Belege, Stunden,
+    // EAR · Buchhaltungsansicht: Jahre, Monat/Abschluss, Belege, Stunden,
     // Wareneingang, Anträge, Signaturen und Auswertungen. Alle brand-scoped.
     Route::get('/management/eur/years', [EurYearsController::class, 'index'])->name('api.management.eur.years');
     Route::get('/management/eur/month', [EurMonthController::class, 'show'])->name('api.management.eur.month.show');
     Route::post('/management/eur/month/close', [EurMonthController::class, 'close'])->name('api.management.eur.month.close');
+    Route::post('/management/eur/months', [EurMonthController::class, 'store'])->name('api.management.eur.months.store');
+    Route::post('/management/eur/months/year', [EurMonthController::class, 'createYear'])->name('api.management.eur.months.year');
+    Route::post('/management/eur/month/create', [EurMonthController::class, 'store'])->name('api.management.eur.month.store');
+    Route::post('/management/eur/month/create-year', [EurMonthController::class, 'createYear'])->name('api.management.eur.month.create-year');
     Route::get('/management/eur/documents', [EurDocumentController::class, 'index'])->name('api.management.eur.documents.index');
     Route::post('/management/eur/documents', [EurDocumentController::class, 'store'])->name('api.management.eur.documents.store');
     Route::get('/management/eur/documents/{id}/download', [EurDocumentController::class, 'download'])->name('api.management.eur.documents.download');
@@ -340,6 +348,9 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/eur/signatures', [EurSignatureController::class, 'index'])->name('api.management.eur.signatures.index');
     Route::post('/management/eur/signatures', [EurSignatureController::class, 'store'])->name('api.management.eur.signatures.store');
     Route::get('/management/eur/analytics', [EurAnalyticsController::class, 'index'])->name('api.management.eur.analytics');
+    Route::get('/management/eur/pdf/month', [EurPdfController::class, 'monthly'])->name('api.management.eur.pdf.month');
+    Route::get('/management/eur/pdf/eigenbeleg', [EurPdfController::class, 'eigenbeleg'])->name('api.management.eur.pdf.eigenbeleg');
+    Route::get('/management/eur/pdf/assets', [EurPdfController::class, 'assets'])->name('api.management.eur.pdf.assets');
     // R-01: Billing-/Impressum-Konfiguration ist ein Super-Admin-Anliegen (s. isImpressumMissing-
     // Gate im Frontend) → zusätzlich super_admin-gesichert. Lesen (GET /settings/billing-details)
     // bleibt auth:api, da Klienten die Bankdaten für "Kauf auf Rechnung" brauchen.

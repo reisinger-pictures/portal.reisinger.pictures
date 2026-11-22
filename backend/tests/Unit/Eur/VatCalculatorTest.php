@@ -8,7 +8,7 @@ use App\Eur\Domain\VatCalculator;
 use PHPUnit\Framework\TestCase;
 
 /**
- * EÜR · Umsatzsteuer (EUE-082 … EUE-088).
+ * EAR · Umsatzsteuer (EUE-082 … EUE-088).
  */
 class VatCalculatorTest extends TestCase
 {

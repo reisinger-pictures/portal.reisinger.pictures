@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * EÜR · Reisekosten (EUE-062 … EUE-081) — Berechnung einer Reisezeile.
+ * EAR · Reisekosten (EUE-062 … EUE-081) — Berechnung einer Reisezeile.
  *
  * Sätze, Kontingente und Grenzen kommen aus dem gepinnten Regelkatalog, die
  * Tag-/Nächtigungssätze aus der Ländertabelle. Alle Antworten sind ganze Cent.

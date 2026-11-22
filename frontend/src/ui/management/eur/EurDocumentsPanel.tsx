@@ -4,8 +4,10 @@ import { Trans } from '@lingui/react/macro';
 import {
     deleteEurDocument,
     eurDocumentDownloadUrl,
+    importEurEntries,
     uploadEurDocument,
     useEurDocuments,
+    type EurImportResult,
 } from '../../../logic/useEur';
 
 interface Props {
@@ -25,7 +27,13 @@ export default function EurDocumentsPanel({year, month}: Props) {
     const [receiptNo, setReceiptNo] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const [csvFile, setCsvFile] = useState<File | null>(null);
+    const [isImporting, setIsImporting] = useState(false);
+    const [csvMessage, setCsvMessage] = useState<string | null>(null);
+    const [csvError, setCsvError] = useState<string | null>(null);
+    const [csvResult, setCsvResult] = useState<EurImportResult | null>(null);
     const fileInputId = useId();
+    const csvInputId = useId();
 
     const submit = async () => {
         if (!file || isSaving) return;
@@ -55,6 +63,27 @@ export default function EurDocumentsPanel({year, month}: Props) {
             void documents.mutate();
         } catch {
             setSaveError(t`Der Beleg konnte nicht gelöscht werden. Laden Sie die Liste erneut und versuchen Sie es noch einmal.`);
+        }
+    };
+
+    const importCsv = async () => {
+        if (!csvFile || isImporting) return;
+        setIsImporting(true);
+        setCsvMessage(null);
+        setCsvError(null);
+        setCsvResult(null);
+
+        try {
+            const result = await importEurEntries({file: csvFile, year, month});
+            setCsvResult(result);
+            const {created, skipped} = result;
+            setCsvMessage(t`Import abgeschlossen: ${created} angelegt, ${skipped} übersprungen.`);
+            setCsvFile(null);
+            void documents.mutate();
+        } catch {
+            setCsvError(t`Der CSV-Import ist fehlgeschlagen. Prüfen Sie die Datei und versuchen Sie es erneut.`);
+        } finally {
+            setIsImporting(false);
         }
     };
 
@@ -181,6 +210,50 @@ export default function EurDocumentsPanel({year, month}: Props) {
                         </p>
                     )}
                 </div>
+
+                <div className="divider my-4"/>
+
+                <h3 className="font-semibold"><Trans>CSV-Import</Trans></h3>
+                <p className="text-sm opacity-70">
+                    <Trans>Buchungen aus einer CSV-Datei in den gewählten Monat importieren. Bereits vorhandene Zeilen werden übersprungen.</Trans>
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 items-end">
+                    <div className="form-control">
+                        <span className="label-text"><Trans>CSV-Datei</Trans></span>
+                        <input
+                            id={csvInputId}
+                            type="file"
+                            accept=".csv,text/csv"
+                            className="peer sr-only"
+                            onChange={(event) => setCsvFile(event.target.files?.[0] ?? null)}
+                        />
+                        <label
+                            htmlFor={csvInputId}
+                            className="btn btn-outline btn-sm w-full cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-primary"
+                        >
+                            <Trans>CSV-Datei auswählen</Trans>
+                        </label>
+                        <span className="text-sm opacity-70 mt-1" aria-live="polite">
+                            {csvFile ? csvFile.name : <Trans>Keine CSV-Datei ausgewählt</Trans>}
+                        </span>
+                    </div>
+                    <div>
+                        <button type="button" className="btn btn-primary btn-sm" onClick={() => void importCsv()}
+                            disabled={!csvFile || isImporting}>
+                            <Trans>CSV importieren</Trans>
+                        </button>
+                    </div>
+                </div>
+
+                {csvMessage && <p className="alert alert-success mt-3" role="status">{csvMessage}</p>}
+                {csvError && <p className="alert alert-error mt-3" role="alert">{csvError}</p>}
+                {csvResult && csvResult.errors.length > 0 && (
+                    <ul className="mt-2 space-y-1 text-sm text-error" aria-label={t`Importfehler`}>
+                        {csvResult.errors.map((message, index) => (
+                            <li key={`${index}-${message}`}>{message}</li>
+                        ))}
+                    </ul>
+                )}
             </div>
         </div>
     );

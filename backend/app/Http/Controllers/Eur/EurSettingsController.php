@@ -10,9 +10,9 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 /**
- * EÜR · Einstellungen (EUE-004 … EUE-009).
+ * EAR · Einstellungen (EUE-004 … EUE-009).
  *
- * Die EÜR-Einstellungen liegen im bestehenden brand-scoped `settings`-Store —
+ * Die EAR-Einstellungen liegen im bestehenden brand-scoped `settings`-Store —
  * es gibt keine zweite Firmendatenquelle. Geschrieben wird nur durch
  * `super_admin`; gelesen wird brand-scoped.
  */

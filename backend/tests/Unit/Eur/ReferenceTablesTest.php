@@ -7,7 +7,7 @@ use App\Eur\Reference\ReferenceTables;
 use PHPUnit\Framework\TestCase;
 
 /**
- * EÜR · Referenzdaten (EUE-004 … EUE-022) aus dem gepinnten Artefakt.
+ * EAR · Referenzdaten (EUE-004 … EUE-022) aus dem gepinnten Artefakt.
  *
  * Framework-/DB-frei. Geprüft werden die kanonischen Werte je Tabelle, die
  * Auflösung nach Land und Jahr, die 5-%-Schritte der Betriebsanteile und die

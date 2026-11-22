@@ -418,7 +418,7 @@ class SettingsController extends Controller
             'company_city' => $resolver->get('company_city', ''),
             'company_country' => $resolver->get('company_country', ''),
             'company_email' => $resolver->get('company_email', 'hello@reisinger.pictures'),
-            // Company details used by the EÜR view. Same brand-scoped settings
+            // Company details used by the EAR view. Same brand-scoped settings
             // store as the Impressum fields above, so there is no second source.
             'steuernummer' => $resolver->get('steuernummer', ''),
             'finanzamt' => $resolver->get('finanzamt', ''),

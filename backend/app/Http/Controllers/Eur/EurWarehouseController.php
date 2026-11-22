@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 use InvalidArgumentException;
 
 /**
- * EÜR · Wareneingang (Portal #27).
+ * EAR · Wareneingang (Portal #27).
  *
  * Beträge sind ausschließlich ganze Cent. Der Wareneingang ist eine eigene
  * Summe im Monatsabschluss und wird nicht in die Buchungen gemischt.

@@ -9,7 +9,7 @@ use App\Eur\Parity\RuleValues;
 use InvalidArgumentException;
 
 /**
- * EÜR · Anlagen und AfA (EUE-049 … EUE-061) sowie degressive AfA
+ * EAR · Anlagen und AfA (EUE-049 … EUE-061) sowie degressive AfA
  * (DEG-001 … DEG-015).
  *
  * Alle Beträge sind ganze Cent. Der lineare Plan folgt EUE-049 (Kosten geteilt

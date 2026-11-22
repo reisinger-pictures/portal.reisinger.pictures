@@ -7,7 +7,7 @@ namespace App\Eur\Domain;
 use InvalidArgumentException;
 
 /**
- * EÜR · Stundenbuch (EUE-080, EUE-123).
+ * EAR · Stundenbuch (EUE-080, EUE-123).
  *
  * Reine Integer-Minuten-Aggregation: Gesamtsumme, Projekt- und Monatssummen
  * sowie die 3-Stunden-Regel (ab 180 Minuten). Keine Datenbank, keine Uhr,

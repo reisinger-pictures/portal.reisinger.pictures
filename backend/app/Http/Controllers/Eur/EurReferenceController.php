@@ -10,7 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * EÜR · Referenzdaten (EUE-004 … EUE-022) für die Oberfläche.
+ * EAR · Referenzdaten (EUE-004 … EUE-022) für die Oberfläche.
  *
  * Die Antwort ist die einzige Sicht auf die gepinnten Tabellen: Geld in
  * ganzen Cent, Anteile in ganzen Prozent, Sätze in Basispunkten. Es gibt

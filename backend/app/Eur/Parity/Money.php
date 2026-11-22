@@ -7,7 +7,7 @@ namespace App\Eur\Parity;
 use InvalidArgumentException;
 
 /**
- * EÜR · Parität — Umrechnungen an der Lesegrenze der Clean-Room-Basis.
+ * EAR · Parität — Umrechnungen an der Lesegrenze der Clean-Room-Basis.
  *
  * Die Fixture liefert Basiswerte als Zahlen (EUR, Stunden, Anteil). Danach
  * sind ausschließlich ganze Cent bzw. ganze Minuten erlaubt: alle Rückgaben

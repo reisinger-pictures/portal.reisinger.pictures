@@ -7,7 +7,7 @@ namespace App\Eur\Domain;
 use InvalidArgumentException;
 
 /**
- * EÜR · Wareneingang ↔ Ausgabenabgleich (EUE-045 … EUE-047, EUE-129).
+ * EAR · Wareneingang ↔ Ausgabenabgleich (EUE-045 … EUE-047, EUE-129).
  *
  * Reiner Vergleich zweier Zeilenlisten: Wareneingänge werden zuerst über die
  * Belegnummer, sonst über Beschreibung + Betrag einer Ausgabe zugeordnet.

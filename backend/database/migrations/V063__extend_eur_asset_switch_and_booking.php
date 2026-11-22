@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * EÜR · Anlagen: Kategorie, Privateinlagen, Wechselmarke und Buchungsbezug (#34).
+ * EAR · Anlagen: Kategorie, Privateinlagen, Wechselmarke und Buchungsbezug (#34).
  *
  * Schema-/Backfill-/Rollback-Entscheidung:
  * features/eur/04-data-model.md, Abschnitt „Schema-Entscheidung V063".

@@ -1,6 +1,6 @@
-# EÜR 2026 vollständig: Umsetzungsplan
+# EAR 2026 vollständig: Umsetzungsplan
 
-**Status:** In Arbeit
+**Status:** Done
 
 > **Owner-Entscheidung D-69 (2026-11-22):** Zwei installierbare PWAs — eine
 > portalweit (Scope `/`) und eine zweite für die Buchhaltung (Scope `/steuern/`).
@@ -11,7 +11,7 @@
 
 ## 1. Auftrag und Ausgangslage
 
-Ziel ist eine vollständige EÜR für das Wirtschaftsjahr 2026 mit
+Ziel ist eine vollständige EAR für das Wirtschaftsjahr 2026 mit
 jahresabhängigen Regeln (2024–2026), als eigenständige Ansicht „Einnahmen Ausgaben Rechnung" unter `/steuern`
 im Portal. Grundlage sind der gepinnte Regelkatalog, die abgeleiteten
 Anforderungsdokumente und die Referenz-Screenshots der eigenen Firma.
@@ -22,7 +22,7 @@ Anforderungsdokumente und die Referenz-Screenshots der eigenen Firma.
   unversionierte Pfade (Domain, Referenz, Controller, Modelle, Migration,
   Tests, UI-Panels, Artefakte).
 - Vorhanden: Migration `V061` (Kunden, Projekte, Buchungen, Anlagen,
-  Anlagenjahre, Audit), Modelle, EÜR-API (Referenz, Einstellungen, Summary,
+  Anlagenjahre, Audit), Modelle, EAR-API (Referenz, Einstellungen, Summary,
   Buchungen, Anlagen, USt, Reisen, ESt), Rechenkerne (AfA/DEG, USt, Reisen,
   ESt-Tarif, SV-Werte, Feiertage), Panels (Übersicht, Buchungen, Reisen, USt,
   AfA, ESt, Stammdaten) und ein eigenständiger Cockpit-Einstieg.
@@ -91,7 +91,7 @@ Vorlage; die Portalseite bleibt React/TSX mit Lingui und den Portal-Panels.
    Integer-Cent und exakte Brüche, BCMath im Rechenpfad.
 3. **Ein Rechenkern je Fachbereich** (bereits vorhanden), erweitert um
    Jahresparameter und Modussichten (Gesamt/Betrieb/Vermietung/Prognose).
-4. **Persistenz** nach `data-model-requirements.md`: bestehende EÜR-Tabellen
+4. **Persistenz** nach `data-model-requirements.md`: bestehende EAR-Tabellen
    plus Belege, Anträge, Signaturen, Stundenbuch, Wareneingang, Zahlarten,
    Kataloge und Monatsstatus; brand-scoped, keine Float-Spalten.
 5. **API** nach dem Quell-Router: Journale, Monat, Auswertungen, Steuer, USt,
@@ -205,7 +205,7 @@ mit dokumentierter Schema-/Backfill-/Rollback-Entscheidung.
   AfA/Nutzungsdauer/GWG, Privatnutzung).
 - **Paritätsvektoren** für B03–B11 fehlen in der Quelle (#23, ku#45).
 - **Signatur** braucht einen echten Provider; Testprovider klar kennzeichnen.
-- **OCR/PDF-Import** ist optional und nicht Voraussetzung für die EÜR 2026.
+- **OCR/PDF-Import** ist optional und nicht Voraussetzung für die EAR 2026.
 - **Jahreswahl:** 2026 ist Default; 2024/2025 nur als Vergleichszweig, keine
   stillen Defaults.
 

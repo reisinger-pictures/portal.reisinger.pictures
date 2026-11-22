@@ -7,7 +7,7 @@ namespace App\Eur\Domain;
 use InvalidArgumentException;
 
 /**
- * EÜR · Umsatzsteuer (EUE-082 … EUE-088).
+ * EAR · Umsatzsteuer (EUE-082 … EUE-088).
  *
  * Die Kennzahlenzuordnung ist fest (EUE-082). Alle Beträge sind ganze Cent;
  * Steuerbeträge werden an der Cent-Grenze gegen null abgerundet, weil die

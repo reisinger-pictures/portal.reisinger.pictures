@@ -12,7 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * EÜR · API-Vertrag (Portal #24, #26, #27).
+ * EAR · API-Vertrag (Portal #24, #26, #27).
  *
  * Abgedeckt: Authentifizierung, Rollen, Brand-Trennung (fremde IDs → 404),
  * Validierung (Jahr 2026, 5-%-Schritte, ganze Cent), Audit ohne Inhalte,

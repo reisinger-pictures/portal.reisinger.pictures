@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** EÜR · Signaturstatus eines Monats (Testprovider ist gekennzeichnet). */
+/** EAR · Signaturstatus eines Monats (Testprovider ist gekennzeichnet). */
 class EurSignature extends Model
 {
     protected $fillable = [

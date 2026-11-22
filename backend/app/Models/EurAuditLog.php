@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * EÜR · Audit-Eintrag für Schreibzugriffe auf Buchhaltungsdaten.
+ * EAR · Audit-Eintrag für Schreibzugriffe auf Buchhaltungsdaten.
  *
  * Der Payload enthält nur fachliche Felder (IDs, Beträge, Aktionen) — keine
  * Dateiinhalte, keine Secrets und keine Tokens.

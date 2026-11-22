@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * EÜR · Kunde (EUE-006, Erweiterung).
+ * EAR · Kunde (EUE-006, Erweiterung).
  */
 class EurCustomer extends Model
 {

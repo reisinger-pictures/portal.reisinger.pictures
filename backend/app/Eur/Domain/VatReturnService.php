@@ -6,9 +6,10 @@ namespace App\Eur\Domain;
 
 use App\Eur\Parity\Money;
 use App\Eur\Reference\EurYear;
+use InvalidArgumentException;
 
 /**
- * EÜR · USt-Voranmeldung aus Buchungszeilen (EUE-082 … EUE-088).
+ * EAR · USt-Voranmeldung aus Buchungszeilen (EUE-082 … EUE-088).
  *
  * Dieser Service ist der reine Adapter vom Journal zu den ganzzahligen Cent-
  * Eingaben des USt-Rechenkerns. Alle acht Kennzahlen, die Zahllast (gegen null
@@ -87,6 +88,32 @@ final class VatReturnService
         return [
             'year' => $year,
             'months' => $months,
+            'quarters' => $aggregated['quarters'],
+            'year_totals' => $aggregated['year'],
+        ];
+    }
+
+    /**
+     * Quartals- und Jahresgruppen für einen einzelnen bebuchten Monat.
+     *
+     * Der EQV-Endpunkt erhält einen Monat; die nicht bebuchten Monate bleiben
+     * leer (null), genau wie in `VatCalculator::sum()`. Die Aggregation selbst
+     * bleibt beim Rechenkern, es entsteht keine zweite Summierlogik.
+     *
+     * @param  array<string, int|null>  $monthResult
+     * @return array{quarters: array<int, array<string, int|null>>, year_totals: array<string, int|null>}
+     */
+    public static function groupMonth(int $month, array $monthResult): array
+    {
+        if ($month < 1 || $month > 12) {
+            throw new InvalidArgumentException(sprintf('Ungültiger Monat: %d.', $month));
+        }
+
+        $months = array_fill(1, 12, []);
+        $months[$month] = $monthResult;
+        $aggregated = (new VatCalculator)->aggregate($months);
+
+        return [
             'quarters' => $aggregated['quarters'],
             'year_totals' => $aggregated['year'],
         ];

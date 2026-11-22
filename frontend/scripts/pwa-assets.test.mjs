@@ -15,7 +15,7 @@ const steuernWorker = read('steuern/sw.js');
 const manifest = JSON.parse(read('steuern/manifest.webmanifest'));
 
 describe('PWA assets', () => {
-    it('ships both service workers and the EÜR manifest', () => {
+    it('ships both service workers and the EAR manifest', () => {
         for (const path of paths) {
             assert.ok(existsSync(resolve(publicRoot, path)), `${path} must exist`);
         }

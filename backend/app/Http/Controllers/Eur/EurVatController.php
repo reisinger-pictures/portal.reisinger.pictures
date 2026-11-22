@@ -3,22 +3,30 @@
 namespace App\Http\Controllers\Eur;
 
 use App\Eur\Domain\VatCalculator;
+use App\Eur\Domain\VatReturnService;
 use App\Eur\Reference\EurYear;
 use App\Http\Controllers\Controller;
+use App\Services\Eur\EurVatDeclarationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * EÜR · Umsatzsteuer (EUE-082 … EUE-088) — Monatsauswertung.
+ * EAR · Umsatzsteuer (EUE-082 … EUE-088) — Monatsauswertung.
  *
  * Der Endpunkt rechnet ausschließlich mit den übergebenen ganzen Cent und
  * liefert die acht Kennzahlen plus Zahllast. Leere Eingaben bleiben leer.
+ * Ergänzend kommen die Quartals-/Jahresgruppen und die beiden Erklärungs-
+ * blöcke aus EUE-088 hinzu; alle bisherigen Antwortschlüssel bleiben
+ * unverändert.
  */
 class EurVatController extends Controller
 {
-    public function calculate(Request $request, VatCalculator $calculator): JsonResponse
-    {
+    public function calculate(
+        Request $request,
+        VatCalculator $calculator,
+        EurVatDeclarationService $declarationService,
+    ): JsonResponse {
         $data = $request->validate([
             'year' => ['required', 'integer', Rule::in(EurYear::SUPPORTED)],
             'month' => 'required|integer|min:1|max:12',
@@ -48,10 +56,37 @@ class EurVatController extends Controller
             'ig_bases_cents' => $bases,
         ]);
 
+        $year = (int) $data['year'];
+        $month = (int) $data['month'];
+        $groups = VatReturnService::groupMonth($month, $result);
+
         return response()->json([
-            'year' => (int) $data['year'],
-            'month' => (int) $data['month'],
+            'year' => $year,
+            'month' => $month,
             'kz' => $result,
+            'zahllast_cents' => $result['zahllast'],
+            'quarters' => $groups['quarters'],
+            'year_totals' => $groups['year_totals'],
+            'erklaerung' => $this->declarations($declarationService, $year, $result),
         ]);
+    }
+
+    /**
+     * Beide Blöcke nutzen dieselben Kennzahlen und dieselbe Zahllast; nur
+     * Titel und Belegzelle unterscheiden sich (EUE-088).
+     *
+     * @param  array<string, int|null>  $result
+     * @return array<string, array<string, mixed>>
+     */
+    private function declarations(EurVatDeclarationService $service, int $year, array $result): array
+    {
+        $blocks = $service->blocks($year);
+
+        foreach ($blocks as $key => $block) {
+            $blocks[$key]['kz'] = $result;
+            $blocks[$key]['zahllast_cents'] = $result['zahllast'] ?? null;
+        }
+
+        return $blocks;
     }
 }

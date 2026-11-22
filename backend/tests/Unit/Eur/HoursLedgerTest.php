@@ -7,7 +7,7 @@ namespace Tests\Unit\Eur;
 use App\Eur\Domain\HoursLedger;
 use PHPUnit\Framework\TestCase;
 
-/** EÜR · Stundenbuch und 3-Stunden-Regel (EUE-071, EUE-080, EUE-123). */
+/** EAR · Stundenbuch und 3-Stunden-Regel (EUE-071, EUE-080, EUE-123). */
 class HoursLedgerTest extends TestCase
 {
     /** @return list<array<string, mixed>> */

@@ -7,7 +7,7 @@ use App\Eur\Parity\RuleValues;
 use PHPUnit\Framework\TestCase;
 
 /**
- * EÜR · Anlagen und AfA (EUE-049 … EUE-061, DEG-001 … DEG-015).
+ * EAR · Anlagen und AfA (EUE-049 … EUE-061, DEG-001 … DEG-015).
  *
  * Die Erwartungswerte sind die im gepinnten DEG-Artefakt nachgerechneten
  * Beträge. Geprüft werden lineare AfA, Halbjahresregel, Erinnerungswert,

@@ -5,7 +5,25 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { formatEuro } from '../../logic/formatCurrency';
 import { useBrand } from '../../logic/useBrand';
 import { useBillingDetails } from '../../logic/useLicenseTerms';
-import { EUR_MONTHS as MONTHS, useEurEntries, useEurReference, useEurSettings, useEurSummary, useEurYears } from '../../logic/useEur';
+import {
+    EUR_MONTHS as MONTHS,
+    createEurEigenbeleg,
+    createEurMonth,
+    createEurYear,
+    eurPdfAssetsUrl,
+    eurPdfEigenbelegUrl,
+    eurPdfMonthUrl,
+    saveEurSettings,
+    useEurDocuments,
+    useEurEntries,
+    useEurHours,
+    useEurMonth,
+    useEurReference,
+    useEurSettings,
+    useEurSummary,
+    useEurYears,
+    type EurSettings,
+} from '../../logic/useEur';
 import EurAnalyticsPanel from './eur/EurAnalyticsPanel';
 import EurApplicationsPanel from './eur/EurApplicationsPanel';
 import EurDepreciationPanel from './eur/EurDepreciationPanel';
@@ -49,9 +67,20 @@ function tabLabel(id: TabId): ReactNode {
 
 const YEARS = [2024, 2025, 2026];
 const DEFAULT_YEAR = 2026;
+const BUSINESS_SHARES = Array.from({length: 21}, (_, index) => index * 5);
 
 const euro = (cents: number): string => formatEuro(cents / 100);
 const display = (value: string | undefined): string => (value && value.trim() !== '' ? value : '—');
+
+function signatureStatusLabel(status: string): string {
+    switch (status) {
+        case 'signed': return t`vorhanden`;
+        case 'pending': return t`ausstehend`;
+        case 'failed': return t`fehlgeschlagen`;
+        case 'none': return t`keine`;
+        default: return t`unbekannt`;
+    }
+}
 
 function CompanyCard({billing}: {billing: ReturnType<typeof useBillingDetails>['billingDetails']}) {
     const address = [
@@ -83,11 +112,108 @@ function CompanyCard({billing}: {billing: ReturnType<typeof useBillingDetails>['
     );
 }
 
+/** Save form for the EAR settings; `key` on the parent remounts it when settings load. */
+function EurSettingsForm({settings, onSaved}: {settings?: EurSettings; onSaved: () => void}) {
+    const [share, setShare] = useState(String(settings?.default_business_share ?? 100));
+    const [svMode, setSvMode] = useState(settings?.sv_mode ?? 'gsvg');
+    const [kleinunternehmer, setKleinunternehmer] = useState(settings?.kleinunternehmer ?? false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [message, setMessage] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const shareNumber = Number(share.replace(',', '.'));
+    const isValidShare = Number.isInteger(shareNumber) && shareNumber >= 0 && shareNumber <= 100 && shareNumber % 5 === 0;
+
+    const submit = async () => {
+        if (!isValidShare || isSaving) return;
+        setIsSaving(true);
+        setMessage(null);
+        setError(null);
+
+        try {
+            await saveEurSettings({default_business_share: shareNumber, sv_mode: svMode, kleinunternehmer});
+            setMessage(t`Die EAR-Einstellungen wurden gespeichert.`);
+            onSaved();
+        } catch {
+            setError(t`Die EAR-Einstellungen konnten nicht gespeichert werden. Prüfen Sie die Eingaben und versuchen Sie es erneut.`);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="rounded-box border border-base-300 bg-base-100 p-6">
+            <h2 className="text-xl font-semibold"><Trans>EAR-Einstellungen speichern</Trans></h2>
+            <p className="text-sm opacity-70">
+                <Trans>Standard-Betriebsanteil und Sozialversicherung gelten als Vorschlag für neue Buchungen.</Trans>
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 items-end">
+                <label className="form-control">
+                    <span className="label-text"><Trans>Standard-Betriebsanteil (%)</Trans></span>
+                    <input
+                        type="number"
+                        className="input input-bordered"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={share}
+                        onChange={(event) => setShare(event.target.value)}
+                        required
+                    />
+                </label>
+                <label className="form-control">
+                    <span className="label-text"><Trans>SV-Modus</Trans></span>
+                    <select
+                        className="select select-bordered"
+                        value={svMode}
+                        onChange={(event) => setSvMode(event.target.value)}
+                        required
+                    >
+                        <option value="gsvg"><Trans>GSVG</Trans></option>
+                        <option value="fsvg"><Trans>FSVG</Trans></option>
+                        <option value="ns_gsvg"><Trans>Neue Selbständige (GSVG)</Trans></option>
+                        <option value="uv_only"><Trans>nur Unfallversicherung</Trans></option>
+                    </select>
+                </label>
+                <label className="label cursor-pointer justify-start gap-3">
+                    <input
+                        type="checkbox"
+                        className="checkbox"
+                        checked={kleinunternehmer}
+                        onChange={(event) => setKleinunternehmer(event.target.checked)}
+                    />
+                    <span className="label-text"><Trans>Kleinunternehmer</Trans></span>
+                </label>
+                <div className="md:col-span-3">
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => void submit()}
+                        disabled={!isValidShare || isSaving}>
+                        <Trans>Einstellungen speichern</Trans>
+                    </button>
+                </div>
+            </div>
+            {message && <p className="alert alert-success mt-4" role="status">{message}</p>}
+            {error && <p className="alert alert-error mt-4" role="alert">{error}</p>}
+        </div>
+    );
+}
+
 export default function ManagementEurView() {
     const {portalName} = useBrand();
     const {billingDetails} = useBillingDetails();
     const [searchParams, setSearchParams] = useSearchParams();
     const [isEntryDialogOpen, setIsEntryDialogOpen] = useState(false);
+    const [monthMessage, setMonthMessage] = useState<string | null>(null);
+    const [monthError, setMonthError] = useState<string | null>(null);
+    const [yearMessage, setYearMessage] = useState<string | null>(null);
+    const [yearError, setYearError] = useState<string | null>(null);
+    const [isEigenbelegOpen, setIsEigenbelegOpen] = useState(false);
+    const [ebDay, setEbDay] = useState(String(new Date().getDate()));
+    const [ebDescription, setEbDescription] = useState('');
+    const [ebAmount, setEbAmount] = useState('');
+    const [ebShare, setEbShare] = useState('100');
+    const [ebMessage, setEbMessage] = useState<string | null>(null);
+    const [ebError, setEbError] = useState<string | null>(null);
+    const [lastEigenbeleg, setLastEigenbeleg] = useState<{description: string; amountCents: number} | null>(null);
 
     // The bookkeeping PWA uses its own manifest while this view is mounted.
     useEffect(() => {
@@ -134,11 +260,26 @@ export default function ManagementEurView() {
         ? requestedMonth
         : (monthsWithEntries[0] ?? new Date().getMonth() + 1);
 
+    const monthData = useEurMonth(year, month);
+    const documents = useEurDocuments(year);
+    const hours = useEurHours(year, month);
+
     const monthEntries = allEntries.filter((entry) => entry.month === month);
     const monthIncome = monthEntries.filter((entry) => entry.direction === 'income').reduce((sum, entry) => sum + entry.business_amount_cents, 0);
     const monthExpense = monthEntries.filter((entry) => entry.direction === 'expense').reduce((sum, entry) => sum + entry.business_amount_cents, 0);
     const monthPrivate = monthEntries.reduce((sum, entry) => sum + (entry.amount_cents - entry.business_amount_cents), 0);
     const monthEntryCount = monthEntries.length;
+    const businessTotal = monthIncome + monthExpense;
+    const documentsForMonth = (documents.data?.documents ?? []).filter((document) => document.month === month).length;
+    const totalMinutes = hours.data?.total_minutes ?? 0;
+    const hoursText = `${Math.floor(totalMinutes / 60)} h ${totalMinutes % 60} min`;
+    const openDocuments = summary.data?.open_documents ?? 0;
+    const signatureStatus = summary.data?.signature_status ?? monthData.data?.signature.status ?? 'none';
+    const isSigned = signatureStatus === 'signed';
+    const monthIncomeLabel = euro(monthIncome);
+    const monthExpenseLabel = euro(monthExpense);
+    const monthPrivateLabel = euro(monthPrivate);
+    const signatureStatusText = signatureStatusLabel(signatureStatus);
 
     const selectTab = (id: TabId) => {
         const next = new URLSearchParams(searchParams);
@@ -163,6 +304,69 @@ export default function ManagementEurView() {
         void settings.mutate();
         void summary.mutate();
         void entries.mutate();
+        void monthData.mutate();
+        void documents.mutate();
+        void hours.mutate();
+    };
+
+    const addMonth = async () => {
+        setMonthMessage(null);
+        setMonthError(null);
+        try {
+            const result = await createEurMonth({year, month});
+            setMonthMessage(result.created
+                ? t`Der Monat ${month}/${year} wurde angelegt.`
+                : t`Der Monat ${month}/${year} war bereits vorhanden.`);
+            reloadAll();
+        } catch {
+            setMonthError(t`Der Monat konnte nicht angelegt werden. Versuchen Sie es erneut.`);
+        }
+    };
+
+    const addYear = async () => {
+        setYearMessage(null);
+        setYearError(null);
+        try {
+            const result = await createEurYear({year});
+            const count = typeof result.created === 'number' ? result.created : result.months.length;
+            setYearMessage(t`Das Jahr ${year} ist angelegt (${count} Monate).`);
+            reloadAll();
+        } catch {
+            setYearError(t`Das Jahr konnte nicht angelegt werden. Versuchen Sie es erneut.`);
+        }
+    };
+
+    const saveEigenbeleg = async () => {
+        const day = Number(ebDay);
+        const amountCents = Math.round(Number(ebAmount.replace(',', '.')) * 100);
+        const share = Number(ebShare);
+        if (!Number.isInteger(day) || day < 1 || day > 31
+            || !Number.isFinite(amountCents) || amountCents <= 0
+            || ebDescription.trim() === '') {
+            setEbError(t`Bitte geben Sie Tag, Beschreibung und einen Betrag größer als null an.`);
+            setEbMessage(null);
+            return;
+        }
+
+        setEbError(null);
+        setEbMessage(null);
+        try {
+            await createEurEigenbeleg({
+                year,
+                month,
+                day,
+                description: ebDescription.trim(),
+                amount_cents: amountCents,
+                business_share: share,
+            });
+            setLastEigenbeleg({description: ebDescription.trim(), amountCents});
+            setEbMessage(t`Der Eigenbeleg wurde erfasst.`);
+            setEbDescription('');
+            setEbAmount('');
+            reloadAll();
+        } catch {
+            setEbError(t`Der Eigenbeleg konnte nicht erfasst werden. Prüfen Sie die Angaben und versuchen Sie es erneut.`);
+        }
     };
 
     return (
@@ -199,6 +403,12 @@ export default function ManagementEurView() {
                     </div>
                 </div>
             </header>
+
+            <div className="sticky top-0 z-10 border-b border-warning/30 bg-warning/10">
+                <div className="max-w-7xl mx-auto px-4 md:px-8 py-2 text-sm">
+                    <Trans>Betriebsanteil-Hilfe: Geben Sie den betrieblichen Anteil in 5-%-Schritten von 0 % bis 100 % an. Der Privatanteil ergibt sich aus 100 % abzüglich des Betriebsanteils.</Trans>
+                </div>
+            </div>
 
             <div className="max-w-7xl mx-auto px-4 md:px-8 pt-4">
                 <div role="tablist" className="tabs tabs-box eur-tabs bg-base-100">
@@ -247,6 +457,19 @@ export default function ManagementEurView() {
                                 );
                             })}
                         </div>
+                        <div className="divider my-3"/>
+                        <div className="space-y-2">
+                            <button type="button" className="btn btn-outline btn-sm w-full" onClick={() => void addMonth()}>
+                                <Trans>Neuer Monat</Trans>
+                            </button>
+                            <button type="button" className="btn btn-outline btn-sm w-full" onClick={() => void addYear()}>
+                                <Trans>Ganzes Jahr anlegen</Trans>
+                            </button>
+                            {monthMessage && <p className="alert alert-success text-xs" role="status">{monthMessage}</p>}
+                            {monthError && <p className="alert alert-error text-xs" role="alert">{monthError}</p>}
+                            {yearMessage && <p className="alert alert-success text-xs" role="status">{yearMessage}</p>}
+                            {yearError && <p className="alert alert-error text-xs" role="alert">{yearError}</p>}
+                        </div>
                     </div>
                 </aside>
 
@@ -258,7 +481,64 @@ export default function ManagementEurView() {
                                 <h2 className="text-2xl font-bold">{MONTHS[month - 1]} {year}</h2>
                                 <p className="text-sm opacity-70"><Trans>{monthEntryCount} Buchungen im Monat</Trans></p>
                             </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm opacity-70"><Trans>{documentsForMonth} Belege</Trans></span>
+                                <span className="text-sm opacity-70"><Trans>Stunden: {hoursText}</Trans></span>
+                                <button type="button" className="btn btn-outline btn-sm"
+                                    onClick={() => setIsEigenbelegOpen((open) => !open)}>
+                                    <Trans>+ Eigenbeleg</Trans>
+                                </button>
+                                <a className="btn btn-outline btn-sm" href={eurPdfMonthUrl(year, month)} download>
+                                    <Trans>PDF signieren</Trans>
+                                </a>
+                            </div>
                         </div>
+
+                        {isEigenbelegOpen && (
+                            <div className="rounded-box border border-base-300 p-4 mt-4">
+                                <h3 className="font-semibold"><Trans>Eigenbeleg erfassen</Trans></h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2 items-end">
+                                    <label className="form-control">
+                                        <span className="label-text"><Trans>Tag</Trans></span>
+                                        <input type="number" className="input input-bordered input-sm" min={1} max={31}
+                                            value={ebDay} onChange={(event) => setEbDay(event.target.value)} required/>
+                                    </label>
+                                    <label className="form-control md:col-span-2">
+                                        <span className="label-text"><Trans>Beschreibung</Trans></span>
+                                        <input type="text" className="input input-bordered input-sm"
+                                            value={ebDescription} onChange={(event) => setEbDescription(event.target.value)} required/>
+                                    </label>
+                                    <label className="form-control">
+                                        <span className="label-text"><Trans>Betrag (€)</Trans></span>
+                                        <input type="text" inputMode="decimal" className="input input-bordered input-sm"
+                                            value={ebAmount} onChange={(event) => setEbAmount(event.target.value)} required/>
+                                    </label>
+                                    <label className="form-control">
+                                        <span className="label-text"><Trans>Betriebsanteil (%)</Trans></span>
+                                        <select className="select select-bordered select-sm" value={ebShare}
+                                            onChange={(event) => setEbShare(event.target.value)} required>
+                                            {BUSINESS_SHARES.map((share) => (
+                                                <option key={share} value={share}>{share} %</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                </div>
+                                <div className="mt-3 flex flex-wrap items-center gap-3">
+                                    <button type="button" className="btn btn-primary btn-sm" onClick={() => void saveEigenbeleg()}>
+                                        <Trans>Eigenbeleg speichern</Trans>
+                                    </button>
+                                    {lastEigenbeleg && (
+                                        <a className="btn btn-ghost btn-sm"
+                                            href={eurPdfEigenbelegUrl(year, month, lastEigenbeleg.description, lastEigenbeleg.amountCents)}
+                                            download>
+                                            <Trans>Eigenbeleg-PDF herunterladen</Trans>
+                                        </a>
+                                    )}
+                                </div>
+                                {ebMessage && <p className="alert alert-success mt-3" role="status">{ebMessage}</p>}
+                                {ebError && <p className="alert alert-error mt-3" role="alert">{ebError}</p>}
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-5">
                             <div className="rounded-box border border-base-300 p-4">
@@ -278,6 +558,24 @@ export default function ManagementEurView() {
                                 <div className="text-2xl font-bold">{euro(monthPrivate)}</div>
                             </div>
                         </div>
+
+                        <div className="rounded-box border border-base-300 p-4 mt-4">
+                            <div className="flex justify-between text-sm font-medium">
+                                <span><Trans>Betrieblich</Trans></span>
+                                <span><Trans>Privat</Trans></span>
+                            </div>
+                            <progress className="progress progress-primary w-full mt-2"
+                                value={businessTotal} max={Math.max(businessTotal + monthPrivate, 1)}/>
+                            <p className="text-sm opacity-70 mt-2">
+                                <Trans>Betriebliche Einnahmen {monthIncomeLabel} und Ausgaben {monthExpenseLabel} · Privatanteil {monthPrivateLabel}.</Trans>
+                            </p>
+                        </div>
+
+                        <footer className="mt-4 pt-3 border-t border-base-300 flex flex-wrap gap-4 text-sm opacity-70">
+                            <span><Trans>Offene Belege: {openDocuments}</Trans></span>
+                            <span><Trans>Signatur: {signatureStatusText}</Trans></span>
+                            {!isSigned && <span className="text-warning"><Trans>Monat nicht signiert</Trans></span>}
+                        </footer>
                     </section>
 
                     {tab === 'buchungen' && (
@@ -310,6 +608,9 @@ export default function ManagementEurView() {
                                 <h2 className="text-xl font-semibold"><Trans>Geringwertige Wirtschaftsgüter</Trans></h2>
                                 <p className="mt-1"><Trans>Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen.</Trans></p>
                                 <a href="#eur-buchungen" className="btn btn-outline btn-sm mt-3"><Trans>Sofort als Ausgabe erfassen</Trans></a>
+                                <a href={eurPdfAssetsUrl(year)} className="btn btn-outline btn-sm mt-3 ml-2" download>
+                                    <Trans>Anlagenverzeichnis als PDF</Trans>
+                                </a>
                             </div>
                         </>
                     )}
@@ -325,7 +626,12 @@ export default function ManagementEurView() {
 
                     {tab === 'reisen' && <EurTravelPanel reference={reference.data}/>}
 
-                    {tab === 'steuer' && <EurIncomeTaxPanel defaultProfitCents={summary.data?.profit_cents ?? 0}/>}
+                    {tab === 'steuer' && (
+                        <EurIncomeTaxPanel
+                            defaultProfitCents={summary.data?.profit_cents ?? 0}
+                            e1ByCode={monthData.data?.e1_by_code}
+                        />
+                    )}
 
                     {tab === 'ust' && <EurVatPanel/>}
 
@@ -336,6 +642,11 @@ export default function ManagementEurView() {
                     {tab === 'einstellungen' && (
                         <>
                             <CompanyCard billing={billingDetails}/>
+                            <EurSettingsForm
+                                key={`${String(settings.data?.default_business_share)}-${String(settings.data?.sv_mode)}-${String(settings.data?.kleinunternehmer)}`}
+                                settings={settings.data}
+                                onSaved={reloadAll}
+                            />
                             <EurReferencePanel
                                 reference={reference.data}
                                 isLoading={reference.isLoading}

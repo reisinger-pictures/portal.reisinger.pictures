@@ -8,7 +8,7 @@ use App\Eur\Parity\Money;
 use RuntimeException;
 
 /**
- * EÜR · Referenzdaten (EUE-004 … EUE-022) — eine Lesegrenze für alle Tabellen.
+ * EAR · Referenzdaten (EUE-004 … EUE-022) — eine Lesegrenze für alle Tabellen.
  *
  * Quelle ist ausschließlich das gepinnte Artefakt
  * `features/eur/cleanroom/artifacts/analysis/tables.json`. Die Datei enthält

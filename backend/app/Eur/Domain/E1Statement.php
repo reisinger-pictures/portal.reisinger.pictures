@@ -9,7 +9,7 @@ use App\Eur\Reference\EurYear;
 use InvalidArgumentException;
 
 /**
- * EÜR · E1A/E1B-Aggregation (EUE-095, EUE-099, EUE-100).
+ * EAR · E1A/E1B-Aggregation (EUE-095, EUE-099, EUE-100).
  *
  * Reine Buchungszeilen → Kennzahlen-Summen in ganzen Cent. Vermietungszeilen
  * (E1B-Präfix oder 9460) werden aus dem Betriebsergebnis herausgerechnet und
@@ -99,6 +99,26 @@ final class E1Statement
             'expense_cents' => $expense,
             'complete' => $complete,
             'flags' => $complete,
+        ];
+    }
+
+    /**
+     * Beträge je Kennzahl, gruppiert nach E1A und E1B (EUE-099/100).
+     *
+     * Dies ist dieselbe Aggregation wie `fromEntries()`, nur ohne die
+     * Summen-/Vollständigkeitsfelder: die Per-KZ-Zeilen werden dadurch auch
+     * an Aufrufer durchgereicht, die bisher nur die Gesamtsummen sahen.
+     *
+     * @param  list<array<string, mixed>>  $entries
+     * @return array{E1A: array<string, int>, E1B: array<string, int>}
+     */
+    public static function byCode(array $entries, int $year = EurYear::DEFAULT): array
+    {
+        $statement = self::fromEntries($entries, $year);
+
+        return [
+            self::GROUP_E1A => $statement['e1a'],
+            self::GROUP_E1B => $statement['e1b'],
         ];
     }
 

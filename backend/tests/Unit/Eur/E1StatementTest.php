@@ -8,7 +8,7 @@ use App\Eur\Domain\E1Statement;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
-/** EÜR · E1A/E1B-Aggregation (EUE-095, EUE-099, EUE-100). */
+/** EAR · E1A/E1B-Aggregation (EUE-095, EUE-099, EUE-100). */
 class E1StatementTest extends TestCase
 {
     /** @return list<array<string, mixed>> */

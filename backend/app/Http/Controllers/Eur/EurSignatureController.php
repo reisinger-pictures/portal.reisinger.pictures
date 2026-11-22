@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
 use InvalidArgumentException;
 
 /**
- * EÜR · Signaturen (Portal #27).
+ * EAR · Signaturen (Portal #27).
  *
  * Je Brand/Jahr/Monat existiert genau eine Signatur; ein erneuter POST ist
  * idempotent (200, kein zweiter Datensatz). Provider mit `test` im Namen

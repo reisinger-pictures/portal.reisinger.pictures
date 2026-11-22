@@ -8,7 +8,7 @@ use App\Eur\Parity\Money;
 use InvalidArgumentException;
 
 /**
- * EÜR · Reise-Pauschalen (EUE-013) — Tag-/Nächtigungssätze je Land.
+ * EAR · Reise-Pauschalen (EUE-013) — Tag-/Nächtigungssätze je Land.
  *
  * Aufgelöst wird serverseitig nach Land und Reisejahr. Die Sätze stammen
  * ausschließlich aus dem gepinnten Referenzartefakt; im Code steht kein

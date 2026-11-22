@@ -11,7 +11,7 @@ use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * EÜR · Reisen und Fahrtkosten (EUE-062 … EUE-081).
+ * EAR · Reisen und Fahrtkosten (EUE-062 … EUE-081).
  */
 class TravelCalculatorTest extends TestCase
 {

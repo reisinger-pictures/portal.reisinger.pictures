@@ -8,7 +8,7 @@ use App\Eur\Reference\ReferenceTables;
 use InvalidArgumentException;
 
 /**
- * EÜR · Journal-Zeilenprüfung (EUE-032 … EUE-042).
+ * EAR · Journal-Zeilenprüfung (EUE-032 … EUE-042).
  *
  * Reine, zustandslose Regeln: kein Datenbankzugriff, keine Uhr, kein Float.
  * Geld ist ganze Cent. Jede Prüfung liefert die vier Schlüssel
