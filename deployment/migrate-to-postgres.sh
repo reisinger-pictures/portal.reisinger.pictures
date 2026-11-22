@@ -122,8 +122,9 @@ COPY:
 VERIFY:
   run portal:db-copy --verify-only against PG
   run php artisan migrate:status --database=pgsql against PG
-  run Tinker SELECT 1 and COUNT queries for users, orders, and settings against PG
+  run a plain PHP smoke query (SELECT 1 plus COUNT on users, orders, settings) against PG — no Tinker, because psysh writes to $HOME (/) and exits non-zero
   every Artisan command carries the absent APP_CONFIG_CACHE override; every database command also carries DB_URL=
+  every one-off container runs with stdin from /dev/null, so a script streamed via `bash -s` is never consumed by the container
 SWITCH:
   cp -p '$ENV_FILE' '$ENV_FILE.<UTC>.bak'; write the root-only switch marker '$SWITCH_MARKER_FILE' with that backup path
   atomically set DB_CONNECTION=pgsql, DB_HOST=db_pg, DB_PORT=5432, and queue/cache connection keys to pgsql
@@ -218,7 +219,7 @@ compose() {
 run_backend_artisan() {
     compose run --rm --no-deps \
         -e APP_CONFIG_CACHE="$CONFIG_CACHE_OVERRIDE" \
-        "$BACKEND_SERVICE" php artisan "$@"
+        "$BACKEND_SERVICE" php artisan "$@" </dev/null
 }
 
 run_backend_artisan_database() {
@@ -229,7 +230,18 @@ run_backend_artisan_database() {
     compose run --rm --no-deps \
         -e DB_CONNECTION="$connection" -e DB_HOST="$host" -e DB_PORT="$port" -e DB_URL= \
         -e APP_CONFIG_CACHE="$CONFIG_CACHE_OVERRIDE" \
-        "$BACKEND_SERVICE" php artisan "$@"
+        "$BACKEND_SERVICE" php artisan "$@" </dev/null
+}
+
+run_backend_php_database() {
+    local connection="$1"
+    local host="$2"
+    local port="$3"
+    local script="$4"
+    compose run --rm --no-deps \
+        -e DB_CONNECTION="$connection" -e DB_HOST="$host" -e DB_PORT="$port" -e DB_URL= \
+        -e APP_CONFIG_CACHE="$CONFIG_CACHE_OVERRIDE" \
+        "$BACKEND_SERVICE" php -r "$script" </dev/null
 }
 
 require_root() {
@@ -689,7 +701,20 @@ print(volume.get("name", ""))
         --source-host="$source_host" --source-port="$source_port" \
         --target-host=db_pg --target-port=5432
     run_backend_artisan_database pgsql db_pg 5432 migrate:status --database=pgsql
-    run_backend_artisan_database pgsql db_pg 5432 tinker --execute='$db = Illuminate\Support\Facades\DB::connection("pgsql"); $db->select("SELECT 1 AS ready"); foreach (["users", "orders", "settings"] as $table) { $db->table($table)->count(); } echo "Smoke queries passed.\n";'
+    # Kein `artisan tinker`: psysh schreibt seine Konfiguration nach $HOME, das
+    # im Backend-Image `/` ist, und bricht dort mit Exit 1 ab. Der Rauchtest
+    # laeuft deshalb als reines PHP mit explizitem Autoloader.
+    run_backend_php_database pgsql db_pg 5432 '
+        require "vendor/autoload.php";
+        $app = require "bootstrap/app.php";
+        $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+        $db = \Illuminate\Support\Facades\DB::connection();
+        $db->select("SELECT 1 AS ready");
+        foreach (["users", "orders", "settings"] as $table) {
+            $db->table($table)->count();
+        }
+        echo "Smoke queries passed.\n";
+    '
 
     banner SWITCH
     local env_backup="$STACK_DIR/.env.${RUN_TIMESTAMP}.bak"
