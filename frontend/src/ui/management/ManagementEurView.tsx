@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -93,6 +93,17 @@ export default function ManagementEurView() {
     const {billingDetails} = useBillingDetails();
     const [searchParams, setSearchParams] = useSearchParams();
     const [isEntryDialogOpen, setIsEntryDialogOpen] = useState(false);
+
+    // The bookkeeping PWA uses its own manifest while this view is mounted.
+    useEffect(() => {
+        const manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+        if (!manifestLink) return;
+        const previousHref = manifestLink.getAttribute('href') ?? '';
+        manifestLink.setAttribute('href', '/steuern/manifest.webmanifest');
+        return () => {
+            manifestLink.setAttribute('href', previousHref);
+        };
+    }, []);
 
     const requestedTab = searchParams.get('bereich');
     const tab: TabId = TABS.some((candidate) => candidate === requestedTab)

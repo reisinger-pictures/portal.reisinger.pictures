@@ -2,6 +2,13 @@
 
 **Status:** In Arbeit
 
+> **Owner-Entscheidung D-69 (2026-11-22):** Zwei installierbare PWAs — eine
+> portalweit (Scope `/`) und eine zweite für die Buchhaltung (Scope `/steuern/`).
+> Die frühere Regel „kein zweiter Service Worker" in `features/eur/05-ui.md`
+> ist damit ersetzt. Beide Worker greifen weder `/api/` noch authentifizierte
+> Antworten ab; die CSP bleibt unverändert. Siehe
+> `features/owner-decisions.md#d-69-two-installable-pwas--one-for-the-portal-one-for-the-bookkeeping-view`.
+
 ## 1. Auftrag und Ausgangslage
 
 Ziel ist eine vollständige EÜR für das Wirtschaftsjahr 2026 mit

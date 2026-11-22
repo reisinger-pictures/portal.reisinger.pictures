@@ -1,0 +1,21 @@
+{
+    "name": "Einnahmen Ausgaben Rechnung",
+    "short_name": "EA Rechnung",
+    "start_url": "/steuern",
+    "scope": "/steuern",
+    "display": "standalone",
+    "background_color": "#FFFFFF",
+    "theme_color": "#1E5631",
+    "icons": [
+        {
+            "src": "/brands/rp/android-chrome-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/brands/rp/android-chrome-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
