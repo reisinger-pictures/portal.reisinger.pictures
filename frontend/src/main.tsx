@@ -14,9 +14,18 @@ import { registerPwas } from './logic/pwa';
 applyTheme();
 void registerPwas();
 
+// react-router 7 wraps every declarative-router state update in
+// React.startTransition by default. That defers the React `location` context —
+// and everything derived from it (e.g. the EUR cockpit's `?bereich=` tab) — to
+// a low-priority commit while the History API has already updated the URL
+// synchronously. Under parallel E2E load that commit can be starved past the
+// assertion window, leaving the URL correct but `aria-selected` stale. The
+// per-navigation `flushSync` option is discarded by the declarative router;
+// `useTransitions={false}` is the public prop that makes its listener call
+// setStateImpl directly, keeping URL and render in one commit.
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
-        <BrowserRouter>
+        <BrowserRouter useTransitions={false}>
             <App/>
         </BrowserRouter>
     </StrictMode>
