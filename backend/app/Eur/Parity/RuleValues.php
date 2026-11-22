@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Eur\Parity;
 
+use App\Eur\Reference\EurYear;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -83,9 +84,7 @@ final class RuleValues
 
     public static function assertYear(int $year): void
     {
-        if ($year !== self::YEAR) {
-            throw new InvalidArgumentException(sprintf('Nur das Wirtschaftsjahr %d ist gepinnt, erhalten: %d.', self::YEAR, $year));
-        }
+        EurYear::assert($year);
     }
 
     private static function readCatalog(): array

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Eur\Reference;
 
 use App\Eur\Parity\Money;
-use InvalidArgumentException;
 use RuntimeException;
 
 /**
@@ -67,13 +66,7 @@ final class ReferenceTables
 
     public function assertBusinessYear(int $year): void
     {
-        if ($year !== self::BUSINESS_YEAR) {
-            throw new InvalidArgumentException(sprintf(
-                'Nur das Wirtschaftsjahr %d ist gepinnt, erhalten: %d.',
-                self::BUSINESS_YEAR,
-                $year,
-            ));
-        }
+        EurYear::assert($year);
     }
 
     /**
