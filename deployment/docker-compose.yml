@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Legacy engine during the one-time cutover. It keeps serving the application
   # until the operator flips DB_CONNECTION/DB_HOST in the host .env, and it stays
