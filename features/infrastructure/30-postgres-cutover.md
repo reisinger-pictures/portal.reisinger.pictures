@@ -142,11 +142,30 @@ the MariaDB source for this migration; they are not the ongoing backup.
 The second precondition — a tested restore path — is implemented in
 `strato-vps/proposed/restore.sh`: stage 4 reads the marker, starts only `db_pg`
 on a fresh host, and replays the dump with `psql -v ON_ERROR_STOP=1
---single-transaction`. That branch is covered by offline tests against stubs,
-not by a drill against a real PostgreSQL instance. A restore drill with a real
-`portal_db-<DATE>.sql.gz` (marker `pgsql`) is required before relying on this
-path; the tests are not a substitute for it, and the existence of a daily dump
-is not evidence that a restore works.
+--single-transaction`. A drill against real PostgreSQL is the evidence that
+counts, not the offline tests: fetch the day's dump from the backup, restore it
+into a throwaway database on the running server, and compare row counts and the
+table count with the active database, then drop it.
+
+```bash
+rclone copyto "pCloud:Backup/strato-v2/db/portal/portal_db-<DATE>.sql.gz" /var/tmp/drill.sql.gz
+gzip -t /var/tmp/drill.sql.gz
+docker exec portal_db_pg sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d postgres \
+  -c "CREATE DATABASE portal_restore_drill"'
+gunzip -c /var/tmp/drill.sql.gz | docker exec -i portal_db_pg sh -c \
+  'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -U "$POSTGRES_USER" -d portal_restore_drill \
+     -v ON_ERROR_STOP=1 --single-transaction -q'
+# compare users/photos/galleries/settings/locations/migrations and the table count
+docker exec portal_db_pg sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" \
+  -d portal_restore_drill -tAc "select count(*) from information_schema.tables where table_schema=current_schema()"'
+docker exec portal_db_pg sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d postgres \
+  -c "DROP DATABASE portal_restore_drill"'
+```
+
+Measured on 2026-11-22 with `portal_db-2026-11-22.sql.gz` (696 KiB gzip): restore
+exit 0; `users/photos/galleries/settings/locations/migrations` =
+5/15/1/33/19477/60 in both the drill database and the active `portal_db`; 63
+tables in each.
 
 ## Verification invariants
 
