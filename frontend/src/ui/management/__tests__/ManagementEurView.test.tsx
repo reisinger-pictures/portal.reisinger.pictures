@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { useBrand } from '../../../logic/useBrand';
 import { useBillingDetails } from '../../../logic/useLicenseTerms';
 import {
+    createEurEntry,
     useEurAnalytics,
     useEurApplications,
     useEurDocuments,
@@ -31,34 +32,38 @@ vi.mock('../../../logic/useLicenseTerms', async (importOriginal) => {
     return {...actual, useBillingDetails: vi.fn()};
 });
 
-vi.mock('../../../logic/useEur', () => ({
-    useEurYears: vi.fn(),
-    useEurReference: vi.fn(),
-    useEurSettings: vi.fn(),
-    useEurSummary: vi.fn(),
-    useEurEntries: vi.fn(),
-    useEurMonth: vi.fn(),
-    useEurDocuments: vi.fn(),
-    useEurHelpTexts: vi.fn(),
-    useEurHours: vi.fn(),
-    useEurWarehouse: vi.fn(),
-    useEurApplications: vi.fn(),
-    useEurSignatures: vi.fn(),
-    useEurAnalytics: vi.fn(),
-    createEurEntry: vi.fn(),
-    closeEurMonth: vi.fn(),
-    uploadEurDocument: vi.fn(),
-    deleteEurDocument: vi.fn(),
-    eurDocumentDownloadUrl: vi.fn(() => '/api/management/eur/documents/1/download'),
-    createEurHour: vi.fn(),
-    createEurWarehouse: vi.fn(),
-    createEurApplication: vi.fn(),
-    createEurSignature: vi.fn(),
-    fetchEurComparison: vi.fn(),
-    calculateEurVat: vi.fn(),
-    calculateEurTravel: vi.fn(),
-    calculateEurIncomeTax: vi.fn(),
-}));
+vi.mock('../../../logic/useEur', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../../logic/useEur')>();
+    return {
+        ...actual,
+        useEurYears: vi.fn(),
+        useEurReference: vi.fn(),
+        useEurSettings: vi.fn(),
+        useEurSummary: vi.fn(),
+        useEurEntries: vi.fn(),
+        useEurMonth: vi.fn(),
+        useEurDocuments: vi.fn(),
+        useEurHelpTexts: vi.fn(),
+        useEurHours: vi.fn(),
+        useEurWarehouse: vi.fn(),
+        useEurApplications: vi.fn(),
+        useEurSignatures: vi.fn(),
+        useEurAnalytics: vi.fn(),
+        createEurEntry: vi.fn(),
+        closeEurMonth: vi.fn(),
+        uploadEurDocument: vi.fn(),
+        deleteEurDocument: vi.fn(),
+        eurDocumentDownloadUrl: vi.fn(() => '/api/management/eur/documents/1/download'),
+        createEurHour: vi.fn(),
+        createEurWarehouse: vi.fn(),
+        createEurApplication: vi.fn(),
+        createEurSignature: vi.fn(),
+        fetchEurComparison: vi.fn(),
+        calculateEurVat: vi.fn(),
+        calculateEurTravel: vi.fn(),
+        calculateEurIncomeTax: vi.fn(),
+    };
+});
 
 const billingDetails = {
     bank_holder: 'Musterfoto GmbH',
@@ -256,6 +261,32 @@ describe('ManagementEurView', () => {
         expect(screen.getByRole('combobox', {name: 'Jahr'})).toHaveValue('2026');
     });
 
+    it('takes the visible years and the default year from the API response', () => {
+        mockHooks();
+        vi.mocked(useEurYears).mockReturnValue(swrResult<ReturnType<typeof useEurYears>>({
+            default_year: 2025,
+            supported: [2024, 2025, 2026, 2027],
+            active_years: [2025],
+            warnings: [],
+        }));
+
+        renderView();
+
+        const selector = screen.getByRole('combobox', {name: 'Jahr'});
+        const options = Array.from(selector.querySelectorAll('option')).map((option) => option.value);
+        expect(options).toEqual(['2025', '2026']);
+        expect(selector).toHaveValue('2025');
+        expect(screen.getByText(/Wirtschaftsjahr 2025/)).toBeVisible();
+    });
+
+    it('explains that the month rail only lists months with bookings', () => {
+        mockHooks();
+
+        renderView();
+
+        expect(screen.getByText('Es werden nur Monate mit Buchungen angezeigt.')).toBeVisible();
+    });
+
     it('places the tab row above the month rail and the month KPIs', () => {
         mockHooks();
 
@@ -284,6 +315,50 @@ describe('ManagementEurView', () => {
 
         await userEvent.click(view.getByRole('button', {name: '+ Buchung'}));
         expect(screen.getByRole('dialog', {name: 'Neue Buchung'})).toBeVisible();
+    });
+
+    it('closes the entry dialog on Escape and keeps Tab focus inside it', async () => {
+        mockHooks();
+
+        renderView();
+
+        await userEvent.click(screen.getAllByRole('button', {name: '+ Buchung'})[0]!);
+        const dialog = screen.getByRole('dialog', {name: 'Neue Buchung'});
+        expect(within(dialog).getByRole('button', {name: 'Schließen'})).toHaveFocus();
+
+        for (let index = 0; index < 12; index += 1) {
+            await userEvent.tab();
+            expect(dialog.contains(document.activeElement)).toBe(true);
+        }
+
+        await userEvent.keyboard('{Escape}');
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('sends only the leading KZ digits of a descriptive E1a label when saving', async () => {
+        mockHooks();
+        vi.mocked(useEurReference).mockReturnValue(swrResult<ReturnType<typeof useEurReference>>({
+            ...reference,
+            expense_kinds: [
+                {type: 'Software', e1a: '9190 - Provisionen und Lizenzen', share_percent: null},
+            ],
+        }));
+        vi.mocked(createEurEntry).mockClear();
+
+        renderView();
+
+        await userEvent.click(screen.getAllByRole('button', {name: '+ Buchung'})[0]!);
+        const dialog = screen.getByRole('dialog', {name: 'Neue Buchung'});
+        await userEvent.selectOptions(within(dialog).getByLabelText('Art'), 'Software');
+        await userEvent.type(within(dialog).getByLabelText('Betrag (€)'), '100');
+        await userEvent.click(within(dialog).getByRole('button', {name: 'Buchung speichern'}));
+
+        expect(createEurEntry).toHaveBeenCalledWith(expect.objectContaining({
+            kind_type: 'Software',
+            e1a_code: '9190',
+            amount_cents: 10000,
+        }));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
     it('opens every tab and shows its German heading', async () => {

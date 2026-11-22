@@ -2995,6 +2995,10 @@ msgstr "Es gilt österreichisches Recht unter Ausschluss des UN-Kaufrechts. Soll
 msgid "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren."
 msgstr "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren."
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "Es werden nur Monate mit Buchungen angezeigt."
+msgstr "Es werden nur Monate mit Buchungen angezeigt."
+
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Es wurde nichts belastet. Du kannst die Bestellung erneut bezahlen."
 msgstr "Es wurde nichts belastet. Du kannst die Bestellung erneut bezahlen."
