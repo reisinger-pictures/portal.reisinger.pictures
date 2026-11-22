@@ -26,6 +26,7 @@ class EurTravelController extends Controller
 
         $data = $request->validate([
             'year' => ['required', 'integer', Rule::in(EurYear::SUPPORTED)],
+            'month' => ['nullable', 'integer', 'min:1', 'max:12'],
             'vehicle' => ['required', 'string', Rule::in(array_column($tables->vehicleTypes(), 'name'))],
             'kilometres' => 'required|integer|min:0|max:100000',
             'passengers' => 'nullable|integer|min:0|max:6',
@@ -36,6 +37,22 @@ class EurTravelController extends Controller
             'business_share' => 'required|integer|min:0|max:100|multiple_of:5',
         ]);
 
+        // EUE-013: nur die Ländertabelle des gepinnten Wirtschaftsjahres liegt
+        // im Referenzartefakt vor. Ohne diesen Gate würde ein 2024/2025-Jahr
+        // eine unkontrollierte InvalidArgumentException und damit HTTP 500
+        // auslösen. Die km-Sätze selbst unterstützen 2024–2026 (YearTables).
+        $year = (int) $data['year'];
+
+        if ($year !== ReferenceTables::BUSINESS_YEAR) {
+            return response()->json([
+                'message' => sprintf(
+                    'Für das Reisejahr %d ist keine Ländertabelle gepinnt; verfügbar ist %d.',
+                    $year,
+                    ReferenceTables::BUSINESS_YEAR,
+                ),
+            ], 422);
+        }
+
         $calculator = new TravelCalculator(new RuleValues, $travel);
 
         $passengers = (int) ($data['passengers'] ?? 0);
@@ -45,8 +62,8 @@ class EurTravelController extends Controller
         $withReceipts = (bool) $data['with_receipts'];
         $share = (int) $data['business_share'];
 
-        $year = (int) $data['year'];
-        $drive = $calculator->kilometreAllowanceCents($data['vehicle'], $kilometres, $passengers, $year);
+        $month = isset($data['month']) ? (int) $data['month'] : null;
+        $drive = $calculator->kilometreAllowanceCents($data['vehicle'], $kilometres, $passengers, $year, $month);
         $daily = $calculator->dailyAllowancesCents($data['country'], $days, $meals, $withReceipts, $year);
         $total = $drive + $daily['day_cents'] + $daily['night_cents'];
 

@@ -63,11 +63,11 @@ class TravelCalculatorTest extends TestCase
 
     public function test_meal_deduction_domestic_and_abroad(): void
     {
-        // EUE-068: Inland halbe/keine Pauschale, Ausland keine/ein Drittel.
+        // EUE-068: Inland halbe/keine Pauschale, Ausland volle/ein Drittel.
         $this->assertSame(3000, $this->calculator->perDiemCents(3000, 0, true));
         $this->assertSame(1500, $this->calculator->perDiemCents(3000, 1, true));
         $this->assertSame(0, $this->calculator->perDiemCents(3000, 2, true));
-        $this->assertSame(0, $this->calculator->perDiemCents(3000, 1, false));
+        $this->assertSame(3000, $this->calculator->perDiemCents(3000, 1, false));
         $this->assertSame(1000, $this->calculator->perDiemCents(3000, 2, false));
     }
 
@@ -103,11 +103,40 @@ class TravelCalculatorTest extends TestCase
 
     public function test_travel_leg_uses_time_and_distance_limits(): void
     {
-        // EUE-071
-        $this->assertTrue($this->calculator->isTravelLeg(60, 50, false));
-        $this->assertTrue($this->calculator->isTravelLeg(60, 25, true));
-        $this->assertFalse($this->calculator->isTravelLeg(240, 50, false));
-        $this->assertFalse($this->calculator->isTravelLeg(60, 24, true));
+        // EUE-071: Hin-/Rückfahrt ab 3 Stunden und Mindestentfernung
+        // (50 km Einzelzeile, 25 km verkettet). Die Bedingung war invertiert.
+        $this->assertTrue($this->calculator->isTravelLeg(240, 50, false));
+        $this->assertFalse($this->calculator->isTravelLeg(60, 50, false));
+        $this->assertTrue($this->calculator->isTravelLeg(240, 25, true));
+        $this->assertFalse($this->calculator->isTravelLeg(240, 24, true));
+
+        // AE3: auch die Stunden des Belegs erfüllen die Zeitgrenze.
+        $this->assertTrue($this->calculator->isTravelLeg(60, 50, false, 180));
+    }
+
+    public function test_km_rates_switch_at_the_2025_half_year_boundary(): void
+    {
+        // EUE-063/064: 30.06./01.07.2025 — 0,50 €/km vorher, 0,25 €/km danach.
+        $this->assertSame(50, $this->calculator->kilometreRateCents('Motorrad', 2025, 6));
+        $this->assertSame(25, $this->calculator->kilometreRateCents('Motorrad', 2025, 7));
+        $this->assertSame(50, $this->calculator->kilometreRateCents('Fahrrad', 2025, 6));
+        $this->assertSame(25, $this->calculator->kilometreRateCents('Fahrrad', 2025, 7));
+
+        // Das API übermittelt keinen Monat: der Wert bleibt lesbar (kein HTTP 500).
+        $this->assertSame(25, $this->calculator->kilometreRateCents('Motorrad', 2025));
+        $this->assertSame(25, $this->calculator->kilometreRateCents('Fahrrad', 2025));
+        $this->assertSame(2500, $this->calculator->kilometreAllowanceCents('Motorrad', 100, 0, 2025));
+    }
+
+    public function test_km_rates_for_2024_and_2026_remain_stable(): void
+    {
+        // EUE-062/063/064
+        $this->assertSame(42, $this->calculator->kilometreRateCents('PKW', 2024));
+        $this->assertSame(24, $this->calculator->kilometreRateCents('Motorrad', 2024));
+        $this->assertSame(38, $this->calculator->kilometreRateCents('Fahrrad', 2024));
+        $this->assertSame(50, $this->calculator->kilometreRateCents('PKW', 2026));
+        $this->assertSame(25, $this->calculator->kilometreRateCents('Motorrad', 2026));
+        $this->assertSame(25, $this->calculator->kilometreRateCents('Fahrrad', 2026));
     }
 
     public function test_business_travel_costs_apply_the_business_share(): void

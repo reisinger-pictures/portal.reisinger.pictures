@@ -56,6 +56,29 @@ class EurIncomeTaxApiTest extends EurBookkeepingTestCase
             ->assertJsonPath('e1a_e1b.E1B.9460', 50000);
     }
 
+    public function test_calc_uses_the_tariff_of_the_selected_year(): void
+    {
+        // EUE-089 … EUE-093: 2024/2025 dürfen nicht mit 2026-Grenzen rechnen.
+        $token = $this->tokenFor();
+
+        $thresholds = [
+            2024 => 1281600,
+            2025 => 1330800,
+            2026 => 1353900,
+        ];
+
+        foreach ($thresholds as $year => $expected) {
+            $response = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/est/calc', [
+                'year' => $year,
+                'profit_cents' => 200000,
+            ]);
+
+            $response->assertOk()
+                ->assertJsonPath('year', $year)
+                ->assertJsonPath('tax_free_threshold_cents', $expected);
+        }
+    }
+
     public function test_mode_is_reflected_in_all_new_fields(): void
     {
         $token = $this->tokenFor();

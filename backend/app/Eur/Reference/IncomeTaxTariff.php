@@ -60,6 +60,37 @@ final class IncomeTaxTariff
         $this->basicAllowanceRatePer10000 = Money::fractionToPer10000($basicAllowance['satz'] ?? 0);
     }
 
+    /**
+     * EUE-089 … EUE-093: Tarif aus den jahresabhängigen Tabellen aufbauen.
+     *
+     * `ReferenceTables::incomeTax()` ist auf das Wirtschaftsjahr 2026 gepinnt;
+     * dieser Factory liefert denselben Tarif für jedes unterstützte Jahr, ohne
+     * eine zweite Regelquelle oder Float-Geldwerte im Rechenpfad.
+     */
+    public static function forYear(int $year): self
+    {
+        EurYear::assert($year);
+
+        $stages = array_map(
+            static fn (array $stage): array => [
+                'grenze' => bcdiv((string) $stage['grenze'], '100', 2),
+                'satz' => bcdiv((string) $stage['satz'], '10000', 6),
+            ],
+            YearTables::tariffStages($year),
+        );
+
+        $allowance = YearTables::basicAllowance($year);
+
+        return new self(
+            $stages,
+            [
+                'grenze' => bcdiv((string) $allowance['grenze'], '100', 2),
+                'satz' => bcdiv((string) $allowance['satz'], '10000', 6),
+            ],
+            $year,
+        );
+    }
+
     public function businessYear(): int
     {
         return $this->businessYear;

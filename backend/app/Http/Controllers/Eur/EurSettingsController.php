@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Eur;
 
+use App\Eur\Reference\SocialInsurance;
 use App\Http\Controllers\Controller;
 use App\Services\SettingResolver;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +30,10 @@ class EurSettingsController extends Controller
             'default_business_share' => (int) ($resolver->get('eur_default_business_share') ?? self::DEFAULT_BUSINESS_SHARE),
             'sv_mode' => (string) ($resolver->get('eur_sv_mode') ?? self::DEFAULT_SV_MODE),
             'kleinunternehmer' => filter_var($resolver->get('eur_kleinunternehmer', false), FILTER_VALIDATE_BOOLEAN),
+            // EUE-108: Jungunternehmer zahlen den Mindest-KV weiter; nur die
+            // KV-Satz-Anzeige entfällt. Das Flag macht den Modus sichtbar.
+            'kv_rate_hidden' => (string) ($resolver->get('eur_sv_mode') ?? self::DEFAULT_SV_MODE)
+                === SocialInsurance::MODE_JUNGUNTERNEHMER,
         ]);
     }
 
@@ -38,7 +43,9 @@ class EurSettingsController extends Controller
 
         $data = $request->validate([
             'default_business_share' => 'required|integer|min:0|max:100|multiple_of:5',
-            'sv_mode' => ['required', Rule::in(['gsvg', 'ns_gsvg', 'fsvg', 'uv_only'])],
+            'sv_mode' => ['required', Rule::in([
+                'gsvg', 'ns_gsvg', 'fsvg', 'uv_only', SocialInsurance::MODE_JUNGUNTERNEHMER,
+            ])],
             'kleinunternehmer' => 'required|boolean',
         ]);
 

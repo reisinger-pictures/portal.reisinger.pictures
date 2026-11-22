@@ -65,6 +65,7 @@ export default function EurEntriesPanel({data, isLoading, error, onRetry, onCrea
                                     <th className="text-right"><Trans>Betrag</Trans></th>
                                     <th className="text-right"><Trans>Anteil</Trans></th>
                                     <th className="text-right"><Trans>Betrieblich</Trans></th>
+                                    <th><Trans>Prüfung</Trans></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -80,6 +81,14 @@ export default function EurEntriesPanel({data, isLoading, error, onRetry, onCrea
                                         <td className="text-right">{cents(entry.amount_cents)}</td>
                                         <td className="text-right">{entry.business_share} %</td>
                                         <td className="text-right">{cents(entry.business_amount_cents)}</td>
+                                        <td>
+                                            {(entry.checks ?? []).filter((check) => !check.ok).map((check) => (
+                                                <span key={check.code} className="badge badge-warning badge-outline mr-1"
+                                                    title={check.hint}>
+                                                    {check.message}
+                                                </span>
+                                            ))}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

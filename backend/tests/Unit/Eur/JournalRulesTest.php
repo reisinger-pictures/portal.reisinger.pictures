@@ -90,14 +90,40 @@ class JournalRulesTest extends TestCase
     {
         $checks = JournalRules::checks(['kind' => 'expense', 'amount_cents' => 1000]);
 
-        foreach (['DAY', 'CATEGORY', 'DESCRIPTION', 'CODE'] as $code) {
+        foreach (['DAY', 'CATEGORY', 'DESCRIPTION', 'MONTH', 'RECEIPT'] as $code) {
             $check = $this->checkByCode($checks, $code);
-            $this->assertTrue($check['ok']);
+            $this->assertFalse($check['ok'], $code.' darf bei fehlendem Pflichtfeld nicht ok sein.');
+            $this->assertStringContainsString('⚠', $check['message']);
             $this->assertStringContainsString('💡', $check['hint']);
         }
 
         $code = $this->checkByCode($checks, 'CODE');
+        $this->assertTrue($code['ok']);
         $this->assertStringContainsString('9230', $code['message']);
+    }
+
+    /** EUE-036/037/043 — gültige Zeile bleibt ok, 9100 verlangt WEB. */
+    public function test_complete_entry_has_no_failed_checks_and_kz_9100_requires_web(): void
+    {
+        $complete = JournalRules::checks([
+            'kind' => 'expense', 'day' => 5, 'month' => 5, 'category' => 'Büro',
+            'description' => 'Bürobedarf', 'receipt_no' => 'R-1', 'business_share' => 100,
+            'amount_cents' => 1000,
+        ]);
+
+        foreach ($complete as $check) {
+            $this->assertTrue($check['ok'], $check['code'].': '.$check['message']);
+        }
+
+        $withWeb = JournalRules::checks([
+            'kind' => 'expense', 'day' => 5, 'month' => 5, 'category' => 'Ware',
+            'description' => 'Wareneingang', 'receipt_no' => 'R-2', 'business_share' => 100,
+            'amount_cents' => 1000, 'e1a_code' => '9100',
+        ]);
+
+        $web = $this->checkByCode($withWeb, 'WEB');
+        $this->assertFalse($web['ok']);
+        $this->assertStringContainsString('Lieferschein', $web['message']);
     }
 
     /** EUE-037/042 — Tagesbereich, USt-Arten, Monatsnamen, Kopfhinweis. */

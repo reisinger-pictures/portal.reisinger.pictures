@@ -48,6 +48,8 @@ final class EurTaxStatementService
 
         $income = (int) ($statement['income_cents'][E1Statement::GROUP_E1A] ?? 0);
         $expenses = (int) ($statement['expense_cents'][E1Statement::GROUP_E1A] ?? 0);
+        $rentalIncome = (int) ($statement['income_cents'][E1Statement::GROUP_E1B] ?? 0);
+        $rentalExpenses = (int) ($statement['expense_cents'][E1Statement::GROUP_E1B] ?? 0);
 
         $isRentalOnly = $mode === 'rental';
         $businessIncome = $isRentalOnly ? 0 : $income;
@@ -63,7 +65,7 @@ final class EurTaxStatementService
             'kz' => [
                 '245' => (int) ($input['employment_income_cents'] ?? 0),
                 '260' => (int) ($input['wage_tax_cents'] ?? 0),
-                'U13' => $this->rentalForecast($mode, $e1b, $input),
+                'U13' => $this->rentalForecast($mode, $rentalIncome, $rentalExpenses, $input),
                 'U26' => (int) ($input['prepayment_cents'] ?? 0),
                 'E40' => $e40,
                 'E39' => $e39,
@@ -86,12 +88,12 @@ final class EurTaxStatementService
     /**
      * EUE-104: die Prognose der Vermietung fließt nur in den Modi mit
      * Vermietungsanteil zu. Ohne expliziten Wert wird sie aus den E1B-Zeilen
-     * abgeleitet (Einnahmen − Werbungskosten).
+     * abgeleitet (Einnahmen − Werbungskosten). Ein reines `array_sum` über die
+     * KZ-Werte würde Einnahmen und Werbungskosten addieren statt verrechnen.
      *
-     * @param  array<string, int>  $e1b
      * @param  array<string, mixed>  $input
      */
-    private function rentalForecast(string $mode, array $e1b, array $input): int
+    private function rentalForecast(string $mode, int $rentalIncome, int $rentalExpenses, array $input): int
     {
         if ($mode === 'business') {
             return 0; // EUE-095: "Nur Betrieb" schließt Vermietung aus.
@@ -105,7 +107,7 @@ final class EurTaxStatementService
             return 0;
         }
 
-        return array_sum($e1b);
+        return $rentalIncome - $rentalExpenses;
     }
 
     /**

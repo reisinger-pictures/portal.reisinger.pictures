@@ -100,6 +100,42 @@ class EurSummaryApiTest extends EurBookkeepingTestCase
         $this->assertStringNotContainsString('999999', (string) json_encode($response->json()));
     }
 
+    public function test_booked_9225_is_removed_from_expenses_outside_the_uv_mode(): void
+    {
+        // EUE-115: bei SV-Berechnung darf 9225 den Gewinn nicht zusätzlich mindern.
+        $token = $this->tokenFor();
+        $brand = BrandRegistry::currentId();
+        app(SettingResolver::class)->set('eur_sv_mode', 'gsvg');
+
+        EurEntry::create([
+            'brand' => $brand, 'year' => 2026, 'month' => 5, 'direction' => 'income',
+            'kind_type' => 'Honorar', 'e1a_code' => '9040', 'business_share' => 100,
+            'amount_cents' => 200000, 'business_amount_cents' => 200000,
+        ]);
+        EurEntry::create([
+            'brand' => $brand, 'year' => 2026, 'month' => 5, 'direction' => 'expense',
+            'kind_type' => 'SV', 'e1a_code' => '9225', 'business_share' => 100,
+            'amount_cents' => 10000, 'business_amount_cents' => 10000,
+        ]);
+        EurAsset::create([
+            'brand' => $brand, 'name' => 'ASSET_115', 'invoice_no' => 'RE-115', 'supplier' => 'Lieferant',
+            'purchase_date' => '2026-01-15', 'cost_cents' => 100000, 'useful_life_years' => 3,
+            'business_share' => 100, 'method' => 'linear',
+        ]);
+        EurAssetYear::create([
+            'brand' => $brand, 'eur_asset_id' => EurAsset::where('name', 'ASSET_115')->firstOrFail()->id,
+            'year' => 2026, 'method' => 'linear', 'depreciation_cents' => 20000,
+            'book_value_cents' => 80000, 'private_use_percent' => 0,
+            'private_use_cents' => 0, 'business_use_cents' => 20000,
+        ]);
+
+        $response = $this->withHeaders($this->bearer($token))->getJson('/api/management/eur/summary?year=2026');
+        $response->assertOk()
+            ->assertJsonPath('expense_cents', 10000)
+            ->assertJsonPath('booked_sv_cents', 10000)
+            ->assertJsonPath('profit_cents', 180000);
+    }
+
     public function test_unknown_year_is_rejected(): void
     {
         $this->withHeaders($this->bearer($this->tokenFor()))

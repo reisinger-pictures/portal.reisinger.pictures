@@ -165,7 +165,7 @@ final class JournalRules
         $day = $entry['day'] ?? null;
 
         if ($day === null || $day === '') {
-            $checks[] = self::check('DAY', true, 'Tag fehlt.', 'Bitte den Tag der Buchung (1–31) ergänzen.');
+            $checks[] = self::check('DAY', false, '⚠ Tag fehlt.', 'Bitte den Tag der Buchung (1–31) ergänzen.');
         } elseif (! self::validDay($day)) {
             $checks[] = self::check(
                 'DAY',
@@ -178,8 +178,8 @@ final class JournalRules
         if (trim((string) ($entry['category'] ?? '')) === '') {
             $checks[] = self::check(
                 'CATEGORY',
-                true,
-                'Kategorie fehlt.',
+                false,
+                '⚠ Kategorie fehlt.',
                 'Bitte eine Einnahmen- oder Ausgaben-Art wählen; sonst gilt der Fallback-Code.',
             );
         }
@@ -187,9 +187,34 @@ final class JournalRules
         if (trim((string) ($entry['description'] ?? '')) === '') {
             $checks[] = self::check(
                 'DESCRIPTION',
-                true,
-                'Beschreibung fehlt.',
+                false,
+                '⚠ Beschreibung fehlt.',
                 'Bitte eine kurze Beschreibung ergänzen, damit der Beleg zuordenbar bleibt.',
+            );
+        }
+
+        // EUE-037: das Artefakt nennt Monatsnamen, die API ganze Zahlen 1–12.
+        // Beide Schreibweisen sind gültig; alles andere ist ein Hinweis.
+        $month = $entry['month'] ?? null;
+        $validMonth = self::validMonth($month)
+            || (is_int($month) && $month >= 1 && $month <= 12);
+
+        if (! $validMonth) {
+            $checks[] = self::check(
+                'MONTH',
+                false,
+                '⚠ Monat fehlt oder ist ungültig.',
+                'Bitte einen Monat zwischen 1 und 12 angeben.',
+            );
+        }
+
+        // EUE-036: Ausgaben brauchen eine Belegnummer.
+        if ($direction === 'expense' && trim((string) ($entry['receipt_no'] ?? '')) === '') {
+            $checks[] = self::check(
+                'RECEIPT',
+                false,
+                '⚠ Belegnummer fehlt.',
+                'Bitte eine Belegnummer vergeben, damit der Beleg zuordenbar bleibt.',
             );
         }
 
@@ -219,6 +244,16 @@ final class JournalRules
                 $code === $fallback
                     ? sprintf('Ohne zugeordnete Art wird %s als Fallback verwendet; bei Bedarf die Art nachtragen.', $fallback)
                     : 'Die Kennzahl ist zugeordnet und wird für die E1A/E1B-Auswertung übernommen.',
+            );
+        }
+
+        // EUE-043: KZ 9100 (Wareneingang) verlangt einen passenden WEB-Eintrag.
+        if ($code === '9100') {
+            $checks[] = self::check(
+                'WEB',
+                false,
+                '⚠ Wareneingang ohne zugeordneten Lieferschein.',
+                'Bitte den Wareneingang im WEB-Panel erfassen und zuordnen.',
             );
         }
 

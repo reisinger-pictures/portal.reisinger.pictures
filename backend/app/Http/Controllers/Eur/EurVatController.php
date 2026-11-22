@@ -67,25 +67,31 @@ class EurVatController extends Controller
             'zahllast_cents' => $result['zahllast'],
             'quarters' => $groups['quarters'],
             'year_totals' => $groups['year_totals'],
-            'erklaerung' => $this->declarations($declarationService, $year, $result),
+            'erklaerung' => $this->declarations($declarationService, $year, $result, $groups['year_totals']),
         ]);
     }
 
     /**
-     * Beide Blöcke nutzen dieselben Kennzahlen und dieselbe Zahllast; nur
-     * Titel und Belegzelle unterscheiden sich (EUE-088).
+     * EUE-088: beide Blöcke haben dieselbe Kennzahlenstruktur, aber
+     * unterschiedliche Werte — die Voranmeldung den Monat, die Erklärung
+     * die Jahressummen.
      *
      * @param  array<string, int|null>  $result
+     * @param  array<string, int|null>  $yearTotals
      * @return array<string, array<string, mixed>>
      */
-    private function declarations(EurVatDeclarationService $service, int $year, array $result): array
-    {
+    private function declarations(
+        EurVatDeclarationService $service,
+        int $year,
+        array $result,
+        array $yearTotals,
+    ): array {
         $blocks = $service->blocks($year);
 
-        foreach ($blocks as $key => $block) {
-            $blocks[$key]['kz'] = $result;
-            $blocks[$key]['zahllast_cents'] = $result['zahllast'] ?? null;
-        }
+        $blocks['voranmeldung']['kz'] = $result;
+        $blocks['voranmeldung']['zahllast_cents'] = $result['zahllast'] ?? null;
+        $blocks['erklaerung']['kz'] = $yearTotals;
+        $blocks['erklaerung']['zahllast_cents'] = $yearTotals['zahllast'] ?? null;
 
         return $blocks;
     }

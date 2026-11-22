@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Eur;
 
 use App\Eur\Reference\EurYear;
-use App\Eur\Reference\ReferenceTables;
+use App\Eur\Reference\IncomeTaxTariff;
 use App\Http\Controllers\Controller;
 use App\Services\Eur\EurTaxStatementService;
 use Closure;
@@ -48,7 +48,9 @@ class EurIncomeTaxController extends Controller
         ]);
 
         $year = (int) ($data['year'] ?? EurYear::DEFAULT);
-        $tariff = ReferenceTables::load()->incomeTax();
+        // EUE-089 … EUE-093: Tarif und Freibetrag aus dem gewählten Jahr,
+        // nicht aus dem auf 2026 gepinnten Referenzartefakt.
+        $tariff = IncomeTaxTariff::forYear($year);
         $profit = (int) $data['profit_cents'];
         $allowance = $tariff->basicAllowanceCents($profit);
         $taxable = max(0, $profit - $allowance);

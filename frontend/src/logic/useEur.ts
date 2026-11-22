@@ -115,6 +115,7 @@ export interface EurEntry {
     customer: string | null;
     receipt_no: string | null;
     note: string | null;
+    checks?: {code: string; ok: boolean; message: string; hint: string}[];
 }
 
 export interface EurEntriesResponse {
@@ -265,6 +266,8 @@ export interface EurMonthData {
     signature: {status: string; provider: string | null; is_test: boolean};
     /** Keyed by E1A/E1B code (e.g. `9040`, `E1B 9460`); optional for older payloads. */
     e1_by_code?: EurE1ByCode;
+    /** EUE-124: die acht USt-Kennzahlen des Monats. */
+    vat?: {kennzahlen: Record<string, number | null>; zahllast_cents: number | null; empty: boolean};
 }
 
 /** `GET/POST /eur/documents` — metadata; the storage path never leaves the server. */

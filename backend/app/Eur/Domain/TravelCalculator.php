@@ -7,6 +7,7 @@ namespace App\Eur\Domain;
 use App\Eur\Parity\Money;
 use App\Eur\Parity\RuleValues;
 use App\Eur\Reference\TravelAllowances;
+use App\Eur\Reference\YearTables;
 use InvalidArgumentException;
 
 /**
@@ -23,10 +24,17 @@ final class TravelCalculator
         private readonly TravelAllowances $allowances,
     ) {}
 
-    /** EUE-062/063/064: Kilometergeld je Transportmittel in Cent. */
-    public function kilometreRateCents(string $vehicle, int $year = 2026): int
+    /**
+     * EUE-062/063/064: Kilometergeld je Transportmittel, Jahr und Halbjahr in Cent.
+     *
+     * Die H1/H2-Sätze 2025 (30.06./01.07.) liegen als strukturierter Wert im
+     * Katalog und können von `RuleValues::parseValue()` nicht gelesen werden.
+     * `YearTables` löst sie nach Jahr und Monat auf; das verhindert HTTP 500
+     * für das API-erlaubte Jahr 2025.
+     */
+    public function kilometreRateCents(string $vehicle, int $year = 2026, ?int $month = null): int
     {
-        return $this->rules->parameterFor($this->ruleForVehicle($vehicle), $this->rateName($vehicle), $year, 'cents');
+        return YearTables::travelPerKmCents($vehicle, $year, $month);
     }
 
     /** EUE-062/063: Mitfahrerzuschlag je Person und Kilometer in Cent. */
@@ -60,8 +68,13 @@ final class TravelCalculator
     /**
      * EUE-062 … EUE-064: Kilometergeld inklusive Mitfahrerzuschlag.
      */
-    public function kilometreAllowanceCents(string $vehicle, int $kilometres, int $passengers = 0, int $year = 2026): int
-    {
+    public function kilometreAllowanceCents(
+        string $vehicle,
+        int $kilometres,
+        int $passengers = 0,
+        int $year = 2026,
+        ?int $month = null,
+    ): int {
         if ($kilometres < 0) {
             throw new InvalidArgumentException('Kilometer dürfen nicht negativ sein.');
         }
@@ -77,7 +90,7 @@ final class TravelCalculator
             ));
         }
 
-        $rate = $this->kilometreRateCents($vehicle, $year)
+        $rate = $this->kilometreRateCents($vehicle, $year, $month)
             + $passengers * $this->passengerSurchargeCents($vehicle, $year);
 
         return $kilometres * $rate;
@@ -114,7 +127,7 @@ final class TravelCalculator
      * EUE-068: Tagesgeld nach Mahlzeitenabzug.
      *
      * Inland: eine Mahlzeit halbiert, zwei Mahlzeiten streichen das Tagesgeld.
-     * Ausland: eine Mahlzeit streicht, zwei Mahlzeiten lassen ein Drittel.
+     * Ausland: eine Mahlzeit lässt die volle Pauschale, zwei ein Drittel.
      */
     public function perDiemCents(int $dayRateCents, int $meals, bool $domestic): int
     {
@@ -126,7 +139,7 @@ final class TravelCalculator
             $meals === 0 => '1',
             $domestic && $meals === 1 => '0.5',
             $domestic && $meals === 2 => '0',
-            ! $domestic && $meals === 1 => '0',
+            ! $domestic && $meals === 1 => '1',
             default => '0.333333333333',
         };
 
@@ -189,10 +202,11 @@ final class TravelCalculator
         bool $withReceipts,
         int $businessSharePercent,
         int $year = 2026,
+        ?int $month = null,
     ): int {
         $this->assertShare($businessSharePercent);
 
-        $total = $this->kilometreAllowanceCents($vehicle, $kilometres, $passengers, $year);
+        $total = $this->kilometreAllowanceCents($vehicle, $kilometres, $passengers, $year, $month);
         $daily = $this->dailyAllowancesCents($country, $days, $meals, $withReceipts, $year);
 
         return Money::applyShare(
@@ -225,9 +239,18 @@ final class TravelCalculator
 
     /**
      * EUE-071: Hin-/Rückfahrt — kein Tagesgeld, Mindestentfernung je Zeilenart.
+     *
+     * Die ODS stuft eine Zeile als Hin-/Rückfahrt ein, wenn die Reisezeit
+     * mindestens drei Stunden beträgt (AJ3) — alternativ die Stunden des
+     * Belegs (AE3) — und die Mindestentfernung erreicht ist. Die frühere
+     * Bedingung war invertiert und wertete 60-Minuten-Fahrten als Reise.
      */
-    public function isTravelLeg(int $minutes, int $kilometres, bool $chained): bool
-    {
+    public function isTravelLeg(
+        int $minutes,
+        int $kilometres,
+        bool $chained,
+        int $ledgerMinutes = 0,
+    ): bool {
         $minimum = $this->rules->parameterFor(
             'EUE-071',
             $chained ? 'Hinfahrt-Minimum verkettet' : 'Hinfahrt-Minimum Einzelzeile',
@@ -235,7 +258,9 @@ final class TravelCalculator
             'count',
         );
 
-        return $minutes < $this->rules->parameterFor('EUE-071', 'Zeitgrenze Hin-/Rückfahrt', 2026, 'count') * 60
+        $timeLimit = $this->rules->parameterFor('EUE-071', 'Zeitgrenze Hin-/Rückfahrt', 2026, 'count') * 60;
+
+        return ($minutes >= $timeLimit || $ledgerMinutes >= $timeLimit)
             && $kilometres >= $minimum;
     }
 
@@ -298,24 +323,6 @@ final class TravelCalculator
             str_contains($normalized, 'motorrad') => 'motorrad',
             str_contains($normalized, 'fahrrad'), str_contains($normalized, 'e-bike') => 'fahrrad',
             default => 'pkw',
-        };
-    }
-
-    private function ruleForVehicle(string $vehicle): string
-    {
-        return match ($this->vehicleKind($vehicle)) {
-            'motorrad' => 'EUE-063',
-            'fahrrad' => 'EUE-064',
-            default => 'EUE-062',
-        };
-    }
-
-    private function rateName(string $vehicle): string
-    {
-        return match ($this->vehicleKind($vehicle)) {
-            'motorrad' => 'KM-Geld Motorrad',
-            'fahrrad' => 'KM-Geld Fahrrad',
-            default => 'KM-Geld PKW',
         };
     }
 

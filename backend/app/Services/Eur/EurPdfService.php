@@ -27,6 +27,7 @@ final class EurPdfService
         $totals = is_array($statement['totals'] ?? null) ? $statement['totals'] : [];
         $lines = is_array($statement['lines'] ?? null) ? $statement['lines'] : [];
         $e1 = is_array($statement['e1_by_code'] ?? null) ? $statement['e1_by_code'] : [];
+        $vat = is_array($statement['vat'] ?? null) ? $statement['vat'] : [];
 
         $rows = '';
 
@@ -69,6 +70,7 @@ final class EurPdfService
             .$this->table(['Art', 'Tag', 'Beschreibung', 'Betrag'], $rows)
             .'<h2>Kennzahlen</h2>'
             .$this->table(['Gruppe', 'Kennzahl', 'Betrag'], $codes)
+            .$this->vatSection($vat)
         );
 
         return $this->render($html);
@@ -147,6 +149,33 @@ final class EurPdfService
         );
 
         return $this->render($html);
+    }
+
+    /**
+     * EUE-124: die acht USt-Kennzahlen als eigene Tabelle im Monats-PDF.
+     * Leere Kennzahlen werden ausgelassen; nur die Lesegrenze formatiert Euro.
+     *
+     * @param  array<string, mixed>  $vat
+     */
+    private function vatSection(array $vat): string
+    {
+        $rows = '';
+
+        foreach (is_array($vat['kennzahlen'] ?? null) ? $vat['kennzahlen'] : [] as $code => $amount) {
+            if ($amount === null) {
+                continue;
+            }
+
+            $rows .= '<tr><td>'.$this->text($code).'</td>'
+                .'<td class="num">'.$this->euro((int) $amount).'</td></tr>';
+        }
+
+        if ($rows === '') {
+            return '';
+        }
+
+        return '<h2>Umsatzsteuer-Kennzahlen</h2>'
+            .$this->table(['Kennzahl', 'Betrag'], $rows);
     }
 
     private function document(string $title, string $body): string

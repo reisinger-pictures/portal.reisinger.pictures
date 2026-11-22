@@ -38,6 +38,12 @@ class MonthStatementTest extends TestCase
         $this->assertSame(1000, $view['totals']['warehouse_cents']);
         $this->assertSame(180, $view['totals']['hours_minutes']);
         $this->assertIsInt($view['totals']['vat_cents']);
+        // EUE-124: alle acht USt-Kennzahlen werden durchgereicht, nicht nur die Zahllast.
+        $this->assertSame(
+            ['000', '016', '057', '070', '072', '073', '008', 125],
+            array_keys($view['vat']['kennzahlen']),
+        );
+        $this->assertArrayHasKey('zahllast_cents', $view['vat']);
         $this->assertSame(
             '💡 Rechenaufwendige Kalkulation: Bitte nach Verwendung wieder auf OFF setzten!',
             $view['hint'],

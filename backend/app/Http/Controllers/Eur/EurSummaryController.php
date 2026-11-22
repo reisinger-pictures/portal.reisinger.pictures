@@ -49,6 +49,11 @@ class EurSummaryController extends Controller
             }
         }
 
+        // EUE-115: 9225 zählt nicht doppelt — bei SV-Berechnung wird es aus
+        // den Ausgaben herausgerechnet, im UV-Modus bleibt es stehen.
+        $expenseForProfit = $expense - ($this->overview->excludeBookedSvFromExpenses() ? $bookedSv : 0);
+        $profit = $income - $expenseForProfit - $afa;
+
         $svMonthly = $this->overview->svMonthly($year, $income - $expense, $bookedSv);
         $withRelations = EurEntry::forCurrentBrand()->forYear($year)->with(['customer', 'project'])->get();
         $signatures = EurSignature::forCurrentBrand()->where('year', $year)->get(['status'])->all();
@@ -59,9 +64,11 @@ class EurSummaryController extends Controller
             'asset_count' => EurAsset::forCurrentBrand()->count(),
             'income_cents' => $income,
             'expense_cents' => $expense,
+            'booked_sv_cents' => $bookedSv,
             'afa_cents' => $afa,
-            'profit_cents' => $income - $expense - $afa,
+            'profit_cents' => $profit,
             'sv_monthly' => $svMonthly,
+            'kv_rate_hidden' => $this->overview->kvRateHidden(),
             'insurance_blocks' => $this->overview->insuranceBlocks($svMonthly),
             'afa_card' => $this->overview->afaCard($assetYears->all()),
             'by_customer' => $this->overview->byCustomer($withRelations),

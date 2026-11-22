@@ -116,6 +116,13 @@ class EurTaxStatementServiceTest extends TestCase
         $forecast = $this->service->build(2026, 'forecast', $this->entries(), [], 0);
         // Ohne expliziten Wert wird U13 aus den E1B-Zeilen abgeleitet.
         $this->assertSame(50000, $forecast['kz']['U13']);
+
+        $withCosts = $this->service->build(2026, 'forecast', [
+            ['direction' => 'income', 'code' => 'E1B 9460', 'amount_cents' => 50000],
+            ['direction' => 'expense', 'code' => 'E1B 9530', 'amount_cents' => 20000],
+        ], [], 0);
+        // EUE-104: Einnahmen minus Werbungskosten, nicht deren Summe.
+        $this->assertSame(30000, $withCosts['kz']['U13']);
     }
 
     public function test_unknown_mode_is_rejected(): void

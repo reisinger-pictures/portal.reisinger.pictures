@@ -58,6 +58,23 @@ export default function EurEntryDialog({year, reference, onClose, onCreated}: Pr
         setForm((current) => ({...current, [key]: value}));
     };
 
+    // EUE-033/048: die Art aus dem Referenzartefakt bestimmt den Betriebsanteil
+    // (z. B. 0 % für private Posten). Der Wert bleibt überschreibbar.
+    const selectKind = (type: string) => {
+        const kind = kinds.find((candidate) => candidate.type === type);
+        const share = kind?.share_percent;
+
+        setForm((current) => ({
+            ...current,
+            kindType: type,
+            businessShare: share === null || share === undefined ? current.businessShare : String(share),
+        }));
+    };
+
+    const selectDirection = (direction: 'income' | 'expense') => {
+        setForm((current) => ({...current, direction, kindType: '', businessShare: '100'}));
+    };
+
     const submit = async () => {
         if (!isValid || isSaving) return;
         setIsSaving(true);
@@ -71,7 +88,8 @@ export default function EurEntryDialog({year, reference, onClose, onCreated}: Pr
                 month: Number(form.month),
                 direction: form.direction,
                 kind_type: form.kindType,
-                e1a_code: kzFromE1a(kind?.e1a),
+                // EUE-033/048: bei 0 % ist die Buchung privat und erhält keine KZ.
+                e1a_code: share === 0 ? null : kzFromE1a(kind?.e1a),
                 business_share: share,
                 amount_cents: amountCents,
                 receipt_no: form.receiptNo === '' ? null : form.receiptNo,
@@ -112,7 +130,7 @@ export default function EurEntryDialog({year, reference, onClose, onCreated}: Pr
                     <label className="form-control">
                         <span className="label-text"><Trans>Richtung</Trans></span>
                         <select className="select select-bordered" value={form.direction}
-                            onChange={(event) => update('direction', event.target.value as 'income' | 'expense')} required>
+                            onChange={(event) => selectDirection(event.target.value as 'income' | 'expense')} required>
                             <option value="expense"><Trans>Ausgabe</Trans></option>
                             <option value="income"><Trans>Einnahme</Trans></option>
                         </select>
@@ -120,7 +138,7 @@ export default function EurEntryDialog({year, reference, onClose, onCreated}: Pr
                     <label className="form-control">
                         <span className="label-text"><Trans>Art</Trans></span>
                         <select className="select select-bordered" value={form.kindType}
-                            onChange={(event) => update('kindType', event.target.value)} required>
+                            onChange={(event) => selectKind(event.target.value)} required>
                             <option value="">—</option>
                             {kinds.map((kind) => (
                                 <option key={kind.type} value={kind.type}>{kind.type}</option>

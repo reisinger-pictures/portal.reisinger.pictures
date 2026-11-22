@@ -97,6 +97,9 @@ final class MonthStatement
             'totals' => $totals,
             'checks' => $checks,
             'e1_by_code' => E1Statement::byCode($monthEntries, $year),
+            // EUE-124: die acht USt-Kennzahlen durchreichen statt nur die
+            // Zahllast zu behalten (Monatspanel und PDF brauchen alle Zeilen).
+            'vat' => $vat,
             'social_insurance' => [
                 'amounts_cents' => YearTables::socialInsuranceAmountsCents($year),
                 'rates_per_10000' => YearTables::socialInsuranceRatesPer10000($year),

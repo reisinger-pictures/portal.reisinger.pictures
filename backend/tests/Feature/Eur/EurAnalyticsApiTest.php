@@ -66,6 +66,93 @@ class EurAnalyticsApiTest extends EurBookkeepingTestCase
         $this->assertSame(75000, $month['profit_cents']);
     }
 
+    public function test_income_type_matrix_reconciles_with_booked_income(): void
+    {
+        // EUE-119: Einnahmen-Art × Monat mit Summen und ✓✓-Abgleich.
+        $token = $this->tokenFor();
+        $brand = BrandRegistry::currentId();
+
+        foreach ([['Honorar', 5, 100000], ['Honorar', 6, 50000], ['Miete', 5, 70000]] as [$kind, $month, $amount]) {
+            EurEntry::create([
+                'brand' => $brand, 'year' => 2026, 'month' => $month, 'day' => 5,
+                'direction' => 'income', 'kind_type' => $kind, 'e1a_code' => '9040',
+                'business_share' => 100, 'amount_cents' => $amount,
+                'business_amount_cents' => $amount,
+            ]);
+        }
+
+        $response = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/analytics/by-income-type?year=2026');
+
+        $response->assertOk()
+            ->assertJsonPath('total_cents', 220000)
+            ->assertJsonPath('booked_cents', 220000)
+            ->assertJsonPath('delta_cents', 0)
+            ->assertJsonPath('match', true)
+            ->assertJsonPath('types.0.type', 'Honorar')
+            ->assertJsonPath('types.0.total_cents', 150000)
+            ->assertJsonPath('month_totals.5', 170000);
+    }
+
+    public function test_expense_type_matrix_groups_a_av_web_and_fr(): void
+    {
+        // EUE-120: Ausgaben-Art × Monat mit A/AV/WEB/FR-Herkunft.
+        $token = $this->tokenFor();
+        $brand = BrandRegistry::currentId();
+
+        foreach ([
+            ['Ware', '9100', 30000], ['Ware', '9130', 10000],
+            ['Fahrt', '9160', 5000], ['Büro', '9230', 2000],
+        ] as [$kind, $code, $amount]) {
+            EurEntry::create([
+                'brand' => $brand, 'year' => 2026, 'month' => 5, 'day' => 5,
+                'direction' => 'expense', 'kind_type' => $kind, 'e1a_code' => $code,
+                'business_share' => 100, 'amount_cents' => $amount,
+                'business_amount_cents' => $amount,
+            ]);
+        }
+
+        $response = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/analytics/by-expense-type?year=2026');
+
+        $response->assertOk()
+            ->assertJsonPath('total_cents', 47000)
+            ->assertJsonPath('match', true);
+
+        $ware = collect($response->json('types'))->firstWhere('type', 'Ware');
+        $this->assertSame(['A' => 0, 'AV' => 10000, 'WEB' => 30000, 'FR' => 0], $ware['sources']);
+        $fahrt = collect($response->json('types'))->firstWhere('type', 'Fahrt');
+        $this->assertSame(5000, $fahrt['sources']['FR']);
+    }
+
+    public function test_payment_reconciliation_opens_tracks_and_closes_balances(): void
+    {
+        // EUE-122: Startsaldo ± Zu-/Abflüsse je Zahlart und Monat.
+        $token = $this->tokenFor();
+        $brand = BrandRegistry::currentId();
+
+        EurEntry::create([
+            'brand' => $brand, 'year' => 2026, 'month' => 5, 'day' => 5,
+            'direction' => 'income', 'kind_type' => 'Honorar', 'e1a_code' => '9040',
+            'payment_method' => 'Bankkonto', 'business_share' => 100,
+            'amount_cents' => 100000, 'business_amount_cents' => 100000,
+        ]);
+        EurEntry::create([
+            'brand' => $brand, 'year' => 2026, 'month' => 6, 'day' => 5,
+            'direction' => 'expense', 'kind_type' => 'Büro', 'e1a_code' => '9230',
+            'payment_method' => 'Bankkonto', 'business_share' => 100,
+            'amount_cents' => 25000, 'business_amount_cents' => 25000,
+        ]);
+
+        $response = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/payment-reconciliation?year=2026');
+
+        $response->assertOk()->assertJsonCount(2, 'methods');
+        $bank = collect($response->json('methods'))->firstWhere('method', 'Bankkonto');
+        $this->assertSame(100000, $bank['months'][4]['closing_cents']);
+        $this->assertSame(75000, $bank['closing_balance_cents']);
+    }
+
     public function test_income_tax_accepts_mode_and_derives_e1a_e1b_from_entries(): void
     {
         $token = $this->tokenFor();

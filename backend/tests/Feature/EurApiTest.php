@@ -331,6 +331,32 @@ class EurApiTest extends TestCase
         $response->assertJsonPath('business_cents', 7200);
     }
 
+    public function test_travel_calculation_rejects_unpinned_years_without_a_server_error(): void
+    {
+        // EUE-063/064: das API-erlaubte Jahr 2025 darf keinen unkontrollierten
+        // HTTP 500 mehr erzeugen. Der km-Satz wird aus YearTables aufgelöst
+        // (30.06./01.07.). Da nur die 2026er-Ländertabelle gepinnt ist (EUE-013),
+        // antwortet die API mit einer klaren 422 statt mit einem 500.
+        $token = $this->tokenFor(UserRole::ADMIN->value);
+
+        $response = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/travel/calc', [
+            'year' => 2025,
+            'month' => 6,
+            'vehicle' => 'Motorrad',
+            'kilometres' => 100,
+            'passengers' => 0,
+            'country' => 'Österreich',
+            'days' => 1,
+            'meals' => 0,
+            'with_receipts' => true,
+            'business_share' => 100,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'Für das Reisejahr 2025 ist keine Ländertabelle gepinnt; verfügbar ist 2026.');
+        $this->assertStringNotContainsString('unlesbarer Parameterwert', json_encode($response->json()));
+    }
+
     public function test_income_tax_calculation_applies_allowance_and_tariff(): void
     {
         $token = $this->tokenFor(UserRole::ADMIN->value);

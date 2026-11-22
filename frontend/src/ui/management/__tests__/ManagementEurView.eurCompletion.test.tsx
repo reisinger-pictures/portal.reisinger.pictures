@@ -183,7 +183,7 @@ describe('ManagementEurView EAR completion UI', () => {
         expect(screen.getByText(/Betriebsanteil-Hilfe: Geben Sie den betrieblichen Anteil in 5-%-Schritten/)).toBeVisible();
         expect(screen.getByText('0 Belege')).toBeVisible();
         expect(screen.getByText('Stunden: 1 h 30 min')).toBeVisible();
-        expect(screen.getByRole('link', {name: 'PDF signieren'}))
+        expect(screen.getByRole('link', {name: 'PDF herunterladen'}))
             .toHaveAttribute('href', '/api/management/eur/pdf/month?year=2026&month=5');
     });
 

@@ -299,6 +299,34 @@ export default function EurMonthPanel({year, month, onMonthChange}: Props) {
                     </>
                 )}
 
+                {Object.values(data.vat?.kennzahlen ?? {}).some((value) => value !== null) && (
+                    <>
+                        <div className="divider my-4"/>
+
+                        <h3 className="font-semibold"><Trans>USt-Kennzahlen</Trans></h3>
+                        <div className="overflow-x-auto mt-2">
+                            <table className="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th><Trans>Kennzahl</Trans></th>
+                                        <th className="text-right"><Trans>Betrag</Trans></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {Object.entries(data.vat?.kennzahlen ?? {})
+                                        .filter(([, value]) => value !== null)
+                                        .map(([code, value]) => (
+                                            <tr key={code}>
+                                                <td className="font-mono">{code}</td>
+                                                <td className="text-right">{cents(value as number)}</td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )}
+
                 <div className="divider my-4"/>
 
                 <div className="flex flex-wrap items-center gap-3">

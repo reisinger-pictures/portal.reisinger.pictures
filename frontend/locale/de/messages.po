@@ -6553,8 +6553,12 @@ msgid "PDF Generieren"
 msgstr "PDF Generieren"
 
 #: src/ui/management/ManagementEurView.tsx
-msgid "PDF signieren"
-msgstr "PDF signieren"
+msgid "PDF herunterladen"
+msgstr "PDF herunterladen"
+
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "PDF signieren"
+#~ msgstr "PDF signieren"
 
 #: src/ui/management/eur/EurMonthPanel.tsx
 msgid "Pensionsversicherungssatz FSVG"
@@ -6898,6 +6902,10 @@ msgstr "Prüfen"
 #: src/ui/management/ManagementSettingsView.tsx
 msgid "Prüft die Mollie-Konfiguration (Schlüssel-Modus, Webhook-URL, Methodenliste, Konto und Zahlungsbereitschaft) — nur bei explizitem Klick."
 msgstr "Prüft die Mollie-Konfiguration (Schlüssel-Modus, Webhook-URL, Methodenliste, Konto und Zahlungsbereitschaft) — nur bei explizitem Klick."
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+msgid "Prüfung"
+msgstr "Prüfung"
 
 #: src/ui/management/eur/EurMonthPanel.tsx
 msgid "Prüfungen"
@@ -8255,6 +8263,10 @@ msgstr "URL Slug"
 #: src/ui/management/ManagementEurView.tsx
 msgid "USt"
 msgstr "USt"
+
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "USt-Kennzahlen"
+msgstr "USt-Kennzahlen"
 
 #: src/ui/management/eur/EurOverviewPanel.tsx
 msgid "UV"

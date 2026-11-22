@@ -50,6 +50,9 @@ class EurPdfApiTest extends EurBookkeepingTestCase
         $text = $this->pdfText($bytes);
         $this->assertStringContainsString('Monatsbericht', $text);
         $this->assertStringContainsString('Betriebliche Einnahmen', $text);
+        // EUE-124: die USt-Kennzahlen erscheinen als eigene Tabelle im PDF.
+        $this->assertStringContainsString('Umsatzsteuer-Kennzahlen', $text);
+        $this->assertStringContainsString('016', $text);
         $this->assertStringContainsString('MONTHLY_MARKER_XYZ', $text);
         $this->assertStringNotContainsString('FOREIGN_MONTHLY_XYZ', $text);
     }

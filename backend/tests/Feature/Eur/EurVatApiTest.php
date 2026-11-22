@@ -44,8 +44,10 @@ class EurVatApiTest extends EurBookkeepingTestCase
 
         $this->assertStringContainsString('EUE-088', (string) $voranmeldung['text']);
         $this->assertSame($voranmeldung['text'], $erklaerung['text']);
+        // EUE-088: Block 1 = Monatswerte, Block 2 = Jahressummen (AD5:AD14/AD20).
         $this->assertSame($response->json('kz'), $voranmeldung['kz']);
-        $this->assertSame($response->json('zahllast_cents'), $erklaerung['zahllast_cents']);
+        $this->assertSame($response->json('year_totals'), $erklaerung['kz']);
+        $this->assertSame($response->json('year_totals.zahllast'), $erklaerung['zahllast_cents']);
     }
 
     public function test_unknown_year_is_rejected(): void

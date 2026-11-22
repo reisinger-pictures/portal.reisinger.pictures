@@ -489,7 +489,7 @@ export default function ManagementEurView() {
                                     <Trans>+ Eigenbeleg</Trans>
                                 </button>
                                 <a className="btn btn-outline btn-sm" href={eurPdfMonthUrl(year, month)} download>
-                                    <Trans>PDF signieren</Trans>
+                                    <Trans>PDF herunterladen</Trans>
                                 </a>
                             </div>
                         </div>

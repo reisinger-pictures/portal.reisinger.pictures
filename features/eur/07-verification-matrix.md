@@ -74,10 +74,10 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 |---|---|---|---|
 | EUE-031 | Die betriebliche Einnahme in Q ergibt sich aus Brutto mal dem (optionalen) betrieblichen Anteil; ohne Anteil gilt 1. | Verhalten (kein Skalarwert) | E1StatementTest.php:57-70 (business_share 50), E1Statement::amountFor |
 | EUE-032 | Die Kennzahl wird aus der hinterlegten Zuordnung der Einnahmenarten ermittelt; ohne Zuordnung gilt die Kennzahl 9040 für Betriebseinnahmen. | KZ: 9040 | E1StatementTest.php, JournalRulesTest.php |
-| EUE-033 | Der Betriebsanteil ist 0, die Buchung erscheint nicht in den betrieblichen Einnahmen und nicht in E1A. | Betriebsanteil Privat=0 | JournalRulesTest.php:20 (share 0 -> keine KZ), E1StatementTest.php:57-70 |
+| EUE-033 | Der Betriebsanteil ist 0, die Buchung erscheint nicht in den betrieblichen Einnahmen und nicht in E1A. | Betriebsanteil Privat=0 | JournalRulesTest.php:20 (share 0 -> keine KZ), E1StatementTest.php:57-70, EurEntryDialog.test.tsx (Art setzt Anteil aus Referenz, 0 % ⇒ KZ leer) |
 | EUE-034 | Der Betrag wird in der Mieteinnahmen in der Vermietungsaufstellung und in der Vermietungs-Ergebnisermittlung des Vermietungsergebnisses in der Übersic | KZ: 9460 | E1StatementTest.php, JournalRulesTest.php, VatReturnServiceTest.php |
 | EUE-035 | Eine fortlaufende Nummer wird nur für tatsächliche Buchungen vergeben; leere Zeilen werden übersprungen. | Verhalten (kein Skalarwert) | — offen — |
-| EUE-036 | Fehlende Belegnummer/Tag/Monat oder eine undefinierte/mehrfach definierte Art erzeugt ⚠-Hinweise in Spalte B; der Hinweis 'Belegnummer fehlt' ist nur  | Verhalten (kein Skalarwert) | JournalRulesTest.php |
+| EUE-036 | Fehlende Belegnummer/Tag/Monat oder eine undefinierte/mehrfach definierte Art erzeugt ⚠-Hinweise in Spalte B; der Hinweis 'Belegnummer fehlt' ist nur  | Verhalten (kein Skalarwert) | JournalRulesTest.php (DAY/CATEGORY/DESCRIPTION/MONTH/RECEIPT ok=false), EurEntriesPanel.tsx (⚠-Spalte) |
 | EUE-037 | Monate müssen einem der zwölf Namen entsprechen; eine Tagesbereichsvalidierung (1–31) existiert in E, AV und WEB, nicht aber im A-Blatt oder im Reiseb | Verhalten (kein Skalarwert) | JournalRulesTest.php |
 
 ## B04 — Ausgaben & Vorsteuer
@@ -89,12 +89,12 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | EUE-040 | Die Steuerschuld aus Reverse Charge wird analog mit 20/10/13 % berechnet. | RC-Sätze=20/10/13 % | JournalRules::RC_RATES, JournalRulesTest.php:45-62 (20/10/13 %) |
 | EUE-041 | Die Kennzahl kommt aus der hinterlegten Zuordnung der Ausgabenarten; ohne Zuordnung gilt die Kennzahl 9230 für übrige Betriebsausgaben. | KZ: 9230 | JournalRules::expenseCode, JournalRulesTest.php:14-22 (9230) |
 | EUE-042 | Fehlende Belegnummer erzeugt den Hinweis auf die Beweispflicht, fehlender Monat/Tag/Art oder eine undefinierte Art erzeugt ⚠; bei FSVG entfällt der WE | Verhalten (kein Skalarwert) | JournalRulesTest.php |
-| EUE-043 | Für Wareneinkäufe wird geprüft, ob die Belegnummer im WEB vorkommt; sonst erscheint ein Hinweis. | KZ: 9100 | — offen — |
+| EUE-043 | Für Wareneinkäufe wird geprüft, ob die Belegnummer im WEB vorkommt; sonst erscheint ein Hinweis. | KZ: 9100 | JournalRules.php (WEB-Check bei KZ 9100), JournalRulesTest.php |
 | EUE-044 | Fortlaufende Nummerierung nur für tatsächliche Buchungen. | Verhalten (kein Skalarwert) | — offen — |
 | EUE-045 | Der betriebliche Anteil wird aus der hinterlegten Zuordnung der Ausgabenarten entnommen; der Betrag wird nur bei Belegnummern mit dem Präfix 'WE' gebi | Verhalten (kein Skalarwert) | WarehouseReconciliationTest.php |
 | EUE-046 | Die WEB-Prüfung verweist auf die passende Ausgabe im A-Blatt und meldet fehlende oder unbekannte Belegnummern. | Verhalten (kein Skalarwert) | WarehouseReconciliationTest.php:14-25,40-59 (receipt_no, WEB-Hinweis) |
 | EUE-047 | Monat, Tag, Lieferant und Warenbezeichnung sind Pflicht; die Ausgaben-Art muss definiert und eindeutig sein. | Verhalten (kein Skalarwert) | WarehouseReconciliationTest.php |
-| EUE-048 | Der Betriebsanteil ist 0; die Ausgabe wird nicht als Betriebsausgabe und nicht in E1A übernommen. | Betriebsanteil Privat=0 | JournalRulesTest.php:20-21, E1StatementTest.php:57-70 (share 0 entfaellt) |
+| EUE-048 | Der Betriebsanteil ist 0; die Ausgabe wird nicht als Betriebsausgabe und nicht in E1A übernommen. | Betriebsanteil Privat=0 | JournalRulesTest.php:20-21, E1StatementTest.php:57-70 (share 0 entfaellt), EurEntryDialog.test.tsx |
 
 ## B05 — Anlagenverzeichnis & AfA
 
@@ -119,15 +119,15 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | Regel-ID | Fachliche Wirkung (gekürzt) | Hergeleiteter Wert | Testnachweis |
 |---|---|---|---|
 | EUE-062 | Der Satz ist 0,42 €/km (2024) bzw. 0,50 €/km (2025+); pro Mitfahrer kommen 0,05 € (2024) bzw. 0,15 € (2025+) hinzu, höchstens 6 Mitfahrer. | KM-Geld PKW=0.42; KM-Geld PKW=0.5; KM-Geld PKW=0.5; Mitfahrerzuschlag PKW=0.05 | TravelCalculatorTest.php, YearTablesTest.php |
-| EUE-063 | 2024: 0,24 €/km; 2025: 0,50 €/km im ersten Halbjahr, 0,25 €/km ab Juli; 2026: 0,25 €/km. Mitfahrerzuschlag wie beim PKW (max 1). | KM-Geld Motorrad=0.24; KM-Geld Motorrad=0,50 H1 / 0,25 H2; KM-Geld Motorrad=0.25; Mitfahrerzuschlag Motorrad=0.05 | YearTablesTest.php:40-51 (Motorrad 50/25/25), TravelCalculatorTest.php:27-33 |
+| EUE-063 | 2024: 0,24 €/km; 2025: 0,50 €/km im ersten Halbjahr, 0,25 €/km ab Juli; 2026: 0,25 €/km. Mitfahrerzuschlag wie beim PKW (max 1). | KM-Geld Motorrad=0.24; KM-Geld Motorrad=0,50 H1 / 0,25 H2; KM-Geld Motorrad=0.25; Mitfahrerzuschlag Motorrad=0.05 | YearTablesTest.php:40-51, TravelCalculatorTest.php (30.06./01.07.-Wechsel + Default), EurApiTest.php (422 statt 500) |
 | EUE-064 | 2024: 0,38 €/km; 2025: 0,50 €/km im ersten Halbjahr, 0,25 €/km ab Juli; 2026: 0,25 €/km. | KM-Geld Fahrrad=0.38; KM-Geld Fahrrad=0,50 H1 / 0,25 H2; KM-Geld Fahrrad=0.25 | YearTablesTest.php:40-51 (Fahrrad 38/50/25), TravelCalculatorTest.php:27-33 |
 | EUE-065 | PKW und Motorrad zusammen sind auf 30.000 km gedeckelt; Fahrrad/E-Bike auf 1.500 km (2024) bzw. 3.000 km (2025+). | Fahrrad-Kontingent=1500; Fahrrad-Kontingent=3000; Fahrrad-Kontingent=3000; KFZ-Kontingent=30000 | TravelCalculatorTest.php |
 | EUE-066 | Bei PKW/Kombi sind höchstens 6, beim Motorrad höchstens 1 Mitfahrer zulässig; bei anderen Transportmitteln muss das Feld leer oder 0 sein. | Max Mitfahrer PKW=6; Max Mitfahrer Motorrad=1 | YearTables.php:117-123 (maximumPassengers: PKW=6, Motorrad=1), TravelCalculatorTest.php:35-44 |
 | EUE-067 | Entweder Anfangs- und Endkilometerstand ODER die Distanz ist anzugeben; beides gleichzeitig ist ein Fehler. | Verhalten (kein Skalarwert) | TravelCalculatorTest.php |
-| EUE-068 | Das Tag-Geld wird anteilig für zwölf Monate berechnet. Bei einer Mahlzeit im Inland wird die halbe Pauschale angesetzt, im Ausland die volle Pauschale | 1 Mahlzeit Inland=AM3/2; 1 Mahlzeit Ausland=AM3 (voll); 2 Mahlzeiten Inland=0; 2 Mahlzeiten Ausland=AM3/3 | TravelCalculatorTest.php |
+| EUE-068 | Das Tag-Geld wird anteilig für zwölf Monate berechnet. Bei einer Mahlzeit im Inland wird die halbe Pauschale angesetzt, im Ausland die volle Pauschale | 1 Mahlzeit Inland=AM3/2; 1 Mahlzeit Ausland=AM3 (voll); 2 Mahlzeiten Inland=0; 2 Mahlzeiten Ausland=AM3/3 | TravelCalculatorTest.php (Ausland 1 Mahlzeit = 3000 ct, Faktor 1) |
 | EUE-069 | Im Inland beträgt die Pauschale vor 2024 4,4 Euro und ab 2024 4,5 Euro, im Ausland 5,85 Euro; ansonsten gilt die Ländertabelle. | Inland Nächtigung ohne Beleg=4.5; Inland Nächtigung ohne Beleg=4.5; Inland Nächtigung ohne Beleg=4.5; Ausland Nächtigung Pauschale=5.85 | TravelCalculatorTest.php |
 | EUE-070 | Ab dem 5. Tag entfällt das Tagesgeld, ab dem 15. Tag auch das Nächtigungsgeld; der Reisestatus weist dies aus. | Tagesgeld-Grenze=5; Nächtigungsgeld-Grenze=15 | TravelCalculatorTest.php |
-| EUE-071 | Die Zeilen werden als 'Hin-Rückfahrt' markiert; dafür entfällt das Tagesgeld und die Veranlassung/Einsatzort bleiben leer. | Zeitgrenze Hin-/Rückfahrt=3; Hinfahrt-Minimum Einzelzeile=50; Hinfahrt-Minimum verkettet=25 | HoursLedgerTest.php, TravelCalculatorTest.php |
+| EUE-071 | Die Zeilen werden als 'Hin-Rückfahrt' markiert; dafür entfällt das Tagesgeld und die Veranlassung/Einsatzort bleiben leer. | Zeitgrenze Hin-/Rückfahrt=3; Hinfahrt-Minimum Einzelzeile=50; Hinfahrt-Minimum verkettet=25 | HoursLedgerTest.php, TravelCalculatorTest.php (ab 180 min, inkl. AE3/ledgerMinutes) |
 | EUE-072 | Der Betriebsanteil wird aus dem Verhältnis der betrieblichen zur gesamten Reisezeit gebildet; liegt er unter zehn Prozent, wird er mit null Prozent be | Untere Rundungsgrenze=10 %; Obere Rundungsgrenze=90 % | TravelCalculatorTest.php |
 | EUE-073 | Die betriebliche Ausgabe und alle anteiligen Kosten werden auf 0 gesetzt; die Reise wird als 'Nein (VERANLASSUNG: Privat)' markiert. | Verhalten (kein Skalarwert) | — offen — |
 | EUE-074 | Die Anzahl der Werktage wird mit NETWORKDAYS inklusive der jahresabhängigen Feiertagsliste berechnet. | Verhalten (kein Skalarwert) | — offen — |
@@ -149,13 +149,13 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | EUE-085 | Die IG-Erwerbe werden je Steuersatz (20 %, 10 %, 13 %, 4,9 %) auf KZ 072, 073, 008 und 125 verteilt und auf zwei Stellen abgerundet. | KZ: KZ 070, KZ 072, KZ 073, KZ 008 | VatCalculatorTest.php |
 | EUE-086 | Die Zahllast ist Reverse Charge plus die IG-Erwerb-Bemessungsgrundlagen multipliziert mit 20 %, 10 %, 13 % und 4,9 %. | USt-Sätze=20/10/13/4,9 % | VatCalculatorTest.php, VatReturnServiceTest.php |
 | EUE-087 | Die Monatswerte werden zu Quartalssummen addiert (H/M/S/X), sofern nicht alle leer sind. | Verhalten (kein Skalarwert) | VatCalculatorTest.php, VatReturnServiceTest.php |
-| EUE-088 | Das Blatt enthält zwei Bereiche: '1. Umsatzsteuervoranmeldung' und '2. Umsatzsteuererklärung' mit gleicher Kennzahlenstruktur. | Verhalten (kein Skalarwert) | VatCalculatorTest.php, VatReturnServiceTest.php |
+| EUE-088 | Das Blatt enthält zwei Bereiche: '1. Umsatzsteuervoranmeldung' und '2. Umsatzsteuererklärung' mit gleicher Kennzahlenstruktur. | Verhalten (kein Skalarwert) | VatCalculatorTest.php, EurVatApiTest.php (Block 1 = Monat, Block 2 = Jahressummen) |
 
 ## B08 — Einkommensteuer & Grundfreibetrag
 
 | Regel-ID | Fachliche Wirkung (gekürzt) | Hergeleiteter Wert | Testnachweis |
 |---|---|---|---|
-| EUE-089 | Der erste Steuersatz beträgt 20 % bis zur jahresabhängigen Grenze 12.816 € (2024) / 13.308 € (2025) / 13.539 € (2026). | Tarifgrenze Stufe 1=12816; Tarifgrenze Stufe 1=13308; Tarifgrenze Stufe 1=13539; Steuersatz Stufe 1=20 % | YearTablesTest.php:17-23, YearTables.php:16-23 (Stufe 1) |
+| EUE-089 | Der erste Steuersatz beträgt 20 % bis zur jahresabhängigen Grenze 12.816 € (2024) / 13.308 € (2025) / 13.539 € (2026). | Tarifgrenze Stufe 1=12816; Tarifgrenze Stufe 1=13308; Tarifgrenze Stufe 1=13539; Steuersatz Stufe 1=20 % | YearTablesTest.php:17-23, IncomeTaxTariff::forYear(), EurIncomeTaxApiTest.php (Jahr-Parameter) |
 | EUE-090 | Der zweite Steuersatz beträgt 30 % von der Grenze Stufe 1 bis 20.818 € (2024) / 21.617 € (2025) / 21.992 € (2026). | Tarifgrenze Stufe 2=20818; Tarifgrenze Stufe 2=21617; Tarifgrenze Stufe 2=21992; Steuersatz Stufe 2=30 % | YearTablesTest.php:17-23, YearTables.php:16-23 (Stufe 2) |
 | EUE-091 | Der dritte Steuersatz beträgt 40 % bis 34.513 € (2024) / 35.836 € (2025) / 36.458 € (2026). | Tarifgrenze Stufe 3=34513; Tarifgrenze Stufe 3=35836; Tarifgrenze Stufe 3=36458; Steuersatz Stufe 3=40 % | YearTablesTest.php:17-23, YearTables.php:16-23 (Stufe 3) |
 | EUE-092 | Der vierte Steuersatz beträgt 48 % bis 66.612 € (2024) / 69.166 € (2025) / 70.365 € (2026). | Tarifgrenze Stufe 4=66612; Tarifgrenze Stufe 4=69166; Tarifgrenze Stufe 4=70365; Steuersatz Stufe 4=48 % | YearTablesTest.php:17-23, YearTables.php:16-23 (Stufe 4) |
@@ -170,7 +170,7 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | EUE-101 | Bis 300 € gilt die kleine Pauschale KZ 9215, von über 300 bis 1.200 € die große KZ 9217; bei Zusage von 9275 (Arbeitszimmer) ist der Wert zu löschen. | Kleine Pauschale bis=300; Große Pauschale bis=1200; Eingabe Minimum=25 | EurTaxStatementService.php:117-135 (9215/9217), EurTaxStatementServiceTest.php:76-96, EurIncomeTaxApiTest.php:54 |
 | EUE-102 | Ergonomisches Mobiliar wird mit KZ 9216 ausgewiesen. Unterdrückt wird die Kennzahl nur, wenn die Arbeitszimmerpauschale 9275 erfasst ist oder kein Bet | Eingabe Maximum=300 | EurTaxStatementService.php:117-144 (9216, Sperre bei 9275), EurTaxStatementServiceTest.php:76-96 |
 | EUE-103 | Die Einkommensteuer wird per Progressionsrechnung auf nichtselbständige Einkünfte, auf Vermietung und auf den Betrieb aufgeteilt; die Einkommensteuer- | KZ: KZ 245, KZ 260 | EurTaxStatementService.php:62-78 (KZ 245/260/U13/U26/E40/E39), EurTaxStatementServiceTest.php:47-74, EurIncomeTaxApiTest.php:45-56 |
-| EUE-104 | Mit Prognose werden weitere betriebliche/ Vermietungsgewinne aufs Jahr hochgerechnet; die Modi bestimmen, welche Einkünfte in die Übersicht einfließen | Verhalten (kein Skalarwert) | EurTaxStatementService::rentalForecast:86-109, EurTaxStatementServiceTest.php:98-119 |
+| EUE-104 | Mit Prognose werden weitere betriebliche/ Vermietungsgewinne aufs Jahr hochgerechnet; die Modi bestimmen, welche Einkünfte in die Übersicht einfließen | Verhalten (kein Skalarwert) | EurTaxStatementService::rentalForecast, EurTaxStatementServiceTest.php (Einnahmen − Werbungskosten) |
 | EUE-105 | Bestimmte Zeilen der Übersicht und die SV-Beiträge werden ausgeblendet bzw. auf 0 gesetzt. | Verhalten (kein Skalarwert) | EurTaxStatementService.php:52-60 (Modus setzt Werte auf 0), EurTaxStatementServiceTest.php:98-119, EurOverviewService.php:90-100 |
 | EUE-106 | Die Auswahl des Rechenmodus bietet nur die Werte 'Gesamt', 'Nur Betrieb' und 'Nur Vermietung'. In der Berechnung werden jedoch zusätzlich die Variante | Verhalten (kein Skalarwert) | EurTaxStatementService.php:25,40-42 (4 Modi inkl. Prognose), EurIncomeTaxPanel.tsx:134-137, EurTaxStatementServiceTest.php:121-127 |
 
@@ -179,14 +179,14 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | Regel-ID | Fachliche Wirkung (gekürzt) | Hergeleiteter Wert | Testnachweis |
 |---|---|---|---|
 | EUE-107 | Vier Modi bestimmen die SV-Beiträge: Gewerbetreibende (GSVG), Neue Selbständige (GSVG), Freiberufliche (FSVG) und Nur Unfallversicherung. | KZ: 9225 | SocialInsurance.php:20-24,106-128,154-157, SocialInsuranceModesTest.php:38-60, EurSettingsController.php:41 |
-| EUE-108 | Bei Jungunternehmern wird nur der KV-Satz in der Anzeige auf '-' gesetzt; der Mindest-KV-Beitrag wird dennoch bezahlt. SVS und PV sind von der Jungunt | Mindest-KV Jungunternehmer=449.64 | SocialInsurance.php:106-128,149-157, SocialInsuranceModesTest.php:38-49,73-78 |
+| EUE-108 | Bei Jungunternehmern wird nur der KV-Satz in der Anzeige auf '-' gesetzt; der Mindest-KV-Beitrag wird dennoch bezahlt. SVS und PV sind von der Jungunt | Mindest-KV Jungunternehmer=449.64 | SocialInsurance.php, SocialInsuranceModesTest.php, EurSettingsApiTest.php (Modus erreichbar, kv_rate_hidden) |
 | EUE-109 | Die Beitragsgrundlage ist das Betriebseinkommen zuzüglich der bereits gezahlten SV-Beiträge (9225), gedeckelt mit dem Zwölffachen der jahresabhängigen | Deckelung Beitragsgrundlage=84840; Deckelung Beitragsgrundlage=90300; Deckelung Beitragsgrundlage=97020 | EurOverviewService.php:35-36 (Einkuenfte + 9225, gedeckelt), EurSummaryController.php:44-52, EurOverviewServiceTest.php:24-41 |
 | EUE-110 | Der KV-Beitrag entspricht dem höheren Wert aus 6,8 Prozent der Beitragsgrundlage und dem zwölffachen Mindest-KV-Beitrag. Bei Jungunternehmern wird nur | KV-Satz=6,8 %; Mindest-KV ×12=425.4; Mindest-KV ×12=449.64; Mindest-KV ×12=449.64 | EurOverviewService.php:38-43, EurOverviewServiceTest.php:24-41 (KV 3747 ct), SocialInsuranceModesTest.php:73-78 |
 | EUE-111 | Der PV-Beitrag ist dem höheren Wert aus Beitragsgrundlage × PV-Satz, modusabhängiger Mindestbeitrag × 12); der Satz ist 18,5 % (GSVG) bzw. 20 % (FSVG) | PV-Satz GSVG=18,5 %; PV-Satz GSVG=18,5 %; PV-Satz GSVG=18,5 %; PV-Satz FSVG=20 % | EurOverviewService.php:45-54, EurOverviewServiceTest.php:24-41,53-60 |
 | EUE-112 | Die Unfallversicherung ist eine Jahrespauschale. Die Selbständigenvorsorge entspricht dem höheren Wert aus 1,53 Prozent der Beitragsgrundlage und dem  | SVS-Satz=1,53 %; UV ×12=136.2; UV ×12=144.84; UV ×12=155.4 | EurOverviewService.php:56-68, EurOverviewServiceTest.php:24-60, SocialInsuranceModesTest.php:62-71 |
 | EUE-113 | Für die Monate ohne Einkommen werden Mindestbeiträge (UV, SVS, KV, PV) als Sockel angesetzt. | Verhalten (kein Skalarwert) | EurOverviewService.php:28-84 (12 Sockel-Monate), EurOverviewServiceTest.php:24-41 |
 | EUE-114 | Die Summe der vier Beiträge ergibt die jährlichen SV-Beiträge; die Division durch 12 liefert den Monatsbetrag. | Verhalten (kein Skalarwert) | EurOverviewService.php:70-83 (Jahreswerte / 12), EurOverviewServiceTest.php:24-41 |
-| EUE-115 | Bereits bezahlte SV-Beiträge (KZ 9225) werden bei der Ermittlung der Beitragsgrundlage zu den Einkünften addiert; in der Übersicht werden sie außerdem | KZ: 9225 | EurSummaryController.php:44-52 (KZ 9225 in der Beitragsgrundlage), EurOverviewService.php:35-36, EurSummaryApiTest.php:36-46,76-98 |
+| EUE-115 | Bereits bezahlte SV-Beiträge (KZ 9225) werden bei der Ermittlung der Beitragsgrundlage zu den Einkünften addiert; in der Übersicht werden sie außerdem | KZ: 9225 | EurOverviewService.php (excludeBookedSvFromExpenses), EurSummaryController.php, EurSummaryApiTest.php (Herausrechnen außer UV-Modus) |
 | EUE-131 | Die Auswahlliste für die Sozialversicherungsart und die Formeln für die Pensionsversicherung verwenden die Bezeichnung 'Freiberufliche (FSVG)'. Die Fo | Verhalten (kein Skalarwert) | — offen — |
 
 ## B10 — Auswertungen & Abgleich
@@ -196,12 +196,12 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | EUE-116 | Der Schalter 'OFF' deaktiviert die rechenaufwendige Monatsansicht; bei OFF erscheint ein 💡-Hinweis, die Ansicht wieder abzuschalten. | Verhalten (kein Skalarwert) | MonthStatementTest.php |
 | EUE-117 | Die Monatsansicht zieht Einnahmen, Ausgaben (A/AV/WEB/FR/USt) und Stunden des gewählten Monats per SUMIFS/INDEX zusammen. | Verhalten (kein Skalarwert) | MonthStatementTest.php |
 | EUE-118 | Die Zeilen der Einnahmen-, Ausgaben-, Anlagen- und Reisejournale werden über eine aufwendige Auswahlformel in die Monatsansicht übernommen; Einträge d | Verhalten (kein Skalarwert) | MonthStatementTest.php |
-| EUE-119 | Eine Matrix zeigt die Einnahmen je Art und Monat; Summen und ein ✓✓-Abgleich gegen das E-Blatt stellen die Vollständigkeit sicher. | Verhalten (kein Skalarwert) | — offen — |
-| EUE-120 | Eine Matrix summiert die Ausgaben aus den Journalen je Art und Monat; FR-Kosten kommen als eigene Zeile hinzu; ✓✓ vergleicht mit der Gesamtsumme. | Verhalten (kein Skalarwert) | — offen — |
+| EUE-119 | Eine Matrix zeigt die Einnahmen je Art und Monat; Summen und ein ✓✓-Abgleich gegen das E-Blatt stellen die Vollständigkeit sicher. | Verhalten (kein Skalarwert) | EurAnalyticsController::byIncomeType, EurAnalyticsApiTest.php |
+| EUE-120 | Eine Matrix summiert die Ausgaben aus den Journalen je Art und Monat; FR-Kosten kommen als eigene Zeile hinzu; ✓✓ vergleicht mit der Gesamtsumme. | Verhalten (kein Skalarwert) | EurAnalyticsController::byExpenseType, EurAnalyticsApiTest.php (A/AV/WEB/FR) |
 | EUE-121 | Für jedes Projekt und jeden Monat werden Einnahmen, Ausgaben (inkl. Vorjahres-AfA und 9225-Bereinigung) und Arbeitsstunden ausgewiesen; Differenz- und | KZ: 9225 | — offen — |
-| EUE-122 | Für jede Zahlart und jeden Monat werden Ein- und Ausflüsse aus E/A/WEB gegenübergestellt; ✓/✓✓ bestätigen die Übereinstimmung mit Saldo und Startsaldo | Verhalten (kein Skalarwert) | — offen — |
+| EUE-122 | Für jede Zahlart und jeden Monat werden Ein- und Ausflüsse aus E/A/WEB gegenübergestellt; ✓/✓✓ bestätigen die Übereinstimmung mit Saldo und Startsaldo | Verhalten (kein Skalarwert) | EurAnalyticsController::paymentReconciliation, EurAnalyticsApiTest.php |
 | EUE-123 | Stunden werden je Monat und Projekt erfasst und speisen die Projekte-Auswertung, die Reise-3-Stunden-Regel und die Monatsübersicht. | Verhalten (kein Skalarwert) | HoursLedgerTest.php |
-| EUE-124 | Die Werte der UST-Voranmeldung werden über ust_daten/ust_kennzahlen/ust_monate in die Monatsansicht übernommen. | Verhalten (kein Skalarwert) | MonthStatementTest.php |
+| EUE-124 | Die Werte der UST-Voranmeldung werden über ust_daten/ust_kennzahlen/ust_monate in die Monatsansicht übernommen. | Verhalten (kein Skalarwert) | MonthStatementTest.php (vat.kennzahlen), EurPdfApiTest.php (USt-Tabelle), EurMonthPanel.tsx |
 | EUE-125 | Der monatliche Mindest-SV-Beitrag (UV, SVS-Minimum, KV-Minimum, PV-Minimum je nach Modus) und die aus den Monatsgewinnen abgeleitete Verlustbasis werd | Mindest-SV monatlich=160.8 | — offen — |
 | EUE-126 | Je Monat wird die anteilige Einkommensteuer samt SV aus der Jahressteuer abgeleitet; der Reingewinn ist Bruttoergebnis minus dieser Belastung; daraus  | Verhalten (kein Skalarwert) | — offen — |
 

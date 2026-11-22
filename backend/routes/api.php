@@ -348,6 +348,9 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/eur/signatures', [EurSignatureController::class, 'index'])->name('api.management.eur.signatures.index');
     Route::post('/management/eur/signatures', [EurSignatureController::class, 'store'])->name('api.management.eur.signatures.store');
     Route::get('/management/eur/analytics', [EurAnalyticsController::class, 'index'])->name('api.management.eur.analytics');
+    Route::get('/management/eur/analytics/by-income-type', [EurAnalyticsController::class, 'byIncomeType'])->name('api.management.eur.analytics.income-types');
+    Route::get('/management/eur/analytics/by-expense-type', [EurAnalyticsController::class, 'byExpenseType'])->name('api.management.eur.analytics.expense-types');
+    Route::get('/management/eur/payment-reconciliation', [EurAnalyticsController::class, 'paymentReconciliation'])->name('api.management.eur.payment-reconciliation');
     Route::get('/management/eur/pdf/month', [EurPdfController::class, 'monthly'])->name('api.management.eur.pdf.month');
     Route::get('/management/eur/pdf/eigenbeleg', [EurPdfController::class, 'eigenbeleg'])->name('api.management.eur.pdf.eigenbeleg');
     Route::get('/management/eur/pdf/assets', [EurPdfController::class, 'assets'])->name('api.management.eur.pdf.assets');

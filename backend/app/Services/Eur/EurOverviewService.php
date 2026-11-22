@@ -21,6 +21,29 @@ final class EurOverviewService
     public function __construct(private readonly SettingResolver $settings) {}
 
     /**
+     * EUE-115: gebuchte 9225-Beiträge werden bei der Gewinnermittlung aus den
+     * Ausgaben herausgerechnet — außer bei "Nur Unfallversicherung", wo sie
+     * als Ausgabe stehen bleiben.
+     */
+    public function excludeBookedSvFromExpenses(): bool
+    {
+        $mode = (string) ($this->settings->get('eur_sv_mode', 'gsvg') ?? 'gsvg');
+
+        return $mode !== SocialInsurance::MODE_UV_ONLY;
+    }
+
+    /**
+     * EUE-108: Jungunternehmer zahlen den Mindest-KV; nur die Anzeige des
+     * KV-Satzes entfällt. Der Mindestbeitrag bleibt davon unberührt.
+     */
+    public function kvRateHidden(): bool
+    {
+        $mode = (string) ($this->settings->get('eur_sv_mode', 'gsvg') ?? 'gsvg');
+
+        return $mode === SocialInsurance::MODE_JUNGUNTERNEHMER;
+    }
+
+    /**
      * Monatliche SV-Beiträge des Jahres (EUE-109 … EUE-114).
      *
      * @return list<array{month: int, kv_cents: int, pv_cents: int, svs_cents: int, uv_cents: int}>
