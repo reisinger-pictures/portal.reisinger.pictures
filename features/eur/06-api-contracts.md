@@ -14,11 +14,16 @@ Technikdetails.
 {
   "default_year": 2026,
   "supported": [2024, 2025, 2026],
+  "active_years": [2024, 2026],
   "warnings": [
     {"year": 2027, "code": "EUE-002", "warning": "…", "supported": false}
   ]
 }
 ```
+
+`active_years` sind die Jahre mit mindestens einer Buchung im aktuellen Brand.
+Die UI zeigt im Jahres-Selector nur diese Jahre plus das laufende Jahr; das ist
+eine Anzeigeregel, keine Einschränkung der akzeptierten `year`-Werte.
 
 Alle übrigen Endpunkte akzeptieren `year` als Query-Parameter (GET) oder im
 Body (POST/PUT). Erlaubt sind 2024–2026; ein anderer Wert ist ein 422 mit
@@ -46,6 +51,15 @@ Body (POST/PUT). Erlaubt sind 2024–2026; ein anderer Wert ist ein 422 mit
   "signature": {"status": "none", "provider": null, "is_test": false}
 }
 ```
+
+`GET /eur/help-texts` und `GET /eur/help-texts?kz=9216` liefern die
+Ausfüllhilfe je Kennzahl aus dem gepinnten Artefakt
+`artifacts/verification/e1a-ausfuellhilfe.md`, Abschnitt 3. Jede Zeile hat
+`kz`, `bezeichnung`, `hilfetext` und `portal_note` (`null` oder ein
+Portalseitiger Hinweis). Die Spalte „Zelle" aus der Quelle wird nicht
+ausgeliefert; die Texte sind reine Hilfe, keine zweite Regelquelle und werden
+nicht verändert. Für `kz=9225` ergänzt `portal_note` den Doppelzählungs-Hinweis
+aus EUE-023/EUE-115. Ein ungültiges `kz` ist ein 422.
 
 `POST /eur/month/close` mit `{year, month, note?}` schließt den Monat
 idempotent (200, auch beim zweiten Aufruf) und erzeugt einen Audit-Eintrag.

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Eur;
 
+use App\Models\EurEntry;
+use App\Support\BrandRegistry;
+
 class EurYearsApiTest extends EurBookkeepingTestCase
 {
     public function test_years_require_authentication(): void
@@ -28,6 +31,32 @@ class EurYearsApiTest extends EurBookkeepingTestCase
         $response->assertJsonPath('warnings.1.year', 2027);
         $response->assertJsonPath('warnings.1.code', 'EUE-002');
         $response->assertJsonPath('warnings.1.supported', false);
+    }
+
+    public function test_active_years_lists_only_years_with_bookings_in_the_current_brand(): void
+    {
+        $token = $this->tokenFor();
+        $brand = BrandRegistry::currentId();
+
+        foreach ([[2024, 3], [2026, 5], [2026, 11]] as [$year, $month]) {
+            EurEntry::create([
+                'brand' => $brand, 'year' => $year, 'month' => $month, 'day' => 5,
+                'direction' => 'income', 'kind_type' => 'Dienstleistung', 'business_share' => 100,
+                'amount_cents' => 10000, 'business_amount_cents' => 10000,
+            ]);
+        }
+
+        // Buchung eines fremden Brands darf die aktiven Jahre nicht beeinflussen.
+        EurEntry::create([
+            'brand' => self::OTHER_BRAND, 'year' => 2025, 'month' => 1, 'day' => 5,
+            'direction' => 'income', 'kind_type' => 'Dienstleistung', 'business_share' => 100,
+            'amount_cents' => 10000, 'business_amount_cents' => 10000,
+        ]);
+
+        $response = $this->withHeaders($this->bearer($token))->getJson('/api/management/eur/years');
+
+        $response->assertOk();
+        $response->assertJsonPath('active_years', [2024, 2026]);
     }
 
     public function test_supported_years_are_accepted_and_2027_is_rejected(): void

@@ -9,6 +9,7 @@ import {
     useEurApplications,
     useEurDocuments,
     useEurEntries,
+    useEurHelpTexts,
     useEurHours,
     useEurMonth,
     useEurReference,
@@ -38,6 +39,7 @@ vi.mock('../../../logic/useEur', () => ({
     useEurEntries: vi.fn(),
     useEurMonth: vi.fn(),
     useEurDocuments: vi.fn(),
+    useEurHelpTexts: vi.fn(),
     useEurHours: vi.fn(),
     useEurWarehouse: vi.fn(),
     useEurApplications: vi.fn(),
@@ -138,7 +140,7 @@ function swrResult<R>(data: unknown): R {
     return {data, error: undefined, isLoading: false, mutate: vi.fn()} as unknown as R;
 }
 
-function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summaryData?: typeof summary; noSummary?: boolean; noBilling?: boolean} = {}) {
+function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summaryData?: typeof summary; noSummary?: boolean; noBilling?: boolean; activeYears?: number[]} = {}) {
     vi.mocked(useBrand).mockReturnValue({
         brand: 'test-brand',
         config: null,
@@ -156,7 +158,7 @@ function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summ
         isLoading: false,
         updateBillingDetails: vi.fn(),
     });
-    vi.mocked(useEurYears).mockReturnValue(swrResult<ReturnType<typeof useEurYears>>({default_year: 2026, supported: [2024, 2025, 2026], warnings: []}));
+    vi.mocked(useEurYears).mockReturnValue(swrResult<ReturnType<typeof useEurYears>>({default_year: 2026, supported: [2024, 2025, 2026], active_years: overrides.activeYears ?? [2024, 2025, 2026], warnings: []}));
     vi.mocked(useEurReference).mockReturnValue(swrResult<ReturnType<typeof useEurReference>>(reference));
     vi.mocked(useEurSettings).mockReturnValue(swrResult<ReturnType<typeof useEurSettings>>({business_year: 2026, default_business_share: 100, sv_mode: 'gsvg', kleinunternehmer: false}));
     vi.mocked(useEurSummary).mockReturnValue(
@@ -174,6 +176,12 @@ function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summ
     }));
     vi.mocked(useEurMonth).mockReturnValue(swrResult<ReturnType<typeof useEurMonth>>(monthData));
     vi.mocked(useEurDocuments).mockReturnValue(swrResult<ReturnType<typeof useEurDocuments>>({documents: []}));
+    vi.mocked(useEurHelpTexts).mockReturnValue(swrResult<ReturnType<typeof useEurHelpTexts>>({help: [
+        {kz: '9216', bezeichnung: 'Ergonomisches Mobiliar', hilfetext: 'Ausgaben bis höchstens 300 Euro.', portal_note: null},
+        {kz: '9215', bezeichnung: 'Arbeitsplatzpauschale', hilfetext: ' betragen diese höchstens 12.816 Euro (ändert sich jedes Jahr).', portal_note: null},
+        {kz: '9217', bezeichnung: 'Arbeitsplatzpauschale', hilfetext: 'Große Pauschale.', portal_note: null},
+        {kz: '9225', bezeichnung: 'Pflichtversicherungen', hilfetext: 'SVA-Beträge.', portal_note: 'Bei berechneter Sozialversicherung wird KZ 9225 nicht zusätzlich erfasst (EUE-023, EUE-115): keine Doppelzählung.'},
+    ]}));
     vi.mocked(useEurHours).mockReturnValue(swrResult<ReturnType<typeof useEurHours>>({hours: [], total_minutes: 0}));
     vi.mocked(useEurWarehouse).mockReturnValue(swrResult<ReturnType<typeof useEurWarehouse>>({entries: [], total_cents: 0}));
     vi.mocked(useEurApplications).mockReturnValue(swrResult<ReturnType<typeof useEurApplications>>({applications: []}));
@@ -225,6 +233,27 @@ describe('ManagementEurView', () => {
 
         expect(screen.getByRole('combobox', {name: 'Jahr'})).toHaveValue('2024');
         expect(screen.getByText(/Wirtschaftsjahr 2024/)).toBeVisible();
+    });
+
+    it('lists only years with bookings plus the current year in the selector', () => {
+        mockHooks({activeYears: [2024]});
+
+        renderView('/steuern?jahr=2024');
+
+        const options = Array.from(screen.getByRole('combobox', {name: 'Jahr'}).querySelectorAll('option'))
+            .map((option) => option.value);
+        expect(options).toEqual(['2024', '2026']);
+    });
+
+    it('always offers the current year even when no year has bookings', () => {
+        mockHooks({activeYears: []});
+
+        renderView();
+
+        const options = Array.from(screen.getByRole('combobox', {name: 'Jahr'}).querySelectorAll('option'))
+            .map((option) => option.value);
+        expect(options).toEqual(['2026']);
+        expect(screen.getByRole('combobox', {name: 'Jahr'})).toHaveValue('2026');
     });
 
     it('places the tab row above the month rail and the month KPIs', () => {
@@ -287,6 +316,12 @@ describe('ManagementEurView', () => {
 
         await userEvent.click(screen.getByRole('tab', {name: 'Steuer'}));
         expect(view.getByRole('heading', {name: 'Einkommensteuer', level: 2})).toBeVisible();
+        expect(view.getAllByText('Ergonomisches Mobiliar').length).toBeGreaterThan(0);
+        expect(view.getAllByText('Arbeitsplatzpauschale').length).toBeGreaterThan(0);
+        expect(view.getByText('9215 / 9217')).toBeVisible();
+        await userEvent.click(view.getAllByRole('button', {name: 'Hilfe zu Kennzahl 9215'})[0]);
+        expect(view.getAllByRole('tooltip')[0]).toHaveTextContent(/12\.816 Euro \(ändert sich jedes Jahr\)/);
+        expect(view.queryByText(/Zelle/)).not.toBeInTheDocument();
 
         await userEvent.click(screen.getByRole('tab', {name: 'USt'}));
         expect(view.getByRole('heading', {name: 'Umsatzsteuer', level: 2})).toBeVisible();

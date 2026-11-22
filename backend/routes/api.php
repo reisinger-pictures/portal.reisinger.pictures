@@ -303,6 +303,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     // EÜR (Portal #22–#30): Referenzdaten, Buchungen, Anlagen, Übersicht.
     // Alle Antworten sind brand-scoped; Geld ist ganzzahlige Cent.
     Route::get('/management/eur/reference', [EurReferenceController::class, 'show'])->name('api.management.eur.reference');
+    Route::get('/management/eur/help-texts', [EurReferenceController::class, 'helpTexts'])->name('api.management.eur.help-texts');
     Route::get('/management/eur/settings', [EurSettingsController::class, 'show'])->name('api.management.eur.settings');
     Route::put('/management/eur/settings', [EurSettingsController::class, 'update'])->name('api.management.eur.settings.update')->middleware('super_admin');
     Route::get('/management/eur/summary', [EurSummaryController::class, 'show'])->name('api.management.eur.summary');

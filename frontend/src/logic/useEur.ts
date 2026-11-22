@@ -135,6 +135,8 @@ export interface EurYearWarning {
 export interface EurYearsResponse {
     default_year: number;
     supported: number[];
+    /** Jahre mit mindestens einer Buchung im aktuellen Brand. */
+    active_years: number[];
     warnings: EurYearWarning[];
 }
 
@@ -535,4 +537,16 @@ export async function createEurSignature(payload: {
     note?: string | null;
 }): Promise<EurSignatureResponse> {
     return apiMutate<EurSignatureResponse>('/api/management/eur/signatures', 'POST', payload);
+}
+
+/** Ausfüllhilfe aus dem gepinnten Artefakt — kein Rechenpfad, keine zweite Regelquelle. */
+export interface EurHelpText {
+    kz: string;
+    bezeichnung: string;
+    hilfetext: string;
+    portal_note: string | null;
+}
+
+export function useEurHelpTexts() {
+    return useSWR<{help: EurHelpText[]}>('/api/management/eur/help-texts', fetcher, SWR_OPTIONS);
 }

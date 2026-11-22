@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Eur;
 
+use App\Eur\Reference\E1aHelpTexts;
 use App\Eur\Reference\Holidays;
 use App\Eur\Reference\ReferenceTables;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * EÜR · Referenzdaten (EUE-004 … EUE-022) für die Oberfläche.
@@ -16,6 +18,45 @@ use Illuminate\Http\JsonResponse;
  */
 class EurReferenceController extends Controller
 {
+    /**
+     * Ausfüllhilfen aus dem gepinnten Artefakt — ohne Zellnachweis, ohne
+     * Ableitung einer Berechnung. KZ 9225 erhält einen Portalseitigen
+     * Doppelzählungs-Hinweis aus EUE-023/EUE-115.
+     */
+    public function helpTexts(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'kz' => 'nullable|string|regex:/^\d{4}$/',
+        ]);
+
+        $rows = E1aHelpTexts::all();
+
+        if (isset($data['kz'])) {
+            $row = E1aHelpTexts::forCode($data['kz']);
+
+            return response()->json([
+                'help' => $row === null ? null : $this->withPortalNote($row),
+            ]);
+        }
+
+        return response()->json([
+            'help' => array_map(fn (array $row): array => $this->withPortalNote($row), $rows),
+        ]);
+    }
+
+    /**
+     * @param  array{kz: string, bezeichnung: string, hilfetext: string}  $row
+     * @return array{kz: string, bezeichnung: string, hilfetext: string, portal_note: string|null}
+     */
+    private function withPortalNote(array $row): array
+    {
+        return $row + [
+            'portal_note' => $row['kz'] === '9225'
+                ? 'Bei berechneter Sozialversicherung wird KZ 9225 nicht zusätzlich erfasst (EUE-023, EUE-115): keine Doppelzählung.'
+                : null,
+        ];
+    }
+
     public function show(): JsonResponse
     {
         $tables = ReferenceTables::load();

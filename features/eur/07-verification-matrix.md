@@ -2,7 +2,7 @@
 
 > **Keine zweite Regelquelle.** Diese Tabelle ist abgeleitete Evidenz aus den
 > gepinnten Dokumenten unter `features/eur/cleanroom/` (MANIFEST v2,
-> `artifact_version 2026.2`). Sie ersetzt weder `domain-rules.json` noch die
+> `artifact_version 2026.3`). Sie ersetzt weder `domain-rules.json` noch die
 > Paritätsfixture. Regel-IDs und Fachwirkung stammen aus dem Regelkatalog,
 > Werte aus den versionierten Artefakten, Testnachweise aus dem Portal-Repo.
 > Bei Abweichung ist der Fixture-Wert maßgeblich; die Portalseite wird

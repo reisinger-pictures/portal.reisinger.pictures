@@ -68,9 +68,9 @@
         }
     ],
     "file_count": 10,
-    "artifact_version": "2026.2",
+    "artifact_version": "2026.3",
     "artifact_source_commit": "75f230c07010db91755f78fdbd9ae591d52c7e85",
-    "artifact_count": 64,
+    "artifact_count": 65,
     "artifacts": [
         {
             "path": "analysis/tables.json",
@@ -391,6 +391,11 @@
             "path": "verification/workbook-soll.md",
             "sha256": "3de68da853c5f36667b353869bb105d846ffb89a3081f0b16e609274e4f0d851",
             "bytes": 11476
+        },
+        {
+            "path": "verification/e1a-ausfuellhilfe.md",
+            "sha256": "d46a7f02fc53c083569befc158fc00a177c12f32a970619196365efe3861e37c",
+            "bytes": 16637
         }
     ],
     "parity_scenarios": 5,

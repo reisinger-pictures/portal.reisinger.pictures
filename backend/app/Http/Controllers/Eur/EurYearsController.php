@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Eur;
 
 use App\Eur\Reference\EurYear;
 use App\Http\Controllers\Controller;
+use App\Models\EurEntry;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -20,9 +21,19 @@ class EurYearsController extends Controller
 {
     public function index(): JsonResponse
     {
+        // Jahre mit mindestens einer Buchung im aktuellen Brand. Die UI zeigt
+        // nur diese Jahre (plus das laufende Jahr) im Jahres-Selector an.
+        $activeYears = EurEntry::forCurrentBrand()
+            ->distinct()
+            ->orderBy('year')
+            ->pluck('year')
+            ->map(static fn (mixed $year): int => (int) $year)
+            ->all();
+
         return response()->json([
             'default_year' => EurYear::DEFAULT,
             'supported' => EurYear::SUPPORTED,
+            'active_years' => $activeYears,
             'warnings' => array_map(
                 static fn (int $year): array => self::warningRow($year),
                 [2023, 2027],

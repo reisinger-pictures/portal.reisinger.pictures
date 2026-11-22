@@ -42,7 +42,7 @@ class CleanRoomFixtureIntegrityTest extends TestCase
     public function test_every_copied_artifact_matches_manifest_checksum_and_size(): void
     {
         $this->assertSame(2, $this->manifest['schema_version']);
-        $this->assertSame('2026.2', $this->manifest['artifact_version']);
+        $this->assertSame('2026.3', $this->manifest['artifact_version']);
         $this->assertSame('75f230c07010db91755f78fdbd9ae591d52c7e85', $this->manifest['artifact_source_commit']);
         $this->assertCount($this->manifest['artifact_count'], $this->manifest['artifacts']);
 

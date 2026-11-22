@@ -5,7 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { formatEuro } from '../../logic/formatCurrency';
 import { useBrand } from '../../logic/useBrand';
 import { useBillingDetails } from '../../logic/useLicenseTerms';
-import { useEurEntries, useEurReference, useEurSettings, useEurSummary } from '../../logic/useEur';
+import { useEurEntries, useEurReference, useEurSettings, useEurSummary, useEurYears } from '../../logic/useEur';
 import EurAnalyticsPanel from './eur/EurAnalyticsPanel';
 import EurApplicationsPanel from './eur/EurApplicationsPanel';
 import EurDepreciationPanel from './eur/EurDepreciationPanel';
@@ -99,8 +99,14 @@ export default function ManagementEurView() {
         ? requestedTab as TabId
         : 'buchungen';
 
+    const years = useEurYears();
+    const activeYears = years.data?.active_years ?? [];
+    const currentYear = new Date().getFullYear();
+    // Ein Jahr erscheint nur, wenn es Buchungen gibt oder es das laufende Jahr ist.
+    const visibleYears = YEARS.filter((value) => activeYears.includes(value) || value === currentYear);
+
     const requestedYear = Number(searchParams.get('jahr'));
-    const year = YEARS.includes(requestedYear) ? requestedYear : DEFAULT_YEAR;
+    const year = visibleYears.includes(requestedYear) ? requestedYear : DEFAULT_YEAR;
 
     const reference = useEurReference();
     const settings = useEurSettings();
@@ -164,7 +170,7 @@ export default function ManagementEurView() {
                             <span><Trans>Jahr</Trans></span>
                             <select className="select select-bordered select-sm" value={year}
                                 onChange={(event) => selectYear(Number(event.target.value))} required>
-                                {YEARS.map((value) => (
+                                {visibleYears.map((value) => (
                                     <option key={value} value={value}>{value}</option>
                                 ))}
                             </select>

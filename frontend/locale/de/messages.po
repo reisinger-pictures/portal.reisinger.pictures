@@ -845,6 +845,10 @@ msgstr "Anzahl Fotos muss mindestens 1 sein"
 msgid "Apple Pay"
 msgstr "Apple Pay"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Arbeitsplatzpauschale"
+msgstr "Arbeitsplatzpauschale"
+
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
 #: src/ui/management/eur/EurApplicationsPanel.tsx
 #: src/ui/management/eur/EurEntriesPanel.tsx
@@ -913,6 +917,10 @@ msgstr "Auftrag löschen?"
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Ausbezahlt"
 msgstr "Ausbezahlt"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Ausfüllhilfe je Kennzahl"
+msgstr "Ausfüllhilfe je Kennzahl"
 
 #: src/ui/management/eur/EurEntriesPanel.tsx
 #: src/ui/management/eur/EurEntryDialog.tsx
@@ -2888,6 +2896,10 @@ msgstr "Ergebnis als Contact Sheet (extern)"
 msgid "Ergebnis als Contact Sheet (intern)"
 msgstr "Ergebnis als Contact Sheet (intern)"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Ergonomisches Mobiliar"
+msgstr "Ergonomisches Mobiliar"
+
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Erlaubt dem User das Ändern von Bildbeschreibungen."
 msgstr "Erlaubt dem User das Ändern von Bildbeschreibungen."
@@ -3902,6 +3914,14 @@ msgstr "Hier kannst du das Contact Sheet als PDF herunterladen. Bitte halte den 
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Hier werden die ursprünglichen Metadaten gespeichert, <0>bevor</0> ein Kunde eine Änderung vorgenommen hat."
 msgstr "Hier werden die ursprünglichen Metadaten gespeichert, <0>bevor</0> ein Kunde eine Änderung vorgenommen hat."
+
+#: src/ui/management/eur/EurHelpPopover.tsx
+msgid "Hilfe zu Kennzahl {kz}"
+msgstr "Hilfe zu Kennzahl {kz}"
+
+#: src/ui/management/eur/EurHelpPopover.tsx
+msgid "Hinweis:"
+msgstr "Hinweis:"
 
 #: src/ui/management/components/ManualDocumentHeader.tsx
 msgid "Hinweistext (Gültigkeit & Annahme)"
