@@ -7,6 +7,7 @@ Verträge und den unveränderlichen, versionierten Dokumentenstand.
 ## Inhalt
 
 - [01-cleanroom-handoff.md](01-cleanroom-handoff.md) — Fixture-Version, Update-Erkennung, Geltungsgrenzen.
+- [02-parity-vectors.md](02-parity-vectors.md) — 19 Paritätsvektoren, minimale Wertekette und Unit-Test (Issue #10).
 - [cleanroom/](cleanroom/) — byte-exakter, gepinnter Stand der abgeleiteten Dokumente (schreibgeschützt).
 
 ## Geltende Einheiten

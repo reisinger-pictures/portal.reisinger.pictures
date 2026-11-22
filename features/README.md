@@ -37,6 +37,7 @@ This directory serves as the single source of truth for all technical concepts, 
 ### 🧾 EÜR
 * [README.md](eur/README.md) - Geltende Einheiten und Grenzen der Clean-Room-basierten EÜR-Integration.
 * [01-cleanroom-handoff.md](eur/01-cleanroom-handoff.md) - Fixture-Version, Update-Erkennung über MANIFEST.json, Abnahmevorbehalte.
+* [02-parity-vectors.md](eur/02-parity-vectors.md) - 19 datengetriebene Paritätsvektoren und die portal-eigene Wertekette (Issue #10).
 
 ### 🖼️ Gallery Management
 * [01-core-architecture.md](gallery/01-core-architecture.md) - Selection vs. Delivery workflows.
