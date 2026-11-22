@@ -1,0 +1,30 @@
+post:
+  operationId: updateAssetPrivateUse
+  summary: Change the private-use percentage of one asset year
+  description: |
+    Percent is a multiple of 5; the business share of the December entry
+    becomes 100 − percent. Only that year is updated, never the previous one.
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [year, private_use_percent]
+          properties:
+            year: { type: integer }
+            private_use_percent: { type: integer, minimum: 0, maximum: 100, multipleOf: 5 }
+            change_reason: { type: string, maxLength: 500 }
+  responses:
+    '200':
+      description: Updated asset.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Asset' }
+    '422':
+      $ref: '#/components/responses/Validation'

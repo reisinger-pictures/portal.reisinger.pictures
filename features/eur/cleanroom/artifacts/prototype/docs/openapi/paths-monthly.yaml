@@ -1,0 +1,61 @@
+get:
+  operationId: getMonthlyView
+  summary: Monthly sheet with switch, journal rows, USt lines and burden
+  description: |
+    W3/B10 (EUE-116/117/118/124/125/126). The switch accepts `OFF` or a German
+    workbook month name. `OFF` returns only the 💡 hint, no rows and no totals;
+    all other values activate the view. Totals aggregate E/A/AV/WEB/FR, the USt
+    Zahllast and the booked hours. USt lines are read from the B07 VAT service,
+    the monthly EST+SV burden from the B08 tax and #27 SV engines. Money is
+    integer cents throughout and work times are integer minutes (`hours_minutes`,
+    3 h = 180); invalid month/switch/year yields 422.
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+    - name: month
+      in: query
+      required: true
+      schema: { type: integer, minimum: 1, maximum: 12 }
+    - name: switch
+      in: query
+      required: false
+      description: 'OFF or Jänner…Dezember; defaults to the month name.'
+      schema: { type: string }
+  responses:
+    '200':
+      description: Monthly payload or the OFF hint.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, month, period, switch, active, hint, field_help]
+            properties:
+              year: { type: integer }
+              month: { type: integer }
+              month_name: { type: string }
+              period: { type: string, example: '2026-05' }
+              switch: { type: string }
+              active: { type: boolean }
+              hint: { type: string }
+              totals:
+                type: object
+                nullable: true
+                properties:
+                  income_cents: { type: integer }
+                  a_cents: { type: integer }
+                  web_cents: { type: integer }
+                  av_cents: { type: integer }
+                  fr_cents: { type: integer }
+                  ust_cents: { type: integer }
+                  expenses_cents: { type: integer }
+                  profit_cents: { type: integer }
+                  hours_minutes: { type: integer, description: 'Integer minutes; 3 h = 180' }
+              rows: { type: array, items: { type: object } }
+              ust_lines: { type: array, items: { type: object } }
+              burden: { type: object, nullable: true }
+              reconciliation: { type: object, nullable: true }
+              hours_minutes: { type: integer, nullable: true, description: 'Integer minutes; 3 h = 180' }
+    '422':
+      $ref: '#/components/responses/Validation'

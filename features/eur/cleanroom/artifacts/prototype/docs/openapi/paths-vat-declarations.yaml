@@ -1,0 +1,60 @@
+get:
+  operationId: getVatDeclarations
+  summary: Both USt declaration areas (EUE-088)
+  description: |
+    Returns the two areas of the UST sheet — `1. Umsatzsteuervoranmeldung`
+    (C2) and `2. Umsatzsteuererklärung` (AB2) — with `wirtschaftsjahr` from
+    AD4. Both blocks share the same eight Kennzahlen, the quarter table and
+    the Zahllast; the rule does not define a different data selection for the
+    second block. The UI switches between them locally.
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+  responses:
+    '200':
+      description: The two declaration blocks keyed by `voranmeldung` and `erklaerung`.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, blocks]
+            properties:
+              year: { type: integer }
+              codes: { type: array, items: { type: string } }
+              labels: { type: object }
+              blocks:
+                type: object
+                description: Both blocks share the same structure and values.
+                properties:
+                  voranmeldung:
+                    type: object
+                    required: [key, title, wirtschaftsjahr, kennzahlen, quarters, zahllast_cents]
+                    properties:
+                      key: { type: string, enum: [voranmeldung, erklaerung] }
+                      title: { type: string }
+                      title_upper: { type: string }
+                      title_cell: { type: string, example: C2 }
+                      wirtschaftsjahr: { type: integer }
+                      year_cell: { type: string, example: AD4 }
+                      kennzahlen: { type: object, additionalProperties: { type: integer, nullable: true } }
+                      quarters: { type: array, items: { type: object } }
+                      zahllast_cents: { type: integer, nullable: true }
+                  erklaerung:
+                    type: object
+                    description: Identical structure and values to `voranmeldung`.
+                    required: [key, title, wirtschaftsjahr, kennzahlen, quarters, zahllast_cents]
+                    properties:
+                      key: { type: string, enum: [voranmeldung, erklaerung] }
+                      title: { type: string }
+                      title_upper: { type: string }
+                      title_cell: { type: string, example: AB2 }
+                      wirtschaftsjahr: { type: integer }
+                      year_cell: { type: string, example: AD4 }
+                      kennzahlen: { type: object, additionalProperties: { type: integer, nullable: true } }
+                      quarters: { type: array, items: { type: object } }
+                      zahllast_cents: { type: integer, nullable: true }
+              field_help: { type: object }
+    '422':
+      $ref: '#/components/responses/Validation'

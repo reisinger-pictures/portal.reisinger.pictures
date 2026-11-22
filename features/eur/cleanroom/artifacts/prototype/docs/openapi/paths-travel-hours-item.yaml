@@ -1,0 +1,15 @@
+delete:
+  operationId: deleteHours
+  summary: Delete one hours-ledger entry
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    '200':
+      description: Deleted.
+    '401':
+      $ref: '#/components/responses/Unauthorized'
+    '404':
+      description: Entry not found in this tenant.

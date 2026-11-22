@@ -1,0 +1,45 @@
+get:
+  operationId: getIncomeKindBreakdown
+  summary: BE-ART matrix of business income by kind and month
+  description: |
+    W3/B10 (EUE-119). Aggregates business income cents from the E journal by
+    entry kind and workbook month, with row sums, column sums and a ✓✓ or
+    "Fehler (Δ €)" control cell against the complete E journal. Rows whose
+    workbook month is blank are intentionally absent from the columns but
+    present in the control sum, so a gap becomes a visible cent delta.
+    Tenant-scoped, read-only, integer cents only.
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+  responses:
+    '200':
+      description: BE-ART matrix.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, sheet, months, kinds, columns_cents, total_cents, control_cents, check]
+            properties:
+              year: { type: integer }
+              sheet: { type: string, const: BE-ART }
+              months: { type: array, items: { type: string } }
+              kinds:
+                type: array
+                items:
+                  type: object
+                  required: [kind, source, months, total_cents]
+                  properties:
+                    kind: { type: string }
+                    source: { type: string }
+                    months: { type: array, items: { type: integer } }
+                    total_cents: { type: integer }
+              columns_cents: { type: array, items: { type: integer } }
+              total_cents: { type: integer }
+              control_cents: { type: integer }
+              check: { type: string, example: '✓✓' }
+              checks: { type: object, additionalProperties: { type: string } }
+              field_help: { type: object }
+    '422':
+      $ref: '#/components/responses/Validation'

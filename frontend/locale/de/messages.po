@@ -66,6 +66,22 @@ msgstr "[PLZ, Ort]"
 msgid "{0, plural, one {# Nutzer} other {# Nutzer}}"
 msgstr "{0, plural, one {# Nutzer} other {# Nutzer}}"
 
+#. placeholder {0}: rows.length
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "{0} Buchungen"
+#~ msgstr "{0} Buchungen"
+
+#. placeholder {0}: monthEntries.length
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "{0} Buchungen im Monat"
+#~ msgstr "{0} Buchungen im Monat"
+
+#. placeholder {0}: summary.entry_count
+#. placeholder {1}: summary.asset_count
+#: src/ui/management/eur/EurOverviewPanel.tsx
+#~ msgid "{0} Buchungen und {1} Anlagegüter im Wirtschaftsjahr."
+#~ msgstr "{0} Buchungen und {1} Anlagegüter im Wirtschaftsjahr."
+
 #: src/ui/ContractSignView.tsx
 msgid "{age} Jahre (geb. {birthDateLabel})"
 msgstr "{age} Jahre (geb. {birthDateLabel})"
@@ -77,6 +93,10 @@ msgstr "{couponsLength} Coupon{couponsPlural} für diese Galerie"
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 msgid "{couponsLength} Coupon{couponsPlural} für diese Galerie-Gruppe"
 msgstr "{couponsLength} Coupon{couponsPlural} für diese Galerie-Gruppe"
+
+#: src/ui/management/eur/EurOverviewPanel.tsx
+msgid "{entryCount} Buchungen und {assetCount} Anlagegüter im Wirtschaftsjahr."
+msgstr "{entryCount} Buchungen und {assetCount} Anlagegüter im Wirtschaftsjahr."
 
 #: src/ui/management/components/UploadDropzone.tsx
 msgid "{failureCount} Bild(er) konnten nicht hochgeladen werden."
@@ -101,6 +121,10 @@ msgstr "{legacyRoleName} · {legacyRoleId} (ungültig)"
 #: src/ui/management/ManagementOrgsView.tsx
 msgid "{metaGalleryCount} Meta-Galerien"
 msgstr "{metaGalleryCount} Meta-Galerien"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "{monthEntryCount} Buchungen im Monat"
+msgstr "{monthEntryCount} Buchungen im Monat"
 
 #: src/ui/client/components/CartItemList.tsx
 msgid "{nextCount, plural, one {Noch # Bild} other {Noch # Bilder}} bis {nextLabel}"
@@ -150,6 +174,10 @@ msgstr "{quarantineCount} Dateien liegen im Quarantäne-Ordner"
 msgid "{ratedCount} von {totalGalleryPhotos} Bildern"
 msgstr "{ratedCount} von {totalGalleryPhotos} Bildern"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "{rowCount} Buchungen"
+msgstr "{rowCount} Buchungen"
+
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "{sharesEarned} Shares"
 msgstr "{sharesEarned} Shares"
@@ -181,6 +209,10 @@ msgstr "/ 100.000 Zeichen (HTML)"
 #: src/ui/components/Pagination.tsx
 msgid "← Zurück"
 msgstr "← Zurück"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "+ Buchung"
+msgstr "+ Buchung"
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "+ das einmal angezeigte Passwort"
@@ -385,6 +417,14 @@ msgstr "Abschließen"
 msgid "Abschluss"
 msgstr "Abschluss"
 
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Abschreibung vergleichen"
+msgstr "Abschreibung vergleichen"
+
+#: src/ui/management/eur/EurOverviewPanel.tsx
+msgid "Abschreibungen"
+msgstr "Abschreibungen"
+
 #: src/ui/management/components/BrandSettingsCard.tsx
 msgid "Absender-Name"
 msgstr "Absender-Name"
@@ -547,6 +587,15 @@ msgstr "Alle löschen"
 msgid "Alle Organisationen / Eigene"
 msgstr "Alle Organisationen / Eigene"
 
+#. placeholder {0}: reference.business_year
+#: src/ui/management/eur/EurReferencePanel.tsx
+#~ msgid "Alle Werte gelten für das Wirtschaftsjahr {0} und sind serverseitig gepinnt."
+#~ msgstr "Alle Werte gelten für das Wirtschaftsjahr {0} und sind serverseitig gepinnt."
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Alle Werte gelten für das Wirtschaftsjahr {businessYear} und sind serverseitig gepinnt."
+msgstr "Alle Werte gelten für das Wirtschaftsjahr {businessYear} und sind serverseitig gepinnt."
+
 #: src/ui/client/ClientCartView.tsx
 msgid "Allgemeine Anmerkungen zum Angebot"
 msgstr "Allgemeine Anmerkungen zum Angebot"
@@ -708,8 +757,20 @@ msgid "Anonymer Gast"
 msgstr "Anonymer Gast"
 
 #: src/ui/management/ManagementEurView.tsx
+#~ msgid "Anschaffungen bis 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
+#~ msgstr "Anschaffungen bis 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
+
+#: src/ui/management/ManagementEurView.tsx
 msgid "Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
 msgstr "Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Anschaffungskosten (€)"
+msgstr "Anschaffungskosten (€)"
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Anschaffungsmonat"
+msgstr "Anschaffungsmonat"
 
 #: src/ui/management/ManagementEurView.tsx
 msgid "Anschrift"
@@ -718,6 +779,11 @@ msgstr "Anschrift"
 #: src/ui/client/ClientDashboard.tsx
 msgid "Ansehen"
 msgstr "Ansehen"
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Anteil"
+msgstr "Anteil"
 
 #: src/ui/client/components/CouponInput.tsx
 #: src/ui/components/WysiwygEditor.tsx
@@ -737,8 +803,14 @@ msgid "Apple Pay"
 msgstr "Apple Pay"
 
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
+#: src/ui/management/eur/EurEntriesPanel.tsx
+#: src/ui/management/ManagementEurView.tsx
 msgid "Art"
 msgstr "Art"
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+msgid "Art auswählen und Betrag sowie Betriebsanteil in 5-%-Schritten angeben."
+msgstr "Art auswählen und Betrag sowie Betriebsanteil in 5-%-Schritten angeben."
 
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "AT..."
@@ -797,9 +869,27 @@ msgstr "Auftrag löschen?"
 msgid "Ausbezahlt"
 msgstr "Ausbezahlt"
 
+#: src/ui/management/eur/EurEntriesPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
-msgid "Ausgaben können einen betrieblichen Anteil von 0 % (privat) bis 100 % (betrieblich) haben."
-msgstr "Ausgaben können einen betrieblichen Anteil von 0 % (privat) bis 100 % (betrieblich) haben."
+msgid "Ausgabe"
+msgstr "Ausgabe"
+
+#: src/ui/management/eur/EurOverviewPanel.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Ausgaben"
+msgstr "Ausgaben"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Ausgaben betrieblich"
+msgstr "Ausgaben betrieblich"
+
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "Ausgaben können einen betrieblichen Anteil von 0 % (privat) bis 100 % (betrieblich) haben."
+#~ msgstr "Ausgaben können einen betrieblichen Anteil von 0 % (privat) bis 100 % (betrieblich) haben."
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Ausgaben-Arten"
+msgstr "Ausgaben-Arten"
 
 #: src/logic/modelRegistration.ts
 msgid "Aussehen & Maße"
@@ -881,8 +971,8 @@ msgid "Backend:"
 msgstr "Backend:"
 
 #: src/ui/management/ManagementEurView.tsx
-msgid "Bald finden Sie hier Ihre Buchungen, Belege und Auswertungen. Die Buchhaltung ist noch im Aufbau."
-msgstr "Bald finden Sie hier Ihre Buchungen, Belege und Auswertungen. Die Buchhaltung ist noch im Aufbau."
+#~ msgid "Bald finden Sie hier Ihre Buchungen, Belege und Auswertungen. Die Buchhaltung ist noch im Aufbau."
+#~ msgstr "Bald finden Sie hier Ihre Buchungen, Belege und Auswertungen. Die Buchhaltung ist noch im Aufbau."
 
 #: src/logic/mollieMethods.ts
 msgid "Bancontact"
@@ -947,6 +1037,7 @@ msgstr "Baustein gelöscht"
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 #: src/ui/management/ManagementCustomersView.tsx
+#: src/ui/management/ManagementEurView.tsx
 #: src/ui/management/ManagementStructureView.tsx
 #: src/ui/management/ManagementTextSnippetsView.tsx
 msgid "Bearbeiten"
@@ -960,6 +1051,7 @@ msgstr "Bearbeitung"
 msgid "Beauftragt"
 msgstr "Beauftragt"
 
+#: src/ui/management/eur/EurVatPanel.tsx
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Bedeutung"
 msgstr "Bedeutung"
@@ -998,6 +1090,7 @@ msgstr "Beitreten & Fortfahren"
 
 #: src/ui/client/CheckoutReturnView.tsx
 #: src/ui/client/ClientOrdersView.tsx
+#: src/ui/management/ManagementEurView.tsx
 msgid "Beleg"
 msgstr "Beleg"
 
@@ -1005,7 +1098,12 @@ msgstr "Beleg"
 msgid "Beleg / Typ"
 msgstr "Beleg / Typ"
 
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Belege vorhanden"
+msgstr "Belege vorhanden"
+
 #: src/ui/management/components/ManualDocumentHeader.tsx
+#: src/ui/management/eur/EurEntriesPanel.tsx
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Belegnummer"
 msgstr "Belegnummer"
@@ -1167,9 +1265,16 @@ msgstr "Bestimmt, welche Auflösungen direkt ohne Checkout geladen werden könne
 msgid "Beteiligte Personen"
 msgstr "Beteiligte Personen"
 
+#: src/ui/management/eur/EurEntriesPanel.tsx
+#: src/ui/management/eur/EurVatPanel.tsx
+#: src/ui/management/ManagementEurView.tsx
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Betrag"
 msgstr "Betrag"
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+msgid "Betrag (€)"
+msgstr "Betrag (€)"
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Betrag in €"
@@ -1183,9 +1288,27 @@ msgstr "Betrag in €"
 msgid "Betreff"
 msgstr "Betreff"
 
+#: src/ui/management/eur/EurEntriesPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
-msgid "Betriebsanteil"
-msgstr "Betriebsanteil"
+msgid "Betrieblich"
+msgstr "Betrieblich"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Betrieblich vs. privat"
+msgstr "Betrieblich vs. privat"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Betrieblicher Anteil"
+msgstr "Betrieblicher Anteil"
+
+#: src/ui/management/ManagementEurView.tsx
+#~ msgid "Betriebsanteil"
+#~ msgstr "Betriebsanteil"
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Betriebsanteil (%)"
+msgstr "Betriebsanteil (%)"
 
 #: src/ui/client/SelectionView.tsx
 msgid "Bewertung konnte nicht gespeichert werden."
@@ -1312,6 +1435,21 @@ msgstr "Bildinformationen"
 msgid "Bildschutz"
 msgstr "Bildschutz"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Bis"
+msgstr "Bis"
+
+#. placeholder {0}: cents(reference.income_tax.basic_allowance.limit_cents)
+#. placeholder {1}: formatPercent(reference.income_tax.basic_allowance.rate_per_10000 / 100)
+#. placeholder {2}: cents(reference.income_tax.basic_allowance.maximum_cents)
+#: src/ui/management/eur/EurReferencePanel.tsx
+#~ msgid "Bis {0} Gewinn, {1}, höchstens {2}."
+#~ msgstr "Bis {0} Gewinn, {1}, höchstens {2}."
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Bis {allowanceLimit} Gewinn, {allowanceRate}, höchstens {allowanceMaximum}."
+msgstr "Bis {allowanceLimit} Gewinn, {allowanceRate}, höchstens {allowanceMaximum}."
+
 #: src/ui/management/ManagementManualInvoiceView.tsx
 msgid "Bitte alle Pflichtfelder ausfüllen (Titel/Menge)."
 msgstr "Bitte alle Pflichtfelder ausfüllen (Titel/Menge)."
@@ -1436,6 +1574,11 @@ msgstr "Bitte wählen"
 msgid "Boudoir"
 msgstr "Boudoir"
 
+#: src/ui/management/components/BillingDetailsCard.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Branchenkennzahl"
+msgstr "Branchenkennzahl"
+
 #: src/ui/management/components/WatermarkSettingsCard.tsx
 msgid "Brand-Logo konnte nicht geladen werden."
 msgstr "Brand-Logo konnte nicht geladen werden."
@@ -1452,10 +1595,29 @@ msgstr "Brand-Standard"
 msgid "Brand-Zuweisung"
 msgstr "Brand-Zuweisung"
 
-#: src/ui/components/Sidebar.tsx
 #: src/ui/management/ManagementEurView.tsx
+msgid "Buchhaltung"
+msgstr "Buchhaltung"
+
+#: src/ui/components/Sidebar.tsx
 msgid "Buchhaltung (EÜR)"
 msgstr "Buchhaltung (EÜR)"
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+msgid "Buchung speichern"
+msgstr "Buchung speichern"
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+msgid "Buchungen"
+msgstr "Buchungen"
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+msgid "Buchungen nicht verfügbar"
+msgstr "Buchungen nicht verfügbar"
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+msgid "Buchungen werden geladen …"
+msgstr "Buchungen werden geladen …"
 
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Bundesland"
@@ -1706,6 +1868,14 @@ msgstr "Definiere die Parameter für den manuellen \"Paket-Kalkulator\" in Angeb
 msgid "Definiert die Mengenrabatt-Staffeln für diese Galerie. Ohne Auswahl gilt das Standard-Preset der Brand."
 msgstr "Definiert die Mengenrabatt-Staffeln für diese Galerie. Ohne Auswahl gilt das Standard-Preset der Brand."
 
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Degressiv"
+msgstr "Degressiv"
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Degressiver Satz (%)"
+msgstr "Degressiver Satz (%)"
+
 #: src/ui/components/Sidebar.tsx
 msgid "Dein Account"
 msgstr "Dein Account"
@@ -1948,6 +2118,14 @@ msgstr "Die Aufbewahrung der IP-bezogenen Bestell- und Sicherheitsdaten richtet 
 msgid "Die Bestätigung ist noch nicht eingetroffen. Der Zahlungsvorgang bleibt erhalten; bitte prüfe den Status in Kürze erneut."
 msgstr "Die Bestätigung ist noch nicht eingetroffen. Der Zahlungsvorgang bleibt erhalten; bitte prüfe den Status in Kürze erneut."
 
+#: src/ui/management/eur/EurOverviewPanel.tsx
+msgid "Die Buchhaltungsdaten konnten nicht geladen werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
+msgstr "Die Buchhaltungsdaten konnten nicht geladen werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+msgid "Die Buchungen konnten nicht geladen werden."
+msgstr "Die Buchungen konnten nicht geladen werden."
+
 #: src/ui/LicenseTerms.tsx
 msgid "Die Darstellung der Produkte im Portal stellt kein bindendes Angebot dar. Mit dem Klicken auf „Zahlungspflichtig bestellen“ gibt der Kunde ein bindendes Angebot zum Abschluss des Vertrages ab. Der Vertrag kommt mit der Bestätigung der Bestellung durch den Fotografen bzw. mit der Aussendung der Bestellbestätigung zustande."
 msgstr "Die Darstellung der Produkte im Portal stellt kein bindendes Angebot dar. Mit dem Klicken auf „Zahlungspflichtig bestellen“ gibt der Kunde ein bindendes Angebot zum Abschluss des Vertrages ab. Der Vertrag kommt mit der Bestätigung der Bestellung durch den Fotografen bzw. mit der Aussendung der Bestellbestätigung zustande."
@@ -2073,8 +2251,8 @@ msgid "Diese Allgemeinen Geschäftsbedingungen (AGB) und Lizenzbedingungen gelte
 msgstr "Diese Allgemeinen Geschäftsbedingungen (AGB) und Lizenzbedingungen gelten für sämtliche über dieses Portal angebotenen Fotoprodukte und digitalen Inhalte (im Folgenden „Download-Dateien“) sowie für alle Verträge, die über dieses Portal geschlossen werden."
 
 #: src/ui/management/ManagementEurView.tsx
-msgid "Diese Angaben stammen aus Ihren Einstellungen und können dort geändert werden."
-msgstr "Diese Angaben stammen aus Ihren Einstellungen und können dort geändert werden."
+#~ msgid "Diese Angaben stammen aus Ihren Einstellungen und können dort geändert werden."
+#~ msgstr "Diese Angaben stammen aus Ihren Einstellungen und können dort geändert werden."
 
 #: src/ui/LicenseTerms.tsx
 msgid "Diese Bedingungen regeln das Vertragsverhältnis zwischen dem Betreiber dieses Portals (im Folgenden „Fotograf“) und dem Kunden bei der Bestellung von Bildern, Lizenzpaketen und sonstigen digitalen Inhalten. Entgegenstehende oder abweichende Bedingungen des Kunden werden nicht anerkannt, sofern der Fotograf ihrer Geltung nicht ausdrücklich schriftlich zugestimmt hat."
@@ -2226,7 +2404,6 @@ msgid "E-Mail der eingeladenen Person"
 msgstr "E-Mail der eingeladenen Person"
 
 #: src/ui/management/components/BillingDetailsCard.tsx
-#: src/ui/management/ManagementEurView.tsx
 msgid "E-Mail für Rückfragen"
 msgstr "E-Mail für Rückfragen"
 
@@ -2275,6 +2452,10 @@ msgstr "Ein unerwarteter Fehler ist aufgetreten"
 msgid "Ein unerwarteter Serverfehler ist aufgetreten."
 msgstr "Ein unerwarteter Serverfehler ist aufgetreten."
 
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "eine"
+msgstr "eine"
+
 #: src/ui/ModelRegistrationView.tsx
 msgid "Eine Person"
 msgstr "Eine Person"
@@ -2298,6 +2479,10 @@ msgstr "Eingereicht:"
 #: src/ui/components/Sidebar.tsx
 msgid "Einkäufe & Anfragen"
 msgstr "Einkäufe & Anfragen"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Einkommensteuer"
+msgstr "Einkommensteuer"
 
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Einladen"
@@ -2361,12 +2546,31 @@ msgstr "Einladungslink (zum Kopieren)"
 msgid "Einladungslink..."
 msgstr "Einladungslink..."
 
+#: src/ui/management/eur/EurEntriesPanel.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Einnahme"
+msgstr "Einnahme"
+
+#: src/ui/management/eur/EurOverviewPanel.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Einnahmen"
+msgstr "Einnahmen"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Einnahmen betrieblich"
+msgstr "Einnahmen betrieblich"
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Einnahmen-Arten"
+msgstr "Einnahmen-Arten"
+
 #: src/ui/management/FtpConnectionRows.tsx
 msgid "Einstellung"
 msgstr "Einstellung"
 
 #: src/ui/components/Sidebar.tsx
 #: src/ui/management/ManagementDashboard.tsx
+#: src/ui/management/ManagementEurView.tsx
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Einstellungen"
 msgstr "Einstellungen"
@@ -2410,6 +2614,16 @@ msgstr "Einzelperson"
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Empfänger:"
 msgstr "Empfänger:"
+
+#. placeholder {0}: result.switch_recommended_year
+#. placeholder {1}: cents(result.switch_advantage_cents)
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+#~ msgid "Empfohlener Wechsel zur linearen Abschreibung: Jahr {0}. Vorteil gegenüber der durchgehenden degressiven Methode: {1}."
+#~ msgstr "Empfohlener Wechsel zur linearen Abschreibung: Jahr {0}. Vorteil gegenüber der durchgehenden degressiven Methode: {1}."
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Empfohlener Wechsel zur linearen Abschreibung: Jahr {switchYear}. Vorteil gegenüber der durchgehenden degressiven Methode: {switchAdvantage}."
+msgstr "Empfohlener Wechsel zur linearen Abschreibung: Jahr {switchYear}. Vorteil gegenüber der durchgehenden degressiven Methode: {switchAdvantage}."
 
 #: src/ui/management/components/ModelDetailModal.tsx
 msgid "Endgültig löschen"
@@ -2492,6 +2706,12 @@ msgstr "Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
 #: src/ui/management/components/InviteModal.tsx
 msgid "Ermöglicht dem Empfänger dieses Links das Ändern von IPTC Titeln und Beschreibungen."
 msgstr "Ermöglicht dem Empfänger dieses Links das Ändern von IPTC Titeln und Beschreibungen."
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+#: src/ui/management/eur/EurOverviewPanel.tsx
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Erneut laden"
+msgstr "Erneut laden"
 
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Erneut prüfen"
@@ -2576,6 +2796,14 @@ msgstr "Extern-Link wurde erstellt."
 #: src/ui/management/components/CalculatorSettingsCard.tsx
 msgid "Extra-Bild"
 msgstr "Extra-Bild"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Fahrzeug"
+msgstr "Fahrzeug"
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Fahrzeugtypen"
+msgstr "Fahrzeugtypen"
 
 #: src/logic/modelRegistration.ts
 msgid "Fashion / Editorial"
@@ -2842,6 +3070,10 @@ msgstr "Fehler: {createError}"
 msgid "Fehler: {emailError}"
 msgstr "Fehler: {emailError}"
 
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Feiertage"
+msgstr "Feiertage"
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
@@ -3052,6 +3284,10 @@ msgstr "FTPS-Verschlüsselung"
 msgid "FTPS: „Vertrauenswürdige Zielserver\" aktivieren"
 msgstr "FTPS: „Vertrauenswürdige Zielserver\" aktivieren"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Fünf Tarifstufen und Grundfreibetrag nach dem gepinnten Tarif 2026. Der Gewinn wird serverseitig versteuert."
+msgstr "Fünf Tarifstufen und Grundfreibetrag nach dem gepinnten Tarif 2026. Der Gewinn wird serverseitig versteuert."
+
 #: src/ui/client/ClientCartView.tsx
 msgid "Für {unresolvedItemCount} Artikel ist der Preis noch nicht verfügbar. Die Summe wird beim Bezahlen verbindlich berechnet."
 msgstr "Für {unresolvedItemCount} Artikel ist der Preis noch nicht verfügbar. Die Summe wird beim Bezahlen verbindlich berechnet."
@@ -3067,6 +3303,10 @@ msgstr "Für den gewählten Kontaktweg fehlt die hinterlegte Angabe."
 #: src/ui/Privacy.tsx
 msgid "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch Zahlungsdaten des Zahlungsdienstleisters und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht. Der Eintrag ist dem angemeldeten Portalkonto zugeordnet und wird ersetzt, sobald sich der Warenkorb ändert."
 msgstr "Für die Wiederaufnahme eines Checkout-Vorgangs speichert Ihr Browser bis zum Ende der Sitzung eine zufällige Checkout-Kennung und eine verkürzte Warenkorb-Markierung im Sitzungsspeicher. Diese Angaben enthalten weder Kartendaten noch Zahlungsdaten des Zahlungsdienstleisters und werden nach Abschluss, Abmeldung oder Zurücksetzen des Warenkorbs gelöscht. Der Eintrag ist dem angemeldeten Portalkonto zugeordnet und wird ersetzt, sobald sich der Warenkorb ändert."
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Für diese Angaben ist kein Wechsel zur linearen Methode vorteilhaft."
+msgstr "Für diese Angaben ist kein Wechsel zur linearen Methode vorteilhaft."
 
 #: src/ui/Privacy.tsx
 msgid "Für eine sofortige Online-Zahlung prüft das Portal zusätzlich serverseitig das Erstellungsdatum Ihres Portalkontos sowie die Anzahl Ihrer Checkout-Versuche und der Versuche Ihrer IP-Adresse. Dafür werden Ihre Konto-ID, Ihr Kontoerstellungsdatum und der oben beschriebene IP-Risikoschlüssel verwendet; die Prüfung entscheidet, ob ein Zahlungsvorgang begonnen wird. Für Bestellungen per Rechnung, Lieferschein oder Angebot gilt diese Prüfung nicht."
@@ -3268,6 +3508,15 @@ msgstr "Gespeichert!"
 msgid "Geteiltes Flatrate-Budget (Cent)"
 msgstr "Geteiltes Flatrate-Budget (Cent)"
 
+#: src/ui/management/eur/EurOverviewPanel.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Gewinn"
+msgstr "Gewinn"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Gewinn (€)"
+msgstr "Gewinn (€)"
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/ManagementCouponsView.tsx
 msgid "Global"
@@ -3280,6 +3529,11 @@ msgstr "Globaler Kontext (Für alle Bilder)"
 #: src/logic/mollieMethods.ts
 msgid "Google Pay"
 msgstr "Google Pay"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Grundfreibetrag"
+msgstr "Grundfreibetrag"
 
 #: src/ui/management/components/LicenseCatalogSettings.tsx
 msgid "Grundhonorar aktualisiert"
@@ -3455,13 +3709,29 @@ msgstr "Ich habe die <0>Datenschutzerklärung</0> gelesen und akzeptiert."
 msgid "iDEAL"
 msgstr "iDEAL"
 
+#: src/ui/management/eur/EurVatPanel.tsx
+msgid "IG-Erwerb 10 % (€)"
+msgstr "IG-Erwerb 10 % (€)"
+
+#: src/ui/management/eur/EurVatPanel.tsx
+msgid "IG-Erwerb 13 % (€)"
+msgstr "IG-Erwerb 13 % (€)"
+
+#: src/ui/management/eur/EurVatPanel.tsx
+msgid "IG-Erwerb 20 % (€)"
+msgstr "IG-Erwerb 20 % (€)"
+
+#: src/ui/management/eur/EurVatPanel.tsx
+msgid "IG-Erwerb 4,9 % (€)"
+msgstr "IG-Erwerb 4,9 % (€)"
+
 #: src/ui/client/components/SelectionFilterBar.tsx
 msgid "Ignoriert"
 msgstr "Ignoriert"
 
 #: src/ui/management/ManagementEurView.tsx
-msgid "Ihre Buchhaltung für {portalName}"
-msgstr "Ihre Buchhaltung für {portalName}"
+#~ msgid "Ihre Buchhaltung für {portalName}"
+#~ msgstr "Ihre Buchhaltung für {portalName}"
 
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/GalleryModal.tsx
@@ -3575,6 +3845,16 @@ msgstr "Inkludiertes Flatrate-Level"
 msgid "Inklusive"
 msgstr "Inklusive"
 
+#. placeholder {0}: cents(reference.travel.domestic.day_cents)
+#. placeholder {1}: cents(reference.travel.domestic.night_cents)
+#: src/ui/management/eur/EurReferencePanel.tsx
+#~ msgid "Inland: {0} Tag und {1} Nächtigung."
+#~ msgstr "Inland: {0} Tag und {1} Nächtigung."
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Inland: {domesticDay} Tag und {domesticNight} Nächtigung."
+msgstr "Inland: {domesticDay} Tag und {domesticNight} Nächtigung."
+
 #: src/ui/management/ManagementContractView.tsx
 msgid "Instanzen"
 msgstr "Instanzen"
@@ -3599,6 +3879,7 @@ msgstr "ISO"
 msgid "Ja"
 msgstr "Ja"
 
+#: src/ui/management/eur/EurDepreciationPanel.tsx
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Jahr"
 msgstr "Jahr"
@@ -3608,6 +3889,10 @@ msgstr "Jahr"
 #: src/ui/ModelRegistrationView.tsx
 msgid "Jahre"
 msgstr "Jahre"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Jede Buchung wird in 5-%-Schritten zwischen privat und betrieblich aufgeteilt."
+msgstr "Jede Buchung wird in 5-%-Schritten zwischen privat und betrieblich aufgeteilt."
 
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Jeder Account benötigt eine Brand-Zuweisung (U-02)."
@@ -3722,6 +4007,10 @@ msgstr "Kein Rabatt (0%)"
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Kein Zugriff auf dieses Board."
 msgstr "Kein Zugriff auf dieses Board."
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "keine"
+msgstr "keine"
 
 #: src/logic/modelRegistration.ts
 #: src/ui/components/GalleryGroupModal.tsx
@@ -3888,6 +4177,14 @@ msgstr "Keine vorherigen Versionen gefunden."
 msgid "Keine Zuweisung"
 msgstr "Keine Zuweisung"
 
+#: src/ui/management/eur/EurVatPanel.tsx
+msgid "Kennzahl"
+msgstr "Kennzahl"
+
+#: src/ui/management/eur/EurVatPanel.tsx
+msgid "Kennzahlen berechnen"
+msgstr "Kennzahlen berechnen"
+
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Keywords"
 msgstr "Keywords"
@@ -3935,6 +4232,26 @@ msgstr "KI-Vorschlag geladen — jetzt prüfen und speichern."
 #: src/ui/management/components/AIGalleryDefaultsModal.tsx
 msgid "KI-Vorschlag geladen."
 msgstr "KI-Vorschlag geladen."
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Kilometer"
+msgstr "Kilometer"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Kilometergeld"
+msgstr "Kilometergeld"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Kilometergeld, Tagesgeld und Nächtigung mit Betriebsanteil. Ab dem 5. Tag entfällt das Tagesgeld, ab dem 15. Tag die Nächtigung."
+msgstr "Kilometergeld, Tagesgeld und Nächtigung mit Betriebsanteil. Ab dem 5. Tag entfällt das Tagesgeld, ab dem 15. Tag die Nächtigung."
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+#~ msgid "Kleinunternehmer"
+#~ msgstr "Kleinunternehmer"
+
+#: src/ui/management/eur/EurVatPanel.tsx
+msgid "Kleinunternehmer-Umsatz (€)"
+msgstr "Kleinunternehmer-Umsatz (€)"
 
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "kollege@firma.de"
@@ -4208,6 +4525,10 @@ msgstr "Letzte Bestätigung:"
 msgid "Lightroom-Katalog"
 msgstr "Lightroom-Katalog"
 
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Linear"
+msgstr "Linear"
+
 #: src/ui/components/WysiwygEditor.tsx
 msgid "Link einfügen"
 msgstr "Link einfügen"
@@ -4327,6 +4648,10 @@ msgstr "Löscht das Profil dauerhaft – inklusive aller Fotos, des Altersnachwe
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Lust"
 msgstr "Lust"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Mahlzeiten"
+msgstr "Mahlzeiten"
 
 #: src/ui/ModelRegistrationView.tsx
 msgid "Managerperson"
@@ -4592,6 +4917,10 @@ msgstr "Mit dem Erwerb einer Lizenz erhält der Kunde das einfache, nicht übert
 msgid "Mit der Bestätigung der Checkbox „Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download)“ erteilt der Kunde diese ausdrückliche Zustimmung. Ab dem Zeitpunkt der Freischaltung des Downloads gilt das Rücktrittsrecht als erloschen."
 msgstr "Mit der Bestätigung der Checkbox „Ich bin einverstanden, dass der Download meiner Fotos unmittelbar nach Zahlungsabschluss beginnt (sofortiger Download)“ erteilt der Kunde diese ausdrückliche Zustimmung. Ab dem Zeitpunkt der Freischaltung des Downloads gilt das Rücktrittsrecht als erloschen."
 
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Mitfahrer"
+msgstr "Mitfahrer"
+
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Mitgliederrolle"
 msgstr "Mitgliederrolle"
@@ -4694,13 +5023,27 @@ msgstr "Models für Kategorie"
 msgid "Mollie-Verbindungstest"
 msgstr "Mollie-Verbindungstest"
 
+#: src/ui/management/eur/EurEntriesPanel.tsx
+#: src/ui/management/eur/EurVatPanel.tsx
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Monat"
 msgstr "Monat"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "Monate"
+msgstr "Monate"
+
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Monatlich (Sammelrechnung)"
 msgstr "Monatlich (Sammelrechnung)"
+
+#: src/ui/management/eur/EurVatPanel.tsx
+msgid "Monatliche Kennzahlen und Zahllast. Leere Felder bleiben leer und werden nicht als Null ausgewiesen."
+msgstr "Monatliche Kennzahlen und Zahllast. Leere Felder bleiben leer und werden nicht als Null ausgewiesen."
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Monatsübersicht"
+msgstr "Monatsübersicht"
 
 #: src/ui/management/components/CalculatorSettingsCard.tsx
 msgid "Muss eine ganze Zahl sein"
@@ -4769,6 +5112,10 @@ msgstr "Nachricht an Kunden senden"
 #: src/ui/management/components/EmailComposerModal.tsx
 msgid "Nachricht Senden"
 msgstr "Nachricht Senden"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Nächtigung"
+msgstr "Nächtigung"
 
 #: src/ui/management/components/ModelDetailModal.tsx
 msgid "Nachweis öffnen"
@@ -4876,6 +5223,10 @@ msgstr "Netzwerkfehler: Rabattcode konnte nicht geprüft werden."
 #: src/ui/client/components/SelectionFilterBar.tsx
 msgid "Neu"
 msgstr "Neu"
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+msgid "Neue Buchung"
+msgstr "Neue Buchung"
 
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Neue Einladung"
@@ -5051,6 +5402,18 @@ msgstr "Noch keine Bewertungen vorhanden."
 msgid "Noch keine Bilder vorhanden"
 msgstr "Noch keine Bilder vorhanden"
 
+#: src/ui/management/eur/EurEntriesPanel.tsx
+msgid "Noch keine Buchungen erfasst. Legen Sie unten die erste Buchung an."
+msgstr "Noch keine Buchungen erfasst. Legen Sie unten die erste Buchung an."
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Noch keine Buchungen in diesem Monat."
+msgstr "Noch keine Buchungen in diesem Monat."
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Noch keine Buchungen. Legen Sie im Tab Buchungen die erste an."
+msgstr "Noch keine Buchungen. Legen Sie im Tab Buchungen die erste an."
+
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Noch keine Download-Daten vorhanden."
 msgstr "Noch keine Download-Daten vorhanden."
@@ -5171,6 +5534,10 @@ msgstr "Nutzer-Zugriff verwalten"
 msgid "Nutzerrechte gespeichert."
 msgstr "Nutzerrechte gespeichert."
 
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Nutzungsdauer (Jahre)"
+msgstr "Nutzungsdauer (Jahre)"
+
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Nutzungsrechte"
 msgstr "Nutzungsrechte"
@@ -5240,6 +5607,10 @@ msgstr "Ohne aktivierte Konfiguration wird Turnstile nicht geladen. Die Aufbewah
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Ohne das aktuelle Passwort kannst du das Kamera-Passwort zurücksetzen. Das alte Passwort wird dabei sofort ungültig — die Kamera muss danach neu konfiguriert werden."
 msgstr "Ohne das aktuelle Passwort kannst du das Kamera-Passwort zurücksetzen. Das alte Passwort wird dabei sofort ungültig — die Kamera muss danach neu konfiguriert werden."
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Ohne die gepinnten Referenzdaten lassen sich Beträge nicht belastbar berechnen."
+msgstr "Ohne die gepinnten Referenzdaten lassen sich Beträge nicht belastbar berechnen."
 
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Online-Verbot (Privacy Fee)"
@@ -5633,6 +6004,10 @@ msgstr "Privat (Nur mit Link / Passwort)"
 msgid "Privat erzwingen (Nur mit Link / Passwort)"
 msgstr "Privat erzwingen (Nur mit Link / Passwort)"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "Privatanteil"
+msgstr "Privatanteil"
+
 #: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "pro Bild"
 msgstr "pro Bild"
@@ -5795,6 +6170,10 @@ msgstr "Qualität wählen"
 msgid "Quartal (Sammelrechnung)"
 msgstr "Quartal (Sammelrechnung)"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "Quelle sind die Einstellungen des Portals."
+msgstr "Quelle sind die Einstellungen des Portals."
+
 #: src/ui/management/components/ProductBatchTable.tsx
 msgid "Rabatt (%)"
 msgstr "Rabatt (%)"
@@ -5888,6 +6267,14 @@ msgstr "Rechte (Gruppen / Galerien)"
 msgid "Rechtsform"
 msgstr "Rechtsform"
 
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Referenzdaten nicht verfügbar"
+msgstr "Referenzdaten nicht verfügbar"
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Referenzdaten werden geladen …"
+msgstr "Referenzdaten werden geladen …"
+
 #: src/ui/ModelRegistrationView.tsx
 msgid "Registrierung abgeschlossen. Dein Einladungslink ist damit verbraucht."
 msgstr "Registrierung abgeschlossen. Dein Einladungslink ist damit verbraucht."
@@ -5912,6 +6299,26 @@ msgstr "Registrierung fehlgeschlagen"
 msgid "Reihenfolge nicht umstellen: erst Konto und Passwort, dann Kamera. Wer zuerst die Kamera konfiguriert, hat noch kein gültiges Passwort und wundert sich über Error 41."
 msgstr "Reihenfolge nicht umstellen: erst Konto und Passwort, dann Kamera. Wer zuerst die Kamera konfiguriert, hat noch kein gültiges Passwort und wundert sich über Error 41."
 
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Reise-Pauschalen"
+msgstr "Reise-Pauschalen"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Reisekosten"
+msgstr "Reisekosten"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Reisekosten berechnen"
+msgstr "Reisekosten berechnen"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Reiseziel"
+msgstr "Reiseziel"
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Reiseziele"
+msgstr "Reiseziele"
+
 #: src/ui/management/components/BrandSettingsCard.tsx
 msgid "Reisinger Foto Portal"
 msgstr "Reisinger Foto Portal"
@@ -5935,6 +6342,14 @@ msgstr "Restriktiv"
 #: src/ui/management/components/PhotographerTeamModal.tsx
 msgid "Restriktiv (Nur zugewiesene Fotografen)"
 msgstr "Restriktiv (Nur zugewiesene Fotografen)"
+
+#: src/ui/management/eur/EurVatPanel.tsx
+msgid "Reverse Charge (€)"
+msgstr "Reverse Charge (€)"
+
+#: src/ui/management/eur/EurEntriesPanel.tsx
+msgid "Richtung"
+msgstr "Richtung"
 
 #: src/ui/ContractSignView.tsx
 msgid "Rolle"
@@ -5977,6 +6392,10 @@ msgstr "Sammelrechnung erstellen"
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Sammelrechnung erstellen?"
 msgstr "Sammelrechnung erstellen?"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Satz"
+msgstr "Satz"
 
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Schlagworte eingeben (Komma/Enter)..."
@@ -6146,6 +6565,10 @@ msgstr "Sofort (automatisch)"
 msgid "Sofort (Einzelrechnung)"
 msgstr "Sofort (Einzelrechnung)"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "Sofort als Ausgabe erfassen"
+msgstr "Sofort als Ausgabe erfassen"
+
 #: src/logic/mollieMethods.ts
 msgid "Sofortige Bezahlung über dein Online-Banking."
 msgstr "Sofortige Bezahlung über dein Online-Banking."
@@ -6161,6 +6584,10 @@ msgstr "Sonstiges"
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Sortierung"
 msgstr "Sortierung"
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+#~ msgid "Sozialversicherung"
+#~ msgstr "Sozialversicherung"
 
 #: src/ui/components/WysiwygEditor.tsx
 msgid "Spalte danach hinzufügen"
@@ -6247,6 +6674,10 @@ msgstr "Staffel hinzufügen"
 msgid "Staffeln"
 msgstr "Staffeln"
 
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Stammdaten und Kataloge"
+msgstr "Stammdaten und Kataloge"
+
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Stammverzeichnis"
 msgstr "Stammverzeichnis"
@@ -6277,6 +6708,24 @@ msgstr "Standard Tarif"
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Standard Tarif Rechner"
 msgstr "Standard Tarif Rechner"
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+#~ msgid "Standard-Betriebsanteil"
+#~ msgstr "Standard-Betriebsanteil"
+
+#. placeholder {0}: settings.default_business_share
+#. placeholder {1}: settings.sv_mode === 'uv_only' ? 'nur Unfallversicherung' : settings.sv_mode.toUpperCase()
+#: src/ui/management/eur/EurOverviewPanel.tsx
+#~ msgid "Standard-Betriebsanteil: {0} %, Sozialversicherung: {1}."
+#~ msgstr "Standard-Betriebsanteil: {0} %, Sozialversicherung: {1}."
+
+#: src/ui/management/eur/EurOverviewPanel.tsx
+msgid "Standard-Betriebsanteil: {defaultShare} %, Sozialversicherung: {svLabel}, Kleinunternehmer: {kleinunternehmerLabel}."
+msgstr "Standard-Betriebsanteil: {defaultShare} %, Sozialversicherung: {svLabel}, Kleinunternehmer: {kleinunternehmerLabel}."
+
+#: src/ui/management/eur/EurOverviewPanel.tsx
+#~ msgid "Standard-Betriebsanteil: {defaultShare} %, Sozialversicherung: {svLabel}."
+#~ msgstr "Standard-Betriebsanteil: {defaultShare} %, Sozialversicherung: {svLabel}."
 
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Standard-Flatrate-Level"
@@ -6341,6 +6790,10 @@ msgstr "Status ändern"
 msgid "Status gespeichert"
 msgstr "Status gespeichert"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Steuer berechnen"
+msgstr "Steuer berechnen"
+
 #: src/ui/client/components/CartItemList.tsx
 msgid "Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG."
 msgstr "Steuerfrei gem. Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG."
@@ -6386,6 +6839,10 @@ msgstr "Streitbeilegung"
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 msgid "Studentenrabatt (33%)"
 msgstr "Studentenrabatt (33%)"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Stufe"
+msgstr "Stufe"
 
 #: src/ui/management/ManagementModelsView.tsx
 msgid "Stufe abwählen"
@@ -6447,6 +6904,14 @@ msgstr "Tabelle einfügen"
 #: src/ui/components/WysiwygEditor.tsx
 msgid "Tabelle löschen"
 msgstr "Tabelle löschen"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Tage"
+msgstr "Tage"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "Tagesgeld"
+msgstr "Tagesgeld"
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "TCP kommt nicht durch"
@@ -6623,6 +7088,15 @@ msgstr "Überschrift 4"
 msgid "Übersicht"
 msgstr "Übersicht"
 
+#. placeholder {0}: summary.year
+#: src/ui/management/eur/EurOverviewPanel.tsx
+#~ msgid "Übersicht {0}"
+#~ msgstr "Übersicht {0}"
+
+#: src/ui/management/eur/EurOverviewPanel.tsx
+msgid "Übersicht {year}"
+msgstr "Übersicht {year}"
+
 #: src/ui/MyModelsView.tsx
 msgid "Übersicht deiner mit diesem Konto verknüpften Model-Profile."
 msgstr "Übersicht deiner mit diesem Konto verknüpften Model-Profile."
@@ -6630,6 +7104,14 @@ msgstr "Übersicht deiner mit diesem Konto verknüpften Model-Profile."
 #: src/ui/photographer/PhotographerPayoutsView.tsx
 msgid "Übersicht deiner monatlichen Einnahmen durch Flatrate-Anteile und Aufpreise."
 msgstr "Übersicht deiner monatlichen Einnahmen durch Flatrate-Anteile und Aufpreise."
+
+#: src/ui/management/eur/EurOverviewPanel.tsx
+msgid "Übersicht nicht verfügbar"
+msgstr "Übersicht nicht verfügbar"
+
+#: src/ui/management/eur/EurOverviewPanel.tsx
+msgid "Übersicht wird geladen …"
+msgstr "Übersicht wird geladen …"
 
 #: src/ui/components/IptcMetadataEditor.tsx
 msgid "Uhr"
@@ -6651,6 +7133,14 @@ msgstr "um den Rechnungs- und Bestellprozess zu aktivieren."
 #: src/ui/Widerrufsbelehrung.tsx
 msgid "Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (den Betreiber dieses Portals) mittels einer eindeutigen Erklärung über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren. Sie können dafür das unten beschriebene Muster-Widerrufsformular verwenden, das jedoch nicht vorgeschrieben ist. Zur Wahrung der Widerrufsfrist genügt es, dass Sie die Mitteilung über die Ausübung des Widerrufsrechts vor Ablauf der Widerrufsfrist absenden."
 msgstr "Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (den Betreiber dieses Portals) mittels einer eindeutigen Erklärung über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren. Sie können dafür das unten beschriebene Muster-Widerrufsformular verwenden, das jedoch nicht vorgeschrieben ist. Zur Wahrung der Widerrufsfrist genügt es, dass Sie die Mitteilung über die Ausübung des Widerrufsrechts vor Ablauf der Widerrufsfrist absenden."
+
+#: src/ui/management/eur/EurVatPanel.tsx
+msgid "Umsatzsteuer"
+msgstr "Umsatzsteuer"
+
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Umsatzsteuer-Arten"
+msgstr "Umsatzsteuer-Arten"
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "unbegrenzt"
@@ -6735,8 +7225,8 @@ msgid "Unternehmensdaten"
 msgstr "Unternehmensdaten"
 
 #: src/ui/management/ManagementEurView.tsx
-msgid "Unternehmensdaten bearbeiten"
-msgstr "Unternehmensdaten bearbeiten"
+#~ msgid "Unternehmensdaten bearbeiten"
+#~ msgstr "Unternehmensdaten bearbeiten"
 
 #: src/ui/Impressum.tsx
 msgid "Unternehmensgegenstand"
@@ -6843,6 +7333,14 @@ msgstr "Verbraucher haben bei Verträgen über digitale Inhalte und Fotoprodukte
 #: src/ui/LicenseTerms.tsx
 msgid "Verbrauchern steht ein gesetzliches Widerrufsrecht zu. Die Details, insbesondere die 14-tägige Widerrufsfrist sowie die Bedingungen für das vorzeitige Erlöschen des Rücktrittsrechts bei digitalen Inhalten, sind in der"
 msgstr "Verbrauchern steht ein gesetzliches Widerrufsrecht zu. Die Details, insbesondere die 14-tägige Widerrufsfrist sowie die Bedingungen für das vorzeitige Erlöschen des Rücktrittsrechts bei digitalen Inhalten, sind in der"
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Vergleich berechnen"
+msgstr "Vergleich berechnen"
+
+#: src/ui/management/eur/EurDepreciationPanel.tsx
+msgid "Vergleicht die lineare und die degressive Abschreibung für ein Anlagegut. Der Wechsel zur linearen Methode ist einmalig und nur mit Begründung möglich."
+msgstr "Vergleicht die lineare und die degressive Abschreibung für ein Anlagegut. Der Wechsel zur linearen Methode ist einmalig und nur mit Begründung möglich."
 
 #: src/ui/management/ManagementProjectsBoard.tsx
 #: src/ui/photographer/PhotographerProductionBoard.tsx
@@ -7048,6 +7546,10 @@ msgstr "Volumen-Summe"
 #: src/ui/client/components/CartItemList.tsx
 msgid "Volumenpreis (Tier {tierNum})"
 msgstr "Volumenpreis (Tier {tierNum})"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Von"
+msgstr "Von"
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Vor dem Test existiert bewusst kein FTP-Konto. Dein FTP-Ordner-Slug ist nur der Name; in SFTPGo wird nichts angelegt, bis die Zugangsdaten angefordert werden. Ein Konto vorab zu provisionieren hieße, Zugangsdaten zu erzeugen, die niemand kennt."
@@ -7268,8 +7770,12 @@ msgid "Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben 
 msgstr "Wirklich löschen? Zuweisungen gehen verloren (Nutzer und Ordner bleiben aber erhalten)."
 
 #: src/ui/management/ManagementEurView.tsx
-#~ msgid "Wirtschaftsjahr 2026"
-#~ msgstr "Wirtschaftsjahr 2026"
+#~ msgid "Wirtschaftsjahr {year}"
+#~ msgstr "Wirtschaftsjahr {year}"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Wirtschaftsjahr 2026"
+msgstr "Wirtschaftsjahr 2026"
 
 #: src/ui/components/Sidebar.tsx
 #: src/ui/management/ManagementBoardsView.tsx
@@ -7279,6 +7785,10 @@ msgstr "Workflow"
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "z. B. 12/345/67890"
 msgstr "z. B. 12/345/67890"
+
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "z. B. 742"
+msgstr "z. B. 742"
 
 #: src/ui/management/components/BillingDetailsCard.tsx
 msgid "z. B. Einzelunternehmen"
@@ -7454,6 +7964,10 @@ msgstr "Zeile davor hinzufügen"
 msgid "Zeile löschen"
 msgstr "Zeile löschen"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "Zeilen des Monats aus dem Buchungsjournal."
+msgstr "Zeilen des Monats aus dem Buchungsjournal."
+
 #: src/ui/components/PhotoHistoryModal.tsx
 msgid "Zeitpunkt"
 msgstr "Zeitpunkt"
@@ -7498,6 +8012,10 @@ msgstr "Zu dieser Zahlung fehlt die Bestellreferenz. Bitte öffne deine Einkäuf
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Zu meinen Einkäufen"
 msgstr "Zu meinen Einkäufen"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Zu versteuernder Gewinn"
+msgstr "Zu versteuernder Gewinn"
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "zuerst „Vertrauenswürdige Zielserver\" auf Aktivieren"
@@ -7657,6 +8175,10 @@ msgstr "Zuweisungen gespeichert."
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Zuweisungen speichern"
 msgstr "Zuweisungen speichern"
+
+#: src/ui/management/eur/EurTravelPanel.tsx
+msgid "zwei"
+msgstr "zwei"
 
 #: src/ui/ContractSignView.tsx
 msgid "Zwischensumme"

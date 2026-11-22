@@ -8,7 +8,10 @@ Verträge und den unveränderlichen, versionierten Dokumentenstand.
 
 - [01-cleanroom-handoff.md](01-cleanroom-handoff.md) — Fixture-Version, Update-Erkennung, Geltungsgrenzen.
 - [02-parity-vectors.md](02-parity-vectors.md) — 19 Paritätsvektoren, minimale Wertekette und Unit-Test (Issue #10).
-- [cleanroom/](cleanroom/) — byte-exakter, gepinnter Stand der abgeleiteten Dokumente (schreibgeschützt).
+- [03-engine.md](03-engine.md) — Rechenverträge je Fachbereich (ESt, USt, Reisen, AfA/DEG), Einheiten und Rundung.
+- [04-data-model.md](04-data-model.md) — Tabellen, Brand-Trennung, API-Vertrag.
+- [05-ui.md](05-ui.md) — Panels, Lösungsaktionen, Sprache und Mobile.
+- [cleanroom/](cleanroom/) — byte-exakter, gepinnter Stand der abgeleiteten Dokumente (schreibgeschützt), inklusive `artifacts/` und `verification/requirements/`.
 
 ## Geltende Einheiten
 
@@ -27,6 +30,16 @@ Verträge und den unveränderlichen, versionierten Dokumentenstand.
 - Die Buchhaltung ist ein eigener Menüpunkt in der bestehenden App-Shell (Route `/eur`) mit einem expliziten Weg zurück ins Portal; keine zweite App-Shell.
 - Die Ansicht zeigt ausschließlich fachlich nützliche Informationen: Unternehmensdaten aus den Einstellungen, die Grenze für geringwertige Wirtschaftsgüter und den betrieblichen Anteil. Technische Hinweise zur Paritätsprüfung sind kein Teil der Nutzeransicht.
 - Die EÜR-spezifischen Firmenfelder (Steuernummer, Finanzamt, UID, Rechtsform) werden in den Einstellungen gepflegt und in der Ansicht angezeigt; fehlende Werte erscheinen als Platzhalter.
+
+## Umfang
+
+- Referenzdaten, Einstellungen, Buchungen, Anlagen/AfA, DEG-Vergleich, USt und
+  Reisen sind über die EÜR-API angebunden.
+- Die UI ist eine eigenständige Buchhaltungsansicht unter `/eur` mit eigener
+  Monatsleiste, Monats- und Jahresübersicht, Tabs und Rücksprung ins Portal.
+  Die vollständige Abdeckung aller in der UI-Anforderung genannten
+  Sonderansichten (Belege, Wareneingang, Auswertungen, Anträge, Signatur)
+  bleibt offene Arbeit und ist in Issue #31 dokumentiert.
 
 ## Grenzen
 

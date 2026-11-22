@@ -1,0 +1,1228 @@
+{
+  "ausgaben_arten": [
+    {
+      "anteil": null,
+      "e1a": "9100 - Waren",
+      "typ": "Wareneinkäufe"
+    },
+    {
+      "anteil": null,
+      "e1a": "9100 - Waren",
+      "typ": "Rohstoffe"
+    },
+    {
+      "anteil": null,
+      "e1a": "9100 - Waren",
+      "typ": "Fertig- und Einzelteile"
+    },
+    {
+      "anteil": null,
+      "e1a": "9110 - Fremdpersonal",
+      "typ": "Materialveredelungen"
+    },
+    {
+      "anteil": null,
+      "e1a": "9110 - Fremdpersonal",
+      "typ": "Freelancer"
+    },
+    {
+      "anteil": 0.6,
+      "e1a": "9130 - Anlagegüter",
+      "typ": "Laptop 40% privat"
+    },
+    {
+      "anteil": 0.6,
+      "e1a": "9130 - Anlagegüter",
+      "typ": "Drucker 40% privat"
+    },
+    {
+      "anteil": null,
+      "e1a": "9130 - Anlagegüter",
+      "typ": "Firmen-Drucker"
+    },
+    {
+      "anteil": null,
+      "e1a": "9130 - Anlagegüter",
+      "typ": "Andere Anlagegüter"
+    },
+    {
+      "anteil": null,
+      "e1a": "9130 - Anlagegüter",
+      "typ": "Firmenwebsite"
+    },
+    {
+      "anteil": null,
+      "e1a": "9130 - Anlagegüter",
+      "typ": "Geringwertige Wirtschaftsgüter"
+    },
+    {
+      "anteil": null,
+      "e1a": "9210 - Buchwert abgeg. Anlagegüter",
+      "typ": "Restbuchwert verkaufter Anlagegüter"
+    },
+    {
+      "anteil": null,
+      "e1a": "9160 - Reisen, Fahrten und Diäten",
+      "typ": "Einzelne Zugfahrten"
+    },
+    {
+      "anteil": 0.5,
+      "e1a": "9165 - 50% Pauschale Massenbeförderung",
+      "typ": "Klimaticket"
+    },
+    {
+      "anteil": null,
+      "e1a": "9190 - Provisionen und Lizenzen",
+      "typ": "Provisionen an Dritte"
+    },
+    {
+      "anteil": null,
+      "e1a": "9190 - Provisionen und Lizenzen",
+      "typ": "Software"
+    },
+    {
+      "anteil": null,
+      "e1a": "9190 - Provisionen und Lizenzen",
+      "typ": "Apps"
+    },
+    {
+      "anteil": null,
+      "e1a": "9225 - Pflichtversicherungen",
+      "typ": "SV-Beiträge"
+    },
+    {
+      "anteil": 0.5,
+      "e1a": "9200 - Werbung und Repräsentation",
+      "typ": "Geschäftsessen"
+    },
+    {
+      "anteil": null,
+      "e1a": "9200 - Werbung und Repräsentation",
+      "typ": "Visitenkarten"
+    },
+    {
+      "anteil": null,
+      "e1a": "9200 - Werbung und Repräsentation",
+      "typ": "Online Werbung"
+    },
+    {
+      "anteil": null,
+      "e1a": "9200 - Werbung und Repräsentation",
+      "typ": "Trinkgelder"
+    },
+    {
+      "anteil": null,
+      "e1a": "9200 - Werbung und Repräsentation",
+      "typ": "Allgemeine Spenden"
+    },
+    {
+      "anteil": 0.5,
+      "e1a": "9230 - Übrige Betriebsausgaben",
+      "typ": "Internetzugang 50% privat"
+    },
+    {
+      "anteil": 0.4,
+      "e1a": "9230 - Übrige Betriebsausgaben",
+      "typ": "Handyvertrag 60% privat"
+    },
+    {
+      "anteil": null,
+      "e1a": "9230 - Übrige Betriebsausgaben",
+      "typ": "Büromaterialien"
+    },
+    {
+      "anteil": null,
+      "e1a": "9230 - Übrige Betriebsausgaben",
+      "typ": "Beratungen Buchhalter"
+    },
+    {
+      "anteil": null,
+      "e1a": "9230 - Übrige Betriebsausgaben",
+      "typ": "Fachliteratur"
+    },
+    {
+      "anteil": null,
+      "e1a": "9230 - Übrige Betriebsausgaben",
+      "typ": "Paypal-Gebühren"
+    },
+    {
+      "anteil": null,
+      "e1a": "9230 - Übrige Betriebsausgaben",
+      "typ": "Umsatzsteuerzahlungen (Reverse Charge)"
+    },
+    {
+      "anteil": null,
+      "e1a": "9230 - Übrige Betriebsausgaben",
+      "typ": "WKO-Grundumlagen"
+    },
+    {
+      "anteil": 0,
+      "e1a": null,
+      "typ": "Unternehmer-Lohn"
+    },
+    {
+      "anteil": 0,
+      "e1a": null,
+      "typ": "Private Ausgaben"
+    },
+    {
+      "anteil": null,
+      "e1a": "E1B 9530 - Sonstige Kosten Vermietung",
+      "typ": "Vermietung Ausgaben"
+    }
+  ],
+  "einnahmen_arten": [
+    {
+      "anteil": null,
+      "e1a": "9040 - Betriebseinnahmen",
+      "typ": "Dienstleistung"
+    },
+    {
+      "anteil": null,
+      "e1a": "9040 - Betriebseinnahmen",
+      "typ": "Warenverkauf"
+    },
+    {
+      "anteil": null,
+      "e1a": "9040 - Betriebseinnahmen",
+      "typ": "Private Entnahme"
+    },
+    {
+      "anteil": null,
+      "e1a": "9090 - Übrige Betriebseinnahmen",
+      "typ": "Förderungen"
+    },
+    {
+      "anteil": null,
+      "e1a": "9060 - Erlös abgeg. Anlagegüter",
+      "typ": "Private Entnahme Anlagegüter"
+    },
+    {
+      "anteil": null,
+      "e1a": "9060 - Erlös abgeg. Anlagegüter",
+      "typ": "Verkauf Anlagegüter"
+    },
+    {
+      "anteil": 0,
+      "e1a": null,
+      "typ": "Private Einnahme"
+    },
+    {
+      "anteil": 0,
+      "e1a": null,
+      "typ": "Private Einzahlung"
+    },
+    {
+      "anteil": null,
+      "e1a": "E1B 9460 - Mieteinnahmen",
+      "typ": "Vermietung Einnahmen"
+    }
+  ],
+  "est_tarif": [
+    {
+      "grenze": 13539,
+      "satz": 0.2
+    },
+    {
+      "grenze": 21992,
+      "satz": 0.3
+    },
+    {
+      "grenze": 36458,
+      "satz": 0.4
+    },
+    {
+      "grenze": 70365,
+      "satz": 0.48
+    },
+    {
+      "grenze": 104859,
+      "satz": 0.5
+    }
+  ],
+  "fahrzeuge": [
+    {
+      "name": "Privatauto",
+      "typ": "PKW oder Kombi"
+    },
+    {
+      "name": "Motorrad",
+      "typ": "Motorrad"
+    },
+    {
+      "name": "Fahrrad",
+      "typ": "Fahrrad oder E-Bike"
+    },
+    {
+      "name": "E-Bike",
+      "typ": "Fahrrad oder E-Bike"
+    },
+    {
+      "name": "Flug",
+      "typ": "Andere"
+    },
+    {
+      "name": "Flug (Inland)",
+      "typ": "Andere"
+    },
+    {
+      "name": "Bus",
+      "typ": "Andere"
+    },
+    {
+      "name": "U-Bahn",
+      "typ": "Andere"
+    },
+    {
+      "name": "Zug",
+      "typ": "Andere"
+    },
+    {
+      "name": "Gemischte Öffis",
+      "typ": "Andere"
+    },
+    {
+      "name": "E-Scooter (Verleih)",
+      "typ": "Andere"
+    },
+    {
+      "name": "Taxi",
+      "typ": "Andere"
+    },
+    {
+      "name": "Carsharing",
+      "typ": "Andere"
+    }
+  ],
+  "feiertage": [
+    "2026-01-01",
+    "2026-01-06",
+    "2026-04-06",
+    "2026-05-01",
+    "2026-05-14",
+    "2026-05-25",
+    "2026-06-04",
+    "2026-08-15",
+    "2026-10-26",
+    "2026-11-01",
+    "2026-12-08",
+    "2026-12-25",
+    "2026-12-26"
+  ],
+  "grundfreibetrag": {
+    "grenze": 33000,
+    "satz": 0.15
+  },
+  "projekte": [
+    "Hauptprojekt",
+    "Nebenprojekt",
+    "Vermietung"
+  ],
+  "reise_pauschalen": [
+    {
+      "land": "Österreich",
+      "nacht": 17,
+      "tag": 30
+    },
+    {
+      "land": "Afghanistan",
+      "nacht": 27.7,
+      "tag": 31.8
+    },
+    {
+      "land": "Ägypten",
+      "nacht": 41.4,
+      "tag": 37.9
+    },
+    {
+      "land": "Albanien",
+      "nacht": 20.9,
+      "tag": 27.9
+    },
+    {
+      "land": "Algerien",
+      "nacht": 27,
+      "tag": 41.4
+    },
+    {
+      "land": "Angola",
+      "nacht": 41.4,
+      "tag": 43.6
+    },
+    {
+      "land": "Argentinien",
+      "nacht": 47.3,
+      "tag": 33.1
+    },
+    {
+      "land": "Armenien",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Aserbaidschan",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Äthiopien",
+      "nacht": 41.4,
+      "tag": 37.9
+    },
+    {
+      "land": "Australien",
+      "nacht": 39.9,
+      "tag": 47.3
+    },
+    {
+      "land": "Bahamas",
+      "nacht": 30.5,
+      "tag": 48
+    },
+    {
+      "land": "Bahrein",
+      "nacht": 37.5,
+      "tag": 54.1
+    },
+    {
+      "land": "Bangladesch",
+      "nacht": 34.2,
+      "tag": 31.8
+    },
+    {
+      "land": "Barbados",
+      "nacht": 43.6,
+      "tag": 51
+    },
+    {
+      "land": "Belarus",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Belgien",
+      "nacht": 22.7,
+      "tag": 35.3
+    },
+    {
+      "land": "Belgien: Brüssel",
+      "nacht": 32,
+      "tag": 41.4
+    },
+    {
+      "land": "Benin",
+      "nacht": 26.6,
+      "tag": 36.2
+    },
+    {
+      "land": "Bolivien",
+      "nacht": 25.1,
+      "tag": 26.6
+    },
+    {
+      "land": "Bosnien und Herzegowina",
+      "nacht": 23.3,
+      "tag": 31
+    },
+    {
+      "land": "Brasilien",
+      "nacht": 36.4,
+      "tag": 33.1
+    },
+    {
+      "land": "Brunei",
+      "nacht": 42.1,
+      "tag": 33.1
+    },
+    {
+      "land": "Bulgarien",
+      "nacht": 22.7,
+      "tag": 31
+    },
+    {
+      "land": "Burkina Faso",
+      "nacht": 21.1,
+      "tag": 39.2
+    },
+    {
+      "land": "Burundi",
+      "nacht": 37.9,
+      "tag": 37.9
+    },
+    {
+      "land": "Chile",
+      "nacht": 36.4,
+      "tag": 37.5
+    },
+    {
+      "land": "China",
+      "nacht": 30.5,
+      "tag": 35.1
+    },
+    {
+      "land": "Costa Rica",
+      "nacht": 31.8,
+      "tag": 31.8
+    },
+    {
+      "land": "Côte d'Ivoire",
+      "nacht": 32,
+      "tag": 39.2
+    },
+    {
+      "land": "Dänemark",
+      "nacht": 41.4,
+      "tag": 41.4
+    },
+    {
+      "land": "Demokratische Rep. Kongo",
+      "nacht": 33.1,
+      "tag": 47.3
+    },
+    {
+      "land": "Deutschland",
+      "nacht": 27.9,
+      "tag": 35.3
+    },
+    {
+      "land": "Deutschland: Grenzort",
+      "nacht": 18.1,
+      "tag": 30.7
+    },
+    {
+      "land": "Dominikanische Republik",
+      "nacht": 43.6,
+      "tag": 39.2
+    },
+    {
+      "land": "Dschibuti",
+      "nacht": 47.3,
+      "tag": 45.8
+    },
+    {
+      "land": "Ecuador",
+      "nacht": 21.6,
+      "tag": 26.6
+    },
+    {
+      "land": "El Salvador",
+      "nacht": 26.2,
+      "tag": 31.8
+    },
+    {
+      "land": "Estland",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Finnland",
+      "nacht": 41.4,
+      "tag": 41.4
+    },
+    {
+      "land": "Frankreich",
+      "nacht": 24,
+      "tag": 32.7
+    },
+    {
+      "land": "Frankreich: Paris/Straßburg",
+      "nacht": 32.7,
+      "tag": 35.8
+    },
+    {
+      "land": "Gabun",
+      "nacht": 39.9,
+      "tag": 45.8
+    },
+    {
+      "land": "Gambia",
+      "nacht": 30.1,
+      "tag": 43.6
+    },
+    {
+      "land": "Georgien",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Ghana",
+      "nacht": 30.1,
+      "tag": 43.6
+    },
+    {
+      "land": "Griechenland",
+      "nacht": 23.3,
+      "tag": 28.6
+    },
+    {
+      "land": "Großbritannien und Nordirland",
+      "nacht": 36.4,
+      "tag": 36.8
+    },
+    {
+      "land": "Großbritannien: London",
+      "nacht": 41.4,
+      "tag": 41.4
+    },
+    {
+      "land": "Guatemala",
+      "nacht": 31.8,
+      "tag": 31.8
+    },
+    {
+      "land": "Guinea",
+      "nacht": 30.1,
+      "tag": 43.6
+    },
+    {
+      "land": "Guyana",
+      "nacht": 34.2,
+      "tag": 39.2
+    },
+    {
+      "land": "Haiti",
+      "nacht": 27.7,
+      "tag": 39.2
+    },
+    {
+      "land": "Honduras",
+      "nacht": 27,
+      "tag": 31.8
+    },
+    {
+      "land": "Hongkong",
+      "nacht": 37.9,
+      "tag": 46.4
+    },
+    {
+      "land": "Indien",
+      "nacht": 39.9,
+      "tag": 31.8
+    },
+    {
+      "land": "Indonesien",
+      "nacht": 32,
+      "tag": 39.2
+    },
+    {
+      "land": "Irak",
+      "nacht": 36.4,
+      "tag": 54.1
+    },
+    {
+      "land": "Iran",
+      "nacht": 29,
+      "tag": 37.1
+    },
+    {
+      "land": "Irland",
+      "nacht": 33.1,
+      "tag": 36.8
+    },
+    {
+      "land": "Island",
+      "nacht": 31.4,
+      "tag": 37.9
+    },
+    {
+      "land": "Israel",
+      "nacht": 32.5,
+      "tag": 37.1
+    },
+    {
+      "land": "Italien",
+      "nacht": 27.9,
+      "tag": 35.8
+    },
+    {
+      "land": "Italien: Grenzorte",
+      "nacht": 18.1,
+      "tag": 30.7
+    },
+    {
+      "land": "Italien: Rom/Mailand",
+      "nacht": 36.4,
+      "tag": 40.6
+    },
+    {
+      "land": "Jamaika",
+      "nacht": 47.1,
+      "tag": 47.1
+    },
+    {
+      "land": "Japan",
+      "nacht": 42.9,
+      "tag": 65.6
+    },
+    {
+      "land": "Jemen",
+      "nacht": 37.5,
+      "tag": 54.1
+    },
+    {
+      "land": "Jordanien",
+      "nacht": 32.5,
+      "tag": 37.1
+    },
+    {
+      "land": "Jugoslawien",
+      "nacht": 23.3,
+      "tag": 31
+    },
+    {
+      "land": "Kambodscha",
+      "nacht": 31.4,
+      "tag": 31.4
+    },
+    {
+      "land": "Kamerun",
+      "nacht": 25.3,
+      "tag": 45.8
+    },
+    {
+      "land": "Kanada",
+      "nacht": 34.2,
+      "tag": 41
+    },
+    {
+      "land": "Kap Verde",
+      "nacht": 19.6,
+      "tag": 27.9
+    },
+    {
+      "land": "Kasachstan",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Katar",
+      "nacht": 37.5,
+      "tag": 54.1
+    },
+    {
+      "land": "Kenia",
+      "nacht": 32,
+      "tag": 34.9
+    },
+    {
+      "land": "Kirgisistan",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Kolumbien",
+      "nacht": 35.1,
+      "tag": 33.1
+    },
+    {
+      "land": "Korea, Dem. Volksrepublik",
+      "nacht": 32.5,
+      "tag": 32.5
+    },
+    {
+      "land": "Korea, Republik",
+      "nacht": 32.5,
+      "tag": 45.3
+    },
+    {
+      "land": "Kroatien",
+      "nacht": 23.3,
+      "tag": 31
+    },
+    {
+      "land": "Kuba",
+      "nacht": 27.7,
+      "tag": 54.1
+    },
+    {
+      "land": "Kuwait",
+      "nacht": 37.5,
+      "tag": 54.1
+    },
+    {
+      "land": "Laos",
+      "nacht": 31.4,
+      "tag": 31.4
+    },
+    {
+      "land": "Lettland",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Libanon",
+      "nacht": 35.1,
+      "tag": 31.8
+    },
+    {
+      "land": "Liberia",
+      "nacht": 41.4,
+      "tag": 39.2
+    },
+    {
+      "land": "Libyen",
+      "nacht": 36.4,
+      "tag": 43.6
+    },
+    {
+      "land": "Liechtenstein",
+      "nacht": 18.1,
+      "tag": 30.7
+    },
+    {
+      "land": "Litauen",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Luxemburg",
+      "nacht": 22.7,
+      "tag": 35.3
+    },
+    {
+      "land": "Madagaskar",
+      "nacht": 36.4,
+      "tag": 36.4
+    },
+    {
+      "land": "Malawi",
+      "nacht": 32.7,
+      "tag": 32.7
+    },
+    {
+      "land": "Malaysia",
+      "nacht": 45.1,
+      "tag": 43.6
+    },
+    {
+      "land": "Mali",
+      "nacht": 31.2,
+      "tag": 39.2
+    },
+    {
+      "land": "Malta",
+      "nacht": 30.1,
+      "tag": 30.1
+    },
+    {
+      "land": "Marokko",
+      "nacht": 21.8,
+      "tag": 32.7
+    },
+    {
+      "land": "Mauretanien",
+      "nacht": 31.2,
+      "tag": 33.8
+    },
+    {
+      "land": "Mauritius",
+      "nacht": 36.4,
+      "tag": 36.4
+    },
+    {
+      "land": "Mexiko",
+      "nacht": 36.4,
+      "tag": 41
+    },
+    {
+      "land": "Moldau",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Mongolei",
+      "nacht": 29.4,
+      "tag": 29.4
+    },
+    {
+      "land": "Mosambik",
+      "nacht": 41.4,
+      "tag": 43.6
+    },
+    {
+      "land": "Myanmar",
+      "nacht": 29.4,
+      "tag": 29.4
+    },
+    {
+      "land": "Namibia",
+      "nacht": 34,
+      "tag": 34.9
+    },
+    {
+      "land": "Nepal",
+      "nacht": 34.2,
+      "tag": 31.8
+    },
+    {
+      "land": "Neuseeland",
+      "nacht": 36.4,
+      "tag": 32.5
+    },
+    {
+      "land": "Nicaragua",
+      "nacht": 36.4,
+      "tag": 31.8
+    },
+    {
+      "land": "Niederlande",
+      "nacht": 27.9,
+      "tag": 35.3
+    },
+    {
+      "land": "Niederländische Antillen",
+      "nacht": 27.7,
+      "tag": 43.6
+    },
+    {
+      "land": "Niger",
+      "nacht": 21.1,
+      "tag": 39.2
+    },
+    {
+      "land": "Nigeria",
+      "nacht": 34.2,
+      "tag": 39.2
+    },
+    {
+      "land": "Norwegen",
+      "nacht": 41.4,
+      "tag": 42.9
+    },
+    {
+      "land": "Oman",
+      "nacht": 37.5,
+      "tag": 54.1
+    },
+    {
+      "land": "Pakistan",
+      "nacht": 25.1,
+      "tag": 27.7
+    },
+    {
+      "land": "Panama",
+      "nacht": 36.4,
+      "tag": 43.6
+    },
+    {
+      "land": "Paraguay",
+      "nacht": 25.1,
+      "tag": 33.1
+    },
+    {
+      "land": "Peru",
+      "nacht": 25.1,
+      "tag": 33.1
+    },
+    {
+      "land": "Philippinen",
+      "nacht": 32.5,
+      "tag": 32.5
+    },
+    {
+      "land": "Polen",
+      "nacht": 25.1,
+      "tag": 32.7
+    },
+    {
+      "land": "Portugal",
+      "nacht": 22.7,
+      "tag": 27.9
+    },
+    {
+      "land": "Republik Kongo",
+      "nacht": 26.8,
+      "tag": 39.2
+    },
+    {
+      "land": "Ruanda",
+      "nacht": 37.9,
+      "tag": 37.9
+    },
+    {
+      "land": "Rumänien",
+      "nacht": 27.3,
+      "tag": 36.8
+    },
+    {
+      "land": "Russ. Föderation: Moskau",
+      "nacht": 31,
+      "tag": 40.6
+    },
+    {
+      "land": "Russische Föderation",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Sambia",
+      "nacht": 34,
+      "tag": 37.1
+    },
+    {
+      "land": "Saudi-Arabien",
+      "nacht": 37.5,
+      "tag": 54.1
+    },
+    {
+      "land": "Schweden",
+      "nacht": 41.4,
+      "tag": 42.9
+    },
+    {
+      "land": "Schweiz",
+      "nacht": 32.7,
+      "tag": 36.8
+    },
+    {
+      "land": "Schweiz: Grenzorte",
+      "nacht": 18.1,
+      "tag": 30.7
+    },
+    {
+      "land": "Senegal",
+      "nacht": 31.2,
+      "tag": 49.3
+    },
+    {
+      "land": "Seychellen",
+      "nacht": 36.4,
+      "tag": 36.4
+    },
+    {
+      "land": "Sierra Leone",
+      "nacht": 34.2,
+      "tag": 43.6
+    },
+    {
+      "land": "Simbabwe",
+      "nacht": 34,
+      "tag": 37.1
+    },
+    {
+      "land": "Singapur",
+      "nacht": 44.7,
+      "tag": 43.6
+    },
+    {
+      "land": "Slowakei",
+      "nacht": 15.9,
+      "tag": 27.9
+    },
+    {
+      "land": "Slowakei: Bratislava",
+      "nacht": 24.4,
+      "tag": 31
+    },
+    {
+      "land": "Slowenien",
+      "nacht": 23.3,
+      "tag": 31
+    },
+    {
+      "land": "Slowenien: Grenzorte",
+      "nacht": 15.9,
+      "tag": 27.9
+    },
+    {
+      "land": "Somalia",
+      "nacht": 29,
+      "tag": 32.7
+    },
+    {
+      "land": "Spanien",
+      "nacht": 30.5,
+      "tag": 34.2
+    },
+    {
+      "land": "Sri Lanka",
+      "nacht": 32.7,
+      "tag": 31.8
+    },
+    {
+      "land": "Südafrika",
+      "nacht": 34,
+      "tag": 34.9
+    },
+    {
+      "land": "Sudan",
+      "nacht": 41.4,
+      "tag": 43.6
+    },
+    {
+      "land": "Suriname",
+      "nacht": 25.1,
+      "tag": 39.2
+    },
+    {
+      "land": "Syrien",
+      "nacht": 29,
+      "tag": 32.7
+    },
+    {
+      "land": "Tadschikistan",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Taiwan",
+      "nacht": 37.5,
+      "tag": 39.2
+    },
+    {
+      "land": "Tansania",
+      "nacht": 32,
+      "tag": 43.6
+    },
+    {
+      "land": "Thailand",
+      "nacht": 42.1,
+      "tag": 39.2
+    },
+    {
+      "land": "Togo",
+      "nacht": 26.6,
+      "tag": 36.2
+    },
+    {
+      "land": "Trinidad, Tobago",
+      "nacht": 43.6,
+      "tag": 51
+    },
+    {
+      "land": "Tschad",
+      "nacht": 26.6,
+      "tag": 36.2
+    },
+    {
+      "land": "Tschechien",
+      "nacht": 24.4,
+      "tag": 31
+    },
+    {
+      "land": "Tschechien: Grenzorte",
+      "nacht": 15.9,
+      "tag": 27.9
+    },
+    {
+      "land": "Tunesien",
+      "nacht": 29.2,
+      "tag": 36.2
+    },
+    {
+      "land": "Türkei",
+      "nacht": 36.4,
+      "tag": 31
+    },
+    {
+      "land": "Turkmenistan",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Uganda",
+      "nacht": 32,
+      "tag": 41.4
+    },
+    {
+      "land": "Ukraine",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Ungarn",
+      "nacht": 26.6,
+      "tag": 26.6
+    },
+    {
+      "land": "Ungarn: Budapest",
+      "nacht": 26.6,
+      "tag": 31
+    },
+    {
+      "land": "Ungarn: Grenzorte",
+      "nacht": 18.1,
+      "tag": 26.6
+    },
+    {
+      "land": "Uruguay",
+      "nacht": 25.1,
+      "tag": 33.1
+    },
+    {
+      "land": "USA",
+      "nacht": 42.9,
+      "tag": 52.3
+    },
+    {
+      "land": "USA: New York/Washington",
+      "nacht": 51,
+      "tag": 65.4
+    },
+    {
+      "land": "Usbekistan",
+      "nacht": 31,
+      "tag": 36.8
+    },
+    {
+      "land": "Venezuela",
+      "nacht": 35.1,
+      "tag": 39.2
+    },
+    {
+      "land": "Ver. Arabische Emirate",
+      "nacht": 37.5,
+      "tag": 54.1
+    },
+    {
+      "land": "Vietnam",
+      "nacht": 31.4,
+      "tag": 31.4
+    },
+    {
+      "land": "Zentralafrik. Republik",
+      "nacht": 29,
+      "tag": 39.2
+    },
+    {
+      "land": "Zypern",
+      "nacht": 30.5,
+      "tag": 28.6
+    }
+  ],
+  "sv_werte": {
+    "fsvg_pv_min": 110.22,
+    "fsvg_pv_satz": 0.2,
+    "gsvg_ns_pv_min": 101.95,
+    "gsvg_pv_min": 101.95,
+    "gsvg_pv_satz": 0.185,
+    "kv_min": 37.47,
+    "kv_satz": 0.068,
+    "max_bgl": 8085,
+    "svs_satz": 0.0153,
+    "uv_pauschale": 12.95
+  },
+  "tag_nacht_pauschale_at": {
+    "nacht": 17,
+    "tag": 30
+  },
+  "ust_arten": [
+    "Reverse Charge 20 %",
+    "Reverse Charge 13 %",
+    "Reverse Charge 10 %",
+    "IG-Erwerb 20 %",
+    "IG-Erwerb 10 %",
+    "IG-Erwerb 13 %",
+    "IG-Erwerb 4.9 %"
+  ],
+  "zahlarten": [
+    {
+      "art": "Bankkonto",
+      "startsaldo": null
+    },
+    {
+      "art": "Bar",
+      "startsaldo": null
+    }
+  ]
+}

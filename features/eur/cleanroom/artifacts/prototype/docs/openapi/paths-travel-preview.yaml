@@ -1,0 +1,19 @@
+post:
+  operationId: previewTravelRow
+  summary: Compute an unsaved travel row (live UI warnings)
+  description: |
+    Runs the exact same engine path as a stored row without persisting it.
+    The Reisen tab uses this for the live preview and warning popovers.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './schemas.yaml#/TravelRowInput' }
+  responses:
+    '200':
+      description: Costs, derived share, day limits and warnings.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/TravelPreview' }
+    '422':
+      $ref: '#/components/responses/Validation'

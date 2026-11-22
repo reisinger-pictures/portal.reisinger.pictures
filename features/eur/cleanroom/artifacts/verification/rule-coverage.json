@@ -1,0 +1,1366 @@
+{
+  "EUE-001": {
+    "status": "covered",
+    "unit": [
+      "EUE-001 /api/analytics/income-kinds rejects year '2027'",
+      "EUE-001 /api/monthly rejects year 'abc'",
+      "EUE-001 unused year has a blank matrix and ✓✓",
+      "EUE-001 row-check endpoint /api/monthly accepts the configured year"
+    ],
+    "e2e": [
+      "Wirtschaftsjahr steuert Überschriften, API und Gültigkeitsbereich",
+      "Der monatliche Mindest-SV-Sockel folgt dem SV-Modus"
+    ]
+  },
+  "EUE-002": {
+    "status": "covered",
+    "unit": [
+      "EUE-002 exact workbook warning text",
+      "EUE-002 settings year-warning endpoint",
+      "EUE-002 overview payload carries the warning without blocking"
+    ],
+    "e2e": [
+      "Kompatibilitätswarnungen erscheinen nicht blockierend in den Einstellungen"
+    ]
+  },
+  "EUE-003": {
+    "status": "covered",
+    "unit": [
+      "EUE-003 exact workbook warning text",
+      "EUE-003 settings year-warning endpoint"
+    ],
+    "e2e": [
+      "Kompatibilitätswarnungen erscheinen nicht blockierend in den Einstellungen"
+    ]
+  },
+  "EUE-004": {
+    "status": "covered",
+    "unit": [
+      "company settings upsert persists",
+      "ÖNACE outside 11-990 is rejected"
+    ],
+    "e2e": [
+      "Einstellungen werden bearbeitet und bleiben nach dem Neuladen erhalten",
+      "Kennzahlen-Referenz zeigt E1A-Codes mit Text und Beispiel"
+    ]
+  },
+  "EUE-005": {
+    "status": "covered",
+    "unit": [
+      "settings endpoint returns the full tenant payload",
+      "settings writes are audited"
+    ],
+    "e2e": [
+      "Einstellungen werden bearbeitet und bleiben nach dem Neuladen erhalten",
+      "Kennzahlen-Referenz zeigt E1A-Codes mit Text und Beispiel"
+    ]
+  },
+  "EUE-006": {
+    "status": "covered",
+    "unit": [
+      "two customers are created for aggregation",
+      "projects are created under their customers"
+    ],
+    "e2e": [
+      "Buchung mit Kunde/Projekt und gefilterte Übersicht",
+      "Einstellungen werden bearbeitet und bleiben nach dem Neuladen erhalten",
+      "Kennzahlen-Referenz zeigt E1A-Codes mit Text und Beispiel"
+    ]
+  },
+  "EUE-007": {
+    "status": "covered",
+    "unit": [
+      "expense catalogue covers 27 distinct E1A codes",
+      "unknown E1A code is rejected"
+    ],
+    "e2e": [
+      "Einstellungen werden bearbeitet und bleiben nach dem Neuladen erhalten",
+      "Kennzahlen-Referenz zeigt E1A-Codes mit Text und Beispiel"
+    ]
+  },
+  "EUE-008": {
+    "status": "covered",
+    "unit": [
+      "every catalogue code has a help text",
+      "settings endpoint returns the full tenant payload"
+    ],
+    "e2e": [
+      "Einstellungen werden bearbeitet und bleiben nach dem Neuladen erhalten",
+      "Kennzahlen-Referenz zeigt E1A-Codes mit Text und Beispiel"
+    ]
+  },
+  "EUE-009": {
+    "status": "covered",
+    "unit": [
+      "default share outside 5 % steps is rejected",
+      "entry type keeps code and 60 % default share"
+    ],
+    "e2e": [
+      "Buchungen mit Betriebsanteil in 5-%-Schritten",
+      "Einstellungen werden bearbeitet und bleiben nach dem Neuladen erhalten",
+      "Kennzahlen-Referenz zeigt E1A-Codes mit Text und Beispiel"
+    ]
+  },
+  "EUE-010": {
+    "status": "covered",
+    "unit": [
+      "settings endpoint returns the full tenant payload"
+    ],
+    "e2e": [
+      "Einstellungen werden bearbeitet und bleiben nach dem Neuladen erhalten",
+      "Kennzahlen-Referenz zeigt E1A-Codes mit Text und Beispiel"
+    ]
+  },
+  "EUE-011": {
+    "status": "covered",
+    "unit": [
+      "settings endpoint returns the full tenant payload"
+    ],
+    "e2e": [
+      "Einstellungen werden bearbeitet und bleiben nach dem Neuladen erhalten",
+      "Kennzahlen-Referenz zeigt E1A-Codes mit Text und Beispiel"
+    ]
+  },
+  "EUE-012": {
+    "status": "covered",
+    "unit": [
+      "thirteen holidays are computed for 2026",
+      "holidays are computed for 2024 as well"
+    ],
+    "e2e": [
+      "Werktage zählen Feiertage mit: 24.–26.12.2025 ist ein Werktag (EUE-012/074)"
+    ]
+  },
+  "EUE-013": {
+    "status": "covered",
+    "unit": [
+      "Austrian per-diem rates for 2025",
+      "Austrian per-diem rates for 2024",
+      "foreign per-diem rates are available",
+      "travel rates API returns the country table",
+      "travel rates API carries the Austrian day rate"
+    ],
+    "e2e": [
+      "Reise zeigt Taggeld und Nächtigungspauschale und übernimmt die Summe"
+    ]
+  },
+  "EUE-014": {
+    "status": "covered",
+    "unit": [
+      "year table exposes the annual cap in cents",
+      "contribution base is capped at 12 x the monthly maximum (EUE-109)"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-015": {
+    "status": "covered",
+    "unit": [
+      "GSVG KV = 6.8 % of the contribution base"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-016": {
+    "status": "covered",
+    "unit": [
+      "zero profit produces the minimum KV/PV block (EUE-113)"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-017": {
+    "status": "covered",
+    "unit": [
+      "zero profit produces the minimum KV/PV block (EUE-113)"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-018": {
+    "status": "covered",
+    "unit": [
+      "zero profit FSVG uses its own minimum PV (EUE-018)",
+      "FSVG PV uses the 20 % rate"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-019": {
+    "status": "covered",
+    "unit": [
+      "GSVG PV = 18.5 % of the contribution base"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-020": {
+    "status": "covered",
+    "unit": [
+      "FSVG PV uses the 20 % rate"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-021": {
+    "status": "covered",
+    "unit": [
+      "GSVG SVS = 1.53 % of the contribution base"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-022": {
+    "status": "covered",
+    "unit": [
+      "UV yearly lump sum is 12 x the monthly rate"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-023": {
+    "status": "covered",
+    "unit": [
+      "all 32 E1A/E1B codes have a one-sentence text and an example",
+      "expense catalogue covers 27 distinct E1A codes"
+    ],
+    "e2e": [
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen",
+      "Ausfüllhilfe: Betriebsanteil, Kunde und Projekt in der Buchung",
+      "Einstellungen werden bearbeitet und bleiben nach dem Neuladen erhalten",
+      "Kennzahlen-Referenz zeigt E1A-Codes mit Text und Beispiel"
+    ]
+  },
+  "EUE-024": {
+    "status": "covered",
+    "unit": [
+      "all 32 E1A/E1B codes have a one-sentence text and an example"
+    ],
+    "e2e": [
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen",
+      "Ausfüllhilfe: Betriebsanteil, Kunde und Projekt in der Buchung",
+      "Einstellungen werden bearbeitet und bleiben nach dem Neuladen erhalten",
+      "Kennzahlen-Referenz zeigt E1A-Codes mit Text und Beispiel"
+    ]
+  },
+  "EUE-025": {
+    "status": "not-applicable",
+    "reason": "Duplikatwarnung einer editierbaren Stammdatenliste, die es im Prototyp nicht gibt."
+  },
+  "EUE-026": {
+    "status": "not-applicable",
+    "reason": "Duplikatwarnung einer editierbaren Stammdatenliste, die es im Prototyp nicht gibt."
+  },
+  "EUE-027": {
+    "status": "not-applicable",
+    "reason": "Duplikatwarnung einer editierbaren Stammdatenliste, die es im Prototyp nicht gibt."
+  },
+  "EUE-028": {
+    "status": "not-applicable",
+    "reason": "Duplikatwarnung einer editierbaren Stammdatenliste, die es im Prototyp nicht gibt."
+  },
+  "EUE-029": {
+    "status": "not-applicable",
+    "reason": "Verwendungsanzeige (❯/99+) ist ein Arbeitsmappen-UI-Artefakt."
+  },
+  "EUE-030": {
+    "status": "covered",
+    "unit": [
+      "ÖNACE outside 11-990 is rejected",
+      "default share outside 5 % steps is rejected",
+      "unknown SV mode is rejected"
+    ],
+    "e2e": [
+      "Einstellungen werden bearbeitet und bleiben nach dem Neuladen erhalten",
+      "Kennzahlen-Referenz zeigt E1A-Codes mit Text und Beispiel"
+    ]
+  },
+  "EUE-031": {
+    "status": "covered",
+    "unit": [
+      "business income aggregated"
+    ],
+    "e2e": [
+      "Buchungen mit Betriebsanteil in 5-%-Schritten"
+    ]
+  },
+  "EUE-032": {
+    "status": "covered",
+    "unit": [
+      "EUE-032 mapped income Kennzahl 9040",
+      "EUE-032 income fallback 9040 for unmapped kind",
+      "EUE-032 private income gets no Kennzahl and no business income"
+    ],
+    "e2e": [
+      "E1A-Fallbacks, Zeilenwarnungen und Hilfe im Buchungsdialog"
+    ]
+  },
+  "EUE-033": {
+    "status": "covered",
+    "unit": [
+      "business income aggregated",
+      "private share kept separate"
+    ],
+    "e2e": [
+      "Buchungen mit Betriebsanteil in 5-%-Schritten"
+    ]
+  },
+  "EUE-034": {
+    "status": "covered",
+    "unit": [
+      "EUE-034 rental income carries E1B 9460",
+      "EUE-034 rental income excluded from business income",
+      "EUE-034 journals totals separate E1B rent from E1A income"
+    ],
+    "e2e": [
+      "Mieteinnahmen landen in E1B 9460 und nicht in den Betriebseinnahmen"
+    ]
+  },
+  "EUE-035": {
+    "status": "not-applicable",
+    "reason": "Laufende Journalnummern ersetzt die Datenbank-ID."
+  },
+  "EUE-036": {
+    "status": "covered",
+    "unit": [
+      "EUE-036 bullet \"• Belegnummer fehlt.\"",
+      "EUE-036 bullet \"• Tag fehlt.\"",
+      "EUE-036 \"⚠ Monat fehlt.\"",
+      "EUE-036 undefined income type warning",
+      "EUE-036 missing income type warning"
+    ],
+    "e2e": [
+      "E1A-Fallbacks, Zeilenwarnungen und Hilfe im Buchungsdialog"
+    ]
+  },
+  "EUE-037": {
+    "status": "covered",
+    "unit": [
+      "EUE-036/037 \"⚠ Ungültiger Monat.\"",
+      "EUE-037 twelve German month names",
+      "EUE-037 day range 1–31",
+      "EUE-037 invalid month name rejected with 422",
+      "EUE-037 rejects an impossible acquisition date",
+      "EUE-037 expense day 32 rejected with 422"
+    ],
+    "e2e": [
+      "E1A-Fallbacks, Zeilenwarnungen und Hilfe im Buchungsdialog",
+      "Katalog-Lücken und ungültige Monate werden über die API gemeldet"
+    ]
+  },
+  "EUE-038": {
+    "status": "covered",
+    "unit": [
+      "business expenses apply 50 % share"
+    ],
+    "e2e": [
+      "Buchungen mit Betriebsanteil in 5-%-Schritten"
+    ]
+  },
+  "EUE-039": {
+    "status": "covered",
+    "unit": [
+      "EUE-039 IG-Erwerb 20 % → 20000/0 ct",
+      "EUE-039 IG-Erwerb 10 % → 10000/0 ct",
+      "EUE-039 IG-Erwerb 13 % → 13000/0 ct",
+      "EUE-039 IG-Erwerb 4,9 % → 4900/0 ct",
+      "EUE-039 exact fraction rounds 19 ct × 1/10 half-up to 2 ct"
+    ],
+    "e2e": [
+      "IG-Erwerb und Reverse Charge werden je Zeile in Cent gerechnet"
+    ]
+  },
+  "EUE-040": {
+    "status": "covered",
+    "unit": [
+      "EUE-040 Reverse Charge 20 % → 0/20000 ct",
+      "EUE-040 Reverse Charge 13 % → 0/13000 ct",
+      "EUE-040 Reverse Charge 10 % → 0/10000 ct",
+      "EUE-040 no 4.9 % reverse-charge rate"
+    ],
+    "e2e": [
+      "IG-Erwerb und Reverse Charge werden je Zeile in Cent gerechnet"
+    ]
+  },
+  "EUE-041": {
+    "status": "covered",
+    "unit": [
+      "EUE-041 mapped expense Kennzahl 9190",
+      "EUE-041 expense fallback 9230"
+    ],
+    "e2e": [
+      "E1A-Fallbacks, Zeilenwarnungen und Hilfe im Buchungsdialog"
+    ]
+  },
+  "EUE-042": {
+    "status": "covered",
+    "unit": [
+      "EUE-042 exact receipt-duty warning",
+      "EUE-042 unknown USt-Art warning",
+      "EUE-042 FSVG suppresses the WEB lookup",
+      "EUE-042 FSVG suppresses the reconciliation goods warning"
+    ],
+    "e2e": [
+      "E1A-Fallbacks, Zeilenwarnungen und Hilfe im Buchungsdialog"
+    ]
+  },
+  "EUE-043": {
+    "status": "covered",
+    "unit": [
+      "EUE-043 goods purchase without WEB row warns",
+      "EUE-043 WEB row removes the goods-purchase warning",
+      "EUE-043 reconciliation reports the missing WEB row"
+    ],
+    "e2e": [
+      "Abgleich meldet fehlende und gefundene Belege im A-Blatt"
+    ]
+  },
+  "EUE-044": {
+    "status": "not-applicable",
+    "reason": "Laufende Journalnummern ersetzt die Datenbank-ID."
+  },
+  "EUE-045": {
+    "status": "covered",
+    "unit": [
+      "EUE-045 WE row derives 100 % and 100000 ct",
+      "EUE-045 Klimaticket derives 50 % and 50000 ct",
+      "EUE-045 explicit 60 % share rounds 100000 ct to 60000 ct",
+      "EUE-045 WEB row round-trip keeps cents and share"
+    ],
+    "e2e": [
+      "Wareneingang speichert Cent-Beträge und zeigt die Plausibilität"
+    ]
+  },
+  "EUE-046": {
+    "status": "covered",
+    "unit": [
+      "EUE-046 \"• Betr. Ausgabe im A-Blatt unter #1 zu finden\"",
+      "EUE-046 \"⚠ Belegnummer im A-Blatt nicht gefunden\"",
+      "EUE-046 \"• Belegnummer aus A-Blatt fehlt noch!\"",
+      "EUE-046 reconciliation message matches the row warning"
+    ],
+    "e2e": [
+      "Abgleich meldet fehlende und gefundene Belege im A-Blatt"
+    ]
+  },
+  "EUE-047": {
+    "status": "covered",
+    "unit": [
+      "EUE-047 ⚠ Monat fehlt",
+      "EUE-047 ⚠ Lieferant fehlt",
+      "EUE-047 undefined WEB expense type",
+      "EUE-047 WEB day 32 rejected"
+    ],
+    "e2e": [
+      "Wareneingang speichert Cent-Beträge und zeigt die Plausibilität"
+    ]
+  },
+  "EUE-048": {
+    "status": "covered",
+    "unit": [
+      "private share kept separate"
+    ],
+    "e2e": [
+      "Buchungen mit Betriebsanteil in 5-%-Schritten"
+    ]
+  },
+  "EUE-049": {
+    "status": "covered",
+    "unit": [
+      "AfA March uses the full-year factor",
+      "AfA July uses the half-year factor",
+      "AfA December uses the half-year factor",
+      "AfA chain is 400,00 / 400,00 / 399,99 for 1.200,00 € over 3 years"
+    ],
+    "e2e": [
+      "Anlage aus Buchung anlegen und AfA-Verlauf prüfen",
+      "Jahresabschluss bucht zwei Anlagegüter und ist idempotent"
+    ]
+  },
+  "EUE-050": {
+    "status": "covered",
+    "unit": [
+      "book value floor is 0,01 €",
+      "AfA plan for 5 years sums to cost plus book value"
+    ],
+    "e2e": [
+      "Anlage aus Buchung anlegen und AfA-Verlauf prüfen",
+      "Verkauf zeigt Status und Buchwertabgang (E1A 9210)"
+    ]
+  },
+  "EUE-051": {
+    "status": "covered",
+    "unit": [
+      "GWG hint applies below 1.000,00 € only",
+      "exactly 1.000,00 € produces no GWG hint"
+    ],
+    "e2e": [
+      "Ausfüllhilfe in Anlagen: Nutzungsdauer, Halbjahresregel, GWG, Anteile"
+    ]
+  },
+  "EUE-052": {
+    "status": "covered",
+    "unit": [
+      "useful life 1 is rejected",
+      "useful life 100 is rejected",
+      "useful life 0 produces no AfA"
+    ],
+    "e2e": [
+      "Ausfüllhilfe in Anlagen: Nutzungsdauer, Halbjahresregel, GWG, Anteile",
+      "Nutzungsdauer und Betriebsanteil: nur gültige Auswahl, API weist Fälschungen zurück (EUE-052/053/054)"
+    ]
+  },
+  "EUE-053": {
+    "status": "covered",
+    "unit": [
+      "EUE-053 rejects an expense type without an AfA code"
+    ],
+    "e2e": [
+      "Nutzungsdauer und Betriebsanteil: nur gültige Auswahl, API weist Fälschungen zurück (EUE-052/053/054)"
+    ]
+  },
+  "EUE-054": {
+    "status": "covered",
+    "unit": [
+      "EUE-054 rejects a business share below 50 %",
+      "a non-multiple of 5 share is rejected"
+    ],
+    "e2e": [
+      "Nutzungsdauer und Betriebsanteil: nur gültige Auswahl, API weist Fälschungen zurück (EUE-052/053/054)"
+    ]
+  },
+  "EUE-055": {
+    "status": "covered",
+    "unit": [
+      "EUE-055 warns with amount and invoice number when the acquisition has a private share"
+    ],
+    "e2e": [
+      "Verkauf zeigt Status und Buchwertabgang (E1A 9210)"
+    ]
+  },
+  "EUE-056": {
+    "status": "covered",
+    "unit": [
+      "EUE-056 flags the corrected AfA against cost/life with the expected amount",
+      "EUE-056 detects an implausible AfA"
+    ],
+    "e2e": [
+      "Jahreskorrektur mit Begründung zeigt AfA- und Kettenwarnung (EUE-056/057)"
+    ]
+  },
+  "EUE-057": {
+    "status": "covered",
+    "unit": [
+      "EUE-057 reports a broken book-value chain",
+      "EUE-057 keeps booked years immutable when the economics change",
+      "EUE-057 detects a broken book-value chain"
+    ],
+    "e2e": [
+      "Jahreskorrektur mit Begründung zeigt AfA- und Kettenwarnung (EUE-056/057)"
+    ]
+  },
+  "EUE-058": {
+    "status": "covered",
+    "unit": [
+      "EUE-058 rejects a future acquisition year"
+    ],
+    "e2e": [
+      "Formular meldet fehlende Belegnummer und Zukunftsjahr"
+    ]
+  },
+  "EUE-059": {
+    "status": "covered",
+    "unit": [
+      "EUE-059 requires an invoice number",
+      "B05 field help is available through the settings catalogue"
+    ],
+    "e2e": [
+      "Formular meldet fehlende Belegnummer und Zukunftsjahr"
+    ]
+  },
+  "EUE-060": {
+    "status": "not-applicable",
+    "reason": "Laufende Anlagennummern ersetzt die Datenbank-ID."
+  },
+  "EUE-061": {
+    "status": "covered",
+    "unit": [
+      "EUE-061 shows the AfA code of the expense type"
+    ],
+    "e2e": [
+      "Anlage aus Buchung anlegen und AfA-Verlauf prüfen"
+    ]
+  },
+  "EUE-062": {
+    "status": "covered",
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Reise anlegen: Sätze, Distanz und Summe werden aus den Zeilen übernommen (EUE-062/067/081)",
+      "prototype/frontend/e2e/travel-rules.spec.js: Satzwechsel, Mitfahrer und Distanzen erscheinen in der Reisezeile (EUE-063/064/066/067)"
+    ],
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-062 100 km car 2024 = 4200 ct",
+      "prototype/backend/tests/smoke/travel.php: EUE-062 car 2025 + 6 = 14000 ct"
+    ]
+  },
+  "EUE-063": {
+    "status": "covered",
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Satzwechsel, Mitfahrer und Distanzen erscheinen in der Reisezeile (EUE-063/064/066/067)"
+    ],
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-063 moto 30.06.2025 + 2 clamped = 6500 ct",
+      "prototype/backend/tests/smoke/travel.php: EUE-063 moto 01.07.2025 + 1 = 4000 ct"
+    ]
+  },
+  "EUE-064": {
+    "status": "covered",
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Satzwechsel, Mitfahrer und Distanzen erscheinen in der Reisezeile (EUE-063/064/066/067)"
+    ],
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-064 bike 30.06.2025 = 5000 ct",
+      "prototype/backend/tests/smoke/travel.php: EUE-064 bike 01.07.2025 = 2500 ct"
+    ]
+  },
+  "EUE-065": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-065 car 29999 → 1 km",
+      "prototype/backend/tests/smoke/travel.php: EUE-065 quota warning stored",
+      "prototype/backend/tests/smoke/travel.php: EUE-065 bike 2025 2999 → 1 km"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Kontingentgrenze erzeugt eine sichtbare Warnung (EUE-065)"
+    ]
+  },
+  "EUE-066": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-066 7 car passengers clamped to 6 with warning",
+      "prototype/backend/tests/smoke/travel.php: EUE-066 bicycle passenger warned"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Satzwechsel, Mitfahrer und Distanzen erscheinen in der Reisezeile (EUE-063/064/066/067)"
+    ]
+  },
+  "EUE-067": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-067 odometer pair derives 50 km",
+      "prototype/backend/tests/smoke/travel.php: EUE-067 distance derives 50 km"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Reise anlegen: Sätze, Distanz und Summe werden aus den Zeilen übernommen (EUE-062/067/081)",
+      "prototype/frontend/e2e/travel-rules.spec.js: Satzwechsel, Mitfahrer und Distanzen erscheinen in der Reisezeile (EUE-063/064/066/067)"
+    ]
+  },
+  "EUE-068": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-068 full day domestic = 3000 ct",
+      "prototype/backend/tests/smoke/travel.php: EUE-068 two meals abroad = one third (1177 ct)"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Mahlzeiten, Nächtigung und 5-/15-Tage-Regel werden in der Zeile ausgewiesen (EUE-068/069/070/074)"
+    ]
+  },
+  "EUE-069": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-069 domestic flat 450 ct",
+      "prototype/backend/tests/smoke/travel.php: EUE-069 country table 2790 × 3 = 8370 ct"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Mahlzeiten, Nächtigung und 5-/15-Tage-Regel werden in der Zeile ausgewiesen (EUE-068/069/070/074)"
+    ]
+  },
+  "EUE-070": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-070 day 5 suppresses per-diem, cap 60",
+      "prototype/backend/tests/smoke/travel.php: EUE-070 night 15 suppresses overnight, cap 180",
+      "prototype/backend/tests/smoke/travel.php: EUE-070 six working days capped at 60 twelfths"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Mahlzeiten, Nächtigung und 5-/15-Tage-Regel werden in der Zeile ausgewiesen (EUE-068/069/070/074)"
+    ]
+  },
+  "EUE-071": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-071 outbound/return row has no per-diem and is flagged",
+      "prototype/backend/tests/smoke/travel.php: EUE-071 single row under 50 km status"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Stundenbuch ab 3,00 h schaltet Hin-/Rückfahrt und Tagesgeld ab (EUE-071/080)"
+    ]
+  },
+  "EUE-072": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-072 BT/PT 50:50 → 50 %",
+      "prototype/backend/tests/smoke/travel.php: EUE-072 1/3 → exact 33 % but persisted in 5 % steps (35 %)",
+      "prototype/backend/tests/smoke/travel.php: EUE-072 non-5-step share rejected by the API"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Betriebsanteil aus BT/PT wird in 5-%-Schritten übernommen (EUE-072)",
+      "prototype/frontend/e2e/travel-rules.spec.js: Ausfüllhilfe ist je Reise-Feld per Popover erreichbar (EUE-B06 HelpField)"
+    ]
+  },
+  "EUE-073": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-073 private purpose zeroes business expense, share and status"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Private Veranlassung setzt die betriebliche Ausgabe auf 0 (EUE-073)"
+    ]
+  },
+  "EUE-074": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-074 24.–26.12.2025 = one working day",
+      "prototype/backend/tests/smoke/travel.php: EUE-074 ordinary week = five working days"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Mahlzeiten, Nächtigung und 5-/15-Tage-Regel werden in der Zeile ausgewiesen (EUE-068/069/070/074)"
+    ]
+  },
+  "EUE-075": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-075 start year mismatch warned",
+      "prototype/backend/tests/smoke/travel.php: EUE-075 impossible date rejected"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Pflichtfelder, Chronologie und doppelte Belegnummern warnen (EUE-075/076/077/078/079)"
+    ]
+  },
+  "EUE-076": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-076 end before start warned",
+      "prototype/backend/tests/smoke/travel.php: EUE-076 two-minute continuation accepted"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Pflichtfelder, Chronologie und doppelte Belegnummern warnen (EUE-075/076/077/078/079)"
+    ]
+  },
+  "EUE-077": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-077 duplicate invoice across trips warned",
+      "prototype/backend/tests/smoke/travel.php: EUE-077 invoice number is mandatory"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Pflichtfelder, Chronologie und doppelte Belegnummern warnen (EUE-075/076/077/078/079)"
+    ]
+  },
+  "EUE-078": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-078 missing country and transport warned",
+      "prototype/backend/tests/smoke/travel.php: EUE-078 unknown catalogue values warn without breaking the evaluation"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Pflichtfelder, Chronologie und doppelte Belegnummern warnen (EUE-075/076/077/078/079)"
+    ]
+  },
+  "EUE-079": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-079 Veranlassung only once per invoice",
+      "prototype/backend/tests/smoke/travel.php: EUE-079 reason empty on outbound row"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Pflichtfelder, Chronologie und doppelte Belegnummern warnen (EUE-075/076/077/078/079)"
+    ]
+  },
+  "EUE-080": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-080 voucher hours sum to 300 hundredths (3 h)",
+      "prototype/backend/tests/smoke/travel.php: EUE-080 ledger hours drive the 3-hour rule even for a 30-minute row"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Stundenbuch ab 3,00 h schaltet Hin-/Rückfahrt und Tagesgeld ab (EUE-071/080)"
+    ]
+  },
+  "EUE-081": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-081 drive + per-diem + overnight = 8450 ct",
+      "prototype/backend/tests/smoke/travel.php: EUE-081 two rows sum to 16900 ct in both totals"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Reise anlegen: Sätze, Distanz und Summe werden aus den Zeilen übernommen (EUE-062/067/081)"
+    ]
+  },
+  "EUE-082": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/vat.php: EUE-082 eight Kennzahlen in form order",
+      "prototype/backend/tests/smoke/vat.php: EUE-082 API keys are the eight codes",
+      "prototype/backend/tests/smoke/vat.php: EUE-082 clean-room labels exposed"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/vat.spec.js: Monatliche Kennzahlen und Zahllast entstehen aus gebuchten USt-Arten",
+      "prototype/frontend/e2e/vat.spec.js: Hilfe ist je Kennzahl per Popover erreichbar"
+    ]
+  },
+  "EUE-083": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/vat.php: EUE-083 business income feeds KZ 016 and KZ 000",
+      "prototype/backend/tests/smoke/vat.php: EUE-083 month without USt entries is empty"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/vat.spec.js: Monatliche Kennzahlen und Zahllast entstehen aus gebuchten USt-Arten",
+      "prototype/frontend/e2e/vat.spec.js: Leerer Monat zeigt leere SUMIFS und einen Hinweis"
+    ]
+  },
+  "EUE-084": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/vat.php: EUE-084 RC tax does not feed KZ 000",
+      "prototype/backend/tests/smoke/vat.php: EUE-086 RC-only Zahllast equals KZ 057"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/vat.spec.js: Monatliche Kennzahlen und Zahllast entstehen aus gebuchten USt-Arten"
+    ]
+  },
+  "EUE-085": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/vat.php: EUE-085 four IG rates split from booked USt types",
+      "prototype/backend/tests/smoke/vat.php: EUE-085 KZ 070 = SUM(E11:E14) = 10000 ct"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/vat.spec.js: Monatliche Kennzahlen und Zahllast entstehen aus gebuchten USt-Arten"
+    ]
+  },
+  "EUE-086": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/vat.php: EUE-086 Zahllast 1234+199+1+10+49 = 1493 ct",
+      "prototype/backend/tests/smoke/vat.php: EUE-086 0.019 € tax truncates to 1 ct",
+      "prototype/backend/tests/smoke/vat.php: EUE-086 negative truncation toward zero"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/vat.spec.js: Monatliche Kennzahlen und Zahllast entstehen aus gebuchten USt-Arten"
+    ]
+  },
+  "EUE-087": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/vat.php: EUE-087 all four quarter columns in order",
+      "prototype/backend/tests/smoke/vat.php: EUE-087 empty quarter S produces no row",
+      "prototype/backend/tests/smoke/vat.php: EUE-087 each quarter sums exactly its three months"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/vat.spec.js: Quartalstabierung fasst H/M/S/X aus den gebuchten Monaten zusammen"
+    ]
+  },
+  "EUE-088": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/vat.php: EUE-088 two declaration blocks",
+      "prototype/backend/tests/smoke/vat.php: EUE-088 UST!C2/AB2 titles",
+      "prototype/backend/tests/smoke/vat.php: EUE-088 both blocks share the Kennzahl structure"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/vat.spec.js: Umschalter zeigt beide Erklärungsbereiche mit identischer Kennzahlstruktur"
+    ]
+  },
+  "EUE-089": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-089…094 2024 Stufe 1 Grenze",
+      "prototype/backend/tests/smoke/tax.php: EUE-089 invalid year '2023' rejected"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Tarifgrenzen werden für 2024, 2025 und 2026 aus der Jahrestabelle angezeigt",
+      "prototype/frontend/e2e/tax.spec.js: Tarifstufen und Moduswechsel bestimmen Einkommen und Aufteilung"
+    ]
+  },
+  "EUE-090": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-089…094 2024 Stufe 2 Grenze",
+      "prototype/backend/tests/smoke/tax.php: EUE-089…094 2025 Stufe 2 +1ct"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Tarifgrenzen werden für 2024, 2025 und 2026 aus der Jahrestabelle angezeigt",
+      "prototype/frontend/e2e/tax.spec.js: Tarifstufen und Moduswechsel bestimmen Einkommen und Aufteilung"
+    ]
+  },
+  "EUE-091": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-089…094 2024 Stufe 3 Grenze"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Tarifgrenzen werden für 2024, 2025 und 2026 aus der Jahrestabelle angezeigt",
+      "prototype/frontend/e2e/tax.spec.js: Tarifstufen und Moduswechsel bestimmen Einkommen und Aufteilung"
+    ]
+  },
+  "EUE-092": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-089…094 2024 Stufe 4 Grenze"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Tarifgrenzen werden für 2024, 2025 und 2026 aus der Jahrestabelle angezeigt",
+      "prototype/frontend/e2e/tax.spec.js: Tarifstufen und Moduswechsel bestimmen Einkommen und Aufteilung"
+    ]
+  },
+  "EUE-093": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-089…094 2026 Stufe 5 Grenze",
+      "prototype/backend/tests/smoke/tax.php: EUE-093/095/103 Gesamt vector: 2905000/380800/230800 ct"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Tarifgrenzen werden für 2024, 2025 und 2026 aus der Jahrestabelle angezeigt",
+      "prototype/frontend/e2e/tax.spec.js: Tarifstufen und Moduswechsel bestimmen Einkommen und Aufteilung"
+    ]
+  },
+  "EUE-094": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-093/095/103 Gesamt vector: 2905000/380800/230800 ct",
+      "prototype/backend/tests/smoke/tax.php: EUE-089…094 2026 Stufe 5 +1ct"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Tarifstufen und Moduswechsel bestimmen Einkommen und Aufteilung"
+    ]
+  },
+  "EUE-095": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-093/095/103 Nur Betrieb vector: 2765000/338800/188800 ct",
+      "prototype/backend/tests/smoke/tax.php: EUE-093/095/103 Gesamt vector: 2905000/380800/230800 ct"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Tarifstufen und Moduswechsel bestimmen Einkommen und Aufteilung"
+    ]
+  },
+  "EUE-096": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-096/098 GFB capped at 4.950,00 EUR (33.000 × 15 %)",
+      "prototype/backend/tests/smoke/tax.php: EUE-098 K5 Grundfreibetrag is 1.350,00 EUR"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: E1A-Auszug entsteht aus gebuchten Einnahmen und Ausgaben je Kennzahl"
+    ]
+  },
+  "EUE-097": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-096/098 GFB capped at 4.950,00 EUR (33.000 × 15 %)",
+      "prototype/backend/tests/smoke/tax.php: EUE-098 K5 Grundfreibetrag is 1.350,00 EUR"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: E1A-Auszug entsteht aus gebuchten Einnahmen und Ausgaben je Kennzahl"
+    ]
+  },
+  "EUE-098": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-098 K5 Grundfreibetrag is 1.350,00 EUR",
+      "prototype/backend/tests/smoke/tax.php: EUE-098 GFB floor is zero on a loss"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: E1A-Auszug entsteht aus gebuchten Einnahmen und Ausgaben je Kennzahl"
+    ]
+  },
+  "EUE-099": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-099 income 9040 is summed per Kennzahl (10.000,00 + 2.000,00 EUR)",
+      "prototype/backend/tests/smoke/tax.php: EUE-099 E1B lines routed to E1B"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: E1A-Auszug entsteht aus gebuchten Einnahmen und Ausgaben je Kennzahl"
+    ]
+  },
+  "EUE-100": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-100 E18 rental result 1.400,00 EUR",
+      "prototype/backend/tests/smoke/tax.php: EUE-100 E15 residual to 9530"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: E1B zeigt Mieteinnahmen, Werbungskosten und Vermietungsergebnis"
+    ]
+  },
+  "EUE-101": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-101 9275 suppresses the Arbeitsplatzpauschale with a warning",
+      "prototype/backend/tests/smoke/tax.php: EUE-101 30000 ct → 9215"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Arbeitsplatzpauschale, ergonomisches Mobiliar und der 9275-Konflikt"
+    ]
+  },
+  "EUE-102": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-102 9217 only warns, 9216 stays",
+      "prototype/backend/tests/smoke/tax.php: EUE-102 9275 suppresses 9216"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Arbeitsplatzpauschale, ergonomisches Mobiliar und der 9275-Konflikt",
+      "prototype/frontend/e2e/tax.spec.js: Ausfüllhilfe ist je Steuertab-Feld per Popover erreichbar"
+    ]
+  },
+  "EUE-103": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-103 no prepayments → full assessed tax",
+      "prototype/backend/tests/smoke/tax.php: EUE-093/095/103 Gesamt vector: 2905000/380800/230800 ct"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Vorauszahlungen ändern den Saldo; ungültige Pauschale zeigt die Fehlerfläche"
+    ]
+  },
+  "EUE-104": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-104 prognose flag adds business and rental forecasts",
+      "prototype/backend/tests/smoke/tax.php: EUE-093/095/103 Mit Prognose vector: 3065000/428800/278800 ct"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Tarifstufen und Moduswechsel bestimmen Einkommen und Aufteilung"
+    ]
+  },
+  "EUE-105": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-105 Nur Bruttolohn hides the rental share",
+      "prototype/backend/tests/smoke/tax.php: EUE-106 API exposes all six calculation modes"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Tarifstufen und Moduswechsel bestimmen Einkommen und Aufteilung"
+    ]
+  },
+  "EUE-106": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/tax.php: EUE-106 Nur Vermietung hides the business share",
+      "prototype/backend/tests/smoke/tax.php: EUE-106 unknown mode rejected"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/tax.spec.js: Tarifstufen und Moduswechsel bestimmen Einkommen und Aufteilung",
+      "prototype/frontend/e2e/tax.spec.js: Ausfüllhilfe ist je Steuertab-Feld per Popover erreichbar"
+    ]
+  },
+  "EUE-107": {
+    "status": "covered",
+    "unit": [
+      "GSVG total vector",
+      "UV-only total is reproducible from the yearly rate"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-108": {
+    "status": "covered",
+    "unit": [
+      "Jungunternehmer pays no KV but PV/SVS remain",
+      "Jungunternehmer total vector"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-109": {
+    "status": "covered",
+    "unit": [
+      "contribution base is capped at 12 x the monthly maximum (EUE-109)",
+      "booked 9225 contributions raise the calculated base"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-110": {
+    "status": "covered",
+    "unit": [
+      "GSVG KV = 6.8 % of the contribution base",
+      "Jungunternehmer pays no KV but PV/SVS remain"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-111": {
+    "status": "covered",
+    "unit": [
+      "GSVG PV = 18.5 % of the contribution base",
+      "FSVG PV uses the 20 % rate"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-112": {
+    "status": "covered",
+    "unit": [
+      "GSVG SVS = 1.53 % of the contribution base",
+      "UV yearly lump sum is 12 x the monthly rate"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-113": {
+    "status": "covered",
+    "unit": [
+      "zero profit produces the minimum KV/PV block (EUE-113)",
+      "zero profit UV-only is the UV lump sum only"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-114": {
+    "status": "covered",
+    "unit": [
+      "SV total is KV + PV + SVS + UV",
+      "monthly SV rounds half up to cents"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-115": {
+    "status": "covered",
+    "unit": [
+      "booked 9225 is not deducted twice when SV is computed",
+      "booked source does not deduct the computed SV"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-131": {
+    "status": "covered",
+    "unit": [
+      "EUE-131: every legacy mode string maps to exactly one branch",
+      "historical Freiberufler spelling normalises to FSVG"
+    ],
+    "e2e": [
+      "Übersicht zeigt SV-Block, Versicherungen und reagiert auf den Moduswechsel",
+      "Ausfüllhilfe: SV-Modus und E1A-Code in Einstellungen"
+    ]
+  },
+  "EUE-116": {
+    "status": "covered",
+    "unit": [
+      "EUE-116 OFF switch disables the view",
+      "EUE-116 exact workbook hint text",
+      "EUE-116 OFF returns the hint and no rows",
+      "EUE-116 switch Jänner activates the view"
+    ],
+    "e2e": [
+      "Monatsschalter schaltet ab und zeigt den 💡-Hinweis an",
+      "Der 💡-Hinweis steht im Monatskopf und der Schalter schaltet ab"
+    ]
+  },
+  "EUE-117": {
+    "status": "covered",
+    "unit": [
+      "EUE-117 E revenues 50000 ct",
+      "EUE-117 A expenses 10000+1000+500 ct",
+      "EUE-117 WEB business expense 2000 ct",
+      "EUE-117 profit 35500 ct and 2,00 hours"
+    ],
+    "e2e": [
+      "Monatssummen und Stunden entstehen aus gebuchten Einträgen"
+    ]
+  },
+  "EUE-118": {
+    "status": "covered",
+    "unit": [
+      "EUE-118 month filter shows E/A/WEB rows only",
+      "EUE-118 WEB row paired with its A booking"
+    ],
+    "e2e": [
+      "Monatssummen und Stunden entstehen aus gebuchten Einträgen",
+      "Der 💡-Hinweis steht im Monatskopf und der Schalter schaltet ab"
+    ]
+  },
+  "EUE-119": {
+    "status": "covered",
+    "unit": [
+      "EUE-119 BE-ART sheet with twelve month columns",
+      "EUE-119 Honorare Jan 12345 / Feb 7777 ct",
+      "EUE-119 row sums 20122 / 5000 ct",
+      "EUE-119 column sums 17345 / 7777 ct",
+      "EUE-119 matrix total matches the E journal with ✓✓"
+    ],
+    "e2e": [
+      "BE-ART zeigt Matrix, Zeilen-/Spaltensummen und ✓ gegen das E-Journal"
+    ]
+  },
+  "EUE-120": {
+    "status": "covered",
+    "unit": [
+      "EUE-120 A expenses Jan Büro 2000 / Feb Werbung 1001 ct",
+      "EUE-120 WEB expense pooled under the A expense kind",
+      "EUE-120 FR has its own row",
+      "EUE-120 total row matches A+AV+WEB+FR with ✓✓"
+    ],
+    "e2e": [
+      "BA-ART fasst A und WEB zusammen und zeigt Fehler (Δ €) bei Lücke"
+    ]
+  },
+  "EUE-121": {
+    "status": "covered",
+    "unit": [
+      "customer breakdown shows contribution margin",
+      "overview filters income/expenses by customer"
+    ],
+    "e2e": [
+      "Buchung mit Kunde/Projekt und gefilterte Übersicht"
+    ]
+  },
+  "EUE-122": {
+    "status": "covered",
+    "unit": [
+      "EUE-122 opening balances 100000 / 5000 ct",
+      "EUE-122 bank inflows from E per month",
+      "EUE-122 running saldo carries into February and ✓✓",
+      "EUE-122 Bar saldo 5000+5000-1001-3000 = 5999 ct",
+      "EUE-129 balanced unknown-method gap stays visible in both directions"
+    ],
+    "e2e": [
+      "ZA gleicht Ein- und Ausflüsse je Zahlart gegen den Saldo ab"
+    ]
+  },
+  "EUE-123": {
+    "status": "covered",
+    "unit": [
+      "prototype/backend/tests/smoke/travel.php: EUE-123 month hours sum to 3 h",
+      "prototype/backend/tests/smoke/travel.php: tenant 33 cannot read tenant 32 hours"
+    ],
+    "e2e": [
+      "prototype/frontend/e2e/travel-rules.spec.js: Stundenbuch ab 3,00 h schaltet Hin-/Rückfahrt und Tagesgeld ab (EUE-071/080)"
+    ]
+  },
+  "EUE-124": {
+    "status": "covered",
+    "unit": [
+      "EUE-124 USt lines follow the UST Kennzahl order",
+      "EUE-124 USt values taken from the VAT return",
+      "EUE-124 Zahllast line"
+    ],
+    "e2e": [
+      "USt-Zeilen und monatliche Last erscheinen im Monatsblatt"
+    ]
+  },
+  "EUE-125": {
+    "status": "covered",
+    "unit": [
+      "EUE-125 2025 GSVG minimum 15992 ct from the SV engine",
+      "EUE-125 monthly minimum matches the SV engine for gsvg/0",
+      "EUE-125 monthly minimum matches the SV engine for fsvg/1",
+      "EUE-125 monthly minimum matches the SV engine for uv_only/0",
+      "EUE-125 2026 GSVG minimum 16080 ct (12,95+8,43+37,47+101,95)",
+      "EUE-125 loss basis from February loss",
+      "EUE-125 loss-adjusted basis 35500+9000 / 0 ct",
+      "EUE-125 booked source reads the category-mapped 9225 contribution"
+    ],
+    "e2e": [
+      "USt-Zeilen und monatliche Last erscheinen im Monatsblatt",
+      "Der monatliche Mindest-SV-Sockel folgt dem SV-Modus"
+    ]
+  },
+  "EUE-126": {
+    "status": "covered",
+    "unit": [
+      "EUE-126 annual burden = tax + SV",
+      "EUE-126 monthly EST+SV sums to the annual cent figure exactly",
+      "EUE-126 net profit = gross profit − allocated burden",
+      "EUE-126 net profit per hour from the 2,00 h ledger",
+      "EUE-126 zero hours leaves net profit per hour blank",
+      "EUE-126 remainder cents go to the earliest month with the largest remainder",
+      "EUE-126 negative weights are clamped before summing and still allocate exactly",
+      "EUE-126 burden weight uses the same AfA-adjusted profit as the Monat sheet",
+      "EUE-126 allocation still sums exactly after the AfA adjustment",
+      "EUE-117 booked AfA reduces the Monat profit"
+    ],
+    "e2e": [
+      "USt-Zeilen und monatliche Last erscheinen im Monatsblatt",
+      "Der monatliche Mindest-SV-Sockel folgt dem SV-Modus"
+    ]
+  },
+  "EUE-127": {
+    "status": "covered",
+    "unit": [
+      "EUE-127 only ⚠ messages count as warnings",
+      "EUE-127 ⚠ messages set the visible highlight flag",
+      "EUE-127 blank workbook month is highlighted",
+      "EUE-127 monthly header shows the 💡 hint"
+    ],
+    "e2e": [
+      "Zeilenchecks mit ⚠ werden in den Buchungen farbig hervorgehoben",
+      "Der 💡-Hinweis steht im Monatskopf und der Schalter schaltet ab",
+      "Hilfe zu Zeilenwarnungen und Vollständigkeit ist erreichbar"
+    ]
+  },
+  "EUE-128": {
+    "status": "not-applicable",
+    "reason": "Bedingte Formatierung der Arbeitsmappe; die App nutzt Theme-Farben statt zellbasierter Hervorhebung."
+  },
+  "EUE-129": {
+    "status": "covered",
+    "unit": [
+      "EUE-129 five completeness checks start with ✓✓",
+      "EUE-129 BE-ART gap is exactly 999 ct",
+      "EUE-129 BE-ART shows the cent delta",
+      "EUE-129 ZA reports unknown payment methods with the exact delta",
+      "EUE-129 reconciliation keeps the balanced ZA gap"
+    ],
+    "e2e": [
+      "BA-ART fasst A und WEB zusammen und zeigt Fehler (Δ €) bei Lücke",
+      "ZA gleicht Ein- und Ausflüsse je Zahlart gegen den Saldo ab",
+      "Vollständigkeit weist ✓ und Fehler je Auswertung aus"
+    ]
+  },
+  "EUE-130": {
+    "status": "not-applicable",
+    "reason": "Die Fußzeile 1001 enthält laut Regel keine gültigen Regeln und ist kein Anwendungssachverhalt."
+  }
+}

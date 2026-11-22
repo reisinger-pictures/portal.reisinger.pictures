@@ -424,6 +424,7 @@ class SettingsController extends Controller
             'finanzamt' => $resolver->get('finanzamt', ''),
             'uid' => $resolver->get('uid', ''),
             'rechtsform' => $resolver->get('rechtsform', ''),
+            'branchenkennzahl' => $resolver->get('branchenkennzahl', ''),
         ]);
     }
 
@@ -480,6 +481,7 @@ class SettingsController extends Controller
             'finanzamt' => 'nullable|string|max:128',
             'uid' => 'nullable|string|max:64',
             'rechtsform' => 'nullable|string|max:128',
+            'branchenkennzahl' => 'nullable|string|max:16',
         ]);
 
         foreach ($validated as $key => $value) {

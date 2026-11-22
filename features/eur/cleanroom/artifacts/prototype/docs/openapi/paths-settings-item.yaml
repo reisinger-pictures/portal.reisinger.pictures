@@ -1,0 +1,70 @@
+get:
+  operationId: getSettingsItem
+  summary: Read one catalogue row
+  parameters:
+    - name: section
+      in: path
+      required: true
+      schema: { type: string }
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    '200':
+      description: Row.
+      content:
+        application/json:
+          schema: { type: object }
+    '404':
+      description: Row not found in this tenant.
+
+put:
+  operationId: updateSettingsItem
+  summary: Update a catalogue or customer/project row
+  description: Owner/accountant role required; writes are audited.
+  parameters:
+    - name: section
+      in: path
+      required: true
+      schema: { type: string }
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { type: object }
+  responses:
+    '200':
+      description: Updated row.
+      content:
+        application/json:
+          schema: { type: object }
+    '404':
+      description: Row not found in this tenant.
+    '422':
+      description: Validation failed.
+
+delete:
+  operationId: archiveSettingsItem
+  summary: Archive a catalogue or customer/project row
+  description: |
+    Sets `active = false` instead of deleting, so historical bookings keep
+    their label. Archived rows disappear from active selection lists.
+  parameters:
+    - name: section
+      in: path
+      required: true
+      schema: { type: string }
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    '200':
+      description: '{ "archived": true }'
+    '404':
+      description: Row not found in this tenant.

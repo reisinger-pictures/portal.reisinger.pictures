@@ -3,7 +3,7 @@ import { AuthHelper } from '../../helpers/AuthHelper';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
 
-test.describe('EÜR integration entry point', () => {
+test.describe('EÜR sub-application', () => {
     let helper: E2ESessionHelper;
     let superAdmin = { email: '', password: '' };
 
@@ -16,7 +16,7 @@ test.describe('EÜR integration entry point', () => {
         if (helper) await helper.teardown();
     });
 
-    test('Super-Admin opens Buchhaltung (EÜR) and returns to the portal', { tag: ['@feature:eur'] }, async ({ page }) => {
+    test('Super-Admin moves through the EÜR tabs, books an entry, calculates travel and VAT and compares the depreciation', { tag: ['@feature:eur'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
 
@@ -25,20 +25,57 @@ test.describe('EÜR integration entry point', () => {
         await sidebar.navigateTo('Buchhaltung (EÜR)');
 
         const main = page.getByRole('main');
-        await expect(main.getByRole('heading', { name: 'Buchhaltung (EÜR)', level: 1 })).toBeVisible();
-        await expect(main).toContainText('Unternehmensdaten');
-        await expect(main).toContainText('Geringwertige Wirtschaftsgüter');
-        await expect(main).toContainText('unter 1.000 €');
-        await expect(main).toContainText('Betriebsanteil');
+        await expect(main.getByRole('heading', { name: /EÜR ·/, level: 1 })).toBeVisible();
+        await expect(main.getByRole('tablist')).toBeVisible();
+        await expect(main.getByRole('heading', { name: 'Übersicht 2026' })).toBeVisible();
+
+        // Stammdaten: gepinnte Kataloge und Reise-Pauschale Inland.
+        await main.getByRole('tab', { name: 'Einstellungen' }).click();
+        await expect(main.getByRole('heading', { name: 'Stammdaten und Kataloge' })).toBeVisible();
+        await expect(main).toContainText('Inland: 30,00 € Tag und 17,00 € Nächtigung.');
+        await expect(main.getByRole('heading', { name: 'Feiertage' })).toBeVisible();
+
+        // Buchung anlegen.
+        await main.getByRole('tab', { name: 'Buchungen' }).click();
+        await main.getByLabel('Monat').selectOption({ label: 'Mai' });
+        await main.getByLabel('Art').selectOption({ label: 'Software' });
+        await main.getByLabel('Betrag (€)').fill('100');
+        await main.getByLabel('Betriebsanteil (%)').fill('60');
+        await main.getByRole('button', { name: 'Buchung speichern' }).click();
+
+        await expect(main.getByRole('cell', { name: 'Software' })).toBeVisible();
+        await expect(main.getByRole('cell', { name: '60 %' })).toBeVisible();
+        await expect(main.getByRole('cell', { name: '60,00 €' })).toBeVisible();
+
+        // Reisen: Kilometer, Tagesgeld und Nächtigung.
+        await main.getByRole('tab', { name: 'Reisen' }).click();
+        await main.getByRole('button', { name: 'Reisekosten berechnen' }).click();
+        await expect(main).toContainText('Kilometergeld');
+        await expect(main.getByText('50,00 €')).toBeVisible();
+
+        // Umsatzsteuer: acht Kennzahlen und Zahllast.
+        await main.getByRole('tab', { name: 'USt' }).click();
+        await main.getByLabel('Kleinunternehmer-Umsatz (€)').fill('1000');
+        await main.getByRole('button', { name: 'Kennzahlen berechnen' }).click();
+        await expect(main.getByRole('cell', { name: 'KZ 016' })).toBeVisible();
+        await expect(main.getByRole('cell', { name: '1.000,00 €' }).first()).toBeVisible();
+
+        // Anlagen: DEG-012 mit dem dokumentierten Beispiel.
+        await main.getByRole('tab', { name: 'Anlagen' }).click();
+        await main.getByLabel('Anschaffungskosten (€)').fill('20000');
+        await main.getByLabel('Nutzungsdauer (Jahre)').fill('10');
+        await main.getByLabel('Degressiver Satz (%)').fill('30');
+        await main.getByLabel('Anschaffungsmonat').selectOption({ label: 'Jänner' });
+        await main.getByRole('button', { name: 'Vergleich berechnen' }).click();
+
+        await expect(main).toContainText('Empfohlener Wechsel zur linearen Abschreibung: Jahr 8');
+        await expect(main).toContainText('258,04 €');
+        await expect(main.getByRole('cell', { name: '6.000,00 €' })).toBeVisible();
 
         await main.getByRole('link', { name: 'Zurück zum Portal' }).click();
 
         await expect(page).toHaveURL('/');
-        // "/" rendert das Dashboard mit currentView "structure" — die
-        // Galerie-Verwaltung liegt auf "/galleries" und ist hier nicht
-        // gemountet. Der belastbare Rückweg ist daher: EÜR-View weg,
-        // Portal-Shell (Sidebar) weiterhin vorhanden.
-        await expect(main.getByRole('heading', { name: 'Buchhaltung (EÜR)', level: 1 })).toHaveCount(0);
+        await expect(main.getByRole('heading', { name: /EÜR ·/, level: 1 })).toHaveCount(0);
         await expect(page.getByRole('complementary').getByRole('link', { name: 'Buchhaltung (EÜR)' })).toBeVisible();
     });
 });

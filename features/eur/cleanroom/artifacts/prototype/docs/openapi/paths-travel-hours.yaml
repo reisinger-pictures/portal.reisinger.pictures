@@ -1,0 +1,57 @@
+get:
+  operationId: listHours
+  summary: List the hours ledger with optional voucher/month/project filters
+  description: |
+    Returns integer work-time minutes (`hours_minutes`; 3 h = 180) and the
+    HoursService sum for the active filter. There is no float `hours` field.
+    Feeds EUE-080 (3-hour rule) and EUE-123.
+  parameters:
+    - name: voucher
+      in: query
+      required: false
+      schema: { type: string }
+    - name: month
+      in: query
+      required: false
+      schema: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' }
+    - name: project
+      in: query
+      required: false
+      schema: { type: string }
+  responses:
+    '200':
+      description: Filtered sum and matching ledger entries.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/HoursLedger' }
+    '401':
+      $ref: '#/components/responses/Unauthorized'
+post:
+  operationId: createHours
+  summary: Book hours against a voucher (EUE-080/EUE-123)
+  description: |
+    Adds a ledger row with an integer `hours_minutes` value (3 h = 180).
+    Fractional minutes are rejected with HTTP 422. Adding hours to a month
+    whose monthly report already has an active signature requires a
+    `change_reason` (HTTP 422 with code `change_reason_required`), mirroring
+    the journal guard.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './schemas.yaml#/HoursEntryInput' }
+  responses:
+    '201':
+      description: The stored hours entry.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/HoursEntry' }
+    '401':
+      $ref: '#/components/responses/Unauthorized'
+    '403':
+      $ref: '#/components/responses/Forbidden'
+    '422':
+      description: Validation error (including fractional minutes) or signed month without a change reason.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Error' }

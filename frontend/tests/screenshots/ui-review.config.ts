@@ -101,7 +101,14 @@ export const uiReviewConfig: UiReviewConfig = {
             path: '/eur',
             states: ['filled'],
             auth: 'admin',
-            note: 'EÜR module landing via its own menu entry: contract facts (WJ 2026, 5 Szenarien / 19 Vektoren, Cent/Minuten) and the explicit "Zurück zum Portal" link. Static page, no data seed required.',
+            note: 'EÜR sub-application via its own menu entry: standalone header with company context, internal tabs, live summary, pinned reference data, entries, travel, VAT and depreciation. Reads the brand-scoped EÜR API.',
+        },
+        {
+            name: 'eur-buchungen',
+            path: '/eur',
+            states: ['filled'],
+            auth: 'admin',
+            note: 'EÜR standalone cockpit: month rail, month KPIs, year overview and the Buchungen tab with the new-entry form.',
         },
         {
             name: 'projects-board',

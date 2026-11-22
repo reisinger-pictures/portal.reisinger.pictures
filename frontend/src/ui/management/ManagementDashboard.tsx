@@ -101,6 +101,12 @@ export default function ManagementDashboard() {
         return <Navigate to="/" replace/>;
     }
 
+    // Die Buchhaltung ist eine eigenständige Sub-Applikation: eigene Ansicht
+    // ohne Portal-Sidebar und Suche, mit explizitem Rücksprung ins Portal.
+    if (currentView === 'eur') {
+        return <ManagementEurView/>;
+    }
+
     return (
         <DashboardLayout
             currentView={currentView}

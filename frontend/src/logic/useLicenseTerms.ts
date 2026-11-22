@@ -146,6 +146,7 @@ export interface BillingDetails {
     finanzamt: string;
     uid: string;
     rechtsform: string;
+    branchenkennzahl: string;
 }
 
 export interface BillingDetailsPayload {
@@ -161,6 +162,7 @@ export interface BillingDetailsPayload {
     finanzamt?: string;
     uid?: string;
     rechtsform?: string;
+    branchenkennzahl?: string;
 }
 
 export function useBillingDetails() {

@@ -1,0 +1,76 @@
+get:
+  operationId: getWarehouseRow
+  summary: Read one WEB row
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    '200':
+      description: The row with derived amount, A-sheet line and warnings.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/WarehouseRow' }
+    '404':
+      description: Row not found in this tenant.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Error' }
+put:
+  operationId: updateWarehouseRow
+  summary: Update a WEB row
+  description: |
+    Recomputes the business amount from the cent amount and share. Tenant-scoped,
+    owner/accountant only and audited.
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './schemas.yaml#/WarehouseRowInput' }
+  responses:
+    '200':
+      description: The updated row.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/WarehouseRow' }
+    '403':
+      $ref: '#/components/responses/Forbidden'
+    '404':
+      description: Row not found in this tenant.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Error' }
+    '422':
+      $ref: '#/components/responses/Validation'
+delete:
+  operationId: deleteWarehouseRow
+  summary: Delete a WEB row
+  description: Tenant-scoped, owner/accountant only and audited.
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    '200':
+      description: Deletion confirmed.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [deleted]
+            properties:
+              deleted: { type: boolean, const: true }
+    '403':
+      $ref: '#/components/responses/Forbidden'
+    '404':
+      description: Row not found in this tenant.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Error' }

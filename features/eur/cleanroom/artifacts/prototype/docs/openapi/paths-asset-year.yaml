@@ -1,0 +1,36 @@
+put:
+  operationId: correctAssetYear
+  summary: Correct the AfA and book value of one asset year
+  description: |
+    Mirrors the workbook's editable AV rows (EUE-056/057). The reason is
+    mandatory and audited. A booked December entry follows the new AfA and
+    the recalculated business share. No cascade into later years: the chain
+    check then reports the deviation as ⚠.
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    - name: year
+      in: path
+      required: true
+      schema: { type: integer, minimum: 2000, maximum: 2100 }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [afa_cents, book_value_cents, change_reason]
+          properties:
+            afa_cents: { type: integer, minimum: 0 }
+            book_value_cents: { type: integer, minimum: 1 }
+            change_reason: { type: string, minLength: 1, maxLength: 500 }
+  responses:
+    '200':
+      description: Updated asset with warnings and chain_error.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Asset' }
+    '422':
+      $ref: '#/components/responses/Validation'

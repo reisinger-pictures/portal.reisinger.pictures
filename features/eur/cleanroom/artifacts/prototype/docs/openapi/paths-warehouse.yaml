@@ -1,0 +1,54 @@
+get:
+  operationId: listWarehouse
+  summary: Wareneingangsbuch rows for a business year
+  description: |
+    Lists the tenant's WEB rows with the derived betrieblicher Betrag in integer
+    cents (only for WE* voucher numbers), the matching A-sheet line and the exact
+    workbook plausibility warnings. Tenant-scoped and read-only.
+  parameters:
+    - name: year
+      in: query
+      required: false
+      schema: { type: integer, minimum: 2000, maximum: 2100 }
+  responses:
+    '200':
+      description: WEB rows and the field help catalogue.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, rows, field_help]
+            properties:
+              year: { type: integer }
+              rows:
+                type: array
+                items: { $ref: './schemas.yaml#/WarehouseRow' }
+              field_help: { type: object }
+    '403':
+      $ref: '#/components/responses/Forbidden'
+    '422':
+      $ref: '#/components/responses/Validation'
+post:
+  operationId: createWarehouseRow
+  summary: Create a WEB row
+  description: |
+    Creates one Wareneingangsbuch line. `net_amount_cents` and `business_share`
+    are validated; the business amount is derived with integer-cent arithmetic
+    in 5-% steps. Writes are limited to owner/accountant and are audited.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './schemas.yaml#/WarehouseRowInput' }
+  responses:
+    '201':
+      description: The created row with its derived warnings.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/WarehouseRow' }
+    '401':
+      $ref: '#/components/responses/Unauthorized'
+    '403':
+      $ref: '#/components/responses/Forbidden'
+    '422':
+      $ref: '#/components/responses/Validation'

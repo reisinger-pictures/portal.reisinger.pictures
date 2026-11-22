@@ -1,0 +1,22 @@
+get:
+  operationId: getTaxE1a
+  summary: E1A statement aggregated by Kennzahl
+  description: |
+    Maps booked journal lines of the year to E1A Kennzahlen via the tenant's
+    entry types and applies the booked business share in integer cents. E1B
+    lines are routed out and returned as `e1b_lines` for the E1B endpoint.
+    The Grundfreibetrag (15 % of profit, capped at 15 % of 33.000 €, floored at
+    zero) and the 9215/9216/9217 classifications come from the tax engine.
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+  responses:
+    '200':
+      description: E1A statement by Kennzahl.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/E1aStatement' }
+    '422':
+      $ref: '#/components/responses/Validation'

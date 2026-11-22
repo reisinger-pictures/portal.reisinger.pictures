@@ -1,71 +1,400 @@
 {
-  "schema_version": 1,
-  "name": "ku-online-cleanroom-handoff",
-  "business_year": 2026,
-  "source_commit": "ea79335f20da42ea6849be2d609e08fbeefe6c2f",
-  "description": "Pinned clean-room documents and parity vectors for portal development",
-  "handoff_sha256": "ab2fe206c8418015774051b98b45aaa0c4542aec88996ca0b2805bbd0e8ad5a8",
-  "files": [
-    {
-      "path": "business-rules/domain-rules.json",
-      "name": "domain-rules.json",
-      "sha256": "ed9226e545e5d6c6342e5c3ebfada5eb505791569d3c1ef500d6deb78222eac9",
-      "bytes": 228827
-    },
-    {
-      "path": "business-rules/domain-rules.schema.json",
-      "name": "domain-rules.schema.json",
-      "sha256": "dd46a6064c54ad757d50dfdb0432b0bb0a95e21755f8da3e3a92c5c77b967660",
-      "bytes": 4358
-    },
-    {
-      "path": "business-rules/rules.json",
-      "name": "rules.json",
-      "sha256": "d761e7d0b2bfb43fbd5cb6fab69a5945ef690a11efab79bd446755a46efe2090",
-      "bytes": 95940
-    },
-    {
-      "path": "business-rules/DOMAIN.md",
-      "name": "DOMAIN.md",
-      "sha256": "559d59995fb35a33b45dc6e7132cdd191cf05a91f5829989b2012dac554cfd95",
-      "bytes": 90164
-    },
-    {
-      "path": "verification/fixtures/cleanroom-parity-2026.json",
-      "name": "cleanroom-parity-2026.json",
-      "sha256": "fec99f677183efcaad671f99a5bce790c7d070249408e9261cbf5b6a4150ab52",
-      "bytes": 11733
-    },
-    {
-      "path": "verification/cleanroom-parity.md",
-      "name": "cleanroom-parity.md",
-      "sha256": "0a0b90ae9e2da732e0663aa0df5b2a14278014d577116caf5357bea08c0d0f09",
-      "bytes": 5580
-    },
-    {
-      "path": "verification/ods-rule-verification.md",
-      "name": "ods-rule-verification.md",
-      "sha256": "da37ca613b2debbcb1a2949a4ac0a32481613644f77676e034d2b9a6256f6ebe",
-      "bytes": 9808
-    },
-    {
-      "path": "verification/ods-coverage-matrix.md",
-      "name": "ods-coverage-matrix.md",
-      "sha256": "3d1746694663dbebfd20266cdad46cbb3a294a5b2a237dda892ba478d6340a6d",
-      "bytes": 14516
-    },
-    {
-      "path": "verification/ods-evidence-by-sheet.md",
-      "name": "ods-evidence-by-sheet.md",
-      "sha256": "0e83581382e7bc9031ce7b0a9d754aad265b37b8628d12067aab9a15fed3416c",
-      "bytes": 40324
-    },
-    {
-      "path": "verification/re-verification.md",
-      "name": "re-verification.md",
-      "sha256": "4cc521018cfe6931fbda7defb046ea93d246b5b6e299d9f2558a9493e167b084",
-      "bytes": 15992
-    }
-  ],
-  "file_count": 10
+    "schema_version": 2,
+    "name": "ku-online-cleanroom-handoff",
+    "business_year": 2026,
+    "source_commit": "ea79335f20da42ea6849be2d609e08fbeefe6c2f",
+    "description": "Pinned clean-room documents, parity vectors and copied data/specification artifacts for portal development",
+    "handoff_sha256": "ab2fe206c8418015774051b98b45aaa0c4542aec88996ca0b2805bbd0e8ad5a8",
+    "files": [
+        {
+            "path": "business-rules/domain-rules.json",
+            "name": "domain-rules.json",
+            "sha256": "ed9226e545e5d6c6342e5c3ebfada5eb505791569d3c1ef500d6deb78222eac9",
+            "bytes": 228827
+        },
+        {
+            "path": "business-rules/domain-rules.schema.json",
+            "name": "domain-rules.schema.json",
+            "sha256": "dd46a6064c54ad757d50dfdb0432b0bb0a95e21755f8da3e3a92c5c77b967660",
+            "bytes": 4358
+        },
+        {
+            "path": "business-rules/rules.json",
+            "name": "rules.json",
+            "sha256": "d761e7d0b2bfb43fbd5cb6fab69a5945ef690a11efab79bd446755a46efe2090",
+            "bytes": 95940
+        },
+        {
+            "path": "business-rules/DOMAIN.md",
+            "name": "DOMAIN.md",
+            "sha256": "559d59995fb35a33b45dc6e7132cdd191cf05a91f5829989b2012dac554cfd95",
+            "bytes": 90164
+        },
+        {
+            "path": "verification/fixtures/cleanroom-parity-2026.json",
+            "name": "cleanroom-parity-2026.json",
+            "sha256": "fec99f677183efcaad671f99a5bce790c7d070249408e9261cbf5b6a4150ab52",
+            "bytes": 11733
+        },
+        {
+            "path": "verification/cleanroom-parity.md",
+            "name": "cleanroom-parity.md",
+            "sha256": "0a0b90ae9e2da732e0663aa0df5b2a14278014d577116caf5357bea08c0d0f09",
+            "bytes": 5580
+        },
+        {
+            "path": "verification/ods-rule-verification.md",
+            "name": "ods-rule-verification.md",
+            "sha256": "da37ca613b2debbcb1a2949a4ac0a32481613644f77676e034d2b9a6256f6ebe",
+            "bytes": 9808
+        },
+        {
+            "path": "verification/ods-coverage-matrix.md",
+            "name": "ods-coverage-matrix.md",
+            "sha256": "3d1746694663dbebfd20266cdad46cbb3a294a5b2a237dda892ba478d6340a6d",
+            "bytes": 14516
+        },
+        {
+            "path": "verification/ods-evidence-by-sheet.md",
+            "name": "ods-evidence-by-sheet.md",
+            "sha256": "0e83581382e7bc9031ce7b0a9d754aad265b37b8628d12067aab9a15fed3416c",
+            "bytes": 40324
+        },
+        {
+            "path": "verification/re-verification.md",
+            "name": "re-verification.md",
+            "sha256": "4cc521018cfe6931fbda7defb046ea93d246b5b6e299d9f2558a9493e167b084",
+            "bytes": 15992
+        }
+    ],
+    "file_count": 10,
+    "artifact_version": "2026.2",
+    "artifact_source_commit": "75f230c07010db91755f78fdbd9ae591d52c7e85",
+    "artifact_count": 64,
+    "artifacts": [
+        {
+            "path": "analysis/tables.json",
+            "sha256": "de6ca35cc01904fb2d3ff8927b089dd17084f8badbb1cb4178b0e36440b89e1c",
+            "bytes": 20803
+        },
+        {
+            "path": "business-rules/DEGRESSIVE-AFA.md",
+            "sha256": "f32c2e0a491fb4696e2d7e80529a2ef4a54554055d849b5943c81f7c0fe7c7cb",
+            "bytes": 6183
+        },
+        {
+            "path": "business-rules/degressive-afa-rules.json",
+            "sha256": "5cfb30fed38a96121bbdef0ddb99d917a69c6269ba3e026d36b62fd6f23094c1",
+            "bytes": 19338
+        },
+        {
+            "path": "prototype/docs/openapi.yaml",
+            "sha256": "e6dd203d1304f77c8d8a6358f91db65b411a752d4da46bc74934d16fa2ea0cc7",
+            "bytes": 16890
+        },
+        {
+            "path": "prototype/docs/openapi/paths-analytics-expense-kinds.yaml",
+            "sha256": "d93f57e44417dfbcb60ac9facbe3c1bd9a074020be8c8906fce799552284ea1d",
+            "bytes": 1823
+        },
+        {
+            "path": "prototype/docs/openapi/paths-analytics-income-kinds.yaml",
+            "sha256": "eca56f6777ed68f579273041e3f6c36e9357955340d3b18532e67f3b4e4a9f09",
+            "bytes": 1904
+        },
+        {
+            "path": "prototype/docs/openapi/paths-analytics-payment-method-assign.yaml",
+            "sha256": "5aedda50ac6e0b8e1b52036690a1cf4a4a3d4c19e39a27c69d0d5f6d556f9b00",
+            "bytes": 1332
+        },
+        {
+            "path": "prototype/docs/openapi/paths-analytics-payment-methods.yaml",
+            "sha256": "cf13e088d9b565bf1d0e9a9a3bb6ea7c11e1708cd410b186965d3fb6aeaa572d",
+            "bytes": 2843
+        },
+        {
+            "path": "prototype/docs/openapi/paths-analytics-reconciliation.yaml",
+            "sha256": "f74248cc5e19fead37b6828ed902c5b1accfc0d38b633ab846162090eef774e1",
+            "bytes": 1415
+        },
+        {
+            "path": "prototype/docs/openapi/paths-asset-comparison.yaml",
+            "sha256": "857b72df8e440cd1ac924347e2a40e535764042ec4536e8a70fdf6e348bcbf71",
+            "bytes": 434
+        },
+        {
+            "path": "prototype/docs/openapi/paths-asset-dispose.yaml",
+            "sha256": "32f5a01773a6642f8f3f8583b8a38a46fb6e9d1f563793ae87a00effa3e9db07",
+            "bytes": 991
+        },
+        {
+            "path": "prototype/docs/openapi/paths-asset-item.yaml",
+            "sha256": "51ff3d2de983db9f3d3e9e93de3ba350b1ca44a605240900665344f11cdee831",
+            "bytes": 1677
+        },
+        {
+            "path": "prototype/docs/openapi/paths-asset-methods.yaml",
+            "sha256": "c37106b77d661c36fd326415ae4e750bab75d25eedd69eedd0317c17613b4671",
+            "bytes": 1227
+        },
+        {
+            "path": "prototype/docs/openapi/paths-asset-private-use.yaml",
+            "sha256": "8197d86451edee56b54110b4ff7476ec12cfc9769b5252c527f3ce45b4d013c7",
+            "bytes": 951
+        },
+        {
+            "path": "prototype/docs/openapi/paths-asset-switch.yaml",
+            "sha256": "a3c5b323c9c7d4ab28522a632060a250e943214472850ce727101515d595d3ee",
+            "bytes": 1061
+        },
+        {
+            "path": "prototype/docs/openapi/paths-asset-year-end.yaml",
+            "sha256": "d4804dca63f6795630d16333e0e9b31cf0f74377d34133406632017df7f3b457",
+            "bytes": 1308
+        },
+        {
+            "path": "prototype/docs/openapi/paths-asset-year.yaml",
+            "sha256": "99260b363815bd61f09b5e1e0e2ea2fd70570ddb4a05c74fc765ace8cf9b1a1a",
+            "bytes": 1219
+        },
+        {
+            "path": "prototype/docs/openapi/paths-assets.yaml",
+            "sha256": "9666d8c05d824f2b7c596c8f11c5de8a12485792af401e5c1e58f80e07f96c19",
+            "bytes": 2016
+        },
+        {
+            "path": "prototype/docs/openapi/paths-customers.yaml",
+            "sha256": "1f725ccad25d5a419f4ec341a60d8a53015cdadb4610c61dc852cd36575a0270",
+            "bytes": 494
+        },
+        {
+            "path": "prototype/docs/openapi/paths-journals.yaml",
+            "sha256": "ccba8a5dea5f7732bef34afb0236b5af6704b623c71925c921355dde3deea3f8",
+            "bytes": 1929
+        },
+        {
+            "path": "prototype/docs/openapi/paths-monthly-burden.yaml",
+            "sha256": "b4fe53767c8de0a8f11dfbc78714091462e27ff5587ff26670e3de201c120378",
+            "bytes": 2928
+        },
+        {
+            "path": "prototype/docs/openapi/paths-monthly-reconciliation.yaml",
+            "sha256": "01f35824c3641af2121444cece11dde89f10d649f3951d8a735bc1041b72e386",
+            "bytes": 1395
+        },
+        {
+            "path": "prototype/docs/openapi/paths-monthly.yaml",
+            "sha256": "a8275bf62bc12981271de705ce8cf162c99764a501d1c0013ac973cf750c2dfc",
+            "bytes": 2614
+        },
+        {
+            "path": "prototype/docs/openapi/paths-overview.yaml",
+            "sha256": "330ef032ccae71ff151c771f0ac83c73d809969a28d06ef7dcd6b241c7cf0f1b",
+            "bytes": 3887
+        },
+        {
+            "path": "prototype/docs/openapi/paths-projects.yaml",
+            "sha256": "6f2ab4398ffdd9f0662c04a37e6404c4927abde97b78c8a28346afcd9f7f9877",
+            "bytes": 570
+        },
+        {
+            "path": "prototype/docs/openapi/paths-settings-catalogue.yaml",
+            "sha256": "d64a095a7753ca83d06fc805f548bab983288500330b54ef540e31991b03f6c8",
+            "bytes": 933
+        },
+        {
+            "path": "prototype/docs/openapi/paths-settings-item.yaml",
+            "sha256": "493ef5968ea391060e1e5ac2de42d2a0a8eebc63fd279fea3296492624b95200",
+            "bytes": 1699
+        },
+        {
+            "path": "prototype/docs/openapi/paths-settings-year-warning.yaml",
+            "sha256": "c7433fabbdc1e2b8d0a06175d58ef49e877b360fcb2401f266cc44c988ffe990",
+            "bytes": 1403
+        },
+        {
+            "path": "prototype/docs/openapi/paths-settings.yaml",
+            "sha256": "861226490dee4c10babc3cf2af8ffe86644705fd38ad70ecbb19766db3263f7b",
+            "bytes": 1122
+        },
+        {
+            "path": "prototype/docs/openapi/paths-tax-e1a.yaml",
+            "sha256": "fc41a6bdfd7414c031515d201f879d7a5d3b8a122acedd8815d667a9f49de20e",
+            "bytes": 835
+        },
+        {
+            "path": "prototype/docs/openapi/paths-tax-e1b.yaml",
+            "sha256": "d8eaf9d98a2612d9154d6172afe7bbb1d37662f0e49c9d3692ed4896b0340d8f",
+            "bytes": 677
+        },
+        {
+            "path": "prototype/docs/openapi/paths-tax-settings.yaml",
+            "sha256": "a78b18c59e8cdd487418f5929da0d9ea81e09eac4864dafacb95e9fc0798a335",
+            "bytes": 860
+        },
+        {
+            "path": "prototype/docs/openapi/paths-tax.yaml",
+            "sha256": "dd9cfdf04a3949bd803076d3e7b0be15f2adfb155babced53fac2e34a6e45063",
+            "bytes": 1372
+        },
+        {
+            "path": "prototype/docs/openapi/paths-travel-catalogue.yaml",
+            "sha256": "b226a74f2f5cbcb91bb6f1f3d1274a7bc371ced81ae0e17f9199b54a3b0b75f9",
+            "bytes": 607
+        },
+        {
+            "path": "prototype/docs/openapi/paths-travel-hours-item.yaml",
+            "sha256": "b5cc1e2c517bbde8a9c28f69ea83c739ddedbf7fe14b6d93e53a7e472b57e09c",
+            "bytes": 348
+        },
+        {
+            "path": "prototype/docs/openapi/paths-travel-hours.yaml",
+            "sha256": "28f5fdc6169f24acb6a9baa4f74998e2cb03bd70feec9b98c1ac1b267929a00d",
+            "bytes": 1933
+        },
+        {
+            "path": "prototype/docs/openapi/paths-travel-item.yaml",
+            "sha256": "de9827eb4d75138aae1b0119cc6770b2681a47101b7d74764dfd223218cf203b",
+            "bytes": 1400
+        },
+        {
+            "path": "prototype/docs/openapi/paths-travel-preview.yaml",
+            "sha256": "a6d5a43e0f7c9ad3d4a2d2d2ea1d61e187c70137c6aaf05e890fb4a95ead0281",
+            "bytes": 642
+        },
+        {
+            "path": "prototype/docs/openapi/paths-travel-row-item.yaml",
+            "sha256": "7da26ff09f4d414e21c8808ca402a660e5ca11b0ebea095c25034134b65aaec1",
+            "bytes": 1008
+        },
+        {
+            "path": "prototype/docs/openapi/paths-travel-rows.yaml",
+            "sha256": "912b2ca97d72a76e5cd865df6534ec9ccb6d42fcc0f3da3a046dabcd8c0f8475",
+            "bytes": 981
+        },
+        {
+            "path": "prototype/docs/openapi/paths-travel-summary.yaml",
+            "sha256": "e33f45e41962cde820d445e5e062984563c27999322424d1287783f3260387c4",
+            "bytes": 867
+        },
+        {
+            "path": "prototype/docs/openapi/paths-travel.yaml",
+            "sha256": "0c2fca76f1f6996f914ba2af52c4117937192e016bc9fdfb7348a675850fc59c",
+            "bytes": 1558
+        },
+        {
+            "path": "prototype/docs/openapi/paths-vat-declarations.yaml",
+            "sha256": "4f22b297e64afc8d51221e5d8ed90bc8fd80781dcff795e9afff0c1705a3ef1f",
+            "bytes": 2951
+        },
+        {
+            "path": "prototype/docs/openapi/paths-vat-quarters.yaml",
+            "sha256": "dc281fdb7bd9486fb25c951fca477737837e3585dd19796b27b89a99f890a037",
+            "bytes": 1428
+        },
+        {
+            "path": "prototype/docs/openapi/paths-vat-return.yaml",
+            "sha256": "8d4cc04828cfa74f9bedf1ab04c45ecd46cf5c48cf7f490e73af16976f83086f",
+            "bytes": 1900
+        },
+        {
+            "path": "prototype/docs/openapi/paths-warehouse-item.yaml",
+            "sha256": "3d83d123730956829c47f0d87b27c2ecd6dc0c8fc8ccfb58c45650d0c9f2dd88",
+            "bytes": 2078
+        },
+        {
+            "path": "prototype/docs/openapi/paths-warehouse-reconciliation.yaml",
+            "sha256": "2ed80bd69514c69f5b239364a90ce5472da80b6d37e67c6f275b76fea74e4c21",
+            "bytes": 1733
+        },
+        {
+            "path": "prototype/docs/openapi/paths-warehouse.yaml",
+            "sha256": "85b288b1b82ea655d84b68a153885af63ffe7ec18872bc7a320b34e3d4a65bbc",
+            "bytes": 1826
+        },
+        {
+            "path": "prototype/docs/openapi/schemas.yaml",
+            "sha256": "073d12d7aafeffced72d55574f39c49f0fc8c9b3ca7d96c89696b420080e92f6",
+            "bytes": 22193
+        },
+        {
+            "path": "verification/asset-register.md",
+            "sha256": "a5f3de7d7c964c5ff07ce32e1b0f4358d765b42e7b989458d53fce4e8df1fbd3",
+            "bytes": 15394
+        },
+        {
+            "path": "verification/degressive-afa-coverage.json",
+            "sha256": "1a6fde86dbd79e58f4fe31e560467516fd2089965715a8a8492a6e5c1a3c15b0",
+            "bytes": 4579
+        },
+        {
+            "path": "verification/parity-plan.md",
+            "sha256": "6e09850b6eb8be1e69cc0cbfd1b04bdcd76870a09b802b27bc60b314f3a901bd",
+            "bytes": 21140
+        },
+        {
+            "path": "verification/requirements/assets-requirements.md",
+            "sha256": "788424f08159c15010bb93a231fd5fc67e9f73d03bf75457eecf9e2831931baa",
+            "bytes": 2980
+        },
+        {
+            "path": "verification/requirements/coverage-status.md",
+            "sha256": "2fdab7122362d386674ea3baef4bb87636d6dddf0b2a940b44a0bfb748143ec0",
+            "bytes": 1948
+        },
+        {
+            "path": "verification/requirements/data-model-requirements.md",
+            "sha256": "b6501061f939d83123525f5aa252b8f4ef9085ded050b47d44fe64758f15d756",
+            "bytes": 2975
+        },
+        {
+            "path": "verification/requirements/deg-scope.md",
+            "sha256": "13815e4c5f55614146a3cd60263f72f46bde4a510aaab2ce04aa6dbcba84ead2",
+            "bytes": 2736
+        },
+        {
+            "path": "verification/requirements/est-requirements.md",
+            "sha256": "08cdd715c91fab1bbd899d95b69d1c71f6e13e9e2fcbe5939e931efe00fd4ced",
+            "bytes": 4770
+        },
+        {
+            "path": "verification/requirements/travel-requirements.md",
+            "sha256": "f617293e5171147075f2c825c197d8e1ef9bfb05ab2863a15853aa391bea390b",
+            "bytes": 4114
+        },
+        {
+            "path": "verification/requirements/ui-requirements.md",
+            "sha256": "0371814145b3bde679158a26f8549fce9f95e96bd5f5df2506bd9969a3e800dd",
+            "bytes": 3745
+        },
+        {
+            "path": "verification/requirements/vat-requirements.md",
+            "sha256": "0b22b22f33f096ed3510d12ffabe2b3f08f61f475e6f4727e4460a149a4b91c8",
+            "bytes": 3078
+        },
+        {
+            "path": "verification/rule-coverage.json",
+            "sha256": "bce7ba4756f45e23e89a6b92aec1f62f3f5c95fbadf0daa08919d2f6a14bb243",
+            "bytes": 47039
+        },
+        {
+            "path": "verification/settings-and-references.md",
+            "sha256": "56928ad306fe4a5c61019ce72476825e040596de5939ec0bd3fbb82f48e3187d",
+            "bytes": 15705
+        },
+        {
+            "path": "verification/ui-review-2026-11-22.md",
+            "sha256": "7f1ebe91023b5eaea9cb722576c046ac1d4a1e954dad9f92d8defef2aa825474",
+            "bytes": 5182
+        },
+        {
+            "path": "verification/workbook-soll.md",
+            "sha256": "3de68da853c5f36667b353869bb105d846ffb89a3081f0b16e609274e4f0d851",
+            "bytes": 11476
+        }
+    ],
+    "parity_scenarios": 5,
+    "parity_cells": 19,
+    "provenance_sha256": "b4bbeb6e90d783804bd1b1727b8d11473776454798220933ec7871d1da4975d0",
+    "requirement_docs": 8
 }

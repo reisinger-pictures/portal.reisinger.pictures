@@ -1,0 +1,38 @@
+get:
+  operationId: getJournalReconciliation
+  summary: Journal completeness checks (EUE-129)
+  description: |
+    Compares the E/A/AV/WEB/FR journal sums with BE-ART, BA-ART, ZA and the
+    E1A/E1B residual rows. Each of the five checks carries expected/actual
+    integer cents, the signed delta and ✓/✓✓ or "Fehler (Δ €)".
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+  responses:
+    '200':
+      description: Five completeness checks.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, checks, all_ok]
+            properties:
+              year: { type: integer }
+              all_ok: { type: boolean }
+              checks:
+                type: array
+                items:
+                  type: object
+                  required: [key, label, expected_cents, actual_cents, delta_cents, marker]
+                  properties:
+                    key: { type: string, enum: [be_art, ba_art, za, e1a, e1b] }
+                    label: { type: string }
+                    expected_cents: { type: integer }
+                    actual_cents: { type: integer }
+                    delta_cents: { type: integer }
+                    marker: { type: string }
+              field_help: { type: object }
+    '422':
+      $ref: '#/components/responses/Validation'

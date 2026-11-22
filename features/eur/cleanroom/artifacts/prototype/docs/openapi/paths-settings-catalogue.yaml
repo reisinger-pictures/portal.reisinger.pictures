@@ -1,0 +1,28 @@
+post:
+  operationId: createSettingsItem
+  summary: Create a catalogue or customer/project row
+  description: |
+    Creates a row in the given section. Sections are kebab-case in the URL
+    (`payment-methods`, `entry-types`, `vat-types`, `vehicles`, `customers`,
+    `projects`). Payload keys are snake_case. Business shares must be
+    multiples of 5. Owner/accountant role required; writes are audited.
+  parameters:
+    - name: section
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [payment-methods, entry-types, vat-types, vehicles, customers, projects]
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { type: object }
+  responses:
+    '201':
+      description: Created row.
+      content:
+        application/json:
+          schema: { type: object }
+    '422':
+      description: Validation failed (empty name, invalid share, unknown E1A code, ...).

@@ -1,0 +1,22 @@
+put:
+  operationId: putTaxSettings
+  summary: Store tax calculation inputs for one tenant and year
+  description: |
+    Creates or updates `tax_settings` (tenant + year). A partial body keeps the
+    previously stored values; all money is integer cents. The calculation mode
+    accepts all six workbook branches. Arbeitsplatzpauschale and ergonomisches
+    Mobiliar may be null (no amount entered). Write access requires the
+    `owner` or `accountant` role and is audited.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './schemas.yaml#/TaxSettingsInput' }
+  responses:
+    '200':
+      description: The stored settings with all defaults materialised.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/TaxSettings' }
+    '422':
+      $ref: '#/components/responses/Validation'

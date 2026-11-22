@@ -1,0 +1,46 @@
+get:
+  operationId: listTravels
+  summary: List B06 travel trips for one business year
+  description: |
+    Returns every tenant-scoped trip of the requested year with its stored
+    rows, engine-computed costs (integer cents), status, warnings and the
+    aggregated business expense. All arithmetic is performed by
+    TravelCalculator, TravelRules and HoursService; the API only maps rows.
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, minimum: 2000, maximum: 2100 }
+  responses:
+    '200':
+      description: Trips, totals and the travel catalogue with field help.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/TravelList' }
+    '401':
+      $ref: '#/components/responses/Unauthorized'
+    '422':
+      $ref: '#/components/responses/Validation'
+post:
+  operationId: createTravel
+  summary: Create a travel trip
+  description: |
+    Creates a trip keyed by a mandatory BELEGNUMMER (EUE-077). The invoice
+    number is deliberately not unique; duplicates are reported as warnings.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './schemas.yaml#/TravelTripInput' }
+  responses:
+    '201':
+      description: The created trip with empty rows.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/TravelTrip' }
+    '401':
+      $ref: '#/components/responses/Unauthorized'
+    '403':
+      $ref: '#/components/responses/Forbidden'
+    '422':
+      $ref: '#/components/responses/Validation'

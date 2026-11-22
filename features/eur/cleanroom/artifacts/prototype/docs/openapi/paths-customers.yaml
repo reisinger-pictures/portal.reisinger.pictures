@@ -1,0 +1,15 @@
+get:
+  operationId: listCustomers
+  summary: List tenant customers (including archived)
+  description: |
+    Tenant-scoped list of customers from the settings catalogue. Archived
+    rows are included so historical bookings keep their label in the UI; new
+    selections only use active rows.
+  responses:
+    '200':
+      description: List of customers.
+      content:
+        application/json:
+          schema:
+            type: array
+            items: { $ref: './schemas.yaml#/Customer' }

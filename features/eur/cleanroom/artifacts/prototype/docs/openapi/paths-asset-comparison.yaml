@@ -1,0 +1,15 @@
+get:
+  operationId: getAssetComparison
+  summary: Linear vs. degressive plan of one asset
+  description: DEG-012. Includes the switch recommendation and the stored method/switch state.
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    '200':
+      description: Comparison for the stored asset.
+      content:
+        application/json:
+          schema: { type: object }

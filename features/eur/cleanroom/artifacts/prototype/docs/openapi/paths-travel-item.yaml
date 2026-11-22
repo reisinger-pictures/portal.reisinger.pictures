@@ -1,0 +1,55 @@
+get:
+  operationId: getTravel
+  summary: Read one travel trip with computed rows
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    '200':
+      description: Trip with row costs, warnings, status and voucher hours.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/TravelTrip' }
+    '401':
+      $ref: '#/components/responses/Unauthorized'
+    '404':
+      description: Trip not found in this tenant.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Error' }
+put:
+  operationId: updateTravel
+  summary: Update a travel trip
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './schemas.yaml#/TravelTripInput' }
+  responses:
+    '200':
+      description: The updated trip.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/TravelTrip' }
+    '422':
+      $ref: '#/components/responses/Validation'
+delete:
+  operationId: deleteTravel
+  summary: Delete a travel trip and all of its rows
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    '200':
+      description: Deleted.
+    '404':
+      description: Trip not found in this tenant.

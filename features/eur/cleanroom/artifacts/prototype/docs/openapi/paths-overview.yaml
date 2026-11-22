@@ -1,0 +1,90 @@
+get:
+  operationId: getOverview
+  summary: Tenant-scoped annual overview with insurance block
+  description: |
+    Returns income, expenses and profit (all integer cents), the social-
+    insurance block (KV/PV/SVS/UV/total/monthly, mode, source), other insurance
+    expenses (category `Versicherung`, E1A 9230) and the combined insurance
+    total without double counting booked 9225 contributions. Also returns
+    open receipts, unsigned months and income/cost/profit per customer/project.
+
+    `customer_id` and `project_id` filter the KPIs and the breakdown; the
+    contribution base for SV is always the business total. `sv_mode` is a
+    non-persisting display override for comparing modes.
+  parameters:
+    - name: year
+      in: query
+      schema: { type: integer, minimum: 2000, maximum: 2100 }
+    - name: month
+      in: query
+      schema: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+    - name: customer_id
+      in: query
+      schema: { type: integer }
+    - name: project_id
+      in: query
+      schema: { type: integer }
+    - name: sv_mode
+      in: query
+      schema: { type: string, enum: [gsvg, ns_gsvg, fsvg, uv_only] }
+  responses:
+    '200':
+      description: Overview payload.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, income_cents, expenses_cents, profit_cents, social_insurance, other_insurance, insurance_total_cents, customer_breakdown, open_documents, unsigned_months]
+            properties:
+              year: { type: integer }
+              month: { type: [string, 'null'] }
+              income_cents: { type: integer }
+              expenses_cents: { type: integer }
+              profit_cents: { type: integer }
+              months:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: integer }
+                    period: { type: string }
+                    income_cents: { type: integer }
+                    expenses_cents: { type: integer }
+                    profit_cents: { type: integer }
+                    signed: { type: boolean }
+              social_insurance:
+                type: object
+                properties:
+                  mode: { type: string, enum: [gsvg, ns_gsvg, fsvg, uv_only] }
+                  mode_label: { type: string }
+                  jungunternehmer: { type: boolean }
+                  source: { type: string, enum: [computed, booked] }
+                  computed: { $ref: './schemas.yaml#/SvResult' }
+                  booked: { type: object }
+                  selected: { $ref: './schemas.yaml#/SvResult' }
+              other_insurance:
+                type: object
+                properties:
+                  category: { type: string }
+                  e1a_code: { type: string }
+                  total_cents: { type: integer }
+              insurance_total_cents: { type: integer }
+              assets:
+                type: object
+                description: B05 figures (integer cents) for the selected year/month; #29.
+                properties:
+                  year: { type: integer }
+                  month: { type: [string, 'null'] }
+                  afa_cents: { type: integer }
+                  business_cents: { type: integer }
+                  private_cents: { type: integer }
+                  book_value_cents: { type: integer }
+                  booked_count: { type: integer }
+                  booked_in_month_cents: { type: [integer, 'null'] }
+              customer_breakdown:
+                type: array
+                items: { $ref: './schemas.yaml#/CustomerBreakdown' }
+              open_documents: { type: integer }
+              unsigned_months:
+                type: array
+                items: { type: object, properties: { id: { type: integer }, period: { type: string } } }

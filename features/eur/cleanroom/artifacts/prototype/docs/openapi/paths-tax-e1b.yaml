@@ -1,0 +1,20 @@
+get:
+  operationId: getTaxE1b
+  summary: E1B rental statement (Vermietung und Verpachtung)
+  description: |
+    Aggregates E1B-prefixed journal lines into rental income (KZ 9460), the
+    five special Werbungskosten codes and the 9530 remainder. The result is
+    income minus Werbungskosten (E18 / KZ 9414), in integer cents.
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+  responses:
+    '200':
+      description: E1B rental statement.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/E1bStatement' }
+    '422':
+      $ref: '#/components/responses/Validation'

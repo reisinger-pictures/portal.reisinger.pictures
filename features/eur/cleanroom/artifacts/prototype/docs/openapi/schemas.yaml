@@ -1,0 +1,523 @@
+SvResult:
+  type: [object, 'null']
+  description: |
+    Pure-calculator result. Every amount is integer cents, rounded half-up.
+    May be null for years without a yearly table (outside 2024-2026).
+  properties:
+    year: { type: integer }
+    mode: { type: string, enum: [gsvg, ns_gsvg, fsvg, uv_only] }
+    mode_label: { type: string }
+    jungunternehmer: { type: boolean }
+    source: { type: string, enum: [computed, booked] }
+    bmg_cents: { type: integer }
+    kv_cents: { type: integer }
+    pv_cents: { type: integer }
+    svs_cents: { type: integer }
+    uv_cents: { type: integer }
+    total_cents: { type: integer }
+    monthly_cents: { type: integer }
+
+CustomerBreakdown:
+  type: object
+  description: Contribution margin per customer or project. SV is not allocated.
+  properties:
+    customer_id: { type: integer }
+    customer_name: { type: string }
+    project_id: { type: [integer, 'null'] }
+    project_name: { type: [string, 'null'] }
+    income_cents: { type: integer }
+    expenses_cents: { type: integer }
+    profit_cents: { type: integer }
+
+Customer:
+  type: object
+  properties:
+    id: { type: integer }
+    tenant_id: { type: integer }
+    name: { type: string }
+    external_id: { type: [string, 'null'] }
+    active: { type: boolean }
+
+Project:
+  type: object
+  properties:
+    id: { type: integer }
+    tenant_id: { type: integer }
+    customer_id: { type: integer }
+    name: { type: string }
+    external_id: { type: [string, 'null'] }
+    active: { type: boolean }
+
+AssetYear:
+  type: object
+  description: One planned/booked AfA year. All amounts are integer cents.
+  properties:
+    year: { type: integer }
+    afa_cents: { type: integer }
+    book_value_cents: { type: integer }
+    private_use_percent: { type: integer, multipleOf: 5 }
+    private_use_cents: { type: integer }
+    business_use_cents: { type: integer }
+    entry_id: { type: [integer, 'null'] }
+    status: { type: string, enum: [planned, booked] }
+
+Asset:
+  type: object
+  description: |
+    Anlagegut (#29). `warnings` carries rule id + text (EUE-051/055/056/059);
+    `chain_error` is non-null when EUE-057 detects a broken book-value chain.
+  properties:
+    id: { type: integer }
+    name: { type: string, maxLength: 190 }
+    invoice_no: { type: string, maxLength: 64 }
+    supplier: { type: string }
+    purchase_date: { type: string, format: date }
+    cost_cents: { type: integer }
+    useful_life_years: { type: string, description: 'NUMERIC(4,1): 0 or 2–99' }
+    life_tenths: { type: integer }
+    business_share: { type: integer, minimum: 50, maximum: 100, multipleOf: 5 }
+    entry_type_id: { type: integer }
+    entry_type_name: { type: string }
+    e1a_code: { type: string, enum: ['9130', '9134', '9135', '9500'] }
+    project_id: { type: [integer, 'null'] }
+    entry_id: { type: [integer, 'null'] }
+    document_id: { type: [integer, 'null'] }
+    status: { type: string, enum: [active, disposed] }
+    disposed_on: { type: [string, 'null'], format: date }
+    disposal_proceeds_cents: { type: [integer, 'null'] }
+    disposal_entry_id: { type: [integer, 'null'] }
+    disposal_loss_cents: { type: integer }
+    notes: { type: string }
+    years:
+      type: array
+      items: { $ref: './schemas.yaml#/AssetYear' }
+    warnings:
+      type: array
+      items:
+        type: object
+        properties:
+          rule: { type: string }
+          text: { type: string }
+    chain_error: { type: [string, 'null'] }
+    afa_method: { type: string, enum: [linear, degressive] }
+    degressive_rate_percent: { type: [integer, 'null'], minimum: 1, maximum: 30 }
+    is_used: { type: boolean }
+    is_immaterial: { type: boolean }
+    immaterial_exception: { type: [string, 'null'], enum: [digitalisation, eco, health, null] }
+    is_electric_vehicle: { type: boolean }
+    has_special_afa: { type: boolean }
+    switched_to_linear_year: { type: [integer, 'null'] }
+    switch_reason: { type: string, maxLength: 500 }
+    switch_hint:
+      type: [object, 'null']
+      description: DEG-013 reminder; null once switched or when linear.
+      properties:
+        year: { type: integer }
+        linear_cents: { type: integer }
+        degressive_cents: { type: integer }
+        annual_gain_cents: { type: integer }
+        advantage_cents: { type: integer }
+
+AssetInput:
+  type: object
+  required: [name, invoice_no, purchase_date, cost_cents, useful_life_years, business_share, entry_type_id]
+  properties:
+    name: { type: string, maxLength: 190 }
+    invoice_no: { type: string, maxLength: 64 }
+    supplier: { type: string, maxLength: 190 }
+    purchase_date: { type: string, format: date }
+    cost_cents: { type: integer, minimum: 1 }
+    useful_life_years: { type: [string, 'number'], description: '0 or 2–99 in 0.1 steps' }
+    business_share: { type: integer, minimum: 50, maximum: 100, multipleOf: 5 }
+    entry_type_id: { type: integer }
+    project_id: { type: [integer, 'null'] }
+    entry_id: { type: [integer, 'null'] }
+    document_id: { type: [integer, 'null'] }
+    notes: { type: string, maxLength: 500 }
+    afa_method: { type: string, enum: [linear, degressive], default: linear }
+    degressive_rate_percent: { type: [integer, 'null'], minimum: 1, maximum: 30 }
+    is_used: { type: boolean, default: false }
+    is_immaterial: { type: boolean, default: false }
+    immaterial_exception: { type: [string, 'null'], enum: [digitalisation, eco, health, null] }
+    is_electric_vehicle: { type: boolean, default: false }
+    has_special_afa: { type: boolean, default: false }
+
+# --- B08 income tax (all monetary fields are integer cents) ----------------
+
+TaxSettings:
+  type: object
+  description: One tenant/year row of `tax_settings`. Money is integer cents.
+  properties:
+    year: { type: integer, enum: [2024, 2025, 2026] }
+    mode:
+      type: string
+      enum: [Gesamt, 'Nur Betrieb', 'Nur Vermietung', 'Mit Prognose', 'Nur Bruttolohn', 'Nur andere Gewinne']
+    prognose: { type: boolean, description: 'U5: include forecast columns' }
+    employment_income_cents: { type: integer, minimum: 0, description: 'U11 / KZ 245' }
+    business_forecast_cents: { type: integer, minimum: 0, description: 'U8' }
+    rental_forecast_cents: { type: integer, minimum: 0, description: 'U13' }
+    prepayment_cents: { type: integer, minimum: 0, description: 'U26' }
+    wage_tax_cents: { type: integer, minimum: 0, description: 'U28 / KZ 260' }
+    arbeitsplatzpauschale_cents: { type: [integer, 'null'], minimum: 2500, maximum: 120000, description: 'E1A!E40, 25,00–1.200,00 EUR' }
+    ergonomisches_mobiliar_cents: { type: [integer, 'null'], minimum: 0, maximum: 30000, description: 'E1A!E39, 0,00–300,00 EUR' }
+
+TaxSettingsInput:
+  type: object
+  description: Partial update; omitted fields keep their stored value.
+  required: [year]
+  properties:
+    year: { type: integer, enum: [2024, 2025, 2026] }
+    mode:
+      type: string
+      enum: [Gesamt, 'Nur Betrieb', 'Nur Vermietung', 'Mit Prognose', 'Nur Bruttolohn', 'Nur andere Gewinne']
+    prognose: { type: boolean }
+    employment_income_cents: { type: integer, minimum: 0 }
+    business_forecast_cents: { type: integer, minimum: 0 }
+    rental_forecast_cents: { type: integer, minimum: 0 }
+    prepayment_cents: { type: integer, minimum: 0 }
+    wage_tax_cents: { type: integer, minimum: 0 }
+    arbeitsplatzpauschale_cents: { type: [integer, 'null'], minimum: 2500, maximum: 120000 }
+    ergonomisches_mobiliar_cents: { type: [integer, 'null'], minimum: 0, maximum: 30000 }
+
+TaxTariffStage:
+  type: object
+  description: One progressive tariff stage; rate is an exact integer fraction.
+  properties:
+    stage: { type: integer, minimum: 1, maximum: 5 }
+    from_cents: { type: integer }
+    to_cents: { type: [integer, 'null'] }
+    rate_num: { type: integer }
+    rate_den: { type: integer }
+    basis_cents: { type: integer }
+    tax_cents: { type: integer }
+
+TaxResult:
+  type: object
+  description: |
+    IncomeTaxService::calculate() plus the tariff, E1A/E1B summaries, settings
+    and field help. All amounts are integer cents; `hidden_rows` lists the
+    allocation rows suppressed by the chosen mode.
+  required: [year, mode, total_income_cents, assessed_tax_cents, balance_cents, tariff, e1a, e1b]
+  properties:
+    year: { type: integer }
+    mode: { type: string }
+    prognose: { type: boolean }
+    business_profit_cents: { type: integer }
+    business_forecast_cents: { type: integer }
+    grundfreibetrag_cents: { type: integer }
+    business_income_cents: { type: integer, description: 'U10' }
+    employment_income_cents: { type: integer, description: 'U11' }
+    rental_result_cents: { type: integer, description: 'U12' }
+    rental_forecast_cents: { type: integer, description: 'U13' }
+    total_income_cents: { type: integer, description: 'U14' }
+    assessed_tax_cents: { type: integer, description: 'U23' }
+    employment_tax_cents: { type: integer, description: 'U27' }
+    rental_tax_cents: { type: integer, description: 'U25' }
+    business_tax_cents: { type: integer, description: 'U24' }
+    prepayment_cents: { type: integer, description: 'U26' }
+    wage_tax_cents: { type: integer, description: 'U28' }
+    balance_cents: { type: integer, description: 'U29' }
+    hidden_rows: { type: array, items: { type: string } }
+    mode_flags: { type: object }
+    tariff:
+      type: object
+      required: [year, income_cents, tax_cents, stages]
+      properties:
+        year: { type: integer }
+        income_cents: { type: integer }
+        tax_cents: { type: integer }
+        stages:
+          type: array
+          items: { $ref: './schemas.yaml#/TaxTariffStage' }
+    e1a: { $ref: './schemas.yaml#/E1aStatement' }
+    e1b: { $ref: './schemas.yaml#/E1bStatement' }
+    settings: { $ref: './schemas.yaml#/TaxSettings' }
+    modes: { type: array, items: { type: string } }
+    field_help: { type: object }
+
+E1aStatement:
+  type: object
+  description: Business statement per Kennzahl; E1B lines are excluded.
+  properties:
+    year: { type: integer }
+    income_by_kennzahl: { type: object, additionalProperties: { type: integer } }
+    expense_by_kennzahl: { type: object, additionalProperties: { type: integer } }
+    by_kennzahl: { type: object, additionalProperties: { type: integer } }
+    income_cents: { type: integer }
+    expenses_cents: { type: integer }
+    profit_cents: { type: integer, description: 'K4' }
+    grundfreibetrag_cents: { type: integer, description: 'K5' }
+    taxable_profit_cents: { type: integer, description: 'K9' }
+    arbeitszimmer_granted: { type: boolean, description: '9275 booked' }
+    arbeitsplatzpauschale: { type: object }
+    ergonomisches_mobiliar: { type: object }
+    e1b_lines: { type: array, items: { type: object } }
+
+E1bStatement:
+  type: object
+  description: Rental income, Werbungskosten and result in integer cents.
+  properties:
+    income_by_kennzahl: { type: object, additionalProperties: { type: integer } }
+    expense_by_kennzahl: { type: object, additionalProperties: { type: integer } }
+    income_cents: { type: integer, description: 'E7' }
+    werbungskosten_cents: { type: integer, description: 'E10:E15' }
+    result_cents: { type: integer, description: 'E18 / KZ 9414' }
+
+# --- B06 Reise- & Fahrtkosten ------------------------------------------------
+TravelTripInput:
+  type: object
+  required: [invoice_no, business_year]
+  properties:
+    invoice_no: { type: string, maxLength: 64, description: 'BELEGNUMMER (EUE-077); not unique' }
+    business_year: { type: integer, minimum: 2000, maximum: 2100 }
+    purpose: { type: string, maxLength: 190, description: 'VERANLASSUNG (EUE-079)' }
+    location: { type: string, maxLength: 190, description: 'EINSATZORT / GEBIET' }
+    project_id: { type: [integer, 'null'] }
+    notes: { type: string, maxLength: 500 }
+
+TravelRowInput:
+  type: object
+  description: |
+    All monetary inputs are integer cents; durations are integer minutes and
+    clock times are HH:MM. One 12-hour travel day is 720 minutes. Distances are
+    either the odometer pair or `distance_km`, never both (EUE-067). The
+    business share must be a multiple of five (5 % steps, #30); when omitted
+    it is derived from the BT/PT times by TravelRules (EUE-072).
+  properties:
+    invoice_no: { type: string, description: 'Voucher for the preview endpoint' }
+    business_year: { type: integer }
+    country: { type: string }
+    transport: { type: string, enum: ['PKW oder Kombi', 'Motorrad', 'Fahrrad oder E-Bike'] }
+    start_date: { type: [string, 'null'], format: date }
+    start_time: { type: [string, 'null'] }
+    end_date: { type: [string, 'null'], format: date }
+    end_time: { type: [string, 'null'] }
+    start_odo: { type: [integer, 'null'] }
+    end_odo: { type: [integer, 'null'] }
+    distance_km: { type: [integer, 'null'] }
+    already_booked_km: { type: integer, minimum: 0, description: 'EUE-065 quota carry-in' }
+    passengers: { type: integer, minimum: 0, description: 'Engine clamps to 6/1 (EUE-066)' }
+    meals: { type: integer, minimum: 0, maximum: 2 }
+    nights: { type: integer, minimum: 0, maximum: 366 }
+    domestic: { type: boolean }
+    daily_rate_cents: { type: [integer, 'null'], minimum: 0 }
+    country_night_cents: { type: [integer, 'null'], minimum: 0 }
+    day_number: { type: integer, minimum: 1, description: '5-day rule counter (EUE-070)' }
+    night_number: { type: integer, minimum: 0, description: '15-night rule counter (EUE-070)' }
+    twelfths_minutes: { type: [integer, 'null'], description: 'Imported FR!AL3 travel time in minutes; one 12 h day = 720' }
+    business_time_minutes: { type: integer, minimum: 0 }
+    private_time_minutes: { type: integer, minimum: 0 }
+    business_share_percent: { type: integer, minimum: 0, maximum: 100, multipleOf: 5 }
+    private: { type: boolean, description: 'EUE-073' }
+    hin_rueckfahrt: { type: boolean, description: 'EUE-071' }
+    veranlassung: { type: string }
+    einsatzort: { type: string }
+
+TravelCosts:
+  type: object
+  description: Engine result for one row; every amount is integer cents.
+  properties:
+    km: { type: integer }
+    drive_cents: { type: integer }
+    per_diem_cents: { type: integer }
+    overnight_cents: { type: integer }
+    total_cents: { type: integer, description: 'BA + BB + BC (EUE-081)' }
+    business_share_percent: { type: integer }
+    business_cents: { type: integer }
+
+TravelRow:
+  type: object
+  properties:
+    data: { type: object, description: 'Persisted row fields' }
+    costs: { $ref: './schemas.yaml#/TravelCosts' }
+    derived_share_percent: { type: integer, description: 'Exact BT/PT ratio before 5-step rounding' }
+    twelfths_minutes: { type: integer, description: 'Travel time in minutes; one 12 h day = 720' }
+    business_days: { type: integer }
+    limits: { type: object }
+    outbound_return: { type: boolean }
+    hin_rueckfahrt: { type: boolean }
+    voucher_hours_minutes: { type: integer, description: 'Voucher hours; 3 h threshold = 180' }
+    remaining_quota_km: { type: integer }
+    status: { type: string }
+    warnings: { type: array, items: { type: string } }
+
+TravelTrip:
+  type: object
+  properties:
+    id: { type: integer }
+    invoice_no: { type: string }
+    business_year: { type: integer }
+    purpose: { type: string }
+    location: { type: string }
+    project_id: { type: [integer, 'null'] }
+    notes: { type: string }
+    rows: { type: array, items: { $ref: './schemas.yaml#/TravelRow' } }
+    totals: { $ref: './schemas.yaml#/TravelCosts' }
+    warnings: { type: array, items: { type: string } }
+    voucher_hours_minutes: { type: integer, description: 'Voucher hours; 3 h threshold = 180' }
+    catalogue: { type: object }
+    field_help: { type: object }
+
+TravelList:
+  type: object
+  properties:
+    year: { type: integer }
+    trips: { type: array, items: { $ref: './schemas.yaml#/TravelTrip' } }
+    totals: { $ref: './schemas.yaml#/TravelCosts' }
+    warnings: { type: array, items: { type: string } }
+    catalogue: { type: object }
+    field_help: { type: object }
+
+TravelSummary:
+  type: object
+  properties:
+    year: { type: integer }
+    month: { type: [integer, 'null'] }
+    total_cents: { type: integer }
+    business_cents: { type: integer, description: 'fr_betriebsausgaben contribution' }
+    row_count: { type: integer }
+    warnings: { type: array, items: { type: string } }
+
+TravelPreview:
+  type: object
+  properties:
+    row: { $ref: './schemas.yaml#/TravelRow' }
+    totals: { $ref: './schemas.yaml#/TravelCosts' }
+    warnings: { type: array, items: { type: string } }
+
+EigenbelegTravel:
+  type: object
+  description: |
+    Travel metadata stored as JSONB on an expense entry. Durations are integer
+    minutes; clock times and `date_from`/`date_to` stay HH:MM / date points in
+    time. The canonical signature-hash projection maps `hours_per_day_minutes`
+    back to the legacy float `hours_per_day`, so existing signatures stay valid.
+  properties:
+    type: { type: string, enum: [travel] }
+    from: { type: string }
+    to: { type: string }
+    purpose: { type: string }
+    country: { type: string }
+    kilometers: { type: number }
+    vehicle: { type: string }
+    days: { type: integer, minimum: 0, maximum: 366 }
+    nights: { type: integer, minimum: 0, maximum: 366 }
+    hours_per_day_minutes: { type: integer, minimum: 0, maximum: 720, default: 480, description: '8 h = 480; 12 h = 720; one 12 h travel day = 720' }
+    date_from: { type: string, format: date }
+    date_to: { type: string, format: date }
+    note: { type: string }
+    request_id: { type: string, format: uuid }
+
+HoursEntryInput:
+  type: object
+  required: [voucher, month, hours_minutes]
+  properties:
+    voucher: { type: string, description: 'References a travel BELEGNUMMER (EUE-080)' }
+    month: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' }
+    project: { type: string }
+    hours_minutes: { type: integer, minimum: 0, description: 'Integer minutes; 3 h = 180. Fractional values are rejected (422).' }
+    description: { type: string }
+    change_reason: { type: string, description: 'Required when the month is signed' }
+
+HoursEntry:
+  type: object
+  properties:
+    id: { type: integer }
+    voucher: { type: string }
+    month: { type: string }
+    project: { type: string }
+    hours_minutes: { type: integer, description: 'Integer minutes; 3 h = 180' }
+    description: { type: string }
+    created_at: { type: string, format: date-time }
+
+HoursLedger:
+  type: object
+  properties:
+    voucher: { type: [string, 'null'] }
+    month: { type: [string, 'null'] }
+    project: { type: [string, 'null'] }
+    hours_minutes: { type: integer, description: 'Integer minutes; 3 h = 180' }
+    entries: { type: array, items: { $ref: './schemas.yaml#/HoursEntry' } }
+
+JournalEntry:
+  type: object
+  description: |
+    One E/A journal row. All amounts are integer cents; rates are exact integer
+    fractions rounded half-up per line. `e1a_code` is the workbook Art mapping
+    with the 9040/9230 fallback; E1B 9460 rental rows carry no business income.
+  properties:
+    id: { type: integer }
+    report_id: { type: integer }
+    line_no: { type: integer }
+    kind: { type: string, enum: [income, expense] }
+    category: { type: string }
+    description: { type: string }
+    entry_date: { type: string, format: date }
+    amount_cents: { type: integer }
+    business_share: { type: integer, minimum: 0, maximum: 100, multipleOf: 5 }
+    business_amount_cents: { type: integer }
+    private_amount_cents: { type: integer }
+    voucher_no: { type: string }
+    month: { type: string, description: 'German month name; 0 = explicitly blank' }
+    day: { type: integer, minimum: 0 }
+    entry_type: { type: string }
+    vat_type: { type: string }
+    e1a_code: { type: string, description: 'E1A fallback 9040/9230 or E1B 9460' }
+    ig_vat_cents: { type: integer }
+    rc_vat_cents: { type: integer }
+    rental_income_cents: { type: integer }
+    business_income_cents: { type: integer }
+    business_expense_cents: { type: integer }
+    rental: { type: boolean }
+    warnings: { type: array, items: { type: string } }
+
+WarehouseRowInput:
+  type: object
+  required: [voucher_no, month, supplier, goods_description, entry_type, net_amount_cents, business_share]
+  properties:
+    voucher_no: { type: string, description: 'WE* rows derive a business amount; other numbers are reconciled with the A sheet' }
+    month: { type: string, description: 'German month name or empty for the workbook warning' }
+    day: { type: [integer, 'null'], minimum: 1, maximum: 31 }
+    supplier: { type: string }
+    goods_description: { type: string }
+    comment: { type: string }
+    payment_method: { type: string }
+    entry_type: { type: string, description: 'Expense Art from the settings catalogue' }
+    net_amount_cents: { type: integer, minimum: 0 }
+    business_share: { type: integer, minimum: 0, maximum: 100, multipleOf: 5 }
+    entry_id: { type: [integer, 'null'] }
+    business_year: { type: integer, description: 'Defaults to the current year' }
+
+WarehouseRow:
+  type: object
+  description: WEB row with the derived cent amount and the exact row-check warnings.
+  properties:
+    id: { type: integer }
+    tenant_id: { type: integer }
+    business_year: { type: integer }
+    voucher_no: { type: string }
+    month: { type: string }
+    day: { type: [integer, 'null'] }
+    supplier: { type: string }
+    goods_description: { type: string }
+    comment: { type: string }
+    payment_method: { type: string }
+    entry_type: { type: string }
+    net_amount_cents: { type: integer }
+    business_share: { type: integer }
+    entry_id: { type: [integer, 'null'] }
+    is_we: { type: boolean }
+    business_amount_cents: { type: [integer, 'null'], description: 'Null for non-WE voucher numbers' }
+    a_line_no: { type: [integer, 'null'], description: 'Line number of the matching A-sheet expense' }
+    warnings: { type: array, items: { type: string } }
+    created_at: { type: string, format: date-time }
+    updated_at: { type: string, format: date-time }
+
+Error:
+  type: object
+  description: German error message with a resolution hint and a stable code.
+  required: [error, action, code]
+  properties:
+    error: { type: string }
+    action: { type: string }
+    code: { type: string }

@@ -9,6 +9,14 @@ use App\Http\Controllers\ContractJoinController;
 use App\Http\Controllers\CouponAdminController;
 use App\Http\Controllers\CouponCheckoutController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\Eur\EurAssetController;
+use App\Http\Controllers\Eur\EurEntryController;
+use App\Http\Controllers\Eur\EurIncomeTaxController;
+use App\Http\Controllers\Eur\EurReferenceController;
+use App\Http\Controllers\Eur\EurSettingsController;
+use App\Http\Controllers\Eur\EurSummaryController;
+use App\Http\Controllers\Eur\EurTravelController;
+use App\Http\Controllers\Eur\EurVatController;
 use App\Http\Controllers\FileDeliveryController;
 use App\Http\Controllers\FtpController;
 use App\Http\Controllers\FtpCredentialController;
@@ -283,6 +291,26 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::put('/management/settings/license-terms', [SettingsController::class, 'updateLicenseTerms'])->name('api.management.settings.license-terms');
     // Volume-Presets lesen ist für alle Management-Rollen (Gallery-Zuordnung); Schreiben nur Super-Admin (unten).
     Route::get('/management/settings/volume-presets', [VolumePresetController::class, 'index'])->name('api.management.settings.volume-presets.index');
+
+    // EÜR (Portal #22–#30): Referenzdaten, Buchungen, Anlagen, Übersicht.
+    // Alle Antworten sind brand-scoped; Geld ist ganzzahlige Cent.
+    Route::get('/management/eur/reference', [EurReferenceController::class, 'show'])->name('api.management.eur.reference');
+    Route::get('/management/eur/settings', [EurSettingsController::class, 'show'])->name('api.management.eur.settings');
+    Route::put('/management/eur/settings', [EurSettingsController::class, 'update'])->name('api.management.eur.settings.update')->middleware('super_admin');
+    Route::get('/management/eur/summary', [EurSummaryController::class, 'show'])->name('api.management.eur.summary');
+    Route::get('/management/eur/entries', [EurEntryController::class, 'index'])->name('api.management.eur.entries.index');
+    Route::post('/management/eur/entries', [EurEntryController::class, 'store'])->name('api.management.eur.entries.store');
+    Route::put('/management/eur/entries/{id}', [EurEntryController::class, 'update'])->name('api.management.eur.entries.update');
+    Route::delete('/management/eur/entries/{id}', [EurEntryController::class, 'destroy'])->name('api.management.eur.entries.destroy');
+    Route::get('/management/eur/assets', [EurAssetController::class, 'index'])->name('api.management.eur.assets.index');
+    Route::get('/management/eur/assets/compare', [EurAssetController::class, 'compare'])->name('api.management.eur.assets.compare');
+    Route::post('/management/eur/vat/calc', [EurVatController::class, 'calculate'])->name('api.management.eur.vat.calc');
+    Route::post('/management/eur/travel/calc', [EurTravelController::class, 'calculate'])->name('api.management.eur.travel.calc');
+    Route::post('/management/eur/est/calc', [EurIncomeTaxController::class, 'calculate'])->name('api.management.eur.est.calc');
+    Route::post('/management/eur/assets', [EurAssetController::class, 'store'])->name('api.management.eur.assets.store');
+    Route::get('/management/eur/assets/{id}/plan', [EurAssetController::class, 'plan'])->name('api.management.eur.assets.plan');
+    Route::post('/management/eur/assets/{id}/switch-to-linear', [EurAssetController::class, 'switchToLinear'])->name('api.management.eur.assets.switch');
+    Route::delete('/management/eur/assets/{id}', [EurAssetController::class, 'destroy'])->name('api.management.eur.assets.destroy');
     // R-01: Billing-/Impressum-Konfiguration ist ein Super-Admin-Anliegen (s. isImpressumMissing-
     // Gate im Frontend) → zusätzlich super_admin-gesichert. Lesen (GET /settings/billing-details)
     // bleibt auth:api, da Klienten die Bankdaten für "Kauf auf Rechnung" brauchen.

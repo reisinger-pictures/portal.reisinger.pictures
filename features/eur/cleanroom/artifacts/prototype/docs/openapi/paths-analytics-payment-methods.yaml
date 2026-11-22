@@ -1,0 +1,65 @@
+get:
+  operationId: getPaymentMethodReconciliation
+  summary: ZA saldo per payment method and month
+  description: |
+    W3/B10 (EUE-122). Gross cents from E are inflows, A and WEB are outflows;
+    the running saldo starts with the tenant's opening balance. Unknown or blank
+    payment methods are not silently dropped: their cents appear in the
+    unassigned figures and turn the ✓✓ control into a "Fehler (Δ €)". The two
+    directions are compared independently, so equal in/out orphan amounts
+    cannot cancel out into a false ✓✓. Tenant-scoped, read-only.
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+  responses:
+    '200':
+      description: ZA payload.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, sheet, methods, months, check]
+            properties:
+              year: { type: integer }
+              sheet: { type: string, const: ZA }
+              methods:
+                type: array
+                items:
+                  type: object
+                  required: [name, opening_balance_cents, months, saldo_cents, check]
+                  properties:
+                    name: { type: string }
+                    opening_balance_cents: { type: integer }
+                    months:
+                      type: array
+                      items:
+                        type: object
+                        required: [month, name, in_cents, out_cents, web_out_cents, saldo_cents]
+                        properties:
+                          month: { type: integer, minimum: 1, maximum: 12 }
+                          name: { type: string }
+                          in_cents: { type: integer }
+                          out_cents: { type: integer }
+                          web_out_cents: { type: integer }
+                          saldo_cents: { type: integer }
+                    in_cents: { type: integer }
+                    out_cents: { type: integer }
+                    web_out_cents: { type: integer }
+                    saldo_cents: { type: integer }
+                    check: { type: string }
+              control_in_cents: { type: integer }
+              control_out_cents: { type: integer }
+              method_in_cents: { type: integer }
+              method_out_cents: { type: integer }
+              unassigned_in_cents: { type: integer }
+              unassigned_out_cents: { type: integer }
+              check: { type: string }
+              check_expected_cents: { type: integer }
+              check_actual_cents: { type: integer }
+              in_delta_cents: { type: integer }
+              out_delta_cents: { type: integer }
+              field_help: { type: object }
+    '422':
+      $ref: '#/components/responses/Validation'

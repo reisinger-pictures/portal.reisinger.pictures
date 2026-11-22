@@ -1,0 +1,152 @@
+{
+  "DEG-001": {
+    "status": "covered",
+    "unit": [
+      "DEG-001 stores the method and the rate"
+    ],
+    "e2e": [
+      "Degressive AfA: Vergleich, Erinnerung und einmaliger Wechsel (DEG-001 – DEG-014)"
+    ]
+  },
+  "DEG-002": {
+    "status": "covered",
+    "unit": [
+      "DEG-002 rejects a degressive rate of 31 %",
+      "DEG-002 rejects a degressive rate of 0 %",
+      "DEG-002 rejects a degressive rate on a linear asset"
+    ],
+    "e2e": [
+      "Degressive AfA: Satzgrenzen und Ausschlüsse werden abgelehnt (DEG-002/006/007/008)"
+    ]
+  },
+  "DEG-003": {
+    "status": "covered",
+    "unit": [
+      "DEG-003 year 1 takes 30 % of 20.000,00 € (6.000,00 €)",
+      "DEG-003 years 2-3 take 30 % of the reduced book value"
+    ],
+    "e2e": [
+      "Degressive AfA: Vergleich, Erinnerung und einmaliger Wechsel (DEG-001 – DEG-014)"
+    ]
+  },
+  "DEG-004": {
+    "status": "covered",
+    "unit": [
+      "DEG-004 the last year writes off the remainder and keeps the 0,01 € memory value"
+    ],
+    "e2e": [
+      "Degressive AfA: Vergleich, Erinnerung und einmaliger Wechsel (DEG-001 – DEG-014)"
+    ]
+  },
+  "DEG-005": {
+    "status": "covered",
+    "unit": [
+      "DEG-005 a July acquisition takes half the first-year rate"
+    ],
+    "e2e": [
+      "Degressive AfA: Satzgrenzen und Ausschlüsse werden abgelehnt (DEG-002/006/007/008)"
+    ]
+  },
+  "DEG-006": {
+    "status": "covered",
+    "unit": [
+      "DEG-006 rejects degressive AfA for used goods"
+    ],
+    "e2e": [
+      "Degressive AfA: Satzgrenzen und Ausschlüsse werden abgelehnt (DEG-002/006/007/008)"
+    ]
+  },
+  "DEG-007": {
+    "status": "covered",
+    "unit": [
+      "DEG-007 rejects immaterial goods without an exception",
+      "DEG-007 allows the documented digitalisation exception"
+    ],
+    "e2e": [
+      "Degressive AfA: Satzgrenzen und Ausschlüsse werden abgelehnt (DEG-002/006/007/008)"
+    ]
+  },
+  "DEG-008": {
+    "status": "covered",
+    "unit": [
+      "DEG-008 rejects goods with a statutory special depreciation",
+      "DEG-008 allows degressive AfA for electric cars"
+    ],
+    "e2e": [
+      "Degressive AfA: Satzgrenzen und Ausschlüsse werden abgelehnt (DEG-002/006/007/008)"
+    ]
+  },
+  "DEG-009": {
+    "status": "covered",
+    "unit": [
+      "DEG-009 a switch in the acquisition year is rejected",
+      "DEG-009 a second switch is rejected",
+      "DEG-009 a linear asset cannot switch to degressive",
+      "DEG-009 the once-only rule also covers a booked asset",
+      "DEG-009 a later booked year blocks the switch"
+    ],
+    "e2e": [
+      "Degressive AfA: Vergleich, Erinnerung und einmaliger Wechsel (DEG-001 – DEG-014)"
+    ]
+  },
+  "DEG-010": {
+    "status": "covered",
+    "unit": [
+      "DEG-010 switching in year 8 spreads 1.647,09 € over the three remaining years",
+      "DEG-010 the switch stores the year and applies the linear remainder"
+    ],
+    "e2e": [
+      "Degressive AfA: Vergleich, Erinnerung und einmaliger Wechsel (DEG-001 – DEG-014)"
+    ]
+  },
+  "DEG-011": {
+    "status": "covered",
+    "unit": [
+      "DEG-011 recommends the first year where linear reaches the degressive rate",
+      "DEG-011 shows the annual gain and the peak advantage until the end of life"
+    ],
+    "e2e": [
+      "Degressive AfA: Vergleich, Erinnerung und einmaliger Wechsel (DEG-001 – DEG-014)"
+    ]
+  },
+  "DEG-012": {
+    "status": "covered",
+    "unit": [
+      "DEG-012 compares both methods with the same engine",
+      "DEG-012 the comparison endpoint returns both plans in cents"
+    ],
+    "e2e": [
+      "Degressive AfA: Vergleich, Erinnerung und einmaliger Wechsel (DEG-001 – DEG-014)"
+    ]
+  },
+  "DEG-013": {
+    "status": "covered",
+    "unit": [
+      "DEG-013 the asset carries a non-blocking switch reminder",
+      "DEG-013 the reminder disappears after the switch"
+    ],
+    "e2e": [
+      "Degressive AfA: Vergleich, Erinnerung und einmaliger Wechsel (DEG-001 – DEG-014)"
+    ]
+  },
+  "DEG-014": {
+    "status": "covered",
+    "unit": [
+      "DEG-014 a switch without a reason is rejected",
+      "DEG-014 a switch after a booked year is still allowed for later years"
+    ],
+    "e2e": [
+      "Degressive AfA: Vergleich, Erinnerung und einmaliger Wechsel (DEG-001 – DEG-014)"
+    ]
+  },
+  "DEG-015": {
+    "status": "covered",
+    "unit": [
+      "DEG-015 a correct degressive plan raises no EUE-056 false alarm",
+      "DEG-015 EUE-056 expects the chosen degressive plan"
+    ],
+    "e2e": [
+      "Degressive AfA: Vergleich, Erinnerung und einmaliger Wechsel (DEG-001 – DEG-014)"
+    ]
+  }
+}

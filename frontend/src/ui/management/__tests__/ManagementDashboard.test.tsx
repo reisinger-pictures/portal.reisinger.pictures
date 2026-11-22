@@ -149,6 +149,7 @@ describe('ManagementDashboard AI configuration notice', () => {
                 finanzamt: 'Finanzamt Wien',
                 uid: 'ATU12345678',
                 rechtsform: 'GmbH',
+                branchenkennzahl: '742',
             },
             isLoading: false,
             updateBillingDetails: vi.fn(),

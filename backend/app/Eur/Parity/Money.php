@@ -26,6 +26,44 @@ final class Money
         return self::scaledInt(self::decimal($hours), '60');
     }
 
+    /**
+     * Anteil 0.0–1.0 → ganze Prozent 0–100 (z. B. 0.6 → 60).
+     */
+    public static function fractionToPercent(float|int|string $fraction): int
+    {
+        return self::scaledInt(self::decimal($fraction), '100');
+    }
+
+    /**
+     * Anteil 0.0–1.0 → Basispunkte (1/10000), z. B. 0.068 → 680.
+     */
+    public static function fractionToPer10000(float|int|string $fraction): int
+    {
+        return self::scaledInt(self::decimal($fraction), '10000');
+    }
+
+    /**
+     * Rundet einen bereits in Cent ausgedrückten Dezimalwert kaufmännisch.
+     */
+    public static function roundCents(float|int|string $cents): int
+    {
+        return self::scaledInt(self::decimal($cents), '1');
+    }
+
+    /**
+     * Teilt einen Cent-Betrag und rundet kaufmännisch auf ganze Cent.
+     */
+    public static function divideCents(int $cents, float|int|string $divisor): int
+    {
+        $decimal = self::decimal($divisor);
+
+        if (bccomp($decimal, '0', 8) === 0) {
+            throw new InvalidArgumentException('Division durch null.');
+        }
+
+        return self::roundCents(bcdiv((string) $cents, $decimal, 8));
+    }
+
     public static function applyShare(int $cents, float|string $share = 1.0): int
     {
         return self::scaledInt((string) $cents, self::decimal($share));

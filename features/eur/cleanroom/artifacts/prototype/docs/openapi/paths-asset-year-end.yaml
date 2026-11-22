@@ -1,0 +1,37 @@
+post:
+  operationId: bookAssetYearEnd
+  summary: Book all open asset AfA amounts in December
+  description: |
+    Idempotent per asset and year. Only the selected year is written; the
+    previous year stays untouched. A signed December requires `change_reason`
+    (code `change_reason_required`), as in #14/#20.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [year]
+          properties:
+            year: { type: integer, minimum: 2000, maximum: 2100 }
+            change_reason: { type: string, maxLength: 500 }
+  responses:
+    '200':
+      description: Booking summary.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, booked, skipped, total_afa_cents, total_business_cents, total_private_cents, entries]
+            properties:
+              year: { type: integer }
+              booked: { type: integer }
+              skipped: { type: integer }
+              total_afa_cents: { type: integer }
+              total_business_cents: { type: integer }
+              total_private_cents: { type: integer }
+              entries:
+                type: array
+                items: { type: integer }
+    '422':
+      $ref: '#/components/responses/Validation'

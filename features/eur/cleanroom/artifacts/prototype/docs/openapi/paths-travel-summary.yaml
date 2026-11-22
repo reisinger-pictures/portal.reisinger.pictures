@@ -1,0 +1,25 @@
+get:
+  operationId: getTravelSummary
+  summary: Aggregated business travel expense by year and month
+  description: |
+    Sums the engine-computed business cents of every row in the year,
+    optionally restricted to one calendar month (1–12). The value is the
+    fr_betriebsausgaben contribution forwarded into monthly and project
+    evaluations (EUE-081).
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, minimum: 2000, maximum: 2100 }
+    - name: month
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 12 }
+  responses:
+    '200':
+      description: Gross and business totals in integer cents plus row count.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/TravelSummary' }
+    '422':
+      $ref: '#/components/responses/Validation'

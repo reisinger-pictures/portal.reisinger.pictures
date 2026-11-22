@@ -1,0 +1,34 @@
+get:
+  operationId: getTax
+  summary: Income tax, tariff and allocation for one business year
+  description: |
+    Aggregates the tenant's booked E1A/E1B journal lines with the pure tax
+    engine and returns total income (U14), the five tariff stages (U17:U21 and
+    U23), the Grundfreibetrag, the tax allocation (U24/U25/U27), prepayments
+    (U26/U28) and the balance (U29). Every monetary value is integer cents;
+    rates are exact integer fractions. Only 2024–2026 are supported.
+
+    This is clean-room workbook logic, not tax advice. The external legal
+    review of the tariff, allowances and classification remains an open gate.
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+    - name: mode
+      in: query
+      required: false
+      description: |
+        Optional, non-persisting mode override for what-if comparison. The
+        stored mode is used when this parameter is omitted.
+      schema:
+        type: string
+        enum: [Gesamt, 'Nur Betrieb', 'Nur Vermietung', 'Mit Prognose', 'Nur Bruttolohn', 'Nur andere Gewinne']
+  responses:
+    '200':
+      description: Full tax statement with tariff and allocation.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/TaxResult' }
+    '422':
+      $ref: '#/components/responses/Validation'

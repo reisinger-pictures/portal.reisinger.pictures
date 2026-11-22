@@ -1,0 +1,37 @@
+get:
+  operationId: getMonthlyReconciliation
+  summary: Journal completeness checks shown in the monthly sheet
+  description: |
+    Same tenant-scoped EUE-129 payload as /analytics/reconciliation, exposed
+    under /monthly so the Monat tab can show ✓/✓✓ or "Fehler (Δ €)" inline.
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+  responses:
+    '200':
+      description: Five completeness checks with integer-cent deltas.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, checks, all_ok]
+            properties:
+              year: { type: integer }
+              all_ok: { type: boolean }
+              checks:
+                type: array
+                items:
+                  type: object
+                  required: [key, label, expected_cents, actual_cents, delta_cents, marker]
+                  properties:
+                    key: { type: string, enum: [be_art, ba_art, za, e1a, e1b] }
+                    label: { type: string }
+                    expected_cents: { type: integer }
+                    actual_cents: { type: integer }
+                    delta_cents: { type: integer }
+                    marker: { type: string }
+              field_help: { type: object }
+    '422':
+      $ref: '#/components/responses/Validation'

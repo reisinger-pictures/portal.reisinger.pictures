@@ -1,0 +1,25 @@
+get:
+  operationId: getSettings
+  summary: Tenant settings and reference catalogues
+  description: |
+    Returns company profile, social-insurance settings, payment methods,
+    entry types (with E1A codes and default business shares), VAT types,
+    vehicles, customers, projects and the Kennzahlen help reference. All rows
+    are tenant-scoped; catalogues are seeded lazily and idempotently.
+  responses:
+    '200':
+      description: Settings payload.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              company: { type: object }
+              sv: { type: object }
+              payment_methods: { type: array, items: { type: object } }
+              entry_types: { type: array, items: { type: object } }
+              vat_types: { type: array, items: { type: object } }
+              vehicles: { type: array, items: { type: object } }
+              customers: { type: array, items: { $ref: './schemas.yaml#/Customer' } }
+              projects: { type: array, items: { $ref: './schemas.yaml#/Project' } }
+              reference: { type: object }

@@ -1,0 +1,57 @@
+get:
+  operationId: listAssets
+  summary: Asset register for one business year
+  description: |
+    Returns every asset of the tenant with its full plan. `assets[].years`
+    contains one row per year from acquisition to end of useful life; every
+    monetary value is integer cents. `useful_life_years` is a NUMERIC(4,1)
+    string (`0` = not depreciable, otherwise 2–99). Shares are 5 % steps.
+  parameters:
+    - name: year
+      in: query
+      required: false
+      schema: { type: integer, minimum: 2000, maximum: 2100 }
+  responses:
+    '200':
+      description: Register and yearly summary.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, assets, summary]
+            properties:
+              year: { type: integer }
+              assets:
+                type: array
+                items: { $ref: './schemas.yaml#/Asset' }
+              summary:
+                type: object
+                properties:
+                  afa_cents: { type: integer }
+                  business_cents: { type: integer }
+                  private_cents: { type: integer }
+                  book_value_cents: { type: integer }
+                  open_count: { type: integer }
+                  booked_count: { type: integer }
+
+post:
+  operationId: createAsset
+  summary: Create an asset and its full AfA plan
+  description: |
+    Validates EUE-052/053/054/058/059. The entry type must carry an AfA E1A
+    code (9130, 9134, 9135, 9500; the catalogue alias `E1B 9500` is accepted
+    as 9500). The business share must be at least 50 % and a multiple of 5.
+    GWG and a missing Entnahme are warnings, not errors.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './schemas.yaml#/AssetInput' }
+  responses:
+    '201':
+      description: Asset with generated plan.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Asset' }
+    '422':
+      $ref: '#/components/responses/Validation'

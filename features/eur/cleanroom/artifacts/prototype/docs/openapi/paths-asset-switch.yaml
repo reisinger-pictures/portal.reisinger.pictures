@@ -1,0 +1,31 @@
+post:
+  operationId: switchAssetToLinear
+  summary: Switch one degressive asset to linear
+  description: |
+    DEG-009/DEG-014. Exactly one switch, at the start of a business year, never
+    in the acquisition year and never for an already booked year. The reason is
+    mandatory and audited. Earlier booked years stay untouched; planned years
+    from the switch year onward are spread linearly over the remaining life.
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [year, change_reason]
+          properties:
+            year: { type: integer, minimum: 2000, maximum: 2100 }
+            change_reason: { type: string, minLength: 1, maxLength: 500 }
+  responses:
+    '200':
+      description: Updated asset with the new plan.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Asset' }
+    '422':
+      $ref: '#/components/responses/Validation'

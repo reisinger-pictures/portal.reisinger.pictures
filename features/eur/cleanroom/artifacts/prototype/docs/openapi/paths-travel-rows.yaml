@@ -1,0 +1,30 @@
+post:
+  operationId: addTravelRow
+  summary: Add a row to a travel trip
+  description: |
+    Stores one travel row and returns it with engine-computed kilometres,
+    drive/per-diem/overnight cents, the 5-step business share and all rule
+    warnings. Money is passed as integer cents, meals as 0/1/2 and the business
+    share in 5 % steps; the exact BT/PT ratio is derived by TravelRules.
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './schemas.yaml#/TravelRowInput' }
+  responses:
+    '201':
+      description: Stored row with computed costs and warnings.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/TravelRow' }
+    '401':
+      $ref: '#/components/responses/Unauthorized'
+    '403':
+      $ref: '#/components/responses/Forbidden'
+    '422':
+      $ref: '#/components/responses/Validation'

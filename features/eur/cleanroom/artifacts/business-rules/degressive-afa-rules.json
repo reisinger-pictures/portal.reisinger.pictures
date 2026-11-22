@@ -1,0 +1,281 @@
+{
+  "meta": {
+    "schema_version": "1.0",
+    "domain": "Degressive AfA in Österreich (Erweiterung zur Clean-Room-Arbeitsmappe)",
+    "source": "https://kalkuel.at/unternehmensratgeber/abschreibung-oesterreich/",
+    "source_title": "Österreich: Abschreibung & Anlagenverzeichnis – Der vollständige Leitfaden",
+    "retrieved": "2026-11-22",
+    "method": "abgeleitet aus einer Sekundärquelle; die Primärquelle (EStG, USP, BMF-Info) und die steuerliche Rechtsprüfung stehen noch aus",
+    "author": "rules-agent",
+    "supported_years": [2024, 2025, 2026],
+    "note": "Die Clean-Room-Arbeitsmappe kennt nur die lineare AfA. Diese Regeln sind bewusste Produkterweiterungen mit eigenen Kennungen (DEG-*), keine EUE-* Regeln. Jede Regel braucht einen Unit- und einen E2E-Beleg; die Nachweisliste steht in business-rules/DEGRESSIVE-AFA.md."
+  },
+  "bereiche": [
+    {
+      "id": "DEG",
+      "name": "Degressive AfA (Erweiterung)",
+      "regeln": [
+        {
+          "id": "DEG-001",
+          "titel": "Methodenwahl im ersten Wirtschaftsjahr",
+          "regeltyp": "Wahlrecht",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "Wahl beim Anlegen des Anlageguts" },
+          "ausloeser": "Beim Anlegen eines abnutzbaren Anlageguts.",
+          "wirkung": "Das Unternehmen wählt für das erste Wirtschaftsjahr linear oder degressiv. Die Wahl ist an das Anlagegut gebunden; ein späterer Wechsel von linear zu degressiv ist nicht zulässig.",
+          "logik": "assets.afa_method ∈ {linear, degressive}. Ein Wechsel linear → degressiv wird mit 422 abgelehnt (DEG-009).",
+          "parameter": [
+            { "name": "Zulässige Methoden", "wert": "linear, degressive", "einheit": "Enum", "hinweis": "" }
+          ],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Unternehmen können im ersten Wirtschaftsjahr entscheiden, welche Methode sie wählen möchten.", "abschnitt": "Degressive Abschreibung" }
+          ],
+          "rechtsgrundlage": "§ 7 EStG (zu verifizieren)",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-002",
+          "titel": "Degressiver Satz bis 30 % des Restwerts",
+          "regeltyp": "Parameter",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "" },
+          "ausloeser": "Bei degressiver Methode.",
+          "wirkung": "Der Satz beträgt 1 bis 30 % des jeweiligen Restwerts, ist frei wählbar und bleibt über die gesamte Nutzungsdauer konstant. In der Praxis wird meist der volle Satz verwendet.",
+          "logik": "degressive_rate_percent ist ganzzahlig, 1 ≤ Satz ≤ 30; 0, 31 oder ein Bruchteil → 422. Der gespeicherte Satz darf nach der ersten Buchung nicht mehr geändert werden.",
+          "parameter": [
+            { "name": "Maximaler degressiver Satz", "wert": 30, "einheit": "%", "hinweis": "bis zu 30 %, frei wählbar" },
+            { "name": "Minimaler degressiver Satz", "wert": 1, "einheit": "%", "hinweis": "0 % wäre keine Abschreibung" }
+          ],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Der Abschreibungssatz beträgt bis zu 30 % des Restwertes pro Jahr und kann frei gewählt werden; dieser Prozentsatz bleibt über die gesamte Nutzungsdauer konstant.", "abschnitt": "Degressive Abschreibung" }
+          ],
+          "rechtsgrundlage": "§ 7 EStG (zu verifizieren)",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-003",
+          "titel": "AfA vom Restbuchwert (geometrisch-degressiv)",
+          "regeltyp": "Berechnung",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "" },
+          "ausloeser": "In jedem Jahr der Nutzungsdauer bei degressiver Methode.",
+          "wirkung": "Die AfA ist der Satz angewendet auf den Restbuchwert zu Jahresbeginn. Der Restbuchwert sinkt entsprechend; die Beträge nehmen jährlich ab.",
+          "logik": "afa_t = round(restbuchwert_t × satz / 100); restbuchwert_t+1 = restbuchwert_t − afa_t. Gerechnet wird in ganzzahligen Cent, eine Rundung je Multiplikation, kein Float.",
+          "parameter": [
+            { "name": "Beispiel Anschaffungskosten", "wert": 20000, "einheit": "EUR", "hinweis": "Quellbeispiel" },
+            { "name": "Beispiel Nutzungsdauer", "wert": 10, "einheit": "Jahre", "hinweis": "Quellbeispiel" },
+            { "name": "Beispiel Satz", "wert": 30, "einheit": "%", "hinweis": "Quellbeispiel" }
+          ],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Jahr 1: 20.000,00 € × 30 % = 6.000,00 €; Jahr 2: 14.000,00 € × 30 % = 4.200,00 €; Jahr 3: 9.800,00 € × 30 % = 2.940,00 €", "abschnitt": "Beispiel der degressiven Abschreibung" }
+          ],
+          "rechtsgrundlage": "§ 7 EStG (zu verifizieren)",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-004",
+          "titel": "Letztes Jahr schreibt den Rest vollständig ab",
+          "regeltyp": "Berechnung",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "Abweichung vom Quellbeispiel: Der Prototyp behält den Erinnerungswert von 0,01 €." },
+          "ausloeser": "Im letzten Jahr der betriebsgewöhnlichen Nutzungsdauer.",
+          "wirkung": "Der verbleibende Restbuchwert wird vollständig abgeschrieben. Die Quelle zeigt 0,00 €; der Prototyp behält konsistent zur linearen AfA 0,01 € als Erinnerungswert.",
+          "logik": "Im letzten Planjahr ist afa = restbuchwert − 0,01 €. Summe aller AfA + 0,01 € = Anschaffungskosten.",
+          "parameter": [
+            { "name": "Mindest-Restbuchwert", "wert": 0.01, "einheit": "EUR", "hinweis": "Produktregel, weicht vom Quellbeispiel (0,00 €) ab" }
+          ],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Im letzten Jahr kann der verbleibende Restbuchwert vollständig abgeschrieben werden.", "abschnitt": "Beispiel der degressiven Abschreibung" }
+          ],
+          "rechtsgrundlage": "§ 7 EStG (zu verifizieren)",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-005",
+          "titel": "Halbjahresregel gilt auch degressiv",
+          "regeltyp": "Berechnung",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "Offener Punkt: Die Quelle stellt auf die Inbetriebnahme ab, der Prototyp speichert nur das Anschaffungsdatum." },
+          "ausloeser": "Im Jahr der Inbetriebnahme (bzw. des Ausscheidens).",
+          "wirkung": "Inbetriebnahme im ersten Halbjahr → voller Jahresbetrag; ab 1. Juli → halber Jahresbetrag. Beim Ausscheiden gilt dasselbe spiegelbildlich (erstes Halbjahr halb, zweites Halbjahr voll).",
+          "logik": "Der degressive Jahresbetrag wird bei Anschaffungsmonat ≥ 7 halbiert (roundDiv(afa, 2)). Der Prototyp verwendet das Anschaffungsdatum als Näherung für die Inbetriebnahme.",
+          "parameter": [
+            { "name": "Halbjahresgrenze", "wert": "01.07.", "einheit": "Datum", "hinweis": "ab Juli halbe AfA" }
+          ],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Für die korrekte Berechnung ist nicht der Anschaffungszeitpunkt entscheidend, sondern der Zeitpunkt der Inbetriebnahme. Wird ein Wirtschaftsgut im ersten Halbjahr in Betrieb genommen, kann der volle Jahresbetrag abgeschrieben werden; ab 1. Juli nur die Hälfte.", "abschnitt": "Halbjahresabschreibung" }
+          ],
+          "rechtsgrundlage": "§ 7 Abs. 1 EStG (zu verifizieren)",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-006",
+          "titel": "Keine degressive AfA für gebrauchte Wirtschaftsgüter",
+          "regeltyp": "Validierung",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "" },
+          "ausloeser": "Methode degressiv und Anlagegut als gebraucht markiert.",
+          "wirkung": "Die degressive Methode wird abgelehnt; das Anlagegut kann nur linear abgeschrieben werden.",
+          "logik": "is_used = true und afa_method = degressive → 422 \"Degressive AfA ist für gebrauchte Wirtschaftsgüter nicht zulässig\".",
+          "parameter": [],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Die degressive AfA ist ausgeschlossen für gebrauchte Wirtschaftsgüter.", "abschnitt": "Degressive Abschreibung – Ausschlüsse" }
+          ],
+          "rechtsgrundlage": "§ 7 EStG (zu verifizieren)",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-007",
+          "titel": "Keine degressive AfA für immaterielle Wirtschaftsgüter (Ausnahmen)",
+          "regeltyp": "Validierung",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "Ausnahmen: Digitalisierung, Ökologisierung, Gesundheit/Life-Science" },
+          "ausloeser": "Methode degressiv und Anlagegut als immateriell markiert.",
+          "wirkung": "Ohne dokumentierte Ausnahme wird die degressive Methode abgelehnt. Mit Ausnahme Digitalisierung, Ökologisierung oder Gesundheit/Life-Science ist sie zulässig.",
+          "logik": "is_immaterial = true und immaterial_exception ∉ {digitalisation, eco, health} → 422. Die Ausnahme wird am Anlagegut gespeichert und angezeigt.",
+          "parameter": [
+            { "name": "Zulässige Ausnahmen", "wert": "digitalisation, eco, health", "einheit": "Enum", "hinweis": "Digitalisierung, Ökologisierung, Gesundheit/Life-Science" }
+          ],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Die degressive AfA ist ausgeschlossen für immaterielle Wirtschaftsgüter (mit Ausnahmen: Digitalisierung, Ökologisierung, Gesundheit/Life-Science).", "abschnitt": "Degressive Abschreibung – Ausschlüsse" }
+          ],
+          "rechtsgrundlage": "§ 7 EStG (zu verifizieren)",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-008",
+          "titel": "Ausschluss gesetzlicher Sonder-AfA; Elektroautos zulässig",
+          "regeltyp": "Validierung",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "Die beschleunigte AfA für Gebäude ist nicht Teil des Anlagenverzeichnisses." },
+          "ausloeser": "Prüfung der Zulässigkeit beim Anlegen.",
+          "wirkung": "Wirtschaftsgüter mit gesetzlicher Sonderform der AfA (z. B. Gebäude) sind von der degressiven Methode ausgeschlossen. Elektroautos sind ausdrücklich zulässig.",
+          "logik": "Gebäude/Sonder-AfA → 422. is_electric_vehicle = true ist kein Ausschlussgrund.",
+          "parameter": [
+            { "name": "Zulässiges Sonderobjekt", "wert": "Elektroauto", "einheit": "Klasse", "hinweis": "Steuerzuckerl" }
+          ],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Ausgeschlossen sind Wirtschaftsgüter mit gesetzlicher Sonderform der AfA. Elektroautos dürfen derzeit degressiv abgeschrieben werden.", "abschnitt": "Degressive Abschreibung – Ausschlüsse / Steuerzuckerl" }
+          ],
+          "rechtsgrundlage": "§ 7 EStG (zu verifizieren)",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-009",
+          "titel": "Einmaliger Wechsel degressiv → linear",
+          "regeltyp": "Wahlrecht",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "" },
+          "ausloeser": "Nutzerentscheidung ab dem zweiten Wirtschaftsjahr.",
+          "wirkung": "Der Wechsel ist genau einmal und nur mit Beginn eines Wirtschaftsjahres möglich. Ein Rückwechsel linear → degressiv ist nicht zulässig.",
+          "logik": "POST /api/assets/{id}/switch-to-linear mit Jahr und Begründung. Voraussetzungen: Methode degressive, switched_to_linear_year ist null, Jahr > Anschaffungsjahr, Jahr ≤ letztes Planjahr, Jahr noch nicht gebucht. Jeder Verstoß → 422.",
+          "parameter": [],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Ein Wechsel von der degressiven zur linearen Abschreibung ist mit Beginn eines Wirtschaftsjahres möglich. Umgekehrt ist ein Wechsel nicht zulässig.", "abschnitt": "Degressive Abschreibung" }
+          ],
+          "rechtsgrundlage": "§ 7 EStG (zu verifizieren)",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-010",
+          "titel": "Wechselbasis ist der Restbuchwert",
+          "regeltyp": "Berechnung",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "" },
+          "ausloeser": "Im Wechseljahr und den Folgejahren.",
+          "wirkung": "Ab dem Wechseljahr wird der Restbuchwert gleichmäßig auf die verbleibenden Jahre verteilt; bereits gebuchte Jahre bleiben unverändert.",
+          "logik": "lineare_rate = round(restbuchwert / verbleibende_jahre); letztes Jahr Rest auf 0,01 €. Beispiel: 20.000 €/10 Jahre/30 %, Wechsel in Jahr 8, Restbuchwert 1.647,09 € → 549,03 € in den Jahren 8 und 9, 549,02 € im letzten Jahr.",
+          "parameter": [
+            { "name": "Beispiel-Restbuchwert vor Wechsel", "wert": 1647.09, "einheit": "EUR", "hinweis": "Quellbeispiel Jahr 8" },
+            { "name": "Beispiel-AfA nach Wechsel", "wert": 549.03, "einheit": "EUR", "hinweis": "Quellbeispiel Jahre 8–9" }
+          ],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Beim Wechsel wird der Restbuchwert als Ausgangsbasis genommen, also die Anschaffungskosten abzüglich aller bisher vorgenommenen Abschreibungen. Beispiel Jahr 8: 1.647,09 € → 549,03 €.", "abschnitt": "Beispiel der degressiven Abschreibung mit Wechsel" }
+          ],
+          "rechtsgrundlage": "§ 7 EStG (zu verifizieren)",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-011",
+          "titel": "Wechselempfehlung, sobald linear ≥ degressiv",
+          "regeltyp": "Berechnung",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "" },
+          "ausloeser": "Bei jeder Berechnung eines degressiven Plans.",
+          "wirkung": "Das System empfiehlt den frühesten Jahresbeginn, an dem der lineare Jahresbetrag auf den Restbuchwert mindestens so hoch ist wie der degressive Jahresbetrag, und zeigt den Vorteil bis Laufzeitende.",
+          "logik": "Für jedes mögliche Wechseljahr y: linear_y = round(restbuchwert_y / verbleibende_jahre), degressiv_y = round(restbuchwert_y × satz / 100). Empfehlung = erstes y mit linear_y ≥ degressiv_y. Vorteil = Summe(Plan mit Wechsel) − Summe(Plan ohne Wechsel), in Cent.",
+          "parameter": [],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Um die maximale Abschreibung zu erzielen, ist es sinnvoll, nach einigen Jahren von der degressiven auf die lineare AfA umzusteigen, nämlich dann, wenn der lineare Jahresbetrag höher ist als der degressive Jahresbetrag.", "abschnitt": "Steuertipp: Maximale Abschreibung" }
+          ],
+          "rechtsgrundlage": "",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-012",
+          "titel": "Vergleichsrechner linear vs. degressiv",
+          "regeltyp": "Abgleich",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "" },
+          "ausloeser": "Beim Anlegen und im Anlagegut-Detail; auch ohne gespeichertes Anlagegut.",
+          "wirkung": "Der Rechner zeigt für beide Methoden AfA, Restbuchwert und kumulierte Abschreibung je Jahr sowie die Differenz über die Gesamtlaufzeit in Cent. Er nutzt dieselbe Engine wie das Anlageverzeichnis.",
+          "logik": "GET /api/assets/compare?cost_cents&useful_life_years&degressive_rate_percent&purchase_year&purchase_month liefert linear[], degressive[], switch{} und difference_cents. Keine Float-Arithmetik.",
+          "parameter": [],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Vergleich der Beispieltabellen linear (2.000,00 €/Jahr) und degressiv (6.000,00 / 4.200,00 / 2.940,00 € …).", "abschnitt": "Beispiel der linearen/degressiven Abschreibung" }
+          ],
+          "rechtsgrundlage": "",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-013",
+          "titel": "Nicht blockierende Wechsel-Erinnerung",
+          "regeltyp": "Abgleich",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "" },
+          "ausloeser": "Übersicht, Anlagegut-Detail und Jahresabschluss, solange ein degressives Gut noch nicht gewechselt ist.",
+          "wirkung": "Ist der Wechsel vorteilhaft, erscheint ein Hinweis mit Empfehlungsjahr und Vorteil. Der Hinweis blockiert keine Buchung und verschwindet nach dem Wechsel.",
+          "logik": "assets[].switch_hint = {year, linear_cents, degressive_cents, advantage_cents} oder null. Das UI zeigt ihn als Warnhinweis, nie als Fehler.",
+          "parameter": [],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Steuertipp: maximaler Abschreibungsvorteil durch rechtzeitigen Wechsel.", "abschnitt": "Steuertipp: Maximale Abschreibung" }
+          ],
+          "rechtsgrundlage": "",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-014",
+          "titel": "Wechsel wird begründet und auditiert",
+          "regeltyp": "Validierung",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "" },
+          "ausloeser": "Beim Wechsel degressiv → linear.",
+          "wirkung": "Der Wechsel verlangt eine Begründung, wird im Audit-Trail festgehalten und verändert keine bereits gebuchten Jahre.",
+          "logik": "change_reason ist Pflicht (422 ohne). Audit-Eintrag asset.switch_to_linear mit Jahr, Satz und Begründung. UPDATE nur auf geplante Jahre ab dem Wechseljahr.",
+          "parameter": [],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Wechsel mit Beginn eines Wirtschaftsjahres; Restbuchwert als Basis.", "abschnitt": "Degressive Abschreibung" }
+          ],
+          "rechtsgrundlage": "§ 7 EStG (zu verifizieren)",
+          "status": "abgeleitet"
+        },
+        {
+          "id": "DEG-015",
+          "titel": "Bestehende AfA-Warnungen werden methodenabhängig",
+          "regeltyp": "Abgleich",
+          "gueltigkeit": { "jahre": [2024, 2025, 2026], "hinweis": "" },
+          "ausloeser": "Plausibilitätsprüfung EUE-056 und Kettenprüfung EUE-057.",
+          "wirkung": "EUE-056 vergleicht die gespeicherte AfA mit dem tatsächlich gewählten Plan (degressiv inklusive Wechseljahr), nicht mehr pauschal mit der linearen AfA. EUE-057 bleibt methodenunabhängig. Korrekte degressive Pläne erzeugen keine Falschwarnung.",
+          "logik": "afaWarning(cost, life, acqYear, acqMonth, years, method, rate, switchYear) erwartet den Plan aus Depreciation::expectedPlan().",
+          "parameter": [],
+          "kennzahlen": ["9130", "9134", "9135", "9500"],
+          "quellen": [
+            { "beleg": "Abgeleitete Konsistenzanforderung aus den bestehenden Regeln EUE-056/057.", "abschnitt": "Produktregel" }
+          ],
+          "rechtsgrundlage": "",
+          "status": "abgeleitet"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+post:
+  operationId: disposeAsset
+  summary: Dispose of an asset and book the remaining book value as E1A 9210
+  description: |
+    Documented workbook extension: the remaining book value after proceeds
+    is booked as an expense in the disposal month. The AfA chain is not
+    changed retroactively.
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [disposed_on]
+          properties:
+            disposed_on: { type: string, format: date }
+            disposal_proceeds_cents: { type: integer, minimum: 0 }
+            change_reason: { type: string, maxLength: 500 }
+  responses:
+    '200':
+      description: Disposed asset including `disposal_loss_cents`.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Asset' }
+    '422':
+      $ref: '#/components/responses/Validation'

@@ -1,0 +1,474 @@
+openapi: 3.1.0
+info:
+  title: EÜR Integration API
+  version: 1.0.0
+  description: |
+    Server-to-server import of invoices and receipts into the EÜR prototype.
+
+    Tokens are tenant-scoped, permission-scoped and never accepted in URLs or
+    logs. Every accepted import is idempotent and audited. The PDF is inspected
+    with `pdfsig`: a cryptographically valid signature with an untrusted
+    certificate is reported as `untrusted` (warning, not a hard failure), an
+    invalid signature is rejected, and an unsigned PDF is only accepted with
+    `allow_unsigned=true`.
+
+    The legacy single `API_TOKEN` service credential is still accepted for
+    `Bearer` requests but is **deprecated**; it carries every scope and the
+    tenant configured in `API_TENANT_ID`. It must not be used for new clients.
+
+    Contract counterpart: `reisinger-pictures/portal.reisinger.pictures#5`
+    (manual upload and verification of signed invoices) and `#6` (anonymous
+    document verification with rate limiting). No webhook is part of this
+    version.
+servers:
+  - url: https://eur.example.at/api
+security:
+  - bearerAuth: []
+paths:
+  # #27 settings/customer/overview endpoints live in per-module files so no
+  # first-party file crosses the 400-line ratchet limit.
+  /overview:
+    $ref: './openapi/paths-overview.yaml'
+  # W3 B10/B11: Auswertungen, Monatsansicht und Vollständigkeit (per-module
+  # path files keep the slim root contract below the 400-line ceiling).
+  /analytics/income-kinds:
+    $ref: './openapi/paths-analytics-income-kinds.yaml'
+  /analytics/expense-kinds:
+    $ref: './openapi/paths-analytics-expense-kinds.yaml'
+  /analytics/payment-methods:
+    $ref: './openapi/paths-analytics-payment-methods.yaml'
+  /analytics/payment-methods/assign:
+    $ref: './openapi/paths-analytics-payment-method-assign.yaml'
+  /analytics/reconciliation:
+    $ref: './openapi/paths-analytics-reconciliation.yaml'
+  /monthly:
+    $ref: './openapi/paths-monthly.yaml'
+  /monthly/burden:
+    $ref: './openapi/paths-monthly-burden.yaml'
+  /monthly/reconciliation:
+    $ref: './openapi/paths-monthly-reconciliation.yaml'
+  /assets/compare:
+    $ref: './openapi/paths-asset-methods.yaml'
+  /assets:
+    $ref: './openapi/paths-assets.yaml'
+  /assets/{id}:
+    $ref: './openapi/paths-asset-item.yaml'
+  /assets/year-end:
+    $ref: './openapi/paths-asset-year-end.yaml'
+  /assets/{id}/private-use:
+    $ref: './openapi/paths-asset-private-use.yaml'
+  /assets/{id}/dispose:
+    $ref: './openapi/paths-asset-dispose.yaml'
+  /assets/{id}/years/{year}:
+    $ref: './openapi/paths-asset-year.yaml'
+  /assets/{id}/comparison:
+    $ref: './openapi/paths-asset-comparison.yaml'
+  /assets/{id}/switch-to-linear:
+    $ref: './openapi/paths-asset-switch.yaml'
+  # B08 tax endpoints live in per-module files (400-line ceiling).
+  /tax:
+    $ref: './openapi/paths-tax.yaml'
+  /tax/settings:
+    $ref: './openapi/paths-tax-settings.yaml'
+  /tax/e1a:
+    $ref: './openapi/paths-tax-e1a.yaml'
+  /tax/e1b:
+    $ref: './openapi/paths-tax-e1b.yaml'
+  # B07 USt-Voranmeldung, Quartale und Erklärung (per-module path files).
+  /vat/return:
+    $ref: './openapi/paths-vat-return.yaml'
+  /vat/quarters:
+    $ref: './openapi/paths-vat-quarters.yaml'
+  /vat/declarations:
+    $ref: './openapi/paths-vat-declarations.yaml'
+  # B06 Reise-/Fahrtkosten and Stundenbuch live in per-module files so the
+  # slim root contract stays below the 400-line ratchet limit.
+  /travel:
+    $ref: './openapi/paths-travel.yaml'
+  /travel/{id}:
+    $ref: './openapi/paths-travel-item.yaml'
+  /travel/{id}/rows:
+    $ref: './openapi/paths-travel-rows.yaml'
+  /travel/{id}/rows/{rowId}:
+    $ref: './openapi/paths-travel-row-item.yaml'
+  /travel/summary:
+    $ref: './openapi/paths-travel-summary.yaml'
+  /travel/preview:
+    $ref: './openapi/paths-travel-preview.yaml'
+  /travel/catalogue:
+    $ref: './openapi/paths-travel-catalogue.yaml'
+  /hours:
+    $ref: './openapi/paths-travel-hours.yaml'
+  /hours/{id}:
+    $ref: './openapi/paths-travel-hours-item.yaml'
+  /customers:
+    $ref: './openapi/paths-customers.yaml'
+  /projects:
+    $ref: './openapi/paths-projects.yaml'
+  # W1 B03/B04 journals, Wareneingangsbuch and the year-compatibility warning.
+  /journals:
+    $ref: './openapi/paths-journals.yaml'
+  /warehouse:
+    $ref: './openapi/paths-warehouse.yaml'
+  /warehouse/reconciliation:
+    $ref: './openapi/paths-warehouse-reconciliation.yaml'
+  /warehouse/{id}:
+    $ref: './openapi/paths-warehouse-item.yaml'
+  /settings:
+    $ref: './openapi/paths-settings.yaml'
+  /settings/year-warning:
+    $ref: './openapi/paths-settings-year-warning.yaml'
+  /settings/{section}:
+    $ref: './openapi/paths-settings-catalogue.yaml'
+  /settings/{section}/{id}:
+    $ref: './openapi/paths-settings-item.yaml'
+  /integrations/invoices:
+    post:
+      operationId: importInvoice
+      summary: Import an invoice or receipt with its PDF
+      description: |
+        Creates a document (kind `upload`) and a matching expense entry in one
+        transaction. The booked amount is always the server-validated
+        `gross_amount_cents`; client-supplied item totals are never used. A failed
+        entry creation removes the document again.
+
+        Requires both `invoices:write` and `documents:write`. Rate limiting is
+        per token, per minute (`INTEGRATION_RATE_LIMIT`, default 60) and counts
+        accepted imports recorded in `integration_requests`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 128
+            pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'
+          description: |
+            Unique per logical import, scoped to the tenant. Replaying the same
+            key with an identical metadata/file body returns 200 with the original
+            ids and `idempotent_replay: true`. The same key **or** the same
+            `external_id` with a different body returns 409.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [metadata, file]
+              properties:
+                metadata:
+                  type: string
+                  description: JSON-encoded InvoiceMetadata object.
+                file:
+                  type: string
+                  format: binary
+                  description: |
+                    PDF, 1 byte to 25 MB (`INTEGRATION_MAX_BYTES`, also honours
+                    `EXTERNAL_SIGNATURE_MAX_BYTES`), must start with `%PDF-`.
+                allow_unsigned:
+                  type: boolean
+                  default: false
+                  description: |
+                    Accept a PDF without a cryptographic signature. The response
+                    then carries `verification.status: unsigned`; without this
+                    flag such a PDF is rejected with 422 `validation_failed`.
+      responses:
+        '201':
+          description: Invoice imported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+        '200':
+          description: Idempotent replay; the original result is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/Validation'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: eur_<prefix>_<secret>
+      description: |
+        Scoped token created with `bin/api-token.php create`. Only a prefix and
+        SHA-256 of the full token are stored. Rotation/widening is done by
+        creating a new token and revoking the old one with `revoke --id=…`.
+  schemas:
+    InvoiceMetadata:
+      type: object
+      required:
+        - external_id
+        - invoice_number
+        - issued_at
+        - gross_amount_cents
+        - category
+        - business_share
+      properties:
+        external_id:
+          type: string
+          maxLength: 190
+          description: Stable id in the source system; unique per tenant.
+        invoice_number:
+          type: string
+          maxLength: 120
+        issued_at:
+          type: string
+          format: date
+        currency:
+          type: string
+          enum: [EUR]
+          default: EUR
+          description: Optional, but only EUR is accepted when supplied.
+        gross_amount_cents:
+          type: integer
+          minimum: 0
+          maximum: 100000000000000
+          description: Gross amount in integer cents, booked as the entry amount. Client totals in items are ignored.
+        net_amount_cents:
+          type: integer
+          minimum: 0
+          maximum: 100000000000000
+        vat_amount_cents:
+          type: integer
+          minimum: 0
+          maximum: 100000000000000
+        category:
+          type: string
+          enum:
+            - Büro
+            - Reise
+            - Werbung
+            - Telefon/Internet
+            - Versicherung
+            - Sonstiges
+        business_share:
+          type: integer
+          minimum: 0
+          maximum: 100
+          multipleOf: 5
+        vendor:
+          type: string
+          maxLength: 190
+        description:
+          type: string
+          maxLength: 500
+        report_period:
+          type: string
+          pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+          description: Optional target month; defaults to the month of issued_at.
+        customer_external_id:
+          type: string
+          maxLength: 190
+          description: |
+            Optional external id of an existing customer. Resolved tenant-scoped;
+            an unknown value returns 422 `unknown_customer_external_id` with an action.
+        project_external_id:
+          type: string
+          maxLength: 190
+          description: |
+            Optional external id of an existing project. Must belong to the given
+            customer; otherwise 422 `unknown_project_external_id` or
+            `project_customer_mismatch`.
+        items:
+          type: array
+          maxItems: 200
+          description: Validated line items; never used to derive the booked amount.
+          items:
+            type: object
+            required: [description, quantity, unit_price_cents]
+            properties:
+              description:
+                type: string
+                maxLength: 300
+              quantity:
+                type: number
+                minimum: 0
+              unit_price_cents:
+                type: integer
+                minimum: 0
+                maximum: 100000000000000
+              vat_rate:
+                type: number
+                minimum: 0
+                maximum: 100
+    ImportResult:
+      type: object
+      required: [entry_id, document_id, report_id, period, verification, idempotent_replay]
+      properties:
+        entry_id:
+          type: integer
+        document_id:
+          type: integer
+        report_id:
+          type: integer
+        period:
+          type: string
+          pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+        idempotent_replay:
+          type: boolean
+        verification:
+          $ref: '#/components/schemas/Verification'
+    Verification:
+      type: object
+      required: [status, signature_valid, certificate_trusted, signer, signed_at, signature_type, pages, sha256]
+      properties:
+        status:
+          type: string
+          enum: [valid, untrusted, unsigned, invalid]
+          description: |
+            `valid` = signature and certificate trusted; `untrusted` = signature
+            valid but certificate not trusted (warning); `unsigned` = no
+            cryptographic signature; `invalid` = rejected before any write.
+        signature_valid:
+          type: boolean
+        certificate_trusted:
+          type: boolean
+        signer:
+          type: [string, 'null']
+        signed_at:
+          type: [string, 'null']
+        signature_type:
+          type: [string, 'null']
+        pages:
+          type: integer
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+    Error:
+      type: object
+      required: [error, action, code]
+      properties:
+        error:
+          type: string
+          description: German, human-readable message.
+        action:
+          type: string
+          description: German resolution hint.
+        code:
+          type: string
+          enum:
+            - invalid_token
+            - insufficient_scope
+            - idempotency_conflict
+            - unsupported_media_type
+            - payload_too_large
+            - validation_failed
+            - pdf_signature_invalid
+            - unknown_customer_external_id
+            - unknown_project_external_id
+            - project_customer_mismatch
+            - rate_limited
+        retry_after:
+          type: integer
+          description: Present only on 429; index.php maps it to the Retry-After header.
+  responses:
+    Unauthorized:
+      description: Missing, malformed, revoked or unknown token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Token ungültig oder abgelaufen
+            action: Neues API-Token erzeugen
+            code: invalid_token
+    Forbidden:
+      description: Token lacks `invoices:write` or `documents:write`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Token darf Rechnungen nicht importieren
+            action: Scope invoices:write vergeben
+            code: insufficient_scope
+    Conflict:
+      description: Idempotency key or external_id reused with a different body.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Idempotency-Key wurde mit anderen Daten verwendet
+            action: Neuen Key verwenden oder ursprüngliche Daten senden
+            code: idempotency_conflict
+    TooLarge:
+      description: PDF exceeds INTEGRATION_MAX_BYTES (default 25 MB).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: PDF ist zu groß (max. 25 MB)
+            action: Datei verkleinern
+            code: payload_too_large
+    UnsupportedMediaType:
+      description: File is not a PDF (header or MIME check failed).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Nur PDF-Dateien sind erlaubt
+            action: Rechnung als PDF senden
+            code: unsupported_media_type
+    Validation:
+      description: Invalid metadata, missing key, or an unsigned/invalid PDF.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            metadata:
+              summary: Metadata or Idempotency-Key invalid
+              value:
+                error: gross_amount_cents muss ein ganzzahliger Centbetrag sein
+                action: Metadaten korrigieren und erneut senden
+                code: validation_failed
+            unsigned:
+              summary: Unsigned PDF without allow_unsigned
+              value:
+                error: Das PDF ist nicht kryptografisch signiert
+                action: Signiertes PDF senden oder allow_unsigned=true setzen
+                code: validation_failed
+            signature:
+              summary: Cryptographic signature invalid or not checkable
+              value:
+                error: Die PDF-Signatur ist ungültig oder nicht prüfbar
+                action: PDF erneut signieren oder allow_unsigned=true verwenden
+                code: pdf_signature_invalid
+    RateLimited:
+      description: Token rate limit (imports per minute) exceeded.
+      headers:
+        Retry-After:
+          description: Seconds until a new import should be attempted.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Zu viele Importe in der letzten Minute
+            action: Nach der Wartezeit erneut versuchen
+            code: rate_limited
+            retry_after: 42

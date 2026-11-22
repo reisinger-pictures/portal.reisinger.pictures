@@ -1,0 +1,43 @@
+get:
+  operationId: getExpenseKindBreakdown
+  summary: BA-ART matrix of business expenses by kind and month
+  description: |
+    W3/B10 (EUE-120). Aggregates business expense cents from A, AV, WEB and FR
+    by kind and workbook month; FR travel costs form their own row. The control
+    cell compares the matrix total with A+AV+WEB+FR and reports "Fehler (Δ €)"
+    with the exact cent delta on a completeness gap. Tenant-scoped, read-only.
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+  responses:
+    '200':
+      description: BA-ART matrix.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, sheet, months, kinds, columns_cents, total_cents, control_cents, check]
+            properties:
+              year: { type: integer }
+              sheet: { type: string, const: BA-ART }
+              months: { type: array, items: { type: string } }
+              kinds:
+                type: array
+                items:
+                  type: object
+                  required: [kind, source, months, total_cents]
+                  properties:
+                    kind: { type: string }
+                    source: { type: string, enum: [A, AV, WEB, FR] }
+                    months: { type: array, items: { type: integer } }
+                    total_cents: { type: integer }
+              columns_cents: { type: array, items: { type: integer } }
+              total_cents: { type: integer }
+              control_cents: { type: integer }
+              check: { type: string, example: '✓✓' }
+              checks: { type: object, additionalProperties: { type: string } }
+              field_help: { type: object }
+    '422':
+      $ref: '#/components/responses/Validation'

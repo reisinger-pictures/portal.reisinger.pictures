@@ -1,0 +1,35 @@
+get:
+  operationId: getYearWarning
+  summary: Non-blocking compatibility warning for a fiscal year
+  description: |
+    Reports the workbook's Einstellungen!D1 compatibility warning for any year
+    without changing the stored fiscal year. Supported years 2024–2026 are
+    silent; newer years ask for the latest table version, older years point to
+    the lifetime licence. The result is advisory (`blocking: false`).
+  parameters:
+    - name: year
+      in: query
+      required: false
+      schema: { type: integer, minimum: 0, maximum: 9999 }
+  responses:
+    '200':
+      description: The warning text and its machine-readable code.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, warning, code, supported, supported_years, blocking]
+            properties:
+              year: { type: integer }
+              warning: { type: string, description: 'Exact workbook wording; empty for supported years' }
+              code: { type: string, enum: [EUE-002, EUE-003] }
+              supported: { type: boolean }
+              supported_years:
+                type: array
+                items: { type: integer, enum: [2024, 2025, 2026] }
+              blocking: { type: boolean, const: false }
+    '422':
+      description: Non-numeric year.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Error' }

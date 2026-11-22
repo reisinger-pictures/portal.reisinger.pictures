@@ -1,0 +1,46 @@
+get:
+  operationId: reconcileWarehouse
+  summary: Cross-check WEB rows against the A-sheet expense journal
+  description: |
+    Both directions of EUE-046: every WEB row reports whether its Belegnummer
+    was found in the A sheet (or is still missing), and every goods-purchase
+    expense without a WEB row is reported back — unless FSVG mode is active.
+    All messages use the exact workbook wordings. Tenant-scoped and read-only.
+  parameters:
+    - name: year
+      in: query
+      required: false
+      schema: { type: integer, minimum: 2000, maximum: 2100 }
+  responses:
+    '200':
+      description: Outstanding messages in both directions.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, web_rows, expense_rows, field_help]
+            properties:
+              year: { type: integer }
+              web_rows:
+                type: array
+                items:
+                  type: object
+                  required: [id, voucher_no, messages]
+                  properties:
+                    id: { type: integer }
+                    voucher_no: { type: string }
+                    messages: { type: array, items: { type: string } }
+              expense_rows:
+                type: array
+                items:
+                  type: object
+                  required: [id, voucher_no, messages]
+                  properties:
+                    id: { type: integer }
+                    voucher_no: { type: string }
+                    messages: { type: array, items: { type: string } }
+              field_help: { type: object }
+    '403':
+      $ref: '#/components/responses/Forbidden'
+    '422':
+      $ref: '#/components/responses/Validation'

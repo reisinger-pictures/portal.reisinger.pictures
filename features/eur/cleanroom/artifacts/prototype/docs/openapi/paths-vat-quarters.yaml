@@ -1,0 +1,37 @@
+get:
+  operationId: getVatQuarters
+  summary: Quarterly USt aggregation H/M/S/X (EUE-087)
+  description: |
+    Sums the twelve monthly results into H (Jan–Mar), M (Apr–Jun), S (Jul–Sep)
+    and X (Oct–Dec). A quarter whose three months are all empty is omitted
+    entirely. Each quarter carries the eight Kennzahlen plus the Zahllast.
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+  responses:
+    '200':
+      description: The populated quarters of the year.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, quarters]
+            properties:
+              year: { type: integer }
+              codes: { type: array, items: { type: string } }
+              labels: { type: object }
+              quarters:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    column: { type: string, enum: [H, M, S, X] }
+                    label: { type: string }
+                    months: { type: array, items: { type: integer } }
+                    kennzahlen: { type: object, additionalProperties: { type: integer, nullable: true } }
+                    zahllast_cents: { type: integer, nullable: true }
+              field_help: { type: object }
+    '422':
+      $ref: '#/components/responses/Validation'

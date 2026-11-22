@@ -1,0 +1,23 @@
+compare:
+  get:
+    operationId: compareAfaMethods
+    summary: Linear vs. degressive AfA for an unsaved asset
+    description: |
+      DEG-011/DEG-012. Returns both plans in integer cents, the earliest
+      recommended switch year (linear rate ≥ degressive rate) and the peak
+      cumulative advantage until the end of useful life. Works without a
+      stored asset and uses the same engine as the register.
+    parameters:
+      - { name: cost_cents, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      - { name: useful_life_years, in: query, required: true, schema: { type: string } }
+      - { name: degressive_rate_percent, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 30, default: 30 } }
+      - { name: purchase_year, in: query, required: false, schema: { type: integer, minimum: 2000, maximum: 2100 } }
+      - { name: purchase_month, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 12, default: 1 } }
+    responses:
+      '200':
+        description: Both plans and the switch recommendation.
+        content:
+          application/json:
+            schema: { type: object }
+      '422':
+        $ref: '#/components/responses/Validation'

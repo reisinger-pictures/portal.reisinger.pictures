@@ -1,0 +1,42 @@
+put:
+  operationId: updateTravelRow
+  summary: Update one row of a travel trip
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    - name: rowId
+      in: path
+      required: true
+      schema: { type: integer }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './schemas.yaml#/TravelRowInput' }
+  responses:
+    '200':
+      description: Updated row with recomputed costs.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/TravelRow' }
+    '422':
+      $ref: '#/components/responses/Validation'
+delete:
+  operationId: deleteTravelRow
+  summary: Delete one row of a travel trip
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    - name: rowId
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    '200':
+      description: Deleted.
+    '404':
+      description: Row not found in this tenant/trip.

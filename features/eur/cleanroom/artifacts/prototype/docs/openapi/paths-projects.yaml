@@ -1,0 +1,18 @@
+get:
+  operationId: listProjects
+  summary: List active tenant projects, optionally filtered by customer
+  description: |
+    Tenant-scoped list of active projects. Archived projects are hidden here
+    but kept for old bookings. `customer_id` narrows the list to one customer.
+  parameters:
+    - name: customer_id
+      in: query
+      schema: { type: integer }
+  responses:
+    '200':
+      description: List of active projects.
+      content:
+        application/json:
+          schema:
+            type: array
+            items: { $ref: './schemas.yaml#/Project' }

@@ -24,6 +24,7 @@ const createBillingDetailsSchema = () => z.object({
     finanzamt: z.string().max(128).optional().or(z.literal('')),
     uid: z.string().max(64).optional().or(z.literal('')),
     rechtsform: z.string().max(128).optional().or(z.literal('')),
+    branchenkennzahl: z.string().max(16).optional().or(z.literal('')),
 });
 
 type BillingFormValues = z.infer<ReturnType<typeof createBillingDetailsSchema>>;
@@ -32,7 +33,7 @@ const EMPTY_DEFAULTS: BillingFormValues = {
     bank_holder: '', bank_iban: '', bank_bic: '',
     company_street: '', company_zip: '', company_city: '',
     company_country: '', company_email: '',
-    steuernummer: '', finanzamt: '', uid: '', rechtsform: '',
+    steuernummer: '', finanzamt: '', uid: '', rechtsform: '', branchenkennzahl: '',
 };
 
 /**
@@ -71,6 +72,7 @@ export default function BillingDetailsCard() {
                 finanzamt: billingDetails.finanzamt ?? '',
                 uid: billingDetails.uid ?? '',
                 rechtsform: billingDetails.rechtsform ?? '',
+                branchenkennzahl: billingDetails.branchenkennzahl ?? '',
             });
         }
     }, [billingDetails, isLoading, reset, isDirty]);
@@ -214,6 +216,14 @@ export default function BillingDetailsCard() {
                                    placeholder={t`z. B. Einzelunternehmen`}
                                    disabled={!canEdit}
                                    {...register('rechtsform')} />
+                        </div>
+                        <div className="form-control">
+                            <label className="label"><span className="label-text font-bold"><Trans>Branchenkennzahl</Trans></span></label>
+                            <input type="text"
+                                   className="input input-bordered"
+                                   placeholder={t`z. B. 742`}
+                                   disabled={!canEdit}
+                                   {...register('branchenkennzahl')} />
                         </div>
                     </div>
 

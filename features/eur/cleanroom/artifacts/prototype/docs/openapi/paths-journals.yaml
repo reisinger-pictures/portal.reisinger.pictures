@@ -1,0 +1,46 @@
+get:
+  operationId: getJournals
+  summary: E/A journals with workbook Kennzahlen, row warnings and VAT cents
+  description: |
+    Returns the tenant's income and expense journal rows for a business year in
+    workbook order, with the E1A fallback (9040 income / 9230 expense), the
+    E1B 9460 rental split and per-line IG-Erwerb / Reverse Charge VAT in integer
+    cents. Warnings use the exact workbook wordings. The FAT-FSVG flag decides
+    whether the goods-purchase cross-check applies. Tenant-scoped and read-only;
+    a narrow package token is rejected with 403.
+  parameters:
+    - name: year
+      in: query
+      required: false
+      schema: { type: integer, minimum: 2000, maximum: 2100 }
+  responses:
+    '200':
+      description: Both journals, derived totals and the field help catalogue.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, income, expense, totals, fsvg, field_help]
+            properties:
+              year: { type: integer }
+              income:
+                type: array
+                items: { $ref: './schemas.yaml#/JournalEntry' }
+              expense:
+                type: array
+                items: { $ref: './schemas.yaml#/JournalEntry' }
+              totals:
+                type: object
+                required: [business_income_cents, rental_income_cents, business_expense_cents, ig_vat_cents, rc_vat_cents]
+                properties:
+                  business_income_cents: { type: integer }
+                  rental_income_cents: { type: integer }
+                  business_expense_cents: { type: integer }
+                  ig_vat_cents: { type: integer }
+                  rc_vat_cents: { type: integer }
+              fsvg: { type: boolean }
+              field_help: { type: object }
+    '403':
+      $ref: '#/components/responses/Forbidden'
+    '422':
+      $ref: '#/components/responses/Validation'

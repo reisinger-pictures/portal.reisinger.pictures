@@ -1,0 +1,19 @@
+get:
+  operationId: getTravelCatalogue
+  summary: Country and transport catalogue plus per-field help
+  description: |
+    Returns the read-only per-diem country list from rates.json, the three
+    transport constants and the clean-room field help used by the Reisen tab.
+  parameters:
+    - name: year
+      in: query
+      required: false
+      schema: { type: integer, minimum: 2000, maximum: 2100 }
+  responses:
+    '200':
+      description: Catalogue and field help.
+      content:
+        application/json:
+          schema: { type: object }
+    '422':
+      $ref: '#/components/responses/Validation'

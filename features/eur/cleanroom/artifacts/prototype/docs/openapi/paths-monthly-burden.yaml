@@ -1,0 +1,63 @@
+get:
+  operationId: getMonthlyBurden
+  summary: Monthly SV minimum, loss basis and EST+SV allocation
+  description: |
+    W3/B10 (EUE-125/126). The SV minimum is derived from the finished SV engine
+    with a zero base; the annual burden is tax plus SV from the finished engines.
+    Monthly shares use the largest-remainder method: floor(weight × annual /
+    Σweight), then one cent each to the largest fractional remainders (ties:
+    earlier month first), so the twelve months sum to the annual cent figure
+    exactly. A month without a report has zero weight; zero hours leave the net
+    profit per hour blank. Work times are integer minutes (`hours_minutes`),
+    and `net_per_hour_cents` = net profit cents × 60 / minutes (integer,
+    rounded half-up).
+  parameters:
+    - name: year
+      in: query
+      required: true
+      schema: { type: integer, enum: [2024, 2025, 2026] }
+  responses:
+    '200':
+      description: Monthly burden payload.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [year, mode, source, months, annual]
+            properties:
+              year: { type: integer }
+              mode: { type: string }
+              source: { type: string, enum: [computed, booked] }
+              jungunternehmer: { type: boolean }
+              months:
+                type: array
+                items:
+                  type: object
+                  required: [month, name, gross_profit_cents, hours_minutes, weight_cents,
+                             minimum_sv_cents, est_sv_cents, net_profit_cents]
+                  properties:
+                    month: { type: integer }
+                    name: { type: string }
+                    gross_profit_cents: { type: integer }
+                    hours_minutes: { type: integer, description: 'Integer minutes; 3 h = 180' }
+                    weight_cents: { type: integer }
+                    minimum_sv_cents: { type: integer }
+                    est_sv_cents: { type: integer }
+                    net_profit_cents: { type: integer }
+                    net_per_hour_cents: { type: integer, nullable: true }
+              annual:
+                type: object
+                required: [tax_cents, sv_cents, burden_cents, allocated_cents, minimum_sv_cents,
+                           loss_basis_cents, basis_cents, sv_difference_cents]
+                properties:
+                  tax_cents: { type: integer }
+                  sv_cents: { type: integer }
+                  booked_sv_cents: { type: integer }
+                  burden_cents: { type: integer }
+                  allocated_cents: { type: integer }
+                  minimum_sv_cents: { type: integer }
+                  loss_basis_cents: { type: integer }
+                  basis_cents: { type: integer }
+                  sv_difference_cents: { type: integer }
+    '422':
+      $ref: '#/components/responses/Validation'

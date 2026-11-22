@@ -1,0 +1,65 @@
+get:
+  operationId: getAsset
+  summary: Asset detail with its AfA history
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    '200':
+      description: Asset detail.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Asset' }
+    '404':
+      description: Asset not found.
+
+put:
+  operationId: updateAsset
+  summary: Update asset master data
+  description: |
+    Economic fields (cost, useful life, acquisition date, business share,
+    entry type) cannot change once a year has been booked; the AfA chain of
+    booked years is immutable (EUE-057).
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: './schemas.yaml#/AssetInput' }
+  responses:
+    '200':
+      description: Updated asset.
+      content:
+        application/json:
+          schema: { $ref: './schemas.yaml#/Asset' }
+    '422':
+      $ref: '#/components/responses/Validation'
+
+delete:
+  operationId: deleteAsset
+  summary: Remove an asset and its linked December bookings
+  description: Maintenance/E2E teardown endpoint; a signed month needs a change reason.
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    - name: change_reason
+      in: query
+      required: false
+      schema: { type: string, maxLength: 500 }
+  responses:
+    '200':
+      description: Asset deleted.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              deleted: { type: boolean }

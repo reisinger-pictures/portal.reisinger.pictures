@@ -39,12 +39,35 @@ class CleanRoomFixtureIntegrityTest extends TestCase
         }
     }
 
+    public function test_every_copied_artifact_matches_manifest_checksum_and_size(): void
+    {
+        $this->assertSame(2, $this->manifest['schema_version']);
+        $this->assertSame('2026.2', $this->manifest['artifact_version']);
+        $this->assertSame('75f230c07010db91755f78fdbd9ae591d52c7e85', $this->manifest['artifact_source_commit']);
+        $this->assertCount($this->manifest['artifact_count'], $this->manifest['artifacts']);
+
+        foreach ($this->manifest['artifacts'] as $entry) {
+            $path = self::CLEANROOM_DIR.'/artifacts/'.$entry['path'];
+            $this->assertFileExists($path, $entry['path']);
+            $this->assertSame($entry['sha256'], hash_file('sha256', $path), $entry['path']);
+            $this->assertSame($entry['bytes'], filesize($path), $entry['path']);
+        }
+    }
+
     public function test_handoff_document_matches_manifest_checksum(): void
     {
         $path = self::CLEANROOM_DIR.'/HANDOFF.md';
 
         $this->assertFileExists($path);
         $this->assertSame($this->manifest['handoff_sha256'], hash_file('sha256', $path));
+    }
+
+    public function test_provenance_document_matches_manifest_checksum(): void
+    {
+        $path = self::CLEANROOM_DIR.'/PROVENANCE.md';
+
+        $this->assertFileExists($path);
+        $this->assertSame($this->manifest['provenance_sha256'], hash_file('sha256', $path));
     }
 
     public function test_fixture_is_pinned_to_business_year_2026(): void
@@ -61,8 +84,8 @@ class CleanRoomFixtureIntegrityTest extends TestCase
             $this->fixture['scenarios']
         ));
 
-        $this->assertCount(5, $this->fixture['scenarios']);
-        $this->assertSame(19, $cells);
+        $this->assertSame($this->manifest['parity_scenarios'], count($this->fixture['scenarios']));
+        $this->assertSame($this->manifest['parity_cells'], $cells);
         $this->assertCount(19, $this->fixture['oracle']['checks']);
     }
 
@@ -79,6 +102,30 @@ class CleanRoomFixtureIntegrityTest extends TestCase
                 $this->assertContains($cell['unit'], $allowedUnits, $label);
                 $this->assertNotSame('', $cell['verify'], $label);
             }
+        }
+    }
+
+    /**
+     * Wirksamkeitsnachweis: ein verändertes Byte genügt, damit die
+     * Manifest-Prüfung nicht mehr grün ist. Die gepinnte Datei wird dabei
+     * nicht angefasst; geprüft wird gegen eine temporäre Kopie.
+     */
+    public function test_changed_artifact_byte_is_detected(): void
+    {
+        $entry = $this->manifest['artifacts'][0];
+        $source = self::CLEANROOM_DIR.'/artifacts/'.$entry['path'];
+
+        $temp = tempnam(sys_get_temp_dir(), 'eur-artifact-');
+        $this->assertIsString($temp);
+        copy($source, $temp);
+
+        try {
+            $contents = (string) file_get_contents($temp);
+            file_put_contents($temp, $contents."\n");
+
+            $this->assertNotSame($entry['sha256'], hash_file('sha256', $temp));
+        } finally {
+            @unlink($temp);
         }
     }
 
