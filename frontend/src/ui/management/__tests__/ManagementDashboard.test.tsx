@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { AuthMeUser } from '../../../api';
 import { useAuth } from '../../../logic/useAuth';
 import { useBrand } from '../../../logic/useBrand';
@@ -110,81 +110,91 @@ function authState(aiIsUnconfigured: boolean) {
     };
 }
 
-function renderDashboard() {
+function CurrentLocation() {
+    const location = useLocation();
+    return <output aria-label="Aktuelle Route">{location.pathname}</output>;
+}
+
+function renderDashboard(path = '/') {
     return renderWithProviders(
-        <MemoryRouter initialEntries={['/']}>
+        <MemoryRouter initialEntries={[path]}>
             <ManagementDashboard />
+            <CurrentLocation />
         </MemoryRouter>,
     );
 }
 
+function setupMocks() {
+    vi.clearAllMocks();
+
+    vi.mocked(useAuth).mockReturnValue(authState(false));
+    vi.mocked(useBrand).mockReturnValue({
+        brand: 'rp',
+        config: null,
+        logoSrc: '/brands/rp/android-chrome-192x192.png',
+        svgUrl: '/brands/rp/safari-pinned-tab.svg',
+        portalName: 'Reisinger Foto Portal',
+        impressumUrl: null,
+        features: { coupons: true, orgs: true },
+        theme: { light: 'rp-light', dark: 'rp-dark' },
+        primaryColor: '#1E5631',
+        secondaryColor: '#A4B494',
+    });
+    vi.mocked(useBillingDetails).mockReturnValue({
+        billingDetails: {
+            bank_holder: 'Reisinger Pictures GmbH',
+            bank_iban: 'AT123456789',
+            bank_bic: 'TESTBICXXX',
+            company_street: 'Teststraße 1',
+            company_zip: '1010',
+            company_city: 'Wien',
+            company_country: 'Österreich',
+            company_email: 'office@example.com',
+            steuernummer: '12/345/67890',
+            finanzamt: 'Finanzamt Wien',
+            uid: 'ATU12345678',
+            rechtsform: 'GmbH',
+            branchenkennzahl: '742',
+        },
+        isLoading: false,
+        updateBillingDetails: vi.fn(),
+    });
+    vi.mocked(usePermissions).mockReturnValue({
+        isStaff: true,
+        isSuperAdmin: false,
+        isAdmin: false,
+        isPhotographer: true,
+        isOrgAdmin: false,
+        canEditMetadata: true,
+        isPowerUser: false,
+        canAccessB2BFeatures: false,
+        canAccessProjectsBoard: false,
+        canAccessProductionBoard: true,
+        showOrgsSection: false,
+        showCRM: false,
+        showInvoicing: false,
+        showPayouts: false,
+    });
+    vi.mocked(useSearch).mockReturnValue({
+        results: { galleries: [], photos: [] },
+        isLoading: false,
+        isError: undefined,
+    });
+    vi.mocked(useDashboard).mockReturnValue({
+        tree: { groups: [], root_galleries: [] },
+        isLoading: false,
+        isError: undefined,
+        mutate: vi.fn(),
+        onOpenGalleryModal: vi.fn(),
+        onOpenGroupModal: vi.fn(),
+        onEditGroup: vi.fn(),
+        onEditGallery: vi.fn(),
+    });
+}
+
 describe('ManagementDashboard AI configuration notice', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-
-        vi.mocked(useAuth).mockReturnValue(authState(false));
-        vi.mocked(useBrand).mockReturnValue({
-            brand: 'rp',
-            config: null,
-            logoSrc: '/brands/rp/android-chrome-192x192.png',
-            svgUrl: '/brands/rp/safari-pinned-tab.svg',
-            portalName: 'Reisinger Foto Portal',
-            impressumUrl: null,
-            features: { coupons: true, orgs: true },
-            theme: { light: 'rp-light', dark: 'rp-dark' },
-            primaryColor: '#1E5631',
-            secondaryColor: '#A4B494',
-        });
-        vi.mocked(useBillingDetails).mockReturnValue({
-            billingDetails: {
-                bank_holder: 'Reisinger Pictures GmbH',
-                bank_iban: 'AT123456789',
-                bank_bic: 'TESTBICXXX',
-                company_street: 'Teststraße 1',
-                company_zip: '1010',
-                company_city: 'Wien',
-                company_country: 'Österreich',
-                company_email: 'office@example.com',
-                steuernummer: '12/345/67890',
-                finanzamt: 'Finanzamt Wien',
-                uid: 'ATU12345678',
-                rechtsform: 'GmbH',
-                branchenkennzahl: '742',
-            },
-            isLoading: false,
-            updateBillingDetails: vi.fn(),
-        });
-        vi.mocked(usePermissions).mockReturnValue({
-            isStaff: true,
-            isSuperAdmin: false,
-            isAdmin: false,
-            isPhotographer: true,
-            isOrgAdmin: false,
-            canEditMetadata: true,
-            isPowerUser: false,
-            canAccessB2BFeatures: false,
-            canAccessProjectsBoard: false,
-            canAccessProductionBoard: true,
-            showOrgsSection: false,
-            showCRM: false,
-            showInvoicing: false,
-            showPayouts: false,
-        });
-        vi.mocked(useSearch).mockReturnValue({
-            results: { galleries: [], photos: [] },
-            isLoading: false,
-            isError: undefined,
-        });
-        vi.mocked(useDashboard).mockReturnValue({
-            tree: { groups: [], root_galleries: [] },
-            isLoading: false,
-            isError: undefined,
-            mutate: vi.fn(),
-            onOpenGalleryModal: vi.fn(),
-            onOpenGroupModal: vi.fn(),
-            onEditGroup: vi.fn(),
-            onEditGallery: vi.fn(),
-        });
+        setupMocks();
     });
 
     it('shows the warning when the auth contract marks AI as unconfigured', () => {
@@ -209,5 +219,37 @@ describe('ManagementDashboard AI configuration notice', () => {
                 name: 'KI-Bildbeschreibung nicht konfiguriert',
             }),
         ).not.toBeInTheDocument();
+    });
+});
+
+describe('ManagementDashboard /steuern access guard', () => {
+    beforeEach(() => {
+        setupMocks();
+    });
+
+    it('does not redirect /steuern while auth is still loading', () => {
+        vi.mocked(useAuth).mockReturnValue({
+            ...authState(false),
+            user: undefined,
+            isLoading: true,
+        });
+
+        renderDashboard('/steuern');
+
+        expect(screen.getByRole('status', {name: 'Aktuelle Route'})).toHaveTextContent('/steuern');
+        expect(document.querySelector('.loading-spinner')).toBeInTheDocument();
+    });
+
+    it('still redirects /steuern to the portal home once auth resolves without access', () => {
+        vi.mocked(useAuth).mockReturnValue({
+            ...authState(false),
+            user: undefined,
+            isLoading: false,
+        });
+
+        renderDashboard('/steuern');
+
+        expect(screen.getByRole('status', {name: 'Aktuelle Route'})).toHaveTextContent('/');
+        expect(document.querySelector('.loading-spinner')).not.toBeInTheDocument();
     });
 });

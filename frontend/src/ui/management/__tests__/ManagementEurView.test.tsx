@@ -439,4 +439,24 @@ describe('ManagementEurView', () => {
         expect(view.getByRole('heading', {name: 'Übersicht nicht verfügbar'})).toBeVisible();
         expect(view.getByRole('button', {name: 'Erneut laden'})).toBeVisible();
     });
+
+    it('marks the EUR tablist with the scoped eur-tabs class for the contrast override', () => {
+        mockHooks();
+
+        renderView();
+
+        expect(screen.getByRole('tablist')).toHaveClass('eur-tabs');
+    });
+
+    it('binds the title separator and portal name in a nowrap span so the dot cannot wrap alone', () => {
+        mockHooks();
+
+        renderView();
+
+        const heading = screen.getByRole('heading', {level: 1});
+        const separator = within(heading).getByText('· Test-Portal');
+        expect(separator).toHaveClass('whitespace-nowrap');
+        expect(separator.tagName).toBe('SPAN');
+        expect(heading).toHaveTextContent('Einnahmen Ausgaben Rechnung · Test-Portal');
+    });
 });
