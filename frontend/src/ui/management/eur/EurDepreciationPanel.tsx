@@ -1,14 +1,9 @@
 import { useState } from 'react';
 import { Trans } from '@lingui/react/macro';
 import { formatEuro } from '../../../logic/formatCurrency';
-import { fetchEurComparison, type EurAssetComparison } from '../../../logic/useEur';
+import { EUR_MONTHS as MONTHS, fetchEurComparison, type EurAssetComparison } from '../../../logic/useEur';
 
 const cents = (value: number): string => formatEuro(value / 100);
-
-const MONTHS = [
-    'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
-    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
-];
 
 interface FormState {
     costEuro: string;

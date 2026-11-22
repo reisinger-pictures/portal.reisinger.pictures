@@ -1,13 +1,8 @@
 import { Trans } from '@lingui/react/macro';
 import { formatEuro } from '../../../logic/formatCurrency';
-import type { EurEntriesResponse } from '../../../logic/useEur';
+import { EUR_MONTHS as MONTHS, type EurEntriesResponse } from '../../../logic/useEur';
 
 const cents = (value: number): string => formatEuro(value / 100);
-
-const MONTHS = [
-    'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
-    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
-];
 
 interface Props {
     data?: EurEntriesResponse;

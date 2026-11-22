@@ -1,14 +1,9 @@
 import { useState } from 'react';
 import { Trans } from '@lingui/react/macro';
 import { formatEuro } from '../../../logic/formatCurrency';
-import { calculateEurVat, type EurVatKz, type EurVatResult } from '../../../logic/useEur';
+import { calculateEurVat, EUR_MONTHS as MONTHS, type EurVatKz, type EurVatResult } from '../../../logic/useEur';
 
 const cents = (value: number): string => formatEuro(value / 100);
-
-const MONTHS = [
-    'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
-    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
-];
 
 const KZ_LABELS: {key: EurVatKz; label: string}[] = [
     {key: '000', label: 'Gesamtbetrag'},
