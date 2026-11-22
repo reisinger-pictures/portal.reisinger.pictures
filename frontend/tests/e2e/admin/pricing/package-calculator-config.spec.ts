@@ -21,6 +21,23 @@ test.describe('Package Calculator Configuration (G2)', () => {
      * reads them back. So each test runs its complete save-then-assert sequence
      * inside one exclusive critical section, and restores the values it found on
      * the way out — a run that ends here leaves the shared row as it started.
+     *
+     * ## Observed flake (2026-11-22)
+     *
+     * `Admin can set outdoor multiplier and verify it in the shooting calculator`
+     * (this file, line 96) failed in CI push run 45063144821 with
+     * `Gesamtbetrag: 319,00 €` instead of `229,00 €`, three times in a row, while
+     * the pull_request run of the identical commit was green. 319,00 € is exactly
+     * the total for `calc_outdoor_images_per_hour = 8` (the value left behind by
+     * `manual-documents.spec.ts`, also the calculator's own default), not 20.
+     *
+     * Root cause: `CalculatorSettingsCard` resets the whole form from SWR when
+     * `/api/settings/license-terms` arrives. If that answer lands *after* the test
+     * filled the fields, it overwrites `Outdoor-Bilder` with 8 before the submit —
+     * while `Stundensatz` still reads 80 because the previous test also used 80,
+     * so the old post-save form assertion could not detect it. Waiting for the form
+     * to be hydrated from the API before typing, and checking the effective values
+     * on the same endpoint after saving, closes that window.
      */
     const withCalculatorSettings = async (body: () => Promise<void>) => {
         await withGlobalSettingsLock(SHOOTING_CALCULATOR_SETTINGS_LOCK, async () => {
@@ -100,6 +117,21 @@ test.describe('Package Calculator Configuration (G2)', () => {
         // they read the same shared row, so a concurrent writer between them
         // would be exactly the bug this guard exists for.
         await withCalculatorSettings(async () => {
+            // The card resets every field from SWR when the terms answer arrives.
+            // Typing before that reset lands makes the submit save the old values —
+            // and a coincidentally identical hourly rate hides it. Wait for the
+            // exact field this test changes to show the value read from the API.
+            const before = await helper.getShootingCalculatorSettings();
+            // SWR can still hold a value written by a previous test (the form
+            // showed 12 while the endpoint already returned 8). Reload inside
+            // the lock so the form hydrates from the frozen server state.
+            await page.reload();
+            await expect(page.locator('h1:has-text("System-Einstellungen")')).toBeVisible();
+            await expect.poll(
+                () => field(cardBody, 'Outdoor-Bilder').inputValue(),
+                { message: 'Das Formular muss die geladenen Einstellungen zeigen, bevor es bearbeitet wird.' },
+            ).toBe(before.calc_outdoor_images_per_hour ?? '8');
+
             await field(cardBody, 'Grundpreis').fill('50');
             await field(cardBody, 'Stundensatz').fill('80');
             await field(cardBody, 'Outdoor-Bilder').fill('20');
@@ -108,8 +140,17 @@ test.describe('Package Calculator Configuration (G2)', () => {
             await cardBody.getByRole('button', { name: 'Einstellungen anwenden' }).click();
             await new ToastHelper(page).expectToast('Kalkulator-Einstellungen gespeichert');
 
-            // Wait for the form to reflect the saved hourly rate (ensures SWR cache is fresh)
-            await expect(field(cardBody, 'Stundensatz')).toHaveValue('80');
+            // Assert the effective value on the very endpoint the calculator
+            // consumes. The form showing 80 only proves the local form state.
+            await expect.poll(
+                () => helper.getShootingCalculatorSettings(),
+                { message: 'Die gespeicherten Werte müssen am Kalkulator-Endpunkt ankommen.' },
+            ).toMatchObject({
+                calc_base_price: 5000,
+                calc_hourly_rate: 8000,
+                calc_images_per_hour: '6',
+                calc_outdoor_images_per_hour: '20',
+            });
             // Navigate to manual offer page and open calculator
             await new SidebarHelper(page).navigateTo('Manuelles Angebot');
 
