@@ -21,7 +21,7 @@
       "value": 1
     },
     "unverified-commits": {
-      "value": 20,
+      "value": 1,
       "reason": "2026-11-17: ceiling 668 -> 20, enforcement window narrowed to commits since 2026-11-17. The 667 historical unverified commits stay in git history but are out of scope; every new commit must carry a Verify footer."
     }
   }

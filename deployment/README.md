@@ -395,24 +395,36 @@ irrtümlich das falsche Dateisystem zu prüfen.
 Restore-Pfad eingerichtet und getestet sein.** Compose konfiguriert weder WAL-
 Archivierung noch Retention. Das Backup des Cutover-Skripts ist ausschließlich
 ein MariaDB-Quellbackup vor dem Kopieren; es schützt keine PostgreSQL-Schreib-
-vorgänge nach dem Umschalten. Der Vertrag und diese offene Betriebsgrenze stehen
-in [`features/infrastructure/30-postgres-cutover.md`](../features/infrastructure/30-postgres-cutover.md).
+vorgänge nach dem Umschalten. Den laufenden Dump liefert `strato-vps`
+(`proposed/backup.sh`, Task 1, Engine-Marker `db/portal/engine`); der Restore
+liegt in `strato-vps/proposed/restore.sh`, Stufe 4. Vertrag und die verbleibende
+Betriebsgrenze (ein Restore-Drill gegen echtes PostgreSQL) stehen in
+[`features/infrastructure/30-postgres-cutover.md`](../features/infrastructure/30-postgres-cutover.md).
 
 ```bash
-# Hostseitiger Dry-Run (das Skript wird über SSH gestreamt und nicht ins Webroot kopiert):
-ssh root@reisinger.pictures 'bash -s -- --dry-run' < deployment/migrate-to-postgres.sh
+# Skript auf den Host kopieren und dort ausführen. Nicht per `bash -s` streamen:
+# ein Einmalcontainer, der stdin liest, würde das restliche Skript verschlucken.
+# Das Skript selbst startet seine Container inzwischen mit stdin aus /dev/null,
+# die Kopie bleibt aber der robuste Weg.
+scp deployment/migrate-to-postgres.sh root@reisinger.pictures:/tmp/migrate-to-postgres.sh
+ssh root@reisinger.pictures 'chmod 700 /tmp/migrate-to-postgres.sh && bash /tmp/migrate-to-postgres.sh </dev/null --dry-run'
 
 # Echt: Backup -> PostgreSQL starten -> migrieren -> kopieren -> verifizieren -> umschalten
-ssh root@reisinger.pictures 'bash -s' < deployment/migrate-to-postgres.sh
+ssh root@reisinger.pictures 'bash /tmp/migrate-to-postgres.sh </dev/null'
 
 # Rollback NACH dem Umschalten: PostgreSQL-Schreibvorgänge werden nicht nach MariaDB übernommen.
 # MariaDB bleibt auf dem Stand VOR dem Cutover; das PostgreSQL-Volume bleibt zur manuellen Abgleichung erhalten.
-ssh root@reisinger.pictures 'bash -s -- --rollback --accept-postgres-write-loss' < deployment/migrate-to-postgres.sh
+ssh root@reisinger.pictures 'bash /tmp/migrate-to-postgres.sh </dev/null --rollback --accept-postgres-write-loss'
 
 # Nur wenn kein PostgreSQL-Switch versucht wurde und das Skript daher keinen
 # `switch-attempted`-Marker hinterlassen hat, genügt:
-ssh root@reisinger.pictures 'bash -s -- --rollback' < deployment/migrate-to-postgres.sh
+ssh root@reisinger.pictures 'bash /tmp/migrate-to-postgres.sh </dev/null --rollback'
 ```
+
+Ein abgebrochener Lauf hinterlässt `/var/lib/portal-postgres-cutover/in-progress`
+und blockiert den nächsten Start. Solange kein `switch-attempted`-Marker
+existiert, ist der normale `--rollback` der vorgesehene Weg: er normalisiert die
+Host-`.env` auf MariaDB, startet das Backend neu und entfernt beide Marker.
 
 Die Phasen (BACKUP / PG / MIGRATE / COPY / VERIFY / SWITCH) brechen benannt ab;
 das Skript schaltet nie teilweise um. Cutover und Rollback halten vor der

@@ -2,13 +2,14 @@
 
 ## Target and topology
 
-Production moves from MariaDB 11.4 to PostgreSQL 16. Compose keeps the two
-engines side by side during the cutover:
+Production runs PostgreSQL 16. MariaDB 11.4 stays alongside it as the rollback
+path until the agreed observation window ends. Compose keeps the two engines
+side by side:
 
-| Engine | Compose service | Container | Volume | Role during cutover |
+| Engine | Compose service | Container | Volume | Role |
 |---|---|---|---|---|
-| MariaDB 11.4 | `db` | `portal_db` | `db_data` | Live source and rollback source |
-| PostgreSQL 16 | `db_pg` | `portal_db_pg` | `db_pg_data` | New target, initialized by Laravel migrations |
+| PostgreSQL 16 | `db_pg` | `portal_db_pg` | `db_pg_data` | Active database |
+| MariaDB 11.4 | `db` | `portal_db` | `db_data` | Rollback snapshot, no longer written by the application |
 
 The backend's host environment selects the active connection. The PostgreSQL
 settings are `DB_CONNECTION=pgsql`, `DB_HOST=db_pg`, and `DB_PORT=5432`; the
@@ -129,15 +130,23 @@ schema. Source and target columns must agree for copied source data.
 ## PostgreSQL backup and restore precondition
 
 Compose configures neither WAL archiving nor WAL retention for `db_pg`; the
-`db_pg_data` volume is the only PostgreSQL copy this repository describes. The
-cutover script's gzip dump, checksum, and row manifest back up MariaDB only:
-they are a one-time backup of the MariaDB source for this migration, do not
-dump PostgreSQL, and are not an ongoing PostgreSQL backup. Before
-the PostgreSQL database accepts production writes, an ongoing PostgreSQL backup
-(base backup plus WAL archiving/PITR, or an equivalent tested dump schedule) and
-a tested restore path are required preconditions. This branch does not provide,
-configure, or prove either of them, and a completed cutover would not be
-evidence that such a path exists.
+`db_pg_data` volume is not a backup. The ongoing dump schedule lives outside
+this repository in `strato-vps` (`proposed/backup.sh`, deployed as
+`/usr/local/bin/volume-backup.sh`): Task 1 reads the selector `DB_CONNECTION`
+from the host `.env` and runs `pg_dump --clean --if-exists --no-owner --no-acl`
+inside `db_pg`, writing `db/portal/portal_db-<DATE>.sql.gz` plus the marker
+`db/portal/engine` that records the engine for the restore. The cutover
+script's own gzip dump, checksum, and row manifest remain a one-time backup of
+the MariaDB source for this migration; they are not the ongoing backup.
+
+The second precondition — a tested restore path — is implemented in
+`strato-vps/proposed/restore.sh`: stage 4 reads the marker, starts only `db_pg`
+on a fresh host, and replays the dump with `psql -v ON_ERROR_STOP=1
+--single-transaction`. That branch is covered by offline tests against stubs,
+not by a drill against a real PostgreSQL instance. A restore drill with a real
+`portal_db-<DATE>.sql.gz` (marker `pgsql`) is required before relying on this
+path; the tests are not a substitute for it, and the existence of a daily dump
+is not evidence that a restore works.
 
 ## Verification invariants
 
