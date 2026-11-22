@@ -2,23 +2,24 @@
 
 ## Target and topology
 
-Production runs PostgreSQL 16. MariaDB 11.4 stays alongside it as the rollback
-path until the agreed observation window ends. Compose keeps the two engines
-side by side:
+Production runs PostgreSQL 16 as its sole database. The repository Compose
+file no longer contains a MariaDB service or the `db_data` volume; removing the
+legacy `portal_db` container and its data on the host is a separate manual gate
+(see the open-gate note below). The one-time forward copy script still reads a
+MariaDB source for hosts where the switch has not yet been executed; that
+source lives in the old host stack, not in this repository's topology.
 
 | Engine | Compose service | Container | Volume | Role |
 |---|---|---|---|---|
 | PostgreSQL 16 | `db_pg` | `portal_db_pg` | `db_pg_data` | Active database |
-| MariaDB 11.4 | `db` | `portal_db` | `db_data` | Rollback snapshot, no longer written by the application |
 
-The backend's host environment selects the active connection. The PostgreSQL
-settings are `DB_CONNECTION=pgsql`, `DB_HOST=db_pg`, and `DB_PORT=5432`; the
-MariaDB settings are `DB_CONNECTION=mariadb`, `DB_HOST=db`, and
-`DB_PORT=3306`. The database name and credentials are shared by both engines.
-Host `.env` files created before this cutover may not contain `DB_HOST` or
-`DB_PORT`: Compose supplied the MariaDB coordinates as defaults. The cutover
-script uses those historical defaults when the keys are absent, then adds
-`DB_HOST` and `DB_PORT` during the switch. These are not new required secrets.
+The backend's host environment selects `DB_CONNECTION=pgsql`,
+`DB_HOST=db_pg`, and `DB_PORT=5432`. Compose defaults `DB_HOST`/`DB_PORT` to
+those PostgreSQL coordinates when the host `.env` omits them. The cutover
+script still reads the old host `.env` and falls back to the historical MariaDB
+defaults (`db`/`3306`) only when reading its source during the one-time copy;
+that fallback is not an active connection target. These are not new required
+secrets.
 The host `.env` must not set a non-empty `DB_URL`: Laravel gives it precedence
 over the individual `DB_*` coordinates, so the script refuses before backup if
 it is present rather than claim a switch that the live backend did not make.
@@ -30,12 +31,12 @@ retrying; an absent or empty `DB_URL` is accepted.
 The copy is a one-time, write-frozen operation, not live replication. It uses a
 preparatory deployment followed by the cutover:
 
-1. Deploy the PostgreSQL-capable code/image and dual-engine Compose while the
-   host `.env` still selects MariaDB. The compatibility defaults keep a legacy
-   host file without `DB_HOST`/`DB_PORT` on `db:3306`. Let the normal backend
-   startup apply all pending migrations to MariaDB; confirm `migrate:status`
-   has no `Pending` entries. The cutover script repeats this check before the
-   backup and refuses to copy a source at an older schema frontier.
+1. The repository stack deploys PostgreSQL only, with the backend selecting
+   `pgsql` and the `db_pg` coordinates. Where the one-time copy has not yet
+   been executed, it runs against the old host stack: the host `.env` there
+   still selects MariaDB, and the script confirms `migrate:status` on that
+   source has no `Pending` entries before the backup. It refuses to copy a
+   source at an older schema frontier.
 2. Before downtime, measure free space on the MariaDB data filesystem, the
    backup filesystem, and the PostgreSQL target's local-volume filesystem (or
    Docker's `volumes` filesystem if the target volume has not been created; if
@@ -43,8 +44,8 @@ preparatory deployment followed by the cutover:
    least three times the current MariaDB data-directory size free; the script
    refuses before stopping the backend if any measurement fails.
 3. Stop application writes and workers. The host runbook script stops the
-   backend service before taking the backup, keeping both engines unchanged
-   until verification succeeds.
+   backend service before taking the backup and does not modify either
+   database until verification succeeds.
 4. Create and validate a mode-0600, gzip-compressed MariaDB dump outside the
    web root, and record exact source row counts in a private manifest.
 5. Start PostgreSQL and run the Laravel migrations to create its schema. Every
@@ -69,7 +70,7 @@ preparatory deployment followed by the cutover:
    `value` (including null values and null brands), not just row counts or
    sums.
 8. Atomically edit the protected host `.env` and recreate the backend against
-   PostgreSQL. MariaDB stays running and untouched.
+   PostgreSQL. The MariaDB source is not modified; no data is copied back.
 
 ### Stable identity for photographer group assignments
 
@@ -85,43 +86,31 @@ PostgreSQL. Existing rows receive distinct generated IDs; no assignments are
 deleted, merged, or rewritten, and the existing nullable group behavior and
 composite unique index remain unchanged. Application pivot relations ignore the
 surrogate ID. The copy carries it verbatim and resets the PostgreSQL sequence
-afterward. If a cutover attempt is abandoned, the additive ID remains on the
-MariaDB source; rollback requires no row rewrite, and repository migrations are
-not rolled back.
+afterward. If a copy attempt is abandoned, the additive ID remains on the
+MariaDB source; no row rewrite and no repository migration change is required.
 
-Cutover and rollback take one exclusive host lock before any preflight check
-(`flock` on `/var/lib/portal-postgres-cutover/cutover.lock`). A concurrent run
-fails closed with a named error instead of interleaving a second backup, copy,
-or environment flip. The lock stays held through an automatic rollback and is
-released when the process exits.
+The cutover takes one exclusive host lock before any preflight check (`flock`
+on `/var/lib/portal-postgres-cutover/cutover.lock`). A concurrent run fails
+closed with a named error instead of interleaving a second backup, copy, or
+environment flip. The lock is released when the process exits.
 
-Rollback restores the timestamped host `.env`, then explicitly selects
-`DB_CONNECTION=mariadb`, `DB_HOST=db`, and `DB_PORT=3306`. It also sets the
-queue/cache connection keys to `mariadb`, adding them if an older `.env`
-omitted them, before recreating the backend. The host/port keys are added too
-when an older `.env` never contained them, so Compose defaults cannot redirect
-rollback traffic. The MariaDB data and volume remain the pre-cutover source.
+There is no rollback path in the repository. The script keeps a timestamped
+copy of the host `.env` for inspection, sets the PostgreSQL coordinates, and
+recreates the backend. If patching, recreation, or the healthcheck fails it
+stops with a named `FATAL`; it never restores a previous engine and never
+copies data back. An unfinished run leaves
+`/var/lib/portal-postgres-cutover/in-progress` behind and blocks a second run.
 
-A manual rollback after the switch abandons PostgreSQL-only writes from the
-active database. The switch writes a root-only `switch-attempted` marker in
-`/var/lib/portal-postgres-cutover` (state directory mode 0700, marker mode
-0600) that records the MariaDB `.env` backup path. It survives a successful
-cutover and is removed only after a successful manual or automatic rollback.
-Whenever that marker exists, `--rollback` refuses to run unless the operator
-passes `--accept-postgres-write-loss`, even if the host `.env` has since been
-edited back to `DB_CONNECTION=mariadb`; the acknowledgement names that those
-writes will not appear in the active MariaDB database. MariaDB is the frozen
-pre-cutover snapshot and no replication copies PostgreSQL writes back into it.
-The PostgreSQL volume remains available for manual reconciliation; reconcile it
-before a later copy because the copier reconstructs the target from MariaDB. If
-no switch was attempted (no marker and the selection is still MariaDB), a
-normal `--rollback` needs no acknowledgement. An automatic rollback on a failed
-switch remains automatic and logs the same boundary. The exact post-switch
-host-side command is:
-
-```bash
-ssh root@reisinger.pictures 'bash -s -- --rollback --accept-postgres-write-loss' < deployment/migrate-to-postgres.sh
-```
+> **OPEN MANUAL GATE — not checked from this host.** Before removing the legacy
+> `portal_db` container and the `db_data` volume on the production host, the
+> operator must evaluate the host-side marker
+> `/var/lib/portal-postgres-cutover/switch-attempted` (state directory mode 0700,
+> marker mode 0600; it records the MariaDB `.env` backup path and survives a
+> successful switch) and must have a tested PostgreSQL backup/restore path with
+> a completed restore drill. Neither the marker nor the drill is reachable from
+> this repository host, and neither has been checked here. A Compose topology
+> change requires a `recreate`, not a `restart`; this does not delete the
+> legacy volume data. No in-repo command reverts the switch.
 
 The command copies rows only. Laravel migrations own the PostgreSQL schema;
 the copy command does not infer types, create tables, alter columns, or migrate
@@ -135,9 +124,11 @@ this repository in `strato-vps` (`proposed/backup.sh`, deployed as
 `/usr/local/bin/volume-backup.sh`): Task 1 reads the selector `DB_CONNECTION`
 from the host `.env` and runs `pg_dump --clean --if-exists --no-owner --no-acl`
 inside `db_pg`, writing `db/portal/portal_db-<DATE>.sql.gz` plus the marker
-`db/portal/engine` that records the engine for the restore. The cutover
-script's own gzip dump, checksum, and row manifest remain a one-time backup of
-the MariaDB source for this migration; they are not the ongoing backup.
+`db/portal/engine`, which records the engine for the restore. The marker name
+is retained from the old dumps; the dumps it describes are PostgreSQL-oriented
+(`pg_dump`/`psql`). The cutover script's own gzip dump, checksum, and row
+manifest remain a one-time backup of the MariaDB source for this migration;
+they are not the ongoing backup.
 
 The second precondition — a tested restore path — is implemented in
 `strato-vps/proposed/restore.sh`: stage 4 reads the marker, starts only `db_pg`
@@ -236,15 +227,11 @@ The verifier returns success only when all of these checks pass:
 `--verify-only` performs no table or sequence writes. Session-local timezone
 settings make timestamp reads deterministic but do not persist in either
 database. The backend waits for a Laravel query on only the selected
-`DB_CONNECTION`; an unavailable, unselected engine does not block MariaDB
-startup before cutover or the MariaDB rollback path. The host cutover script's
-backup, switch, lock contention, explicit config-cache override, refused and
-acknowledged post-switch rollback, rollback after an operator edits the host
-`.env` back to MariaDB, automatic rollback, switch process failure, and
-pre-switch rollback lifecycle, plus low-target-space and unsupported/mismatched
-target-volume refusals before downtime, are exercised against a Docker CLI test
-double in CI; the copy itself is tested against real MariaDB and PostgreSQL
-services.
+`DB_CONNECTION` and rejects a stale non-`pgsql` selection fail-closed. The host
+cutover script's backup, switch, lock contention, explicit config-cache
+override, and low-target-space and unsupported/mismatched target-volume
+refusals before downtime are exercised against a Docker CLI test double in CI;
+the copy itself is tested against real MariaDB and PostgreSQL services.
 
 ## Time and collation hazards
 
@@ -284,11 +271,10 @@ choosing a value silently.
 - Non-database state such as uploaded files, Redis cache contents, search
   indexes, and third-party provider state. Those retain their existing
   lifecycle or must be rebuilt independently.
-- Bidirectional rollback after PostgreSQL accepts production writes. The saved
-  MariaDB snapshot is not updated from PostgreSQL; after the first post-switch
-  write, reverting the environment leaves those new writes on the PostgreSQL
-  volume and absent from the active MariaDB dataset. A manual `--rollback`
-  therefore requires `--accept-postgres-write-loss` once the switch has been
-  attempted (recorded by the `switch-attempted` marker), even if the host `.env`
-  has since been edited back to MariaDB; the flag acknowledges that divergence,
-  it does not copy data back.
+- A rollback path after PostgreSQL accepts production writes. The legacy
+  MariaDB source is not updated from PostgreSQL, and the repository no longer
+  ships a command that reverts the environment or copies data back. Removing
+  the old container and its volume on the host stays an operator decision with
+  the open manual gate documented above; the `switch-attempted` marker name is
+  retained there because the marker lives in the host state directory, outside
+  this repository.

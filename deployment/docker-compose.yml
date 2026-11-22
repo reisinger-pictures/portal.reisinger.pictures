@@ -1,56 +1,13 @@
 services:
-  # Legacy engine during the one-time cutover. It keeps serving the application
-  # until the operator flips DB_CONNECTION/DB_HOST in the host .env, and it stays
-  # running afterwards as the rollback path: rolling back is that same env flip,
-  # not a restore. Remove this service only after the cutover has been stable for
-  # the agreed observation window.
-  db:
-    image: mariadb:11.4
-    container_name: portal_db
-    restart: unless-stopped
-    # PITR statt 24h-Datenverlust. log_bin war OFF, damit gab es keine
-    # Binlogs und bei einem Desaster nur den Tages-Dump -> groesster
-    # moeglicher Verlust 24 Stunden. Am 2026-09-28 verifiziert:
-    # log_bin=ON, binlog_format=ROW, binlog_expire_logs_seconds=604800.
-    #   ROW ist hier richtig: zeilenbasiert, damit ein Replay determinis-
-    #   tisch ist und nicht von Tabellenscan-Reihenfolge abhaengt.
-    #   7 Tage Aufbewahrung lokal; die Sicherung der Binlogs uebernimmt
-    #   das Backup, sonst waeren sie nach 7 Tagen weg.
-    # ACHTUNG 1: log_bin ist ein Startparameter -> erfordert Recreate des
-    # db-Dienstes, nicht nur Restart.
-    # ACHTUNG 2: Diese Datei ist die Quelle und wird durch
-    # deployment/deploy.sh nach /opt/stacks/portal-reisinger-pictures/compose.yaml
-    # übertragen. Die Host-.env bleibt dabei unangetastet. Nach Änderungen an
-    # dieser Datei den Stack aus dem Repo deployen.
-    command:
-      - --log-bin=mariadb-bin
-      - --binlog-format=ROW
-      - --binlog-expire-logs-seconds=604800
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: portal_db
-      MYSQL_USER: portal_user
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
-      interval: "15s"
-      timeout: 5s
-      retries: 10
-    networks:
-      - portal_internal
-
-  # The PostgreSQL target. A separate container name and a separate volume are
-  # deliberate: the MariaDB container above already owns the name `portal_db`
-  # and the volume `db_data`, so reusing either would point PostgreSQL at an
-  # InnoDB data directory. PostgreSQL PITR is based on a base backup plus
-  # archived WAL segments; WAL archiving and its retention are NOT configured by
-  # this file, so this service alone does not provide PITR.
+  # The sole production database. The name `portal_db_pg` and the volume
+  # `db_pg_data` are deliberate so the historical MariaDB source container and
+  # volume on the host cannot be mistaken for PostgreSQL data. PITR needs a base
+  # backup plus archived WAL segments; WAL archiving and retention are NOT set
+  # here, so this service alone does not provide PITR.
+  #
+  # This file is the source and is transferred by deployment/deploy.sh to
+  # /opt/stacks/portal-reisinger-pictures/compose.yaml; the host .env is left
+  # untouched. A change to the topology requires a recreate, not a restart.
   db_pg:
     image: postgres:16
     container_name: portal_db_pg
@@ -123,9 +80,8 @@ services:
     container_name: portal_backend
     restart: unless-stopped
     depends_on:
-      # Database readiness is checked against only DB_CONNECTION by the
-      # container entrypoint. Depending on both engines here would let an
-      # unhealthy, unselected engine block startup and the rollback path.
+      # Database readiness is probed by the container entrypoint against the
+      # selected DB_CONNECTION only, so no database service is listed here.
       search:
         condition: service_healthy
       composer_init:
@@ -140,13 +96,10 @@ services:
       - /home/webadmin/websites/ftp:/var/www/ftp:Z
     environment:
       - DB_CONNECTION=${DB_CONNECTION:-pgsql}
-      # Compatibility defaults keep a pre-cutover host .env (which has no
-      # DB_HOST/DB_PORT keys and still selects DB_CONNECTION=mariadb) on its
-      # existing database during the preparatory deploy. The cutover script
-      # atomically writes db_pg/5432 when it switches to PostgreSQL; rollback
-      # writes db/3306. New PostgreSQL environments must set both explicitly.
-      - DB_HOST=${DB_HOST:-db}
-      - DB_PORT=${DB_PORT:-3306}
+      # PostgreSQL coordinates only. The host .env may set both explicitly;
+      # the defaults keep a file without DB_HOST/DB_PORT on db_pg/5432.
+      - DB_HOST=${DB_HOST:-db_pg}
+      - DB_PORT=${DB_PORT:-5432}
       # SFTPGo Admin-API (P1-M22). Der Backend provisioniert FTP-Konten ueber
       # diese URL. Der API-Key kommt aus der Host-.env; ohne ihn
       # faellt der Client auf den JWT-Pfad zurueck, der ebenfalls die
@@ -225,8 +178,7 @@ services:
       - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
       - MAIL_FROM_NAME=${MAIL_FROM_NAME}
       # Scheduler mutexes must use a store shared by every backend replica.
-      # Until cutover, default these connections to the selected application
-      # engine; after the switch DB_CONNECTION selects PostgreSQL.
+      # These connections follow the selected PostgreSQL engine.
       - CACHE_STORE=${CACHE_STORE:-database}
       - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-${DB_CONNECTION:-pgsql}}
       - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-${DB_CONNECTION:-pgsql}}
@@ -444,9 +396,6 @@ services:
     image: drakkan/sftpgo:2.7.x
     container_name: portal_sftpgo
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     logging:
       driver: "json-file"
       options:
@@ -635,7 +584,6 @@ networks:
   portal_internal:
 
 volumes:
-  db_data:
   db_pg_data:
   search_data:
   sftpgo_data:

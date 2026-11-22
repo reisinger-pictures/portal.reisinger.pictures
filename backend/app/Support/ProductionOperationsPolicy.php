@@ -13,8 +13,8 @@ final class ProductionOperationsPolicy
     /**
      * Cache stores that can coordinate scheduler mutexes across containers.
      *
-     * The current deployment uses the already provisioned MariaDB database
-     * store. The other stores remain valid only when their infrastructure is
+     * The current deployment uses the provisioned PostgreSQL database store.
+     * The other stores remain valid only when their infrastructure is
      * explicitly provisioned and configured.
      */
     public const SHARED_CACHE_STORES = [

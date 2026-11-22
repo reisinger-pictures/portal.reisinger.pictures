@@ -16,10 +16,10 @@ evidence listed below on the target host.
 
 The D-64 production deployment uses PostgreSQL 16 (`db_pg`, container
 `portal_db_pg`); the backend selects it with `DB_CONNECTION=pgsql`,
-`DB_HOST=db_pg`, `DB_PORT=5432`. The `mariadb:11.4` service `db` stays in the
-Compose file as the rollback snapshot and is removed only after the observation
-window; it is no longer written by the application. The stack does **not**
-introduce Redis, Horizon, Supervisor, or another external process manager.
+`DB_HOST=db_pg`, `DB_PORT=5432`. The legacy MariaDB service is no longer part of
+the Compose stack; removing the old container and its volume on the host is a
+separate manual gate. The stack does **not** introduce Redis, Horizon,
+Supervisor, or another external process manager.
 The shell supervisor in `deployment/backend-supervisor.sh` is intentionally
 small and runs inside the existing PHP-FPM container as UID/GID `1002:82`, the
 uid of the website tree it writes (D-1, owner decision 2026-10-25).
@@ -51,7 +51,7 @@ migrations, queue workers, the scheduler, or PHP-FPM are started.
 | Variable | Required value/constraint |
 |---|---|
 | `APP_ENV` | `production` for the production policy to be active |
-| `DB_CONNECTION` | Explicit application connection: `pgsql` (MariaDB `mariadb` only for a rollback) |
+| `DB_CONNECTION` | Explicit application connection: `pgsql` (a stale `mariadb` selection is rejected fail-closed) |
 | `DB_QUEUE_CONNECTION` | Exactly the same value as `DB_CONNECTION` |
 | `QUEUE_CONNECTION` | Exactly `database` |
 | `DB_QUEUE_RETRY_AFTER` | Raw positive integer (no whitespace, no decimal point); currently `90` seconds |

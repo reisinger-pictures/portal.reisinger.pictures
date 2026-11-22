@@ -57,13 +57,17 @@ measurement.
 system are never written to any log. Read §1.4 before building an alert on a
 signal that does not exist.
 
-**Database-engine boundary (D-64):** the SQL examples in this runbook that use
-`portal_db` and `mariadb` are MariaDB-specific. They query the live primary
-before cutover. After the verified PostgreSQL switch, `portal_db` is the
-unchanged MariaDB rollback source, so these commands are for rollback-source
-inspection only and are not evidence about the live application database. Do
-not use them for post-cutover monitoring; query the active PostgreSQL primary
-(`portal_db_pg`) with PostgreSQL-compatible statements instead.
+**Database-engine boundary (D-64, updated after the rollback path was
+removed):** the SQL examples below that use `portal_db` and `mariadb` are
+MariaDB-specific and target the legacy container. That container is no longer
+part of the repository Compose stack; removing it and its volume on the
+production host is a separate operator gate. These commands are retained as
+the historical record of how the number was reproduced before the switch —
+they are **not** runnable against the current stack and are not evidence about
+the live application database. The operator must migrate each one to
+`portal_db_pg` and PostgreSQL-compatible statements; no psql translation is
+invented here. For post-cutover monitoring use the active PostgreSQL primary
+(`portal_db_pg`, credentials from `POSTGRES_USER`/`POSTGRES_PASSWORD`).
 
 ---
 
@@ -118,8 +122,9 @@ To correlate a digest with a concrete actor you must fall back to the durable
 
 **MariaDB-only cache-query examples in this runbook** (the password is read
 inside the container, so nothing sensitive enters your shell history). The
-same engine boundary above applies to every repeated `portal_db`/`mariadb`
-command below: after cutover these commands inspect only the rollback source.
+engine boundary at the top of this runbook applies to every repeated
+`portal_db`/`mariadb` command below: they target the legacy container and must
+be migrated to `portal_db_pg`/`psql` by the operator before use.
 
 ```bash
 docker exec -i portal_db sh -lc 'mariadb -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' <<'SQL'

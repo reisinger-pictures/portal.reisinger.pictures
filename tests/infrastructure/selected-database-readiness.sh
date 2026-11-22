@@ -81,7 +81,6 @@ run_case() {
     fi
 }
 
-run_case mariadb ready 0
 run_case pgsql delayed 0
 run_case pgsql unavailable 1
 
@@ -90,7 +89,17 @@ DB_CONNECTION=mysql "$WAITER" >"$temporary_root/invalid-connection.txt" 2>&1
 invalid_status=$?
 set -e
 [ "$invalid_status" -ne 0 ] || { echo 'FAIL: unsupported DB_CONNECTION was accepted.' >&2; exit 1; }
-grep -Fq 'DB_CONNECTION must select mariadb or pgsql' "$temporary_root/invalid-connection.txt" \
+grep -Fq 'DB_CONNECTION must select pgsql' "$temporary_root/invalid-connection.txt" \
     || { cat "$temporary_root/invalid-connection.txt" >&2; echo 'FAIL: invalid DB_CONNECTION was not named.' >&2; exit 1; }
 
-echo 'PASS: selected database readiness retries and fails closed without probing the unselected engine'
+# A stale pre-cutover .env selecting the removed MariaDB service fails closed
+# before any probe reaches a non-PostgreSQL connection.
+set +e
+DB_CONNECTION=mariadb "$WAITER" >"$temporary_root/stale-mariadb.txt" 2>&1
+stale_status=$?
+set -e
+[ "$stale_status" -ne 0 ] || { echo 'FAIL: stale MariaDB DB_CONNECTION was accepted.' >&2; exit 1; }
+grep -Fq 'DB_CONNECTION must select pgsql' "$temporary_root/stale-mariadb.txt" \
+    || { cat "$temporary_root/stale-mariadb.txt" >&2; echo 'FAIL: stale MariaDB selection was not named.' >&2; exit 1; }
+
+echo 'PASS: selected database readiness retries, rejects stale MariaDB selection, and fails closed'

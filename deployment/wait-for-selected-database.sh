@@ -4,9 +4,9 @@ set -eu
 
 database="${DB_CONNECTION:-}"
 case "$database" in
-    mariadb|pgsql) ;;
+    pgsql) ;;
     *)
-        echo 'FATAL: DB_CONNECTION must select mariadb or pgsql before database readiness can be checked.' >&2
+        echo 'FATAL: DB_CONNECTION must select pgsql before database readiness can be checked.' >&2
         exit 1
         ;;
 esac

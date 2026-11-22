@@ -7,7 +7,6 @@ readonly ENV_FILE="$STACK_DIR/.env"
 readonly BACKUP_DIR="${PORTAL_BACKUP_DIR:-/var/backups/portal}"
 readonly STATE_DIR="${PORTAL_STATE_DIR:-/var/lib/portal-postgres-cutover}"
 readonly MARKER_FILE="$STATE_DIR/in-progress"
-readonly SWITCH_MARKER_FILE="$STATE_DIR/switch-attempted"
 readonly LOCK_FILE="$STATE_DIR/cutover.lock"
 readonly SOURCE_CONTAINER="portal_db"
 readonly TARGET_SERVICE="db_pg"
@@ -15,8 +14,6 @@ readonly TARGET_CONTAINER="portal_db_pg"
 readonly BACKEND_SERVICE="backend"
 
 DRY_RUN=false
-ROLLBACK=false
-ACCEPT_POSTGRES_WRITE_LOSS=false
 LOCK_FD=''
 CURRENT_PHASE="PREFLIGHT"
 
@@ -31,7 +28,7 @@ readonly CONFIG_CACHE_OVERRIDE
 
 usage() {
     cat <<'USAGE'
-Usage: deployment/migrate-to-postgres.sh [--dry-run | --rollback [--accept-postgres-write-loss] | --help]
+Usage: deployment/migrate-to-postgres.sh [--dry-run | --help]
 
 Runs on the AlmaLinux production host as root. The stack must be at
 /opt/stacks/portal-reisinger-pictures (or PORTAL_STACK_DIR for a controlled
@@ -39,15 +36,18 @@ test environment). PORTAL_BACKUP_DIR and PORTAL_STATE_DIR may also be set for
 isolated tests only when PORTAL_STACK_DIR points at that controlled stack; the
 production defaults remain /var/backups/portal and /var/lib/portal-postgres-cutover.
 
-The cutover and rollback share one exclusive host lock
+The cutover takes one exclusive host lock
 (/var/lib/portal-postgres-cutover/cutover.lock). A second run fails closed while
-the lock is held; the lock is released when the process exits.
+the lock is held; the lock is released when the process exits. There is no
+rollback path in this script: a failed switch fails closed and leaves the saved
+.env backup and the in-progress marker for operator inspection.
+
 The migration phases are:
 
   PREFLIGHT  Check the stack, containers, images, free disk, source env, and
-              that neither an unfinished cutover nor a prior switch marker
-              exists; require DB_URL to be absent or empty so it cannot override
-              the DB_* coordinates during the live switch.
+              that no unfinished cutover marker exists; require DB_URL to be
+              absent or empty so it cannot override the DB_* coordinates during
+              the live switch.
   BACKUP     Stop the backend to establish a write freeze, then create and
              verify a private MariaDB dump and exact per-table row manifest.
   PG         Start only db_pg (portal_db_pg) and wait for PostgreSQL readiness.
@@ -55,32 +55,16 @@ The migration phases are:
   COPY       Copy MariaDB rows to PG with portal:db-copy.
   VERIFY     Run all copy invariants and independent smoke queries.
   SWITCH     Back up and edit the host .env, recreate the backend, and wait
-             for its healthcheck. MariaDB remains running and untouched.
+             for its healthcheck. A failure stops here; nothing is copied back.
 
   --dry-run  Print the complete plan without requiring the stack or changing
              anything. Safe to run on a development machine.
-  --rollback Restore the saved host .env from an active state marker, select
-              the legacy MariaDB coordinates, and recreate the backend. MariaDB
-              is not restored; stale backup pointers are never used.
-  --accept-postgres-write-loss
-             Required with --rollback once a PostgreSQL switch has been
-             attempted, even if the host .env has since been edited back to
-             MariaDB. The root-only switch marker
-             /var/lib/portal-postgres-cutover/switch-attempted records the
-             attempt and the MariaDB .env backup path, and survives a
-             successful cutover. MariaDB is the pre-cutover snapshot and is
-             not updated from PostgreSQL, so PostgreSQL-only writes will not
-             appear in the active MariaDB database after rollback. The
-             PostgreSQL volume is retained for manual reconciliation. A
-             rollback before any switch attempt (no switch marker) needs no
-             acknowledgement. An automatic rollback on a failed switch
-             remains automatic and logs the same boundary.
   --help     Show this help.
 
-The backup is stored under /var/backups/portal with mode 0600. The in-progress
-marker is deliberately left behind after a failure; use --rollback before
-starting a new attempt. The switch marker is removed only by a successful
-manual or automatic rollback.
+The backups are stored under /var/backups/portal with mode 0600. The in-progress
+marker is deliberately left behind after a failure; a later run refuses to
+start while it exists. The operator must inspect it on the host before deciding
+how to proceed.
 USAGE
 }
 
@@ -93,13 +77,13 @@ PREFLIGHT:
   docker compose -f '$COMPOSE_FILE' version
   command -v python3 gzip sha256sum du df stat install awk grep sed seq flock; fail before downtime if any are missing
   docker inspect '$SOURCE_CONTAINER'; require State.Running=true
-  docker compose -f '$COMPOSE_FILE' config --services; require db, db_pg, backend
+  docker compose -f '$COMPOSE_FILE' config --services; require db_pg, backend
   docker compose -f '$COMPOSE_FILE' config --format json | python3 <validate db/db_pg names, images, and local volumes>
   docker compose -f '$COMPOSE_FILE' config --format json | python3 <read backend image>
   docker image inspect <configured backend image>
   docker compose -f '$COMPOSE_FILE' run --rm --no-deps backend php -r <require pdo_mysql and pdo_pgsql>
   docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan list --raw | grep -E '^portal:db-copy([[:space:]]|$)' >/dev/null
-  test ! -e '$MARKER_FILE' && test ! -e '$SWITCH_MARKER_FILE'
+  test ! -e '$MARKER_FILE'
   python3 <require DB_URL absent or empty; read DB_CONNECTION and optional DB_HOST/DB_PORT privately; use historical Compose defaults when host/port are absent>
   docker compose -f '$COMPOSE_FILE' run --rm --no-deps -e DB_CONNECTION=mariadb -e DB_HOST=<source> -e DB_PORT=<source> -e DB_URL= -e APP_CONFIG_CACHE=$CONFIG_CACHE_OVERRIDE backend php artisan migrate:status --database=mariadb --no-ansi; require no Pending migrations
   docker inspect -f <MariaDB /var/lib/mysql host mount> '$SOURCE_CONTAINER'
@@ -126,17 +110,10 @@ VERIFY:
   every Artisan command carries the absent APP_CONFIG_CACHE override; every database command also carries DB_URL=
   every one-off container runs with stdin from /dev/null, so a script streamed via `bash -s` is never consumed by the container
 SWITCH:
-  cp -p '$ENV_FILE' '$ENV_FILE.<UTC>.bak'; write the root-only switch marker '$SWITCH_MARKER_FILE' with that backup path
+  cp -p '$ENV_FILE' '$ENV_FILE.<UTC>.bak'; keep this root-only backup for operator inspection
   atomically set DB_CONNECTION=pgsql, DB_HOST=db_pg, DB_PORT=5432, and queue/cache connection keys to pgsql
   docker compose -f '$COMPOSE_FILE' up -d --force-recreate '$BACKEND_SERVICE'; wait for healthy
-  if recreation or healthcheck fails: automatic rollback, restore the saved .env and recreate the backend against MariaDB; log that PostgreSQL-only writes remain on the PG volume and are not copied back; remove the switch marker
-ROLLBACK:
-  acquire the same exclusive host lock '$LOCK_FILE' with flock; fail closed while another run holds it
-  if the switch marker exists: require --accept-postgres-write-loss even when the host .env now selects mariadb (MariaDB is the pre-cutover snapshot; PostgreSQL writes are not copied back and remain on the PostgreSQL volume)
-  else if the host .env selects pgsql: require --accept-postgres-write-loss
-  else: no acknowledgement is required
-  restore the .env backup named by the switch or in-progress marker; if neither exists, refuse rather than use a stale backup pointer; set DB_CONNECTION=mariadb, DB_HOST=db, DB_PORT=3306, and queue/cache connection keys to mariadb
-  docker compose -f '$COMPOSE_FILE' up -d --force-recreate '$BACKEND_SERVICE'; wait for healthy; do not alter MariaDB; remove the switch marker
+  if patching, recreation, or the healthcheck fails: stop with a named FATAL; never restore a previous engine or copy data back
 PLAN
 }
 
@@ -147,7 +124,7 @@ fail() {
 
 on_error() {
     local status=$?
-    printf 'FATAL: stopped during %s (exit %s). The in-progress and switch markers, if created, were preserved.\n' \
+    printf 'FATAL: stopped during %s (exit %s). The in-progress marker, if created, was preserved.\n' \
         "$CURRENT_PHASE" "$status" >&2
     exit "$status"
 }
@@ -264,63 +241,16 @@ acquire_lock() {
         || fail "Could not open the cutover lock '$LOCK_FILE'."
     chmod 0600 "$LOCK_FILE"
     if ! flock -n "$LOCK_FD"; then
-        fail "Another cutover or rollback already holds the host lock '$LOCK_FILE'; refusing to run concurrently."
+        fail "Another cutover already holds the host lock '$LOCK_FILE'; refusing to run concurrently."
     fi
     printf 'Host cutover lock acquired: %s\n' "$LOCK_FILE"
 }
 
-write_state_marker() {
-    local path="$1"
-    local env_backup="$2"
-    local temporary="$path.tmp"
-    {
-        printf 'started_at=%s\n' "$RUN_TIMESTAMP"
-        printf 'env_backup=%s\n' "$env_backup"
-    } > "$temporary"
-    chmod 0600 "$temporary"
-    mv -f "$temporary" "$path"
-}
-
 atomic_write_marker() {
-    write_state_marker "$MARKER_FILE" "$1"
-}
-
-save_marker_env_backup() {
-    write_state_marker "$MARKER_FILE" "$1"
-}
-
-write_switch_marker() {
-    local env_backup="$1"
-    local temporary="$SWITCH_MARKER_FILE.tmp"
-    {
-        printf 'switch=attempted\n'
-        printf 'started_at=%s\n' "$RUN_TIMESTAMP"
-        printf 'env_backup=%s\n' "$env_backup"
-    } > "$temporary"
+    local temporary="$MARKER_FILE.tmp"
+    printf 'started_at=%s\n' "$RUN_TIMESTAMP" > "$temporary"
     chmod 0600 "$temporary"
-    mv -f "$temporary" "$SWITCH_MARKER_FILE"
-}
-
-restore_env_backup() {
-    local backup="$1"
-    [[ -f "$backup" ]] || fail 'The saved host .env backup is missing; refusing to guess the rollback values.'
-    [[ "$backup" == "$STACK_DIR"/.env.* ]] || fail 'The saved .env backup path is outside the configured stack directory.'
-
-    local temporary="$ENV_FILE.rollback.tmp"
-    cp -p -- "$backup" "$temporary"
-    mv -f -- "$temporary" "$ENV_FILE"
-}
-
-rollback_failed_switch() {
-    local backup="$1"
-    printf 'Automatic rollback boundary: the PostgreSQL switch failed its health gate. Any PostgreSQL-only writes made during the brief switch window will not appear in the active MariaDB database; the PostgreSQL volume remains available for manual reconciliation.\n' >&2
-    printf 'Switch health failed; restoring the saved host .env and returning the backend to MariaDB.\n' >&2
-    restore_env_backup "$backup"
-    patch_host_env_for_mariadb
-    compose up -d --force-recreate "$BACKEND_SERVICE"
-    wait_for_backend || fail 'Automatic switch rollback restored .env but the backend did not become healthy.'
-    rm -f -- "$MARKER_FILE" "$SWITCH_MARKER_FILE"
-    fail 'The PostgreSQL switch failed and was automatically rolled back to MariaDB.'
+    mv -f "$temporary" "$MARKER_FILE"
 }
 
 patch_host_env_for_database() {
@@ -396,81 +326,6 @@ PY
 
 patch_host_env_for_postgres() {
     patch_host_env_for_database pgsql db_pg 5432
-}
-
-patch_host_env_for_mariadb() {
-    patch_host_env_for_database mariadb db 3306
-}
-
-run_rollback() {
-    require_root
-    validate_test_directory_overrides
-    acquire_lock
-    banner ROLLBACK
-    [[ -d "$STACK_DIR" && -f "$COMPOSE_FILE" && -f "$ENV_FILE" ]] \
-        || fail 'The host stack directory, compose.yaml, or .env is missing.'
-    docker info >/dev/null 2>&1 || fail 'Docker daemon is not usable.'
-    compose version >/dev/null 2>&1 || fail 'docker compose is not usable.'
-
-    local selected_connection switch_attempted=false
-    if ! selected_connection="$(read_env_value DB_CONNECTION)"; then
-        fail 'DB_CONNECTION must occur exactly once in the host .env before a rollback can select the database.'
-    fi
-    if [[ -f "$SWITCH_MARKER_FILE" ]]; then
-        switch_attempted=true
-    fi
-
-    case "$selected_connection" in
-        mariadb)
-            if [[ "$switch_attempted" == true ]]; then
-                if [[ "$ACCEPT_POSTGRES_WRITE_LOSS" != true ]]; then
-                    fail "A PostgreSQL switch was already attempted (state marker '$SWITCH_MARKER_FILE'), even though the host .env now selects MariaDB. MariaDB is the pre-cutover snapshot and is NOT updated from PostgreSQL: PostgreSQL-only writes will not appear in the active MariaDB database after rollback. The PostgreSQL volume remains available for manual reconciliation. Re-run with --rollback --accept-postgres-write-loss to acknowledge this divergence."
-                fi
-                printf 'Rollback boundary: --accept-postgres-write-loss acknowledged for a previously attempted PostgreSQL switch. PostgreSQL-only writes will not appear in the active MariaDB database; the PostgreSQL volume remains available for manual reconciliation.\n'
-            else
-                printf 'Rollback boundary: the host .env still selects MariaDB and no PostgreSQL switch was recorded, so no PostgreSQL writes are being discarded.\n'
-            fi
-            ;;
-        pgsql)
-            if [[ "$ACCEPT_POSTGRES_WRITE_LOSS" != true ]]; then
-                fail 'The host .env selects PostgreSQL. MariaDB is the pre-cutover snapshot and is NOT updated from PostgreSQL: PostgreSQL-only writes will not appear in the active MariaDB database after rollback. The PostgreSQL volume remains available for manual reconciliation. Re-run with --rollback --accept-postgres-write-loss to acknowledge this divergence.'
-            fi
-            printf 'Rollback boundary: --accept-postgres-write-loss acknowledged. PostgreSQL-only writes will not appear in the active MariaDB database; the PostgreSQL volume remains available for manual reconciliation.\n'
-            ;;
-        *)
-            fail "The host .env selects unexpected DB_CONNECTION='$selected_connection'; refusing to guess whether a rollback would discard PostgreSQL writes."
-            ;;
-    esac
-
-    local backup=''
-    if [[ -f "$SWITCH_MARKER_FILE" ]]; then
-        backup="$(sed -n 's/^env_backup=//p' "$SWITCH_MARKER_FILE" | head -n 1)"
-    fi
-    if [[ -z "$backup" ]]; then
-        if [[ -f "$MARKER_FILE" ]]; then
-            backup="$(sed -n 's/^env_backup=//p' "$MARKER_FILE" | head -n 1)"
-        else
-            fail 'No in-progress cutover or switch marker is available for rollback; refusing to restore a stale .env backup.'
-        fi
-    fi
-
-    if [[ -n "$backup" ]]; then
-        restore_env_backup "$backup"
-        printf 'Restored the saved host .env; values were not displayed.\n'
-    else
-        printf 'No .env backup was recorded; MariaDB connection keys will be normalized to the rollback target.\n'
-    fi
-
-    patch_host_env_for_mariadb
-
-    compose up -d --force-recreate "$BACKEND_SERVICE"
-    wait_for_backend
-    rm -f -- "$MARKER_FILE" "$SWITCH_MARKER_FILE"
-    if [[ "$switch_attempted" == true || "$selected_connection" == 'pgsql' ]]; then
-        printf 'Rollback complete. MariaDB was not modified or restored; PostgreSQL-only writes remain on the PostgreSQL volume and are not in the active database.\n'
-    else
-        printf 'Rollback complete. MariaDB was not modified or restored.\n'
-    fi
 }
 
 run_cutover() {
@@ -552,8 +407,7 @@ print(volume.get("name", ""))
     run_backend_artisan list --raw \
         | grep -E '^portal:db-copy([[:space:]]|$)' >/dev/null \
         || fail 'The deployed backend code does not register portal:db-copy; deploy the cutover-capable code first.'
-    [[ ! -e "$MARKER_FILE" ]] || fail "An unfinished cutover marker exists at '$MARKER_FILE'; run --rollback first (add --accept-postgres-write-loss if a PostgreSQL switch was attempted)."
-    [[ ! -e "$SWITCH_MARKER_FILE" ]] || fail "A previous PostgreSQL switch is recorded at '$SWITCH_MARKER_FILE'; run --rollback --accept-postgres-write-loss before starting another cutover, even if the host .env now selects MariaDB."
+    [[ ! -e "$MARKER_FILE" ]] || fail "An unfinished cutover marker exists at '$MARKER_FILE'; inspect it and the saved .env backup on the host before deciding how to proceed."
 
     local source_host source_port source_connection source_host_origin source_port_origin
     if grep -q '^DB_HOST=' "$ENV_FILE"; then
@@ -640,7 +494,7 @@ print(volume.get("name", ""))
 
     install -d -o root -g root -m 0700 "$STATE_DIR"
     install -d -o root -g root -m 0700 "$BACKUP_DIR"
-    atomic_write_marker ''
+    atomic_write_marker
 
     banner BACKUP
     printf 'Write freeze: stopping backend service before backup and copy.\n'
@@ -720,39 +574,26 @@ print(volume.get("name", ""))
     local env_backup="$STACK_DIR/.env.${RUN_TIMESTAMP}.bak"
     cp -p -- "$ENV_FILE" "$env_backup"
     chmod 0600 "$env_backup"
-    write_switch_marker "$env_backup"
-    save_marker_env_backup "$env_backup"
     if ! patch_host_env_for_postgres; then
-        rollback_failed_switch "$env_backup"
+        fail "Switch failed while patching the host .env; saved backup '$env_backup' and the in-progress marker were preserved."
     fi
     if ! compose up -d --force-recreate "$BACKEND_SERVICE"; then
-        rollback_failed_switch "$env_backup"
+        fail "Switch failed while recreating the backend; saved backup '$env_backup' and the in-progress marker were preserved."
     fi
     if ! wait_for_backend; then
-        rollback_failed_switch "$env_backup"
+        fail "Switch failed the backend health gate; saved backup '$env_backup' and the in-progress marker were preserved."
     fi
     rm -f -- "$MARKER_FILE"
-    printf 'PostgreSQL cutover complete. MariaDB remains running and untouched. Saved .env backup: %s\n' "$env_backup"
-    printf "Rollback command (PostgreSQL-only writes remain on the PG volume and are not copied to MariaDB; acknowledgement required): ssh root@reisinger.pictures 'bash -s -- --rollback --accept-postgres-write-loss' < deployment/migrate-to-postgres.sh\n"
+    printf 'PostgreSQL cutover complete. Saved .env backup: %s\n' "$env_backup"
 }
 
 for argument in "$@"; do
     case "$argument" in
         --dry-run) DRY_RUN=true ;;
-        --rollback) ROLLBACK=true ;;
-        --accept-postgres-write-loss) ACCEPT_POSTGRES_WRITE_LOSS=true ;;
         --help|-h) usage; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$argument" >&2; usage >&2; exit 2 ;;
     esac
 done
-
-if [[ "$DRY_RUN" == true && "$ROLLBACK" == true ]]; then
-    fail '--dry-run and --rollback cannot be combined.'
-fi
-
-if [[ "$ACCEPT_POSTGRES_WRITE_LOSS" == true && "$ROLLBACK" != true ]]; then
-    fail '--accept-postgres-write-loss is only valid together with --rollback.'
-fi
 
 if [[ "$DRY_RUN" == true ]]; then
     plan
@@ -761,8 +602,4 @@ fi
 
 trap on_error ERR
 
-if [[ "$ROLLBACK" == true ]]; then
-    run_rollback
-else
-    run_cutover
-fi
+run_cutover

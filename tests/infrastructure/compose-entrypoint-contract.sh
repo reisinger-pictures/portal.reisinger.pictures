@@ -52,20 +52,19 @@ assert_contains() {
     grep -Fq -- "$2" "$COMPOSE" || fail "$3"
 }
 
-# The dual-engine production Compose file is deployed before the one-time data
-# copy. Legacy .env files have DB_CONNECTION=mariadb but no host/port or cache
-# engine keys, so their fallback must remain MariaDB until the cutover helper
-# writes the PostgreSQL coordinates atomically.
-assert_contains "$COMPOSE" '      - DB_HOST=${DB_HOST:-db}' \
-    'a legacy production .env without DB_HOST must stay on the MariaDB service during the preparatory deploy'
-assert_contains "$COMPOSE" '      - DB_PORT=${DB_PORT:-3306}' \
-    'a legacy production .env without DB_PORT must stay on the MariaDB port during the preparatory deploy'
+# The production Compose file has one database engine. A host .env without
+# DB_HOST/DB_PORT must still reach the PostgreSQL service; the queue and cache
+# connections follow the selected engine (pgsql).
+assert_contains "$COMPOSE" '      - DB_HOST=${DB_HOST:-db_pg}' \
+    'a production .env without DB_HOST must default to the PostgreSQL service'
+assert_contains "$COMPOSE" '      - DB_PORT=${DB_PORT:-5432}' \
+    'a production .env without DB_PORT must default to the PostgreSQL port'
 assert_contains "$COMPOSE" '      - DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
-    'the queue database must default to the selected engine before and after cutover'
+    'the queue database must default to the selected PostgreSQL engine'
 assert_contains "$COMPOSE" '      - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
-    'the cache database must default to the selected engine before and after cutover'
+    'the cache database must default to the selected PostgreSQL engine'
 assert_contains "$COMPOSE" '      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
-    'the cache-lock database must default to the selected engine before and after cutover'
+    'the cache-lock database must default to the selected PostgreSQL engine'
 
 backend_dependencies() {
     awk '

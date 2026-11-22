@@ -418,11 +418,11 @@ class ProductionOperationsPolicyTest extends TestCase
 
         foreach ([
             'APP_ENV=${APP_ENV:-production}',
-            // PostgreSQL is the production target; MariaDB stays live until
-            // the verified host cutover. The engine remains an environment
-            // override so rollback can select the still-running MariaDB service
-            // without editing the Compose file.
+            // PostgreSQL is the sole production engine. The connection remains
+            // an environment override so the host .env can set it explicitly.
             'DB_CONNECTION=${DB_CONNECTION:-pgsql}',
+            'DB_HOST=${DB_HOST:-db_pg}',
+            'DB_PORT=${DB_PORT:-5432}',
             'DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-${DB_CONNECTION:-pgsql}}',
             'DB_QUEUE_RETRY_AFTER=${DB_QUEUE_RETRY_AFTER:-90}',
             'QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}',
@@ -437,12 +437,6 @@ class ProductionOperationsPolicyTest extends TestCase
         ] as $environmentLine) {
             $this->assertStringContainsString('- '.$environmentLine, $compose);
         }
-
-        // The MariaDB service remains the rollback path during the cutover
-        // window; only the selected default moved to PostgreSQL.
-        $this->assertStringContainsString('image: mariadb:11.4', $compose);
-        $this->assertStringContainsString('container_name: portal_db', $compose);
-        $this->assertStringContainsString('rolling back is that same env flip', $compose);
 
         $this->assertStringContainsString('/usr/local/bin/validate-production-env || exit 1;', $compose);
         $this->assertStringContainsString('php artisan cache:clear || exit 1;', $compose);
