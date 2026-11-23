@@ -14,18 +14,19 @@ return [
     | JWT -> Sanctum migration driver (Portal #9, Phase 3)
     |--------------------------------------------------------------------------
     |
-    | The `api` guard is now backed by Sanctum (D-73/D-74). The guard NAME
-    | `api` never changes. 'legacy' remains as a fallback for the final
-    | characterisation run while the JWT package is still installed; it is
-    | removed together with that package in Phase 4 (D-77). The access and
-    | refresh windows are unchanged by the swap (D-76).
+    | The `api` guard is backed by Sanctum (D-73/D-74). The guard NAME `api`
+    | never changes; the JWT package and its legacy driver are gone (D-77).
+    | Credentials stay in the same two httpOnly cookies (D-75) with the same
+    | 240-minute access / 7-day refresh windows (D-76).
     |
     */
     'migration' => [
         'driver' => env('AUTH_DRIVER', 'sanctum'),
-        // D-76: the 240-minute access / 7-day refresh windows are unchanged by
-        // the driver swap. JWT_TTL in the checked-in env files stays as-is for
-        // legacy mode; these keys drive the Sanctum token lifetimes.
+        // D-75: cookie names stay `rp_jwt` / `rp_jwt_refresh` so the frontend
+        // and already-issued credentials do not change.
+        'cookie_access' => env('AUTH_COOKIE_ACCESS', 'rp_jwt'),
+        'cookie_refresh' => env('AUTH_COOKIE_REFRESH', 'rp_jwt_refresh'),
+        // D-76: the 240-minute access / 7-day refresh windows are unchanged.
         'access_ttl' => (int) env('AUTH_ACCESS_TTL', 240),
         'refresh_ttl' => (int) env('AUTH_REFRESH_TTL', 10080),
     ],
@@ -36,17 +37,21 @@ return [
             'provider' => 'users',
         ],
         'api' => [
-            // D-74: the guard NAME stays `api`; only its driver is swapped.
+            // D-74: the guard NAME stays `api`; only its driver was swapped.
             // The custom `sanctum_transient` driver is registered by
             // AppServiceProvider and wraps SanctumTransientGuard.
-            'driver' => env('AUTH_DRIVER', 'sanctum') === 'legacy' ? 'jwt' : 'sanctum_transient',
+            'driver' => 'sanctum_transient',
             'provider' => 'users',
         ],
     ],
 
     'providers' => [
         'users' => [
-            'driver' => 'transient_eloquent',
+            // The legacy transient provider only existed to read JWT claims in
+            // retrieveById(). Sanctum resolves guests in SanctumTransientGuard,
+            // so the plain Eloquent provider also restores web-guard resolution
+            // by id (D-77).
+            'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
         ],
     ],

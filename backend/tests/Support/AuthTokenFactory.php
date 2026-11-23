@@ -9,16 +9,14 @@ use App\Services\Auth\TransientClaimsCodec;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 use Laravel\Sanctum\PersonalAccessToken;
-use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
-use PHPOpenSourceSaver\JWTAuth\Factory;
-use PHPOpenSourceSaver\JWTAuth\JWTAuth as JwtAuthManager;
 
 /**
- * Test-only credential factory that abstracts the JWT -> Sanctum migration.
+ * Test-only credential factory for the Sanctum `api` guard (Portal #9).
  *
- * Legacy mode reproduces the exact JWT call patterns the tests used before the
- * migration. Sanctum mode issues a real PersonalAccessToken through
- * AuthTokenService so the tests exercise the new guard instead of a shim.
+ * It issues a real PersonalAccessToken through AuthTokenService so tests
+ * exercise the production guard. The legacy claim names are kept as the
+ * public input shape: they are mapped onto structured `tp1:` abilities, which
+ * is where the authority lives now (D-73/D-78).
  */
 final class AuthTokenFactory
 {
@@ -26,19 +24,13 @@ final class AuthTokenFactory
 
     public static function forUser(User $user, array $claims = []): string
     {
-        if (self::isSanctum()) {
-            $token = app(AuthTokenService::class)->issue($user, self::transientClaims($claims));
-            // JWT's login() replaced the guard's cached user. A Sanctum
-            // RequestGuard keeps the user of the PREVIOUS request in a reused
-            // test app, so a second request would authenticate the wrong actor.
-            self::freshGuard();
+        $token = app(AuthTokenService::class)->issue($user, self::transientClaims($claims));
+        // A Sanctum RequestGuard keeps the user of the PREVIOUS request in a
+        // reused test app, so a second request would authenticate the wrong
+        // actor. JWT's login() replaced the guard's cached user; forget it here.
+        self::freshGuard();
 
-            return $token;
-        }
-
-        return $claims === []
-            ? Auth::guard('api')->login($user)
-            : JWTAuth::claims($claims)->fromUser($user);
+        return $token;
     }
 
     /** @param array<string, mixed> $claims */
@@ -60,23 +52,16 @@ final class AuthTokenFactory
      */
     public static function forGuest(array $claims): string
     {
-        if (self::isSanctum()) {
-            $guestId = self::guestId($claims);
-            $user = new User;
-            $user->id = null;
-            $user->guest_id = $guestId;
-            $user->name = is_string($claims['guest_name'] ?? null) ? $claims['guest_name'] : 'Gast';
+        $guestId = self::guestId($claims);
+        $user = new User;
+        $user->id = null;
+        $user->guest_id = $guestId;
+        $user->name = is_string($claims['guest_name'] ?? null) ? $claims['guest_name'] : 'Gast';
 
-            $token = app(AuthTokenService::class)->issue($user, self::transientClaims($claims));
-            self::freshGuard();
+        $token = app(AuthTokenService::class)->issue($user, self::transientClaims($claims));
+        self::freshGuard();
 
-            return $token;
-        }
-
-        $factory = app(Factory::class);
-        $payload = $factory->customClaims($claims)->make();
-
-        return app(JwtAuthManager::class)->encode($payload)->get();
+        return $token;
     }
 
     public function asGuest(): string
@@ -86,16 +71,7 @@ final class AuthTokenFactory
 
     public static function check(string $token): bool
     {
-        if (self::isSanctum()) {
-            return app(AuthTokenService::class)->verify($token) !== null;
-        }
-
-        return app(JwtAuthManager::class)->setToken($token)->check();
-    }
-
-    private static function isSanctum(): bool
-    {
-        return config('auth.migration.driver') === 'sanctum';
+        return app(AuthTokenService::class)->verify($token) !== null;
     }
 
     private static function freshGuard(): void
@@ -104,8 +80,8 @@ final class AuthTokenFactory
     }
 
     /**
-     * Read the claim set of a credential in either format, normalised to the
-     * legacy JWT payload keys the characterization tests assert on.
+     * Read the claim set of a credential, normalised to the legacy payload keys
+     * the characterization tests assert on.
      *
      * This is a read-only test aid: it does not grant authority and never
      * bypasses the guard. Sanctum claims come straight out of the stored
@@ -115,44 +91,32 @@ final class AuthTokenFactory
      */
     public static function claimsOf(string $token): array
     {
-        if (self::isSanctum()) {
-            $record = PersonalAccessToken::findToken($token);
-            if (! $record instanceof PersonalAccessToken) {
-                return [];
-            }
-
-            try {
-                $claims = app(TransientClaimsCodec::class)->decode($record->abilities);
-            } catch (InvalidArgumentException) {
-                return [];
-            }
-
-            $subject = $claims->guestId !== null
-                ? 'guest_'.$claims->guestId
-                : ($record->getAttribute('tokenable_id') === null
-                    ? null
-                    : (string) $record->getAttribute('tokenable_id'));
-
-            return [
-                'sub' => $subject,
-                'guest_id' => $claims->guestId,
-                'guest_name' => $claims->guestName,
-                'transient_invite_ids' => $claims->transientInviteIds,
-                'transient_galleries' => $claims->transientGalleries,
-                'transient_meta_galleries' => $claims->transientMetaGalleries,
-                'transient_invites' => $claims->transientInvites,
-            ];
-        }
-
-        $segments = explode('.', $token);
-        if (count($segments) !== 3) {
+        $record = PersonalAccessToken::findToken($token);
+        if (! $record instanceof PersonalAccessToken) {
             return [];
         }
 
-        $payload = $segments[1].str_repeat('=', (4 - strlen($segments[1]) % 4) % 4);
-        $decoded = json_decode(base64_decode(strtr($payload, '-_', '+/'), true), true);
+        try {
+            $claims = app(TransientClaimsCodec::class)->decode($record->abilities);
+        } catch (InvalidArgumentException) {
+            return [];
+        }
 
-        return is_array($decoded) ? $decoded : [];
+        $subject = $claims->guestId !== null
+            ? 'guest_'.$claims->guestId
+            : ($record->getAttribute('tokenable_id') === null
+                ? null
+                : (string) $record->getAttribute('tokenable_id'));
+
+        return [
+            'sub' => $subject,
+            'guest_id' => $claims->guestId,
+            'guest_name' => $claims->guestName,
+            'transient_invite_ids' => $claims->transientInviteIds,
+            'transient_galleries' => $claims->transientGalleries,
+            'transient_meta_galleries' => $claims->transientMetaGalleries,
+            'transient_invites' => $claims->transientInvites,
+        ];
     }
 
     /**

@@ -13,47 +13,36 @@ use Laravel\Sanctum\PersonalAccessToken;
 use RuntimeException;
 
 /**
- * Issue / verify / revoke credentials behind the JWT -> Sanctum flag (Portal #9).
+ * Issue / verify / revoke credentials for the `api` guard (Portal #9).
  *
- * The default `sanctum` uses the token store and the `api` guard's custom
- * `sanctum_transient` driver; `legacy` is a temporary fallback delegating to
- * the JWT flow through `Auth::guard('api')` until that package is removed
- * (D-77). The guard NAME stays `api` (D-74) and credentials
- * stay two httpOnly cookies (D-75), with the unchanged 240-minute access /
- * 7-day refresh windows (D-76) read from `auth.migration.access_ttl` and
- * `auth.migration.refresh_ttl`.
+ * D-77 removed the JWT package and its legacy driver entirely. The guard NAME
+ * stays `api` (D-74), credentials stay two httpOnly cookies (D-75) with the
+ * unchanged 240-minute access / 7-day refresh windows (D-76) read from
+ * `auth.migration.access_ttl` and `auth.migration.refresh_ttl`.
  *
  * Roles are never transported in abilities (D-78): only `TransientClaims` are
  * encoded through `TransientClaimsCodec` into one `tp1:` ability, and every
  * claim is revalidated by the guard/authorization layer on resolution (D-39/D-44).
  *
  * Constructor: none. Resolving this service never touches Sanctum state or a
- * database connection; the driver is read per call so the legacy path is
- * trivially unchanged and the flag can be flipped without rebuilding the
- * container.
+ * database connection.
  */
 final class AuthTokenService
 {
-    public const DRIVER_LEGACY = 'legacy';
-
     public const DRIVER_SANCTUM = 'sanctum';
 
     /**
-     * 'sanctum' is the configured default in config/auth.php, so an unset env
-     * resolves to sanctum here. Only an explicitly set value other than
-     * 'sanctum' (notably the temporary 'legacy' fallback) selects legacy;
-     * that legacy path is removed together with the JWT package in Phase 4.
+     * Kept as a stable, driver-independent read for callers and tests. The JWT
+     * fallback was removed with the package (D-77), so this is always sanctum.
      */
     public function driver(): string
     {
-        $driver = config('auth.migration.driver', self::DRIVER_LEGACY);
-
-        return $driver === self::DRIVER_SANCTUM ? self::DRIVER_SANCTUM : self::DRIVER_LEGACY;
+        return self::DRIVER_SANCTUM;
     }
 
     public function isSanctum(): bool
     {
-        return $this->driver() === self::DRIVER_SANCTUM;
+        return true;
     }
 
     public function accessTtlMinutes(): int
@@ -71,66 +60,46 @@ final class AuthTokenService
     }
 
     /**
-     * Issue the access credential. Legacy returns the JWT from the guard;
-     * Sanctum issues a 240-minute token (D-76) named `api`.
+     * Issue the 240-minute access token (D-76) named `api`.
      */
     public function issue(User $user, ?TransientClaims $claims = null): string
     {
-        return $this->isSanctum()
-            ? $this->issueSanctum($user, $claims ?? new TransientClaims, now()->addMinutes($this->accessTtlMinutes()))
-            : $this->issueLegacy($user);
+        return $this->issueSanctum($user, $claims ?? new TransientClaims, now()->addMinutes($this->accessTtlMinutes()));
     }
 
     /**
-     * Issue the longer-lived refresh credential. Legacy keeps the single JWT
-     * carried by both cookies; Sanctum issues a separate 7-day token (D-76).
+     * Issue the separate 7-day refresh token (D-76).
      */
     public function issueRefresh(User $actor, ?TransientClaims $claims = null): string
     {
-        return $this->isSanctum()
-            ? $this->issueSanctum($actor, $claims ?? new TransientClaims, now()->addMinutes($this->refreshTtlMinutes()), 'refresh')
-            : $this->issueLegacy($actor);
+        return $this->issueSanctum($actor, $claims ?? new TransientClaims, now()->addMinutes($this->refreshTtlMinutes()), 'refresh');
     }
 
     public function verify(?string $credential = null): ?User
     {
-        return $this->isSanctum()
-            ? $this->verifySanctum($credential)
-            : $this->verifyLegacy($credential);
+        return $this->verifySanctum($credential);
     }
 
     /**
-     * Rotate a credential of either driver. Kept for the Phase-2 contract;
-     * controllers use `verify()` + `issueRefresh()` for the shim in Sanctum mode.
+     * Rotate a credential. Controllers use `verify()` + `issueRefresh()` for
+     * the `/api/auth/refresh` shim; this method remains for the Phase-2 contract.
      */
     public function refresh(?string $credential, ?DateTimeInterface $expiresAt = null): ?string
     {
-        return $this->isSanctum()
-            ? $this->refreshSanctum($credential, $expiresAt)
-            : $this->refreshLegacy($credential);
+        return $this->refreshSanctum($credential, $expiresAt);
     }
 
-    /**
-     * Invalidate a credential. In legacy mode the JWT blacklist is owned by
-     * `AuthController::logout()` through the guard, so this is a no-op there.
-     */
     public function revoke(string $token): void
     {
-        if (! $this->isSanctum()) {
-            return;
-        }
-
         PersonalAccessToken::findToken($token)?->delete();
     }
 
     /**
-     * Read the structured transient claims carried by a credential. In legacy
-     * mode the JWT guard owns its payload and this returns empty claims; the
-     * controller's legacy branch reads `Auth::guard('api')->payload()` instead.
+     * Read the structured transient claims carried by a credential.
      */
     public function claimsOf(?string $credential): TransientClaims
     {
-        if (! $this->isSanctum() || $credential === null || $credential === '') {
+        if ($credential === null || $credential === '') {
             return new TransientClaims;
         }
 
@@ -154,10 +123,6 @@ final class AuthTokenService
      */
     public function revokeFromRequest(?Request $request = null): void
     {
-        if (! $this->isSanctum()) {
-            return;
-        }
-
         $request ??= request();
         $credentials = [];
         $bearer = $request->bearerToken();
@@ -166,8 +131,8 @@ final class AuthTokenService
         }
 
         foreach ([
-            (string) config('jwt.cookie_key_name', 'rp_jwt'),
-            (string) config('jwt.refresh_cookie_key_name', 'rp_jwt_refresh'),
+            (string) config('auth.migration.cookie_access', 'rp_jwt'),
+            (string) config('auth.migration.cookie_refresh', 'rp_jwt_refresh'),
         ] as $cookieName) {
             $value = $request->cookie($cookieName);
             if (is_string($value) && $value !== '') {
@@ -181,23 +146,19 @@ final class AuthTokenService
     }
 
     /**
-     * Rotate a Sanctum refresh credential into a fresh access/refresh pair,
-     * preserving every transient claim carried by the consumed token. Dropping
-     * the claims here would log a guest out on the next request and silently
-     * strip a registered actor's invite grants (D-73/D-44).
+     * Rotate a refresh credential into a fresh access/refresh pair, preserving
+     * every transient claim carried by the consumed token. Dropping the claims
+     * here would log a guest out on the next request and silently strip a
+     * registered actor's invite grants (D-73/D-44).
      *
      * The consumed row is deleted with a conditional delete so two concurrent
      * refresh requests cannot both mint a live credential. The still-valid
-     * access token is revoked too, matching the legacy blacklist semantics.
+     * access token is revoked too, matching the old blacklist semantics.
      *
      * @return array{access: string, refresh: string}|null
      */
     public function rotateRefresh(string $refreshToken, ?string $accessToken = null): ?array
     {
-        if (! $this->isSanctum()) {
-            return null;
-        }
-
         // Full guard trust path: blacklist, live invites, reserved null-brand.
         $actor = $this->verifySanctum($refreshToken);
         if (! $actor instanceof User) {
@@ -228,16 +189,6 @@ final class AuthTokenService
             'access' => $this->issueSanctum($actor, $claims, now()->addMinutes($this->accessTtlMinutes())),
             'refresh' => $this->issueSanctum($actor, $claims, now()->addMinutes($this->refreshTtlMinutes()), 'refresh'),
         ];
-    }
-
-    private function issueLegacy(User $user): string
-    {
-        $token = Auth::guard('api')->login($user);
-        if (! is_string($token)) {
-            throw new RuntimeException('The legacy api guard did not return a token string.');
-        }
-
-        return $token;
     }
 
     private function issueSanctum(
@@ -285,19 +236,6 @@ final class AuthTokenService
         return $token->getKey().'|'.$plain;
     }
 
-    private function verifyLegacy(?string $credential): ?User
-    {
-        $guard = Auth::guard('api');
-
-        if ($credential !== null && method_exists($guard, 'setToken')) {
-            $guard->setToken($credential);
-        }
-
-        $user = $guard->user();
-
-        return $user instanceof User ? $user : null;
-    }
-
     private function verifySanctum(?string $credential): ?User
     {
         $guard = app(SanctumTransientGuard::class);
@@ -307,22 +245,6 @@ final class AuthTokenService
         }
 
         return $guard->__invoke(request());
-    }
-
-    private function refreshLegacy(?string $credential): ?string
-    {
-        if ($credential === null) {
-            return null;
-        }
-
-        $guard = Auth::guard('api');
-        if (! method_exists($guard, 'setToken') || ! method_exists($guard, 'refresh')) {
-            throw new RuntimeException('The legacy api guard cannot refresh a credential.');
-        }
-
-        $token = $guard->setToken($credential)->refresh();
-
-        return is_string($token) ? $token : null;
     }
 
     private function refreshSanctum(?string $credential, ?DateTimeInterface $expiresAt): ?string

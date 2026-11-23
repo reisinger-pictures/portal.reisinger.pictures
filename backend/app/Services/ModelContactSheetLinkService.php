@@ -19,9 +19,9 @@ use Illuminate\Support\Str;
  * protokolliert (dieselbe Abwägung wie bei den bestehenden Token-Routen
  * `/api/model-profil/{token}` und `/api/contracts/join/{token}`).
  *
- * Signiert wird über {@see OfferTokenService} — derselbe HS256-Secret und
- * derselbe Verifikationspfad wie der Login-Token. Es gibt bewusst **keine**
- * zweite HMAC-/Base64-Eigenimplementierung.
+ * Signiert wird über {@see OfferTokenService} mit nativem HMAC-SHA256 und dem
+ * zentralen `services.signed_links.secret`. Der Wire-Format bleibt bewusst
+ * kompatibel zu vor der Migration ausgestellten Links (D-77).
  *
  * Die Variante ist **immer** `external`: die interne Variante enthält PII
  * (Realname, Kontaktdaten, Altersnachweis-Status) und darf niemals teilbar

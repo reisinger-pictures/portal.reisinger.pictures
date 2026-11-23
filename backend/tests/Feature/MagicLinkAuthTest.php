@@ -107,12 +107,9 @@ class MagicLinkAuthTest extends TestCase
             ->assertOk()
             ->assertJsonPath('full_path', $gallery->full_path);
 
-        // The guest redeem above issued a guest token, and the jwt-auth
-        // `Factory` is a container singleton whose claims collection
-        // accumulates. The registered user token must therefore start from a
-        // clean claim state, or it would carry the guest's `guest_id` and
-        // `transient_galleries` claims.
-        $this->resetJwtClaimState();
+        // The registered user token is issued separately from the guest token:
+        // Sanctum carries claims as explicit abilities, so no shared claim
+        // state can leak between the two credentials (D-73).
         $userToken = AuthTokenFactory::forUser($user);
         $registered = $this->withHeaders(['Authorization' => "Bearer $userToken"])
             ->postJson('/api/invites/redeem', [
@@ -143,11 +140,10 @@ class MagicLinkAuthTest extends TestCase
             'token' => 'transient-rating-'.Str::uuid(),
         ]);
 
-        // FIX: Token über die Fassade generieren, anstatt `login($user)` aufzurufen.
-        // Das verhindert, dass der Test-User im Speicher gecached wird, und zwingt
-        // den anschließenden Request durch unseren TransientUserProvider!
-        // Invite provenance is part of the claim contract: transient galleries
-        // without a live invite are revalidated away (D-39) in both modes.
+        // Issue the token through the factory instead of caching a user on the
+        // guard, so the request resolves the credential through
+        // SanctumTransientGuard. Invite provenance is part of the claim contract:
+        // transient galleries without a live invite are revalidated away (D-39).
         $transientToken = AuthTokenFactory::claims([
             'transient_galleries' => [$gallery->id],
             'transient_invite_ids' => [(string) $invite->getKey()],

@@ -16,9 +16,8 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
-class User extends Authenticatable implements JWTSubject
+class User extends Authenticatable
 {
     // HasApiTokens adds the token relation/createToken API used by
     // AuthTokenService. No route uses `auth:sanctum` directly — the `api`
@@ -166,16 +165,6 @@ class User extends Authenticatable implements JWTSubject
         'ftp_provisioned_at' => 'datetime',
         'ftp_revoked_at' => 'datetime',
     ];
-
-    public function getJWTIdentifier()
-    {
-        return $this->getKey();
-    }
-
-    public function getJWTCustomClaims()
-    {
-        return [];
-    }
 
     public function roles()
     {

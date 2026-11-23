@@ -22,12 +22,11 @@ use Laravel\Sanctum\PersonalAccessToken;
  * - Registered users: the token's morph resolves to a persisted `User`. Reserved
  *   null-brand actors are refused; transient claims from the token's `tp1:`
  *   ability are revalidated through `AuthorizationService::sanitizeTransientClaims()`.
- *   A revoked invite therefore removes only its grant, never logs the user out
- *   (the same registered-branch semantics as `TransientUserProvider::retrieveById`).
+ *   A revoked invite therefore removes only its grant, never logs the user out.
  * - DB-less guests: no `users` row exists (the token's `guest_<uuid>` morph
- *   resolves to null). The User is hydrated exactly as `TransientUserProvider`
- *   does today — blacklist, live-invite liveness check, sanitized claims — with
- *   no database lookup for the actor itself.
+ *   resolves to null). The User is hydrated with the blacklist, live-invite
+ *   liveness check and sanitized claims — with no database lookup for the actor
+ *   itself.
  *
  * Abilities are transport, not decision: roles stay live DB queries (D-78) and
  * every claim is revalidated on every request (D-39/D-44). `resolveCredential()`
@@ -100,7 +99,7 @@ final class SanctumTransientGuard
 
     private function credentialFromRequest(Request $request): ?string
     {
-        $cookieName = (string) config('jwt.cookie_key_name', 'rp_jwt');
+        $cookieName = (string) config('auth.migration.cookie_access', 'rp_jwt');
         $fromHeader = $request->bearerToken();
         if (is_string($fromHeader) && $fromHeader !== '') {
             return $fromHeader;
@@ -129,7 +128,7 @@ final class SanctumTransientGuard
             return null;
         }
 
-        // Mirror TransientUserProvider's guest branch: a guest token is a
+        // A guest token is a
         // capability for at least one invite that is still active on the
         // current host. Otherwise the identifier is blacklisted and refused.
         $activeInviteIds = array_values(array_filter(
@@ -158,8 +157,7 @@ final class SanctumTransientGuard
 
     private function hydrateRegistered(User $user, TransientClaims $claims): ?User
     {
-        // Mirror TransientUserProvider::retrieveById's registered branch. A
-        // revoked invite removes only its grant via sanitizeTransientClaims();
+        // A revoked invite removes only its grant via sanitizeTransientClaims();
         // it must not log the user out or discard account access (D-44).
         if ($this->authorization->isReservedNullBrandActor($user)) {
             return null;
@@ -185,9 +183,8 @@ final class SanctumTransientGuard
 
     private function applyTransientClaims(User $user, TransientClaims $claims): void
     {
-        // Revalidate against live invite state (D-39/D-44). This mirrors
-        // TransientUserProvider::applyTransientClaims, which delegates to the
-        // same AuthorizationService entry point. The stricter guest-only filter
+        // Revalidate against live invite state (D-39/D-44) through the same
+        // AuthorizationService entry point. The stricter guest-only filter
         // is applied downstream by getActiveTransientGalleryIds() through
         // synchronizeTransientClaims(); the codec itself decides nothing.
         $sanitized = $this->authorization->sanitizeTransientClaims([
@@ -205,7 +202,7 @@ final class SanctumTransientGuard
 
     private function inviteBlacklistTtlMinutes(): int
     {
-        $ttl = config('jwt.ttl', 240);
+        $ttl = config('auth.migration.access_ttl', 240);
 
         return is_numeric($ttl) ? max(1, (int) $ttl) : 240;
     }

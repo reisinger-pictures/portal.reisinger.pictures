@@ -9,12 +9,11 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Make the browser's auth cookie the credential it is.
  *
- * The JWT package resolves a token from the `Authorization` header first and
- * from a request field named `token` second — both **before** the cookie
- * parser. A browser mutation whose body carries a `token` (redeeming an
- * organization or gallery invite) therefore looked anonymous although the
- * session cookie was present, and the redeem fell into the guest branch that
- * demands `name` and `password`.
+ * The api guard resolves a credential from the `Authorization` header before
+ * the cookie parser. A browser mutation whose body carries a `token` (redeeming
+ * an organization or gallery invite) must not look anonymous only because a
+ * cookie was present: the redeem would fall into the guest branch that demands
+ * `name` and `password`.
  *
  * A request without an `Authorization` header but with the auth cookie is a
  * browser session, so the cookie is promoted to the header the parsers read
@@ -25,7 +24,7 @@ class AuthenticateJwtCookie
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $cookieName = (string) config('jwt.cookie_key_name', 'rp_jwt');
+        $cookieName = (string) config('auth.migration.cookie_access', 'rp_jwt');
         $token = $request->cookie($cookieName);
 
         if (! $request->headers->has('Authorization') && is_string($token) && $token !== '') {

@@ -41,10 +41,9 @@ final class ActorIdentity
             return null;
         }
 
-        // TransientUserProvider derives this from the signed `guest_id` claim
-        // and falls back to the `guest_<id>` JWT subject. The fallback here is
-        // intentionally limited to the property populated by that provider;
-        // an unidentifiable null-id actor is never allowed to own a row.
+        // The guest identity is carried in the `tp1:` ability and hydrated onto
+        // the DB-less actor by SanctumTransientGuard (D-73). An unidentifiable
+        // null-id actor is never allowed to own a row.
         return self::nonEmptyString($actor->guest_id);
     }
 

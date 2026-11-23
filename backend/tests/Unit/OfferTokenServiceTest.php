@@ -55,4 +55,27 @@ class OfferTokenServiceTest extends TestCase
 
         $this->assertSame(['a' => 'b'], $this->service->verify($token));
     }
+
+    /**
+     * D-77: a token issued by the removed Lcobucci/JWT provider still verifies
+     * with the native HMAC verifier. The fixture was signed with HS256 over the
+     * unchanged `{"typ":"JWT","alg":"HS256"}` header.
+     */
+    public function test_a_token_issued_by_the_removed_jwt_provider_still_verifies(): void
+    {
+        $fixture = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0IiwiaWF0IjoxNzAwMDAwMDAwLCJuYmYiOjE3MDAwMDAwMDAsImV4cCI6MjAwMDAwMDAwMCwic3ViIjoib2ZmZXIiLCJqdGkiOiJwaGFzZTQtY29tcGF0LWZpeHR1cmUiLCJvZmZlciI6eyJmaXh0dXJlIjp0cnVlLCJwcmljZSI6MTIzNCwicGhvdG9zIjpbImNvbXBhdC1waG90by0xIl19fQ.u6fdrCgIEVnR-opbJHAQvdalU0Uz__vF15AjufzDVCI';
+
+        config([
+            'services.signed_links.secret' => 'phase4-compat-fixture-secret-do-not-use-in-prod',
+            // The fixture was issued with this issuer; strict iss validation
+            // (D-77) requires the verifier to read the same configured value.
+            'app.url' => 'http://localhost',
+        ]);
+
+        $this->assertSame([
+            'fixture' => true,
+            'price' => 1234,
+            'photos' => ['compat-photo-1'],
+        ], $this->service->verify($fixture));
+    }
 }

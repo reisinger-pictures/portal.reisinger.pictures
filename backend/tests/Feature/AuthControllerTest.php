@@ -202,11 +202,9 @@ class AuthControllerTest extends TestCase
 
         $this->assertFalse(AuthTokenFactory::check($token));
 
-        // In legacy mode the refresh cookie is the same long-lived JWT, so the
-        // expired credential is still refreshable. Sanctum issues a separate
-        // refresh token (D-76); the expired access token alone cannot be rotated.
-        $tokens = app(AuthTokenService::class);
-        $refreshCredential = $tokens->isSanctum() ? $tokens->issueRefresh($user) : $token;
+        // Sanctum issues a separate refresh token (D-76); the expired access
+        // token alone cannot be rotated.
+        $refreshCredential = app(AuthTokenService::class)->issueRefresh($user);
 
         // The expired access token is sent as a bearer header to prove that
         // auth:api is not involved. A browser would have removed rp_jwt by now;
@@ -323,12 +321,8 @@ class AuthControllerTest extends TestCase
 
     private function issueExpiredAccessToken(User $user): string
     {
-        $tokens = app(AuthTokenService::class);
-        // The legacy TTL lives in jwt.ttl; the Sanctum access window is read
-        // from the driver-independent service (D-76).
-        $accessTtl = $tokens->isSanctum()
-            ? $tokens->accessTtlMinutes()
-            : max((int) config('jwt.ttl', 240), 1);
+        // The access window is read from the driver-independent service (D-76).
+        $accessTtl = app(AuthTokenService::class)->accessTtlMinutes();
         Carbon::setTestNow(Carbon::now()->subMinutes($accessTtl + 1));
 
         try {

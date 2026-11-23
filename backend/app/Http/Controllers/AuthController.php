@@ -70,16 +70,11 @@ class AuthController extends Controller
             }
 
             $tokens = app(AuthTokenService::class);
-            if ($tokens->isSanctum()) {
-                return $this->respondWithTokens(
-                    $tokens->issue($user),
-                    $tokens->issueRefresh($user),
-                );
-            }
 
-            $token = Auth::guard('api')->login($user);
-
-            return $this->respondWithToken($token);
+            return $this->respondWithTokens(
+                $tokens->issue($user),
+                $tokens->issueRefresh($user),
+            );
         }
 
         return response()->json(['error' => 'Ungültige Zugangsdaten.'], 401);
@@ -282,16 +277,11 @@ class AuthController extends Controller
         }
 
         $tokens = app(AuthTokenService::class);
-        if ($tokens->isSanctum()) {
-            return $this->respondWithTokens(
-                $tokens->issue($user),
-                $tokens->issueRefresh($user),
-            );
-        }
 
-        $token = Auth::guard('api')->login($user);
-
-        return $this->respondWithToken($token);
+        return $this->respondWithTokens(
+            $tokens->issue($user),
+            $tokens->issueRefresh($user),
+        );
     }
 
     public function updateProfile(Request $request)
@@ -511,7 +501,7 @@ class AuthController extends Controller
 
     public function refresh(Request $request)
     {
-        $refreshCookieName = (string) config('jwt.refresh_cookie_key_name', 'rp_jwt_refresh');
+        $refreshCookieName = (string) config('auth.migration.cookie_refresh', 'rp_jwt_refresh');
         $refreshToken = $request->cookie($refreshCookieName);
 
         if (! is_string($refreshToken) || $refreshToken === '') {
@@ -521,40 +511,21 @@ class AuthController extends Controller
         $tokens = app(AuthTokenService::class);
 
         try {
-            if ($tokens->isSanctum()) {
-                // The refresh credential is resolved through the same guard
-                // trust checks as a request (blacklist, live invites, reserved
-                // null-brand actor), then atomically rotated into a new pair.
-                // rotateRefresh() preserves the transient claims of the
-                // consumed token — dropping them would log guests out and
-                // strip registered actors' invite grants.
-                $accessToken = $request->cookie((string) config('jwt.cookie_key_name', 'rp_jwt'));
-                $pair = $tokens->rotateRefresh(
-                    $refreshToken,
-                    is_string($accessToken) ? $accessToken : null,
-                );
-                if ($pair === null) {
-                    return response()->json(['error' => 'Token konnte nicht aktualisiert werden.'], 401);
-                }
-
-                return $this->respondWithTokens($pair['access'], $pair['refresh']);
-            }
-
-            // Resolve the subject before refreshing. The refresh endpoint is
-            // outside auth:api, so provider-level trust checks would otherwise
-            // be skipped for a legacy null-brand account.
-            $guard = Auth::guard('api')->setToken($refreshToken);
-            $user = $guard->user();
-            if (! $user || app(AuthorizationService::class)->isReservedNullBrandActor($user)) {
+            // The refresh credential is resolved through the same guard trust
+            // checks as a request (blacklist, live invites, reserved null-brand
+            // actor), then atomically rotated into a new pair. rotateRefresh()
+            // preserves the transient claims of the consumed token — dropping
+            // them would log guests out and strip invite grants.
+            $accessToken = $request->cookie((string) config('auth.migration.cookie_access', 'rp_jwt'));
+            $pair = $tokens->rotateRefresh(
+                $refreshToken,
+                is_string($accessToken) ? $accessToken : null,
+            );
+            if ($pair === null) {
                 return response()->json(['error' => 'Token konnte nicht aktualisiert werden.'], 401);
             }
 
-            // The access cookie is deliberately not used here. It is allowed to
-            // expire in the browser, while this httpOnly credential remains
-            // refreshable within the configured JWT refresh window.
-            $token = $guard->refresh();
-
-            return $this->respondWithToken($token);
+            return $this->respondWithTokens($pair['access'], $pair['refresh']);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Token konnte nicht aktualisiert werden.'], 401);
         }
@@ -563,17 +534,13 @@ class AuthController extends Controller
     public function logout()
     {
         $tokens = app(AuthTokenService::class);
-        if ($tokens->isSanctum()) {
-            // Revoke every credential actually presented (bearer or cookie)
-            // before the browser forgets the cookies, mirroring the guard's
-            // own bearer-first extraction.
-            $tokens->revokeFromRequest();
-        } else {
-            Auth::guard('api')->logout();
-        }
+        // Revoke every credential actually presented (bearer or cookie) before
+        // the browser forgets the cookies, mirroring the guard's bearer-first
+        // extraction.
+        $tokens->revokeFromRequest();
 
-        $accessCookie = cookie()->forget((string) config('jwt.cookie_key_name', 'rp_jwt'), '/');
-        $refreshCookie = cookie()->forget((string) config('jwt.refresh_cookie_key_name', 'rp_jwt_refresh'), '/');
+        $accessCookie = cookie()->forget((string) config('auth.migration.cookie_access', 'rp_jwt'), '/');
+        $refreshCookie = cookie()->forget((string) config('auth.migration.cookie_refresh', 'rp_jwt_refresh'), '/');
 
         return response()->json(['message' => 'Successfully logged out'])
             ->withCookie($accessCookie)

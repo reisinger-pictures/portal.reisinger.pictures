@@ -6,7 +6,6 @@ use App\Enums\Brand;
 use App\Models\Gallery;
 use App\Models\GalleryInvite;
 use App\Models\User;
-use App\Services\Auth\AuthTokenService;
 use App\Services\ModelContactSheetLinkService;
 use App\Services\OfferTokenService;
 use Carbon\Carbon;
@@ -18,11 +17,9 @@ use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
- * Phase-0 characterization of the CURRENT JWT behaviour (issue #9).
+ * Contract characterization for the Sanctum auth flow (issue #9).
  *
- * These tests pin what exists TODAY so the dangerous Phase-3 guard flip
- * (jwt -> Sanctum) has an oracle. Production/auth code is deliberately left
- * untouched. Each contract is tied to an owner decision:
+ * Each contract is tied to an owner decision:
  *
  *  - D-73 (guest identity): an anonymous invite redeem resolves to a DB-less
  *    user with a `guest_id`; no `users` row is created.
@@ -30,16 +27,14 @@ use Tests\TestCase;
  *    `rp_jwt_refresh`; a cookie-authenticated mutation without a valid CSRF
  *    double-submit token answers 403 (not 419).
  *  - D-76 (refresh shim / windows): 240-minute access window, 7-day refresh
- *    window; `/api/auth/refresh` rotates and blacklists the previous token.
- *  - D-77 (signed links before the HMAC move): the D-48 7-day shared links and
- *    the 14-day offer tokens are signed JWTs verified through the same
- *    secret/path; they are brand-bound, expire, and reject tampering / wrong
- *    brands.
+ *    window; `/api/auth/refresh` rotates and consumes the previous token.
+ *  - D-77 (signed links moved to HMAC): the D-48 7-day shared links and 14-day
+ *    offer tokens keep their signed wire format; they are brand-bound, expire,
+ *    and reject tampering / wrong brands.
  *
- * Note on the access window: the checked-in local `.env` overrides
- * `JWT_TTL=60`, while D-76 pins the contract at 240 minutes. The cookie test
- * fixes both config keys to the documented contract so the characterization is
- * deterministic and independent of local environment drift.
+ * Tests 1 and 3 originally pinned the removed JWT cookie payload and were
+ * skipped in sanctum mode; after D-77 they assert the Sanctum cookie/guest
+ * contract instead. Tests 2 and 4-7 keep their original assertions.
  */
 class LegacyAuthContractTest extends TestCase
 {
@@ -52,15 +47,10 @@ class LegacyAuthContractTest extends TestCase
      */
     public function test_login_issues_two_httponly_cookies_with_documented_windows(): void
     {
-        if (app(AuthTokenService::class)->isSanctum()) {
-            $this->markTestSkipped('Phase-0 characterization of the JWT wire format; legacy mode only (D-76/D-77).');
-        }
-
-        Config::set('jwt.ttl', 240);
-        Config::set('jwt.refresh_ttl', 10080); // 7 * 24 * 60 minutes
-        // The factory holds its TTL from service-provider boot; force the value
-        // after the config override so the issued JWT carries 240 minutes too.
-        Auth::guard('api')->factory()->setTTL(240);
+        // Pin the documented windows explicitly; local env files may override
+        // them, and the characterization must stay deterministic.
+        Config::set('auth.migration.access_ttl', 240);
+        Config::set('auth.migration.refresh_ttl', 10080); // 7 * 24 * 60 minutes
 
         $user = User::factory()->create([
             'brand' => Brand::B2B,
@@ -88,13 +78,11 @@ class LegacyAuthContractTest extends TestCase
         $this->assertEqualsWithDelta($now + 240 * 60, $access->getExpiresTime(), 5);
         $this->assertEqualsWithDelta($now + 7 * 24 * 60 * 60, $refresh->getExpiresTime(), 5);
 
-        // The access JWT itself carries the 240-minute window in its claims.
-        $claims = $this->decodeClaims((string) $access->getValue());
-        $this->assertSame(240 * 60, (int) $claims['exp'] - (int) $claims['iat']);
-
-        // Today the refresh cookie is a longer-lived copy of the same JWT, not
-        // a distinct credential. Pin that fact before the format changes.
-        $this->assertSame($access->getValue(), $refresh->getValue());
+        // Sanctum issues two distinct credentials; the removed JWT package
+        // reused one token for both cookies (D-75/D-76).
+        $this->assertNotSame($access->getValue(), $refresh->getValue());
+        $this->assertTrue(AuthTokenFactory::check((string) $access->getValue()));
+        $this->assertTrue(AuthTokenFactory::check((string) $refresh->getValue()));
     }
 
     /**
@@ -146,10 +134,6 @@ class LegacyAuthContractTest extends TestCase
      */
     public function test_anonymous_invite_redeem_yields_a_dbless_guest_actor(): void
     {
-        if (app(AuthTokenService::class)->isSanctum()) {
-            $this->markTestSkipped('Phase-0 characterization pins the JWT payload of the guest cookie; legacy mode only (D-73/D-77).');
-        }
-
         $gallery = Gallery::factory()->create(['type' => 'selection', 'is_public' => false]);
         GalleryInvite::create(['gallery_id' => $gallery->id, 'token' => 'guest-contract-1']);
         GalleryInvite::create(['gallery_id' => $gallery->id, 'token' => 'guest-contract-2']);
@@ -174,7 +158,9 @@ class LegacyAuthContractTest extends TestCase
         $this->assertDatabaseMissing('users', ['email' => 'anna@example.com']);
 
         $token = (string) $first->getCookie('rp_jwt', false)->getValue();
-        $claims = $this->decodeClaims($token);
+        // Sanctum carries the guest identity in a structured `tp1:` ability;
+        // the factory normalises it back to the asserted claim keys (D-73).
+        $claims = AuthTokenFactory::claimsOf($token);
         $guestId = (string) $claims['guest_id'];
         $this->assertNotSame('', $guestId);
         $this->assertSame('guest_'.$guestId, $claims['sub']);
@@ -299,8 +285,8 @@ class LegacyAuthContractTest extends TestCase
     }
 
     /**
-     * Decode the payload of a signed JWT without verifying its signature —
-     * enough to read the time/identity claims the contracts pin.
+     * Decode the payload of a signed link token without verifying its signature —
+     * enough to read the time claims the contracts pin.
      *
      * @return array<string, mixed>
      */

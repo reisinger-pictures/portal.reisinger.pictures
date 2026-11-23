@@ -13,7 +13,6 @@ use App\Services\AuthorizationService;
 use App\Services\OrgDefaultRolePolicy;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -216,22 +215,15 @@ class OrgInviteController extends Controller
             }
 
             $tokens = app(AuthTokenService::class);
-            if ($tokens->isSanctum()) {
-                // The guest credential that redeemed this invite is replaced by
-                // a fresh registered-user credential; leaving it valid would
-                // keep a replayable guest session alive (D-75).
-                $tokens->revokeFromRequest();
+            // The guest credential that redeemed this invite is replaced by a
+            // fresh registered-user credential; leaving it valid would keep a
+            // replayable guest session alive (D-75).
+            $tokens->revokeFromRequest();
 
-                return $this->respondWithTokens(
-                    $tokens->issue($user),
-                    $tokens->issueRefresh($user),
-                );
-            }
-
-            Auth::guard('api')->logout();
-            $token = Auth::guard('api')->login($user);
-
-            return $this->respondWithToken($token);
+            return $this->respondWithTokens(
+                $tokens->issue($user),
+                $tokens->issueRefresh($user),
+            );
         });
     }
 }

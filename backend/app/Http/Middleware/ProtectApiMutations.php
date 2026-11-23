@@ -199,8 +199,8 @@ class ProtectApiMutations
 
     private function hasJwtCookie(Request $request): bool
     {
-        return $request->hasCookie((string) config('jwt.cookie_key_name', 'rp_jwt'))
-            || $request->hasCookie((string) config('jwt.refresh_cookie_key_name', 'rp_jwt_refresh'));
+        return $request->hasCookie((string) config('auth.migration.cookie_access', 'rp_jwt'))
+            || $request->hasCookie((string) config('auth.migration.cookie_refresh', 'rp_jwt_refresh'));
     }
 
     private function hasValidCsrfToken(Request $request): bool
@@ -279,6 +279,6 @@ class ProtectApiMutations
      */
     private function csrfTtlMinutes(): int
     {
-        return max(1, (int) config('jwt.refresh_ttl', 10080));
+        return max(1, (int) config('auth.migration.refresh_ttl', 10080));
     }
 }

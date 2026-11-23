@@ -13,8 +13,6 @@ use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use PHPOpenSourceSaver\JWTAuth\JWT;
-use PHPOpenSourceSaver\JWTAuth\JWTAuth as JwtAuthManager;
 use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
@@ -210,14 +208,14 @@ class InviteRevocationTest extends TestCase
 
     private function asToken(string $token): self
     {
-        $this->resetJwtState();
+        $this->resetGuardState();
 
         return $this->withToken($token);
     }
 
     private function asRefreshToken(string $token): self
     {
-        $this->resetJwtState();
+        $this->resetGuardState();
         $csrf = $this->csrfCredentials();
 
         return $this->withUnencryptedCookie('XSRF-TOKEN', $csrf['cookie'])
@@ -226,11 +224,9 @@ class InviteRevocationTest extends TestCase
             ->withCredentials();
     }
 
-    private function resetJwtState(): void
+    private function resetGuardState(): void
     {
         Auth::forgetGuards();
-        app(JWT::class)->unsetToken();
-        app(JwtAuthManager::class)->unsetToken();
     }
 
     /**

@@ -21,8 +21,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\Factory;
-use PHPOpenSourceSaver\JWTAuth\JWTAuth;
 
 class InviteController extends Controller
 {
@@ -108,18 +106,7 @@ class InviteController extends Controller
             return response()->json(['error' => 'Das Galerie-Passwort ist nicht korrekt.'], 403);
         }
 
-        $guard = Auth::guard('api');
-        $tokens = app(AuthTokenService::class);
-        $currentUser = $guard->user();
-        // `setToken()` is a JWT-guard-only API. In sanctum mode the guard has
-        // already resolved the cookie through the middleware's bearer promotion.
-        if (! $currentUser && ! $tokens->isSanctum() && $request->hasCookie('rp_jwt')) {
-            try {
-                $currentUser = $guard->setToken($request->cookie('rp_jwt'))->user();
-            } catch (\Exception $e) {
-                // Ignore invalid/expired token gracefully
-            }
-        }
+        $currentUser = Auth::guard('api')->user();
 
         if ($currentUser) {
             $authorization = app(AuthorizationService::class);
@@ -138,119 +125,55 @@ class InviteController extends Controller
 
         if ($currentUser) {
             $tokens = app(AuthTokenService::class);
-            if ($tokens->isSanctum()) {
-                // Mirror the JWT branch: carry the current grants into a fresh
-                // credential pair after merging this invite. Claims are read
-                // from the presented token's abilities, never trusted at face
-                // value — sanitizeTransientClaims() revalidates every grant
-                // against live invite state (D-39/D-44, FINAL-6).
-                $credential = $request->bearerToken();
-                if (! is_string($credential) || $credential === '') {
-                    $fromCookie = $request->cookie((string) config('jwt.cookie_key_name', 'rp_jwt'));
-                    $credential = is_string($fromCookie) ? $fromCookie : null;
-                }
-                $claims = $tokens->claimsOf($credential);
-
-                $inviteId = (string) $invite->getKey();
-                $existingInvites = $claims->transientInvites;
-                $existingInvites[$inviteId] = [
-                    'gallery_ids' => [(string) $gallery->getKey()],
-                    'meta_gallery_ids' => $invite->can_edit_metadata ? [(string) $gallery->getKey()] : [],
-                ];
-
-                $sanitized = app(AuthorizationService::class)->sanitizeTransientClaims([
-                    'transient_galleries' => array_values(array_unique([
-                        ...$claims->transientGalleries,
-                        ...$transientGalleries,
-                    ])),
-                    'transient_meta_galleries' => array_values(array_unique([
-                        ...$claims->transientMetaGalleries,
-                        ...$transientMetaGalleries,
-                    ])),
-                    'transient_invites' => $existingInvites,
-                    'transient_invite_ids' => array_values(array_unique([
-                        ...$claims->transientInviteIds,
-                        $inviteId,
-                    ])),
-                ], true);
-
-                $merged = new TransientClaims(
-                    guestId: $claims->guestId,
-                    guestName: $claims->guestName,
-                    transientInviteIds: $sanitized['transient_invite_ids'],
-                    transientGalleries: $sanitized['transient_galleries'],
-                    transientMetaGalleries: $sanitized['transient_meta_galleries'],
-                    transientInvites: $sanitized['transient_invites'],
-                );
-
-                return $this->respondWithTokens(
-                    $tokens->issue($currentUser, $merged),
-                    $tokens->issueRefresh($currentUser, $merged),
-                    ['full_path' => $gallery->full_path],
-                );
+            // Carry the current grants into a fresh credential pair after
+            // merging this invite. Claims are read from the presented token's
+            // abilities, never trusted at face value —
+            // sanitizeTransientClaims() revalidates every grant against live
+            // invite state (D-39/D-44, FINAL-6).
+            $credential = $request->bearerToken();
+            if (! is_string($credential) || $credential === '') {
+                $fromCookie = $request->cookie((string) config('auth.migration.cookie_access', 'rp_jwt'));
+                $credential = is_string($fromCookie) ? $fromCookie : null;
             }
-
-            $payload = $guard->payload();
-            $transientClaims = [
-                'transient_galleries' => $payload->get('transient_galleries'),
-                'transient_meta_galleries' => $payload->get('transient_meta_galleries'),
-            ];
-
-            foreach ([
-                'transient_invites',
-                'transient_invite_ids',
-            ] as $claim) {
-                if ($payload->hasKey($claim)) {
-                    $transientClaims[$claim] = $payload->get($claim);
-                }
-            }
-
-            $existingGalleries = is_array($transientClaims['transient_galleries'])
-                ? $transientClaims['transient_galleries']
-                : [];
-            $existingMetaGalleries = is_array($transientClaims['transient_meta_galleries'])
-                ? $transientClaims['transient_meta_galleries']
-                : [];
-            $transientClaims['transient_galleries'] = array_values(array_unique(array_merge(
-                $existingGalleries,
-                $transientGalleries
-            )));
-            $transientClaims['transient_meta_galleries'] = array_values(array_unique(array_merge(
-                $existingMetaGalleries,
-                $transientMetaGalleries
-            )));
+            $claims = $tokens->claimsOf($credential);
 
             $inviteId = (string) $invite->getKey();
-            $existingInvites = is_array($transientClaims['transient_invites'] ?? null)
-                ? $transientClaims['transient_invites']
-                : [];
+            $existingInvites = $claims->transientInvites;
             $existingInvites[$inviteId] = [
-                'gallery_id' => (string) $gallery->getKey(),
-                'can_edit_metadata' => (bool) $invite->can_edit_metadata,
+                'gallery_ids' => [(string) $gallery->getKey()],
+                'meta_gallery_ids' => $invite->can_edit_metadata ? [(string) $gallery->getKey()] : [],
             ];
-            $transientClaims['transient_invites'] = $existingInvites;
-            $transientClaims['transient_invite_ids'] = array_values(array_unique(array_merge(
-                is_array($transientClaims['transient_invite_ids'] ?? null)
-                    ? $transientClaims['transient_invite_ids']
-                    : [],
-                [$inviteId]
-            )));
 
-            // Sanitize before issuing a replacement token as well. This drops
-            // grants whose invite was revoked while the current JWT was alive.
-            //
-            // FINAL-6: a grant that is only invisible from this host is carried
-            // through rather than burned, because the replacement token outlives
-            // this request and a host mismatch is a viewing-context problem, not
-            // a revocation. The server still has to be on the invite's host for
-            // the grant to become usable.
-            $transientClaims = app(AuthorizationService::class)->sanitizeTransientClaims(
-                $transientClaims,
-                true,
+            $sanitized = app(AuthorizationService::class)->sanitizeTransientClaims([
+                'transient_galleries' => array_values(array_unique([
+                    ...$claims->transientGalleries,
+                    ...$transientGalleries,
+                ])),
+                'transient_meta_galleries' => array_values(array_unique([
+                    ...$claims->transientMetaGalleries,
+                    ...$transientMetaGalleries,
+                ])),
+                'transient_invites' => $existingInvites,
+                'transient_invite_ids' => array_values(array_unique([
+                    ...$claims->transientInviteIds,
+                    $inviteId,
+                ])),
+            ], true);
+
+            $merged = new TransientClaims(
+                guestId: $claims->guestId,
+                guestName: $claims->guestName,
+                transientInviteIds: $sanitized['transient_invite_ids'],
+                transientGalleries: $sanitized['transient_galleries'],
+                transientMetaGalleries: $sanitized['transient_meta_galleries'],
+                transientInvites: $sanitized['transient_invites'],
             );
-            $token = $guard->claims($transientClaims)->login($currentUser);
 
-            return $this->respondWithToken($token, ['full_path' => $gallery->full_path]);
+            return $this->respondWithTokens(
+                $tokens->issue($currentUser, $merged),
+                $tokens->issueRefresh($currentUser, $merged),
+                ['full_path' => $gallery->full_path],
+            );
         }
 
         // Anonymous Guest
@@ -265,42 +188,26 @@ class InviteController extends Controller
             }
         }
 
+        // The guest is DB-less; the token's synthetic morph id
+        // (`guest_<uuid>`) keeps every lookup out of the users table (D-73).
         $tokens = app(AuthTokenService::class);
-        if ($tokens->isSanctum()) {
-            // Same values as the legacy guest JWT, transported as structured
-            // abilities. The guest is DB-less; the token's synthetic morph id
-            // (`guest_<uuid>`) keeps every lookup out of the users table (D-73).
-            $claims = new TransientClaims(
-                guestId: $guestId,
-                guestName: $guestName,
-                transientInviteIds: [(string) $invite->getKey()],
-                transientGalleries: $transientGalleries,
-                transientMetaGalleries: $transientMetaGalleries,
-            );
-            $guest = new User;
-            $guest->id = null;
-            $guest->name = $guestName;
-            $guest->guest_id = $guestId;
+        $claims = new TransientClaims(
+            guestId: $guestId,
+            guestName: $guestName,
+            transientInviteIds: [(string) $invite->getKey()],
+            transientGalleries: $transientGalleries,
+            transientMetaGalleries: $transientMetaGalleries,
+        );
+        $guest = new User;
+        $guest->id = null;
+        $guest->name = $guestName;
+        $guest->guest_id = $guestId;
 
-            return $this->respondWithTokens(
-                $tokens->issue($guest, $claims),
-                $tokens->issueRefresh($guest, $claims),
-                ['full_path' => $gallery->full_path],
-            );
-        }
-
-        $factory = app(Factory::class);
-        $payload = $factory->customClaims([
-            'sub' => 'guest_'.$guestId,
-            'guest_id' => $guestId,
-            'guest_name' => $guestName,
-            'guest_invite_id' => $invite->id,
-            'transient_galleries' => $transientGalleries,
-            'transient_meta_galleries' => $transientMetaGalleries,
-        ])->make();
-        $token = app(JWTAuth::class)->encode($payload)->get();
-
-        return $this->respondWithToken($token, ['full_path' => $gallery->full_path]);
+        return $this->respondWithTokens(
+            $tokens->issue($guest, $claims),
+            $tokens->issueRefresh($guest, $claims),
+            ['full_path' => $gallery->full_path],
+        );
     }
 
     public function index($galleryId)
@@ -348,12 +255,8 @@ class InviteController extends Controller
         // invite is refused while its credential can be used (D-76). This is a
         // cache marker only: AuthorizationService::isInviteActive() also checks
         // the database after the marker expires, so the revocation is not
-        // solely bounded by this TTL. In sanctum mode the JWT factory is gone
-        // after Phase 4, hence the driver-independent service call.
-        $ttl = $tokens->isSanctum()
-            ? $tokens->accessTtlMinutes()
-            : (int) Auth::guard('api')->factory()->getTTL();
-        $ttl = is_numeric($ttl) ? max(1, (int) $ttl) : 240;
+        // solely bounded by this TTL.
+        $ttl = max(1, $tokens->accessTtlMinutes());
         // The same marker is checked for guest_invite_id and registered
         // transient_invite_ids. It is intentionally independent of the token
         // subject so one invite can be revoked for every issued session.

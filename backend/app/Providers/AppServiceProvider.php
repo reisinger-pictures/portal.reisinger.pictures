@@ -4,7 +4,6 @@ namespace App\Providers;
 
 use App\Auth\SanctumApiGuard;
 use App\Auth\SanctumTransientGuard;
-use App\Auth\TransientUserProvider;
 use App\Contracts\PricingStrategy;
 use App\Enums\UserRole;
 use App\Mail\Transports\GmailRestTransport;
@@ -232,12 +231,8 @@ class AppServiceProvider extends ServiceProvider
             return $isClient || $isPrivileged;
         });
 
-        Auth::provider('transient_eloquent', function ($app, array $config) {
-            return new TransientUserProvider($app['hash'], $config['model']);
-        });
-
         // Portal #9 / D-73: custom `sanctum_transient` driver backing the `api`
-        // guard (D-74). `legacy` is a temporary fallback until JWT is removed.
+        // guard (D-74). The JWT fallback was removed with the package (D-77).
         Auth::extend('sanctum_transient', function ($app, string $name, array $config) {
             $guard = new SanctumApiGuard(
                 $app->make(SanctumTransientGuard::class),

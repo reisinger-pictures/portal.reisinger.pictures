@@ -6,15 +6,12 @@ use App\Models\Gallery;
 use App\Models\GalleryInvite;
 use App\Models\Photo;
 use App\Models\User;
-use App\Services\Auth\AuthTokenService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\Factory;
-use PHPOpenSourceSaver\JWTAuth\JWTAuth;
 use PHPUnit\Framework\AssertionFailedError;
 use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
@@ -398,7 +395,7 @@ class RatingUniquenessTest extends TestCase
             'transient_invite_ids' => [(string) $invite->id],
         ]);
 
-        $this->withCleanClaims($userToken, function () use ($userToken, $photo): void {
+        $this->withCleanClaims(function () use ($userToken, $photo): void {
             $this->withHeader('Authorization', 'Bearer '.$userToken)
                 ->postJson("/api/photos/{$photo->id}/rate", [
                     'rating' => 5,
@@ -427,7 +424,7 @@ class RatingUniquenessTest extends TestCase
             'The registered user request must be authenticated as the registered user.'
         );
 
-        $this->withCleanClaims($guestToken, function () use ($guestToken, $photo): void {
+        $this->withCleanClaims(function () use ($guestToken, $photo): void {
             $this->withHeader('Authorization', 'Bearer '.$guestToken)
                 ->postJson("/api/photos/{$photo->id}/rate", [
                     'rating' => 1,
@@ -492,107 +489,54 @@ class RatingUniquenessTest extends TestCase
         // The guest token leaves its claims in the shared claims collection.
         $this->guestToken($guestId, $gallery->id, $invite->id);
 
-        if (app(AuthTokenService::class)->isSanctum()) {
-            // Sanctum tokens carry explicit abilities instead of a shared JWT
-            // claims collection. Reproduce the same forbidden state directly:
-            // a registered actor's credential carrying guest identity.
-            $leakedToken = AuthTokenFactory::forUser($user, [
-                'guest_id' => $guestId,
-                'guest_name' => 'Rating Guest',
-                'guest_invite_id' => (string) $invite->getKey(),
-                'transient_galleries' => [$gallery->id],
-            ]);
-            $leakedClaims = AuthTokenFactory::claimsOf($leakedToken);
-
-            $this->assertSame($guestId, $leakedClaims['guest_id']);
-
-            $this->expectException(AssertionFailedError::class);
-            $this->assertGuestClaimsAbsent($leakedClaims, 'The registered user request');
-
-            return;
-        }
-
-        // The registered user token is built on purpose WITHOUT the claim
-        // reset, so the collection leaks the guest claims into the token.
-        $leakedPayload = app(Factory::class)->customClaims([
-            'sub' => (string) $user->getKey(),
+        // Sanctum tokens carry explicit abilities instead of a shared claims
+        // collection. Reproduce the same forbidden state directly: a registered
+        // actor's credential carrying guest identity.
+        $leakedToken = AuthTokenFactory::forUser($user, [
+            'guest_id' => $guestId,
+            'guest_name' => 'Rating Guest',
+            'guest_invite_id' => (string) $invite->getKey(),
             'transient_galleries' => [$gallery->id],
-        ])->make();
-        $leakedToken = app(JWTAuth::class)->encode($leakedPayload)->get();
+        ]);
+        $leakedClaims = AuthTokenFactory::claimsOf($leakedToken);
 
-        $this->assertTrue(
-            $leakedPayload->hasKey('guest_id'),
-            'The leak must be reproducible: the guest claim has to reach the registered user token.'
-        );
-        $this->assertSame($guestId, $leakedPayload->get('guest_id'));
+        $this->assertSame($guestId, $leakedClaims['guest_id']);
 
-        // The very assertion the isolation test makes has to reject this token.
         $this->expectException(AssertionFailedError::class);
-        $this->assertGuestClaimsAbsent($leakedPayload->toArray(), 'The registered user request');
+        $this->assertGuestClaimsAbsent($leakedClaims, 'The registered user request');
     }
 
     /**
-     * A guest token that starts from a clean claim collection.
-     *
-     * `make(true)` empties the collection first: the guest token must not
-     * inherit anything that was issued before it.
+     * A guest token with an explicit, self-contained claim set.
      */
     private function guestToken(string $guestId, string $galleryId, string $inviteId): string
     {
-        $claims = [
+        return AuthTokenFactory::forGuest([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Rating Guest',
             'guest_invite_id' => $inviteId,
             'transient_galleries' => [$galleryId],
-        ];
-
-        if (app(AuthTokenService::class)->isSanctum()) {
-            return AuthTokenFactory::forGuest($claims);
-        }
-
-        $payload = app(Factory::class)->customClaims($claims)->make(true);
-
-        return app(JWTAuth::class)->encode($payload)->get();
+        ]);
     }
 
     /**
      * A registered user token with an explicit claim set.
      *
-     * `make(true)` empties the claims collection first, so the token carries
-     * exactly the claims of this request and nothing that was issued before.
-     *
      * @param  array<string, mixed>  $claims
      */
     private function userToken(User $user, array $claims = []): string
     {
-        if (app(AuthTokenService::class)->isSanctum()) {
-            return AuthTokenFactory::forUser($user, $claims);
-        }
-
-        $payload = app(Factory::class)->customClaims(array_merge([
-            'sub' => (string) $user->getKey(),
-        ], $claims))->make(true);
-
-        return app(JWTAuth::class)->encode($payload)->get();
+        return AuthTokenFactory::forUser($user, $claims);
     }
 
     /**
-     * Run a request with a clean jwt-auth claim state.
-     *
-     * `Manager::decode()` merges the whole claims collection of the shared
-     * `Factory` singleton into the decoded payload, and the guard keeps the
-     * last token of the process. Both have to be reset, otherwise the request
-     * runs with the claims of a foreign token.
+     * Run a request with a clean guard state. The Sanctum RequestGuard caches
+     * the resolved user, so a stale identity must not leak between requests.
      */
-    private function withCleanClaims(string $token, callable $callback): void
+    private function withCleanClaims(callable $callback): void
     {
-        $this->resetJwtClaimState();
-
         Auth::forgetGuards();
-        if (! app(AuthTokenService::class)->isSanctum()) {
-            Auth::guard('api')->setToken($token);
-        }
 
         $callback();
     }

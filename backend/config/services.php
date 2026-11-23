@@ -119,6 +119,17 @@ return [
     'proxy_delivery_header' => env('PROXY_DELIVERY_HEADER'),
 
     /*
+     * Signing key for detached signed links (offer tokens, shared contact-sheet
+     * links, ...). D-77 moved these to native HMAC while preserving the exact
+     * wire format, so the existing production JWT_SECRET keeps every
+     * already-issued link valid without any deployment change. SIGNED_LINK_SECRET
+     * is the dedicated replacement; APP_KEY is the last-resort fallback.
+     */
+    'signed_links' => [
+        'secret' => env('SIGNED_LINK_SECRET') ?? env('JWT_SECRET') ?? env('APP_KEY'),
+    ],
+
+    /*
      * What a camera needs to be configured with, as shown in the management UI
      * (feature doc 7.13). Deliberately NO defaults: these are the host-facing
      * values, and a default would be a guess about this deployment's network

@@ -2,15 +2,17 @@
 
 namespace Tests\Unit\Auth;
 
+use App\Enums\Brand;
 use App\Models\User;
 use App\Services\Auth\AuthTokenService;
-use Illuminate\Support\Facades\Auth;
-use Mockery;
-use PHPOpenSourceSaver\JWTAuth\JWTGuard;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\PersonalAccessToken;
 use Tests\TestCase;
 
 class AuthTokenServiceTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_driver_defaults_to_sanctum_without_the_env_flag(): void
     {
         // Assert the declared default in config/auth.php, independent of any
@@ -25,46 +27,48 @@ class AuthTokenServiceTest extends TestCase
         $this->assertTrue($service->isSanctum());
     }
 
-    public function test_unknown_driver_value_falls_back_to_legacy(): void
+    public function test_a_stray_driver_value_cannot_restore_the_removed_legacy_mode(): void
     {
         config()->set('auth.migration.driver', 'typo');
 
-        $this->assertSame(AuthTokenService::DRIVER_LEGACY, app(AuthTokenService::class)->driver());
+        $service = app(AuthTokenService::class);
+
+        $this->assertSame(AuthTokenService::DRIVER_SANCTUM, $service->driver());
+        $this->assertTrue($service->isSanctum());
     }
 
-    public function test_legacy_issue_delegates_to_the_jwt_guard_without_creating_a_sanctum_token(): void
+    public function test_issue_and_verify_use_a_persisted_sanctum_access_token(): void
     {
-        config()->set('auth.migration.driver', AuthTokenService::DRIVER_LEGACY);
-        $guard = Mockery::mock(JWTGuard::class);
-        $guard->shouldReceive('login')->once()->andReturn('jwt-token');
-        Auth::shouldReceive('guard')->once()->with('api')->andReturn($guard);
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $service = app(AuthTokenService::class);
 
-        $user = Mockery::mock(User::class);
-        $user->shouldNotReceive('createToken');
+        $token = $service->issue($user);
+        $record = PersonalAccessToken::findToken($token);
 
-        $this->assertSame('jwt-token', app(AuthTokenService::class)->issue($user));
+        $this->assertInstanceOf(PersonalAccessToken::class, $record);
+        $this->assertSame('api', $record->name);
+        $this->assertEqualsWithDelta(
+            now()->addMinutes($service->accessTtlMinutes())->timestamp,
+            $record->expires_at?->timestamp,
+            5,
+        );
+
+        $resolved = $service->verify($token);
+        $this->assertInstanceOf(User::class, $resolved);
+        $this->assertSame($user->getKey(), $resolved->getKey());
     }
 
-    public function test_legacy_verify_delegates_to_the_jwt_guard_user(): void
+    public function test_refresh_rotates_the_credential_and_invalidates_the_old_one(): void
     {
-        config()->set('auth.migration.driver', AuthTokenService::DRIVER_LEGACY);
-        $user = new User;
-        $guard = Mockery::mock(JWTGuard::class);
-        $guard->shouldReceive('setToken')->once()->with('jwt-token')->andReturnSelf();
-        $guard->shouldReceive('user')->once()->andReturn($user);
-        Auth::shouldReceive('guard')->once()->with('api')->andReturn($guard);
+        $user = User::factory()->create(['brand' => Brand::B2B]);
+        $service = app(AuthTokenService::class);
 
-        $this->assertSame($user, app(AuthTokenService::class)->verify('jwt-token'));
-    }
+        $access = $service->issue($user);
+        $rotated = $service->refresh($access);
 
-    public function test_legacy_refresh_delegates_to_the_jwt_guard_refresh(): void
-    {
-        config()->set('auth.migration.driver', AuthTokenService::DRIVER_LEGACY);
-        $guard = Mockery::mock(JWTGuard::class);
-        $guard->shouldReceive('setToken')->once()->with('old-token')->andReturnSelf();
-        $guard->shouldReceive('refresh')->once()->andReturn('new-token');
-        Auth::shouldReceive('guard')->once()->with('api')->andReturn($guard);
-
-        $this->assertSame('new-token', app(AuthTokenService::class)->refresh('old-token'));
+        $this->assertIsString($rotated);
+        $this->assertNotSame($access, $rotated);
+        $this->assertNull($service->verify($access));
+        $this->assertInstanceOf(User::class, $service->verify($rotated));
     }
 }

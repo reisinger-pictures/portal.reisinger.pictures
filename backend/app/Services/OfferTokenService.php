@@ -5,25 +5,28 @@ namespace App\Services;
 use App\Support\BrandRegistry;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\Contracts\Providers\JWT as JWTProvider;
-use PHPOpenSourceSaver\JWTAuth\Exceptions\JWTException;
-use PHPOpenSourceSaver\JWTAuth\Manager;
-use PHPOpenSourceSaver\JWTAuth\Token;
+use JsonException;
+use RuntimeException;
 
 /**
- * Issues and verifies signed JWTs carrying machine-readable offer payloads.
+ * Issues and verifies detached, signed offer payloads.
  *
- * Reuses the already-installed `php-open-source-saver/jwt-auth` infrastructure
- * (the same Manager / provider / HS256 secret that powers user login), so offer
- * tokens and login tokens share one signing key + verification path.
- * No `config('app.key')` and no separate HMAC/base64 logic is used here.
+ * D-77 removed the JWT package entirely, including its role as a signature
+ * library. The wire format is deliberately kept byte-compatible with the old
+ * HS256 provider — `base64url(header).base64url(payload).base64url(sig)` with
+ * the exact header `{"typ":"JWT","alg":"HS256"}` and an HMAC-SHA256 over the
+ * first two segments — so links issued before the migration stay verifiable.
+ * The key comes from `services.signed_links.secret`, which falls back to the
+ * production `JWT_SECRET` and therefore needs no deployment change.
+ *
+ * No token here is an authentication credential: `verify()` returns only the
+ * embedded `offer` array (D-48).
  */
 class OfferTokenService
 {
     /**
-     * Subject claim for detached offer tokens (these tokens are not bound to a
-     * User model). `sub` is part of `jwt.required_claims`, so a stable value is
-     * required for the payload validator to accept the token on verify.
+     * Subject claim for detached offer tokens. It is part of the payload the
+     * strict verifier checks, so a stable value is required.
      */
     public const SUBJECT = 'offer';
 
@@ -32,13 +35,13 @@ class OfferTokenService
      */
     public const DEFAULT_VALIDITY_DAYS = 14;
 
-    public function __construct(
-        private Manager $manager,
-        private JWTProvider $provider,
-    ) {}
+    /**
+     * Kept verbatim so already-issued tokens keep the same header segment.
+     */
+    private const HEADER = ['typ' => 'JWT', 'alg' => 'HS256'];
 
     /**
-     * Issue a signed JWT carrying the given offer payload.
+     * Issue a signed token carrying the given offer payload.
      *
      * @param  array  $offerPayload  Arbitrary offer data (items, customer_*, terms, ...).
      * @param  Carbon|null  $expiresAt  Expiry; defaults to now + 14 days.
@@ -48,10 +51,6 @@ class OfferTokenService
         $expiresAt ??= now()->addDays(self::DEFAULT_VALIDITY_DAYS);
         $now = now();
 
-        // Author the claims directly (no encode-time payload validation: we trust
-        // our own issuance; strict validation — incl. exp — runs on verify via
-        // the manager). The provider signs with config('jwt.secret') / HS256,
-        // identical to the login-token mechanism.
         $claims = [
             'iss' => config('app.url'),
             'iat' => $now->timestamp,
@@ -62,7 +61,7 @@ class OfferTokenService
             'offer' => $offerPayload,
         ];
 
-        return $this->provider->encode($claims);
+        return $this->sign($claims);
     }
 
     /**
@@ -154,25 +153,149 @@ class OfferTokenService
     }
 
     /**
-     * Verify a signed JWT and return its embedded offer payload.
+     * Verify a signed token and return its embedded offer payload.
      *
-     * Returns null on any failure (bad signature, malformed, expired).
+     * Returns null on any failure (bad signature, malformed, expired, wrong
+     * subject or issuer). There is deliberately no distinguishable error: the
+     * token is a link credential and must not become an oracle (D-48).
      */
     public function verify(string $token): ?array
     {
-        try {
-            // The manager re-validates the payload (signature, structure, exp)
-            // using the same provider + secret + PayloadValidator as login.
-            $payload = $this->manager->decode(new Token($token));
-
-            /** @var mixed $offer */
-            $offer = $payload->get('offer');
-
-            return is_array($offer) ? $offer : null;
-        } catch (JWTException) {
-            return null;
-        } catch (\Throwable) {
+        $claims = $this->decode($token);
+        if ($claims === null) {
             return null;
         }
+
+        /** @var mixed $offer */
+        $offer = $claims['offer'] ?? null;
+
+        return is_array($offer) ? $offer : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $claims
+     */
+    private function sign(array $claims): string
+    {
+        $secret = $this->secret();
+        if ($secret === null) {
+            throw new RuntimeException('No signed-link secret is configured.');
+        }
+
+        $header = self::base64UrlEncode(self::jsonEncode(self::HEADER));
+        $payload = self::base64UrlEncode(self::jsonEncode($claims));
+        $signature = self::base64UrlEncode(hash_hmac('sha256', $header.'.'.$payload, $secret, true));
+
+        return $header.'.'.$payload.'.'.$signature;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function decode(string $token): ?array
+    {
+        $secret = $this->secret();
+        if ($secret === null) {
+            return null;
+        }
+
+        $segments = explode('.', $token);
+        if (count($segments) !== 3) {
+            return null;
+        }
+
+        [$headerSegment, $payloadSegment, $signatureSegment] = $segments;
+        $headerJson = self::base64UrlDecode($headerSegment);
+        $payloadJson = self::base64UrlDecode($payloadSegment);
+        $signature = self::base64UrlDecode($signatureSegment);
+        if ($headerJson === null || $payloadJson === null || $signature === null) {
+            return null;
+        }
+
+        try {
+            /** @var mixed $header */
+            $header = json_decode($headerJson, true, 512, JSON_THROW_ON_ERROR);
+            /** @var mixed $claims */
+            $claims = json_decode($payloadJson, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return null;
+        }
+
+        if (! is_array($header)
+            || ($header['typ'] ?? null) !== self::HEADER['typ']
+            || ($header['alg'] ?? null) !== self::HEADER['alg']) {
+            return null;
+        }
+
+        $expected = hash_hmac('sha256', $headerSegment.'.'.$payloadSegment, $secret, true);
+        if (! hash_equals($expected, $signature)) {
+            return null;
+        }
+
+        if (! is_array($claims)) {
+            return null;
+        }
+
+        // Strict claim validation. A signed payload is still not a credential
+        // unless every time/identity claim has the expected type and value.
+        if (! isset($claims['exp']) || ! is_int($claims['exp']) || $claims['exp'] <= time()) {
+            return null;
+        }
+        if (! isset($claims['nbf']) || ! is_int($claims['nbf']) || $claims['nbf'] > time()) {
+            return null;
+        }
+        if (! isset($claims['iat']) || ! is_int($claims['iat'])) {
+            return null;
+        }
+        if (($claims['sub'] ?? null) !== self::SUBJECT) {
+            return null;
+        }
+
+        $issuer = config('app.url');
+        if (! is_string($issuer) || $issuer === ''
+            || ! is_string($claims['iss'] ?? null)
+            || ! hash_equals($issuer, $claims['iss'])) {
+            return null;
+        }
+
+        if (! is_string($claims['jti'] ?? null) || $claims['jti'] === '') {
+            return null;
+        }
+
+        return $claims;
+    }
+
+    private function secret(): ?string
+    {
+        $secret = config('services.signed_links.secret');
+
+        return is_string($secret) && $secret !== '' ? $secret : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $value
+     */
+    private static function jsonEncode(array $value): string
+    {
+        return json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    private static function base64UrlEncode(string $bytes): string
+    {
+        return rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');
+    }
+
+    private static function base64UrlDecode(string $segment): ?string
+    {
+        if (preg_match('/\A[A-Za-z0-9_-]*\z/D', $segment) !== 1) {
+            return null;
+        }
+
+        $decoded = base64_decode(strtr($segment, '-_', '+/'), true);
+        if (! is_string($decoded) || self::base64UrlEncode($decoded) !== $segment) {
+            return null;
+        }
+
+        return $decoded;
     }
 }
