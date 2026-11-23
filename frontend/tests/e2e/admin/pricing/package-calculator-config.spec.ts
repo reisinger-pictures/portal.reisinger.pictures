@@ -38,6 +38,21 @@ test.describe('Package Calculator Configuration (G2)', () => {
      * so the old post-save form assertion could not detect it. Waiting for the form
      * to be hydrated from the API before typing, and checking the effective values
      * on the same endpoint after saving, closes that window.
+     *
+     * ## Observed flake (2026-11-23)
+     *
+     * `Admin can configure package calculator settings` (this file) failed in
+     * CI push run 45132699736, job 137551622438, `E2E (Playwright) — Desktop
+     * (1/3)`, with `toHaveValue(95)` receiving `80` three times in a row; the
+     * identical test was green in the prior run 45130935340. 80 is the hourly
+     * rate left on the shared brand-scoped row by another test/worker. Unlike
+     * the second test, this one filled the form before the initial
+     * `/api/settings/license-terms` SWR answer had landed, so the card's
+     * `reset(mapApiToForm(terms))` overwrote the typed 95 with the stale 80
+     * before the submit. Both tests now wait for the terms *response* after
+     * the in-lock reload (a field poll alone passes too early when the frozen
+     * value equals the form default), and the first also checks the exact saved
+     * values on the endpoint after saving.
      */
     const withCalculatorSettings = async (body: () => Promise<void>) => {
         await withGlobalSettingsLock(SHOOTING_CALCULATOR_SETTINGS_LOCK, async () => {
@@ -94,6 +109,26 @@ test.describe('Package Calculator Configuration (G2)', () => {
         // pinned separately in `manual-documents.spec.ts`, which writes through
         // `E2ESessionHelper` and therefore cannot speak euros at all.
         await withCalculatorSettings(async () => {
+            // The card resets every field from SWR when the terms answer arrives.
+            // Filling before that reset lands makes the submit save the old values
+            // — and 80 (the value left on the shared row) is exactly what the
+            // failed run saw instead of 95. Read the frozen server state, reload
+            // inside the lock so SWR hydrates from it, and wait for both the
+            // network answer and the field that showed the stale value before
+            // typing anything. reset() hydrates the whole form at once, so one
+            // synchronized field is enough to make all three safe to fill.
+            const before = await helper.getShootingCalculatorSettings();
+            const termsLoaded = page.waitForResponse(
+                response => response.url().includes('/api/settings/license-terms') && response.ok(),
+            );
+            await page.reload();
+            await termsLoaded;
+            await expect(page.locator('h1:has-text("System-Einstellungen")')).toBeVisible();
+            await expect.poll(
+                () => field(cardBody, 'Stundensatz').inputValue(),
+                { message: 'Das Formular muss die geladenen Einstellungen zeigen, bevor es bearbeitet wird.' },
+            ).toBe(String(before.calc_hourly_rate / 100));
+
             // Saved and read back inside the same critical section, so what the
             // form shows is what this test just wrote — no other worker can have
             // replaced the value in between. It asserts the save/read round trip.
@@ -107,6 +142,18 @@ test.describe('Package Calculator Configuration (G2)', () => {
             await expect(field(cardBody, 'Stundensatz')).toHaveValue('95');
             await expect(field(cardBody, 'Outdoor-Bilder')).toHaveValue('12');
             await expect(field(cardBody, 'Reportage-Aufschlag')).toHaveValue('25');
+
+            // The form assertions only prove local state; the endpoint is what
+            // the calculator consumes. 95 €/h = 9500 cents, 25 % surcharge =
+            // factor 1.25 on the wire — the euro form unit is intentional.
+            await expect.poll(
+                () => helper.getShootingCalculatorSettings(),
+                { message: 'Die gespeicherten Werte müssen am Kalkulator-Endpunkt ankommen.' },
+            ).toMatchObject({
+                calc_hourly_rate: 9500,
+                calc_outdoor_images_per_hour: '12',
+                calc_flatrate_multiplier: '1.25',
+            });
         });
     });
 
@@ -124,8 +171,15 @@ test.describe('Package Calculator Configuration (G2)', () => {
             const before = await helper.getShootingCalculatorSettings();
             // SWR can still hold a value written by a previous test (the form
             // showed 12 while the endpoint already returned 8). Reload inside
-            // the lock so the form hydrates from the frozen server state.
+            // the lock so the form hydrates from the frozen server state. Wait
+            // for the terms *response* as well: when the frozen value equals
+            // the form default (8), the field poll below passes before hydration
+            // has actually landed, and a late reset then saves 8 instead of 20.
+            const termsLoaded = page.waitForResponse(
+                response => response.url().includes('/api/settings/license-terms') && response.ok(),
+            );
             await page.reload();
+            await termsLoaded;
             await expect(page.locator('h1:has-text("System-Einstellungen")')).toBeVisible();
             await expect.poll(
                 () => field(cardBody, 'Outdoor-Bilder').inputValue(),
