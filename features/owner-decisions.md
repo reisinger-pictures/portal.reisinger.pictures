@@ -456,6 +456,13 @@ and instead routes such assets to the private directory. The owner will supply
 the final specialist term (Fachbegriff) for the two directories; that label is
 not a blocker for the data model.
 
+**Open point, explicitly not implemented here:** a transition between a private
+and a business asset must be possible and must raise a warning. Its fachliche
+Grundlagen still need research; this is tracked in
+[issue #55](https://github.com/reisinger-pictures/portal.reisinger.pictures/issues/55)
+and belongs to a later implementation story. No transition logic, warning text
+or schema for it is part of this decision.
+
 All amounts in both directories, including carry-over rows, remain whole cents
 (`*_cents`, integer) per the repository-wide money rule in
 [`AGENTS.md`](../AGENTS.md). The schema, backfill and rollback decision for the
