@@ -40,6 +40,28 @@ ausschließlich `cleanroom/`.
 - Beträge sind ganzzahlige Cent, Zeitmengen ganzzahlige Minuten. Relevant ist
   nur das Wirtschaftsjahr 2026.
 
+## Anforderungsdokumente und Abdeckungsnachweis
+
+Die engine-nahen Anforderungsdokumente gehören zum gepinnten Dokumentenstand
+und sind die fachliche Grundlage für ESt, USt, Reisen und Anlagen/AfA. Sie
+beschreiben Regel → Verhalten, Einheiten, Rundungs-/Grenzwerte und Modi, ohne
+Klassen, Methoden, Formelstrings oder Zellbezüge. Konsumiert wird ausschließlich
+die gepinnte Fassung unter `cleanroom/artifacts/verification/requirements/`:
+
+- `est-requirements.md` — ESt, EUE-089 … EUE-106
+- `vat-requirements.md` — USt, EUE-082 … EUE-088
+- `travel-requirements.md` — Reisen, EUE-062 … EUE-081
+- `assets-requirements.md` — Anlagen/AfA, EUE-049 … EUE-061
+
+Der gepinnte Abdeckungsnachweis liegt in
+`cleanroom/artifacts/verification/requirements/coverage-status.md`. Er enthält
+den aktuellen Stand und kennzeichnet die ältere Aussage
+„7 covered / 15 partial / 99 missing / 10 not-applicable" ausdrücklich als
+überholt; sie ist nicht als Grundlage für Umfangs- oder Aufwandschätzungen zu
+verwenden. Alle genannten Dateien sind über `MANIFEST.json` (`artifacts[]`,
+`artifact_version`) versioniert und checksummengeprüft und werden nicht
+redaktionell verändert.
+
 ## Update-Erkennung
 
 1. **Prüfsummen:** Jede Datei in `cleanroom/` gegen `files[].sha256` aus dem
@@ -71,7 +93,7 @@ if digest(root / "HANDOFF.md") != manifest["handoff_sha256"]:
 fixture = json.loads((root / "cleanroom-parity-2026.json").read_text())
 if manifest["business_year"] != 2026 or fixture["oracle"]["year"] != 2026:
     failures.append("business_year")
-if len(fixture["scenarios"]) != 5 or sum(len(s["expected"]) for s in fixture["scenarios"]) != 19:
+if len(fixture["scenarios"]) != 16 or sum(len(s["expected"]) for s in fixture["scenarios"]) != 45:
     failures.append("vector_count")
 
 print(f'{manifest["file_count"]} documents, {len(failures)} failures', failures)

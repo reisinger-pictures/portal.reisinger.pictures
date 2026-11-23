@@ -7,7 +7,7 @@ Verträge und den unveränderlichen, versionierten Dokumentenstand.
 ## Inhalt
 
 - [01-cleanroom-handoff.md](01-cleanroom-handoff.md) — Fixture-Version, Update-Erkennung, Geltungsgrenzen.
-- [02-parity-vectors.md](02-parity-vectors.md) — 19 Paritätsvektoren, minimale Wertekette und Unit-Test (Issue #10).
+- [02-parity-vectors.md](02-parity-vectors.md) — 16 Szenarien / 45 Zellen, minimale Wertekette und Unit-Test (Issue #10).
 - [03-engine.md](03-engine.md) — Rechenverträge je Fachbereich (ESt, USt, Reisen, AfA/DEG), Einheiten und Rundung.
 - [04-data-model.md](04-data-model.md) — Tabellen, Brand-Trennung, API-Vertrag.
 - [05-ui.md](05-ui.md) — Panels, Lösungsaktionen, Sprache und Mobile.
