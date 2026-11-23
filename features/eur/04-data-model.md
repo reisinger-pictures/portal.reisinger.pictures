@@ -225,6 +225,44 @@ umgerechnet. Es wird keine Belegnummer aus Notizen oder Datum erfunden.
 additiv und nullable; ein Entfernen verliert nur Belegnummer, Kilometerstände,
 Veranlassung und Kennzahl, nicht die Reise selbst oder ihre Beträge.
 
+### Schema-Entscheidung V071 (Anlagenverzeichnisse je Jahr, D-85)
+
+**Schema.** `eur_assets` bleibt der stabile Stamm (Anschaffungsdaten, Belege)
+und wird **nicht** pro Jahr dupliziert; das bestehende `eur_asset_years` ist
+bereits die jahresbezogene Zeile und trägt nach der Migration `scope`
+(`business`|`private`, 16) und `carry_over_from_year` (integer, nullable).
+`eur_assets` erhält zusätzlich `scope` (16, nullable), serverseitig aus dem
+ganzzahligen `business_share` abgeleitet: `< 50` → `private`, `>= 50` →
+`business`. Die bisherige Validierung auf `50…100` wird auf `0…100` in
+5-%-Schritten erweitert; damit ist die bisher nicht speicherbare Konstellation
+unter 50 % darstellbar und landet im gesonderten **privaten** Verzeichnis (D-85,
+bewusste Abweichung von EUE-054 — das gepinnte Artefakt bleibt unverändert).
+`is_private_investment` bleibt als Alt-Flag erhalten, ist aber nicht mehr die
+Quelle der Einordnung.
+
+Eine neue Tabelle `eur_asset_documents` verknüpft `eur_asset_id` und
+`eur_document_id` (beide FKs, `brand`, eindeutig je Paar). Sie hat **keine**
+Jahresspalte: Belege gehören zum Stamm und werden beim Jahreswechsel nicht
+kopiert. Der zwischengespeicherte `sha256`-Abgleich der Belege bleibt unberührt.
+
+Der Jahreswechsel wird über einen idempotenten Carry-over erledigt: für ein
+Zieljahr erhält jedes aktive Anlagegut, das noch keine Zeile hat, eine neue
+`eur_asset_years`-Zeile mit dem Restbuchwert und den aus ihm berechneten
+ganzzahligen AfA-Beträgen des Vorjahres; `carry_over_from_year` hält die
+Herkunft. Bereits vorhandene Zeilen und gebuchte Jahre werden nie verändert,
+veräußerte Güter übersprungen. Alle Beträge bleiben ganze Cent.
+
+**Backfill.** Bestehende Anlagegüter haben ausnahmslos `business_share >= 50`
+(alte Validierung) und erhalten `scope = business`; ihre vorhandenen
+`eur_asset_years`-Zeilen erhalten denselben Wert und `carry_over_from_year =
+null`. Es werden keine neuen Zeilen, Belege oder AfA-Werte erfunden. Weil es
+vorher keine Anlage↔Beleg-Verknüpfung gab, bleibt die neue Tabelle leer.
+
+**Rollback.** `down()` ist nach Repository-Policy leer. Alle Änderungen sind
+additiv bzw. mit Defaultwerten versehen; ein Entfernen verliert nur die
+Verzeichniszuordnung, die Carry-over-Herkunft und die Belegverknüpfung, nicht
+die Anlagegüter, ihre AfA-Pläne, Buchungen oder Belege selbst.
+
 ## Beziehungen
 
 - Buchung → genau ein Kunde und optional ein Projekt; Reise analog.

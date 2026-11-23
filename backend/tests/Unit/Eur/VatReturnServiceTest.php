@@ -44,6 +44,22 @@ class VatReturnServiceTest extends TestCase
         $this->assertFalse($result['empty']);
     }
 
+    /**
+     * EUE-039/040 — die ODS verwendet ausdrücklich die Brutto-Basis: A!L2
+     * ("Bruttobetrag, also den Betrag inkl. Steuern … direkt im Blatt UST
+     * verwendet") und E1A!C8 ("USt-Bruttosystem"). Der Regelsatz-Wortlaut
+     * "Nettobetrag" widerspricht seiner eigenen Formel und gilt als Tippfehler.
+     */
+    public function test_ig_base_is_the_gross_amount_not_a_net_amount(): void
+    {
+        $result = VatReturnService::forMonth([
+            ['kind' => 'expense', 'code' => '9130', 'amount_cents' => 119000, 'month' => 5, 'vat_kind' => 'IG-Erwerb 20 %'],
+        ]);
+
+        $this->assertSame(119000, $result['kennzahlen']['072']);
+        $this->assertSame(23800, $result['zahllast_cents']);
+    }
+
     /** EUE-034 — Mieteinnahmen erhöhen nicht KZ 016/000. */
     public function test_rental_income_is_excluded_from_kz_016(): void
     {

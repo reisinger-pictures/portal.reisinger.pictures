@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-84. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-87. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -432,3 +432,61 @@ bytes, not that a signer is trusted. The concrete library, failure behaviour
 and any migration/seed impact are technical decisions documented in
 `features/eur/` with the implementation; implementation status belongs in the
 issue tracker, not here.
+
+### D-85: Per-year asset directories with a separate private directory
+
+The owner decided on 2026-11-23 that the Anlagenverzeichnis is kept **per
+Wirtschaftsjahr**: entries are duplicated for each year, and starting a new year
+must carry the previous year's entries forward automatically. The acquisition
+facts stay on one stable master record, and uploaded evidence receipts belong
+to that master — **receipts are never duplicated per year**; only the concrete
+depreciation amounts change from year to year.
+
+There are **two asset directories**, managed the same way but kept separate:
+one for business assets and one for private assets. The classification is
+derived from the whole-percent business share: below 50 % the asset is private
+property, 50 % and above it is business property. This is an intentional
+**deviation from pinned EUE-054**, whose consequence is that a sub-50 % asset
+does not belong in the Anlagenverzeichnis at all. The pinned clean-room
+artifact is not edited; the portal keeps the warning as a documented deviation
+and instead routes such assets to the private directory. The owner will supply
+the final specialist term (Fachbegriff) for the two directories; that label is
+not a blocker for the data model.
+
+All amounts in both directories, including carry-over rows, remain whole cents
+(`*_cents`, integer) per the repository-wide money rule in
+[`AGENTS.md`](../AGENTS.md). The schema, backfill and rollback decision for the
+required migration belongs in `features/eur/04-data-model.md` before the
+migration is written (D-83 policy).
+
+### D-86: One custom Beleg per trip — no ODS-style leg rows
+
+The ODS models one trip as several consecutive FR rows sharing a Belegnummer
+(Hin-/Rückfahrt, Veranlassung only on one row, continuation of start/end times).
+The owner reviewed this and prefers a **single custom Beleg that carries all
+details of the trip**. The portal therefore keeps the one-row-per-trip model
+introduced with V070; no legs table and no repeated Belegnummer will be added,
+and brand-wide uniqueness of `receipt_no` stays in force (EUE-077 as applied to
+the portal model).
+
+This is a documented deviation from the ODS row structure, not an unfinished
+migration. `isTravelLeg()`, `businessSharePercent()` and `sumMinutesForVoucher()`
+remain domain helpers; they become a product path only if a future decision
+adds leg rows. All trip amounts stay whole cents (`*_cents`, integer) per the
+repository-wide money rule in [`AGENTS.md`](../AGENTS.md); the independent check
+on 2026-11-23 found no float/decimal money leak in the travel path.
+
+### D-87: Gross is the VAT base — EUE-039 prose is a typo
+
+The owner decided on 2026-11-23 that the VAT base is the **gross amount**
+(Bruttobetrag inkl. Steuern). This is confirmed by the pinned ODS live text
+`A!L2` ("… direkt im Blatt UST verwendet"), `E!Q2` (Bruttomethode,
+Kleinunternehmer without Vorsteuerabzug) and the checked `E1A!C8`. EUE-039's
+wording "Nettobetrag" contradicts both the rule's own formula and those
+passages; it is treated as a source typo, not as an alternative contract. The
+portal already computes IG/RG tax from the stored gross `amount_cents`; no
+behaviour change is required, only the evidence wording and an explicit test.
+
+The pinned artifacts contain a separate, unresolved contradiction (`A!Q2` and
+`UST!C7` mention a Vorsteuerabzug / KZ 066). The portal has no KZ 066 deduction.
+Adding one is **not** decided here and must not be implied by UI or docs.

@@ -38,6 +38,7 @@
 - Always use `pnpm lint:fix` for local linting. Plain `pnpm lint` is reserved for CI/PR checks.
 - When reporting a test failure before proposing a fix, state what failed, cite the relevant logs/DOM evidence, explain the inferred root cause, and connect the proposed fix to it.
 - Do not use multi-line regular expressions for code search-and-replace or Base64 to emit file contents. Any `patch.mjs` replacement must check that the target exists before replacing it, then verify the content changed and fail clearly otherwise.
+- Money is stored and computed **only as whole cents** (`*_cents`, `int` in PHP, `integer`/`bigint` in the database). Floating-point or decimal money columns and float money values are not allowed, including in new travel and asset models; round with integer arithmetic (`Money`/`bcdiv` helpers). This applies to every amount that is persisted, regardless of the source workbook's decimal presentation.
 
 ## 6. Agent roles and delegation
 
