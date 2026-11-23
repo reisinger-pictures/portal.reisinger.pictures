@@ -93,6 +93,6 @@ The mirror can drift from the host. One command proves they still agree:
 ./scripts/check-csp-policy.sh
 ```
 
-It reads the policy from the host (the Caddy container's `Caddyfile`) and compares it with `deployment/content-security-policy.txt`. Exit 0 means they are identical; exit 1 means the host serves a different policy than this repository documents — then the mirror is updated here (and the change is reviewed like any other contract change).
+It reads the policy from the host (the Caddy container's `Caddyfile` plus all `conf/*.caddy` fragments imported by `import conf/*.caddy`) and compares it with `deployment/content-security-policy.txt`. Since 2026-11 the page policy lives in a fragment, not in the main `Caddyfile`; a separate snippet fragment declares `frame-ancestors 'none'`. The check therefore compares the mirror against the whole set of declared CSP headers (order-independent). Exit 0 means the mirror is among them; exit 1 means the host serves no matching policy — then the mirror is updated here (and the change is reviewed like any other contract change).
 
 The check follows the same pattern as [`check-license-pricing.sh`](../../scripts/check-license-pricing.sh) and [`check-seeded-settings.sh`](../../scripts/check-seeded-settings.sh): it runs from the checkout against the host, it needs no secret, and it is read-only.

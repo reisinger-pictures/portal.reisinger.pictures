@@ -477,6 +477,27 @@ Caching-Problem. Steht als STRICT-Regel in `AGENTS.md` §13.
 Der Frontend-Sync braucht keinen Neustart (`dist/` ist statisch), und
 Migrationen laufen nicht mit — die gehören bewusst und getrennt dazu.
 
+**Bei einer Änderung an `composer.lock` zuerst `vendor/` auf dem Host
+aktualisieren**, sonst startet das Backend mit veralteten Klassen. `sync.sh`
+überträgt kein `vendor/`; der `composer_init`-Dienst installiert es beim
+`docker compose up` in den gemounteten Website-Baum. Beim EÜR-Rollout am
+2026-11-23 (Issue #17) entfernten die Auth-Commits das JWT-Package und fügten
+Sanctum hinzu — der Non-Compose-Weg war:
+
+```bash
+./sync.sh
+ssh root@reisinger.pictures 'cd /opt/stacks/portal-reisinger-pictures && \
+  docker compose -f compose.yaml run --rm composer_init && \
+  docker compose -f compose.yaml restart backend'
+```
+
+Der Restart führt den Entrypoint aus; dort laufen `migrate --force`,
+`app:seed-if-fresh` (nur bei leerer `users`-Tabelle) und `admin:update`.
+Danach Health und eine Route der geänderten Funktion prüfen (`/api/ping`,
+`route:list --path=api/management/eur`). Die gemessenen Gates und der
+Restore-Test für Belege stehen in
+[`features/security/eur-document-backup-and-delivery.md`](../features/security/eur-document-backup-and-delivery.md).
+
 #### Rechte-Modell: UID 1002 und geschlossene Dateirechte (OPS-3)
 
 Owner-Entscheidung 2026-10-25 (Issue #31): erst die Identität angleichen, dann
