@@ -229,6 +229,77 @@ describe('ManagementEurView EAR completion UI', () => {
         expect(screen.getByRole('link', {name: 'Eigenbeleg-PDF herunterladen'})).toBeVisible();
     });
 
+    it('rejects an invalid Eigenbeleg with inline German errors and no API call', async () => {
+        mockHooks();
+        vi.clearAllMocks();
+        renderView();
+
+        await userEvent.click(screen.getByRole('button', {name: '+ Eigenbeleg'}));
+        const day = screen.getByLabelText('Tag');
+        await userEvent.clear(day);
+        await userEvent.type(day, '32');
+        await userEvent.type(screen.getByLabelText('Betrag (€)'), 'abc');
+        await userEvent.click(screen.getByRole('button', {name: 'Eigenbeleg speichern'}));
+
+        expect(screen.getByText('Tag zwischen 1 und 31 angeben')).toBeVisible();
+        expect(screen.getByText('Beschreibung angeben')).toBeVisible();
+        expect(screen.getByText('Bitte einen gültigen Betrag angeben')).toBeVisible();
+        expect(screen.getByText('Bitte geben Sie Tag, Beschreibung und einen Betrag größer als null an.')).toBeVisible();
+        expect(createEurEigenbeleg).not.toHaveBeenCalled();
+    });
+
+    it('rejects a Betriebsanteil outside the 5-% steps', async () => {
+        mockHooks();
+        vi.clearAllMocks();
+        renderView();
+
+        await userEvent.click(screen.getByRole('button', {name: '+ Eigenbeleg'}));
+        const share = screen.getByLabelText('Betriebsanteil (%)');
+        const option = document.createElement('option');
+        option.value = '7';
+        option.textContent = '7 %';
+        share.append(option);
+        await userEvent.selectOptions(share, '7');
+        await userEvent.type(screen.getByLabelText('Beschreibung'), 'Porto');
+        await userEvent.type(screen.getByLabelText('Betrag (€)'), '5');
+        await userEvent.click(screen.getByRole('button', {name: 'Eigenbeleg speichern'}));
+
+        expect(screen.getByText('Betriebsanteil in 5-%-Schritten von 0 bis 100 angeben')).toBeVisible();
+        expect(createEurEigenbeleg).not.toHaveBeenCalled();
+    });
+
+    it('accepts a zero-amount Eigenbeleg with a 0 % private share', async () => {
+        mockHooks();
+        vi.clearAllMocks();
+        vi.mocked(createEurEigenbeleg).mockResolvedValue({
+            entry: {
+                id: 3, year: 2026, month: 5, direction: 'expense', kind_type: 'Eigenbeleg',
+                e1a_code: null, business_share: 0, amount_cents: 0, business_amount_cents: 0,
+                vat_kind: null, payment_method: null, project: null, customer: null, receipt_no: null, note: null,
+            },
+        });
+        renderView();
+
+        await userEvent.click(screen.getByRole('button', {name: '+ Eigenbeleg'}));
+        const day = screen.getByLabelText('Tag');
+        await userEvent.clear(day);
+        await userEvent.type(day, '5');
+        await userEvent.type(screen.getByLabelText('Beschreibung'), 'Null');
+        await userEvent.type(screen.getByLabelText('Betrag (€)'), '0');
+        await userEvent.selectOptions(screen.getByLabelText('Betriebsanteil (%)'), '0');
+        await userEvent.click(screen.getByRole('button', {name: 'Eigenbeleg speichern'}));
+
+        expect(createEurEigenbeleg).toHaveBeenCalledWith({
+            year: 2026,
+            month: 5,
+            day: 5,
+            description: 'Null',
+            amount_cents: 0,
+            business_share: 0,
+        });
+        expect(await screen.findByText('Der Eigenbeleg wurde erfasst.')).toBeVisible();
+    });
+
     it('saves EAR settings from the Einstellungen tab', async () => {
         mockHooks();
         vi.mocked(saveEurSettings).mockResolvedValue(undefined);

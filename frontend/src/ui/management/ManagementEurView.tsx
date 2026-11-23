@@ -1,6 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatEuro } from '../../logic/formatCurrency';
 import { useBrand } from '../../logic/useBrand';
@@ -69,6 +72,34 @@ function tabLabel(id: TabId): ReactNode {
 const YEARS = [2024, 2025, 2026];
 const DEFAULT_YEAR = 2026;
 const BUSINESS_SHARES = Array.from({length: 21}, (_, index) => index * 5);
+
+/** Same rounding as the booking dialog, including the finite/non-negative guards. */
+const eigenbelegCentsOrNull = (value: string): number | null => {
+    if (value.trim() === '') return null;
+    const amount = Number(value.replace(',', '.'));
+    if (!Number.isFinite(amount)) return null;
+    const cents = Math.round(amount * 100);
+    return Number.isFinite(cents) && cents >= 0 ? cents : null;
+};
+
+// Called inside the component: a `t` macro at module scope would evaluate
+// before i18n.activate() and crash.
+const createEigenbelegSchema = () => z.object({
+    ebDay: z.string().refine((value) => {
+        const day = Number(value);
+        return value.trim() !== '' && Number.isInteger(day) && day >= 1 && day <= 31;
+    }, t`Tag zwischen 1 und 31 angeben`),
+    ebDescription: z.string().trim().min(1, t`Beschreibung angeben`),
+    ebAmount: z.string().refine((value) => eigenbelegCentsOrNull(value) !== null,
+        t`Bitte einen gültigen Betrag angeben`),
+    ebShare: z.string().refine((value) => {
+        if (value.trim() === '') return false;
+        const share = Number(value);
+        return Number.isInteger(share) && share >= 0 && share <= 100 && share % 5 === 0;
+    }, t`Betriebsanteil in 5-%-Schritten von 0 bis 100 angeben`),
+});
+
+type EigenbelegFormValues = z.infer<ReturnType<typeof createEigenbelegSchema>>;
 
 const euro = (cents: number): string => formatEuro(cents / 100);
 const display = (value: string | undefined): string => (value && value.trim() !== '' ? value : '—');
@@ -208,13 +239,20 @@ export default function ManagementEurView() {
     const [yearMessage, setYearMessage] = useState<string | null>(null);
     const [yearError, setYearError] = useState<string | null>(null);
     const [isEigenbelegOpen, setIsEigenbelegOpen] = useState(false);
-    const [ebDay, setEbDay] = useState(String(new Date().getDate()));
-    const [ebDescription, setEbDescription] = useState('');
-    const [ebAmount, setEbAmount] = useState('');
-    const [ebShare, setEbShare] = useState('100');
     const [ebMessage, setEbMessage] = useState<string | null>(null);
     const [ebError, setEbError] = useState<string | null>(null);
     const [lastEigenbeleg, setLastEigenbeleg] = useState<{description: string; amountCents: number} | null>(null);
+    const eigenbelegSchema = createEigenbelegSchema();
+    const {register, setValue, handleSubmit, formState: {errors: eigenbelegErrors}} = useForm<EigenbelegFormValues>({
+        resolver: zodResolver(eigenbelegSchema),
+        defaultValues: {
+            ebDay: String(new Date().getDate()),
+            ebDescription: '',
+            ebAmount: '',
+            ebShare: '100',
+        },
+        mode: 'onTouched',
+    });
 
     // The bookkeeping PWA uses its own manifest while this view is mounted.
     useEffect(() => {
@@ -347,17 +385,16 @@ export default function ManagementEurView() {
         }
     };
 
-    const saveEigenbeleg = async () => {
-        const day = Number(ebDay);
-        const amountCents = Math.round(Number(ebAmount.replace(',', '.')) * 100);
-        const share = Number(ebShare);
-        if (!Number.isInteger(day) || day < 1 || day > 31
-            || !Number.isFinite(amountCents) || amountCents <= 0
-            || ebDescription.trim() === '') {
-            setEbError(t`Bitte geben Sie Tag, Beschreibung und einen Betrag größer als null an.`);
-            setEbMessage(null);
-            return;
-        }
+    const rejectEigenbeleg = () => {
+        setEbError(t`Bitte geben Sie Tag, Beschreibung und einen Betrag größer als null an.`);
+        setEbMessage(null);
+    };
+
+    const saveEigenbeleg = async (values: EigenbelegFormValues) => {
+        const day = Number(values.ebDay);
+        const amountCents = Math.round(Number(values.ebAmount.replace(',', '.')) * 100);
+        const share = Number(values.ebShare);
+        const description = values.ebDescription.trim();
 
         setEbError(null);
         setEbMessage(null);
@@ -366,14 +403,14 @@ export default function ManagementEurView() {
                 year,
                 month,
                 day,
-                description: ebDescription.trim(),
+                description,
                 amount_cents: amountCents,
                 business_share: share,
             });
-            setLastEigenbeleg({description: ebDescription.trim(), amountCents});
+            setLastEigenbeleg({description, amountCents});
             setEbMessage(t`Der Eigenbeleg wurde erfasst.`);
-            setEbDescription('');
-            setEbAmount('');
+            setValue('ebDescription', '');
+            setValue('ebAmount', '');
             reloadAll();
         } catch {
             setEbError(t`Der Eigenbeleg konnte nicht erfasst werden. Prüfen Sie die Angaben und versuchen Sie es erneut.`);
@@ -515,30 +552,34 @@ export default function ManagementEurView() {
                                     <label className="form-control">
                                         <span className="label-text"><Trans>Tag</Trans></span>
                                         <input type="number" className="input input-bordered input-sm" min={1} max={31}
-                                            value={ebDay} onChange={(event) => setEbDay(event.target.value)} required/>
+                                            {...register('ebDay')} required/>
+                                        {eigenbelegErrors.ebDay && <span className="text-error text-xs mt-1">{eigenbelegErrors.ebDay.message}</span>}
                                     </label>
                                     <label className="form-control md:col-span-2">
                                         <span className="label-text"><Trans>Beschreibung</Trans></span>
                                         <input type="text" className="input input-bordered input-sm"
-                                            value={ebDescription} onChange={(event) => setEbDescription(event.target.value)} required/>
+                                            {...register('ebDescription')} required/>
+                                        {eigenbelegErrors.ebDescription && <span className="text-error text-xs mt-1">{eigenbelegErrors.ebDescription.message}</span>}
                                     </label>
                                     <label className="form-control">
                                         <span className="label-text"><Trans>Betrag (€)</Trans></span>
                                         <input type="text" inputMode="decimal" className="input input-bordered input-sm"
-                                            value={ebAmount} onChange={(event) => setEbAmount(event.target.value)} required/>
+                                            {...register('ebAmount')} required/>
+                                        {eigenbelegErrors.ebAmount && <span className="text-error text-xs mt-1">{eigenbelegErrors.ebAmount.message}</span>}
                                     </label>
                                     <label className="form-control">
                                         <span className="label-text"><Trans>Betriebsanteil (%)</Trans></span>
-                                        <select className="select select-bordered select-sm" value={ebShare}
-                                            onChange={(event) => setEbShare(event.target.value)} required>
+                                        <select className="select select-bordered select-sm" {...register('ebShare')} required>
                                             {BUSINESS_SHARES.map((share) => (
                                                 <option key={share} value={share}>{share} %</option>
                                             ))}
                                         </select>
+                                        {eigenbelegErrors.ebShare && <span className="text-error text-xs mt-1">{eigenbelegErrors.ebShare.message}</span>}
                                     </label>
                                 </div>
                                 <div className="mt-3 flex flex-wrap items-center gap-3">
-                                    <button type="button" className="btn btn-primary btn-sm" onClick={() => void saveEigenbeleg()}>
+                                    <button type="button" className="btn btn-primary btn-sm"
+                                        onClick={handleSubmit(saveEigenbeleg, rejectEigenbeleg)}>
                                         <Trans>Eigenbeleg speichern</Trans>
                                     </button>
                                     {lastEigenbeleg && (

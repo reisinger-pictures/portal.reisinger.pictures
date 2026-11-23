@@ -1402,6 +1402,10 @@ msgstr "Beschreibe die Galerie — die KI generiert Vorschläge für Titel, Besc
 msgid "Beschreibung"
 msgstr "Beschreibung"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "Beschreibung angeben"
+msgstr "Beschreibung angeben"
+
 #: src/ui/management/eur/EurWarehousePanel.tsx
 msgid "Beschreibung und Betrag angeben; der Tag ist optional und liegt zwischen 1 und 31."
 msgstr "Beschreibung und Betrag angeben; der Tag ist optional und liegt zwischen 1 und 31."
@@ -1545,6 +1549,11 @@ msgstr "Betriebsanteil"
 #: src/ui/management/ManagementEurView.tsx
 msgid "Betriebsanteil (%)"
 msgstr "Betriebsanteil (%)"
+
+#: src/ui/management/eur/EurEntryDialog.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Betriebsanteil in 5-%-Schritten von 0 bis 100 angeben"
+msgstr "Betriebsanteil in 5-%-Schritten von 0 bis 100 angeben"
 
 #: src/ui/management/ManagementEurView.tsx
 msgid "Betriebsanteil-Hilfe: Geben Sie den betrieblichen Anteil in 5-%-Schritten von 0 % bis 100 % an. Der Privatanteil ergibt sich aus 100 % abzüglich des Betriebsanteils."
@@ -1722,6 +1731,10 @@ msgstr "Bitte das aktuelle Kamera-Passwort eingeben."
 msgid "Bitte ein Datum in der Vergangenheit angeben."
 msgstr "Bitte ein Datum in der Vergangenheit angeben."
 
+#: src/ui/management/eur/EurEntryDialog.tsx
+msgid "Bitte eine Art auswählen"
+msgstr "Bitte eine Art auswählen"
+
 #: src/ui/photographer/components/PhotoJobModal.tsx
 msgid "Bitte eine gültige Anzahl eingeben"
 msgstr "Bitte eine gültige Anzahl eingeben"
@@ -1754,6 +1767,11 @@ msgstr "Bitte einen Altersnachweis hochladen."
 #: src/ui/management/eur/EurApplicationsPanel.tsx
 msgid "Bitte einen Betreff angeben. Die Art ist voreingestellt und kann geändert werden."
 msgstr "Bitte einen Betreff angeben. Die Art ist voreingestellt und kann geändert werden."
+
+#: src/ui/management/eur/EurEntryDialog.tsx
+#: src/ui/management/ManagementEurView.tsx
+msgid "Bitte einen gültigen Betrag angeben"
+msgstr "Bitte einen gültigen Betrag angeben"
 
 #: src/ui/management/components/ProjectModal.tsx
 msgid "Bitte einen gültigen Betrag eingeben"
@@ -5783,6 +5801,10 @@ msgstr "Monat des Korrektur-PDF"
 msgid "Monat nicht signiert"
 msgstr "Monat nicht signiert"
 
+#: src/ui/management/eur/EurEntryDialog.tsx
+msgid "Monat zwischen 1 und 12 wählen"
+msgstr "Monat zwischen 1 und 12 wählen"
+
 #: src/ui/management/eur/EurAnalyticsPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
 msgid "Monate"
@@ -8017,6 +8039,10 @@ msgstr "Tabelle löschen"
 #: src/ui/management/ManagementEurView.tsx
 msgid "Tag"
 msgstr "Tag"
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Tag zwischen 1 und 31 angeben"
+msgstr "Tag zwischen 1 und 31 angeben"
 
 #: src/ui/management/eur/EurTravelPanel.tsx
 msgid "Tage"
