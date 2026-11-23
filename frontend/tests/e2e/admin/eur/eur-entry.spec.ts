@@ -49,12 +49,16 @@ test.describe('EAR sub-application', () => {
         await expect(dialog).toHaveCount(0);
 
         // EUR entries are brand-scoped; a super-admin shares the default brand
-        // with the parallel Mobile project, so scope to the newest matching row
-        // instead of relying on a single table-wide cell.
-        const bookedRow = main.getByRole('row').filter({ hasText: 'Software' }).first();
-        await expect(bookedRow.getByRole('cell', { name: 'Software' })).toBeVisible();
-        await expect(bookedRow.getByRole('cell', { name: '60 %' })).toBeVisible();
-        await expect(bookedRow.getByRole('cell', { name: '60,00 €' })).toBeVisible();
+        // with the parallel Mobile project, so scope to the first matching entry
+        // instead of relying on a single table-wide cell. The Buchungen panel
+        // renders a table on desktop and cards below the md breakpoint, and both
+        // markups stay in the DOM — :visible selects the one actually rendered
+        // at this viewport, so each shard verifies its own visible list rather
+        // than the hidden counterpart (Playwright also matches display:none).
+        const bookedEntry = main.locator('#eur-buchungen').locator('article:visible, tr:visible').filter({ hasText: 'Software' }).first();
+        await expect(bookedEntry).toContainText('Software');
+        await expect(bookedEntry).toContainText('60 %');
+        await expect(bookedEntry).toContainText('60,00 €');
 
         // Reisen: Kilometer, Tagesgeld und Nächtigung.
         await page.getByRole('tab', { name: 'Reisen' }).click();
