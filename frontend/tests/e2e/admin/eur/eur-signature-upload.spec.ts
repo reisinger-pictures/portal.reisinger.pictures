@@ -69,7 +69,16 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         // portal's bytes. A test-only backend route (local/testing only) signs
         // the exact downloaded PDF with a throwaway self-signed certificate;
         // no production endpoint can produce such a signature.
-        const signedResponse = await page.request.post(`/api/test/eur/sign-document/${documentId}`);
+        // ProtectApiMutations guards every API POST: the browser context has
+        // the JWT cookie, so the request needs a same-origin Origin and the
+        // decoded XSRF-TOKEN header, exactly like the SPA's apiMutate helper.
+        const csrf = (await page.context().cookies()).find((cookie) => cookie.name === 'XSRF-TOKEN');
+        const signedResponse = await page.request.post(`/api/test/eur/sign-document/${documentId}`, {
+            headers: {
+                Origin: 'http://localhost:4321',
+                ...(csrf ? {'X-XSRF-TOKEN': decodeURIComponent(csrf.value)} : {}),
+            },
+        });
         expect(signedResponse.status()).toBe(200);
         const signed = await signedResponse.body();
 
