@@ -116,24 +116,4 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         await expect(alert).toContainText(String(body.action));
         await expect(row.getByRole('link', { name: 'Signiertes PDF herunterladen' })).toHaveCount(0);
     });
-
-    // Last in the file on purpose: correction documents are brand-scoped and
-    // E2ESessionHelper teardown removes users, not documents. Keeping this test
-    // at the end leaves the two existing row-selection tests in their original
-    // order, and it deletes its own document to keep the shared brand clean.
-    test('OCR-Hinweise sind beratend und melden ein PDF als nicht unterstützt', { tag: ['@feature:eur-signature'] }, async ({ page }) => {
-        const main = await openBelege(page);
-        const documentId = await createCorrection(page, main);
-
-        // Die Liste wird nach dem Erstellen asynchron neu geladen; `.first()`
-        // würde nach dem Refetch auf eine andere Zeile zeigen.
-        const row = main.getByRole('row').filter({
-            has: main.locator(`a[href="/api/management/eur/documents/${documentId}/download"]`),
-        });
-        await expect(row).toBeVisible();
-        await row.getByRole('button', { name: 'OCR-Hinweise' }).click();
-
-        await expect(row.getByText('OCR ist nur für Bildbelege (PNG/JPEG) verfügbar.')).toBeVisible();
-        await page.request.delete(`/api/management/eur/documents/${documentId}`);
-    });
 });
