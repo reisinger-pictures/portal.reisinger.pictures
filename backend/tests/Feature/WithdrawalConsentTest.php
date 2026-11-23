@@ -20,6 +20,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -60,7 +61,7 @@ class WithdrawalConsentTest extends TestCase
     public function test_purchase_with_withdrawal_waived_false_is_rejected(): void
     {
         [$user, $photo] = $this->createPurchasingUserAndPhoto();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', $this->purchasePayload($photo, ['withdrawal_waived' => false]));
@@ -73,7 +74,7 @@ class WithdrawalConsentTest extends TestCase
     public function test_purchase_without_withdrawal_waived_field_is_rejected(): void
     {
         [$user, $photo] = $this->createPurchasingUserAndPhoto();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $payload = $this->purchasePayload($photo);
         unset($payload['withdrawal_waived']);
@@ -88,7 +89,7 @@ class WithdrawalConsentTest extends TestCase
     public function test_purchase_with_consent_persists_waiver_flag_and_snapshot_evidence(): void
     {
         [$user, $photo] = $this->createPurchasingUserAndPhoto();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', $this->purchasePayload($photo, ['payment_method' => 'invoice', 'withdrawal_waived' => true]));
@@ -115,7 +116,7 @@ class WithdrawalConsentTest extends TestCase
     public function test_quote_request_without_consent_is_allowed_with_waiver_false(): void
     {
         [$user, $photo] = $this->createPurchasingUserAndPhoto();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', [

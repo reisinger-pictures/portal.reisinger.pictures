@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\InvoiceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class CollectiveInvoiceOrganizationAttributionTest extends TestCase
@@ -70,7 +71,7 @@ class CollectiveInvoiceOrganizationAttributionTest extends TestCase
 
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $this->withHeader('Authorization', "Bearer {$token}")
             ->getJson("/api/management/orgs/{$purchaseOrg->id}")

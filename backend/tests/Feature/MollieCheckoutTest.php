@@ -21,6 +21,7 @@ use Mollie\Api\Fake\MockMollieClient;
 use Mollie\Api\Fake\MockResponse;
 use Mollie\Api\Http\Data\Money;
 use Mollie\Api\Http\Requests\CreatePaymentRequest;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
@@ -105,7 +106,7 @@ class MollieCheckoutTest extends TestCase
         $payload = $this->payload($photo);
         unset($payload['payment_method']);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->postJson('/api/orders/checkout', $payload)
             ->assertOk()
             ->assertJsonStructure(['checkout_url']);
@@ -120,7 +121,7 @@ class MollieCheckoutTest extends TestCase
         $payload = $this->payload($photo);
         $payload['payment_method'] = 'stripe';
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->postJson('/api/orders/checkout', $payload)
             ->assertStatus(422)
             ->assertJsonValidationErrors('payment_method');
@@ -191,7 +192,7 @@ class MollieCheckoutTest extends TestCase
         $payload = $this->payload($photo);
         $payload['mollie_method'] = 'eps';
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->postJson('/api/orders/checkout', $payload)
             ->assertOk()
             ->assertJsonStructure(['checkout_url']);
@@ -212,7 +213,7 @@ class MollieCheckoutTest extends TestCase
         $payload = $this->payload($photo);
         $this->assertArrayNotHasKey('mollie_method', $payload);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->postJson('/api/orders/checkout', $payload)
             ->assertOk()
             ->assertJsonStructure(['checkout_url']);
@@ -233,7 +234,7 @@ class MollieCheckoutTest extends TestCase
         $payload = $this->payload($photo);
         $payload['mollie_method'] = 'klarna';
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->postJson('/api/orders/checkout', $payload)
             ->assertStatus(422)
             ->assertJsonValidationErrors('mollie_method');
@@ -251,7 +252,7 @@ class MollieCheckoutTest extends TestCase
         $this->configureMollie(['paybybank', 'eps', 'creditcard']);
         [$user, $photo] = $this->createCheckoutItem();
         $headers = [
-            'Authorization' => 'Bearer '.auth('api')->login($user),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($user),
             'Idempotency-Key' => 'mollie-method-identity-0001',
         ];
 
@@ -328,7 +329,7 @@ class MollieCheckoutTest extends TestCase
         // to a customer who could otherwise still pay.
         [$user, $photo] = $this->createCheckoutItem();
         $headers = [
-            'Authorization' => 'Bearer '.auth('api')->login($user),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($user),
             'Idempotency-Key' => 'mollie-resume-without-webhook-0001',
         ];
 
@@ -362,7 +363,7 @@ class MollieCheckoutTest extends TestCase
         Mail::fake();
         [$user, $photo] = $this->createCheckoutItem();
         $headers = [
-            'Authorization' => 'Bearer '.auth('api')->login($user),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($user),
             'Idempotency-Key' => 'mollie-paid-replay-without-webhook-0001',
         ];
 
@@ -394,7 +395,7 @@ class MollieCheckoutTest extends TestCase
         config(['services.mollie.webhook_url' => '']);
         [$user, $photo] = $this->createCheckoutItem();
         $headers = [
-            'Authorization' => 'Bearer '.auth('api')->login($user),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($user),
             'Idempotency-Key' => 'mollie-config-recovery-0001',
         ];
         $sequenceBefore = InvoiceSequence::query()->value('current_value');
@@ -442,7 +443,7 @@ class MollieCheckoutTest extends TestCase
         ]);
 
         [$user, $photo] = $this->createCheckoutItem();
-        $headers = ['Authorization' => 'Bearer '.auth('api')->login($user), 'Idempotency-Key' => 'mollie-timeout-retry-0001'];
+        $headers = ['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user), 'Idempotency-Key' => 'mollie-timeout-retry-0001'];
 
         $this->withHeaders($headers)->postJson('/api/orders/checkout', $this->payload($photo))
             ->assertStatus(503);
@@ -474,7 +475,7 @@ class MollieCheckoutTest extends TestCase
         ]);
 
         [$user, $photo] = $this->createCheckoutItem();
-        $headers = ['Authorization' => 'Bearer '.auth('api')->login($user), 'Idempotency-Key' => 'mollie-retry-generation-0001'];
+        $headers = ['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user), 'Idempotency-Key' => 'mollie-retry-generation-0001'];
 
         $this->withHeaders($headers)->postJson('/api/orders/checkout', $this->payload($photo))
             ->assertStatus(503);
@@ -507,7 +508,7 @@ class MollieCheckoutTest extends TestCase
         ]);
 
         [$user, $photo] = $this->createCheckoutItem();
-        $headers = ['Authorization' => 'Bearer '.auth('api')->login($user), 'Idempotency-Key' => 'mollie-attempt-ceiling-0001'];
+        $headers = ['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user), 'Idempotency-Key' => 'mollie-attempt-ceiling-0001'];
 
         $this->withHeaders($headers)->postJson('/api/orders/checkout', $this->payload($photo))
             ->assertStatus(503);
@@ -550,7 +551,7 @@ class MollieCheckoutTest extends TestCase
         $payload['items'] = [['photoId' => $photo->id, 'tier' => 'web', 'isQuote' => true]];
         $payload['quote_message'] = 'Bitte um Angebot';
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->postJson('/api/orders/checkout', $payload)
             ->assertOk();
 
@@ -637,7 +638,7 @@ class MollieCheckoutTest extends TestCase
 
     private function checkout(User $user, Photo $photo)
     {
-        return $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        return $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->postJson('/api/orders/checkout', $this->payload($photo));
     }
 }

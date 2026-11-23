@@ -20,10 +20,10 @@ use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements JWTSubject
 {
-    // HasApiTokens is dormant while AUTH_DRIVER=legacy (the default): it only
-    // adds the token relation/createToken API used by AuthTokenService's
-    // sanctum branch. No route uses `auth:sanctum` in Phase 2 and the `api`
-    // guard keeps its `jwt` driver (Portal #9, D-74/D-75).
+    // HasApiTokens adds the token relation/createToken API used by
+    // AuthTokenService. No route uses `auth:sanctum` directly — the `api`
+    // guard keeps its name and uses the custom `sanctum_transient` driver
+    // (Portal #9, D-74/D-75).
     use HasApiTokens, HasFactory, HasUuids, Notifiable;
 
     public $guest_id = null;

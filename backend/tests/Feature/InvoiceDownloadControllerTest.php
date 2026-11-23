@@ -6,6 +6,7 @@ use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class InvoiceDownloadControllerTest extends TestCase
@@ -15,7 +16,7 @@ class InvoiceDownloadControllerTest extends TestCase
     public function test_user_can_download_invoice_for_own_order()
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $order = Order::create([
             'user_id' => $user->id,
@@ -43,7 +44,7 @@ class InvoiceDownloadControllerTest extends TestCase
     {
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $order = Order::create([
             'user_id' => $otherUser->id,
@@ -60,7 +61,7 @@ class InvoiceDownloadControllerTest extends TestCase
     public function test_pending_quote_request_blocks_invoice_download()
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $order = Order::create([
             'user_id' => $user->id,

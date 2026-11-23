@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -32,7 +33,7 @@ class MailControllerAuthorizationTest extends TestCase
             'restricted_photographers' => true,
         ]);
 
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/galleries/{$gallery->id}/send-custom-email", [
@@ -64,7 +65,7 @@ class MailControllerAuthorizationTest extends TestCase
             'gallery_id' => $gallery->id,
         ]);
 
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/galleries/{$gallery->id}/send-custom-email", [

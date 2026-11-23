@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class CouponAdminControllerTest extends TestCase
@@ -45,7 +46,7 @@ class CouponAdminControllerTest extends TestCase
         $superAdmin = User::factory()->create(['brand' => null]);
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
-        return auth('api')->login($superAdmin);
+        return AuthTokenFactory::forUser($superAdmin);
     }
 
     private function photoPackagePayload(array $overrides = []): array

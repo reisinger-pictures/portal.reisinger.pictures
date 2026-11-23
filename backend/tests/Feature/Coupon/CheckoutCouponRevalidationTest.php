@@ -16,6 +16,7 @@ use App\Support\BrandRegistry;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mollie\Api\Http\Requests\CreatePaymentRequest;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
@@ -68,7 +69,7 @@ class CheckoutCouponRevalidationTest extends TestCase
     {
         $data = $this->createCheckoutData();
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', [
@@ -98,7 +99,7 @@ class CheckoutCouponRevalidationTest extends TestCase
 
         $data = $this->createCheckoutData();
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', [
@@ -129,7 +130,7 @@ class CheckoutCouponRevalidationTest extends TestCase
 
         $data = $this->createCheckoutData();
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', [
@@ -160,7 +161,7 @@ class CheckoutCouponRevalidationTest extends TestCase
 
         $data = $this->createCheckoutData();
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', [
@@ -191,7 +192,7 @@ class CheckoutCouponRevalidationTest extends TestCase
         ]);
         $data = $this->createCheckoutData();
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $payload = [
             'items' => $data['items'],
@@ -258,7 +259,7 @@ class CheckoutCouponRevalidationTest extends TestCase
 
         $data = $this->createCheckoutData();
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/orders/checkout', [
@@ -291,7 +292,7 @@ class CheckoutCouponRevalidationTest extends TestCase
         $data = $this->createCheckoutData();
         $user1 = User::factory()->create();
         $user2 = User::factory()->create();
-        $token1 = auth('api')->login($user1);
+        $token1 = AuthTokenFactory::forUser($user1);
 
         $r1 = $this->withHeaders(['Authorization' => 'Bearer '.$token1])
             ->postJson('/api/orders/checkout', [
@@ -304,7 +305,7 @@ class CheckoutCouponRevalidationTest extends TestCase
                 'withdrawal_waived' => true,
             ]);
         $r1->assertStatus(200);
-        $token2 = auth('api')->login($user2);
+        $token2 = AuthTokenFactory::forUser($user2);
 
         $r2 = $this->withHeaders(['Authorization' => 'Bearer '.$token2])
             ->postJson('/api/orders/checkout', [

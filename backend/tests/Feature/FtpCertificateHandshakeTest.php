@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Assert;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class FtpCertificateHandshakeTest extends TestCase
@@ -104,7 +105,7 @@ class FtpCertificateHandshakeTest extends TestCase
         $photographer->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
         return $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer),
         ])->get('/api/management/ftp/certificate');
     }
 

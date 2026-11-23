@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class GalleryModalFieldsTest extends TestCase
@@ -16,7 +17,7 @@ class GalleryModalFieldsTest extends TestCase
     {
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         // 1. Group erstellen mit allen Settings
         $resGroup = $this->withHeaders(['Authorization' => 'Bearer '.$token])

@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -35,7 +36,7 @@ class BrandSettingsControllerTest extends TestCase
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => $role]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     private function bearer(string $token): array

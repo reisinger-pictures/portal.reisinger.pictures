@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class OrgDefaultRoleLegacyGuardTest extends TestCase
@@ -67,7 +68,7 @@ class OrgDefaultRoleLegacyGuardTest extends TestCase
         $existingMember->roles()->attach([$client->id, $photographer->id]);
         $incomingMember = User::factory()->create(['brand' => 'rp']);
         $incomingMember->roles()->attach($client->id);
-        $headers = ['Authorization' => 'Bearer '.auth('api')->login($admin)];
+        $headers = ['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)];
 
         $this->withHeaders($headers)
             ->putJson('/api/management/orgs/'.$org->id.'/users', [
@@ -128,7 +129,7 @@ class OrgDefaultRoleLegacyGuardTest extends TestCase
         $org = $this->org($photographer);
         $member = User::factory()->create(['brand' => 'rp', 'org_id' => $org->id]);
         $member->roles()->attach([$client->id, $photographer->id]);
-        $headers = ['Authorization' => 'Bearer '.auth('api')->login($admin)];
+        $headers = ['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)];
 
         $writes = $this->collectWriteStatements(function () use ($headers, $org): void {
             $this->withHeaders($headers)

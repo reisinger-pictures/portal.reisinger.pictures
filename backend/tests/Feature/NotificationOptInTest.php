@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
 
@@ -24,7 +25,7 @@ class NotificationOptInTest extends TestCase
         $client->galleries()->attach($gallery, ['wants_notifications' => false]); // Startet opt-out
 
         // 1. API Toggle Test
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/galleries/{$gallery->id}/opt-in", ['wants_notifications' => true]);
         $response->assertStatus(200);
@@ -45,7 +46,7 @@ class NotificationOptInTest extends TestCase
         // 2. Mail Controller Test (Sollte den User nun inkludieren)
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $adminToken = auth('api')->login($admin);
+        $adminToken = AuthTokenFactory::forUser($admin);
 
         $adminResponse = $this->withHeaders(['Authorization' => "Bearer $adminToken"])
             ->postJson("/api/management/galleries/{$gallery->id}/send-custom-email", [
@@ -68,7 +69,7 @@ class NotificationOptInTest extends TestCase
         $gallery = Gallery::factory()->create();
         $client->galleries()->attach($gallery);
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         $this->withHeaders($headers)
@@ -102,7 +103,7 @@ class NotificationOptInTest extends TestCase
         $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
         $gallery = Gallery::factory()->create(); // Client has NO relationship to this gallery
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/galleries/{$gallery->id}/opt-in", ['wants_notifications' => true]);
 
@@ -120,7 +121,7 @@ class NotificationOptInTest extends TestCase
         $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
         $group = GalleryGroup::factory()->create(); // Client has NO membership in this group
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/gallery-groups/{$group->id}/opt-in", ['wants_notifications' => true]);
 

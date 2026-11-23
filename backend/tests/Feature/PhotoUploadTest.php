@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class PhotoUploadTest extends TestCase
@@ -37,7 +38,7 @@ class PhotoUploadTest extends TestCase
         $content = file_exists($fixturePath) ? file_get_contents($fixturePath) : 'dummy content';
         $file = UploadedFile::fake()->createWithContent('test_upload.jpg', $content);
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/management/upload', [
@@ -71,7 +72,7 @@ class PhotoUploadTest extends TestCase
         $fixturePath = base_path('tests/Fixtures/sample.jpg');
         $content = file_exists($fixturePath) ? file_get_contents($fixturePath) : 'dummy content';
         $file = UploadedFile::fake()->createWithContent('selection.jpg', $content);
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/management/upload', [
@@ -100,7 +101,7 @@ class PhotoUploadTest extends TestCase
         $photogA->galleries()->attach($gallery);
 
         // Upload als Fotograf B (kein Zugriff)
-        $token = auth('api')->login($photogB);
+        $token = AuthTokenFactory::forUser($photogB);
         $file = UploadedFile::fake()->image('hacked.jpg', 600, 600);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])

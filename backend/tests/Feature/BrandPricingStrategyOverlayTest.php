@@ -17,6 +17,7 @@ use App\Services\PricingStrategyResolver;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -64,7 +65,7 @@ class BrandPricingStrategyOverlayTest extends TestCase
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     private function adminToken(): string
@@ -72,7 +73,7 @@ class BrandPricingStrategyOverlayTest extends TestCase
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     /**

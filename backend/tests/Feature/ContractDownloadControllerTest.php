@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class ContractDownloadControllerTest extends TestCase
@@ -44,7 +45,7 @@ class ContractDownloadControllerTest extends TestCase
         $admin->roles()->attach(
             Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value])
         );
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $contract = Contract::create([
             'status' => 'closed',
@@ -70,7 +71,7 @@ class ContractDownloadControllerTest extends TestCase
         $admin->roles()->attach(
             Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value])
         );
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $contract = Contract::create([
             'status' => 'active',

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class ShootingCalculatorSettingsTest extends TestCase
@@ -54,7 +55,7 @@ class ShootingCalculatorSettingsTest extends TestCase
             Role::firstOrCreate(['name' => UserRole::ADMIN->value])
         );
 
-        return auth('api')->login($admin);
+        return AuthTokenFactory::forUser($admin);
     }
 
     /**
@@ -68,7 +69,7 @@ class ShootingCalculatorSettingsTest extends TestCase
             Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value])
         );
 
-        return auth('api')->login($superAdmin);
+        return AuthTokenFactory::forUser($superAdmin);
     }
 
     /**
@@ -657,7 +658,7 @@ class ShootingCalculatorSettingsTest extends TestCase
     {
         // Plain User ohne Admin-Rolle → ManagementMiddleware 403
         $user = User::factory()->create(); // keine Rollen
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/management/settings/license-terms', $this->validCalcPayload())

@@ -16,6 +16,7 @@ use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -447,7 +448,7 @@ class FtpQuarantineTest extends TestCase
 
         $this->processAs($user)->assertOk();
 
-        $status = $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $status = $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->getJson('/api/management/ftp/status');
 
         $status->assertOk();
@@ -578,7 +579,7 @@ class FtpQuarantineTest extends TestCase
     private function processAs(User $user)
     {
         return $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($user),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($user),
         ])->postJson('/api/management/ftp/process');
     }
 }

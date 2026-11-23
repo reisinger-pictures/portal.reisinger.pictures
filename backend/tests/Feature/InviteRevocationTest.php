@@ -13,9 +13,9 @@ use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 use PHPOpenSourceSaver\JWTAuth\JWT;
 use PHPOpenSourceSaver\JWTAuth\JWTAuth as JwtAuthManager;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class InviteRevocationTest extends TestCase
@@ -70,7 +70,7 @@ class InviteRevocationTest extends TestCase
             'can_edit_metadata' => true,
         ]);
 
-        $userToken = Auth::guard('api')->login($user);
+        $userToken = AuthTokenFactory::forUser($user);
         $redeem = $this->asToken($userToken)
             ->postJson('/api/invites/redeem', [
                 'token' => $invite->token,
@@ -83,14 +83,17 @@ class InviteRevocationTest extends TestCase
         $this->assertNotSame('', $accessToken);
         $this->assertNotSame('', $refreshToken);
 
-        $payload = app(JWT::class)->setToken($accessToken)->getPayload();
+        // White-box check that the redeem response's access credential carries
+        // the invite grant. The factory reads the JWT payload in legacy mode and
+        // the stored tp1: ability in Sanctum mode — same claims, either format.
+        $claims = AuthTokenFactory::claimsOf($accessToken);
         $this->assertSame(
             [(string) $invite->id],
-            $payload->get('transient_invite_ids')
+            $claims['transient_invite_ids']
         );
         $this->assertSame(
             [(string) $invitedGallery->id],
-            $payload->get('transient_invites')[(string) $invite->id]['gallery_ids']
+            $claims['transient_invites'][(string) $invite->id]['gallery_ids']
         );
 
         // Legitimate access exists before revocation.
@@ -183,7 +186,7 @@ class InviteRevocationTest extends TestCase
             'can_edit_metadata' => true,
         ]);
 
-        $token = JWTAuth::claims([
+        $token = AuthTokenFactory::claims([
             'transient_galleries' => [$gallery->id],
             'transient_meta_galleries' => [$gallery->id],
             'transient_invites' => [
@@ -239,6 +242,6 @@ class InviteRevocationTest extends TestCase
         $role = Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]);
         $admin->roles()->attach($role->id);
 
-        return [$admin, Auth::guard('api')->login($admin)];
+        return [$admin, AuthTokenFactory::forUser($admin)];
     }
 }

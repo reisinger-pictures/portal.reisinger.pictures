@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -34,7 +35,7 @@ abstract class EurBookkeepingTestCase extends TestCase
         $user = User::factory()->create(['brand' => BrandRegistry::currentId()]);
         $user->roles()->attach(Role::firstOrCreate(['name' => $role ?? UserRole::ADMIN->value]));
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         // Nicht über den Test-Prozess hinweg angemeldet lassen: sonst wirkt ein
         // späterer Request ohne Bearer-Header trotzdem authentifiziert.
         auth('api')->forgetUser();

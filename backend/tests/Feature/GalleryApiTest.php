@@ -7,7 +7,7 @@ use App\Models\GalleryGroup;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Auth;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class GalleryApiTest extends TestCase
@@ -26,7 +26,7 @@ class GalleryApiTest extends TestCase
     public function test_photographer_can_create_gallery(): void
     {
         $photographer = $this->createUserWithRole('photographer');
-        $token = Auth::guard('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/management/galleries', [
@@ -46,7 +46,7 @@ class GalleryApiTest extends TestCase
     public function test_pure_admin_cannot_create_gallery(): void
     {
         $admin = $this->createUserWithRole('admin');
-        $token = Auth::guard('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/management/galleries', [
@@ -60,7 +60,7 @@ class GalleryApiTest extends TestCase
     public function test_client_cannot_create_gallery(): void
     {
         $client = $this->createUserWithRole('client');
-        $token = Auth::guard('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/management/galleries', [
@@ -84,7 +84,7 @@ class GalleryApiTest extends TestCase
     public function test_gallery_slug_collision_and_expires_at_conversion()
     {
         $photographer = $this->createUserWithRole('photographer');
-        $token = Auth::guard('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         // Erste Galerie
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
@@ -113,7 +113,7 @@ class GalleryApiTest extends TestCase
     public function test_selection_create_normalizes_public_and_free_download_flags(): void
     {
         $photographer = $this->createUserWithRole('photographer');
-        $token = Auth::guard('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/management/galleries', [
@@ -139,7 +139,7 @@ class GalleryApiTest extends TestCase
             'is_public' => true,
             'is_free_download' => true,
         ]);
-        $token = Auth::guard('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/management/galleries', [
@@ -168,7 +168,7 @@ class GalleryApiTest extends TestCase
             'is_free_download' => false,
         ]);
         $photographer->galleries()->attach($gallery);
-        $token = Auth::guard('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->putJson('/api/management/galleries/'.$gallery->id, [
@@ -189,7 +189,7 @@ class GalleryApiTest extends TestCase
     public function test_invalid_date_throws_validation_error()
     {
         $photographer = $this->createUserWithRole('photographer');
-        $token = Auth::guard('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $res = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/management/galleries', [

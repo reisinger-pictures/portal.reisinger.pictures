@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\VolumePresetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -65,7 +66,7 @@ class LicenseTermsAccessTest extends TestCase
 
     private function tokenFor(UserRole $role): string
     {
-        return auth('api')->login($this->userWithRole($role));
+        return AuthTokenFactory::forUser($this->userWithRole($role));
     }
 
     public function test_full_license_terms_is_anonymous_401(): void

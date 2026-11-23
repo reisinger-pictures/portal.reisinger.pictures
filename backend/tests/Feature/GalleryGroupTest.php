@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class GalleryGroupTest extends TestCase
@@ -16,7 +17,7 @@ class GalleryGroupTest extends TestCase
     {
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/gallery-groups', ['name' => 'Wedding 2024']);
@@ -28,7 +29,7 @@ class GalleryGroupTest extends TestCase
     {
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/gallery-groups', ['name' => 'Hacked Group']);

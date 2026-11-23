@@ -15,6 +15,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\PayoutCalculationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -30,7 +31,7 @@ class PayoutLockedStatementsTest extends TestCase
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
-        return auth('api')->login($superAdmin);
+        return AuthTokenFactory::forUser($superAdmin);
     }
 
     public function test_calculate_preserves_approved_statement(): void

@@ -10,8 +10,7 @@ use App\Models\Photo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
-use PHPOpenSourceSaver\JWTAuth\Factory;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class TransientMagicLinkTest extends TestCase
@@ -44,15 +43,13 @@ class TransientMagicLinkTest extends TestCase
         ]);
 
         $guestId = (string) Str::uuid();
-        $factory = app(Factory::class);
-        $payload = $factory->customClaims([
+        $token = AuthTokenFactory::claims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Guest',
             'guest_invite_id' => $invite->id,
             'transient_galleries' => [$gallery->id],
-        ])->make();
-        $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
+        ])->asGuest();
 
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson("/api/galleries/{$gallery->slug}");
@@ -71,15 +68,13 @@ class TransientMagicLinkTest extends TestCase
         ]);
 
         $guestId = (string) Str::uuid();
-        $factory = app(Factory::class);
-        $payload = $factory->customClaims([
+        $token = AuthTokenFactory::claims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Guest',
             'guest_invite_id' => $invite->id,
             'transient_galleries' => [$allowed->id],
-        ])->make();
-        $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
+        ])->asGuest();
 
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson("/api/galleries/{$blocked->slug}");
@@ -97,15 +92,13 @@ class TransientMagicLinkTest extends TestCase
         ]);
 
         $guestId = (string) Str::uuid();
-        $factory = app(Factory::class);
-        $payload = $factory->customClaims([
+        $token = AuthTokenFactory::claims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Rating Guest',
             'guest_invite_id' => $invite->id,
             'transient_galleries' => [$gallery->id],
-        ])->make();
-        $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
+        ])->asGuest();
 
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/photos/{$photo->id}/rate", ['rating' => 4, 'comment' => 'Nice!']);
@@ -153,15 +146,13 @@ class TransientMagicLinkTest extends TestCase
         ]);
 
         $guestId = (string) Str::uuid();
-        $factory = app(Factory::class);
-        $payload = $factory->customClaims([
+        $token = AuthTokenFactory::claims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Me Guest',
             'guest_invite_id' => $invite->id,
             'transient_galleries' => [$gallery->id],
-        ])->make();
-        $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
+        ])->asGuest();
 
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/auth/me');
@@ -185,7 +176,7 @@ class TransientMagicLinkTest extends TestCase
 
         GalleryInvite::create(['gallery_id' => $invited->id, 'token' => 'merge-token']);
 
-        $token = JWTAuth::fromUser($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/invites/redeem', [

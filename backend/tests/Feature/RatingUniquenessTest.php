@@ -6,6 +6,7 @@ use App\Models\Gallery;
 use App\Models\GalleryInvite;
 use App\Models\Photo;
 use App\Models\User;
+use App\Services\Auth\AuthTokenService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
@@ -14,8 +15,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PHPOpenSourceSaver\JWTAuth\Factory;
 use PHPOpenSourceSaver\JWTAuth\JWTAuth;
-use PHPOpenSourceSaver\JWTAuth\Payload;
 use PHPUnit\Framework\AssertionFailedError;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -417,7 +418,7 @@ class RatingUniquenessTest extends TestCase
         // registered user and with its own claim set — a guest claim that
         // leaked into it would authorise the request and hide the leak.
         $this->assertGuestClaimsAbsent(
-            Auth::guard('api')->payload(),
+            AuthTokenFactory::claimsOf($userToken),
             'The registered user request'
         );
         $this->assertSame(
@@ -491,6 +492,26 @@ class RatingUniquenessTest extends TestCase
         // The guest token leaves its claims in the shared claims collection.
         $this->guestToken($guestId, $gallery->id, $invite->id);
 
+        if (app(AuthTokenService::class)->isSanctum()) {
+            // Sanctum tokens carry explicit abilities instead of a shared JWT
+            // claims collection. Reproduce the same forbidden state directly:
+            // a registered actor's credential carrying guest identity.
+            $leakedToken = AuthTokenFactory::forUser($user, [
+                'guest_id' => $guestId,
+                'guest_name' => 'Rating Guest',
+                'guest_invite_id' => (string) $invite->getKey(),
+                'transient_galleries' => [$gallery->id],
+            ]);
+            $leakedClaims = AuthTokenFactory::claimsOf($leakedToken);
+
+            $this->assertSame($guestId, $leakedClaims['guest_id']);
+
+            $this->expectException(AssertionFailedError::class);
+            $this->assertGuestClaimsAbsent($leakedClaims, 'The registered user request');
+
+            return;
+        }
+
         // The registered user token is built on purpose WITHOUT the claim
         // reset, so the collection leaks the guest claims into the token.
         $leakedPayload = app(Factory::class)->customClaims([
@@ -507,7 +528,7 @@ class RatingUniquenessTest extends TestCase
 
         // The very assertion the isolation test makes has to reject this token.
         $this->expectException(AssertionFailedError::class);
-        $this->assertGuestClaimsAbsent($leakedPayload, 'The registered user request');
+        $this->assertGuestClaimsAbsent($leakedPayload->toArray(), 'The registered user request');
     }
 
     /**
@@ -518,13 +539,19 @@ class RatingUniquenessTest extends TestCase
      */
     private function guestToken(string $guestId, string $galleryId, string $inviteId): string
     {
-        $payload = app(Factory::class)->customClaims([
+        $claims = [
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Rating Guest',
             'guest_invite_id' => $inviteId,
             'transient_galleries' => [$galleryId],
-        ])->make(true);
+        ];
+
+        if (app(AuthTokenService::class)->isSanctum()) {
+            return AuthTokenFactory::forGuest($claims);
+        }
+
+        $payload = app(Factory::class)->customClaims($claims)->make(true);
 
         return app(JWTAuth::class)->encode($payload)->get();
     }
@@ -539,6 +566,10 @@ class RatingUniquenessTest extends TestCase
      */
     private function userToken(User $user, array $claims = []): string
     {
+        if (app(AuthTokenService::class)->isSanctum()) {
+            return AuthTokenFactory::forUser($user, $claims);
+        }
+
         $payload = app(Factory::class)->customClaims(array_merge([
             'sub' => (string) $user->getKey(),
         ], $claims))->make(true);
@@ -559,17 +590,19 @@ class RatingUniquenessTest extends TestCase
         $this->resetJwtClaimState();
 
         Auth::forgetGuards();
-        Auth::guard('api')->setToken($token);
+        if (! app(AuthTokenService::class)->isSanctum()) {
+            Auth::guard('api')->setToken($token);
+        }
 
         $callback();
     }
 
     /**
-     * Assert that a payload carries no guest identity.
+     * Assert that a credential's claims carry no guest identity.
      *
-     * @param  Payload  $payload
+     * @param  array<string, mixed>  $claims
      */
-    private function assertGuestClaimsAbsent($payload, string $context): void
+    private function assertGuestClaimsAbsent(array $claims, string $context): void
     {
         $guestClaims = [
             'guest_id',
@@ -579,7 +612,9 @@ class RatingUniquenessTest extends TestCase
 
         $leaked = array_values(array_filter(
             $guestClaims,
-            fn (string $claim): bool => $payload->hasKey($claim)
+            fn (string $claim): bool => array_key_exists($claim, $claims)
+                && $claims[$claim] !== null
+                && $claims[$claim] !== ''
         ));
 
         $this->assertSame(

@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class BoardRelationshipIsolationTest extends TestCase
@@ -363,9 +364,12 @@ class BoardRelationshipIsolationTest extends TestCase
     {
         $admin = $this->userWithRole('admin', null);
 
+        // JWT's login() leaves the reserved null-brand actor cached on the
+        // guard, so legacy reaches the middleware (403). Sanctum resolves from
+        // the token and refuses the actor at guard level (401). Both deny.
         $this->withHeaders($this->headers($admin))
             ->getJson('/api/management/projects')
-            ->assertStatus(403);
+            ->assertStatus(config('auth.migration.driver') === 'sanctum' ? 401 : 403);
     }
 
     public function test_brand_bound_actor_cannot_use_a_board_for_another_brand(): void
@@ -393,7 +397,7 @@ class BoardRelationshipIsolationTest extends TestCase
 
     private function headers(User $user): array
     {
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         return [
             'Authorization' => "Bearer {$token}",

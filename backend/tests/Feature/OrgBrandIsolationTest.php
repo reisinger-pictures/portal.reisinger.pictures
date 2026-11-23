@@ -8,6 +8,7 @@ use App\Models\Org;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -25,7 +26,7 @@ class OrgBrandIsolationTest extends TestCase
         $user = User::factory()->create(['brand' => $brand]);
         $user->roles()->attach(Role::firstOrCreate(['name' => $role->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     public function test_brand_bound_admin_cannot_view_brandless_org(): void

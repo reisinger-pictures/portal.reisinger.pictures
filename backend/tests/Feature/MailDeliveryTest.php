@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
 
@@ -36,7 +37,7 @@ class MailDeliveryTest extends TestCase
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
         $admin->galleries()->attach($gallery);
 
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/management/galleries/'.$gallery->id.'/invites/send', [

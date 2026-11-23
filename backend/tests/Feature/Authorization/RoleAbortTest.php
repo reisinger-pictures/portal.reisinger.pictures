@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class RoleAbortTest extends TestCase
@@ -24,7 +25,7 @@ class RoleAbortTest extends TestCase
     public function test_super_admin_can_access_protected_routes(): void
     {
         $superAdmin = $this->createUserWithRole(UserRole::SUPER_ADMIN->value);
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/management/customers')
@@ -34,7 +35,7 @@ class RoleAbortTest extends TestCase
     public function test_admin_gets_403_on_super_admin_routes(): void
     {
         $admin = $this->createUserWithRole(UserRole::ADMIN->value);
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         // Customers CRUD
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -57,7 +58,7 @@ class RoleAbortTest extends TestCase
     public function test_photographer_gets_403_on_super_admin_routes(): void
     {
         $photographer = $this->createUserWithRole(UserRole::PHOTOGRAPHER->value);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         // Customers CRUD
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -80,7 +81,7 @@ class RoleAbortTest extends TestCase
     public function test_client_gets_403_on_super_admin_routes(): void
     {
         $client = $this->createUserWithRole(UserRole::CLIENT->value);
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
 
         // Customers CRUD
         $this->withHeaders(['Authorization' => "Bearer $token"])

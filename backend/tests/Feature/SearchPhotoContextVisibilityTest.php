@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class SearchPhotoContextVisibilityTest extends TestCase
@@ -117,7 +118,7 @@ class SearchPhotoContextVisibilityTest extends TestCase
 
     private function contextAs(User $user, Photo $photo)
     {
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         return $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->getJson($this->contextUrl($photo));

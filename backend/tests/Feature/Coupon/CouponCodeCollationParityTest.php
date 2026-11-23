@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -284,7 +285,7 @@ class CouponCodeCollationParityTest extends TestCase
         $superAdmin = User::factory()->create(['brand' => null]);
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
-        return auth('api')->login($superAdmin);
+        return AuthTokenFactory::forUser($superAdmin);
     }
 
     private function migration(): object

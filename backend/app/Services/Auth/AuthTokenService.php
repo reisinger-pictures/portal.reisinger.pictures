@@ -15,10 +15,10 @@ use RuntimeException;
 /**
  * Issue / verify / revoke credentials behind the JWT -> Sanctum flag (Portal #9).
  *
- * The default `AUTH_DRIVER=legacy` delegates to the existing JWT flow through
- * `Auth::guard('api')`; nothing there creates a Sanctum token or touches the
- * database. Only `sanctum` uses the token store and the `api` guard's custom
- * `sanctum_transient` driver. The guard NAME stays `api` (D-74) and credentials
+ * The default `sanctum` uses the token store and the `api` guard's custom
+ * `sanctum_transient` driver; `legacy` is a temporary fallback delegating to
+ * the JWT flow through `Auth::guard('api')` until that package is removed
+ * (D-77). The guard NAME stays `api` (D-74) and credentials
  * stay two httpOnly cookies (D-75), with the unchanged 240-minute access /
  * 7-day refresh windows (D-76) read from `auth.migration.access_ttl` and
  * `auth.migration.refresh_ttl`.
@@ -39,8 +39,10 @@ final class AuthTokenService
     public const DRIVER_SANCTUM = 'sanctum';
 
     /**
-     * Only the documented value 'sanctum' leaves the legacy path. Every other
-     * value (including an unset env and a typo) means legacy.
+     * 'sanctum' is the configured default in config/auth.php, so an unset env
+     * resolves to sanctum here. Only an explicitly set value other than
+     * 'sanctum' (notably the temporary 'legacy' fallback) selects legacy;
+     * that legacy path is removed together with the JWT package in Phase 4.
      */
     public function driver(): string
     {
@@ -119,6 +121,29 @@ final class AuthTokenService
         }
 
         PersonalAccessToken::findToken($token)?->delete();
+    }
+
+    /**
+     * Read the structured transient claims carried by a credential. In legacy
+     * mode the JWT guard owns its payload and this returns empty claims; the
+     * controller's legacy branch reads `Auth::guard('api')->payload()` instead.
+     */
+    public function claimsOf(?string $credential): TransientClaims
+    {
+        if (! $this->isSanctum() || $credential === null || $credential === '') {
+            return new TransientClaims;
+        }
+
+        $token = PersonalAccessToken::findToken($credential);
+        if (! $token instanceof PersonalAccessToken) {
+            return new TransientClaims;
+        }
+
+        try {
+            return app(TransientClaimsCodec::class)->decode($token->abilities);
+        } catch (InvalidArgumentException) {
+            return new TransientClaims;
+        }
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\GalleryGroup;
 use App\Models\Photo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class GalleryFrontendTest extends TestCase
@@ -52,7 +53,7 @@ class GalleryFrontendTest extends TestCase
         $user->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/photos/{$photo->id}/rate", ['rating' => 5]);
 

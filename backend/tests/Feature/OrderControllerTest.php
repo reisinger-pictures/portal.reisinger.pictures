@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class OrderControllerTest extends TestCase
@@ -28,7 +29,7 @@ class OrderControllerTest extends TestCase
     public function test_user_can_list_own_orders(): void
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $order = Order::factory()->create(['user_id' => $user->id]);
         // Another user's order should not appear
@@ -45,7 +46,7 @@ class OrderControllerTest extends TestCase
     public function test_user_can_read_own_order_status_without_exposing_payment_secrets(): void
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         $order = Order::factory()->create([
             'user_id' => $user->id,
             'status' => 'pending_payment',
@@ -80,7 +81,7 @@ class OrderControllerTest extends TestCase
         $owner = User::factory()->create();
         $otherUser = User::factory()->create();
         $order = Order::factory()->create(['user_id' => $owner->id]);
-        $token = auth('api')->login($otherUser);
+        $token = AuthTokenFactory::forUser($otherUser);
 
         $this->withHeaders(['Authorization' => "Bearer {$token}"])
             ->getJson("/api/orders/{$order->id}")
@@ -90,7 +91,7 @@ class OrderControllerTest extends TestCase
     public function test_user_order_list_includes_invoice_snapshot(): void
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $order = Order::factory()->create(['user_id' => $user->id]);
         $snapshot = InvoiceSnapshot::create([
@@ -111,7 +112,7 @@ class OrderControllerTest extends TestCase
     public function test_admin_can_list_all_orders(): void
     {
         $admin = $this->createUserWithRole(UserRole::ADMIN->value);
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         Order::factory()->count(3)->create(['brand' => Brand::B2B]);
 
@@ -125,7 +126,7 @@ class OrderControllerTest extends TestCase
     public function test_regular_user_cannot_list_all_orders(): void
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer {$token}"])
             ->getJson('/api/management/orders');
@@ -136,7 +137,7 @@ class OrderControllerTest extends TestCase
     public function test_photographer_cannot_list_all_orders(): void
     {
         $photographer = $this->createUserWithRole(UserRole::PHOTOGRAPHER->value);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer {$token}"])
             ->getJson('/api/management/orders');
@@ -147,7 +148,7 @@ class OrderControllerTest extends TestCase
     public function test_admin_can_update_order_status(): void
     {
         $admin = $this->createUserWithRole(UserRole::ADMIN->value);
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $order = Order::factory()->create([
             'brand' => Brand::B2B,
@@ -171,7 +172,7 @@ class OrderControllerTest extends TestCase
     public function test_admin_cannot_set_invalid_status(): void
     {
         $admin = $this->createUserWithRole(UserRole::ADMIN->value);
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $order = Order::factory()->create(['status' => 'pending']);
 
@@ -186,7 +187,7 @@ class OrderControllerTest extends TestCase
     public function test_regular_user_cannot_update_order_status(): void
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $order = Order::factory()->create(['status' => 'pending']);
 
@@ -201,7 +202,7 @@ class OrderControllerTest extends TestCase
     public function test_order_index_is_sorted_by_date_descending(): void
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $oldOrder = Order::factory()->create([
             'user_id' => $user->id,
@@ -235,7 +236,7 @@ class OrderControllerTest extends TestCase
     public function test_super_admin_can_generate_manual_invoice(): void
     {
         $superAdmin = $this->createUserWithRole(UserRole::SUPER_ADMIN->value);
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         Setting::updateOrCreate(['key' => 'bank_holder', 'brand' => 'rp'], ['value' => 'Test Holder']);
         Setting::updateOrCreate(['key' => 'bank_iban', 'brand' => 'rp'], ['value' => 'AT123456789']);
@@ -270,7 +271,7 @@ class OrderControllerTest extends TestCase
     public function test_non_super_admin_cannot_generate_manual_invoice(): void
     {
         $admin = $this->createUserWithRole(UserRole::ADMIN->value);
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer {$token}"])
             ->postJson('/api/management/invoices/manual', [

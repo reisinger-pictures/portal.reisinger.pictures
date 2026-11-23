@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class PaymentFindingsRegressionTest extends TestCase
@@ -336,7 +337,7 @@ class PaymentFindingsRegressionTest extends TestCase
 
     private function token(User $user): string
     {
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     private function couponPayload(array $overrides = []): array

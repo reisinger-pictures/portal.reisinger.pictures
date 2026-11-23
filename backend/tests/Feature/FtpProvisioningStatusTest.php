@@ -10,6 +10,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -196,7 +197,7 @@ class FtpProvisioningStatusTest extends TestCase
 
     public function test_a_client_cannot_read_the_provisioning_status(): void
     {
-        $token = auth('api')->login(User::factory()->create());
+        $token = AuthTokenFactory::forUser(User::factory()->create());
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/management/ftp/status');
@@ -206,7 +207,7 @@ class FtpProvisioningStatusTest extends TestCase
 
     private function statusFor(User $user)
     {
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         return $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/management/ftp/status');

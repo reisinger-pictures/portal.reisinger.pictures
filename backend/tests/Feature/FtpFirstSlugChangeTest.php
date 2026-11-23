@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -72,7 +73,7 @@ class FtpFirstSlugChangeTest extends TestCase
     public function test_a_pending_account_is_provisioned_without_deleting_anything(): void
     {
         $photographer = $this->photographer(FtpCredentialService::STATUS_PENDING);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
         $slugBefore = $photographer->ftp_slug;
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -124,7 +125,7 @@ class FtpFirstSlugChangeTest extends TestCase
     public function test_an_account_in_error_retries_deleting_its_known_name(): void
     {
         $photographer = $this->photographer(FtpCredentialService::STATUS_ERROR);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', [
@@ -155,7 +156,7 @@ class FtpFirstSlugChangeTest extends TestCase
         ]);
 
         $photographer = $this->photographer(FtpCredentialService::STATUS_ACTIVE);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
         $slugBefore = $photographer->ftp_slug;
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -187,7 +188,7 @@ class FtpFirstSlugChangeTest extends TestCase
         ]);
 
         $photographer = $this->photographer(FtpCredentialService::STATUS_PENDING);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
         $slugBefore = $photographer->ftp_slug;
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])

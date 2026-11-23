@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
 
@@ -49,7 +50,7 @@ class ContractCloseTest extends TestCase
 
     private function authHeaders(User $user): array
     {
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         return ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
     }

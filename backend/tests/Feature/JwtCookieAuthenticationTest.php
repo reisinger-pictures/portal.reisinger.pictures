@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -40,7 +41,7 @@ class JwtCookieAuthenticationTest extends TestCase
     public function test_the_auth_cookie_identifies_a_request_whose_body_carries_a_token(): void
     {
         $member = $this->userWithRole(UserRole::CLIENT);
-        $jwt = auth('api')->login($member);
+        $jwt = AuthTokenFactory::forUser($member);
         Auth::forgetGuards();
         $csrf = $this->csrf();
 
@@ -67,8 +68,8 @@ class JwtCookieAuthenticationTest extends TestCase
     {
         $cookieUser = $this->userWithRole(UserRole::CLIENT);
         $bearerUser = $this->userWithRole(UserRole::CLIENT);
-        $cookieJwt = auth('api')->login($cookieUser);
-        $bearerJwt = auth('api')->login($bearerUser);
+        $cookieJwt = AuthTokenFactory::forUser($cookieUser);
+        $bearerJwt = AuthTokenFactory::forUser($bearerUser);
         Auth::forgetGuards();
 
         $this->withUnencryptedCookie('rp_jwt', $cookieJwt)

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Auth\SanctumApiGuard;
 use App\Auth\SanctumTransientGuard;
 use App\Auth\TransientUserProvider;
 use App\Contracts\PricingStrategy;
@@ -22,7 +23,6 @@ use App\Support\CheckoutKey;
 use App\Support\UuidDatabaseFailedJobProvider;
 use App\Support\UuidDatabaseQueueConnector;
 use ArrayObject;
-use Illuminate\Auth\RequestGuard;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
@@ -236,13 +236,10 @@ class AppServiceProvider extends ServiceProvider
             return new TransientUserProvider($app['hash'], $config['model']);
         });
 
-        // Portal #9 / D-73: dormant `sanctum_transient` guard driver. It is
-        // registered but NOT active — the `api` guard still uses `jwt` (D-74)
-        // and no route references this driver in Phase 2. Resolving it only
-        // happens when a guard is explicitly configured with this driver; the
-        // legacy path never reaches this closure.
+        // Portal #9 / D-73: custom `sanctum_transient` driver backing the `api`
+        // guard (D-74). `legacy` is a temporary fallback until JWT is removed.
         Auth::extend('sanctum_transient', function ($app, string $name, array $config) {
-            $guard = new RequestGuard(
+            $guard = new SanctumApiGuard(
                 $app->make(SanctumTransientGuard::class),
                 $app['request'],
                 $app->make('auth')->createUserProvider($config['provider'] ?? null),

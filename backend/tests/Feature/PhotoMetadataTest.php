@@ -9,6 +9,7 @@ use App\Models\PhotoMetadataVersion;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class PhotoMetadataTest extends TestCase
@@ -32,7 +33,7 @@ class PhotoMetadataTest extends TestCase
             'description' => 'Original Description',
         ]);
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/photos/{$photo->id}/meta", [
@@ -71,7 +72,7 @@ class PhotoMetadataTest extends TestCase
 
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/photos/{$photo->id}/meta", [
@@ -101,7 +102,7 @@ class PhotoMetadataTest extends TestCase
             'title' => 'Old Title',
         ]);
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/photos/{$photo->id}/meta", [
@@ -137,7 +138,7 @@ class PhotoMetadataTest extends TestCase
             'description' => 'Original Description',
         ]);
 
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/photos/{$photo->id}/meta", [
@@ -175,7 +176,7 @@ class PhotoMetadataTest extends TestCase
 
         $photo1 = Photo::factory()->create(['gallery_id' => $gallery1->id]);
 
-        $token2 = auth('api')->login($photog2);
+        $token2 = AuthTokenFactory::forUser($photog2);
 
         // Update Meta
         $this->withHeaders(['Authorization' => "Bearer $token2"])
@@ -196,7 +197,7 @@ class PhotoMetadataTest extends TestCase
         $photog->galleries()->attach($gallery);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id, 'user_id' => $photog->id]);
 
-        $token = auth('api')->login($photog);
+        $token = AuthTokenFactory::forUser($photog);
 
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/photos/{$photo->id}/meta", [
@@ -228,7 +229,7 @@ class PhotoMetadataTest extends TestCase
         $longKeywords = str_repeat('long_keyword_string, ', 50); // > 1000 Zeichen
         $this->assertGreaterThan(255, strlen($longKeywords));
 
-        $token = auth('api')->login($photog);
+        $token = AuthTokenFactory::forUser($photog);
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/photos/{$photo->id}/meta", [
                 'keywords' => $longKeywords,
@@ -294,7 +295,7 @@ class PhotoMetadataTest extends TestCase
             'captured_at' => '2025-01-01 12:00:00',
         ]);
 
-        $token = auth('api')->login($photog);
+        $token = AuthTokenFactory::forUser($photog);
 
         // 1. Context API prüft, ob Datum ausgeliefert wird
         $resContext = $this->withHeaders(['Authorization' => "Bearer $token"])

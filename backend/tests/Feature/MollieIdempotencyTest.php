@@ -14,6 +14,7 @@ use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mollie\Api\Fake\MockMollieClient;
 use Mollie\Api\Http\Requests\CreatePaymentRequest;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
@@ -57,7 +58,7 @@ class MollieIdempotencyTest extends TestCase
     public function test_checkout_sends_the_attempt_idempotency_key_to_mollie(): void
     {
         [$user, $photo] = $this->createCheckoutItem();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$token,
@@ -81,7 +82,7 @@ class MollieIdempotencyTest extends TestCase
     public function test_two_checkout_sessions_use_distinct_mollie_idempotency_keys(): void
     {
         [$user, $photo] = $this->createCheckoutItem();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $first = $this->withHeaders([
             'Authorization' => 'Bearer '.$token,
@@ -118,7 +119,7 @@ class MollieIdempotencyTest extends TestCase
     public function test_retrying_the_same_session_resumes_without_a_second_create(): void
     {
         [$user, $photo] = $this->createCheckoutItem();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         $payload = $this->checkoutPayload($photo);
         $headers = [
             'Authorization' => 'Bearer '.$token,

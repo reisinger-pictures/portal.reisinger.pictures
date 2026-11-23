@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\OfferTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class QuoteLinkTest extends TestCase
@@ -25,7 +26,7 @@ class QuoteLinkTest extends TestCase
         $photographer = User::factory()->create(['brand' => 'rp']);
         $photographer->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
         $photographer->photographerGalleries()->attach($gallery);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/orders/quote-link', [
@@ -45,7 +46,7 @@ class QuoteLinkTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $admin = User::factory()->create(['brand' => 'rp']);
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/orders/quote-link', [
@@ -62,7 +63,7 @@ class QuoteLinkTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $client = User::factory()->create();
         $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/orders/quote-link', [
@@ -83,7 +84,7 @@ class QuoteLinkTest extends TestCase
         $photographer = User::factory()->create(['brand' => 'rp']);
         $photographer->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
         $photographer->photographerGalleries()->attach($gallery);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $generate = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/orders/quote-link', [

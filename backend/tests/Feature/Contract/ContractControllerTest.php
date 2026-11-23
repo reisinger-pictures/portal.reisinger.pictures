@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class ContractControllerTest extends TestCase
@@ -43,7 +44,7 @@ class ContractControllerTest extends TestCase
 
     private function authHeaders(User $user): array
     {
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         return ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
     }

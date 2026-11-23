@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Mollie\Api\Fake\MockResponse;
 use Mollie\Api\Http\Requests\GetPaymentRequest;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
@@ -197,7 +198,7 @@ class MolliePaymentStatusTest extends TestCase
 
     private function actingAsUser(User $user): static
     {
-        return $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)]);
+        return $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)]);
     }
 
     /**

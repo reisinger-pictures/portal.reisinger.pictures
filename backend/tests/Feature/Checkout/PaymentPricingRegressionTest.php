@@ -23,6 +23,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -136,7 +137,7 @@ class PaymentPricingRegressionTest extends TestCase
             file_get_contents($fixture),
         );
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         $zipResponse = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->get('/api/orders/'.$order->id.'/download-zip');
         $zipResponse->assertOk();

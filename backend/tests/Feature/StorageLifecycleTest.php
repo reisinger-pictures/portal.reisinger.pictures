@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class StorageLifecycleTest extends TestCase
@@ -41,7 +42,7 @@ class StorageLifecycleTest extends TestCase
 
         // Wir loggen uns ein, um die ImageMagick-Wasserzeichengenerierung zu umgehen,
         // welche an der Dummy-Textdatei des Tests scheitern und 404 auslösen würde.
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         // First Request
         $this->withHeaders(['Authorization' => "Bearer $token"])

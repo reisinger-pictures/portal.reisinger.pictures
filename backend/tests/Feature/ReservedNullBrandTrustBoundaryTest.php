@@ -17,8 +17,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\Factory;
-use PHPOpenSourceSaver\JWTAuth\JWTAuth;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -38,7 +37,7 @@ class ReservedNullBrandTrustBoundaryTest extends TestCase
         $target->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.Auth::guard('api')->login($actor),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($actor),
         ])->putJson("/api/management/users/{$target->id}", [
             'role_ids' => [$superAdminRole->id],
         ]);
@@ -95,7 +94,7 @@ class ReservedNullBrandTrustBoundaryTest extends TestCase
     {
         $user = User::factory()->create(['brand' => null]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
-        $token = Auth::guard('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $csrf = $this->csrfCredentials();
 
@@ -113,11 +112,17 @@ class ReservedNullBrandTrustBoundaryTest extends TestCase
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
         $gallery = Gallery::factory()->create(['brand' => Brand::B2B]);
 
-        $token = Auth::guard('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
+        // JWT's login() caches the user on the guard, so legacy reaches the
+        // management middleware (403). The Sanctum guard resolves from the
+        // presented token and rejects the reserved null-brand actor at
+        // guard level (401). Both are a denial; the security boundary and
+        // the controller-level checks below are identical in both modes.
+        $managementStatus = config('auth.migration.driver') === 'sanctum' ? 401 : 403;
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->getJson('/api/management/users')
-            ->assertForbidden();
+            ->assertStatus($managementStatus);
 
         $org = Org::factory()->create();
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
@@ -125,7 +130,7 @@ class ReservedNullBrandTrustBoundaryTest extends TestCase
                 'name' => 'Should Not Be Managed',
                 'invoice_frequency' => 'immediate',
             ])
-            ->assertForbidden();
+            ->assertStatus($managementStatus);
 
         $orgInvite = OrgInvite::create([
             'org_id' => $org->id,
@@ -138,7 +143,10 @@ class ReservedNullBrandTrustBoundaryTest extends TestCase
                 'token' => $orgInvite->token,
                 'accept_privacy' => true,
             ])
-            ->assertForbidden();
+            // Sanctum cannot authenticate the reserved actor, so this request
+            // reaches the anonymous redeem validation (422) instead of the
+            // controller's authenticated 403. Still a denial in both modes.
+            ->assertStatus(config('auth.migration.driver') === 'sanctum' ? 422 : 403);
 
         $authorization = app(AuthorizationService::class);
         $this->assertTrue($authorization->isReservedNullBrandActor($user));
@@ -147,7 +155,7 @@ class ReservedNullBrandTrustBoundaryTest extends TestCase
         $this->assertFalse($authorization->canManageGallery($user, $gallery->id));
         $this->assertSame(0, app(StatsCalculationService::class)->getStatsForUser($user)['galleries_count']);
 
-        $providerToken = Auth::guard('api')->login($user);
+        $providerToken = AuthTokenFactory::forUser($user);
         Auth::forgetGuards();
         $this->withHeaders(['Authorization' => 'Bearer '.$providerToken])
             ->getJson('/api/auth/me')
@@ -198,15 +206,12 @@ class ReservedNullBrandTrustBoundaryTest extends TestCase
     {
         $gallery = Gallery::factory()->create(['brand' => Brand::B2B]);
         $guestId = (string) Str::uuid();
-        $factory = app(Factory::class);
-        $token = app(JWTAuth::class)
-            ->encode($factory->customClaims([
-                'sub' => 'guest_'.$guestId,
-                'guest_id' => $guestId,
-                'guest_name' => 'Forged Guest',
-                'transient_galleries' => [$gallery->id],
-            ])->make())
-            ->get();
+        $token = AuthTokenFactory::claims([
+            'sub' => 'guest_'.$guestId,
+            'guest_id' => $guestId,
+            'guest_name' => 'Forged Guest',
+            'transient_galleries' => [$gallery->id],
+        ])->asGuest();
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->getJson('/api/auth/me')
@@ -224,12 +229,12 @@ class ReservedNullBrandTrustBoundaryTest extends TestCase
             'token' => 'scalar-provenance-invite',
         ]);
         $guestId = (string) Str::uuid();
-        $token = app(JWTAuth::class)->encode(app(Factory::class)->customClaims([
+        $token = AuthTokenFactory::claims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Scalar Provenance Guest',
             'guest_invite_id' => $invite->id,
-        ])->make())->get();
+        ])->asGuest();
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->getJson('/api/galleries/'.$gallery->slug)
@@ -248,14 +253,14 @@ class ReservedNullBrandTrustBoundaryTest extends TestCase
             'can_edit_metadata' => false,
         ]);
         $guestId = (string) Str::uuid();
-        $token = app(JWTAuth::class)->encode(app(Factory::class)->customClaims([
+        $token = AuthTokenFactory::claims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Read-only Guest',
             'guest_invite_id' => $invite->id,
             'transient_galleries' => [$gallery->id],
             'transient_meta_galleries' => [$gallery->id],
-        ])->make())->get();
+        ])->asGuest();
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->getJson('/api/auth/me')
@@ -288,7 +293,7 @@ class ReservedNullBrandTrustBoundaryTest extends TestCase
         $org = Org::factory()->create();
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.Auth::guard('api')->login($actor),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($actor),
         ])->putJson("/api/management/orgs/{$org->id}/users", [
             'user_ids' => [$legacyUser->id],
         ]);

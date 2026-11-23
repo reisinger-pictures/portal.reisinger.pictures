@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -22,7 +23,7 @@ class BrandSettingsFromNameTest extends TestCase
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     public function test_from_name_accepts_sender_display_name(): void

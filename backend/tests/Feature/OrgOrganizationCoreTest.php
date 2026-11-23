@@ -8,6 +8,7 @@ use App\Models\OrgInvite;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class OrgOrganizationCoreTest extends TestCase
@@ -20,7 +21,7 @@ class OrgOrganizationCoreTest extends TestCase
         $user = User::factory()->create(['org_id' => $org->id]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ORG_ADMIN->value]));
 
-        return ['token' => auth('api')->login($user), 'org' => $org, 'user' => $user];
+        return ['token' => AuthTokenFactory::forUser($user), 'org' => $org, 'user' => $user];
     }
 
     private function adminToken(): string
@@ -28,7 +29,7 @@ class OrgOrganizationCoreTest extends TestCase
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     private function orgAdminWithoutOrgToken(): string
@@ -36,7 +37,7 @@ class OrgOrganizationCoreTest extends TestCase
         $user = User::factory()->create(['org_id' => null]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ORG_ADMIN->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     // ──────────────────────────────────────────────
@@ -216,7 +217,7 @@ class OrgOrganizationCoreTest extends TestCase
 
         // Create a user who is already logged in (no org_id yet)
         $user = User::factory()->create(['org_id' => null]);
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/org-invites/redeem', [

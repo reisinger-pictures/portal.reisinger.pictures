@@ -6,6 +6,7 @@ use App\Http\Middleware\BrandContextMiddleware;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mollie\Api\Fake\MockMollieClient;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
@@ -38,7 +39,7 @@ class PaymentMethodsEndpointTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->getJson('/api/payment-methods')
             ->assertOk()
             ->assertExactJson(['methods' => ['paybybank', 'eps', 'creditcard']]);
@@ -51,7 +52,7 @@ class PaymentMethodsEndpointTest extends TestCase
         $this->configureMollie(['paybybank', 'klarna']);
         $user = User::factory()->create();
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->getJson('/api/payment-methods')
             ->assertOk()
             ->assertExactJson(['methods' => []]);

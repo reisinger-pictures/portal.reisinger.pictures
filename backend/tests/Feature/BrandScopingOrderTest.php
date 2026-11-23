@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -27,7 +28,7 @@ class BrandScopingOrderTest extends TestCase
         $role = $brand === null ? UserRole::SUPER_ADMIN : UserRole::ADMIN;
         $user->roles()->attach(Role::firstOrCreate(['name' => $role->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     private function bearer(string $token): array

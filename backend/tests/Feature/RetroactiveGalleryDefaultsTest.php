@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class RetroactiveGalleryDefaultsTest extends TestCase
@@ -43,7 +44,7 @@ class RetroactiveGalleryDefaultsTest extends TestCase
         $fixturePath = base_path('tests/Fixtures/sample.jpg');
         Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, file_get_contents($fixturePath));
 
-        $token = auth('api')->login($photog);
+        $token = AuthTokenFactory::forUser($photog);
 
         // 1. Löst die retroaktive Übernahme aus
         $this->withHeaders(['Authorization' => "Bearer $token"])

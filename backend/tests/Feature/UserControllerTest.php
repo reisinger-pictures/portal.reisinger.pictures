@@ -7,6 +7,7 @@ use App\Models\Gallery;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
 
@@ -18,7 +19,7 @@ class UserControllerTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/users', ['name' => 'Test User', 'email' => 'test@test.com']);
@@ -33,7 +34,7 @@ class UserControllerTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $clientRole = Role::firstOrCreate(['name' => UserRole::CLIENT->value]);
         $photogRole = Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]);
@@ -55,7 +56,7 @@ class UserControllerTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $clientRole = Role::firstOrCreate(['name' => UserRole::CLIENT->value]);
         $client = User::factory()->create(['flatrate_level' => 'none', 'brand' => 'rp']);
@@ -80,7 +81,7 @@ class UserControllerTest extends TestCase
     {
         $photog = User::factory()->create();
         $photog->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
-        $token = auth('api')->login($photog);
+        $token = AuthTokenFactory::forUser($photog);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/users', ['name' => 'Test User', 'email' => 'test@test.com']);

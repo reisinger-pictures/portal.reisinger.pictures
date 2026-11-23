@@ -9,6 +9,7 @@ use App\Models\GalleryGroup;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -33,7 +34,7 @@ class CouponOwnershipAuthorizationTest extends TestCase
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
-        return [$user, auth('api')->login($user)];
+        return [$user, AuthTokenFactory::forUser($user)];
     }
 
     private function payload(): array

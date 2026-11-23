@@ -20,6 +20,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -160,7 +161,7 @@ class FtpCredentialRevocationTest extends TestCase
             ->andReturn($lock);
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($orgAdmin),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($orgAdmin),
         ])->putJson("/api/management/users/{$photographer->id}", [
             // The org-admin editor submitted the role set it read before the
             // concurrent revocation removed the specialized role.
@@ -497,7 +498,7 @@ class FtpCredentialRevocationTest extends TestCase
         ]);
 
         $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer->fresh()),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer->fresh()),
         ])->postJson('/api/management/ftp/reset-password')->assertStatus(409);
         Http::assertSentCount(1);
 
@@ -683,7 +684,7 @@ class FtpCredentialRevocationTest extends TestCase
 
     private function asAdmin(User $admin)
     {
-        return $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)]);
+        return $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)]);
     }
 
     private function photographer(string $slug, string $status = FtpCredentialService::STATUS_ACTIVE): User

@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Mollie\Api\Fake\MockMollieClient;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
@@ -194,6 +195,6 @@ class OrderStatusPaidTest extends TestCase
         $admin = User::factory()->create(['brand' => Brand::B2B]);
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        return ['Authorization' => 'Bearer '.auth('api')->login($admin)];
+        return ['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)];
     }
 }

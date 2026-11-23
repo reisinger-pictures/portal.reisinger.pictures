@@ -23,6 +23,7 @@ use Illuminate\Support\Testing\Fakes\MailFake;
 use Mockery;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractTransport;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -116,7 +117,7 @@ class QuoteControllerSecurityTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $order = $this->orderForPhoto($photo);
 
-        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+        $token = AuthTokenFactory::forUser($this->userWithRole(UserRole::ADMIN->value));
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
@@ -132,7 +133,7 @@ class QuoteControllerSecurityTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $order = $this->orderForPhoto($photo, ['status' => 'paid']);
 
-        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+        $token = AuthTokenFactory::forUser($this->userWithRole(UserRole::ADMIN->value));
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
@@ -147,7 +148,7 @@ class QuoteControllerSecurityTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $order = $this->orderForPhoto($photo, ['brand' => 'other-brand']);
 
-        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+        $token = AuthTokenFactory::forUser($this->userWithRole(UserRole::ADMIN->value));
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
@@ -165,7 +166,7 @@ class QuoteControllerSecurityTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $order = $this->orderForPhoto($photo);
 
-        $token = auth('api')->login($this->userWithRole(UserRole::PHOTOGRAPHER->value));
+        $token = AuthTokenFactory::forUser($this->userWithRole(UserRole::PHOTOGRAPHER->value));
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
@@ -194,7 +195,7 @@ class QuoteControllerSecurityTest extends TestCase
         $otherPhoto = Photo::factory()->create(['gallery_id' => $otherGallery->id]);
         $order = $this->orderForPhoto($otherPhoto);
 
-        $token = auth('api')->login($actor);
+        $token = AuthTokenFactory::forUser($actor);
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
             ->assertForbidden();
@@ -213,7 +214,7 @@ class QuoteControllerSecurityTest extends TestCase
             'customer_details' => ['items' => [['photoId' => (string) Str::uuid()]]],
         ]);
 
-        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+        $token = AuthTokenFactory::forUser($this->userWithRole(UserRole::ADMIN->value));
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
             ->assertStatus(422);
@@ -231,7 +232,7 @@ class QuoteControllerSecurityTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $order = $this->orderForPhoto($photo);
 
-        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+        $token = AuthTokenFactory::forUser($this->userWithRole(UserRole::ADMIN->value));
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
             ->assertStatus(422);
@@ -258,7 +259,7 @@ class QuoteControllerSecurityTest extends TestCase
                 });
         });
 
-        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+        $token = AuthTokenFactory::forUser($this->userWithRole(UserRole::ADMIN->value));
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
             ->assertStatus(409);
@@ -273,7 +274,7 @@ class QuoteControllerSecurityTest extends TestCase
         $gallery = Gallery::factory()->create(['is_public' => true]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $order = $this->orderForPhoto($photo);
-        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+        $token = AuthTokenFactory::forUser($this->userWithRole(UserRole::ADMIN->value));
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload())
@@ -291,7 +292,7 @@ class QuoteControllerSecurityTest extends TestCase
         $gallery = Gallery::factory()->create(['is_public' => true]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $order = $this->orderForPhoto($photo);
-        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+        $token = AuthTokenFactory::forUser($this->userWithRole(UserRole::ADMIN->value));
 
         $this->useFailingQuoteTransport();
         try {
@@ -317,7 +318,7 @@ class QuoteControllerSecurityTest extends TestCase
         $gallery = Gallery::factory()->create(['is_public' => true]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $order = $this->orderForPhoto($photo);
-        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+        $token = AuthTokenFactory::forUser($this->userWithRole(UserRole::ADMIN->value));
 
         // Fail after the conditional claim, at the queue boundary.
         $pendingMail = Mockery::mock(PendingMail::class);
@@ -360,7 +361,7 @@ class QuoteControllerSecurityTest extends TestCase
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $order = $this->orderForPhoto($photo);
 
-        $token = auth('api')->login($this->userWithRole(UserRole::ADMIN->value));
+        $token = AuthTokenFactory::forUser($this->userWithRole(UserRole::ADMIN->value));
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orders/{$order->id}/send-quote", $this->payload(['custom_price' => 0]))

@@ -9,6 +9,7 @@ use App\Services\FtpCredentialService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -91,7 +92,7 @@ class ProfileFtpProvisioningTest extends TestCase
 
     private function as(User $user)
     {
-        return $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)]);
+        return $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)]);
     }
 
     public function test_a_client_cannot_change_the_ftp_slug(): void

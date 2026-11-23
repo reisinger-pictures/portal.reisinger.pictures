@@ -12,6 +12,7 @@ use App\Services\AuthorizationService;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -81,7 +82,7 @@ class OrgAdminDelegationBoundaryTest extends TestCase
 
     private function as(User $user)
     {
-        return $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)]);
+        return $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)]);
     }
 
     private function readerIds(User $user): array

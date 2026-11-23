@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -102,7 +103,7 @@ class UnauthenticatedApiRequestTest extends TestCase
 
         $response = $this->call('GET', '/api/settings/license-terms', [], [], [], [
             'HTTP_ACCEPT' => '*/*',
-            'HTTP_AUTHORIZATION' => 'Bearer '.auth('api')->login($user),
+            'HTTP_AUTHORIZATION' => 'Bearer '.AuthTokenFactory::forUser($user),
         ]);
 
         $this->assertFalse(app('request')->expectsJson());

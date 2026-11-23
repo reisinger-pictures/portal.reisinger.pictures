@@ -11,8 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
-use PHPOpenSourceSaver\JWTAuth\Factory;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -288,7 +287,7 @@ class RegisteredClientTransientMediaDeliveryTest extends TestCase
         GalleryInvite $invite,
         array $additionalGalleries = [],
     ): string {
-        return JWTAuth::claims([
+        return AuthTokenFactory::claims([
             'transient_galleries' => array_merge([(string) $gallery->id], $additionalGalleries),
             'transient_meta_galleries' => [],
             'transient_invites' => [
@@ -303,21 +302,20 @@ class RegisteredClientTransientMediaDeliveryTest extends TestCase
 
     private function tokenWithoutClaims(User $client): string
     {
-        return JWTAuth::claims([])->fromUser($client);
+        return AuthTokenFactory::claims([])->fromUser($client);
     }
 
     private function guestToken(Gallery $gallery, GalleryInvite $invite): string
     {
         $guestId = (string) Str::uuid();
-        $payload = app(Factory::class)->customClaims([
+
+        return AuthTokenFactory::claims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Gast',
             'guest_invite_id' => (string) $invite->id,
             'transient_galleries' => [(string) $gallery->id],
             'transient_meta_galleries' => [],
-        ])->make();
-
-        return app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
+        ])->asGuest();
     }
 }

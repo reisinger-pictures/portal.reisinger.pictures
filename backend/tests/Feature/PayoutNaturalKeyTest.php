@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 use Throwable;
 
@@ -321,7 +322,7 @@ class PayoutNaturalKeyTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $photographer = User::factory()->create();
         $gallery = Gallery::factory()->create();

@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class LightroomCatalogTest extends TestCase
@@ -42,7 +43,7 @@ class LightroomCatalogTest extends TestCase
 
     private function authHeaders(User $user): array
     {
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         return ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
     }

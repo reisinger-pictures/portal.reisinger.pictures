@@ -17,6 +17,7 @@ use Mollie\Api\Http\Data\Money;
 use Mollie\Api\Http\Requests\CancelPaymentRequest;
 use Mollie\Api\Http\Requests\GetPaymentRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
@@ -355,6 +356,6 @@ class OrderStatusMollieTest extends TestCase
         $admin = User::factory()->create(['brand' => Brand::B2B]);
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        return ['Authorization' => 'Bearer '.auth('api')->login($admin)];
+        return ['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)];
     }
 }

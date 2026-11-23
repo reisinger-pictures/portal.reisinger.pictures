@@ -17,6 +17,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -273,7 +274,7 @@ class FtpPasswordChangeEndpointTest extends TestCase
     {
         $this->fakeSuccessfulService();
         $user = $this->photographer();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         for ($attempt = 1; $attempt <= FtpCredentialService::RESET_LIMIT_PER_HOUR; $attempt++) {
             $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -306,7 +307,7 @@ class FtpPasswordChangeEndpointTest extends TestCase
     {
         $this->fakeSuccessfulService();
         $user = $this->photographer();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         for ($attempt = 0; $attempt < FtpCredentialService::RESET_LIMIT_PER_HOUR; $attempt++) {
             $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -348,7 +349,7 @@ class FtpPasswordChangeEndpointTest extends TestCase
         $this->fakeSuccessfulService();
         $client = User::factory()->create();
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($client)])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($client)])
             ->postJson('/api/management/ftp/change-password', [
                 'current_password' => self::CURRENT_PASSWORD,
             ]);
@@ -368,7 +369,7 @@ class FtpPasswordChangeEndpointTest extends TestCase
         $this->fakeSuccessfulService();
         $user = $this->photographer();
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->postJson('/api/management/ftp/change-password');
 
         $response->assertStatus(422);
@@ -429,7 +430,7 @@ class FtpPasswordChangeEndpointTest extends TestCase
         $caller = $this->photographer(['ftp_slug' => 'florian', 'email' => 'florian@example.com']);
         $victim = $this->photographer(['ftp_slug' => 'sabine', 'email' => 'sabine@example.com']);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($caller)])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($caller)])
             ->postJson('/api/management/ftp/change-password', [
                 'current_password' => self::CURRENT_PASSWORD,
                 'user_id' => $victim->id,
@@ -544,7 +545,7 @@ class FtpPasswordChangeEndpointTest extends TestCase
 
     private function changeFor(User $user, string $currentPassword = self::CURRENT_PASSWORD)
     {
-        return $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        return $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->postJson('/api/management/ftp/change-password', [
                 'current_password' => $currentPassword,
             ]);

@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
@@ -101,7 +102,7 @@ class OrderStatusCancellationTest extends TestCase
         // Degraded config: a read path must not need a provider key at all.
         $this->disablesMollie();
 
-        $this->getJson('/api/orders', ['Authorization' => 'Bearer '.auth('api')->login($admin)])
+        $this->getJson('/api/orders', ['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
             ->assertOk()
             ->assertJsonFragment(['id' => $order->id]);
     }
@@ -111,6 +112,6 @@ class OrderStatusCancellationTest extends TestCase
         $admin = User::factory()->create(['brand' => Brand::B2B]);
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        return ['Authorization' => 'Bearer '.auth('api')->login($admin)];
+        return ['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)];
     }
 }

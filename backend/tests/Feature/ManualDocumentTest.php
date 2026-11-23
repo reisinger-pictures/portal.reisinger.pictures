@@ -10,6 +10,7 @@ use App\Services\OfferTokenService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\UsesIsolatedTempDirectory;
 use Tests\TestCase;
 
@@ -39,7 +40,7 @@ class ManualDocumentTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         $payload = [
             'invoice_number' => 'R-2026-999',
@@ -65,7 +66,7 @@ class ManualDocumentTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/invoices/manual', [
@@ -89,7 +90,7 @@ class ManualDocumentTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/invoices/manual', [
@@ -114,7 +115,7 @@ class ManualDocumentTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/invoices/manual', [
@@ -155,7 +156,7 @@ class ManualDocumentTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/invoices/manual', [
@@ -179,7 +180,7 @@ class ManualDocumentTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/invoices/manual', [
@@ -195,7 +196,7 @@ class ManualDocumentTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         $payload = [
             'invoice_number' => 'A-2026-999',
@@ -267,7 +268,7 @@ class ManualDocumentTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         $expiredJwt = app(OfferTokenService::class)
             ->issue(['customer_name' => 'Expired'], now()->subDay());
@@ -300,7 +301,7 @@ class ManualDocumentTest extends TestCase
         // Clean break: an old %SMART_DOC% PDF must report no embedded offer.
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         $pdfContent = $this->makeFakePdf('%SMART_DOC:legacy.legacy%');
 

@@ -6,6 +6,7 @@ use App\Enums\Brand;
 use App\Models\Gallery;
 use App\Models\GalleryInvite;
 use App\Models\User;
+use App\Services\Auth\AuthTokenService;
 use App\Services\ModelContactSheetLinkService;
 use App\Services\OfferTokenService;
 use Carbon\Carbon;
@@ -13,7 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\JWTAuth;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -51,6 +52,10 @@ class LegacyAuthContractTest extends TestCase
      */
     public function test_login_issues_two_httponly_cookies_with_documented_windows(): void
     {
+        if (app(AuthTokenService::class)->isSanctum()) {
+            $this->markTestSkipped('Phase-0 characterization of the JWT wire format; legacy mode only (D-76/D-77).');
+        }
+
         Config::set('jwt.ttl', 240);
         Config::set('jwt.refresh_ttl', 10080); // 7 * 24 * 60 minutes
         // The factory holds its TTL from service-provider boot; force the value
@@ -100,7 +105,7 @@ class LegacyAuthContractTest extends TestCase
     public function test_refresh_uses_the_refresh_cookie_and_blacklists_the_previous_token(): void
     {
         $user = User::factory()->create(['brand' => Brand::B2B]);
-        $token = Auth::guard('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $first = $this->withValidCsrf()
             ->withUnencryptedCookie('rp_jwt_refresh', $token)
@@ -110,7 +115,7 @@ class LegacyAuthContractTest extends TestCase
         $first->assertOk()->assertCookie('rp_jwt')->assertCookie('rp_jwt_refresh');
         $rotated = (string) $first->getCookie('rp_jwt_refresh', false)->getValue();
         $this->assertNotSame($token, $rotated);
-        $this->assertTrue(app(JWTAuth::class)->setToken($rotated)->check());
+        $this->assertTrue(AuthTokenFactory::check($rotated));
 
         // Replaying the consumed refresh credential is rejected (blacklist).
         $replay = $this->withValidCsrf()
@@ -141,6 +146,10 @@ class LegacyAuthContractTest extends TestCase
      */
     public function test_anonymous_invite_redeem_yields_a_dbless_guest_actor(): void
     {
+        if (app(AuthTokenService::class)->isSanctum()) {
+            $this->markTestSkipped('Phase-0 characterization pins the JWT payload of the guest cookie; legacy mode only (D-73/D-77).');
+        }
+
         $gallery = Gallery::factory()->create(['type' => 'selection', 'is_public' => false]);
         GalleryInvite::create(['gallery_id' => $gallery->id, 'token' => 'guest-contract-1']);
         GalleryInvite::create(['gallery_id' => $gallery->id, 'token' => 'guest-contract-2']);
@@ -268,7 +277,7 @@ class LegacyAuthContractTest extends TestCase
     public function test_cookie_authenticated_mutation_without_csrf_token_is_403(): void
     {
         $user = User::factory()->create(['brand' => Brand::B2B]);
-        $jwt = Auth::guard('api')->login($user);
+        $jwt = AuthTokenFactory::forUser($user);
         Auth::forgetGuards();
 
         $this->withUnencryptedCookie('rp_jwt_refresh', $jwt)

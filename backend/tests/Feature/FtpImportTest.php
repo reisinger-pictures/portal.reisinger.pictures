@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
 use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class FtpImportTest extends TestCase
@@ -43,7 +44,7 @@ class FtpImportTest extends TestCase
     {
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])->getJson('/api/management/ftp/status');
         $response->assertStatus(200)->assertJsonStructure(['ftp_folder', 'file_count']);
@@ -52,7 +53,7 @@ class FtpImportTest extends TestCase
     public function test_client_cannot_access_ftp()
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])->getJson('/api/management/ftp/status');
         $response->assertStatus(403);
@@ -65,7 +66,7 @@ class FtpImportTest extends TestCase
 
         $otherGallery = Gallery::factory()->create(['brand' => 'test-brand']);
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/ftp/target', ['gallery_id' => $otherGallery->id]);
 
@@ -80,7 +81,7 @@ class FtpImportTest extends TestCase
         $gallery = Gallery::factory()->create(['brand' => Brand::B2B]);
         $user->galleries()->attach($gallery->id);
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/ftp/target', ['gallery_id' => $gallery->id]);
 
@@ -95,7 +96,7 @@ class FtpImportTest extends TestCase
         $otherGallery = Gallery::factory()->create(['brand' => 'test-brand']);
         $user->update(['current_ftp_gallery_id' => $otherGallery->id]);
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/ftp/process');
 
@@ -107,7 +108,7 @@ class FtpImportTest extends TestCase
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/ftp/target', ['gallery_id' => 'non-existent']);
 
@@ -549,7 +550,7 @@ class FtpImportTest extends TestCase
             new UnreadableInboxFtpController(app(PhotoProcessingService::class)),
         );
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->getJson('/api/management/ftp/status')
             ->assertStatus(500)
             ->assertJson(['error' => 'Der FTP-Posteingang konnte nicht gelesen werden.']);
@@ -619,7 +620,7 @@ class FtpImportTest extends TestCase
     private function processAs(User $user)
     {
         return $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($user),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($user),
         ])->postJson('/api/management/ftp/process');
     }
 

@@ -67,18 +67,25 @@ final class SanctumTransientGuard
             return null;
         }
 
+        $tokenableId = $accessToken->getAttribute('tokenable_id');
+        $isGuestMorph = is_string($tokenableId)
+            && str_starts_with($tokenableId, 'guest_')
+            && trim(substr($tokenableId, 6)) !== '';
+
         $guestId = $claims->guestId;
-        if ($guestId !== null && $guestId !== '') {
+        // A guest claim alone is not enough: only the synthetic `guest_<uuid>`
+        // morph may resolve to a DB-less actor. A persisted-user token that
+        // ever carried a guest_id must keep its real account identity instead
+        // of being silently replaced by a null-user guest (defence in depth).
+        // Such a token falls through to the registered branch below, where the
+        // transient claims are still revalidated.
+        if ($guestId !== null && $guestId !== '' && $isGuestMorph) {
             return $this->hydrateGuest($guestId, $claims);
         }
 
-        // Guest tokens are stored with tokenable_id `guest_<uuid>` and the morph
-        // resolves to null. Never query the uuid column for that synthetic id
-        // (it would be an invalid uuid), and never accept a guest-shaped token
-        // whose claims lost their guest identity. Mirror TransientUserProvider's
-        // Str::isUuid() guard so a malformed/foreign PAT row cannot turn a
-        // request into SQLSTATE 22P02.
-        $tokenableId = $accessToken->getAttribute('tokenable_id');
+        // A missing guest claim on a guest morph is never a credential. For a
+        // registered morph the UUID guard prevents a malformed/foreign PAT row
+        // from turning the lookup into SQLSTATE 22P02.
         if (! is_string($tokenableId) || ! Str::isUuid($tokenableId)) {
             return null;
         }

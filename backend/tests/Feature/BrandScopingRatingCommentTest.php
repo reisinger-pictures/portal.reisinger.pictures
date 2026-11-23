@@ -7,7 +7,7 @@ use App\Models\GalleryInvite;
 use App\Models\Photo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -30,7 +30,7 @@ class BrandScopingRatingCommentTest extends TestCase
             'token' => 'brand-scoping-rating-comment-'.uniqid(),
         ]);
 
-        return JWTAuth::claims([
+        return AuthTokenFactory::claims([
             'transient_galleries' => [$gallery->id],
             'transient_invites' => [
                 (string) $invite->id => [

@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class SettingsControllerTest extends TestCase
@@ -30,7 +31,7 @@ class SettingsControllerTest extends TestCase
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     private function superAdminToken(): string
@@ -38,7 +39,7 @@ class SettingsControllerTest extends TestCase
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     private function clientToken(): string
@@ -46,7 +47,7 @@ class SettingsControllerTest extends TestCase
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     /**

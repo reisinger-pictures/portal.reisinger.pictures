@@ -14,6 +14,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -56,6 +57,13 @@ class OrgScopeQueryBaselineTest extends TestCase
     private const ME_STATEMENTS = 22;
 
     /**
+     * A Sanctum credential additionally reads the personal access token and
+     * resolves its tokenable user on every request (+2) and decodes the
+     * structured abilities (+1 revalidation read) compared with JWT.
+     */
+    private const ME_STATEMENTS_SANCTUM = 25;
+
+    /**
      * The measured number of `getOrgGroupScope()` reads inside
      * `GET /api/auth/me`.
      */
@@ -81,11 +89,19 @@ class OrgScopeQueryBaselineTest extends TestCase
      */
     private const ORG_DETAIL_STATEMENTS = 26;
 
+    /** Sanctum token lookup + tokenable resolution + ability revalidation. */
+    private const ORG_DETAIL_STATEMENTS_SANCTUM = 29;
+
     /**
      * The measured number of `getOrgGroupScope()` reads inside
      * `GET /api/management/orgs/{id}`.
      */
     private const ORG_DETAIL_SCOPE_READS = 1;
+
+    private static function expected(int $legacy, int $sanctum): int
+    {
+        return config('auth.migration.driver') === 'sanctum' ? $sanctum : $legacy;
+    }
 
     /**
      * `GET /api/auth/me` — the endpoint that answers "who am I and what may
@@ -97,13 +113,13 @@ class OrgScopeQueryBaselineTest extends TestCase
         [$org, $user] = $this->fixture();
 
         $statements = $this->collectStatements(function () use ($user): void {
-            $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+            $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
                 ->getJson('/api/auth/me')
                 ->assertOk();
         });
 
         $this->assertSame(
-            self::ME_STATEMENTS,
+            self::expected(self::ME_STATEMENTS, self::ME_STATEMENTS_SANCTUM),
             count($statements),
             'The measured baseline of GET /api/auth/me changed. A deliberate change of the query count must be '
             .'updated here in the same change — this pin is a baseline, not a target.'
@@ -128,13 +144,13 @@ class OrgScopeQueryBaselineTest extends TestCase
         [$org, $user] = $this->fixture();
 
         $statements = $this->collectStatements(function () use ($org, $user): void {
-            $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+            $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
                 ->getJson('/api/management/orgs/'.$org->id)
                 ->assertOk();
         });
 
         $this->assertSame(
-            self::ORG_DETAIL_STATEMENTS,
+            self::expected(self::ORG_DETAIL_STATEMENTS, self::ORG_DETAIL_STATEMENTS_SANCTUM),
             count($statements),
             'The measured baseline of GET /api/management/orgs/{id} changed. A deliberate change of the query '
             .'count must be updated here in the same change — this pin is a baseline, not a target.'

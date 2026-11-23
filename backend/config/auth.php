@@ -4,26 +4,25 @@ use App\Models\User;
 
 return [
     'defaults' => [
-        // Standardmäßig nutzen wir sofort die API (JWT), nicht das Session-basierte 'web'
+        // Standardmäßig nutzen wir sofort die API (Sanctum), nicht das Session-basierte 'web'
         'guard' => env('AUTH_GUARD', 'api'),
         'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | JWT -> Sanctum migration driver (Portal #9, Phase 2)
+    | JWT -> Sanctum migration driver (Portal #9, Phase 3)
     |--------------------------------------------------------------------------
     |
-    | Dormant feature flag. The default and every existing environment stay on
-    | 'legacy': the JWT path below is used unchanged, the `api` guard keeps its
-    | `jwt` driver and no controller/middleware/route behaviour changes.
-    | Only 'sanctum' makes the token infrastructure reachable: the `api` guard
-    | driver and the controllers' credential issuance switch together. The guard NAME
-    | `api` never changes (D-74).
+    | The `api` guard is now backed by Sanctum (D-73/D-74). The guard NAME
+    | `api` never changes. 'legacy' remains as a fallback for the final
+    | characterisation run while the JWT package is still installed; it is
+    | removed together with that package in Phase 4 (D-77). The access and
+    | refresh windows are unchanged by the swap (D-76).
     |
     */
     'migration' => [
-        'driver' => env('AUTH_DRIVER', 'legacy'),
+        'driver' => env('AUTH_DRIVER', 'sanctum'),
         // D-76: the 240-minute access / 7-day refresh windows are unchanged by
         // the driver swap. JWT_TTL in the checked-in env files stays as-is for
         // legacy mode; these keys drive the Sanctum token lifetimes.
@@ -37,10 +36,10 @@ return [
             'provider' => 'users',
         ],
         'api' => [
-            // D-74: the guard NAME stays `api`; only its driver is swapped. The
-            // default is unchanged JWT behaviour; the custom driver is registered
-            // by AppServiceProvider and wraps SanctumTransientGuard.
-            'driver' => env('AUTH_DRIVER', 'legacy') === 'sanctum' ? 'sanctum_transient' : 'jwt',
+            // D-74: the guard NAME stays `api`; only its driver is swapped.
+            // The custom `sanctum_transient` driver is registered by
+            // AppServiceProvider and wraps SanctumTransientGuard.
+            'driver' => env('AUTH_DRIVER', 'sanctum') === 'legacy' ? 'jwt' : 'sanctum_transient',
             'provider' => 'users',
         ],
     ],

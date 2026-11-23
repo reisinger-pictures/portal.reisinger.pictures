@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class OrgInviteControllerTest extends TestCase
@@ -28,7 +29,7 @@ class OrgInviteControllerTest extends TestCase
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     private function clientToken(): string
@@ -36,7 +37,7 @@ class OrgInviteControllerTest extends TestCase
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     public function test_admin_can_create_invite(): void

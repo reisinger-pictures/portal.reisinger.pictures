@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -99,7 +100,7 @@ class PublicMediaBrandIsolationTest extends TestCase
             ]);
             $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
             $user->galleries()->attach($gallery);
-            $token = auth('api')->login($user);
+            $token = AuthTokenFactory::forUser($user);
 
             $this->withHeaders(['Authorization' => 'Bearer '.$token])
                 ->postJson('/api/photos/'.$photo->id.'/rate', ['rating' => 5])

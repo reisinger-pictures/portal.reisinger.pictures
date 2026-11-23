@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -57,7 +58,7 @@ class OrgInviteBrandIsolationTest extends TestCase
     {
         $org = $this->orgWithInvite('rp', 'foreign-brand-invite', 'invited@example.com');
         $actor = $this->login(UserRole::CLIENT, self::OTHER_BRAND);
-        $token = auth('api')->login($actor);
+        $token = AuthTokenFactory::forUser($actor);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/org-invites/redeem', [
@@ -83,7 +84,7 @@ class OrgInviteBrandIsolationTest extends TestCase
             'expires_at' => now()->addDays(7),
         ]);
         $actor = $this->login(UserRole::CLIENT, 'rp');
-        $token = auth('api')->login($actor);
+        $token = AuthTokenFactory::forUser($actor);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/org-invites/redeem', [
@@ -101,7 +102,7 @@ class OrgInviteBrandIsolationTest extends TestCase
     {
         $org = $this->orgWithInvite('rp', 'same-brand-invite', 'invited@example.com');
         $actor = $this->login(UserRole::CLIENT, 'rp');
-        $token = auth('api')->login($actor);
+        $token = AuthTokenFactory::forUser($actor);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/org-invites/redeem', [
@@ -119,7 +120,7 @@ class OrgInviteBrandIsolationTest extends TestCase
     {
         $org = $this->orgWithInvite('rp', 'cross-brand-invite', 'invited@example.com');
         $actor = $this->login(UserRole::SUPER_ADMIN, null);
-        $token = auth('api')->login($actor);
+        $token = AuthTokenFactory::forUser($actor);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/org-invites/redeem', [
@@ -172,7 +173,7 @@ class OrgInviteBrandIsolationTest extends TestCase
     {
         $org = Org::factory()->create(['brand' => self::OTHER_BRAND]);
         $actor = $this->login(UserRole::ADMIN, 'rp');
-        $token = auth('api')->login($actor);
+        $token = AuthTokenFactory::forUser($actor);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/management/orgs/{$org->id}/invites", ['email' => 'someone@example.com'])

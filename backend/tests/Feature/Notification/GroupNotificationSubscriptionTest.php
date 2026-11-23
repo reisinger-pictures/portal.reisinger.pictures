@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Mockery;
 use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -39,7 +40,7 @@ class GroupNotificationSubscriptionTest extends TestCase
     {
         [$client, $group] = $this->assignedClientWithGroup();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/gallery-groups/{$group->id}/opt-in", ['wants_notifications' => true]);
         $response->assertStatus(200);
@@ -65,7 +66,7 @@ class GroupNotificationSubscriptionTest extends TestCase
     {
         [$client, $group, $gallery] = $this->assignedClientWithGroup();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/gallery-groups/{$group->id}/opt-in", ['wants_notifications' => true])
             ->assertStatus(200);
@@ -89,7 +90,7 @@ class GroupNotificationSubscriptionTest extends TestCase
         // visible so that it can be revoked.
         [$client, $group] = $this->assignedClientWithGroup();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/gallery-groups/{$group->id}/opt-in", ['wants_notifications' => true])
             ->assertStatus(200);
@@ -107,7 +108,7 @@ class GroupNotificationSubscriptionTest extends TestCase
     {
         [$client, $group] = $this->assignedClientWithGroup();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         $this->withHeaders($headers)
@@ -140,7 +141,7 @@ class GroupNotificationSubscriptionTest extends TestCase
     {
         [$client, $group] = $this->assignedClientWithGroup();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         // Before the opt-in the group is not subscribed to.
@@ -182,7 +183,7 @@ class GroupNotificationSubscriptionTest extends TestCase
         // can be revoked.
         [$client, $group] = $this->assignedClientWithGroup();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         $this->withHeaders($headers)
@@ -206,7 +207,7 @@ class GroupNotificationSubscriptionTest extends TestCase
     {
         [$client, $group] = $this->assignedClientWithGroup();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         $this->withHeaders($headers)
@@ -231,7 +232,7 @@ class GroupNotificationSubscriptionTest extends TestCase
     {
         [$client, $group] = $this->assignedClientWithGroup();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         $this->withHeaders($headers)
@@ -260,7 +261,7 @@ class GroupNotificationSubscriptionTest extends TestCase
     {
         [$client, $group] = $this->assignedClientWithGroup();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
 
         $preferences = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/notifications/preferences')
@@ -292,7 +293,7 @@ class GroupNotificationSubscriptionTest extends TestCase
             'The fixture must be a D-39-voided subtree: the grant hands out nothing.',
         );
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
 
         $preferences = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/notifications/preferences')
@@ -320,7 +321,7 @@ class GroupNotificationSubscriptionTest extends TestCase
         Gallery::factory()->create(['type' => 'delivery', 'gallery_group_id' => $revokedGroup->id]);
         $client->galleryGroups()->attach($revokedGroup->id);
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/gallery-groups/{$revokedGroup->id}/opt-in", ['wants_notifications' => true])
             ->assertStatus(200);
@@ -370,7 +371,7 @@ class GroupNotificationSubscriptionTest extends TestCase
 
         $this->instance(AuthorizationService::class, $service);
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
 
         $preferences = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/notifications/preferences')
@@ -419,7 +420,7 @@ class GroupNotificationSubscriptionTest extends TestCase
             $writes[] = $query->sql;
         });
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/gallery-groups/{$group->id}/opt-in", ['wants_notifications' => true]);
 
@@ -467,7 +468,7 @@ class GroupNotificationSubscriptionTest extends TestCase
                 ->delete();
         });
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/gallery-groups/{$group->id}/opt-in", ['wants_notifications' => true]);
 
@@ -522,7 +523,7 @@ class GroupNotificationSubscriptionTest extends TestCase
             ]);
         });
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/gallery-groups/{$group->id}/opt-in", ['wants_notifications' => true]);
 
@@ -551,7 +552,7 @@ class GroupNotificationSubscriptionTest extends TestCase
         $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
         $group = GalleryGroup::factory()->create();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/gallery-groups/{$group->id}/opt-in", ['wants_notifications' => true]);
 
@@ -572,7 +573,7 @@ class GroupNotificationSubscriptionTest extends TestCase
 
         [$client, $group, $gallery] = $this->assignedClientWithGroup();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/gallery-groups/{$group->id}/opt-in", ['wants_notifications' => true])
             ->assertStatus(200);
@@ -580,7 +581,7 @@ class GroupNotificationSubscriptionTest extends TestCase
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
             ->postJson("/api/management/galleries/{$gallery->id}/send-custom-email", [
                 'subject' => 'OptIn Update',
                 'body' => 'Hello',
@@ -600,7 +601,7 @@ class GroupNotificationSubscriptionTest extends TestCase
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
             ->postJson("/api/management/galleries/{$gallery->id}/send-custom-email", [
                 'subject' => 'OptIn Update',
                 'body' => 'Hello',

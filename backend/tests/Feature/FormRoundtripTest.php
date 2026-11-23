@@ -7,6 +7,7 @@ use App\Models\GalleryGroup;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class FormRoundtripTest extends TestCase
@@ -19,7 +20,7 @@ class FormRoundtripTest extends TestCase
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
 
-        return auth('api')->login($superAdmin);
+        return AuthTokenFactory::forUser($superAdmin);
     }
 
     public function test_customer_modal_roundtrip()

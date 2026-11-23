@@ -10,6 +10,7 @@ use App\Services\AuthorizationService;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -151,7 +152,7 @@ class OrgSyncLockOrderTest extends TestCase
         $member = $this->user($org, [UserRole::CLIENT]);
         $incoming = $this->user(null, [UserRole::CLIENT]);
 
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $statements = $this->collectStatements(function () use ($token, $org, $incoming): void {
             $this->withHeaders(['Authorization' => 'Bearer '.$token])
@@ -214,7 +215,7 @@ class OrgSyncLockOrderTest extends TestCase
         $orgAdmin = $this->user($org, [UserRole::ORG_ADMIN]);
         $client = $this->user(null, [UserRole::CLIENT]);
 
-        $token = auth('api')->login($orgAdmin);
+        $token = AuthTokenFactory::forUser($orgAdmin);
 
         $statements = $this->collectStatements(function () use ($token, $org, $orgAdmin, $client): void {
             $this->withHeaders(['Authorization' => 'Bearer '.$token])
@@ -237,7 +238,7 @@ class OrgSyncLockOrderTest extends TestCase
         $admin = $this->user(null, [UserRole::ADMIN]);
         $member = $this->user($org, [UserRole::CLIENT]);
 
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $authorization = app(AuthorizationService::class);
         $statements = [];
@@ -299,7 +300,7 @@ class OrgSyncLockOrderTest extends TestCase
         $admin = $this->user(null, [UserRole::ADMIN]);
         $client = $this->user(null, [UserRole::CLIENT]);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
             ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => [$client->id]])
             ->assertOk()
             ->assertJsonPath('success', true);
@@ -313,13 +314,13 @@ class OrgSyncLockOrderTest extends TestCase
         $orgAdmin = $this->user($org, [UserRole::ORG_ADMIN]);
         $client = $this->user(null, [UserRole::CLIENT]);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($orgAdmin)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($orgAdmin)])
             ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => [$client->id]])
             ->assertOk();
 
         $this->assertDatabaseHas('users', ['id' => $client->id, 'org_id' => $org->id]);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($orgAdmin)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($orgAdmin)])
             ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => []])
             ->assertOk();
 
@@ -331,7 +332,7 @@ class OrgSyncLockOrderTest extends TestCase
         $org = $this->org();
         $orgAdmin = $this->user($org, [UserRole::ORG_ADMIN]);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($orgAdmin)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($orgAdmin)])
             ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => []])
             ->assertOk();
 
@@ -346,7 +347,7 @@ class OrgSyncLockOrderTest extends TestCase
         $photographer = $this->user(null, [UserRole::PHOTOGRAPHER]);
         $client = $this->user(null, [UserRole::CLIENT]);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($photographer)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer)])
             ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => [$client->id]])
             ->assertForbidden()
             ->assertJsonPath('error', 'Forbidden');
@@ -360,7 +361,7 @@ class OrgSyncLockOrderTest extends TestCase
         $admin = $this->user(null, [UserRole::ADMIN]);
         $foreignUser = $this->user(null, [UserRole::CLIENT], self::OTHER_BRAND);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
             ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => [$foreignUser->id]])
             ->assertStatus(422)
             ->assertJsonPath(
@@ -377,7 +378,7 @@ class OrgSyncLockOrderTest extends TestCase
         $admin = $this->user(null, [UserRole::ADMIN]);
         $superAdmin = $this->user(null, [UserRole::SUPER_ADMIN]);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
             ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => [$superAdmin->id]])
             ->assertStatus(422)
             ->assertJsonPath('error', 'Super-Admins können keiner Organisation zugewiesen werden.');
@@ -391,7 +392,7 @@ class OrgSyncLockOrderTest extends TestCase
         $orgAdmin = $this->user($org, [UserRole::ORG_ADMIN]);
         $admin = $this->user(null, [UserRole::ADMIN]);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($orgAdmin)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($orgAdmin)])
             ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => [$admin->id]])
             ->assertStatus(422)
             ->assertJsonPath('error', 'Es dürfen nur Benutzer mit Rollen der eigenen Organisation hinzugefügt werden.');

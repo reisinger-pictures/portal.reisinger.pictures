@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class OrgDefaultRoleTest extends TestCase
@@ -77,7 +78,7 @@ class OrgDefaultRoleTest extends TestCase
     /** @return array<string, string> */
     private function headersFor(User $user): array
     {
-        return ['Authorization' => 'Bearer '.auth('api')->login($user)];
+        return ['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)];
     }
 
     public function test_each_allowlisted_role_is_inherited_by_persisted_role_id_in_all_join_paths(): void

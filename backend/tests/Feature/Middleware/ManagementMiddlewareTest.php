@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class ManagementMiddlewareTest extends TestCase
@@ -27,7 +28,7 @@ class ManagementMiddlewareTest extends TestCase
         $client = User::factory()->create();
         $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/management/galleries');
 
@@ -39,7 +40,7 @@ class ManagementMiddlewareTest extends TestCase
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/management/galleries');
 

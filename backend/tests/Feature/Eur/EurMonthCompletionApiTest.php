@@ -9,6 +9,7 @@ use App\Models\EurMonthlyReport;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\BrandRegistry;
+use Tests\Support\AuthTokenFactory;
 
 /**
  * Portal #31 / P7 — idempotente Monatsanlage über die kanonischen Routen.
@@ -46,7 +47,7 @@ class EurMonthCompletionApiTest extends EurBookkeepingTestCase
     {
         $user = User::factory()->create(['brand' => null]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         auth('api')->forgetUser();
 
         $first = $this->withHeaders($this->bearer($token))

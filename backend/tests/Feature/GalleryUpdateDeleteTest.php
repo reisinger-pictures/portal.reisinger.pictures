@@ -12,6 +12,7 @@ use App\Models\VolumePreset;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class GalleryUpdateDeleteTest extends TestCase
@@ -29,7 +30,7 @@ class GalleryUpdateDeleteTest extends TestCase
     {
         $photog = User::factory()->create();
         $photog->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
-        $token = auth('api')->login($photog);
+        $token = AuthTokenFactory::forUser($photog);
 
         $gallery = Gallery::factory()->create();
         $photog->galleries()->attach($gallery);
@@ -60,7 +61,7 @@ class GalleryUpdateDeleteTest extends TestCase
         $gallery = Gallery::factory()->create(['restricted_photographers' => true]);
         $photog1->galleries()->attach($gallery);
 
-        $token2 = auth('api')->login($photog2);
+        $token2 = AuthTokenFactory::forUser($photog2);
 
         // Update
         $this->withHeaders(['Authorization' => "Bearer $token2"])
@@ -82,7 +83,7 @@ class GalleryUpdateDeleteTest extends TestCase
 
         $photog = User::factory()->create();
         $photog->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
-        $token = auth('api')->login($photog);
+        $token = AuthTokenFactory::forUser($photog);
 
         $gallery = Gallery::factory()->create();
         $photog->galleries()->attach($gallery);
@@ -100,7 +101,7 @@ class GalleryUpdateDeleteTest extends TestCase
 
         $photog = User::factory()->create();
         $photog->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
-        $token = auth('api')->login($photog);
+        $token = AuthTokenFactory::forUser($photog);
 
         $gallery = Gallery::factory()->create();
         $photog->galleries()->attach($gallery);
@@ -116,7 +117,7 @@ class GalleryUpdateDeleteTest extends TestCase
     {
         $photog = User::factory()->create();
         $photog->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
-        $token = auth('api')->login($photog);
+        $token = AuthTokenFactory::forUser($photog);
 
         $group = GalleryGroup::factory()->create();
         $gallery = Gallery::factory()->create(['gallery_group_id' => $group->id]);

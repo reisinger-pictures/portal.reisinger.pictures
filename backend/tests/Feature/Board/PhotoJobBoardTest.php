@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class PhotoJobBoardTest extends TestCase
@@ -46,7 +47,7 @@ class PhotoJobBoardTest extends TestCase
 
     private function authHeaders(User $user): array
     {
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         return ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
     }

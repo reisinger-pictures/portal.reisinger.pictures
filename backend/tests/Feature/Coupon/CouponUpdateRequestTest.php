@@ -8,6 +8,7 @@ use App\Models\Coupon;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -30,7 +31,7 @@ class CouponUpdateRequestTest extends TestCase
 
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/management/coupons/{$coupon->id}", [
@@ -47,7 +48,7 @@ class CouponUpdateRequestTest extends TestCase
 
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/management/coupons/{$coupon->id}", [

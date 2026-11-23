@@ -13,6 +13,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -324,7 +325,7 @@ class PhotoIdentifierAssignmentTest extends TestCase
     private function postJsonAsUser(User $user, string $uri)
     {
         return $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($user),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($user),
         ])->postJson($uri);
     }
 

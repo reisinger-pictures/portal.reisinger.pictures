@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class OrgIsolationTest extends TestCase
@@ -34,7 +35,7 @@ class OrgIsolationTest extends TestCase
         $userB->org_id = $orgB->id;
         $userB->save();
 
-        $token = auth('api')->login($managerA);
+        $token = AuthTokenFactory::forUser($managerA);
 
         // Flow AI: Update attempt on cross-org user -> Expect 403
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
@@ -73,7 +74,7 @@ class OrgIsolationTest extends TestCase
         $managerA->org_id = $orgA->id;
         $managerA->save();
 
-        $token = auth('api')->login($managerA);
+        $token = AuthTokenFactory::forUser($managerA);
 
         $res = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->getJson('/api/management/orgs');
@@ -200,7 +201,7 @@ class OrgIsolationTest extends TestCase
         $managerA->org_id = $orgA->id;
         $managerA->save();
 
-        $token = auth('api')->login($managerA);
+        $token = AuthTokenFactory::forUser($managerA);
 
         // Versuch, Org B abzurufen
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])

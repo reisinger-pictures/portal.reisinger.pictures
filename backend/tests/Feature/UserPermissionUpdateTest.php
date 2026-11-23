@@ -9,6 +9,7 @@ use App\Models\GalleryGroup;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class UserPermissionUpdateTest extends TestCase
@@ -19,7 +20,7 @@ class UserPermissionUpdateTest extends TestCase
     {
         $admin = User::factory()->create(['brand' => Brand::B2B]);
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $targetUser = User::factory()->create(['brand' => Brand::B2B]);
 
@@ -51,7 +52,7 @@ class UserPermissionUpdateTest extends TestCase
     {
         $admin = User::factory()->create(['brand' => Brand::B2B]);
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $targetUser = User::factory()->create(['brand' => Brand::B2B]);
         $role = Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]);
@@ -72,7 +73,7 @@ class UserPermissionUpdateTest extends TestCase
         $adminRole = Role::firstOrCreate(['name' => UserRole::ADMIN->value]);
         $admin = User::factory()->create(['brand' => 'rp']);
         $admin->roles()->attach($adminRole);
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $targetUser = User::factory()->create(['brand' => 'rp']);
         $targetUser->roles()->attach($adminRole);
@@ -94,7 +95,7 @@ class UserPermissionUpdateTest extends TestCase
     {
         $admin = User::factory()->create(['brand' => 'rp']);
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $targetUser = User::factory()->create(['brand' => 'rp']);
         $targetUser->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
@@ -115,7 +116,7 @@ class UserPermissionUpdateTest extends TestCase
     {
         $admin = User::factory()->create(['brand' => null]);
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $targetUser = User::factory()->create(['brand' => 'rp']);
         $targetUser->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
@@ -136,7 +137,7 @@ class UserPermissionUpdateTest extends TestCase
     {
         $admin = User::factory()->create(['brand' => Brand::B2B]);
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $targetUser = User::factory()->create(['brand' => Brand::B2B]);
         $superAdminRole = Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]);
@@ -156,7 +157,7 @@ class UserPermissionUpdateTest extends TestCase
     {
         $admin = User::factory()->create(['brand' => Brand::B2B]);
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $targetUser = User::factory()->create(['brand' => Brand::B2B]);
         $superAdminRole = Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]);

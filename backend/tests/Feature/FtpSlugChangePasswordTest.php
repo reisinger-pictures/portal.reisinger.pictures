@@ -16,6 +16,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -88,7 +89,7 @@ class FtpSlugChangePasswordTest extends TestCase
     public function test_a_slug_change_hands_the_new_camera_password_to_the_photographer(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', [
@@ -189,7 +190,7 @@ class FtpSlugChangePasswordTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer),
         ])->putJson('/api/auth/profile', [
             'name' => 'Max Mustermann',
             'ftp_slug' => 'new-slug',
@@ -207,7 +208,7 @@ class FtpSlugChangePasswordTest extends TestCase
         $this->expectedSftpGoTransactionLevel = DB::transactionLevel();
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer),
         ])->putJson('/api/auth/profile', [
             'name' => 'Max Mustermann',
             'ftp_slug' => 'new-slug',
@@ -232,7 +233,7 @@ class FtpSlugChangePasswordTest extends TestCase
             ->andReturn($lock);
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer),
         ])->putJson('/api/auth/profile', [
             'name' => 'Changed Name',
             'ftp_slug' => 'new-slug',
@@ -266,7 +267,7 @@ class FtpSlugChangePasswordTest extends TestCase
             ->andReturn($lock);
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer),
         ])->putJson('/api/auth/profile', [
             'name' => 'Changed Name',
             'ftp_slug' => 'new-slug',
@@ -287,7 +288,7 @@ class FtpSlugChangePasswordTest extends TestCase
         $this->deleteResponseStatus = 503;
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer),
         ])->putJson('/api/auth/profile', [
             'name' => 'Changed Name',
             'ftp_slug' => 'new-slug',
@@ -312,7 +313,7 @@ class FtpSlugChangePasswordTest extends TestCase
         $this->deleteResponseStatus = 503;
 
         $firstResponse = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer),
         ])->putJson('/api/auth/profile', [
             'name' => 'Changed Name',
             'ftp_slug' => 'new-slug',
@@ -331,7 +332,7 @@ class FtpSlugChangePasswordTest extends TestCase
         // account. It must not prevent the replacement from completing.
         $this->deleteResponseStatus = 404;
         $secondResponse = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer),
         ])->putJson('/api/auth/profile', [
             'name' => 'Changed Name',
             'ftp_slug' => 'new-slug',
@@ -358,7 +359,7 @@ class FtpSlugChangePasswordTest extends TestCase
         ])->save();
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer),
         ])->putJson('/api/auth/profile', [
             'name' => 'Changed Name',
             'ftp_slug' => 'new-slug',
@@ -382,7 +383,7 @@ class FtpSlugChangePasswordTest extends TestCase
         $this->provisionResponseStatus = 503;
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer),
         ])->putJson('/api/auth/profile', [
             'name' => 'Changed Name',
             'ftp_slug' => 'new-slug',
@@ -406,7 +407,7 @@ class FtpSlugChangePasswordTest extends TestCase
         User::saving(static fn (User $user): bool => $user->ftp_account_status !== FtpCredentialService::STATUS_ACTIVE);
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($photographer),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer),
         ])->putJson('/api/auth/profile', [
             'name' => 'Changed Name',
             'ftp_slug' => 'new-slug',
@@ -435,7 +436,7 @@ class FtpSlugChangePasswordTest extends TestCase
     public function test_a_refused_slug_change_returns_no_password_at_all(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
         $slugBefore = $photographer->ftp_slug;
 
         $this->configureSftpGo([
@@ -477,7 +478,7 @@ class FtpSlugChangePasswordTest extends TestCase
     public function test_a_profile_update_without_a_slug_change_returns_no_password(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', [

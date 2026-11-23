@@ -5,17 +5,17 @@ namespace Tests\Feature;
 use App\Enums\Brand;
 use App\Models\Org;
 use App\Models\User;
+use App\Services\Auth\AuthTokenService;
 use App\Support\BrandRegistry;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\JWTAuth;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\MailpitAssertions;
 use Tests\TestCase;
 
@@ -154,7 +154,7 @@ class AuthControllerTest extends TestCase
             'can_edit_metadata' => true,
             'can_purchase_upgrades' => true,
         ]);
-        $token = Auth::guard('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/auth/me');
@@ -200,14 +200,20 @@ class AuthControllerTest extends TestCase
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $token = $this->issueExpiredAccessToken($user);
 
-        $this->assertFalse(app(JWTAuth::class)->setToken($token)->check());
+        $this->assertFalse(AuthTokenFactory::check($token));
+
+        // In legacy mode the refresh cookie is the same long-lived JWT, so the
+        // expired credential is still refreshable. Sanctum issues a separate
+        // refresh token (D-76); the expired access token alone cannot be rotated.
+        $tokens = app(AuthTokenService::class);
+        $refreshCredential = $tokens->isSanctum() ? $tokens->issueRefresh($user) : $token;
 
         // The expired access token is sent as a bearer header to prove that
         // auth:api is not involved. A browser would have removed rp_jwt by now;
         // only the longer-lived refresh cookie is sent below.
         $response = $this->withValidCsrf()
             ->withHeader('Authorization', "Bearer $token")
-            ->withUnencryptedCookie('rp_jwt_refresh', $token)
+            ->withUnencryptedCookie('rp_jwt_refresh', $refreshCredential)
             ->withCredentials()
             ->postJson('/api/auth/refresh');
 
@@ -220,13 +226,13 @@ class AuthControllerTest extends TestCase
 
         $this->assertNotSame($token, $newAccessToken);
         $this->assertNotSame($token, $newRefreshToken);
-        $this->assertTrue(app(JWTAuth::class)->setToken($newAccessToken)->check());
+        $this->assertTrue(AuthTokenFactory::check($newAccessToken));
     }
 
     public function test_refresh_rotates_and_blacklists_previous_refresh_cookie()
     {
         $user = User::factory()->create(['brand' => Brand::B2B]);
-        $token = Auth::guard('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $first = $this->withValidCsrf()
             ->withUnencryptedCookie('rp_jwt_refresh', $token)
@@ -248,7 +254,7 @@ class AuthControllerTest extends TestCase
     public function test_logout_expires_access_and_refresh_cookies()
     {
         $user = User::factory()->create(['brand' => Brand::B2B]);
-        $token = Auth::guard('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withValidCsrf()
             ->withUnencryptedCookie('rp_jwt', $token)
@@ -263,7 +269,7 @@ class AuthControllerTest extends TestCase
     public function test_me_endpoint_returns_user_data()
     {
         $user = User::factory()->create(['brand' => Brand::B2B]);
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])->getJson('/api/auth/me');
         $response->assertStatus(200)->assertJsonPath('email', $user->email);
     }
@@ -317,11 +323,16 @@ class AuthControllerTest extends TestCase
 
     private function issueExpiredAccessToken(User $user): string
     {
-        $accessTtl = max((int) config('jwt.ttl', 240), 1);
+        $tokens = app(AuthTokenService::class);
+        // The legacy TTL lives in jwt.ttl; the Sanctum access window is read
+        // from the driver-independent service (D-76).
+        $accessTtl = $tokens->isSanctum()
+            ? $tokens->accessTtlMinutes()
+            : max((int) config('jwt.ttl', 240), 1);
         Carbon::setTestNow(Carbon::now()->subMinutes($accessTtl + 1));
 
         try {
-            return Auth::guard('api')->login($user);
+            return AuthTokenFactory::forUser($user);
         } finally {
             Carbon::setTestNow();
         }

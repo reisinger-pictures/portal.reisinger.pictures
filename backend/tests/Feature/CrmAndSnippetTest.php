@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class CrmAndSnippetTest extends TestCase
@@ -16,7 +17,7 @@ class CrmAndSnippetTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         // Test Customer Creation
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -35,7 +36,7 @@ class CrmAndSnippetTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/management/customers')

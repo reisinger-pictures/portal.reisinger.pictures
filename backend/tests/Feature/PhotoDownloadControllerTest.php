@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\UsesIsolatedTempDirectory;
 use Tests\TestCase;
 use ZipArchive;
@@ -90,7 +91,7 @@ class PhotoDownloadControllerTest extends TestCase
         $content = file_get_contents($fixturePath);
         Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, $content);
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->get('/api/photos/'.$photo->id.'/download');
@@ -133,7 +134,7 @@ class PhotoDownloadControllerTest extends TestCase
         $content = file_get_contents($fixturePath);
         Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, $content);
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->get('/api/photos/'.$photo->id.'/download');
@@ -443,7 +444,7 @@ class PhotoDownloadControllerTest extends TestCase
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
 
-        $token1 = auth('api')->login($user1);
+        $token1 = AuthTokenFactory::forUser($user1);
 
         $this->withHeaders(['Authorization' => "Bearer $token1"])
             ->get("/api/photos/{$photo->id}/download")
@@ -486,7 +487,7 @@ class PhotoDownloadControllerTest extends TestCase
             'tax_rate' => 0,
         ]);
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->get("/api/photos/{$photo->id}/download?tier=original")
@@ -664,7 +665,7 @@ class PhotoDownloadControllerTest extends TestCase
             $gallery->id.'/'.$photo->filename,
             file_get_contents(base_path('tests/Fixtures/sample.jpg')),
         );
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->get('/api/galleries/'.$gallery->id.'/download-zip?tier=web')
@@ -684,7 +685,7 @@ class PhotoDownloadControllerTest extends TestCase
         $fixturePath = base_path('tests/Fixtures/sample.jpg');
         Storage::disk('photos')->put($gallery->id.'/'.$photo->filename, file_get_contents($fixturePath));
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->get('/api/media/'.$gallery->slug.'/'.$photo->id.'.jpg');

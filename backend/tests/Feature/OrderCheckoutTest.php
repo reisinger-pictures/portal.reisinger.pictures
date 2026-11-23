@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mollie\Api\Http\Requests\CreatePaymentRequest;
 use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
@@ -44,7 +45,7 @@ class OrderCheckoutTest extends TestCase
     {
         $user = User::factory()->create(['flatrate_level' => 'print']);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::POWER_USER->value]));
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);
@@ -78,7 +79,7 @@ class OrderCheckoutTest extends TestCase
         $user = User::factory()->create();
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
         $user->roles()->attach(Role::firstOrCreate(['name' => 'power_user']));
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);
@@ -112,7 +113,7 @@ class OrderCheckoutTest extends TestCase
     {
         $user = User::factory()->create(['flatrate_level' => 'none']);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $gallery = Gallery::factory()->create(['type' => 'delivery', 'is_public' => false]);
         $user->galleries()->attach($gallery);

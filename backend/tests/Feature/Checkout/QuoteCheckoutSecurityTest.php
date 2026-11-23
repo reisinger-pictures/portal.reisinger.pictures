@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -114,7 +115,7 @@ class QuoteCheckoutSecurityTest extends TestCase
         $photographer = User::factory()->create(['brand' => 'rp']);
         $photographer->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
         $photographer->photographerGalleries()->attach($gallery);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         foreach ([0, -500] as $price) {
             $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -249,7 +250,7 @@ class QuoteCheckoutSecurityTest extends TestCase
         $photographer = User::factory()->create(['brand' => 'rp']);
         $photographer->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
         $photographer->photographerGalleries()->attach($publicGallery);
-        $authToken = auth('api')->login($photographer);
+        $authToken = AuthTokenFactory::forUser($photographer);
 
         $this->withHeaders(['Authorization' => "Bearer $authToken"])
             ->postJson('/api/management/orders/quote-link', [

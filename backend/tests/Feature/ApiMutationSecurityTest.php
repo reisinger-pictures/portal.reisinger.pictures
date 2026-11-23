@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class ApiMutationSecurityTest extends TestCase
@@ -63,7 +64,7 @@ class ApiMutationSecurityTest extends TestCase
     public function test_cookie_authenticated_mutations_fail_closed_without_a_csrf_token(): void
     {
         $user = User::factory()->create(['brand' => Brand::B2B]);
-        $jwt = auth('api')->login($user);
+        $jwt = AuthTokenFactory::forUser($user);
         Auth::forgetGuards();
 
         $this->withUnencryptedCookie('rp_jwt_refresh', $jwt)
@@ -76,7 +77,7 @@ class ApiMutationSecurityTest extends TestCase
     public function test_same_origin_cookie_authenticated_mutation_accepts_the_signed_csrf_token(): void
     {
         $user = User::factory()->create(['brand' => Brand::B2B]);
-        $jwt = auth('api')->login($user);
+        $jwt = AuthTokenFactory::forUser($user);
         $csrf = $this->csrfCredentials();
         Auth::forgetGuards();
 
@@ -91,7 +92,7 @@ class ApiMutationSecurityTest extends TestCase
     public function test_a_body_less_mutation_passes_the_content_type_boundary(): void
     {
         $user = User::factory()->create(['brand' => Brand::B2B]);
-        $jwt = auth('api')->login($user);
+        $jwt = AuthTokenFactory::forUser($user);
         $csrf = $this->csrfCredentials();
         Auth::forgetGuards();
 
@@ -109,7 +110,7 @@ class ApiMutationSecurityTest extends TestCase
     public function test_a_body_without_a_content_type_is_still_rejected(): void
     {
         $user = User::factory()->create(['brand' => Brand::B2B]);
-        $jwt = auth('api')->login($user);
+        $jwt = AuthTokenFactory::forUser($user);
         $csrf = $this->csrfCredentials();
         Auth::forgetGuards();
 
@@ -133,7 +134,7 @@ class ApiMutationSecurityTest extends TestCase
         $org = Org::factory()->create();
         $admin = User::factory()->create(['brand' => Brand::B2B]);
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $jwt = auth('api')->login($admin);
+        $jwt = AuthTokenFactory::forUser($admin);
 
         $this->withUnencryptedCookie('rp_jwt', $jwt)
             ->call(

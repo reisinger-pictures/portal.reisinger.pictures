@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -43,7 +44,7 @@ class UserBrandIsolationTest extends TestCase
         $user = User::factory()->create(['brand' => $brand]);
         $user->roles()->attach($this->role($role));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     public function test_brand_bound_admin_cannot_update_foreign_brand_user(): void

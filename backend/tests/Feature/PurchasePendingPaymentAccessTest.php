@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\PurchaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -76,7 +77,7 @@ class PurchasePendingPaymentAccessTest extends TestCase
 
         $this->assertFalse(app(PurchaseService::class)->hasPurchasedPhoto($user, $photo->id, 'original'));
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->get('/api/photos/'.$photo->id.'/download?tier=original')
@@ -87,7 +88,7 @@ class PurchasePendingPaymentAccessTest extends TestCase
     {
         [$user, , , $order] = $this->makeAccessibleOrder('pending_payment');
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->get('/api/orders/'.$order->id.'/download-zip')
@@ -100,7 +101,7 @@ class PurchasePendingPaymentAccessTest extends TestCase
 
         $this->assertTrue(app(PurchaseService::class)->hasPurchasedPhoto($user, $photo->id, 'original'));
 
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->get('/api/photos/'.$photo->id.'/download?tier=original')

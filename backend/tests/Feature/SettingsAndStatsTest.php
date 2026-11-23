@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class SettingsAndStatsTest extends TestCase
@@ -16,7 +17,7 @@ class SettingsAndStatsTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])->getJson('/api/management/stats');
         $response->assertStatus(200);
@@ -25,7 +26,7 @@ class SettingsAndStatsTest extends TestCase
     public function test_client_cannot_access_stats()
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])->getJson('/api/management/stats');
         $response->assertStatus(403);

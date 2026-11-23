@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -78,7 +79,7 @@ class FtpPasswordResetEndpointTest extends TestCase
     {
         $this->fakeSuccessfulService();
         $user = $this->photographer();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         for ($attempt = 1; $attempt <= FtpCredentialService::RESET_LIMIT_PER_HOUR; $attempt++) {
             $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -107,7 +108,7 @@ class FtpPasswordResetEndpointTest extends TestCase
     {
         $this->fakeSuccessfulService();
         $user = $this->photographer();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         for ($attempt = 0; $attempt < FtpCredentialService::RESET_LIMIT_PER_HOUR; $attempt++) {
             $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -157,7 +158,7 @@ class FtpPasswordResetEndpointTest extends TestCase
         $caller = $this->photographer(['ftp_slug' => 'florian', 'email' => 'florian@example.com']);
         $victim = $this->photographer(['ftp_slug' => 'sabine', 'email' => 'sabine@example.com']);
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($caller)])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($caller)])
             ->postJson('/api/management/ftp/reset-password', [
                 'user_id' => $victim->id,
                 'ftp_slug' => 'sabine',
@@ -183,7 +184,7 @@ class FtpPasswordResetEndpointTest extends TestCase
         $this->fakeSuccessfulService();
         $client = User::factory()->create();
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($client)])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($client)])
             ->postJson('/api/management/ftp/reset-password');
 
         $response->assertStatus(403);
@@ -307,7 +308,7 @@ class FtpPasswordResetEndpointTest extends TestCase
 
     private function resetFor(User $user)
     {
-        return $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        return $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->postJson('/api/management/ftp/reset-password');
     }
 

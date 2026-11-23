@@ -10,6 +10,7 @@ use App\Models\VolumePreset;
 use App\Services\VolumePresetService;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class VolumePresetControllerTest extends TestCase
@@ -21,7 +22,7 @@ class VolumePresetControllerTest extends TestCase
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
-        return auth('api')->login($superAdmin);
+        return AuthTokenFactory::forUser($superAdmin);
     }
 
     public function test_super_admin_can_create_update_default_and_delete_preset(): void
@@ -209,7 +210,7 @@ class VolumePresetControllerTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/settings/volume-presets', ['name' => 'Hack', 'tiers' => [['min_quantity' => 0, 'price_cents' => 1]]])
@@ -220,7 +221,7 @@ class VolumePresetControllerTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->getJson('/api/management/settings/volume-presets')

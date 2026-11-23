@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class CouponCheckoutControllerTest extends TestCase
@@ -51,7 +52,7 @@ class CouponCheckoutControllerTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/coupons/validate', [
@@ -81,7 +82,7 @@ class CouponCheckoutControllerTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/coupons/validate', [
@@ -96,7 +97,7 @@ class CouponCheckoutControllerTest extends TestCase
     public function test_validate_coupon_returns_invalid_for_nonexistent(): void
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/coupons/validate', [
@@ -128,7 +129,7 @@ class CouponCheckoutControllerTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/coupons/validate', [
@@ -151,7 +152,7 @@ class CouponCheckoutControllerTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/coupons/validate', [
@@ -167,7 +168,7 @@ class CouponCheckoutControllerTest extends TestCase
     public function test_validate_coupon_rejects_non_string_members_in_scope_arrays(): void
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/coupons/validate', [

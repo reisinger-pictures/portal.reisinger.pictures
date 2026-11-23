@@ -10,6 +10,7 @@ use App\Support\FtpInboxDirectory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -55,7 +56,7 @@ class FtpSlugDirectoryProvisioningTest extends TestCase
     public function test_setting_a_slug_creates_its_inbox_directory(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->putSlug($token, 'j-doe')->assertOk();
 
@@ -79,7 +80,7 @@ class FtpSlugDirectoryProvisioningTest extends TestCase
     public function test_the_created_directory_has_the_group_writable_setgid_mode(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->putSlug($token, 'j-doe')->assertOk();
 
@@ -115,7 +116,7 @@ class FtpSlugDirectoryProvisioningTest extends TestCase
     public function test_a_slug_change_creates_the_new_directory_and_retains_the_old_one(): void
     {
         $photographer = $this->photographer('old-slug');
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->assertDirectoryExists($this->inboxRoot.'/old-slug');
 
@@ -131,7 +132,7 @@ class FtpSlugDirectoryProvisioningTest extends TestCase
     public function test_the_slug_is_not_saved_when_the_directory_cannot_be_created(): void
     {
         $photographer = $this->photographer('old-slug');
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         // A missing parent is the failure the deployed pipeline actually risks
         // (the bind mount is absent) and it fails for every user, including root.
@@ -160,7 +161,7 @@ class FtpSlugDirectoryProvisioningTest extends TestCase
     public function test_the_failure_message_names_the_path_and_the_reason(): void
     {
         $photographer = $this->photographer('old-slug');
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $path = $this->inboxRoot.'/absent/j-doe';
         config(['filesystems.disks.ftp_inbox.root' => $this->inboxRoot.'/absent']);
@@ -200,13 +201,13 @@ class FtpSlugDirectoryProvisioningTest extends TestCase
 
         // Path 1: the profile form changes a slug.
         $slugWriter = $this->photographer('old-slug');
-        $slugStatus = $this->putSlug(auth('api')->login($slugWriter), 'j-doe')->status();
+        $slugStatus = $this->putSlug(AuthTokenFactory::forUser($slugWriter), 'j-doe')->status();
 
         // Path 2: the inbox provisions a first camera account (`pending` is the
         // only state that reaches `ensure()`; an `active` account rotates).
         $provisioner = $this->photographer('pending-slug', FtpCredentialService::STATUS_PENDING);
         $resetStatus = $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($provisioner),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($provisioner),
         ])->postJson('/api/management/ftp/reset-password')->status();
 
         $this->assertSame(503, $slugStatus);
@@ -227,7 +228,7 @@ class FtpSlugDirectoryProvisioningTest extends TestCase
         mkdir($this->inboxRoot.'/j-doe', 0755);
         $before = fileperms($this->inboxRoot.'/j-doe');
 
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
         $this->putSlug($token, 'j-doe')->assertOk();
 
         clearstatcache(true, $this->inboxRoot.'/j-doe');

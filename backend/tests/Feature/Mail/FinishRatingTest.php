@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class FinishRatingTest extends TestCase
@@ -25,7 +26,7 @@ class FinishRatingTest extends TestCase
 
         $gallery = Gallery::factory()->create(); // Client has NO access to this gallery
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/galleries/{$gallery->id}/finish-rating");
 
@@ -43,7 +44,7 @@ class FinishRatingTest extends TestCase
         $gallery = Gallery::factory()->create();
         $client->galleries()->attach($gallery);
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/galleries/{$gallery->id}/finish-rating");
 

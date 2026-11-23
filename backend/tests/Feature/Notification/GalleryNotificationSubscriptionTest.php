@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -37,7 +38,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
     {
         [$client, $gallery] = $this->orgMemberWithDeliveryGallery();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/galleries/{$gallery->id}/opt-in", ['wants_notifications' => true]);
         $response->assertStatus(200);
@@ -53,7 +54,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
     {
         [$client, $gallery] = $this->orgMemberWithDeliveryGallery();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/galleries/{$gallery->id}/opt-in", ['wants_notifications' => true]);
         $response->assertStatus(200);
@@ -75,7 +76,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
     {
         [$client, $gallery] = $this->orgMemberWithDeliveryGallery();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         $this->withHeaders($headers)
@@ -101,7 +102,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
     {
         [$client, $gallery] = $this->orgMemberWithDeliveryGallery();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         // Before the opt-in the gallery is not part of the list: the client
@@ -141,7 +142,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
         // can be revoked.
         [$client, $gallery] = $this->orgMemberWithDeliveryGallery();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         $this->withHeaders($headers)
@@ -165,7 +166,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
     {
         [$client, $gallery] = $this->orgMemberWithDeliveryGallery();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         $this->withHeaders($headers)
@@ -192,7 +193,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
         // response (frontend/src/logic/useGallery.ts).
         [$client, $gallery] = $this->orgMemberWithDeliveryGallery();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         $this->withHeaders($headers)
@@ -217,7 +218,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
 
         [$client, $gallery] = $this->orgMemberWithDeliveryGallery();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/galleries/{$gallery->id}/opt-in", ['wants_notifications' => true])
             ->assertStatus(200);
@@ -225,7 +226,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
             ->postJson("/api/management/galleries/{$gallery->id}/send-custom-email", [
                 'subject' => 'OptIn Update',
                 'body' => 'Hello',
@@ -245,7 +246,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
 
-        $response = $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
             ->postJson("/api/management/galleries/{$gallery->id}/send-custom-email", [
                 'subject' => 'OptIn Update',
                 'body' => 'Hello',
@@ -279,7 +280,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
         // and subscribes to it (the subscription).
         $photographer->galleries()->attach($gallery);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($photographer)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer)])
             ->postJson("/api/galleries/{$gallery->id}/opt-in", ['wants_notifications' => true])
             ->assertStatus(200);
 
@@ -287,7 +288,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
         $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
         $client->galleries()->attach($gallery);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($client)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($client)])
             ->postJson("/api/galleries/{$gallery->id}/finish-rating")
             ->assertStatus(200);
 
@@ -308,7 +309,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
         $client->roles()->attach(Role::firstOrCreate(['name' => UserRole::CLIENT->value]));
         $client->galleries()->attach($gallery);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($client)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($client)])
             ->postJson("/api/galleries/{$gallery->id}/finish-rating")
             ->assertStatus(200);
 
@@ -342,7 +343,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
             ]);
         });
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson("/api/galleries/{$gallery->id}/opt-in", ['wants_notifications' => true]);
 
@@ -355,7 +356,7 @@ class GalleryNotificationSubscriptionTest extends TestCase
     {
         [$client, $gallery] = $this->orgMemberWithDeliveryGallery();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $headers = ['Authorization' => "Bearer $token"];
 
         $this->withHeaders($headers)

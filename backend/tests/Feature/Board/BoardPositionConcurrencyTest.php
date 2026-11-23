@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class BoardPositionConcurrencyTest extends TestCase
@@ -302,7 +303,7 @@ class BoardPositionConcurrencyTest extends TestCase
 
     private function headers(User $user): array
     {
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         return [
             'Authorization' => "Bearer {$token}",

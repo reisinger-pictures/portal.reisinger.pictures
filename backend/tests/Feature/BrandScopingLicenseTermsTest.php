@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\BrandRegistry;
 use App\Values\BrandConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -55,7 +56,7 @@ class BrandScopingLicenseTermsTest extends TestCase
         $user = User::factory()->create(['brand' => null]);
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
 
-        return auth('api')->login($user);
+        return AuthTokenFactory::forUser($user);
     }
 
     public function test_license_pricing_ignores_foreign_brand_gallery_mode(): void

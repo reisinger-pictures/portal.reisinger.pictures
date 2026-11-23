@@ -9,9 +9,7 @@ use App\Models\Photo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
-use PHPOpenSourceSaver\JWTAuth\Factory;
-use PHPOpenSourceSaver\JWTAuth\JWT;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class MagicLinkAuthTest extends TestCase
@@ -47,15 +45,13 @@ class MagicLinkAuthTest extends TestCase
 
         // Wir fälschen uns das JWT für den Test, genau so wie der Server es ausstellen würde
         $guestId = (string) Str::uuid();
-        $factory = app(Factory::class);
-        $payload = $factory->customClaims([
+        $token = AuthTokenFactory::claims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Test Guest',
             'guest_invite_id' => $invite->id,
             'transient_galleries' => [$gallery->id],
-        ])->make();
-        $token = app(\PHPOpenSourceSaver\JWTAuth\JWTAuth::class)->encode($payload)->get();
+        ])->asGuest();
 
         // Wir senden das Token als Bearer-Header, was JWT-Auth standardmäßig unterstützt
         $rateRes = $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -78,7 +74,7 @@ class MagicLinkAuthTest extends TestCase
         $gallery = Gallery::factory()->create(['type' => 'selection', 'is_public' => false]);
         $invite = GalleryInvite::create(['gallery_id' => $gallery->id, 'token' => 'test-token-2']);
 
-        $initialToken = JWTAuth::fromUser($user);
+        $initialToken = AuthTokenFactory::forUser($user);
 
         $res = $this->withHeaders(['Authorization' => "Bearer $initialToken"])
             ->postJson('/api/invites/redeem', [
@@ -117,7 +113,7 @@ class MagicLinkAuthTest extends TestCase
         // clean claim state, or it would carry the guest's `guest_id` and
         // `transient_galleries` claims.
         $this->resetJwtClaimState();
-        $userToken = JWTAuth::fromUser($user);
+        $userToken = AuthTokenFactory::forUser($user);
         $registered = $this->withHeaders(['Authorization' => "Bearer $userToken"])
             ->postJson('/api/invites/redeem', [
                 'token' => $invite->token,
@@ -128,11 +124,9 @@ class MagicLinkAuthTest extends TestCase
             ->assertJsonPath('full_path', $gallery->full_path);
 
         $accessToken = (string) $registered->getCookie('rp_jwt', false)->getValue();
-        $payload = app(JWT::class)
-            ->setToken($accessToken)
-            ->getPayload();
-        $this->assertSame((string) $user->id, (string) $payload->get('sub'));
-        $this->assertSame([(string) $invite->id], $payload->get('transient_invite_ids'));
+        $claims = AuthTokenFactory::claimsOf($accessToken);
+        $this->assertSame((string) $user->id, (string) $claims['sub']);
+        $this->assertSame([(string) $invite->id], $claims['transient_invite_ids']);
 
         $this->assertDatabaseHas('gallery_invites', ['id' => $invite->id]);
         $this->assertDatabaseMissing('users', ['email' => 'anonymous-guest@example.com']);
@@ -144,12 +138,26 @@ class MagicLinkAuthTest extends TestCase
         $user = User::factory()->create(['brand' => Brand::B2B]);
         $gallery = Gallery::factory()->create(['type' => 'selection', 'is_public' => false]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
+        $invite = GalleryInvite::create([
+            'gallery_id' => $gallery->id,
+            'token' => 'transient-rating-'.Str::uuid(),
+        ]);
 
         // FIX: Token über die Fassade generieren, anstatt `login($user)` aufzurufen.
         // Das verhindert, dass der Test-User im Speicher gecached wird, und zwingt
         // den anschließenden Request durch unseren TransientUserProvider!
-        $transientToken = JWTAuth::claims(['transient_galleries' => [$gallery->id]])
-            ->fromUser($user);
+        // Invite provenance is part of the claim contract: transient galleries
+        // without a live invite are revalidated away (D-39) in both modes.
+        $transientToken = AuthTokenFactory::claims([
+            'transient_galleries' => [$gallery->id],
+            'transient_invite_ids' => [(string) $invite->getKey()],
+            'transient_invites' => [
+                (string) $invite->getKey() => [
+                    'gallery_id' => (string) $gallery->getKey(),
+                    'can_edit_metadata' => false,
+                ],
+            ],
+        ])->fromUser($user);
 
         $rateRes = $this->withHeaders(['Authorization' => "Bearer $transientToken"])
             ->postJson("/api/photos/{$photo->id}/rate", ['rating' => 4]);

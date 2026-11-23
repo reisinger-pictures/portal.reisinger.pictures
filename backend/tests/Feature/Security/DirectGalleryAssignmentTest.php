@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\AuthorizationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -95,7 +96,7 @@ class DirectGalleryAssignmentTest extends TestCase
 
     private function as(User $user)
     {
-        return $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)]);
+        return $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)]);
     }
 
     /**

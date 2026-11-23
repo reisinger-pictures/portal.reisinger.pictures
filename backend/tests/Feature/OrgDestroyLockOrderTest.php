@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\LockRenderingSQLiteGrammar;
 use Tests\TestCase;
 
@@ -248,6 +249,13 @@ class OrgDestroyLockOrderTest extends TestCase
                 continue;
             }
 
+            // A Sanctum token resolves its tokenable with a single-row morph
+            // lookup (`where users.id = ? limit 1`). That is credential
+            // resolution, not the member load this baseline measures.
+            if (preg_match('/\blimit\s+1\b/i', $statements[$index]['sql'])) {
+                continue;
+            }
+
             if (preg_match('/(?:"users"\.)?"id"\s*(?:in|between|=|<|>)/i', $statements[$index]['sql'])) {
                 return $index;
             }
@@ -392,7 +400,7 @@ class OrgDestroyLockOrderTest extends TestCase
         $admin = $this->user(null, [UserRole::ADMIN]);
 
         $statements = $this->collectStatements(function () use ($admin, $org): void {
-            $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+            $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
                 ->deleteJson("/api/management/orgs/{$org->id}")
                 ->assertOk()
                 ->assertJsonPath('success', true);
@@ -451,7 +459,7 @@ class OrgDestroyLockOrderTest extends TestCase
         $admin = $this->user(null, [UserRole::ADMIN]);
 
         $statements = $this->collectStatements(function () use ($admin, $org): void {
-            $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+            $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
                 ->deleteJson("/api/management/orgs/{$org->id}")
                 ->assertOk();
         });
@@ -478,13 +486,13 @@ class OrgDestroyLockOrderTest extends TestCase
         $admin = $this->user(null, [UserRole::ADMIN]);
 
         $syncStatements = $this->collectStatements(function () use ($admin, $syncOrg): void {
-            $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+            $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
                 ->putJson("/api/management/orgs/{$syncOrg->id}/users", ['user_ids' => []])
                 ->assertOk();
         });
 
         $destroyStatements = $this->collectStatements(function () use ($admin, $destroyOrg): void {
-            $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+            $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
                 ->deleteJson("/api/management/orgs/{$destroyOrg->id}")
                 ->assertOk();
         });
@@ -523,7 +531,7 @@ class OrgDestroyLockOrderTest extends TestCase
         $admin = $this->user(null, [UserRole::ADMIN]);
 
         $statements = $this->collectStatements(function () use ($admin, $org): void {
-            $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+            $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
                 ->deleteJson("/api/management/orgs/{$org->id}")
                 ->assertOk()
                 ->assertJsonPath('success', true);
@@ -607,14 +615,14 @@ class OrgDestroyLockOrderTest extends TestCase
 
         // The sync locks the member rows in ONE ascending statement.
         $syncStatements = $this->collectStatements(function () use ($admin, $org, $first, $second): void {
-            $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+            $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
                 ->putJson("/api/management/orgs/{$org->id}/users", ['user_ids' => [$first->id, $second->id]])
                 ->assertOk();
         });
 
         // The destroy locks the same member rows one after another.
         $destroyStatements = $this->collectStatements(function () use ($admin, $org): void {
-            $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+            $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
                 ->deleteJson("/api/management/orgs/{$org->id}")
                 ->assertOk();
         });
@@ -673,7 +681,7 @@ class OrgDestroyLockOrderTest extends TestCase
 
         $admin = $this->user(null, [UserRole::ADMIN]);
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($admin)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($admin)])
             ->deleteJson("/api/management/orgs/{$org->id}")
             ->assertOk()
             ->assertJsonPath('success', true);

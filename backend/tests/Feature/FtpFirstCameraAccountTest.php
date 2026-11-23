@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -88,7 +89,7 @@ class FtpFirstCameraAccountTest extends TestCase
     public function test_a_photographer_without_an_account_gets_one(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->assertSame('pending', $photographer->fresh()?->ftp_account_status);
 
@@ -138,7 +139,7 @@ class FtpFirstCameraAccountTest extends TestCase
     public function test_a_first_provision_creates_the_inbox_directory(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
         $slug = (string) $photographer->ftp_slug;
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -168,7 +169,7 @@ class FtpFirstCameraAccountTest extends TestCase
     public function test_a_first_provision_that_cannot_create_the_directory_creates_no_account(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         config(['filesystems.disks.ftp_inbox.root' => $this->inboxRoot.'/absent']);
 
@@ -200,7 +201,7 @@ class FtpFirstCameraAccountTest extends TestCase
     public function test_an_existing_account_is_still_rotated_not_recreated(): void
     {
         $photographer = $this->photographer(FtpCredentialService::STATUS_ACTIVE);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/ftp/reset-password');
@@ -227,7 +228,7 @@ class FtpFirstCameraAccountTest extends TestCase
     public function test_a_revoked_account_cannot_be_revived_by_a_reset(): void
     {
         $photographer = $this->photographer(FtpCredentialService::STATUS_REVOKED);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/ftp/reset-password');
@@ -255,7 +256,7 @@ class FtpFirstCameraAccountTest extends TestCase
     public function test_an_account_in_error_is_not_reset(): void
     {
         $photographer = $this->photographer(FtpCredentialService::STATUS_ERROR);
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/ftp/reset-password');
@@ -282,7 +283,7 @@ class FtpFirstCameraAccountTest extends TestCase
         foreach ([FtpCredentialService::STATUS_REVOKED, FtpCredentialService::STATUS_ERROR] as $status) {
             $photographer = $this->photographer($status);
 
-            $response = $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($photographer)])
+            $response = $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer)])
                 ->postJson('/api/management/ftp/reset-password');
 
             $reported[$status] = $response->getStatusCode();
@@ -302,7 +303,7 @@ class FtpFirstCameraAccountTest extends TestCase
         foreach ([FtpCredentialService::STATUS_REVOKED, FtpCredentialService::STATUS_ERROR] as $status) {
             $photographer = $this->photographer($status);
 
-            $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($photographer)])
+            $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($photographer)])
                 ->postJson('/api/management/ftp/reset-password')
                 ->assertStatus(409);
         }
@@ -326,7 +327,7 @@ class FtpFirstCameraAccountTest extends TestCase
     public function test_a_first_account_creation_is_not_written_to_the_reset_trail(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/ftp/reset-password')
@@ -349,7 +350,7 @@ class FtpFirstCameraAccountTest extends TestCase
         ]);
 
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/ftp/reset-password');
@@ -370,7 +371,7 @@ class FtpFirstCameraAccountTest extends TestCase
     public function test_the_hourly_quota_also_covers_the_provisioning_branch(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         for ($attempt = 0; $attempt < FtpCredentialService::RESET_LIMIT_PER_HOUR; $attempt++) {
             $this->withHeaders(['Authorization' => "Bearer $token"])

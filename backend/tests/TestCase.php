@@ -154,6 +154,10 @@ abstract class TestCase extends BaseTestCase
      * does not cross a test boundary — but it does cross every token and
      * every request inside one test. The reset makes the invariant explicit
      * and keeps it true if the application is ever reused.
+     *
+     * With AUTH_DRIVER=sanctum this is a no-op: Sanctum tokens carry their
+     * claims as explicit abilities and the JWT package stays installed only
+     * for the legacy path (Phase 3).
      */
     protected function resetJwtClaimState(): void
     {

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class OrgMembershipPolicyTest extends TestCase
@@ -44,7 +45,7 @@ class OrgMembershipPolicyTest extends TestCase
     /** @return array<string, string> */
     private function headersFor(User $user): array
     {
-        return ['Authorization' => 'Bearer '.auth('api')->login($user)];
+        return ['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)];
     }
 
     private function invite(Org $org, string $email, string $token): OrgInvite
@@ -106,7 +107,7 @@ class OrgMembershipPolicyTest extends TestCase
         $member->roles()->attach($client->id);
         $invite = $this->invite($orgB, $member->email, 'browser-cookie-org-switch-token');
 
-        $jwt = auth('api')->login($member);
+        $jwt = AuthTokenFactory::forUser($member);
         Auth::forgetGuards();
         $csrf = $this->csrfCredentials();
 

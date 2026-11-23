@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class ProfileUpdateScoutTest extends TestCase
@@ -53,7 +54,7 @@ class ProfileUpdateScoutTest extends TestCase
         // Mock für Scout
         Bus::fake();
 
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', [
@@ -83,7 +84,7 @@ class ProfileUpdateScoutTest extends TestCase
         // the role instead of relying on "any authenticated account", which was
         // the behaviour the finding removed.
         $user2->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
-        $token = auth('api')->login($user2);
+        $token = AuthTokenFactory::forUser($user2);
 
         // 1. Conflict Test (422)
         $responseConflict = $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -120,7 +121,7 @@ class ProfileUpdateScoutTest extends TestCase
         // The actor has to be a photographer to reach the provisioning branch
         // this test refuses (SEC-20261018-04).
         $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::PHOTOGRAPHER->value]));
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $this->configureSftpGo(['api_key' => null, 'admin_username' => null, 'admin_password' => null]);
         Http::fake();

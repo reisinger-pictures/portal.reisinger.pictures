@@ -6,8 +6,7 @@ use App\Models\Gallery;
 use App\Models\GalleryInvite;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\Factory;
-use PHPOpenSourceSaver\JWTAuth\JWTAuth;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -26,16 +25,14 @@ class BrandScopingGuestOptInTest extends TestCase
             'token' => 'opt-in-guest-invite-'.Str::uuid(),
         ]);
         $guestId = (string) Str::uuid();
-        $factory = app(Factory::class);
-        $payload = $factory->customClaims([
+
+        return AuthTokenFactory::claims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Opt-In Guest',
             'guest_invite_id' => $invite->id,
             'transient_galleries' => [$galleryId],
-        ])->make();
-
-        return app(JWTAuth::class)->encode($payload)->get();
+        ])->asGuest();
     }
 
     public function test_guest_opt_in_is_rejected_without_writing_null_user_row(): void

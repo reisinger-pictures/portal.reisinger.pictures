@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -91,7 +92,7 @@ class FtpSlugValidationTest extends TestCase
     public function test_photographer_login_is_stored_for_a_compliant_value(string $value): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', [
@@ -110,7 +111,7 @@ class FtpSlugValidationTest extends TestCase
     public function test_cosmetic_input_is_normalized_before_it_is_stored(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', [
@@ -146,7 +147,7 @@ class FtpSlugValidationTest extends TestCase
     public function test_photographer_gets_an_error_for_a_value_the_account_system_cannot_carry(string $value): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', [
@@ -169,7 +170,7 @@ class FtpSlugValidationTest extends TestCase
         $other->forceFill(['ftp_slug' => 'florian'])->save();
 
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', [
@@ -186,7 +187,7 @@ class FtpSlugValidationTest extends TestCase
     {
         $photographer = $this->photographer();
         $photographer->forceFill(['ftp_slug' => 'max'])->save();
-        $token = auth('api')->login($photographer->fresh());
+        $token = AuthTokenFactory::forUser($photographer->fresh());
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', [
@@ -209,7 +210,7 @@ class FtpSlugValidationTest extends TestCase
     {
         $photographer = $this->photographer();
         $photographer->forceFill(['ftp_slug' => 'j.doe'])->save();
-        $token = auth('api')->login($photographer->fresh());
+        $token = AuthTokenFactory::forUser($photographer->fresh());
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', [
@@ -228,7 +229,7 @@ class FtpSlugValidationTest extends TestCase
     public function test_profile_update_without_a_slug_stays_valid(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', ['name' => 'Max Mustermann'])
@@ -253,7 +254,7 @@ class FtpSlugValidationTest extends TestCase
     public function test_a_slug_change_replaces_the_account_in_sftpgo_before_the_new_slug_is_committed(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson('/api/auth/profile', [
@@ -311,7 +312,7 @@ class FtpSlugValidationTest extends TestCase
     public function test_a_slug_change_is_refused_when_sftpgo_is_not_configured(): void
     {
         $photographer = $this->photographer();
-        $token = auth('api')->login($photographer);
+        $token = AuthTokenFactory::forUser($photographer);
         $slugBefore = $photographer->ftp_slug;
 
         // Caught rather than rendered, because there is no handler for it — and

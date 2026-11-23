@@ -6,6 +6,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class ExtractOfferValidationTest extends TestCase
@@ -17,7 +18,7 @@ class ExtractOfferValidationTest extends TestCase
         $user = User::factory()->create();
         $role = Role::firstOrCreate(['name' => 'super_admin']);
         $user->roles()->attach($role);
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         return ['user' => $user, 'token' => $token];
     }
@@ -56,7 +57,7 @@ class ExtractOfferValidationTest extends TestCase
     public function test_non_super_admin_gets_403(): void
     {
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
 
         $response = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->postJson('/api/management/invoices/extract-offer', [

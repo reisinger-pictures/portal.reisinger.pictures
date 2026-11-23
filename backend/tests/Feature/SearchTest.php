@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Meilisearch\Client;
 use Meilisearch\Contracts\TasksQuery;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class SearchTest extends TestCase
@@ -73,7 +74,7 @@ class SearchTest extends TestCase
 
         $this->waitForSearchIndex();
 
-        $adminToken = auth('api')->login($admin);
+        $adminToken = AuthTokenFactory::forUser($admin);
         $response = $this->withHeaders(['Authorization' => "Bearer $adminToken"])->getJson('/api/search?q=');
 
         $this->assertCount(1, $response->json('galleries'));
@@ -90,7 +91,7 @@ class SearchTest extends TestCase
 
         $this->waitForSearchIndex();
 
-        $token = auth('api')->login($client);
+        $token = AuthTokenFactory::forUser($client);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])->getJson('/api/search?q=AllowedPhoto123');
 
         $this->assertCount(1, $response->json('photos'));
@@ -107,7 +108,7 @@ class SearchTest extends TestCase
 
         $this->waitForSearchIndex();
 
-        $token = auth('api')->login($photog);
+        $token = AuthTokenFactory::forUser($photog);
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])->getJson('/api/search?q=PhotogOwnPhoto');
 
         $this->assertCount(1, $response->json('photos'));

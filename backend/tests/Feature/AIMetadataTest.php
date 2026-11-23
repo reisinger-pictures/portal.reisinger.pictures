@@ -9,13 +9,14 @@ use App\Models\Photo;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AIService;
+use App\Services\Auth\AuthTokenService;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
-use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class AIMetadataTest extends TestCase
@@ -66,7 +67,12 @@ class AIMetadataTest extends TestCase
 
     protected function tearDown(): void
     {
-        auth('api')->logout();
+        // The Sanctum api guard is a RequestGuard without logout(); RefreshDatabase
+        // already discards its token rows after every test.
+        if (! app(AuthTokenService::class)->isSanctum()) {
+            auth('api')->logout();
+        }
+
         parent::tearDown();
     }
 
@@ -269,7 +275,7 @@ class AIMetadataTest extends TestCase
             'token' => 'ai-metadata-active-invite',
             'can_edit_metadata' => true,
         ]);
-        $token = JWTAuth::claims([
+        $token = AuthTokenFactory::claims([
             'transient_galleries' => [(string) $invitedGallery->id],
             'transient_meta_galleries' => [(string) $invitedGallery->id],
             'transient_invites' => [

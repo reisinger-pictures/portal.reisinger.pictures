@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Mollie\Api\Http\Requests\CreatePaymentRequest;
+use Tests\Support\AuthTokenFactory;
 use Tests\Support\FakesMollie;
 use Tests\TestCase;
 
@@ -171,7 +172,7 @@ class CheckoutRateLimitTest extends TestCase
         Setting::updateOrCreate(['key' => 'company_street', 'brand' => 'rp'], ['value' => 'Teststreet 1']);
 
         $user = User::factory()->create();
-        $token = auth('api')->login($user);
+        $token = AuthTokenFactory::forUser($user);
         $gallery = Gallery::factory()->create(['is_public' => true]);
         $photo = Photo::factory()->create(['gallery_id' => $gallery->id]);
         $useCase = LicenseUseCase::create([

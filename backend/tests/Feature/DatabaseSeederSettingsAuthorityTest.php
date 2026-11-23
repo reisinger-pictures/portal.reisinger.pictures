@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -212,7 +213,7 @@ class DatabaseSeederSettingsAuthorityTest extends TestCase
     {
         $admin = User::query()->where('email', config('admin.email'))->firstOrFail();
 
-        return auth('api')->login($admin);
+        return AuthTokenFactory::forUser($admin);
     }
 
     /**

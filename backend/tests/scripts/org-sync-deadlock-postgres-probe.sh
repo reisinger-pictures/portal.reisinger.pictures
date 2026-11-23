@@ -125,8 +125,11 @@ for ($i = 0; $i < (int) getenv('ORG_SYNC_PROBE_SCENARIOS'); $i++) {
     $actorA->roles()->attach([$adminRole->id, $defaultRole->id]);
     $actorB = User::factory()->create(['brand' => Brand::B2B, 'org_id' => $orgX->id]);
     $actorB->roles()->attach([$adminRole->id, $defaultRole->id]);
+    // Issue through AuthTokenService so the probe works in both driver modes:
+    // the default `sanctum` api guard is a RequestGuard with no login() method.
+    $tokens = app(\App\Services\Auth\AuthTokenService::class);
     $scenarios[] = ['org_x' => $orgX->id, 'org_y' => $orgY->id, 'actor_a' => $actorA->id, 'actor_b' => $actorB->id,
-        'token_a' => auth('api')->login($actorA), 'token_b' => auth('api')->login($actorB)];
+        'token_a' => $tokens->issue($actorA), 'token_b' => $tokens->issue($actorB)];
 }
 echo json_encode(['scenarios' => $scenarios], JSON_THROW_ON_ERROR);
 PHP

@@ -29,8 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\Factory;
-use PHPOpenSourceSaver\JWTAuth\JWTAuth;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -380,7 +379,7 @@ class MediaVerifierFollowUpsTest extends TestCase
             $ratingPhoto = Photo::factory()->create(['gallery_id' => $ratingGallery->id]);
             $user = User::factory()->create(['brand' => Brand::B2B]);
             $user->galleries()->attach($ratingGallery);
-            $token = auth('api')->login($user);
+            $token = AuthTokenFactory::forUser($user);
             $this->withToken($token)
                 ->postJson('/api/photos/'.$ratingPhoto->id.'/rate', ['rating' => 5])
                 ->assertNotFound();
@@ -451,7 +450,7 @@ class MediaVerifierFollowUpsTest extends TestCase
         }
         $this->assertNotNull($quoteError);
 
-        $adminToken = auth('api')->login($admin);
+        $adminToken = AuthTokenFactory::forUser($admin);
         $this->withToken($adminToken)
             ->postJson('/api/management/orders/quote-link', [
                 'photo_ids' => [$photo->id],
@@ -692,7 +691,8 @@ class MediaVerifierFollowUpsTest extends TestCase
             'gallery_id' => $authGallery->id,
             'token' => 'media-verifier-'.Str::random(12),
         ]);
-        $payload = app(Factory::class)->customClaims([
+
+        return AuthTokenFactory::claims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Verifier Guest',
@@ -704,9 +704,7 @@ class MediaVerifierFollowUpsTest extends TestCase
                     'meta_gallery_ids' => [],
                 ],
             ],
-        ])->make();
-
-        return app(JWTAuth::class)->encode($payload)->get();
+        ])->asGuest();
     }
 
     /**
@@ -725,7 +723,8 @@ class MediaVerifierFollowUpsTest extends TestCase
             'gallery_id' => $gallery->id,
             'token' => 'media-verifier-selection-'.Str::random(12),
         ]);
-        $payload = app(Factory::class)->customClaims([
+
+        return AuthTokenFactory::claims([
             'sub' => 'guest_'.$guestId,
             'guest_id' => $guestId,
             'guest_name' => 'Selection Guest',
@@ -738,9 +737,7 @@ class MediaVerifierFollowUpsTest extends TestCase
                 ],
             ],
             'transient_invite_ids' => [(string) $invite->id],
-        ])->make();
-
-        return app(JWTAuth::class)->encode($payload)->get();
+        ])->asGuest();
     }
 
     /**

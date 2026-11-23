@@ -20,6 +20,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 use TypeError;
 
@@ -307,7 +308,7 @@ class GalleryGroupBrandInvariantTest extends TestCase
     public function test_brand_bound_super_admin_foreign_group_is_rejected_by_the_brand_scoped_request_validation(): void
     {
         $foreignGroup = GalleryGroup::factory()->create(['brand' => 'srp']);
-        $token = auth('api')->login($this->user(UserRole::SUPER_ADMIN, Brand::B2B->value));
+        $token = AuthTokenFactory::forUser($this->user(UserRole::SUPER_ADMIN, Brand::B2B->value));
 
         $response = $this->withHeaders($this->bearer($token))
             ->postJson('/api/management/galleries', [
@@ -329,7 +330,7 @@ class GalleryGroupBrandInvariantTest extends TestCase
     public function test_brand_bound_super_admin_may_reference_a_group_of_its_own_brand(): void
     {
         $ownGroup = GalleryGroup::factory()->create(['brand' => Brand::B2B->value]);
-        $token = auth('api')->login($this->user(UserRole::SUPER_ADMIN, Brand::B2B->value));
+        $token = AuthTokenFactory::forUser($this->user(UserRole::SUPER_ADMIN, Brand::B2B->value));
 
         $response = $this->withHeaders($this->bearer($token))
             ->postJson('/api/management/galleries', [
@@ -833,7 +834,7 @@ class GalleryGroupBrandInvariantTest extends TestCase
             'gallery_group_id' => null,
         ]);
         $foreignGroup = GalleryGroup::factory()->create(['brand' => 'srp']);
-        $token = auth('api')->login($this->user(UserRole::SUPER_ADMIN, null));
+        $token = AuthTokenFactory::forUser($this->user(UserRole::SUPER_ADMIN, null));
 
         $response = $this->withHeaders($this->bearer($token))
             ->putJson("/api/management/galleries/{$gallery->id}", [

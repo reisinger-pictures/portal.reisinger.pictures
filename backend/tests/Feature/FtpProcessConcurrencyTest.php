@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -89,7 +90,7 @@ class FtpProcessConcurrencyTest extends TestCase
     public function test_a_concurrent_second_call_neither_duplicates_the_photo_nor_the_unlink(): void
     {
         [$user, $sourcePath] = $this->createImportContext();
-        $token = 'Bearer '.auth('api')->login($user);
+        $token = 'Bearer '.AuthTokenFactory::forUser($user);
 
         $metadataExtractions = 0;
         $realService = new PhotoProcessingService;
@@ -240,7 +241,7 @@ class FtpProcessConcurrencyTest extends TestCase
     private function processAs(User $user)
     {
         return $this->withHeaders([
-            'Authorization' => 'Bearer '.auth('api')->login($user),
+            'Authorization' => 'Bearer '.AuthTokenFactory::forUser($user),
         ])->postJson('/api/management/ftp/process');
     }
 

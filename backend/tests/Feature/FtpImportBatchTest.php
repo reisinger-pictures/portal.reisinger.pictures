@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Group;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -474,7 +475,7 @@ class FtpImportBatchTest extends TestCase
         $this->app->instance(PhotoProcessingService::class, $photoService);
         $this->app->instance(FtpController::class, new FtpController($photoService));
 
-        $this->withHeaders(['Authorization' => 'Bearer '.auth('api')->login($user)])
+        $this->withHeaders(['Authorization' => 'Bearer '.AuthTokenFactory::forUser($user)])
             ->postJson('/api/management/ftp/process')
             ->assertOk()
             ->assertJson(['success' => true, 'processed' => 1]);

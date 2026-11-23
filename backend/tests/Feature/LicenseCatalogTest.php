@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 class LicenseCatalogTest extends TestCase
@@ -16,7 +17,7 @@ class LicenseCatalogTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         // 1. Create Use Case
         $resUC = $this->withHeaders(['Authorization' => "Bearer $token"])
@@ -53,7 +54,7 @@ class LicenseCatalogTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->roles()->attach(Role::firstOrCreate(['name' => UserRole::ADMIN->value]));
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/settings/license-use-cases', ['name' => 'Hack', 'base_price' => 1000])

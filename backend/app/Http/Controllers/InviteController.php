@@ -109,8 +109,11 @@ class InviteController extends Controller
         }
 
         $guard = Auth::guard('api');
+        $tokens = app(AuthTokenService::class);
         $currentUser = $guard->user();
-        if (! $currentUser && $request->hasCookie('rp_jwt')) {
+        // `setToken()` is a JWT-guard-only API. In sanctum mode the guard has
+        // already resolved the cookie through the middleware's bearer promotion.
+        if (! $currentUser && ! $tokens->isSanctum() && $request->hasCookie('rp_jwt')) {
             try {
                 $currentUser = $guard->setToken($request->cookie('rp_jwt'))->user();
             } catch (\Exception $e) {
@@ -134,6 +137,59 @@ class InviteController extends Controller
         $transientMetaGalleries = $invite->can_edit_metadata ? [(string) $gallery->id] : [];
 
         if ($currentUser) {
+            $tokens = app(AuthTokenService::class);
+            if ($tokens->isSanctum()) {
+                // Mirror the JWT branch: carry the current grants into a fresh
+                // credential pair after merging this invite. Claims are read
+                // from the presented token's abilities, never trusted at face
+                // value — sanitizeTransientClaims() revalidates every grant
+                // against live invite state (D-39/D-44, FINAL-6).
+                $credential = $request->bearerToken();
+                if (! is_string($credential) || $credential === '') {
+                    $fromCookie = $request->cookie((string) config('jwt.cookie_key_name', 'rp_jwt'));
+                    $credential = is_string($fromCookie) ? $fromCookie : null;
+                }
+                $claims = $tokens->claimsOf($credential);
+
+                $inviteId = (string) $invite->getKey();
+                $existingInvites = $claims->transientInvites;
+                $existingInvites[$inviteId] = [
+                    'gallery_ids' => [(string) $gallery->getKey()],
+                    'meta_gallery_ids' => $invite->can_edit_metadata ? [(string) $gallery->getKey()] : [],
+                ];
+
+                $sanitized = app(AuthorizationService::class)->sanitizeTransientClaims([
+                    'transient_galleries' => array_values(array_unique([
+                        ...$claims->transientGalleries,
+                        ...$transientGalleries,
+                    ])),
+                    'transient_meta_galleries' => array_values(array_unique([
+                        ...$claims->transientMetaGalleries,
+                        ...$transientMetaGalleries,
+                    ])),
+                    'transient_invites' => $existingInvites,
+                    'transient_invite_ids' => array_values(array_unique([
+                        ...$claims->transientInviteIds,
+                        $inviteId,
+                    ])),
+                ], true);
+
+                $merged = new TransientClaims(
+                    guestId: $claims->guestId,
+                    guestName: $claims->guestName,
+                    transientInviteIds: $sanitized['transient_invite_ids'],
+                    transientGalleries: $sanitized['transient_galleries'],
+                    transientMetaGalleries: $sanitized['transient_meta_galleries'],
+                    transientInvites: $sanitized['transient_invites'],
+                );
+
+                return $this->respondWithTokens(
+                    $tokens->issue($currentUser, $merged),
+                    $tokens->issueRefresh($currentUser, $merged),
+                    ['full_path' => $gallery->full_path],
+                );
+            }
+
             $payload = $guard->payload();
             $transientClaims = [
                 'transient_galleries' => $payload->get('transient_galleries'),

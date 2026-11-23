@@ -18,8 +18,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use PHPOpenSourceSaver\JWTAuth\Factory;
-use PHPOpenSourceSaver\JWTAuth\JWTAuth;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -57,10 +56,7 @@ class GuestOrderIsolationTest extends TestCase
             $claims['guest_id'] = $guestId;
         }
 
-        $factory = app(Factory::class);
-        $payload = $factory->customClaims($claims)->make();
-
-        return app(JWTAuth::class)->encode($payload)->get();
+        return AuthTokenFactory::claims($claims)->asGuest();
     }
 
     private function guestActor(string $guestId): User

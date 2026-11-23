@@ -7,6 +7,7 @@ use App\Models\Org;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -40,7 +41,7 @@ class UserPrivilegeEscalationTest extends TestCase
         $target = User::factory()->create(['org_id' => $org->id, 'brand' => 'rp']);
 
         $adminRole = Role::firstOrCreate(['name' => UserRole::ADMIN->value]);
-        $token = auth('api')->login($orgAdmin);
+        $token = AuthTokenFactory::forUser($orgAdmin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/management/users/{$target->id}", [
@@ -61,7 +62,7 @@ class UserPrivilegeEscalationTest extends TestCase
         $orgAdmin = $this->makeOrgAdmin($org);
 
         $adminRole = Role::firstOrCreate(['name' => UserRole::ADMIN->value]);
-        $token = auth('api')->login($orgAdmin);
+        $token = AuthTokenFactory::forUser($orgAdmin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/management/users/{$orgAdmin->id}", [
@@ -83,7 +84,7 @@ class UserPrivilegeEscalationTest extends TestCase
         $target = User::factory()->create(['org_id' => $org->id, 'brand' => 'rp']);
 
         $clientRole = Role::firstOrCreate(['name' => UserRole::CLIENT->value]);
-        $token = auth('api')->login($orgAdmin);
+        $token = AuthTokenFactory::forUser($orgAdmin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/management/users/{$target->id}", [
@@ -105,7 +106,7 @@ class UserPrivilegeEscalationTest extends TestCase
         $target = User::factory()->create(['brand' => 'rp']);
 
         $adminRole = Role::firstOrCreate(['name' => UserRole::ADMIN->value]);
-        $token = auth('api')->login($admin);
+        $token = AuthTokenFactory::forUser($admin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->putJson("/api/management/users/{$target->id}", [

@@ -15,6 +15,7 @@ use App\Support\BrandRegistry;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
 /**
@@ -178,7 +179,7 @@ class PdfTypographyTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/invoices/manual', [
@@ -203,7 +204,7 @@ class PdfTypographyTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
-        $token = auth('api')->login($superAdmin);
+        $token = AuthTokenFactory::forUser($superAdmin);
 
         $res = $this->withHeaders(['Authorization' => "Bearer $token"])
             ->postJson('/api/management/invoices/manual', [
