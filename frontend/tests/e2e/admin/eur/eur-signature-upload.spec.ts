@@ -125,7 +125,12 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         const main = await openBelege(page);
         const documentId = await createCorrection(page, main);
 
-        const row = main.getByRole('row').filter({ hasText: 'unsigned' }).first();
+        // Die Liste wird nach dem Erstellen asynchron neu geladen; `.first()`
+        // würde nach dem Refetch auf eine andere Zeile zeigen.
+        const row = main.getByRole('row').filter({
+            has: main.locator(`a[href="/api/management/eur/documents/${documentId}/download"]`),
+        });
+        await expect(row).toBeVisible();
         await row.getByRole('button', { name: 'OCR-Hinweise' }).click();
 
         await expect(row.getByText('OCR ist nur für Bildbelege (PNG/JPEG) verfügbar.')).toBeVisible();
