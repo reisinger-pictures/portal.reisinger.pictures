@@ -268,16 +268,9 @@ describe('ManagementEurView EAR completion UI', () => {
         expect(createEurEigenbeleg).not.toHaveBeenCalled();
     });
 
-    it('accepts a zero-amount Eigenbeleg with a 0 % private share', async () => {
+    it('rejects a zero-amount Eigenbeleg (backend requires min:1)', async () => {
         mockHooks();
         vi.clearAllMocks();
-        vi.mocked(createEurEigenbeleg).mockResolvedValue({
-            entry: {
-                id: 3, year: 2026, month: 5, direction: 'expense', kind_type: 'Eigenbeleg',
-                e1a_code: null, business_share: 0, amount_cents: 0, business_amount_cents: 0,
-                vat_kind: null, payment_method: null, project: null, customer: null, receipt_no: null, note: null,
-            },
-        });
         renderView();
 
         await userEvent.click(screen.getByRole('button', {name: '+ Eigenbeleg'}));
@@ -289,15 +282,8 @@ describe('ManagementEurView EAR completion UI', () => {
         await userEvent.selectOptions(screen.getByLabelText('Betriebsanteil (%)'), '0');
         await userEvent.click(screen.getByRole('button', {name: 'Eigenbeleg speichern'}));
 
-        expect(createEurEigenbeleg).toHaveBeenCalledWith({
-            year: 2026,
-            month: 5,
-            day: 5,
-            description: 'Null',
-            amount_cents: 0,
-            business_share: 0,
-        });
-        expect(await screen.findByText('Der Eigenbeleg wurde erfasst.')).toBeVisible();
+        expect(screen.getByText('Bitte einen gültigen Betrag angeben')).toBeVisible();
+        expect(createEurEigenbeleg).not.toHaveBeenCalled();
     });
 
     it('saves EAR settings from the Einstellungen tab', async () => {

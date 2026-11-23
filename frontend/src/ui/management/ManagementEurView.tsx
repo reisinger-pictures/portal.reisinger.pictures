@@ -73,13 +73,15 @@ const YEARS = [2024, 2025, 2026];
 const DEFAULT_YEAR = 2026;
 const BUSINESS_SHARES = Array.from({length: 21}, (_, index) => index * 5);
 
-/** Same rounding as the booking dialog, including the finite/non-negative guards. */
+// Like the booking dialog's rounding, but strictly positive: the backend
+// validates the Eigenbeleg amount with `min:1`, so 0 must be rejected here
+// (and never sent to an API that would refuse it with a 422).
 const eigenbelegCentsOrNull = (value: string): number | null => {
     if (value.trim() === '') return null;
     const amount = Number(value.replace(',', '.'));
     if (!Number.isFinite(amount)) return null;
     const cents = Math.round(amount * 100);
-    return Number.isFinite(cents) && cents >= 0 ? cents : null;
+    return Number.isFinite(cents) && cents > 0 ? cents : null;
 };
 
 // Called inside the component: a `t` macro at module scope would evaluate
