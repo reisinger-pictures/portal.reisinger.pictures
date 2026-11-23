@@ -26,7 +26,9 @@ test.describe('EAR · DEG-Ausschlüsse', () => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);
         await auth.login(superAdmin.email, superAdmin.password);
-        const headers = await browserAuthHeadersFromPage(page);
+        // Ohne Accept: application/json rendert Laravel abort(422) eine HTML-
+        // Fehlerseite; die API-Antwort muss aber der JSON-Vertrag sein.
+        const headers = {...await browserAuthHeadersFromPage(page), 'Accept': 'application/json'};
 
         const payload = {
             name: 'DEG-Prüfling',
