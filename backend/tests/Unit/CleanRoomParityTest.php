@@ -4,28 +4,35 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
+use App\Eur\Domain\VatCalculator;
 use App\Eur\Parity\BookkeepingTotals;
 use App\Eur\Parity\Money;
 use App\Eur\Parity\RuleValues;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 /**
- * EAR · Parität — 19 datengetriebene Vektoren aus der gepinnten Fixture.
+ * EAR · Parität — datengetriebene Vektoren aus der gepinnten Fixture.
  *
  * Framework-/DB-frei (PHPUnit\Framework\TestCase, NICHT Tests\TestCase).
  * Expected Values und Inputs kommen ausschließlich aus der Fixture; es gibt
  * keinen Direktvergleich, keine zweite Regelquelle und keine kopierten
  * Formeln. Weicht ein abgeleiteter Wert ab, gilt immer canonical.
+ *
+ * Regelzellen lesen ihren 2026-Wert über RuleValues::canonicalFor bzw.
+ * RuleValues::parameterFor aus dem gepinnten Katalog (EUE-ID + Parametername).
+ * Die USt-Zahllast (EUE-086) läuft über die portal-eigene VatCalculator-Kette;
+ * ihr Erwartungswert stammt aus dem ersten Teilsatz des gepinnten Parameters.
  */
 class CleanRoomParityTest extends TestCase
 {
     private const FIXTURE = __DIR__.'/../../../features/eur/cleanroom/cleanroom-parity-2026.json';
 
     /**
-     * @return array<string, array{verify: string, rule: string, unit: string, canonical: int, inputs: array<string, int|float>, year: int}>
+     * @return array<string, array{verify: string, rule: string, parameter: string|null, unit: string, canonical: int, inputs: array<string, int|float>, year: int}>
      */
     public static function vectorProvider(): array
     {
@@ -44,6 +51,7 @@ class CleanRoomParityTest extends TestCase
                 $cases[$label] = [
                     'verify' => $cell['verify'],
                     'rule' => $cell['rule'],
+                    'parameter' => $cell['parameter'] ?? null,
                     'unit' => $cell['unit'],
                     'canonical' => $cell['canonical'],
                     'inputs' => $inputs,
@@ -59,9 +67,11 @@ class CleanRoomParityTest extends TestCase
      * @param  array<string, int|float>  $inputs
      */
     #[DataProvider('vectorProvider')]
+    #[Group('smoke')]
     public function test_vector_matches_fixture_canonical(
         string $verify,
         string $rule,
+        ?string $parameter,
         string $unit,
         int $canonical,
         array $inputs,
@@ -69,12 +79,17 @@ class CleanRoomParityTest extends TestCase
     ): void {
         $this->assertVector(
             $canonical,
-            $this->resolve($verify, $rule, $unit, $year, $inputs),
+            $this->resolve($verify, $rule, $parameter, $unit, $year, $inputs),
             $verify,
         );
     }
 
-    public function test_fixture_drives_nineteen_named_vectors(): void
+    /**
+     * Der Vertrag zählt 16 Szenarien / 45 Zellen. Die Zählung ist selbst Teil
+     * der Fixture-Prüfung: ein hinzugefügter oder entfernter Vektor muss rot
+     * werden, bis MANIFEST.json und die Zähler bewusst nachgezogen sind.
+     */
+    public function test_fixture_drives_contract_vector_counts(): void
     {
         $cases = self::vectorProvider();
         $scenarios = array_unique(array_map(
@@ -82,8 +97,39 @@ class CleanRoomParityTest extends TestCase
             array_keys($cases),
         ));
 
-        $this->assertCount(19, $cases);
-        $this->assertCount(5, $scenarios);
+        $this->assertCount(45, $cases);
+        $this->assertCount(16, $scenarios);
+    }
+
+    /**
+     * Wirksamkeitsnachweis auch für eine abgeleitete Regelkonstante: ein
+     * geänderter Erwartungswert lässt genau diesen Vektor rot werden.
+     */
+    public function test_changed_derived_rule_value_is_rejected(): void
+    {
+        $case = null;
+
+        foreach (self::vectorProvider() as $candidate) {
+            if ($candidate['rule'] === 'EUE-062') {
+                $case = $candidate;
+                break;
+            }
+        }
+
+        $this->assertNotNull($case);
+
+        $actual = $this->resolve(
+            $case['verify'],
+            $case['rule'],
+            $case['parameter'],
+            $case['unit'],
+            $case['year'],
+            $case['inputs'],
+        );
+        $this->assertVector($case['canonical'], $actual, $case['verify']);
+
+        $this->expectException(ExpectationFailedException::class);
+        $this->assertVector($case['canonical'] + 1, $actual, $case['verify']);
     }
 
     public function test_changed_expected_value_is_rejected(): void
@@ -99,7 +145,14 @@ class CleanRoomParityTest extends TestCase
 
         $this->assertNotNull($case);
 
-        $actual = $this->resolve($case['verify'], $case['rule'], $case['unit'], $case['year'], $case['inputs']);
+        $actual = $this->resolve(
+            $case['verify'],
+            $case['rule'],
+            $case['parameter'],
+            $case['unit'],
+            $case['year'],
+            $case['inputs'],
+        );
         $this->assertVector($case['canonical'], $actual, $case['verify']);
 
         $this->expectException(ExpectationFailedException::class);
@@ -109,10 +162,30 @@ class CleanRoomParityTest extends TestCase
     /**
      * @param  array<string, int|float>  $inputs
      */
-    private function resolve(string $verify, string $rule, string $unit, int $year, array $inputs): int
-    {
+    private function resolve(
+        string $verify,
+        string $rule,
+        ?string $parameter,
+        string $unit,
+        int $year,
+        array $inputs,
+    ): int {
+        // EUE-086: ein gepinnter Mehrratenwert („20/10/13/4,9 %"), den
+        // RuleValues nicht als Skalar liest. Die Zahllast läuft über die
+        // portal-eigene VatCalculator-Kette; der Erwartungswert der Fixture
+        // stammt aus dem ersten Teilsatz dieses gepinnten Parameters.
+        if ($verify === 'vat.zahllastCents') {
+            return (new VatCalculator)->forMonth([
+                'ig_bases_cents' => [20 => $inputs['VatInput!B7']],
+            ])['zahllast'];
+        }
+
         if ($rule !== 'SCENARIO') {
-            return (new RuleValues)->canonicalFor($rule, $year, $unit);
+            $values = new RuleValues;
+
+            return $parameter !== null
+                ? $values->parameterFor($rule, $parameter, $year, $unit)
+                : $values->canonicalFor($rule, $year, $unit);
         }
 
         return match ($verify) {

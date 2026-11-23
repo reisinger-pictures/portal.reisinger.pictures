@@ -11,11 +11,18 @@ bleiben im privaten Ausgangsprojekt.
   sowie von `HANDOFF.md`.
 - Regeln: `domain-rules.json`, `domain-rules.schema.json`, `rules.json`, `DOMAIN.md`
   (131 Regeln, 11 Bereiche, 26 jahresabhängig).
-- Paritätsvektoren: `cleanroom-parity-2026.json` — 5 Szenarien, 19 Zellen.
+- Paritätsvektoren: `cleanroom-parity-2026.json` — 16 Szenarien, 45 Zellen;
+  mindestens ein Szenario je Fachbereich B01–B11 und alle 26 jahresabhängigen
+  Regeln mit 2026-Wert. Das Orakel weist `mismatch: 0` aus.
   `inputs` und `reference_value` stehen in Basiseinheiten (EUR, Rate, Stunden);
   `canonical` ist der ganze-Cent-/Minuten- bzw. exakte Ratenwert für den
   Engine-Vergleich. Szenarien ohne eigene Regel-ID sind als `SCENARIO`
   gekennzeichnet und prüfen zusammengesetzte Werte (z. B. Summen).
+  Abgeleitete Regelzellen nennen im Feld `parameter` den gepinnten Parameternamen
+  und im Orakel `oracle_value` den gepinnten Wert; die USt-Zahllast (EUE-086)
+  wird über die portal-eigene `VatCalculator`-Kette aus dem ersten Teilsatz des
+  gepinnten Mehrratenwerts abgeleitet. Die Herkunft steht in
+  [`PROVENANCE.md`](PROVENANCE.md).
 - Verfahren und Nachweise: `cleanroom-parity.md`, `ods-rule-verification.md`,
   `ods-coverage-matrix.md`, `ods-evidence-by-sheet.md`
   (131/131 Regeln mit Beleg, 0 Abweichungen) und `re-verification.md`

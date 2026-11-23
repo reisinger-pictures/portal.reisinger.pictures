@@ -83,8 +83,12 @@ Dieselbe Prüfung läuft als Unit-Test: `php artisan test --filter=CleanRoomFixt
 
 ## Abnahme und Vorbehalte
 
-- Feste Vektoranzahl: 5 Szenarien / 19 Zellen. Eine Änderung der Anzahl ist eine Vertragsänderung.
+- Feste Vektoranzahl: 16 Szenarien / 45 Zellen, ein Szenario je Fachbereich B01–B11 und alle 26 jahresabhängigen Regeln mit 2026-Wert; Orakel `mismatch: 0`. Eine Änderung der Anzahl ist eine Vertragsänderung.
 - Wirksamkeit: Ein absichtlich veränderter Erwartungswert muss den Test rot werden lassen.
 - Keine Kopie der Clean-Room-Basis und kein direkter Vergleich im Portal-Repo.
-- Parität „covered" erst mit Smoke- und Playwright-Referenz.
+- Parität „covered" erst mit Smoke- und Playwright-Referenz. Die Smoke-Referenz
+  ist die `#[Group('smoke')]`-Markierung von `CleanRoomParityTest`; eine
+  Playwright-Referenz für Fixture-Parität gibt es in diesem Repository nicht und
+  ist einem gesonderten Frontend-Change vorbehalten (siehe
+  [02-parity-vectors.md](02-parity-vectors.md)).
 - Die externe steuerliche Prüfung bleibt ein dokumentierter Vorbehalt, kein Blocker.

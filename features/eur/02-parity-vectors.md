@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Die 19 Vektoren der gepinnten Paritäts-Fixture sind die einzige Paritätsreferenz des Portals für den nächsten Schritt von Issue #10. Sie liefern die Expected Values (`expected[].canonical`) und die Inputs in Basiseinheiten. Der Test `backend/tests/Unit/CleanRoomParityTest.php` liest die Fixture zur Laufzeit, leitet jeden Ist-Wert über die portal-eigene Wertekette ab und vergleicht ihn mit dem Fixture-Wert.
+Die 45 Vektoren der gepinnten Paritäts-Fixture sind die einzige Paritätsreferenz des Portals. Sie liefern die Expected Values (`expected[].canonical`) und die Inputs in Basiseinheiten. Der Test `backend/tests/Unit/CleanRoomParityTest.php` liest die Fixture zur Laufzeit, leitet jeden Ist-Wert über die portal-eigene Wertekette ab und vergleicht ihn mit dem Fixture-Wert. Die Fixture deckt alle elf Fachbereiche B01–B11 und alle 26 jahresabhängigen Regeln mit 2026-Wert ab; das Orakel weist `mismatch: 0` aus.
 
 Parität entsteht ausschließlich aus dieser Fixture und den abgeleiteten Dokumenten der Clean-Room-Basis. Es gibt keinen Zugriff auf eine andere Implementierung, keinen Direktvergleich, keine zweite Regelquelle und keine Kopie von Formeln oder Code. Weicht ein hergeleiteter Wert ab, ist immer der Fixture-Wert maßgeblich: Umrechnung und Logik im Portal sind zu korrigieren, nicht die Fixture.
 
@@ -17,8 +17,19 @@ Parität entsteht ausschließlich aus dieser Fixture und den abgeleiteten Dokume
 | `business-share-100` | `money.businessShare100Cents` | cents |
 | `expense-totals-2026` | `totals.expensesCents`, `totals.profitCents`, `e1a.resultCents`, `analytics.expenseCents`, `analytics.paymentCents` | cents |
 | `hours-to-minutes` | `time.threeHoursMinutes` | minutes |
+| `business-year-2026` | `derived.eue.001.*`, `derived.eue.002.*`, `derived.eue.003.*` | count |
+| `per-diem-2026` | `derived.eue.013.*` | cents |
+| `private-income-2026` | `derived.eue.033.*` | cents |
+| `private-expense-2026` | `derived.eue.048.*` | cents |
+| `asset-constants-2026` | `derived.eue.051.*`, `derived.eue.052.*` | cents, count |
+| `travel-rates-2026` | `derived.eue.062.*`, `derived.eue.063.*`, `derived.eue.064.*`, `derived.eue.065.*`, `derived.eue.069.*` | cents |
+| `vat-2026` | `vat.zahllastCents` | cents |
+| `est-tariff-2026` | `derived.eue.089.*` … `derived.eue.093.*` | cents |
+| `sv-2026` | `derived.eue.108.*` … `derived.eue.112.*` | cents, per-mille |
+| `analytics-2026` | `derived.eue.125.*` | cents |
+| `validation-2026` | `derived.eue.129.*` | count |
 
-Die Konstanten-Szenarien verweisen über Regel-IDs auf den Katalog (EUE-014 bis EUE-022 sowie EUE-096 und EUE-097); die drei Szenarien ohne Regelkonstante sind Szenariowerte der Fixture.
+Die Konstanten-Szenarien verweisen über Regel-IDs und Parameternamen auf den Katalog; die Szenarien ohne Regelkonstante (`business-share-100`, `expense-totals-2026`, `hours-to-minutes`) prüfen zusammengesetzte Werte. `vat-2026` ist aus dem ersten Teilsatz des gepinnten EUE-086-Parameters (`USt-Sätze`) und dem 10000-Cent-Eingabewert abgeleitet; die Ist-Wert-Kette ist `VatCalculator`.
 
 ## Wertekette und Einheiten
 
@@ -32,7 +43,9 @@ Die Konstanten-Szenarien verweisen über Regel-IDs auf den Katalog (EUE-014 bis 
 
 ## Konstanten
 
-`RuleValues` liest den gepinnten Katalog `cleanroom/domain-rules.json` zur Laufzeit und wählt pro Regel-ID den Parameter mit dem Wirtschaftsjahr 2026. Es werden nur die strukturierten Felder ausgelesen; Regeltexte und Formelstrings wandern nicht in den Code. Bei mehreren Parametern für dasselbe Jahr muss deren Wert identisch sein, sonst wird die Anfrage mit einer Ausnahme abgebrochen — es wird nie still einer gewählt. Andere Jahre und unbekannte Einheiten werden abgewiesen. Es gibt keine zweite, redaktionell gepflegte Regelquelle.
+`RuleValues` liest den gepinnten Katalog `cleanroom/domain-rules.json` zur Laufzeit und wählt pro Regel-ID den Parameter mit dem Wirtschaftsjahr 2026. `canonicalFor` verlangt identische Werte bei mehreren Parametern für dasselbe Jahr; `parameterFor` wählt einen benannten Parameter und wird für Regeln mit mehreren unterschiedlichen Werten verwendet. Es werden nur die strukturierten Felder ausgelesen; Regeltexte und Formelstrings wandern nicht in den Code. Andere Jahre und unbekannte Einheiten werden abgewiesen. Es gibt keine zweite, redaktionell gepflegte Regelquelle.
+
+Die Einheit `count` bleibt ein ganzer Zählwert (z. B. Wirtschaftsjahr 2026, Nutzungsjahre 2, Abgleich-Rundung 1); sie wird nicht in Cent skaliert.
 
 ## Ausführen
 
@@ -40,18 +53,18 @@ Die Konstanten-Szenarien verweisen über Regel-IDs auf den Katalog (EUE-014 bis 
 cd backend && php artisan test --filter=CleanRoomParityTest
 ```
 
-Erwartet: 21 grüne Tests — 19 benannte Vektoren, der Zähler für 5 Szenarien / 19 Zellen und der Wirksamkeitsnachweis.
+Erwartet: 48 grüne Tests — 45 benannte Vektoren, den Zähler für 16 Szenarien / 45 Zellen und zwei Wirksamkeitsnachweise.
 
 ## Wirksamkeitsnachweis
 
-`test_changed_expected_value_is_rejected` prüft zuerst den korrekten Canonical-Wert des Vektors `money.businessShare100Cents` und ruft dann `assertVector` mit `canonical + 1` auf. Der Test erwartet dafür eine `ExpectationFailedException`. Ein veränderter Erwartungswert lässt den Test damit nachweislich rot werden; eine neue oder geänderte Fixture wird nicht still übergangen.
+`test_changed_expected_value_is_rejected` prüft den Vektor `money.businessShare100Cents`, `test_changed_derived_rule_value_is_rejected` den abgeleiteten Regelvektor `EUE-062`. Beide rufen `assertVector` anschließend mit `canonical + 1` auf und erwarten eine `ExpectationFailedException`. Ein veränderter Erwartungswert lässt die Tests damit nachweislich rot werden; eine neue oder geänderte Fixture wird nicht still übergangen.
 
 ## Abgrenzung
 
-Dieses Modul ist das Paritätsziel für Issue #10. Die vollständige Buchhaltungs-Engine entsteht in den Folgetickets; hier liegt nur die minimale portal-eigene Wertekette vor. Parität gilt als `covered` erst mit Smoke- und Playwright-Referenz. Die externe steuerliche Prüfung bleibt ein dokumentierter Vorbehalt, kein Blocker.
+Die Fixture ist die Paritätsreferenz der gepinnten Vektoren. Die fachlichen Domain-Services liegen in `backend/app/Eur/`; die Parität prüft ihre Ergebnisse gegen die Fixture. Unit-Referenz ist `CleanRoomParityTest`, Smoke-Referenz ist die `#[Group('smoke')]`-Markierung desselben Tests. Eine Playwright-Referenz existiert nicht: es gibt im Repository kein E2E-Muster für Fixture-Parität, und Frontend-E2E-Änderungen sind ausdrücklich einem gesonderten, CI-gesteuerten Change vorbehalten. Die externe steuerliche Prüfung bleibt ein dokumentierter Vorbehalt, kein Blocker.
 
 ## Verweise
 
 - [01-cleanroom-handoff.md](01-cleanroom-handoff.md) — Fixture-Version und Update-Erkennung.
-- [Paritäts-Fixture 2026](cleanroom/cleanroom-parity-2026.json) — einzige Grundlage der 19 Vektoren.
+- [Paritäts-Fixture 2026](cleanroom/cleanroom-parity-2026.json) — einzige Grundlage der 45 Vektoren.
 - [Gepinnter Regelkatalog](cleanroom/domain-rules.json) — einzige Quelle der Jahreskonstanten.

@@ -74,9 +74,20 @@ Damit gilt ausdrücklich:
   Beschreibungs- oder Testnamen (`prototype/docs/openapi/schemas.yaml`,
   `paths-settings-year-warning.yaml`, `verification/rule-coverage.json`). Sie sind
   kein Rechenpfad und werden vom Portal nicht ausgewertet.
-- Die Paritätsvektoren bleiben bei 5 Szenarien / 19 Zellen. Die Erweiterung auf
-  alle elf Fachbereiche und alle 26 jahresabhängigen Regeln ist als
-  `ku-online#45` angefordert; bis dahin ist #23 blockiert.
+- Die Paritätsvektoren sind lokal aus dem gepinnten `domain-rules.json`
+  abgeleitet (Entscheidung D-70): 16 Szenarien / 45 Zellen, ein Szenario je
+  Fachbereich B01–B11, alle 26 jahresabhängigen Regeln mit 2026-Wert,
+  `mismatch: 0`. Jede abgeleitete Zelle nennt ihre EUE-ID und den gepinnten
+  Parameternamen; `oracle_value` ist der unveränderte `wert` aus dem Katalog.
+  Der Vektor für EUE-086 (`USt-Sätze`, `20/10/13/4,9 %`) ist aus dem ersten
+  Teilsatz dieses gepinnten Werts und einem 10000-Cent-Eingabewert abgeleitet;
+  die Ist-Wert-Kette ist der portal-eigene `VatCalculator`. Weitere Konstanten
+  werden über `RuleValues::parameterFor` bzw. `canonicalFor` gelesen. Es wurden
+  keine Formeln, Zellbezüge, Basiswerte oder Quellcode übernommen. Die
+  Änderung ist mit `artifact_version 2026.4` und nachgezogenen Prüfsummen
+  versioniert.
 - Die engine-nahen Anforderungsdokumente (ESt, USt, Reisen, AfA), das
-  Datenmodell-Dokument und die fachlichen UI-Anforderungen fehlen weiterhin und
-  sind ebenfalls in `ku-online#45` angefordert.
+  Datenmodell-Dokument und die fachlichen UI-Anforderungen liegen als
+  byte-exakte Kopien unter `artifacts/verification/requirements/` (siehe oben).
+  Ein gesondertes Statusartefakt zum Paritätsstand ist nicht Teil dieses
+  Handoffs; der Paritätsstand der Fixture steht in deren `oracle`-Block.

@@ -65,7 +65,7 @@ The group covers the critical paths whose breakage means "do not continue", not 
 - the model file path — the store, the encryption, the image budget, the contact sheet,
 - the order/payout path — the checkout, the money fields in cents, the ZIP.
 
-The group spans both test suites: 17 of the 18 tagged methods live in `tests/Feature`, one (`PersistedMoneyTest`) in `tests/Unit`.
+The group spans both test suites: 17 of the 19 tagged methods live in `tests/Feature`, two (`PersistedMoneyTest` and `CleanRoomParityTest`) in `tests/Unit`. The parity method is data-driven, so the group runs 63 cases.
 
 Rules for the group:
 

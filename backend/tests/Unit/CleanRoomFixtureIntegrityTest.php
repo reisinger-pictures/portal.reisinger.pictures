@@ -42,7 +42,7 @@ class CleanRoomFixtureIntegrityTest extends TestCase
     public function test_every_copied_artifact_matches_manifest_checksum_and_size(): void
     {
         $this->assertSame(2, $this->manifest['schema_version']);
-        $this->assertSame('2026.3', $this->manifest['artifact_version']);
+        $this->assertSame('2026.4', $this->manifest['artifact_version']);
         $this->assertSame('75f230c07010db91755f78fdbd9ae591d52c7e85', $this->manifest['artifact_source_commit']);
         $this->assertCount($this->manifest['artifact_count'], $this->manifest['artifacts']);
 
@@ -77,7 +77,7 @@ class CleanRoomFixtureIntegrityTest extends TestCase
         $this->assertSame(2026, $this->fixture['basis']['business_year']);
     }
 
-    public function test_vector_count_is_fixed_at_five_scenarios_and_nineteen_cells(): void
+    public function test_vector_count_is_fixed_at_sixteen_scenarios_and_forty_five_cells(): void
     {
         $cells = array_sum(array_map(
             static fn (array $scenario): int => count($scenario['expected']),
@@ -86,12 +86,13 @@ class CleanRoomFixtureIntegrityTest extends TestCase
 
         $this->assertSame($this->manifest['parity_scenarios'], count($this->fixture['scenarios']));
         $this->assertSame($this->manifest['parity_cells'], $cells);
-        $this->assertCount(19, $this->fixture['oracle']['checks']);
+        $this->assertCount(45, $this->fixture['oracle']['checks']);
+        $this->assertSame(0, $this->fixture['oracle']['mismatch']);
     }
 
     public function test_every_expected_cell_carries_an_integer_canonical_value(): void
     {
-        $allowedUnits = ['cents', 'minutes', 'per-mille', 'per-10000', 'percent'];
+        $allowedUnits = ['cents', 'minutes', 'per-mille', 'per-10000', 'percent', 'count'];
 
         foreach ($this->fixture['scenarios'] as $scenario) {
             $this->assertNotEmpty($scenario['inputs'], $scenario['id']);
@@ -103,6 +104,85 @@ class CleanRoomFixtureIntegrityTest extends TestCase
                 $this->assertNotSame('', $cell['verify'], $label);
             }
         }
+    }
+
+    /**
+     * D-70: jeder abgeleitete Vektor nennt die EUE-ID und den exakt gepinnten
+     * Parameterwert. Die Prüfung liest ausschließlich den Katalog, nie eine
+     * Ableitung oder eine Formel.
+     */
+    public function test_every_matched_check_names_a_pinned_rule_parameter(): void
+    {
+        $catalog = $this->readJson(self::CLEANROOM_DIR.'/domain-rules.json');
+        $rules = [];
+
+        foreach ($catalog['bereiche'] as $bereich) {
+            foreach ($bereich['regeln'] as $rule) {
+                $rules[$rule['id']] = $rule;
+            }
+        }
+
+        foreach ($this->fixture['oracle']['checks'] as $check) {
+            if ($check['status'] !== 'matched') {
+                continue;
+            }
+
+            $label = $check['rule'].'/'.$check['parameter'];
+            $this->assertArrayHasKey($check['rule'], $rules, $label);
+
+            $pinned = array_filter(
+                $rules[$check['rule']]['parameter'] ?? [],
+                static fn (array $parameter): bool => $parameter['name'] === $check['parameter']
+                    && in_array(2026, $parameter['jahre'] ?? [], true),
+            );
+
+            $this->assertNotEmpty($pinned, $label);
+            $this->assertContains(
+                $check['oracle_value'],
+                array_column($pinned, 'wert'),
+                $label,
+            );
+        }
+    }
+
+    /**
+     * Abnahme: mindestens ein Vektor je Fachbereich und alle 26 jahresabhängigen
+     * Regeln mit 2026-Wert. Die Zugehörigkeit kommt aus dem gepinnten Katalog.
+     */
+    public function test_every_area_and_every_year_dependent_rule_is_covered(): void
+    {
+        $catalog = $this->readJson(self::CLEANROOM_DIR.'/domain-rules.json');
+        $covered = [];
+
+        foreach ($this->fixture['oracle']['checks'] as $check) {
+            if ($check['status'] === 'matched') {
+                $covered[$check['rule']] = true;
+            }
+        }
+
+        $areas = [];
+        $yearDependent = 0;
+
+        foreach ($catalog['bereiche'] as $bereich) {
+            foreach ($bereich['regeln'] as $rule) {
+                if (isset($covered[$rule['id']])) {
+                    $areas[$bereich['id']] = true;
+                }
+
+                $perYear = array_filter(
+                    $rule['parameter'] ?? [],
+                    static fn (array $parameter): bool => count($parameter['jahre'] ?? []) === 1
+                        && $parameter['wert'] !== null,
+                );
+
+                if ($perYear !== [] && isset($covered[$rule['id']])) {
+                    $yearDependent++;
+                }
+            }
+        }
+
+        $this->assertCount(11, $areas);
+        $this->assertSame(26, $yearDependent);
     }
 
     /**

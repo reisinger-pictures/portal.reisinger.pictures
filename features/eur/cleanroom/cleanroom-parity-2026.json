@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_by": "tools/cleanroom_parity.py extract",
+  "generated_by": "local derivation from pinned domain-rules.json (D-70); original 5 scenarios from cleanroom_parity.py extract",
   "oracle": {
     "source": "business-rules/domain-rules.json",
     "year": 2026,
-    "description": "Independent authoritative rule catalogue. Rule constants must match a 2026 parameter; scenario-only values are marked no-rule-constant.",
-    "matched": 12,
+    "description": "Independent authoritative rule catalogue. Rule constants must match a 2026 parameter; scenario-only values are marked no-rule-constant. Derived vectors name the EUE rule and pinned parameter value; B07 is derived from the first rate of the pinned EUE-086 multi-rate parameter via the portal VatCalculator chain.",
+    "matched": 38,
     "unmatched": 7,
     "mismatch": 0,
     "checks": [
@@ -198,6 +198,267 @@
         "canonical": 180,
         "unit": "minutes",
         "status": "no-rule-constant"
+      },
+      {
+        "verify": "derived.eue.001.wirtschaftsjahr",
+        "rule": "EUE-001",
+        "cell": "Regelkatalog!EUE-001",
+        "parameter": "Wirtschaftsjahr",
+        "oracle_value": 2026,
+        "canonical": 2026,
+        "unit": "count",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.002.obergrenze",
+        "rule": "EUE-002",
+        "cell": "Regelkatalog!EUE-002",
+        "parameter": "Obergrenze",
+        "oracle_value": 2026,
+        "canonical": 2026,
+        "unit": "count",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.003.untergrenze",
+        "rule": "EUE-003",
+        "cell": "Regelkatalog!EUE-003",
+        "parameter": "Untergrenze",
+        "oracle_value": 2024,
+        "canonical": 2024,
+        "unit": "count",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.013.inland.tagespauschale",
+        "rule": "EUE-013",
+        "cell": "Regelkatalog!EUE-013",
+        "parameter": "Inland Tagespauschale",
+        "oracle_value": 30,
+        "canonical": 3000,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.033.betriebsanteil.privat",
+        "rule": "EUE-033",
+        "cell": "Regelkatalog!EUE-033",
+        "parameter": "Betriebsanteil Privat",
+        "oracle_value": 0,
+        "canonical": 0,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.048.betriebsanteil.privat",
+        "rule": "EUE-048",
+        "cell": "Regelkatalog!EUE-048",
+        "parameter": "Betriebsanteil Privat",
+        "oracle_value": 0,
+        "canonical": 0,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.051.gwg.grenze",
+        "rule": "EUE-051",
+        "cell": "Regelkatalog!EUE-051",
+        "parameter": "GWG-Grenze",
+        "oracle_value": 1000,
+        "canonical": 100000,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.052.nutzungsjahre.minimum",
+        "rule": "EUE-052",
+        "cell": "Regelkatalog!EUE-052",
+        "parameter": "Nutzungsjahre Minimum",
+        "oracle_value": 2,
+        "canonical": 2,
+        "unit": "count",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.062.km.geld.pkw",
+        "rule": "EUE-062",
+        "cell": "Regelkatalog!EUE-062",
+        "parameter": "KM-Geld PKW",
+        "oracle_value": 0.5,
+        "canonical": 50,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.063.km.geld.motorrad",
+        "rule": "EUE-063",
+        "cell": "Regelkatalog!EUE-063",
+        "parameter": "KM-Geld Motorrad",
+        "oracle_value": 0.25,
+        "canonical": 25,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.064.km.geld.fahrrad",
+        "rule": "EUE-064",
+        "cell": "Regelkatalog!EUE-064",
+        "parameter": "KM-Geld Fahrrad",
+        "oracle_value": 0.25,
+        "canonical": 25,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.065.fahrrad.kontingent",
+        "rule": "EUE-065",
+        "cell": "Regelkatalog!EUE-065",
+        "parameter": "Fahrrad-Kontingent",
+        "oracle_value": 3000,
+        "canonical": 300000,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.069.inland.n.chtigung.ohne.beleg",
+        "rule": "EUE-069",
+        "cell": "Regelkatalog!EUE-069",
+        "parameter": "Inland Nächtigung ohne Beleg",
+        "oracle_value": 4.5,
+        "canonical": 450,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "vat.zahllastCents",
+        "rule": "EUE-086",
+        "cell": "Regelkatalog!EUE-086",
+        "parameter": "USt-Sätze",
+        "oracle_value": "20/10/13/4,9 %",
+        "canonical": 2000,
+        "unit": "cents",
+        "status": "matched",
+        "derived_from": "Erster Teilsatz 20 % des gepinnten EUE-086-Parameters auf 10000 Cent Eingabe"
+      },
+      {
+        "verify": "derived.eue.089.tarifgrenze.stufe.1",
+        "rule": "EUE-089",
+        "cell": "Regelkatalog!EUE-089",
+        "parameter": "Tarifgrenze Stufe 1",
+        "oracle_value": 13539,
+        "canonical": 1353900,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.090.tarifgrenze.stufe.2",
+        "rule": "EUE-090",
+        "cell": "Regelkatalog!EUE-090",
+        "parameter": "Tarifgrenze Stufe 2",
+        "oracle_value": 21992,
+        "canonical": 2199200,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.091.tarifgrenze.stufe.3",
+        "rule": "EUE-091",
+        "cell": "Regelkatalog!EUE-091",
+        "parameter": "Tarifgrenze Stufe 3",
+        "oracle_value": 36458,
+        "canonical": 3645800,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.092.tarifgrenze.stufe.4",
+        "rule": "EUE-092",
+        "cell": "Regelkatalog!EUE-092",
+        "parameter": "Tarifgrenze Stufe 4",
+        "oracle_value": 70365,
+        "canonical": 7036500,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.093.tarifgrenze.stufe.5",
+        "rule": "EUE-093",
+        "cell": "Regelkatalog!EUE-093",
+        "parameter": "Tarifgrenze Stufe 5",
+        "oracle_value": 104859,
+        "canonical": 10485900,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.108.mindest.kv.jungunternehmer",
+        "rule": "EUE-108",
+        "cell": "Regelkatalog!EUE-108",
+        "parameter": "Mindest-KV Jungunternehmer",
+        "oracle_value": 449.64,
+        "canonical": 44964,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.109.deckelung.beitragsgrundlage",
+        "rule": "EUE-109",
+        "cell": "Regelkatalog!EUE-109",
+        "parameter": "Deckelung Beitragsgrundlage",
+        "oracle_value": 97020,
+        "canonical": 9702000,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.110.mindest.kv.12",
+        "rule": "EUE-110",
+        "cell": "Regelkatalog!EUE-110",
+        "parameter": "Mindest-KV ×12",
+        "oracle_value": 449.64,
+        "canonical": 44964,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.111.pv.satz.gsvg",
+        "rule": "EUE-111",
+        "cell": "Regelkatalog!EUE-111",
+        "parameter": "PV-Satz GSVG",
+        "oracle_value": "18,5 %",
+        "canonical": 185,
+        "unit": "per-mille",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.112.uv.12",
+        "rule": "EUE-112",
+        "cell": "Regelkatalog!EUE-112",
+        "parameter": "UV ×12",
+        "oracle_value": 155.4,
+        "canonical": 15540,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.125.mindest.sv.monatlich",
+        "rule": "EUE-125",
+        "cell": "Regelkatalog!EUE-125",
+        "parameter": "Mindest-SV monatlich",
+        "oracle_value": 160.8,
+        "canonical": 16080,
+        "unit": "cents",
+        "status": "matched"
+      },
+      {
+        "verify": "derived.eue.129.abgleich.rundung",
+        "rule": "EUE-129",
+        "cell": "Regelkatalog!EUE-129",
+        "parameter": "Abgleich-Rundung",
+        "oracle_value": 1,
+        "canonical": 1,
+        "unit": "count",
+        "status": "matched"
       }
     ]
   },
@@ -444,6 +705,408 @@
           "unit": "minutes",
           "verify": "time.threeHoursMinutes",
           "rule": "SCENARIO"
+        }
+      ]
+    },
+    {
+      "id": "business-year-2026",
+      "title": "Wirtschaftsjahr und Jahresgrenzen 2026 (B01)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-001",
+          "reference_value": 2026.0,
+          "canonical": 2026,
+          "unit": "count",
+          "verify": "derived.eue.001.wirtschaftsjahr",
+          "rule": "EUE-001",
+          "parameter": "Wirtschaftsjahr"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-002",
+          "reference_value": 2026.0,
+          "canonical": 2026,
+          "unit": "count",
+          "verify": "derived.eue.002.obergrenze",
+          "rule": "EUE-002",
+          "parameter": "Obergrenze"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-003",
+          "reference_value": 2024.0,
+          "canonical": 2024,
+          "unit": "count",
+          "verify": "derived.eue.003.untergrenze",
+          "rule": "EUE-003",
+          "parameter": "Untergrenze"
+        }
+      ]
+    },
+    {
+      "id": "per-diem-2026",
+      "title": "Inländische Reiseverpflegungspauschale 2026 (B02)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-013",
+          "reference_value": 30.0,
+          "canonical": 3000,
+          "unit": "cents",
+          "verify": "derived.eue.013.inland.tagespauschale",
+          "rule": "EUE-013",
+          "parameter": "Inland Tagespauschale"
+        }
+      ]
+    },
+    {
+      "id": "private-income-2026",
+      "title": "Private Einnahmen sind nicht betrieblich 2026 (B03)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-033",
+          "reference_value": 0.0,
+          "canonical": 0,
+          "unit": "cents",
+          "verify": "derived.eue.033.betriebsanteil.privat",
+          "rule": "EUE-033",
+          "parameter": "Betriebsanteil Privat"
+        }
+      ]
+    },
+    {
+      "id": "private-expense-2026",
+      "title": "Private Ausgaben sind nicht abzugsfähig 2026 (B04)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-048",
+          "reference_value": 0.0,
+          "canonical": 0,
+          "unit": "cents",
+          "verify": "derived.eue.048.betriebsanteil.privat",
+          "rule": "EUE-048",
+          "parameter": "Betriebsanteil Privat"
+        }
+      ]
+    },
+    {
+      "id": "asset-constants-2026",
+      "title": "AfA-Konstanten 2026 (B05)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-051",
+          "reference_value": 1000.0,
+          "canonical": 100000,
+          "unit": "cents",
+          "verify": "derived.eue.051.gwg.grenze",
+          "rule": "EUE-051",
+          "parameter": "GWG-Grenze"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-052",
+          "reference_value": 2.0,
+          "canonical": 2,
+          "unit": "count",
+          "verify": "derived.eue.052.nutzungsjahre.minimum",
+          "rule": "EUE-052",
+          "parameter": "Nutzungsjahre Minimum"
+        }
+      ]
+    },
+    {
+      "id": "travel-rates-2026",
+      "title": "Kilometer- und Nächtigungssätze 2026 (B06)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-062",
+          "reference_value": 0.5,
+          "canonical": 50,
+          "unit": "cents",
+          "verify": "derived.eue.062.km.geld.pkw",
+          "rule": "EUE-062",
+          "parameter": "KM-Geld PKW"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-063",
+          "reference_value": 0.25,
+          "canonical": 25,
+          "unit": "cents",
+          "verify": "derived.eue.063.km.geld.motorrad",
+          "rule": "EUE-063",
+          "parameter": "KM-Geld Motorrad"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-064",
+          "reference_value": 0.25,
+          "canonical": 25,
+          "unit": "cents",
+          "verify": "derived.eue.064.km.geld.fahrrad",
+          "rule": "EUE-064",
+          "parameter": "KM-Geld Fahrrad"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-065",
+          "reference_value": 3000.0,
+          "canonical": 300000,
+          "unit": "cents",
+          "verify": "derived.eue.065.fahrrad.kontingent",
+          "rule": "EUE-065",
+          "parameter": "Fahrrad-Kontingent"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-069",
+          "reference_value": 4.5,
+          "canonical": 450,
+          "unit": "cents",
+          "verify": "derived.eue.069.inland.n.chtigung.ohne.beleg",
+          "rule": "EUE-069",
+          "parameter": "Inland Nächtigung ohne Beleg"
+        }
+      ]
+    },
+    {
+      "id": "vat-2026",
+      "title": "Umsatzsteuer-Zahllast 2026 (B07)",
+      "inputs": [
+        {
+          "sheet": "VatInput",
+          "cell": "B7",
+          "value": 10000
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-086",
+          "reference_value": 2000.0,
+          "canonical": 2000,
+          "unit": "cents",
+          "verify": "vat.zahllastCents",
+          "rule": "EUE-086"
+        }
+      ]
+    },
+    {
+      "id": "est-tariff-2026",
+      "title": "Einkommensteuertarif-Grenzen 2026 (B08)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-089",
+          "reference_value": 13539.0,
+          "canonical": 1353900,
+          "unit": "cents",
+          "verify": "derived.eue.089.tarifgrenze.stufe.1",
+          "rule": "EUE-089",
+          "parameter": "Tarifgrenze Stufe 1"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-090",
+          "reference_value": 21992.0,
+          "canonical": 2199200,
+          "unit": "cents",
+          "verify": "derived.eue.090.tarifgrenze.stufe.2",
+          "rule": "EUE-090",
+          "parameter": "Tarifgrenze Stufe 2"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-091",
+          "reference_value": 36458.0,
+          "canonical": 3645800,
+          "unit": "cents",
+          "verify": "derived.eue.091.tarifgrenze.stufe.3",
+          "rule": "EUE-091",
+          "parameter": "Tarifgrenze Stufe 3"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-092",
+          "reference_value": 70365.0,
+          "canonical": 7036500,
+          "unit": "cents",
+          "verify": "derived.eue.092.tarifgrenze.stufe.4",
+          "rule": "EUE-092",
+          "parameter": "Tarifgrenze Stufe 4"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-093",
+          "reference_value": 104859.0,
+          "canonical": 10485900,
+          "unit": "cents",
+          "verify": "derived.eue.093.tarifgrenze.stufe.5",
+          "rule": "EUE-093",
+          "parameter": "Tarifgrenze Stufe 5"
+        }
+      ]
+    },
+    {
+      "id": "sv-2026",
+      "title": "Sozialversicherung 2026 (B09)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-108",
+          "reference_value": 449.64,
+          "canonical": 44964,
+          "unit": "cents",
+          "verify": "derived.eue.108.mindest.kv.jungunternehmer",
+          "rule": "EUE-108",
+          "parameter": "Mindest-KV Jungunternehmer"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-109",
+          "reference_value": 97020.0,
+          "canonical": 9702000,
+          "unit": "cents",
+          "verify": "derived.eue.109.deckelung.beitragsgrundlage",
+          "rule": "EUE-109",
+          "parameter": "Deckelung Beitragsgrundlage"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-110",
+          "reference_value": 449.64,
+          "canonical": 44964,
+          "unit": "cents",
+          "verify": "derived.eue.110.mindest.kv.12",
+          "rule": "EUE-110",
+          "parameter": "Mindest-KV ×12"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-111",
+          "reference_value": "18,5 %",
+          "canonical": 185,
+          "unit": "per-mille",
+          "verify": "derived.eue.111.pv.satz.gsvg",
+          "rule": "EUE-111",
+          "parameter": "PV-Satz GSVG"
+        },
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-112",
+          "reference_value": 155.4,
+          "canonical": 15540,
+          "unit": "cents",
+          "verify": "derived.eue.112.uv.12",
+          "rule": "EUE-112",
+          "parameter": "UV ×12"
+        }
+      ]
+    },
+    {
+      "id": "analytics-2026",
+      "title": "Mindest-SV-Sockel in Auswertungen 2026 (B10)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-125",
+          "reference_value": 160.8,
+          "canonical": 16080,
+          "unit": "cents",
+          "verify": "derived.eue.125.mindest.sv.monatlich",
+          "rule": "EUE-125",
+          "parameter": "Mindest-SV monatlich"
+        }
+      ]
+    },
+    {
+      "id": "validation-2026",
+      "title": "Vollständigkeitsabgleich 2026 (B11)",
+      "inputs": [
+        {
+          "sheet": "Einstellungen",
+          "cell": "D2",
+          "value": 2026
+        }
+      ],
+      "expected": [
+        {
+          "sheet": "Regelkatalog",
+          "cell": "EUE-129",
+          "reference_value": 1.0,
+          "canonical": 1,
+          "unit": "count",
+          "verify": "derived.eue.129.abgleich.rundung",
+          "rule": "EUE-129",
+          "parameter": "Abgleich-Rundung"
         }
       ]
     }
