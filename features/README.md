@@ -70,7 +70,7 @@ This directory serves as the single source of truth for all technical concepts, 
 * [14-per-brand-catalog.md](infrastructure/14-per-brand-catalog.md) - Per-brand catalog, CRM, and settings isolation.
 * [16-srp-volume-pricing.md](infrastructure/16-srp-volume-pricing.md) - **Historical:** altes SRP-Volumen-Preismodell; aktuelle Presets und generische Strategie siehe 17/27.
 * [17-pricing-strategy-pattern.md](infrastructure/17-pricing-strategy-pattern.md) - **Current SOLL:** Scope-/Volume-Strategie, Brand-Default plus Gallery-Override, Presets und Mixed-Cart-Aufteilung.
-* [27-volume-licensing-presets.md](infrastructure/27-volume-licensing-presets.md) - **Current SOLL:** V029-basierte Presets, Gallery-Zuordnung und Admin/API; V038 bleibt die aktuelle Repository-Migrations-Frontier.
+* [27-volume-licensing-presets.md](infrastructure/27-volume-licensing-presets.md) - **Current SOLL:** V029-basierte Presets, Gallery-Zuordnung und Admin/API; Migrations-Frontier siehe [AD-2 in den Architekturentscheidungen](tech/07-architectural-decisions.md).
 * [18-jwt-offer-tokens.md](infrastructure/18-jwt-offer-tokens.md) - JWT-based machine-readable offer tokens.
 * [19-ftp-upload-pipeline.md](infrastructure/19-ftp-upload-pipeline.md) - FTP upload pipeline and storage mapping.
 * [21-brand-config-driven.md](infrastructure/21-brand-config-driven.md) - Static, code-reviewed brand configuration.
