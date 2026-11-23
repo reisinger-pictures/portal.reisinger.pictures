@@ -372,6 +372,9 @@ export interface EurWarehouseEntry {
     month: number;
     day: number | null;
     description: string;
+    supplier: string | null;
+    expense_kind: string | null;
+    business_share: number | null;
     amount_cents: number;
     receipt_no: string | null;
 }
@@ -924,13 +927,16 @@ export async function createEurHour(payload: {
     await apiMutate('/api/management/eur/hours', 'POST', payload);
 }
 
+/** D-83b: business_share is server-derived from the pinned expense-kind mapping. */
 export async function createEurWarehouse(payload: {
     year: number;
     month: number;
-    day?: number | null;
+    day: number;
     description: string;
+    supplier: string;
+    expense_kind?: string | null;
     amount_cents: number;
-    receipt_no?: string | null;
+    receipt_no: string;
 }): Promise<void> {
     await apiMutate('/api/management/eur/warehouse', 'POST', payload);
 }

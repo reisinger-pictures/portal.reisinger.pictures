@@ -27,6 +27,7 @@
 | `eur_asset_years` | AfA- und Privatnutzungsplan je Jahr | Jahr, Methode, AfA in Cent, Restbuchwert in Cent, Privatanteil, Status |
 | `eur_audit_logs` | Audit | Aktion, Akteur, Objekt; keine Dateiinhalte und keine Secrets |
 | `eur_travel_trips` | gespeicherte Reisezeilen (D-83a) | Jahr 2026, Brand, Fahrzeug, Kilometer, Land, Tage, Betriebsanteil; Cent-Beträge vom Server berechnet |
+| `eur_warehouse_entries` | Wareneingangsbuch WEB (D-83b) | Jahr 2026, Monat, Tag, Lieferant, Warenbezeichnung, Belegnummer, Ausgaben-Art, Betriebsanteil aus dem Katalog |
 
 Die Migrationen sind additiv und enthalten keinen Backfill; der aktuelle Stand
 steht ausschließlich in
@@ -152,6 +153,29 @@ Reisen und ihre Audit-Hinweise verlieren, nicht Buchungen, AfA-Pläne oder
 Belege. Der schreibende Pfad (`POST travel`) ist die einzige Quelle neuer
 Zeilen und fällt mit der Tabelle weg.
 
+### Schema-Entscheidung V068 (WEB-Datenmodell, D-83b)
+
+**Schema.** Die bestehende Tabelle `eur_warehouse_entries` (V062) erhält drei
+nullable Spalten: `supplier` (Lieferant, 190), `expense_kind` (Ausgaben-Art,
+190) und `business_share` (ganze Prozent, default-null). Die Pflichtfelder nach
+EUE-047 — Monat, Tag, Lieferant, Warenbezeichnung und Belegnummer — werden an
+der Schreibgrenze mit 422 erzwungen, nicht als nachträglicher NOT-NULL-Constraint.
+Bei Belegnummern mit Präfix `WE` ist zusätzlich eine definierte Ausgaben-Art
+nötig (EUE-045/047); sie muss einer `type` aus `expenseKinds()` des gepinnten
+Referenzartefakts entsprechen. Der Betriebsanteil wird daraus abgeleitet
+(`share_percent`, sonst 100) und ist kein Client-Eingabefeld — `business_share`
+ist im Request `prohibited`. Damit bleibt die serverseitige Regelquelle der
+Katalog (EUE-045).
+
+**Backfill.** Keiner. Das WEB existiert seit V062 und kann Zeilen enthalten;
+diese behalten `null` in den neuen Spalten und werden in der Antwort als `null`
+ausgeliefert. Es wird kein Lieferant und keine Ausgaben-Art aus Alttext
+erraten, und bestehende Beträge werden nicht umgerechnet.
+
+**Rollback.** `down()` ist nach Repository-Policy leer. Die Spalten sind
+nullable und die Tabelle ist sonst unverändert; ein Entfernen würde nur die
+neuen WEB-Metadaten verlieren, nicht die Wareneingangsbeträge selbst.
+
 ## Beziehungen
 
 - Buchung → genau ein Kunde und optional ein Projekt; Reise analog.
@@ -176,6 +200,8 @@ brand-scoped; ein fremder Datensatz liefert 404, eine ungültige Eingabe 422.
 - `POST vat/calc`, `POST travel/calc`, `POST est/calc`
 - `GET/POST travel`, `DELETE travel/{id}` (D-83a, brand-scoped, Cent-Beträge
   serverseitig berechnet und gespeichert)
+- `GET/POST warehouse` (D-83b, Pflichtfelder und Ausgaben-Art validiert,
+  Betriebsanteil aus dem Katalog abgeleitet)
 
 Schreibende Aktionen erzeugen einen Audit-Eintrag ohne Dateiinhalte. Der
 Servierer berechnet Preise, Summen und AfA; der Client rechnet nicht nach.

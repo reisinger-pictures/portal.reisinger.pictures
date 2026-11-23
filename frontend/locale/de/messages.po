@@ -1054,6 +1054,10 @@ msgstr "Ausgaben betrieblich"
 msgid "Ausgaben nach Art (BA-ART)"
 msgstr "Ausgaben nach Art (BA-ART)"
 
+#: src/ui/management/eur/EurWarehousePanel.tsx
+msgid "Ausgaben-Art"
+msgstr "Ausgaben-Art"
+
 #: src/ui/management/eur/EurReferencePanel.tsx
 msgid "Ausgaben-Arten"
 msgstr "Ausgaben-Arten"
@@ -1429,8 +1433,8 @@ msgid "Beschreibung angeben"
 msgstr "Beschreibung angeben"
 
 #: src/ui/management/eur/EurWarehousePanel.tsx
-msgid "Beschreibung und Betrag angeben; der Tag ist optional und liegt zwischen 1 und 31."
-msgstr "Beschreibung und Betrag angeben; der Tag ist optional und liegt zwischen 1 und 31."
+#~ msgid "Beschreibung und Betrag angeben; der Tag ist optional und liegt zwischen 1 und 31."
+#~ msgstr "Beschreibung und Betrag angeben; der Tag ist optional und liegt zwischen 1 und 31."
 
 #: src/ui/management/components/AIGalleryDefaultsModal.tsx
 msgid "Beschreibung:"
@@ -2483,8 +2487,12 @@ msgid "Der Wareneingang konnte nicht geladen werden. Prüfen Sie Ihre Verbindung
 msgstr "Der Wareneingang konnte nicht geladen werden. Prüfen Sie Ihre Verbindung und laden Sie die Liste erneut."
 
 #: src/ui/management/eur/EurWarehousePanel.tsx
-msgid "Der Wareneingang konnte nicht gespeichert werden. Prüfen Sie Beschreibung und Betrag und versuchen Sie es erneut."
-msgstr "Der Wareneingang konnte nicht gespeichert werden. Prüfen Sie Beschreibung und Betrag und versuchen Sie es erneut."
+#~ msgid "Der Wareneingang konnte nicht gespeichert werden. Prüfen Sie Beschreibung und Betrag und versuchen Sie es erneut."
+#~ msgstr "Der Wareneingang konnte nicht gespeichert werden. Prüfen Sie Beschreibung und Betrag und versuchen Sie es erneut."
+
+#: src/ui/management/eur/EurWarehousePanel.tsx
+msgid "Der Wareneingang konnte nicht gespeichert werden. Prüfen Sie Pflichtfelder, Belegnummer und Ausgaben-Art und versuchen Sie es erneut."
+msgstr "Der Wareneingang konnte nicht gespeichert werden. Prüfen Sie Pflichtfelder, Belegnummer und Ausgaben-Art und versuchen Sie es erneut."
 
 #: src/ui/client/CheckoutReturnView.tsx
 msgid "Der Zahlungsstatus konnte nicht geladen werden"
@@ -5294,6 +5302,7 @@ msgid "Letzte Bestätigung:"
 msgstr "Letzte Bestätigung:"
 
 #: src/ui/management/eur/EurDepreciationPanel.tsx
+#: src/ui/management/eur/EurWarehousePanel.tsx
 msgid "Lieferant"
 msgstr "Lieferant"
 
@@ -8123,6 +8132,10 @@ msgstr "Tag"
 #: src/ui/management/ManagementEurView.tsx
 msgid "Tag zwischen 1 und 31 angeben"
 msgstr "Tag zwischen 1 und 31 angeben"
+
+#: src/ui/management/eur/EurWarehousePanel.tsx
+msgid "Tag, Beschreibung, Lieferant, Belegnummer und Betrag angeben; bei WE-Belegen ist die Ausgaben-Art erforderlich."
+msgstr "Tag, Beschreibung, Lieferant, Belegnummer und Betrag angeben; bei WE-Belegen ist die Ausgaben-Art erforderlich."
 
 #: src/ui/management/eur/EurTravelPanel.tsx
 msgid "Tage"

@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 class EurWarehouseEntry extends Model
 {
     protected $fillable = [
-        'brand', 'year', 'month', 'day', 'description', 'amount_cents', 'receipt_no',
+        'brand', 'year', 'month', 'day', 'description', 'supplier', 'expense_kind',
+        'amount_cents', 'business_share', 'receipt_no',
     ];
 
     protected $casts = [
@@ -20,6 +21,7 @@ class EurWarehouseEntry extends Model
         'month' => 'integer',
         'day' => 'integer',
         'amount_cents' => 'integer',
+        'business_share' => 'integer',
     ];
 
     public function scopeForCurrentBrand(Builder $query): Builder

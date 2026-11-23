@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { formatEuro } from '../../../logic/formatCurrency';
-import { createEurWarehouse, useEurWarehouse } from '../../../logic/useEur';
+import {
+    createEurWarehouse,
+    useEurReference,
+    useEurWarehouse,
+} from '../../../logic/useEur';
 
 const cents = (value: number): string => formatEuro(value / 100);
 
@@ -14,23 +18,35 @@ interface Props {
 interface FormState {
     day: string;
     description: string;
-    amountEuro: string;
+    supplier: string;
     receiptNo: string;
+    expenseKind: string;
+    amountEuro: string;
 }
 
-const INITIAL: FormState = {day: '', description: '', amountEuro: '', receiptNo: ''};
+const INITIAL: FormState = {
+    day: '', description: '', supplier: '', receiptNo: '', expenseKind: '', amountEuro: '',
+};
 
 export default function EurWarehousePanel({year, month}: Props) {
     const warehouse = useEurWarehouse(year, month);
+    const reference = useEurReference();
     const [form, setForm] = useState<FormState>(INITIAL);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
 
     const amountCents = Math.round(Number(form.amountEuro.replace(',', '.')) * 100);
     const day = Number(form.day);
+    const receiptNo = form.receiptNo.trim();
+    const isWeReceipt = /^WE/i.test(receiptNo);
+    const expenseKinds = reference.data?.expense_kinds ?? [];
+
     const isValid = form.description.trim() !== ''
+        && form.supplier.trim() !== ''
+        && receiptNo !== ''
+        && (!isWeReceipt || form.expenseKind !== '')
         && Number.isFinite(amountCents) && amountCents > 0
-        && (form.day === '' || (Number.isInteger(day) && day >= 1 && day <= 31));
+        && Number.isInteger(day) && day >= 1 && day <= 31;
 
     const update = (key: keyof FormState, value: string) => {
         setForm((current) => ({...current, [key]: value}));
@@ -45,15 +61,17 @@ export default function EurWarehousePanel({year, month}: Props) {
             await createEurWarehouse({
                 year,
                 month,
-                day: form.day === '' ? null : day,
+                day,
                 description: form.description.trim(),
+                supplier: form.supplier.trim(),
+                expense_kind: form.expenseKind === '' ? null : form.expenseKind,
                 amount_cents: amountCents,
-                receipt_no: form.receiptNo === '' ? null : form.receiptNo,
+                receipt_no: receiptNo,
             });
             setForm(INITIAL);
             void warehouse.mutate();
         } catch {
-            setSaveError(t`Der Wareneingang konnte nicht gespeichert werden. Prüfen Sie Beschreibung und Betrag und versuchen Sie es erneut.`);
+            setSaveError(t`Der Wareneingang konnte nicht gespeichert werden. Prüfen Sie Pflichtfelder, Belegnummer und Ausgaben-Art und versuchen Sie es erneut.`);
         } finally {
             setIsSaving(false);
         }
@@ -110,6 +128,8 @@ export default function EurWarehousePanel({year, month}: Props) {
                                 <tr>
                                     <th><Trans>Tag</Trans></th>
                                     <th><Trans>Beschreibung</Trans></th>
+                                    <th><Trans>Lieferant</Trans></th>
+                                    <th><Trans>Ausgaben-Art</Trans></th>
                                     <th><Trans>Beleg</Trans></th>
                                     <th className="text-right"><Trans>Betrag</Trans></th>
                                 </tr>
@@ -119,6 +139,8 @@ export default function EurWarehousePanel({year, month}: Props) {
                                     <tr key={entry.id}>
                                         <td>{entry.day ?? '—'}</td>
                                         <td>{entry.description}</td>
+                                        <td>{entry.supplier ?? '—'}</td>
+                                        <td>{entry.expense_kind ?? '—'}</td>
                                         <td>{entry.receipt_no ?? '—'}</td>
                                         <td className="text-right">{cents(entry.amount_cents)}</td>
                                     </tr>
@@ -138,7 +160,7 @@ export default function EurWarehousePanel({year, month}: Props) {
                     <label className="form-control">
                         <span className="label-text"><Trans>Tag</Trans></span>
                         <input type="number" min={1} max={31} className="input input-bordered"
-                            value={form.day} onChange={(event) => update('day', event.target.value)}/>
+                            value={form.day} onChange={(event) => update('day', event.target.value)} required/>
                     </label>
                     <label className="form-control">
                         <span className="label-text"><Trans>Betrag (€)</Trans></span>
@@ -151,9 +173,25 @@ export default function EurWarehousePanel({year, month}: Props) {
                             value={form.description} onChange={(event) => update('description', event.target.value)} required/>
                     </label>
                     <label className="form-control md:col-span-2">
+                        <span className="label-text"><Trans>Lieferant</Trans></span>
+                        <input type="text" className="input input-bordered"
+                            value={form.supplier} onChange={(event) => update('supplier', event.target.value)} required/>
+                    </label>
+                    <label className="form-control md:col-span-2">
                         <span className="label-text"><Trans>Belegnummer</Trans></span>
                         <input type="text" className="input input-bordered"
-                            value={form.receiptNo} onChange={(event) => update('receiptNo', event.target.value)}/>
+                            value={form.receiptNo} onChange={(event) => update('receiptNo', event.target.value)} required/>
+                    </label>
+                    <label className="form-control md:col-span-2">
+                        <span className="label-text"><Trans>Ausgaben-Art</Trans></span>
+                        <select className="select select-bordered" value={form.expenseKind}
+                            onChange={(event) => update('expenseKind', event.target.value)}
+                            required={isWeReceipt}>
+                            <option value="">—</option>
+                            {expenseKinds.map((kind) => (
+                                <option key={kind.type} value={kind.type}>{kind.type}</option>
+                            ))}
+                        </select>
                     </label>
                 </div>
 
@@ -167,7 +205,7 @@ export default function EurWarehousePanel({year, month}: Props) {
                     </button>
                     {!isValid && (
                         <p className="text-sm opacity-70 mt-2">
-                            <Trans>Beschreibung und Betrag angeben; der Tag ist optional und liegt zwischen 1 und 31.</Trans>
+                            <Trans>Tag, Beschreibung, Lieferant, Belegnummer und Betrag angeben; bei WE-Belegen ist die Ausgaben-Art erforderlich.</Trans>
                         </p>
                     )}
                 </div>

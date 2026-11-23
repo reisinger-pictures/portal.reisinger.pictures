@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Eur;
 
 use App\Eur\Reference\EurYear;
+use App\Eur\Reference\ReferenceTables;
 use App\Http\Controllers\Controller;
 use App\Models\EurAuditLog;
 use App\Models\EurWarehouseEntry;
@@ -12,13 +13,17 @@ use App\Support\BrandRegistry;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
 /**
- * EAR · Wareneingang (Portal #27).
+ * EAR · Wareneingangsbuch (Portal #27, D-83b).
  *
  * Beträge sind ausschließlich ganze Cent. Der Wareneingang ist eine eigene
- * Summe im Monatsabschluss und wird nicht in die Buchungen gemischt.
+ * Summe im Monatsabschluss und wird nicht in die Buchungen gemischt. Die
+ * WEB-Pflichtfelder und die Ausgaben-Art-Validierung folgen EUE-047; der
+ * betriebliche Anteil kommt aus der gepinnten Ausgabenarten-Zuordnung (EUE-045)
+ * und wird nie vom Client übernommen.
  */
 class EurWarehouseController extends Controller
 {
@@ -49,23 +54,40 @@ class EurWarehouseController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $kinds = ReferenceTables::load()->expenseKinds();
+        $receiptNo = $request->input('receipt_no');
+        $isWeReceipt = is_string($receiptNo) && str_starts_with(strtoupper($receiptNo), 'WE');
+
         $data = $request->validate([
             'year' => $this->yearRule(),
             'month' => 'required|integer|min:1|max:12',
-            'day' => 'nullable|integer|min:1|max:31',
+            'day' => 'required|integer|min:1|max:31',
             'description' => 'required|string|max:190',
+            'supplier' => 'required|string|max:190',
             'amount_cents' => 'required|integer|min:0',
-            'receipt_no' => 'nullable|string|max:64',
+            'receipt_no' => 'required|string|max:64',
+            'expense_kind' => [
+                $isWeReceipt ? 'required' : 'nullable',
+                'string',
+                'max:190',
+                Rule::in(array_column($kinds, 'type')),
+            ],
+            // Nie eine Eingabe: der Anteil wird aus dem Katalog abgeleitet.
+            'business_share' => 'prohibited',
         ]);
 
+        $share = $this->businessShare((string) ($data['expense_kind'] ?? ''), $kinds);
         $entry = EurWarehouseEntry::create([
             'brand' => BrandRegistry::currentId(),
             'year' => (int) ($data['year'] ?? EurYear::DEFAULT),
             'month' => (int) $data['month'],
-            'day' => isset($data['day']) ? (int) $data['day'] : null,
+            'day' => (int) $data['day'],
             'description' => $data['description'],
+            'supplier' => $data['supplier'],
+            'expense_kind' => $data['expense_kind'] ?? null,
             'amount_cents' => (int) $data['amount_cents'],
-            'receipt_no' => $data['receipt_no'] ?? null,
+            'business_share' => $share,
+            'receipt_no' => $data['receipt_no'],
         ]);
 
         EurAuditLog::create([
@@ -78,10 +100,33 @@ class EurWarehouseController extends Controller
                 'year' => $entry->year,
                 'month' => $entry->month,
                 'amount_cents' => $entry->amount_cents,
+                'business_share' => $share,
+                'expense_kind' => $entry->expense_kind,
             ],
         ]);
 
         return response()->json(['entry' => $this->serialize($entry)], 201);
+    }
+
+    /**
+     * EUE-045: der Anteil kommt aus der Ausgabenarten-Zuordnung. Ohne
+     * hinterlegten Anteil gilt der volle Betrag (ODS: `IF(P="",1,P)`).
+     *
+     * @param  list<array{type: string, e1a: string|null, share_percent: int|null}>  $kinds
+     */
+    private function businessShare(string $kind, array $kinds): int
+    {
+        if ($kind === '') {
+            return 100;
+        }
+
+        foreach ($kinds as $candidate) {
+            if (($candidate['type'] ?? '') === $kind) {
+                return $candidate['share_percent'] ?? 100;
+            }
+        }
+
+        return 100;
     }
 
     /**
@@ -95,6 +140,9 @@ class EurWarehouseController extends Controller
             'month' => (int) $entry->month,
             'day' => $entry->day === null ? null : (int) $entry->day,
             'description' => $entry->description,
+            'supplier' => $entry->supplier,
+            'expense_kind' => $entry->expense_kind,
+            'business_share' => $entry->business_share === null ? null : (int) $entry->business_share,
             'amount_cents' => (int) $entry->amount_cents,
             'receipt_no' => $entry->receipt_no,
         ];
