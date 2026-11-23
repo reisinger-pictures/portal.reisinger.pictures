@@ -78,4 +78,27 @@ class OfferTokenServiceTest extends TestCase
             'photos' => ['compat-photo-1'],
         ], $this->service->verify($fixture));
     }
+
+    /**
+     * D-77: the removed Lcobucci/JWT HS256 signer refused keys shorter than
+     * 256 bits. The native HMAC signer must keep that floor and fail closed
+     * instead of silently producing a weak signature.
+     */
+    public function test_a_short_signing_key_fails_closed(): void
+    {
+        config(['services.signed_links.secret' => 'too-short']);
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->service->issue(['x' => 1], now()->addDay());
+    }
+
+    public function test_a_short_signing_key_verifies_nothing(): void
+    {
+        config(['services.signed_links.secret' => 'too-short']);
+
+        $token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhIjoxfQ.invalid';
+
+        $this->assertNull($this->service->verify($token));
+    }
 }

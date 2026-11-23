@@ -76,7 +76,7 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
 | Config Key | File | Resolution |
 |---|---|---|
 | `APP_KEY` | `config/app.php` | `env('APP_KEY')` |
-| `JWT_SECRET` | `config/jwt.php` | `env('JWT_SECRET')` |
+| Signed-Link-Signing-Key | `config/services.php` (`services.signed_links.secret`) | `env('SIGNED_LINK_SECRET') ?? env('JWT_SECRET') ?? env('APP_KEY')`; `JWT_SECRET` bleibt als Fallback für bereits ausgestellte Signed Links erhalten (D-77), `config/jwt.php` wurde entfernt |
 | `FILE_ENCRYPTION_KEY` | File-Encryption config/provider | `env('FILE_ENCRYPTION_KEY')`, separate from `APP_KEY` |
 | `MOLLIE_KEY` / `MOLLIE_PAYMENT_METHODS` / `MOLLIE_WEBHOOK_URL` (`MOLLIE_PAYMENT_METHOD` is the deprecated single-value fallback) | `config/services.php` | `env(...)`, server-only, list in display order; payment creation needs the key, a non-empty allowlist and a usable HTTPS webhook URL, otherwise it fails closed. Mollie is the only payment provider (D-63); there is no Stripe config key and no Stripe credential |
 | `CHECKOUT_ENABLED` / `CHECKOUT_NEW_ACCOUNT_HOURS` | `config/checkout.php` | `env(...)` with the defaults `true` / `24`; provider-neutral checkout kill switch and minimum account age, no credential |

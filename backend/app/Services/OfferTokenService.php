@@ -269,7 +269,11 @@ class OfferTokenService
     {
         $secret = config('services.signed_links.secret');
 
-        return is_string($secret) && $secret !== '' ? $secret : null;
+        // D-77: the removed Lcobucci/JWT HS256 signer refused keys shorter than
+        // 256 bits. Keep that floor so a misconfigured short secret fails closed
+        // instead of silently producing weak signatures. Already-issued links
+        // can only have been signed with a >= 32-byte key, so this stays compatible.
+        return is_string($secret) && strlen($secret) >= 32 ? $secret : null;
     }
 
     /**
