@@ -139,6 +139,48 @@ the chain of the gallery's own group (the last one an access-widening mutation t
 other test in the repository caught) — and the measured scaling pairs
 (1 gallery 18 → 10, 3 galleries 40 → 12, 10 galleries 117 → 19).
 
+## 7. Sanctum-Token-Speicher (V066) — JWT → Sanctum migration, Phase 1
+
+Phase 1 of Portal #9 adds the storage table for the Sanctum token migration. It is
+a **schema-only, additive change**: no guard is flipped, no auth production code
+changes, and `php-open-source-saver/jwt-auth` stays installed until Phase 3/4
+([D-77](../owner-decisions.md#d-77-signed-links-move-completely-to-hmac--jwt-package-removed)).
+The current JWT behaviour remains pinned by the Phase-0 characterization suite
+`backend/tests/Feature/Auth/LegacyAuthContractTest.php`, which this phase does not touch.
+
+**Why the table is needed.** [D-73](../owner-decisions.md#d-73-transient-guest-grants-as-structured-abilities-behind-a-custom-guard)
+models transient guest rights (guest id, redeemed invites, gallery grants) as
+structured Sanctum abilities transported by the custom guard `sanctum_transient`;
+[D-75](../owner-decisions.md#d-75-two-httponly-cookies-with-sanctum-tokens-no-php-session)
+carries the tokens in two httpOnly cookies (`rp_jwt`, `rp_jwt_refresh`) with no PHP
+session and no `/sanctum/csrf-cookie`. Sanctum needs this table to store the token
+records those mechanisms reference. Abilities remain **transport, not decision**:
+`sanitizeTransientClaims()` / `filterGuestTransientClaims()` keep revalidating against
+live invite state on every request (D-39/D-44), and roles stay live DB queries in
+`AuthorizationService`, never stored abilities (D-78). The guard name `api` stays and
+only its driver changes (D-74); `/api/auth/refresh` stays a shim with the unchanged
+240-minute/7-day windows (D-76); no service-to-service scope tokens are introduced
+(D-72, consistent with D-71).
+
+**Schema decision.** `V066__create_personal_access_tokens.php` creates one new table
+`personal_access_tokens` in Sanctum's standard schema (as shipped in
+`vendor/laravel/sanctum/database/migrations/`): `id`, `morphs('tokenable')`
+(`tokenable_type` + `tokenable_id` + index), `name` (text), `token` (string 64, unique),
+`abilities` (text, nullable), `last_used_at` (timestamp, nullable), `expires_at`
+(timestamp, nullable, indexed), and `created_at`/`updated_at`. Column and index creation
+is guarded with `Schema::hasTable` / `Schema::hasIndex` so a replay is safe. No existing
+table, column or index is altered. The canonical migration frontier and its measured
+count live only in [AD-2](../tech/07-architectural-decisions.md).
+
+**No backfill.** There is nothing to copy: existing JWT cookies are not token rows, and
+tokens are issued fresh after the cutover. Seeding the table would create credentials
+outside the login/refresh flow, so none is performed.
+
+**Rollback.** `down()` is deliberately empty — `backend/AGENTS.md` states `down()` is
+never executed, and a rollback of this additive table must not drop data written after
+the migration. Reversibility here means the change adds a table without touching any
+existing state.
+
 ## Related
 - [Magic Links & Invites](../auth/02-magic-links.md) � transient access for guests overriding role model
 - [Roles & Access Management (Single Org)](../auth/03-roles-and-rbac.md) � enterprise RBAC evolution of the role system
