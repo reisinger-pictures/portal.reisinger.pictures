@@ -17,8 +17,9 @@ evidence listed below on the target host.
 The D-64 production deployment uses PostgreSQL 16 (`db_pg`, container
 `portal_db_pg`); the backend selects it with `DB_CONNECTION=pgsql`,
 `DB_HOST=db_pg`, `DB_PORT=5432`. The legacy MariaDB service is no longer part of
-the Compose stack; removing the old container and its volume on the host is a
-separate manual gate. The stack does **not** introduce Redis, Horizon,
+the Compose stack; the old container and its volume were removed from the host
+on 2026-11-23 after the manual gate was measured (D-64). The stack does **not**
+introduce Redis, Horizon,
 Supervisor, or another external process manager.
 The shell supervisor in `deployment/backend-supervisor.sh` is intentionally
 small and runs inside the existing PHP-FPM container as UID/GID `1002:82`, the

@@ -3,9 +3,9 @@
 ## Target and topology
 
 Production runs PostgreSQL 16 as its sole database. The repository Compose
-file no longer contains a MariaDB service or the `db_data` volume; removing the
-legacy `portal_db` container and its data on the host is a separate manual gate
-(see the open-gate note below). The one-time forward copy script still reads a
+file no longer contains a MariaDB service or the `db_data` volume; the legacy
+`portal_db` container and its data were removed from the production host on
+2026-11-23 after the gate below was measured. The one-time forward copy script still reads a
 MariaDB source for hosts where the switch has not yet been executed; that
 source lives in the old host stack, not in this repository's topology.
 
@@ -101,16 +101,21 @@ stops with a named `FATAL`; it never restores a previous engine and never
 copies data back. An unfinished run leaves
 `/var/lib/portal-postgres-cutover/in-progress` behind and blocks a second run.
 
-> **OPEN MANUAL GATE — not checked from this host.** Before removing the legacy
-> `portal_db` container and the `db_data` volume on the production host, the
-> operator must evaluate the host-side marker
-> `/var/lib/portal-postgres-cutover/switch-attempted` (state directory mode 0700,
-> marker mode 0600; it records the MariaDB `.env` backup path and survives a
-> successful switch) and must have a tested PostgreSQL backup/restore path with
-> a completed restore drill. Neither the marker nor the drill is reachable from
-> this repository host, and neither has been checked here. A Compose topology
-> change requires a `recreate`, not a `restart`; this does not delete the
-> legacy volume data. No in-repo command reverts the switch.
+> **MANUAL GATE CLOSED — measured on the production host 2026-11-23.** Before
+> the removal, the root-only marker `/var/lib/portal-postgres-cutover/switch-attempted`
+> (state directory mode 0700, marker mode 0600) was evaluated: `switch=attempted`,
+> `started_at=20261122T065234Z`, and
+> `env_backup=/opt/stacks/portal-reisinger-pictures/.env.20261122T065234Z.bak`
+> (mode 0600, still holding the MariaDB coordinates, retained as evidence). The
+> active host `.env` selects `pgsql`/`db_pg`/`5432`, the offsite engine marker
+> `db/portal/engine` reads `pgsql` with `portal_db-2026-11-23.sql.gz` present,
+> and the restore drill above is measured (2026-11-22). After
+> `./deployment/deploy.sh` recreated the stack (no `restart`) the backend was
+> healthy and `GET /api/ping` returned `{"message":"API OK"}`; only then were
+> `portal_db` and `portal-reisinger-pictures_db_data` removed and their absence
+> verified. The nightly backup source was switched to PostgreSQL-only in
+> `strato-vps` (`proposed/backup.sh`, marker retained for old dumps). No in-repo
+> command reverts the switch; a rollback would be a restore.
 
 The command copies rows only. Laravel migrations own the PostgreSQL schema;
 the copy command does not infer types, create tables, alter columns, or migrate
@@ -274,7 +279,7 @@ choosing a value silently.
 - A rollback path after PostgreSQL accepts production writes. The legacy
   MariaDB source is not updated from PostgreSQL, and the repository no longer
   ships a command that reverts the environment or copies data back. Removing
-  the old container and its volume on the host stays an operator decision with
-  the open manual gate documented above; the `switch-attempted` marker name is
-  retained there because the marker lives in the host state directory, outside
-  this repository.
+  the old container and its volume on the host was an operator decision; the
+  gate was measured and closed on 2026-11-23 as documented above. The
+  `switch-attempted` marker name is retained there because the marker lives in
+  the host state directory, outside this repository.

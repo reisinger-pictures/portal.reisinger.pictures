@@ -129,7 +129,7 @@ Danach den PHP-Prozess neu starten, damit er die Tools findet.
   `backend/.env`. `admin@example.com` steht nur als Beispiel im Template bzw. in
   expliziten E2E-Fixtures; es gibt im aktuellen Runtime-Config keinen
   Admin-Passwort-Fallback.
-- **Datenbank:** PostgreSQL 16 aus `docker-compose.local.yml` (Container `portal_local_db`, `127.0.0.1:5432`, Datenbank `portal_db`, Zugang wie in `backend/.env.example`); Einrichtung via `php artisan migrate:fresh --seed`. Lokal läuft damit dieselbe Engine wie in Produktion (D-64); eine SQLite-Datei ist als lokale Dev-Datenbank zulässig, aber nicht der abgebildete Stand. Produktion läuft seit dem Cutover auf PostgreSQL; der alte MariaDB-Container auf dem Host ist manuell zu entfernen (offener MANUAL GATE, siehe D-64).
+- **Datenbank:** PostgreSQL 16 aus `docker-compose.local.yml` (Container `portal_local_db`, `127.0.0.1:5432`, Datenbank `portal_db`, Zugang wie in `backend/.env.example`); Einrichtung via `php artisan migrate:fresh --seed`. Lokal läuft damit dieselbe Engine wie in Produktion (D-64); eine SQLite-Datei ist als lokale Dev-Datenbank zulässig, aber nicht der abgebildete Stand. Produktion läuft seit dem Cutover auf PostgreSQL; der alte MariaDB-Container und das `db_data`-Volume wurden am 2026-11-23 nach Messung des Host-Gates entfernt (siehe D-64).
 
 ### Mollie-Webhooks (Lokal Testen)
 Neue Online-Zahlungen laufen über Mollies gehostete Checkout-Seite: das Portal

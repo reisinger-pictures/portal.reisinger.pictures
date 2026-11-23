@@ -1,6 +1,6 @@
 # Deployment — was zu tun ist
 
-> **Stand: 2026-11-02.** Ziel-Soll-Zustand für `reisinger.pictures`.
+> **Stand: 2026-11-23.** Ziel-Soll-Zustand für `reisinger.pictures`.
 > Diese Datei ist die **einzige** Anleitung für den Produktions-Deploy.
 >
 > Architektur: `features/infrastructure/19-ftp-upload-pipeline.md`
@@ -15,7 +15,7 @@
 | 1. Host-`.env` prüfen | Owner, SSH | 2 Minuten |
 | 2. **Firewall: 3 Ports öffnen** | Owner, SSH | **2 Minuten** |
 | 3. Backup + Restore-Test | Owner, SSH | 10 Minuten |
-| 3a. PostgreSQL-Cutover (einmalig, D-64; nur noch Vorwärtskopie, Host-Gate offen) | Owner, SSH | `deployment/migrate-to-postgres.sh`, siehe Abschnitt 3a |
+| 3a. PostgreSQL-Cutover (einmalig, D-64; nur noch Vorwärtskopie, Host-Gate gemessen und geschlossen) | Owner, SSH | `deployment/migrate-to-postgres.sh`, siehe Abschnitt 3a |
 | 4. `deployment/deploy.sh` | Owner | 3 Minuten |
 | 5. Kamera testen | Fotograf | 20 Minuten |
 | 6. `pure-ftpd` abschalten | Owner, SSH | 1 Minute → **schon geschehen (2026-09-27), nur noch Gegenprobe, siehe Schritt 6** |
@@ -424,16 +424,19 @@ hält vor der Vorprüfung einen exklusiven Host-Lock
 bricht benannt ab, solange der Lock gehalten wird, und der Lock wird beim
 Prozessende freigegeben.
 
-> **OPEN MANUAL GATE — nicht auf diesem Host geprüft.** Vor dem Entfernen des
+> **MANUAL GATE GESCHLOSSEN — am 2026-11-23 auf dem Produktionshost gemessen.** Vor dem Entfernen des
 > alten MariaDB-Containers und des `db_data`-Volumes **auf dem Produktionshost**
-> muss der Operator (1) den dortigen Marker
-> `/var/lib/portal-postgres-cutover/switch-attempted` und die zugehörige
-> `.env`-Sicherung ausgewertet haben und (2) einen getesteten
-> PostgreSQL-Backup-/Restore-Pfad samt Restore-Drill nachgewiesen haben. Weder
-> der Marker noch der Restore-Drill sind von diesem Host aus erreichbar oder
-> hier geprüft worden. Der Wechsel der Compose-Topologie erfordert ein
-> Recreate des Stacks, keinen Restart; die `db`-Daten werden dabei nicht
-> gelöscht.
+> wurden der root-only-Marker
+> `/var/lib/portal-postgres-cutover/switch-attempted` (`switch=attempted`,
+> `started_at=20261122T065234Z`) und die zugehörige, weiterhin vorhandene
+> `.env`-Sicherung mit den MariaDB-Koordinaten ausgewertet. Die aktive Host-`.env`
+> steht auf `pgsql`/`db_pg`/`5432`, der Engine-Marker im Backup auf `pgsql`, und
+> der PostgreSQL-Restore-Drill ist belegt (2026-11-22, 63 Tabellen, Zeilenzahlen
+> 5/15/1/33/19477/60). Nach `./deployment/deploy.sh` (Recreate, kein Restart)
+> war das Backend healthy und `/api/ping` antwortete `{"message":"API OK"}`;
+> erst danach wurden `portal_db` und `portal-reisinger-pictures_db_data`
+> entfernt und ihr Fehlen geprüft. Der nächtliche Dump läuft seither nur noch
+> mit `pg_dump` (`strato-vps/proposed/backup.sh`, Marker für Altdumps bleibt).
 
 Der Vertrag, die Invarianten des Verifiers (einschließlich des exakten
 Vergleichs aller `settings`-Zeilen nach `key`, `brand` und `value`) und was
@@ -728,9 +731,9 @@ backend
 ```
 
 Der aktuelle Compose-Zielstand enthält nur `db_pg`; `db` (MariaDB) und
-`db_data` sind aus dem Repo-Stack entfernt. Das Entfernen des alten Containers
-und seines Volumes auf dem Host bleibt ein offener manueller Schritt (siehe
-Abschnitt 3a). Die Liste oben ist die Messung vom 2026-09-27 und bleibt als
+`db_data` sind aus dem Repo-Stack entfernt; der alte Container und sein Volume
+wurden am 2026-11-23 auch auf dem Host entfernt (Beleg in Abschnitt 3a). Die
+Liste oben ist die Messung vom 2026-09-27 und bleibt als
 solche stehen — ein erneutes `config --services` zeigt den aktuellen Stand.
 Die Topologieänderung braucht ein Recreate, keinen Restart.
 
