@@ -70,6 +70,15 @@ final class RuleValues
     }
 
     /**
+     * Der gepinnte Regeltext einer Regel — für Hinweise, deren Werte nicht als
+     * Parameter, sondern im Formeltext stehen (z. B. die AfA-KZ-Whitelist).
+     */
+    public function ruleLogic(string $ruleId): string
+    {
+        return (string) (self::findRule(self::readCatalog(), $ruleId)['logik'] ?? '');
+    }
+
+    /**
      * @return list<string> die Namen aller Parameter einer Regel
      */
     public function parameterNames(string $ruleId): array

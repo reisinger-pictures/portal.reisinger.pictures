@@ -31,6 +31,20 @@ final class DepreciationCalculator
         return $this->rules->parameterFor('EUE-051', 'GWG-Grenze', 2026, 'cents');
     }
 
+    /**
+     * EUE-053: die zulässigen AfA-Kennzahlen stehen im gepinnten Regeltext,
+     * nicht in einer zweiten Hardcoded-Liste. Der Text nennt genau vier
+     * vierstellige KZ; andere Zahlen darin sind einstellige Mengenvergleiche.
+     *
+     * @return list<string>
+     */
+    public function afaCodes(): array
+    {
+        preg_match_all('/\b\d{4}\b/', $this->rules->ruleLogic('EUE-053'), $matches);
+
+        return array_values(array_unique($matches[0] ?? []));
+    }
+
     public function minimumBusinessSharePercent(): int
     {
         return $this->rules->parameterFor('EUE-054', 'Mindest-Betriebsanteil', 2026, 'fraction-percent');

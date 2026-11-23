@@ -133,6 +133,11 @@ export default function EurAssetsPanel({ year }: Props) {
                                                 <span className="font-medium">{asset.name}</span>
                                                 {isGwg && <span className="badge badge-info badge-outline ml-2"><Trans>GWG</Trans></span>}
                                                 {asset.is_private_investment && <span className="badge badge-warning badge-outline ml-2"><Trans>Privat</Trans></span>}
+                                                {asset.warnings?.map((warning) => (
+                                                    <span key={warning.code} className="block text-xs text-warning mt-1">
+                                                        {warning.text}
+                                                    </span>
+                                                ))}
                                             </td>
                                             <td>{asset.method}</td>
                                             <td className="text-right">

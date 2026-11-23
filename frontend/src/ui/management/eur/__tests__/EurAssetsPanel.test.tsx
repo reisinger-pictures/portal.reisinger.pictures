@@ -142,6 +142,19 @@ describe('EurAssetsPanel (#34)', () => {
         expect(switchEurAssetToLinear).toHaveBeenCalledWith(1, 2026, 'Wirtschaftlichkeitsprüfung 2026');
     });
 
+    it('zeigt die AV-Hinweise aus dem gepinnten Regeltext (EUE-053/058)', () => {
+        setAssets(asset({warnings: [
+            {code: 'EUE-053', text: '⚠ Ausgaben-Art muss zu einer AfA-Kennzahl zugeordnet sein'},
+            {code: 'EUE-058', text: '⚠ Jahr liegt in der Zukunft'},
+        ]}));
+
+        renderWithProviders(<EurAssetsPanel year={2026}/>);
+
+        const table = screen.getByRole('table');
+        expect(within(table).getByText('⚠ Ausgaben-Art muss zu einer AfA-Kennzahl zugeordnet sein')).toBeVisible();
+        expect(within(table).getByText('⚠ Jahr liegt in der Zukunft')).toBeVisible();
+    });
+
     it('verwendet die GWG-Grenze aus dem Katalog, nicht den Offline-Fallback (EUE-051)', () => {
         setAssets(
             asset({id: 1, name: 'Unter Grenze', cost_cents: 140000}),

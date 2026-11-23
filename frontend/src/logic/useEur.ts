@@ -162,6 +162,8 @@ export interface EurAsset {
     /** #34 P5.3: a permanent switch to linear is recorded here. */
     switched_to_linear_at?: string | null;
     switch_reason?: string | null;
+    /** EUE-053/058: nicht blockierende Hinweise aus dem gepinnten Regeltext. */
+    warnings?: {code: string; text: string}[];
 }
 
 /** #34 P5.2: AfA category suggested from the pinned reference catalogue. */

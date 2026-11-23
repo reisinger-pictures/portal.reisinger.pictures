@@ -269,6 +269,39 @@ class EurApiTest extends TestCase
         $response->assertJsonPath('asset.years.0.business_use_cents', 32000);
     }
 
+    /**
+     * EUE-053/058: die AV-Hinweise sind Antwortfelder, keine 422-Fehler, und
+     * die AfA-KZ-Whitelist kommt aus dem gepinnten Regeltext (nicht hartcodiert).
+     */
+    public function test_asset_exposes_pinned_afa_and_future_year_warnings(): void
+    {
+        $token = $this->tokenFor(UserRole::ADMIN->value);
+        $payload = [
+            'name' => 'Drucker',
+            'invoice_no' => 'R-2',
+            'supplier' => 'Fotohandel',
+            'purchase_date' => '2027-01-15',
+            'cost_cents' => 200000,
+            'useful_life_years' => 5,
+            'business_share' => 100,
+            'method' => 'linear',
+        ];
+
+        $bad = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/assets',
+            [...$payload, 'category' => 'Wareneinkäufe']);
+        $bad->assertCreated();
+        $bad->assertJsonPath('asset.warnings.0.code', 'EUE-053');
+        $bad->assertJsonPath('asset.warnings.0.text', '⚠ Ausgaben-Art muss zu einer AfA-Kennzahl zugeordnet sein');
+        $bad->assertJsonPath('asset.warnings.1.code', 'EUE-058');
+        $bad->assertJsonPath('asset.warnings.1.text', '⚠ Jahr liegt in der Zukunft');
+
+        $good = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/assets',
+            [...$payload, 'category' => 'Firmen-Drucker']);
+        $good->assertCreated();
+        $good->assertJsonCount(1, 'asset.warnings');
+        $good->assertJsonPath('asset.warnings.0.code', 'EUE-058');
+    }
+
     public function test_degressive_comparison_matches_the_pinned_example(): void
     {
         $token = $this->tokenFor(UserRole::ADMIN->value);

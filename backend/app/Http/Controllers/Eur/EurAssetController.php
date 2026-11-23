@@ -452,6 +452,37 @@ class EurAssetController extends Controller
     }
 
     /**
+     * EUE-053/058: die beiden AV-Hinweise aus dem gepinnten Regeltext.
+     *
+     * Die ODS zeigt ein ⚠ an, blockiert die Eingabe aber nicht — deshalb sind
+     * die Hinweise Antwortfelder und keine 422-Fehler.
+     *
+     * @return list<array{code: string, text: string}>
+     */
+    private function warnings(EurAsset $asset): array
+    {
+        $warnings = [];
+        $calculator = new DepreciationCalculator(new RuleValues);
+
+        if ((int) $asset->useful_life_years > 1
+            && ! in_array($this->categoryCode((string) $asset->category), $calculator->afaCodes(), true)) {
+            $warnings[] = [
+                'code' => 'EUE-053',
+                'text' => '⚠ Ausgaben-Art muss zu einer AfA-Kennzahl zugeordnet sein',
+            ];
+        }
+
+        if ($asset->purchase_date !== null && (int) $asset->purchase_date->format('Y') > EurYear::UPPER) {
+            $warnings[] = [
+                'code' => 'EUE-058',
+                'text' => '⚠ Jahr liegt in der Zukunft',
+            ];
+        }
+
+        return $warnings;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function serialize(EurAsset $asset): array
@@ -472,6 +503,7 @@ class EurAssetController extends Controller
             'switched_to_linear_at' => $asset->switched_to_linear_at?->toIso8601String(),
             'switch_reason' => $asset->switch_reason,
             'status' => $asset->status,
+            'warnings' => $this->warnings($asset),
             'years' => $asset->years->map(fn (EurAssetYear $year): array => [
                 'year' => (int) $year->year,
                 'method' => $year->method,
