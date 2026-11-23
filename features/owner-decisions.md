@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-83. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-84. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -417,3 +417,18 @@ The owner approved on 2026-11-23 adding the German Tesseract language data (`tes
 ### D-83: Migrations approved for travel persistence and the WEB data model
 
 The owner approved on 2026-11-23 new database migrations for (a) travel-trip persistence so the existing travel-domain units reach a product path, and (b) the WEB data model (`business_share`, `expense_kind`, `supplier`, `WE*` receipt numbers, required fields). The general [migration policy](../backend/AGENTS.md) stays in force: each migration needs a documented schema, backfill and rollback decision before it is written; deployed migrations are never modified; required seeding follows the backend rules.
+
+### D-84: PHP CMS/PAdES parser for signed-PDF upload verification
+
+The owner chose on 2026-11-23 a **PHP signature-verification library** for the
+upload-time check required by [D-81](#d-81-externally-signed-pdfs--verify-on-upload-no-public-verify):
+the deployment image gains a CMS/PKCS#7-PAdES parser so the backend can verify
+that the re-uploaded PDF carries a signature over the portal's bytes. As with
+D-82, a deployment-image dependency is an owner-approved change. `pdfsig`
+stays excluded (D-81). This decision adds **no public `/verify` endpoint**,
+**no QES/trust-chain claim** and no change to the existing SHA-256/JWT content
+binding: a successful check means a verifiable signature is present over those
+bytes, not that a signer is trusted. The concrete library, failure behaviour
+and any migration/seed impact are technical decisions documented in
+`features/eur/` with the implementation; implementation status belongs in the
+issue tracker, not here.
