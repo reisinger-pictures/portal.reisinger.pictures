@@ -8,6 +8,7 @@ use App\Models\GalleryInvite;
 use App\Models\User;
 use App\Services\ModelContactSheetLinkService;
 use App\Services\OfferTokenService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
@@ -215,6 +216,10 @@ class LegacyAuthContractTest extends TestCase
      */
     public function test_d48_shared_link_window_is_seven_days_and_offer_default_is_fourteen(): void
     {
+        // issue() calls now() twice (default expiry and iat); freeze the clock so
+        // exp - iat cannot drift by one second across a boundary.
+        Carbon::setTestNow(Carbon::create(2026, 5, 15, 12, 0, 0));
+
         $links = app(ModelContactSheetLinkService::class);
         $this->assertSame(7, ModelContactSheetLinkService::TTL_DAYS);
 
@@ -232,6 +237,8 @@ class LegacyAuthContractTest extends TestCase
 
         $expiredOffer = $offers->issue(['price' => 100], now()->subDay());
         $this->assertNull($offers->verify($expiredOffer));
+
+        Carbon::setTestNow();
     }
 
     /**
