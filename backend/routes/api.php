@@ -23,6 +23,7 @@ use App\Http\Controllers\Eur\EurReferenceController;
 use App\Http\Controllers\Eur\EurSettingsController;
 use App\Http\Controllers\Eur\EurSignatureController;
 use App\Http\Controllers\Eur\EurSummaryController;
+use App\Http\Controllers\Eur\EurTestSignatureController;
 use App\Http\Controllers\Eur\EurTravelController;
 use App\Http\Controllers\Eur\EurVatController;
 use App\Http\Controllers\Eur\EurWarehouseController;
@@ -117,6 +118,12 @@ Route::get('/settings/calculator-terms', [SettingsController::class, 'getCalcula
     ->name('api.settings.calculator-terms');
 
 if (app()->environment('local', 'testing')) {
+    // E2E only: produces a real, self-signed PAdES signature over a portal
+    // document so the signed-upload flow can be exercised end to end. No
+    // equivalent route is registered in production.
+    Route::post('/test/eur/sign-document/{id}', [EurTestSignatureController::class, 'sign'])
+        ->name('api.test.eur.sign-document');
+
     Route::delete('/test/cleanup-user/{id}', function ($id) {
         $user = User::find($id);
         if ($user) {

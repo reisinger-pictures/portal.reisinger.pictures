@@ -117,11 +117,16 @@ verlieren, nicht den ursprünglichen Beleg oder seine Audithistorie.
 **Grenze der Aussage.** Die geprüfte Bindung ist CONTENT-IDENTITY: Der Marker
 im unsigned PDF trägt einen signierten JWT-Hash der Ursprungsbytes; beim
 Wiedereingang müssen die Upload-Bytes mit den gespeicherten Bytes beginnen und
-der Marker muss Marke, Art, Jahr, Monat und diesen Hash binden. Das ist keine
-qualifizierte elektronische Signatur, keine CMS-/PAdES-Validierung und keine
-Vertrauensprüfung; `pdfsig` ist im Deployment-Image nicht installiert und wird
-nicht aufgerufen. Ein erfolgreicher Upload besagt nur, dass die geprüfte Datei
-auf demselben Inhalt beruht.
+der Marker muss Marke, Art, Jahr, Monat und diesen Hash binden. Zusätzlich
+verifiziert `EurPdfSignatureService` (D-84) den eingebetteten CMS-/PKCS#7-Block
+mit der PHP-Bibliothek `lsnepomuceno/signet-pdf`: der `/ByteRange` muss bei 0
+beginnen und die Ursprungsbytes abdecken, die Signatur muss über genau diese
+Bytes kryptografisch gültig sein und die gesamte Datei abdecken. Das ist
+weiterhin **keine** qualifizierte elektronische Signatur: kein Trust-Store,
+keine Ketten- oder Revocation-Prüfung, kein Netzwerkzugriff und kein `pdfsig`
+im Deployment-Image. `isTrusted` wird nicht ausgewertet. Ein erfolgreicher
+Upload besagt, dass eine verifizierbare Signatur über dem Inhalt unseres Belegs
+liegt — nicht, dass ein Signer vertrauenswürdig ist.
 
 ### Schema-Entscheidung V067 (Reisezeilen, D-83a)
 

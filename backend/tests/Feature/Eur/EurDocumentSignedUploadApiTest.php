@@ -6,6 +6,7 @@ namespace Tests\Feature\Eur;
 
 use App\Models\EurDocument;
 use App\Services\Eur\EurPdfFingerprintService;
+use App\Services\Eur\EurPdfSignatureService;
 use App\Services\OfferTokenService;
 use App\Support\BoundFileEncryption;
 use App\Support\BrandRegistry;
@@ -16,12 +17,11 @@ use Illuminate\Testing\TestResponse;
 
 /**
  * EAR · Unsigned Berichtigungs-PDF, externe Signatur, Wiedereingang mit
- * Content-Identity-Prüfung. Keine QES/CMS-Prüfung (siehe Service-Doku).
+ * Content-Identity- und echter CMS-/PAdES-Prüfung (D-81, D-84). Keine Trust-,
+ * Ketten- oder Revocation-Prüfung und keine QES-Behauptung.
  */
 class EurDocumentSignedUploadApiTest extends EurBookkeepingTestCase
 {
-    private const SIGNATURE_APPENDIX = "\n%DEMO-EXTERNAL-SIGNATURE-DATA%\n";
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -87,7 +87,7 @@ class EurDocumentSignedUploadApiTest extends EurBookkeepingTestCase
         $document = $this->createCorrection($token, 'monthly', 2026, 5);
         $row = EurDocument::findOrFail($document['id']);
         $original = $this->storedBytes($row);
-        $signedBytes = $original.self::SIGNATURE_APPENDIX;
+        $signedBytes = $this->signedBytes($original);
 
         $this->uploadSigned($token, (int) $document['id'], $signedBytes)
             ->assertOk()
@@ -127,12 +127,39 @@ class EurDocumentSignedUploadApiTest extends EurBookkeepingTestCase
         $this->assertDatabaseHas('eur_audit_logs', ['action' => 'signed_uploaded', 'subject_type' => 'eur_document']);
     }
 
+    public function test_test_only_route_produces_a_verifiable_signature(): void
+    {
+        $token = $this->tokenFor();
+        $document = $this->createCorrection($token, 'monthly', 2026, 5);
+        $original = $this->storedBytes(EurDocument::findOrFail($document['id']));
+
+        $response = $this->postJson("/api/test/eur/sign-document/{$document['id']}")->assertOk();
+        $signed = $response->getContent();
+        $this->assertIsString($signed);
+        $this->assertTrue(app(EurPdfSignatureService::class)->verify($signed, $original));
+    }
+
+    public function test_upload_without_a_valid_pades_signature_is_rejected(): void
+    {
+        $token = $this->tokenFor();
+        $document = $this->createCorrection($token, 'monthly', 2026, 5);
+        $original = $this->storedBytes(EurDocument::findOrFail($document['id']));
+
+        $this->uploadSigned($token, (int) $document['id'], $original."\n%FAKE-SIGNATURE%\n")
+            ->assertUnprocessable()
+            ->assertJsonPath('error', 'Die hochgeladene PDF-Datei enthält keine gültige Signatur über unseren Beleg.')
+            ->assertJsonStructure(['error', 'action']);
+
+        $this->assertSame('unsigned', EurDocument::findOrFail($document['id'])->status);
+        $this->assertNull(EurDocument::findOrFail($document['id'])->signed_storage_path);
+    }
+
     public function test_a_new_file_with_a_copied_marker_is_rejected(): void
     {
         $token = $this->tokenFor();
         $document = $this->createCorrection($token, 'monthly', 2026, 5);
         $marked = $this->storedBytes(EurDocument::findOrFail($document['id']));
-        $forged = "%PDF-1.7 neu erzeugt\n%%EOF".$this->markerFrom($marked).self::SIGNATURE_APPENDIX;
+        $forged = "%PDF-1.7 neu erzeugt\n%%EOF".$this->markerFrom($marked);
 
         $this->uploadSigned($token, (int) $document['id'], $forged)
             ->assertUnprocessable()

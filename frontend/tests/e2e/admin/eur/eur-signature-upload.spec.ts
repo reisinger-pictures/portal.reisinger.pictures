@@ -65,16 +65,13 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         const signedInput = row.getByLabel('Signiertes PDF hochladen');
         await expect(row.getByText('Signiertes PDF hochladen', { exact: true })).toBeVisible();
 
-        // The byte-binding check requires the upload to START with the exact
-        // bytes we delivered (an external signature is an incremental update).
-        // Fetch the real unsigned PDF with the page's auth cookies, then append
-        // a signature revision — a foreign PDF would correctly get a 422.
-        const download = await page.request.get(`/api/management/eur/documents/${documentId}/download`);
-        expect(download.status()).toBe(200);
-        const signed = Buffer.concat([
-            await download.body(),
-            Buffer.from('\n%DEMO-EXTERNAL-SIGNATURE-DATA%\n', 'utf-8'),
-        ]);
+        // D-84: the upload now requires a real CMS/PAdES signature over the
+        // portal's bytes. A test-only backend route (local/testing only) signs
+        // the exact downloaded PDF with a throwaway self-signed certificate;
+        // no production endpoint can produce such a signature.
+        const signedResponse = await page.request.post(`/api/test/eur/sign-document/${documentId}`);
+        expect(signedResponse.status()).toBe(200);
+        const signed = await signedResponse.body();
 
         const uploaded = page.waitForResponse((response) =>
             response.request().method() === 'POST'

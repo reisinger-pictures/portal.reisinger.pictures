@@ -18,6 +18,7 @@ use App\Models\EurSignature;
 use App\Models\EurWarehouseEntry;
 use App\Services\Eur\EurPdfFingerprintService;
 use App\Services\Eur\EurPdfService;
+use App\Services\Eur\EurPdfSignatureService;
 use App\Services\Eur\EurReceiptOcrService;
 use App\Support\BoundFileEncryption;
 use App\Support\BrandRegistry;
@@ -42,10 +43,10 @@ use Throwable;
  * fremde ID ist ein 404.
  *
  * Die Berichtigungs-PDFs werden unsigned erzeugt, extern signiert und mit
- * einer Inhaltsbindung wieder eingeliefert. Das ist CONTENT-IDENTITY (gleiche
- * Ursprungsbytes), keine qualifizierte elektronische Signatur: kein CMS,
- * kein PAdES, keine Trust-Prüfung; `pdfsig` ist im Deployment-Image nicht
- * installiert und wird nicht aufgerufen.
+ * einer Inhaltsbindung wieder eingeliefert. Zusätzlich prüft der Upload eine
+ * vorhandene CMS-/PAdES-Signatur über diese Bytes (D-84, PHP-Bibliothek). Das
+ * ist weiterhin keine qualifizierte elektronische Signatur: keine Trust-,
+ * Ketten- oder Revocation-Prüfung und kein `pdfsig` im Deployment-Image.
  */
 class EurDocumentController extends Controller
 {
@@ -65,6 +66,7 @@ class EurDocumentController extends Controller
         private readonly BoundFileEncryption $encryption,
         private readonly EurPdfService $pdf,
         private readonly EurPdfFingerprintService $fingerprints,
+        private readonly EurPdfSignatureService $signatures,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -277,10 +279,11 @@ class EurDocumentController extends Controller
     /**
      * Extern signierte PDF wieder einliefern.
      *
-     * Zwei Prüfungen müssen bestehen: die Upload-Bytes beginnen mit den exakten
+     * Drei Prüfungen müssen bestehen: die Upload-Bytes beginnen mit den exakten
      * gespeicherten Bytes (damit eine neu erzeugte Datei mit kopiertem Marker
-     * scheitert), und der Marker bindet Brand/Art/Jahr/Monat sowie den Hash der
-     * Ursprungsbytes. Keine Signatur-, CMS- oder Trust-Prüfung.
+     * scheitert), der Marker bindet Brand/Art/Jahr/Monat sowie den Hash der
+     * Ursprungsbytes, und eine CMS-/PAdES-Signatur verifiziert diese Bytes.
+     * Keine Trust-, Ketten- oder Revocation-Prüfung.
      */
     public function storeSigned(Request $request, int $id): JsonResponse
     {
@@ -327,6 +330,15 @@ class EurDocumentController extends Controller
             return $this->signedRejection(
                 'Der Beleg-Marker fehlt, wurde verändert oder gehört zu einem anderen Beleg.',
                 'Laden Sie die aus diesem Portal heruntergeladene, extern signierte PDF-Datei unverändert wieder hoch.',
+            );
+        }
+
+        // D-81/D-84: zusätzlich zur Inhaltsbindung muss die PDF eine gültige
+        // Signatur über genau diese Bytes enthalten. Keine Trust-/QES-Prüfung.
+        if (! $this->signatures->verify($uploadedBytes, $originalBytes)) {
+            return $this->signedRejection(
+                'Die hochgeladene PDF-Datei enthält keine gültige Signatur über unseren Beleg.',
+                'Signieren Sie die aus diesem Portal heruntergeladene PDF-Datei extern und laden Sie das signierte Ergebnis erneut hoch.',
             );
         }
 

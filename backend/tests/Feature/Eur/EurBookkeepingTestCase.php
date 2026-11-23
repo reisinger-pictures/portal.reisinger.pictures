@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Support\BrandRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use LSNepomuceno\Signet\Signet;
 use Tests\Support\AuthTokenFactory;
 use Tests\TestCase;
 
@@ -41,6 +42,27 @@ abstract class EurBookkeepingTestCase extends TestCase
         auth('api')->forgetUser();
 
         return $token;
+    }
+
+    /** Produces a real self-signed PAdES signature over the given bytes (D-84). */
+    protected function signedBytes(string $original): string
+    {
+        $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        $csr = openssl_csr_new(['commonName' => 'EAR Unit Testsigner'], $key, ['digest_alg' => 'sha256']);
+        $x509 = openssl_csr_sign($csr, null, $key, 1, ['digest_alg' => 'sha256']);
+
+        if ($key === false || $csr === false || $x509 === false) {
+            $this->fail('Could not generate the test signing certificate.');
+        }
+
+        openssl_x509_export($x509, $certificate);
+        openssl_pkey_export($key, $privateKey);
+
+        return (new Signet)->newSignature()
+            ->certificateFromPem((string) $certificate, (string) $privateKey)
+            ->pdfContents($original, 'signiert.pdf')
+            ->sign()
+            ->contents();
     }
 
     /**
