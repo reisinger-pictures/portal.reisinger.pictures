@@ -21,8 +21,11 @@ type GalleryFixture = {
  *   Cause: "Alle ausklappen" was clicked before the gallery tree had loaded,
  *   and the nested child link was clicked without waiting for it to appear.
  *   Attempt 2 (CI 45285427570): groups render as <summary>, not links, so a
- *   group-link wait could never succeed. The spec now waits for the group's
- *   text, expands, then waits for the child gallery link before clicking it.
+ *   group-link wait could never succeed; the child group text then resolved
+ *   but was hidden inside the collapsed parent. Attempt 3 (CI 45287755403):
+ *   TreeNode initialises prevSignal at mount, so an early expand click opens
+ *   nothing. The spec now waits for the top-level group (visible once loaded)
+ *   before expanding, then waits for the nested gallery link.
  */
 test.describe('Meta-gallery child licensing', () => {
     let helper: E2ESessionHelper;
@@ -145,9 +148,12 @@ test.describe('Meta-gallery child licensing', () => {
         await new SidebarHelper(page).navigateTo('Galerien & Ordner');
 
         const main = page.getByRole('main');
-        // Gruppen sind <summary>-Elemente im Baum, keine Links. Erst wenn die
-        // Kindgruppe gerendert ist, hat "Alle ausklappen" etwas zum Aufklappen.
-        await expect(main.getByText(childGroupName, {exact: true})).toBeVisible({timeout: 15000});
+        // Der Baum lädt asynchron. TreeNode initialisiert prevSignal beim Mount
+        // mit dem dann aktuellen expandSignal — ein zu früher "Alle ausklappen"-
+        // Klick öffnet danach gemountete Knoten nicht. Die Top-Level-Gruppe ist
+        // als <summary> sichtbar, sobald der Baum geladen ist; die Kindgruppe
+        // bleibt dagegen hidden, bis der Parent aufgeklappt ist.
+        await expect(main.getByText(`E2E Meta Licensing ${suffix}`, {exact: true})).toBeVisible({timeout: 15000});
         await main.getByRole('button', {name: 'Alle ausklappen'}).click();
         const nestedGalleryName = definitions[2].name;
         const nestedGalleryLink = main.getByRole('link', {name: nestedGalleryName, exact: true});

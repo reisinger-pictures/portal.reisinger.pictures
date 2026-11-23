@@ -22,9 +22,12 @@ import { SidebarHelper } from '../../helpers/SidebarHelper';
  *   Cause: `filter({hasText:'unsigned'}).first()` selected an arbitrary unsigned
  *   document of the shared brand instead of the correction just created, so the
  *   POST went to a different document id and `waitForResponse` timed out.
- *   Attempt 2 (CI 45285427570): a `has`-intersection on the Öffnen link did not
- *   resolve the row. Both tests now use the component's deterministic input id
- *   `eur-signed-upload-{documentId}` and derive the row from that input.
+ *   Attempt 2 (CI 45287755403): a `has`-intersection on the Öffnen link did not
+ *   resolve the row; the input-id approach then enabled the upload but the row
+ *   vanished afterwards, because SignedCell replaces the input with the
+ *   signed-download link and the row was derived from that input.
+ *   Attempt 3: the row is derived from the stable Öffnen download anchor,
+ *   which survives the re-render and still carries the document id.
  */
 test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
     let helper: E2ESessionHelper;
@@ -51,12 +54,14 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
     }
 
     /**
-     * The upload input id is derived from the document id by the component, so
-     * it is the only locator that cannot pick another shared-brand row.
+     * Derive the row from the stable "Öffnen" download link (its href carries
+     * the document id). SignedCell replaces the upload input with the
+     * signed-download link after a successful upload, so a row derived from the
+     * input disappears; this anchor survives that re-render.
      */
-    function signedInputFor(main: Locator, documentId: number): Locator {
-        return main.getByLabel('Signiertes PDF hochladen')
-            .and(main.locator(`#eur-signed-upload-${documentId}`));
+    function correctionRow(main: Locator, documentId: number): Locator {
+        const openLink = main.locator(`a[href="/api/management/eur/documents/${documentId}/download"]`);
+        return openLink.locator('xpath=ancestor::tr');
     }
 
     async function createCorrection(page: Page, main: Locator) {
@@ -81,10 +86,10 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         const main = await openBelege(page);
         const documentId = await createCorrection(page, main);
 
-        const signedInput = signedInputFor(main, documentId);
-        const row = signedInput.locator('xpath=ancestor::tr');
-        await expect(signedInput).toHaveCount(1);
+        const row = correctionRow(main, documentId);
+        const signedInput = row.getByLabel('Signiertes PDF hochladen');
         await expect(row.getByText('unsigned', { exact: true })).toBeVisible();
+        await expect(signedInput).toHaveCount(1);
 
         // D-84: the upload now requires a real CMS/PAdES signature over the
         // portal's bytes. A test-only backend route (local/testing only) signs
@@ -122,10 +127,10 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         const main = await openBelege(page);
         const documentId = await createCorrection(page, main);
 
-        const signedInput = signedInputFor(main, documentId);
-        const row = signedInput.locator('xpath=ancestor::tr');
-        await expect(signedInput).toHaveCount(1);
+        const row = correctionRow(main, documentId);
+        const signedInput = row.getByLabel('Signiertes PDF hochladen');
         await expect(row.getByText('unsigned', { exact: true })).toBeVisible();
+        await expect(signedInput).toHaveCount(1);
         const rejected = page.waitForResponse((response) =>
             response.request().method() === 'POST'
             && response.url().includes(`/api/management/eur/documents/${documentId}/signed`));
