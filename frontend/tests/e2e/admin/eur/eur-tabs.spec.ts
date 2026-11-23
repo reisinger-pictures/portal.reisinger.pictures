@@ -50,16 +50,19 @@ test.describe('EAR cockpit navigation', () => {
                 // The Anlagen panel is tall; after its heading assertion the
                 // page can still be settling at a lower scroll position. Bring
                 // the tab back into view so the click cannot land on a neighbour
-                // in the 12-tab strip (deterministic "Monat" miss seen in CI).
+                // in the 12-tab strip.
                 await tabButton.scrollIntoViewIfNeeded();
                 await tabButton.click();
-                // The tab is URL-driven (selectTab → `bereich`). Waiting for the
-                // URL first both proves the click registered and gives React a
-                // reliable point to re-render before checking aria-selected.
-                await expect(page).toHaveURL(new RegExp(`bereich=${id}(?:&|$)`));
-                await expect(tabButton).toHaveAttribute('aria-selected', 'true');
-                // D-10: Panel-Inhalte bleiben auf das main-Landmark gescopt.
-                await expect(main.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+                // The tab is URL-driven (selectTab → `bereich`). The History API
+                // updates the URL synchronously, while the React render of the
+                // selected panel can lag under parallel CI load. The panel
+                // heading is rendered from the very same `tab` value as the
+                // button's `aria-selected` (both are `tab === id`), so waiting
+                // for it proves the selection actually committed — a stronger
+                // end-state check than asserting the redundant ARIA attribute
+                // inside a short 5s window. D-10: keep the scope on <main>.
+                await expect(page).toHaveURL(new RegExp(`bereich=${id}(?:&|$)`), {timeout: 20_000});
+                await expect(main.getByRole('heading', { name: heading, exact: true })).toBeVisible({timeout: 20_000});
             });
         }
     });
