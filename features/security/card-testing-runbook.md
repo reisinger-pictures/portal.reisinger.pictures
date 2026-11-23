@@ -132,10 +132,12 @@ SELECT 1;
 SQL
 ```
 
-Container and credentials are from `deployment/docker-compose.yml:6`
-(`container_name: portal_db`), `:33` (`MYSQL_DATABASE: portal_db`), `:34`
-(`MYSQL_USER: portal_user`), `:35` (`MYSQL_PASSWORD: ${DB_PASSWORD}`). If the
-client binary is not called `mariadb` in your image, use `mysql`.
+These credentials belong to the old MariaDB host container, if it still
+exists; the `db` service and its `MYSQL_*` variables are no longer in the
+repository Compose stack, so no Compose line references apply. There is no
+active rollback: the commands above are historical evidence from before the
+switch, not runnable against the current PostgreSQL stack. If the client binary
+is not called `mariadb` in that legacy image, use `mysql`.
 
 `value` is a `mediumText` column, so it sorts **lexicographically** — every
 ordering below casts explicitly. Reproduce the whole set of active namespaces:

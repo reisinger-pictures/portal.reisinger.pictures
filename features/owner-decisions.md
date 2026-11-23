@@ -39,14 +39,12 @@ and [PostgreSQL cutover](infrastructure/30-postgres-cutover.md).
 
 ### D-64: PostgreSQL 16 is the production engine
 
-**PostgreSQL 16 is the approved production target** replacing D-49. Until the
-host cutover procedure completes, the existing production instance remains on
-MariaDB; the repository must not imply that editing Compose has migrated live
-data. `backend/config/database.php` defaults to `pgsql`, and
-`deployment/docker-compose.yml` provides PostgreSQL as `db_pg` (`portal_db_pg`,
-volume `db_pg_data`) alongside MariaDB as the temporary source/rollback service.
-Local development, CI and PHPUnit use PostgreSQL so they exercise the target
-engine rather than SQLite.
+**PostgreSQL 16 is the sole production engine**, replacing D-49. Production has
+run on PostgreSQL since 2026-11-22. `backend/config/database.php` defaults to
+`pgsql`, and `deployment/docker-compose.yml` provides PostgreSQL only as `db_pg`
+(`portal_db_pg`, volume `db_pg_data`); the MariaDB `db` service is no longer part
+of the repository stack. Local development, CI and PHPUnit use PostgreSQL so
+they exercise the target engine rather than SQLite.
 
 Binding consequences:
 
@@ -55,8 +53,8 @@ Binding consequences:
 - The migration history V001–V052 was ported in place, not appended to, because the whole schema moved engines in one step. From V053 on, a deployed migration is immutable again.
 - The contract-signer, payout and guest-order invariants are proven on PostgreSQL, not skipped there. A driver-gated test that skips on the production engine is a defect; CI turns such a skip into a red job.
 - Email identity is case-insensitive by construction, not by collation: the application normalises on write, reads with `lower(email)`, and a functional unique index makes the invariant structural. MariaDB's `utf8mb4_unicode_ci` did this implicitly; PostgreSQL does not.
-- Until the cutover is executed, MariaDB remains the live production source. During the transition its driver is also required by the one-time export (`portal:db-copy` source) and the rollback path. Removing the `db` service after the observation window is a separate decision.
-- The cutover itself — freeze, backup, copy, verify, switch, rollback — is a documented, host-executable procedure: `deployment/migrate-to-postgres.sh`, contract in [PostgreSQL cutover](infrastructure/30-postgres-cutover.md). Rollback is an `.env` flip (`DB_CONNECTION=mariadb`, `DB_HOST=db`, `DB_PORT=3306`), not a restore and not a compose revert.
+- The old MariaDB container and `db_data` volume on the production host are an explicit **OPEN MANUAL GATE**, not an in-repo rollback: the operator must evaluate the host-side `switch-attempted` marker, complete a PostgreSQL backup/restore drill, and remove the legacy container and volume there. The MariaDB driver is still needed for the one-time forward export (`portal:db-copy` source), and the forward-copy script remains for hosts where the switch has not yet run.
+- The cutover itself — freeze, backup, copy, verify, switch — is a documented, host-executable procedure: `deployment/migrate-to-postgres.sh`, contract in [PostgreSQL cutover](infrastructure/30-postgres-cutover.md). There is no in-repo rollback: reverting the switch would be a restore from a PostgreSQL backup, not an `.env` flip and not a compose revert.
 
 ### D-52: Watchtower keeps supervising `portal_backend`
 

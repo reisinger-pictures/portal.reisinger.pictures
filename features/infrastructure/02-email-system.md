@@ -248,12 +248,14 @@ Der Dry-Run nennt für jede Zeile Benutzer (E-Mail), Gruppe (Name), Einstufung, 
 The `password_reset_tokens` slot is identified case-insensitively by email.
 Issuance stores the `EmailNormalizer` form; claim, takeover, reset lookup and
 consumption use the same case-folded identity. PostgreSQL enforces one slot per
-identity with V059's unique expression index on `LOWER(email)`. MariaDB retains
-its case-insensitive primary-key collation.
+identity with V059's unique expression index on `LOWER(email)`. The MariaDB DDL
+branch retains its case-insensitive primary-key collation only for the one-time
+copy source; MariaDB is no longer a production engine.
 
 V059 preflights case-folded duplicates and aborts without listing email
 addresses, rewriting token rows, or choosing a winning token. It performs no
 backfill: one legacy mixed-case row remains valid and usable, and the unique
 index prevents a second case variant. The cutover copy preserves that row
-verbatim. Repository migrations are not rolled back; switching back to
-MariaDB requires no token-data rewrite and uses its existing primary key.
+verbatim. Repository migrations are not rolled back. Reverting the switch would
+be a restore from a PostgreSQL backup, not an `.env` flip to MariaDB, and needs
+no token-data rewrite.

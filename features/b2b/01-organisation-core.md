@@ -86,9 +86,10 @@ This contract is intentionally case-folding parity, not a byte-for-byte
 replacement for MariaDB `utf8mb4_unicode_ci`: PostgreSQL `LOWER()` does not also
 make accents equivalent or ignore trailing spaces. Domain identity is expected
 to use DNS/IDNA names; those additional MariaDB equivalence classes are outside
-this contract. Rollback does not rewrite data or remove the PostgreSQL index;
-the repository does not execute migration `down()` methods, and the MariaDB
-rollback path continues to use its existing unique key and collation.
+this contract. Rollback of the migration does not rewrite data or remove the
+PostgreSQL index; the repository does not execute migration `down()` methods.
+MariaDB, the pre-cutover engine, used its existing unique key and collation; it
+is no longer part of the repository stack.
 
 ---
 

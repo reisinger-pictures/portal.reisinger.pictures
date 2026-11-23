@@ -83,7 +83,11 @@ sufficient — is a legal confirmation, not a code finding; it stays with #2.
 
 The command above is the **pre-drop** evidence and cannot be re-run once the
 drop migration is deployed. Verify the post-drop state instead — the frontier
-migration recorded in AD-2 shows `Ran`, and no matching columns remain:
+migration recorded in AD-2 shows `Ran`, and no matching columns remain. The
+`portal_db`/`mariadb` command below is historical MariaDB-era evidence: the
+`db` service is no longer in the repository stack, so run the equivalent check
+against `portal_db_pg`/`psql` (D-64). The measured pre-drop counts above remain
+valid as history:
 
 ```sh
 docker exec portal_backend sh -c 'php artisan migrate:status | grep -i pending'
@@ -136,7 +140,7 @@ The branches are pinned in `backend/tests/Feature/MolliePaymentCheckControllerTe
 
 ## Verification boundary
 
-Provider fakes prove the installed SDK request/response contract without real credentials. Backend concurrency is separately exercised on MariaDB, the production engine; SQLite's in-memory transaction behavior is not evidence of row-lock concurrency. Tests must cover all provider states, exact snapshot identity, unknown/forged/reordered events, create ambiguity and idempotency expiry, retry limits, historical order replay, and at-most-once fulfillment.
+Provider fakes prove the installed SDK request/response contract without real credentials. Backend concurrency is separately exercised on PostgreSQL, the production engine (D-64); the earlier MariaDB-based measurement is historical evidence from before the cutover. SQLite's in-memory transaction behavior is not evidence of row-lock concurrency. Tests must cover all provider states, exact snapshot identity, unknown/forged/reordered events, create ambiguity and idempotency expiry, retry limits, historical order replay, and at-most-once fulfillment.
 
 The browser side is covered in two layers. `frontend/src/ui/__tests__/CheckoutReturnView.test.tsx` drives every return state (paid, failed, ambiguous, unconfirmed, error, missing reference) against a mocked status endpoint, and `ClientCartView.test.tsx` asserts the hosted redirect, the refusal of a foreign checkout host, and that the cart and checkout identity survive a return without payment. `frontend/tests/e2e/client/checkout-return.spec.ts` then exercises the return route against the real backend without any API mock: a missing reference, an unknown order, and another customer's order must all end in an unreadable state, never in `paid`. No card data and no provider credential are involved.
 

@@ -81,19 +81,21 @@ CI-Klassifizierung.
 
 ### Test-Fixtures
 
-**Kanonischer PHPUnit-Testbetrieb:** `backend/phpunit.xml` setzt
-`DB_CONNECTION=sqlite` und `DB_DATABASE=:memory:`. Die dort gesetzten
+**Kanonischer PHPUnit-Testbetrieb:** `backend/phpunit.xml` pinnt keine
+Datenbank-Engine; die Suite läuft auf dem konfigurierten PostgreSQL
+(`backend/.env.ci` in CI, lokal `backend/.env`). Die dort gesetzten
 localhost-Service-Fixtures (`127.0.0.1:7701`, `test_meili_secret`, Mail-Port
-`1025` usw.) sind Test-Konfiguration und keine MySQL/MariaDB-Datenbank.
+`1025` usw.) sind Test-Konfiguration und keine Produktionsdatenbank.
 
 `backend/.env.ci` ist ein **getracktes CI-Setup** und enthält in seinem
-allgemeinen Abschnitt MariaDB-Werte für den separaten E2E-Servicebetrieb. Der
-Backend-/PHPUnit-CI-Job kopiert die Datei als `.env`, überschreibt aber die
-Datenbank für PHPUnit durch `phpunit.xml` auf SQLite `:memory:`; der E2E-Job
-passt die Werte separat auf seine MariaDB-/Meilisearch-/Mailpit-Service-Namen
-an. Die alten `127.0.0.1:3307`-/MariaDB-Angaben dürfen daher nicht als
-PHPUnit-Standard beschrieben werden. Siehe `AGENTS.md` §8 (Security Risk
-Register).
+allgemeinen Abschnitt PostgreSQL-Werte (`DB_CONNECTION=pgsql`, `DB_HOST=127.0.0.1`,
+`DB_PORT=5432`, `DB_DATABASE=portal_test_db`) für den separaten E2E-/DB-
+Servicebetrieb (D-64). Der Backend-/PHPUnit-CI-Job kopiert die Datei als `.env`;
+`phpunit.xml` pinnt keine Datenbank-Engine, die Suite läuft auf dem konfigurierten
+PostgreSQL. Der E2E-Job passt die Werte separat auf seine PostgreSQL-/Meilisearch-
+/Mailpit-Service-Namen an. Die alten `127.0.0.1:3307`-/MariaDB-Angaben sind
+historisch; enginespezifische DB-Werte in dieser Datei müssen zur aktiven Engine
+passen. Siehe `AGENTS.md` §8 (Security Risk Register).
 
 ### Code-Fallbacks
 

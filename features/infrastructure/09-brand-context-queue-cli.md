@@ -109,8 +109,8 @@ abschließende `finally`-Block (`:80-82`) stellt den vorherigen Brand wieder her
   der Compose-Healthcheck prüft Supervisor-, Worker- und Scheduler-PID.
 - Scheduler-Events mit `onOneServer()` benötigen einen geteilten Cache-Store.
   Der database-backed Cache verwendet dieselbe Engine, die `DB_CONNECTION`
-  auswählt (MariaDB vor dem verifizierten Cutover, PostgreSQL danach);
-  `file`/`array` sind für diesen Produktionspfad ungültig. Die Policy erzwingt
+  auswählt (in Produktion ausschließlich `pgsql`, D-64); `file`/`array` sind für
+  diesen Produktionspfad ungültig. Die Policy erzwingt
   die Shared-Cache-Anforderung, ohne Redis oder eine andere nicht vorhandene
   Infrastruktur einzuführen.
 - Die vollständige Betriebs- und Recovery-Matrix steht im
