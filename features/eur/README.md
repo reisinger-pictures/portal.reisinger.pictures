@@ -39,8 +39,10 @@ Verträge und den unveränderlichen, versionierten Dokumentenstand.
 - Die UI ist eine eigenständige Buchhaltungsansicht unter `/steuern` (Alias `/eur`) mit eigener
   Monatsleiste, Monats- und Jahresübersicht, 12 Tabs und Rücksprung ins Portal.
   Belege, Wareneingang, Auswertungen, Anträge und Signatur sind als eigene
-  Tabs und Panels umgesetzt. Offen bleiben PDF-Erzeugung, OCR, echte
-  QES-Signaturkette und die Filter der Jahresübersicht (Issue #31).
+  Tabs und Panels umgesetzt. Beratende OCR-Hinweise aus Belegbildern liefert
+  `POST /eur/documents/{id}/ocr` (Tesseract-deu, D-82); sie werden nie in eine
+  Buchung übernommen. Offen bleiben PDF-Erzeugung, echte QES-Signaturkette und
+  die Filter der Jahresübersicht (Issue #31).
 
 ## Grenzen
 

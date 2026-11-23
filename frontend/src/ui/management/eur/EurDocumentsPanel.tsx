@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
+import { formatEuro } from '../../../logic/formatCurrency';
 import {
     createEurCorrectionDocument,
     deleteEurDocument,
@@ -8,9 +9,11 @@ import {
     eurDocumentSignedDownloadUrl,
     EUR_MONTHS,
     importEurEntries,
+    ocrEurDocument,
     uploadEurDocument,
     uploadSignedEurDocument,
     useEurDocuments,
+    type EurOcrHints,
     type EurCorrectionKind,
     type EurCorrectionPayload,
     type EurDocument,
@@ -124,6 +127,8 @@ export default function EurDocumentsPanel({year, month}: Props) {
     const [signedErrors, setSignedErrors] = useState<Record<number, SignedUploadFailure>>({});
     const [signedDocs, setSignedDocs] = useState<Record<number, EurDocument>>({});
     const [signedBusyId, setSignedBusyId] = useState<number | null>(null);
+    const [ocrHints, setOcrHints] = useState<Record<number, EurOcrHints>>({});
+    const [ocrBusyId, setOcrBusyId] = useState<number | null>(null);
     const fileInputId = useId();
     const csvInputId = useId();
 
@@ -196,6 +201,22 @@ export default function EurDocumentsPanel({year, month}: Props) {
             setCorrectionError(t`Das Korrektur-PDF konnte nicht erstellt werden. Prüfen Sie die Auswahl und versuchen Sie es erneut.`);
         } finally {
             setIsCreatingCorrection(false);
+        }
+    };
+
+    const runOcr = async (id: number) => {
+        if (ocrBusyId !== null) return;
+        setOcrBusyId(id);
+        try {
+            const {ocr} = await ocrEurDocument(id);
+            setOcrHints((previous) => ({...previous, [id]: ocr}));
+        } catch {
+            setOcrHints((previous) => ({
+                ...previous,
+                [id]: {supported: false, reason: t`OCR konnte nicht ausgeführt werden.`},
+            }));
+        } finally {
+            setOcrBusyId(null);
         }
     };
 
@@ -285,7 +306,22 @@ export default function EurDocumentsPanel({year, month}: Props) {
                             <tbody>
                                 {items.map((document) => (
                                     <tr key={document.id}>
-                                        <td>{document.original_name}</td>
+                                        <td>
+                                            {document.original_name}
+                                            {ocrHints[document.id] && (
+                                                <span className="block text-xs opacity-70 mt-1">
+                                                    {ocrHints[document.id].supported
+                                                        ? [
+                                                            ocrHints[document.id].receipt_no,
+                                                            ocrHints[document.id].date,
+                                                            ocrHints[document.id].amount_cents === null || ocrHints[document.id].amount_cents === undefined
+                                                                ? null
+                                                                : formatEuro((ocrHints[document.id].amount_cents ?? 0) / 100),
+                                                        ].filter(Boolean).join(' · ') || t`Keine Hinweise erkannt`
+                                                        : ocrHints[document.id].reason}
+                                                </span>
+                                            )}
+                                        </td>
                                         <td>{document.receipt_no ?? '—'}</td>
                                         <td>{document.month ?? '—'}</td>
                                         <td>{formatSize(document.size_bytes)}</td>
@@ -304,6 +340,11 @@ export default function EurDocumentsPanel({year, month}: Props) {
                                                 <a className="btn btn-ghost btn-xs" href={eurDocumentDownloadUrl(document.id)}>
                                                     <Trans>Öffnen</Trans>
                                                 </a>
+                                                <button type="button" className="btn btn-ghost btn-xs"
+                                                    disabled={ocrBusyId === document.id}
+                                                    onClick={() => void runOcr(document.id)}>
+                                                    <Trans>OCR-Hinweise</Trans>
+                                                </button>
                                                 <button type="button" className="btn btn-ghost btn-xs"
                                                     onClick={() => void remove(document.id)}>
                                                     <Trans>Entfernen</Trans>

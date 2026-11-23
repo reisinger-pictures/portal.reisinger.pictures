@@ -22,7 +22,8 @@ FROM php:${PHP_VERSION}-fpm
 ARG RUNTIME_UID=1000
 ARG RUNTIME_GID=1000
 
-# System dependencies & PHP extensions (GD, ExifTool, ImageMagick CLI, Zip, Intl, DB driver)
+# System dependencies & PHP extensions (GD, ExifTool, ImageMagick CLI, Tesseract
+# with German language data for advisory receipt OCR, Zip, Intl, DB driver)
 RUN apt-get update && apt-get install -y \
     libicu-dev \
     libfreetype6-dev \
@@ -33,6 +34,8 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     libimage-exiftool-perl \
     imagemagick \
+    tesseract-ocr \
+    tesseract-ocr-deu \
     --no-install-recommends \
     && docker-php-ext-configure intl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \

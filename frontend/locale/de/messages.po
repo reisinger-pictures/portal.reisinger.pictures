@@ -4820,6 +4820,10 @@ msgstr "Keine Gutscheincodes gefunden. Lege den ersten Gutscheincode an."
 msgid "Keine Gutscheincodes vorhanden."
 msgstr "Keine Gutscheincodes vorhanden."
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Keine Hinweise erkannt"
+msgstr "Keine Hinweise erkannt"
+
 #: src/ui/management/ManagementCustomersView.tsx
 msgid "Keine Kunden gefunden."
 msgstr "Keine Kunden gefunden."
@@ -6474,6 +6478,14 @@ msgstr "Ø Sterne"
 #: src/ui/components/GalleryModal.tsx
 msgid "Oberste Ebene (Root)"
 msgstr "Oberste Ebene (Root)"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "OCR konnte nicht ausgeführt werden."
+msgstr "OCR konnte nicht ausgeführt werden."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "OCR-Hinweise"
+msgstr "OCR-Hinweise"
 
 #: src/ui/management/components/UploadDropzone.tsx
 msgid "oder auf den Button klicken, um Dateien auszuwählen"

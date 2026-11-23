@@ -91,6 +91,16 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         await expect(link).toHaveAttribute('href', `/api/management/eur/documents/${documentId}/signed/download`);
     });
 
+    test('OCR-Hinweise sind beratend und melden ein PDF als nicht unterstützt', { tag: ['@feature:eur-signature'] }, async ({ page }) => {
+        const main = await openBelege(page);
+        await createCorrection(page, main);
+
+        const row = main.getByRole('row').filter({ hasText: 'unsigned' }).first();
+        await row.getByRole('button', { name: 'OCR-Hinweise' }).click();
+
+        await expect(row.getByText('OCR ist nur für Bildbelege (PNG/JPEG) verfügbar.')).toBeVisible();
+    });
+
     test('fehlgeschlagene Inhaltsprüfung zeigt Fehler und nächsten Schritt', { tag: ['@feature:eur-signature'] }, async ({ page }) => {
         const main = await openBelege(page);
         const documentId = await createCorrection(page, main);

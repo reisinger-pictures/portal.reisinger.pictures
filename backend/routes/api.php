@@ -336,6 +336,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::post('/management/eur/month/create-year', [EurMonthController::class, 'createYear'])->name('api.management.eur.month.create-year');
     Route::get('/management/eur/documents', [EurDocumentController::class, 'index'])->name('api.management.eur.documents.index');
     Route::post('/management/eur/documents', [EurDocumentController::class, 'store'])->name('api.management.eur.documents.store');
+    Route::post('/management/eur/documents/{id}/ocr', [EurDocumentController::class, 'ocr'])->name('api.management.eur.documents.ocr');
     // Berichtigungs-PDFs: unsigned erzeugen, extern signieren, mit Inhaltsbindung
     // wieder einliefern. Content-Identity, keine QES (kein CMS/PAdES, kein pdfsig).
     Route::post('/management/eur/documents/corrections', [EurDocumentController::class, 'createCorrection'])->name('api.management.eur.documents.corrections');

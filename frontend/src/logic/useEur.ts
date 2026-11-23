@@ -890,6 +890,20 @@ export function uploadSignedEurDocument(id: number, file: File): Promise<EurDocu
     return apiUpload<EurDocumentResponse>(`/api/management/eur/documents/${id}/signed`, body);
 }
 
+/** D-82: beratende OCR-Hinweise aus einem Belegbild (nie eine Buchung). */
+export interface EurOcrHints {
+    supported: boolean;
+    reason?: string;
+    text?: string;
+    receipt_no?: string | null;
+    date?: string | null;
+    amount_cents?: number | null;
+}
+
+export function ocrEurDocument(id: number): Promise<{ocr: EurOcrHints}> {
+    return apiMutate<{ocr: EurOcrHints}>(`/api/management/eur/documents/${id}/ocr`, 'POST');
+}
+
 /** Authenticated link to the signed PDF bytes. */
 export function eurDocumentSignedDownloadUrl(id: number): string {
     return `/api/management/eur/documents/${id}/signed/download`;

@@ -18,6 +18,7 @@ use App\Models\EurSignature;
 use App\Models\EurWarehouseEntry;
 use App\Services\Eur\EurPdfFingerprintService;
 use App\Services\Eur\EurPdfService;
+use App\Services\Eur\EurReceiptOcrService;
 use App\Support\BoundFileEncryption;
 use App\Support\BrandRegistry;
 use Closure;
@@ -168,6 +169,56 @@ class EurDocumentController extends Controller
         $this->audit('uploaded', $document);
 
         return response()->json(['document' => $this->serialize($document, [])], 201);
+    }
+
+    /**
+     * D-82: beratende OCR-Hinweise für einen bereits hochgeladenen Bildbeleg.
+     *
+     * Der Endpunkt ändert nichts am Beleg und liefert keine URL oder Pfade.
+     * PDFs werden nicht verarbeitet (Tesseract liest keine PDFs); fehlende
+     * Sprachdaten führen zu `supported: false`, nicht zu einem Upload-Fehler.
+     */
+    public function ocr(EurReceiptOcrService $ocr, int $id): JsonResponse
+    {
+        $document = EurDocument::forCurrentBrand()->findOrFail($id);
+
+        if (! in_array($document->mime_type, ['image/png', 'image/jpeg'], true)) {
+            return response()->json([
+                'ocr' => [
+                    'supported' => false,
+                    'reason' => 'OCR ist nur für Bildbelege (PNG/JPEG) verfügbar.',
+                ],
+            ]);
+        }
+
+        try {
+            $bytes = $this->encryption->read(
+                $document->storage_path,
+                BrandRegistry::currentId(),
+                (string) $document->id,
+            );
+        } catch (DocumentContextMismatchException) {
+            abort(422, 'Der Beleg kann nicht gelesen werden.');
+        }
+
+        $text = $ocr->recognise($bytes);
+
+        if ($text === null) {
+            return response()->json([
+                'ocr' => [
+                    'supported' => false,
+                    'reason' => 'OCR ist in dieser Umgebung nicht verfügbar.',
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'ocr' => [
+                'supported' => true,
+                'text' => $text,
+                ...$ocr->hints($text),
+            ],
+        ]);
     }
 
     /**

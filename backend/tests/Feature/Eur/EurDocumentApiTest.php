@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Eur;
 
 use App\Models\EurDocument;
+use App\Services\Eur\EurReceiptOcrService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -52,6 +53,44 @@ class EurDocumentApiTest extends EurBookkeepingTestCase
         Storage::disk('local')->assertExists($stored->storage_path);
         $this->assertStringStartsWith('eur/'.BrandRegistry::currentId().'/', $stored->storage_path);
         $this->assertDatabaseHas('eur_audit_logs', ['action' => 'uploaded', 'subject_type' => 'eur_document']);
+    }
+
+    public function test_ocr_returns_advisory_hints_for_an_image_receipt(): void
+    {
+        $token = $this->tokenFor();
+        $this->app->instance(EurReceiptOcrService::class, new EurReceiptOcrService(
+            static fn (string $bytes): string => "Beleg Nr: R-2026-42\n15.05.2026\nGesamt 1.234,56 €",
+        ));
+        $upload = $this->withHeaders($this->uploadHeaders($token))->post('/api/management/eur/documents', [
+            'file' => UploadedFile::fake()->image('beleg.png', 20, 20),
+            'year' => 2026,
+            'month' => 5,
+        ]);
+        $id = $upload->json('document.id');
+
+        $response = $this->withHeaders($this->bearer($token))->postJson("/api/management/eur/documents/{$id}/ocr");
+
+        $response->assertOk();
+        $response->assertJsonPath('ocr.supported', true);
+        $response->assertJsonPath('ocr.receipt_no', 'R-2026-42');
+        $response->assertJsonPath('ocr.date', '2026-05-15');
+        $response->assertJsonPath('ocr.amount_cents', 123456);
+    }
+
+    public function test_ocr_reports_unsupported_for_pdf_instead_of_failing_the_upload(): void
+    {
+        $token = $this->tokenFor();
+        $upload = $this->withHeaders($this->uploadHeaders($token))->post('/api/management/eur/documents', [
+            'file' => UploadedFile::fake()->create('beleg.pdf', 10, 'application/pdf'),
+            'year' => 2026,
+            'month' => 5,
+        ]);
+        $id = $upload->json('document.id');
+
+        $response = $this->withHeaders($this->bearer($token))->postJson("/api/management/eur/documents/{$id}/ocr");
+
+        $response->assertOk();
+        $response->assertJsonPath('ocr.supported', false);
     }
 
     public function test_duplicate_upload_is_idempotent(): void

@@ -3,6 +3,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
     createEurCorrectionDocument,
+    ocrEurDocument,
     uploadSignedEurDocument,
     useEurDocuments,
     type EurDocument,
@@ -16,6 +17,7 @@ vi.mock('../../../../logic/useEur', async (importOriginal) => {
         ...actual,
         useEurDocuments: vi.fn(),
         createEurCorrectionDocument: vi.fn(),
+        ocrEurDocument: vi.fn(),
         uploadSignedEurDocument: vi.fn(),
     };
 });
@@ -159,5 +161,24 @@ describe('EurDocumentsPanel signed upload', () => {
         expect(alert).toHaveTextContent('Die hochgeladene Datei ist nicht die signierte Version unseres PDFs.');
         expect(alert).toHaveTextContent('Signieren Sie unser Original-PDF erneut und laden Sie es hier hoch.');
         expect(within(row).queryByRole('link', {name: 'Signiertes PDF herunterladen'})).not.toBeInTheDocument();
+    });
+
+    it('zeigt beratende OCR-Hinweise, ohne daraus eine Buchung zu machen (D-82)', async () => {
+        const user = userEvent.setup();
+        vi.mocked(useEurDocuments).mockReturnValue(documentsWithUnsigned());
+        vi.mocked(ocrEurDocument).mockResolvedValue({ocr: {
+            supported: true,
+            receipt_no: 'R-2026-42',
+            date: '2026-05-15',
+            amount_cents: 123456,
+        }});
+
+        renderWithProviders(<EurDocumentsPanel year={2026} month={1}/>);
+
+        const row = screen.getByRole('row', {name: /korrektur-2026-01\.pdf/});
+        await user.click(within(row).getByRole('button', {name: 'OCR-Hinweise'}));
+
+        expect(ocrEurDocument).toHaveBeenCalledWith(42);
+        expect(within(row).getByText(/R-2026-42 · 2026-05-15 · 1\.234,56/)).toBeVisible();
     });
 });
