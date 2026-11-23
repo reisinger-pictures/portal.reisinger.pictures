@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Location;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Auth\AuthTokenService;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -65,7 +66,12 @@ class AIDetectedCityLookupReadOnlyTest extends TestCase
 
     protected function tearDown(): void
     {
-        auth('api')->logout();
+        // The Sanctum api guard is a RequestGuard without logout(); RefreshDatabase
+        // already discards its token rows after every test.
+        if (! app(AuthTokenService::class)->isSanctum()) {
+            auth('api')->logout();
+        }
+
         parent::tearDown();
     }
 

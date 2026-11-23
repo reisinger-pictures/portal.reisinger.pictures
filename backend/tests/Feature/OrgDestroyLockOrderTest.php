@@ -10,6 +10,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\AuthTokenFactory;
+use Tests\Support\LockRenderingPostgresGrammar;
 use Tests\Support\LockRenderingSQLiteGrammar;
 use Tests\TestCase;
 
@@ -86,11 +87,15 @@ class OrgDestroyLockOrderTest extends TestCase
     {
         parent::setUp();
 
-        // The SQLite grammar compiles a row lock to an empty string. This
-        // grammar renders it as a comment, so the executed statements show
-        // which statement carried a lock.
+        // Render a row lock as a comment so the executed statements show which
+        // statement carried a lock. Keep the connection's native grammar as the
+        // base: on PostgreSQL a swapped-in SQLite grammar would compile the
+        // Sanctum token INSERT without `returning "id"` and break createToken().
         $connection = DB::connection();
-        $connection->setQueryGrammar(new LockRenderingSQLiteGrammar($connection));
+        $grammarClass = $connection->getDriverName() === 'pgsql'
+            ? LockRenderingPostgresGrammar::class
+            : LockRenderingSQLiteGrammar::class;
+        $connection->setQueryGrammar(new $grammarClass($connection));
     }
 
     private function role(UserRole $role): Role

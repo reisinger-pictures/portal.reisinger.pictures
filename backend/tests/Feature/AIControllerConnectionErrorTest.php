@@ -7,6 +7,7 @@ use App\Models\Gallery;
 use App\Models\Photo;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Auth\AuthTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -36,7 +37,12 @@ class AIControllerConnectionErrorTest extends TestCase
 
     protected function tearDown(): void
     {
-        auth('api')->logout();
+        // The Sanctum api guard is a RequestGuard without logout(); RefreshDatabase
+        // already discards its token rows after every test.
+        if (! app(AuthTokenService::class)->isSanctum()) {
+            auth('api')->logout();
+        }
+
         parent::tearDown();
     }
 
