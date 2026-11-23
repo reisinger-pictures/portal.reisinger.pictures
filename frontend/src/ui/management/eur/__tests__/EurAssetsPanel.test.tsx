@@ -155,6 +155,27 @@ describe('EurAssetsPanel (#34)', () => {
         expect(within(table).getByText('⚠ Jahr liegt in der Zukunft')).toBeVisible();
     });
 
+    it('zeigt die nicht blockierende Wechsel-Erinnerung (DEG-013)', () => {
+        setAssets(asset({
+            method: 'degressiv',
+            degressive_rate: 3000,
+            switch_hint: {
+                year: 2027,
+                linear_cents: 84000,
+                degressive_cents: 50400,
+                advantage_cents: 33600,
+            },
+        }));
+
+        renderWithProviders(<EurAssetsPanel year={2026}/>);
+
+        const table = screen.getByRole('table');
+        expect(within(table).getByText(/Wechsel zur linearen AfA ab Jahr 2027 empfohlen/)).toBeVisible();
+        expect(within(table).getByText(/336,00/)).toBeVisible();
+        // Der Hinweis ist ausdrücklich kein Fehler: die Buchung bleibt möglich.
+        expect(within(table).getByRole('button', {name: 'AfA buchen'})).toBeEnabled();
+    });
+
     it('verwendet die GWG-Grenze aus dem Katalog, nicht den Offline-Fallback (EUE-051)', () => {
         setAssets(
             asset({id: 1, name: 'Unter Grenze', cost_cents: 140000}),

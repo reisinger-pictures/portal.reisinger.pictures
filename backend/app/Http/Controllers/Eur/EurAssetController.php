@@ -483,6 +483,66 @@ class EurAssetController extends Controller
     }
 
     /**
+     * DEG-013: nicht blockierende Wechsel-Erinnerung. Der Hinweis kommt aus
+     * demselben Calculator wie der Vergleichsrechner (DEG-011/012) und wird
+     * aus den gespeicherten Werten abgeleitet — keine zweite Regelquelle.
+     * `year` ist das absolute Kalenderjahr, weil `/assets/{id}/switch-to-linear`
+     * dieses Format erwartet. Nach einem vollzogenen Wechsel verschwindet der
+     * Hinweis; er ist ausdrücklich kein Fehler und blockiert keine Buchung.
+     *
+     * @return array{year: int, linear_cents: int, degressive_cents: int, advantage_cents: int}|null
+     */
+    private function switchHint(EurAsset $asset): ?array
+    {
+        if ($asset->method !== DepreciationCalculator::METHOD_DEGRESSIVE
+            || $asset->switched_to_linear_at !== null
+            || $asset->purchase_date === null) {
+            return null;
+        }
+
+        $years = $asset->relationLoaded('years')
+            ? $asset->years
+            : $asset->years()->get();
+
+        if ($years->contains(static fn (EurAssetYear $year): bool => $year->method === DepreciationCalculator::METHOD_LINEAR)) {
+            return null;
+        }
+
+        $rate = (int) ($asset->degressive_rate ?? 0);
+
+        if ($rate <= 0) {
+            return null;
+        }
+
+        $calculator = new DepreciationCalculator(new RuleValues);
+        $cost = (int) $asset->cost_cents;
+        $life = (int) $asset->useful_life_years;
+        $month = (int) $asset->purchase_date->format('n');
+        $relativeYear = $calculator->recommendedSwitchYear($cost, $life, $rate, $month);
+
+        if ($relativeYear === null) {
+            return null;
+        }
+
+        $advantage = $calculator->switchAdvantageCents($cost, $life, $rate, $month, $relativeYear);
+
+        if ($advantage <= 0) {
+            return null;
+        }
+
+        $degressive = $calculator->degressivePlan($cost, $life, $rate, $month);
+        $withSwitch = $calculator->degressivePlan($cost, $life, $rate, $month, $relativeYear);
+        $index = $relativeYear - 1;
+
+        return [
+            'year' => (int) $asset->purchase_date->format('Y') + $relativeYear - 1,
+            'linear_cents' => $withSwitch[$index]['depreciation_cents'] ?? 0,
+            'degressive_cents' => $degressive[$index]['depreciation_cents'] ?? 0,
+            'advantage_cents' => $advantage,
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function serialize(EurAsset $asset): array
@@ -504,6 +564,7 @@ class EurAssetController extends Controller
             'switch_reason' => $asset->switch_reason,
             'status' => $asset->status,
             'warnings' => $this->warnings($asset),
+            'switch_hint' => $this->switchHint($asset),
             'years' => $asset->years->map(fn (EurAssetYear $year): array => [
                 'year' => (int) $year->year,
                 'method' => $year->method,

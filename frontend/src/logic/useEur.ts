@@ -164,6 +164,13 @@ export interface EurAsset {
     switch_reason?: string | null;
     /** EUE-053/058: nicht blockierende Hinweise aus dem gepinnten Regeltext. */
     warnings?: {code: string; text: string}[];
+    /** DEG-013: empfohlener Wechsel, serverseitig aus dem AfA-Plan abgeleitet. */
+    switch_hint?: {
+        year: number;
+        linear_cents: number;
+        degressive_cents: number;
+        advantage_cents: number;
+    } | null;
 }
 
 /** #34 P5.2: AfA category suggested from the pinned reference catalogue. */

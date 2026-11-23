@@ -127,6 +127,11 @@ export default function EurAssetsPanel({ year }: Props) {
                                     const plan = asset.years.find((candidate) => candidate.year === year);
                                     const isGwg = asset.cost_cents < gwgLimitCents;
                                     const switched = asset.switched_to_linear_at != null;
+                                    // Lingui-Makros erlauben im Text nur einfache
+                                    // Variablen, keine Ausdrücke oder Property-Zugriffe.
+                                    const hint = asset.switch_hint;
+                                    const hintYear = hint?.year ?? 0;
+                                    const hintAdvantage = hint ? cents(hint.advantage_cents) : '';
                                     return (
                                         <tr key={asset.id}>
                                             <td>
@@ -138,6 +143,13 @@ export default function EurAssetsPanel({ year }: Props) {
                                                         {warning.text}
                                                     </span>
                                                 ))}
+                                                {hint && (
+                                                    <span className="block text-xs text-warning mt-1" role="status">
+                                                        <Trans>
+                                                            Wechsel zur linearen AfA ab Jahr {hintYear} empfohlen; Vorteil {hintAdvantage}.
+                                                        </Trans>
+                                                    </span>
+                                                )}
                                             </td>
                                             <td>{asset.method}</td>
                                             <td className="text-right">

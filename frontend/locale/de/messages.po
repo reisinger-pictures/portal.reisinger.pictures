@@ -8946,6 +8946,16 @@ msgstr "Web & Social"
 msgid "Website: [Domain]"
 msgstr "Website: [Domain]"
 
+#. placeholder {0}: asset.switch_hint.year
+#. placeholder {1}: cents(asset.switch_hint.advantage_cents)
+#: src/ui/management/eur/EurAssetsPanel.tsx
+#~ msgid "Wechsel zur linearen AfA ab Jahr {0} empfohlen; Vorteil {1}."
+#~ msgstr "Wechsel zur linearen AfA ab Jahr {0} empfohlen; Vorteil {1}."
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Wechsel zur linearen AfA ab Jahr {hintYear} empfohlen; Vorteil {hintAdvantage}."
+msgstr "Wechsel zur linearen AfA ab Jahr {hintYear} empfohlen; Vorteil {hintAdvantage}."
+
 #: src/ui/Privacy.tsx
 msgid "Weder das Prüftoken noch die Antwort der Prüfung und auch das Prüfergebnis selbst werden im Portal gespeichert. Ihre Warenkorb- und Bestelldaten werden dabei nicht an Cloudflare übermittelt; übermittelt werden das Token, ein serverseitiger Schlüssel und die IP-Adresse des Checkout-Vorgangs."
 msgstr "Weder das Prüftoken noch die Antwort der Prüfung und auch das Prüfergebnis selbst werden im Portal gespeichert. Ihre Warenkorb- und Bestelldaten werden dabei nicht an Cloudflare übermittelt; übermittelt werden das Token, ein serverseitiger Schlüssel und die IP-Adresse des Checkout-Vorgangs."
