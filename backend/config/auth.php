@@ -17,13 +17,18 @@ return [
     | Dormant feature flag. The default and every existing environment stay on
     | 'legacy': the JWT path below is used unchanged, the `api` guard keeps its
     | `jwt` driver and no controller/middleware/route behaviour changes.
-    | Only 'sanctum' makes the Phase-2 token infrastructure reachable; the
-    | actual guard flip and credential wiring are later phases. The guard NAME
+    | Only 'sanctum' makes the token infrastructure reachable: the `api` guard
+    | driver and the controllers' credential issuance switch together. The guard NAME
     | `api` never changes (D-74).
     |
     */
     'migration' => [
         'driver' => env('AUTH_DRIVER', 'legacy'),
+        // D-76: the 240-minute access / 7-day refresh windows are unchanged by
+        // the driver swap. JWT_TTL in the checked-in env files stays as-is for
+        // legacy mode; these keys drive the Sanctum token lifetimes.
+        'access_ttl' => (int) env('AUTH_ACCESS_TTL', 240),
+        'refresh_ttl' => (int) env('AUTH_REFRESH_TTL', 10080),
     ],
 
     'guards' => [
@@ -32,7 +37,10 @@ return [
             'provider' => 'users',
         ],
         'api' => [
-            'driver' => 'jwt',
+            // D-74: the guard NAME stays `api`; only its driver is swapped. The
+            // default is unchanged JWT behaviour; the custom driver is registered
+            // by AppServiceProvider and wraps SanctumTransientGuard.
+            'driver' => env('AUTH_DRIVER', 'legacy') === 'sanctum' ? 'sanctum_transient' : 'jwt',
             'provider' => 'users',
         ],
     ],

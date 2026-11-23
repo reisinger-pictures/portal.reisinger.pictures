@@ -9,6 +9,8 @@ use App\Mail\GalleryInviteMail;
 use App\Models\Gallery;
 use App\Models\GalleryInvite;
 use App\Models\User;
+use App\Services\Auth\AuthTokenService;
+use App\Services\Auth\TransientClaims;
 use App\Services\AuthorizationService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\Request;
@@ -207,6 +209,30 @@ class InviteController extends Controller
             }
         }
 
+        $tokens = app(AuthTokenService::class);
+        if ($tokens->isSanctum()) {
+            // Same values as the legacy guest JWT, transported as structured
+            // abilities. The guest is DB-less; the token's synthetic morph id
+            // (`guest_<uuid>`) keeps every lookup out of the users table (D-73).
+            $claims = new TransientClaims(
+                guestId: $guestId,
+                guestName: $guestName,
+                transientInviteIds: [(string) $invite->getKey()],
+                transientGalleries: $transientGalleries,
+                transientMetaGalleries: $transientMetaGalleries,
+            );
+            $guest = new User;
+            $guest->id = null;
+            $guest->name = $guestName;
+            $guest->guest_id = $guestId;
+
+            return $this->respondWithTokens(
+                $tokens->issue($guest, $claims),
+                $tokens->issueRefresh($guest, $claims),
+                ['full_path' => $gallery->full_path],
+            );
+        }
+
         $factory = app(Factory::class);
         $payload = $factory->customClaims([
             'sub' => 'guest_'.$guestId,
@@ -261,7 +287,16 @@ class InviteController extends Controller
 
         GalleryInvite::destroy($id);
 
-        $ttl = Auth::guard('api')->factory()->getTTL();
+        $tokens = app(AuthTokenService::class);
+        // Mirror the access window so a still-valid token that carries this
+        // invite is refused while its credential can be used (D-76). This is a
+        // cache marker only: AuthorizationService::isInviteActive() also checks
+        // the database after the marker expires, so the revocation is not
+        // solely bounded by this TTL. In sanctum mode the JWT factory is gone
+        // after Phase 4, hence the driver-independent service call.
+        $ttl = $tokens->isSanctum()
+            ? $tokens->accessTtlMinutes()
+            : (int) Auth::guard('api')->factory()->getTTL();
         $ttl = is_numeric($ttl) ? max(1, (int) $ttl) : 240;
         // The same marker is checked for guest_invite_id and registered
         // transient_invite_ids. It is intentionally independent of the token

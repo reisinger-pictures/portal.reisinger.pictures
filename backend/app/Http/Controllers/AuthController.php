@@ -11,6 +11,7 @@ use App\Models\OrgInvite;
 use App\Models\User;
 use App\Services\ActivationTokenService;
 use App\Services\AIService;
+use App\Services\Auth\AuthTokenService;
 use App\Services\AuthorizationService;
 use App\Services\FtpCredentialService;
 use App\Services\OrgDefaultRolePolicy;
@@ -66,6 +67,14 @@ class AuthController extends Controller
                 return response()->json([
                     'error' => 'Dieser Account ist für ein anderes Portal registriert.',
                 ], 403);
+            }
+
+            $tokens = app(AuthTokenService::class);
+            if ($tokens->isSanctum()) {
+                return $this->respondWithTokens(
+                    $tokens->issue($user),
+                    $tokens->issueRefresh($user),
+                );
             }
 
             $token = Auth::guard('api')->login($user);
@@ -270,6 +279,14 @@ class AuthController extends Controller
 
                 return $lockedUser;
             });
+        }
+
+        $tokens = app(AuthTokenService::class);
+        if ($tokens->isSanctum()) {
+            return $this->respondWithTokens(
+                $tokens->issue($user),
+                $tokens->issueRefresh($user),
+            );
         }
 
         $token = Auth::guard('api')->login($user);
@@ -501,7 +518,28 @@ class AuthController extends Controller
             return response()->json(['error' => 'Token konnte nicht aktualisiert werden.'], 401);
         }
 
+        $tokens = app(AuthTokenService::class);
+
         try {
+            if ($tokens->isSanctum()) {
+                // The refresh credential is resolved through the same guard
+                // trust checks as a request (blacklist, live invites, reserved
+                // null-brand actor), then atomically rotated into a new pair.
+                // rotateRefresh() preserves the transient claims of the
+                // consumed token — dropping them would log guests out and
+                // strip registered actors' invite grants.
+                $accessToken = $request->cookie((string) config('jwt.cookie_key_name', 'rp_jwt'));
+                $pair = $tokens->rotateRefresh(
+                    $refreshToken,
+                    is_string($accessToken) ? $accessToken : null,
+                );
+                if ($pair === null) {
+                    return response()->json(['error' => 'Token konnte nicht aktualisiert werden.'], 401);
+                }
+
+                return $this->respondWithTokens($pair['access'], $pair['refresh']);
+            }
+
             // Resolve the subject before refreshing. The refresh endpoint is
             // outside auth:api, so provider-level trust checks would otherwise
             // be skipped for a legacy null-brand account.
@@ -524,7 +562,16 @@ class AuthController extends Controller
 
     public function logout()
     {
-        Auth::guard('api')->logout();
+        $tokens = app(AuthTokenService::class);
+        if ($tokens->isSanctum()) {
+            // Revoke every credential actually presented (bearer or cookie)
+            // before the browser forgets the cookies, mirroring the guard's
+            // own bearer-first extraction.
+            $tokens->revokeFromRequest();
+        } else {
+            Auth::guard('api')->logout();
+        }
+
         $accessCookie = cookie()->forget((string) config('jwt.cookie_key_name', 'rp_jwt'), '/');
         $refreshCookie = cookie()->forget((string) config('jwt.refresh_cookie_key_name', 'rp_jwt_refresh'), '/');
 

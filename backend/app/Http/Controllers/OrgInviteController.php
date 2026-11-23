@@ -8,6 +8,7 @@ use App\Mail\OrgInviteMail;
 use App\Models\Org;
 use App\Models\OrgInvite;
 use App\Models\User;
+use App\Services\Auth\AuthTokenService;
 use App\Services\AuthorizationService;
 use App\Services\OrgDefaultRolePolicy;
 use App\Support\BrandRegistry;
@@ -212,6 +213,19 @@ class OrgInviteController extends Controller
 
             if ($isAuthenticatedUser) {
                 return response()->json(['success' => true]);
+            }
+
+            $tokens = app(AuthTokenService::class);
+            if ($tokens->isSanctum()) {
+                // The guest credential that redeemed this invite is replaced by
+                // a fresh registered-user credential; leaving it valid would
+                // keep a replayable guest session alive (D-75).
+                $tokens->revokeFromRequest();
+
+                return $this->respondWithTokens(
+                    $tokens->issue($user),
+                    $tokens->issueRefresh($user),
+                );
             }
 
             Auth::guard('api')->logout();
