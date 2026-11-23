@@ -6,6 +6,8 @@ use App\Mail\InvoiceMail;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\Eur\EurInvoiceTakeoverData;
+use App\Services\Eur\EurInvoiceTakeoverService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
@@ -71,6 +73,20 @@ class InvoiceMailDispatcher
         }
 
         if ($snapshot->invoiceMailDispatchClaimed()) {
+            // A replay must still reach the bookkeeping boundary: a snapshot
+            // claimed before the takeover existed would otherwise never be
+            // booked. The takeover is idempotent; the row lock serialises a
+            // concurrent replay with the original send.
+            DB::transaction(function () use ($snapshot): void {
+                $lockedSnapshot = InvoiceSnapshot::query()
+                    ->whereKey($snapshot->getKey())
+                    ->lockForUpdate()
+                    ->first();
+                if ($lockedSnapshot instanceof InvoiceSnapshot) {
+                    $this->takeover($lockedSnapshot);
+                }
+            });
+
             return false;
         }
 
@@ -106,10 +122,27 @@ class InvoiceMailDispatcher
             // commit succeeds, SMTP delivery is a separate retryable worker
             // concern and is not exactly-once.
             $this->claimMarker($lockedSnapshot);
+
+            // The same durable claim that authorises the send authorises the
+            // bookkeeping takeover. Delivery-note (L-) snapshots are filtered
+            // by the takeover service; the P- collective snapshot is booked.
+            $this->takeover($lockedSnapshot);
+
             Mail::to($resolvedRecipient)->queue(new InvoiceMail($order, $lockedSnapshot));
 
             return true;
         });
+    }
+
+    private function takeover(InvoiceSnapshot $snapshot): void
+    {
+        $details = is_array($snapshot->customer_details) ? $snapshot->customer_details : [];
+        $source = ($details['is_collective'] ?? false) === true
+            ? EurInvoiceTakeoverData::SOURCE_COLLECTIVE_INVOICE
+            : EurInvoiceTakeoverData::SOURCE_ORDER_INVOICE;
+        app(EurInvoiceTakeoverService::class)->takeover(
+            EurInvoiceTakeoverData::fromInvoiceSnapshot($snapshot, $source)
+        );
     }
 
     /**

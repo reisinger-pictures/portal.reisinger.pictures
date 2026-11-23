@@ -11,6 +11,7 @@ Verträge und den unveränderlichen, versionierten Dokumentenstand.
 - [03-engine.md](03-engine.md) — Rechenverträge je Fachbereich (ESt, USt, Reisen, AfA/DEG), Einheiten und Rundung.
 - [04-data-model.md](04-data-model.md) — Tabellen, Brand-Trennung, API-Vertrag.
 - [05-ui.md](05-ui.md) — Panels, Lösungsaktionen, Sprache und Mobile.
+- [08-invoice-takeover.md](08-invoice-takeover.md) — automatische Rechnungsübernahme, Idempotenz, Ausschlüsse.
 - [cleanroom/](cleanroom/) — byte-exakter, gepinnter Stand der abgeleiteten Dokumente (schreibgeschützt), inklusive `artifacts/` und `verification/requirements/`.
 
 ## Geltende Einheiten

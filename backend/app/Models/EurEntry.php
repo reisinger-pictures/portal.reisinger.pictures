@@ -22,7 +22,7 @@ class EurEntry extends Model
         'brand', 'year', 'month', 'day', 'direction', 'kind_type', 'category',
         'description', 'e1a_code', 'business_share', 'amount_cents',
         'business_amount_cents', 'vat_kind', 'payment_method', 'eur_project_id',
-        'eur_customer_id', 'receipt_no', 'note',
+        'eur_customer_id', 'receipt_no', 'external_id', 'note',
     ];
 
     protected $casts = [

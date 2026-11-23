@@ -22,7 +22,7 @@
 |---|---|---|
 | `eur_customers` | Kunden | Name, Brand; Löschen nur Archivieren |
 | `eur_projects` | Projekte | Name, Brand, aktiv/archiviert |
-| `eur_entries` | Buchungen (Einnahme/Ausgabe) | Jahr 2026, Monat 1–12, Richtung, Art, Betrag in Cent, Betriebsanteil in 5-%-Schritten, Belegnummer |
+| `eur_entries` | Buchungen (Einnahme/Ausgabe) | Jahr 2026, Monat 1–12, Richtung, Art, Betrag in Cent, Betriebsanteil in 5-%-Schritten, Belegnummer, optionale externe ID der Rechnungsübernahme |
 | `eur_assets` | Anlagegüter | Belegnummer, Anschaffungsdatum, Kosten in Cent, Nutzungsjahre 0/2–99, Betriebsanteil ≥ 50 %, AfA-Kennzahl, Methode |
 | `eur_asset_years` | AfA- und Privatnutzungsplan je Jahr | Jahr, Methode, AfA in Cent, Restbuchwert in Cent, Privatanteil, Status |
 | `eur_audit_logs` | Audit | Aktion, Akteur, Objekt; keine Dateiinhalte und keine Secrets |
@@ -66,6 +66,31 @@ würde nur Kategorie, Wechselgrund und Buchungsverknüpfung verlieren, nicht die
 AfA-Plane selbst. Ein Rückwechsel auf degressiv bleibt fachlich gesperrt, weil
 es keinen Schreibpfad gibt, der `method` nach einem Wechsel wieder auf
 `degressiv` setzt.
+
+### Schema-Entscheidung V065 (automatische Rechnungsübernahme)
+
+**Schema.** `eur_entries` erhält nullable `external_id` (190) und den
+Unique-Index `(brand, external_id)`. `receipt_no` bleibt Freitext für
+Handbuchungen und CSV-Import und wird nicht als Identitätsfeld benutzt: es ist
+weder eindeutig noch technisch kontrolliert und würde mit menschlich
+vergebenen Belegnummern kollidieren. Die externe ID der Übernahme ist
+`invoice:<Rechnungsnummer>`; die `invoice_snapshots`-PK stammt aus der
+gemeinsamen `InvoiceSequence` und ist damit quellenübergreifend stabil. Der
+Brand ist Teil des Schlüssels, damit gleiche Nummern verschiedener Mandanten
+getrennt bleiben.
+
+**Backfill.** Keiner. Bereits vorhandene Buchungen behalten `external_id =
+null` und werden nicht nachträglich einer Rechnung zugeordnet. Ein Replay
+einer bereits versandten P-Rechnung erzeugt erst beim erneuten Durchlauf des
+Sendepfads eine Übernahme; Lieferscheine und Angebote sind keine Buchungsquellen.
+
+**Rollback.** `down()` ist nach Repository-Policy leer. Die Spalte ist
+nullable; ein Entfernen würde nur die Zuordnung zur Quelle verlieren, nicht
+die Buchung selbst. Ohne Unique-Index ist ein Replay-Schutz nicht mehr
+datenbankseitig garantiert — das ist der Grund für den Index.
+
+Der fachliche Vertrag der Übernahme steht in
+[`08-invoice-takeover.md`](08-invoice-takeover.md).
 
 ### Schema-Entscheidung — signierte Fassung eines Belegs
 
