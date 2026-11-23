@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-87. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-88. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -443,9 +443,12 @@ to that master — **receipts are never duplicated per year**; only the concrete
 depreciation amounts change from year to year.
 
 There are **two asset directories**, managed the same way but kept separate:
-one for business assets and one for private assets. The classification is
-derived from the whole-percent business share: below 50 % the asset is private
-property, 50 % and above it is business property. This is an intentional
+one for business assets and one for private assets. The private directory is
+built exactly like the Anlagenverzeichnis, but instead of a tax-deductible
+depreciation booking it creates an **Eigenbeleg**: a portal-generated voucher
+documenting the theoretical depreciation of the asset for the business-usage
+percentage of that year. The Eigenbeleg is documentation only — it never
+creates a journal expense and never reduces profit. This is an intentional
 **deviation from pinned EUE-054**, whose consequence is that a sub-50 % asset
 does not belong in the Anlagenverzeichnis at all. The pinned clean-room
 artifact is not edited; the portal keeps the warning as a documented deviation
@@ -490,3 +493,15 @@ behaviour change is required, only the evidence wording and an explicit test.
 The pinned artifacts contain a separate, unresolved contradiction (`A!Q2` and
 `UST!C7` mention a Vorsteuerabzug / KZ 066). The portal has no KZ 066 deduction.
 Adding one is **not** decided here and must not be implied by UI or docs.
+
+### D-88: The tax-engine note is clean-room compliant and may be used
+
+The owner clarified on 2026-11-23 that the tax engine contains **only publicly
+accessible tax forms** and therefore does not violate the clean-room boundary,
+regardless of what an artifact manifest says about the file. The document
+`verification/tax-engine.md` in the sibling `ku-online` project may therefore be
+read and used as a source for the EUE-095/EUE-103/EUE-126 formulas and cent
+vectors. This supersedes the earlier, more restrictive reading of
+[`PROVENANCE.md`](eur/cleanroom/PROVENANCE.md) for that document only; no pinned
+artifact in this repository is edited by this decision, and all portal amounts
+remain whole cents per [`AGENTS.md`](../AGENTS.md).
