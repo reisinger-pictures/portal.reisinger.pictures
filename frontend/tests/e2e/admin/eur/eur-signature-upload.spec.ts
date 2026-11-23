@@ -21,8 +21,10 @@ import { SidebarHelper } from '../../helpers/SidebarHelper';
  * - "fehlgeschlagene Inhaltsprüfung zeigt Fehler und nächsten Schritt"
  *   Cause: `filter({hasText:'unsigned'}).first()` selected an arbitrary unsigned
  *   document of the shared brand instead of the correction just created, so the
- *   POST went to a different document id and `waitForResponse` timed out. Both
- *   tests now scope the row by the created document's own download link.
+ *   POST went to a different document id and `waitForResponse` timed out.
+ *   Attempt 2 (CI 45285427570): a `has`-intersection on the Öffnen link did not
+ *   resolve the row. Both tests now use the component's deterministic input id
+ *   `eur-signed-upload-{documentId}` and derive the row from that input.
  */
 test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
     let helper: E2ESessionHelper;
@@ -48,11 +50,13 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         return main;
     }
 
-    /** Scopes to the row of this document, not an arbitrary shared-brand row. */
-    function correctionRow(main: Locator, documentId: number): Locator {
-        const ownLink = main.getByRole('link', { name: 'Öffnen' })
-            .and(main.locator(`[href="/api/management/eur/documents/${documentId}/download"]`));
-        return main.getByRole('row').filter({ has: ownLink });
+    /**
+     * The upload input id is derived from the document id by the component, so
+     * it is the only locator that cannot pick another shared-brand row.
+     */
+    function signedInputFor(main: Locator, documentId: number): Locator {
+        return main.getByLabel('Signiertes PDF hochladen')
+            .and(main.locator(`#eur-signed-upload-${documentId}`));
     }
 
     async function createCorrection(page: Page, main: Locator) {
@@ -77,9 +81,9 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         const main = await openBelege(page);
         const documentId = await createCorrection(page, main);
 
-        const row = correctionRow(main, documentId);
-        const signedInput = row.getByLabel('Signiertes PDF hochladen');
-        await expect(row.getByText('Signiertes PDF hochladen', { exact: true })).toBeVisible();
+        const signedInput = signedInputFor(main, documentId);
+        const row = signedInput.locator('xpath=ancestor::tr');
+        await expect(signedInput).toHaveCount(1);
         await expect(row.getByText('unsigned', { exact: true })).toBeVisible();
 
         // D-84: the upload now requires a real CMS/PAdES signature over the
@@ -109,7 +113,7 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         });
         expect((await uploaded).status()).toBe(200);
 
-        const link = main.getByRole('link', { name: 'Signiertes PDF herunterladen' });
+        const link = row.getByRole('link', { name: 'Signiertes PDF herunterladen' });
         await expect(link).toBeVisible();
         await expect(link).toHaveAttribute('href', `/api/management/eur/documents/${documentId}/signed/download`);
     });
@@ -118,12 +122,14 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         const main = await openBelege(page);
         const documentId = await createCorrection(page, main);
 
-        const row = correctionRow(main, documentId);
+        const signedInput = signedInputFor(main, documentId);
+        const row = signedInput.locator('xpath=ancestor::tr');
+        await expect(signedInput).toHaveCount(1);
         await expect(row.getByText('unsigned', { exact: true })).toBeVisible();
         const rejected = page.waitForResponse((response) =>
             response.request().method() === 'POST'
             && response.url().includes(`/api/management/eur/documents/${documentId}/signed`));
-        await row.getByLabel('Signiertes PDF hochladen').setInputFiles({
+        await signedInput.setInputFiles({
             name: 'falsch-signiert.pdf',
             mimeType: 'application/pdf',
             buffer: Buffer.from('%PDF-1.4\n fremder Inhalt\n%%EOF\n', 'utf-8'),

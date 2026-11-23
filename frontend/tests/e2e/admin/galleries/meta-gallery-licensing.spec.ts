@@ -20,8 +20,9 @@ type GalleryFixture = {
  * - "resolves mixed child presets and keeps the group coupon tab available"
  *   Cause: "Alle ausklappen" was clicked before the gallery tree had loaded,
  *   and the nested child link was clicked without waiting for it to appear.
- *   The spec now waits for the tree's group link, expands, and waits for the
- *   child gallery link before clicking it.
+ *   Attempt 2 (CI 45285427570): groups render as <summary>, not links, so a
+ *   group-link wait could never succeed. The spec now waits for the group's
+ *   text, expands, then waits for the child gallery link before clicking it.
  */
 test.describe('Meta-gallery child licensing', () => {
     let helper: E2ESessionHelper;
@@ -144,9 +145,9 @@ test.describe('Meta-gallery child licensing', () => {
         await new SidebarHelper(page).navigateTo('Galerien & Ordner');
 
         const main = page.getByRole('main');
-        // Der Baum wird asynchron geladen; erst wenn die Gruppe sichtbar ist,
-        // hat "Alle ausklappen" etwas zum Aufklappen.
-        await expect(main.getByRole('link', {name: childGroupName, exact: true})).toBeVisible({timeout: 15000});
+        // Gruppen sind <summary>-Elemente im Baum, keine Links. Erst wenn die
+        // Kindgruppe gerendert ist, hat "Alle ausklappen" etwas zum Aufklappen.
+        await expect(main.getByText(childGroupName, {exact: true})).toBeVisible({timeout: 15000});
         await main.getByRole('button', {name: 'Alle ausklappen'}).click();
         const nestedGalleryName = definitions[2].name;
         const nestedGalleryLink = main.getByRole('link', {name: nestedGalleryName, exact: true});
