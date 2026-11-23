@@ -93,12 +93,16 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
 
     test('OCR-Hinweise sind beratend und melden ein PDF als nicht unterstützt', { tag: ['@feature:eur-signature'] }, async ({ page }) => {
         const main = await openBelege(page);
-        await createCorrection(page, main);
+        const documentId = await createCorrection(page, main);
 
         const row = main.getByRole('row').filter({ hasText: 'unsigned' }).first();
         await row.getByRole('button', { name: 'OCR-Hinweise' }).click();
 
         await expect(row.getByText('OCR ist nur für Bildbelege (PNG/JPEG) verfügbar.')).toBeVisible();
+
+        // Belege sind brand-scope und werden vom User-Teardown nicht gelöscht.
+        // Ohne Aufräumen wählt der nächste Test mit `.first()` diesen Beleg.
+        await page.request.delete(`/api/management/eur/documents/${documentId}`);
     });
 
     test('fehlgeschlagene Inhaltsprüfung zeigt Fehler und nächsten Schritt', { tag: ['@feature:eur-signature'] }, async ({ page }) => {
