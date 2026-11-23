@@ -63,11 +63,14 @@ export default function EurOverviewPanel({summary, settings, isLoading, error, o
         );
     }
 
+    // Der formatierte Betrag ist kein Schlüssel: ohne Buchungen sind alle vier
+    // Karten „0,00 €“ und React meldet doppelte Keys. Die Bedeutung bleibt
+    // stabil, unabhängig vom Wert.
     const cards = [
-        {label: <Trans>Einnahmen</Trans>, value: cents(summary.income_cents), tone: 'text-success'},
-        {label: <Trans>Ausgaben</Trans>, value: cents(summary.expense_cents), tone: 'text-error'},
-        {label: <Trans>Abschreibungen</Trans>, value: cents(summary.afa_cents), tone: 'text-warning'},
-        {label: <Trans>Gewinn</Trans>, value: cents(summary.profit_cents), tone: 'text-primary'},
+        {id: 'income', label: <Trans>Einnahmen</Trans>, value: cents(summary.income_cents), tone: 'text-success'},
+        {id: 'expense', label: <Trans>Ausgaben</Trans>, value: cents(summary.expense_cents), tone: 'text-error'},
+        {id: 'afa', label: <Trans>Abschreibungen</Trans>, value: cents(summary.afa_cents), tone: 'text-warning'},
+        {id: 'profit', label: <Trans>Gewinn</Trans>, value: cents(summary.profit_cents), tone: 'text-primary'},
     ];
 
     const year = summary.year;
@@ -101,7 +104,7 @@ export default function EurOverviewPanel({summary, settings, isLoading, error, o
                 <h2 className="card-title text-primary"><Trans>Übersicht {year}</Trans></h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
                     {cards.map((card) => (
-                        <div key={card.value} className="rounded-box border border-base-300 p-4">
+                        <div key={card.id} className="rounded-box border border-base-300 p-4">
                             <div className="text-sm opacity-60">{card.label}</div>
                             <div className={`text-2xl font-bold ${card.tone}`}>{card.value}</div>
                         </div>

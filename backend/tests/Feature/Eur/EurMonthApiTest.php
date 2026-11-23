@@ -66,6 +66,48 @@ class EurMonthApiTest extends EurBookkeepingTestCase
         $response->assertJsonPath('signature.is_test', true);
     }
 
+    /**
+     * Regressionsfall für Issue #52: `lines[].warnings`/`lines[].hints` sind
+     * Zeichenketten (Check-Nachricht bzw. -Hinweis), keine Check-Objekte. Ein
+     * Objekt ließ `withWarning()` im Monatspanel mit
+     * `text.startsWith is not a function` abstürzen.
+     */
+    public function test_month_line_warnings_and_hints_are_check_messages_as_strings(): void
+    {
+        $token = $this->tokenFor();
+
+        EurEntry::create([
+            'brand' => BrandRegistry::currentId(), 'year' => 2026, 'month' => 5, 'day' => null,
+            'direction' => 'expense', 'kind_type' => 'Software', 'category' => 'IT',
+            'description' => 'Abo ohne Tag', 'business_share' => 100,
+            'amount_cents' => 1000, 'business_amount_cents' => 1000, 'receipt_no' => 'R-52',
+        ]);
+
+        $response = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/month?year=2026&month=5');
+
+        $response->assertOk();
+
+        $line = null;
+        foreach ($response->json('lines') as $candidate) {
+            if ($candidate['description'] === 'Abo ohne Tag') {
+                $line = $candidate;
+                break;
+            }
+        }
+        $this->assertNotNull($line, 'Die Buchung fehlt in den Monatszeilen.');
+
+        foreach (['warnings', 'hints'] as $key) {
+            $this->assertIsArray($line[$key]);
+            foreach ($line[$key] as $value) {
+                $this->assertIsString($value, sprintf('lines[].%s darf nur Strings enthalten.', $key));
+            }
+        }
+
+        $this->assertContains('⚠ Tag fehlt.', $line['warnings']);
+        $this->assertContains('💡 Bitte den Tag der Buchung (1–31) ergänzen.', $line['hints']);
+    }
+
     public function test_month_defaults_to_2026_and_rejects_2027(): void
     {
         $token = $this->tokenFor();

@@ -96,8 +96,22 @@ test.describe('EAR cockpit navigation', () => {
         const monthControls = page.getByRole('complementary');
         const monthStatus = monthControls.getByRole('status').filter({ hasText: 'Der Monat' });
         const yearStatus = monthControls.getByRole('status').filter({ hasText: 'Das Jahr' });
-        const waitForMonthPost = () => page.waitForResponse((response) =>
-            response.request().method() === 'POST' && response.url().endsWith('/api/management/eur/months'));
+        // Ein 401 mit anschließendem Refresh-Replay (src/api.ts fetchWithRefresh)
+        // erzeugt zwei POST-Antworten pro Klick. Ein unspecific waitForResponse
+        // löst bereits auf der 401 aus, sodass der nächste Klick mit dem Replay
+        // der vorherigen Anfrage race't. Gewartet wird daher auf die 200-Antwort
+        // mit dem geforderten `created`-Wert; ohne Wert genügt jede gültige
+        // Antwort (ein Monat aus einem früheren Lauf darf hier nicht stören).
+        const waitForMonthPost = (created?: boolean) => page.waitForResponse(async (response) => {
+            if (response.request().method() !== 'POST'
+                || !response.url().endsWith('/api/management/eur/months')
+                || response.status() !== 200
+                || !(response.headers()['content-type'] ?? '').includes('application/json')) {
+                return false;
+            }
+            const body = await response.json() as {created?: unknown};
+            return typeof body.created === 'boolean' && (created === undefined || body.created === created);
+        });
         const waitForYearPost = () => page.waitForResponse((response) =>
             response.request().method() === 'POST' && response.url().endsWith('/api/management/eur/months/year'));
 
@@ -107,7 +121,7 @@ test.describe('EAR cockpit navigation', () => {
         await expect(monthStatus).toContainText(/Der Monat \d+\/\d+ (wurde angelegt|war bereits vorhanden)\./, { timeout: 10000 });
 
         // Zweiter Klick: der Monat existiert bereits und bleibt erfolgreich.
-        post = waitForMonthPost();
+        post = waitForMonthPost(false);
         await monthControls.getByRole('button', { name: 'Neuer Monat' }).click();
         await post;
         await expect(monthStatus).toContainText(/Der Monat \d+\/\d+ war bereits vorhanden\./, { timeout: 10000 });

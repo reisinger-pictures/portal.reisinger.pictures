@@ -266,8 +266,17 @@ class EurMonthController extends Controller
                 'business_amount_cents' => $amount,
                 'vat_kind' => $entry->vat_kind,
                 'receipt_no' => $entry->receipt_no,
-                'warnings' => array_values(array_filter($checks, static fn (array $check): bool => $check['ok'] === false)),
-                'hints' => array_values(array_filter($checks, static fn (array $check): bool => ! empty($check['hint']))),
+                // Wie in MonthStatement: der Vertrag liefert Strings, keine
+                // Check-Objekte. Die Filter (Fehler bzw. vorhandener Hinweis)
+                // und die von JournalRules::check() gesetzten Marker bleiben.
+                'warnings' => array_values(array_map(
+                    static fn (array $check): string => $check['message'],
+                    array_filter($checks, static fn (array $check): bool => $check['ok'] === false),
+                )),
+                'hints' => array_values(array_map(
+                    static fn (array $check): string => $check['hint'],
+                    array_filter($checks, static fn (array $check): bool => ! empty($check['hint'])),
+                )),
             ];
 
             if ($entry->direction === 'income') {

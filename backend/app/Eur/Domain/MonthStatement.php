@@ -138,9 +138,11 @@ final class MonthStatement
                 'vat_kind' => $entry['vat_kind'] ?? null,
                 'receipt_no' => $entry['receipt_no'] ?? $entry['voucher_no'] ?? null,
                 'checks' => $checks,
-                'warnings' => array_values(array_filter(
-                    $checks,
-                    static fn (array $check): bool => ! $check['ok'],
+                // Der API-Vertrag liefert hier Nachrichten/Hinweise als Strings,
+                // nicht die Check-Objekte aus `checks` (siehe EurMonthPanel).
+                'warnings' => array_values(array_map(
+                    static fn (array $check): string => $check['message'],
+                    array_filter($checks, static fn (array $check): bool => ! $check['ok']),
                 )),
                 'hints' => array_values(array_map(
                     static fn (array $check): string => $check['hint'],
@@ -177,7 +179,7 @@ final class MonthStatement
                 'vat_kind' => null,
                 'receipt_no' => $row['receipt_no'] ?? $row['voucher_no'] ?? null,
                 'checks' => [$hint],
-                'warnings' => $hint['ok'] ? [] : [$hint],
+                'warnings' => $hint['ok'] ? [] : [$hint['message']],
                 'hints' => [$hint['hint']],
             ];
         }
@@ -202,7 +204,7 @@ final class MonthStatement
                 'vat_kind' => null,
                 'receipt_no' => null,
                 'checks' => [$check],
-                'warnings' => $check['ok'] ? [] : [$check],
+                'warnings' => $check['ok'] ? [] : [$check['message']],
                 'hints' => [$check['hint']],
             ];
         }

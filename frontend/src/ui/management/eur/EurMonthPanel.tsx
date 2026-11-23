@@ -65,8 +65,36 @@ function signatureStatusLabel(status: string): string {
     }
 }
 
-const withLamp = (text: string): string => (text.startsWith('💡') ? text : `💡 ${text}`);
-const withWarning = (text: string): string => (text.startsWith('⚠') ? text : `⚠ ${text}`);
+/**
+ * Der Server liefert je Zeile Strings (`message`/`hint`), ältere Antworten
+ * können jedoch noch Check-Objekte enthalten. Beides wird hier ohne `any` auf
+ * Text reduziert, bevor die Symbole gesetzt werden.
+ */
+function messageOf(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value !== null && typeof value === 'object' && 'message' in value && typeof value.message === 'string') {
+        return value.message;
+    }
+    return t`Hinweis nicht verfügbar`;
+}
+
+function hintOf(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value !== null && typeof value === 'object' && 'hint' in value && typeof value.hint === 'string') {
+        return value.hint;
+    }
+    return t`Hinweis nicht verfügbar`;
+}
+
+const withLamp = (value: unknown): string => {
+    const text = hintOf(value);
+    return text.startsWith('💡') ? text : `💡 ${text}`;
+};
+
+const withWarning = (value: unknown): string => {
+    const text = messageOf(value);
+    return text.startsWith('⚠') ? text : `⚠ ${text}`;
+};
 
 export default function EurMonthPanel({year, month, onMonthChange}: Props) {
     const monthData = useEurMonth(year, month);
@@ -197,12 +225,18 @@ export default function EurMonthPanel({year, month, onMonthChange}: Props) {
                                         <td>{line.day ?? '—'}</td>
                                         <td>
                                             {line.description}
-                                            {line.warnings.map((warning) => (
-                                                <div key={warning} className="text-xs text-warning">{withWarning(warning)}</div>
-                                            ))}
-                                            {line.hints.map((hint) => (
-                                                <div key={hint} className="text-xs opacity-70">{withLamp(hint)}</div>
-                                            ))}
+                                            {line.warnings.map((warning, warningIndex) => {
+                                                const text = withWarning(warning);
+                                                return (
+                                                    <div key={`${warningIndex}-${text}`} className="text-xs text-warning">{text}</div>
+                                                );
+                                            })}
+                                            {line.hints.map((hint, hintIndex) => {
+                                                const text = withLamp(hint);
+                                                return (
+                                                    <div key={`${hintIndex}-${text}`} className="text-xs opacity-70">{text}</div>
+                                                );
+                                            })}
                                         </td>
                                         <td>{line.receipt_no ?? '—'}</td>
                                         <td className="text-right">{cents(line.amount_cents)}</td>

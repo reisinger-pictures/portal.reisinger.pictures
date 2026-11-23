@@ -4287,6 +4287,10 @@ msgstr "Hier werden die ursprünglichen Metadaten gespeichert, <0>bevor</0> ein 
 msgid "Hilfe zu Kennzahl {kz}"
 msgstr "Hilfe zu Kennzahl {kz}"
 
+#: src/ui/management/eur/EurMonthPanel.tsx
+msgid "Hinweis nicht verfügbar"
+msgstr "Hinweis nicht verfügbar"
+
 #: src/ui/management/eur/EurHelpPopover.tsx
 msgid "Hinweis:"
 msgstr "Hinweis:"

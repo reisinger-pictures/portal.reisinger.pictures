@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Eur;
 
+use App\Enums\UserRole;
 use App\Models\EurMonthlyReport;
+use App\Models\Role;
+use App\Models\User;
 use App\Support\BrandRegistry;
 
 /**
@@ -31,6 +34,34 @@ class EurMonthCompletionApiTest extends EurBookkeepingTestCase
 
         $this->assertSame($first->json('report.id'), $second->json('report.id'));
         $this->assertDatabaseCount('eur_monthly_reports', 1);
+    }
+
+    /**
+     * E2E-Regressionsfall (eur-tabs.spec.ts, Issue #52): der Super-Admin aus
+     * E2ESessionHelper hat `brand = null`. Die Idempotenz hängt am Host-Kontext
+     * (BrandContextMiddleware), nicht am User — zwei Requests auf demselben
+     * Host müssen denselben Monatsdatensatz treffen.
+     */
+    public function test_canonical_months_route_is_idempotent_for_super_admin_without_brand(): void
+    {
+        $user = User::factory()->create(['brand' => null]);
+        $user->roles()->attach(Role::firstOrCreate(['name' => UserRole::SUPER_ADMIN->value]));
+        $token = auth('api')->login($user);
+        auth('api')->forgetUser();
+
+        $first = $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/months', ['year' => 2026, 'month' => 5]);
+        $first->assertOk()->assertJsonPath('created', true);
+
+        $second = $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/months', ['year' => 2026, 'month' => 5]);
+        $second->assertOk()->assertJsonPath('created', false);
+
+        $this->assertSame($first->json('report.id'), $second->json('report.id'));
+        $this->assertDatabaseCount('eur_monthly_reports', 1);
+        $this->assertDatabaseHas('eur_monthly_reports', [
+            'brand' => BrandRegistry::currentId(), 'year' => 2026, 'month' => 5,
+        ]);
     }
 
     public function test_create_year_creates_twelve_months_once_and_does_not_reopen_closed_months(): void
