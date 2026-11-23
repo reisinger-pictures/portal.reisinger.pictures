@@ -97,8 +97,21 @@ class OfferTokenServiceTest extends TestCase
     {
         config(['services.signed_links.secret' => 'too-short']);
 
-        $token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhIjoxfQ.invalid';
+        // A fully valid token signed with the short key using raw HMAC. Without
+        // the key-length guard the signature and claims would pass verification;
+        // with it the verifier fails closed and returns null.
+        $header = rtrim(strtr(base64_encode('{"typ":"JWT","alg":"HS256"}'), '+/', '-_'), '=');
+        $payload = rtrim(strtr(base64_encode(json_encode([
+            'iss' => config('app.url'),
+            'iat' => time(),
+            'nbf' => time(),
+            'exp' => time() + 3600,
+            'sub' => 'offer',
+            'jti' => 'short-key-fixture',
+            'offer' => ['x' => 1],
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)), '+/', '-_'), '=');
+        $signature = rtrim(strtr(base64_encode(hash_hmac('sha256', $header.'.'.$payload, 'too-short', true)), '+/', '-_'), '=');
 
-        $this->assertNull($this->service->verify($token));
+        $this->assertNull($this->service->verify($header.'.'.$payload.'.'.$signature));
     }
 }

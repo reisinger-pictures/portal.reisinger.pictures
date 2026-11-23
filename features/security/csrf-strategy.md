@@ -55,8 +55,11 @@ unsafe:
 - API responses set a host-only, `SameSite=Lax`, JavaScript-readable
   `XSRF-TOKEN` cookie. Its value is a nonce signed with `APP_KEY`; it is
   stateless and requires no database/session state. It expires with the refresh
-  session (`JWT_REFRESH_TTL`, 14 days by default) and is re-issued on every API
-  response, so a still-valid session never runs into a missing token.
+  session (`auth.migration.refresh_ttl` in `backend/config/auth.php`, **7 days**
+  / 10080 minutes by default, overridable via `AUTH_REFRESH_TTL`) and is re-issued
+  on every API response, so a still-valid session never runs into a missing token.
+  The old `JWT_REFRESH_TTL` env key was removed with the JWT package (D-77); the
+  window itself is unchanged from the earlier 7-day decision.
 - Cookie-authenticated unsafe requests must echo that value in the
   `X-XSRF-TOKEN` header. The server checks the signature, expiry, and constant-
   time equality between cookie and header.

@@ -126,7 +126,9 @@ return [
      * is the dedicated replacement; APP_KEY is the last-resort fallback.
      */
     'signed_links' => [
-        'secret' => env('SIGNED_LINK_SECRET') ?? env('JWT_SECRET') ?? env('APP_KEY'),
+        // `?:` (not `??`) so a blank `SIGNED_LINK_SECRET=` is treated as unset
+        // and the fallback chain stays intact — blank env values are unset (D-77).
+        'secret' => env('SIGNED_LINK_SECRET') ?: env('JWT_SECRET') ?: env('APP_KEY'),
     ],
 
     /*
