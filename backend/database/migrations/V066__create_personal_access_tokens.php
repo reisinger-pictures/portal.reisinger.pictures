@@ -18,10 +18,20 @@ use Illuminate\Support\Facades\Schema;
  * - D-77: JWT-Package wird erst in Phase 3/4 entfernt — diese Migration ist rein additiv.
  * - D-78: Rollen werden nie in gespeicherte Abilities kopiert (bleiben DB-Queries).
  *
- * Schema (Sanctum-Standard, vgl. vendor/laravel/sanctum/database/migrations/):
- * `id`, `morphs('tokenable')` (tokenable_type + tokenable_id + Index), `name` (text),
- * `token` (string 64, unique), `abilities` (text, nullable), `last_used_at`
- * (timestamp, nullable), `expires_at` (timestamp, nullable, index), Timestamps.
+ * Schema (angelehnt an vendor/laravel/sanctum/database/migrations/):
+ * `id`, `tokenable_type` (string), `tokenable_id` (string) plus zusammengesetzter
+ * Index, `name` (text), `token` (string 64, unique), `abilities` (text, nullable),
+ * `last_used_at` (timestamp, nullable), `expires_at` (timestamp, nullable, index),
+ * Timestamps.
+ *
+ * Abweichung vom Sanctum-Standard `morphs('tokenable')`: diese erzeugt eine
+ * `unsignedBigInteger`-Spalte. Die Portal-Actor-IDs sind jedoch `users.id` als
+ * 36-Zeichen-UUID (HasUuids) bzw. für DB-less Gäste `guest_<uuid>` (42 Zeichen,
+ * vgl. InviteController::redeem und ActorIdentity). Ein Bigint würde diese IDs
+ * auf PostgreSQL ablehnen (`invalid input syntax for type bigint`) und auf MySQL
+ * still verstümmeln. `string` fasst beide Formen; Sanctum löst den Morph unabhängig
+ * vom Spaltentyp über `morphTo` auf (D-73/D-75). Kein Backfill — die Tabelle ist neu
+ * und leer, Tokens werden nach dem Cutover neu ausgestellt.
  *
  * Additiv: keine bestehende Tabelle wird verändert. Kein Backfill — die Tokens
  * werden nach dem Cutover neu ausgestellt (D-73/D-75), es gibt nichts zu
@@ -38,7 +48,12 @@ return new class extends Migration
         if (! Schema::hasTable(self::TABLE)) {
             Schema::create(self::TABLE, function (Blueprint $table): void {
                 $table->id();
-                $table->morphs('tokenable');
+                $table->string('tokenable_type');
+                $table->string('tokenable_id');
+                $table->index(
+                    ['tokenable_type', 'tokenable_id'],
+                    'personal_access_tokens_tokenable_type_tokenable_id_index'
+                );
                 $table->text('name');
                 $table->string('token', 64);
                 $table->text('abilities')->nullable();

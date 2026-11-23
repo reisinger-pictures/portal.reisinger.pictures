@@ -163,14 +163,23 @@ only its driver changes (D-74); `/api/auth/refresh` stays a shim with the unchan
 (D-72, consistent with D-71).
 
 **Schema decision.** `V066__create_personal_access_tokens.php` creates one new table
-`personal_access_tokens` in Sanctum's standard schema (as shipped in
-`vendor/laravel/sanctum/database/migrations/`): `id`, `morphs('tokenable')`
-(`tokenable_type` + `tokenable_id` + index), `name` (text), `token` (string 64, unique),
-`abilities` (text, nullable), `last_used_at` (timestamp, nullable), `expires_at`
-(timestamp, nullable, indexed), and `created_at`/`updated_at`. Column and index creation
-is guarded with `Schema::hasTable` / `Schema::hasIndex` so a replay is safe. No existing
-table, column or index is altered. The canonical migration frontier and its measured
-count live only in [AD-2](../tech/07-architectural-decisions.md).
+`personal_access_tokens` based on Sanctum's standard schema (as shipped in
+`vendor/laravel/sanctum/database/migrations/`): `id`, `tokenable_type` (string),
+`tokenable_id` (string), a composite `tokenable_type,tokenable_id` index, `name` (text),
+`token` (string 64, unique), `abilities` (text, nullable), `last_used_at` (timestamp,
+nullable), `expires_at` (timestamp, nullable, indexed), and `created_at`/`updated_at`.
+Column and index creation is guarded with `Schema::hasTable` / `Schema::hasIndex` so a
+replay is safe. No existing table, column or index is altered. The canonical migration
+frontier and its measured count live only in [AD-2](../tech/07-architectural-decisions.md).
+
+The one deliberate deviation from the Sanctum stock migration is `tokenable_id`:
+`morphs('tokenable')` would create an `unsignedBigInteger` column, but portal actor IDs
+are 36-character UUIDs (`users.id` via `HasUuids`) or, for DB-less guests,
+`guest_<uuid>` (42 characters — `InviteController::redeem`, `ActorIdentity`). A bigint
+column rejects those values on PostgreSQL and silently corrupts them on MySQL. A
+`string` column holds both forms; Sanctum resolves the morph through `morphTo`
+independently of the column type. This keeps [D-73](../owner-decisions.md#d-73-transient-guest-grants-as-structured-abilities-behind-a-custom-guard)'s
+DB-less guest identity possible without a synthetic `users` row.
 
 **No backfill.** There is nothing to copy: existing JWT cookies are not token rows, and
 tokens are issued fresh after the cutover. Seeding the table would create credentials
