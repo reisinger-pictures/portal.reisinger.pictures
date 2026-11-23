@@ -107,6 +107,100 @@ class EurIncomeTaxApiTest extends EurBookkeepingTestCase
             ->assertJsonPath('steuerbilanz.betriebliche_einnahmen_cents', 200000);
     }
 
+    public function test_calc_exposes_the_allocation_and_neutral_monthly_results(): void
+    {
+        $token = $this->tokenFor();
+
+        $response = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/est/calc', [
+            'profit_cents' => 200000,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('est_allocation.tax_cents', 0) // 170 000 ct liegen unter der ersten Tarifgrenze.
+            ->assertJsonPath('monthlyResults.annual', null);
+
+        $this->assertCount(12, $response->json('monthlyResults.months'));
+        $this->assertNull($response->json('monthlyResults.months.0.est_sv_cents'));
+        $this->assertNull($response->json('monthlyResults.months.11.net_per_hour_cents'));
+    }
+
+    public function test_calc_monthly_results_follow_the_pinned_est_allocation(): void
+    {
+        $token = $this->tokenFor();
+        $months = [];
+
+        for ($month = 1; $month <= 12; $month++) {
+            $months[] = ['month' => $month, 'gross_profit_cents' => 100000, 'hours_minutes' => 600];
+        }
+
+        $response = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/est/calc', [
+            'year' => 2026,
+            'profit_cents' => 900000,
+            'mode' => 'total',
+            'employment_income_cents' => 2000000,
+            'prepayment_cents' => 100000,
+            'wage_tax_cents' => 50000,
+            'entries' => [
+                ['direction' => 'income', 'code' => '9040', 'amount_cents' => 900000],
+                ['direction' => 'income', 'code' => 'E1B 9460', 'amount_cents' => 140000],
+            ],
+            'months' => $months,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('kz.U12', 140000)
+            ->assertJsonPath('est_allocation.total_income_cents', 2905000)
+            ->assertJsonPath('est_allocation.tax_cents', 380800)
+            ->assertJsonPath('est_allocation.employment_tax_cents', 129220)
+            ->assertJsonPath('est_allocation.rental_tax_cents', 28000)
+            ->assertJsonPath('est_allocation.business_tax_cents', 223580)
+            ->assertJsonPath('est_allocation.due_cents', 230800)
+            ->assertJsonPath('monthlyResults.year', 2026)
+            ->assertJsonPath('monthlyResults.annual.minimum_sv_cents', 16080)
+            ->assertJsonPath('monthlyResults.annual.months_with_data', 12);
+
+        $payload = $response->json();
+        $monthly = $payload['monthlyResults'];
+        $sum = 0;
+
+        foreach ($monthly['months'] as $row) {
+            $this->assertSame(100000, $row['gross_profit_cents']);
+            $this->assertSame($row['gross_profit_cents'] - $row['est_sv_cents'], $row['net_profit_cents']);
+            $this->assertSame((int) round($row['net_profit_cents'] * 60 / 600), $row['net_per_hour_cents']);
+            $this->assertSame($monthly['annual']['allocation_basis_cents'], $row['basis_cents']);
+            $sum += $row['est_sv_cents'];
+        }
+
+        // Die zwölf Monatsanteile ergeben genau die Jahresbelastung (U24+U25+SV).
+        $this->assertSame($monthly['annual']['burden_cents'], $sum);
+        $this->assertSame($monthly['annual']['allocated_cents'], $sum);
+    }
+
+    public function test_calc_monthly_results_are_null_for_months_without_data_and_zero_hours(): void
+    {
+        $token = $this->tokenFor();
+
+        $response = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/est/calc', [
+            'profit_cents' => 200000,
+            'months' => [
+                ['month' => 3, 'gross_profit_cents' => 50000, 'hours_minutes' => 0],
+            ],
+        ]);
+
+        $response->assertOk();
+
+        $months = $response->json('monthlyResults.months');
+
+        $this->assertCount(12, $months);
+        $this->assertSame(3, $months[2]['month']);
+        $this->assertSame(50000, $months[2]['gross_profit_cents']);
+        $this->assertNull($months[2]['net_per_hour_cents']);
+        $this->assertNotNull($months[2]['est_sv_cents']);
+        $this->assertNull($months[0]['gross_profit_cents']);
+        $this->assertNull($months[0]['est_sv_cents']);
+        $this->assertNull($months[0]['net_profit_cents']);
+    }
+
     public function test_invalid_mode_and_negative_money_are_rejected(): void
     {
         $token = $this->withHeaders($this->bearer($this->tokenFor()));

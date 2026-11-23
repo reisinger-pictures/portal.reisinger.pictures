@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Eur;
 
 use App\Eur\Domain\DepreciationCalculator;
+use App\Eur\Domain\EurAssetCarryOver;
 use App\Eur\Parity\RuleValues;
 use App\Eur\Reference\DegressiveRules;
 use App\Eur\Reference\EurYear;
@@ -10,8 +11,10 @@ use App\Eur\Reference\ReferenceTables;
 use App\Eur\Support\Share;
 use App\Http\Controllers\Controller;
 use App\Models\EurAsset;
+use App\Models\EurAssetDocument;
 use App\Models\EurAssetYear;
 use App\Models\EurAuditLog;
+use App\Models\EurDocument;
 use App\Models\EurEntry;
 use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
@@ -33,12 +36,17 @@ class EurAssetController extends Controller
     {
         $data = $request->validate([
             'private' => 'nullable|boolean',
+            'scope' => 'nullable|in:business,private',
         ]);
 
-        $query = EurAsset::forCurrentBrand()->with('years');
+        $query = EurAsset::forCurrentBrand()->with(['years', 'assetDocuments']);
 
         if (($data['private'] ?? false) === true || ($data['private'] ?? null) === '1') {
             $query->where('is_private_investment', true);
+        }
+
+        if (isset($data['scope'])) {
+            $query->where('scope', $data['scope']);
         }
 
         $assets = $query->orderBy('name')->get();
@@ -52,6 +60,9 @@ class EurAssetController extends Controller
     {
         $data = $this->validateAsset($request);
         $data['brand'] = BrandRegistry::currentId();
+        // D-85: die Einordnung ist serverseitig aus dem ganze-Prozent-Anteil
+        // abgeleitet; ein Client kann `scope` nicht setzen (prohibited).
+        $data['scope'] = (int) $data['business_share'] < 50 ? 'private' : 'business';
 
         $calculator = new DepreciationCalculator(new RuleValues);
         $month = (int) Carbon::parse($data['purchase_date'])->format('n');
@@ -75,7 +86,7 @@ class EurAssetController extends Controller
 
     public function plan(int $id): JsonResponse
     {
-        $asset = EurAsset::forCurrentBrand()->with('years')->findOrFail($id);
+        $asset = EurAsset::forCurrentBrand()->with(['years', 'assetDocuments'])->findOrFail($id);
 
         return response()->json(['asset' => $this->serialize($asset)]);
     }
@@ -90,7 +101,7 @@ class EurAssetController extends Controller
             'useful_life_years' => 'required|integer|min:2|max:99',
             'degressive_rate' => 'required|integer|min:100|max:3000',
             'acquisition_month' => 'required|integer|min:1|max:12',
-            'business_share' => 'nullable|integer|min:50|max:100|multiple_of:5',
+            'business_share' => 'nullable|integer|min:0|max:100|multiple_of:5',
             'name' => 'nullable|string|max:190',
         ]);
 
@@ -211,6 +222,13 @@ class EurAssetController extends Controller
         $year = (int) $data['year'];
         $plan = $asset->years()->where('year', $year)->firstOrFail();
 
+        // D-85: das private Verzeichnis dokumentiert die fiktive AfA in einem
+        // Eigenbeleg. Es entsteht keine Buchung und kein Aufwand, der den
+        // Gewinn mindert.
+        if ($asset->scope === 'private') {
+            return $this->bookPrivateEigenbeleg($asset, $plan, $year);
+        }
+
         if ($plan->eur_entry_id !== null) {
             return response()->json([
                 'entry' => $this->serializeEntry(EurEntry::forCurrentBrand()->findOrFail($plan->eur_entry_id)),
@@ -253,11 +271,113 @@ class EurAssetController extends Controller
         return response()->json(['entry' => $this->serializeEntry($entry), 'already_booked' => false], 201);
     }
 
+    /**
+     * D-85: Dokumentation der fiktiven AfA im privaten Verzeichnis. Es wird
+     * ausschließlich die Jahreszeile ergänzt — keine EurEntry, kein Aufwand,
+     * keine Auswirkung auf den Gewinn. Idempotent über `eigenbeleg_created_at`.
+     */
+    private function bookPrivateEigenbeleg(EurAsset $asset, EurAssetYear $plan, int $year): JsonResponse
+    {
+        if ($plan->eigenbeleg_created_at !== null) {
+            return response()->json([
+                'eigenbeleg' => $this->serializeEigenbeleg($plan),
+                'already_created' => true,
+            ]);
+        }
+
+        $theoreticalCents = (int) $plan->depreciation_cents;
+        $usagePercent = 100 - (int) $plan->private_use_percent;
+
+        $plan->forceFill([
+            'eigenbeleg_no' => sprintf('EB-%d-%d', $asset->id, $year),
+            'theoretical_depreciation_cents' => $theoreticalCents,
+            'usage_percent' => $usagePercent,
+            'eigenbeleg_cents' => Share::apply($theoreticalCents, $usagePercent),
+            'eigenbeleg_created_at' => now(),
+        ])->save();
+
+        $this->audit('eigenbeleg_created', $asset, [
+            'year' => $year,
+            'eigenbeleg_no' => $plan->eigenbeleg_no,
+            'eigenbeleg_cents' => $plan->eigenbeleg_cents,
+        ]);
+
+        return response()->json([
+            'eigenbeleg' => $this->serializeEigenbeleg($plan),
+            'already_created' => false,
+        ], 201);
+    }
+
     public function destroy(int $id): JsonResponse
     {
         $asset = EurAsset::forCurrentBrand()->findOrFail($id);
         $asset->delete();
         $this->audit('deleted', $asset);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * D-85: idempotenter Jahreswechsel — nur fehlende Jahreszeilen anlegen.
+     */
+    public function carryOver(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'year' => ['required', 'integer', Rule::in(EurYear::SUPPORTED)],
+        ]);
+        $year = (int) $data['year'];
+        $created = (new EurAssetCarryOver)->carryOver($year, BrandRegistry::currentId());
+
+        EurAuditLog::create([
+            'brand' => BrandRegistry::currentId(),
+            'user_id' => auth('api')->id(),
+            'action' => 'carry_over',
+            'subject_type' => 'eur_asset',
+            'subject_id' => null,
+            'payload' => ['year' => $year, 'created' => $created],
+        ]);
+
+        return response()->json(['year' => $year, 'created' => $created], $created > 0 ? 201 : 200);
+    }
+
+    /**
+     * D-85: Beleg einmal am Stamm verknüpfen, nie pro Jahr kopieren.
+     */
+    public function attachDocument(Request $request, int $id): JsonResponse
+    {
+        $asset = EurAsset::forCurrentBrand()->findOrFail($id);
+        $data = $request->validate(['document_id' => 'required|integer']);
+        $document = EurDocument::forCurrentBrand()->findOrFail((int) $data['document_id']);
+
+        $pivot = EurAssetDocument::firstOrCreate([
+            'brand' => $asset->brand,
+            'eur_asset_id' => $asset->id,
+            'eur_document_id' => $document->id,
+        ]);
+
+        if ($pivot->wasRecentlyCreated) {
+            $this->audit('document_attached', $asset, ['document_id' => $document->id]);
+        }
+
+        return response()->json([
+            'document' => $this->serializeDocument($document),
+            'already_linked' => ! $pivot->wasRecentlyCreated,
+        ], $pivot->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function detachDocument(int $id, int $documentId): JsonResponse
+    {
+        $asset = EurAsset::forCurrentBrand()->findOrFail($id);
+        $document = EurDocument::forCurrentBrand()->findOrFail($documentId);
+
+        $deleted = EurAssetDocument::forCurrentBrand()
+            ->where('eur_asset_id', $asset->id)
+            ->where('eur_document_id', $document->id)
+            ->delete();
+
+        if ($deleted > 0) {
+            $this->audit('document_detached', $asset, ['document_id' => $document->id]);
+        }
 
         return response()->json(['success' => true]);
     }
@@ -274,7 +394,8 @@ class EurAssetController extends Controller
             'purchase_date' => 'required|date',
             'cost_cents' => 'required|integer|min:1',
             'useful_life_years' => 'required|integer|min:2|max:99',
-            'business_share' => 'required|integer|min:50|max:100|multiple_of:5',
+            'business_share' => 'required|integer|min:0|max:100|multiple_of:5',
+            'scope' => 'prohibited',
             'method' => ['required', Rule::in([DepreciationCalculator::METHOD_LINEAR, DepreciationCalculator::METHOD_DEGRESSIVE])],
             'degressive_rate' => 'nullable|integer|min:100|max:3000',
             'category' => 'nullable|string|max:190',
@@ -350,6 +471,7 @@ class EurAssetController extends Controller
                 'brand' => $asset->brand,
                 'eur_asset_id' => $asset->id,
                 'year' => $purchaseYear + $lastBookedIndex + $row['year'] - 1,
+                'scope' => $asset->scope,
                 'method' => DepreciationCalculator::METHOD_LINEAR,
                 'depreciation_cents' => $row['depreciation_cents'],
                 'book_value_cents' => $row['book_value_cents'],
@@ -377,6 +499,7 @@ class EurAssetController extends Controller
                 'brand' => $asset->brand,
                 'eur_asset_id' => $asset->id,
                 'year' => $purchaseYear + $row['year'] - 1,
+                'scope' => $asset->scope,
                 'method' => $row['method'],
                 'depreciation_cents' => $row['depreciation_cents'],
                 'book_value_cents' => $row['book_value_cents'],
@@ -460,6 +583,38 @@ class EurAssetController extends Controller
         }
 
         return $categories[0];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeEigenbeleg(EurAssetYear $year): array
+    {
+        return [
+            'year' => (int) $year->year,
+            'eigenbeleg_no' => $year->eigenbeleg_no,
+            'theoretical_depreciation_cents' => $year->theoretical_depreciation_cents === null
+                ? null : (int) $year->theoretical_depreciation_cents,
+            'usage_percent' => $year->usage_percent === null ? null : (int) $year->usage_percent,
+            'eigenbeleg_cents' => $year->eigenbeleg_cents === null ? null : (int) $year->eigenbeleg_cents,
+            'eigenbeleg_created_at' => $year->eigenbeleg_created_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Belegmetadaten ohne Dateipfad — `storage_path` und `signed_storage_path`
+     * verlassen die API nie.
+     *
+     * @return array<string, mixed>
+     */
+    private function serializeDocument(EurDocument $document): array
+    {
+        return [
+            'id' => (int) $document->id,
+            'receipt_no' => $document->receipt_no,
+            'original_name' => $document->original_name,
+            'sha256' => $document->sha256,
+        ];
     }
 
     /**
@@ -585,6 +740,7 @@ class EurAssetController extends Controller
             'cost_cents' => (int) $asset->cost_cents,
             'useful_life_years' => (int) $asset->useful_life_years,
             'business_share' => (int) $asset->business_share,
+            'scope' => $asset->scope,
             'method' => $asset->method,
             'degressive_rate' => $asset->degressive_rate === null ? null : (int) $asset->degressive_rate,
             'category' => $asset->category,
@@ -603,6 +759,9 @@ class EurAssetController extends Controller
             'switch_hint' => $this->switchHint($asset),
             'years' => $asset->years->map(fn (EurAssetYear $year): array => [
                 'year' => (int) $year->year,
+                'scope' => $year->scope,
+                'carry_over_from_year' => $year->carry_over_from_year === null
+                    ? null : (int) $year->carry_over_from_year,
                 'method' => $year->method,
                 'depreciation_cents' => (int) $year->depreciation_cents,
                 'book_value_cents' => (int) $year->book_value_cents,
@@ -612,7 +771,16 @@ class EurAssetController extends Controller
                 'status' => $year->status,
                 'eur_entry_id' => $year->eur_entry_id === null ? null : (int) $year->eur_entry_id,
                 'booked_at' => $year->booked_at?->toIso8601String(),
+                'eigenbeleg_no' => $year->eigenbeleg_no,
+                'theoretical_depreciation_cents' => $year->theoretical_depreciation_cents === null
+                    ? null : (int) $year->theoretical_depreciation_cents,
+                'usage_percent' => $year->usage_percent === null ? null : (int) $year->usage_percent,
+                'eigenbeleg_cents' => $year->eigenbeleg_cents === null ? null : (int) $year->eigenbeleg_cents,
+                'eigenbeleg_created_at' => $year->eigenbeleg_created_at?->toIso8601String(),
             ])->values(),
+            'documents' => $asset->assetDocuments
+                ->map(fn (EurDocument $document): array => $this->serializeDocument($document))
+                ->values(),
         ];
     }
 }

@@ -58,6 +58,7 @@ class EurTaxStatementServiceTest extends TestCase
         $this->assertSame([
             '245' => 30000,
             '260' => 4000,
+            'U12' => 50000,
             'U13' => 7000,
             'U26' => 5000,
             'E40' => 20000,

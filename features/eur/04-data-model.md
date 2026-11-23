@@ -240,10 +240,26 @@ bewusste Abweichung von EUE-054 — das gepinnte Artefakt bleibt unverändert).
 `is_private_investment` bleibt als Alt-Flag erhalten, ist aber nicht mehr die
 Quelle der Einordnung.
 
+Das **private** Verzeichnis wird wie das Anlagenverzeichnis geführt, ersetzt
+die steuerlich absetzbare AfA-Buchung aber durch einen **Eigenbeleg**: Er
+dokumentiert die theoretische AfA des Jahres nur für den betrieblichen
+Nutzungsanteil dieses Jahres. Es entsteht dabei **keine Journalbuchung, kein
+Aufwand und keine Gewinnminderung**. Dafür trägt `eur_asset_years` die nullable
+Felder `eigenbeleg_no` (`EB-{assetId}-{year}`),
+`theoretical_depreciation_cents` (geplante AfA des Jahres), `usage_percent`
+(betrieblicher Nutzungsanteil des Jahres, ganzzahlige Prozent),
+`eigenbeleg_cents` (theoretische AfA × Nutzungsanteil, kaufmännisch auf ganze
+Cent gerundet) und `eigenbeleg_created_at`. Der Eigenbeleg wird über die
+bestehende Buchungsaktion des Jahres erzeugt und ist über
+`eigenbeleg_created_at` idempotent. Bei `scope = business` bleibt die bisherige
+AfA-Buchung mit `eur_entry_id` unverändert.
+
 Eine neue Tabelle `eur_asset_documents` verknüpft `eur_asset_id` und
 `eur_document_id` (beide FKs, `brand`, eindeutig je Paar). Sie hat **keine**
 Jahresspalte: Belege gehören zum Stamm und werden beim Jahreswechsel nicht
-kopiert. Der zwischengespeicherte `sha256`-Abgleich der Belege bleibt unberührt.
+kopiert. Der zwischengespeicherte `sha256`-Abgleich der Belege bleibt unberührt;
+die API liefert nur `id`, `receipt_no`, `original_name` und `sha256`, nie einen
+Speicherpfad.
 
 Der Jahreswechsel wird über einen idempotenten Carry-over erledigt: für ein
 Zieljahr erhält jedes aktive Anlagegut, das noch keine Zeile hat, eine neue
@@ -255,13 +271,15 @@ veräußerte Güter übersprungen. Alle Beträge bleiben ganze Cent.
 **Backfill.** Bestehende Anlagegüter haben ausnahmslos `business_share >= 50`
 (alte Validierung) und erhalten `scope = business`; ihre vorhandenen
 `eur_asset_years`-Zeilen erhalten denselben Wert und `carry_over_from_year =
-null`. Es werden keine neuen Zeilen, Belege oder AfA-Werte erfunden. Weil es
+null`. Die Eigenbeleg-Felder und die neue Verknüpfungstabelle bleiben leer; es
+werden keine neuen Zeilen, Belege, Eigenbelege oder AfA-Werte erfunden. Weil es
 vorher keine Anlage↔Beleg-Verknüpfung gab, bleibt die neue Tabelle leer.
 
 **Rollback.** `down()` ist nach Repository-Policy leer. Alle Änderungen sind
 additiv bzw. mit Defaultwerten versehen; ein Entfernen verliert nur die
-Verzeichniszuordnung, die Carry-over-Herkunft und die Belegverknüpfung, nicht
-die Anlagegüter, ihre AfA-Pläne, Buchungen oder Belege selbst.
+Verzeichniszuordnung, die Carry-over-Herkunft, die Eigenbeleg-Dokumentation und
+die Belegverknüpfung, nicht die Anlagegüter, ihre AfA-Pläne, Buchungen oder
+Belege selbst.
 
 ## Beziehungen
 
@@ -282,8 +300,13 @@ brand-scoped; ein fremder Datensatz liefert 404, eine ungültige Eingabe 422.
 
 - `GET reference`, `GET/PUT settings`, `GET summary`
 - `GET/POST/PUT/DELETE entries`
-- `GET/POST assets`, `GET assets/compare`, `GET assets/{id}/plan`,
-  `POST assets/{id}/switch-to-linear`
+- `GET/POST assets` (Index mit optionalem `scope=business|private`),
+  `GET assets/compare`, `GET assets/{id}/plan`,
+  `POST assets/{id}/switch-to-linear`, `POST assets/carry-over` (idempotent,
+  `{year}` aus `EurYear::SUPPORTED`), `POST/DELETE assets/{id}/documents`
+  (Beleg am Stamm, markenbegrenzt). Die Buchungsaktion `POST
+  assets/{id}/book-depreciation` erzeugt bei `scope = private` einen
+  Eigenbeleg ohne Journalbuchung.
 - `POST vat/calc`, `POST travel/calc`, `POST est/calc`
 - `GET/POST travel`, `DELETE travel/{id}` (D-83a, brand-scoped, Cent-Beträge
   serverseitig berechnet und gespeichert)

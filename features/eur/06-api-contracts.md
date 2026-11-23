@@ -133,6 +133,22 @@ idempotent (zweiter Aufruf: 200 mit `already_booked: true`).
 (`total|business|rental|forecast`) und liefert `e1a`, `e1b`, `deductions_cents`
 sowie `stages`. Der Client rechnet nichts nach.
 
+Die Antwort enthält zwei additive Blöcke (EUE-095/103/126):
+
+- `est_allocation`: `total_income_cents` (U14), `tax_cents` (U23/`ue_est`),
+  `employment_tax_cents` (U27), `rental_tax_cents` (U25),
+  `business_tax_cents` (U24, im Bruttolohn-Modus `null`) und `due_cents` (U29).
+  `kz.U12` ist das E1B-Ergebnis.
+- `monthlyResults`: `year`, `mode`, `annual` und `months` (zwölf Einträge).
+  Optionaler Request-Block `months: [{month: 1..12, gross_profit_cents,
+  hours_minutes?}]` liefert die Monatsgewinn-/Stundenbasis. Ohne Monatsdaten
+  ist `annual: null` und jeder Monatswert `null`. Je Monat werden
+  `est_sv_cents` (J12), `net_profit_cents` (K12), `net_per_hour_cents` (N5,
+  ganzzahlige Cent pro Stunde) sowie `basis_cents` (I16),
+  `loss_basis_cents` (I14) und `minimum_sv_cents` (I12) ausgeliefert.
+  `hours_minutes` sind ganze Minuten; bei 0 Minuten bleibt
+  `net_per_hour_cents` leer. Alle Geldbeträge sind ganze Cent.
+
 ## Querschnitt
 
 - Jeder Schreibzugriff schreibt `eur_audit_logs` ohne Dateiinhalte.

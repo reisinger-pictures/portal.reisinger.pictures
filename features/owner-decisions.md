@@ -466,8 +466,9 @@ or schema for it is part of this decision.
 All amounts in both directories, including carry-over rows, remain whole cents
 (`*_cents`, integer) per the repository-wide money rule in
 [`AGENTS.md`](../AGENTS.md). The schema, backfill and rollback decision for the
-required migration belongs in `features/eur/04-data-model.md` before the
-migration is written (D-83 policy).
+required migration belongs in the
+[V071 decision](eur/04-data-model.md#schema-entscheidung-v071-anlagenverzeichnisse-je-jahr-d-85)
+before the migration is written (D-83 policy).
 
 ### D-86: One custom Beleg per trip — no ODS-style leg rows
 

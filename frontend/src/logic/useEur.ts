@@ -141,6 +141,37 @@ export interface EurPlanYear {
     /** #34: present once the year-end booking created a journal entry. */
     eur_entry_id?: number | null;
     booked_at?: string | null;
+    /** D-85: directory this year row belongs to. Optional for legacy caches. */
+    scope?: 'business' | 'private';
+    /** D-85: set when this row was created by the idempotent year carry-over. */
+    carry_over_from_year?: number | null;
+    /** D-85: documentation-only voucher of a private asset's theoretical AfA. */
+    eigenbeleg_no?: string | null;
+    /** Whole cents of the theoretical depreciation before the usage share. */
+    theoretical_depreciation_cents?: number | null;
+    /** Whole percent (not basis points) of business usage for that year. */
+    usage_percent?: number | null;
+    /** Whole cents documented by the Eigenbeleg. */
+    eigenbeleg_cents?: number | null;
+    eigenbeleg_created_at?: string | null;
+}
+
+/** D-85: a private asset's Eigenbeleg; never a journal entry. */
+export interface EurEigenbeleg {
+    year: number;
+    eigenbeleg_no: string | null;
+    theoretical_depreciation_cents: number | null;
+    usage_percent: number | null;
+    eigenbeleg_cents: number | null;
+    eigenbeleg_created_at: string | null;
+}
+
+/** D-85: receipt metadata attached to an asset master. No storage path is ever sent. */
+export interface EurAssetDocument {
+    id: number;
+    receipt_no: string | null;
+    original_name: string;
+    sha256: string;
 }
 
 export interface EurAsset {
@@ -156,6 +187,10 @@ export interface EurAsset {
     degressive_rate: number | null;
     status: string;
     years: EurPlanYear[];
+    /** D-85: server-derived directory (`business` at >= 50 % business share). */
+    scope?: 'business' | 'private';
+    /** D-85: receipts belong to the master and are never duplicated per year. */
+    documents?: EurAssetDocument[];
     /** #34 P5.4: private/mixed-use investment shown in its own view. */
     is_private_investment?: boolean;
     category?: string | null;
@@ -532,8 +567,10 @@ export function useEurSettings() {
     return useSWR<EurSettings>('/api/management/eur/settings', fetcher, SWR_OPTIONS);
 }
 
-export function useEurAssets() {
-    return useSWR<{assets: EurAsset[]}>('/api/management/eur/assets', fetcher, SWR_OPTIONS);
+/** D-85: an optional scope queries one of the two asset directories server-side. */
+export function useEurAssets(scope?: 'business' | 'private') {
+    const query = scope === undefined ? '' : `?scope=${scope}`;
+    return useSWR<{assets: EurAsset[]}>(`/api/management/eur/assets${query}`, fetcher, SWR_OPTIONS);
 }
 
 export function useEurYears() {
@@ -714,12 +751,46 @@ export async function fetchEurComparison(params: {
     return fetcher<EurAssetComparison>(`/api/management/eur/assets/compare?${query.toString()}`);
 }
 
-/** #34 P5.5: idempotent year-end booking of an asset's business depreciation. */
-export function bookEurAssetDepreciation(id: number, year: number): Promise<{
-    entry: {id: number; receipt_no: string | null; business_amount_cents: number};
-    already_booked: boolean;
-}> {
-    return apiMutate(`/api/management/eur/assets/${id}/book-depreciation`, 'POST', {year});
+/**
+ * #34 P5.5 / D-85: idempotent year-end action for an asset. A business asset
+ * returns a journal `entry`; a private asset only returns an `eigenbeleg` and
+ * never affects profit. Both result shapes are optional so callers must branch
+ * on the directory rather than assume an entry exists.
+ */
+export interface EurBookAssetResult {
+    entry?: {id: number; receipt_no: string | null; business_amount_cents: number};
+    already_booked?: boolean;
+    eigenbeleg?: EurEigenbeleg;
+    already_created?: boolean;
+}
+
+export function bookEurAssetDepreciation(id: number, year: number): Promise<EurBookAssetResult> {
+    return apiMutate<EurBookAssetResult>(`/api/management/eur/assets/${id}/book-depreciation`, 'POST', {year});
+}
+
+/** D-85: idempotent carry-over of missing year rows from the previous year. */
+export interface EurCarryOverResult {
+    year: number;
+    created: number;
+}
+
+export function carryOverEurAssets(year: number): Promise<EurCarryOverResult> {
+    return apiMutate<EurCarryOverResult>('/api/management/eur/assets/carry-over', 'POST', {year});
+}
+
+/** D-85: attach one existing receipt to an asset master (idempotent). */
+export interface EurAssetDocumentResult {
+    document: EurAssetDocument;
+    already_linked: boolean;
+}
+
+export function attachEurAssetDocument(id: number, documentId: number): Promise<EurAssetDocumentResult> {
+    return apiMutate<EurAssetDocumentResult>(`/api/management/eur/assets/${id}/documents`, 'POST', {document_id: documentId});
+}
+
+/** D-85: detach a receipt from an asset master; the receipt itself is kept. */
+export async function detachEurAssetDocument(id: number, documentId: number): Promise<void> {
+    await apiMutate(`/api/management/eur/assets/${id}/documents/${documentId}`, 'DELETE');
 }
 
 /** #34 P5.3: one-time, reasoned switch from degressive to linear. */

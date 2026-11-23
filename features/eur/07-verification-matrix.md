@@ -10,6 +10,19 @@
 > Abnahmegate; eine QES wird ohne validierte Kette nicht behauptet.
 
 >
+> **Evidenzgrenze B08 (D-88, 2026-11-23):** Die Integrationsnotiz
+> `ku-online/verification/tax-engine.md` war im Clean-Room-Handoff zunächst als
+> Engine-Code ausgeschlossen. Der Eigentümer hat die Nutzung ausdrücklich
+> freigegeben, weil sie nur öffentlich zugängliche Steuerformeln und
+> Cent-Vektoren enthält (D-88 in `features/owner-decisions.md`). Verwendet
+> wurden ausschließlich die Formelbeschreibungen und
+> die Cent-Vektoren für EUE-094/095/103; **keine** Klassen, Methoden oder
+> Implementierungslogik. Alle Zahlen wurden vor der Assertion gegen die
+> gepinnten Tarifgrenzen und -sätze in `YearTables`/`IncomeTaxTariff`
+> nachgerechnet. Die Parameter selbst bleiben allein aus `domain-rules.json`
+> und den gepinnten Tabellen; es gibt keine zweite Regelquelle.
+
+>
 > **Reconciliation, 2. Pass (2026-11-22, nur Dokumentation):** Nach dem
 > ersten Pass wurden die 46 verbleibenden `— offen —`-Zeilen erneut gegen
 > den Repo-Stand geprüft. Die inzwischen gelandeten Implementierungen
@@ -161,7 +174,7 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | EUE-092 | Der vierte Steuersatz beträgt 48 % bis 66.612 € (2024) / 69.166 € (2025) / 70.365 € (2026). | Tarifgrenze Stufe 4=66612; Tarifgrenze Stufe 4=69166; Tarifgrenze Stufe 4=70365; Steuersatz Stufe 4=48 % | YearTablesTest.php:17-23, YearTables.php:16-23 (Stufe 4) |
 | EUE-093 | Der fünfte Steuersatz beträgt 50 % oberhalb von 99.266 € (2024) / 103.072 € (2025) / 104.859 € (2026). | Tarifgrenze Stufe 5=99266; Tarifgrenze Stufe 5=103072; Tarifgrenze Stufe 5=104859; Steuersatz Stufe 5=50 % | YearTablesTest.php:17-23, YearTables.php:16-23 (Stufe 5) |
 | EUE-094 | Die Steuer wird stufenweise aus den jeweiligen Einkommensanteilen berechnet; die Summe der fünf Stufen ergibt die Einkommensteuer. | Verhalten (kein Skalarwert) | MonthStatementTest.php |
-| EUE-095 | Je nach Modus ('Gesamt', 'Nur Betrieb', 'Nur Vermietung') werden betriebliche Einkünfte, Vermietung, nichtselbständige Einkünfte und prognostizierte W | KZ: KZ 245 | E1StatementTest.php |
+| EUE-095 | Je nach Modus ('Gesamt', 'Nur Betrieb', 'Nur Vermietung') werden betriebliche Einkünfte, Vermietung, nichtselbständige Einkünfte und prognostizierte W | KZ: KZ 245; U14 (Vektor) = 2 905 000 ct | `IncomeTaxService::totalIncomeCents()` (U10+U11 / U11+U12+U13 / Summe), `EurTaxStatementService` liefert U12/U13; `IncomeTaxServiceTest.php` (3 Modi + Aliase), `EurIncomeTaxApiTest.php` (`est_allocation.total_income_cents`, `kz.U12`) |
 | EUE-096 | Die Grenze beträgt 30.000 € vor 2024 und 33.000 € ab 2024; im unterstützten Zeitraum immer 33.000 €. | Grundfreibetrag Grenze=33000; Grundfreibetrag Grenze=33000; Grundfreibetrag Grenze=33000 | YearTablesTest.php:25-30, YearTables::basicAllowance:59-65 · fixture |
 | EUE-097 | Der Satz beträgt 13 % vor 2022 und 15 % ab 2022; im unterstützten Zeitraum immer 15 %. | Grundfreibetrag Satz=15 %; Grundfreibetrag Satz=15 %; Grundfreibetrag Satz=15 % | YearTablesTest.php:25-30 (satz 1500/10000) · fixture |
 | EUE-098 | Der Grundfreibetrag entspricht dem kleineren Wert aus 15 Prozent des Gewinns und 15 Prozent von 33.000 Euro, mindestens null; er wird vom Gewinn abgez | KZ: KZ 330 | YearTablesTest.php |
@@ -169,7 +182,7 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | EUE-100 | Mieteinnahmen und Werbungskosten je Kennzahl werden aus den Einnahmen-, Ausgaben- und Anlagenjournalen aggregiert; der Überschuss der Mieteinnahmen üb | KZ: 9414, 9460, 9500, 9135 | E1StatementTest.php |
 | EUE-101 | Bis 300 € gilt die kleine Pauschale KZ 9215, von über 300 bis 1.200 € die große KZ 9217; bei Zusage von 9275 (Arbeitszimmer) ist der Wert zu löschen. | Kleine Pauschale bis=300; Große Pauschale bis=1200; Eingabe Minimum=25 | EurTaxStatementService.php:117-135 (9215/9217), EurTaxStatementServiceTest.php:76-96, EurIncomeTaxApiTest.php:54 |
 | EUE-102 | Ergonomisches Mobiliar wird mit KZ 9216 ausgewiesen. Unterdrückt wird die Kennzahl nur, wenn die Arbeitszimmerpauschale 9275 erfasst ist oder kein Bet | Eingabe Maximum=300 | EurTaxStatementService.php:117-144 (9216, Sperre bei 9275), EurTaxStatementServiceTest.php:76-96 |
-| EUE-103 | Die Einkommensteuer wird per Progressionsrechnung auf nichtselbständige Einkünfte, auf Vermietung und auf den Betrieb aufgeteilt; die Einkommensteuer- | KZ: KZ 245, KZ 260 | EurTaxStatementService.php:62-78 (KZ 245/260/U13/U26/E40/E39), EurTaxStatementServiceTest.php:47-74, EurIncomeTaxApiTest.php:45-56 |
+| EUE-103 | Die Einkommensteuer wird per Progressionsrechnung auf nichtselbständige Einkünfte, auf Vermietung und auf den Betrieb aufgeteilt; die Einkommensteuer- | KZ: KZ 245, KZ 260; Vektor U23 380 800 / U27 129 220 / U25 28 000 / U24 223 580 / U29 230 800 ct | `IncomeTaxService::allocate()` + `::progressiveTaxCents()` (gepinnter Tarif); `ue_est` als U23 dokumentiert (D-88). `EurIncomeTaxController` gibt `est_allocation` aus. `IncomeTaxServiceTest.php`, `EurIncomeTaxApiTest.php` (Vektor, Null-Vorauszahlung, Bruttolohn-Modus) |
 | EUE-104 | Mit Prognose werden weitere betriebliche/ Vermietungsgewinne aufs Jahr hochgerechnet; die Modi bestimmen, welche Einkünfte in die Übersicht einfließen | Verhalten (kein Skalarwert) | EurTaxStatementService::rentalForecast, EurTaxStatementServiceTest.php (Einnahmen − Werbungskosten) |
 | EUE-105 | Bestimmte Zeilen der Übersicht und die SV-Beiträge werden ausgeblendet bzw. auf 0 gesetzt. | Verhalten (kein Skalarwert) | EurTaxStatementService.php:52-60 (Modus setzt Werte auf 0), EurTaxStatementServiceTest.php:98-119, EurOverviewService.php:90-100 |
 | EUE-106 | Die Auswahl des Rechenmodus bietet nur die Werte 'Gesamt', 'Nur Betrieb' und 'Nur Vermietung'. In der Berechnung werden jedoch zusätzlich die Variante | Verhalten (kein Skalarwert) | EurTaxStatementService.php:25,40-42 (4 Modi inkl. Prognose), EurIncomeTaxPanel.tsx:134-137, EurTaxStatementServiceTest.php:121-127 |
@@ -202,8 +215,8 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | EUE-122 | Für jede Zahlart und jeden Monat werden Ein- und Ausflüsse aus E/A/WEB gegenübergestellt; ✓/✓✓ bestätigen die Übereinstimmung mit Saldo und Startsaldo | Verhalten (kein Skalarwert) | EurAnalyticsController::paymentReconciliation, EurAnalyticsApiTest.php; sichtbar in `EurAnalyticsMatricesPanel.tsx` (Vitest, E2E `@feature:eur-analytics`) |
 | EUE-123 | Stunden werden je Monat und Projekt erfasst und speisen die Projekte-Auswertung, die Reise-3-Stunden-Regel und die Monatsübersicht. | Verhalten (kein Skalarwert) | HoursLedgerTest.php |
 | EUE-124 | Die Werte der UST-Voranmeldung werden über ust_daten/ust_kennzahlen/ust_monate in die Monatsansicht übernommen. | Verhalten (kein Skalarwert) | MonthStatementTest.php (vat.kennzahlen), EurPdfApiTest.php (USt-Tabelle), EurMonthPanel.tsx |
-| EUE-125 | Der monatliche Mindest-SV-Beitrag (UV, SVS-Minimum, KV-Minimum, PV-Minimum je nach Modus) und die aus den Monatsgewinnen abgeleitete Verlustbasis werd | Mindest-SV monatlich=160.8 | — offen — |
-| EUE-126 | Je Monat wird die anteilige Einkommensteuer samt SV aus der Jahressteuer abgeleitet; der Reingewinn ist Bruttoergebnis minus dieser Belastung; daraus  | Verhalten (kein Skalarwert) | — offen — |
+| EUE-125 | Der monatliche Mindest-SV-Beitrag (UV, SVS-Minimum, KV-Minimum, PV-Minimum je nach Modus) und die aus den Monatsgewinnen abgeleitete Verlustbasis werd | Mindest-SV monatlich=160.80 €; I14 = ABS(MIN(ue_gewinn_pro_monat)) | `EurOverviewService::svMonthly()` bei leerer Bemessungsgrundlage → I12 16 080 ct (gepinnte SV-Parameter); `IncomeTaxService::monthlyResults()` setzt I14 aus den Monatsgewinnen. `IncomeTaxServiceTest.php`, `EurIncomeTaxApiTest.php` |
+| EUE-126 | Je Monat wird die anteilige Einkommensteuer samt SV aus der Jahressteuer abgeleitet; der Reingewinn ist Bruttoergebnis minus dieser Belastung; daraus  | J12 = (G12+I14)/I16×I13+I12; K12 = N(G12)−N(J12); N5 = K12×60/M12; Unit-Vektor (SV = 12×I12, 12×100 000 ct) → J12 37 045 / K12 62 955 / N5 6 296 ct | `IncomeTaxService::monthlyResults()` (ganze Cent, BCMath); `EurIncomeTaxController` ergänzt `monthlyResults` mit `est_sv_cents`, `net_profit_cents`, `net_per_hour_cents` und den J12/K12/N5/I16-Äquivalenten (null ohne Monatsdaten). `IncomeTaxServiceTest.php`, `EurIncomeTaxApiTest.php` |
 
 ## B11 — Validierung & Plausibilität
 

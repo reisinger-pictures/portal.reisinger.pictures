@@ -53,6 +53,20 @@ Grundfreibetrag. Fehlt eine Tabelle, bricht das Laden ab.
 - E1A/E1B-Aggregation, Aufteilung und Rechenmodi (EUE-095, EUE-099 … EUE-106)
   sind als Anforderung dokumentiert; die Zuordnung der Kennzahlen stammt aus
   dem Katalog.
+- [`IncomeTaxService`](../../backend/app/Eur/Domain/IncomeTaxService.php) bildet
+  die Kennzahlen U14 (Gesamteinkommen je Modus), U23/U27/U25/U24 (Aufteilung
+  mit dem gepinnten Tarif) und U29 (Abzug von Vorauszahlung und Lohnsteuer).
+  `ue_est` ist im gepinnten Dump ein definierter Name ohne Formel; das Portal
+  liest ihn als U23, die Endsteuer auf das Gesamteinkommen (D-88). Diese
+  Auslegung ist dokumentierte Interpretation, keine neue Regelquelle. Die
+  vom Eigentümer freigegebene Integrationsnotiz lieferte die Cent-Vektoren;
+  alle Werte wurden gegen die gepinnten Tarifgrenzen nachgerechnet.
+- Die monatliche Belastung (EUE-125/126) verteilt die Jahressteuer samt SV
+  gewichtet auf die Monate: I12 ist der Mindest-SV-Sockel aus der gepinnten
+  SV-Engine bei leerer Bemessungsgrundlage, I14 = `ABS(MIN(Monatsgewinn))`,
+  I16 die Summe aus Monatsgewinn und I14. J12 = anteilige EST+SV,
+  K12 = Bruttoergebnis − J12, N5 = K12 × 60 / Minuten. Monate ohne Daten und
+  Monate ohne Stunden liefern `null`; gerechnet wird nur mit ganzen Cent.
 
 ## Umsatzsteuer (EUE-082 … EUE-088)
 

@@ -65,6 +65,9 @@ final class EurTaxStatementService
             'kz' => [
                 '245' => (int) ($input['employment_income_cents'] ?? 0),
                 '260' => (int) ($input['wage_tax_cents'] ?? 0),
+                // EUE-095/103: U12 ist das E1B-Ergebnis (Einnahmen − Werbungskosten).
+                // Im Modus "Nur Betrieb" blendet die gepinnte Formel U12 aus.
+                'U12' => $mode === 'business' ? 0 : $rentalIncome - $rentalExpenses,
                 'U13' => $this->rentalForecast($mode, $rentalIncome, $rentalExpenses, $input),
                 'U26' => (int) ($input['prepayment_cents'] ?? 0),
                 'E40' => $e40,

@@ -331,9 +331,12 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::delete('/management/eur/travel/{id}', [EurTravelController::class, 'destroy'])->name('api.management.eur.travel.destroy');
     Route::post('/management/eur/est/calc', [EurIncomeTaxController::class, 'calculate'])->name('api.management.eur.est.calc');
     Route::post('/management/eur/assets', [EurAssetController::class, 'store'])->name('api.management.eur.assets.store');
+    Route::post('/management/eur/assets/carry-over', [EurAssetController::class, 'carryOver'])->name('api.management.eur.assets.carry-over');
     Route::get('/management/eur/assets/{id}/plan', [EurAssetController::class, 'plan'])->name('api.management.eur.assets.plan');
     Route::post('/management/eur/assets/{id}/switch-to-linear', [EurAssetController::class, 'switchToLinear'])->name('api.management.eur.assets.switch');
     Route::post('/management/eur/assets/{id}/book-depreciation', [EurAssetController::class, 'bookDepreciation'])->name('api.management.eur.assets.book-depreciation');
+    Route::post('/management/eur/assets/{id}/documents', [EurAssetController::class, 'attachDocument'])->name('api.management.eur.assets.documents.attach');
+    Route::delete('/management/eur/assets/{id}/documents/{documentId}', [EurAssetController::class, 'detachDocument'])->name('api.management.eur.assets.documents.detach');
     Route::delete('/management/eur/assets/{id}', [EurAssetController::class, 'destroy'])->name('api.management.eur.assets.destroy');
     // EAR · Buchhaltungsansicht: Jahre, Monat/Abschluss, Belege, Stunden,
     // Wareneingang, Anträge, Signaturen und Auswertungen. Alle brand-scoped.
