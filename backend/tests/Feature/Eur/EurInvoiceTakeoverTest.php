@@ -22,6 +22,7 @@ use App\Services\InvoiceMailDispatcher;
 use App\Services\InvoiceService;
 use App\Support\BrandRegistry;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 class EurInvoiceTakeoverTest extends EurBookkeepingTestCase
@@ -262,7 +263,12 @@ class EurInvoiceTakeoverTest extends EurBookkeepingTestCase
     {
         app(EurInvoiceTakeoverService::class)->takeover($this->data());
 
+        // Unter PostgreSQL bricht ein Unique-Verstoß die laufende Transaktion
+        // ab (25P02); die folgenden assertDatabase*-Aufrufe würden sonst
+        // scheitern. Ein Savepoint begrenzt den abgebrochenen Versuch auf den
+        // Kollisions-Fork und lässt die äußere Test-Transaktion intakt.
         $collision = false;
+        DB::beginTransaction();
         try {
             EurEntry::create([
                 'brand' => 'rp',
@@ -278,6 +284,8 @@ class EurInvoiceTakeoverTest extends EurBookkeepingTestCase
             ]);
         } catch (QueryException) {
             $collision = true;
+        } finally {
+            DB::rollBack();
         }
 
         $this->assertTrue($collision);
