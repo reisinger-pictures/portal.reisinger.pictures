@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Auth\SanctumTransientGuard;
 use App\Auth\TransientUserProvider;
 use App\Contracts\PricingStrategy;
 use App\Enums\UserRole;
@@ -21,6 +22,7 @@ use App\Support\CheckoutKey;
 use App\Support\UuidDatabaseFailedJobProvider;
 use App\Support\UuidDatabaseQueueConnector;
 use ArrayObject;
+use Illuminate\Auth\RequestGuard;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
@@ -233,6 +235,23 @@ class AppServiceProvider extends ServiceProvider
         Auth::provider('transient_eloquent', function ($app, array $config) {
             return new TransientUserProvider($app['hash'], $config['model']);
         });
+
+        // Portal #9 / D-73: dormant `sanctum_transient` guard driver. It is
+        // registered but NOT active — the `api` guard still uses `jwt` (D-74)
+        // and no route references this driver in Phase 2. Resolving it only
+        // happens when a guard is explicitly configured with this driver; the
+        // legacy path never reaches this closure.
+        Auth::extend('sanctum_transient', function ($app, string $name, array $config) {
+            $guard = new RequestGuard(
+                $app->make(SanctumTransientGuard::class),
+                $app['request'],
+                $app->make('auth')->createUserProvider($config['provider'] ?? null),
+            );
+            $app->refresh('request', $guard, 'setRequest');
+
+            return $guard;
+        });
+
         // Den neuen Custom Transport in Laravel's Mail-Manager integrieren
         Mail::extend('gmail_rest', function (array $config) {
             return new GmailRestTransport(

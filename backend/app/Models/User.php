@@ -15,11 +15,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements JWTSubject
 {
-    use HasFactory, HasUuids, Notifiable;
+    // HasApiTokens is dormant while AUTH_DRIVER=legacy (the default): it only
+    // adds the token relation/createToken API used by AuthTokenService's
+    // sanctum branch. No route uses `auth:sanctum` in Phase 2 and the `api`
+    // guard keeps its `jwt` driver (Portal #9, D-74/D-75).
+    use HasApiTokens, HasFactory, HasUuids, Notifiable;
 
     public $guest_id = null;
 
