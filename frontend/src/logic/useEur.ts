@@ -313,6 +313,8 @@ export interface EurMonthData {
     e1_by_code?: EurE1ByCode;
     /** EUE-124: die acht USt-Kennzahlen des Monats. */
     vat?: {kennzahlen: Record<string, number | null>; zahllast_cents: number | null; empty: boolean};
+    /** EUE-116: Kopfhinweis (💡 … OFF) aus `JournalRules::headerHint()`. */
+    hint?: string;
 }
 
 /** `GET/POST /eur/documents` — metadata; the storage path never leaves the server. */

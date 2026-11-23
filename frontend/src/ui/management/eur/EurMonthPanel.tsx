@@ -163,6 +163,9 @@ export default function EurMonthPanel({year, month, onMonthChange}: Props) {
                         <p className="text-sm opacity-70">
                             <Trans>Alle Zeilen, Summen und Prüfhinweise des Monats auf einen Blick.</Trans>
                         </p>
+                        {data.hint && (
+                            <p className="text-sm text-warning mt-1" role="status">{data.hint}</p>
+                        )}
                     </div>
                     <label className="form-control">
                         <span className="label-text"><Trans>Monat</Trans></span>

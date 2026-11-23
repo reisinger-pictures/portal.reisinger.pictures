@@ -169,6 +169,20 @@ test.describe('EAR cockpit navigation', () => {
             .toContainText('Import abgeschlossen: 0 angelegt, 0 übersprungen.');
     });
 
+    test('Monat zeigt den 💡-Kopfhinweis (EUE-116)', { tag: ['@feature:eur'] }, async ({ page }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        await auth.login(superAdmin.email, superAdmin.password);
+        await sidebar.navigateTo('EA Rechnung');
+
+        const main = page.getByRole('main');
+        await page.getByRole('tab', { name: 'Monat', exact: true }).click();
+
+        await expect(main.getByRole('heading', { name: 'Monatsabschluss' })).toBeVisible();
+        await expect(main.getByText(/Rechenaufwendige Kalkulation/)).toBeVisible();
+    });
+
     test('Auswertungen zeigen BE-ART, BA-ART und ZA als sichtbare Matrizen', { tag: ['@feature:eur-analytics'] }, async ({ page }) => {
         const auth = new AuthHelper(page);
         const sidebar = new SidebarHelper(page);

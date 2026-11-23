@@ -125,4 +125,17 @@ describe('EurMonthPanel status values', () => {
         expect(screen.getByText(new RegExp(`Signatur: ${expected}`))).toBeVisible();
         expect(screen.queryByText(new RegExp(`\\b${status}\\b`))).not.toBeInTheDocument();
     });
+
+    it('rendert den Kopfhinweis aus der API (EUE-116)', () => {
+        const hint = '💡 Rechenaufwendige Kalkulation: Bitte nach Verwendung wieder auf OFF setzten!';
+        renderPanel({...monthData, hint});
+
+        expect(screen.getByText(hint)).toBeVisible();
+    });
+
+    it('lässt den Kopfhinweis weg, wenn die API ihn nicht liefert (EUE-116)', () => {
+        renderPanel();
+
+        expect(screen.queryByText(/Rechenaufwendige Kalkulation/)).not.toBeInTheDocument();
+    });
 });

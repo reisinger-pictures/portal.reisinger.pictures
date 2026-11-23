@@ -193,7 +193,7 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 
 | Regel-ID | Fachliche Wirkung (gekürzt) | Hergeleiteter Wert | Testnachweis |
 |---|---|---|---|
-| EUE-116 | Der Schalter 'OFF' deaktiviert die rechenaufwendige Monatsansicht; bei OFF erscheint ein 💡-Hinweis, die Ansicht wieder abzuschalten. | Verhalten (kein Skalarwert) | MonthStatementTest.php |
+| EUE-116 | Der Schalter 'OFF' deaktiviert die rechenaufwendige Monatsansicht; bei OFF erscheint ein 💡-Hinweis, die Ansicht wieder abzuschalten. | Verhalten (kein Skalarwert) | MonthStatementTest.php (`JournalRules::HEADER_HINT`); Hint wird in `EurMonthPanel.tsx` gerendert (TS-Feld `EurMonthData.hint`, Vitest) |
 | EUE-117 | Die Monatsansicht zieht Einnahmen, Ausgaben (A/AV/WEB/FR/USt) und Stunden des gewählten Monats per SUMIFS/INDEX zusammen. | Verhalten (kein Skalarwert) | MonthStatementTest.php |
 | EUE-118 | Die Zeilen der Einnahmen-, Ausgaben-, Anlagen- und Reisejournale werden über eine aufwendige Auswahlformel in die Monatsansicht übernommen; Einträge d | Verhalten (kein Skalarwert) | MonthStatementTest.php |
 | EUE-119 | Eine Matrix zeigt die Einnahmen je Art und Monat; Summen und ein ✓✓-Abgleich gegen das E-Blatt stellen die Vollständigkeit sicher. | Verhalten (kein Skalarwert) | EurAnalyticsController::byIncomeType, EurAnalyticsApiTest.php; sichtbar in `EurAnalyticsMatricesPanel.tsx` mit %-Spalte (1 Stelle) und ✓✓/Δ (Vitest, E2E `@feature:eur-analytics`) |
