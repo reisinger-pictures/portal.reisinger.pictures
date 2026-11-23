@@ -319,6 +319,9 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/eur/assets/compare', [EurAssetController::class, 'compare'])->name('api.management.eur.assets.compare');
     Route::post('/management/eur/vat/calc', [EurVatController::class, 'calculate'])->name('api.management.eur.vat.calc');
     Route::post('/management/eur/travel/calc', [EurTravelController::class, 'calculate'])->name('api.management.eur.travel.calc');
+    Route::get('/management/eur/travel', [EurTravelController::class, 'index'])->name('api.management.eur.travel.index');
+    Route::post('/management/eur/travel', [EurTravelController::class, 'store'])->name('api.management.eur.travel.store');
+    Route::delete('/management/eur/travel/{id}', [EurTravelController::class, 'destroy'])->name('api.management.eur.travel.destroy');
     Route::post('/management/eur/est/calc', [EurIncomeTaxController::class, 'calculate'])->name('api.management.eur.est.calc');
     Route::post('/management/eur/assets', [EurAssetController::class, 'store'])->name('api.management.eur.assets.store');
     Route::get('/management/eur/assets/{id}/plan', [EurAssetController::class, 'plan'])->name('api.management.eur.assets.plan');

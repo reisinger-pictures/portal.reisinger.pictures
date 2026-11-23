@@ -26,6 +26,7 @@
 | `eur_assets` | Anlagegüter | Belegnummer, Anschaffungsdatum, Kosten in Cent, Nutzungsjahre 0/2–99, Betriebsanteil ≥ 50 %, AfA-Kennzahl, Methode |
 | `eur_asset_years` | AfA- und Privatnutzungsplan je Jahr | Jahr, Methode, AfA in Cent, Restbuchwert in Cent, Privatanteil, Status |
 | `eur_audit_logs` | Audit | Aktion, Akteur, Objekt; keine Dateiinhalte und keine Secrets |
+| `eur_travel_trips` | gespeicherte Reisezeilen (D-83a) | Jahr 2026, Brand, Fahrzeug, Kilometer, Land, Tage, Betriebsanteil; Cent-Beträge vom Server berechnet |
 
 Die Migrationen sind additiv und enthalten keinen Backfill; der aktuelle Stand
 steht ausschließlich in
@@ -122,6 +123,30 @@ Vertrauensprüfung; `pdfsig` ist im Deployment-Image nicht installiert und wird
 nicht aufgerufen. Ein erfolgreicher Upload besagt nur, dass die geprüfte Datei
 auf demselben Inhalt beruht.
 
+### Schema-Entscheidung V067 (Reisezeilen, D-83a)
+
+**Schema.** Neue Tabelle `eur_travel_trips` mit den Eingaben des bestehenden
+`travel/calc`-Endpunkts (`year`, `month`, `vehicle`, `kilometres`, `passengers`,
+`country`, `days`, `meals`, `with_receipts`, `business_share`) und den vom Server
+berechneten `kilometre_cents`, `day_cents`, `night_cents`, `total_cents`,
+`business_cents` sowie `note`. Wie im AfA-Plan wird das Ergebnis beim Anlegen
+berechnet und gespeichert, nicht bei jeder Anzeige neu erzeugt. Geld ist
+ausschließlich ganzzahlige Cent, Anteile ganze Prozent in 5-%-Schritten; es gibt
+keine Float-Spalten. Die Tabelle trägt `brand` und wird über `forCurrentBrand()`
+gescoped; der Index `(brand, year, month)` deckt die Monatsansicht ab.
+
+**Backfill.** Keiner. Reisen existierten vorher nur als flüchtige
+Berechnungsergebnisse ohne Identität und werden nicht nachträglich angelegt.
+Die bestehenden Journale und Auswertungen werden nicht umgeschrieben; die
+neue Tabelle ergänzt die Monatsansicht, ohne Summen zu verdoppeln, solange
+keine Reisezeile gespeichert ist.
+
+**Rollback.** `down()` ist nach Repository-Policy leer. Die Tabelle ist additiv
+und verändert keine bestehende Tabelle; ein Entfernen würde nur gespeicherte
+Reisen und ihre Audit-Hinweise verlieren, nicht Buchungen, AfA-Pläne oder
+Belege. Der schreibende Pfad (`POST travel`) ist die einzige Quelle neuer
+Zeilen und fällt mit der Tabelle weg.
+
 ## Beziehungen
 
 - Buchung → genau ein Kunde und optional ein Projekt; Reise analog.
@@ -144,6 +169,8 @@ brand-scoped; ein fremder Datensatz liefert 404, eine ungültige Eingabe 422.
 - `GET/POST assets`, `GET assets/compare`, `GET assets/{id}/plan`,
   `POST assets/{id}/switch-to-linear`
 - `POST vat/calc`, `POST travel/calc`, `POST est/calc`
+- `GET/POST travel`, `DELETE travel/{id}` (D-83a, brand-scoped, Cent-Beträge
+  serverseitig berechnet und gespeichert)
 
 Schreibende Aktionen erzeugen einen Audit-Eintrag ohne Dateiinhalte. Der
 Servierer berechnet Preise, Summen und AfA; der Client rechnet nicht nach.
