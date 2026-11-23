@@ -181,4 +181,39 @@ class TravelCalculatorTest extends TestCase
         $this->assertContains('Das Reiseende muss nach dem Reisestart liegen.', $warnings);
         $this->assertContains('Belegnummer fehlt. Bitte eine Belegnummer vergeben.', $warnings);
     }
+
+    public function test_working_days_follow_the_year_dependent_easter_formula(): void
+    {
+        // EUE-012/074: Ostermontag 2025 ist der 21.04.; die Ableitung über
+        // die Osterformel wird in ReferenceTablesTest gegen das Artefakt geprüft.
+        $this->assertSame(0, $this->calculator->workingDays('2025-04-21', '08:00', '2025-04-21', '17:00'));
+        $this->assertSame(1, $this->calculator->workingDays('2025-04-22', '08:00', '2025-04-22', '17:00'));
+    }
+
+    public function test_working_days_use_the_pinned_holidays_and_the_half_day_rule(): void
+    {
+        // EUE-074 / FR!AV3: 2026-01-01 ist Donnerstag, aber gesetzlicher
+        // Feiertag → null Werktage, obwohl die Zeitspanne einen Werktag deckt.
+        $this->assertSame(0, $this->calculator->workingDays('2026-01-01', '08:00', '2026-01-01', '17:00'));
+
+        // Fr 02.01. bis Mo 05.01. → Fr + Mo, das Wochenende zählt nicht.
+        $this->assertSame(2, $this->calculator->workingDays('2026-01-02', '08:00', '2026-01-05', '17:00'));
+
+        // Start nach 12:00 verschiebt auf den 14.05. (Feiertag), Ende bis 12:00
+        // zieht auf denselben Tag zurück → null Werktage.
+        $this->assertSame(0, $this->calculator->workingDays('2026-05-13', '13:00', '2026-05-15', '10:00'));
+
+        // Do 24.12. + Fr 25.12. (Feiertag) + Sa 26.12. → nur der 24. zählt.
+        $this->assertSame(1, $this->calculator->workingDays('2026-12-24', '09:00', '2026-12-26', '15:00'));
+
+        // Ohne Enddatum gilt das Startdatum; 12:00 Uhr ist noch ganztägig.
+        $this->assertSame(1, $this->calculator->workingDays('2026-05-07', '12:00'));
+        $this->assertSame(0, $this->calculator->workingDays('2026-05-07', '12:01'));
+    }
+
+    public function test_working_days_reject_malformed_dates_and_times(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->calculator->workingDays('07.05.2026', '08:00');
+    }
 }

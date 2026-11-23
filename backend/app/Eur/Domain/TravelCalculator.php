@@ -6,8 +6,11 @@ namespace App\Eur\Domain;
 
 use App\Eur\Parity\Money;
 use App\Eur\Parity\RuleValues;
+use App\Eur\Reference\Holidays;
 use App\Eur\Reference\TravelAllowances;
 use App\Eur\Reference\YearTables;
+use DateTimeImmutable;
+use DateTimeZone;
 use InvalidArgumentException;
 
 /**
@@ -316,6 +319,79 @@ final class TravelCalculator
     public function isPrivateTrip(string $purpose): bool
     {
         return mb_strtolower(trim($purpose), 'UTF-8') === 'privat';
+    }
+
+    /**
+     * EUE-074: Werktage inklusive der gepinnten Feiertagsliste, mit der
+     * Halbtages-Logik aus FR!AV3 der ODS.
+     *
+     * Beginnt die Reise nach 12:00 Uhr, zählt der Folgetag; endet sie bis
+     * 12:00 Uhr, zählt der Vortag. Ohne Enddatum wird das Startdatum verwendet.
+     * Die Feiertage kommen aus `Holidays` (Osterformel, gegen das gepinnte
+     * Referenzartefakt geprüft) und werden für alle vom Zeitraum berührten
+     * Jahre gebildet — keine zweite, im Code festgeschriebene Feiertagsliste.
+     */
+    public function workingDays(
+        string $startDate,
+        string $startTime,
+        ?string $endDate = null,
+        string $endTime = '23:59',
+    ): int {
+        $start = self::parseDate($startDate);
+        $first = self::minutes($startTime) <= 720
+            ? $start
+            : $start->modify('+1 day');
+        $lastDate = self::parseDate($endDate ?? $startDate);
+        $last = self::minutes($endTime) > 720
+            ? $lastDate
+            : $lastDate->modify('-1 day');
+
+        if ($last < $first) {
+            return 0;
+        }
+
+        $holidays = [];
+
+        for ($year = (int) $first->format('Y'); $year <= (int) $last->format('Y'); $year++) {
+            $holidays = array_merge($holidays, Holidays::datesForYear($year));
+        }
+
+        $holidays = array_flip($holidays);
+        $days = 0;
+
+        for ($day = $first; $day <= $last; $day = $day->modify('+1 day')) {
+            $key = $day->format('Y-m-d');
+
+            if ((int) $day->format('N') < 6 && ! isset($holidays[$key])) {
+                $days++;
+            }
+        }
+
+        return $days;
+    }
+
+    private static function parseDate(string $value): DateTimeImmutable
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+            throw new InvalidArgumentException('Reisedaten müssen im Format Y-m-d vorliegen.');
+        }
+
+        $date = new DateTimeImmutable($value.' 00:00:00', new DateTimeZone('UTC'));
+
+        if ($date->format('Y-m-d') !== $value) {
+            throw new InvalidArgumentException('Ungültiges Reisedatum: '.$value);
+        }
+
+        return $date;
+    }
+
+    private static function minutes(string $value): int
+    {
+        if (preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $value, $match) !== 1) {
+            throw new InvalidArgumentException('Reisezeiten müssen im Format H:i vorliegen.');
+        }
+
+        return ((int) $match[1]) * 60 + (int) substr($value, 3, 2);
     }
 
     private function isDomestic(string $country): bool
