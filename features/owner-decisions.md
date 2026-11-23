@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-69. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-78. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -367,3 +367,33 @@ Because this changes pinned artifacts, the change carries a deliberate `artifact
 The owner clarified on 2026-11-22 that the versioned OpenAPI document pinned in the clean-room handoff (`prototype/docs/openapi.yaml`) was **information delivered with the handoff**, not a contract the portal must implement or use in production. It was never used in portal tests and is not to be used productively. The portal's own management API contract is [`eur/06-api-contracts.md`](eur/06-api-contracts.md); that document, not the pinned OpenAPI, governs paths, units, errors and authorization.
 
 Consequences: the OpenAPI-specific mechanisms (tenant/permission-scoped bearer tokens and scopes, `Idempotency-Key`, `409 idempotency_conflict`, `429` with `Retry-After`, per-token rate limiting, `POST /integrations/invoices`) are **not** portal requirements and are not claimed as implemented. This does not weaken the portal's own rules: integer cents and whole minutes at the boundary, explicit 0.0–1.0 ↔ 0–100 conversion, brand scoping, server-authoritative pricing, validated uploads and metadata-only audit remain in force. Issue #26 is closed on that basis; any future server-to-server integration needs a new decision and its own contract.
+
+### D-72: No service-to-service scope tokens for the ku-online client
+
+The owner decided on 2026-11-23 that the service-token scope requirement in issue #9 (`invoices:write`, `documents:write`, `verification:read` for the ku-online client, replacing `eur_<prefix>_<secret>`) is **removed**. Consistent with [D-71](owner-decisions.md#d-71-the-pinned-openapi-contract-is-reference-information-not-a-portal-api-contract), the scope-bearing tokens in the pinned OpenAPI are reference information, not a portal requirement. Issue #9's acceptance criterion for scoped service tokens is superseded by this decision; a future server-to-server integration needs its own decision and contract. `ModelAccessToken` stays a 24-hour magic link for model profiles and is not a service-token substitute.
+
+### D-73: Transient guest grants as structured abilities behind a custom guard
+
+The owner decided on 2026-11-23 that the Sanctum migration models transient guest rights (guest id, redeemed invites, gallery grants) as **structured Sanctum abilities** transported by a custom guard `sanctum_transient`. The guard hydrates exactly the DB-less `User` that `TransientUserProvider` builds today — no dummy user row, no persistent `GuestSession`. Abilities are **transport, not decision**: `sanitizeTransientClaims()` / `filterGuestTransientClaims()` must revalidate against live invite status on every request ([D-39](owner-decisions.md#d-39-re-validate-existing-gallery-grants-on-read) and [D-44](owner-decisions.md#d-44-a-re-resolved-actor-keeps-its-validated-transient-claims) stay in force). Roles are never copied into abilities (see [D-78](owner-decisions.md#d-78-roles-are-never-copied-into-stored-abilities)). Alternatives rejected: a persistent guest-session row (B) and keeping JWT for guests (C, incomplete migration). See issue #9.
+
+### D-74: Keep the guard name `api`, swap only the driver
+
+The owner decided on 2026-11-23 that the guard name `api` stays unchanged; only the driver changes from `jwt` to Sanctum. This avoids editing the roughly 541 call sites that reference the guard by name. Authorization behavior of `management` / `super_admin` middleware and the `Role` model must remain identical. See issue #9.
+
+### D-75: Two httpOnly cookies with Sanctum tokens, no PHP session
+
+The owner decided on 2026-11-23 that credentials are carried in **two httpOnly cookies** (`rp_jwt`, `rp_jwt_refresh`) holding Sanctum tokens. There is **no** PHP session and **no** `/sanctum/csrf-cookie` endpoint; the existing double-submit CSRF strategy stays in force. The stock Sanctum SPA-session alternative was rejected because it contradicts the no-sessions decision and would force a CSRF rebuild. See issue #9 and [CSRF strategy](security/csrf-strategy.md).
+
+### D-76: Keep `/api/auth/refresh` as a shim with unchanged windows
+
+The owner decided on 2026-11-23 that `/api/auth/refresh` remains as a compatibility shim; the 240-minute access window and 7-day refresh window are unchanged. Frontend refresh handling adapts to the new credential format only. See issue #9.
+
+Measured config drift (Phase-0 finding, to reconcile before the Phase-3 guard flip): the checked-in `backend/.env:58` and `backend/.env.ci:54` currently set `JWT_TTL=60`, while the framework default at `backend/config/jwt.php:95` is `240` and the refresh TTL is `10080` (7 days) in all three places. The Phase-0 characterization test `LegacyAuthContractTest` pins the documented 240-minute contract by overriding the config explicitly, so it stays deterministic regardless of local environment drift. This is an observation, not a new decision — the owner's 240-minute decision stands; the deployment configuration must be brought in line with it (or the decision reconciled) before Phase 3. Reproduce with `grep -nE 'JWT_TTL|JWT_REFRESH' backend/.env backend/.env.ci backend/config/jwt.php`.
+
+### D-77: Signed links move completely to HMAC — JWT package removed
+
+The owner decided on 2026-11-23 that the JWT package `php-open-source-saver/jwt-auth` is **removed entirely**, including its role as a signature library. All signed-link usage — the 7-day shared links and offer tokens from [D-48](owner-decisions.md#d-48-the-contact-sheet-ships-as-a-collection-and-the-customer-link-carries-the-external-sheet-only) — moves to HMAC / `URL::temporarySignedRoute`. The D-48 contract is preserved and must be re-proved: 7-day validity, non-revocability, generic 404 (no token oracle), no information leakage. This is the more elaborate variant; Phase 0 adds dedicated characterization tests for the signed-link contracts before any change. See issue #9.
+
+### D-78: Roles are never copied into stored abilities
+
+The owner decided on 2026-11-23 that roles (`super_admin`, `admin`, `accounting`, `photographer`, `client`, …) remain live DB queries in `AuthorizationService` and are **never** copied into stored Sanctum abilities. Duplicating them would create a second, drifting authority source. Only transient rights are transported as abilities (see [D-73](owner-decisions.md#d-73-transient-guest-grants-as-structured-abilities-behind-a-custom-guard)); role behavior must be identical before and after migration. See issue #9.
