@@ -42,7 +42,10 @@ test.describe('EAR sub-application', () => {
         const dialog = main.getByRole('dialog', { name: 'Neue Buchung' });
         await expect(dialog).toBeVisible();
         await dialog.getByLabel('Monat').selectOption({ label: 'Mai' });
-        await dialog.getByLabel('Art').selectOption({ label: 'Software' });
+        // Der zugrunde liegende <select> trägt den registrierten Feldnamen
+        // `kindType`. `getByLabel('Art')` wäre hier mehrdeutig, seit das neue
+        // Feld `Zahlungsart` den Teilstring „Art" enthält (strict-mode violation).
+        await dialog.locator('select[name="kindType"]').selectOption({ label: 'Software' });
         await dialog.getByLabel('Betrag (€)').fill('100');
         await dialog.getByLabel('Betriebsanteil (%)').fill('60');
         // EUE-005/006: Zahlungsart und Projekt sind im Buchungsdialog wählbar.
