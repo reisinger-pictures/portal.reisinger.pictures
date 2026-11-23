@@ -301,7 +301,7 @@ davon unabhängig ein CI-only Fixture.
 kopiert das Script `.env.example` nur, wenn `.env` fehlt, generiert einen
 Application Key und führt anschließend `php artisan migrate --force --seed` aus.
 Leeres `ADMIN_PASSWORD` (wie in der Vorlage) lässt den Seeder fehlschlagen; das
-Script fragt nicht nach Zugangsdaten und erzeugt keinen JWT- oder
+Script fragt nicht nach Zugangsdaten und erzeugt keinen Signing- oder
 File-Encryption-Key. Deshalb zuerst die `.env` vollständig konfigurieren:
 
 ```bash
@@ -310,9 +310,11 @@ cp .env.example .env
 # In .env mindestens setzen:
 # ADMIN_EMAIL=<lokale Admin-Adresse>
 # ADMIN_PASSWORD=<nicht leeres lokales Passwort>
-# Danach die übrigen benötigten JWT-, File-Encryption-, DB-, Mail- und Mollie-Werte.
+# Danach die übrigen benötigten Signed-Link-, File-Encryption-, DB-, Mail- und Mollie-Werte.
 php artisan key:generate
-php artisan jwt:secret
+# SIGNED_LINK_SECRET ist optional; ohne Wert fallen Signed Links auf
+# JWT_SECRET bzw. APP_KEY zurück (D-77). php artisan jwt:secret existiert
+# seit Entfernung des JWT-Packages nicht mehr.
 # Generate FILE_ENCRYPTION_KEY and paste the output into .env:
 php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"
 composer setup

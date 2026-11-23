@@ -7,11 +7,11 @@ status: active
 # Technical Concept: Roles & Access Management
 
 ## 1. Authentication Concept
-- **Stateless JWT:** The API uses JSON Web Tokens (JWT) via `php-open-source-saver/jwt-auth`. There are no PHP sessions (the `web` guard is deactivated).
-- **Storage & XSS Prevention:** Tokens are NEVER sent in the JSON body or stored in `localStorage`. They are attached as secure, `HttpOnly`, `SameSite=Lax` cookies (`rp_jwt`).
-- **Cookie precedence:** A request that carries the auth cookie and no `Authorization` header is a browser session, and the cookie decides who it is. `AuthenticateJwtCookie` promotes the cookie to the header before the JWT parsers run, because the package reads a request field named `token` *before* the cookie — a mutation body that carries a `token` (redeeming an organization or gallery invite) would otherwise be treated as anonymous. An explicit bearer token keeps precedence; a request without the cookie is untouched.
-- **Silent Refresh:** The frontend Axios/Fetch layer intercepts `401 Unauthorized` errors, calls `/api/auth/refresh` to get a new cookie, and retries the original request seamlessly.
-- **Session Lifetime (SOLL, 2026-08-13):** Access-Token TTL 240 min (`JWT_TTL`); Refresh-Fenster **7 Tage** (`JWT_REFRESH_TTL=10080`), rolling via `refresh_iat=true`. Nach 7 Tagen Inaktivität ist ein Re-Login erforderlich (härtet den Rolling-Refresh ab — vorher 14 Tage). The current production Compose does not pass `JWT_TTL` or `JWT_REFRESH_TTL` into the backend, so Laravel's defaults in `backend/config/jwt.php` apply; adding a host `.env` value alone does not override them. An explicit production override requires a separate Compose change.
+- **Sanctum tokens, no JWT package:** The `api` guard keeps its name but is backed by the custom `sanctum_transient` driver (D-73/D-74). `php-open-source-saver/jwt-auth`, its config and its legacy driver were removed in Phase 4 (D-77). There are no PHP sessions (the `web` guard is deactivated) and no `/sanctum/csrf-cookie`; CSRF for mutations stays double-submit, [D-77](../owner-decisions.md#d-77-signed-links-move-completely-to-hmac--jwt-package-removed).
+- **Storage & XSS Prevention:** Tokens are NEVER sent in the JSON body or stored in `localStorage`. They travel in two secure, `HttpOnly`, `SameSite=Lax` cookies: `rp_jwt` (access) and `rp_jwt_refresh` (refresh), [D-75](../owner-decisions.md#d-75-two-httponly-cookies-with-sanctum-tokens-no-php-session). The cookie names are unchanged from the JWT era so already-issued credentials and the frontend keep working.
+- **Cookie precedence:** A request that carries the auth cookie and no `Authorization` header is a browser session, and the cookie decides who it is. `AuthenticateJwtCookie` promotes the cookie to the header the guard resolves first, so a mutation body that carries a `token` (redeeming an organization or gallery invite) is not mistaken for anonymous. An explicit bearer token keeps precedence; a request without the cookie is untouched. `SanctumApiGuard` clears a credential-resolved user when the request changes, so a reused process cannot inherit the previous caller's identity.
+- **Silent Refresh:** The frontend Axios/Fetch layer intercepts `401 Unauthorized` errors, calls `/api/auth/refresh` to get a new cookie, and retries the original request seamlessly. The endpoint stays a shim with the same windows (D-76).
+- **Session Lifetime:** Access-Token TTL 240 min; Refresh-Fenster **7 Tage**. Die Werte liegen jetzt in `auth.migration.access_ttl` / `auth.migration.refresh_ttl` (`backend/config/auth.php`, überschreibbar über `AUTH_ACCESS_TTL` / `AUTH_REFRESH_TTL`), nicht mehr in `config/jwt.php` (entfernt). Nach 7 Tagen Inaktivität ist ein Re-Login erforderlich.
 
 ## 2. Role System
 Roles are strictly separated.
@@ -22,7 +22,7 @@ Roles are strictly separated.
 - **Client (`is_client`):** Standard registered user. Has explicit access to specific galleries. 
   - In *Selection Galleries*: Can view, rate, and comment.
   - In *Delivery Galleries*: Can view, download, and edit IPTC metadata (if the gallery allows it and the user has the `can_edit_metadata` flag).
-- **Guest (Transient Access):** Unregistered or unregistered-equivalent users accessing the system via Magic Links. Their access rights are bound to temporary tokens/JWT claims, not persistent database user records.
+- **Guest (Transient Access):** Unregistered or unregistered-equivalent users accessing the system via Magic Links. Their access rights are bound to structured Sanctum abilities on a DB-less user, transported by the `sanctum_transient` guard (D-73), not persistent database user records and not JWT claims. The abilities are transport only: `sanitizeTransientClaims()` / `filterGuestTransientClaims()` revalidate them against live invite state on every request (D-39/D-44).
 - **Pending:** Users who have registered an account but have no assigned roles or gallery mappings yet.
 - **Registered users with roles and magic links:** Users who have registered an account must have access based on their role and additionally must temporarily have the permissionset of the accessed magic link.
 
@@ -139,14 +139,19 @@ the chain of the gallery's own group (the last one an access-widening mutation t
 other test in the repository caught) — and the measured scaling pairs
 (1 gallery 18 → 10, 3 galleries 40 → 12, 10 galleries 117 → 19).
 
-## 7. Sanctum-Token-Speicher (V066) — JWT → Sanctum migration, Phase 1
+## 7. Sanctum-Token-Speicher (V066) — JWT → Sanctum migration
 
-Phase 1 of Portal #9 adds the storage table for the Sanctum token migration. It is
-a **schema-only, additive change**: no guard is flipped, no auth production code
-changes, and `php-open-source-saver/jwt-auth` stays installed until Phase 3/4
+Phase 1 of Portal #9 added this storage table as a **schema-only, additive change**.
+Phases 3/4 then flipped the `api` guard to `sanctum_transient` and removed
+`php-open-source-saver/jwt-auth` entirely
 ([D-77](../owner-decisions.md#d-77-signed-links-move-completely-to-hmac--jwt-package-removed)).
-The current JWT behaviour remains pinned by the Phase-0 characterization suite
-`backend/tests/Feature/Auth/LegacyAuthContractTest.php`, which this phase does not touch.
+The guard name stays `api` and only its driver changed (D-74); the two httpOnly
+cookies keep their names and the 240-minute/7-day windows (D-75/D-76); roles stay
+live DB queries, never stored abilities (D-78). The table below is unchanged by
+the later phases — there is nothing to backfill, since JWT cookies were never
+token rows. `backend/tests/Feature/Auth/LegacyAuthContractTest.php` now pins the
+Sanctum cookie/guest contract and the `/api/auth/refresh` shim; the two old
+JWT-wire-format pins were adapted to it.
 
 **Why the table is needed.** [D-73](../owner-decisions.md#d-73-transient-guest-grants-as-structured-abilities-behind-a-custom-guard)
 models transient guest rights (guest id, redeemed invites, gallery grants) as

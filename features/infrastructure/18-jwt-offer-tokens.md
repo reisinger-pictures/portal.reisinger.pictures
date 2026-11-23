@@ -1,9 +1,20 @@
-# 18 — JWT-Based Machine-Readable Offer Tokens
+# 18 — JWT-Format Machine-Readable Offer Tokens
 
 > **Spec (Soll-Zustand).** Source of truth for J-01.
 > Replaces the hand-rolled HMAC/base64 mechanisms in `QuoteLinkService`,
-> `ManualInvoiceService`, and `OrderController::sendQuote` with signed JWTs.
-> Stand: 2026-06-30.
+> `ManualInvoiceService`, and `OrderController::sendQuote` with signed tokens
+> in JWT wire format.
+> Stand: 2026-06-30; signing mechanism updated 2026-11-23 (D-77).
+>
+> **Current signing mechanism (D-77, Portal #9 Phase 4):** tokens keep the exact
+> compact JWT wire format (`{"typ":"JWT","alg":"HS256"}` header, base64url
+> segments, `hash_hmac` SHA-256 signature over `header.payload`) so already-issued
+> links stay valid, but they are produced and verified natively in
+> `OfferTokenService` — `php-open-source-saver/jwt-auth` and `config/jwt.php` are
+> removed. The key comes from `services.signed_links.secret`
+> (`SIGNED_LINK_SECRET ?? JWT_SECRET ?? APP_KEY`); no production env change is
+> needed. The implementation notes below that name the package describe the
+> original 2026-06-30 design and are superseded by D-77.
 
 ## 1. Goal
 
@@ -38,12 +49,15 @@ class OfferTokenService {
 }
 ```
 
-- Uses `config('jwt.secret')` as the signing key (NOT `config('app.key')`), HS256 — consistent
-  with the existing `php-open-source-saver/jwt-auth` config (`config/jwt.php` algo HS256).
-- Implementation: reuse `PHPOpenSourceSaver\JWTAuth\JWT` factory via `app('tymon.jwt')` /
-  `JWTAuth::customClaims([...])`, OR — if simpler — use `Firebase\JWT\JWT` (add via composer
-  only if the jwt-auth factory cannot issue detached non-user tokens cleanly). Prefer reusing
-  the already-installed jwt-auth package; no new dependency if avoidable.
+- Signing key (current, D-77): `config('services.signed_links.secret')`, resolved as
+  `SIGNED_LINK_SECRET ?? JWT_SECRET ?? APP_KEY`. This preserves the key material the
+  old `config('jwt.secret')` / `JWT_SECRET` produced so already-issued links still verify.
+- Implementation (current, D-77): native `hash_hmac` SHA-256 in `OfferTokenService` with
+  strict base64url/JSON parsing and `hash_equals` signature comparison. No JWT package;
+  the compact JWT wire format is kept for compatibility only.
+- Original 2026-06-30 design (superseded by D-77): reuse the
+  `PHPOpenSourceSaver\JWTAuth\JWT` factory via `app('tymon.jwt')` / `JWTAuth::customClaims([...])`.
+  That package was removed in Phase 4 and must not be reintroduced.
 - Claims: `iat` (issued-at), `exp` (expiry = offer validity), `jti` (unique id, `Str::uuid()`),
   and a custom `offer` claim carrying the payload (`items`, `customer_*`, `terms_html`, etc.).
 - `issue()`:
