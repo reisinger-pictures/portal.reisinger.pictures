@@ -132,16 +132,11 @@ final class SocialInsurance
      *
      * Der Tabellenwert `uv_pauschale` ist der Monatswert, aus dem die
      * Jahrespauschale als `uv_pauschale × 12` gebildet wird (Beleg AA12).
-     * Der Name `accidentYearlyCents()` bleibt aus Kompatibilitätsgründen
-     * erhalten; diese Methode benennt die Leserichtung explizit.
+     * Die frühere Bezeichnung `accidentYearlyCents()` war irreführend, weil
+     * sie denselben Monatswert zurückgab; sie wurde durch diese eindeutig
+     * benannte Methode ersetzt (EUE-022).
      */
     public function accidentMonthlyCents(): int
-    {
-        return $this->amountCents('uv_pauschale');
-    }
-
-    /** Jährliche Unfallversicherungspauschale (EUE-022/112). */
-    public function accidentYearlyCents(): int
     {
         return $this->amountCents('uv_pauschale');
     }

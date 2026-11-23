@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Eur;
 
+use App\Eur\Domain\DepreciationCalculator;
+use App\Eur\Parity\RuleValues;
 use App\Eur\Reference\E1aHelpTexts;
 use App\Eur\Reference\Holidays;
 use App\Eur\Reference\ReferenceTables;
@@ -94,6 +96,11 @@ class EurReferenceController extends Controller
             'social_insurance' => [
                 'amounts_cents' => $social->amountsCents(),
                 'rates_per_10000' => $social->ratesPer10000(),
+            ],
+            // EUE-051: die GWG-Grenze kommt aus dem gepinnten Katalog, damit
+            // die UI nicht einen eigenen, irgendwann veralteten Wert pflegt.
+            'assets' => [
+                'gwg_limit_cents' => (new DepreciationCalculator(new RuleValues))->lowValueLimitCents(),
             ],
         ]);
     }

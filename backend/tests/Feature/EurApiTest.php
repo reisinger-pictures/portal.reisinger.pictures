@@ -67,6 +67,8 @@ class EurApiTest extends TestCase
         $response->assertJsonPath('travel.domestic.night_cents', 1700);
         $response->assertJsonCount(5, 'income_tax.stages');
         $this->assertSame(808500, $response->json('social_insurance.amounts_cents.max_bgl'));
+        // EUE-051: GWG-Grenze aus dem gepinnten Katalog (1.000 € = 100000 ct).
+        $response->assertJsonPath('assets.gwg_limit_cents', 100000);
     }
 
     public function test_photographer_is_rejected_by_management_scope(): void

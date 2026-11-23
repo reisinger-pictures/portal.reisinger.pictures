@@ -315,8 +315,8 @@
         "cell": "Regelkatalog!EUE-065",
         "parameter": "Fahrrad-Kontingent",
         "oracle_value": 3000,
-        "canonical": 300000,
-        "unit": "cents",
+        "canonical": 3000,
+        "unit": "count",
         "status": "matched"
       },
       {
@@ -898,8 +898,8 @@
           "sheet": "Regelkatalog",
           "cell": "EUE-065",
           "reference_value": 3000.0,
-          "canonical": 300000,
-          "unit": "cents",
+          "canonical": 3000,
+          "unit": "count",
           "verify": "derived.eue.065.fahrrad.kontingent",
           "rule": "EUE-065",
           "parameter": "Fahrrad-Kontingent"

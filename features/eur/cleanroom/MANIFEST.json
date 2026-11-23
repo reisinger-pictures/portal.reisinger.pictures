@@ -33,8 +33,8 @@
         {
             "path": "verification/fixtures/cleanroom-parity-2026.json",
             "name": "cleanroom-parity-2026.json",
-            "sha256": "e01f52d1184f601f5c986c851487ea6b880e7b59c5276ea55618e53fabea99ca",
-            "bytes": 30482
+            "sha256": "80cc1ab18ff91b4186408da34fc1561e983df3c7d62320c1ea7743f35e99ce69",
+            "bytes": 30478
         },
         {
             "path": "verification/cleanroom-parity.md",

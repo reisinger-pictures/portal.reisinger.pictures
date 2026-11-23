@@ -481,7 +481,15 @@ class SettingsController extends Controller
             'finanzamt' => 'nullable|string|max:128',
             'uid' => 'nullable|string|max:64',
             'rechtsform' => 'nullable|string|max:128',
-            'branchenkennzahl' => 'nullable|string|max:16',
+            // EUE-004: die ÖNACE-Kennzahl ist eine Dezimalzahl im gepinnten
+            // Bereich 11–990 (domain-rules.json, Branchenkennzahl Minimum/Maximum).
+            // `numeric|between` prüft den Zahlenwert; `min`/`max` würden bei
+            // einem String die Zeichenlänge meinen und den Bereich nicht
+            // absichern. ConvertEmptyStringsToNull lässt ein leeres Feld zu.
+            'branchenkennzahl' => 'nullable|numeric|between:11,990',
+        ], [
+            'branchenkennzahl.numeric' => 'Die Branchenkennzahl muss eine Zahl zwischen 11 und 990 sein.',
+            'branchenkennzahl.between' => 'Die Branchenkennzahl muss zwischen 11 und 990 liegen.',
         ]);
 
         foreach ($validated as $key => $value) {

@@ -10,6 +10,9 @@ import {
     createEurYear,
     saveEurSettings,
     useEurAnalytics,
+    useEurIncomeTypeAnalytics,
+    useEurExpenseTypeAnalytics,
+    useEurPaymentReconciliation,
     useEurApplications,
     useEurDocuments,
     useEurEntries,
@@ -48,6 +51,9 @@ vi.mock('../../../logic/useEur', async (importOriginal) => {
         useEurApplications: vi.fn(),
         useEurSignatures: vi.fn(),
         useEurAnalytics: vi.fn(),
+        useEurIncomeTypeAnalytics: vi.fn(),
+        useEurExpenseTypeAnalytics: vi.fn(),
+        useEurPaymentReconciliation: vi.fn(),
         createEurEntry: vi.fn(),
         closeEurMonth: vi.fn(),
         uploadEurDocument: vi.fn(),
@@ -105,6 +111,10 @@ function mockHooks() {
     vi.mocked(useEurAnalytics).mockReturnValue(swrResult<ReturnType<typeof useEurAnalytics>>({
         by_customer: [], by_project: [], by_month: [],
     }));
+    const emptyMatrix = {types: [], month_totals: {}, total_cents: 0, booked_cents: 0, delta_cents: 0, match: true};
+    vi.mocked(useEurIncomeTypeAnalytics).mockReturnValue(swrResult<ReturnType<typeof useEurIncomeTypeAnalytics>>({year: 2026, kind: 'income', ...emptyMatrix}));
+    vi.mocked(useEurExpenseTypeAnalytics).mockReturnValue(swrResult<ReturnType<typeof useEurExpenseTypeAnalytics>>({year: 2026, kind: 'expense', ...emptyMatrix}));
+    vi.mocked(useEurPaymentReconciliation).mockReturnValue(swrResult<ReturnType<typeof useEurPaymentReconciliation>>({year: 2026, methods: []}));
     vi.mocked(useEurSettings).mockReturnValue(swrResult<ReturnType<typeof useEurSettings>>({
         business_year: 2026,
         default_business_share: 100,

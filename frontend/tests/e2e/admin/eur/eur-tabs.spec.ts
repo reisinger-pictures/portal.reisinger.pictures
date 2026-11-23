@@ -168,4 +168,21 @@ test.describe('EAR cockpit navigation', () => {
         await expect(main.getByRole('status').filter({ hasText: 'Import abgeschlossen' }))
             .toContainText('Import abgeschlossen: 0 angelegt, 0 übersprungen.');
     });
+
+    test('Auswertungen zeigen BE-ART, BA-ART und ZA als sichtbare Matrizen', { tag: ['@feature:eur-analytics'] }, async ({ page }) => {
+        const auth = new AuthHelper(page);
+        const sidebar = new SidebarHelper(page);
+
+        await auth.login(superAdmin.email, superAdmin.password);
+        await sidebar.navigateTo('EA Rechnung');
+
+        const main = page.getByRole('main');
+        await page.getByRole('tab', { name: 'Auswertungen', exact: true }).click();
+
+        // D-10: alle Panel-Inhalte bleiben auf das main-Landmark gescopt.
+        await expect(main.getByRole('heading', { name: /Auswertungsmatrizen/ })).toBeVisible({ timeout: 20_000 });
+        await expect(main.getByRole('heading', { name: 'Einnahmen nach Art (BE-ART)' })).toBeVisible();
+        await expect(main.getByRole('heading', { name: 'Ausgaben nach Art (BA-ART)' })).toBeVisible();
+        await expect(main.getByRole('heading', { name: 'Zahlungsart (ZA)' })).toBeVisible();
+    });
 });

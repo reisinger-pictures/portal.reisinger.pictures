@@ -7,6 +7,9 @@ import { useBillingDetails } from '../../../logic/useLicenseTerms';
 import {
     createEurEntry,
     useEurAnalytics,
+    useEurIncomeTypeAnalytics,
+    useEurExpenseTypeAnalytics,
+    useEurPaymentReconciliation,
     useEurApplications,
     useEurDocuments,
     useEurEntries,
@@ -49,6 +52,9 @@ vi.mock('../../../logic/useEur', async (importOriginal) => {
         useEurApplications: vi.fn(),
         useEurSignatures: vi.fn(),
         useEurAnalytics: vi.fn(),
+        useEurIncomeTypeAnalytics: vi.fn(),
+        useEurExpenseTypeAnalytics: vi.fn(),
+        useEurPaymentReconciliation: vi.fn(),
         createEurEntry: vi.fn(),
         closeEurMonth: vi.fn(),
         uploadEurDocument: vi.fn(),
@@ -145,7 +151,7 @@ function swrResult<R>(data: unknown): R {
     return {data, error: undefined, isLoading: false, mutate: vi.fn()} as unknown as R;
 }
 
-function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summaryData?: typeof summary; noSummary?: boolean; noBilling?: boolean; activeYears?: number[]} = {}) {
+function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summaryData?: typeof summary; noSummary?: boolean; noBilling?: boolean; activeYears?: number[]; warnings?: {year: number; code: string; warning: string; supported: boolean}[]} = {}) {
     vi.mocked(useBrand).mockReturnValue({
         brand: 'test-brand',
         config: null,
@@ -163,7 +169,7 @@ function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summ
         isLoading: false,
         updateBillingDetails: vi.fn(),
     });
-    vi.mocked(useEurYears).mockReturnValue(swrResult<ReturnType<typeof useEurYears>>({default_year: 2026, supported: [2024, 2025, 2026], active_years: overrides.activeYears ?? [2024, 2025, 2026], warnings: []}));
+    vi.mocked(useEurYears).mockReturnValue(swrResult<ReturnType<typeof useEurYears>>({default_year: 2026, supported: [2024, 2025, 2026], active_years: overrides.activeYears ?? [2024, 2025, 2026], warnings: overrides.warnings ?? []}));
     vi.mocked(useEurReference).mockReturnValue(swrResult<ReturnType<typeof useEurReference>>(reference));
     vi.mocked(useEurSettings).mockReturnValue(swrResult<ReturnType<typeof useEurSettings>>({business_year: 2026, default_business_share: 100, sv_mode: 'gsvg', kleinunternehmer: false}));
     vi.mocked(useEurSummary).mockReturnValue(
@@ -192,6 +198,10 @@ function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summ
     vi.mocked(useEurApplications).mockReturnValue(swrResult<ReturnType<typeof useEurApplications>>({applications: []}));
     vi.mocked(useEurSignatures).mockReturnValue(swrResult<ReturnType<typeof useEurSignatures>>({signatures: []}));
     vi.mocked(useEurAnalytics).mockReturnValue(swrResult<ReturnType<typeof useEurAnalytics>>({by_customer: [], by_project: [], by_month: []}));
+    const emptyMatrix = {types: [], month_totals: {}, total_cents: 0, booked_cents: 0, delta_cents: 0, match: true};
+    vi.mocked(useEurIncomeTypeAnalytics).mockReturnValue(swrResult<ReturnType<typeof useEurIncomeTypeAnalytics>>({year: 2026, kind: 'income', ...emptyMatrix}));
+    vi.mocked(useEurExpenseTypeAnalytics).mockReturnValue(swrResult<ReturnType<typeof useEurExpenseTypeAnalytics>>({year: 2026, kind: 'expense', ...emptyMatrix}));
+    vi.mocked(useEurPaymentReconciliation).mockReturnValue(swrResult<ReturnType<typeof useEurPaymentReconciliation>>({year: 2026, methods: []}));
 }
 
 function renderView(initialEntry = '/steuern') {
@@ -220,6 +230,27 @@ describe('ManagementEurView', () => {
         expect(view.getByRole('heading', {name: 'Buchungen', level: 2})).toBeVisible();
         expect(view.getByRole('heading', {name: 'Übersicht 2026'})).toBeVisible();
         expect(screen.getByRole('link', {name: 'Zurück zum Portal'})).toHaveAttribute('href', '/');
+    });
+
+    it('renders the unsupported-year warnings from the API as a visible banner (EUE-002/003)', () => {
+        mockHooks({warnings: [
+            {year: 2023, code: 'EUE-003', warning: '⚠ Ältere Version (Lifetime-Lizenz) nötig.', supported: false},
+            {year: 2027, code: 'EUE-002', warning: '⚠ Bitte neueste Version der Tabelle.', supported: false},
+        ]});
+
+        renderView();
+
+        const alerts = screen.getAllByRole('alert');
+        expect(alerts.some((node) => node.textContent?.includes('Lifetime-Lizenz'))).toBe(true);
+        expect(alerts.some((node) => node.textContent?.includes('neueste Version der Tabelle'))).toBe(true);
+    });
+
+    it('does not render a year-warning banner when the API reports none', () => {
+        mockHooks({warnings: []});
+
+        renderView();
+
+        expect(screen.queryByText(/Lifetime-Lizenz/)).not.toBeInTheDocument();
     });
 
     it('falls back to 2026 when the year parameter is unknown', () => {

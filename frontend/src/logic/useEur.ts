@@ -49,6 +49,8 @@ export interface EurReference {
         amounts_cents: Record<string, number>;
         rates_per_10000: Record<string, number>;
     };
+    /** EUE-051: GWG-Grenze aus dem gepinnten Katalog (optional für ältere Caches). */
+    assets?: {gwg_limit_cents: number};
 }
 
 /** One row of the monthly social-insurance overview. All amounts are cents. */
@@ -427,6 +429,48 @@ export interface EurAnalytics {
     by_month: EurAnalyticsMonth[];
 }
 
+/** EUE-119/120: Art × Monat aus `/analytics/by-income-type` und `by-expense-type`. */
+export interface EurTypeMatrixRow {
+    type: string;
+    /** Centbetrag je Monat, Schlüssel 1–12. */
+    months: Record<string, number>;
+    total_cents: number;
+    /** Nur Ausgaben: Herkunft A/AV/WEB/FR in Cent. */
+    sources?: {A: number; AV: number; WEB: number; FR: number};
+}
+
+export interface EurTypeMatrix {
+    year: number;
+    kind: 'income' | 'expense';
+    types: EurTypeMatrixRow[];
+    month_totals: Record<string, number>;
+    total_cents: number;
+    booked_cents: number;
+    delta_cents: number;
+    match: boolean;
+}
+
+/** EUE-122: Zahlungsart × Monat aus `/payment-reconciliation`. */
+export interface EurPaymentMethodMonth {
+    month: number;
+    in_cents: number;
+    out_cents: number;
+    closing_cents: number;
+}
+
+export interface EurPaymentMethodRow {
+    method: string;
+    opening_balance_cents: number | null;
+    closing_balance_cents: number;
+    status: string;
+    months: EurPaymentMethodMonth[];
+}
+
+export interface EurPaymentReconciliation {
+    year: number;
+    methods: EurPaymentMethodRow[];
+}
+
 /** German month names, indexed 0..11, shared by the EAR cockpit panels. */
 export const EUR_MONTHS = [
     'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
@@ -500,6 +544,18 @@ export function useEurSignatures(year = 2026) {
 
 export function useEurAnalytics(year = 2026) {
     return useSWR<EurAnalytics>(`/api/management/eur/analytics?year=${year}`, fetcher, SWR_OPTIONS);
+}
+
+export function useEurIncomeTypeAnalytics(year = 2026) {
+    return useSWR<EurTypeMatrix>(`/api/management/eur/analytics/by-income-type?year=${year}`, fetcher, SWR_OPTIONS);
+}
+
+export function useEurExpenseTypeAnalytics(year = 2026) {
+    return useSWR<EurTypeMatrix>(`/api/management/eur/analytics/by-expense-type?year=${year}`, fetcher, SWR_OPTIONS);
+}
+
+export function useEurPaymentReconciliation(year = 2026) {
+    return useSWR<EurPaymentReconciliation>(`/api/management/eur/payment-reconciliation?year=${year}`, fetcher, SWR_OPTIONS);
 }
 
 export interface EurEntryPayload {

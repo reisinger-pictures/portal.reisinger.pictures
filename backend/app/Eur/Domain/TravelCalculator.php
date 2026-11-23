@@ -90,10 +90,18 @@ final class TravelCalculator
             ));
         }
 
+        // EUE-065: das Kilometergeld ist auf das Jahreskontingent des
+        // Fahrzeugs begrenzt (PKW/Motorrad 30.000 km, Fahrrad 3.000 km). Ohne
+        // diese Kappe würde eine einzelne 40.000-km-Abrechnung 2.000.000 ct
+        // statt der zulässigen 1.500.000 ct ergeben. Die Kappe gilt je
+        // Berechnung; eine über das Jahr kummulierte Kontingentverwaltung ist
+        // nicht Teil der zustandslosen Engine.
+        $paidKilometres = min($kilometres, $this->kilometreQuota($vehicle, $year));
+
         $rate = $this->kilometreRateCents($vehicle, $year, $month)
             + $passengers * $this->passengerSurchargeCents($vehicle, $year);
 
-        return $kilometres * $rate;
+        return $paidKilometres * $rate;
     }
 
     /**

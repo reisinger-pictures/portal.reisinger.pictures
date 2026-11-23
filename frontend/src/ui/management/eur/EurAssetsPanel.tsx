@@ -6,14 +6,16 @@ import {
     bookEurAssetDepreciation,
     switchEurAssetToLinear,
     useEurAssets,
+    useEurReference,
     type EurAsset,
     type EurPlanYear,
 } from '../../../logic/useEur';
 
 const cents = (value: number): string => formatEuro(value / 100);
 
-/** EUE-051: below 1.000 € an asset may be expensed immediately (GWG). */
-const GWG_LIMIT_CENTS = 100000;
+// Offline-Fallback, bis die Referenzantwort den gepinnten Katalogwert liefert.
+// Die API ist authoritative (EUE-051); dieser Wert ist nur ein Anzeige-Fallback.
+const GWG_LIMIT_FALLBACK_CENTS = 100000;
 
 interface Props {
     year: number;
@@ -23,6 +25,8 @@ type Scope = 'all' | 'private';
 
 export default function EurAssetsPanel({ year }: Props) {
     const assets = useEurAssets();
+    const reference = useEurReference();
+    const gwgLimitCents = reference.data?.assets?.gwg_limit_cents ?? GWG_LIMIT_FALLBACK_CENTS;
     const [scope, setScope] = useState<Scope>('all');
     const [busyId, setBusyId] = useState<number | null>(null);
     const [switchingId, setSwitchingId] = useState<number | null>(null);
@@ -121,7 +125,7 @@ export default function EurAssetsPanel({ year }: Props) {
                             <tbody>
                                 {shown.map((asset) => {
                                     const plan = asset.years.find((candidate) => candidate.year === year);
-                                    const isGwg = asset.cost_cents < GWG_LIMIT_CENTS;
+                                    const isGwg = asset.cost_cents < gwgLimitCents;
                                     const switched = asset.switched_to_linear_at != null;
                                     return (
                                         <tr key={asset.id}>

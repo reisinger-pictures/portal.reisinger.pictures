@@ -239,6 +239,10 @@ msgstr "< 50€ (Rollover)"
 msgid "< 50€ (Übertrag ins nächste Monat)"
 msgstr "< 50€ (Übertrag ins nächste Monat)"
 
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "✓✓ Abgleich mit dem Journal: kein Unterschied."
+msgstr "✓✓ Abgleich mit dem Journal: kein Unterschied."
+
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "1 Datei liegt im Quarantäne-Ordner"
 msgstr "1 Datei liegt im Quarantäne-Ordner"
@@ -382,6 +386,10 @@ msgstr "Abbrechen"
 msgid "Abbuchung von deinem Konto per Mandat."
 msgstr "Abbuchung von deinem Konto per Mandat."
 
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Abflüsse"
+msgstr "Abflüsse"
+
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Abgebrochen"
 msgstr "Abgebrochen"
@@ -394,6 +402,10 @@ msgstr "Abgelaufen"
 #: src/ui/management/eur/EurMonthPanel.tsx
 msgid "abgeschlossen"
 msgstr "abgeschlossen"
+
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Abgleich"
+msgstr "Abgleich"
 
 #: src/ui/components/GalleryModal.tsx
 msgid "Ablaufdatum"
@@ -888,6 +900,7 @@ msgstr "Ansehen"
 msgid "Ansicht"
 msgstr "Ansicht"
 
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
 #: src/ui/management/eur/EurEntriesPanel.tsx
 msgid "Anteil"
 msgstr "Anteil"
@@ -939,6 +952,7 @@ msgid "Arbeitsplatzpauschale"
 msgstr "Arbeitsplatzpauschale"
 
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
 #: src/ui/management/eur/EurApplicationsPanel.tsx
 #: src/ui/management/eur/EurEntriesPanel.tsx
 #: src/ui/management/eur/EurEntryDialog.tsx
@@ -1036,6 +1050,10 @@ msgstr "Ausgaben betrieblich"
 #~ msgid "Ausgaben können einen betrieblichen Anteil von 0 % (privat) bis 100 % (betrieblich) haben."
 #~ msgstr "Ausgaben können einen betrieblichen Anteil von 0 % (privat) bis 100 % (betrieblich) haben."
 
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Ausgaben nach Art (BA-ART)"
+msgstr "Ausgaben nach Art (BA-ART)"
+
 #: src/ui/management/eur/EurReferencePanel.tsx
 msgid "Ausgaben-Arten"
 msgstr "Ausgaben-Arten"
@@ -1103,6 +1121,10 @@ msgstr "Auswertungen nicht verfügbar"
 #: src/ui/management/eur/EurAnalyticsPanel.tsx
 msgid "Auswertungen werden geladen …"
 msgstr "Auswertungen werden geladen …"
+
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Auswertungsmatrizen (BE-ART / BA-ART / ZA)"
+msgstr "Auswertungsmatrizen (BE-ART / BA-ART / ZA)"
 
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Auszahlung"
@@ -2519,6 +2541,10 @@ msgstr "Die Belegliste konnte nicht geladen werden. Prüfen Sie Ihre Verbindung 
 msgid "Die Bestätigung ist noch nicht eingetroffen. Der Zahlungsvorgang bleibt erhalten; bitte prüfe den Status in Kürze erneut."
 msgstr "Die Bestätigung ist noch nicht eingetroffen. Der Zahlungsvorgang bleibt erhalten; bitte prüfe den Status in Kürze erneut."
 
+#: src/ui/management/components/BillingDetailsCard.tsx
+msgid "Die Branchenkennzahl (ÖNACE) muss zwischen 11 und 990 liegen."
+msgstr "Die Branchenkennzahl (ÖNACE) muss zwischen 11 und 990 liegen."
+
 #: src/ui/management/eur/EurOverviewPanel.tsx
 msgid "Die Buchhaltungsdaten konnten nicht geladen werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
 msgstr "Die Buchhaltungsdaten konnten nicht geladen werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
@@ -2694,6 +2720,10 @@ msgstr "Diese Allgemeinen Geschäftsbedingungen (AGB) und Lizenzbedingungen gelt
 #: src/ui/management/ManagementEurView.tsx
 #~ msgid "Diese Angaben stammen aus Ihren Einstellungen und können dort geändert werden."
 #~ msgstr "Diese Angaben stammen aus Ihren Einstellungen und können dort geändert werden."
+
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Diese Auswertung konnte nicht geladen werden."
+msgstr "Diese Auswertung konnte nicht geladen werden."
 
 #: src/ui/LicenseTerms.tsx
 msgid "Diese Bedingungen regeln das Vertragsverhältnis zwischen dem Betreiber dieses Portals (im Folgenden „Fotograf“) und dem Kunden bei der Bestellung von Bildern, Lizenzpaketen und sonstigen digitalen Inhalten. Entgegenstehende oder abweichende Bedingungen des Kunden werden nicht anerkannt, sofern der Fotograf ihrer Geltung nicht ausdrücklich schriftlich zugestimmt hat."
@@ -3049,6 +3079,14 @@ msgstr "Einnahmen Ausgaben Rechnung"
 msgid "Einnahmen betrieblich"
 msgstr "Einnahmen betrieblich"
 
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Einnahmen nach Art (BE-ART)"
+msgstr "Einnahmen nach Art (BE-ART)"
+
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Einnahmen und Ausgaben je Art und Monat sowie der Saldoabgleich je Zahlungsart. Die Beträge stammen aus dem Journal und werden nicht im Browser nachgerechnet."
+msgstr "Einnahmen und Ausgaben je Art und Monat sowie der Saldoabgleich je Zahlungsart. Die Beträge stammen aus dem Journal und werden nicht im Browser nachgerechnet."
+
 #: src/ui/management/eur/EurReferencePanel.tsx
 msgid "Einnahmen-Arten"
 msgstr "Einnahmen-Arten"
@@ -3122,6 +3160,10 @@ msgstr "Empfohlener Wechsel zur linearen Abschreibung: Jahr {switchYear}. Vortei
 #: src/ui/management/components/ModelDetailModal.tsx
 msgid "Endgültig löschen"
 msgstr "Endgültig löschen"
+
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Endsaldo"
+msgstr "Endsaldo"
 
 #: src/ui/client/components/CartItemList.tsx
 #: src/ui/client/components/CouponInput.tsx
@@ -3243,6 +3285,7 @@ msgstr "Erlöschen des Rücktrittsrechts bei digitalen Inhalten"
 msgid "Ermöglicht dem Empfänger dieses Links das Ändern von IPTC Titeln und Beschreibungen."
 msgstr "Ermöglicht dem Empfänger dieses Links das Ändern von IPTC Titeln und Beschreibungen."
 
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
 #: src/ui/management/eur/EurAnalyticsPanel.tsx
 #: src/ui/management/eur/EurApplicationsPanel.tsx
 #: src/ui/management/eur/EurDocumentsPanel.tsx
@@ -4270,6 +4313,10 @@ msgstr "Hauptbild wurde aktualisiert."
 #: src/ui/management/ManagementStructureView.tsx
 msgid "Hauptverzeichnis (Ohne Ordner)"
 msgstr "Hauptverzeichnis (Ohne Ordner)"
+
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Herkunft A/AV/WEB/FR"
+msgstr "Herkunft A/AV/WEB/FR"
 
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Hier findest du alle deine lizenzierten Bilder und die dazugehörigen Rechnungen."
@@ -6241,6 +6288,10 @@ msgstr "Noch keine Buchungen erfasst. Legen Sie die erste Buchung an."
 #~ msgid "Noch keine Buchungen erfasst. Legen Sie unten die erste Buchung an."
 #~ msgstr "Noch keine Buchungen erfasst. Legen Sie unten die erste Buchung an."
 
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Noch keine Buchungen für diese Auswertung vorhanden."
+msgstr "Noch keine Buchungen für diese Auswertung vorhanden."
+
 #: src/ui/management/ManagementEurView.tsx
 #~ msgid "Noch keine Buchungen in diesem Monat."
 #~ msgstr "Noch keine Buchungen in diesem Monat."
@@ -6308,6 +6359,10 @@ msgstr "Noch keine Verträge vorhanden."
 #: src/ui/management/eur/EurWarehousePanel.tsx
 msgid "Noch keine Wareneingänge erfasst. Legen Sie unten den ersten Eintrag an."
 msgstr "Noch keine Wareneingänge erfasst. Legen Sie unten den ersten Eintrag an."
+
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Noch keine Zahlungsflüsse vorhanden."
+msgstr "Noch keine Zahlungsflüsse vorhanden."
 
 #: src/ui/management/components/LicenseCatalogSettings.tsx
 msgid "Noch keine Zuschläge angelegt."
@@ -7809,6 +7864,10 @@ msgstr "Standardrolle für neue Mitglieder"
 msgid "Starten"
 msgstr "Starten"
 
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Startsaldo"
+msgstr "Startsaldo"
+
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Statistiken & Audit-Logs"
 msgstr "Statistiken & Audit-Logs"
@@ -7990,6 +8049,10 @@ msgstr "Suchergebnisse für"
 #: src/ui/components/SearchBarWithSuggestions.tsx
 msgid "Sucht..."
 msgstr "Sucht..."
+
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Summe"
+msgstr "Summe"
 
 #: src/ui/management/eur/EurHoursPanel.tsx
 msgid "Summe im Monat"
@@ -9163,8 +9226,13 @@ msgid "Zahlung wird manuell geprüft"
 msgstr "Zahlung wird manuell geprüft"
 
 #: src/ui/client/ClientCartView.tsx
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
 msgid "Zahlungsart"
 msgstr "Zahlungsart"
+
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Zahlungsart (ZA)"
+msgstr "Zahlungsart (ZA)"
 
 #: src/ui/client/ClientCartView.tsx
 msgid "Zahlungsart wählen"
@@ -9266,6 +9334,10 @@ msgstr "Zu versteuernder Gewinn"
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "zuerst „Vertrauenswürdige Zielserver\" auf Aktivieren"
 msgstr "zuerst „Vertrauenswürdige Zielserver\" auf Aktivieren"
+
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Zuflüsse"
+msgstr "Zuflüsse"
 
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Zugangsdaten für die Kamera"
@@ -9433,3 +9505,12 @@ msgstr "Zwischensumme"
 #: src/ui/client/components/CartItemList.tsx
 msgid "Zwischensumme: {formattedTotalAmount}"
 msgstr "Zwischensumme: {formattedTotalAmount}"
+
+#. placeholder {0}: cents(matrix.delta_cents)
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+#~ msgid "Δ Abweichung zum Journal: {0}."
+#~ msgstr "Δ Abweichung zum Journal: {0}."
+
+#: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+msgid "Δ Abweichung zum Journal: {deltaText}."
+msgstr "Δ Abweichung zum Journal: {deltaText}."

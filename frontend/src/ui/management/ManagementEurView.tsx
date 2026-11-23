@@ -28,6 +28,7 @@ import {
     type EurSettings,
 } from '../../logic/useEur';
 import EurAnalyticsPanel from './eur/EurAnalyticsPanel';
+import EurAnalyticsMatricesPanel from './eur/EurAnalyticsMatricesPanel';
 import EurApplicationsPanel from './eur/EurApplicationsPanel';
 import EurAssetsPanel from './eur/EurAssetsPanel';
 import EurDepreciationPanel from './eur/EurDepreciationPanel';
@@ -463,6 +464,16 @@ export default function ManagementEurView() {
                 </div>
             </div>
 
+            {/* EUE-002/003: Warnhinweise zu Jahren außerhalb des Supports werden
+                von /eur/years geliefert, aber durften bisher nicht sichtbar werden. */}
+            {(years.data?.warnings ?? []).filter((warning) => !warning.supported).map((warning) => (
+                <div className="border-b border-error/30 bg-error/10" key={warning.code}>
+                    <div className="max-w-7xl mx-auto px-4 md:px-8 py-2 text-sm" role="alert">
+                        {warning.warning}
+                    </div>
+                </div>
+            ))}
+
             <div className="max-w-7xl mx-auto px-4 md:px-8 pt-4">
                 <div role="tablist" className="tabs tabs-box eur-tabs bg-base-100">
                     {TABS.map((id) => (
@@ -680,7 +691,12 @@ export default function ManagementEurView() {
                         </>
                     )}
 
-                    {tab === 'auswertungen' && <EurAnalyticsPanel year={year}/>}
+                    {tab === 'auswertungen' && (
+                        <>
+                            <EurAnalyticsPanel year={year}/>
+                            <EurAnalyticsMatricesPanel year={year}/>
+                        </>
+                    )}
 
                     {tab === 'reisen' && <EurTravelPanel reference={reference.data}/>}
 

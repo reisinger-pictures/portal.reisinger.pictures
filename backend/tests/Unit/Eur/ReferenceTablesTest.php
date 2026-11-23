@@ -185,7 +185,7 @@ class ReferenceTablesTest extends TestCase
         $this->assertSame(10195, $sv->minimumPensionMonthlyCents('gsvg'));
         $this->assertSame(10195, $sv->minimumPensionMonthlyCents('ns_gsvg'));
         $this->assertSame(11022, $sv->minimumPensionMonthlyCents('fsvg'));
-        $this->assertSame(1295, $sv->accidentYearlyCents());
+        $this->assertSame(1295, $sv->accidentMonthlyCents());
 
         $this->assertSame(680, $sv->healthRatePer10000());
         $this->assertSame(1850, $sv->pensionRatePer10000('gsvg'));

@@ -65,7 +65,6 @@ class SocialInsuranceModesTest extends TestCase
             $sv = $this->socialInsurance($year);
 
             $this->assertSame($expected, $sv->accidentMonthlyCents());
-            $this->assertSame($expected, $sv->accidentYearlyCents());
             $this->assertSame(0, $sv->minimumPensionMonthlyCents(SocialInsurance::MODE_UV_ONLY));
         }
     }

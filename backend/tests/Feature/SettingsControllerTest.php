@@ -282,6 +282,34 @@ class SettingsControllerTest extends TestCase
         $this->assertDatabaseHas('settings', ['key' => 'rechtsform', 'value' => 'GmbH']);
     }
 
+    /**
+     * EUE-004: die Branchenkennzahl muss im gepinnten ÖNACE-Bereich 11–990
+     * liegen; Werte außerhalb werden mit einer 422 abgewiesen.
+     */
+    public function test_billing_details_validate_onace_range(): void
+    {
+        $token = $this->superAdminToken();
+
+        foreach (['10', '991', 'abc'] as $invalid) {
+            $this->withHeaders(['Authorization' => "Bearer $token"])
+                ->putJson('/api/management/settings/billing-details', [
+                    'branchenkennzahl' => $invalid,
+                ])
+                ->assertStatus(422)
+                ->assertJsonValidationErrors('branchenkennzahl');
+        }
+
+        foreach (['11', '742', '990'] as $valid) {
+            $this->withHeaders(['Authorization' => "Bearer $token"])
+                ->putJson('/api/management/settings/billing-details', [
+                    'branchenkennzahl' => $valid,
+                ])
+                ->assertStatus(200);
+        }
+
+        $this->assertDatabaseHas('settings', ['key' => 'branchenkennzahl', 'value' => '990']);
+    }
+
     public function test_admin_can_read_system_info(): void
     {
         $token = $this->adminToken();

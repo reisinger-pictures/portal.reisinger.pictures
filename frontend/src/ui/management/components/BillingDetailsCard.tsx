@@ -24,7 +24,12 @@ const createBillingDetailsSchema = () => z.object({
     finanzamt: z.string().max(128).optional().or(z.literal('')),
     uid: z.string().max(64).optional().or(z.literal('')),
     rechtsform: z.string().max(128).optional().or(z.literal('')),
-    branchenkennzahl: z.string().max(16).optional().or(z.literal('')),
+    // EUE-004: ÖNACE ist eine Dezimalzahl im gepinnten Bereich 11–990.
+    branchenkennzahl: z.string().max(16).optional().or(z.literal('')).refine((value) => {
+        if (!value) return true;
+        const code = Number(value);
+        return Number.isFinite(code) && code >= 11 && code <= 990;
+    }, t`Die Branchenkennzahl (ÖNACE) muss zwischen 11 und 990 liegen.`),
 });
 
 type BillingFormValues = z.infer<ReturnType<typeof createBillingDetailsSchema>>;

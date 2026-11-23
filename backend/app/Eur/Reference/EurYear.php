@@ -52,7 +52,7 @@ final class EurYear
         if ($year > self::UPPER) {
             return [
                 'year' => $year,
-                'warning' => 'Die Tabelle ist nicht offiziell mit '.$year.' kompatibel. Bitte auf die neueste Version wechseln.',
+                'warning' => '⚠ Die Tabelle nicht offiziell mit '.$year.' kompatibel. Bitte auf die neueste Version der Tabelle umsteigen.',
                 'code' => 'EUE-002',
                 'supported' => false,
             ];
@@ -60,7 +60,7 @@ final class EurYear
 
         return [
             'year' => $year,
-            'warning' => 'Die Tabelle ist nicht offiziell mit '.$year.' kompatibel. Bitte eine ältere Version verwenden.',
+            'warning' => '⚠ Die Tabelle nicht offiziell mit '.$year.' kompatibel. Kontaktieren Sie uns für den Zugang zu einer älteren Version (Kauf der Lifetime-Lizenz erforderlich).',
             'code' => 'EUE-003',
             'supported' => false,
         ];

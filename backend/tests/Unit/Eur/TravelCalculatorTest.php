@@ -51,6 +51,22 @@ class TravelCalculatorTest extends TestCase
         $this->assertSame(3000, $this->calculator->kilometreQuota('Fahrrad'));
     }
 
+    public function test_km_allowance_is_capped_at_the_annual_quota(): void
+    {
+        // EUE-065 (Regression): ohne Kappe lieferte 40.000 km beim PKW
+        // 2.000.000 ct statt der zulässigen 30.000 × 50 = 1.500.000 ct.
+        $this->assertSame(1500000, $this->calculator->kilometreAllowanceCents('PKW', 40000));
+        $this->assertSame(75000, $this->calculator->kilometreAllowanceCents('Fahrrad', 40000));
+
+        // Unterhalb des Kontingents bleibt das Ergebnis unberührt.
+        $this->assertSame(5000, $this->calculator->kilometreAllowanceCents('PKW', 100));
+
+        // Die Kappe wirkt auch im betrieblichen Gesamtpfad (EUE-081).
+        $costs = $this->calculator->businessTravelCostsCents('PKW', 40000, 0, 'Österreich', 1, 0, true, 100);
+        // 1.500.000 (Kilometergeld gekappt) + 3.000 Tagesgeld + 1.700 Nächtigung.
+        $this->assertSame(1504700, $costs);
+    }
+
     public function test_distance_accepts_readings_or_distance_but_never_both(): void
     {
         // EUE-067

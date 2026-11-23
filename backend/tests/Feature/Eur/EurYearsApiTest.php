@@ -28,9 +28,11 @@ class EurYearsApiTest extends EurBookkeepingTestCase
         $response->assertJsonPath('warnings.0.year', 2023);
         $response->assertJsonPath('warnings.0.code', 'EUE-003');
         $response->assertJsonPath('warnings.0.supported', false);
+        $response->assertJsonPath('warnings.0.warning', '⚠ Die Tabelle nicht offiziell mit 2023 kompatibel. Kontaktieren Sie uns für den Zugang zu einer älteren Version (Kauf der Lifetime-Lizenz erforderlich).');
         $response->assertJsonPath('warnings.1.year', 2027);
         $response->assertJsonPath('warnings.1.code', 'EUE-002');
         $response->assertJsonPath('warnings.1.supported', false);
+        $response->assertJsonPath('warnings.1.warning', '⚠ Die Tabelle nicht offiziell mit 2027 kompatibel. Bitte auf die neueste Version der Tabelle umsteigen.');
     }
 
     public function test_active_years_lists_only_years_with_bookings_in_the_current_brand(): void

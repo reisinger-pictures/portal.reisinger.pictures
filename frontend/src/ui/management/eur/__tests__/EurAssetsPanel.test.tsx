@@ -5,6 +5,7 @@ import {
     bookEurAssetDepreciation,
     switchEurAssetToLinear,
     useEurAssets,
+    useEurReference,
     type EurAsset,
     type EurPlanYear,
 } from '../../../../logic/useEur';
@@ -13,7 +14,7 @@ import EurAssetsPanel from '../EurAssetsPanel';
 
 vi.mock('../../../../logic/useEur', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../../../../logic/useEur')>();
-    return {...actual, useEurAssets: vi.fn(), bookEurAssetDepreciation: vi.fn(), switchEurAssetToLinear: vi.fn()};
+    return {...actual, useEurAssets: vi.fn(), useEurReference: vi.fn(), bookEurAssetDepreciation: vi.fn(), switchEurAssetToLinear: vi.fn()};
 });
 
 const plan = (overrides: Partial<EurPlanYear> = {}): EurPlanYear => ({
@@ -46,12 +47,13 @@ const asset = (overrides: Partial<EurAsset> = {}): EurAsset => ({
     ...overrides,
 });
 
-function swrResult(data: unknown) {
-    return {data, error: undefined, isLoading: false, mutate: vi.fn()} as unknown as ReturnType<typeof useEurAssets>;
+function swrResult<R>(data: unknown): R {
+    return {data, error: undefined, isLoading: false, mutate: vi.fn()} as unknown as R;
 }
 
 function setAssets(...assets: EurAsset[]) {
-    vi.mocked(useEurAssets).mockReturnValue(swrResult({assets}));
+    vi.mocked(useEurAssets).mockReturnValue(swrResult<ReturnType<typeof useEurAssets>>({assets}));
+    vi.mocked(useEurReference).mockReturnValue(swrResult<ReturnType<typeof useEurReference>>({assets: {gwg_limit_cents: 100000}}));
 }
 
 describe('EurAssetsPanel (#34)', () => {
@@ -138,5 +140,26 @@ describe('EurAssetsPanel (#34)', () => {
         await user.click(screen.getByRole('button', {name: 'Bestätigen'}));
 
         expect(switchEurAssetToLinear).toHaveBeenCalledWith(1, 2026, 'Wirtschaftlichkeitsprüfung 2026');
+    });
+
+    it('verwendet die GWG-Grenze aus dem Katalog, nicht den Offline-Fallback (EUE-051)', () => {
+        setAssets(
+            asset({id: 1, name: 'Unter Grenze', cost_cents: 140000}),
+            asset({id: 2, name: 'Über Grenze', cost_cents: 160000}),
+        );
+        // Abweichender Katalogwert (150.000 ct) beweist, dass die API-Quelle
+        // und nicht die hart codierte 100.000 ct herangezogen wird.
+        vi.mocked(useEurReference).mockReturnValue(swrResult<ReturnType<typeof useEurReference>>({
+            assets: {gwg_limit_cents: 150000},
+        }));
+
+        renderWithProviders(<EurAssetsPanel year={2026}/>);
+
+        const below = screen.getByText('Unter Grenze').closest('tr');
+        const above = screen.getByText('Über Grenze').closest('tr');
+        expect(below).not.toBeNull();
+        expect(above).not.toBeNull();
+        expect(within(below as HTMLElement).getByText('GWG')).toBeVisible();
+        expect(within(above as HTMLElement).queryByText('GWG')).not.toBeInTheDocument();
     });
 });
