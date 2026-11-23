@@ -14,6 +14,15 @@ type GalleryFixture = {
     name: string;
 };
 
+/**
+ * Flaky history (CI 45282235119) — file:
+ * frontend/tests/e2e/admin/galleries/meta-gallery-licensing.spec.ts
+ * - "resolves mixed child presets and keeps the group coupon tab available"
+ *   Cause: "Alle ausklappen" was clicked before the gallery tree had loaded,
+ *   and the nested child link was clicked without waiting for it to appear.
+ *   The spec now waits for the tree's group link, expands, and waits for the
+ *   child gallery link before clicking it.
+ */
 test.describe('Meta-gallery child licensing', () => {
     let helper: E2ESessionHelper;
     let testUser: {email: string; password: string; id: string};
@@ -135,15 +144,22 @@ test.describe('Meta-gallery child licensing', () => {
         await new SidebarHelper(page).navigateTo('Galerien & Ordner');
 
         const main = page.getByRole('main');
+        // Der Baum wird asynchron geladen; erst wenn die Gruppe sichtbar ist,
+        // hat "Alle ausklappen" etwas zum Aufklappen.
+        await expect(main.getByRole('link', {name: childGroupName, exact: true})).toBeVisible({timeout: 15000});
         await main.getByRole('button', {name: 'Alle ausklappen'}).click();
         const nestedGalleryName = definitions[2].name;
-        await main.getByRole('link', {name: nestedGalleryName}).click();
+        const nestedGalleryLink = main.getByRole('link', {name: nestedGalleryName, exact: true});
+        await expect(nestedGalleryLink).toBeVisible({timeout: 15000});
+        await nestedGalleryLink.click();
         // Anchored regex, not `exact`: the detail heading reads
         // "<gallery> Galerie bearbeiten", so an exact match on the bare gallery
         // name never resolves. The prefix still pins the gallery identity.
         await expect(main.getByRole('heading', {name: new RegExp(`^${nestedGalleryName}`)})).toBeVisible();
         await expect(main.getByRole('link', {name: childGroupName, exact: true})).toBeVisible();
-        await main.getByRole('link', {name: `E2E Meta Licensing ${suffix}`, exact: true}).click();
+        const parentGroupLink = main.getByRole('link', {name: `E2E Meta Licensing ${suffix}`, exact: true});
+        await expect(parentGroupLink).toBeVisible({timeout: 15000});
+        await parentGroupLink.click();
         await expect(page).toHaveURL(new RegExp(`/meta/${groupId}$`));
 
         const pricingSection = main.getByRole('region', {name: 'Preise nach Untergalerie'});

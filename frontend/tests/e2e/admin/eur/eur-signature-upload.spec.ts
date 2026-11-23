@@ -14,6 +14,15 @@ import { SidebarHelper } from '../../helpers/SidebarHelper';
  * Navigation is SPA-only (sidebar + tabs). All views are scoped to <main>
  * (owner decision D-10). This spec was written by inspection: Playwright cannot
  * run on the development host, so its gates belong to CI.
+ *
+ * Flaky history (CI 45282235119) — file:
+ * frontend/tests/e2e/admin/eur/eur-signature-upload.spec.ts
+ * - "Korrektur-PDF erstellen, extern signieren und signiertes PDF hochladen"
+ * - "fehlgeschlagene Inhaltsprüfung zeigt Fehler und nächsten Schritt"
+ *   Cause: `filter({hasText:'unsigned'}).first()` selected an arbitrary unsigned
+ *   document of the shared brand instead of the correction just created, so the
+ *   POST went to a different document id and `waitForResponse` timed out. Both
+ *   tests now scope the row by the created document's own download link.
  */
 test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
     let helper: E2ESessionHelper;
@@ -39,6 +48,13 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         return main;
     }
 
+    /** Scopes to the row of this document, not an arbitrary shared-brand row. */
+    function correctionRow(main: Locator, documentId: number): Locator {
+        const ownLink = main.getByRole('link', { name: 'Öffnen' })
+            .and(main.locator(`[href="/api/management/eur/documents/${documentId}/download"]`));
+        return main.getByRole('row').filter({ has: ownLink });
+    }
+
     async function createCorrection(page: Page, main: Locator) {
         await expect(main.getByText('Korrektur-PDF', { exact: true })).toBeVisible();
         await expect(main.getByText(/Inhaltsprüfung/)).toBeVisible();
@@ -61,9 +77,10 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         const main = await openBelege(page);
         const documentId = await createCorrection(page, main);
 
-        const row = main.getByRole('row').filter({ hasText: 'unsigned' }).first();
+        const row = correctionRow(main, documentId);
         const signedInput = row.getByLabel('Signiertes PDF hochladen');
         await expect(row.getByText('Signiertes PDF hochladen', { exact: true })).toBeVisible();
+        await expect(row.getByText('unsigned', { exact: true })).toBeVisible();
 
         // D-84: the upload now requires a real CMS/PAdES signature over the
         // portal's bytes. A test-only backend route (local/testing only) signs
@@ -101,7 +118,8 @@ test.describe('EAR Belege — externe Signatur mit Inhaltsprüfung', () => {
         const main = await openBelege(page);
         const documentId = await createCorrection(page, main);
 
-        const row = main.getByRole('row').filter({ hasText: 'unsigned' }).first();
+        const row = correctionRow(main, documentId);
+        await expect(row.getByText('unsigned', { exact: true })).toBeVisible();
         const rejected = page.waitForResponse((response) =>
             response.request().method() === 'POST'
             && response.url().includes(`/api/management/eur/documents/${documentId}/signed`));
