@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-78. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-83. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -395,3 +395,25 @@ The owner decided on 2026-11-23 that the JWT package `php-open-source-saver/jwt-
 ### D-78: Roles are never copied into stored abilities
 
 The owner decided on 2026-11-23 that roles (`super_admin`, `admin`, `accounting`, `photographer`, `client`, …) remain live DB queries in `AuthorizationService` and are **never** copied into stored Sanctum abilities. Duplicating them would create a second, drifting authority source. Only transient rights are transported as abilities (see [D-73](owner-decisions.md#d-73-transient-guest-grants-as-structured-abilities-behind-a-custom-guard)); role behavior must be identical before and after migration. See issue #9.
+
+## EÜR re-verification (issue #53)
+
+### D-79: Keep the corrected FSVG minimum of 110,22 € (EUE-131)
+
+The owner confirmed on 2026-11-23 that the portal keeps the corrected, internally consistent FSVG pension minimum of **110,22 €/month** for 2025/2026 (103,69 € for 2024). The ODS workbook's 101,95 € is a documented formula defect, not an alternative authoritative value: its validation list and `Ü!Z15`/`Ü!AA15` use `Freiberufliche (FSVG)`, while `Ü!I12` tests `Freiberufler (FSVG)` and falls through to the GSVG minimum — an 8,27 €/month internal contradiction. Evidence: `features/eur/cleanroom/rules.json` (EUE-131) and `features/eur/cleanroom/re-verification.md`. No parity fallback to 101,95 € is added.
+
+### D-80: Internal-only invoice takeover — no external integration API
+
+The owner clarified on 2026-11-23 that the invoice takeover is **inside the portal**: the rest of the portal software may add bookings; nothing external is in scope. [D-71](owner-decisions.md#d-71-the-pinned-openapi-contract-is-reference-information-not-a-portal-api-contract) and [D-72](owner-decisions.md#d-72-no-service-to-service-scope-tokens-for-the-ku-online-client) stay in force. There is no public import endpoint, no machine credential, no scope-token contract, no `Idempotency-Key` header requirement and no rate-limit contract. Issue #16's internal idempotent takeover remains the product path. The external-API pillar of issue #53 is therefore a deliberate N/A, not an unimplemented requirement.
+
+### D-81: Externally signed PDFs — verify on upload, no public `/verify`
+
+The owner chose on 2026-11-23 this flow: the portal produces the PDF, the user **downloads** it, signs it with an **external provider**, and **uploads the signed document back**. There is **no public `/verify` endpoint**. Instead, uploading a signed document must verify that it is correctly signed, in addition to the existing SHA-256/JWT content binding (`/signed` upload, V064). This decision does **not** claim QES: validating a signer's trust chain against a CA source is a separate, undecided matter and must not be implied by UI or documentation. `pdfsig` stays out of the deployment image.
+
+### D-82: Tesseract-deu is approved for the deployment image
+
+The owner approved on 2026-11-23 adding the German Tesseract language data (`tesseract-deu`) to the deployment image so receipt OCR can be implemented. The dependency change belongs in the deployment image definition, not in application code; OCR results remain advisory metadata and never override bookings or server-authoritative values.
+
+### D-83: Migrations approved for travel persistence and the WEB data model
+
+The owner approved on 2026-11-23 new database migrations for (a) travel-trip persistence so the existing travel-domain units reach a product path, and (b) the WEB data model (`business_share`, `expense_kind`, `supplier`, `WE*` receipt numbers, required fields). The general [migration policy](../backend/AGENTS.md) stays in force: each migration needs a documented schema, backfill and rollback decision before it is written; deployed migrations are never modified; required seeding follows the backend rules.

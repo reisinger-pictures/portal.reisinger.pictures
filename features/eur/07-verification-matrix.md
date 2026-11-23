@@ -187,7 +187,7 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | EUE-113 | Für die Monate ohne Einkommen werden Mindestbeiträge (UV, SVS, KV, PV) als Sockel angesetzt. | Verhalten (kein Skalarwert) | EurOverviewService.php:28-84 (12 Sockel-Monate), EurOverviewServiceTest.php:24-41 |
 | EUE-114 | Die Summe der vier Beiträge ergibt die jährlichen SV-Beiträge; die Division durch 12 liefert den Monatsbetrag. | Verhalten (kein Skalarwert) | EurOverviewService.php:70-83 (Jahreswerte / 12), EurOverviewServiceTest.php:24-41 |
 | EUE-115 | Bereits bezahlte SV-Beiträge (KZ 9225) werden bei der Ermittlung der Beitragsgrundlage zu den Einkünften addiert; in der Übersicht werden sie außerdem | KZ: 9225 | EurOverviewService.php (excludeBookedSvFromExpenses), EurSummaryController.php, EurSummaryApiTest.php (Herausrechnen außer UV-Modus) |
-| EUE-131 | Die Auswahlliste für die Sozialversicherungsart und die Formeln für die Pensionsversicherung verwenden die Bezeichnung 'Freiberufliche (FSVG)'. Die Fo | Verhalten (kein Skalarwert) | — offen — |
+| EUE-131 | Die Auswahlliste für die Sozialversicherungsart und die Formeln für die Pensionsversicherung verwenden die Bezeichnung 'Freiberufliche (FSVG)'. Die Fo | Verhalten (kein Skalarwert) | **Entscheidung D-79:** Portal nutzt den korrigierten FSVG-Mindestbeitrag 110,22 € (2025/26) statt des ODS-Defekts 101,95 € aus `Ü!I12` (String 'Freiberufler' trifft die Validierung 'Freiberufliche' nicht). Beleg: rules.json (EUE-131), re-verification.md:57 |
 
 ## B10 — Auswertungen & Abgleich
 
