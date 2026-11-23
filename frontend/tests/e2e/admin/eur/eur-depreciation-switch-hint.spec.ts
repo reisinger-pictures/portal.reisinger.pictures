@@ -48,9 +48,12 @@ test.describe('EAR · DEG-013 Wechsel-Erinnerung', () => {
 
         // Server-derived: 240.000 ct / 3 Jahre, 30 % degressiv, Jan 2026 →
         // Wechseljahr 2027, Vorteil 336,00 € (DEG-011/013).
-        await expect(main.getByText(/Wechsel zur linearen AfA ab Jahr 2027 empfohlen/)).toBeVisible();
-        await expect(main.getByText(/336,00/)).toBeVisible();
+        // Das Brand ist über E2E-Shards/tests geteilt: mehrere Anlagegüter
+        // können denselben Hinweis tragen. Auf die eigene Zeile scoppen.
+        const row = main.getByRole('row').filter({ hasText: 'Degressives E2E-Gut' });
+        await expect(row.getByText(/Wechsel zur linearen AfA ab Jahr 2027 empfohlen/)).toBeVisible();
+        await expect(row.getByText(/336,00/)).toBeVisible();
         // Der Hinweis blockiert keine Buchung und ist ausdrücklich kein Fehler.
-        await expect(main.getByRole('alert')).toHaveCount(0);
+        await expect(main.getByTestId('eur-assets-panel').getByRole('alert')).toHaveCount(0);
     });
 });
