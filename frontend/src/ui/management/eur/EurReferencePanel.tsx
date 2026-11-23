@@ -1,8 +1,35 @@
+import type { ReactNode } from 'react';
 import { Trans } from '@lingui/react/macro';
 import { formatEuro, formatPercent } from '../../../logic/formatCurrency';
 import type { EurReference } from '../../../logic/useEur';
 
 const cents = (value: number): string => formatEuro(value / 100);
+
+interface UsageListProps {
+    heading: ReactNode;
+    kinds: {type: string}[];
+    counts: Record<string, number>;
+    cap: number;
+}
+
+/** EUE-029: ❯ = ungenutzt, Zahl = Verwendungen, Obergrenze als "99+"/"999+". */
+function UsageList({heading, kinds, counts, cap}: UsageListProps) {
+    const label = (count: number): string => count === 0 ? '❯' : count > cap ? `${cap}+` : String(count);
+
+    return (
+        <div>
+            <h4 className="font-semibold">{heading}</h4>
+            <ul className="mt-1 space-y-0.5 text-sm">
+                {kinds.map((kind) => (
+                    <li key={kind.type} className="flex justify-between gap-3">
+                        <span>{kind.type}</span>
+                        <span className="tabular-nums opacity-70">{label(counts[kind.type] ?? 0)}</span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
 
 interface Props {
     reference?: EurReference;
@@ -92,6 +119,26 @@ export default function EurReferencePanel({reference, isLoading, error, onRetry}
                         </li>
                     ))}
                 </ul>
+
+                {reference.usage_counts && (
+                    <>
+                        <h3 className="font-semibold mt-4"><Trans>Verwendungszähler</Trans></h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">
+                            <UsageList
+                                heading={<Trans>Ausgaben-Arten</Trans>}
+                                kinds={reference.expense_kinds}
+                                counts={reference.usage_counts.expense}
+                                cap={99}
+                            />
+                            <UsageList
+                                heading={<Trans>Einnahmen-Arten</Trans>}
+                                kinds={reference.income_kinds}
+                                counts={reference.usage_counts.income}
+                                cap={999}
+                            />
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );

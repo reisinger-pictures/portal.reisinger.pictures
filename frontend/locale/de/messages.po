@@ -7080,6 +7080,7 @@ msgstr "Profil-Zugang"
 msgid "Prognose"
 msgstr "Prognose"
 
+#: src/ui/management/eur/EurEntryDialog.tsx
 #: src/ui/management/eur/EurHoursPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
 msgid "Projekt"
@@ -8761,6 +8762,10 @@ msgstr "Verwaltung wurde abgegeben."
 msgid "Verwendung"
 msgstr "Verwendung"
 
+#: src/ui/management/eur/EurReferencePanel.tsx
+msgid "Verwendungszähler"
+msgstr "Verwendungszähler"
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Verwerfen"
 msgstr "Verwerfen"
@@ -9227,6 +9232,7 @@ msgstr "Zahlung wird manuell geprüft"
 
 #: src/ui/client/ClientCartView.tsx
 #: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+#: src/ui/management/eur/EurEntryDialog.tsx
 msgid "Zahlungsart"
 msgstr "Zahlungsart"
 

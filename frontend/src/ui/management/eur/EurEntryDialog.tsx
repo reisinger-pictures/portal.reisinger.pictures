@@ -43,6 +43,9 @@ const createEurEntrySchema = () => z.object({
     businessShare: z.string().refine(isBusinessShare,
         t`Betriebsanteil in 5-%-Schritten von 0 bis 100 angeben`),
     receiptNo: z.string(),
+    // EUE-005/006: optionale Zuordnung, '' bedeutet "nicht gesetzt".
+    paymentMethod: z.string(),
+    projectId: z.string(),
 });
 
 type EurEntryFormValues = z.infer<ReturnType<typeof createEurEntrySchema>>;
@@ -54,6 +57,8 @@ const INITIAL: EurEntryFormValues = {
     amountEuro: '',
     businessShare: '100',
     receiptNo: '',
+    paymentMethod: '',
+    projectId: '',
 };
 
 // The reference table stores descriptive labels such as
@@ -120,6 +125,8 @@ export default function EurEntryDialog({year, reference, onClose, onCreated}: Pr
                 business_share: share,
                 amount_cents: amountCents,
                 receipt_no: values.receiptNo === '' ? null : values.receiptNo,
+                payment_method: values.paymentMethod === '' ? null : values.paymentMethod,
+                eur_project_id: values.projectId === '' ? null : Number(values.projectId),
             });
             onCreated();
             onClose();
@@ -188,6 +195,24 @@ export default function EurEntryDialog({year, reference, onClose, onCreated}: Pr
                     <label className="form-control">
                         <span className="label-text"><Trans>Belegnummer</Trans></span>
                         <input type="text" className="input input-bordered" {...register('receiptNo')}/>
+                    </label>
+                    <label className="form-control">
+                        <span className="label-text"><Trans>Zahlungsart</Trans></span>
+                        <select className="select select-bordered" {...register('paymentMethod')}>
+                            <option value="">—</option>
+                            {(reference?.payment_methods ?? []).map((method) => (
+                                <option key={method.kind} value={method.kind}>{method.kind}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="form-control">
+                        <span className="label-text"><Trans>Projekt</Trans></span>
+                        <select className="select select-bordered" {...register('projectId')}>
+                            <option value="">—</option>
+                            {(reference?.eur_projects ?? []).map((project) => (
+                                <option key={project.id} value={project.id}>{project.name}</option>
+                            ))}
+                        </select>
                     </label>
                 </div>
 

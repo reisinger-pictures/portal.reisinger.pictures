@@ -16,6 +16,11 @@ const reference = {
         {type: 'Bürobedarf', e1a: '9230 - Bürobedarf', share_percent: 100},
     ],
     income_kinds: [],
+    payment_methods: [
+        {kind: 'Bankkonto', opening_balance_cents: null},
+        {kind: 'Bar', opening_balance_cents: 10000},
+    ],
+    eur_projects: [{id: 7, name: 'Projekt A'}],
 } as unknown as EurReference;
 
 function renderDialog() {
@@ -43,6 +48,36 @@ describe('EurEntryDialog', () => {
         expect(createEurEntry).toHaveBeenCalledWith(expect.objectContaining({
             business_share: 0,
             e1a_code: null,
+        }));
+    });
+
+    it('sends payment method and project id from the reference lists (EUE-005/006)', async () => {
+        const user = userEvent.setup();
+        renderDialog();
+
+        await user.selectOptions(screen.getByLabelText('Art'), 'Bürobedarf');
+        await user.type(screen.getByLabelText('Betrag (€)'), '50');
+        await user.selectOptions(screen.getByLabelText('Zahlungsart'), 'Bar');
+        await user.selectOptions(screen.getByLabelText('Projekt'), '7');
+        await user.click(screen.getByRole('button', {name: 'Buchung speichern'}));
+
+        expect(createEurEntry).toHaveBeenCalledWith(expect.objectContaining({
+            payment_method: 'Bar',
+            eur_project_id: 7,
+        }));
+    });
+
+    it('sends null when no payment method or project is selected (EUE-005/006)', async () => {
+        const user = userEvent.setup();
+        renderDialog();
+
+        await user.selectOptions(screen.getByLabelText('Art'), 'Bürobedarf');
+        await user.type(screen.getByLabelText('Betrag (€)'), '50');
+        await user.click(screen.getByRole('button', {name: 'Buchung speichern'}));
+
+        expect(createEurEntry).toHaveBeenCalledWith(expect.objectContaining({
+            payment_method: null,
+            eur_project_id: null,
         }));
     });
 
@@ -117,5 +152,27 @@ describe('EurEntryDialog', () => {
 
         expect(screen.getByText('Bitte eine Art auswählen')).toBeVisible();
         expect(screen.getByRole('button', {name: 'Buchung speichern'})).toBeDisabled();
+    });
+
+    it('sendet den Katalog-Typ unverändert als kind_type (EUE-029-Vertragskette)', async () => {
+        // Echter Typ aus tables.json/ausgaben_arten — die Usage-Counts des
+        // Referenz-Endpunkts werden genau über diesen Wert gematcht.
+        const realCatalog = {
+            ...reference,
+            expense_kinds: [{type: 'Wareneinkäufe', e1a: '9100 - Waren', share_percent: 100}],
+        } as unknown as EurReference;
+        renderWithProviders(
+            <EurEntryDialog year={2026} reference={realCatalog} onClose={() => {}} onCreated={() => {}} />,
+        );
+        const user = userEvent.setup();
+
+        await user.selectOptions(screen.getByLabelText('Art'), 'Wareneinkäufe');
+        await user.type(screen.getByLabelText('Betrag (€)'), '50');
+        await user.click(screen.getByRole('button', {name: 'Buchung speichern'}));
+
+        expect(createEurEntry).toHaveBeenCalledWith(expect.objectContaining({
+            kind_type: 'Wareneinkäufe',
+            e1a_code: '9100',
+        }));
     });
 });

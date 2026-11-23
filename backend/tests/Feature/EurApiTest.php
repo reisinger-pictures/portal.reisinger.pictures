@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\UserRole;
 use App\Models\EurAuditLog;
 use App\Models\EurEntry;
+use App\Models\EurProject;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\BrandRegistry;
@@ -69,6 +70,60 @@ class EurApiTest extends TestCase
         $this->assertSame(808500, $response->json('social_insurance.amounts_cents.max_bgl'));
         // EUE-051: GWG-Grenze aus dem gepinnten Katalog (1.000 € = 100000 ct).
         $response->assertJsonPath('assets.gwg_limit_cents', 100000);
+    }
+
+    /**
+     * EUE-006: die Referenz liefert echte, brand-scope Projekt-IDs, damit die
+     * Buchung `eur_project_id` setzen kann (die Katalogliste `projects` bleibt
+     * nur eine Anzeigehilfe).
+     */
+    public function test_reference_exposes_brand_scoped_project_ids_for_booking(): void
+    {
+        $token = $this->tokenFor(UserRole::ADMIN->value);
+        $project = EurProject::create(['brand' => BrandRegistry::currentId(), 'name' => 'Projekt A']);
+        EurProject::create(['brand' => self::OTHER_BRAND, 'name' => 'Fremdprojekt']);
+
+        $response = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/reference');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'eur_projects');
+        $response->assertJsonPath('eur_projects.0.id', $project->id);
+        $response->assertJsonPath('eur_projects.0.name', 'Projekt A');
+    }
+
+    /**
+     * EUE-029: der Verwendungszähler zählt echte Journalbuchungen des Brands,
+     * nicht die statischen Katalogarten.
+     */
+    public function test_reference_exposes_journal_usage_counts(): void
+    {
+        $token = $this->tokenFor(UserRole::ADMIN->value);
+        $brand = BrandRegistry::currentId();
+
+        // Echte Katalog-Typen aus tables.json (`ausgaben_arten`), damit der
+        // Vertrag kind_type (Buchung) ↔ type (Katalog) mitgeprüft wird.
+        foreach (['Wareneinkäufe', 'Wareneinkäufe', 'Rohstoffe'] as $type) {
+            EurEntry::create([
+                'brand' => $brand, 'year' => 2026, 'month' => 5, 'day' => 5,
+                'direction' => 'expense', 'kind_type' => $type, 'business_share' => 100,
+                'amount_cents' => 10000, 'business_amount_cents' => 10000,
+            ]);
+        }
+
+        EurEntry::create([
+            'brand' => self::OTHER_BRAND, 'year' => 2026, 'month' => 5, 'day' => 5,
+            'direction' => 'expense', 'kind_type' => 'Wareneinkäufe', 'business_share' => 100,
+            'amount_cents' => 10000, 'business_amount_cents' => 10000,
+        ]);
+
+        $response = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/reference');
+
+        $response->assertOk();
+        $response->assertJsonPath('usage_counts.expense.Wareneinkäufe', 2);
+        $response->assertJsonPath('usage_counts.expense.Rohstoffe', 1);
+        $response->assertJsonPath('usage_counts.income', []);
     }
 
     public function test_photographer_is_rejected_by_management_scope(): void

@@ -45,6 +45,10 @@ test.describe('EAR sub-application', () => {
         await dialog.getByLabel('Art').selectOption({ label: 'Software' });
         await dialog.getByLabel('Betrag (€)').fill('100');
         await dialog.getByLabel('Betriebsanteil (%)').fill('60');
+        // EUE-005/006: Zahlungsart und Projekt sind im Buchungsdialog wählbar.
+        await expect(dialog.getByLabel('Zahlungsart')).toBeVisible();
+        await dialog.getByLabel('Zahlungsart').selectOption({ label: 'Bar' });
+        await expect(dialog.getByLabel('Projekt')).toBeVisible();
         await dialog.getByRole('button', { name: 'Buchung speichern' }).click();
         await expect(dialog).toHaveCount(0);
 

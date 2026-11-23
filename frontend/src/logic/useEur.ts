@@ -35,6 +35,10 @@ export interface EurReference {
     vehicle_types: {name: string; category: string}[];
     payment_methods: {kind: string; opening_balance_cents: number | null}[];
     projects: string[];
+    /** EUE-006: echte, brand-scope Projekt-IDs für die Buchung. */
+    eur_projects?: {id: number; name: string}[];
+    /** EUE-029: Verwendungszähler je Art und Richtung aus den Journalen. */
+    usage_counts?: {expense: Record<string, number>; income: Record<string, number>};
     travel: {
         countries: EurTravelRate[];
         domestic: {day_cents: number; night_cents: number};
@@ -570,6 +574,9 @@ export interface EurEntryPayload {
     amount_cents: number;
     receipt_no?: string | null;
     note?: string | null;
+    /** EUE-005/006: Zahlungsart und Projekt der Buchung. */
+    payment_method?: string | null;
+    eur_project_id?: number | null;
 }
 
 export async function createEurEntry(payload: EurEntryPayload): Promise<void> {
