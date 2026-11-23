@@ -17,6 +17,14 @@ const cents = (value: number): string => formatEuro(value / 100);
 // Die API ist authoritative (EUE-051); dieser Wert ist nur ein Anzeige-Fallback.
 const GWG_LIMIT_FALLBACK_CENTS = 100000;
 
+// DEG-007: Anzeige der gepinnten Enum-Werte; die Zulässigkeit prüft die API
+// gegen das DEG-Artefakt, nicht diese Übersetzung.
+const EXCEPTION_LABELS: Record<string, string> = {
+    digitalisation: 'Digitalisierung',
+    eco: 'Ökologisierung',
+    health: 'Gesundheit/Life-Science',
+};
+
 interface Props {
     year: number;
 }
@@ -132,12 +140,24 @@ export default function EurAssetsPanel({ year }: Props) {
                                     const hint = asset.switch_hint;
                                     const hintYear = hint?.year ?? 0;
                                     const hintAdvantage = hint ? cents(hint.advantage_cents) : '';
+                                    const exceptionLabel = asset.immaterial_exception
+                                        ? EXCEPTION_LABELS[asset.immaterial_exception] ?? asset.immaterial_exception
+                                        : '';
                                     return (
                                         <tr key={asset.id}>
                                             <td>
                                                 <span className="font-medium">{asset.name}</span>
                                                 {isGwg && <span className="badge badge-info badge-outline ml-2"><Trans>GWG</Trans></span>}
                                                 {asset.is_private_investment && <span className="badge badge-warning badge-outline ml-2"><Trans>Privat</Trans></span>}
+                                                {asset.is_used && <span className="badge badge-warning badge-outline ml-2"><Trans>Gebraucht</Trans></span>}
+                                                {asset.is_immaterial && <span className="badge badge-info badge-outline ml-2"><Trans>Immateriell</Trans></span>}
+                                                {asset.immaterial_exception && (
+                                                    <span className="block text-xs text-info mt-1">
+                                                        <Trans>Ausnahme: {exceptionLabel}</Trans>
+                                                    </span>
+                                                )}
+                                                {asset.special_depreciation && <span className="badge badge-warning badge-outline ml-2"><Trans>Sonder-AfA</Trans></span>}
+                                                {asset.is_electric_vehicle && <span className="badge badge-success badge-outline ml-2"><Trans>Elektroauto</Trans></span>}
                                                 {asset.warnings?.map((warning) => (
                                                     <span key={warning.code} className="block text-xs text-warning mt-1">
                                                         {warning.text}

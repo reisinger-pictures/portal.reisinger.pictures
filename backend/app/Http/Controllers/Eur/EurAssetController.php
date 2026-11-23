@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Eur;
 
 use App\Eur\Domain\DepreciationCalculator;
 use App\Eur\Parity\RuleValues;
+use App\Eur\Reference\DegressiveRules;
 use App\Eur\Reference\EurYear;
 use App\Eur\Reference\ReferenceTables;
 use App\Eur\Support\Share;
@@ -278,6 +279,11 @@ class EurAssetController extends Controller
             'degressive_rate' => 'nullable|integer|min:100|max:3000',
             'category' => 'nullable|string|max:190',
             'is_private_investment' => 'nullable|boolean',
+            'is_used' => 'nullable|boolean',
+            'is_immaterial' => 'nullable|boolean',
+            'immaterial_exception' => ['nullable', 'string', Rule::in((new DegressiveRules)->allowedImmaterialExceptions())],
+            'special_depreciation' => 'nullable|boolean',
+            'is_electric_vehicle' => 'nullable|boolean',
             'notes' => 'nullable|string|max:2000',
         ]);
     }
@@ -294,6 +300,29 @@ class EurAssetController extends Controller
         if (! $calculator->isBusinessShareValid((int) $data['business_share'])) {
             abort(422, 'Der Betriebsanteil muss zwischen 50 % und 100 % in 5-%-Schritten liegen.');
         }
+
+        // DEG-006/007/008: die Ausschlüsse kommen aus den gepinnten Regeln;
+        // die zulässigen immateriellen Ausnahmen aus dem DEG-Artefakt.
+        if ($this->flag($data, 'is_used')) {
+            abort(422, 'Degressive AfA ist für gebrauchte Wirtschaftsgüter nicht zulässig.');
+        }
+
+        if ($this->flag($data, 'is_immaterial')
+            && ! (new DegressiveRules)->isAllowedImmaterialException($data['immaterial_exception'] ?? null)) {
+            abort(422, 'Degressive AfA ist für immaterielle Wirtschaftsgüter nur mit einer dokumentierten Ausnahme zulässig.');
+        }
+
+        if ($this->flag($data, 'special_depreciation') && ! $this->flag($data, 'is_electric_vehicle')) {
+            abort(422, 'Degressive AfA ist bei gesetzlicher Sonder-AfA nicht zulässig.');
+        }
+    }
+
+    /**
+     * HTML-Formulare liefern "1"/"0", JSON liefert echte Booleans.
+     */
+    private function flag(array $data, string $key): bool
+    {
+        return filter_var($data[$key] ?? false, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
@@ -560,6 +589,13 @@ class EurAssetController extends Controller
             'degressive_rate' => $asset->degressive_rate === null ? null : (int) $asset->degressive_rate,
             'category' => $asset->category,
             'is_private_investment' => (bool) $asset->is_private_investment,
+            // DEG-006/007/008: Ausschlussmerkmale und die gespeicherte Ausnahme
+            // werden angezeigt; die Prüfung selbst läuft nur beim Anlegen.
+            'is_used' => (bool) $asset->is_used,
+            'is_immaterial' => (bool) $asset->is_immaterial,
+            'immaterial_exception' => $asset->immaterial_exception,
+            'special_depreciation' => (bool) $asset->special_depreciation,
+            'is_electric_vehicle' => (bool) $asset->is_electric_vehicle,
             'switched_to_linear_at' => $asset->switched_to_linear_at?->toIso8601String(),
             'switch_reason' => $asset->switch_reason,
             'status' => $asset->status,

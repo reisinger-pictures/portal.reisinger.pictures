@@ -176,6 +176,31 @@ erraten, und bestehende Beträge werden nicht umgerechnet.
 nullable und die Tabelle ist sonst unverändert; ein Entfernen würde nur die
 neuen WEB-Metadaten verlieren, nicht die Wareneingangsbeträge selbst.
 
+### Schema-Entscheidung V069 (DEG-Ausschlussmerkmale)
+
+**Schema.** `eur_assets` erhält fünf Merkmale für die Zulässigkeitsprüfung der
+degressiven AfA: `is_used` (DEG-006), `is_immaterial` (DEG-007),
+`immaterial_exception` (nullable Enum: `digitalisation`, `eco`, `health`),
+`special_depreciation` (DEG-008, gesetzliche Sonder-AfA z. B. Gebäude) und
+`is_electric_vehicle` (DEG-008, ausdrücklich zulässig). Die vier Booleans sind
+`default false`, das Enum ist `nullable`. Die zulässigen Ausnahmen kommen aus
+dem Parameter „Zulässige Ausnahmen" des gepinnten Artefakts
+`business-rules/degressive-afa-rules.json` (DEG-007), nicht aus einer zweiten
+Hardcoded-Liste. Die Prüfung läuft beim Anlegen: gebrauchte Güter, immaterielle
+Güter ohne Ausnahme und Sonder-AfA werden mit 422 abgelehnt; ein Elektroauto ist
+auch bei `special_depreciation = true` zulässig. Für lineare Güter sind die
+Merkmale zulässig, aber ohne fachliche Wirkung. Der Ausnahme-Enum wird im
+Anlagendatensatz gespeichert und in der Übersicht angezeigt (DEG-007).
+
+**Backfill.** Keiner. Bestehende Anlagegüter behalten `false`/`null` und bleiben
+damit in der degressiven Methode zulässig; es wird kein Merkmal aus Name,
+Kategorie oder Bezeichnung erraten. Bereits berechnete AfA-Pläne werden nicht
+neu erzeugt, und ein bereits vollzogener Wechsel bleibt unberührt.
+
+**Rollback.** `down()` ist nach Repository-Policy leer. Die Spalten sind
+additiv mit Defaultwerten; ein Entfernen verliert nur die Ausschlussmerkmale,
+nicht die Anlagegüter, ihre AfA-Pläne oder Buchungen.
+
 ## Beziehungen
 
 - Buchung → genau ein Kunde und optional ein Projekt; Reise analog.

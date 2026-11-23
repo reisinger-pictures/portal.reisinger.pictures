@@ -1062,6 +1062,10 @@ msgstr "Ausgaben-Art"
 msgid "Ausgaben-Arten"
 msgstr "Ausgaben-Arten"
 
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Ausnahme: {exceptionLabel}"
+msgstr "Ausnahme: {exceptionLabel}"
+
 #: src/logic/modelRegistration.ts
 msgid "Aussehen & Maße"
 msgstr "Aussehen & Maße"
@@ -3151,6 +3155,10 @@ msgstr "Einwilligungen"
 msgid "Einzelperson"
 msgstr "Einzelperson"
 
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Elektroauto"
+msgstr "Elektroauto"
+
 #: src/ui/client/ClientOrdersView.tsx
 msgid "Empfänger:"
 msgstr "Empfänger:"
@@ -4080,6 +4088,10 @@ msgid "Geben Sie einen positiven Zeitwert an; der Tag ist optional."
 msgstr "Geben Sie einen positiven Zeitwert an; der Tag ist optional."
 
 #: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Gebraucht"
+msgstr "Gebraucht"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
 msgid "Gebucht"
 msgstr "Gebucht"
 
@@ -4436,6 +4448,10 @@ msgstr "Im Portal speichern wir keine Kartendaten wie PAN oder CVC und keinen vo
 #: src/ui/client/components/VolumeLicensingCard.tsx
 msgid "Im Warenkorb"
 msgstr "Im Warenkorb"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Immateriell"
+msgstr "Immateriell"
 
 #. placeholder {0}: result.created
 #. placeholder {1}: result.skipped
@@ -7679,6 +7695,10 @@ msgstr "Sofort als Ausgabe erfassen"
 #: src/logic/mollieMethods.ts
 msgid "Sofortige Bezahlung über dein Online-Banking."
 msgstr "Sofortige Bezahlung über dein Online-Banking."
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Sonder-AfA"
+msgstr "Sonder-AfA"
 
 #: src/ui/client/components/LicenseSelectorCard.tsx
 msgid "Sonderanfrage (Angebot)"

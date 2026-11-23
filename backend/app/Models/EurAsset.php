@@ -23,6 +23,8 @@ class EurAsset extends Model
         'useful_life_years', 'business_share', 'method', 'degressive_rate',
         'category', 'is_private_investment', 'switched_to_linear_at',
         'switch_reason', 'status', 'disposed_on', 'disposal_proceeds_cents', 'notes',
+        'is_used', 'is_immaterial', 'immaterial_exception', 'special_depreciation',
+        'is_electric_vehicle',
     ];
 
     protected $casts = [
@@ -35,9 +37,11 @@ class EurAsset extends Model
         'degressive_rate' => 'integer',
         'is_private_investment' => 'boolean',
         'switched_to_linear_at' => 'datetime',
-        'is_private_investment' => 'boolean',
-        'switched_to_linear_at' => 'datetime',
         'disposal_proceeds_cents' => 'integer',
+        'is_used' => 'boolean',
+        'is_immaterial' => 'boolean',
+        'special_depreciation' => 'boolean',
+        'is_electric_vehicle' => 'boolean',
     ];
 
     public function years(): HasMany

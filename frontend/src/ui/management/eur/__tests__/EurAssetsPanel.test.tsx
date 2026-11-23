@@ -176,6 +176,25 @@ describe('EurAssetsPanel (#34)', () => {
         expect(within(table).getByRole('button', {name: 'AfA buchen'})).toBeEnabled();
     });
 
+    it('zeigt die DEG-Ausschlussmerkmale und die gespeicherte Ausnahme (DEG-006/007/008)', () => {
+        setAssets(asset({
+            is_used: true,
+            is_immaterial: true,
+            immaterial_exception: 'digitalisation',
+            special_depreciation: true,
+            is_electric_vehicle: true,
+        }));
+
+        renderWithProviders(<EurAssetsPanel year={2026}/>);
+
+        const table = screen.getByRole('table');
+        expect(within(table).getByText('Gebraucht')).toBeVisible();
+        expect(within(table).getByText('Immateriell')).toBeVisible();
+        expect(within(table).getByText(/Ausnahme: Digitalisierung/)).toBeVisible();
+        expect(within(table).getByText('Sonder-AfA')).toBeVisible();
+        expect(within(table).getByText('Elektroauto')).toBeVisible();
+    });
+
     it('verwendet die GWG-Grenze aus dem Katalog, nicht den Offline-Fallback (EUE-051)', () => {
         setAssets(
             asset({id: 1, name: 'Unter Grenze', cost_cents: 140000}),

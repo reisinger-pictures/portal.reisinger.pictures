@@ -162,6 +162,12 @@ export interface EurAsset {
     /** #34 P5.3: a permanent switch to linear is recorded here. */
     switched_to_linear_at?: string | null;
     switch_reason?: string | null;
+    /** DEG-006/007/008: Ausschlussmerkmale der degressiven AfA. */
+    is_used?: boolean;
+    is_immaterial?: boolean;
+    immaterial_exception?: string | null;
+    special_depreciation?: boolean;
+    is_electric_vehicle?: boolean;
     /** EUE-053/058: nicht blockierende Hinweise aus dem gepinnten Regeltext. */
     warnings?: {code: string; text: string}[];
     /** DEG-013: empfohlener Wechsel, serverseitig aus dem AfA-Plan abgeleitet. */
