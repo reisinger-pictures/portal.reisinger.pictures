@@ -11,8 +11,9 @@ use Illuminate\Database\Eloquent\Model;
 class EurTravelTrip extends Model
 {
     protected $fillable = [
-        'brand', 'year', 'month', 'vehicle', 'kilometres', 'passengers',
-        'country', 'days', 'meals', 'with_receipts', 'business_share',
+        'brand', 'year', 'month', 'receipt_no', 'vehicle', 'kilometres',
+        'start_km', 'end_km', 'passengers', 'country', 'purpose', 'e1a_code',
+        'days', 'meals', 'with_receipts', 'business_share',
         'kilometre_cents', 'day_cents', 'night_cents', 'total_cents',
         'business_cents', 'note',
     ];
@@ -23,6 +24,8 @@ class EurTravelTrip extends Model
         'month' => 'integer',
         'vehicle' => 'string',
         'kilometres' => 'integer',
+        'start_km' => 'integer',
+        'end_km' => 'integer',
         'passengers' => 'integer',
         'country' => 'string',
         'days' => 'integer',

@@ -774,14 +774,23 @@ export interface EurTravelResult {
     night_cents: number;
     total_cents: number;
     business_cents: number;
+    /** EUE-073: false bei privater Veranlassung (betrieblicher Anteil 0). */
+    deductible?: boolean;
 }
 
 export interface EurTravelPayload {
     year: number;
     vehicle: string;
-    kilometres: number;
+    /** EUE-067: entweder kilometres oder start_km + end_km. */
+    kilometres?: number;
+    start_km?: number;
+    end_km?: number;
     passengers: number;
     country: string;
+    /** EUE-073: 'Geschäftlich' (Standard) oder 'Privat'. */
+    purpose?: 'Geschäftlich' | 'Privat';
+    /** EUE-077: Pflicht beim Speichern, optional bei der reinen Berechnung. */
+    receipt_no?: string;
     days: number;
     meals: number;
     with_receipts: boolean;

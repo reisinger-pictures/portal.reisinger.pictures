@@ -21,6 +21,7 @@ class EurTravelPersistenceTest extends EurBookkeepingTestCase
         return [
             'year' => 2026,
             'month' => 5,
+            'receipt_no' => 'R-REISE-E2E',
             'vehicle' => 'Privatauto',
             'kilometres' => 120,
             'passengers' => 1,
@@ -62,6 +63,10 @@ class EurTravelPersistenceTest extends EurBookkeepingTestCase
         $this->assertSame($calc['business_cents'], $created['business_cents']);
         $this->assertSame(80, $created['business_share']);
         $this->assertSame('Kundentermin Wien', $created['note']);
+        // EUE-077/081: Belegnummer und Kennzahl werden mitgespeichert.
+        $this->assertSame('R-REISE-E2E', $created['receipt_no']);
+        $this->assertSame('9160', $created['e1a_code']);
+        $this->assertTrue($created['deductible']);
 
         $this->assertDatabaseHas('eur_travel_trips', [
             'id' => $created['id'],
@@ -83,7 +88,10 @@ class EurTravelPersistenceTest extends EurBookkeepingTestCase
             ->postJson('/api/management/eur/travel', $this->payload())
             ->assertCreated();
         $this->withHeaders($this->bearer($token))
-            ->postJson('/api/management/eur/travel', array_merge($this->payload(), ['kilometres' => 30]))
+            ->postJson('/api/management/eur/travel', array_merge($this->payload(), [
+                'receipt_no' => 'R-REISE-E2E-2',
+                'kilometres' => 30,
+            ]))
             ->assertCreated();
 
         $foreign = EurTravelTrip::create(array_merge($this->payload(), [
@@ -145,5 +153,93 @@ class EurTravelPersistenceTest extends EurBookkeepingTestCase
             ->assertUnprocessable();
 
         $this->assertDatabaseCount('eur_travel_trips', 0);
+    }
+
+    public function test_store_requires_a_receipt_number_and_rejects_duplicates(): void
+    {
+        $token = $this->tokenFor();
+
+        $without = $this->payload();
+        unset($without['receipt_no']);
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/travel', $without)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('receipt_no');
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/travel', $this->payload())
+            ->assertCreated();
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/travel', $this->payload())
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Diese Belegnummer ist bereits für eine andere Reise vergeben.');
+
+        $this->assertDatabaseCount('eur_travel_trips', 1);
+    }
+
+    public function test_store_derives_distance_from_km_readings_and_rejects_mixing(): void
+    {
+        $token = $this->tokenFor();
+        $payload = $this->payload();
+        unset($payload['kilometres']);
+        $payload['start_km'] = 1000;
+        $payload['end_km'] = 1120;
+
+        $created = $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/travel', $payload)
+            ->assertCreated()
+            ->json('trip');
+
+        $this->assertSame(120, $created['kilometres']);
+        $this->assertSame(1000, $created['start_km']);
+        $this->assertSame(1120, $created['end_km']);
+
+        // EUE-067: nie Distanz und Kilometerstand zusammen.
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/travel', array_merge($this->payload(), [
+                'start_km' => 1000,
+                'end_km' => 1120,
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['kilometres', 'start_km', 'end_km']);
+
+        // Und der Endstand muss größer sein als der Startstand.
+        $reversed = $payload;
+        $reversed['start_km'] = 1120;
+        $reversed['end_km'] = 1000;
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/travel', $reversed)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('end_km');
+
+        $this->assertDatabaseCount('eur_travel_trips', 1);
+    }
+
+    public function test_private_purpose_zeroes_the_deductible_amount(): void
+    {
+        $token = $this->tokenFor();
+        $payload = array_merge($this->payload(), [
+            'receipt_no' => 'R-REISE-PRIVAT',
+            'purpose' => 'Privat',
+        ]);
+
+        $created = $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/travel', $payload)
+            ->assertCreated()
+            ->json('trip');
+
+        $this->assertSame('Privat', $created['purpose']);
+        $this->assertSame(0, $created['business_cents']);
+        $this->assertFalse($created['deductible']);
+        $this->assertGreaterThan(0, $created['total_cents']);
+        $this->assertSame('9160', $created['e1a_code']);
+
+        $index = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/travel?year=2026')
+            ->assertOk()
+            ->json('trips.0');
+        $this->assertFalse($index['deductible']);
+        $this->assertSame(0, $index['business_cents']);
     }
 }

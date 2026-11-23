@@ -201,6 +201,30 @@ neu erzeugt, und ein bereits vollzogener Wechsel bleibt unberührt.
 additiv mit Defaultwerten; ein Entfernen verliert nur die Ausschlussmerkmale,
 nicht die Anlagegüter, ihre AfA-Pläne oder Buchungen.
 
+### Schema-Entscheidung V070 (Reise-Verdrahtung)
+
+**Schema.** `eur_travel_trips` (V067) erhält `receipt_no` (64), `start_km` und
+`end_km` (bigint), `purpose` (32) und `e1a_code` (8) — alle nullable. Die
+Belegnummer ist für neue Reisen Pflicht (EUE-077) und brand-weit eindeutig;
+weil eine Zeile im Portal genau eine Reise ist, ist eine Wiederverwendung für
+eine andere Reise ein Fehler. Dieselbe Belegnummer mehrerer Zeilen einer
+zusammengehörigen Reise gibt es im Portal nicht. Nach EUE-067 wird entweder
+die Distanz (`kilometres`) **oder** ein Start-/Endkilometerstand angegeben,
+nie beides; der Endstand muss größer sein. Die gefahrene Distanz wird
+serverseitig aus der Differenz berechnet und wie zuvor auf das Jahreskontingent
+gekappt. Die Veranlassung ist `Geschäftlich` oder `Privat`; bei `Privat` sind
+die betrieblichen Kosten 0 und die Reise trägt den Status
+„Nein (VERANLASSUNG: Privat)" (EUE-073). `e1a_code` wird serverseitig auf die
+Reisekennzahl 9160 gesetzt (EUE-081) und ist kein Eingabefeld.
+
+**Backfill.** Keiner. Bestehende Reisen behalten `null` in allen fünf Spalten;
+ihre bereits gespeicherten Cent-Beträge werden nicht neu berechnet oder
+umgerechnet. Es wird keine Belegnummer aus Notizen oder Datum erfunden.
+
+**Rollback.** `down()` ist nach Repository-Policy leer. Die Spalten sind
+additiv und nullable; ein Entfernen verliert nur Belegnummer, Kilometerstände,
+Veranlassung und Kennzahl, nicht die Reise selbst oder ihre Beträge.
+
 ## Beziehungen
 
 - Buchung → genau ein Kunde und optional ein Projekt; Reise analog.

@@ -24,6 +24,20 @@ use Illuminate\Validation\Rule;
  */
 class EurTravelController extends Controller
 {
+    /** EUE-073: die ODS verwendet genau diese Bezeichnung der Veranlassung. */
+    private const PURPOSE_PRIVATE = 'Privat';
+
+    private const PURPOSE_BUSINESS = 'Geschäftlich';
+
+    /** EUE-081: Reisekennzahl im Ausgabenjournal. */
+    private const TRAVEL_E1A_CODE = '9160';
+
+    /** EUE-073: gespeicherte Veranlassung privat → nicht abziehbar. */
+    private static function isPrivatePurpose(?string $purpose): bool
+    {
+        return $purpose !== null && mb_strtolower(trim($purpose), 'UTF-8') === 'privat';
+    }
+
     public function calculate(Request $request): JsonResponse
     {
         $data = $request->validate($this->travelRules());
@@ -62,11 +76,21 @@ class EurTravelController extends Controller
     /** Speichert eine serverseitig berechnete Reisezeile (D-83a). */
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate($this->travelRules() + ['note' => 'nullable|string|max:500']);
+        $data = $request->validate(array_merge($this->travelRules(), [
+            'receipt_no' => 'required|string|max:64',
+            'note' => 'nullable|string|max:500',
+        ]));
         $gate = $this->countryTableGate((int) $data['year']);
 
         if ($gate !== null) {
             return $gate;
+        }
+
+        // EUE-077: eine Belegnummer gehört zu genau einer Reise des Brands.
+        if (EurTravelTrip::forCurrentBrand()->where('receipt_no', trim((string) $data['receipt_no']))->exists()) {
+            return response()->json([
+                'message' => 'Diese Belegnummer ist bereits für eine andere Reise vergeben.',
+            ], 422);
         }
 
         $result = $this->compute($data);
@@ -74,6 +98,11 @@ class EurTravelController extends Controller
             'brand' => BrandRegistry::currentId(),
             'year' => $result['year'],
             'month' => isset($data['month']) ? (int) $data['month'] : null,
+            'receipt_no' => trim((string) $data['receipt_no']),
+            'start_km' => isset($data['start_km']) ? (int) $data['start_km'] : null,
+            'end_km' => isset($data['end_km']) ? (int) $data['end_km'] : null,
+            'purpose' => $data['purpose'] ?? null,
+            'e1a_code' => self::TRAVEL_E1A_CODE,
             'vehicle' => (string) $data['vehicle'],
             'kilometres' => $result['kilometres'],
             'passengers' => (int) ($data['passengers'] ?? 0),
@@ -116,9 +145,14 @@ class EurTravelController extends Controller
             'year' => ['required', 'integer', Rule::in(EurYear::SUPPORTED)],
             'month' => 'nullable|integer|min:1|max:12',
             'vehicle' => ['required', 'string', Rule::in(array_column($tables->vehicleTypes(), 'name'))],
-            'kilometres' => 'required|integer|min:0|max:100000',
+            // EUE-067: entweder die Distanz oder Start-/Endstand, nie beides.
+            'kilometres' => ['nullable', 'integer', 'min:0', 'max:1000000', 'required_without:start_km', 'prohibits:start_km,end_km'],
+            'start_km' => ['nullable', 'integer', 'min:0', 'prohibits:kilometres', 'required_with:end_km'],
+            'end_km' => ['nullable', 'integer', 'min:0', 'prohibits:kilometres', 'required_with:start_km', 'gt:start_km'],
             'passengers' => 'nullable|integer|min:0|max:6',
             'country' => ['required', 'string', Rule::in($travel->countries())],
+            'purpose' => ['nullable', 'string', Rule::in([self::PURPOSE_BUSINESS, self::PURPOSE_PRIVATE])],
+            'receipt_no' => 'nullable|string|max:64',
             'days' => 'required|integer|min:1|max:366',
             'meals' => 'required|integer|min:0|max:2',
             'with_receipts' => 'required|boolean',
@@ -149,14 +183,18 @@ class EurTravelController extends Controller
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array<string, int>
+     * @return array<string, int|bool|string|null>
      */
     private function compute(array $data): array
     {
         $calculator = new TravelCalculator(new RuleValues, ReferenceTables::load()->travel());
 
         $passengers = (int) ($data['passengers'] ?? 0);
-        $kilometres = (int) $data['kilometres'];
+        $kilometres = isset($data['start_km'], $data['end_km'])
+            ? (int) $data['end_km'] - (int) $data['start_km']
+            : (int) $data['kilometres'];
+        $purpose = isset($data['purpose']) ? (string) $data['purpose'] : null;
+        $isPrivate = self::isPrivatePurpose($purpose);
         $days = (int) $data['days'];
         $meals = (int) $data['meals'];
         $withReceipts = (bool) $data['with_receipts'];
@@ -168,14 +206,12 @@ class EurTravelController extends Controller
         $daily = $calculator->dailyAllowancesCents($data['country'], $days, $meals, $withReceipts, $year);
         $total = $drive + $daily['day_cents'] + $daily['night_cents'];
 
-        return [
-            'year' => $year,
-            'kilometres' => $kilometres,
-            'kilometre_cents' => $drive,
-            'day_cents' => $daily['day_cents'],
-            'night_cents' => $daily['night_cents'],
-            'total_cents' => $total,
-            'business_cents' => $calculator->businessTravelCostsCents(
+        // EUE-073: bei privater Veranlassung bleibt die Reise in der Liste
+        // sichtbar, der betriebliche (abziehbare) Anteil wird aber auf 0
+        // gesetzt — genau wie FR!BA3/AT3 der ODS.
+        $businessCents = $isPrivate
+            ? 0
+            : $calculator->businessTravelCostsCents(
                 $data['vehicle'],
                 $kilometres,
                 $passengers,
@@ -184,7 +220,17 @@ class EurTravelController extends Controller
                 $meals,
                 $withReceipts,
                 $share,
-            ),
+            );
+
+        return [
+            'year' => $year,
+            'kilometres' => $kilometres,
+            'kilometre_cents' => $drive,
+            'day_cents' => $daily['day_cents'],
+            'night_cents' => $daily['night_cents'],
+            'total_cents' => $total,
+            'business_cents' => $businessCents,
+            'deductible' => ! $isPrivate,
         ];
     }
 
@@ -197,10 +243,16 @@ class EurTravelController extends Controller
             'id' => (int) $trip->id,
             'year' => (int) $trip->year,
             'month' => $trip->month === null ? null : (int) $trip->month,
+            'receipt_no' => $trip->receipt_no,
             'vehicle' => (string) $trip->vehicle,
             'kilometres' => (int) $trip->kilometres,
+            'start_km' => $trip->start_km === null ? null : (int) $trip->start_km,
+            'end_km' => $trip->end_km === null ? null : (int) $trip->end_km,
             'passengers' => (int) $trip->passengers,
             'country' => (string) $trip->country,
+            'purpose' => $trip->purpose,
+            'e1a_code' => $trip->e1a_code,
+            'deductible' => ! self::isPrivatePurpose($trip->purpose),
             'days' => (int) $trip->days,
             'meals' => (int) $trip->meals,
             'with_receipts' => (bool) $trip->with_receipts,
