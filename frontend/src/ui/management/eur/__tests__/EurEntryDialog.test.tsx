@@ -21,6 +21,7 @@ const reference = {
         {kind: 'Bar', opening_balance_cents: 10000},
     ],
     eur_projects: [{id: 7, name: 'Projekt A'}],
+    vat_kinds: ['Reverse Charge 20 %', 'IG-Erwerb 20 %'],
 } as unknown as EurReference;
 
 function renderDialog() {
@@ -152,6 +153,33 @@ describe('EurEntryDialog', () => {
 
         expect(screen.getByText('Bitte eine Art auswählen')).toBeVisible();
         expect(screen.getByRole('button', {name: 'Buchung speichern'})).toBeDisabled();
+    });
+
+    it('sendet die gewählte USt-Behandlung als vat_kind, sonst null (EUE-039/040)', async () => {
+        const user = userEvent.setup();
+        renderDialog();
+
+        await user.selectOptions(screen.getByLabelText('Art'), 'Bürobedarf');
+        await user.type(screen.getByLabelText('Betrag (€)'), '50');
+        await user.selectOptions(screen.getByLabelText('USt-Behandlung'), 'IG-Erwerb 20 %');
+        await user.click(screen.getByRole('button', {name: 'Buchung speichern'}));
+
+        expect(createEurEntry).toHaveBeenCalledWith(expect.objectContaining({
+            vat_kind: 'IG-Erwerb 20 %',
+        }));
+    });
+
+    it('sendet vat_kind null ohne Auswahl (EUE-039/040)', async () => {
+        const user = userEvent.setup();
+        renderDialog();
+
+        await user.selectOptions(screen.getByLabelText('Art'), 'Bürobedarf');
+        await user.type(screen.getByLabelText('Betrag (€)'), '50');
+        await user.click(screen.getByRole('button', {name: 'Buchung speichern'}));
+
+        expect(createEurEntry).toHaveBeenCalledWith(expect.objectContaining({
+            vat_kind: null,
+        }));
     });
 
     it('sendet den Katalog-Typ unverändert als kind_type (EUE-029-Vertragskette)', async () => {

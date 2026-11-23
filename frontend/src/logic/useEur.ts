@@ -577,6 +577,8 @@ export interface EurEntryPayload {
     /** EUE-005/006: Zahlungsart und Projekt der Buchung. */
     payment_method?: string | null;
     eur_project_id?: number | null;
+    /** EUE-039/040: USt-Behandlung (IG-Erwerb / Reverse Charge) der Buchung. */
+    vat_kind?: string | null;
 }
 
 export async function createEurEntry(payload: EurEntryPayload): Promise<void> {

@@ -46,6 +46,8 @@ const createEurEntrySchema = () => z.object({
     // EUE-005/006: optionale Zuordnung, '' bedeutet "nicht gesetzt".
     paymentMethod: z.string(),
     projectId: z.string(),
+    // EUE-039/040: optionale USt-Behandlung aus dem gepinnten Katalog.
+    vatKind: z.string(),
 });
 
 type EurEntryFormValues = z.infer<ReturnType<typeof createEurEntrySchema>>;
@@ -59,6 +61,7 @@ const INITIAL: EurEntryFormValues = {
     receiptNo: '',
     paymentMethod: '',
     projectId: '',
+    vatKind: '',
 };
 
 // The reference table stores descriptive labels such as
@@ -127,6 +130,7 @@ export default function EurEntryDialog({year, reference, onClose, onCreated}: Pr
                 receipt_no: values.receiptNo === '' ? null : values.receiptNo,
                 payment_method: values.paymentMethod === '' ? null : values.paymentMethod,
                 eur_project_id: values.projectId === '' ? null : Number(values.projectId),
+                vat_kind: values.vatKind === '' ? null : values.vatKind,
             });
             onCreated();
             onClose();
@@ -211,6 +215,15 @@ export default function EurEntryDialog({year, reference, onClose, onCreated}: Pr
                             <option value="">—</option>
                             {(reference?.eur_projects ?? []).map((project) => (
                                 <option key={project.id} value={project.id}>{project.name}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="form-control">
+                        <span className="label-text"><Trans>USt-Behandlung</Trans></span>
+                        <select className="select select-bordered" {...register('vatKind')}>
+                            <option value="">—</option>
+                            {(reference?.vat_kinds ?? []).map((kind) => (
+                                <option key={kind} value={kind}>{kind}</option>
                             ))}
                         </select>
                     </label>

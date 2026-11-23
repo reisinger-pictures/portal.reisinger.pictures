@@ -52,6 +52,9 @@ test.describe('EAR sub-application', () => {
         await expect(dialog.getByLabel('Zahlungsart')).toBeVisible();
         await dialog.getByLabel('Zahlungsart').selectOption({ label: 'Bar' });
         await expect(dialog.getByLabel('Projekt')).toBeVisible();
+        // EUE-039/040: USt-Behandlung (Reverse Charge / IG-Erwerb) ist wählbar.
+        await expect(dialog.getByLabel('USt-Behandlung')).toBeVisible();
+        await dialog.getByLabel('USt-Behandlung').selectOption({ label: 'IG-Erwerb 20 %' });
         await dialog.getByRole('button', { name: 'Buchung speichern' }).click();
         await expect(dialog).toHaveCount(0);
 

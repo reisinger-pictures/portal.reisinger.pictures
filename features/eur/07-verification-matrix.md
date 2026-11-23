@@ -85,8 +85,8 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | Regel-ID | Fachliche Wirkung (gekürzt) | Hergeleiteter Wert | Testnachweis |
 |---|---|---|---|
 | EUE-038 | Die betriebliche Ausgabe ergibt sich aus dem Betrag mal dem hinterlegten betrieblichen Anteil; ohne Anteil gilt der volle Betrag. Es gibt keine 'VST'- | Verhalten (kein Skalarwert) | E1StatementTest.php:57-70 (business_share 50 -> 500 ct) |
-| EUE-039 | Die IG-Erwerb-Vorsteuer wird mit dem jeweiligen Steuersatz (20/10/13/4,9 %) auf den Nettobetrag berechnet. | IG-Sätze=20/10/13/4,9 % | JournalRulesTest.php |
-| EUE-040 | Die Steuerschuld aus Reverse Charge wird analog mit 20/10/13 % berechnet. | RC-Sätze=20/10/13 % | JournalRules::RC_RATES, JournalRulesTest.php:45-62 (20/10/13 %) |
+| EUE-039 | Die IG-Erwerb-Vorsteuer wird mit dem jeweiligen Steuersatz (20/10/13/4,9 %) auf den Nettobetrag berechnet. | IG-Sätze=20/10/13/4,9 % | JournalRulesTest.php; `vat_kind` aus dem Katalog ist im Buchungsdialog wählbar und wird gespeichert (EurEntryDialog, Vitest/E2E) |
+| EUE-040 | Die Steuerschuld aus Reverse Charge wird analog mit 20/10/13 % berechnet. | RC-Sätze=20/10/13 % | JournalRules::RC_RATES, JournalRulesTest.php:45-62 (20/10/13 %); `vat_kind` wie EUE-039 |
 | EUE-041 | Die Kennzahl kommt aus der hinterlegten Zuordnung der Ausgabenarten; ohne Zuordnung gilt die Kennzahl 9230 für übrige Betriebsausgaben. | KZ: 9230 | JournalRules::expenseCode, JournalRulesTest.php:14-22 (9230) |
 | EUE-042 | Fehlende Belegnummer erzeugt den Hinweis auf die Beweispflicht, fehlender Monat/Tag/Art oder eine undefinierte Art erzeugt ⚠; bei FSVG entfällt der WE | Verhalten (kein Skalarwert) | JournalRulesTest.php |
 | EUE-043 | Für Wareneinkäufe wird geprüft, ob die Belegnummer im WEB vorkommt; sonst erscheint ein Hinweis. | KZ: 9100 | JournalRules.php (WEB-Check bei KZ 9100), JournalRulesTest.php |

@@ -8549,6 +8549,10 @@ msgstr "URL Slug"
 msgid "USt"
 msgstr "USt"
 
+#: src/ui/management/eur/EurEntryDialog.tsx
+msgid "USt-Behandlung"
+msgstr "USt-Behandlung"
+
 #: src/ui/management/eur/EurMonthPanel.tsx
 msgid "USt-Kennzahlen"
 msgstr "USt-Kennzahlen"
