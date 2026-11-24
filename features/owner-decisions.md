@@ -573,3 +573,25 @@ document store (D-89 stands). The decision:
 
 The schema decision is recorded in `eur/04-data-model.md` (V074); all amounts
 remain whole cents and every new query is brand-scoped.
+
+### D-91: FinanzOnline is filled in manually from the portal's ODS-aligned values
+
+The owner decided on 2026-11-24 (issue #61) that the Austrian tax declaration
+is **entered by hand in FinanzOnline**, using the ODS *Ausfüllhilfe* from
+`ku-online` as the field guide. The portal is therefore a **value provider and
+working-paper tool**, not a filing client:
+
+- No ELSTER/FinanzOnline client, electronic submission, XML return or qualified
+  signature is in scope. Those are not blockers for the owner's workflow.
+- The portal must instead expose **every value the Ausfüllhilfe asks for**, in
+  the form and order of the pinned ODS sheets, so the owner can transfer it
+  without recalculating: E1A/E1B codes, USt Kennzahlen, SV (including the booked
+  `9225` entries), the income-tax fields (U13/U23/U24/U25/U26/U27/U29,
+  J12/K12/N5/I12/I14/I16), and the monthly/project cross-checks.
+- Values remain whole cents internally; the portal formats them for display and
+  keeps the pinned rule logic (`features/eur/cleanroom/`). Where the portal
+  deliberately deviates from the workbook (D-79 FSVG minimum, D-85/D-89/D-90
+  asset/group conventions, D-86 travel structure), the deviation must be
+  visible next to the value so the owner can decide what to enter.
+- External tax review remains the acceptance gate; this decision does not
+  claim tax correctness.
