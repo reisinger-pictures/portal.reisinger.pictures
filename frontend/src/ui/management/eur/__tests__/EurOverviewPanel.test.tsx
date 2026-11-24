@@ -24,9 +24,9 @@ function settings(overrides: Partial<EurSettings> = {}): EurSettings {
     };
 }
 
-function renderPanel(value: EurSettings) {
+function renderPanel(value: EurSettings, override: Partial<EurSummary> = {}) {
     return renderWithProviders(
-        <EurOverviewPanel summary={summary} settings={value} isLoading={false} error={undefined} onRetry={vi.fn()}/>,
+        <EurOverviewPanel summary={{...summary, ...override}} settings={value} isLoading={false} error={undefined} onRetry={vi.fn()}/>,
     );
 }
 
@@ -56,5 +56,37 @@ describe('EurOverviewPanel settings labels', () => {
         renderPanel(settings({sv_mode: 'fsvg'}));
 
         expect(screen.getByText(/Sozialversicherung: FSVG/)).toBeVisible();
+    });
+
+    it('reminds of the real 9225 booking when a quarter is open (Portal #58)', () => {
+        renderPanel(settings(), {
+            sv_reminder: {
+                target_per_quarter_cents: 3800,
+                quarters: [
+                    {quarter: 1, booked_cents: 0, done: false},
+                    {quarter: 2, booked_cents: 3800, done: true},
+                    {quarter: 3, booked_cents: 0, done: false},
+                    {quarter: 4, booked_cents: 0, done: false},
+                ],
+                open_quarters: [1, 3, 4],
+                message: '⚠ Sozialversicherung: noch keine ausreichende 9225-Buchung für Q1, Q3, Q4 2026. Bitte als Ausgabe mit KZ 9225 erfassen.',
+            },
+        });
+
+        expect(screen.getByRole('status')).toHaveTextContent('Q1, Q3, Q4 2026');
+        expect(screen.getByRole('status')).toHaveTextContent('KZ 9225');
+    });
+
+    it('shows no reminder when every quarter is booked', () => {
+        renderPanel(settings(), {
+            sv_reminder: {
+                target_per_quarter_cents: 3800,
+                quarters: [1, 2, 3, 4].map((quarter) => ({quarter, booked_cents: 3800, done: true})),
+                open_quarters: [],
+                message: null,
+            },
+        });
+
+        expect(screen.queryByText(/Sozialversicherung: noch keine/)).not.toBeInTheDocument();
     });
 });

@@ -14,6 +14,7 @@ use App\Models\EurHour;
 use App\Models\EurMonthlyReport;
 use App\Models\EurSignature;
 use App\Models\EurWarehouseEntry;
+use App\Services\Eur\EurSvBookingReminder;
 use App\Support\BrandRegistry;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +31,8 @@ use InvalidArgumentException;
  */
 class EurMonthController extends Controller
 {
+    public function __construct(private readonly EurSvBookingReminder $svReminder) {}
+
     public function show(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -41,6 +44,12 @@ class EurMonthController extends Controller
         $month = (int) $data['month'];
 
         $entries = EurEntry::forCurrentBrand()->where('year', $year)->where('month', $month)->get();
+        $quarter = intdiv($month - 1, 3) + 1;
+        $quarterBookedSv = (int) EurEntry::forCurrentBrand()
+            ->where('year', $year)
+            ->whereBetween('month', [($quarter - 1) * 3 + 1, $quarter * 3])
+            ->where('e1a_code', 'like', '9225%')
+            ->sum('business_amount_cents');
         $warehouse = EurWarehouseEntry::forCurrentBrand()->where('year', $year)->where('month', $month)->get();
         $hours = EurHour::forCurrentBrand()->where('year', $year)->where('month', $month)->get();
         $report = EurMonthlyReport::forCurrentBrand()->where('year', $year)->where('month', $month)->first();
@@ -77,6 +86,13 @@ class EurMonthController extends Controller
                 $year,
                 $month,
             );
+        }
+
+        // Portal #58: Quartalserinnerung nur in den Quartalsmonaten, rein
+        // hinweisend — der Monatsabschluss bleibt unverändert möglich.
+        $quarterCheck = $this->svReminder->quarterEndCheck($year, $month, $quarterBookedSv);
+        if ($quarterCheck !== null) {
+            $payload['checks'][] = $quarterCheck;
         }
 
         return response()->json(array_replace($this->defaults($year, $month), $payload));

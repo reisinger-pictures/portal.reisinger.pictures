@@ -88,6 +88,13 @@ export interface EurByCustomer {
     margin_cents: number;
 }
 
+export interface EurSvReminder {
+    target_per_quarter_cents: number;
+    quarters: Array<{quarter: number; booked_cents: number; done: boolean}>;
+    open_quarters: number[];
+    message: string | null;
+}
+
 export interface EurSummary {
     year: number;
     entry_count: number;
@@ -98,6 +105,8 @@ export interface EurSummary {
     profit_cents: number;
     /** Additive fields from the completed EAR summary contract; optional so older payloads stay renderable. */
     sv_monthly?: EurSvMonthly[];
+    /** Portal #58: nicht blockierende Erinnerung an die 9225-Buchung. */
+    sv_reminder?: EurSvReminder;
     insurance_blocks?: EurInsuranceBlock[];
     afa_card?: EurAfaCard;
     by_customer?: EurByCustomer[];

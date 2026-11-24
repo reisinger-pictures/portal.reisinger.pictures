@@ -64,9 +64,13 @@ test.describe('EAR · Anlagegruppen (D-89)', () => {
 
         const panel = await openGroups(page);
         const groupName = `Set-${suffix}`;
-        await panel.getByLabel('Name der Gruppe').fill(groupName);
-        await panel.getByRole('combobox', { name: 'Betriebsanteil', exact: true }).selectOption('30');
-        await panel.getByRole('button', { name: 'Gruppe anlegen' }).click();
+        // Der Label-Text enthält alle Options-Texte, daher ist der accessible
+        // Name der Selects nie exakt "Betriebsanteil". Scope auf das einzige
+        // <form> im Panel (die Karten-Selects liegen in keinem Formular).
+        const createForm = panel.locator('form');
+        await createForm.locator('input[type="text"]').fill(groupName);
+        await createForm.locator('select').selectOption('30');
+        await createForm.getByRole('button', { name: 'Gruppe anlegen' }).click();
 
         const groupsResponse = await page.request.get('/api/management/eur/asset-groups', { headers });
         expect(groupsResponse.ok()).toBe(true);

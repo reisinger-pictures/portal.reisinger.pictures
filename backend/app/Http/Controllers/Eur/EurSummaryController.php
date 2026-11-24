@@ -10,6 +10,7 @@ use App\Models\EurDocument;
 use App\Models\EurEntry;
 use App\Models\EurSignature;
 use App\Services\Eur\EurOverviewService;
+use App\Services\Eur\EurSvBookingReminder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -24,7 +25,10 @@ use Illuminate\Validation\Rule;
  */
 class EurSummaryController extends Controller
 {
-    public function __construct(private readonly EurOverviewService $overview) {}
+    public function __construct(
+        private readonly EurOverviewService $overview,
+        private readonly EurSvBookingReminder $svReminder,
+    ) {}
 
     public function show(Request $request): JsonResponse
     {
@@ -65,6 +69,8 @@ class EurSummaryController extends Controller
             'income_cents' => $income,
             'expense_cents' => $expense,
             'booked_sv_cents' => $bookedSv,
+            // Portal #58: nicht blockierende Erinnerung an die reale 9225-Buchung.
+            'sv_reminder' => $this->svReminder->forYear($year, $entries),
             'afa_cents' => $afa,
             'profit_cents' => $profit,
             'sv_monthly' => $svMonthly,

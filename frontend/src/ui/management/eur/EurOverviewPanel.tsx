@@ -82,6 +82,7 @@ export default function EurOverviewPanel({summary, settings, isLoading, error, o
     const kleinunternehmerLabel = settings?.kleinunternehmer ? t`Ja` : t`Nein`;
 
     const svMonthly = summary.sv_monthly ?? [];
+    const svReminder = summary.sv_reminder;
     const insuranceBlocks = summary.insurance_blocks ?? [];
     const afaCard = summary.afa_card;
     const byCustomer = summary.by_customer ?? [];
@@ -122,6 +123,9 @@ export default function EurOverviewPanel({summary, settings, isLoading, error, o
                 <div className="divider my-4"/>
 
                 <h3 className="font-semibold"><Trans>Sozialversicherung je Monat</Trans></h3>
+                {svReminder?.message && (
+                    <p className="alert alert-warning mt-2" role="status">{svReminder.message}</p>
+                )}
                 {svMonthly.length === 0 ? (
                     <p className="text-sm opacity-70 mt-1">
                         <Trans>Für dieses Jahr sind keine monatlichen Sozialversicherungswerte hinterlegt.</Trans>

@@ -62,6 +62,20 @@ Body (POST/PUT). Erlaubt sind 2024–2026; ein anderer Wert ist ein 422 mit
 }
 ```
 
+Portal #58 ergänzt zwei **nicht blockierende** Hinweise zur realen SV-Buchung
+(38,00 € je Quartal, KZ 9225). `GET /eur/summary` liefert zusätzlich
+`sv_reminder` mit `target_per_quarter_cents` (3800), `quarters`
+(`quarter`, `booked_cents`, `done` für Q1–Q4), `open_quarters` und einem
+deutschen `message` (null, wenn alle Quartale gedeckt sind). Die Summe zählt
+brand-scoped alle 9225-Buchungen der jeweiligen Quartalsmonate; mehrere
+Buchungen addieren sich in ganzen Cent. Der Wert wird **nicht** aus
+`svMonthly()` hergeleitet und verändert weder `booked_sv_cents` noch die
+SV-Berechnung (EUE-109/115, D-79 bleiben unberührt). `GET /eur/month` enthält
+in den Quartalsmonaten 3/6/9/12 zusätzlich einen Check mit `code: "SV-9225"`
+im bestehenden `checks`-Array (`JournalRules::check`-Form mit ⚠/💡); außerhalb
+dieser Monate erscheint er nicht. Der Monatsabschluss bleibt uneingeschränkt
+möglich.
+
 `GET /eur/help-texts` und `GET /eur/help-texts?kz=9216` liefern die
 Ausfüllhilfe je Kennzahl aus dem gepinnten Artefakt
 `artifacts/verification/e1a-ausfuellhilfe.md`, Abschnitt 3. Jede Zeile hat
