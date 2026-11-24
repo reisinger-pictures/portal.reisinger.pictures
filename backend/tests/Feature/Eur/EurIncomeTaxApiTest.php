@@ -215,4 +215,110 @@ class EurIncomeTaxApiTest extends EurBookkeepingTestCase
             'prepayment_cents' => -1,
         ])->assertUnprocessable()->assertJsonValidationErrors('prepayment_cents');
     }
+
+    public function test_calc_accepts_the_shipped_frontend_payload(): void
+    {
+        $months = [];
+
+        for ($month = 1; $month <= 6; $month++) {
+            $months[] = ['month' => $month, 'gross_profit_cents' => 100000, 'hours_minutes' => 600];
+        }
+
+        $response = $this->withHeaders($this->bearer($this->tokenFor()))->postJson('/api/management/eur/est/calc', [
+            'year' => 2026,
+            'profit_cents' => 200000,
+            'mode' => 'other_profits',
+            'employment_income_cents' => 2000000,
+            'wage_tax_cents' => 50000,
+            'prepayment_cents' => 100000,
+            'arbeitsplatzpauschale_cents' => 120000,
+            'ergonomisches_mobiliar_cents' => 30000,
+            'prognose' => true,
+            'business_forecast_cents' => 25000,
+            'entries' => [
+                ['direction' => 'income', 'code' => '9040', 'amount_cents' => 200000],
+                ['direction' => 'expense', 'code' => '9130', 'amount_cents' => 20000],
+                ['direction' => 'income', 'code' => 'E1B 9460', 'amount_cents' => 50000],
+            ],
+            'months' => $months,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('mode', 'other_profits')
+            ->assertJsonPath('steuerbilanz.pauschalen.e40_code', '9217')
+            ->assertJsonPath('steuerbilanz.pauschalen.e39_code', '9216')
+            ->assertJsonPath('steuerbilanz.pauschalen.e39_warning', 'Wert löschen (wegen 9217 große Pauschale) →')
+            ->assertJsonPath('est_allocation.prepayment_cents', 100000)
+            ->assertJsonPath('est_allocation.wage_tax_cents', 50000)
+            ->assertJsonPath('kz.U26', 100000)
+            ->assertJsonPath('kz.260', 50000)
+            ->assertJsonPath('kz.U8', 25000) // expliziter Wert hat Vorrang
+            ->assertJsonPath('kz.U13', 50000) // 50000 / 6 * 12 − 50000
+            ->assertJsonPath('e1a_e1b.E1A.9040', 200000)
+            ->assertJsonPath('e1a_e1b.E1B.9460', 50000);
+    }
+
+    public function test_calc_accepts_all_six_modes_and_hides_u24_for_gross_wage(): void
+    {
+        $token = $this->withHeaders($this->bearer($this->tokenFor()));
+
+        foreach (['total', 'business', 'rental', 'forecast', 'gross_wage', 'other_profits'] as $mode) {
+            $response = $token->postJson('/api/management/eur/est/calc', [
+                'profit_cents' => 200000,
+                'mode' => $mode,
+            ]);
+            $response->assertOk()->assertJsonPath('mode', $mode);
+
+            if ($mode === 'gross_wage') {
+                $response->assertJsonPath('est_allocation.business_tax_cents', null);
+            }
+        }
+    }
+
+    public function test_calc_reads_booked_sv_from_code_and_e1a_code(): void
+    {
+        $token = $this->withHeaders($this->bearer($this->tokenFor()));
+        $months = [];
+
+        for ($month = 1; $month <= 12; $month++) {
+            $months[] = ['month' => $month, 'gross_profit_cents' => 100000, 'hours_minutes' => 600];
+        }
+
+        $payload = static fn (string $key): array => [
+            'year' => 2026,
+            'profit_cents' => 2000000,
+            'mode' => 'total',
+            'months' => $months,
+            'entries' => [
+                ['direction' => 'income', 'code' => '9040', 'amount_cents' => 2000000],
+                ['direction' => 'expense', $key => '9225', 'amount_cents' => 100000],
+            ],
+        ];
+
+        $fromCode = $token->postJson('/api/management/eur/est/calc', $payload('code'));
+        $fromE1aCode = $token->postJson('/api/management/eur/est/calc', $payload('e1a_code'));
+
+        $fromCode->assertOk();
+        $fromE1aCode->assertOk();
+        $this->assertSame(
+            $fromCode->json('monthlyResults.annual.sv_cents'),
+            $fromE1aCode->json('monthlyResults.annual.sv_cents'),
+        );
+        $this->assertGreaterThan(0, $fromE1aCode->json('monthlyResults.annual.sv_cents'));
+    }
+
+    public function test_invalid_prognose_and_negative_forecast_are_rejected(): void
+    {
+        $token = $this->withHeaders($this->bearer($this->tokenFor()));
+
+        $token->postJson('/api/management/eur/est/calc', [
+            'profit_cents' => 100,
+            'prognose' => 'vielleicht',
+        ])->assertUnprocessable()->assertJsonValidationErrors('prognose');
+
+        $token->postJson('/api/management/eur/est/calc', [
+            'profit_cents' => 100,
+            'business_forecast_cents' => -1,
+        ])->assertUnprocessable()->assertJsonValidationErrors('business_forecast_cents');
+    }
 }

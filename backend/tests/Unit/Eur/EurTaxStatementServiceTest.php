@@ -59,6 +59,7 @@ class EurTaxStatementServiceTest extends TestCase
             '245' => 30000,
             '260' => 4000,
             'U12' => 50000,
+            'U8' => 0, // ohne Prognose bleibt die Hochrechnung leer
             'U13' => 7000,
             'U26' => 5000,
             'E40' => 20000,
@@ -132,5 +133,111 @@ class EurTaxStatementServiceTest extends TestCase
         $this->expectExceptionMessage('Unbekannter Steuer-Modus');
 
         $this->service->build(2026, 'unknown', [], [], 0);
+    }
+
+    public function test_pauschalen_warnings_use_the_pinned_german_literals(): void
+    {
+        $tooHigh = $this->service->build(2026, 'total', [], [
+            'arbeitsplatzpauschale_cents' => 130000, // 1.300 € über der Obergrenze
+        ], 0)['steuerbilanz']['pauschalen'];
+        $this->assertNull($tooHigh['e40_code']);
+        $this->assertSame('Falscher Betrag', $tooHigh['e40_warning']);
+
+        $tooLow = $this->service->build(2026, 'total', [], [
+            'arbeitsplatzpauschale_cents' => 1000, // 10 € unter der Untergrenze
+        ], 0)['steuerbilanz']['pauschalen'];
+        $this->assertSame('Falscher Betrag', $tooLow['e40_warning']);
+
+        // Ein leeres Feld ist kein falscher Betrag.
+        $empty = $this->service->build(2026, 'total', [], [], 0)['steuerbilanz']['pauschalen'];
+        $this->assertNull($empty['e40_warning']);
+
+        $large = $this->service->build(2026, 'total', [], [
+            'arbeitsplatzpauschale_cents' => 120000, // 9217 bei genau 1.200 €
+            'ergonomisches_mobiliar_cents' => 30000, // 9216 bei genau 300 €
+        ], 0)['steuerbilanz']['pauschalen'];
+        $this->assertSame('9217', $large['e40_code']);
+        $this->assertNull($large['e40_warning']);
+        // 9217 underdrückt 9216 nicht, erzeugt aber die gepinnte Warnung.
+        $this->assertSame('9216', $large['e39_code']);
+        $this->assertSame('Wert löschen (wegen 9217 große Pauschale) →', $large['e39_warning']);
+
+        $suppressed = $this->service->build(2026, 'total', [], [
+            'arbeitsplatzpauschale_cents' => 120000,
+            'ergonomisches_mobiliar_cents' => 30000,
+            'arbeitszimmer_cents' => 5000, // 9275
+        ], 0)['steuerbilanz']['pauschalen'];
+        $this->assertNull($suppressed['e40_warning']);
+        $this->assertNull($suppressed['e39_warning']);
+    }
+
+    public function test_prognose_projects_u8_and_u13_from_the_filled_months(): void
+    {
+        // E1A: 120000 − 20000 = 100000 ct; E1B: 70000 − 20000 = 50000 ct.
+        $entries = [
+            ['direction' => 'income', 'code' => '9040', 'amount_cents' => 120000],
+            ['direction' => 'expense', 'code' => '9130', 'amount_cents' => 20000],
+            ['direction' => 'income', 'code' => 'E1B 9460', 'amount_cents' => 70000],
+            ['direction' => 'expense', 'code' => 'E1B 9530', 'amount_cents' => 20000],
+        ];
+        $months = [];
+
+        for ($month = 1; $month <= 7; $month++) {
+            $months[] = ['month' => $month, 'gross_profit_cents' => 100000, 'hours_minutes' => 600];
+        }
+
+        $result = $this->service->build(2026, 'total', $entries, [
+            'prognose' => true,
+            'months' => $months,
+        ], 0);
+
+        // 100000 / 7 * 12 − 100000 = 71428,57… → ganze Cent kaufmännisch gerundet.
+        $this->assertSame(71429, $result['kz']['U8']);
+        // 50000 / 7 * 12 − 50000 = 35714,28… → ganze Cent.
+        $this->assertSame(35714, $result['kz']['U13']);
+
+        $noMonths = $this->service->build(2026, 'total', $entries, ['prognose' => true], 0);
+        $this->assertSame(0, $noMonths['kz']['U8']); // Nullteiler → 0
+        $this->assertSame(0, $noMonths['kz']['U13']);
+
+        $noPrognose = $this->service->build(2026, 'total', $entries, ['months' => $months], 0);
+        $this->assertSame(0, $noPrognose['kz']['U8']);
+        $this->assertSame(0, $noPrognose['kz']['U13']);
+
+        $explicit = $this->service->build(2026, 'total', $entries, [
+            'prognose' => true,
+            'months' => $months,
+            'business_forecast_cents' => 25000,
+            'rental_forecast_cents' => 7000,
+        ], 0);
+        $this->assertSame(25000, $explicit['kz']['U8']);
+        $this->assertSame(7000, $explicit['kz']['U13']);
+    }
+
+    public function test_prognose_respects_the_mode_specific_exclusions_and_new_modes(): void
+    {
+        $entries = $this->entries();
+        $months = [['month' => 1, 'gross_profit_cents' => 100000]];
+
+        $business = $this->service->build(2026, 'business', $entries, [
+            'prognose' => true,
+            'months' => $months,
+        ], 0);
+        $this->assertGreaterThan(0, $business['kz']['U8']);
+        $this->assertSame(0, $business['kz']['U13']); // "Nur Betrieb" schließt Vermietung aus.
+
+        $rental = $this->service->build(2026, 'rental', $entries, [
+            'prognose' => true,
+            'months' => $months,
+        ], 0);
+        $this->assertSame(0, $rental['kz']['U8']); // "Nur Vermietung" schließt den Betrieb aus.
+        $this->assertGreaterThan(0, $rental['kz']['U13']);
+
+        foreach (['gross_wage', 'other_profits'] as $mode) {
+            $result = $this->service->build(2026, $mode, $entries, ['prognose' => true, 'months' => $months], 0);
+            $this->assertArrayHasKey('kz', $result);
+            $this->assertIsInt($result['kz']['U8']);
+            $this->assertIsInt($result['kz']['U13']);
+        }
     }
 }

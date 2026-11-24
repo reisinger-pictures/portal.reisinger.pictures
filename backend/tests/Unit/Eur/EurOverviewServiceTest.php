@@ -59,6 +59,37 @@ class EurOverviewServiceTest extends TestCase
         $this->assertSame(3747, $first['kv_cents']);
     }
 
+    public function test_other_profits_est_mode_drops_only_the_9225_surcharge(): void
+    {
+        $service = $this->service();
+
+        $withBooking = $service->svMonthly(2026, 1000000, 100000)[0];
+        $defaultMode = $service->svMonthly(2026, 1000000, 100000, 'total')[0];
+        $otherProfits = $service->svMonthly(2026, 1000000, 100000, 'other_profits')[0];
+        $withoutBooking = $service->svMonthly(2026, 1000000, 0)[0];
+
+        // Der Default erhält das bisherige Verhalten.
+        $this->assertSame($withBooking, $defaultMode);
+        // EUE-115: "Nur andere Gewinne" ist ein Est-Modus, kein SV-Modus —
+        // nur der Zuschlag entfällt, der Mindest-KV bleibt erhalten.
+        $this->assertSame($withoutBooking['kv_cents'], $otherProfits['kv_cents']);
+        $this->assertSame($withoutBooking['svs_cents'], $otherProfits['svs_cents']);
+        $this->assertGreaterThan($otherProfits['kv_cents'], $withBooking['kv_cents']);
+    }
+
+    public function test_the_booked_sv_exception_is_an_sv_mode_not_an_est_mode(): void
+    {
+        $this->assertFalse($this->service('uv_only')->excludeBookedSvFromExpenses());
+        $this->assertTrue($this->service()->excludeBookedSvFromExpenses());
+    }
+
+    public function test_the_cap_hint_survives_the_other_profits_mode(): void
+    {
+        $rows = $this->service()->svMonthly(2026, 9702000, 500000, 'other_profits');
+
+        $this->assertSame(EurOverviewService::MAXIMUM_BASE_HINT, $rows[0]['base_at_cap_hint']);
+    }
+
     public function test_insurance_blocks_and_afa_card_are_derived(): void
     {
         $service = $this->service();

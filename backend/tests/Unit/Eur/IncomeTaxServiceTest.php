@@ -58,6 +58,10 @@ class IncomeTaxServiceTest extends TestCase
         $this->assertSame(28000, $result['rental_tax_cents']);      // U25
         $this->assertSame(223580, $result['business_tax_cents']);   // U24
         $this->assertSame(230800, $result['due_cents']);            // U29
+        // EUE-103: U29 = ue_est − U26 − U28; beide Abzüge bleiben in der Antwort.
+        $this->assertSame(100000, $result['prepayment_cents']);     // U26
+        $this->assertSame(50000, $result['wage_tax_cents']);        // U28 / KZ 260
+        $this->assertSame(380800 - 100000 - 50000, $result['due_cents']);
         $this->assertSame(129220 + 28000 + 223580, $result['tax_cents']); // U23 = U27 + U25 + U24
     }
 
@@ -68,6 +72,12 @@ class IncomeTaxServiceTest extends TestCase
 
         $grossWage = $this->service->allocate('Nur Bruttolohn', 2905000, 2000000, 140000, 0, 0);
         $this->assertNull($grossWage['business_tax_cents']);
+
+        // EUE-105: der Portal-Alias wird auf denselben Modus abgebildet.
+        $grossWageAlias = $this->service->allocate('gross_wage', 2905000, 2000000, 140000, 0, 0);
+        $this->assertNull($grossWageAlias['business_tax_cents']);
+        $this->assertSame('Nur Bruttolohn', $this->service->normaliseMode('gross_wage'));
+        $this->assertSame('Nur andere Gewinne', $this->service->normaliseMode('other_profits'));
     }
 
     public function test_monthly_results_allocate_the_annual_burden_in_whole_cents(): void

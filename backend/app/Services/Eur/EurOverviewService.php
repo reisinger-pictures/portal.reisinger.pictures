@@ -49,18 +49,29 @@ final class EurOverviewService
     /**
      * Monatliche SV-Beiträge des Jahres (EUE-109 … EUE-114).
      *
+     * Der Est-Modus ist von `eur_sv_mode` verschieden: nur "Nur andere
+     * Gewinne" lässt den 9225-Zuschlag zur Beitragsgrundlage entfallen (EUE-115).
+     * Ohne übergebenen Modus bleibt das Verhalten aller bisherigen Aufrufer
+     * unverändert.
+     *
      * @return list<array{month: int, kv_cents: int, pv_cents: int, svs_cents: int, uv_cents: int, base_at_cap_hint: string|null}>
      */
-    public function svMonthly(int $year, int $profitCents, int $bookedSvCents): array
-    {
+    public function svMonthly(
+        int $year,
+        int $profitCents,
+        int $bookedSvCents,
+        string $estMode = 'total',
+    ): array {
         $amounts = YearTables::socialInsuranceAmountsCents($year);
         $rates = YearTables::socialInsuranceRatesPer10000($year);
         $mode = (string) ($this->settings->get('eur_sv_mode', 'gsvg') ?? 'gsvg');
         $flatRateOnly = $mode === SocialInsurance::MODE_UV_ONLY;
 
-        // EUE-109: Einkünfte + bereits gebuchte 9225, gedeckelt auf 12 × max_bgl.
+        // EUE-109/115: Einkünfte + bereits gebuchte 9225 (außer bei Est-Modus
+        // "Nur andere Gewinne"), gedeckelt auf 12 × max_bgl.
+        $svSurcharge = $estMode === 'other_profits' ? 0 : $bookedSvCents;
         $maximumYearlyBase = $amounts['max_bgl'] * 12;
-        $base = min($profitCents + $bookedSvCents, $maximumYearlyBase);
+        $base = min($profitCents + $svSurcharge, $maximumYearlyBase);
         // EUE-014: nur der bereits gedeckelte Wert entscheidet über den
         // Hinweis; es gibt keine zweite Grenze und keinen Float im Rechenpfad.
         $baseHint = $base >= $maximumYearlyBase ? self::MAXIMUM_BASE_HINT : null;

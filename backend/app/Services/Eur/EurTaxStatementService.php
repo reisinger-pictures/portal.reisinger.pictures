@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Eur;
 
 use App\Eur\Domain\E1Statement;
+use App\Eur\Parity\Money;
 use App\Eur\Parity\RuleValues;
 use App\Eur\Reference\E1aHelpTexts;
 use App\Eur\Reference\EurYear;
@@ -22,9 +23,15 @@ use InvalidArgumentException;
  */
 final class EurTaxStatementService
 {
-    public const MODES = ['total', 'business', 'rental', 'forecast'];
+    public const MODES = ['total', 'business', 'rental', 'forecast', 'gross_wage', 'other_profits'];
 
     private const AFA_CODES = ['9130', '9134', '9135'];
+
+    /** EUE-101: D40 zeigt bei einem Wert außerhalb 25–1200 € diesen Hinweis. */
+    private const E40_OUT_OF_RANGE_WARNING = 'Falscher Betrag';
+
+    /** EUE-102: D39 warnt bei 9217, ohne C39 zu löschen. */
+    private const E39_LARGE_ALLOWANCE_WARNING = 'Wert löschen (wegen 9217 große Pauschale) →';
 
     public function __construct(private readonly RuleValues $rules = new RuleValues) {}
 
@@ -60,6 +67,8 @@ final class EurTaxStatementService
         $e40 = $isRentalOnly ? 0 : (int) ($input['arbeitsplatzpauschale_cents'] ?? 0);
         $e39 = $isRentalOnly ? 0 : (int) ($input['ergonomisches_mobiliar_cents'] ?? 0);
         $arbeitszimmer = (int) ($input['arbeitszimmer_cents'] ?? 0);
+        $prognose = ($input['prognose'] ?? false) === true;
+        $monthCount = $this->filledMonthCount($input);
 
         return [
             'kz' => [
@@ -68,7 +77,10 @@ final class EurTaxStatementService
                 // EUE-095/103: U12 ist das E1B-Ergebnis (Einnahmen − Werbungskosten).
                 // Im Modus "Nur Betrieb" blendet die gepinnte Formel U12 aus.
                 'U12' => $mode === 'business' ? 0 : $rentalIncome - $rentalExpenses,
-                'U13' => $this->rentalForecast($mode, $rentalIncome, $rentalExpenses, $input),
+                // EUE-104: U8/Betrieb und U13/Vermietung werden bei Prognose
+                // aufs Jahr hochgerechnet; explizite Werte haben Vorrang.
+                'U8' => $this->businessForecast($mode, $income, $expenses, $monthCount, $prognose, $input),
+                'U13' => $this->rentalForecast($mode, $rentalIncome, $rentalExpenses, $monthCount, $prognose, $input),
                 'U26' => (int) ($input['prepayment_cents'] ?? 0),
                 'E40' => $e40,
                 'E39' => $e39,
@@ -89,15 +101,46 @@ final class EurTaxStatementService
     }
 
     /**
-     * EUE-104: die Prognose der Vermietung fließt nur in den Modi mit
-     * Vermietungsanteil zu. Ohne expliziten Wert wird sie aus den E1B-Zeilen
-     * abgeleitet (Einnahmen − Werbungskosten). Ein reines `array_sum` über die
-     * KZ-Werte würde Einnahmen und Werbungskosten addieren statt verrechnen.
+     * EUE-104: U8 ist die hochgerechnete Prognose des Betriebsergebnisses.
+     * `business_forecast_cents` überschreibt die Berechnung; ohne Prognose oder
+     * im Modus "Nur Vermietung" bleibt die Kennzahl 0.
      *
      * @param  array<string, mixed>  $input
      */
-    private function rentalForecast(string $mode, int $rentalIncome, int $rentalExpenses, array $input): int
-    {
+    private function businessForecast(
+        string $mode,
+        int $income,
+        int $expenses,
+        int $monthCount,
+        bool $prognose,
+        array $input,
+    ): int {
+        if ($mode === 'rental') {
+            return 0; // EUE-095: "Nur Vermietung" schließt den Betrieb aus.
+        }
+
+        if (isset($input['business_forecast_cents'])) {
+            return (int) $input['business_forecast_cents'];
+        }
+
+        return $this->project($income - $expenses, $monthCount, $prognose);
+    }
+
+    /**
+     * EUE-104: Prognose der Vermietung, abgeleitet aus Einnahmen minus
+     * Werbungskosten. Ein expliziter Wert hat Vorrang; ohne Prognose bleibt
+     * nur der legacy-Modus "Mit Prognose" erhalten.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    private function rentalForecast(
+        string $mode,
+        int $rentalIncome,
+        int $rentalExpenses,
+        int $monthCount,
+        bool $prognose,
+        array $input,
+    ): int {
         if ($mode === 'business') {
             return 0; // EUE-095: "Nur Betrieb" schließt Vermietung aus.
         }
@@ -106,18 +149,61 @@ final class EurTaxStatementService
             return (int) $input['rental_forecast_cents'];
         }
 
+        $result = $rentalIncome - $rentalExpenses;
+        $projected = $this->project($result, $monthCount, $prognose);
+
+        if ($projected !== 0 || $prognose) {
+            return $projected;
+        }
+
         if ($mode !== 'forecast') {
             return 0;
         }
 
-        return $rentalIncome - $rentalExpenses;
+        return $result;
+    }
+
+    /**
+     * EUE-104: `(Ergebnis / Anzahl nicht-leerer Monate) * 12 − Ergebnis`.
+     * Ohne Monate (Nullteiler) oder ohne Prognose ist die Hochrechnung 0.
+     * Die Division läuft über BCMath und wird genau einmal auf ganze Cent
+     * gerundet — kein Float im Rechenpfad.
+     */
+    private function project(int $result, int $monthCount, bool $prognose): int
+    {
+        if (! $prognose || $monthCount === 0) {
+            return 0;
+        }
+
+        $annualised = bcdiv(bcmul((string) $result, '12', 8), (string) $monthCount, 8);
+
+        return Money::roundCents(bcsub($annualised, (string) $result, 8));
+    }
+
+    /**
+     * SUMPRODUCT((ue_gewinn_pro_monat<>"")*1) aus EUE-104: gezählt werden die
+     * übergebenen Monate mit einem Werteeintrag, nicht die Kalendermonate.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    private function filledMonthCount(array $input): int
+    {
+        $count = 0;
+
+        foreach ($input['months'] ?? [] as $month) {
+            if (is_array($month) && isset($month['gross_profit_cents'])) {
+                $count++;
+            }
+        }
+
+        return $count;
     }
 
     /**
      * EUE-101/102: Klassifikation ausschließlich aus den gepinnten
      * Regelparametern; die Bezeichnungen stammen aus der E1A-Ausfüllhilfe.
      *
-     * @return array{e40_code: string|null, e40_label: string|null, e39_code: string|null, e39_label: string|null}
+     * @return array{e40_code: string|null, e40_label: string|null, e40_warning: string|null, e39_code: string|null, e39_label: string|null, e39_warning: string|null}
      */
     private function pauschalen(int $year, int $e40, int $e39, int $arbeitszimmer): array
     {
@@ -128,7 +214,14 @@ final class EurTaxStatementService
 
         // EUE-108/EUE-101: 9275 unterdrückt beide Pauschalen.
         if ($arbeitszimmer > 0) {
-            return ['e40_code' => null, 'e40_label' => null, 'e39_code' => null, 'e39_label' => null];
+            return [
+                'e40_code' => null,
+                'e40_label' => null,
+                'e40_warning' => null,
+                'e39_code' => null,
+                'e39_label' => null,
+                'e39_warning' => null,
+            ];
         }
 
         $e40Code = null;
@@ -139,13 +232,23 @@ final class EurTaxStatementService
             $e40Code = '9217';
         }
 
+        // EUE-101: D40 zeigt bei einem Wert außerhalb der Validierung 25–1200 €
+        // "Falscher Betrag". Ein leeres Feld (0) ist kein falscher Betrag.
+        $e40Warning = $e40Code === null && $e40 > 0 ? self::E40_OUT_OF_RANGE_WARNING : null;
+
         $e39Code = $e39 > 0 && $e39 <= $maximum ? '9216' : null;
+        // EUE-102: 9217 unterdrückt 9216 nicht, sondern erzeugt nur D39-Warnung.
+        $e39Warning = $e40Code === '9217' && $e39 > 0
+            ? self::E39_LARGE_ALLOWANCE_WARNING
+            : null;
 
         return [
             'e40_code' => $e40Code,
             'e40_label' => $e40Code === null ? null : $this->label($e40Code),
+            'e40_warning' => $e40Warning,
             'e39_code' => $e39Code,
             'e39_label' => $e39Code === null ? null : $this->label('9216'),
+            'e39_warning' => $e39Warning,
         ];
     }
 

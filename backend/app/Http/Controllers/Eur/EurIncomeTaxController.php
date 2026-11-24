@@ -46,6 +46,9 @@ class EurIncomeTaxController extends Controller
             'employment_income_cents' => 'nullable|integer|min:0',
             'wage_tax_cents' => 'nullable|integer|min:0',
             'rental_forecast_cents' => 'nullable|integer|min:0',
+            // EUE-104: Prognose-Flag und Prognose des Betriebsergebnisses.
+            'prognose' => 'nullable|boolean',
+            'business_forecast_cents' => 'nullable|integer|min:0',
             'prepayment_cents' => 'nullable|integer|min:0',
             'arbeitsplatzpauschale_cents' => 'nullable|integer|min:0',
             'ergonomisches_mobiliar_cents' => 'nullable|integer|min:0',
@@ -100,8 +103,17 @@ class EurIncomeTaxController extends Controller
         $bookedSv = 0;
 
         foreach ($data['entries'] ?? [] as $entry) {
-            if (is_array($entry) && str_starts_with((string) ($entry['code'] ?? ''), '9225')) {
-                $bookedSv += (int) ($entry['amount_cents'] ?? 0);
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            // EUE-115: das Journal kennt `code` und `e1a_code`; die 9225 darf
+            // nicht je nach Feldname übersehen oder doppelt gezählt werden.
+            foreach ([$entry['code'] ?? '', $entry['e1a_code'] ?? ''] as $code) {
+                if (str_starts_with((string) $code, '9225')) {
+                    $bookedSv += (int) ($entry['amount_cents'] ?? 0);
+                    break;
+                }
             }
         }
 
@@ -192,13 +204,13 @@ class EurIncomeTaxController extends Controller
         // EUE-114: Jahres-SV (AA17) ist die Summe der zwölf Monatsbeiträge.
         $annualSv = 0;
 
-        foreach ($overview->svMonthly($year, $businessIncome, $bookedSv) as $row) {
+        foreach ($overview->svMonthly($year, $businessIncome, $bookedSv, $mode) as $row) {
             $annualSv += (int) $row['kv_cents'] + (int) $row['pv_cents']
                 + (int) $row['svs_cents'] + (int) $row['uv_cents'];
         }
 
         // EUE-125: I12 ist der Monats-Sockel bei leerer Beitragsgrundlage.
-        $floor = $overview->svMonthly($year, 0, 0)[0] ?? [];
+        $floor = $overview->svMonthly($year, 0, 0, $mode)[0] ?? [];
         $minimumSv = (int) ($floor['kv_cents'] ?? 0) + (int) ($floor['pv_cents'] ?? 0)
             + (int) ($floor['svs_cents'] ?? 0) + (int) ($floor['uv_cents'] ?? 0);
 
