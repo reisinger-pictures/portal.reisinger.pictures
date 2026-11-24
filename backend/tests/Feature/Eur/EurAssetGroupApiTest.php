@@ -324,6 +324,64 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
         $this->assertNull($asset->fresh()->eur_asset_group_id);
     }
 
+    public function test_changing_the_group_share_updates_every_members_scope_to_the_effective_share(): void
+    {
+        $token = $this->tokenFor();
+        $first = $this->createAsset($token, 'Erstes', 80, 240000);
+        $second = $this->createAsset($token, 'Zweites', 80, 60000);
+        $groupId = $this->createGroup($token, 'Grenz-Set', 60);
+        $this->assign($token, $groupId, $first);
+        $this->assign($token, $groupId, $second);
+        $this->assertSame('business', $first->fresh()->scope);
+        $this->assertSame('business', $second->fresh()->scope);
+
+        // 60 % → 40 %: der Gruppenanteil fällt unter 50 %, beide Mitglieder
+        // wechseln in das private Verzeichnis, obwohl ihr eigener Anteil 80 % ist.
+        $this->withHeaders($this->bearer($token))
+            ->putJson("/api/management/eur/asset-groups/{$groupId}", [
+                'name' => 'Grenz-Set', 'business_share' => 40,
+            ])->assertOk();
+
+        foreach ([$first, $second] as $member) {
+            $fresh = $member->fresh();
+            $this->assertSame(40, $fresh->effectiveBusinessShare());
+            $this->assertSame('private', $fresh->scope);
+            $this->assertSame($groupId, (int) $fresh->eur_asset_group_id);
+        }
+
+        // 40 % → 50 %: genau 50 % ist betrieblich (D-89: "< 50" → privat).
+        $this->withHeaders($this->bearer($token))
+            ->putJson("/api/management/eur/asset-groups/{$groupId}", [
+                'name' => 'Grenz-Set', 'business_share' => 50,
+            ])->assertOk();
+
+        $this->assertSame('business', $first->fresh()->scope);
+        $this->assertSame('business', $second->fresh()->scope);
+    }
+
+    public function test_a_booked_member_prevents_both_share_and_scope_changes(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->createAsset($token, 'Gebucht', 80, 240000);
+        $groupId = $this->createGroup($token, 'Gesperrt', 60);
+        $this->assign($token, $groupId, $asset);
+        $this->assertSame('business', $asset->fresh()->scope);
+        $asset->years()->first()->update(['status' => 'booked']);
+
+        $this->withHeaders($this->bearer($token))
+            ->putJson("/api/management/eur/asset-groups/{$groupId}", [
+                'name' => 'Gesperrt', 'business_share' => 30,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('error', EurAssetGroupService::BOOKED_GROUP_MESSAGE);
+
+        $this->assertSame(60, (int) EurAssetGroup::findOrFail($groupId)->business_share);
+        $fresh = $asset->fresh();
+        $this->assertSame(60, $fresh->effectiveBusinessShare());
+        $this->assertSame('business', $fresh->scope);
+        $this->assertSame($groupId, (int) $fresh->eur_asset_group_id);
+    }
+
     public function test_unassign_restores_the_individual_entnahme(): void
     {
         $token = $this->tokenFor();

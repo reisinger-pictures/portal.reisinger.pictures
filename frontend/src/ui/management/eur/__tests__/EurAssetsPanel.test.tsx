@@ -240,6 +240,25 @@ describe('EurAssetsPanel (#34)', () => {
         expect(within(above as HTMLElement).queryByText('GWG')).not.toBeInTheDocument();
     });
 
+    it('zeigt den gepinnten EUE-051-Hinweis wörtlich nur unter der GWG-Grenze (EUE-051)', () => {
+        const hint = '• Unter GWG-Grenze (1000€) - evtl. sofort im A-Blatt erfassen';
+        setAssets(
+            asset({id: 1, name: 'GWG-Gut', cost_cents: 80000}),
+            asset({id: 2, name: 'Normal-Gut', cost_cents: 120000}),
+        );
+
+        renderWithProviders(<EurAssetsPanel year={2026}/>);
+
+        const low = screen.getByText('GWG-Gut').closest('tr');
+        const high = screen.getByText('Normal-Gut').closest('tr');
+        expect(low).not.toBeNull();
+        expect(high).not.toBeNull();
+        expect(within(low as HTMLElement).getByText(hint)).toBeVisible();
+        expect(within(high as HTMLElement).queryByText(hint)).not.toBeInTheDocument();
+        // Der Hinweis bleibt nicht blockierend: die AfA ist weiter buchbar.
+        expect(within(low as HTMLElement).getByRole('button', {name: 'AfA buchen'})).toBeEnabled();
+    });
+
     it('filtert die beiden Verzeichnisse über scope, mit Fallback für Legacy-Zeilen (D-85)', async () => {
         const user = userEvent.setup();
         setAssets(

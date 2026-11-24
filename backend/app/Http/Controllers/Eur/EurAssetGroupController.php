@@ -70,9 +70,14 @@ class EurAssetGroupController extends Controller
         DB::transaction(function () use ($group, $data): void {
             $group->update($data);
             $group = $group->refresh();
-            // D-89: der geänderte Gruppenanteil gilt auch für die offenen
-            // Planzeilen der Mitglieder; gebuchte Jahre bleiben unberührt.
+            // D-89: der geänderte Gruppenanteil überschreibt den eigenen
+            // Anteil der Mitglieder — auch für den Scope. Der Guard oben
+            // verhindert diese Änderung bereits bei gebuchten Jahren.
+            $scope = (int) $group->business_share < 50 ? 'private' : 'business';
             foreach ($group->assets as $member) {
+                $member->update(['scope' => $scope]);
+                // Gebuchte Jahre bleiben unberührt; nur offene Planzeilen
+                // folgen dem neuen Gruppenanteil.
                 $this->creationService->recalculateUnbookedPlanShares($member);
             }
             $this->service->sync($group);

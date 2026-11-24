@@ -22,6 +22,11 @@ const cents = (value: number): string => formatEuro(value / 100);
 // Die API ist authoritative (EUE-051); dieser Wert ist nur ein Anzeige-Fallback.
 const GWG_LIMIT_FALLBACK_CENTS = 100000;
 
+// EUE-051: wörtlich gepinnter Hinweis aus rules.json (AV!B3). Die Grenze selbst
+// kommt aus der Referenz-API; der Text ist ein unveränderliches Artefakt und
+// bleibt ausdrücklich nicht blockierend (asset-register.md: das Gut bleibt erfassbar).
+const GWG_HINT = '• Unter GWG-Grenze (1000€) - evtl. sofort im A-Blatt erfassen';
+
 // DEG-007: Anzeige der gepinnten Enum-Werte; die Zulässigkeit prüft die API
 // gegen das DEG-Artefakt, nicht diese Übersetzung.
 const EXCEPTION_LABELS: Record<string, string> = {
@@ -249,6 +254,7 @@ export default function EurAssetsPanel({ year }: Props) {
                                             <td>
                                                 <span className="font-medium">{asset.name}</span>
                                                 {isGwg && <span className="badge badge-info badge-outline ml-2"><Trans>GWG</Trans></span>}
+                                                {isGwg && <span className="ml-2 text-xs text-info" data-testid="eur-gwg-hint">{GWG_HINT}</span>}
                                                 {isPrivate && <span className="badge badge-warning badge-outline ml-2"><Trans>Privat</Trans></span>}
                                                 {asset.is_used && <span className="badge badge-warning badge-outline ml-2"><Trans>Gebraucht</Trans></span>}
                                                 {asset.is_immaterial && <span className="badge badge-info badge-outline ml-2"><Trans>Immateriell</Trans></span>}
