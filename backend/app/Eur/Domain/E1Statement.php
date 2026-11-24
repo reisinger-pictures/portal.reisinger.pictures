@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Eur\Domain;
 
 use App\Eur\Parity\Money;
+use App\Eur\Reference\E1aHelpTexts;
 use App\Eur\Reference\EurYear;
 use InvalidArgumentException;
 
@@ -20,6 +21,15 @@ final class E1Statement
     public const GROUP_E1A = 'E1A';
 
     public const GROUP_E1B = 'E1B';
+
+    /** EUE-024: die vier Betriebseinnahmen-Kennzahlen in ODS-Reihenfolge. */
+    private const INCOME_CODES = ['9040', '9050', '9060', '9090'];
+
+    /** EUE-101/102: Pauschalen sind Eingabefelder, keine Journal-Kennzahlen. */
+    private const INPUT_CODES = ['9216', '9215', '9217'];
+
+    /** E1B!C10:C15 (EUE-100) — 9135 ist bewusst auch hier geführt. */
+    private const E1B_CODES = ['9500', '9135', '9510', '9520', '9521', '9530'];
 
     /**
      * @param  list<array<string, mixed>>  $entries
@@ -123,6 +133,134 @@ final class E1Statement
     }
 
     /**
+     * D-91: Jahreswerte in ODS-Reihenfolge aus den vier gepinnten Quellen.
+     *
+     * `A` ist das Ausgaben-/Einnahmenjournal, `WEB` der Wareneingang, `AV` das
+     * Anlagenverzeichnis und `FR` das Reiseblatt. Jede Quelle wird mit
+     * `fromEntries()` aggregiert; die Kennzahlen werden anschließend per
+     * Präfix-SUMIF (EUE-099/100) auf die Zeilen der Ausfüllhilfe verteilt.
+     * 9040 und 9230 sind Restgrößen. Es entsteht keine neue Regel: die
+     * Reihenfolge der Ausgabenzeilen kommt aus `E1aHelpTexts`, die Kataloge
+     * bleiben unverändert. Nullwerte werden erst in der Antwort auf `null`
+     * abgebildet; hier wird weiter in ganzen Cent gerechnet.
+     *
+     * @param  array{A?: list<array<string, mixed>>, AV?: list<array<string, mixed>>, WEB?: list<array<string, mixed>>, FR?: list<array<string, mixed>>}  $sources
+     * @return array{
+     *     year: int,
+     *     sources: array<string, array<string, mixed>>,
+     *     income: array<string, int>,
+     *     expense: array<string, int>,
+     *     e1b: array<string, int>,
+     *     income_cents: int,
+     *     expense_cents: int,
+     *     profit_cents: int
+     * }
+     */
+    public static function annual(array $sources, int $year = EurYear::DEFAULT): array
+    {
+        EurYear::assert($year);
+
+        $perSource = [];
+
+        foreach (['A', 'AV', 'WEB', 'FR'] as $key) {
+            $rows = $sources[$key] ?? [];
+            $statement = self::fromEntries(is_array($rows) ? $rows : [], $year);
+            $perSource[$key] = [
+                'codes' => [
+                    self::GROUP_E1A => $statement['e1a'],
+                    self::GROUP_E1B => $statement['e1b'],
+                ],
+                'income_cents' => (int) $statement['income_cents'][self::GROUP_E1A],
+                'expense_cents' => (int) $statement['expense_cents'][self::GROUP_E1A],
+                'e1b_income_cents' => (int) $statement['income_cents'][self::GROUP_E1B],
+                'e1b_expense_cents' => (int) $statement['expense_cents'][self::GROUP_E1B],
+            ];
+        }
+
+        $incomeCents = 0;
+        $expenseCents = 0;
+        $e1bIncomeCents = 0;
+        $e1bExpenseCents = 0;
+
+        foreach ($perSource as $source) {
+            $incomeCents += $source['income_cents'];
+            $expenseCents += $source['expense_cents'];
+            $e1bIncomeCents += $source['e1b_income_cents'];
+            $e1bExpenseCents += $source['e1b_expense_cents'];
+        }
+
+        // EUE-024: 9040 ist das Sammelbecken. E1B-Einnahmen sind durch die
+        // Gruppierung in fromEntries() bereits herausgerechnet.
+        $income = ['9040' => $incomeCents];
+
+        foreach (array_slice(self::INCOME_CODES, 1) as $code) {
+            $value = self::sumPrefix($perSource['A']['codes'][self::GROUP_E1A], $code);
+            $income[$code] = $value;
+            $income['9040'] -= $value;
+        }
+
+        $expense = [];
+        $assigned = 0;
+
+        foreach (E1aHelpTexts::all() as $help) {
+            $code = $help['kz'];
+
+            if (in_array($code, self::INCOME_CODES, true) || in_array($code, self::INPUT_CODES, true)) {
+                continue;
+            }
+
+            $value = self::sumPrefix($perSource['A']['codes'][self::GROUP_E1A], $code);
+
+            // EUE-099: WEB vollständig in 9100, FR vollständig in 9160,
+            // AV auf die drei AfA-Kennzahlen verteilt.
+            if ($code === '9100') {
+                $value += $perSource['WEB']['expense_cents'];
+            } elseif (in_array($code, ['9130', '9134', '9135'], true)) {
+                $value += self::sumPrefix($perSource['AV']['codes'][self::GROUP_E1A], $code);
+            } elseif ($code === '9160') {
+                $value += $perSource['FR']['expense_cents'];
+            }
+
+            $expense[$code] = $value;
+
+            // 9230 wird unten als Rest berechnet und darf hier nicht
+            // zusätzlich in die bereits zugeordneten Zeilen zählen.
+            if ($code !== '9230') {
+                $assigned += $value;
+            }
+        }
+
+        // E38: Restgröße über alle vier Quellen, nie zusätzlich zu E17:E37.
+        $expense['9230'] = $expenseCents - $assigned;
+
+        $e1b = ['9460' => $e1bIncomeCents];
+        $coded = 0;
+
+        foreach (self::E1B_CODES as $code) {
+            $value = self::sumPrefix($perSource['A']['codes'][self::GROUP_E1B], $code)
+                + self::sumPrefix($perSource['AV']['codes'][self::GROUP_E1B], $code);
+            $e1b[$code] = $value;
+            $coded += $value;
+        }
+
+        // E15 ist die Sammelzeile der übrigen E1B-Werbungskosten, E18 das
+        // Vermietungsergebnis (EUE-100).
+        $e1b['E15'] = $e1bExpenseCents - $coded;
+        $e1b['E18'] = $e1bIncomeCents - $e1bExpenseCents;
+
+        return [
+            'year' => $year,
+            'sources' => $perSource,
+            'income' => $income,
+            'expense' => $expense,
+            'e1b' => $e1b,
+            'income_cents' => $incomeCents,
+            'expense_cents' => $expenseCents,
+            'profit_cents' => $incomeCents - $expenseCents,
+        ];
+    }
+
+    /**
      * Nettosumme aller E1A-Zeilen (Einnahmen minus Ausgaben).
      *
      * @param  list<array<string, mixed>>  $entries
@@ -154,6 +292,25 @@ final class E1Statement
         }
 
         return $income - $expenses;
+    }
+
+    /**
+     * Präfix-SUMIF über die bereits aggregierten Kennzahlen (EUE-099/100):
+     * `9100*` umfasst auch `9100 - Waren` und `9100 Sonstiges`.
+     *
+     * @param  array<string, int>  $codes
+     */
+    private static function sumPrefix(array $codes, string $prefix): int
+    {
+        $sum = 0;
+
+        foreach ($codes as $code => $amount) {
+            if (str_starts_with((string) $code, $prefix)) {
+                $sum += $amount;
+            }
+        }
+
+        return $sum;
     }
 
     /** @param array<string, mixed> $entry */

@@ -13,6 +13,7 @@ use App\Models\EurHour;
 use App\Models\EurMonthlyReport;
 use App\Models\EurSignature;
 use App\Models\EurWarehouseEntry;
+use App\Services\Eur\EurAusfuellhilfeService;
 use App\Services\Eur\EurPdfService;
 use Closure;
 use Illuminate\Http\Request;
@@ -108,6 +109,29 @@ class EurPdfController extends Controller
         return $this->response(
             $this->pdf->assets($year, $rows),
             'Anlagenverzeichnis-'.$year.'.pdf',
+        );
+    }
+
+    public function ausfuellhilfe(Request $request, EurAusfuellhilfeService $service): Response
+    {
+        $data = $request->validate([
+            'year' => ['required', 'integer', ...$this->yearRule()],
+            'e39_cents' => 'nullable|integer|min:0',
+            'e40_cents' => 'nullable|integer|min:0',
+            'arbeitszimmer_cents' => 'nullable|integer|min:0',
+            'employment_income_cents' => 'nullable|integer|min:0',
+            'rental_income_cents' => 'nullable|integer|min:0',
+            'rental_forecast_cents' => 'nullable|integer|min:0',
+            'prepayment_cents' => 'nullable|integer|min:0',
+            'wage_tax_cents' => 'nullable|integer|min:0',
+        ]);
+
+        $year = (int) $data['year'];
+        unset($data['year']);
+
+        return $this->response(
+            $this->pdf->ausfuellhilfe($service->build($year, $data)),
+            'Ausfuellhilfe-'.$year.'.pdf',
         );
     }
 

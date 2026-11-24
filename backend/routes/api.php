@@ -13,6 +13,7 @@ use App\Http\Controllers\Eur\EurAnalyticsController;
 use App\Http\Controllers\Eur\EurApplicationController;
 use App\Http\Controllers\Eur\EurAssetController;
 use App\Http\Controllers\Eur\EurAssetGroupController;
+use App\Http\Controllers\Eur\EurAusfuellhilfeController;
 use App\Http\Controllers\Eur\EurDocumentController;
 use App\Http\Controllers\Eur\EurDocumentPositionController;
 use App\Http\Controllers\Eur\EurEigenbelegController;
@@ -313,6 +314,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
 
     // EAR (Portal #22–#30): Referenzdaten, Buchungen, Anlagen, Übersicht.
     // Alle Antworten sind brand-scoped; Geld ist ganzzahlige Cent.
+    Route::get('/management/eur/ausfuellhilfe', [EurAusfuellhilfeController::class, 'show'])->name('api.management.eur.ausfuellhilfe');
     Route::get('/management/eur/reference', [EurReferenceController::class, 'show'])->name('api.management.eur.reference');
     Route::get('/management/eur/help-texts', [EurReferenceController::class, 'helpTexts'])->name('api.management.eur.help-texts');
     Route::get('/management/eur/settings', [EurSettingsController::class, 'show'])->name('api.management.eur.settings');
@@ -385,6 +387,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/eur/analytics/by-expense-type', [EurAnalyticsController::class, 'byExpenseType'])->name('api.management.eur.analytics.expense-types');
     Route::get('/management/eur/analytics/by-project', [EurAnalyticsController::class, 'byProject'])->name('api.management.eur.analytics.by-project');
     Route::get('/management/eur/payment-reconciliation', [EurAnalyticsController::class, 'paymentReconciliation'])->name('api.management.eur.payment-reconciliation');
+    Route::get('/management/eur/pdf/ausfuellhilfe', [EurPdfController::class, 'ausfuellhilfe'])->name('api.management.eur.pdf.ausfuellhilfe');
     Route::get('/management/eur/pdf/month', [EurPdfController::class, 'monthly'])->name('api.management.eur.pdf.month');
     Route::get('/management/eur/pdf/eigenbeleg', [EurPdfController::class, 'eigenbeleg'])->name('api.management.eur.pdf.eigenbeleg');
     Route::get('/management/eur/pdf/assets', [EurPdfController::class, 'assets'])->name('api.management.eur.pdf.assets');

@@ -178,6 +178,63 @@ final class EurPdfService
             .$this->table(['Kennzahl', 'Betrag'], $rows);
     }
 
+    /**
+     * D-91: druckbare Ausfüllhilfe. Leere Zeilen werden ausgelassen, die
+     * letzte Spalte zeigt die Codes der bewussten Abweichungen vom ODS.
+     *
+     * @param  array<string, mixed>  $data  Ergebnis von EurAusfuellhilfeService::build()
+     */
+    public function ausfuellhilfe(array $data): string
+    {
+        $year = (int) ($data['year'] ?? 0);
+        $body = '<h1>Werte für FinanzOnline</h1>'
+            .'<p class="meta">Jahr: '.$this->text($year).'</p>'
+            .'<p class="meta">'.$this->text($data['notice'] ?? '').'</p>';
+
+        foreach (is_array($data['sections'] ?? null) ? $data['sections'] : [] as $section) {
+            if (! is_array($section)) {
+                continue;
+            }
+
+            $rows = '';
+
+            foreach (is_array($section['fields'] ?? null) ? $section['fields'] : [] as $field) {
+                if (! is_array($field) || ($field['value_cents'] ?? null) === null
+                    && ($field['value_text'] ?? null) === null) {
+                    continue;
+                }
+
+                $value = ($field['value_cents'] ?? null) !== null
+                    ? $this->euro((int) $field['value_cents'])
+                    : $this->text($field['value_text']);
+                $codes = [];
+
+                foreach (is_array($field['deviations'] ?? null) ? $field['deviations'] : [] as $deviation) {
+                    if (is_array($deviation) && isset($deviation['code'])) {
+                        $codes[] = (string) $deviation['code'];
+                    }
+                }
+
+                $rows .= '<tr>'
+                    .'<td>'.$this->text($field['cell'] ?? '').'</td>'
+                    .'<td>'.$this->text($field['kz'] ?? '').'</td>'
+                    .'<td>'.$this->text($field['label_de'] ?? '').'</td>'
+                    .'<td class="num">'.$value.'</td>'
+                    .'<td>'.$this->text(implode(', ', $codes)).'</td>'
+                    .'</tr>';
+            }
+
+            if ($rows === '') {
+                continue;
+            }
+
+            $body .= '<h2>'.$this->text($section['title_de'] ?? ($section['id'] ?? '')).'</h2>'
+                .$this->table(['Zelle', 'KZ', 'Bezeichnung', 'Wert', 'Abweichung'], $rows);
+        }
+
+        return $this->render($this->document('Ausfuellhilfe '.$year, $body));
+    }
+
     private function document(string $title, string $body): string
     {
         return '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">'
