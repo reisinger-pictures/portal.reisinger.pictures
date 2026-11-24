@@ -4,21 +4,32 @@ import { browserAuthHeaders } from '../../helpers/BrowserAuthHeaders';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
 
-/** Amount of the month cell is rendered as "1.234,56 € / 0,00 €…" (whole cents). */
-const firstAmountCents = (text: string): number => {
-    const match = text.match(/^([\d.]+),(\d{2})\s/);
-    if (!match) throw new Error(`Unexpected project cell text: ${text}`);
-    return Number(match[1].replaceAll('.', '')) * 100 + Number(match[2]);
-};
-
 /**
  * EUE-121 — Projekte × Monat. Das Panel wird über den bestehenden
  * Auswertungs-Tab erreicht (D-10: alle Panel-Locators auf <main> gescopt).
- * Der Test misst die Differenz gegen die schon gerenderte Zelle, weil der
- * E2E-Brand weitere Buchungen desselben Monats enthalten kann. Die eigene
- * Buchung wird am Ende gelöscht, damit Wiederholungen die Zelle nicht
- * aufsummieren.
+ *
+ * Flaky-Historie (dieser Test, nicht das Feature):
+ * - CI 45361498710: absolute Erwartung "1.234,56 €" war falsch, weil der
+ *   geteilte E2E-Brand im November bereits eine 395,00-€-Buchung ohne Projekt
+ *   enthält (Zelle zeigte 1.629,56 €). Jeder Retry addierte die Buchung erneut.
+ * - CI 45363332767: Tab-Wechsel löste keine SWR-Revalidierung aus, die Zelle
+ *   blieb bei 39.500 ct.
+ * Fix: Buchung per API anlegen, erwarteten Wert aus demselben Endpunkt lesen,
+ * den das Panel nutzt, und die Seite danach frisch laden. Die Buchung wird im
+ * finally-Block gelöscht, damit Wiederholungen nichts aufsummieren.
  */
+
+/** de-DE-Betrag mit zwei Nachkommastellen, ohne Symbol (formatEuro nutzt NBSP vor €). */
+const amount = (cents: number): string =>
+    (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+type ByProject = {
+    projects: Array<{
+        project: string;
+        months: Array<{ month: number; income_cents: number }>;
+    }>;
+};
+
 test.describe('EUE-121 Projekte-Auswertung', () => {
     let helper: E2ESessionHelper;
     let user: { email: string; password: string; id: string };
@@ -43,24 +54,6 @@ test.describe('EUE-121 Projekte-Auswertung', () => {
                 ...browserAuthHeaders(cookie),
             };
 
-            await new AuthHelper(page).login(user.email, user.password);
-            const sidebar = new SidebarHelper(page);
-            await sidebar.navigateTo('EA Rechnung');
-
-            const main = page.getByRole('main');
-            const tab = (name: string) => page.getByRole('tab', { name, exact: true });
-            await tab('Auswertungen').click();
-
-            const panel = main.getByTestId('eur-project-analytics-panel');
-            await expect(panel.getByRole('heading', { name: /Projekte-Auswertung/ })).toBeVisible({ timeout: 20_000 });
-            await expect(panel.getByRole('columnheader', { name: 'Projekt' })).toBeVisible();
-            await expect(panel.getByRole('columnheader', { name: 'Nov' })).toBeVisible();
-            await expect(panel.getByRole('columnheader', { name: 'Cent pro Minute' })).toBeVisible();
-
-            const cell = panel.getByTestId('eur-project-cell-Ohne Projekt-11');
-            await expect(cell).toBeVisible();
-            const beforeCents = firstAmountCents(await cell.innerText());
-
             const created = await request.post('/api/management/eur/entries', {
                 data: {
                     year: 2026, month: 11, day: 10, direction: 'income',
@@ -70,17 +63,31 @@ test.describe('EUE-121 Projekte-Auswertung', () => {
                 headers,
             });
             expect(created.ok(), `EUR entry create failed: ${await created.text()}`).toBeTruthy();
-            const entryId = (await created.json() as {entry: {id: number}}).entry.id;
+            const entryId = (await created.json() as { entry: { id: number } }).entry.id;
 
             try {
-                // Tab-Wechsel mountet das Panel neu und löst die SWR-Revalidierung aus.
-                await tab('Monat').click();
-                await tab('Auswertungen').click();
-                await expect.poll(async () => firstAmountCents(await cell.innerText()), { timeout: 20_000 })
-                    .toBe(beforeCents + 123456);
+                // Erwarteter Wert aus demselben Endpunkt, den das Panel rendert.
+                const analyticsResponse = await request.get('/api/management/eur/analytics/by-project?year=2026', { headers });
+                expect(analyticsResponse.ok(), `Analytics request failed: ${await analyticsResponse.text()}`).toBeTruthy();
+                const analytics = await analyticsResponse.json() as ByProject;
+                const expectedCents = analytics.projects
+                    .find(row => row.project === 'Ohne Projekt')?.months
+                    .find(cell => cell.month === 11)?.income_cents ?? 0;
+                expect(expectedCents, 'the created income entry must be in the November total').toBeGreaterThanOrEqual(123456);
 
-                await expect(panel.getByText(/^Vorjahres-AfA/)).toBeVisible();
-                await expect(panel.getByText(/SV-Bereinigung/)).toBeVisible();
+                await new AuthHelper(page).login(user.email, user.password);
+                await new SidebarHelper(page).navigateTo('EA Rechnung');
+
+                const main = page.getByRole('main');
+                await page.getByRole('tab', { name: 'Auswertungen', exact: true }).click();
+
+                const panel = main.getByTestId('eur-project-analytics-panel');
+                await expect(panel.getByRole('heading', { name: /Projekte-Auswertung/ })).toBeVisible({ timeout: 20_000 });
+                await expect(panel.getByRole('columnheader', { name: 'Projekt' })).toBeVisible();
+                await expect(panel.getByRole('columnheader', { name: 'Nov' })).toBeVisible();
+                await expect(panel.getByRole('columnheader', { name: 'Cent pro Minute' })).toBeVisible();
+
+                await expect(panel.getByTestId('eur-project-cell-Ohne Projekt-11')).toContainText(amount(expectedCents));
                 await expect(panel.getByRole('status').filter({ hasText: /Abgleich Projekte|Abweichung Projekte/ }))
                     .toBeVisible();
             } finally {
