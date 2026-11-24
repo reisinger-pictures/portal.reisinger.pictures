@@ -138,6 +138,15 @@ degressive_business_cents}` sowie `suggested_category` aus dem gepinnten
 Katalog (keine hartcodierte Kategorie). Neue Anlagegüter übernehmen den
 Kategorievorschlag, sofern nichts anderes angegeben wird.
 
+Bei `business_share < 100` legt das Portal zusätzlich die **Entnahme** nach
+EUE-055 automatisch an: eine Einnahme mit `kind_type = "Entnahme"`, `e1a_code =
+"9040"` (die gepinnte Ausfüllhilfe beschreibt 9060 als Erlös eines *abgegangenen*
+Anlageguts, hier liegt kein Abgang vor), `receipt_no = invoice_no` des
+Anlageguts und `amount_cents = cost_cents × (100 − business_share)` in ganzen
+Cent. Sie ist über Belegnummer + Art idempotent. Das Anlagegut liefert
+`entnahme: {done, entry_id, amount_cents}`; fehlende Entnahmen erzeugen eine
+nicht blockierende Warnung `EUE-055`.
+
 Bei `scope = private` erzeugt das Portal den Eigenbeleg **automatisch** mit dem
 AfA-Plan (beim Anlegen und beim Jahreswechsel, `EurAssetEigenbelegService`);
 die Jahreszeile trägt `eigenbeleg_no`, `theoretical_depreciation_cents`,

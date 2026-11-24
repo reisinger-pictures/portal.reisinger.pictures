@@ -205,6 +205,8 @@ export interface EurAsset {
     is_electric_vehicle?: boolean;
     /** EUE-053/058: nicht blockierende Hinweise aus dem gepinnten Regeltext. */
     warnings?: {code: string; text: string}[];
+    /** EUE-055: automatische Entnahme-Buchung bei Anschaffung. */
+    entnahme?: {done: boolean; entry_id: number | null; amount_cents: number | null};
     /** DEG-013: empfohlener Wechsel, serverseitig aus dem AfA-Plan abgeleitet. */
     switch_hint?: {
         year: number;

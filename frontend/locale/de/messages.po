@@ -3242,12 +3242,24 @@ msgid "Entfernen"
 msgstr "Entfernen"
 
 #: src/ui/management/eur/EurAssetsPanel.tsx
-msgid "Entnahme bei hohem Privatanteil prüfen (EUE-055)"
-msgstr "Entnahme bei hohem Privatanteil prüfen (EUE-055)"
+msgid "Entnahme bei Anschaffung (EUE-055)"
+msgstr "Entnahme bei Anschaffung (EUE-055)"
 
 #: src/ui/management/eur/EurAssetsPanel.tsx
-msgid "Entnahme prüfen"
-msgstr "Entnahme prüfen"
+#~ msgid "Entnahme bei hohem Privatanteil prüfen (EUE-055)"
+#~ msgstr "Entnahme bei hohem Privatanteil prüfen (EUE-055)"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Entnahme erledigt"
+msgstr "Entnahme erledigt"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+msgid "Entnahme fehlt"
+msgstr "Entnahme fehlt"
+
+#: src/ui/management/eur/EurAssetsPanel.tsx
+#~ msgid "Entnahme prüfen"
+#~ msgstr "Entnahme prüfen"
 
 #: src/ui/management/ManagementContractView.tsx
 msgid "Entwurf"

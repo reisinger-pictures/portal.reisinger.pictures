@@ -41,7 +41,9 @@ class EurAssetAutoEigenbelegTest extends EurBookkeepingTestCase
             );
         }
 
-        $this->assertSame(0, EurEntry::forCurrentBrand()->count());
+        // Die einzige Buchung ist die EUE-055-Entnahme, nicht der Eigenbeleg.
+        $this->assertSame(1, EurEntry::forCurrentBrand()->count());
+        $this->assertSame('OBJ-1', EurEntry::forCurrentBrand()->firstOrFail()->receipt_no);
         $this->assertSame(0, EurAssetYear::forCurrentBrand()->where('status', 'booked')->count());
     }
 
@@ -91,7 +93,8 @@ class EurAssetAutoEigenbelegTest extends EurBookkeepingTestCase
         $response->assertJsonPath('already_created', true);
         $response->assertJsonPath('eigenbeleg.eigenbeleg_cents', (int) $row->eigenbeleg_cents);
         $this->assertSame($createdAt, $row->refresh()->eigenbeleg_created_at?->toIso8601String());
-        $this->assertSame(0, EurEntry::forCurrentBrand()->count());
+        $this->assertSame(1, EurEntry::forCurrentBrand()->count());
+        $this->assertSame('PG-1', EurEntry::forCurrentBrand()->firstOrFail()->receipt_no);
     }
 
     public function test_carry_over_creates_a_private_eigenbeleg_without_user_action(): void
@@ -121,6 +124,7 @@ class EurAssetAutoEigenbelegTest extends EurBookkeepingTestCase
         $this->assertNotNull($row->eigenbeleg_created_at);
         $this->assertSame(30, (int) $row->usage_percent);
         $this->assertSame(Share::apply((int) $row->depreciation_cents, 30), (int) $row->eigenbeleg_cents);
-        $this->assertSame(0, EurEntry::forCurrentBrand()->count());
+        $this->assertSame(1, EurEntry::forCurrentBrand()->count());
+        $this->assertSame('FP-1', EurEntry::forCurrentBrand()->firstOrFail()->receipt_no);
     }
 }

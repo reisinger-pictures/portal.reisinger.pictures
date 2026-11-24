@@ -128,18 +128,27 @@ describe('EurAssetsPanel (#34)', () => {
         expect(screen.queryByRole('button', {name: 'Zu linear wechseln'})).not.toBeInTheDocument();
     });
 
-    it('shows a withdrawal hint for any mixed private share (EUE-055)', () => {
+    it('shows the EUE-055 withdrawal status for a mixed private share', () => {
         // 75 % business / 25 % private is backend-producible (50–100 in
         // 5-% steps) and triggers EUE-055 for any private share above zero.
-        setAssets(asset({business_share: 75, years: [plan({
-            private_use_percent: 25,
-            private_use_cents: 5000,
-            business_use_cents: 15000,
-        })]}));
+        const mixed = {
+            business_share: 75,
+            years: [plan({
+                private_use_percent: 25,
+                private_use_cents: 5000,
+                business_use_cents: 15000,
+            })],
+        };
 
+        setAssets(asset(mixed));
+        const {unmount} = renderWithProviders(<EurAssetsPanel year={2026}/>);
+        expect(screen.getByText('Entnahme fehlt')).toBeVisible();
+        unmount();
+
+        setAssets(asset({...mixed, entnahme: {done: true, entry_id: 7, amount_cents: 50000}}));
         renderWithProviders(<EurAssetsPanel year={2026}/>);
-
-        expect(screen.getByText('Entnahme prüfen')).toBeVisible();
+        expect(screen.getByText('Entnahme erledigt')).toBeVisible();
+        expect(screen.queryByText('Entnahme fehlt')).not.toBeInTheDocument();
     });
 
     it('requires a reason for the one-time switch to linear (P5.3)', async () => {

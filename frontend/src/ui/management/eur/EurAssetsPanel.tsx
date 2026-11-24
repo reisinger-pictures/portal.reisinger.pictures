@@ -60,7 +60,7 @@ export default function EurAssetsPanel({ year }: Props) {
     const viewLabel = t`Ansicht`;
     const reasonLabel = t`Begründung`;
     const documentLabel = t`Beleg`;
-    const withdrawalTitle = t`Entnahme bei hohem Privatanteil prüfen (EUE-055)`;
+    const withdrawalTitle = t`Entnahme bei Anschaffung (EUE-055)`;
     const all = assets.data?.assets ?? [];
     const shown = scope === 'all' ? all : all.filter((asset) => scopeOf(asset) === scope);
 
@@ -308,9 +308,15 @@ export default function EurAssetsPanel({ year }: Props) {
                                                     )
                                                 )}
                                                 {plan && !isPrivate && withdrawalHint(plan) && (
-                                                    <span className="badge badge-warning badge-outline ml-1" title={withdrawalTitle}>
-                                                        <Trans>Entnahme prüfen</Trans>
-                                                    </span>
+                                                    asset.entnahme?.done ? (
+                                                        <span className="badge badge-success badge-outline ml-1" title={withdrawalTitle}>
+                                                            <Trans>Entnahme erledigt</Trans>
+                                                        </span>
+                                                    ) : (
+                                                        <span className="badge badge-warning badge-outline ml-1" title={withdrawalTitle}>
+                                                            <Trans>Entnahme fehlt</Trans>
+                                                        </span>
+                                                    )
                                                 )}
                                                 {switched && <span className="badge badge-neutral badge-outline ml-1"><Trans>Linear (fest)</Trans></span>}
                                             </td>

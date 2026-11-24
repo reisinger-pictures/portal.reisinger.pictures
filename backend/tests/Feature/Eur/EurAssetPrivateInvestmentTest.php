@@ -95,7 +95,9 @@ class EurAssetPrivateInvestmentTest extends EurBookkeepingTestCase
         $second->assertJsonPath('already_booked', true);
         $second->assertJsonPath('entry.id', $entryId);
 
-        $this->assertSame(1, EurEntry::forCurrentBrand()->count());
+        // Neben der AfA-Buchung existiert die automatische EUE-055-Entnahme.
+        $this->assertSame(1, EurEntry::forCurrentBrand()->where('kind_type', 'AfA')->count());
+        $this->assertSame(1, EurEntry::forCurrentBrand()->where('kind_type', 'Entnahme')->count());
         $this->assertSame(1, EurAssetYear::forCurrentBrand()->whereNotNull('eur_entry_id')->count());
         $this->assertDatabaseHas('eur_audit_logs', ['action' => 'booked_depreciation', 'subject_id' => $asset->id]);
     }

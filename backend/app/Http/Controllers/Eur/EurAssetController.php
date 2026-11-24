@@ -18,6 +18,7 @@ use App\Models\EurAuditLog;
 use App\Models\EurDocument;
 use App\Models\EurEntry;
 use App\Services\Eur\EurAssetEigenbelegService;
+use App\Services\Eur\EurEntnahmeService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -34,7 +35,10 @@ use Illuminate\Validation\Rule;
  */
 class EurAssetController extends Controller
 {
-    public function __construct(private readonly EurAssetEigenbelegService $eigenbelegService) {}
+    public function __construct(
+        private readonly EurAssetEigenbelegService $eigenbelegService,
+        private readonly EurEntnahmeService $entnahmeService,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -79,6 +83,8 @@ class EurAssetController extends Controller
         $asset = DB::transaction(function () use ($data, $calculator, $month): EurAsset {
             $asset = EurAsset::create($data);
             $this->writePlan($asset, $calculator, $month);
+            // EUE-055: die Entnahme bei Anschaffung entsteht ohne Benutzeraktion.
+            $this->entnahmeService->createForAsset($asset);
 
             return $asset;
         });
@@ -640,6 +646,16 @@ class EurAssetController extends Controller
             ];
         }
 
+        // EUE-055: bei Privatanteil muss die Entnahme unter derselben
+        // Belegnummer gebucht sein. Neue Anlagegüter bekommen sie automatisch;
+        // der Hinweis bleibt für bestehende Güter ohne Entnahme.
+        if ((int) $asset->business_share < 100 && ! $this->entnahmeService->status($asset)['done']) {
+            $warnings[] = [
+                'code' => 'EUE-055',
+                'text' => '⚠ Entnahme bei Anschaffung fehlt',
+            ];
+        }
+
         // EUE-056/057: Vorjahres-AfA und Restbuchwert gegen den gepinnten Plan
         // prüfen. Die Toleranz kommt aus dem Regelkatalog, nicht aus dem Code.
         if ($asset->purchase_date !== null) {
@@ -769,6 +785,8 @@ class EurAssetController extends Controller
             'switch_reason' => $asset->switch_reason,
             'status' => $asset->status,
             'warnings' => $this->warnings($asset),
+            // EUE-055: Entnahme bei Anschaffung — erledigt/nicht erledigt.
+            'entnahme' => $this->entnahmeService->status($asset),
             'switch_hint' => $this->switchHint($asset),
             'years' => $asset->years->map(fn (EurAssetYear $year): array => [
                 'year' => (int) $year->year,
