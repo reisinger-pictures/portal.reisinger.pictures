@@ -83,14 +83,14 @@ test.describe('EAR · Anlagegruppen (D-89)', () => {
 
         const card = panel.getByTestId(`eur-asset-group-${group?.id}`);
         await expect(card).toBeVisible();
-        await expect(card.getByText('Privat')).toBeVisible();
+        await expect(card.getByText('Privat', { exact: true })).toBeVisible();
 
         for (const asset of [lens, hood]) {
             await card.getByLabel('Anlagegut zuordnen').selectOption(String(asset.id));
             await card.getByRole('button', { name: 'Zuordnen' }).click();
         }
 
-        await expect(card.getByText('2 Anlagegüter')).toBeVisible();
+        await expect(card.getByText('2 Anlagegüter', { exact: true })).toBeVisible();
         await expect(card.getByText(/Eigenbeleg EBG-/).first()).toBeVisible();
 
         const after = await page.request.get('/api/management/eur/asset-groups', { headers });
