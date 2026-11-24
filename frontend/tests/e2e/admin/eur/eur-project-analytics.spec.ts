@@ -4,11 +4,20 @@ import { browserAuthHeaders } from '../../helpers/BrowserAuthHeaders';
 import { E2ESessionHelper } from '../../helpers/E2ESessionHelper';
 import { SidebarHelper } from '../../helpers/SidebarHelper';
 
+/** Amount of the month cell is rendered as "1.234,56 € / 0,00 €…" (whole cents). */
+const firstAmountCents = (text: string): number => {
+    const match = text.match(/^([\d.]+),(\d{2})\s/);
+    if (!match) throw new Error(`Unexpected project cell text: ${text}`);
+    return Number(match[1].replaceAll('.', '')) * 100 + Number(match[2]);
+};
+
 /**
  * EUE-121 — Projekte × Monat. Das Panel wird über den bestehenden
- * Auswertungs-Tab erreicht (D-10: alle Locators auf <main> gescopt).
- * Die Buchung wird vor dem Öffnen des Tabs per API angelegt, damit der
- * erste SWR-Ladevorgang den Wert bereits enthält.
+ * Auswertungs-Tab erreicht (D-10: alle Panel-Locators auf <main> gescopt).
+ * Der Test misst die Differenz gegen die schon gerenderte Zelle, weil der
+ * E2E-Brand weitere Buchungen desselben Monats enthalten kann. Die eigene
+ * Buchung wird am Ende gelöscht, damit Wiederholungen die Zelle nicht
+ * aufsummieren.
  */
 test.describe('EUE-121 Projekte-Auswertung', () => {
     let helper: E2ESessionHelper;
@@ -27,28 +36,20 @@ test.describe('EUE-121 Projekte-Auswertung', () => {
         { tag: ['@feature:eur-project-analytics'] },
         async ({ page, request }) => {
             const cookie = await helper.loginAs(user.email, user.password);
-            const created = await request.post('/api/management/eur/entries', {
-                data: {
-                    year: 2026, month: 11, day: 10, direction: 'income',
-                    kind_type: 'Honorar', e1a_code: '9040',
-                    business_share: 100, amount_cents: 123456,
-                },
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    Cookie: cookie,
-                    ...browserAuthHeaders(cookie),
-                },
-            });
-            expect(created.ok(), `EUR entry create failed: ${await created.text()}`).toBeTruthy();
+            const headers = {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                ...browserAuthHeaders(cookie),
+            };
 
-            const auth = new AuthHelper(page);
+            await new AuthHelper(page).login(user.email, user.password);
             const sidebar = new SidebarHelper(page);
-            await auth.login(user.email, user.password);
             await sidebar.navigateTo('EA Rechnung');
 
             const main = page.getByRole('main');
-            await page.getByRole('tab', { name: 'Auswertungen', exact: true }).click();
+            const tab = (name: string) => page.getByRole('tab', { name, exact: true });
+            await tab('Auswertungen').click();
 
             const panel = main.getByTestId('eur-project-analytics-panel');
             await expect(panel.getByRole('heading', { name: /Projekte-Auswertung/ })).toBeVisible({ timeout: 20_000 });
@@ -56,12 +57,35 @@ test.describe('EUE-121 Projekte-Auswertung', () => {
             await expect(panel.getByRole('columnheader', { name: 'Nov' })).toBeVisible();
             await expect(panel.getByRole('columnheader', { name: 'Cent pro Minute' })).toBeVisible();
 
-            // Die Buchung ohne Projekt landet in der Zeile "Ohne Projekt" und im Nov-Feld.
-            await expect(panel.getByTestId('eur-project-cell-Ohne Projekt-11')).toContainText('1.234,56 €');
+            const cell = panel.getByTestId('eur-project-cell-Ohne Projekt-11');
+            await expect(cell).toBeVisible();
+            const beforeCents = firstAmountCents(await cell.innerText());
 
-            await expect(panel.getByText(/^Vorjahres-AfA/)).toBeVisible();
-            await expect(panel.getByText(/SV-Bereinigung/)).toBeVisible();
-            await expect(panel.getByRole('status').filter({ hasText: /Abgleich Projekte|Abweichung Projekte/ }))
-                .toBeVisible();
+            const created = await request.post('/api/management/eur/entries', {
+                data: {
+                    year: 2026, month: 11, day: 10, direction: 'income',
+                    kind_type: 'Honorar', e1a_code: '9040',
+                    business_share: 100, amount_cents: 123456,
+                },
+                headers,
+            });
+            expect(created.ok(), `EUR entry create failed: ${await created.text()}`).toBeTruthy();
+            const entryId = (await created.json() as {entry: {id: number}}).entry.id;
+
+            try {
+                // Tab-Wechsel mountet das Panel neu und löst die SWR-Revalidierung aus.
+                await tab('Monat').click();
+                await tab('Auswertungen').click();
+                await expect.poll(async () => firstAmountCents(await cell.innerText()), { timeout: 20_000 })
+                    .toBe(beforeCents + 123456);
+
+                await expect(panel.getByText(/^Vorjahres-AfA/)).toBeVisible();
+                await expect(panel.getByText(/SV-Bereinigung/)).toBeVisible();
+                await expect(panel.getByRole('status').filter({ hasText: /Abgleich Projekte|Abweichung Projekte/ }))
+                    .toBeVisible();
+            } finally {
+                const removed = await request.delete(`/api/management/eur/entries/${entryId}`, { headers });
+                expect(removed.ok(), `EUR entry cleanup failed: ${await removed.text()}`).toBeTruthy();
+            }
         });
 });
