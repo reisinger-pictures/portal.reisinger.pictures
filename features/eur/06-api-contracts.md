@@ -71,6 +71,12 @@ ausgeliefert; die Texte sind reine Hilfe, keine zweite Regelquelle und werden
 nicht verändert. Für `kz=9225` ergänzt `portal_note` den Doppelzählungs-Hinweis
 aus EUE-023/EUE-115. Ein ungültiges `kz` ist ein 422.
 
+`GET /eur/reference` ergänzt `kz_catalogue` mit `expense_codes` (27 diverse
+Kennzahlen), `income_codes` (5), `e1b_codes` (6, inklusive der geteilten 9135)
+und `distinct_expense_count`. Die Vektoren stammen aus der gepinnten `DOMAIN.md`,
+nicht aus der Ausfüllhilfe und nicht aus einer zweiten Liste im Code; die
+Ausfüllhilfe hat einen anderen Scope (Einnahmen/Pauschalen ohne E1B).
+
 `POST /eur/month/close` mit `{year, month, note?}` schließt den Monat
 idempotent (200, auch beim zweiten Aufruf) und erzeugt einen Audit-Eintrag.
 
@@ -110,6 +116,19 @@ Werte erzeugen einen Hinweis mit Lösungsweg statt eines Fehlers.
 }
 ```
 
+`GET /eur/analytics/by-project?year=2026` (EUE-121) adds the project × month
+cross-tab: one row per project with twelve month cells (`income_cents`,
+`expense_cents`, `hours_minutes`, `result_cents`, `result_per_hour_cents`),
+project and annual totals, `month_totals`, `undistributed_hours_minutes`,
+`sv_excluded_cents` and `checks`/`match`. All money is whole cents, all time
+whole minutes; `result_per_hour_cents` is integer cents **per minute** of
+logged time (null without hours). Booked 9225 expenses are removed from
+project expenses outside the UV-only mode and reported as `sv_excluded_cents`.
+`prior_year_afa_cents` is deliberately a single top-level figure: assets have
+no project relation in the portal (D-85), so it is never distributed across
+projects. Hours without a project appear in the "Ohne Projekt" row and are
+also reported as `undistributed_hours_minutes` so no time is dropped.
+
 ### Anlagen (#34)
 
 `GET /eur/assets?private=1` liefert nur Privateinlagen. `GET /eur/assets/compare`
@@ -118,6 +137,13 @@ akzeptiert zusätzlich `business_share` (50–100 in 5-%-Schritten) und `name` u
 degressive_business_cents}` sowie `suggested_category` aus dem gepinnten
 Katalog (keine hartcodierte Kategorie). Neue Anlagegüter übernehmen den
 Kategorievorschlag, sofern nichts anderes angegeben wird.
+
+Die Antwort enthält je Anlage `warnings: [{code, text}]`. Neben EUE-053/058
+meldet `AssetPlausibility` die nicht blockierenden Hinweise EUE-056
+(Vorjahres-AfA weicht vom gepinnten Plan um mehr als 1 Cent ab) und EUE-057
+(überzählige Vorjahres-AfA im Anschaffungsjahr, fehlender oder abweichender
+Restbuchwert). Der Restbuchwert-Vergleich rundet wie die ODS auf ganze Euro;
+die angezeigte Differenz bleibt in Cent.
 
 `POST /eur/assets/{id}/switch-to-linear` setzt zusätzlich
 `switched_to_linear_at` und `switch_reason`. Ein Rückwechsel auf degressiv
