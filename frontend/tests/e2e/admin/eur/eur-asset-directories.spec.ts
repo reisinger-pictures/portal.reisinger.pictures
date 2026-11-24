@@ -104,11 +104,15 @@ test.describe('EAR · Anlagenverzeichnisse je Jahr (D-85)', () => {
         expect(planBody.asset.years.every((row) => row.eigenbeleg_no?.startsWith('EB-') === true)).toBe(true);
         expect(planBody.asset.years.every((row) => row.eigenbeleg_cents !== null)).toBe(true);
 
-        // D-85: der Eigenbeleg erzeugt keinen Journalaufwand und keinen Gewinneffekt.
+        // D-85: der Eigenbeleg erzeugt keine Buchung für dieses Anlagegut.
+        // Der E2E-Brand enthält weitere Buchungen aus der automatischen
+        // Rechnungsübernahme, daher wird nur die eigene Belegnummer geprüft.
         const entriesResponse = await page.request.get(`/api/management/eur/entries?year=${year}`, { headers });
         expect(entriesResponse.ok()).toBe(true);
-        const entriesBody = await entriesResponse.json() as { entries: unknown[] };
-        expect(entriesBody.entries).toHaveLength(0);
+        const entriesBody = await entriesResponse.json() as { entries: Array<{ receipt_no: string | null }> };
+        const ownEntries = entriesBody.entries.filter((entry) =>
+            entry.receipt_no?.startsWith(`AV-${privateAsset.id}-`) === true);
+        expect(ownEntries).toHaveLength(0);
         await expect(privateRow).not.toHaveText(/Gebucht|Buchung/);
 
         // Idempotent: der zweite Klick darf nicht fehlschlagen.
