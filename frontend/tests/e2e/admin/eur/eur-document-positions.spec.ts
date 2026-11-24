@@ -50,16 +50,21 @@ test.describe('EAR Belege — Positionen und Gruppen (#59)', () => {
     }
 
     async function upload(page: Page, headers: Record<string, string>, name: string, bytes: Buffer) {
+        // Eindeutige Bytes je Versuch: der Upload ist per sha256 idempotent,
+        // sonst könnte ein Retry auf einen bereits gesplitteten Beleg treffen.
+        const unique = Buffer.concat([bytes, Buffer.from(`\nnonce-${Math.random()}`)]);
         const response = await page.request.post('/api/management/eur/documents', {
             headers,
             multipart: {
-                file: { name: `${name}.png`, mimeType: 'image/png', buffer: bytes },
+                file: { name: `${name}.png`, mimeType: 'image/png', buffer: unique },
                 year: '2026',
                 month: '3',
                 receipt_no: name,
             },
         });
-        expect(response.status()).toBe(201);
+        // Der Upload ist per sha256 idempotent: Retry liefert 200 mit dem
+        // bereits vorhandenen Dokument, der erste Durchlauf 201.
+        expect([200, 201]).toContain(response.status());
         return (await response.json() as { document: { id: number } }).document;
     }
 
@@ -74,17 +79,17 @@ test.describe('EAR Belege — Positionen und Gruppen (#59)', () => {
         total: string,
         addSecond = false,
     ) {
-        await cell.getByRole('spinbutton', { name: 'Belegbetrag in Cent', exact: true }).fill(total);
-        const first = cell.locator('form fieldset > div').first();
-        await first.getByRole('textbox', { name: 'Name', exact: true }).fill(name);
-        await first.getByRole('spinbutton', { name: 'Betrag in Cent', exact: true }).fill(amount);
-        await first.getByRole('spinbutton', { name: 'Nutzungsdauer in Jahren', exact: true }).fill('3');
+        // react-hook-form setzt deterministische name-Attribute; die sind
+        // unabhängig vom accessible Name der umgebenden Labels.
+        await cell.locator('input[name="totalCents"]').fill(total);
+        await cell.locator('input[name="positions.0.name"]').fill(name);
+        await cell.locator('input[name="positions.0.amountCents"]').fill(amount);
+        await cell.locator('input[name="positions.0.usefulLifeYears"]').fill('3');
         if (addSecond) {
             await cell.getByRole('button', { name: 'Position hinzufügen' }).click();
-            const second = cell.locator('form fieldset > div').nth(1);
-            await second.getByRole('textbox', { name: 'Name', exact: true }).fill(`${name}-Zubehör`);
-            await second.getByRole('spinbutton', { name: 'Betrag in Cent', exact: true }).fill('100000');
-            await second.getByRole('spinbutton', { name: 'Nutzungsdauer in Jahren', exact: true }).fill('3');
+            await cell.locator('input[name="positions.1.name"]').fill(`${name}-Zubehör`);
+            await cell.locator('input[name="positions.1.amountCents"]').fill('100000');
+            await cell.locator('input[name="positions.1.usefulLifeYears"]').fill('3');
         }
         await cell.getByRole('button', { name: 'Beleg aufteilen' }).click();
         await expect(cell.getByRole('status')).toContainText('aufgeteilt');
@@ -129,7 +134,8 @@ test.describe('EAR Belege — Positionen und Gruppen (#59)', () => {
         await splitOnce(cellB, `Blende-${suffix}`, '240000', '240000');
 
         for (const cell of [cellA, cellB]) {
-            await cell.getByLabel('Beleg einer Gruppe zuordnen').selectOption(String(groupId));
+            // Der Gruppen-Select steht nach dem Formular als letzter Select.
+            await cell.locator('select').last().selectOption(String(groupId));
             await cell.getByRole('button', { name: 'Zuordnen' }).click();
             await expect(cell.getByRole('status')).toContainText('Gruppe zugeordnet');
         }
