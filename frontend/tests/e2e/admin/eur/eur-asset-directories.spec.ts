@@ -90,18 +90,26 @@ test.describe('EAR · Anlagenverzeichnisse je Jahr (D-85)', () => {
         await expect(privateRow).toBeVisible();
         await expect(panel.getByRole('row').filter({ hasText: businessName })).toHaveCount(0);
 
+        // EUE-055: der Eigenbeleg entsteht automatisch ohne Benutzeraktion.
+        // Der Button „Eigenbeleg erstellen" ist deshalb nicht mehr gerendert.
+        await expect(privateRow.getByText(/Eigenbeleg EB-/)).toBeVisible();
+        await expect(privateRow.getByRole('button', { name: 'Eigenbeleg erstellen' })).toHaveCount(0);
+
+        const planResponse = await page.request.get(`/api/management/eur/assets/${privateAsset.id}/plan`, { headers });
+        expect(planResponse.ok(), `asset plan failed: ${await planResponse.text()}`).toBe(true);
+        const planBody = await planResponse.json() as {
+            asset: { years: Array<{ eigenbeleg_no: string | null; eigenbeleg_cents: number | null }> };
+        };
+        expect(planBody.asset.years).toHaveLength(3);
+        expect(planBody.asset.years.every((row) => row.eigenbeleg_no?.startsWith('EB-') === true)).toBe(true);
+        expect(planBody.asset.years.every((row) => row.eigenbeleg_cents !== null)).toBe(true);
+
         // D-85: der Eigenbeleg erzeugt keinen Journalaufwand und keinen Gewinneffekt.
-        const eigenbelegResponse = page.waitForResponse((response) =>
-            response.request().method() === 'POST'
-            && response.url().endsWith(`/api/management/eur/assets/${privateAsset.id}/book-depreciation`)
-            && [200, 201].includes(response.status()));
-        await privateRow.getByRole('button', { name: 'Eigenbeleg erstellen' }).click();
-        const eigenbeleg = await eigenbelegResponse;
-        const eigenbelegBody = await eigenbeleg.json() as { eigenbeleg: { eigenbeleg_no: string }; entry?: unknown };
-        expect(eigenbelegBody.eigenbeleg.eigenbeleg_no).toContain('EB-');
-        expect(eigenbelegBody.entry).toBeUndefined();
-        await expect(panel.getByRole('status').filter({ hasText: eigenbelegBody.eigenbeleg.eigenbeleg_no })).toBeVisible();
-        expect(await panel.getByRole('status').innerText()).not.toMatch(/gebucht|Buchung/);
+        const entriesResponse = await page.request.get(`/api/management/eur/entries?year=${year}`, { headers });
+        expect(entriesResponse.ok()).toBe(true);
+        const entriesBody = await entriesResponse.json() as { entries: unknown[] };
+        expect(entriesBody.entries).toHaveLength(0);
+        await expect(privateRow).not.toHaveText(/Gebucht|Buchung/);
 
         // Idempotent: der zweite Klick darf nicht fehlschlagen.
         const carryOverResponse = page.waitForResponse((response) =>
