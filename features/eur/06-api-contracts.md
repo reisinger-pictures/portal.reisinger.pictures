@@ -264,8 +264,22 @@ Jahresabschlussbuchung über den bereits im AfA-Plan enthaltenen
 idempotent (zweiter Aufruf: 200 mit `already_booked: true`).
 
 `POST /eur/est/calc` akzeptiert zusätzlich `mode`
-(`total|business|rental|forecast`) und liefert `e1a`, `e1b`, `deductions_cents`
-sowie `stages`. Der Client rechnet nichts nach.
+(`total|business|rental|forecast|gross_wage|other_profits`; EUE-105/106 —
+die letzten beiden kommen nur in den Formeln vor, das ODS bietet keinen
+Selector dafür) und liefert `e1a`, `e1b`, `deductions_cents` sowie `stages`.
+Der Client rechnet nichts nach. Weitere optionale Eingaben sind
+`employment_income_cents`, `wage_tax_cents`, `prepayment_cents`,
+`ergonomisches_mobiliar_cents`, `arbeitsplatzpauschale_cents`,
+`arbeitszimmer_cents`, `prognose` und `business_forecast_cents`; die
+Antwort ergänzt `steuerbilanz.pauschalen.e40_warning`/`e39_warning` mit den
+gepinnten Texten, `kz.U8`/`kz.U13` (EUE-104) sowie
+`est_allocation.prepayment_cents`/`wage_tax_cents`.
+
+Der Endpunkt bleibt ein **Rechner über übergebene Werte**: ohne `entries`
+und `months` ist die Prognose-Hochrechnung 0, solange kein expliziter
+Prognosewert übergeben wird. Die echten Jahressummen aus der Datenbank
+liefert `GET /eur/ausfuellhilfe` (D-91); die Steueransicht ist keine
+amtliche Erklärung.
 
 Die Antwort enthält zwei additive Blöcke (EUE-095/103/126):
 
