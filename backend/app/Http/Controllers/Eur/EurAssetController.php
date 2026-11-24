@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Eur;
 
+use App\Eur\Domain\AssetPlausibility;
 use App\Eur\Domain\DepreciationCalculator;
 use App\Eur\Domain\EurAssetCarryOver;
 use App\Eur\Parity\RuleValues;
@@ -661,6 +662,37 @@ class EurAssetController extends Controller
                 'code' => 'EUE-058',
                 'text' => '⚠ Jahr liegt in der Zukunft',
             ];
+        }
+
+        // EUE-056/057: Vorjahres-AfA und Restbuchwert gegen den gepinnten Plan
+        // prüfen. Die Toleranz kommt aus dem Regelkatalog, nicht aus dem Code.
+        if ($asset->purchase_date !== null) {
+            $rules = new RuleValues;
+            $plausibility = new AssetPlausibility(
+                $calculator,
+                $rules->parameterFor('EUE-056', 'Toleranz AfA', EurYear::DEFAULT, 'cents'),
+            );
+            $purchaseYear = (int) $asset->purchase_date->format('Y');
+            $switchYear = $asset->switched_to_linear_at === null
+                ? null
+                : (int) $asset->switched_to_linear_at->format('Y') - $purchaseYear + 1;
+            $years = $asset->relationLoaded('years') ? $asset->years : $asset->years()->get();
+
+            array_push($warnings, ...$plausibility->warnings([
+                'current_year' => EurYear::DEFAULT,
+                'acquisition_year' => $purchaseYear,
+                'acquisition_month' => (int) $asset->purchase_date->format('n'),
+                'cost_cents' => (int) $asset->cost_cents,
+                'useful_life_years' => (int) $asset->useful_life_years,
+                'method' => (string) $asset->method,
+                'degressive_rate_per_10000' => (int) ($asset->degressive_rate ?? 0),
+                'switch_year' => $switchYear,
+                'years' => $years->map(static fn (EurAssetYear $year): array => [
+                    'year' => (int) $year->year,
+                    'depreciation_cents' => (int) $year->depreciation_cents,
+                    'book_value_cents' => $year->book_value_cents === null ? null : (int) $year->book_value_cents,
+                ])->all(),
+            ]));
         }
 
         return $warnings;

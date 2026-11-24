@@ -6,6 +6,7 @@ use App\Eur\Domain\DepreciationCalculator;
 use App\Eur\Parity\RuleValues;
 use App\Eur\Reference\E1aHelpTexts;
 use App\Eur\Reference\Holidays;
+use App\Eur\Reference\KzCatalogue;
 use App\Eur\Reference\ReferenceTables;
 use App\Http\Controllers\Controller;
 use App\Models\EurEntry;
@@ -89,6 +90,9 @@ class EurReferenceController extends Controller
             ],
             'expense_kinds' => $tables->expenseKinds(),
             'income_kinds' => $tables->incomeKinds(),
+            // EUE-023/024: Kontenplan aus der gepinnten DOMAIN.md — bewusst
+            // getrennt von den Ausfüllhilfen, die einen anderen Scope haben.
+            'kz_catalogue' => (new KzCatalogue)->all(),
             'vat_kinds' => $tables->vatKinds(),
             'vehicle_types' => $tables->vehicleTypes(),
             'payment_methods' => $tables->paymentMethods(),
