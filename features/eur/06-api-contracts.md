@@ -143,6 +143,33 @@ no project relation in the portal (D-85), so it is never distributed across
 projects. Hours without a project appear in the "Ohne Projekt" row and are
 also reported as `undistributed_hours_minutes` so no time is dropped.
 
+### Ausfüllhilfe-Werte für FinanzOnline (Portal #62/#63, D-91)
+
+`GET /eur/ausfuellhilfe?year=2026` und `GET /eur/pdf/ausfuellhilfe?year=2026`
+liefern die Werte der gepinnten ODS-Ausfüllhilfe in **ODS-Reihenfolge**, mit
+deutschen Labels, ganzen Cent und `null` für „leer" (nie `0`). Die Abschnitte
+sind `E1A`, `E1B`, `UST`, `UEBERSICHT`, `ABGLEICH`; jedes Feld trägt
+`order`, `sheet`, `cell`, `kz`, `label_de`, `value_cents`, `value_text`,
+`unit`, `source` und `deviations[]`. Das PDF ist eine interne Arbeitsunterlage
+(`Ausfuellhilfe-<year>.pdf`), kein amtliches Formular.
+
+Die E1A-Werte aggregiert `E1Statement::annual()` aus brand-scope Journalen mit
+Quellenzuordnung: `9100` enthält WEB, `9130/9134/9135` das Anlagenverzeichnis,
+`9160` die Reisen; `9040` und `9230` sind Restgrößen, E1B-Beiträge werden
+ausgeschlossen. Die UST-Werte stammen aus `VatReturnService::forYear()`, die SV
+aus `EurOverviewService::svMonthly()`. Es werden **keine** neuen Regeln oder
+Artefakte eingeführt; abweichende Konventionen erscheinen als Marker
+(D-79 110,22 €, D-85 private Eigenbelege, D-86 Reise-Struktur, D-87 KZ 066
+unentschieden, D-88 U23-Interpretation, D-89/D-90 Gruppen/Positionen).
+
+E39 (`ergonomisches_mobiliar_cents`), E40 (`arbeitsplatzpauschale_cents`) und
+`9275` (`arbeitszimmer_cents`) sind optionale **Request**-Parameter
+(`?e39_cents=…&e40_cents=…&arbeitszimmer_cents=…`), validiert und klassifiziert
+mit den gepinnten EUE-101/102-Parametern, aber **nicht persistiert**. Ohne
+Parameter bleibt der Wert `null` mit `source`-Hinweis „Eingabefeld, noch nicht
+gespeichert". Die manuelle Eintragung in FinanzOnline bleibt ausdrücklich beim
+Eigentümer; es gibt keinen elektronischen Übermittlungsweg.
+
 ### Anlagen (#34)
 
 `GET /eur/assets?private=1` liefert nur Privateinlagen. `GET /eur/assets/compare`
