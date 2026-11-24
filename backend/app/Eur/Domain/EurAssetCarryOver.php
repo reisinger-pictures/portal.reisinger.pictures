@@ -79,7 +79,9 @@ final class EurAssetCarryOver
 
         // D-85/EUE-055: der Eigenbeleg des privaten Verzeichnisses entsteht
         // automatisch mit der neuen Jahreszeile, ohne Benutzeraktion.
-        if ($row->wasRecentlyCreated && ($row->scope ?? $asset->scope) === 'private') {
+        if ($row->wasRecentlyCreated
+            && ($row->scope ?? $asset->scope) === 'private'
+            && $asset->eur_asset_group_id === null) {
             $this->eigenbelegService->createForYear($asset, $row);
         }
 

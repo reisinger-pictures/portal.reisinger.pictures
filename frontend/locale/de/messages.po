@@ -126,6 +126,10 @@ msgstr "{groupPayableCount} Bilder × {groupTotalPriceText} € (Tier {groupTot
 msgid "{legacyRoleName} · {legacyRoleId} (ungültig)"
 msgstr "{legacyRoleName} · {legacyRoleId} (ungültig)"
 
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "{memberCount} Anlagegüter"
+msgstr "{memberCount} Anlagegüter"
+
 #: src/ui/management/ManagementOrgsView.tsx
 msgid "{metaGalleryCount} Meta-Galerien"
 msgstr "{metaGalleryCount} Meta-Galerien"
@@ -828,9 +832,21 @@ msgstr "Angebotsdetails"
 msgid "Angebotstext (Einleitung)"
 msgstr "Angebotstext (Einleitung)"
 
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Anlagegruppen"
+msgstr "Anlagegruppen"
+
 #: src/ui/management/eur/EurAssetsPanel.tsx
 msgid "Anlagegut"
 msgstr "Anlagegut"
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Anlagegut wählen"
+msgstr "Anlagegut wählen"
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Anlagegut zuordnen"
+msgstr "Anlagegut zuordnen"
 
 #: src/ui/management/ManagementEurView.tsx
 msgid "Anlagen"
@@ -1553,6 +1569,7 @@ msgstr "Betreff"
 msgid "Betriebl. Anteil"
 msgstr "Betriebl. Anteil"
 
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
 #: src/ui/management/eur/EurEntriesPanel.tsx
 #: src/ui/management/eur/EurMonthPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
@@ -1594,6 +1611,7 @@ msgstr "Betrieblicher Anteil"
 msgid "Betriebsanlagen"
 msgstr "Betriebsanlagen"
 
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
 #: src/ui/management/eur/EurDepreciationPanel.tsx
 msgid "Betriebsanteil"
 msgstr "Betriebsanteil"
@@ -1604,6 +1622,11 @@ msgstr "Betriebsanteil"
 msgid "Betriebsanteil (%)"
 msgstr "Betriebsanteil (%)"
 
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Betriebsanteil ändern"
+msgstr "Betriebsanteil ändern"
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
 #: src/ui/management/eur/EurEntryDialog.tsx
 #: src/ui/management/ManagementEurView.tsx
 msgid "Betriebsanteil in 5-%-Schritten von 0 bis 100 angeben"
@@ -1612,6 +1635,10 @@ msgstr "Betriebsanteil in 5-%-Schritten von 0 bis 100 angeben"
 #: src/ui/management/ManagementEurView.tsx
 msgid "Betriebsanteil-Hilfe: Geben Sie den betrieblichen Anteil in 5-%-Schritten von 0 % bis 100 % an. Der Privatanteil ergibt sich aus 100 % abzüglich des Betriebsanteils."
 msgstr "Betriebsanteil-Hilfe: Geben Sie den betrieblichen Anteil in 5-%-Schritten von 0 % bis 100 % an. Der Privatanteil ergibt sich aus 100 % abzüglich des Betriebsanteils."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Betriebsanteil: {businessShare} %"
+msgstr "Betriebsanteil: {businessShare} %"
 
 #: src/ui/client/SelectionView.tsx
 msgid "Bewertung konnte nicht gespeichert werden."
@@ -1821,6 +1848,10 @@ msgstr "Bitte einen Altersnachweis hochladen."
 #: src/ui/management/eur/EurApplicationsPanel.tsx
 msgid "Bitte einen Betreff angeben. Die Art ist voreingestellt und kann geändert werden."
 msgstr "Bitte einen Betreff angeben. Die Art ist voreingestellt und kann geändert werden."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Bitte einen Gruppennamen angeben"
+msgstr "Bitte einen Gruppennamen angeben"
 
 #: src/ui/management/eur/EurEntryDialog.tsx
 #: src/ui/management/ManagementEurView.tsx
@@ -2082,6 +2113,22 @@ msgstr "dargestellt."
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Das aktuelle Kamera-Passwort bestätigt die Änderung. Danach wird ein neues Kamera-Passwort erzeugt und genau einmal angezeigt — die Kamera muss mit dem neuen Passwort neu konfiguriert werden."
 msgstr "Das aktuelle Kamera-Passwort bestätigt die Änderung. Danach wird ein neues Kamera-Passwort erzeugt und genau einmal angezeigt — die Kamera muss mit dem neuen Passwort neu konfiguriert werden."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Das Anlagegut konnte nicht gelöst werden."
+msgstr "Das Anlagegut konnte nicht gelöst werden."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Das Anlagegut konnte nicht zugeordnet werden."
+msgstr "Das Anlagegut konnte nicht zugeordnet werden."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Das Anlagegut wurde aus der Gruppe gelöst und wird einzeln abgerechnet."
+msgstr "Das Anlagegut wurde aus der Gruppe gelöst und wird einzeln abgerechnet."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Das Anlagegut wurde der Gruppe zugeordnet."
+msgstr "Das Anlagegut wurde der Gruppe zugeordnet."
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "das einmal angezeigte Passwort"
@@ -2361,6 +2408,14 @@ msgstr "Der Beleg konnte nicht gelöscht werden. Laden Sie die Liste erneut und 
 msgid "Der Beleg konnte nicht hochgeladen werden. Prüfen Sie die Datei und die Belegnummer und versuchen Sie es erneut."
 msgstr "Der Beleg konnte nicht hochgeladen werden. Prüfen Sie die Datei und die Belegnummer und versuchen Sie es erneut."
 
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Der Betriebsanteil konnte nicht geändert werden."
+msgstr "Der Betriebsanteil konnte nicht geändert werden."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Der Betriebsanteil von {name} wurde auf {share} % gesetzt."
+msgstr "Der Betriebsanteil von {name} wurde auf {share} % gesetzt."
+
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Der Client erwartet implizites TLS"
 msgstr "Der Client erwartet implizites TLS"
@@ -2632,6 +2687,18 @@ msgstr "Die gespeicherte Standardrolle „{legacyRoleName}“ (ID {legacyRoleId}
 #: src/ui/ModelProfileAccessView.tsx
 msgid "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen."
 msgstr "Die gewählte Person wird neuer Manager dieses Acts. Du kannst danach die Verwaltung nicht mehr für diesen Act übernehmen."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Die Gruppe konnte nicht angelegt werden. Bitte erneut versuchen."
+msgstr "Die Gruppe konnte nicht angelegt werden. Bitte erneut versuchen."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Die Gruppe konnte nicht gelöscht werden."
+msgstr "Die Gruppe konnte nicht gelöscht werden."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Die Gruppe wurde gelöscht. Die Anlagegüter werden einzeln abgerechnet."
+msgstr "Die Gruppe wurde gelöscht. Die Anlagegüter werden einzeln abgerechnet."
 
 #: src/ui/management/eur/EurDocumentsPanel.tsx
 msgid "Die Inhaltsprüfung des signierten PDFs ist fehlgeschlagen."
@@ -3004,6 +3071,10 @@ msgstr "Eigenbeleg speichern"
 msgid "Eigenbeleg-PDF herunterladen"
 msgstr "Eigenbeleg-PDF herunterladen"
 
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Eigenbelege der Gruppe"
+msgstr "Eigenbelege der Gruppe"
+
 #: src/ui/components/ErrorMessage.tsx
 #: src/ui/components/ManagementPageShell.tsx
 msgid "Ein Fehler ist aufgetreten."
@@ -3020,6 +3091,10 @@ msgstr "Ein unerwarteter Serverfehler ist aufgetreten."
 #: src/ui/management/eur/EurTravelPanel.tsx
 msgid "eine"
 msgstr "eine"
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Eine Gruppe ist eine Abrechnungseinheit: Betriebliche Gruppen erzeugen eine Entnahme, private Gruppen je Jahr einen Eigenbeleg. Belege bleiben an den einzelnen Anlagegütern."
+msgstr "Eine Gruppe ist eine Abrechnungseinheit: Betriebliche Gruppen erzeugen eine Entnahme, private Gruppen je Jahr einen Eigenbeleg. Belege bleiben an den einzelnen Anlagegütern."
 
 #: src/ui/ModelRegistrationView.tsx
 msgid "Eine Person"
@@ -3236,6 +3311,7 @@ msgstr "Endsaldo"
 #: src/ui/components/WysiwygEditor.tsx
 #: src/ui/management/components/GalleryAccessModal.tsx
 #: src/ui/management/components/PhotographerTeamModal.tsx
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
 #: src/ui/management/eur/EurDocumentsPanel.tsx
 #: src/ui/ModelRegistrationView.tsx
 msgid "Entfernen"
@@ -3440,6 +3516,10 @@ msgstr "Es gilt österreichisches Recht unter Ausschluss des UN-Kaufrechts. Soll
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren."
 msgstr "Es sind aktuell keine Personen für diese Galerie freigeschaltet.<0/>Erstelle einen Einladungslink oder weise Nutzer zu, um Gästen Zugriff zu gewähren."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Es sind noch keine Anlagegruppen angelegt."
+msgstr "Es sind noch keine Anlagegruppen angelegt."
 
 #: src/ui/management/ManagementEurView.tsx
 msgid "Es werden nur Monate mit Buchungen angezeigt."
@@ -4305,6 +4385,18 @@ msgstr "Grundpreis"
 msgid "Gruppe"
 msgstr "Gruppe"
 
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Gruppe {name} wurde angelegt."
+msgstr "Gruppe {name} wurde angelegt."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Gruppe anlegen"
+msgstr "Gruppe anlegen"
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Gruppe löschen"
+msgstr "Gruppe löschen"
+
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Gruppen"
 msgstr "Gruppen"
@@ -4673,6 +4765,10 @@ msgstr "Ja"
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Jahr"
 msgstr "Jahr"
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Jahr {yearValue}: Eigenbeleg {eigenbelegNo} · {amount} bei {usage} Nutzung"
+msgstr "Jahr {yearValue}: Eigenbeleg {eigenbelegNo} · {amount} bei {usage} Nutzung"
 
 #: src/ui/management/eur/EurAssetsPanel.tsx
 msgid "Jahr übernehmen"
@@ -6108,6 +6204,10 @@ msgstr "Name / Notiz darf höchstens 255 Zeichen lang sein."
 msgid "Name der Galerie"
 msgstr "Name der Galerie"
 
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Name der Gruppe"
+msgstr "Name der Gruppe"
+
 #: src/ui/management/components/InviteModal.tsx
 msgid "Name des Gastes"
 msgstr "Name des Gastes"
@@ -6412,6 +6512,10 @@ msgstr "Noch keine Download-Daten vorhanden."
 #: src/ui/management/ManagementStatsView.tsx
 msgid "Noch keine Downloads aufgezeichnet."
 msgstr "Noch keine Downloads aufgezeichnet."
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Noch keine Eigenbelege erfasst."
+msgstr "Noch keine Eigenbelege erfasst."
 
 #: src/ui/management/components/InviteModal.tsx
 msgid "Noch keine Einladungen"
@@ -7068,6 +7172,7 @@ msgstr "Print bis 4000px (2.00x)"
 msgid "Privacy-Fee"
 msgstr "Privacy-Fee"
 
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
 #: src/ui/management/eur/EurAssetsPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
 msgid "Privat"
@@ -9554,6 +9659,10 @@ msgstr "Zugriffs-Status (Fotografen)"
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Zum Stammzertifikat"
 msgstr "Zum Stammzertifikat"
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Zuordnen"
+msgstr "Zuordnen"
 
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "Zuordnung"

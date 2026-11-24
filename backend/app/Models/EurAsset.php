@@ -6,6 +6,7 @@ use App\Casts\AsBrand;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -22,7 +23,7 @@ class EurAsset extends Model
 {
     protected $fillable = [
         'brand', 'name', 'invoice_no', 'supplier', 'purchase_date', 'cost_cents',
-        'useful_life_years', 'business_share', 'scope', 'method', 'degressive_rate',
+        'useful_life_years', 'business_share', 'scope', 'eur_asset_group_id', 'method', 'degressive_rate',
         'category', 'is_private_investment', 'switched_to_linear_at',
         'switch_reason', 'status', 'disposed_on', 'disposal_proceeds_cents', 'notes',
         'is_used', 'is_immaterial', 'immaterial_exception', 'special_depreciation',
@@ -37,6 +38,7 @@ class EurAsset extends Model
         'useful_life_years' => 'integer',
         'business_share' => 'integer',
         'scope' => 'string',
+        'eur_asset_group_id' => 'integer',
         'degressive_rate' => 'integer',
         'is_private_investment' => 'boolean',
         'switched_to_linear_at' => 'datetime',
@@ -50,6 +52,14 @@ class EurAsset extends Model
     public function years(): HasMany
     {
         return $this->hasMany(EurAssetYear::class)->orderBy('year');
+    }
+
+    /**
+     * Portal #57: die Abrechnungsgruppe; `null` bedeutet Einzelabrechnung.
+     */
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(EurAssetGroup::class, 'eur_asset_group_id');
     }
 
     /**

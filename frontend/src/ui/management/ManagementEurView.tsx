@@ -30,6 +30,7 @@ import {
 import EurAnalyticsPanel from './eur/EurAnalyticsPanel';
 import EurAnalyticsMatricesPanel from './eur/EurAnalyticsMatricesPanel';
 import EurApplicationsPanel from './eur/EurApplicationsPanel';
+import EurAssetGroupsPanel from './eur/EurAssetGroupsPanel';
 import EurAssetsPanel from './eur/EurAssetsPanel';
 import EurDepreciationPanel from './eur/EurDepreciationPanel';
 import EurDocumentsPanel from './eur/EurDocumentsPanel';
@@ -673,6 +674,7 @@ export default function ManagementEurView() {
                     {tab === 'anlagen' && (
                         <>
                             <EurAssetsPanel year={year}/>
+                            <EurAssetGroupsPanel/>
                             <EurDepreciationPanel year={year}/>
                             <div className="rounded-box border border-base-300 bg-base-100 p-5">
                                 <h2 className="text-xl font-semibold"><Trans>Geringwertige Wirtschaftsgüter</Trans></h2>

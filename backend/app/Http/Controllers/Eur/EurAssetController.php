@@ -13,11 +13,13 @@ use App\Eur\Support\Share;
 use App\Http\Controllers\Controller;
 use App\Models\EurAsset;
 use App\Models\EurAssetDocument;
+use App\Models\EurAssetGroup;
 use App\Models\EurAssetYear;
 use App\Models\EurAuditLog;
 use App\Models\EurDocument;
 use App\Models\EurEntry;
 use App\Services\Eur\EurAssetEigenbelegService;
+use App\Services\Eur\EurAssetGroupService;
 use App\Services\Eur\EurEntnahmeService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
@@ -38,6 +40,7 @@ class EurAssetController extends Controller
     public function __construct(
         private readonly EurAssetEigenbelegService $eigenbelegService,
         private readonly EurEntnahmeService $entnahmeService,
+        private readonly EurAssetGroupService $groupService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -70,7 +73,11 @@ class EurAssetController extends Controller
         $data['brand'] = BrandRegistry::currentId();
         // D-85: die Einordnung ist serverseitig aus dem ganze-Prozent-Anteil
         // abgeleitet; ein Client kann `scope` nicht setzen (prohibited).
-        $data['scope'] = (int) $data['business_share'] < 50 ? 'private' : 'business';
+        // Portal #57: in einer Gruppe überschreibt der Gruppenanteil den des Guts.
+        $groupId = isset($data['eur_asset_group_id']) ? (int) $data['eur_asset_group_id'] : null;
+        $group = $groupId === null ? null : EurAssetGroup::forCurrentBrand()->findOrFail($groupId);
+        $effectiveShare = $group === null ? (int) $data['business_share'] : (int) $group->business_share;
+        $data['scope'] = $effectiveShare < 50 ? 'private' : 'business';
 
         $calculator = new DepreciationCalculator(new RuleValues);
         $month = (int) Carbon::parse($data['purchase_date'])->format('n');
@@ -80,11 +87,16 @@ class EurAssetController extends Controller
             $this->assertDegressiveAllowed($data, $calculator);
         }
 
-        $asset = DB::transaction(function () use ($data, $calculator, $month): EurAsset {
+        $asset = DB::transaction(function () use ($data, $calculator, $month, $group): EurAsset {
             $asset = EurAsset::create($data);
             $this->writePlan($asset, $calculator, $month);
-            // EUE-055: die Entnahme bei Anschaffung entsteht ohne Benutzeraktion.
-            $this->entnahmeService->createForAsset($asset);
+            // Portal #57: eine Gruppe bucht EINMAL für alle Mitglieder.
+            if ($group === null) {
+                // EUE-055: die Entnahme bei Anschaffung entsteht ohne Benutzeraktion.
+                $this->entnahmeService->createForAsset($asset);
+            } else {
+                $this->groupService->sync($group->refresh());
+            }
 
             return $asset;
         });
@@ -288,6 +300,12 @@ class EurAssetController extends Controller
      */
     private function bookPrivateEigenbeleg(EurAsset $asset, EurAssetYear $plan, int $year): JsonResponse
     {
+        // Portal #57: in einer Gruppe entsteht der Eigenbeleg nur einmal für
+        // die gesamte Gruppe, nicht je Mitglied.
+        if ($asset->eur_asset_group_id !== null) {
+            return response()->json(['error' => 'Der Eigenbeleg wird für die Anlagegruppe erstellt.'], 422);
+        }
+
         $result = $this->eigenbelegService->createForYear($asset, $plan);
 
         if (! $result['already_created']) {
@@ -320,6 +338,12 @@ class EurAssetController extends Controller
         ]);
         $year = (int) $data['year'];
         $created = (new EurAssetCarryOver)->carryOver($year, BrandRegistry::currentId());
+
+        // Portal #57: private Gruppen bekommen genau EINEN Eigenbeleg je Jahr,
+        // unabhängig von der Zahl ihrer Mitglieder.
+        foreach (EurAssetGroup::forCurrentBrand()->get() as $group) {
+            $this->groupService->sync($group);
+        }
 
         EurAuditLog::create([
             'brand' => BrandRegistry::currentId(),
@@ -389,6 +413,7 @@ class EurAssetController extends Controller
             'useful_life_years' => 'required|integer|min:2|max:99',
             'business_share' => 'required|integer|min:0|max:100|multiple_of:5',
             'scope' => 'prohibited',
+            'eur_asset_group_id' => ['nullable', 'integer', Rule::exists('eur_asset_groups', 'id')->where('brand', BrandRegistry::currentId())],
             'method' => ['required', Rule::in([DepreciationCalculator::METHOD_LINEAR, DepreciationCalculator::METHOD_DEGRESSIVE])],
             'degressive_rate' => 'nullable|integer|min:100|max:3000',
             'category' => 'nullable|string|max:190',
@@ -504,7 +529,7 @@ class EurAssetController extends Controller
 
             // D-85/EUE-055: im privaten Verzeichnis entsteht der Eigenbeleg
             // automatisch mit dem Plan — ohne Benutzeraktion und ohne Buchung.
-            if ($asset->scope === 'private') {
+            if ($asset->scope === 'private' && $asset->eur_asset_group_id === null) {
                 $this->eigenbelegService->createForYear($asset, $yearRow);
             }
         }
@@ -649,7 +674,9 @@ class EurAssetController extends Controller
         // EUE-055: bei Privatanteil muss die Entnahme unter derselben
         // Belegnummer gebucht sein. Neue Anlagegüter bekommen sie automatisch;
         // der Hinweis bleibt für bestehende Güter ohne Entnahme.
-        if ((int) $asset->business_share < 100 && ! $this->entnahmeService->status($asset)['done']) {
+        if ($asset->eur_asset_group_id === null
+            && (int) $asset->business_share < 100
+            && ! $this->entnahmeService->status($asset)['done']) {
             $warnings[] = [
                 'code' => 'EUE-055',
                 'text' => '⚠ Entnahme bei Anschaffung fehlt',
@@ -785,8 +812,12 @@ class EurAssetController extends Controller
             'switch_reason' => $asset->switch_reason,
             'status' => $asset->status,
             'warnings' => $this->warnings($asset),
+            // Portal #57: die Abrechnungseinheit (Gruppe oder Einzelgut).
+            'eur_asset_group_id' => $asset->eur_asset_group_id === null ? null : (int) $asset->eur_asset_group_id,
             // EUE-055: Entnahme bei Anschaffung — erledigt/nicht erledigt.
-            'entnahme' => $this->entnahmeService->status($asset),
+            'entnahme' => $asset->eur_asset_group_id === null
+                ? $this->entnahmeService->status($asset)
+                : ['done' => true, 'entry_id' => null, 'amount_cents' => null, 'group' => true],
             'switch_hint' => $this->switchHint($asset),
             'years' => $asset->years->map(fn (EurAssetYear $year): array => [
                 'year' => (int) $year->year,

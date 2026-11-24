@@ -191,6 +191,8 @@ export interface EurAsset {
     scope?: 'business' | 'private';
     /** D-85: receipts belong to the master and are never duplicated per year. */
     documents?: EurAssetDocument[];
+    /** #57: billing group; `null` means the asset is billed individually. */
+    eur_asset_group_id?: number | null;
     /** #34 P5.4: private/mixed-use investment shown in its own view. */
     is_private_investment?: boolean;
     category?: string | null;
@@ -214,6 +216,31 @@ export interface EurAsset {
         degressive_cents: number;
         advantage_cents: number;
     } | null;
+}
+
+/**
+ * #57: one group is one billing unit. Business groups (>= 50 %) produce a
+ * single Entnahme, private groups a single Eigenbeleg per year. Receipts stay
+ * on the individual assets.
+ */
+export interface EurAssetGroup {
+    id: number;
+    name: string;
+    business_share: number;
+    scope: 'business' | 'private';
+    asset_ids: number[];
+    assets: Array<{id: number; name: string; invoice_no: string; cost_cents: number}>;
+    years: Array<{
+        year: number;
+        eigenbeleg_no: string | null;
+        eigenbeleg_cents: number | null;
+        usage_percent: number | null;
+    }>;
+}
+
+export interface EurAssetGroupPayload {
+    name: string;
+    business_share: number;
 }
 
 /** #34 P5.2: AfA category suggested from the pinned reference catalogue. */
@@ -635,6 +662,11 @@ export function useEurAssets(scope?: 'business' | 'private') {
     return useSWR<{assets: EurAsset[]}>(`/api/management/eur/assets${query}`, fetcher, SWR_OPTIONS);
 }
 
+/** #57: all billing groups of the current brand, including their members. */
+export function useEurAssetGroups() {
+    return useSWR<{groups: EurAssetGroup[]}>('/api/management/eur/asset-groups', fetcher, SWR_OPTIONS);
+}
+
 export function useEurYears() {
     return useSWR<EurYearsResponse>('/api/management/eur/years', fetcher, SWR_OPTIONS);
 }
@@ -843,6 +875,31 @@ export interface EurCarryOverResult {
 
 export function carryOverEurAssets(year: number): Promise<EurCarryOverResult> {
     return apiMutate<EurCarryOverResult>('/api/management/eur/assets/carry-over', 'POST', {year});
+}
+
+/** #57: create a billing group; business_share is a multiple of 5 in 0–100. */
+export function createEurAssetGroup(payload: EurAssetGroupPayload): Promise<{group: EurAssetGroup}> {
+    return apiMutate<{group: EurAssetGroup}>('/api/management/eur/asset-groups', 'POST', payload);
+}
+
+/** #57: rename a group and/or change its business share. */
+export function updateEurAssetGroup(id: number, payload: EurAssetGroupPayload): Promise<{group: EurAssetGroup}> {
+    return apiMutate<{group: EurAssetGroup}>(`/api/management/eur/asset-groups/${id}`, 'PUT', payload);
+}
+
+/** #57: assign an ungrouped asset to a group. */
+export function assignEurAssetToGroup(id: number, assetId: number): Promise<{group: EurAssetGroup}> {
+    return apiMutate<{group: EurAssetGroup}>(`/api/management/eur/asset-groups/${id}/assets`, 'POST', {asset_id: assetId});
+}
+
+/** #57: release one member back to individual bookkeeping. */
+export function unassignEurAssetFromGroup(id: number, assetId: number): Promise<{group: EurAssetGroup}> {
+    return apiMutate<{group: EurAssetGroup}>(`/api/management/eur/asset-groups/${id}/assets/${assetId}`, 'DELETE');
+}
+
+/** #57: delete a group; its assets are released back to individual bookkeeping. */
+export function deleteEurAssetGroup(id: number): Promise<{success: true}> {
+    return apiMutate<{success: true}>(`/api/management/eur/asset-groups/${id}`, 'DELETE');
 }
 
 /** D-85: attach one existing receipt to an asset master (idempotent). */

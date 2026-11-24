@@ -513,3 +513,30 @@ vectors. This supersedes the earlier, more restrictive reading of
 [`PROVENANCE.md`](eur/cleanroom/PROVENANCE.md) for that document only; no pinned
 artifact in this repository is edited by this decision, and all portal amounts
 remain whole cents per [`AGENTS.md`](../AGENTS.md).
+
+### D-89: Asset groups are one billing unit, receipts stay on the items
+
+The owner decided on 2026-11-24 (issue #57) that several purchases that form
+one economic unit — his example is a lens plus a separately bought
+Streulichtblende — can be combined into an **asset group**. The decision:
+
+- A group is its **own master record** (`eur_asset_groups`) with a brand, a
+  name and a whole-percent business share. `eur_assets.eur_asset_group_id` is
+  nullable; an ungrouped asset is billed on its own as before. The group's
+  business share overrides the member assets' shares for scope and for all
+  calculations; the member value is retained as information.
+- A group is **one billing unit**: a business group produces exactly one
+  EUE-055 withdrawal income entry (KZ 9040, receipt `GR-<group id>`) over the
+  sum of the members' acquisition costs; a private group produces exactly one
+  Eigenbeleg per year over the summed linear depreciation, capped at the sum
+  of the acquisition costs. Member assets produce no individual withdrawal or
+  Eigenbeleg while grouped.
+- **Receipts remain attached to the individual assets** — this explicitly
+  revises the earlier suggestion to attach them to the group. The existing
+  per-asset document link (D-85) is unchanged; there is no group document
+  store.
+- Grouping is refused for an asset with a booked year (fail closed). Removing
+  an asset from a group restores its individual booking.
+
+All amounts stay whole cents. GWG and the private↔business transition remain
+with #55; this decision does not touch them.

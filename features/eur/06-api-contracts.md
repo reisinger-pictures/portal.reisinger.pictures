@@ -166,6 +166,20 @@ EUE-050 auf dem Mindestwert von 1 Cent. Betriebliche Güter behalten ihren
 festen Plan. `EurAssetsPanel.tsx` zeigt die privaten Güter in der eigenen
 Ansicht `Privateinlagen`.
 
+### Anlagegruppen (Portal #57, D-89)
+
+`GET/POST /eur/asset-groups`, `PUT /eur/asset-groups/{id}`,
+`POST /eur/asset-groups/{id}/assets` (`{asset_id}`),
+`DELETE /eur/asset-groups/{id}/assets/{assetId}` und
+`DELETE /eur/asset-groups/{id}` verwalten Abrechnungsgruppen. Eine Gruppe hat
+`id`, `name`, `business_share`, `scope`, `asset_ids`, `assets` und `years`.
+Der Gruppenanteil überschreibt den Anteil der Mitglieder; ein gruppiertes Gut
+trägt `eur_asset_group_id` und wird nicht mehr einzeln abgerechnet. Belege
+bleiben an den einzelnen Gütern. Eine Zuordnung mit gebuchtem Jahr wird mit
+422 abgewiesen. Betriebliche Gruppen buchen **eine** Entnahme unter
+`GR-<group id>`; private Gruppen erzeugen **einen** Eigenbeleg je Jahr
+(`EBG-<group id>-<year>`). Alle Beträge sind ganze Cent.
+
 Die Antwort enthält je Anlage `warnings: [{code, text}]`. Neben EUE-053/058
 meldet `AssetPlausibility` die nicht blockierenden Hinweise EUE-056
 (Vorjahres-AfA weicht vom gepinnten Plan um mehr als 1 Cent ab) und EUE-057

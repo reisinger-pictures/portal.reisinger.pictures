@@ -321,6 +321,34 @@ Zeilennummer für doppelte Projekte in der ODS-Tabelle. Das Portal verhindert
 doppelte Projekte strukturell; die Warnung ist damit gegenstandslos („besser"
 gegenüber der gepinnten Regel). Die gepinnten Artefakte werden nicht verändert.
 
+### Schema-Entscheidung V073 (Anlagegruppen, Portal #57 / D-89)
+
+**Entscheidung des Eigentümers (2026-11-24):** Mehrere Rechnungen können eine
+wirtschaftliche Einheit sein (Objektiv + separat gekaufte Streulichtblende).
+Eine **Gruppe** ist ein eigener Stamm mit einem Betriebsanteil und eine
+**Abrechnungseinheit**; Belege bleiben ausdrücklich an den einzelnen Gütern.
+
+**Schema.** Neue Tabelle `eur_asset_groups` mit `id`, `brand` (16), `name`
+(190), `business_share` (integer, 0–100 in 5-%-Schritten) und Timestamps;
+Unique-Index `(brand, name)`. `eur_assets` erhält das nullable
+`eur_asset_group_id` mit FK (`nullOnDelete`) und den Index
+`(brand, eur_asset_group_id)`. Neue Tabelle `eur_asset_group_years` mit `id`,
+`brand`, `eur_asset_group_id` (`cascadeOnDelete`), `year`, Beträgen in ganzen
+Cent, den Eigenbeleg-Feldern (wie in V071) und Unique-Index
+`(eur_asset_group_id, year)`.
+
+**Abrechnung.** Der Gruppenanteil überschreibt den Anteil der Mitglieder für
+`scope` und alle Berechnungen. Betriebliche Gruppen erzeugen **eine** Entnahme
+(KZ 9040, `receipt_no = GR-<id>`, Betrag `Σ cost × Privatanteil`); private
+Gruppen erzeugen **einen** Eigenbeleg je Jahr über die summierten linearen
+AfA-Beträge, kumuliert begrenzt auf die Summe der Anschaffungskosten, mit
+Restbuchwert 1 ct. Mitglieder erzeugen während der Zugehörigkeit keine
+einzelnen Entnahmen oder Eigenbelege. Eine Zuordnung mit gebuchtem Jahr wird
+abgewiesen; das Trennen stellt die Einzelabrechnung wieder her.
+
+**Backfill.** Keiner. Bestehende Güter bleiben einzeln abgerechnet, bis sie
+ausdrücklich zugeordnet werden. **Rollback:** `down()` ist leer.
+
 ## Beziehungen
 
 - Buchung → genau ein Kunde und optional ein Projekt; Reise analog.
