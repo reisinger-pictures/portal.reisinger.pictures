@@ -700,10 +700,13 @@ const SWR_OPTIONS = {revalidateOnFocus: false} as const;
  * must refresh all of them without the caller knowing each URL.
  */
 export async function revalidateEur(): Promise<void> {
+    // SWR only takes the revalidate-only path when fewer than three arguments
+    // are passed (see `internalMutate` in swr 2.x). Passing an explicit
+    // `undefined` as data writes `undefined` into every matching cache entry
+    // first, which turns `isLoading` true on all panels and unmounts their
+    // rows — including the confirmation of the write that triggered this call.
     await globalMutate(
         (key) => typeof key === 'string' && key.startsWith('/api/management/eur/'),
-        undefined,
-        {revalidate: true},
     );
 }
 

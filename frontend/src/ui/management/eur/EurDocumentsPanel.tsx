@@ -285,7 +285,13 @@ function DocumentPositions({doc, groups}: DocumentPositionsProps) {
                     <Trans>Dieser Beleg ist bereits aufgeteilt. Entfernen Sie zuerst die Positionen, um ihn erneut zu splitten.</Trans>
                 </p>
             )}
-            <form onSubmit={handleSubmit(onSplit)} className="space-y-2">
+            {/*
+             * `noValidate`: zod decides, and every rejection is rendered inline
+             * below its field. The native bubbles would block the submit event
+             * before React sees it — a silent no-op for the user and for tests.
+             * The `required` attributes stay: they drive the label star.
+             */}
+            <form onSubmit={handleSubmit(onSplit)} noValidate className="space-y-2">
                 <fieldset disabled={alreadySplit || busy} className="space-y-2">
                     <label className="form-control">
                         <span className="label-text"><Trans>Belegbetrag in Cent</Trans></span>
@@ -293,7 +299,8 @@ function DocumentPositions({doc, groups}: DocumentPositionsProps) {
                         {errors.totalCents && <span className="text-error text-xs mt-1">{errors.totalCents.message}</span>}
                     </label>
                     {fields.map((field, index) => (
-                        <div key={field.id} className="rounded-box border border-base-300 p-2 space-y-2">
+                        <div key={field.id} className="rounded-box border border-base-300 p-2 space-y-2"
+                            data-testid={`eur-document-position-${index}`}>
                             <label className="form-control">
                                 <span className="label-text"><Trans>Name</Trans></span>
                                 <input type="text" className="input input-bordered input-sm" required
@@ -318,6 +325,9 @@ function DocumentPositions({doc, groups}: DocumentPositionsProps) {
                                         <option key={share} value={share}>{share} %</option>
                                     ))}
                                 </select>
+                                {errors.positions?.[index]?.businessShare && (
+                                    <span className="text-error text-xs mt-1">{errors.positions[index]?.businessShare?.message}</span>
+                                )}
                             </label>
                             <label className="form-control">
                                 <span className="label-text"><Trans>Nutzungsdauer in Jahren</Trans></span>
@@ -355,6 +365,7 @@ function DocumentPositions({doc, groups}: DocumentPositionsProps) {
                     <span className="label-text"><Trans>Beleg einer Gruppe zuordnen</Trans></span>
                     <select className="select select-bordered select-sm" value={groupSelection}
                         disabled={busy}
+                        data-testid="eur-document-group-select"
                         onChange={(event) => setGroupSelection(event.target.value)}>
                         <option value=""><Trans>Gruppe wählen</Trans></option>
                         {groups.map((group) => (
@@ -373,7 +384,9 @@ function DocumentPositions({doc, groups}: DocumentPositionsProps) {
                 </button>
             </div>
 
-            {message && <p className="alert alert-info mt-2" role="status">{message}</p>}
+            {message && (
+                <p className="alert alert-info mt-2" role="status" data-testid="eur-document-positions-status">{message}</p>
+            )}
         </div>
     );
 }
@@ -381,6 +394,25 @@ function DocumentPositions({doc, groups}: DocumentPositionsProps) {
 export default function EurDocumentsPanel({year, month}: Props) {
     const documents = useEurDocuments(year);
     const groups = useEurAssetGroups();
+    /**
+     * A background revalidation (or a failed one) must not blank the document
+     * rows: their local editors and confirmations would unmount and the user
+     * would lose what they just did. The last loaded list therefore stays on
+     * screen until the refetch lands, with an error banner when it fails.
+     * Adjusting the state during render (instead of in an effect) is React's
+     * documented pattern for deriving state from the current render's data.
+     */
+    const [lastLoaded, setLastLoaded] = useState<{year: number; documents: EurDocument[]} | null>(null);
+    const fetched = documents.data?.documents;
+    if (fetched !== undefined
+        && (lastLoaded === null || lastLoaded.year !== year || lastLoaded.documents !== fetched)) {
+        setLastLoaded({year, documents: fetched});
+    }
+    const loadedItems = fetched !== undefined
+        ? fetched
+        : lastLoaded !== null && lastLoaded.year === year
+            ? lastLoaded.documents
+            : undefined;
     const [file, setFile] = useState<File | null>(null);
     const [receiptNo, setReceiptNo] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -517,7 +549,9 @@ export default function EurDocumentsPanel({year, month}: Props) {
         }
     };
 
-    if (documents.isLoading) {
+    // Only a first load without any previously loaded list shows the spinner;
+    // a background revalidation keeps the rendered rows (see `lastLoaded`).
+    if (loadedItems === undefined && documents.isLoading) {
         return (
             <div className="card bg-base-100 border border-base-300 shadow-sm" role="status">
                 <div className="card-body p-6">
@@ -528,7 +562,7 @@ export default function EurDocumentsPanel({year, month}: Props) {
         );
     }
 
-    if (documents.error || !documents.data) {
+    if (loadedItems === undefined) {
         return (
             <div className="card bg-base-100 border border-base-300 shadow-sm" role="alert">
                 <div className="card-body p-6">
@@ -546,7 +580,7 @@ export default function EurDocumentsPanel({year, month}: Props) {
         );
     }
 
-    const items = documents.data.documents;
+    const items = loadedItems;
 
     return (
         <div className="card bg-base-100 border border-base-300 shadow-sm">
@@ -555,6 +589,15 @@ export default function EurDocumentsPanel({year, month}: Props) {
                 <p className="text-sm opacity-70">
                     <Trans>Belege bleiben privat gespeichert. Jede Betriebsausgabe sollte über eine Belegnummer auffindbar sein.</Trans>
                 </p>
+
+                {documents.error && (
+                    <div className="alert alert-error mt-4" role="alert">
+                        <span><Trans>Die Belegliste konnte nicht geladen werden. Prüfen Sie Ihre Verbindung und laden Sie sie erneut.</Trans></span>
+                        <button type="button" className="btn btn-sm" onClick={() => void documents.mutate()}>
+                            <Trans>Erneut laden</Trans>
+                        </button>
+                    </div>
+                )}
 
                 {items.length === 0 ? (
                     <p className="opacity-70 mt-4">
