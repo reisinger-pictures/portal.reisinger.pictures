@@ -5,6 +5,7 @@ import {
     createEurCorrectionDocument,
     ocrEurDocument,
     uploadSignedEurDocument,
+    useEurAssetGroups,
     useEurDocuments,
     type EurDocument,
 } from '../../../../logic/useEur';
@@ -16,7 +17,11 @@ vi.mock('../../../../logic/useEur', async (importOriginal) => {
     return {
         ...actual,
         useEurDocuments: vi.fn(),
+        useEurAssetGroups: vi.fn(),
         createEurCorrectionDocument: vi.fn(),
+        createEurDocumentPositions: vi.fn(),
+        deleteEurDocumentPosition: vi.fn(),
+        setEurDocumentGroup: vi.fn(),
         ocrEurDocument: vi.fn(),
         uploadSignedEurDocument: vi.fn(),
     };
@@ -44,6 +49,11 @@ const unsignedDocument: EurDocument = {
     signed_sha256: null,
     signed_storage_path: null,
     signed_size_bytes: null,
+    linked_entry_ids: [],
+    total_cents: null,
+    allocated_cents: 0,
+    remaining_cents: null,
+    positions: [],
 };
 
 function documentsWithUnsigned() {
@@ -52,6 +62,7 @@ function documentsWithUnsigned() {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useEurAssetGroups).mockReturnValue(swrResult<ReturnType<typeof useEurAssetGroups>>({groups: []}));
 });
 
 describe('EurDocumentsPanel upload control', () => {

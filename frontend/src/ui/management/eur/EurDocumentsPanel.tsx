@@ -1,23 +1,32 @@
 import { useId, useState } from 'react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { formatEuro } from '../../../logic/formatCurrency';
 import {
     createEurCorrectionDocument,
+    createEurDocumentPositions,
     deleteEurDocument,
+    deleteEurDocumentPosition,
     eurDocumentDownloadUrl,
     eurDocumentSignedDownloadUrl,
     EUR_MONTHS,
     importEurEntries,
     ocrEurDocument,
+    setEurDocumentGroup,
     uploadEurDocument,
     uploadSignedEurDocument,
+    useEurAssetGroups,
     useEurDocuments,
-    type EurOcrHints,
+    type EurAssetGroup,
+    type EurDocument,
+    type EurDocumentPosition,
     type EurCorrectionKind,
     type EurCorrectionPayload,
-    type EurDocument,
     type EurImportResult,
+    type EurOcrHints,
 } from '../../../logic/useEur';
 
 interface Props {
@@ -108,8 +117,270 @@ function SignedCell({document, uploaded, failure, busy, onUpload}: SignedCellPro
     );
 }
 
+const cents = (value: number): string => formatEuro(value / 100);
+
+/** #59: the API accepts 0–100 in 5-% steps, just like the group editor. */
+const BUSINESS_SHARES = Array.from({length: 21}, (_, index) => index * 5);
+
+/** A 422 carries the server's German reason on `error`; keep it if present. */
+const readServerError = (cause: unknown, fallback: string): string => {
+    const info = isRecord(cause) && 'info' in cause ? cause.info : cause;
+    if (isRecord(info) && typeof info.error === 'string' && info.error.length > 0) return info.error;
+    return fallback;
+};
+
+// Factory, called inside the component: a `t` macro at module scope would be
+// evaluated before i18n.activate() (see main.tsx).
+const createSplitSchema = () => z.object({
+    totalCents: z.string().refine((value) => {
+        if (value.trim() === '') return true;
+        const amount = Number(value);
+        return Number.isSafeInteger(amount) && amount >= 0;
+    }, t`Belegbetrag als ganze Cent angeben`),
+    positions: z.array(z.object({
+        name: z.string().trim().min(1, t`Bitte einen Namen angeben`),
+        amountCents: z.string().refine((value) => {
+            const amount = Number(value);
+            return value.trim() !== '' && Number.isSafeInteger(amount) && amount > 0;
+        }, t`Betrag als ganze Cent angeben`),
+        businessShare: z.string().refine((value) => {
+            const share = Number(value);
+            return Number.isInteger(share) && share >= 0 && share <= 100 && share % 5 === 0;
+        }, t`Betriebsanteil in 5-%-Schritten von 0 bis 100 angeben`),
+        usefulLifeYears: z.string().refine((value) => {
+            const years = Number(value);
+            return value.trim() !== '' && Number.isInteger(years) && years >= 1 && years <= 50;
+        }, t`Nutzungsdauer in ganzen Jahren von 1 bis 50 angeben`),
+        label: z.string(),
+    })).min(1, t`Mindestens eine Position angeben`),
+});
+
+type SplitFormValues = z.infer<ReturnType<typeof createSplitSchema>>;
+
+const emptySplitPosition = () => ({name: '', amountCents: '', businessShare: '100', usefulLifeYears: '', label: ''});
+
+interface DocumentPositionsProps {
+    doc: EurDocument;
+    groups: EurAssetGroup[];
+}
+
+/**
+ * #59: row-scoped split/merge editor. Everything a test needs stays inside the
+ * document's table row (D-10), no separate portal-level landmark.
+ */
+function DocumentPositions({doc, groups}: DocumentPositionsProps) {
+    const [message, setMessage] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [groupSelection, setGroupSelection] = useState('');
+    const {control, register, handleSubmit, reset, formState: {errors}} = useForm<SplitFormValues>({
+        resolver: zodResolver(createSplitSchema()),
+        defaultValues: {totalCents: '', positions: [emptySplitPosition()]},
+        mode: 'onSubmit',
+    });
+    const {fields, append, remove} = useFieldArray({control, name: 'positions'});
+
+    const alreadySplit = doc.positions.length > 0;
+    const total = doc.total_cents === null ? '—' : cents(doc.total_cents);
+    const allocated = cents(doc.allocated_cents);
+    const remaining = doc.remaining_cents === null ? '—' : cents(doc.remaining_cents);
+
+    const onSplit = async (values: SplitFormValues) => {
+        if (busy) return;
+        setBusy(true);
+        setMessage(null);
+        try {
+            await createEurDocumentPositions(doc.id, {
+                total_cents: values.totalCents.trim() === '' ? null : Number(values.totalCents),
+                positions: values.positions.map((position) => ({
+                    name: position.name.trim(),
+                    amount_cents: Number(position.amountCents),
+                    business_share: Number(position.businessShare),
+                    useful_life_years: Number(position.usefulLifeYears),
+                    label: position.label.trim() === '' ? null : position.label.trim(),
+                    method: 'linear',
+                })),
+            });
+            reset({totalCents: '', positions: [emptySplitPosition()]});
+            const count = values.positions.length;
+            setMessage(t`Der Beleg wurde in ${count} Positionen aufgeteilt.`);
+        } catch (cause) {
+            setMessage(readServerError(
+                cause,
+                t`Der Beleg konnte nicht aufgeteilt werden. Prüfen Sie die Beträge und versuchen Sie es erneut.`,
+            ));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const onRemove = async (position: EurDocumentPosition) => {
+        setBusy(true);
+        setMessage(null);
+        try {
+            await deleteEurDocumentPosition(position.id);
+            const name = position.asset_name;
+            setMessage(t`Die Position ${name} wurde entfernt.`);
+        } catch {
+            setMessage(t`Die Position konnte nicht entfernt werden.`);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const onAssign = async () => {
+        if (groupSelection === '') return;
+        setBusy(true);
+        setMessage(null);
+        try {
+            await setEurDocumentGroup(doc.id, Number(groupSelection));
+            setGroupSelection('');
+            setMessage(t`Der Beleg wurde der Gruppe zugeordnet.`);
+        } catch {
+            setMessage(t`Der Beleg konnte nicht zugeordnet werden.`);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const onDetach = async () => {
+        setBusy(true);
+        setMessage(null);
+        try {
+            await setEurDocumentGroup(doc.id, null);
+            setMessage(t`Der Beleg wurde aus der Gruppe gelöst.`);
+        } catch {
+            setMessage(t`Der Beleg konnte nicht gelöst werden.`);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="mt-3 space-y-2" data-testid={`eur-document-positions-${doc.id}`}>
+            <h4 className="font-medium"><Trans>Positionen</Trans></h4>
+            <p className="text-sm opacity-70">
+                <Trans>Belegbetrag: {total} · verteilt: {allocated} · offen: {remaining}</Trans>
+            </p>
+            {doc.positions.length === 0 ? (
+                <p className="text-sm opacity-70"><Trans>Noch keine Positionen erfasst.</Trans></p>
+            ) : (
+                <ul className="text-sm" data-testid={`eur-document-position-list-${doc.id}`}>
+                    {doc.positions.map((position) => (
+                        <li key={position.id} className="flex flex-wrap items-center justify-between gap-2">
+                            <span>{position.label ?? position.asset_name}</span>
+                            <span className="flex flex-wrap items-center gap-2">
+                                <span>{position.amount_cents === null ? '—' : cents(position.amount_cents)}</span>
+                                <button type="button" className="btn btn-ghost btn-xs" disabled={busy}
+                                    onClick={() => void onRemove(position)}>
+                                    <Trans>Position entfernen</Trans>
+                                </button>
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {alreadySplit && (
+                <p className="text-sm opacity-70">
+                    <Trans>Dieser Beleg ist bereits aufgeteilt. Entfernen Sie zuerst die Positionen, um ihn erneut zu splitten.</Trans>
+                </p>
+            )}
+            <form onSubmit={handleSubmit(onSplit)} className="space-y-2">
+                <fieldset disabled={alreadySplit || busy} className="space-y-2">
+                    <label className="form-control">
+                        <span className="label-text"><Trans>Belegbetrag in Cent</Trans></span>
+                        <input type="number" className="input input-bordered input-sm" {...register('totalCents')}/>
+                        {errors.totalCents && <span className="text-error text-xs mt-1">{errors.totalCents.message}</span>}
+                    </label>
+                    {fields.map((field, index) => (
+                        <div key={field.id} className="rounded-box border border-base-300 p-2 space-y-2">
+                            <label className="form-control">
+                                <span className="label-text"><Trans>Name</Trans></span>
+                                <input type="text" className="input input-bordered input-sm" required
+                                    {...register(`positions.${index}.name`)}/>
+                                {errors.positions?.[index]?.name && (
+                                    <span className="text-error text-xs mt-1">{errors.positions[index]?.name?.message}</span>
+                                )}
+                            </label>
+                            <label className="form-control">
+                                <span className="label-text"><Trans>Betrag in Cent</Trans></span>
+                                <input type="number" className="input input-bordered input-sm" required
+                                    {...register(`positions.${index}.amountCents`)}/>
+                                {errors.positions?.[index]?.amountCents && (
+                                    <span className="text-error text-xs mt-1">{errors.positions[index]?.amountCents?.message}</span>
+                                )}
+                            </label>
+                            <label className="form-control">
+                                <span className="label-text"><Trans>Betriebsanteil</Trans></span>
+                                <select className="select select-bordered select-sm" required
+                                    {...register(`positions.${index}.businessShare`)}>
+                                    {BUSINESS_SHARES.map((share) => (
+                                        <option key={share} value={share}>{share} %</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="form-control">
+                                <span className="label-text"><Trans>Nutzungsdauer in Jahren</Trans></span>
+                                <input type="number" className="input input-bordered input-sm" required
+                                    min={1} max={50} {...register(`positions.${index}.usefulLifeYears`)}/>
+                                {errors.positions?.[index]?.usefulLifeYears && (
+                                    <span className="text-error text-xs mt-1">{errors.positions[index]?.usefulLifeYears?.message}</span>
+                                )}
+                            </label>
+                            <label className="form-control">
+                                <span className="label-text"><Trans>Bezeichnung</Trans></span>
+                                <input type="text" className="input input-bordered input-sm"
+                                    {...register(`positions.${index}.label`)}/>
+                            </label>
+                            <button type="button" className="btn btn-ghost btn-xs"
+                                onClick={() => remove(index)}>
+                                <Trans>Zeile entfernen</Trans>
+                            </button>
+                        </div>
+                    ))}
+                    <div className="flex flex-wrap gap-2">
+                        <button type="button" className="btn btn-outline btn-sm"
+                            onClick={() => append(emptySplitPosition())}>
+                            <Trans>Position hinzufügen</Trans>
+                        </button>
+                        <button type="submit" className="btn btn-primary btn-sm">
+                            <Trans>Beleg aufteilen</Trans>
+                        </button>
+                    </div>
+                </fieldset>
+            </form>
+
+            <div className="flex flex-wrap items-end gap-2">
+                <label className="form-control">
+                    <span className="label-text"><Trans>Beleg einer Gruppe zuordnen</Trans></span>
+                    <select className="select select-bordered select-sm" value={groupSelection}
+                        disabled={busy}
+                        onChange={(event) => setGroupSelection(event.target.value)}>
+                        <option value=""><Trans>Gruppe wählen</Trans></option>
+                        {groups.map((group) => (
+                            <option key={group.id} value={group.id}>{group.name}</option>
+                        ))}
+                    </select>
+                </label>
+                <button type="button" className="btn btn-outline btn-sm"
+                    disabled={busy || groupSelection === ''}
+                    onClick={() => void onAssign()}>
+                    <Trans>Zuordnen</Trans>
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" disabled={busy}
+                    onClick={() => void onDetach()}>
+                    <Trans>Gruppe lösen</Trans>
+                </button>
+            </div>
+
+            {message && <p className="alert alert-info mt-2" role="status">{message}</p>}
+        </div>
+    );
+}
+
 export default function EurDocumentsPanel({year, month}: Props) {
     const documents = useEurDocuments(year);
+    const groups = useEurAssetGroups();
     const [file, setFile] = useState<File | null>(null);
     const [receiptNo, setReceiptNo] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -301,6 +572,7 @@ export default function EurDocumentsPanel({year, month}: Props) {
                                     <th><Trans>Status</Trans></th>
                                     <th><Trans>Signatur</Trans></th>
                                     <th><Trans>Aktion</Trans></th>
+                                    <th><Trans>Positionen</Trans></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -350,6 +622,9 @@ export default function EurDocumentsPanel({year, month}: Props) {
                                                     <Trans>Entfernen</Trans>
                                                 </button>
                                             </div>
+                                        </td>
+                                        <td>
+                                            <DocumentPositions doc={document} groups={groups.data?.groups ?? []}/>
                                         </td>
                                     </tr>
                                 ))}

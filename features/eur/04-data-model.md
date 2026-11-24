@@ -349,6 +349,34 @@ abgewiesen; das Trennen stellt die Einzelabrechnung wieder her.
 **Backfill.** Keiner. Bestehende Güter bleiben einzeln abgerechnet, bis sie
 ausdrücklich zugeordnet werden. **Rollback:** `down()` ist leer.
 
+### Schema-Entscheidung V074 (Beleg-Positionen, Portal #59 / D-90)
+
+**Entscheidung des Eigentümers (2026-11-24):** Ein Beleg kann mehrere
+Positionen enthalten; umgekehrt können mehrere Belege eine Abrechnungsgruppe
+bilden. Beide Richtungen nutzen die bereits bestehende echte Many-to-Many-Pivot
+`eur_asset_documents` — es entsteht **keine** neue Positions-Haupttabelle und
+kein gruppeneigener Belegspeicher (D-89 bleibt).
+
+**Schema.** `eur_asset_documents` erhält drei nullable Spalten: `label`
+(string), `amount_cents` (bigint, ganze Cent) und `ordinal` (unsigned integer);
+der bestehende Unique-Index `(eur_asset_id, eur_document_id)` bleibt, zusätzlich
+gibt es einen Index `(brand, eur_document_id, ordinal)`. `eur_documents` erhält
+das nullable `total_cents` (bigint) als optionalen Belegbetrag. Alle neuen
+Spalten sind nullable.
+
+**Abrechnung.** Der Split erzeugt je Position ein eigenes `EurAsset` mit
+eigenem Betrag, Anteil, Nutzungsdauer und eigener AfA; solange es nicht in einer
+Gruppe ist, bucht es unabhängig Entnahme bzw. Eigenbeleg. Ist `total_cents`
+gesetzt, darf die Summe der Positionsbeträge den Belegbetrag nicht überschreiten
+(422); ein Restbetrag ist erlaubt und wird in der API ausgewiesen. Der Merge
+ordnet die mit den Belegen verknüpften Güter einer bestehenden Gruppe zu; die
+Gruppe bleibt **eine** Abrechnungseinheit, ihr Anteil überschreibt die
+Mitgliederanteile (D-89). Ein Gut mit gebuchtem Jahr lässt sich nicht
+gruppieren; das Lösen der Gruppe stellt die Einzelbuchung wieder her.
+
+**Backfill.** Keiner — bestehende Verknüpfungen behalten NULL-Werte und bleiben
+gültig. **Rollback:** `down()` ist leer.
+
 ## Beziehungen
 
 - Buchung → genau ein Kunde und optional ein Projekt; Reise analog.

@@ -16,6 +16,7 @@ use App\Models\EurHour;
 use App\Models\EurMonthlyReport;
 use App\Models\EurSignature;
 use App\Models\EurWarehouseEntry;
+use App\Services\Eur\EurDocumentPositionService;
 use App\Services\Eur\EurPdfFingerprintService;
 use App\Services\Eur\EurPdfService;
 use App\Services\Eur\EurPdfSignatureService;
@@ -67,6 +68,7 @@ class EurDocumentController extends Controller
         private readonly EurPdfService $pdf,
         private readonly EurPdfFingerprintService $fingerprints,
         private readonly EurPdfSignatureService $signatures,
+        private readonly EurDocumentPositionService $positions,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -523,6 +525,8 @@ class EurDocumentController extends Controller
     private function serialize(EurDocument $document, array $entriesByReceipt): array
     {
         // `storage_path` wird bewusst nicht ausgeliefert.
+        $allocation = $this->positions->serializeDocument($document);
+
         return [
             'id' => (int) $document->id,
             'year' => (int) $document->year,
@@ -532,6 +536,11 @@ class EurDocumentController extends Controller
                 ? ($entriesByReceipt[$document->receipt_no] ?? [])
                 : [],
             'original_name' => $document->original_name,
+            // Portal #59/D-90: Positionsdaten aus der Pivot, nie aus dem Dateipfad.
+            'total_cents' => $allocation['total_cents'],
+            'allocated_cents' => $allocation['allocated_cents'],
+            'remaining_cents' => $allocation['remaining_cents'],
+            'positions' => $allocation['positions'],
             'mime_type' => $document->mime_type,
             'size_bytes' => (int) $document->size_bytes,
             'sha256' => $document->sha256,

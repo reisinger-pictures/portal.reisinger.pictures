@@ -98,6 +98,10 @@ msgstr "{couponsLength} Coupon{couponsPlural} für diese Galerie"
 msgid "{couponsLength} Coupon{couponsPlural} für diese Galerie-Gruppe"
 msgstr "{couponsLength} Coupon{couponsPlural} für diese Galerie-Gruppe"
 
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "{documentCount} Belege"
+msgstr "{documentCount} Belege"
+
 #: src/ui/management/ManagementEurView.tsx
 msgid "{documentsForMonth} Belege"
 msgstr "{documentsForMonth} Belege"
@@ -1330,6 +1334,14 @@ msgid "Beleg anhängen"
 msgstr "Beleg anhängen"
 
 #: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Beleg aufteilen"
+msgstr "Beleg aufteilen"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Beleg einer Gruppe zuordnen"
+msgstr "Beleg einer Gruppe zuordnen"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
 msgid "Beleg hochladen"
 msgstr "Beleg hochladen"
 
@@ -1337,6 +1349,19 @@ msgstr "Beleg hochladen"
 msgid "Beleg wählen"
 msgstr "Beleg wählen"
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Belegbetrag als ganze Cent angeben"
+msgstr "Belegbetrag als ganze Cent angeben"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Belegbetrag in Cent"
+msgstr "Belegbetrag in Cent"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Belegbetrag: {total} · verteilt: {allocated} · offen: {remaining}"
+msgstr "Belegbetrag: {total} · verteilt: {allocated} · offen: {remaining}"
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
 #: src/ui/management/eur/EurAssetsPanel.tsx
 #: src/ui/management/eur/EurDocumentsPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
@@ -1552,9 +1577,17 @@ msgstr "Betrag"
 msgid "Betrag (€)"
 msgstr "Betrag (€)"
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Betrag als ganze Cent angeben"
+msgstr "Betrag als ganze Cent angeben"
+
 #: src/ui/management/components/CouponFormDrawer.tsx
 msgid "Betrag in €"
 msgstr "Betrag in €"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Betrag in Cent"
+msgstr "Betrag in Cent"
 
 #: src/ui/management/ManagementEurView.tsx
 #~ msgid "Beträge in ganzen Cent, Zeiten in ganzen Minuten"
@@ -1613,6 +1646,7 @@ msgstr "Betriebsanlagen"
 
 #: src/ui/management/eur/EurAssetGroupsPanel.tsx
 #: src/ui/management/eur/EurDepreciationPanel.tsx
+#: src/ui/management/eur/EurDocumentsPanel.tsx
 msgid "Betriebsanteil"
 msgstr "Betriebsanteil"
 
@@ -1627,6 +1661,7 @@ msgid "Betriebsanteil ändern"
 msgstr "Betriebsanteil ändern"
 
 #: src/ui/management/eur/EurAssetGroupsPanel.tsx
+#: src/ui/management/eur/EurDocumentsPanel.tsx
 #: src/ui/management/eur/EurEntryDialog.tsx
 #: src/ui/management/ManagementEurView.tsx
 msgid "Betriebsanteil in 5-%-Schritten von 0 bis 100 angeben"
@@ -1671,6 +1706,7 @@ msgid "Bezahlung über dein PayPal-Konto."
 msgstr "Bezahlung über dein PayPal-Konto."
 
 #: src/ui/management/eur/EurDepreciationPanel.tsx
+#: src/ui/management/eur/EurDocumentsPanel.tsx
 msgid "Bezeichnung"
 msgstr "Bezeichnung"
 
@@ -1865,6 +1901,10 @@ msgstr "Bitte einen gültigen Betrag eingeben"
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Bitte einen gültigen Betrag eingeben."
 msgstr "Bitte einen gültigen Betrag eingeben."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Bitte einen Namen angeben"
+msgstr "Bitte einen Namen angeben"
 
 #: src/logic/useCoupon.ts
 msgid "Bitte einen Rabattcode eingeben."
@@ -2401,12 +2441,41 @@ msgid "Der Beleg ist optional. Ohne passenden Beleg lässt sich die Signatur sp�
 msgstr "Der Beleg ist optional. Ohne passenden Beleg lässt sich die Signatur später trotzdem zuordnen."
 
 #: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Der Beleg konnte nicht aufgeteilt werden. Prüfen Sie die Beträge und versuchen Sie es erneut."
+msgstr "Der Beleg konnte nicht aufgeteilt werden. Prüfen Sie die Beträge und versuchen Sie es erneut."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
 msgid "Der Beleg konnte nicht gelöscht werden. Laden Sie die Liste erneut und versuchen Sie es noch einmal."
 msgstr "Der Beleg konnte nicht gelöscht werden. Laden Sie die Liste erneut und versuchen Sie es noch einmal."
 
 #: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Der Beleg konnte nicht gelöst werden."
+msgstr "Der Beleg konnte nicht gelöst werden."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
 msgid "Der Beleg konnte nicht hochgeladen werden. Prüfen Sie die Datei und die Belegnummer und versuchen Sie es erneut."
 msgstr "Der Beleg konnte nicht hochgeladen werden. Prüfen Sie die Datei und die Belegnummer und versuchen Sie es erneut."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Der Beleg konnte nicht zugeordnet werden."
+msgstr "Der Beleg konnte nicht zugeordnet werden."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Der Beleg wurde aus der Gruppe gelöst."
+msgstr "Der Beleg wurde aus der Gruppe gelöst."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Der Beleg wurde der Gruppe zugeordnet."
+msgstr "Der Beleg wurde der Gruppe zugeordnet."
+
+#. placeholder {0}: values.positions.length
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+#~ msgid "Der Beleg wurde in {0} Positionen aufgeteilt."
+#~ msgstr "Der Beleg wurde in {0} Positionen aufgeteilt."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Der Beleg wurde in {count} Positionen aufgeteilt."
+msgstr "Der Beleg wurde in {count} Positionen aufgeteilt."
 
 #: src/ui/management/eur/EurAssetGroupsPanel.tsx
 msgid "Der Betriebsanteil konnte nicht geändert werden."
@@ -2752,6 +2821,19 @@ msgstr "Die Monatsdaten konnten nicht geladen werden. Prüfen Sie Ihre Verbindun
 msgid "Die Passwörter stimmen nicht überein."
 msgstr "Die Passwörter stimmen nicht überein."
 
+#. placeholder {0}: position.asset_name
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+#~ msgid "Die Position {0} wurde entfernt."
+#~ msgstr "Die Position {0} wurde entfernt."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Die Position {name} wurde entfernt."
+msgstr "Die Position {name} wurde entfernt."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Die Position konnte nicht entfernt werden."
+msgstr "Die Position konnte nicht entfernt werden."
+
 #: src/ui/management/ManagementUserView.tsx
 msgid "Die Rollen wurden inzwischen geändert. Der Dialog wurde geschlossen – bitte erneut öffnen und die Rechte erneut speichern."
 msgstr "Die Rollen wurden inzwischen geändert. Der Dialog wurde geschlossen – bitte erneut öffnen und die Rechte erneut speichern."
@@ -2860,6 +2942,10 @@ msgstr "Diese Galerie inklusive aller Bilder wirklich löschen? Dieser Schritt k
 #: src/ui/Privacy.tsx
 msgid "Diese Plattform verwendet sogenannte \"HttpOnly\"-Cookies, um angemeldete Benutzer sicher zu authentifizieren. Diese Cookies speichern einen Authentifizierungs-Token (JWT) und sind für die technische Funktion des Portals (Zugriff auf private Galerien, Speichern von Bewertungen) zwingend erforderlich. Sie können nicht durch clientseitige Skripte (JavaScript) ausgelesen werden."
 msgstr "Diese Plattform verwendet sogenannte \"HttpOnly\"-Cookies, um angemeldete Benutzer sicher zu authentifizieren. Diese Cookies speichern einen Authentifizierungs-Token (JWT) und sind für die technische Funktion des Portals (Zugriff auf private Galerien, Speichern von Bewertungen) zwingend erforderlich. Sie können nicht durch clientseitige Skripte (JavaScript) ausgelesen werden."
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Dieser Beleg ist bereits aufgeteilt. Entfernen Sie zuerst die Positionen, um ihn erneut zu splitten."
+msgstr "Dieser Beleg ist bereits aufgeteilt. Entfernen Sie zuerst die Positionen, um ihn erneut zu splitten."
 
 #: src/ui/management/components/PhotographerTeamModal.tsx
 msgid "Dieser Bereich ist aktuell für <0>alle Fotografen</0> freigegeben. Du musst keine expliziten Zuweisungen vornehmen."
@@ -3091,6 +3177,10 @@ msgstr "Ein unerwarteter Serverfehler ist aufgetreten."
 #: src/ui/management/eur/EurTravelPanel.tsx
 msgid "eine"
 msgstr "eine"
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Eine Gruppe ist eine Abrechnungseinheit: Alle Anlagegüter der hier verknüpften Belege sind Mitglieder dieser Gruppe."
+msgstr "Eine Gruppe ist eine Abrechnungseinheit: Alle Anlagegüter der hier verknüpften Belege sind Mitglieder dieser Gruppe."
 
 #: src/ui/management/eur/EurAssetGroupsPanel.tsx
 msgid "Eine Gruppe ist eine Abrechnungseinheit: Betriebliche Gruppen erzeugen eine Entnahme, private Gruppen je Jahr einen Eigenbeleg. Belege bleiben an den einzelnen Anlagegütern."
@@ -4397,6 +4487,14 @@ msgstr "Gruppe anlegen"
 msgid "Gruppe löschen"
 msgstr "Gruppe löschen"
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Gruppe lösen"
+msgstr "Gruppe lösen"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Gruppe wählen"
+msgstr "Gruppe wählen"
+
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Gruppen"
 msgstr "Gruppen"
@@ -4925,6 +5023,10 @@ msgstr "Keine Auto-Join Domain"
 #: src/ui/components/WysiwygEditor.tsx
 msgid "Keine Bausteine gefunden"
 msgstr "Keine Bausteine gefunden"
+
+#: src/ui/management/eur/EurAssetGroupsPanel.tsx
+msgid "Keine Belege zugeordnet."
+msgstr "Keine Belege zugeordnet."
 
 #: src/ui/management/ManagementContractView.tsx
 #: src/ui/management/ManagementManualInvoiceView.tsx
@@ -5902,6 +6004,10 @@ msgstr "Mindestens 8 Zeichen"
 msgid "Mindestens eine Person muss erfasst werden."
 msgstr "Mindestens eine Person muss erfasst werden."
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Mindestens eine Position angeben"
+msgstr "Mindestens eine Position angeben"
+
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Mindestens eine Preisstaffel erforderlich"
 msgstr "Mindestens eine Preisstaffel erforderlich"
@@ -6175,6 +6281,7 @@ msgstr "Nachweis öffnen"
 #: src/ui/management/components/UserTable.tsx
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 #: src/ui/management/eur/EurAnalyticsPanel.tsx
+#: src/ui/management/eur/EurDocumentsPanel.tsx
 #: src/ui/management/ManagementContractView.tsx
 msgid "Name"
 msgstr "Name"
@@ -6545,6 +6652,10 @@ msgstr "Noch keine Organisationen angelegt."
 msgid "Noch keine Pools berechnet."
 msgstr "Noch keine Pools berechnet."
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Noch keine Positionen erfasst."
+msgstr "Noch keine Positionen erfasst."
+
 #: src/ui/management/components/VolumePresetSettingsCard.tsx
 msgid "Noch keine Presets angelegt."
 msgstr "Noch keine Presets angelegt."
@@ -6671,6 +6782,18 @@ msgstr "Nutzerrechte gespeichert."
 #: src/ui/management/eur/EurDepreciationPanel.tsx
 msgid "Nutzungsdauer (Jahre)"
 msgstr "Nutzungsdauer (Jahre)"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+#~ msgid "Nutzungsdauer in ganzen Jahren angeben"
+#~ msgstr "Nutzungsdauer in ganzen Jahren angeben"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Nutzungsdauer in ganzen Jahren von 1 bis 50 angeben"
+msgstr "Nutzungsdauer in ganzen Jahren von 1 bis 50 angeben"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Nutzungsdauer in Jahren"
+msgstr "Nutzungsdauer in Jahren"
 
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Nutzungsrechte"
@@ -7096,6 +7219,18 @@ msgstr "Portrait"
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Position"
 msgstr "Position"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Position entfernen"
+msgstr "Position entfernen"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Position hinzufügen"
+msgstr "Position hinzufügen"
+
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Positionen"
+msgstr "Positionen"
 
 #: src/ui/management/components/UserTable.tsx
 #: src/ui/management/ManagementOrgDetailView.tsx
@@ -9534,6 +9669,10 @@ msgstr "Zeile danach hinzufügen"
 msgid "Zeile davor hinzufügen"
 msgstr "Zeile davor hinzufügen"
 
+#: src/ui/management/eur/EurDocumentsPanel.tsx
+msgid "Zeile entfernen"
+msgstr "Zeile entfernen"
+
 #: src/ui/components/WysiwygEditor.tsx
 msgid "Zeile löschen"
 msgstr "Zeile löschen"
@@ -9661,6 +9800,7 @@ msgid "Zum Stammzertifikat"
 msgstr "Zum Stammzertifikat"
 
 #: src/ui/management/eur/EurAssetGroupsPanel.tsx
+#: src/ui/management/eur/EurDocumentsPanel.tsx
 msgid "Zuordnen"
 msgstr "Zuordnen"
 

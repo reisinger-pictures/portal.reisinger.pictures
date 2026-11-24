@@ -8,9 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Models\EurAsset;
 use App\Models\EurAssetGroup;
 use App\Models\EurAuditLog;
-use App\Services\Eur\EurAssetEigenbelegService;
+use App\Services\Eur\EurAssetGroupSerializer;
 use App\Services\Eur\EurAssetGroupService;
-use App\Services\Eur\EurEntnahmeService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,8 +27,7 @@ class EurAssetGroupController extends Controller
 {
     public function __construct(
         private readonly EurAssetGroupService $service,
-        private readonly EurEntnahmeService $entnahmeService,
-        private readonly EurAssetEigenbelegService $eigenbelegService,
+        private readonly EurAssetGroupSerializer $serializer,
     ) {}
 
     public function index(): JsonResponse
@@ -38,7 +36,7 @@ class EurAssetGroupController extends Controller
             ->with(['assets', 'years'])
             ->orderBy('name')
             ->get()
-            ->map(fn (EurAssetGroup $group): array => $this->serialize($group));
+            ->map(fn (EurAssetGroup $group): array => $this->serializer->serialize($group));
 
         return response()->json(['groups' => $groups]);
     }
@@ -55,7 +53,7 @@ class EurAssetGroupController extends Controller
             return $group;
         });
 
-        return response()->json(['group' => $this->serialize($group->refresh())], 201);
+        return response()->json(['group' => $this->serializer->serialize($group->refresh())], 201);
     }
 
     public function update(Request $request, int $id): JsonResponse
@@ -69,7 +67,7 @@ class EurAssetGroupController extends Controller
             $this->audit('group_updated', $group);
         });
 
-        return response()->json(['group' => $this->serialize($group->refresh())]);
+        return response()->json(['group' => $this->serializer->serialize($group->refresh())]);
     }
 
     public function assign(Request $request, int $id): JsonResponse
@@ -89,8 +87,11 @@ class EurAssetGroupController extends Controller
         DB::transaction(function () use ($group, $asset): void {
             if ($asset->eur_asset_group_id !== null && (int) $asset->eur_asset_group_id !== $group->id) {
                 $old = EurAssetGroup::forCurrentBrand()->find($asset->eur_asset_group_id);
-                $asset->update(['eur_asset_group_id' => null]);
-                $this->entnahmeService->createForAsset($asset->refresh());
+                $asset->update([
+                    'eur_asset_group_id' => null,
+                    'scope' => (int) $asset->business_share < 50 ? 'private' : 'business',
+                ]);
+                $this->service->restoreIndividualBookkeeping($asset);
                 if ($old !== null) {
                     $this->service->sync($old->refresh());
                 }
@@ -106,7 +107,7 @@ class EurAssetGroupController extends Controller
             $this->audit('group_asset_assigned', $group, ['asset_id' => $asset->id]);
         });
 
-        return response()->json(['group' => $this->serialize($group->refresh())]);
+        return response()->json(['group' => $this->serializer->serialize($group->refresh())]);
     }
 
     public function unassign(int $id, int $assetId): JsonResponse
@@ -119,12 +120,12 @@ class EurAssetGroupController extends Controller
                 'eur_asset_group_id' => null,
                 'scope' => (int) $asset->business_share < 50 ? 'private' : 'business',
             ]);
-            $this->restoreIndividualBookkeeping($asset);
+            $this->service->restoreIndividualBookkeeping($asset);
             $this->service->sync($group->refresh());
             $this->audit('group_asset_unassigned', $group, ['asset_id' => $asset->id]);
         });
 
-        return response()->json(['group' => $this->serialize($group->refresh())]);
+        return response()->json(['group' => $this->serializer->serialize($group->refresh())]);
     }
 
     public function destroy(int $id): JsonResponse
@@ -137,26 +138,13 @@ class EurAssetGroupController extends Controller
                     'eur_asset_group_id' => null,
                     'scope' => (int) $asset->business_share < 50 ? 'private' : 'business',
                 ]);
-                $this->restoreIndividualBookkeeping($asset);
+                $this->service->restoreIndividualBookkeeping($asset);
             }
             $this->audit('group_deleted', $group);
             $group->delete();
         });
 
         return response()->json(['success' => true]);
-    }
-
-    /** Nach dem Trennen gilt wieder die Einzelabrechnung (D-89). */
-    private function restoreIndividualBookkeeping(EurAsset $asset): void
-    {
-        $asset = $asset->refresh();
-        $this->entnahmeService->createForAsset($asset);
-
-        if ($asset->scope === 'private') {
-            foreach ($asset->years as $year) {
-                $this->eigenbelegService->createForYear($asset, $year);
-            }
-        }
     }
 
     /**
@@ -173,32 +161,6 @@ class EurAssetGroupController extends Controller
             ],
             'business_share' => ['required', 'integer', 'min:0', 'max:100', 'multiple_of:5'],
         ]);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function serialize(EurAssetGroup $group): array
-    {
-        return [
-            'id' => (int) $group->id,
-            'name' => $group->name,
-            'business_share' => (int) $group->business_share,
-            'scope' => (int) $group->business_share < 50 ? 'private' : 'business',
-            'asset_ids' => $group->assets->map(fn (EurAsset $asset): int => (int) $asset->id)->values()->all(),
-            'assets' => $group->assets->map(fn (EurAsset $asset): array => [
-                'id' => (int) $asset->id,
-                'name' => $asset->name,
-                'invoice_no' => $asset->invoice_no,
-                'cost_cents' => (int) $asset->cost_cents,
-            ])->values()->all(),
-            'years' => $group->years->map(fn ($year): array => [
-                'year' => (int) $year->year,
-                'eigenbeleg_no' => $year->eigenbeleg_no,
-                'eigenbeleg_cents' => $year->eigenbeleg_cents === null ? null : (int) $year->eigenbeleg_cents,
-                'usage_percent' => $year->usage_percent === null ? null : (int) $year->usage_percent,
-            ])->values()->all(),
-        ];
     }
 
     /**

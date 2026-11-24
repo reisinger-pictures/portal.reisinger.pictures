@@ -245,6 +245,14 @@ export interface EurAssetGroup {
         eigenbeleg_cents: number | null;
         usage_percent: number | null;
     }>;
+    /** #59: receipts merged into this single billing unit. Optional for older payloads. */
+    document_ids?: number[];
+    /** #59: enriched receipts used to derive display names. Optional for older payloads. */
+    documents?: Array<{
+        id: number;
+        receipt_no: string | null;
+        original_name: string | null;
+    }>;
 }
 
 export interface EurAssetGroupPayload {
@@ -409,6 +417,20 @@ export interface EurMonthData {
     hint?: string;
 }
 
+/**
+ * #59: one enriched row of the `eur_asset_documents` pivot. A position is the
+ * asset created from one part of a split receipt; the pivot row carries the
+ * display label and the ordinal within the receipt.
+ */
+export interface EurDocumentPosition {
+    id: number;
+    asset_id: number;
+    asset_name: string;
+    label: string | null;
+    amount_cents: number | null;
+    ordinal: number | null;
+}
+
 /** `GET/POST /eur/documents` — metadata; the storage path never leaves the server. */
 export interface EurDocument {
     id: number;
@@ -425,6 +447,14 @@ export interface EurDocument {
     signed_sha256: string | null;
     signed_storage_path: string | null;
     signed_size_bytes: number | null;
+    /** Journal bookings linked to this receipt. Always delivered by the backend. */
+    linked_entry_ids: number[];
+    /** #59: receipt total when known, and the split/merge distribution around it. */
+    total_cents: number | null;
+    allocated_cents: number;
+    remaining_cents: number | null;
+    /** #59: one row per independently billed asset split from this receipt. */
+    positions: EurDocumentPosition[];
 }
 
 export interface EurDocumentsResponse {
@@ -433,6 +463,34 @@ export interface EurDocumentsResponse {
 
 export interface EurDocumentResponse {
     document: EurDocument;
+}
+
+/** `GET/POST /eur/documents/{id}/positions` — the same receipt with its rows. */
+export interface EurDocumentPositionsResponse {
+    document: {
+        id: number;
+        receipt_no: string | null;
+        original_name: string | null;
+        total_cents: number | null;
+        allocated_cents: number;
+        remaining_cents: number | null;
+    };
+    positions: EurDocumentPosition[];
+}
+
+export interface EurDocumentPositionPayload {
+    name: string;
+    amount_cents: number;
+    business_share: number;
+    useful_life_years: number;
+    method?: 'linear' | 'degressive';
+    label?: string | null;
+    ordinal?: number | null;
+}
+
+export interface EurDocumentPositionsPayload {
+    total_cents?: number | null;
+    positions: EurDocumentPositionPayload[];
 }
 
 /** `GET/POST /eur/hours` — time is always whole minutes. */
@@ -686,6 +744,15 @@ export function useEurMonth(year = 2026, month = 1) {
 
 export function useEurDocuments(year = 2026) {
     return useSWR<EurDocumentsResponse>(`/api/management/eur/documents?year=${year}`, fetcher, SWR_OPTIONS);
+}
+
+/** #59: the positions of one receipt, including its allocation summary. */
+export function useEurDocumentPositions(documentId: number) {
+    return useSWR<EurDocumentPositionsResponse>(
+        `/api/management/eur/documents/${documentId}/positions`,
+        fetcher,
+        SWR_OPTIONS,
+    );
 }
 
 export function useEurHours(year = 2026, month?: number) {
@@ -1140,6 +1207,44 @@ export function eurDocumentSignedDownloadUrl(id: number): string {
 
 export async function deleteEurDocument(id: number): Promise<void> {
     await apiMutate(`/api/management/eur/documents/${id}`, 'DELETE');
+}
+
+/**
+ * #59 SPLIT: create one independently billed asset per position from a single
+ * receipt. A 422 signals over-allocation or an existing split; the caller owns
+ * the user-facing reaction.
+ */
+export async function createEurDocumentPositions(
+    documentId: number,
+    payload: EurDocumentPositionsPayload,
+): Promise<{ document: EurDocumentPositionsResponse['document'] }> {
+    const result = await apiMutate<{ document: EurDocumentPositionsResponse['document'] }>(
+        `/api/management/eur/documents/${documentId}/positions`,
+        'POST',
+        payload,
+    );
+    await revalidateEur();
+    return result;
+}
+
+/** #59: remove only the pivot link; the asset itself is kept. */
+export async function deleteEurDocumentPosition(positionId: number): Promise<void> {
+    await apiMutate(`/api/management/eur/documents/positions/${positionId}`, 'DELETE');
+    await revalidateEur();
+}
+
+/** #59 MERGE: put a receipt into one existing billing group; `null` detaches it. */
+export async function setEurDocumentGroup(
+    documentId: number,
+    groupId: number | null,
+): Promise<{group: EurAssetGroup}> {
+    const result = await apiMutate<{group: EurAssetGroup}>(
+        `/api/management/eur/documents/${documentId}/group`,
+        'PUT',
+        {group_id: groupId},
+    );
+    await revalidateEur();
+    return result;
 }
 
 export async function createEurHour(payload: {

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Casts\AsBrand;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -36,6 +37,36 @@ class EurAssetGroup extends Model
     public function years(): HasMany
     {
         return $this->hasMany(EurAssetGroupYear::class, 'eur_asset_group_id')->orderBy('year');
+    }
+
+    /**
+     * Portal #59/D-90: Belege gehören transitiv zu den Mitgliedern, nie direkt
+     * zur Gruppe. Nur die Pivot `eur_asset_documents` ist die Wahrheitsquelle.
+     *
+     * @return list<int>
+     */
+    public function documentIds(): array
+    {
+        $assetIds = $this->assets()->pluck('id');
+
+        return EurAssetDocument::forCurrentBrand()
+            ->whereIn('eur_asset_id', $assetIds)
+            ->pluck('eur_document_id')
+            ->unique()
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return Collection<int, EurDocument>
+     */
+    public function documents(): Collection
+    {
+        return EurDocument::forCurrentBrand()
+            ->whereIn('id', $this->documentIds())
+            ->orderBy('id')
+            ->get();
     }
 
     public function scopeForCurrentBrand(Builder $query): Builder

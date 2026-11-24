@@ -8,6 +8,7 @@ use App\Eur\Parity\Money;
 use App\Eur\Reference\EurYear;
 use App\Eur\Support\Share;
 use App\Models\EurAsset;
+use App\Models\EurAssetDocument;
 use App\Models\EurAssetGroup;
 use App\Models\EurAssetGroupYear;
 use App\Models\EurEntry;
@@ -28,9 +29,28 @@ final class EurAssetGroupService
 {
     public const RECEIPT_PREFIX = 'GR-';
 
+    public function __construct(
+        private readonly EurEntnahmeService $entnahmeService = new EurEntnahmeService,
+        private readonly EurAssetEigenbelegService $eigenbelegService = new EurAssetEigenbelegService,
+    ) {}
+
     public function sync(EurAssetGroup $group): void
     {
         $members = $group->assets()->get()->all();
+
+        // Eine geleerte Gruppe ist keine Abrechnungseinheit mehr: sonst
+        // verbliebe nach einem Gruppenwechsel eine 0-Cent-Entnahme der alten
+        // Gruppe (Regressionsfall Portal #59).
+        if ($members === []) {
+            EurEntry::forCurrentBrand()
+                ->where('receipt_no', self::RECEIPT_PREFIX.$group->id)
+                ->where('kind_type', 'Entnahme')
+                ->delete();
+            $group->years()->delete();
+
+            return;
+        }
+
         $totalCost = array_sum(array_map(static fn (EurAsset $a): int => (int) $a->cost_cents, $members));
         $businessPercent = (int) $group->business_share;
         $privatePercent = 100 - $businessPercent;
@@ -60,10 +80,19 @@ final class EurAssetGroupService
 
     public function removeIndividualBookkeeping(EurAsset $asset): void
     {
-        EurEntry::forCurrentBrand()
+        $query = EurEntry::forCurrentBrand()
             ->where('receipt_no', $asset->invoice_no)
-            ->where('kind_type', 'Entnahme')
-            ->delete();
+            ->where('kind_type', 'Entnahme');
+
+        // Portal #59: Split-Geschwister teilen dieselbe Belegnummer. Ohne
+        // Positionsschlüssel würde das Gruppieren eines Guts die Entnahmen
+        // seiner ungruppierten Geschwister mitlöschen.
+        $positionKey = $this->positionKeyFor($asset);
+        if ($positionKey !== null) {
+            $query->where('description', 'like', '% (Position '.$positionKey.')');
+        }
+
+        $query->delete();
 
         $asset->years()->update([
             'eigenbeleg_no' => null,
@@ -72,6 +101,44 @@ final class EurAssetGroupService
             'eigenbeleg_cents' => null,
             'eigenbeleg_created_at' => null,
         ]);
+    }
+
+    /**
+     * Nach dem Trennen gilt wieder die Einzelabrechnung (D-89, Portal #59).
+     * Die Dienste sind idempotent: es entsteht keine zweite Entnahme und kein
+     * zweiter Eigenbeleg für dasselbe Gut.
+     */
+    public function restoreIndividualBookkeeping(EurAsset $asset): void
+    {
+        $asset = $asset->refresh();
+
+        // Portal #59: mehrere Positionen teilen eine Belegnummer; der
+        // Positionsschlüssel aus der Pivot hält ihre Entnahmen getrennt.
+        $this->entnahmeService->createForAsset($asset, $this->positionKeyFor($asset));
+
+        if ($asset->scope === 'private') {
+            foreach ($asset->years as $year) {
+                $this->eigenbelegService->createForYear($asset, $year);
+            }
+        }
+    }
+
+    /**
+     * Portal #59/D-90: stable Schlüssel `documentId-ordinal` aus der Pivot.
+     * Ohne Position (klassisches Anlagegut) bleibt der Wert null und damit
+     * das bestehende Verhalten exakt erhalten.
+     */
+    private function positionKeyFor(EurAsset $asset): ?string
+    {
+        $pivot = EurAssetDocument::forCurrentBrand()
+            ->where('eur_asset_id', $asset->id)
+            ->whereNotNull('ordinal')
+            ->orderBy('ordinal')
+            ->first();
+
+        return $pivot === null
+            ? null
+            : sprintf('%d-%d', $pivot->eur_document_id, $pivot->ordinal);
     }
 
     private function syncEntnahme(EurAssetGroup $group, int $totalCost, int $businessPercent, int $privatePercent): void

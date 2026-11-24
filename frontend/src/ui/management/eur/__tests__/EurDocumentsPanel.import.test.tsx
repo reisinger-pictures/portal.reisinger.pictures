@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { importEurEntries, useEurDocuments } from '../../../../logic/useEur';
+import { importEurEntries, useEurAssetGroups, useEurDocuments } from '../../../../logic/useEur';
 import { renderWithProviders } from '../../../../test-setup';
 import EurDocumentsPanel from '../EurDocumentsPanel';
 
@@ -10,10 +10,16 @@ vi.mock('../../../../logic/useEur', async (importOriginal) => {
     return {
         ...actual,
         useEurDocuments: vi.fn(),
+        useEurAssetGroups: vi.fn(),
         uploadEurDocument: vi.fn(),
         deleteEurDocument: vi.fn(),
         importEurEntries: vi.fn(),
     };
+});
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useEurAssetGroups).mockReturnValue(swrResult<ReturnType<typeof useEurAssetGroups>>({groups: []}));
 });
 
 function swrResult<R>(data: unknown): R {

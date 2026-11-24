@@ -194,6 +194,28 @@ bleiben an den einzelnen Gütern. Eine Zuordnung mit gebuchtem Jahr wird mit
 `GR-<group id>`; private Gruppen erzeugen **einen** Eigenbeleg je Jahr
 (`EBG-<group id>-<year>`). Alle Beträge sind ganze Cent.
 
+### Beleg-Positionen (Portal #59, D-90)
+
+`GET/POST /eur/documents/{id}/positions`,
+`DELETE /eur/documents/positions/{positionId}` und
+`PUT /eur/documents/{id}/group` (`{group_id: number|null}`) bilden die beiden
+Richtungen derselben Verknüpfung. Eine Position ist eine angereicherte Zeile
+der bestehenden Pivot `eur_asset_documents` mit `id`, `asset_id`,
+`asset_name`, `label`, `amount_cents` und `ordinal`. Der Dokumenteintrag
+liefert zusätzlich `total_cents` (nullable), `allocated_cents` und
+`remaining_cents` (nullable). Das Splitten legt je Position ein eigenes
+Anlagegut mit eigener AfA und eigener Entnahme/Eigenbeleg an, solange es nicht
+gruppiert ist; ein gesetzter Belegbetrag darf nicht überschritten werden
+(sonst 422), ein Restbetrag bleibt erlaubt. Ein zweiter Split desselben Belegs
+wird mit 422 abgewiesen; das Löschen einer Position entfernt nur die
+Verknüpfung, nicht das Gut und seine Buchung. Die Gruppenzuordnung fasst alle
+mit dem Beleg verknüpften Güter in einer bestehenden Gruppe zusammen (eine
+Abrechnungseinheit je D-89) und stellt beim Lösen die Einzelabrechnung wieder
+her. `GET /eur/documents` liefert dieselben Zusatzfelder je Beleg;
+`GET /eur/asset-groups` ergänzt `document_ids` und `documents`, abgeleitet aus
+den verknüpften Gütern. Alle Abfragen sind brand-scoped (fremder Brand → 404),
+alle Beträge ganze Cent.
+
 Die Antwort enthält je Anlage `warnings: [{code, text}]`. Neben EUE-053/058
 meldet `AssetPlausibility` die nicht blockierenden Hinweise EUE-056
 (Vorjahres-AfA weicht vom gepinnten Plan um mehr als 1 Cent ab) und EUE-057

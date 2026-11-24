@@ -32,7 +32,15 @@ final class EurEntnahmeService
 
     public const CODE = '9040';
 
-    public function createForAsset(EurAsset $asset): ?EurEntry
+    /**
+     * Portal #59/D-90: beim Beleg-Split teilen sich mehrere Anlagegüter
+     * dieselbe Belegnummer (`invoice_no`). Ein optionaler Positionsschlüssel
+     * hält die Entnahme je Position idempotent, ohne die Belegnummer zu
+     * verändern oder eine zweite Regelquelle zu schaffen. Ohne Schlüssel
+     * bleibt das bestehende Verhalten (eine Entnahme je Belegnummer) exakt
+     * erhalten.
+     */
+    public function createForAsset(EurAsset $asset, ?string $positionKey = null): ?EurEntry
     {
         $privatePercent = 100 - (int) $asset->business_share;
 
@@ -40,10 +48,20 @@ final class EurEntnahmeService
             return null;
         }
 
-        $existing = EurEntry::forCurrentBrand()
+        $description = 'Entnahme bei Anschaffung: '.$asset->name;
+        if ($positionKey !== null) {
+            $description .= ' (Position '.$positionKey.')';
+        }
+
+        $query = EurEntry::forCurrentBrand()
             ->where('receipt_no', $asset->invoice_no)
-            ->where('kind_type', self::KIND)
-            ->first();
+            ->where('kind_type', self::KIND);
+
+        if ($positionKey !== null) {
+            $query->where('description', $description);
+        }
+
+        $existing = $query->first();
 
         if ($existing !== null) {
             return $existing;
@@ -60,7 +78,7 @@ final class EurEntnahmeService
             'direction' => 'income',
             'kind_type' => self::KIND,
             'category' => self::KIND,
-            'description' => 'Entnahme bei Anschaffung: '.$asset->name,
+            'description' => $description,
             'e1a_code' => self::CODE,
             'business_share' => 100,
             'amount_cents' => $cents,

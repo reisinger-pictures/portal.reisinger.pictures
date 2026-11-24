@@ -175,6 +175,11 @@ export default function EurAssetGroupsPanel() {
                         {list.map((group) => {
                             const memberCount = group.asset_ids.length;
                             const businessShare = group.business_share;
+                            // Legacy groups carry neither field: show zero receipts.
+                            const documentCount = group.document_ids
+                                ? group.document_ids.length
+                                : (group.documents?.length ?? 0);
+                            const linkedDocuments = group.documents ?? [];
                             return (
                                 <div key={group.id} className="rounded-box border border-base-300 p-4"
                                     data-testid={`eur-asset-group-${group.id}`}>
@@ -247,6 +252,25 @@ export default function EurAssetGroupsPanel() {
                                             </li>
                                         ))}
                                     </ul>
+
+                                    <div className="mt-3" data-testid={`eur-asset-group-documents-${group.id}`}>
+                                        <h3 className="font-medium"><Trans>Belege</Trans></h3>
+                                        <p className="text-sm opacity-70">
+                                            <Trans>Eine Gruppe ist eine Abrechnungseinheit: Alle Anlagegüter der hier verknüpften Belege sind Mitglieder dieser Gruppe.</Trans>
+                                        </p>
+                                        <p className="text-sm">
+                                            <Trans>{documentCount} Belege</Trans>
+                                        </p>
+                                        {linkedDocuments.length === 0 ? (
+                                            <p className="text-sm opacity-70"><Trans>Keine Belege zugeordnet.</Trans></p>
+                                        ) : (
+                                            <ul className="text-sm">
+                                                {linkedDocuments.map((document) => (
+                                                    <li key={document.id}>{document.receipt_no ?? document.original_name ?? '—'}</li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
 
                                     {group.scope === 'private' && (
                                         <div className="mt-3" data-testid={`eur-asset-group-years-${group.id}`}>

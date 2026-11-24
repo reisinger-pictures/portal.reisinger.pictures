@@ -14,6 +14,7 @@ use App\Http\Controllers\Eur\EurApplicationController;
 use App\Http\Controllers\Eur\EurAssetController;
 use App\Http\Controllers\Eur\EurAssetGroupController;
 use App\Http\Controllers\Eur\EurDocumentController;
+use App\Http\Controllers\Eur\EurDocumentPositionController;
 use App\Http\Controllers\Eur\EurEigenbelegController;
 use App\Http\Controllers\Eur\EurEntryController;
 use App\Http\Controllers\Eur\EurHourController;
@@ -357,6 +358,12 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/eur/documents', [EurDocumentController::class, 'index'])->name('api.management.eur.documents.index');
     Route::post('/management/eur/documents', [EurDocumentController::class, 'store'])->name('api.management.eur.documents.store');
     Route::post('/management/eur/documents/{id}/ocr', [EurDocumentController::class, 'ocr'])->name('api.management.eur.documents.ocr');
+    // Portal #59/D-90: 1 Beleg → N Positionen und N Belege → 1 Gruppe.
+    // Die statische Positions-Route steht vor den dynamischen `{id}`-Routen.
+    Route::delete('/management/eur/documents/positions/{positionId}', [EurDocumentPositionController::class, 'destroy'])->name('api.management.eur.documents.positions.destroy');
+    Route::get('/management/eur/documents/{id}/positions', [EurDocumentPositionController::class, 'index'])->name('api.management.eur.documents.positions.index');
+    Route::post('/management/eur/documents/{id}/positions', [EurDocumentPositionController::class, 'store'])->name('api.management.eur.documents.positions.store');
+    Route::put('/management/eur/documents/{id}/group', [EurDocumentPositionController::class, 'assignGroup'])->name('api.management.eur.documents.group');
     // Berichtigungs-PDFs: unsigned erzeugen, extern signieren, mit Inhaltsbindung
     // wieder einliefern. Content-Identity, keine QES (kein CMS/PAdES, kein pdfsig).
     Route::post('/management/eur/documents/corrections', [EurDocumentController::class, 'createCorrection'])->name('api.management.eur.documents.corrections');

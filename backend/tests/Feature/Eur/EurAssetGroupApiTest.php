@@ -153,6 +153,26 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
         $this->assertNull($foreign->fresh()->eur_asset_group_id);
     }
 
+    public function test_switching_an_asset_between_groups_restores_individual_booking(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->createAsset($token, 'Wechsel', 80, 240000);
+        $oldGroup = $this->createGroup($token, 'Alt', 60);
+        $newGroup = $this->createGroup($token, 'Neu', 70);
+        $this->assign($token, $oldGroup, $asset);
+
+        // Regressionsfall: der Controller verwies auf ein nicht mehr
+        // existierendes Property und lieferte hier einen 500-Fehler.
+        $this->assign($token, $newGroup, $asset);
+
+        $this->assertSame($newGroup, (int) $asset->fresh()->eur_asset_group_id);
+        $this->assertSame([$asset->id], $this->group($token, $newGroup)['asset_ids']);
+        $this->assertSame([], $this->group($token, $oldGroup)['asset_ids']);
+        $entnahmen = EurEntry::forCurrentBrand()->where('kind_type', 'Entnahme')->get();
+        $this->assertCount(1, $entnahmen);
+        $this->assertSame('GR-'.$newGroup, $entnahmen->first()->receipt_no);
+    }
+
     private function createAsset(string $token, string $name, int $share, int $cost, string $date = '2026-01-15'): EurAsset
     {
         $response = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/assets', [

@@ -540,3 +540,36 @@ Streulichtblende — can be combined into an **asset group**. The decision:
 
 All amounts stay whole cents. GWG and the private↔business transition remain
 with #55; this decision does not touch them.
+
+### D-90: A document position is an allocation; split and merge are two directions of the same link
+
+The owner decided on 2026-11-24 (issue #59) that a single uploaded receipt can
+contain several positions, and that several receipts can form one billing
+group. Both directions reuse the **existing** `eur_asset_documents`
+many-to-many link (D-85); there is no new position master table and no group
+document store (D-89 stands). The decision:
+
+- A **position** is an enriched pivot row: `label`, whole-cent `amount_cents`
+  and `ordinal` on `eur_asset_documents`. The pivot stays the single source of
+  truth for which receipt belongs to which item; existing links keep NULLs and
+  remain valid (no backfill).
+- **Split:** one `EurDocument` → N `EurAsset` items. Each item has its own
+  acquisition cost, business share, useful life, depreciation plan and its own
+  withdrawal/Eigenbeleg **while it is ungrouped** — this is what "billed
+  independently" means. Over-allocating a receipt with a stored
+  `total_cents` is refused (422); a partial allocation is allowed and reported
+  as an open remainder.
+- **Merge:** N `EurDocument` rows → one existing `EurAssetGroup`, implemented
+  by assigning the documents' linked assets to that group. The group remains
+  **one** billing unit (D-89); its share overrides member shares, so a grouped
+  position is not independently billed. Document-to-group is transitive via
+  member assets; the group only *displays* its members' receipts.
+- Split (independent) and merge (one unit) are therefore mutually exclusive
+  per item, not a double booking. Grouping a booked year still fails closed
+  and detaching restores individual bookings.
+- No `EurEntry` position type, no direct group-document ownership and no
+  mandatory `Σ positions = total` are decided here; those remain open
+  questions in issue #59. No clean-room artifact is changed.
+
+The schema decision is recorded in `eur/04-data-model.md` (V074); all amounts
+remain whole cents and every new query is brand-scoped.

@@ -6,6 +6,7 @@ use App\Casts\AsBrand;
 use App\Support\BrandRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * EAR · Belegmetadaten. Die Datei liegt ausschließlich im privaten Storage;
@@ -14,12 +15,16 @@ use Illuminate\Database\Eloquent\Model;
  *
  * `signed_*` beschreibt die extern signierte Fassung. Deren Inhaltsbindung ist
  * eine Content-Identity-Prüfung (gleiche Ursprungsbytes), keine QES.
+ *
+ * Portal #59/D-90: `total_cents` ist der optionale Belegbetrag in ganzen Cent;
+ * die Positionen sind angereicherte Zeilen der bestehenden Pivot
+ * `eur_asset_documents` (keine neue Haupttabelle).
  */
 class EurDocument extends Model
 {
     protected $fillable = [
         'brand', 'year', 'month', 'receipt_no', 'original_name', 'storage_path',
-        'mime_type', 'size_bytes', 'sha256', 'status',
+        'mime_type', 'size_bytes', 'total_cents', 'sha256', 'status',
         'signed_storage_path', 'signed_sha256', 'signed_mime_type',
         'signed_size_bytes', 'signed_at',
     ];
@@ -29,9 +34,24 @@ class EurDocument extends Model
         'year' => 'integer',
         'month' => 'integer',
         'size_bytes' => 'integer',
+        'total_cents' => 'integer',
         'signed_size_bytes' => 'integer',
         'signed_at' => 'datetime',
     ];
+
+    /**
+     * Die Pivot-Zeilen selbst: eine Position ist genau eine dieser Zeilen.
+     */
+    public function assetDocuments(): HasMany
+    {
+        return $this->hasMany(EurAssetDocument::class, 'eur_document_id');
+    }
+
+    /** Alias für die positionsrelevante Sicht auf die Pivot. */
+    public function positions(): HasMany
+    {
+        return $this->assetDocuments();
+    }
 
     public function scopeForCurrentBrand(Builder $query): Builder
     {

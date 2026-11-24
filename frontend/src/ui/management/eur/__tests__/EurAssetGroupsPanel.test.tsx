@@ -208,4 +208,35 @@ describe('EurAssetGroupsPanel (#57)', () => {
         expect(within(business).queryByTestId('eur-asset-group-years-1')).not.toBeInTheDocument();
         expect(within(privateGroup).getByTestId('eur-asset-group-years-2')).toBeVisible();
     });
+
+    it('zeigt die verknüpften Belege als eine Abrechnungseinheit (#59)', () => {
+        setData([group({
+            document_ids: [3, 4],
+            documents: [
+                {id: 3, receipt_no: 'R-3', original_name: 'beleg-3.pdf'},
+                {id: 4, receipt_no: null, original_name: 'beleg-4.pdf'},
+            ],
+        })]);
+
+        renderWithProviders(<EurAssetGroupsPanel/>);
+        const card = screen.getByTestId('eur-asset-group-1');
+        const receipts = within(card).getByTestId('eur-asset-group-documents-1');
+
+        expect(within(receipts).getByText('2 Belege')).toBeVisible();
+        expect(within(receipts).getByText('R-3')).toBeVisible();
+        expect(within(receipts).getByText('beleg-4.pdf')).toBeVisible();
+        expect(within(receipts).getByText(/eine Abrechnungseinheit/)).toBeVisible();
+        expect(within(card).getByText('1 Anlagegüter')).toBeVisible();
+    });
+
+    it('zeigt bei älteren Gruppen ohne Belegfeld null Belege an', () => {
+        setData([group()]);
+
+        renderWithProviders(<EurAssetGroupsPanel/>);
+        const receipts = within(screen.getByTestId('eur-asset-group-1'))
+            .getByTestId('eur-asset-group-documents-1');
+
+        expect(within(receipts).getByText('0 Belege')).toBeVisible();
+        expect(within(receipts).getByText('Keine Belege zugeordnet.')).toBeVisible();
+    });
 });
