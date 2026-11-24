@@ -718,6 +718,44 @@ export function useEurSummary(year = 2026) {
     return useSWR<EurSummary>(`/api/management/eur/summary?year=${year}`, fetcher, SWR_OPTIONS);
 }
 
+/** D-91: eine Zeile der ODS-Ausfüllhilfe; alle Beträge ganze Cent, leere Werte `null`. */
+export interface EurAusfuellhilfeDeviation {
+    code: string;
+    text_de: string;
+}
+
+export interface EurAusfuellhilfeField {
+    order: number;
+    sheet: string;
+    cell: string;
+    kz: string | null;
+    label_de: string;
+    value_cents: number | null;
+    value_text: string | null;
+    unit: string;
+    source: string;
+    deviations: EurAusfuellhilfeDeviation[];
+}
+
+export interface EurAusfuellhilfeSection {
+    id: string;
+    title_de: string;
+    fields: EurAusfuellhilfeField[];
+}
+
+export interface EurAusfuellhilfe {
+    year: number;
+    units: {money: 'cents'; time: 'minutes'; rate: 'per-10000'};
+    notice: string;
+    empty_is_null: boolean;
+    sections: EurAusfuellhilfeSection[];
+}
+
+/** D-91: Wertelieferant für die manuelle Übertragung in FinanzOnline. */
+export function useEurAusfuellhilfe(year = 2026) {
+    return useSWR<EurAusfuellhilfe>(`/api/management/eur/ausfuellhilfe?year=${year}`, fetcher, SWR_OPTIONS);
+}
+
 export function useEurEntries(year = 2026) {
     return useSWR<EurEntriesResponse>(`/api/management/eur/entries?year=${year}`, fetcher, SWR_OPTIONS);
 }
@@ -907,6 +945,11 @@ export function eurPdfAssetsUrl(year: number): string {
     return `/api/management/eur/pdf/assets?year=${year}`;
 }
 
+/** D-91: druckbare Ausfüllhilfe; kein ELSTER/FinanzOnline-Client. */
+export function eurPdfAusfuellhilfeUrl(year: number): string {
+    return `/api/management/eur/pdf/ausfuellhilfe?year=${year}`;
+}
+
 export async function fetchEurComparison(params: {
     cost_cents: number;
     useful_life_years: number;
@@ -1075,7 +1118,7 @@ export async function calculateEurTravel(payload: EurTravelPayload): Promise<Eur
     return apiMutate<EurTravelResult>('/api/management/eur/travel/calc', 'POST', payload);
 }
 
-export type EurIncomeTaxMode = 'total' | 'business' | 'rental' | 'forecast';
+export type EurIncomeTaxMode = 'total' | 'business' | 'rental' | 'forecast' | 'gross_wage' | 'other_profits';
 
 /** Classification of the E1A lump-sum allowances (a non-money block). */
 export interface EurSteuerbilanzPauschalen {
@@ -1083,6 +1126,22 @@ export interface EurSteuerbilanzPauschalen {
     e40_label: string | null;
     e39_code: string | null;
     e39_label: string | null;
+    /** EUE-101/102: the pinned warning texts from the calculation response. */
+    e40_warning?: string | null;
+    e39_warning?: string | null;
+}
+
+/** EUE-103: Aufteilung der Endsteuer (U23/U27/U25/U24/U29), alles ganze Cent. */
+export interface EurEstAllocation {
+    total_income_cents?: number;
+    tax_cents?: number | null;
+    employment_tax_cents?: number | null;
+    rental_tax_cents?: number | null;
+    business_tax_cents?: number | null;
+    due_cents?: number | null;
+    prepayment_cents?: number | null;
+    wage_tax_cents?: number | null;
+    [key: string]: unknown;
 }
 
 /** Named figures of the tax balance sheet; keys are defined by the EAR engine. */
@@ -1111,6 +1170,7 @@ export interface EurIncomeTaxResult {
     /** Additional KZ values (245, 260, U13, U26, E40, E39) from the calculation. */
     kz?: Record<string, number>;
     steuerbilanz?: EurSteuerbilanz;
+    est_allocation?: EurEstAllocation;
     /** Optional fallbacks when the month endpoint is not consulted for E1A/E1B rows. */
     e1_by_code?: EurE1ByCode;
     e1a_e1b?: EurE1ByCode;
@@ -1121,19 +1181,44 @@ export interface EurIncomeTaxOptions {
     mode?: EurIncomeTaxMode;
     e1a?: string | null;
     e1b?: string | null;
+    /** EUE-103: Bruttolohn (KZ 245), Lohnsteuer (KZ 260) und Vorauszahlung (U26). */
+    employment_income_cents?: number | null;
+    wage_tax_cents?: number | null;
+    prepayment_cents?: number | null;
+    /** EUE-101/102 und EUE-108: E40, E39 und das Arbeitszimmer (9275). */
+    arbeitsplatzpauschale_cents?: number | null;
+    ergonomisches_mobiliar_cents?: number | null;
+    arbeitszimmer_cents?: number | null;
+    /** EUE-104/106: Prognose-Flag und die Prognosewerte. */
+    prognose?: boolean;
+    business_forecast_cents?: number | null;
+    rental_forecast_cents?: number | null;
 }
 
 export async function calculateEurIncomeTax(
     profitCents: number,
     options: EurIncomeTaxOptions = {},
 ): Promise<EurIncomeTaxResult> {
-    const payload: Record<string, number | string | null> = {
+    const payload: Record<string, number | string | boolean | null> = {
         year: options.year ?? 2026,
         profit_cents: profitCents,
     };
     if (options.mode !== undefined) payload.mode = options.mode;
     if (options.e1a !== undefined) payload.e1a = options.e1a;
     if (options.e1b !== undefined) payload.e1b = options.e1b;
+    if (options.employment_income_cents !== undefined) payload.employment_income_cents = options.employment_income_cents;
+    if (options.wage_tax_cents !== undefined) payload.wage_tax_cents = options.wage_tax_cents;
+    if (options.prepayment_cents !== undefined) payload.prepayment_cents = options.prepayment_cents;
+    if (options.arbeitsplatzpauschale_cents !== undefined) {
+        payload.arbeitsplatzpauschale_cents = options.arbeitsplatzpauschale_cents;
+    }
+    if (options.ergonomisches_mobiliar_cents !== undefined) {
+        payload.ergonomisches_mobiliar_cents = options.ergonomisches_mobiliar_cents;
+    }
+    if (options.arbeitszimmer_cents !== undefined) payload.arbeitszimmer_cents = options.arbeitszimmer_cents;
+    if (options.prognose !== undefined) payload.prognose = options.prognose;
+    if (options.business_forecast_cents !== undefined) payload.business_forecast_cents = options.business_forecast_cents;
+    if (options.rental_forecast_cents !== undefined) payload.rental_forecast_cents = options.rental_forecast_cents;
 
     return apiMutate<EurIncomeTaxResult>('/api/management/eur/est/calc', 'POST', payload);
 }

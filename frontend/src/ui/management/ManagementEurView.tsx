@@ -29,6 +29,7 @@ import {
 } from '../../logic/useEur';
 import EurAnalyticsPanel from './eur/EurAnalyticsPanel';
 import EurAnalyticsMatricesPanel from './eur/EurAnalyticsMatricesPanel';
+import EurAusfuellhilfePanel from './eur/EurAusfuellhilfePanel';
 import EurApplicationsPanel from './eur/EurApplicationsPanel';
 import EurAssetGroupsPanel from './eur/EurAssetGroupsPanel';
 import EurAssetsPanel from './eur/EurAssetsPanel';
@@ -705,10 +706,13 @@ export default function ManagementEurView() {
                     {tab === 'reisen' && <EurTravelPanel reference={reference.data}/>}
 
                     {tab === 'steuer' && (
-                        <EurIncomeTaxPanel
-                            defaultProfitCents={summary.data?.profit_cents ?? 0}
-                            e1ByCode={monthData.data?.e1_by_code}
-                        />
+                        <>
+                            <EurIncomeTaxPanel
+                                defaultProfitCents={summary.data?.profit_cents ?? 0}
+                                e1ByCode={monthData.data?.e1_by_code}
+                            />
+                            <EurAusfuellhilfePanel year={year}/>
+                        </>
                     )}
 
                     {tab === 'ust' && <EurVatPanel/>}

@@ -976,9 +976,17 @@ msgstr "Apple Pay"
 msgid "Arbeitsplatzpauschale"
 msgstr "Arbeitsplatzpauschale"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Arbeitsplatzpauschale (E40)"
+msgstr "Arbeitsplatzpauschale (E40)"
+
 #: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
 msgid "Arbeitsstunden in Minuten"
 msgstr "Arbeitsstunden in Minuten"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Arbeitszimmer (KZ 9275)"
+msgstr "Arbeitszimmer (KZ 9275)"
 
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
 #: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
@@ -1029,6 +1037,10 @@ msgstr "Aufschlag"
 msgid "Aufschlag (%)"
 msgstr "Aufschlag (%)"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Aufteilung der Einkommensteuer"
+msgstr "Aufteilung der Einkommensteuer"
+
 #: src/ui/photographer/PhotographerProductionBoard.tsx
 msgid "Auftrag aktualisiert"
 msgstr "Auftrag aktualisiert"
@@ -1054,9 +1066,17 @@ msgstr "Auftrag löschen?"
 msgid "Ausbezahlt"
 msgstr "Ausbezahlt"
 
+#: src/ui/management/eur/EurAusfuellhilfePanel.tsx
+msgid "Ausfüllhilfe als PDF herunterladen"
+msgstr "Ausfüllhilfe als PDF herunterladen"
+
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Ausfüllhilfe je Kennzahl"
 msgstr "Ausfüllhilfe je Kennzahl"
+
+#: src/ui/management/eur/EurAusfuellhilfePanel.tsx
+msgid "Ausfüllhilfe wird geladen …"
+msgstr "Ausfüllhilfe wird geladen …"
 
 #: src/ui/management/eur/EurEntriesPanel.tsx
 #: src/ui/management/eur/EurEntryDialog.tsx
@@ -1647,6 +1667,7 @@ msgstr "Betriebsanlagen"
 #: src/ui/management/eur/EurAssetGroupsPanel.tsx
 #: src/ui/management/eur/EurDepreciationPanel.tsx
 #: src/ui/management/eur/EurDocumentsPanel.tsx
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Betriebsanteil"
 msgstr "Betriebsanteil"
 
@@ -1697,6 +1718,10 @@ msgstr "Bewertungs-Galerien sind zwingend privat."
 msgid "Bezahlt"
 msgstr "Bezahlt"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Bezahlte Lohnsteuer (KZ 260)"
+msgstr "Bezahlte Lohnsteuer (KZ 260)"
+
 #: src/logic/mollieMethods.ts
 msgid "Bezahlung mit einer hinterlegten Karte."
 msgstr "Bezahlung mit einer hinterlegten Karte."
@@ -1705,8 +1730,10 @@ msgstr "Bezahlung mit einer hinterlegten Karte."
 msgid "Bezahlung über dein PayPal-Konto."
 msgstr "Bezahlung über dein PayPal-Konto."
 
+#: src/ui/management/eur/EurAusfuellhilfePanel.tsx
 #: src/ui/management/eur/EurDepreciationPanel.tsx
 #: src/ui/management/eur/EurDocumentsPanel.tsx
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Bezeichnung"
 msgstr "Bezeichnung"
 
@@ -1898,6 +1925,7 @@ msgstr "Bitte einen gültigen Betrag angeben"
 msgid "Bitte einen gültigen Betrag eingeben"
 msgstr "Bitte einen gültigen Betrag eingeben"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Bitte einen gültigen Betrag eingeben."
 msgstr "Bitte einen gültigen Betrag eingeben."
@@ -1989,6 +2017,10 @@ msgstr "Brand-Standard"
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Brand-Zuweisung"
 msgstr "Brand-Zuweisung"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Bruttolohn/des Einkommens (KZ 245)"
+msgstr "Bruttolohn/des Einkommens (KZ 245)"
 
 #: src/ui/management/components/UserTable.tsx
 #: src/ui/management/ManagementEurView.tsx
@@ -2693,6 +2725,10 @@ msgstr "Die Anträge konnten nicht geladen werden. Prüfen Sie Ihre Verbindung u
 msgid "Die Aufbewahrung der IP-bezogenen Bestell- und Sicherheitsdaten richtet sich je nach Datenkategorie nach der geltenden Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten. Die IP-Risikoschlüssel laufen mit dem jeweiligen konfigurierten Limitierungsfenster ab. Die konkrete Frist und die zugrunde liegende Zuordnung teilt der Betreiber auf Anfrage mit."
 msgstr "Die Aufbewahrung der IP-bezogenen Bestell- und Sicherheitsdaten richtet sich je nach Datenkategorie nach der geltenden Aufbewahrungsrichtlinie sowie den einschlägigen rechtlichen, steuerlichen und abrechnungsbezogenen Pflichten. Die IP-Risikoschlüssel laufen mit dem jeweiligen konfigurierten Limitierungsfenster ab. Die konkrete Frist und die zugrunde liegende Zuordnung teilt der Betreiber auf Anfrage mit."
 
+#: src/ui/management/eur/EurAusfuellhilfePanel.tsx
+msgid "Die Ausfüllhilfe konnte nicht geladen werden."
+msgstr "Die Ausfüllhilfe konnte nicht geladen werden."
+
 #: src/ui/management/eur/EurAnalyticsPanel.tsx
 msgid "Die Auswertungen konnten nicht geladen werden. Prüfen Sie Ihre Verbindung und laden Sie sie erneut."
 msgstr "Die Auswertungen konnten nicht geladen werden. Prüfen Sie Ihre Verbindung und laden Sie sie erneut."
@@ -3214,6 +3250,10 @@ msgstr "Einkäufe & Anfragen"
 msgid "Einkommensteuer"
 msgstr "Einkommensteuer"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Einkommensteuer-Vorauszahlung"
+msgstr "Einkommensteuer-Vorauszahlung"
+
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Einladen"
 msgstr "Einladen"
@@ -3396,6 +3436,10 @@ msgstr "Endgültig löschen"
 msgid "Endsaldo"
 msgstr "Endsaldo"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Endsteuer"
+msgstr "Endsteuer"
+
 #: src/ui/client/components/CartItemList.tsx
 #: src/ui/client/components/CouponInput.tsx
 #: src/ui/components/WysiwygEditor.tsx
@@ -3492,6 +3536,10 @@ msgstr "Ergebnis als Contact Sheet (intern)"
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Ergonomisches Mobiliar"
 msgstr "Ergonomisches Mobiliar"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Ergonomisches Mobiliar (E39)"
+msgstr "Ergonomisches Mobiliar (E39)"
 
 #: src/ui/management/eur/EurVatPanel.tsx
 msgid "Erklärungen"
@@ -4030,6 +4078,10 @@ msgstr "Format"
 msgid "Formatierung entfernen"
 msgstr "Formatierung entfernen"
 
+#: src/ui/management/eur/EurAusfuellhilfePanel.tsx
+msgid "Formularfeld"
+msgstr "Formularfeld"
+
 #: src/ui/management/components/RatingStatusModal.tsx
 msgid "Fortschritt"
 msgstr "Fortschritt"
@@ -4185,6 +4237,14 @@ msgstr "Für dieses Jahr sind keine AfA-Werte hinterlegt."
 #: src/ui/management/eur/EurOverviewPanel.tsx
 msgid "Für dieses Jahr sind keine monatlichen Sozialversicherungswerte hinterlegt."
 msgstr "Für dieses Jahr sind keine monatlichen Sozialversicherungswerte hinterlegt."
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Für E39 sind 0 € bis 300 € erlaubt."
+msgstr "Für E39 sind 0 € bis 300 € erlaubt."
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Für E40 sind 25 € bis 1.200 € erlaubt."
+msgstr "Für E40 sind 25 € bis 1.200 € erlaubt."
 
 #: src/ui/Privacy.tsx
 msgid "Für eine sofortige Online-Zahlung prüft das Portal zusätzlich serverseitig das Erstellungsdatum Ihres Portalkontos sowie die Anzahl Ihrer Checkout-Versuche und der Versuche Ihrer IP-Adresse. Dafür werden Ihre Konto-ID, Ihr Kontoerstellungsdatum und der oben beschriebene IP-Risikoschlüssel verwendet; die Prüfung entscheidet, ob ein Zahlungsvorgang begonnen wird. Für Bestellungen per Rechnung, Lieferschein oder Angebot gilt diese Prüfung nicht."
@@ -4855,6 +4915,7 @@ msgstr "ISO"
 #: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 #: src/ui/management/components/UserTable.tsx
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
 msgid "Ja"
 msgstr "Ja"
@@ -5191,6 +5252,7 @@ msgstr "Keine weiteren Versicherungen für diesen Filter hinterlegt."
 msgid "Keine Zuweisung"
 msgstr "Keine Zuweisung"
 
+#: src/ui/management/eur/EurAusfuellhilfePanel.tsx
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 #: src/ui/management/eur/EurMonthPanel.tsx
 #: src/ui/management/eur/EurVatPanel.tsx
@@ -5540,6 +5602,10 @@ msgstr "leer = auf gesamten Warenkorb"
 msgid "Leer = Nur Magic Link"
 msgstr "Leer = Nur Magic Link"
 
+#: src/ui/management/eur/EurAusfuellhilfePanel.tsx
+msgid "Leere Felder bleiben leer und werden nicht als Null ausgewiesen."
+msgstr "Leere Felder bleiben leer und werden nicht als Null ausgewiesen."
+
 #: src/ui/management/ManagementOrdersView.tsx
 msgid "Lege einen Gesamtpreis für die angefragten Bilder fest und verfasse eine Nachricht an den Kunden."
 msgstr "Lege einen Gesamtpreis für die angefragten Bilder fest und verfasse eine Nachricht an den Kunden."
@@ -5678,6 +5744,10 @@ msgstr "Logo"
 #: src/logic/useAuth.ts
 msgid "Logout fehlgeschlagen"
 msgstr "Logout fehlgeschlagen"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Lohnsteueranteil"
+msgstr "Lohnsteueranteil"
 
 #: src/ui/management/components/AIBatchEditModal.tsx
 msgid "Lokal:"
@@ -6362,6 +6432,7 @@ msgstr "name@beispiel.de"
 #: src/ui/management/components/ModelDetailModal.tsx
 #: src/ui/management/components/ShootingCalculatorModal.tsx
 #: src/ui/management/components/UserTable.tsx
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
 msgid "Nein"
 msgstr "Nein"
@@ -6708,8 +6779,16 @@ msgid "Nummerierte Liste"
 msgstr "Nummerierte Liste"
 
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Nur andere Gewinne"
+msgstr "Nur andere Gewinne"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Nur Betrieb"
 msgstr "Nur Betrieb"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Nur Bruttolohn"
+msgstr "Nur Bruttolohn"
 
 #: src/ui/components/GalleryGroupModal.tsx
 #: src/ui/components/GalleryModal.tsx
@@ -7433,6 +7512,14 @@ msgstr "Profil-Zugang"
 msgid "Prognose"
 msgstr "Prognose"
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Prognose des Betriebsergebnisses (€)"
+msgstr "Prognose des Betriebsergebnisses (€)"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Prognose des Vermietungsergebnisses (€)"
+msgstr "Prognose des Vermietungsergebnisses (€)"
+
 #: src/ui/management/eur/EurEntryDialog.tsx
 #: src/ui/management/eur/EurHoursPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
@@ -7529,6 +7616,10 @@ msgstr "Qualität wählen"
 #: src/ui/management/ManagementOrgDetailView.tsx
 msgid "Quartal (Sammelrechnung)"
 msgstr "Quartal (Sammelrechnung)"
+
+#: src/ui/management/eur/EurAusfuellhilfePanel.tsx
+msgid "Quelle"
+msgstr "Quelle"
 
 #: src/ui/management/ManagementEurView.tsx
 msgid "Quelle sind die Einstellungen des Portals."
@@ -7662,6 +7753,10 @@ msgstr "Registrierung erfolgreich. Bitte bestätige deine E-Mail."
 #: src/logic/useAuth.ts
 msgid "Registrierung fehlgeschlagen"
 msgstr "Registrierung fehlgeschlagen"
+
+#: src/ui/management/eur/EurAusfuellhilfePanel.tsx
+msgid "Reihenfolge"
+msgstr "Reihenfolge"
 
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Reihenfolge nicht umstellen: erst Konto und Passwort, dann Kamera. Wer zuerst die Kamera konfiguriert, hat noch kein gültiges Passwort und wundert sich über Error 41."
@@ -8981,6 +9076,10 @@ msgstr "Vergleich berechnen"
 #~ msgstr "Vergleicht die lineare und die degressive Abschreibung für ein Anlagegut. Der Wechsel zur linearen Methode ist einmalig und nur mit Begründung möglich."
 
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
+msgid "Vermietungsanteil"
+msgstr "Vermietungsanteil"
+
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Vermietungsergebnis (E1B)"
 msgstr "Vermietungsergebnis (E1B)"
 
@@ -9375,6 +9474,7 @@ msgstr "Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die 
 #: src/ui/management/components/GalleryGroupCouponsTab.tsx
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
 #: src/ui/management/components/ProductBatchTable.tsx
+#: src/ui/management/eur/EurAusfuellhilfePanel.tsx
 #: src/ui/management/FtpConnectionRows.tsx
 #: src/ui/management/KameraEinrichtungContent.tsx
 #: src/ui/management/ManagementCouponsView.tsx
@@ -9396,6 +9496,10 @@ msgstr "Wert muss positiv sein"
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Wert pro Share:"
 msgstr "Wert pro Share:"
+
+#: src/ui/management/eur/EurAusfuellhilfePanel.tsx
+msgid "Werte für FinanzOnline"
+msgstr "Werte für FinanzOnline"
 
 #: src/ui/Privacy.tsx
 msgid "Wichtiger Hinweis zu Metadaten:"
@@ -9591,6 +9695,7 @@ msgstr "z.B. Werbung, Standard, Event"
 msgid "Zahlbar sofort nach Erhalt der Rechnung."
 msgstr "Zahlbar sofort nach Erhalt der Rechnung."
 
+#: src/ui/management/eur/EurIncomeTaxPanel.tsx
 #: src/ui/management/eur/EurVatPanel.tsx
 msgid "Zahllast"
 msgstr "Zahllast"
