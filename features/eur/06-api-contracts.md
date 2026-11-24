@@ -143,7 +143,10 @@ meldet `AssetPlausibility` die nicht blockierenden Hinweise EUE-056
 (Vorjahres-AfA weicht vom gepinnten Plan um mehr als 1 Cent ab) und EUE-057
 (überzählige Vorjahres-AfA im Anschaffungsjahr, fehlender oder abweichender
 Restbuchwert). Der Restbuchwert-Vergleich rundet wie die ODS auf ganze Euro;
-die angezeigte Differenz bleibt in Cent.
+die angezeigte Differenz bleibt in Cent. Nach einem vollzogenen Methodenwechsel
+(DEG-009/014) ist der gespeicherte Plan maßgeblich; für solche Anlagen werden
+keine EUE-056/057-Hinweise erzeugt, weil `switched_to_linear_at` den
+Entscheidungszeitpunkt und nicht das Wechseljahr des Plans speichert.
 
 `POST /eur/assets/{id}/switch-to-linear` setzt zusätzlich
 `switched_to_linear_at` und `switch_reason`. Ein Rückwechsel auf degressiv

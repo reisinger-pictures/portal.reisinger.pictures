@@ -20,6 +20,14 @@ use InvalidArgumentException;
  * Restbuchwerts. Die ODS rundet bei EUE-057 auf ganze Euro; das Portal tut
  * dasselbe über ganzzahlige Cent-Arithmetik (`intdiv(wert + 50, 100)`).
  *
+ * Nach einem vollzogenen Methodenwechsel ist der gespeicherte Plan die einzige
+ * gültige Basis (DEG-009/014): gebuchte Jahre werden nie umgeschrieben und
+ * `switched_to_linear_at` ist der Zeitpunkt der Entscheidung, nicht das
+ * Wechseljahr des Plans. Wie `EurAssetCarryOver` werden für solche Anlagen
+ * keine Plausibilitätsvergleiche gegen einen rekonstruierten Plan gezogen —
+ * ein solcher Vergleich würde degressive Historie gegen einen linearen Plan
+ * melden und Fehlalarme erzeugen.
+ *
  * Die Hinweise sind Antwortfelder, keine 422-Fehler: die ODS zeigt ein ⚠ an,
  * blockiert die Eingabe aber nicht.
  */
@@ -42,6 +50,7 @@ final class AssetPlausibility
      *     cost_cents: int,
      *     useful_life_years: int,
      *     method: string,
+     *     switched: bool,
      *     degressive_rate_per_10000: int,
      *     switch_year: int|null,
      *     years: list<array{year: int, depreciation_cents: int, book_value_cents: int|null}>
@@ -55,6 +64,11 @@ final class AssetPlausibility
 
         if (! is_int($currentYear) || ! is_int($acquisitionYear)) {
             throw new InvalidArgumentException('Plausibilität braucht ganzzahlige Jahre.');
+        }
+
+        // DEG-009/014: nach einem Wechsel ist der gespeicherte Plan maßgeblich.
+        if (($asset['switched'] ?? false) === true) {
+            return [];
         }
 
         $expected = $this->expectedPlan($asset);

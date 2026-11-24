@@ -62,6 +62,41 @@ class EurAssetPlausibilityApiTest extends EurBookkeepingTestCase
         $this->assertNotContains('EUE-057', $codes);
     }
 
+    public function test_a_completed_switch_does_not_produce_false_plausibility_warnings(): void
+    {
+        $token = $this->tokenFor();
+        $created = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/assets', [
+            'name' => 'Wechselgut',
+            'invoice_no' => 'SW-1',
+            'supplier' => 'Lieferant',
+            'purchase_date' => '2024-01-15',
+            'cost_cents' => 30000,
+            'useful_life_years' => 3,
+            'business_share' => 100,
+            'method' => 'degressive',
+            'degressive_rate' => 2000,
+        ]);
+        $created->assertCreated();
+        $id = (int) $created->json('asset.id');
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson("/api/management/eur/assets/{$id}/switch-to-linear", [
+                'year' => 2025,
+                'reason' => 'Lineare AfA ist wirtschaftlicher.',
+            ])
+            ->assertOk();
+
+        $response = $this->withHeaders($this->bearer($token))->getJson('/api/management/eur/assets');
+        $response->assertOk();
+
+        $asset = collect($response->json('assets'))->firstWhere('id', $id);
+        $codes = array_column($asset['warnings'], 'code');
+
+        $this->assertNotContains('EUE-056', $codes);
+        $this->assertNotContains('EUE-057', $codes);
+        $this->assertSame('linear', $asset['method']);
+    }
+
     public function test_foreign_brand_assets_do_not_enter_the_warning_check(): void
     {
         $token = $this->tokenFor();

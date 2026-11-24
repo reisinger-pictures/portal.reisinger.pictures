@@ -673,9 +673,6 @@ class EurAssetController extends Controller
                 $rules->parameterFor('EUE-056', 'Toleranz AfA', EurYear::DEFAULT, 'cents'),
             );
             $purchaseYear = (int) $asset->purchase_date->format('Y');
-            $switchYear = $asset->switched_to_linear_at === null
-                ? null
-                : (int) $asset->switched_to_linear_at->format('Y') - $purchaseYear + 1;
             $years = $asset->relationLoaded('years') ? $asset->years : $asset->years()->get();
 
             array_push($warnings, ...$plausibility->warnings([
@@ -685,8 +682,16 @@ class EurAssetController extends Controller
                 'cost_cents' => (int) $asset->cost_cents,
                 'useful_life_years' => (int) $asset->useful_life_years,
                 'method' => (string) $asset->method,
+                // DEG-009/014: ein vollzogener oder in den Jahreszeilen sichtbarer
+                // Wechsel entzieht dem rekonstruierten Plan die Gültigkeit.
+                'switched' => $asset->switched_to_linear_at !== null
+                    || $years->pluck('method')->filter(static fn (mixed $method): bool => in_array($method, [
+                        DepreciationCalculator::METHOD_LINEAR,
+                        DepreciationCalculator::METHOD_DEGRESSIVE,
+                    ], true))->unique()->count() > 1,
                 'degressive_rate_per_10000' => (int) ($asset->degressive_rate ?? 0),
-                'switch_year' => $switchYear,
+                // Ohne vollzogenen Wechsel gibt es kein Wechseljahr im Plan.
+                'switch_year' => null,
                 'years' => $years->map(static fn (EurAssetYear $year): array => [
                     'year' => (int) $year->year,
                     'depreciation_cents' => (int) $year->depreciation_cents,

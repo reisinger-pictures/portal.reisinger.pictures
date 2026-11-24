@@ -140,6 +140,23 @@ final class AssetPlausibilityTest extends TestCase
         $this->assertStringContainsString('Abschreibung 2025 entfernen.', $warnings[0]['text']);
     }
 
+    public function test_a_completed_method_switch_suspends_the_reconstructed_plan_comparison(): void
+    {
+        // DEG-009/014: gespeicherte degressive Historie + Wechsel auf linear.
+        // Ein rekonstruierter Plan würde hier drei Fehlalarme erzeugen.
+        $asset = $this->linearAsset([
+            'method' => DepreciationCalculator::METHOD_LINEAR,
+            'switched' => true,
+            'degressive_rate_per_10000' => 2000,
+            'years' => [
+                ['year' => 2024, 'depreciation_cents' => 6000, 'book_value_cents' => 24000],
+                ['year' => 2025, 'depreciation_cents' => 12000, 'book_value_cents' => 12000],
+            ],
+        ]);
+
+        $this->assertSame([], $this->plausibility()->warnings($asset));
+    }
+
     public function test_degressive_expectation_follows_the_chosen_plan(): void
     {
         $asset = $this->linearAsset([
