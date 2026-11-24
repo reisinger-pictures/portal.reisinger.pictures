@@ -18,6 +18,9 @@ use App\Services\SettingResolver;
  */
 final class EurOverviewService
 {
+    /** EUE-014: gepinnter Hinweistext aus `Ü!Y10` des ODS-Artefakts. */
+    public const MAXIMUM_BASE_HINT = 'Wow! Maximale Beitragsgrundlage erreicht.';
+
     public function __construct(private readonly SettingResolver $settings) {}
 
     /**
@@ -46,7 +49,7 @@ final class EurOverviewService
     /**
      * Monatliche SV-Beiträge des Jahres (EUE-109 … EUE-114).
      *
-     * @return list<array{month: int, kv_cents: int, pv_cents: int, svs_cents: int, uv_cents: int}>
+     * @return list<array{month: int, kv_cents: int, pv_cents: int, svs_cents: int, uv_cents: int, base_at_cap_hint: string|null}>
      */
     public function svMonthly(int $year, int $profitCents, int $bookedSvCents): array
     {
@@ -56,7 +59,11 @@ final class EurOverviewService
         $flatRateOnly = $mode === SocialInsurance::MODE_UV_ONLY;
 
         // EUE-109: Einkünfte + bereits gebuchte 9225, gedeckelt auf 12 × max_bgl.
-        $base = min($profitCents + $bookedSvCents, $amounts['max_bgl'] * 12);
+        $maximumYearlyBase = $amounts['max_bgl'] * 12;
+        $base = min($profitCents + $bookedSvCents, $maximumYearlyBase);
+        // EUE-014: nur der bereits gedeckelte Wert entscheidet über den
+        // Hinweis; es gibt keine zweite Grenze und keinen Float im Rechenpfad.
+        $baseHint = $base >= $maximumYearlyBase ? self::MAXIMUM_BASE_HINT : null;
 
         // EUE-110/108: Jungunternehmer zahlen den Mindest-KV weiter; nur der
         // UV-Modus lässt KV, SVS und PV gemeinsam entfallen.
@@ -100,7 +107,7 @@ final class EurOverviewService
         $rows = [];
 
         for ($month = 1; $month <= 12; $month++) {
-            $rows[] = ['month' => $month] + $monthly;
+            $rows[] = ['month' => $month] + $monthly + ['base_at_cap_hint' => $baseHint];
         }
 
         return $rows;

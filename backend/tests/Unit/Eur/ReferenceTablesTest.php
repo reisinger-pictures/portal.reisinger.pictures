@@ -4,6 +4,10 @@ namespace Tests\Unit\Eur;
 
 use App\Eur\Reference\Holidays;
 use App\Eur\Reference\ReferenceTables;
+use App\Eur\Reference\SocialInsurance;
+use App\Eur\Reference\YearTables;
+use App\Services\Eur\EurOverviewService;
+use App\Services\SettingResolver;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -199,5 +203,70 @@ class ReferenceTablesTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $sv->minimumPensionMonthlyCents('unbekannt');
+    }
+
+    private function svService(string $mode): EurOverviewService
+    {
+        $settings = $this->createMock(SettingResolver::class);
+        $settings->method('get')->willReturnCallback(
+            static fn (string $key, mixed $default = null): mixed => $key === 'eur_sv_mode' ? $mode : $default,
+        );
+
+        return new EurOverviewService($settings);
+    }
+
+    /** EUE-014: der Hinweis folgt dem bereits gedeckelten Beitragsgrundlagen-Wert. */
+    public function test_sv_base_cap_hint_comes_from_the_capped_value(): void
+    {
+        $service = $this->svService('gsvg');
+        $maximumYearlyBase = $this->tables->socialInsurance()->maximumYearlyBaseCents();
+
+        $atCap = $service->svMonthly(2026, $maximumYearlyBase, 0);
+        $this->assertCount(12, $atCap);
+        foreach ($atCap as $row) {
+            $this->assertSame(EurOverviewService::MAXIMUM_BASE_HINT, $row['base_at_cap_hint']);
+        }
+
+        $this->assertNull($service->svMonthly(2026, $maximumYearlyBase - 1, 0)[0]['base_at_cap_hint']);
+
+        // EUE-115: bereits gebuchte 9225 zählen zur Basis — genau am Maximum.
+        $this->assertSame(
+            EurOverviewService::MAXIMUM_BASE_HINT,
+            $service->svMonthly(2026, $maximumYearlyBase - 3800, 3800)[0]['base_at_cap_hint'],
+        );
+        $this->assertNull($service->svMonthly(2026, $maximumYearlyBase - 3801, 3800)[0]['base_at_cap_hint']);
+        $this->assertSame('Wow! Maximale Beitragsgrundlage erreicht.', EurOverviewService::MAXIMUM_BASE_HINT);
+    }
+
+    /** EUE-131 / D-79: korrigierter FSVG-Mindestbeitrag ohne 101,95-€-Fallback. */
+    public function test_fsvg_pension_minimum_has_no_10195_fallback(): void
+    {
+        foreach ([2024 => 10369, 2025 => 11022, 2026 => 11022] as $year => $expectedCents) {
+            $amounts = YearTables::socialInsuranceAmountsCents($year);
+            $this->assertSame($expectedCents, $amounts['fsvg_pv_min']);
+
+            // YearTables liefert Cent, die Lesegrenze SocialInsurance erwartet Euro.
+            $values = [];
+            foreach ($amounts as $key => $cents) {
+                $values[$key] = (float) bcdiv((string) $cents, '100', 2);
+            }
+            $sv = new SocialInsurance($values, $year);
+
+            $this->assertSame($expectedCents, $sv->minimumPensionMonthlyCents('fsvg'));
+            $this->assertNotSame(10195, $sv->minimumPensionMonthlyCents('fsvg'));
+            $this->assertSame($expectedCents, $this->svService('fsvg')->svMonthly($year, 0, 0)[0]['pv_cents']);
+        }
+
+        // 101,95 € bleibt der GSVG-Wert 2025/26 — nie der FSVG-Fallback (D-79).
+        foreach ([2025, 2026] as $year) {
+            $values = [];
+            foreach (YearTables::socialInsuranceAmountsCents($year) as $key => $cents) {
+                $values[$key] = (float) bcdiv((string) $cents, '100', 2);
+            }
+            $sv = new SocialInsurance($values, $year);
+
+            $this->assertSame(10195, $sv->minimumPensionMonthlyCents('gsvg'));
+            $this->assertNotSame($sv->minimumPensionMonthlyCents('gsvg'), $sv->minimumPensionMonthlyCents('fsvg'));
+        }
     }
 }

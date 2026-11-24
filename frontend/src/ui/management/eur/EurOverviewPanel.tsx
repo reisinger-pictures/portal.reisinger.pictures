@@ -5,10 +5,14 @@ import { formatEuro } from '../../../logic/formatCurrency';
 import {
     EUR_MONTHS,
     type EurSettings,
+    type EurSvMonthly,
     type EurSummary,
 } from '../../../logic/useEur';
 
 const cents = (value: number): string => formatEuro(value / 100);
+
+/** EUE-014: der Server liefert den Hinweis aus dem bereits gedeckelten SV-Basiswert. */
+type SvMonthlyRow = EurSvMonthly & {base_at_cap_hint?: string | null};
 
 /** Mode codes stay uppercase abbreviations; the phrase is never uppercased. */
 function svModeLabel(mode: string | undefined): string {
@@ -81,7 +85,8 @@ export default function EurOverviewPanel({summary, settings, isLoading, error, o
     const svLabel = svModeLabel(svMode);
     const kleinunternehmerLabel = settings?.kleinunternehmer ? t`Ja` : t`Nein`;
 
-    const svMonthly = summary.sv_monthly ?? [];
+    const svMonthly: SvMonthlyRow[] = summary.sv_monthly ?? [];
+    const svBaseHint = svMonthly.find((row) => row.base_at_cap_hint)?.base_at_cap_hint;
     const svReminder = summary.sv_reminder;
     const insuranceBlocks = summary.insurance_blocks ?? [];
     const afaCard = summary.afa_card;
@@ -125,6 +130,9 @@ export default function EurOverviewPanel({summary, settings, isLoading, error, o
                 <h3 className="font-semibold"><Trans>Sozialversicherung je Monat</Trans></h3>
                 {svReminder?.message && (
                     <p className="alert alert-warning mt-2" role="status">{svReminder.message}</p>
+                )}
+                {svBaseHint && (
+                    <p className="alert alert-info mt-2" role="status">{svBaseHint}</p>
                 )}
                 {svMonthly.length === 0 ? (
                     <p className="text-sm opacity-70 mt-1">
