@@ -212,7 +212,8 @@ final class EurTaxStatementService
         $minimum = $this->rules->parameterFor('EUE-101', 'Eingabe Minimum', $year, 'cents');
         $maximum = $this->rules->parameterFor('EUE-102', 'Eingabe Maximum', $year, 'cents');
 
-        // EUE-108/EUE-101: 9275 unterdrückt beide Pauschalen.
+        // EUE-108/EUE-101: 9275 unterdrückt beide Kennzahlen, aber EUE-102
+        // verlangt weiterhin den D39-Warnhinweis, wenn E39 einen Wert hat.
         if ($arbeitszimmer > 0) {
             return [
                 'e40_code' => null,
@@ -220,7 +221,7 @@ final class EurTaxStatementService
                 'e40_warning' => null,
                 'e39_code' => null,
                 'e39_label' => null,
-                'e39_warning' => null,
+                'e39_warning' => $e39 > 0 ? self::E39_LARGE_ALLOWANCE_WARNING : null,
             ];
         }
 
@@ -237,8 +238,9 @@ final class EurTaxStatementService
         $e40Warning = $e40Code === null && $e40 > 0 ? self::E40_OUT_OF_RANGE_WARNING : null;
 
         $e39Code = $e39 > 0 && $e39 <= $maximum ? '9216' : null;
-        // EUE-102: 9217 unterdrückt 9216 nicht, sondern erzeugt nur D39-Warnung.
-        $e39Warning = $e40Code === '9217' && $e39 > 0
+        // EUE-102: die D39-Warnung gilt für E40 > 300 € — auch oberhalb der
+        // Validierung (dann bleibt C40 leer) — und unterdrückt C39 nicht.
+        $e39Warning = $e40 > $small && $e39 > 0
             ? self::E39_LARGE_ALLOWANCE_WARNING
             : null;
 

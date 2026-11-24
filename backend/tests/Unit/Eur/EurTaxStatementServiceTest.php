@@ -142,6 +142,12 @@ class EurTaxStatementServiceTest extends TestCase
         ], 0)['steuerbilanz']['pauschalen'];
         $this->assertNull($tooHigh['e40_code']);
         $this->assertSame('Falscher Betrag', $tooHigh['e40_warning']);
+        // EUE-102: E40 > 300 € warnt bei gesetztem E39 auch ohne gültigen C40-Code.
+        $tooHighWithE39 = $this->service->build(2026, 'total', [], [
+            'arbeitsplatzpauschale_cents' => 130000,
+            'ergonomisches_mobiliar_cents' => 30000,
+        ], 0)['steuerbilanz']['pauschalen'];
+        $this->assertSame('Wert löschen (wegen 9217 große Pauschale) →', $tooHighWithE39['e39_warning']);
 
         $tooLow = $this->service->build(2026, 'total', [], [
             'arbeitsplatzpauschale_cents' => 1000, // 10 € unter der Untergrenze
@@ -168,7 +174,8 @@ class EurTaxStatementServiceTest extends TestCase
             'arbeitszimmer_cents' => 5000, // 9275
         ], 0)['steuerbilanz']['pauschalen'];
         $this->assertNull($suppressed['e40_warning']);
-        $this->assertNull($suppressed['e39_warning']);
+        // EUE-102: 9275 unterdrückt C39/C40, but the D39 warning remains.
+        $this->assertSame('Wert löschen (wegen 9217 große Pauschale) →', $suppressed['e39_warning']);
     }
 
     public function test_prognose_projects_u8_and_u13_from_the_filled_months(): void

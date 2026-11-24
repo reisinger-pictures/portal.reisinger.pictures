@@ -201,10 +201,19 @@ class EurIncomeTaxController extends Controller
             return ['year' => $year, 'mode' => $mode, 'months' => $rows, 'annual' => null];
         }
 
+        // EUE-115: "Nur andere Gewinne" lässt nur den Zuschlag zur
+        // Beitragsgrundlage entfallen; das Herausrechnen der 9225 aus den
+        // Ausgaben bleibt bestehen. Der übergebene Gewinn enthält die 9225
+        // noch als Ausgabe, daher hier einmal zurückaddieren. Ohne diesen
+        // Ausgleich würde die Basis in diesem Modus doppelt belastet.
+        $svProfitCents = $mode === 'other_profits'
+            ? $businessIncome + $bookedSv
+            : $businessIncome;
+
         // EUE-114: Jahres-SV (AA17) ist die Summe der zwölf Monatsbeiträge.
         $annualSv = 0;
 
-        foreach ($overview->svMonthly($year, $businessIncome, $bookedSv, $mode) as $row) {
+        foreach ($overview->svMonthly($year, $svProfitCents, $bookedSv, $mode) as $row) {
             $annualSv += (int) $row['kv_cents'] + (int) $row['pv_cents']
                 + (int) $row['svs_cents'] + (int) $row['uv_cents'];
         }

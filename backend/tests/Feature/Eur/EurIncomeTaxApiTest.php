@@ -284,27 +284,86 @@ class EurIncomeTaxApiTest extends EurBookkeepingTestCase
             $months[] = ['month' => $month, 'gross_profit_cents' => 100000, 'hours_minutes' => 600];
         }
 
+        // 50.000 € Gewinn: die SV-Beiträge sind basisgetrieben, nicht der
+        // Mindestbetrags-Sockel — sonst weaker die 1.000 € 9225 nicht sichtbar.
         $payload = static fn (string $key): array => [
             'year' => 2026,
-            'profit_cents' => 2000000,
+            'profit_cents' => 1000000,
             'mode' => 'total',
             'months' => $months,
             'entries' => [
-                ['direction' => 'income', 'code' => '9040', 'amount_cents' => 2000000],
+                ['direction' => 'income', 'code' => '9040', 'amount_cents' => 1000000],
                 ['direction' => 'expense', $key => '9225', 'amount_cents' => 100000],
             ],
         ];
 
+        // Baseline without any 9225 entry. A booked 9225 is neutral for the
+        // contribution basis (it is removed from expenses and added back as
+        // AA8): the two lookups below must therefore produce the SAME SV as
+        // this baseline. If either lookup is removed, the basis drops.
+        $withoutSv = $token->postJson('/api/management/eur/est/calc', [
+            'year' => 2026,
+            'profit_cents' => 1000000,
+            'mode' => 'total',
+            'months' => $months,
+            'entries' => [
+                ['direction' => 'income', 'code' => '9040', 'amount_cents' => 1000000],
+            ],
+        ]);
+
         $fromCode = $token->postJson('/api/management/eur/est/calc', $payload('code'));
         $fromE1aCode = $token->postJson('/api/management/eur/est/calc', $payload('e1a_code'));
 
+        $withoutSv->assertOk();
         $fromCode->assertOk();
         $fromE1aCode->assertOk();
         $this->assertSame(
             $fromCode->json('monthlyResults.annual.sv_cents'),
             $fromE1aCode->json('monthlyResults.annual.sv_cents'),
         );
+        $this->assertSame(
+            $withoutSv->json('monthlyResults.annual.sv_cents'),
+            $fromE1aCode->json('monthlyResults.annual.sv_cents'),
+        );
         $this->assertGreaterThan(0, $fromE1aCode->json('monthlyResults.annual.sv_cents'));
+    }
+
+    public function test_other_profits_keeps_the_9225_expense_exclusion(): void
+    {
+        $token = $this->withHeaders($this->bearer($this->tokenFor()));
+        $months = [];
+
+        for ($month = 1; $month <= 12; $month++) {
+            $months[] = ['month' => $month, 'gross_profit_cents' => 100000, 'hours_minutes' => 600];
+        }
+
+        $base = [
+            'year' => 2026,
+            'profit_cents' => 1000000,
+            'months' => $months,
+            'entries' => [
+                ['direction' => 'income', 'code' => '9040', 'amount_cents' => 1000000],
+            ],
+        ];
+
+        $plain = $token->postJson('/api/management/eur/est/calc', $base + ['mode' => 'other_profits']);
+        $withSv = $token->postJson('/api/management/eur/est/calc', array_merge($base, [
+            'mode' => 'other_profits',
+            'entries' => array_merge($base['entries'], [
+                ['direction' => 'expense', 'e1a_code' => '9225', 'amount_cents' => 100000],
+            ]),
+        ]));
+
+        $plain->assertOk();
+        $withSv->assertOk();
+        // EUE-115: "Herausrechnen bleibt bestehen" — with AA8 = 0 the booked
+        // 9225 must still be added back once to the profit, so the basis
+        // equals the no-9225 baseline. Without the add-back it would drop.
+        $this->assertSame(
+            $plain->json('monthlyResults.annual.sv_cents'),
+            $withSv->json('monthlyResults.annual.sv_cents'),
+        );
+        $this->assertGreaterThan(0, $withSv->json('monthlyResults.annual.sv_cents'));
     }
 
     public function test_invalid_prognose_and_negative_forecast_are_rejected(): void
