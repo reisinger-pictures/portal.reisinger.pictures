@@ -9,6 +9,7 @@ use App\Models\EurAssetDocument;
 use App\Models\EurAssetGroup;
 use App\Models\EurDocument;
 use App\Models\EurEntry;
+use App\Services\Eur\EurAssetGroupService;
 use App\Support\BrandRegistry;
 use Illuminate\Testing\TestResponse;
 
@@ -189,6 +190,47 @@ class EurDocumentPositionApiTest extends EurBookkeepingTestCase
 
         $this->assignGroup($token, $document, $groupId)->assertUnprocessable();
         $this->assertNull($asset->fresh()->eur_asset_group_id);
+    }
+
+    public function test_switching_from_a_group_with_a_booked_member_is_refused(): void
+    {
+        $token = $this->tokenFor();
+        $document = $this->document('R-BOOKED-SWITCH', 240000, 2024);
+        $this->split($token, $document, [$this->position('Gebucht', 240000)])->assertCreated();
+        $asset = EurAsset::forCurrentBrand()->firstOrFail();
+        $oldGroup = $this->createGroup($token, 'Alt', 60);
+        $this->assignGroup($token, $document, $oldGroup)->assertOk();
+        $asset->years()->first()->update(['status' => 'booked']);
+        $newGroup = $this->createGroup($token, 'Neu', 70);
+
+        $this->assignGroup($token, $document, $newGroup)
+            ->assertUnprocessable()
+            ->assertJsonPath('error', EurAssetGroupService::BOOKED_GROUP_MESSAGE);
+
+        $this->assertSame($oldGroup, (int) $asset->fresh()->eur_asset_group_id);
+        $this->assertSame(
+            [(int) $asset->id],
+            array_map('intval', EurAssetGroup::findOrFail($oldGroup)->assets()->pluck('id')->all()),
+        );
+    }
+
+    public function test_detaching_a_group_with_a_booked_member_is_refused(): void
+    {
+        $token = $this->tokenFor();
+        $document = $this->document('R-BOOKED-DETACH', 240000, 2024);
+        $this->split($token, $document, [$this->position('Gebucht', 240000)])->assertCreated();
+        $asset = EurAsset::forCurrentBrand()->firstOrFail();
+        $groupId = $this->createGroup($token, 'Gesperrt', 60);
+        $this->assignGroup($token, $document, $groupId)->assertOk();
+        $asset->years()->first()->update(['status' => 'booked']);
+
+        $this->assignGroup($token, $document, null)
+            ->assertUnprocessable()
+            ->assertJsonPath('error', EurAssetGroupService::BOOKED_GROUP_MESSAGE);
+
+        $this->assertSame($groupId, (int) $asset->fresh()->eur_asset_group_id);
+        $this->assertSame(0, EurEntry::forCurrentBrand()
+            ->where('receipt_no', 'R-BOOKED-DETACH')->where('kind_type', 'Entnahme')->count());
     }
 
     public function test_foreign_brand_document_and_group_are_not_found(): void

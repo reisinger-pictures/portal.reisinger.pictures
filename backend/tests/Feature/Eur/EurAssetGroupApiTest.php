@@ -7,6 +7,7 @@ namespace Tests\Feature\Eur;
 use App\Models\EurAsset;
 use App\Models\EurAssetGroup;
 use App\Models\EurEntry;
+use App\Services\Eur\EurAssetGroupService;
 
 /** Portal #57: Anlagegruppen als eine Abrechnungseinheit. */
 class EurAssetGroupApiTest extends EurBookkeepingTestCase
@@ -88,6 +89,107 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
         $this->withHeaders($this->bearer($token))
             ->postJson("/api/management/eur/asset-groups/{$groupId}/assets", ['asset_id' => $asset->id])
             ->assertUnprocessable();
+        $this->assertNull($asset->fresh()->eur_asset_group_id);
+    }
+
+    public function test_changing_a_group_share_with_a_booked_member_is_refused(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->createAsset($token, 'Gebucht', 80, 240000);
+        $groupId = $this->createGroup($token, 'Gesperrt', 60);
+        $this->assign($token, $groupId, $asset);
+        $asset->years()->first()->update(['status' => 'booked']);
+
+        $this->withHeaders($this->bearer($token))
+            ->putJson("/api/management/eur/asset-groups/{$groupId}", [
+                'name' => 'Gesperrt', 'business_share' => 70,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('error', EurAssetGroupService::BOOKED_GROUP_MESSAGE);
+
+        $this->assertSame(60, (int) EurAssetGroup::findOrFail($groupId)->business_share);
+    }
+
+    public function test_unassigning_a_booked_member_is_refused(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->createAsset($token, 'Gebucht', 80, 240000);
+        $groupId = $this->createGroup($token, 'Gesperrt', 60);
+        $this->assign($token, $groupId, $asset);
+        $asset->years()->first()->update(['status' => 'booked']);
+
+        $this->withHeaders($this->bearer($token))
+            ->deleteJson("/api/management/eur/asset-groups/{$groupId}/assets/{$asset->id}")
+            ->assertUnprocessable()
+            ->assertJsonPath('error', EurAssetGroupService::BOOKED_GROUP_MESSAGE);
+
+        $this->assertSame($groupId, (int) $asset->fresh()->eur_asset_group_id);
+        $this->assertSame([$asset->id], $this->group($token, $groupId)['asset_ids']);
+    }
+
+    public function test_deleting_a_group_with_a_booked_member_is_refused(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->createAsset($token, 'Gebucht', 80, 240000);
+        $groupId = $this->createGroup($token, 'Gesperrt', 60);
+        $this->assign($token, $groupId, $asset);
+        $asset->years()->first()->update(['status' => 'booked']);
+
+        $this->withHeaders($this->bearer($token))
+            ->deleteJson("/api/management/eur/asset-groups/{$groupId}")
+            ->assertUnprocessable()
+            ->assertJsonPath('error', EurAssetGroupService::BOOKED_GROUP_MESSAGE);
+
+        $this->assertNotNull(EurAssetGroup::find($groupId));
+        $this->assertSame($groupId, (int) $asset->fresh()->eur_asset_group_id);
+    }
+
+    public function test_assigning_into_a_group_with_a_booked_member_is_refused(): void
+    {
+        $token = $this->tokenFor();
+        $booked = $this->createAsset($token, 'Gebucht', 80, 240000);
+        $groupId = $this->createGroup($token, 'Gesperrt', 60);
+        $this->assign($token, $groupId, $booked);
+        $booked->years()->first()->update(['status' => 'booked']);
+        $new = $this->createAsset($token, 'Neu', 80, 60000);
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson("/api/management/eur/asset-groups/{$groupId}/assets", ['asset_id' => $new->id])
+            ->assertUnprocessable()
+            ->assertJsonPath('error', EurAssetGroupService::BOOKED_GROUP_MESSAGE);
+        $this->assertNull($new->fresh()->eur_asset_group_id);
+
+        $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/assets', [
+            'name' => 'Direkt', 'invoice_no' => 'G-Direkt', 'supplier' => 'Lieferant',
+            'purchase_date' => '2026-01-15', 'cost_cents' => 60000,
+            'useful_life_years' => 3, 'business_share' => 80, 'method' => 'linear',
+            'eur_asset_group_id' => $groupId,
+        ])->assertUnprocessable()->assertJsonPath('error', EurAssetGroupService::BOOKED_GROUP_MESSAGE);
+        $this->assertSame([$booked->id], $this->group($token, $groupId)['asset_ids']);
+    }
+
+    public function test_an_unbooked_group_still_allows_share_changes_and_unassign(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->createAsset($token, 'Frei', 80, 240000);
+        $groupId = $this->createGroup($token, 'Offen', 60);
+        $this->assign($token, $groupId, $asset);
+
+        $this->withHeaders($this->bearer($token))
+            ->putJson("/api/management/eur/asset-groups/{$groupId}", [
+                'name' => 'Offen', 'business_share' => 70,
+            ])->assertOk();
+
+        $this->assertSame(70, (int) EurAssetGroup::findOrFail($groupId)->business_share);
+        // 240000 ct × 30 % privat = 72000 ct, neu berechnet aus dem Gruppenanteil.
+        $this->assertSame(
+            72000,
+            (int) EurEntry::forCurrentBrand()->where('receipt_no', 'GR-'.$groupId)->firstOrFail()->amount_cents,
+        );
+
+        $this->withHeaders($this->bearer($token))
+            ->deleteJson("/api/management/eur/asset-groups/{$groupId}/assets/{$asset->id}")
+            ->assertOk();
         $this->assertNull($asset->fresh()->eur_asset_group_id);
     }
 

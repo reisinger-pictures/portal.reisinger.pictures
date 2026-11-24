@@ -6,9 +6,9 @@ namespace App\Services\Eur;
 
 use App\Eur\Parity\Money;
 use App\Eur\Reference\EurYear;
+use App\Eur\Support\EurAssetPositionKey;
 use App\Eur\Support\Share;
 use App\Models\EurAsset;
-use App\Models\EurAssetDocument;
 use App\Models\EurAssetGroup;
 use App\Models\EurAssetGroupYear;
 use App\Models\EurEntry;
@@ -28,6 +28,9 @@ use Carbon\Carbon;
 final class EurAssetGroupService
 {
     public const RECEIPT_PREFIX = 'GR-';
+
+    /** D-89: eine Gruppe mit gebuchtem Jahr ist gegen Änderungen gesperrt. */
+    public const BOOKED_GROUP_MESSAGE = 'Eine Anlagegruppe mit gebuchtem Jahr darf nicht geändert werden.';
 
     public function __construct(
         private readonly EurEntnahmeService $entnahmeService = new EurEntnahmeService,
@@ -73,6 +76,26 @@ final class EurAssetGroupService
         }
     }
 
+    /**
+     * D-89 (fail closed): eine Änderung des Gruppenanteils oder der
+     * Mitgliedschaft ist unzulässig, sobald ein aktuelles Mitglied ein
+     * gebuchtes Jahr hat. `assertAssignable` schützt nur die Zuordnung
+     * einzelner Güter; dieser Guard schützt die Gruppe selbst.
+     */
+    public function hasBookedYear(EurAssetGroup $group): bool
+    {
+        return $group->assets()
+            ->whereHas('years', static fn ($query) => $query->where('status', 'booked'))
+            ->exists();
+    }
+
+    public function assertGroupMutable(EurAssetGroup $group): void
+    {
+        if ($this->hasBookedYear($group)) {
+            throw new \InvalidArgumentException(self::BOOKED_GROUP_MESSAGE);
+        }
+    }
+
     public function detach(EurAsset $asset): void
     {
         $this->removeIndividualBookkeeping($asset);
@@ -87,7 +110,7 @@ final class EurAssetGroupService
         // Portal #59: Split-Geschwister teilen dieselbe Belegnummer. Ohne
         // Positionsschlüssel würde das Gruppieren eines Guts die Entnahmen
         // seiner ungruppierten Geschwister mitlöschen.
-        $positionKey = $this->positionKeyFor($asset);
+        $positionKey = EurAssetPositionKey::forAsset($asset);
         if ($positionKey !== null) {
             $query->where('description', 'like', '% (Position '.$positionKey.')');
         }
@@ -114,31 +137,13 @@ final class EurAssetGroupService
 
         // Portal #59: mehrere Positionen teilen eine Belegnummer; der
         // Positionsschlüssel aus der Pivot hält ihre Entnahmen getrennt.
-        $this->entnahmeService->createForAsset($asset, $this->positionKeyFor($asset));
+        $this->entnahmeService->createForAsset($asset, EurAssetPositionKey::forAsset($asset));
 
         if ($asset->scope === 'private') {
             foreach ($asset->years as $year) {
                 $this->eigenbelegService->createForYear($asset, $year);
             }
         }
-    }
-
-    /**
-     * Portal #59/D-90: stable Schlüssel `documentId-ordinal` aus der Pivot.
-     * Ohne Position (klassisches Anlagegut) bleibt der Wert null und damit
-     * das bestehende Verhalten exakt erhalten.
-     */
-    private function positionKeyFor(EurAsset $asset): ?string
-    {
-        $pivot = EurAssetDocument::forCurrentBrand()
-            ->where('eur_asset_id', $asset->id)
-            ->whereNotNull('ordinal')
-            ->orderBy('ordinal')
-            ->first();
-
-        return $pivot === null
-            ? null
-            : sprintf('%d-%d', $pivot->eur_document_id, $pivot->ordinal);
     }
 
     private function syncEntnahme(EurAssetGroup $group, int $totalCost, int $businessPercent, int $privatePercent): void

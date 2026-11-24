@@ -165,10 +165,27 @@ final class EurDocumentPositionService
         $assets = EurAsset::forCurrentBrand()->whereIn('id', $assetIds)->orderBy('id')->get()->all();
 
         DB::transaction(function () use ($document, $assets, $groupId): void {
+            // D-89 fail closed: jede Gruppe, deren Mitgliedschaft sich ändert,
+            // muss frei von gebuchten Jahren sein — beim Zuordnen die Zielgruppe,
+            // beim Trennen und beim Gruppenwechsel auch die verlassenen Gruppen.
+            $target = $groupId === null ? null : EurAssetGroup::forCurrentBrand()->findOrFail($groupId);
+            if ($target !== null) {
+                $this->assertGroupMutable($target);
+            }
+
             $affectedGroupIds = [];
+            foreach ($assets as $asset) {
+                if ($asset->eur_asset_group_id === null || (int) $asset->eur_asset_group_id === $groupId) {
+                    continue;
+                }
+                $affectedGroupIds[(int) $asset->eur_asset_group_id] = true;
+            }
+            foreach (array_keys($affectedGroupIds) as $affectedGroupId) {
+                $this->assertGroupMutable(EurAssetGroup::forCurrentBrand()->findOrFail($affectedGroupId));
+            }
 
             if ($groupId !== null) {
-                $group = EurAssetGroup::forCurrentBrand()->findOrFail($groupId);
+                $group = $target;
 
                 foreach ($assets as $asset) {
                     try {
@@ -232,6 +249,15 @@ final class EurDocumentPositionService
                 'asset_ids' => array_map(static fn (EurAsset $asset): int => (int) $asset->id, $assets),
             ]);
         });
+    }
+
+    private function assertGroupMutable(EurAssetGroup $group): void
+    {
+        try {
+            $this->groupService->assertGroupMutable($group);
+        } catch (InvalidArgumentException $exception) {
+            throw new EurDocumentPositionException($exception->getMessage(), 0, $exception);
+        }
     }
 
     /**

@@ -59,6 +59,10 @@ class EurAssetGroupController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $group = EurAssetGroup::forCurrentBrand()->findOrFail($id);
+        $blocked = $this->blockedByBookedYear([$group]);
+        if ($blocked !== null) {
+            return $blocked;
+        }
         $data = $this->validateGroup($request, $group->id);
 
         DB::transaction(function () use ($group, $data): void {
@@ -82,6 +86,20 @@ class EurAssetGroupController extends Controller
             $this->service->assertAssignable($asset);
         } catch (\InvalidArgumentException $exception) {
             return response()->json(['error' => $exception->getMessage()], 422);
+        }
+
+        // Auch die Gruppe, die das Gut verlässt, ist von der Mitgliedschaft
+        // betroffen und darf keine gebuchten Jahre enthalten.
+        $affected = [$group];
+        if ($asset->eur_asset_group_id !== null && (int) $asset->eur_asset_group_id !== $group->id) {
+            $old = EurAssetGroup::forCurrentBrand()->find((int) $asset->eur_asset_group_id);
+            if ($old !== null) {
+                $affected[] = $old;
+            }
+        }
+        $blocked = $this->blockedByBookedYear($affected);
+        if ($blocked !== null) {
+            return $blocked;
         }
 
         DB::transaction(function () use ($group, $asset): void {
@@ -114,6 +132,10 @@ class EurAssetGroupController extends Controller
     {
         $group = EurAssetGroup::forCurrentBrand()->findOrFail($id);
         $asset = EurAsset::forCurrentBrand()->where('eur_asset_group_id', $group->id)->findOrFail($assetId);
+        $blocked = $this->blockedByBookedYear([$group]);
+        if ($blocked !== null) {
+            return $blocked;
+        }
 
         DB::transaction(function () use ($group, $asset): void {
             $asset->update([
@@ -131,6 +153,12 @@ class EurAssetGroupController extends Controller
     public function destroy(int $id): JsonResponse
     {
         $group = EurAssetGroup::forCurrentBrand()->findOrFail($id);
+        // Das Lösen aller Mitglieder stellt deren Einzelbuchung wieder her;
+        // bei gebuchten Jahren darf diese Änderung nicht stattfinden.
+        $blocked = $this->blockedByBookedYear([$group]);
+        if ($blocked !== null) {
+            return $blocked;
+        }
 
         DB::transaction(function () use ($group): void {
             foreach ($group->assets as $asset) {
@@ -161,6 +189,20 @@ class EurAssetGroupController extends Controller
             ],
             'business_share' => ['required', 'integer', 'min:0', 'max:100', 'multiple_of:5'],
         ]);
+    }
+
+    /**
+     * @param  list<EurAssetGroup>  $groups
+     */
+    private function blockedByBookedYear(array $groups): ?JsonResponse
+    {
+        foreach ($groups as $group) {
+            if ($this->service->hasBookedYear($group)) {
+                return response()->json(['error' => EurAssetGroupService::BOOKED_GROUP_MESSAGE], 422);
+            }
+        }
+
+        return null;
     }
 
     /**

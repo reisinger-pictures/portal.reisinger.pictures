@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Eur;
 
+use App\Eur\Support\EurAssetPositionKey;
 use App\Eur\Support\Share;
 use App\Models\EurAsset;
 use App\Models\EurEntry;
@@ -89,14 +90,25 @@ final class EurEntnahmeService
     }
 
     /**
+     * Portal #59/D-90: der Status muss dieselbe Position meinen wie Anlage und
+     * Löschung. Split-Geschwister teilen die Belegnummer; ohne den
+     * Positionsschlüssel würde eine gelöschte Entnahme als vorhanden gemeldet.
+     * Ohne Pivot bleibt die Suche exakt beim klassischen Verhalten.
+     *
      * @return array{done: bool, entry_id: int|null, amount_cents: int|null}
      */
     public function status(EurAsset $asset): array
     {
-        $entry = EurEntry::forCurrentBrand()
+        $query = EurEntry::forCurrentBrand()
             ->where('receipt_no', $asset->invoice_no)
-            ->where('kind_type', self::KIND)
-            ->first();
+            ->where('kind_type', self::KIND);
+
+        $positionKey = EurAssetPositionKey::forAsset($asset);
+        if ($positionKey !== null) {
+            $query->where('description', 'like', '% (Position '.$positionKey.')');
+        }
+
+        $entry = $query->first();
 
         return [
             'done' => $entry !== null,

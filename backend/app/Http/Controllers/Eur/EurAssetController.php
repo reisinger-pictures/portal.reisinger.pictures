@@ -77,6 +77,11 @@ class EurAssetController extends Controller
         // Portal #57: in einer Gruppe überschreibt der Gruppenanteil den des Guts.
         $groupId = isset($data['eur_asset_group_id']) ? (int) $data['eur_asset_group_id'] : null;
         $group = $groupId === null ? null : EurAssetGroup::forCurrentBrand()->findOrFail($groupId);
+        // D-89 fail closed: auch das Anlegen eines Guts in eine Gruppe ändert
+        // deren Mitgliedschaft und ist bei gebuchten Jahren unzulässig.
+        if ($group !== null && $this->groupService->hasBookedYear($group)) {
+            return response()->json(['error' => EurAssetGroupService::BOOKED_GROUP_MESSAGE], 422);
+        }
         $effectiveShare = $group === null ? (int) $data['business_share'] : (int) $group->business_share;
         $data['scope'] = $effectiveShare < 50 ? 'private' : 'business';
 
