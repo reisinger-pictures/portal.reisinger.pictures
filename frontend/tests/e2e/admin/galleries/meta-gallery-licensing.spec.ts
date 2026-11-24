@@ -6,6 +6,9 @@ import {E2ESessionHelper} from '../../helpers/E2ESessionHelper';
 import {SidebarHelper} from '../../helpers/SidebarHelper';
 import {browserAuthHeaders} from '../../helpers/BrowserAuthHeaders';
 
+/** Escape a literal name before embedding it in an anchored RegExp. */
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const sampleImagePath = path.resolve(process.cwd(), '../backend/tests/Fixtures/sample.jpg');
 const sampleImage = readFileSync(sampleImagePath);
 
@@ -25,7 +28,12 @@ type GalleryFixture = {
  *   but was hidden inside the collapsed parent. Attempt 3 (CI 45287755403):
  *   TreeNode initialises prevSignal at mount, so an early expand click opens
  *   nothing. The spec now waits for the top-level group (visible once loaded)
- *   before expanding, then waits for the nested gallery link.
+ *   before expanding, then waits for the nested gallery link. Attempt 4
+ *   (CI 45289915137): the CI log shows "element(s) not found" at line 160 in
+ *   all three retries — the gallery link renders as "<name> Delivery" because
+ *   TreeNode adds a type badge inside the link, so `exact: true` can never
+ *   match. The locator now anchors the name at the start and tolerates the
+ *   trailing badge. Owner granted a fourth attempt after three failures.
  */
 test.describe('Meta-gallery child licensing', () => {
     let helper: E2ESessionHelper;
@@ -156,7 +164,12 @@ test.describe('Meta-gallery child licensing', () => {
         await expect(main.getByText(`E2E Meta Licensing ${suffix}`, {exact: true})).toBeVisible({timeout: 15000});
         await main.getByRole('button', {name: 'Alle ausklappen'}).click();
         const nestedGalleryName = definitions[2].name;
-        const nestedGalleryLink = main.getByRole('link', {name: nestedGalleryName, exact: true});
+        // TreeNode renders the gallery link as "<name> <Delivery|Auswahl>": the
+        // type badge is part of the accessible name, so `exact: true` resolves
+        // to zero elements. Anchor the name at the start instead.
+        const nestedGalleryLink = main.getByRole('link', {
+            name: new RegExp(`^${escapeRegExp(nestedGalleryName)}(?:\\s|$)`),
+        });
         await expect(nestedGalleryLink).toBeVisible({timeout: 15000});
         await nestedGalleryLink.click();
         // Anchored regex, not `exact`: the detail heading reads
