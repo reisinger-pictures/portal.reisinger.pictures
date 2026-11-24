@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\EurAsset;
 use App\Models\EurAssetGroup;
 use App\Models\EurAuditLog;
+use App\Services\Eur\EurAssetCreationService;
 use App\Services\Eur\EurAssetGroupSerializer;
 use App\Services\Eur\EurAssetGroupService;
 use App\Support\BrandRegistry;
@@ -28,6 +29,7 @@ class EurAssetGroupController extends Controller
     public function __construct(
         private readonly EurAssetGroupService $service,
         private readonly EurAssetGroupSerializer $serializer,
+        private readonly EurAssetCreationService $creationService,
     ) {}
 
     public function index(): JsonResponse
@@ -67,7 +69,13 @@ class EurAssetGroupController extends Controller
 
         DB::transaction(function () use ($group, $data): void {
             $group->update($data);
-            $this->service->sync($group->refresh());
+            $group = $group->refresh();
+            // D-89: der geänderte Gruppenanteil gilt auch für die offenen
+            // Planzeilen der Mitglieder; gebuchte Jahre bleiben unberührt.
+            foreach ($group->assets as $member) {
+                $this->creationService->recalculateUnbookedPlanShares($member);
+            }
+            $this->service->sync($group);
             $this->audit('group_updated', $group);
         });
 
@@ -121,6 +129,9 @@ class EurAssetGroupController extends Controller
                 'eur_asset_group_id' => $group->id,
                 'scope' => (int) $group->business_share < 50 ? 'private' : 'business',
             ]);
+            // D-89: der Plan eines später zugeordneten Guts muss denselben
+            // Anteil verwenden wie die Gruppenbuchung (Entnahme/Eigenbeleg).
+            $this->creationService->recalculateUnbookedPlanShares($asset);
             $this->service->sync($group->refresh());
             $this->audit('group_asset_assigned', $group, ['asset_id' => $asset->id]);
         });
@@ -142,6 +153,9 @@ class EurAssetGroupController extends Controller
                 'eur_asset_group_id' => null,
                 'scope' => (int) $asset->business_share < 50 ? 'private' : 'business',
             ]);
+            // D-89: nur noch offene Jahre wechseln zurück auf den eigenen
+            // Anteil — gebuchte Jahre bleiben in der ursprünglichen Aufteilung.
+            $this->creationService->recalculateUnbookedPlanShares($asset);
             $this->service->restoreIndividualBookkeeping($asset);
             $this->service->sync($group->refresh());
             $this->audit('group_asset_unassigned', $group, ['asset_id' => $asset->id]);
@@ -166,6 +180,7 @@ class EurAssetGroupController extends Controller
                     'eur_asset_group_id' => null,
                     'scope' => (int) $asset->business_share < 50 ? 'private' : 'business',
                 ]);
+                $this->creationService->recalculateUnbookedPlanShares($asset);
                 $this->service->restoreIndividualBookkeeping($asset);
             }
             $this->audit('group_deleted', $group);

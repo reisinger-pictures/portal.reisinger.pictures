@@ -57,7 +57,8 @@ final class EurAssetCarryOver
             return false;
         }
 
-        $privatePercent = 100 - (int) $asset->business_share;
+        // D-89: Folgejahre werden aus dem effektiven Anteil geschrieben.
+        $privatePercent = 100 - $asset->effectiveBusinessShare();
         $depreciationCents = (int) $planRow['depreciation_cents'];
         $privateCents = Share::apply($depreciationCents, $privatePercent);
 
@@ -156,7 +157,7 @@ final class EurAssetCarryOver
 
         $cost = (int) $asset->cost_cents;
         $life = (int) $asset->useful_life_years;
-        $businessPercent = (int) $asset->business_share;
+        $businessPercent = $asset->effectiveBusinessShare();
 
         if ($cost <= 0 || $life <= 0 || $businessPercent <= 0) {
             return null;

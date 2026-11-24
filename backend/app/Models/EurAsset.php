@@ -63,6 +63,22 @@ class EurAsset extends Model
     }
 
     /**
+     * D-89: der Gruppenanteil überschreibt den des Guts für Scope und alle
+     * Berechnungen; der eigene Anteil bleibt als Information erhalten. Die
+     * Gruppenzuordnung wird dabei auf die aktuelle Marke eingeschränkt.
+     */
+    public function effectiveBusinessShare(): int
+    {
+        if ($this->eur_asset_group_id === null) {
+            return (int) $this->business_share;
+        }
+
+        $group = EurAssetGroup::forCurrentBrand()->find($this->eur_asset_group_id);
+
+        return $group === null ? (int) $this->business_share : (int) $group->business_share;
+    }
+
+    /**
      * Belege gehören zum stabilen Stamm, nicht zum Jahresplan (D-85).
      */
     public function assetDocuments(): BelongsToMany

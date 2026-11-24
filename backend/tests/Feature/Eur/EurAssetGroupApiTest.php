@@ -7,6 +7,7 @@ namespace Tests\Feature\Eur;
 use App\Models\EurAsset;
 use App\Models\EurAssetGroup;
 use App\Models\EurEntry;
+use App\Services\Eur\EurAssetCreationService;
 use App\Services\Eur\EurAssetGroupService;
 
 /** Portal #57: Anlagegruppen als eine Abrechnungseinheit. */
@@ -77,6 +78,136 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
 
         $this->assertSame('private', $asset->fresh()->scope);
         $this->assertSame(30, (int) EurAssetGroup::findOrFail($groupId)->business_share);
+    }
+
+    public function test_group_share_drives_plan_and_booked_afa_for_a_member_with_a_different_share(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->createAsset($token, 'Set-Gut', 80, 240000, '2024-01-15');
+
+        // Ohne Gruppe gilt der eigene Anteil: 80 % betrieblich / 20 % privat.
+        $this->assertSame(20, (int) $asset->years()->first()->private_use_percent);
+        $this->assertSame(16000, (int) $asset->years()->first()->private_use_cents);
+        $this->assertSame(64000, (int) $asset->years()->first()->business_use_cents);
+
+        $groupId = $this->createGroup($token, '60er-Set', 60);
+        $this->assign($token, $groupId, $asset);
+
+        // D-89: 60 % betrieblich / 40 % privat — nicht 80/20 des Guts.
+        $fresh = $asset->fresh();
+        $this->assertSame(80, (int) $fresh->business_share);
+        $this->assertSame(60, $fresh->effectiveBusinessShare());
+        $years = $fresh->years()->orderBy('year')->get();
+        $this->assertCount(3, $years);
+        foreach ($years as $year) {
+            $this->assertSame(40, (int) $year->private_use_percent);
+            $this->assertSame(
+                (int) $year->depreciation_cents - (int) $year->private_use_cents,
+                (int) $year->business_use_cents,
+            );
+        }
+        $this->assertSame(32000, (int) $years[0]->private_use_cents);
+        $this->assertSame(48000, (int) $years[0]->business_use_cents);
+        $this->assertSame(32000, (int) $years[1]->private_use_cents);
+        $this->assertSame(48000, (int) $years[1]->business_use_cents);
+        $this->assertSame(32000, (int) $years[2]->private_use_cents);
+        $this->assertSame(47999, (int) $years[2]->business_use_cents);
+
+        $book = $this->withHeaders($this->bearer($token))->postJson(
+            '/api/management/eur/assets/'.$asset->id.'/book-depreciation',
+            ['year' => 2024],
+        );
+        $book->assertCreated();
+        $book->assertJsonPath('entry.amount_cents', 48000);
+        $book->assertJsonPath('entry.business_amount_cents', 48000);
+        $this->assertSame(
+            48000,
+            (int) EurEntry::forCurrentBrand()->where('kind_type', 'AfA')->firstOrFail()->amount_cents,
+        );
+    }
+
+    public function test_ungrouped_asset_keeps_its_own_share_for_plan_and_booked_afa(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->createAsset($token, 'Einzel-Gut', 80, 240000, '2024-01-15');
+
+        $this->assertSame(80, $asset->effectiveBusinessShare());
+        $year = $asset->years()->first();
+        $this->assertSame(20, (int) $year->private_use_percent);
+        $this->assertSame(16000, (int) $year->private_use_cents);
+        $this->assertSame(64000, (int) $year->business_use_cents);
+
+        $book = $this->withHeaders($this->bearer($token))->postJson(
+            '/api/management/eur/assets/'.$asset->id.'/book-depreciation',
+            ['year' => 2024],
+        );
+        $book->assertCreated();
+        $book->assertJsonPath('entry.amount_cents', 64000);
+        $book->assertJsonPath('entry.business_amount_cents', 64000);
+    }
+
+    public function test_unassign_restores_the_members_share_for_open_years(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->createAsset($token, 'Löse-Gut', 80, 240000, '2024-01-15');
+        $groupId = $this->createGroup($token, 'Set', 60);
+        $this->assign($token, $groupId, $asset);
+
+        $this->assertSame(40, (int) $asset->years()->first()->private_use_percent);
+        $this->assertSame(32000, (int) $asset->years()->first()->private_use_cents);
+
+        $this->withHeaders($this->bearer($token))
+            ->deleteJson("/api/management/eur/asset-groups/{$groupId}/assets/{$asset->id}")
+            ->assertOk();
+
+        $fresh = $asset->fresh();
+        $this->assertNull($fresh->eur_asset_group_id);
+        $this->assertSame(80, (int) $fresh->business_share);
+        $this->assertSame(80, $fresh->effectiveBusinessShare());
+        foreach ($fresh->years()->orderBy('year')->get() as $year) {
+            $this->assertSame(20, (int) $year->private_use_percent);
+        }
+        $this->assertSame(16000, (int) $fresh->years()->first()->private_use_cents);
+        $this->assertSame(64000, (int) $fresh->years()->first()->business_use_cents);
+
+        $book = $this->withHeaders($this->bearer($token))->postJson(
+            '/api/management/eur/assets/'.$asset->id.'/book-depreciation',
+            ['year' => 2024],
+        );
+        $book->assertCreated();
+        $book->assertJsonPath('entry.amount_cents', 64000);
+    }
+
+    public function test_recalculation_leaves_a_booked_year_untouched(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->createAsset($token, 'Gebucht', 80, 240000, '2024-01-15');
+        $groupId = $this->createGroup($token, 'Set', 60);
+        $this->assign($token, $groupId, $asset);
+
+        $booked = $asset->years()->orderBy('year')->first();
+        $booked->forceFill([
+            'status' => 'booked',
+            'private_use_percent' => 40,
+            'private_use_cents' => 32000,
+            'business_use_cents' => 48000,
+        ])->save();
+
+        // Das Trennen ist mit gebuchtem Jahr gesperrt; der Guard der
+        // Neuberechnung selbst wird hier direkt geprüft.
+        $detached = $asset->fresh();
+        $detached->forceFill(['eur_asset_group_id' => null])->save();
+        $updated = $this->app->make(EurAssetCreationService::class)->recalculateUnbookedPlanShares($detached);
+
+        $this->assertSame(2, $updated);
+        $bookedRow = $detached->years()->where('year', 2024)->firstOrFail();
+        $this->assertSame(40, (int) $bookedRow->private_use_percent);
+        $this->assertSame(32000, (int) $bookedRow->private_use_cents);
+        $this->assertSame(48000, (int) $bookedRow->business_use_cents);
+        $open = $detached->years()->where('year', 2025)->firstOrFail();
+        $this->assertSame(20, (int) $open->private_use_percent);
+        $this->assertSame(16000, (int) $open->private_use_cents);
+        $this->assertSame(64000, (int) $open->business_use_cents);
     }
 
     public function test_a_booked_asset_cannot_be_assigned(): void

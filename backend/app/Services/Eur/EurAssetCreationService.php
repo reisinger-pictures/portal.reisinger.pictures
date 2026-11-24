@@ -67,7 +67,9 @@ final class EurAssetCreationService
             : $calculator->linearPlan((int) $asset->cost_cents, (int) $asset->useful_life_years, $month);
 
         $purchaseYear = (int) $asset->purchase_date->format('Y');
-        $privatePercent = 100 - (int) $asset->business_share;
+        // D-89: der Gruppenanteil gilt für alle Berechnungen; der eigene
+        // Anteil des Guts bleibt unverändert als Information erhalten.
+        $privatePercent = 100 - $asset->effectiveBusinessShare();
 
         foreach ($plan as $row) {
             $privateCents = Share::apply($row['depreciation_cents'], $privatePercent);
@@ -92,6 +94,41 @@ final class EurAssetCreationService
                 $this->eigenbelegService->createForYear($asset, $yearRow);
             }
         }
+    }
+
+    /**
+     * D-89: nach einer Änderung der Abrechnungseinheit (Gruppe wechseln,
+     * Mitglied aufteilen, Gruppenanteil ändern) übernehmen die noch offenen
+     * Planzeilen den effektiven Anteil. Gebuchte Jahre sind final und werden
+     * nie umgeschrieben — eine solche Änderung ist ohnehin nur für Gruppen
+     * ohne gebuchtes Jahr zulässig.
+     *
+     * @return int Anzahl der aktualisierten Planzeilen
+     */
+    public function recalculateUnbookedPlanShares(EurAsset $asset): int
+    {
+        $privatePercent = 100 - $asset->effectiveBusinessShare();
+        $updated = 0;
+
+        $unbooked = $asset->years()
+            ->whereNull('eur_entry_id')
+            ->where('status', '!=', 'booked')
+            ->get();
+
+        foreach ($unbooked as $year) {
+            $depreciationCents = (int) $year->depreciation_cents;
+            $privateCents = Share::apply($depreciationCents, $privatePercent);
+
+            $year->forceFill([
+                'private_use_percent' => $privatePercent,
+                'private_use_cents' => $privateCents,
+                'business_use_cents' => $depreciationCents - $privateCents,
+            ])->save();
+
+            $updated++;
+        }
+
+        return $updated;
     }
 
     /**

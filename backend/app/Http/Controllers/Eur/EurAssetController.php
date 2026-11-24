@@ -431,7 +431,9 @@ class EurAssetController extends Controller
         }
 
         $purchaseYear = (int) $asset->purchase_date->format('Y');
-        $privatePercent = 100 - (int) $asset->business_share;
+        // D-89: auch der nach einem Methodenwechsel neu geschriebene Restplan
+        // folgt dem effektiven (ggf. vom Gruppenstamm kommenden) Anteil.
+        $privatePercent = 100 - $asset->effectiveBusinessShare();
 
         foreach ($calculator->linearPlan($carryingCents, $remainingYears, 1) as $row) {
             $privateCents = Share::apply($row['depreciation_cents'], $privatePercent);
