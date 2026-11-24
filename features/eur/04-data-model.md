@@ -281,6 +281,41 @@ Verzeichniszuordnung, die Carry-over-Herkunft, die Eigenbeleg-Dokumentation und
 die Belegverknüpfung, nicht die Anlagegüter, ihre AfA-Pläne, Buchungen oder
 Belege selbst.
 
+### Schema-Entscheidung V072 (eindeutiger Projektstamm, EUE-026)
+
+**Entscheidung des Eigentümers (2026-11-24):** Projekte werden als
+**jahresübergreifender Stamm** gespeichert — eine Projektzeile pro Brand,
+Buchungen und Stunden tragen ihr eigenes Jahr (dasselbe Muster wie der stabile
+Anlagenstamm in D-85). Es gibt damit **keine doppelten Projekte**; ein
+Projektname ist pro Brand genau einmal erlaubt.
+
+**Schema.** `eur_projects` erhält einen Unique-Index `(brand, name)` namens
+`eur_projects_brand_name_unique`. Der bisherige einfache Index
+`eur_projects_brand_name_index` aus V061 wird entfernt, weil er mit dem
+Unique-Index redundanzfrei ersetzt wird. Die Groß-/Kleinschreibung ist
+Bestandteil des Namens; eine case-insensitive Eindeutigkeit ist nicht
+vereinbart. Bestehende `external_id`, Kunden-Zuordnung und `active` bleiben
+unverändert; es werden keine Spalten hinzugefügt.
+
+**Preflight.** Vor dem Anlegen des Unique-Index zählt die Migration die
+Gruppen `(brand, name)` mit mehr als einer Zeile. Findet sie welche, bricht sie
+mit einer benannten `FATAL`-Meldung ab, die bis zu fünf betroffene Gruppen samt
+jeweiliger Zeilenanzahl auflistet. Es werden **keine** Zeilen zusammengeführt, umbenannt oder gelöscht —
+die Bereinigung bleibt eine bewusste Entscheidung mit eigener Migration. Auf
+einer frischen Datenbank (E2E, Tests) gibt es keine Projekte und damit keine
+Duplikate.
+
+**Backfill.** Keiner. Der Unique-Index ist rein strukturell; vorhandene
+eindeutige Zeilen bleiben inhaltlich unverändert.
+
+**Rollback.** `down()` ist nach Repository-Policy leer. Ein Entfernen des
+Unique-Index würde doppelte Namen wieder zulassen, aber keine Zeile verändern.
+
+**Wirkung auf EUE-026.** Die gepinnte Regel verlangt eine ⚠-Warnung mit
+Zeilennummer für doppelte Projekte in der ODS-Tabelle. Das Portal verhindert
+doppelte Projekte strukturell; die Warnung ist damit gegenstandslos („besser"
+gegenüber der gepinnten Regel). Die gepinnten Artefakte werden nicht verändert.
+
 ## Beziehungen
 
 - Buchung → genau ein Kunde und optional ein Projekt; Reise analog.
