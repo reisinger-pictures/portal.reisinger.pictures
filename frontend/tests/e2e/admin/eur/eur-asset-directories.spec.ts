@@ -132,6 +132,60 @@ test.describe('EAR · Anlagenverzeichnisse je Jahr (D-85)', () => {
         await expect(panel.getByRole('status').filter({ hasText: /bereits vollständig übernommen/ })).toBeVisible();
     });
 
+    test('Private Einlage läuft linear über die Nutzungsdauer hinaus (EUE-055)', { tag: ['@feature:eur-asset-directories'] }, async ({ page }) => {
+        const headers = await login(page);
+        const name = `EUE055-Fortlauf-${Date.now()}`;
+        const created = await page.request.post('/api/management/eur/assets', {
+            headers,
+            data: {
+                name,
+                invoice_no: `R-${name}`,
+                supplier: 'Lieferant',
+                purchase_date: '2024-01-15',
+                cost_cents: 100000,
+                useful_life_years: 2,
+                business_share: 25,
+                method: 'linear',
+            },
+        });
+        expect(created.status()).toBe(201);
+        const asset = (await created.json() as { asset: { id: number; scope: string } }).asset;
+        expect(asset.scope).toBe('private');
+
+        const firstPlan = await page.request.get(`/api/management/eur/assets/${asset.id}/plan`, { headers });
+        expect(firstPlan.ok()).toBe(true);
+        const firstBody = await firstPlan.json() as {
+            asset: { years: Array<{ year: number; eigenbeleg_cents: number | null }> };
+        };
+        expect(firstBody.asset.years.map((row) => row.year)).toEqual([2024, 2025]);
+        // 100000 ct / 2 Jahre = 50000 ct theoretisch; 25 % betrieblich = 12500 ct.
+        expect(firstBody.asset.years.every((row) => row.eigenbeleg_cents === 12500)).toBe(true);
+
+        const panel = await openAssets(page);
+        await panel.getByRole('button', { name: 'Privateinlagen' }).click();
+        const row = panel.getByRole('row').filter({ hasText: name });
+        await expect(row).toBeVisible();
+        await expect(row.getByText('Eigenbeleg offen')).toBeVisible();
+
+        const carryOver = page.waitForResponse((response) =>
+            response.request().method() === 'POST'
+            && response.url().endsWith('/api/management/eur/assets/carry-over')
+            && response.ok());
+        await panel.getByRole('button', { name: 'Jahr übernehmen' }).click();
+        await carryOver;
+
+        const nextPlan = await page.request.get(`/api/management/eur/assets/${asset.id}/plan`, { headers });
+        expect(nextPlan.ok()).toBe(true);
+        const nextBody = await nextPlan.json() as {
+            asset: { years: Array<{ year: number; eigenbeleg_cents: number | null; eigenbeleg_no: string | null }> };
+        };
+        const continuation = nextBody.asset.years.find((entry) => entry.year === 2026);
+        expect(continuation).toBeDefined();
+        expect(continuation?.eigenbeleg_cents).toBe(12500);
+        expect(continuation?.eigenbeleg_no).toMatch(/^EB-/);
+        await expect(row.getByText(/Eigenbeleg EB-/)).toBeVisible();
+    });
+
     test('Beleg am Stamm anhängen und lösen', { tag: ['@feature:eur-asset-directories'] }, async ({ page }) => {
         const headers = await login(page);
         const name = `V071-Beleg-${Date.now()}`;

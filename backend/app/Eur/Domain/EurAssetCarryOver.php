@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Eur\Domain;
 
+use App\Eur\Parity\Money;
 use App\Eur\Parity\RuleValues;
 use App\Eur\Support\Share;
 use App\Models\EurAsset;
@@ -121,10 +122,75 @@ final class EurAssetCarryOver
 
         $row = $plan[$targetYear - $purchaseYear] ?? null;
 
+        if ($row === null && $this->isPrivate($asset)) {
+            return $this->privateContinuationRow($asset, $targetYear);
+        }
+
         return $row === null ? null : [
             'method' => $row['method'],
             'depreciation_cents' => (int) $row['depreciation_cents'],
             'book_value_cents' => (int) $row['book_value_cents'],
         ];
+    }
+
+    /**
+     * EUE-055: das private Verzeichnis schreibt linear über die Nutzungsdauer
+     * hinaus fort, solange das Gut betrieblich genutzt wird (der Carry-over
+     * überspringt veräußerte Güter). Die jährliche fiktive AfA bleibt
+     * `(1 / Nutzungsdauer) × Betriebsanteil × Anschaffungswert` in ganzen Cent;
+     * die kumulierten Eigenbelege dürfen den initialen Anschaffungswert nicht
+     * überschreiten. Ein Jahr, das die Grenze überschreiten würde, wird nicht
+     * angelegt — es gibt bewusst keine gekürzte Restbuchung.
+     *
+     * @return array{method: string, depreciation_cents: int, book_value_cents: int}|null
+     */
+    private function privateContinuationRow(EurAsset $asset, int $targetYear): ?array
+    {
+        $purchaseYear = (int) $asset->purchase_date->format('Y');
+
+        if ($targetYear <= $purchaseYear) {
+            return null;
+        }
+
+        $cost = (int) $asset->cost_cents;
+        $life = (int) $asset->useful_life_years;
+        $businessPercent = (int) $asset->business_share;
+
+        if ($cost <= 0 || $life <= 0 || $businessPercent <= 0) {
+            return null;
+        }
+
+        $theoretical = Money::divideCents($cost, $life);
+        $annualEigenbeleg = Share::apply($theoretical, $businessPercent);
+
+        if ($annualEigenbeleg <= 0) {
+            return null;
+        }
+
+        $priorYears = $asset->years()->where('year', '<', $targetYear);
+        $cumulative = (int) (clone $priorYears)->sum('eigenbeleg_cents');
+
+        if ($cumulative + $annualEigenbeleg > $cost) {
+            return null;
+        }
+
+        // Der Plan ist aufgebraucht; der Restbuchwert bleibt gemäß EUE-050
+        // auf dem Mindestwert und steigt nicht wieder an.
+        // years() sortiert aufsteigend; orderByDesc() würde nur anhängen und
+        // value() das früheste Jahr liefern — daher zuerst reorder().
+        $lastBookValue = (int) ((clone $priorYears)->reorder()->orderByDesc('year')->value('book_value_cents') ?? $cost);
+
+        return [
+            'method' => DepreciationCalculator::METHOD_LINEAR,
+            'depreciation_cents' => $theoretical,
+            'book_value_cents' => $this->calculator->residualCents($lastBookValue, $theoretical),
+        ];
+    }
+
+    private function isPrivate(EurAsset $asset): bool
+    {
+        $scope = $asset->scope ?? ((int) $asset->business_share < 50 ? 'private' : 'business');
+
+        return $scope === 'private';
     }
 }

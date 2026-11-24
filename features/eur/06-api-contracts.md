@@ -156,6 +156,16 @@ meldet bei einem automatisch erzeugten Eigenbeleg aber `already_created: true`
 und schreibt kein zweites Mal. Es entsteht keine Journalbuchung und keine
 Gewinnminderung.
 
+Die lineare Fortführung im privaten Verzeichnis ist nicht an die
+`useful_life_years` gebunden: `EurAssetCarryOver` erzeugt für jede weitere
+Jahresübernahme eine Zeile mit `(1 / Nutzungsdauer) × Betriebsanteil ×
+Anschaffungswert`, solange das Gut aktiv ist. Die kumulierten Eigenbelege
+dürfen den initialen Anschaffungswert nicht übersteigen; eine Zeile, die die
+Grenze überschreiten würde, entsteht nicht. Der Restbuchwert bleibt dabei gemäß
+EUE-050 auf dem Mindestwert von 1 Cent. Betriebliche Güter behalten ihren
+festen Plan. `EurAssetsPanel.tsx` zeigt die privaten Güter in der eigenen
+Ansicht `Privateinlagen`.
+
 Die Antwort enthält je Anlage `warnings: [{code, text}]`. Neben EUE-053/058
 meldet `AssetPlausibility` die nicht blockierenden Hinweise EUE-056
 (Vorjahres-AfA weicht vom gepinnten Plan um mehr als 1 Cent ab) und EUE-057
