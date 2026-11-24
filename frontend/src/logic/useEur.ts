@@ -509,6 +509,66 @@ export interface EurTypeMatrix {
     match: boolean;
 }
 
+/** EUE-121: one month cell of the project × month cross-tab (whole cents/minutes). */
+export interface EurProjectAnalyticsMonth {
+    month: number;
+    income_cents: number;
+    expense_cents: number;
+    hours_minutes: number;
+    result_cents: number;
+    /** Whole cents per *minute* of logged time (integer division), null without hours. */
+    result_per_hour_cents: number | null;
+}
+
+/** EUE-121: the four total figures of a project row or of the whole year. */
+export interface EurProjectAnalyticsTotals {
+    income_cents: number;
+    expense_cents: number;
+    hours_minutes: number;
+    result_cents: number;
+    result_per_hour_cents: number | null;
+}
+
+/** EUE-121: one project row with twelve month cells and its totals. */
+export interface EurProjectAnalyticsRow {
+    project: string;
+    months: EurProjectAnalyticsMonth[];
+    totals: EurProjectAnalyticsTotals;
+}
+
+/** EUE-121: one calendar-month column of the cross-tab. */
+export interface EurProjectAnalyticsMonthTotal {
+    month: number;
+    income_cents: number;
+    expense_cents: number;
+    hours_minutes: number;
+    result_cents: number;
+}
+
+/** EUE-121: reconciliation marker (⚠/💡 markers are embedded in the texts). */
+export interface EurProjectAnalyticsCheck {
+    code: string;
+    ok: boolean;
+    message: string;
+    hint: string;
+}
+
+/** EUE-121: `GET /eur/analytics/by-project`. The server never recalculates in the browser. */
+export interface EurProjectAnalytics {
+    year: number;
+    projects: EurProjectAnalyticsRow[];
+    month_totals: EurProjectAnalyticsMonthTotal[];
+    totals: EurProjectAnalyticsTotals;
+    /** Minutes booked without a project; reported so no hours are dropped silently. */
+    undistributed_hours_minutes: number;
+    /** Prior-year booked depreciation. Assets have no project relation (D-85). */
+    prior_year_afa_cents: number;
+    /** Booked 9225 expenses left out of project expenses outside the UV mode. */
+    sv_excluded_cents: number;
+    checks: EurProjectAnalyticsCheck[];
+    match: boolean;
+}
+
 /** EUE-122: Zahlungsart × Monat aus `/payment-reconciliation`. */
 export interface EurPaymentMethodMonth {
     month: number;
@@ -617,6 +677,11 @@ export function useEurExpenseTypeAnalytics(year = 2026) {
 
 export function useEurPaymentReconciliation(year = 2026) {
     return useSWR<EurPaymentReconciliation>(`/api/management/eur/payment-reconciliation?year=${year}`, fetcher, SWR_OPTIONS);
+}
+
+/** EUE-121: project × month cross-tab with income, expenses, hours and reconciliation. */
+export function useEurProjectAnalytics(year = 2026) {
+    return useSWR<EurProjectAnalytics>(`/api/management/eur/analytics/by-project?year=${year}`, fetcher, SWR_OPTIONS);
 }
 
 export interface EurEntryPayload {

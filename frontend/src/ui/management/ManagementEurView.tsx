@@ -39,6 +39,7 @@ import EurHoursPanel from './eur/EurHoursPanel';
 import EurIncomeTaxPanel from './eur/EurIncomeTaxPanel';
 import EurMonthPanel from './eur/EurMonthPanel';
 import EurOverviewPanel from './eur/EurOverviewPanel';
+import EurProjectAnalyticsPanel from './eur/EurProjectAnalyticsPanel';
 import EurReferencePanel from './eur/EurReferencePanel';
 import EurSignaturePanel from './eur/EurSignaturePanel';
 import EurTravelPanel from './eur/EurTravelPanel';
@@ -695,6 +696,7 @@ export default function ManagementEurView() {
                         <>
                             <EurAnalyticsPanel year={year}/>
                             <EurAnalyticsMatricesPanel year={year}/>
+                            <EurProjectAnalyticsPanel year={year}/>
                         </>
                     )}
 

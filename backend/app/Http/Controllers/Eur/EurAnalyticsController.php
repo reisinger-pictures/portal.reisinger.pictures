@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Eur;
 
+use App\Eur\Domain\ProjectAnalytics;
 use App\Eur\Reference\EurYear;
 use App\Eur\Reference\ReferenceTables;
 use App\Http\Controllers\Controller;
+use App\Models\EurAssetYear;
 use App\Models\EurEntry;
+use App\Models\EurHour;
+use App\Services\Eur\EurOverviewService;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +27,8 @@ use InvalidArgumentException;
  */
 class EurAnalyticsController extends Controller
 {
+    public function __construct(private readonly EurOverviewService $overview) {}
+
     public function index(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -73,6 +79,53 @@ class EurAnalyticsController extends Controller
             'kind' => 'expense',
             ...$this->typeMatrix($entries, 'expense', true),
         ]);
+    }
+
+    /**
+     * EUE-121: Projekt × Monat mit Einnahmen, Ausgaben (inkl. 9225-Bereinigung)
+     * und Arbeitsstunden. Die Vorjahres-AfA steht bewusst nur als Gesamtzahl
+     * oben: Anlagegüter haben im Portal keine Projektzuordnung (D-85).
+     */
+    public function byProject(Request $request): JsonResponse
+    {
+        $year = $this->resolveYear($request);
+
+        $entries = EurEntry::forCurrentBrand()->forYear($year)->with('project')->get();
+        $hours = EurHour::forCurrentBrand()->where('year', $year)->get();
+        $priorYearAfaCents = (int) EurAssetYear::forCurrentBrand()
+            ->where('year', '<', $year)
+            ->where('status', 'booked')
+            ->sum('business_use_cents');
+
+        $entryRows = [];
+
+        foreach ($entries as $entry) {
+            $entryRows[] = [
+                'month' => (int) $entry->month,
+                'direction' => (string) $entry->direction,
+                'project' => $entry->project?->name,
+                'business_amount_cents' => (int) $entry->business_amount_cents,
+                'e1a_code' => $entry->e1a_code,
+            ];
+        }
+
+        $hourRows = [];
+
+        foreach ($hours as $hour) {
+            $hourRows[] = [
+                'month' => (int) $hour->month,
+                'minutes' => (int) $hour->minutes,
+                'project' => $hour->project,
+            ];
+        }
+
+        return response()->json(ProjectAnalytics::build(
+            $year,
+            $entryRows,
+            $hourRows,
+            $priorYearAfaCents,
+            $this->overview->excludeBookedSvFromExpenses(),
+        ));
     }
 
     /**

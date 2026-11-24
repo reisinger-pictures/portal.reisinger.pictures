@@ -243,6 +243,10 @@ msgstr "< 50€ (Übertrag ins nächste Monat)"
 msgid "✓✓ Abgleich mit dem Journal: kein Unterschied."
 msgstr "✓✓ Abgleich mit dem Journal: kein Unterschied."
 
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
+msgid "✓✓ Abgleich Projekte: alle Buchungen und Stunden sind erfasst."
+msgstr "✓✓ Abgleich Projekte: alle Buchungen und Stunden sind erfasst."
+
 #: src/ui/management/ManagementFtpInbox.tsx
 msgid "1 Datei liegt im Quarantäne-Ordner"
 msgstr "1 Datei liegt im Quarantäne-Ordner"
@@ -902,6 +906,7 @@ msgstr "Ansicht"
 
 #: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
 #: src/ui/management/eur/EurEntriesPanel.tsx
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
 msgid "Anteil"
 msgstr "Anteil"
 
@@ -950,6 +955,10 @@ msgstr "Apple Pay"
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Arbeitsplatzpauschale"
 msgstr "Arbeitsplatzpauschale"
+
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
+msgid "Arbeitsstunden in Minuten"
+msgstr "Arbeitsstunden in Minuten"
 
 #: src/ui/management/components/invoice/InvoiceDiscountsSection.tsx
 #: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
@@ -1039,6 +1048,7 @@ msgstr "Ausgabe"
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 #: src/ui/management/eur/EurMonthPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
 msgid "Ausgaben"
 msgstr "Ausgaben"
 
@@ -1959,6 +1969,10 @@ msgstr "Business / Corporate"
 msgid "Canon EOS R1 / R6 Mark II → Portal. Menüpfade und Nummerierung aus dem Canon-Handbuch, Abschnitt „Übertragen von Bildern auf einen FTP-Server\"."
 msgstr "Canon EOS R1 / R6 Mark II → Portal. Menüpfade und Nummerierung aus dem Canon-Handbuch, Abschnitt „Übertragen von Bildern auf einen FTP-Server\"."
 
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
+msgid "Cent pro Minute"
+msgstr "Cent pro Minute"
+
 #: src/ui/client/components/TurnstileWidget.tsx
 msgid "Cloudflare Turnstile"
 msgstr "Cloudflare Turnstile"
@@ -2707,6 +2721,10 @@ msgstr "Die Telefonnummer ist zu lang."
 #~ msgid "Die vollständige Buchhaltungs-UI entsteht in Folgetickets. Die Parität ist über die gepinnte Fixture der Clean-Room-Basis abgesichert."
 #~ msgstr "Die vollständige Buchhaltungs-UI entsteht in Folgetickets. Die Parität ist über die gepinnte Fixture der Clean-Room-Basis abgesichert."
 
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
+msgid "Die Vorjahres-AfA wird als Gesamtbetrag ausgewiesen: Im Portal lassen sich Anlagen keinem Projekt zuordnen (D-85), daher erfolgt keine Verteilung auf Projekte. Gebuchte 9225-Beiträge werden außer im UV-Modus aus den Ausgaben herausgerechnet. „Cent pro Minute\" ist das Ergebnis geteilt durch die erfassten Minuten."
+msgstr "Die Vorjahres-AfA wird als Gesamtbetrag ausgewiesen: Im Portal lassen sich Anlagen keinem Projekt zuordnen (D-85), daher erfolgt keine Verteilung auf Projekte. Gebuchte 9225-Beiträge werden außer im UV-Modus aus den Ausgaben herausgerechnet. „Cent pro Minute\" ist das Ergebnis geteilt durch die erfassten Minuten."
+
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "Die Werte für die Kamera"
 msgstr "Die Werte für die Kamera"
@@ -2748,6 +2766,7 @@ msgstr "Diese Allgemeinen Geschäftsbedingungen (AGB) und Lizenzbedingungen gelt
 #~ msgstr "Diese Angaben stammen aus Ihren Einstellungen und können dort geändert werden."
 
 #: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
 msgid "Diese Auswertung konnte nicht geladen werden."
 msgstr "Diese Auswertung konnte nicht geladen werden."
 
@@ -3102,6 +3121,7 @@ msgstr "Einnahme"
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 #: src/ui/management/eur/EurMonthPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
 msgid "Einnahmen"
 msgstr "Einnahmen"
 
@@ -3128,6 +3148,10 @@ msgstr "Einnahmen und Ausgaben je Art und Monat sowie der Saldoabgleich je Zahlu
 #: src/ui/management/eur/EurReferencePanel.tsx
 msgid "Einnahmen-Arten"
 msgstr "Einnahmen-Arten"
+
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
+msgid "Einnahmen, Ausgaben und Arbeitsstunden je Projekt und Monat. Je Zelle oben Einnahmen / Ausgaben, unten Stunden / Ergebnis. Alle Beträge sind ganze Cent, alle Zeiten ganze Minuten."
+msgstr "Einnahmen, Ausgaben und Arbeitsstunden je Projekt und Monat. Je Zelle oben Einnahmen / Ausgaben, unten Stunden / Ergebnis. Alle Beträge sind ganze Cent, alle Zeiten ganze Minuten."
 
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 msgid "Einordnung der Pauschalen"
@@ -3275,6 +3299,7 @@ msgid "Erfolgreich registriert"
 msgstr "Erfolgreich registriert"
 
 #: src/ui/management/eur/EurAnalyticsPanel.tsx
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
 msgid "Ergebnis"
 msgstr "Ergebnis"
 
@@ -3335,6 +3360,7 @@ msgstr "Ermöglicht dem Empfänger dieses Links das Ändern von IPTC Titeln und 
 #: src/ui/management/eur/EurHoursPanel.tsx
 #: src/ui/management/eur/EurMonthPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
 #: src/ui/management/eur/EurReferencePanel.tsx
 #: src/ui/management/eur/EurSignaturePanel.tsx
 #: src/ui/management/eur/EurWarehousePanel.tsx
@@ -6359,6 +6385,10 @@ msgstr "Noch keine Buchungen für diese Auswertung vorhanden."
 #~ msgid "Noch keine Buchungen in diesem Monat."
 #~ msgstr "Noch keine Buchungen in diesem Monat."
 
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
+msgid "Noch keine Buchungen oder Stunden für die Projekte-Auswertung vorhanden."
+msgstr "Noch keine Buchungen oder Stunden für die Projekte-Auswertung vorhanden."
+
 #: src/ui/management/ManagementEurView.tsx
 msgid "Noch keine Buchungen. Legen Sie im Tab Buchungen die erste an."
 msgstr "Noch keine Buchungen. Legen Sie im Tab Buchungen die erste an."
@@ -7154,6 +7184,7 @@ msgstr "Prognose"
 #: src/ui/management/eur/EurEntryDialog.tsx
 #: src/ui/management/eur/EurHoursPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
 msgid "Projekt"
 msgstr "Projekt"
 
@@ -7187,6 +7218,10 @@ msgstr "Projekt löschen?"
 #: src/ui/management/ManagementProjectsBoard.tsx
 msgid "Projekte"
 msgstr "Projekte"
+
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
+msgid "Projekte-Auswertung (EUE-121)"
+msgstr "Projekte-Auswertung (EUE-121)"
 
 #: src/ui/management/components/CouponFormDrawer.tsx
 #: src/ui/management/components/GalleryCouponsTab.tsx
@@ -8073,6 +8108,10 @@ msgstr "Stunden"
 msgid "Stunden eintragen"
 msgstr "Stunden eintragen"
 
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
+msgid "Stunden ohne Projekt"
+msgstr "Stunden ohne Projekt"
+
 #: src/ui/management/eur/EurHoursPanel.tsx
 msgid "Stunden speichern"
 msgstr "Stunden speichern"
@@ -8127,6 +8166,7 @@ msgid "Sucht..."
 msgstr "Sucht..."
 
 #: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
 msgid "Summe"
 msgstr "Summe"
 
@@ -8150,6 +8190,10 @@ msgstr "Super-Admin"
 #: src/ui/management/components/UserPermissionsModal.tsx
 msgid "Super-Administratoren sind immer cross-brand (keine Brand-Bindung)."
 msgstr "Super-Administratoren sind immer cross-brand (keine Brand-Bindung)."
+
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
+msgid "SV-Bereinigung (KZ 9225)"
+msgstr "SV-Bereinigung (KZ 9225)"
 
 #: src/ui/management/eur/EurOverviewPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
@@ -8922,6 +8966,10 @@ msgstr "Vorgänge wie Ausgleich oder Fristverlängerung bleiben hier übersichtl
 msgid "vorhanden"
 msgstr "vorhanden"
 
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
+msgid "Vorjahres-AfA"
+msgstr "Vorjahres-AfA"
+
 #: src/ui/management/ManagementContractView.tsx
 msgid "Vorlage"
 msgstr "Vorlage"
@@ -9608,6 +9656,10 @@ msgstr "Zwischensumme"
 #: src/ui/client/components/CartItemList.tsx
 msgid "Zwischensumme: {formattedTotalAmount}"
 msgstr "Zwischensumme: {formattedTotalAmount}"
+
+#: src/ui/management/eur/EurProjectAnalyticsPanel.tsx
+msgid "Δ Abweichung Projekte: {deviation}."
+msgstr "Δ Abweichung Projekte: {deviation}."
 
 #. placeholder {0}: cents(matrix.delta_cents)
 #: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx

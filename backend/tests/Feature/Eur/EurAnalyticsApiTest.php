@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Eur;
 
+use App\Models\EurAsset;
+use App\Models\EurAssetYear;
 use App\Models\EurCustomer;
 use App\Models\EurEntry;
+use App\Models\EurHour;
 use App\Models\EurProject;
 use App\Support\BrandRegistry;
 
@@ -192,5 +195,186 @@ class EurAnalyticsApiTest extends EurBookkeepingTestCase
             ->getJson('/api/management/eur/analytics?year=2027')
             ->assertUnprocessable()
             ->assertJsonValidationErrors('year');
+    }
+
+    // ── EUE-121: Projekt × Monat ─────────────────────────────────────────
+
+    public function test_by_project_requires_authentication(): void
+    {
+        $this->getJson('/api/management/eur/analytics/by-project?year=2026')->assertUnauthorized();
+    }
+
+    public function test_by_project_is_tenant_isolated(): void
+    {
+        $token = $this->tokenFor();
+        $brand = BrandRegistry::currentId();
+
+        $customer = EurCustomer::create(['brand' => $brand, 'name' => 'Eigener Kunde']);
+        $project = EurProject::create([
+            'brand' => $brand, 'eur_customer_id' => $customer->id, 'name' => 'Sichtbares Projekt',
+        ]);
+
+        EurEntry::create([
+            'brand' => $brand, 'year' => 2026, 'month' => 3, 'day' => 5,
+            'direction' => 'income', 'kind_type' => 'Honorar', 'e1a_code' => '9040',
+            'business_share' => 100, 'amount_cents' => 10000, 'business_amount_cents' => 10000,
+            'eur_customer_id' => $customer->id, 'eur_project_id' => $project->id,
+        ]);
+        EurHour::create([
+            'brand' => $brand, 'year' => 2026, 'month' => 3, 'day' => 5, 'minutes' => 60,
+            'project' => 'Sichtbares Projekt',
+        ]);
+
+        EurEntry::create([
+            'brand' => self::OTHER_BRAND, 'year' => 2026, 'month' => 3, 'day' => 5,
+            'direction' => 'income', 'kind_type' => 'Honorar', 'e1a_code' => '9040',
+            'business_share' => 100, 'amount_cents' => 999999, 'business_amount_cents' => 999999,
+        ]);
+        EurHour::create([
+            'brand' => self::OTHER_BRAND, 'year' => 2026, 'month' => 3, 'day' => 5,
+            'minutes' => 9999, 'project' => 'Fremdes Projekt',
+        ]);
+
+        $response = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/analytics/by-project?year=2026');
+
+        $response->assertOk()
+            ->assertJsonPath('projects.0.project', 'Sichtbares Projekt')
+            ->assertJsonPath('totals.income_cents', 10000)
+            ->assertJsonPath('totals.hours_minutes', 60);
+
+        $raw = (string) json_encode($response->json());
+        $this->assertStringNotContainsString('999999', $raw);
+        $this->assertStringNotContainsString('Fremdes Projekt', $raw);
+        $this->assertStringNotContainsString('9999', $raw);
+    }
+
+    public function test_by_project_excludes_9225_in_the_default_sv_mode(): void
+    {
+        $token = $this->tokenFor();
+        $brand = BrandRegistry::currentId();
+
+        $customer = EurCustomer::create(['brand' => $brand, 'name' => 'Kunde 9225']);
+        $project = EurProject::create([
+            'brand' => $brand, 'eur_customer_id' => $customer->id, 'name' => 'SV-Projekt',
+        ]);
+
+        foreach ([
+            ['income', '9040', 20000],
+            ['expense', '9225', 3000],
+            ['expense', '9230', 2000],
+        ] as [$direction, $code, $amount]) {
+            EurEntry::create([
+                'brand' => $brand, 'year' => 2026, 'month' => 4, 'day' => 5,
+                'direction' => $direction, 'kind_type' => 'Buchung', 'e1a_code' => $code,
+                'business_share' => 100, 'amount_cents' => $amount, 'business_amount_cents' => $amount,
+                'eur_customer_id' => $customer->id, 'eur_project_id' => $project->id,
+            ]);
+        }
+
+        $response = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/analytics/by-project?year=2026');
+
+        $response->assertOk()
+            ->assertJsonPath('sv_excluded_cents', 3000)
+            ->assertJsonPath('totals.income_cents', 20000)
+            ->assertJsonPath('totals.expense_cents', 2000)
+            ->assertJsonPath('totals.result_cents', 18000)
+            ->assertJsonPath('projects.0.months.3.expense_cents', 2000)
+            ->assertJsonPath('match', true);
+    }
+
+    public function test_by_project_returns_whole_cent_and_minute_shape(): void
+    {
+        $token = $this->tokenFor();
+        $brand = BrandRegistry::currentId();
+
+        $customer = EurCustomer::create(['brand' => $brand, 'name' => 'Kunde Shape']);
+        $project = EurProject::create([
+            'brand' => $brand, 'eur_customer_id' => $customer->id, 'name' => 'Shape Projekt',
+        ]);
+
+        EurEntry::create([
+            'brand' => $brand, 'year' => 2026, 'month' => 1, 'day' => 5,
+            'direction' => 'income', 'kind_type' => 'Honorar', 'e1a_code' => '9040',
+            'business_share' => 100, 'amount_cents' => 10000, 'business_amount_cents' => 10000,
+            'eur_customer_id' => $customer->id, 'eur_project_id' => $project->id,
+        ]);
+        EurEntry::create([
+            'brand' => $brand, 'year' => 2026, 'month' => 1, 'day' => 6,
+            'direction' => 'expense', 'kind_type' => 'Büro', 'e1a_code' => '9230',
+            'business_share' => 100, 'amount_cents' => 5000, 'business_amount_cents' => 5000,
+            'eur_customer_id' => $customer->id, 'eur_project_id' => $project->id,
+        ]);
+        EurHour::create([
+            'brand' => $brand, 'year' => 2026, 'month' => 1, 'day' => 5,
+            'minutes' => 180, 'project' => 'Shape Projekt',
+        ]);
+        EurHour::create([
+            'brand' => $brand, 'year' => 2026, 'month' => 2, 'day' => 5, 'minutes' => 60,
+        ]);
+
+        $asset = EurAsset::create([
+            'brand' => $brand, 'name' => 'ASSET-121', 'invoice_no' => 'RE-121', 'supplier' => 'Lieferant',
+            'purchase_date' => '2024-01-15', 'cost_cents' => 100000, 'useful_life_years' => 3,
+            'business_share' => 100, 'method' => 'linear',
+        ]);
+        EurAssetYear::create([
+            'brand' => $brand, 'eur_asset_id' => $asset->id, 'year' => 2025, 'method' => 'linear',
+            'depreciation_cents' => 12345, 'book_value_cents' => 0,
+            'private_use_percent' => 0, 'private_use_cents' => 0,
+            'business_use_cents' => 12345, 'status' => 'booked',
+        ]);
+        EurAssetYear::create([
+            'brand' => $brand, 'eur_asset_id' => $asset->id, 'year' => 2024, 'method' => 'linear',
+            'depreciation_cents' => 7777, 'book_value_cents' => 0,
+            'private_use_percent' => 0, 'private_use_cents' => 0,
+            'business_use_cents' => 7777, 'status' => 'planned',
+        ]);
+        EurAssetYear::create([
+            'brand' => $brand, 'eur_asset_id' => $asset->id, 'year' => 2026, 'method' => 'linear',
+            'depreciation_cents' => 5555, 'book_value_cents' => 0,
+            'private_use_percent' => 0, 'private_use_cents' => 0,
+            'business_use_cents' => 5555, 'status' => 'booked',
+        ]);
+
+        $response = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/analytics/by-project?year=2026');
+
+        $response->assertOk()
+            ->assertJsonPath('year', 2026)
+            ->assertJsonPath('projects.0.project', 'Shape Projekt')
+            ->assertJsonCount(12, 'projects.0.months')
+            ->assertJsonCount(12, 'month_totals')
+            ->assertJsonPath('projects.0.months.0.income_cents', 10000)
+            ->assertJsonPath('projects.0.months.0.expense_cents', 5000)
+            ->assertJsonPath('projects.0.months.0.hours_minutes', 180)
+            ->assertJsonPath('projects.0.months.0.result_cents', 5000)
+            ->assertJsonPath('projects.0.months.0.result_per_hour_cents', 27)
+            ->assertJsonPath('month_totals.0.result_cents', 5000)
+            ->assertJsonPath('totals.income_cents', 10000)
+            ->assertJsonPath('totals.expense_cents', 5000)
+            ->assertJsonPath('totals.hours_minutes', 240)
+            ->assertJsonPath('totals.result_cents', 5000)
+            ->assertJsonPath('totals.result_per_hour_cents', 20)
+            ->assertJsonPath('undistributed_hours_minutes', 60)
+            ->assertJsonPath('prior_year_afa_cents', 12345)
+            ->assertJsonPath('sv_excluded_cents', 0)
+            ->assertJsonPath('match', true);
+
+        foreach (['income_cents', 'expense_cents', 'hours_minutes', 'result_cents', 'result_per_hour_cents'] as $key) {
+            $this->assertIsInt($response->json('totals.'.$key));
+        }
+        foreach (['income_cents', 'expense_cents', 'hours_minutes', 'result_cents'] as $key) {
+            $this->assertIsInt($response->json('projects.0.months.0.'.$key));
+        }
+        $this->assertIsInt($response->json('undistributed_hours_minutes'));
+        $this->assertIsInt($response->json('prior_year_afa_cents'));
+        $this->assertIsInt($response->json('sv_excluded_cents'));
+
+        $codes = array_column($response->json('checks'), 'code');
+        $this->assertContains('P121-INCOME', $codes);
+        $this->assertContains('P121-EXPENSE', $codes);
+        $this->assertContains('P121-HOURS', $codes);
     }
 }
