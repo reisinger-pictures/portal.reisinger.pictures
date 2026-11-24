@@ -138,6 +138,15 @@ degressive_business_cents}` sowie `suggested_category` aus dem gepinnten
 Katalog (keine hartcodierte Kategorie). Neue Anlagegüter übernehmen den
 Kategorievorschlag, sofern nichts anderes angegeben wird.
 
+Bei `scope = private` erzeugt das Portal den Eigenbeleg **automatisch** mit dem
+AfA-Plan (beim Anlegen und beim Jahreswechsel, `EurAssetEigenbelegService`);
+die Jahreszeile trägt `eigenbeleg_no`, `theoretical_depreciation_cents`,
+`usage_percent` (`100 - private_use_percent`), `eigenbeleg_cents` und
+`eigenbeleg_created_at`. `POST /assets/{id}/book-depreciation` bleibt erhalten,
+meldet bei einem automatisch erzeugten Eigenbeleg aber `already_created: true`
+und schreibt kein zweites Mal. Es entsteht keine Journalbuchung und keine
+Gewinnminderung.
+
 Die Antwort enthält je Anlage `warnings: [{code, text}]`. Neben EUE-053/058
 meldet `AssetPlausibility` die nicht blockierenden Hinweise EUE-056
 (Vorjahres-AfA weicht vom gepinnten Plan um mehr als 1 Cent ab) und EUE-057

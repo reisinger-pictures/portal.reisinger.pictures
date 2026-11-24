@@ -249,10 +249,15 @@ Felder `eigenbeleg_no` (`EB-{assetId}-{year}`),
 `theoretical_depreciation_cents` (geplante AfA des Jahres), `usage_percent`
 (betrieblicher Nutzungsanteil des Jahres, ganzzahlige Prozent),
 `eigenbeleg_cents` (theoretische AfA × Nutzungsanteil, kaufmännisch auf ganze
-Cent gerundet) und `eigenbeleg_created_at`. Der Eigenbeleg wird über die
-bestehende Buchungsaktion des Jahres erzeugt und ist über
-`eigenbeleg_created_at` idempotent. Bei `scope = business` bleibt die bisherige
-AfA-Buchung mit `eur_entry_id` unverändert.
+Cent gerundet) und `eigenbeleg_created_at`. Der Eigenbeleg wird **automatisch ohne
+Benutzeraktion** erzeugt — beim Anlegen des AfA-Plans und beim Jahreswechsel
+über `EurAssetEigenbelegService` — und ist über `eigenbeleg_created_at`
+idempotent. Die bestehende Buchungsaktion des Jahres bleibt als Endpunkt
+erhalten, meldet bei einem bereits automatisch erzeugten Eigenbeleg aber
+`already_created` und schreibt kein zweites Mal. Der Eigentümer hat die Formel
+am 2026-11-24 bestätigt: maßgeblich ist der **betriebliche** Anteil
+(`100 - private_use_percent`), nicht der Privatanteil. Bei `scope = business`
+bleibt die bisherige AfA-Buchung mit `eur_entry_id` unverändert.
 
 Eine neue Tabelle `eur_asset_documents` verknüpft `eur_asset_id` und
 `eur_document_id` (beide FKs, `brand`, eindeutig je Paar). Sie hat **keine**

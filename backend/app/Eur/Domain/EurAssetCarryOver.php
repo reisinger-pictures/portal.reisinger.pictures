@@ -8,6 +8,7 @@ use App\Eur\Parity\RuleValues;
 use App\Eur\Support\Share;
 use App\Models\EurAsset;
 use App\Models\EurAssetYear;
+use App\Services\Eur\EurAssetEigenbelegService;
 
 /**
  * EAR · idempotenter Jahreswechsel der Anlagenverzeichnisse (D-85).
@@ -20,7 +21,10 @@ use App\Models\EurAssetYear;
  */
 final class EurAssetCarryOver
 {
-    public function __construct(private readonly DepreciationCalculator $calculator = new DepreciationCalculator(new RuleValues)) {}
+    public function __construct(
+        private readonly DepreciationCalculator $calculator = new DepreciationCalculator(new RuleValues),
+        private readonly EurAssetEigenbelegService $eigenbelegService = new EurAssetEigenbelegService,
+    ) {}
 
     /**
      * @return int Anzahl der neu angelegten Jahreszeilen
@@ -71,6 +75,12 @@ final class EurAssetCarryOver
                 'status' => 'planned',
             ],
         );
+
+        // D-85/EUE-055: der Eigenbeleg des privaten Verzeichnisses entsteht
+        // automatisch mit der neuen Jahreszeile, ohne Benutzeraktion.
+        if ($row->wasRecentlyCreated && ($row->scope ?? $asset->scope) === 'private') {
+            $this->eigenbelegService->createForYear($asset, $row);
+        }
 
         return $row->wasRecentlyCreated;
     }

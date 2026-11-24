@@ -17,6 +17,7 @@ use App\Models\EurAssetYear;
 use App\Models\EurAuditLog;
 use App\Models\EurDocument;
 use App\Models\EurEntry;
+use App\Services\Eur\EurAssetEigenbelegService;
 use App\Support\BrandRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,6 +34,8 @@ use Illuminate\Validation\Rule;
  */
 class EurAssetController extends Controller
 {
+    public function __construct(private readonly EurAssetEigenbelegService $eigenbelegService) {}
+
     public function index(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -279,34 +282,17 @@ class EurAssetController extends Controller
      */
     private function bookPrivateEigenbeleg(EurAsset $asset, EurAssetYear $plan, int $year): JsonResponse
     {
-        if ($plan->eigenbeleg_created_at !== null) {
-            return response()->json([
-                'eigenbeleg' => $this->serializeEigenbeleg($plan),
-                'already_created' => true,
+        $result = $this->eigenbelegService->createForYear($asset, $plan);
+
+        if (! $result['already_created']) {
+            $this->audit('eigenbeleg_created', $asset, [
+                'year' => $year,
+                'eigenbeleg_no' => $plan->eigenbeleg_no,
+                'eigenbeleg_cents' => $plan->eigenbeleg_cents,
             ]);
         }
 
-        $theoreticalCents = (int) $plan->depreciation_cents;
-        $usagePercent = 100 - (int) $plan->private_use_percent;
-
-        $plan->forceFill([
-            'eigenbeleg_no' => sprintf('EB-%d-%d', $asset->id, $year),
-            'theoretical_depreciation_cents' => $theoreticalCents,
-            'usage_percent' => $usagePercent,
-            'eigenbeleg_cents' => Share::apply($theoreticalCents, $usagePercent),
-            'eigenbeleg_created_at' => now(),
-        ])->save();
-
-        $this->audit('eigenbeleg_created', $asset, [
-            'year' => $year,
-            'eigenbeleg_no' => $plan->eigenbeleg_no,
-            'eigenbeleg_cents' => $plan->eigenbeleg_cents,
-        ]);
-
-        return response()->json([
-            'eigenbeleg' => $this->serializeEigenbeleg($plan),
-            'already_created' => false,
-        ], 201);
+        return response()->json($result, $result['already_created'] ? 200 : 201);
     }
 
     public function destroy(int $id): JsonResponse
@@ -496,7 +482,7 @@ class EurAssetController extends Controller
         foreach ($plan as $row) {
             $privateCents = Share::apply($row['depreciation_cents'], $privatePercent);
 
-            EurAssetYear::create([
+            $yearRow = EurAssetYear::create([
                 'brand' => $asset->brand,
                 'eur_asset_id' => $asset->id,
                 'year' => $purchaseYear + $row['year'] - 1,
@@ -509,6 +495,12 @@ class EurAssetController extends Controller
                 'business_use_cents' => $row['depreciation_cents'] - $privateCents,
                 'status' => 'planned',
             ]);
+
+            // D-85/EUE-055: im privaten Verzeichnis entsteht der Eigenbeleg
+            // automatisch mit dem Plan — ohne Benutzeraktion und ohne Buchung.
+            if ($asset->scope === 'private') {
+                $this->eigenbelegService->createForYear($asset, $yearRow);
+            }
         }
     }
 
@@ -584,22 +576,6 @@ class EurAssetController extends Controller
         }
 
         return $categories[0];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function serializeEigenbeleg(EurAssetYear $year): array
-    {
-        return [
-            'year' => (int) $year->year,
-            'eigenbeleg_no' => $year->eigenbeleg_no,
-            'theoretical_depreciation_cents' => $year->theoretical_depreciation_cents === null
-                ? null : (int) $year->theoretical_depreciation_cents,
-            'usage_percent' => $year->usage_percent === null ? null : (int) $year->usage_percent,
-            'eigenbeleg_cents' => $year->eigenbeleg_cents === null ? null : (int) $year->eigenbeleg_cents,
-            'eigenbeleg_created_at' => $year->eigenbeleg_created_at?->toIso8601String(),
-        ];
     }
 
     /**
