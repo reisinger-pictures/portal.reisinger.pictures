@@ -10,6 +10,16 @@ import { SidebarHelper } from '../../helpers/SidebarHelper';
  * über die UI, ordnet beide Güter zu und prüft den einen Eigenbeleg je Jahr.
  * Alle Locators sind auf <main> und den Panel-testid gescopt (D-10). E2E läuft
  * hostbedingt ausschließlich in CI (RAM-Policy).
+ *
+ * Flaky-Dokumentation (AGENTS.md, E2E workflow 4):
+ * `frontend/tests/e2e/admin/eur/eur-asset-groups.spec.ts` — "private Gruppe
+ * bündelt zwei Güter zu einem Eigenbeleg je Jahr": Der create-Handler in
+ * `EurAssetGroupsPanel.tsx` ist asynchron (POST + `revalidateEur()`), `click()`
+ * wartet jedoch nicht auf den DB-Commit. Der direkte API-GET konnte die Gruppe
+ * daher noch nicht sehen und `expect(group).toBeDefined()` schlug fehl.
+ * Beobachtet in den CI-Runs 45570120314 (3/3 Fehlschläge) und 45572439612
+ * (2/3 Fehlschläge, grün erst mit Retry) auf Head 2105e91c. Der Test wartet
+ * jetzt auf die UI-Erfolgsmeldung und wiederholt den API-Read per `expect.poll`.
  */
 test.describe('EAR · Anlagegruppen (D-89)', () => {
     let helper: E2ESessionHelper;
@@ -71,14 +81,21 @@ test.describe('EAR · Anlagegruppen (D-89)', () => {
         await createForm.locator('input[type="text"]').fill(groupName);
         await createForm.locator('select').selectOption('30');
         await createForm.getByRole('button', { name: 'Gruppe anlegen' }).click();
+        // Der create-Handler ist asynchron (POST + revalidateEur()); click()
+        // wartet nicht auf den Commit. Die Erfolgsmeldung der UI ist das Signal.
+        const createdMessage = panel.getByRole('status')
+            .getByText(`Gruppe ${groupName} wurde angelegt.`, { exact: true });
+        await expect(createdMessage).toBeVisible();
 
-        const groupsResponse = await page.request.get('/api/management/eur/asset-groups', { headers });
-        expect(groupsResponse.ok()).toBe(true);
-        const groups = await groupsResponse.json() as {
-            groups: Array<{ id: number; name: string; scope: string }>;
-        };
-        const group = groups.groups.find((entry) => entry.name === groupName);
-        expect(group).toBeDefined();
+        type AssetGroup = { id: number; name: string; scope: string };
+        let group: AssetGroup | undefined;
+        await expect.poll(async () => {
+            const response = await page.request.get('/api/management/eur/asset-groups', { headers });
+            expect(response.ok()).toBe(true);
+            const body = await response.json() as { groups: AssetGroup[] };
+            group = body.groups.find((entry) => entry.name === groupName);
+            return group !== undefined;
+        }, { message: `Gruppe ${groupName} muss in der API vorhanden sein` }).toBe(true);
         expect(group?.scope).toBe('private');
 
         const card = panel.getByTestId(`eur-asset-group-${group?.id}`);
