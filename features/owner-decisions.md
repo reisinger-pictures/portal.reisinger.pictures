@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-93. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-94. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -635,3 +635,12 @@ This decision fixes the depreciation method only. It does **not** introduce a
 new private↔business transition workflow: the existing scope/business-share
 handling, the Entnahme, the Eigenbeleg and `EurAssetCarryOver` remain unchanged.
 A separate transition endpoint design would be a separate owner decision.
+
+### D-94: No external tax review as an acceptance gate
+
+The owner decided on 2026-11-25 (issue #61) that the external tax review is
+**not performed**. It is therefore no longer an acceptance gate for the EÜR
+work. The portal still makes no claim of tax correctness: the values are the
+pinned ODS/cleanroom rules, and the manual entry in FinanzOnline under D-91
+remains the owner's responsibility. This decision changes no cleanroom
+artifact and no calculation rule.

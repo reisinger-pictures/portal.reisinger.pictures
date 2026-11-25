@@ -132,5 +132,7 @@ acht Kennzahlen und die Zahllast:
 ## Vorbehalt
 
 Die externe steuerliche Prüfung von Tarif, Pauschalen, AfA/Nutzungsdauer/GWG
-und Privatnutzung bleibt ein dokumentierter Vorbehalt und eine Abnahmebedingung
-für „vollständig", kein Blocker für die Implementierung.
+und Privatnutzung wird laut D-94 nicht durchgeführt und ist keine
+Abnahmebedingung mehr. Das Portal erhebt weiterhin keine Aussage über
+steuerliche Richtigkeit; die manuelle Eintragung in FinanzOnline bleibt die
+Verantwortung des Eigentümers (D-91).

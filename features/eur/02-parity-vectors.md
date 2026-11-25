@@ -61,7 +61,7 @@ Erwartet: 48 grüne Tests — 45 benannte Vektoren, den Zähler für 16 Szenarie
 
 ## Abgrenzung
 
-Die Fixture ist die Paritätsreferenz der gepinnten Vektoren. Die fachlichen Domain-Services liegen in `backend/app/Eur/`; die Parität prüft ihre Ergebnisse gegen die Fixture. Unit-Referenz ist `CleanRoomParityTest`, Smoke-Referenz ist die `#[Group('smoke')]`-Markierung desselben Tests. Eine Playwright-Referenz existiert nicht: es gibt im Repository kein E2E-Muster für Fixture-Parität, und Frontend-E2E-Änderungen sind ausdrücklich einem gesonderten, CI-gesteuerten Change vorbehalten. Die externe steuerliche Prüfung bleibt ein dokumentierter Vorbehalt, kein Blocker.
+Die Fixture ist die Paritätsreferenz der gepinnten Vektoren. Die fachlichen Domain-Services liegen in `backend/app/Eur/`; die Parität prüft ihre Ergebnisse gegen die Fixture. Unit-Referenz ist `CleanRoomParityTest`, Smoke-Referenz ist die `#[Group('smoke')]`-Markierung desselben Tests. Eine Playwright-Referenz existiert nicht: es gibt im Repository kein E2E-Muster für Fixture-Parität, und Frontend-E2E-Änderungen sind ausdrücklich einem gesonderten, CI-gesteuerten Change vorbehalten. Die externe steuerliche Prüfung wird laut D-94 nicht durchgeführt und ist kein Abnahmegate mehr; das Portal erhebt keine steuerliche Richtigkeitsaussage.
 
 ## Verweise
 

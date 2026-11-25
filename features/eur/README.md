@@ -50,5 +50,5 @@ Verträge und den unveränderlichen, versionierten Dokumentenstand.
 - Es gibt keine zweite, redaktionell gepflegte Regelquelle; Regeln werden über ihre IDs referenziert, nicht umformuliert.
 - Es werden keine Formeln, keine Neuberechnung der Basis und kein Engine-Code übernommen.
 - Die Paritäts-Fixture ist die einzige Grundlage der Portal-Unit-Tests.
-- Parität gilt als `covered` erst mit Smoke- und Playwright-Referenz; die externe steuerliche Prüfung bleibt dokumentierter Vorbehalt, kein Blocker.
+- Parität gilt als `covered` erst mit Smoke- und Playwright-Referenz; die externe steuerliche Prüfung wird laut D-94 nicht durchgeführt und ist kein Abnahmegate mehr.
 - In portal-eigenem Code, Dokumentation, Commits und GitHub-Kommentaren wird ausschließlich die Bezeichnung „Clean-Room-Basis" verwendet. Der gepinnte Dokumentenstand ist ein unveränderlicher Fremdartefakt und davon ausgenommen.

@@ -113,4 +113,4 @@ Dieselbe Prüfung läuft als Unit-Test: `php artisan test --filter=CleanRoomFixt
   Playwright-Referenz für Fixture-Parität gibt es in diesem Repository nicht und
   ist einem gesonderten Frontend-Change vorbehalten (siehe
   [02-parity-vectors.md](02-parity-vectors.md)).
-- Die externe steuerliche Prüfung bleibt ein dokumentierter Vorbehalt, kein Blocker.
+- Die externe steuerliche Prüfung wird laut D-94 nicht durchgeführt und ist kein Abnahmegate mehr; das Portal erhebt keine steuerliche Richtigkeitsaussage.
