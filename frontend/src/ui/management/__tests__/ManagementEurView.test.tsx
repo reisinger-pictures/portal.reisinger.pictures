@@ -407,7 +407,8 @@ describe('ManagementEurView', () => {
 
         await userEvent.click(screen.getByRole('tab', {name: 'Anlagen'}));
         expect(view.getByRole('heading', {name: 'Abschreibung vergleichen', level: 2})).toBeVisible();
-        expect(view.getByText(/unter 1.000 €/)).toBeVisible();
+        expect(view.getByText(/Anschaffungen unter 1\.000 € können Sie nur im Jahr des Kaufs direkt als Ausgabe erfassen/)).toBeVisible();
+        expect(view.getByText(/Privatanlagen werden immer linear über die Nutzungsjahre abgeschrieben/)).toBeVisible();
 
         await userEvent.click(screen.getByRole('tab', {name: 'Monat'}));
         expect(view.getByRole('heading', {name: 'Monatsabschluss', level: 2})).toBeVisible();

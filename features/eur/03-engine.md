@@ -111,7 +111,12 @@ acht Kennzahlen und die Zahllast:
 
 - Lineare AfA mit Halbjahresfaktor 1 bzw. 0,5 (EUE-049); Restbuchwert mit
   Erinnerungswert 0,01 € (EUE-050); GWG-Hinweis unter 1.000 €, genau 1.000 €
-  löst keinen Hinweis aus (EUE-051).
+  löst keinen Hinweis aus (EUE-051). Nach D-93 erscheint der Hinweis nur im
+  Erwerbsjahr, und Privatanlagen (`scope === 'private'` bzw. veraltet
+  `is_private_investment`) werden immer linear über die Nutzungsjahre
+  abgeschrieben — nie als GWG-Sofortausgabe, nie degressiv. D-93 betrifft
+  ausschließlich die Abschreibungsmethode; Scope/Betriebsanteil, Entnahme,
+  Eigenbeleg und `EurAssetCarryOver` bleiben unverändert.
 - Nutzungsdauer 0 oder 2–99, AfA-Kennzahl und Mindestbetriebsanteil 50 %
   (EUE-052 … EUE-054).
 - Degressive AfA (DEG-001 … DEG-015): Satz 1–30 %, konstant, halbe Jahres-AfA

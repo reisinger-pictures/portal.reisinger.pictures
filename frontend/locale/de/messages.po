@@ -897,8 +897,12 @@ msgstr "Anschaffung"
 #~ msgstr "Anschaffungen bis 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
 
 #: src/ui/management/ManagementEurView.tsx
-msgid "Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
-msgstr "Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
+#~ msgid "Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
+#~ msgstr "Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen."
+
+#: src/ui/management/ManagementEurView.tsx
+msgid "Anschaffungen unter 1.000 € können Sie nur im Jahr des Kaufs direkt als Ausgabe erfassen. Privatanlagen werden immer linear über die Nutzungsjahre abgeschrieben."
+msgstr "Anschaffungen unter 1.000 € können Sie nur im Jahr des Kaufs direkt als Ausgabe erfassen. Privatanlagen werden immer linear über die Nutzungsjahre abgeschrieben."
 
 #: src/ui/management/eur/EurDepreciationPanel.tsx
 msgid "Anschaffungsjahr im Vergleich"

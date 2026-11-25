@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Eur;
 
+use App\Eur\Domain\DepreciationCalculator;
+use App\Eur\Parity\RuleValues;
+use App\Eur\Support\Share;
 use App\Models\EurAsset;
 use App\Models\EurAssetYear;
 use App\Models\EurEntry;
+use App\Services\Eur\EurAssetCreationService;
+use App\Support\BrandRegistry;
 
 /** #34: Anzeige statt Rechner, Kategorievorschlag, Einmal-Wechsel, Privat-AV, Jahresbuchung. */
 class EurAssetPrivateInvestmentTest extends EurBookkeepingTestCase
@@ -157,13 +162,85 @@ class EurAssetPrivateInvestmentTest extends EurBookkeepingTestCase
         )->assertUnprocessable();
     }
 
-    private function createAsset(string $name, string $method, bool $private = false, int $share = 100): EurAsset
+    /**
+     * D-93: die Abschreibungsmethode ist der einzige Unterschied. Ein
+     * privates Gut bleibt linear (inklusive Eigenbeleg), ein Betriebsgut
+     * gleicher Daten behält den degressiven Plan.
+     */
+    public function test_a_private_asset_is_always_linear_even_with_a_degressive_request(): void
     {
+        $purchaseDate = '2026-07-15';
+        $this->tokenFor();
+
+        // Die API lehnt `degressive` bei einem Betriebsanteil unter 50 % vor
+        // dem Plan ab; der Plan selbst ist die einzige Regelquelle für D-93
+        // und wird hier direkt über den gemeinsamen Anlagepfad geschrieben.
+        $private = EurAsset::create([
+            'brand' => BrandRegistry::currentId(),
+            'name' => 'Privat-Degressiv',
+            'invoice_no' => 'R-Privat-Degressiv',
+            'supplier' => 'Lieferant',
+            'purchase_date' => $purchaseDate,
+            'cost_cents' => 240000,
+            'useful_life_years' => 3,
+            'business_share' => 30,
+            'scope' => 'private',
+            'method' => DepreciationCalculator::METHOD_DEGRESSIVE,
+            'degressive_rate' => 3000,
+        ]);
+        app(EurAssetCreationService::class)->writePlan(
+            $private,
+            new DepreciationCalculator(new RuleValues),
+            7,
+        );
+
+        $business = $this->createAsset('Betrieb-Degressiv', 'degressive', false, 100, $purchaseDate);
+
+        $this->assertSame('private', $private->scope);
+        $this->assertSame('business', $business->scope);
+
+        // 240000 ct / 3 Jahre, Anschaffung in der zweiten Jahreshälfte:
+        // Halbjahresregel im ersten Jahr, Restabschreibung im letzten Jahr.
+        $linear = [40000, 80000, 119999];
+        $degressive = [36000, 61200, 142799];
+
+        foreach ([0, 1, 2] as $index) {
+            $year = 2026 + $index;
+
+            $privateYear = EurAssetYear::forCurrentBrand()
+                ->where('eur_asset_id', $private->id)
+                ->where('year', $year)
+                ->firstOrFail();
+            $this->assertSame('linear', $privateYear->method);
+            $this->assertSame($linear[$index], (int) $privateYear->depreciation_cents);
+            // Der Eigenbeleg dokumentiert die lineare AfA des Jahres.
+            $this->assertSame($linear[$index], (int) $privateYear->theoretical_depreciation_cents);
+            $this->assertSame(30, (int) $privateYear->usage_percent);
+            $this->assertSame(Share::apply($linear[$index], 30), (int) $privateYear->eigenbeleg_cents);
+            $this->assertSame('EB-'.$private->id.'-'.$year, $privateYear->eigenbeleg_no);
+
+            $businessYear = EurAssetYear::forCurrentBrand()
+                ->where('eur_asset_id', $business->id)
+                ->where('year', $year)
+                ->firstOrFail();
+            $this->assertSame('degressive', $businessYear->method);
+            $this->assertSame($degressive[$index], (int) $businessYear->depreciation_cents);
+            $this->assertNull($businessYear->eigenbeleg_no);
+        }
+    }
+
+    private function createAsset(
+        string $name,
+        string $method,
+        bool $private = false,
+        int $share = 100,
+        string $purchaseDate = '2026-01-15',
+    ): EurAsset {
         $payload = [
             'name' => $name,
             'invoice_no' => 'R-'.$name,
             'supplier' => 'Lieferant',
-            'purchase_date' => '2026-01-15',
+            'purchase_date' => $purchaseDate,
             'cost_cents' => 240000,
             'useful_life_years' => 3,
             'business_share' => $share,

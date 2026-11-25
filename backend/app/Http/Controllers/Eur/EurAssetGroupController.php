@@ -79,6 +79,10 @@ class EurAssetGroupController extends Controller
                 // Gebuchte Jahre bleiben unberührt; nur offene Planzeilen
                 // folgen dem neuen Gruppenanteil.
                 $this->creationService->recalculateUnbookedPlanShares($member);
+                // D-93: wird das Mitglied durch den neuen Anteil privat, so
+                // wird sein degressiver Plan automatisch linear (kein neuer
+                // Übergangs-Endpunkt). Der Guard oben sperrt gebuchte Jahre.
+                $this->creationService->convertUnbookedPlanToLinear($member);
             }
             $this->service->sync($group);
             $this->audit('group_updated', $group);

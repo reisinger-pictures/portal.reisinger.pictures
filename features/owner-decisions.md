@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-92. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-93. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -614,3 +614,24 @@ not as an approved test, and no result is inferred from that classification.
 - The five environment keys keep safe defaults; the effective production
   values and the host-side checks are human gates. The contract is in
   [Registration hardening](auth/05-registration-hardening.md).
+
+### D-93: GWG only in the acquisition year; private assets always linear
+
+The owner decided on 2026-11-25 (issue #55) that immediate expensing is a
+**depreciation-method** rule with two boundaries:
+
+- The GWG hint suggesting immediate expensing applies **only in the asset's
+  acquisition year** (`purchase_date` year equals the displayed/selected year).
+  In later years no GWG badge and no GWG hint are shown.
+- An asset in the private directory (`scope === 'private'`, or the legacy
+  `is_private_investment === true`) is **always depreciated linearly over its
+  useful life** — never treated as an immediate GWG expense and never with a
+  degressive plan. For a group member the effective (group) business share
+  determines whether it is private; if a later group-share change makes it
+  private, its open plan and the asset's method become linear automatically,
+  while booked years stay untouched.
+
+This decision fixes the depreciation method only. It does **not** introduce a
+new private↔business transition workflow: the existing scope/business-share
+handling, the Entnahme, the Eigenbeleg and `EurAssetCarryOver` remain unchanged.
+A separate transition endpoint design would be a separate owner decision.

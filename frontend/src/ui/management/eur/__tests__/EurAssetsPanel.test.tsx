@@ -259,6 +259,34 @@ describe('EurAssetsPanel (#34)', () => {
         expect(within(low as HTMLElement).getByRole('button', {name: 'AfA buchen'})).toBeEnabled();
     });
 
+    it('zeigt GWG nur im Erwerbsjahr und nie für Privatanlagen (D-93)', () => {
+        const hint = '• Unter GWG-Grenze (1000€) - evtl. sofort im A-Blatt erfassen';
+        setAssets(
+            asset({id: 1, name: 'Privat-GWG', cost_cents: 80000, business_share: 30, scope: 'private'}),
+            asset({id: 2, name: 'Betrieb-GWG-Späterjahr', cost_cents: 80000, purchase_date: '2025-01-15'}),
+            asset({id: 3, name: 'Betrieb-GWG-Erwerbsjahr', cost_cents: 80000}),
+        );
+
+        renderWithProviders(<EurAssetsPanel year={2026}/>);
+
+        const rowOf = (name: string): HTMLElement => {
+            const row = screen.getByText(name).closest('tr');
+            expect(row).not.toBeNull();
+            return row as HTMLElement;
+        };
+        const privateRow = rowOf('Privat-GWG');
+        const laterRow = rowOf('Betrieb-GWG-Späterjahr');
+        const acquisitionRow = rowOf('Betrieb-GWG-Erwerbsjahr');
+
+        for (const row of [privateRow, laterRow]) {
+            expect(within(row).queryByText('GWG')).not.toBeInTheDocument();
+            expect(within(row).queryByText(hint)).not.toBeInTheDocument();
+        }
+        // Der gepinnte Hinweistext bleibt im Erwerbsjahr wörtlich erhalten.
+        expect(within(acquisitionRow).getByText('GWG')).toBeVisible();
+        expect(within(acquisitionRow).getByText(hint)).toBeVisible();
+    });
+
     it('filtert die beiden Verzeichnisse über scope, mit Fallback für Legacy-Zeilen (D-85)', async () => {
         const user = userEvent.setup();
         setAssets(

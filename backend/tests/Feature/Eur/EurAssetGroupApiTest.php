@@ -359,6 +359,64 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
         $this->assertSame('business', $second->fresh()->scope);
     }
 
+    /** D-93: ein degressives Mitglied wird beim Wechsel ins private Verzeichnis automatisch linear. */
+    public function test_a_degressive_member_becomes_linear_when_the_group_turns_private(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->createAsset($token, 'Degressiv', 100, 240000, '2024-01-15', 'degressive');
+        $groupId = $this->createGroup($token, 'Wechsel-Privat', 60);
+        $this->assign($token, $groupId, $asset);
+
+        $this->assertSame('degressive', $asset->fresh()->method);
+        $this->assertSame('degressive', $asset->years()->first()->method);
+
+        $this->withHeaders($this->bearer($token))
+            ->putJson("/api/management/eur/asset-groups/{$groupId}", [
+                'name' => 'Wechsel-Privat', 'business_share' => 40,
+            ])->assertOk();
+
+        $fresh = $asset->fresh();
+        $this->assertSame('private', $fresh->scope);
+        $this->assertSame(40, $fresh->effectiveBusinessShare());
+        $this->assertSame('linear', $fresh->method);
+
+        // 240000 ct / 3 Jahre: 80000 ct je Jahr, Restbuchwert im letzten Jahr.
+        // 60 % Privatanteil, kaufmännisch auf ganze Cent gerundet.
+        $expected = [80000, 80000, 79999];
+        $privateExpected = [48000, 48000, 47999];
+        foreach ($fresh->years()->orderBy('year')->get() as $index => $year) {
+            $this->assertSame('linear', $year->method);
+            $this->assertSame($expected[$index], (int) $year->depreciation_cents);
+            $this->assertSame(60, (int) $year->private_use_percent);
+            $this->assertSame($privateExpected[$index], (int) $year->private_use_cents);
+            $this->assertSame($expected[$index] - $privateExpected[$index], (int) $year->business_use_cents);
+            $this->assertNull($year->eur_entry_id);
+        }
+
+        // Die private Gruppe dokumentiert die lineare AfA im Eigenbeleg.
+        $group = EurAssetGroup::findOrFail($groupId);
+        $this->assertCount(3, $group->years);
+        foreach ($group->years->sortBy('year') as $year) {
+            $this->assertSame(80000, (int) $year->theoretical_depreciation_cents);
+            $this->assertSame(32000, (int) $year->eigenbeleg_cents);
+        }
+
+        // Gebuchte Jahre bleiben final: der bestehende Guard sperrt die Änderung.
+        $booked = $fresh->years()->orderBy('year')->first();
+        $booked->forceFill(['status' => 'booked'])->save();
+        $this->withHeaders($this->bearer($token))
+            ->putJson("/api/management/eur/asset-groups/{$groupId}", [
+                'name' => 'Wechsel-Privat', 'business_share' => 30,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('error', EurAssetGroupService::BOOKED_GROUP_MESSAGE);
+
+        $after = $asset->fresh();
+        $this->assertSame(40, $after->effectiveBusinessShare());
+        $this->assertSame('linear', $after->method);
+        $this->assertSame(80000, (int) $booked->fresh()->depreciation_cents);
+    }
+
     public function test_a_booked_member_prevents_both_share_and_scope_changes(): void
     {
         $token = $this->tokenFor();
@@ -464,13 +522,24 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
         $this->assertSame('GR-'.$newGroup, $entnahmen->first()->receipt_no);
     }
 
-    private function createAsset(string $token, string $name, int $share, int $cost, string $date = '2026-01-15'): EurAsset
-    {
-        $response = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/assets', [
+    private function createAsset(
+        string $token,
+        string $name,
+        int $share,
+        int $cost,
+        string $date = '2026-01-15',
+        string $method = 'linear',
+    ): EurAsset {
+        $payload = [
             'name' => $name, 'invoice_no' => 'G-'.$name, 'supplier' => 'Lieferant',
             'purchase_date' => $date, 'cost_cents' => $cost,
-            'useful_life_years' => 3, 'business_share' => $share, 'method' => 'linear',
-        ]);
+            'useful_life_years' => 3, 'business_share' => $share, 'method' => $method,
+        ];
+        if ($method === 'degressive') {
+            $payload['degressive_rate'] = 3000;
+        }
+
+        $response = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/assets', $payload);
         $response->assertCreated();
 
         return EurAsset::forCurrentBrand()->findOrFail((int) $response->json('asset.id'));

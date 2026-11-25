@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { formatEuro, formatPercent } from '../../../logic/formatCurrency';
+import { gwgEligible } from '../../../logic/eurAssetGwg';
 import {
     attachEurAssetDocument,
     bookEurAssetDepreciation,
@@ -230,7 +231,8 @@ export default function EurAssetsPanel({ year }: Props) {
                             <tbody>
                                 {shown.map((asset) => {
                                     const plan = asset.years.find((candidate) => candidate.year === year);
-                                    const isGwg = asset.cost_cents < gwgLimitCents;
+                                    // D-93: GWG nur im Erwerbsjahr, nie für Privatanlagen.
+                                    const isGwg = gwgEligible(asset, year, gwgLimitCents);
                                     const switched = asset.switched_to_linear_at != null;
                                     const isPrivate = scopeOf(asset) === 'private';
                                     const eigenbelegNo = plan?.eigenbeleg_no ?? '';

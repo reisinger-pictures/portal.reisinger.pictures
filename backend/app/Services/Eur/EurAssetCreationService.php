@@ -62,7 +62,14 @@ final class EurAssetCreationService
 
     public function writePlan(EurAsset $asset, DepreciationCalculator $calculator, int $month, ?int $switchYear = null): void
     {
-        $plan = $asset->method === DepreciationCalculator::METHOD_DEGRESSIVE
+        // D-93: Privatanlagen sind immer linear — auch bei übermitteltem
+        // `method=degressive` und auch als Gruppenmitglied mit effektiv
+        // privatem Anteil. Gebuchte Jahre werden nicht umgeschrieben.
+        $isPrivate = $asset->scope === 'private'
+            || (bool) $asset->is_private_investment
+            || $asset->effectiveBusinessShare() < 50;
+
+        $plan = $asset->method === DepreciationCalculator::METHOD_DEGRESSIVE && ! $isPrivate
             ? $calculator->degressivePlan((int) $asset->cost_cents, (int) $asset->useful_life_years, (int) $asset->degressive_rate, $month, $switchYear)
             : $calculator->linearPlan((int) $asset->cost_cents, (int) $asset->useful_life_years, $month);
 
@@ -127,6 +134,82 @@ final class EurAssetCreationService
 
             $updated++;
         }
+
+        return $updated;
+    }
+
+    /**
+     * D-93: ein Gruppenmitglied kann degressiv angelegt und später durch eine
+     * Senkung des Gruppenanteils privat werden. Sein offener Plan wird dann
+     * automatisch linear — ohne neuen Übergangs-Endpunkt. Gebuchte Jahre und
+     * Zeilen mit `eur_entry_id` bleiben final; Eigenbelegnummer und
+     * Erstellungszeitpunkt bleiben stabil.
+     *
+     * @return int Anzahl der auf lineare AfA umgestellten Planzeilen
+     */
+    public function convertUnbookedPlanToLinear(EurAsset $asset): int
+    {
+        $isPrivate = $asset->scope === 'private'
+            || (bool) $asset->is_private_investment
+            || $asset->effectiveBusinessShare() < 50;
+
+        if (! $isPrivate || $asset->method !== DepreciationCalculator::METHOD_DEGRESSIVE) {
+            return 0;
+        }
+
+        $plan = (new DepreciationCalculator(new RuleValues))->linearPlan(
+            (int) $asset->cost_cents,
+            (int) $asset->useful_life_years,
+            (int) $asset->purchase_date->format('n'),
+        );
+
+        $purchaseYear = (int) $asset->purchase_date->format('Y');
+        $planByYear = [];
+        foreach ($plan as $row) {
+            $planByYear[$purchaseYear + $row['year'] - 1] = $row;
+        }
+
+        $privatePercent = 100 - $asset->effectiveBusinessShare();
+        $updated = 0;
+
+        $unbooked = $asset->years()
+            ->whereNull('eur_entry_id')
+            ->where('status', '!=', 'booked')
+            ->get();
+
+        foreach ($unbooked as $year) {
+            $row = $planByYear[(int) $year->year] ?? null;
+            if ($row === null) {
+                continue;
+            }
+
+            $privateCents = Share::apply($row['depreciation_cents'], $privatePercent);
+            $fields = [
+                'method' => DepreciationCalculator::METHOD_LINEAR,
+                'depreciation_cents' => $row['depreciation_cents'],
+                'book_value_cents' => $row['book_value_cents'],
+                'private_use_percent' => $privatePercent,
+                'private_use_cents' => $privateCents,
+                'business_use_cents' => $row['depreciation_cents'] - $privateCents,
+            ];
+
+            // Nur vorhandene Eigenbelege aktualisieren; Nummer und Timestamp
+            // bleiben unverändert, der Betrag folgt dem linearen Plan.
+            if ($year->eigenbeleg_no !== null || $year->eigenbeleg_created_at !== null) {
+                $usagePercent = $year->usage_percent === null
+                    ? $asset->effectiveBusinessShare()
+                    : (int) $year->usage_percent;
+                $fields['usage_percent'] = $usagePercent;
+                $fields['theoretical_depreciation_cents'] = $row['depreciation_cents'];
+                $fields['eigenbeleg_cents'] = Share::apply($row['depreciation_cents'], $usagePercent);
+            }
+
+            $year->forceFill($fields)->save();
+            $updated++;
+        }
+
+        // Die Anzeige folgt dem Plan: ein privates Gut ist nie degressiv.
+        $asset->forceFill(['method' => DepreciationCalculator::METHOD_LINEAR])->save();
 
         return $updated;
     }

@@ -679,7 +679,7 @@ export default function ManagementEurView() {
                             <EurDepreciationPanel year={year}/>
                             <div className="rounded-box border border-base-300 bg-base-100 p-5">
                                 <h2 className="text-xl font-semibold"><Trans>Geringwertige Wirtschaftsgüter</Trans></h2>
-                                <p className="mt-1"><Trans>Anschaffungen unter 1.000 € können Sie im Jahr des Kaufs direkt als Ausgabe erfassen.</Trans></p>
+                                <p className="mt-1"><Trans>Anschaffungen unter 1.000 € können Sie nur im Jahr des Kaufs direkt als Ausgabe erfassen. Privatanlagen werden immer linear über die Nutzungsjahre abgeschrieben.</Trans></p>
                                 <a href="#eur-buchungen" className="btn btn-outline btn-sm mt-3"><Trans>Sofort als Ausgabe erfassen</Trans></a>
                                 <a href={eurPdfAssetsUrl(year)} className="btn btn-outline btn-sm mt-3 ml-2" download>
                                     <Trans>Anlagenverzeichnis als PDF</Trans>
