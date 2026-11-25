@@ -15,6 +15,7 @@ use App\Services\Auth\AuthTokenService;
 use App\Services\AuthorizationService;
 use App\Services\FtpCredentialService;
 use App\Services\OrgDefaultRolePolicy;
+use App\Services\RegistrationGuardService;
 use App\Support\BrandRegistry;
 use App\Support\EmailNormalizer;
 use App\Support\FtpInboxDirectory;
@@ -80,7 +81,7 @@ class AuthController extends Controller
         return response()->json(['error' => 'Ungültige Zugangsdaten.'], 401);
     }
 
-    public function register(Request $request)
+    public function register(Request $request, RegistrationGuardService $guard)
     {
         // AUTH-2: no `unique:users` rule. "422 for a taken address, 200 for a
         // free one" is an account-existence oracle, so the endpoint answers both
@@ -90,6 +91,12 @@ class AuthController extends Controller
             'email' => 'required|string|email|max:255',
         ]);
         $validated['email'] = EmailNormalizer::normalize($validated['email']);
+
+        // Registration hardening (D-92): reject abusive domains, bursts and —
+        // when enabled — undeliverable domains before any account lookup or
+        // write. Every attempt, including one for an existing address, is
+        // counted here; the generic success below stays unchanged (AUTH-2).
+        $guard->guard($request, $validated['email']);
 
         // Resolve the account before anything else. An existing address is not
         // touched at all: no insert, no org/invite handling, no activation

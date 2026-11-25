@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Auth\SanctumApiGuard;
 use App\Auth\SanctumTransientGuard;
+use App\Contracts\DnsResolver;
 use App\Contracts\PricingStrategy;
 use App\Enums\UserRole;
 use App\Mail\Transports\GmailRestTransport;
@@ -19,6 +20,7 @@ use App\Services\VolumePresetService;
 use App\Support\ActorIdentity;
 use App\Support\BrandRegistry;
 use App\Support\CheckoutKey;
+use App\Support\SystemDnsResolver;
 use App\Support\UuidDatabaseFailedJobProvider;
 use App\Support\UuidDatabaseQueueConnector;
 use ArrayObject;
@@ -43,6 +45,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // The registration MX check is opt-in (registration.mx_check.enabled);
+        // binding the interface keeps DNS injectable and fakeable in tests.
+        $this->app->bind(DnsResolver::class, SystemDnsResolver::class);
+
         // V001 defines jobs.id as a UUID, while Laravel's stock database
         // connector uses insertGetId() and assumes an auto-increment key. Use
         // the compatible queue writer for both normal dispatch and worker

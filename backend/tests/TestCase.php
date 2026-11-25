@@ -31,6 +31,18 @@ abstract class TestCase extends BaseTestCase
 
         $this->isolateFakedDiskRoots();
 
+        // Registration hardening (D-92): many fixtures register several
+        // accounts from the single test-client IP, so the production budget is
+        // not the right harness default. RegistrationGuardTest overrides these
+        // values explicitly to exercise the real limits and rejections.
+        config()->set([
+            'registration.blocked_domains' => [],
+            'registration.rate_limit.per_ip' => 1000,
+            'registration.rate_limit.per_domain' => 1000,
+            'registration.rate_limit.window_seconds' => 300,
+            'registration.mx_check.enabled' => false,
+        ]);
+
         if (! app()->bound('brand.context')) {
             BrandRegistry::set(Brand::B2B);
         }

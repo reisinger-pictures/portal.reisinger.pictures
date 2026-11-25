@@ -1,6 +1,6 @@
 # Owner Decisions
 
-This is the canonical current contract for owner decisions D-1 through D-88. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
+This is the canonical current contract for owner decisions D-1 through D-92. Apply these decisions unless a later reviewed decision replaces one. Implementation status belongs in GitHub issues; security findings additionally carry a machine-readable status in `ratchet.findings.json` (human record: `features/security/`). Domain specifications carry the detailed system contracts.
 
 ## Operations and deployment
 
@@ -595,3 +595,22 @@ working-paper tool**, not a filing client:
   visible next to the value so the owner can decide what to enter.
 - External tax review remains the acceptance gate; this decision does not
   claim tax correctness.
+
+### D-92: The 25.11.2026 registration wave is an incident, not an authorized pentest
+
+The owner decided on 2026-11-25 (issue #67) that the registration wave of
+25.11.2026, 02:06–02:20 CET, is classified **"Nein / unklar"**: there is no
+authorization for a penetration test. It is documented as a security incident,
+not as an approved test, and no result is inferred from that classification.
+
+- Host-side incident checks remain with the owner: accounts created in that
+  window, source IPs, log correlation and any password resets. This host has no
+  production access, so none of those checks is asserted here.
+- The portal response is code hardening at `POST /api/auth/register`: an exact
+  email-domain blocklist, count-first per-IP and per-domain budgets that count
+  every attempt (including blocked and already-known addresses), and an
+  opt-in, injectable MX/DNS check. Rejections use fixed German error bodies and
+  a `registration.rejected` log schema without the email address.
+- The five environment keys keep safe defaults; the effective production
+  values and the host-side checks are human gates. The contract is in
+  [Registration hardening](auth/05-registration-hardening.md).
