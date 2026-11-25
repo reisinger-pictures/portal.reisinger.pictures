@@ -39,6 +39,19 @@ trim, drop empty entries and deduplicate for the blocklist; an explicitly empty
 and non-numeric or non-positive numeric values for the four limits fall back to
 their defaults.
 
+The `backend` service in `deployment/docker-compose.yml` forwards all five keys
+as `${KEY:-default}` with the values below, so they reach the container even
+when the host `.env` omits them, and a non-empty host `.env` entry overrides
+them. An empty host value counts as unset (Compose's `:-` substitution), so it
+yields the default and never an empty blocklist. A key the service does not
+forward is invisible to the container: the config default applies and a host
+value has no effect. The effective values of a given host are what
+`docker compose -f /opt/stacks/portal-reisinger-pictures/compose.yaml config`
+prints for the five keys: Compose resolves `.env` from the compose file's
+directory, not from the current working directory, and a `.env` in a parent
+directory is ignored. That output, not the presence of a `.env` line, is the
+evidence.
+
 | Env key | Default | Meaning |
 |---|---|---|
 | `REGISTRATION_BLOCKED_DOMAINS` | `example.com,example.net,example.org,euploading.com` | Exact email domains refused at registration |

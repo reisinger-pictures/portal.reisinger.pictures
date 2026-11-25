@@ -52,6 +52,15 @@ assert_contains() {
     grep -Fq -- "$2" "$COMPOSE" || fail "$3"
 }
 
+# `assert_contains` greps the whole file, so it cannot tell "forwarded to the
+# backend" from "forwarded to some service". When the owning service is the
+# point, match an extracted service block instead. Whole-line match: a
+# commented-out pin (`#      - KEY=…`) is not a forwarded key, and a substring
+# match would accept it.
+assert_block_contains() {
+    grep -Fxq -- "$1" <<< "$2" || fail "$3"
+}
+
 # The production Compose file has one database engine. A host .env without
 # DB_HOST/DB_PORT must still reach the PostgreSQL service; the queue and cache
 # connections follow the selected engine (pgsql).
@@ -69,7 +78,7 @@ assert_contains "$COMPOSE" '      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CON
 backend_dependencies() {
     awk '
         /^  backend:$/ { in_backend = 1; next }
-        in_backend && /^  [a-z_]+:$/ { exit }
+        in_backend && /^  [^ #]/ { exit }
         in_backend && /^    depends_on:$/ { in_dependencies = 1; next }
         in_dependencies && /^    [a-z_]+:/ { in_dependencies = 0 }
         in_dependencies { print }
@@ -137,23 +146,51 @@ done
 # blocks the backend before it can emit a log line.
 composer_init_service="$(awk '
     /^  composer_init:$/ { in_service = 1; next }
-    in_service && /^  [a-z_]+:/ { in_service = 0 }
+    in_service && /^  [^ #]/ { in_service = 0 }
     in_service { print }
 ' "$COMPOSE")"
-grep -qF '    user: "1002:82"' <<<"$composer_init_service" \
-    || fail 'composer_init must run as 1002:82, the website-tree owner, or package replacement blocks backend startup'
+assert_block_contains '    user: "1002:82"' "$composer_init_service" \
+    'composer_init must run as 1002:82, the website-tree owner, or package replacement blocks backend startup'
 
 # The backend must run as the tree owner, and no service may keep the old
 # non-owner identity: 1000:82 was the precondition that forced the
 # world-writable F666/D2777 sync modes (OPS-3). One identity in the compose
 # file, and it is the one sync.sh chowns to.
+# The stop pattern must treat every service-level line as a boundary: an
+# earlier `[a-z_]+` missed `ftp-events:`, so this block swallowed that service
+# and any pin matched a line it did not own. Service keys sit at exactly two
+# spaces; two-space lines inside a block are comments, which do not end it.
 backend_service="$(awk '
     /^  backend:$/ { in_service = 1; next }
-    in_service && /^  [a-z_]+:/ { in_service = 0 }
+    in_service && /^  [^ #]/ { in_service = 0 }
     in_service { print }
 ' "$COMPOSE")"
-grep -qF '    user: "1002:82"' <<<"$backend_service" \
-    || fail 'the backend must run as 1002:82, the uid of the tree it writes (D-1, OPS-3)'
+assert_block_contains '    user: "1002:82"' "$backend_service" \
+    'the backend must run as 1002:82, the uid of the tree it writes (D-1, OPS-3)'
+
+# Registration hardening (D-92, issue #67). config/registration.php reads five
+# env keys; a key the backend service does not forward is invisible to the
+# container, so the fail-closed defaults are the only thing that can apply and
+# a host .env value silently does nothing. Scoped to the backend block on
+# purpose: the same line under another service would forward the key nowhere.
+# The patterns include the `:-default` part, so they pin the compose defaults as
+# well — those are the effective production values while the host .env omits
+# the key. A default change must therefore be a deliberate edit of this gate.
+assert_block_contains '      - REGISTRATION_BLOCKED_DOMAINS=${REGISTRATION_BLOCKED_DOMAINS:-example.com,example.net,example.org,euploading.com}' \
+    "$backend_service" \
+    'the registration blocklist must reach the backend container, or the host .env cannot set it'
+assert_block_contains '      - REGISTRATION_IP_LIMIT=${REGISTRATION_IP_LIMIT:-3}' \
+    "$backend_service" \
+    'the per-IP registration budget must reach the backend container'
+assert_block_contains '      - REGISTRATION_DOMAIN_LIMIT=${REGISTRATION_DOMAIN_LIMIT:-3}' \
+    "$backend_service" \
+    'the per-domain registration budget must reach the backend container'
+assert_block_contains '      - REGISTRATION_WINDOW_SECONDS=${REGISTRATION_WINDOW_SECONDS:-300}' \
+    "$backend_service" \
+    'the registration counter window must reach the backend container'
+assert_block_contains '      - REGISTRATION_MX_CHECK=${REGISTRATION_MX_CHECK:-false}' \
+    "$backend_service" \
+    'the opt-in MX check must reach the backend container and stay off by default'
 if grep -qF 'user: "1000:82"' "$COMPOSE"; then
     fail 'a service still runs as 1000:82; that non-owner identity is what made the world-writable sync modes necessary'
 fi

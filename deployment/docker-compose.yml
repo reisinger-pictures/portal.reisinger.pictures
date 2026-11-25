@@ -188,6 +188,21 @@ services:
       - MEILISEARCH_KEY=${MEILI_MASTER_KEY}
       - GALLERY_CLEANUP_GRACE_MONTHS=${GALLERY_CLEANUP_GRACE_MONTHS}
       - AUTH_THROTTLE_LIMIT=10
+      # Registration hardening (D-92, issue #67). Until this block existed the
+      # five keys were referenced by config/registration.php but never
+      # forwarded, so only the fail-closed defaults applied and the host .env
+      # could not change them at all. The defaults below duplicate
+      # backend/config/registration.php on purpose: they are the documented
+      # contract (features/auth/05-registration-hardening.md), visible in git,
+      # and a host .env entry still wins. The `:-` form substitutes on an unset
+      # OR empty value, so an empty blocklist becomes the default list here and
+      # can never mean "block nothing"; the config-file fallback covers a run
+      # without this mapping.
+      - REGISTRATION_BLOCKED_DOMAINS=${REGISTRATION_BLOCKED_DOMAINS:-example.com,example.net,example.org,euploading.com}
+      - REGISTRATION_IP_LIMIT=${REGISTRATION_IP_LIMIT:-3}
+      - REGISTRATION_DOMAIN_LIMIT=${REGISTRATION_DOMAIN_LIMIT:-3}
+      - REGISTRATION_WINDOW_SECONDS=${REGISTRATION_WINDOW_SECONDS:-300}
+      - REGISTRATION_MX_CHECK=${REGISTRATION_MX_CHECK:-false}
       - DOWNLOAD_THROTTLE=120
       - ZIP_DOWNLOAD_THROTTLE=10
       - CHECKOUT_THROTTLE_USER_PER_HOUR=${CHECKOUT_THROTTLE_USER_PER_HOUR:-5}
