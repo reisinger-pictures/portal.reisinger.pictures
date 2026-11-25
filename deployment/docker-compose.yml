@@ -305,19 +305,29 @@ services:
     # Kommentar: `command: >` ist ein gefalteter Skalar, alle Zeilen werden zu
     # EINER Zeile, und `sh` beginnt ab einem `#` mitten in der Zeile den
     # Kommentar — der frisst for-Schleife, migrate und exec (Restart-Schleife
-    # vom 2026-09-26). 2) KEIN `$` ausser in `$(...)`, und auch dort ist es
-    # kaputt: Compose v5.0.2 gibt JEDE Command-Substitution als `$$(...)` aus,
-    # auch wenn in der Datei schon `$$` steht. Der Container-Shell expandiert
-    # `$$` dann zur PID — aus `[ "$$(id -u)" -ne 1002 ]` wird
+    # vom 2026-09-26). 2) KEINE Expansion irgendeiner Form im `command:`: `$$`,
+    # `$(`, `${` und ein blankes `$VAR` sind verboten; ein `$` als Regex-Anker
+    # ohne folgenden Namen ist erlaubt (die beiden `grep -qE`-Zeilen unten).
+    # Compose v5.0.2 gibt JEDE Command-Substitution als `$$(...)` aus, auch wenn
+    # in der Datei schon `$$` steht. Der Container-Shell expandiert `$$` dann zur PID — aus `[ "$$(id -u)" -ne 1002 ]` wird
     # `[ "1(id -u)" -ne 1002 ]`, also `Illegal number` und FATAL. Ebenso
     # werden `$${APP_ENV}` zu `1234{APP_ENV}`. Nachgewiesen mit
-    # Docker Compose v5.0.2; `$$` wirkt in KEINER YAML-Form. Deshalb liest
+    # Docker Compose v5.0.2; im `command:`-Block rettet `$$` in keiner
+    # YAML-Form. Deshalb liest
     # dieser Guard ueber `printenv | grep` und `xargs -I{}` statt ueber
     # Variablen-Expansion, und verzichtet auf `${VAR}` komplett: das wuerde
     # Secrets zur Compose-Interpolationszeit in `docker inspect Cmd` schreiben.
+    # Abgrenzung nach FELD, nicht nach Schreibweise: im `healthcheck` wird `$$`
+    # beim Anlegen des Containers zu `$` (dort steht `"$(cat ...)"` in
+    # `Config.Healthcheck.Test` — am laufenden Container gemessen 2026-11-25).
+    # In diesem `command:`-Block wird es in KEINER YAML-Form reduziert: die
+    # Autorenform `$$(id -u)` erreichte die Shell am 2026-09-26 als `$$`, und
+    # `docker compose config` gibt fuer beide Quellformen `$$(id -u)` aus.
     #
     # Gegenprobe vor jedem Deploy (siehe deployment/README.md):
-    #   docker compose config --format json | grep -c '\$\$'   -> muss 0 sein
+    #   docker compose config --format json | grep -c '\$\$('  -> 1 (Healthcheck)
+    #   Massgeblich ist dieser Quelltext-Block: er enthaelt kein `$$`, `$(`, `${`
+    #   und kein blankes `$VAR`; das Gate prueft genau das.
     # SFTPGo-Aktion und -Regel sind Provider-Zustand außerhalb des Containers.
     # Der idempotente Befehl schreibt dieselbe Aktion erneut und läuft bei jedem
     # Start; ein manueller Deploy-Schritt ist daher nicht nötig. Fail-closed:

@@ -1,5 +1,12 @@
 # Names referenced by deployment/docker-compose.yml; inventory only, not dotenv.
 # Actual values exist only in /opt/stacks/portal-reisinger-pictures/.env on the host.
+# Direction: every name here MUST be referenced by the compose file, and
+# tests/infrastructure/compose-entrypoint-contract.sh fails when one is not.
+# Names the compose file sets as literals (DB_DATABASE, DB_USERNAME, LOG_CHANNEL,
+# MEILISEARCH_HOST, FTP_STORAGE_PATH, SFTPGO_*__BINDINGS__*, SFTPGO_DATA_PROVIDER__*,
+# XDG_*, AUTH_THROTTLE_LIMIT, DOWNLOAD_THROTTLE, ZIP_DOWNLOAD_THROTTLE) are
+# deliberately absent — the host cannot override them. The CHECKOUT_THROTTLE_*
+# names are overridable (`${…:-default}`) and therefore listed.
 ACCOUNTING_EMAIL
 ADMIN_EMAIL
 ADMIN_PASSWORD

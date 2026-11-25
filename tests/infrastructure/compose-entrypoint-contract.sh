@@ -9,10 +9,13 @@
 #    never reached php-fpm and Docker restarted it in a loop while the log
 #    stayed quiet.
 #
-# 2. `$` inside a folded `command: >` block. Docker Compose v5.0.2 emits every
-#    command substitution as `$$(...)`, even when the file already contains
-#    `$$`, and it never reduces `$$` to `$` in any YAML form. The container
-#    shell then expands `$$` to its PID, so
+# 2. `$` inside a folded `command: >` block. Whether `$$` is reduced to `$`
+#    depends on the FIELD, not on how it was written. In the `healthcheck` it is
+#    reduced (`Config.Healthcheck.Test` carries `"$(cat …)"`, measured on the
+#    running container). In the `command:` block it is not reduced in any YAML
+#    form: the author form `$$(id -u)` reached the shell as `$$` on 2026-09-26,
+#    and Docker Compose v5.0.2 emits `$$(...)` for both source forms. The
+#    container shell then expands `$$` to its PID, so
 #        [ "$$(id -u)" -ne 1000 ]   becomes   [ "1(id -u)" -ne 1000 ]
 #    which fails with `Illegal number`, and
 #        "$${APP_ENV}"              becomes   "1234{APP_ENV}"
@@ -61,18 +64,50 @@ assert_block_contains() {
     grep -Fxq -- "$1" <<< "$2" || fail "$3"
 }
 
+# The backend service block and, inside it, the environment list. A key is only
+# forwarded when it sits in that list: the same line under `volumes:` or in
+# another service leaves the container without the value, so a file-wide or
+# block-wide pin would accept a line that forwards nothing.
+# The stop pattern must treat every service-level line as a boundary: an
+# earlier `[a-z_]+` missed `ftp-events:`, so the block swallowed that service
+# and any pin matched a line it did not own. Service keys sit at exactly two
+# spaces; two-space lines inside a block are comments, which do not end it.
+backend_service="$(awk '
+    /^  backend:$/ { in_service = 1; next }
+    in_service && /^  [^ #]/ { in_service = 0 }
+    in_service { print }
+' "$COMPOSE")"
+backend_environment="$(awk '
+    /^    environment:$/ { in_environment = 1; next }
+    in_environment && /^    [a-z_]+:/ { in_environment = 0 }
+    in_environment { print }
+' <<< "$backend_service")"
+
+# The sftpgo service's environment list, same rule: its bootstrap keys are only
+# effective where the sftpgo container reads them.
+sftpgo_service="$(awk '
+    /^  sftpgo:$/ { in_service = 1; next }
+    in_service && /^  [^ #]/ { in_service = 0 }
+    in_service { print }
+' "$COMPOSE")"
+sftpgo_environment="$(awk '
+    /^    environment:$/ { in_environment = 1; next }
+    in_environment && /^    [a-z_]+:/ { in_environment = 0 }
+    in_environment { print }
+' <<< "$sftpgo_service")"
+
 # The production Compose file has one database engine. A host .env without
 # DB_HOST/DB_PORT must still reach the PostgreSQL service; the queue and cache
 # connections follow the selected engine (pgsql).
-assert_contains "$COMPOSE" '      - DB_HOST=${DB_HOST:-db_pg}' \
+assert_block_contains '      - DB_HOST=${DB_HOST:-db_pg}' "$backend_environment" \
     'a production .env without DB_HOST must default to the PostgreSQL service'
-assert_contains "$COMPOSE" '      - DB_PORT=${DB_PORT:-5432}' \
+assert_block_contains '      - DB_PORT=${DB_PORT:-5432}' "$backend_environment" \
     'a production .env without DB_PORT must default to the PostgreSQL port'
-assert_contains "$COMPOSE" '      - DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
+assert_block_contains '      - DB_QUEUE_CONNECTION=${DB_QUEUE_CONNECTION:-${DB_CONNECTION:-pgsql}}' "$backend_environment" \
     'the queue database must default to the selected PostgreSQL engine'
-assert_contains "$COMPOSE" '      - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
+assert_block_contains '      - DB_CACHE_CONNECTION=${DB_CACHE_CONNECTION:-${DB_CONNECTION:-pgsql}}' "$backend_environment" \
     'the cache database must default to the selected PostgreSQL engine'
-assert_contains "$COMPOSE" '      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-${DB_CONNECTION:-pgsql}}' \
+assert_block_contains '      - DB_CACHE_LOCK_CONNECTION=${DB_CACHE_LOCK_CONNECTION:-${DB_CONNECTION:-pgsql}}' "$backend_environment" \
     'the cache-lock database must default to the selected PostgreSQL engine'
 
 backend_dependencies() {
@@ -125,6 +160,12 @@ for token in '$$' '$(' '${'; do
         fail "the folded command: block uses $token, which Compose v5 corrupts (see the header of this gate)"
     fi
 done
+# A bare `$VAR` is interpolated exactly like `${VAR}` and would put the value in
+# `docker inspect Cmd` just the same. The two `$`-anchored regexes in the block
+# (`'^[A-Za-z0-9-]*$'`) end the `$` before a quote and are therefore no match.
+if grep -qE '\$[A-Za-z_]' <<<"$CMD_BLOCK"; then
+    fail 'the folded command: block uses a bare $VAR, which Compose interpolates into docker inspect Cmd'
+fi
 
 # Identity and path guards must read the environment without expansion.
 # The uid and gid literals are pinned independently because they have to agree
@@ -156,40 +197,30 @@ assert_block_contains '    user: "1002:82"' "$composer_init_service" \
 # non-owner identity: 1000:82 was the precondition that forced the
 # world-writable F666/D2777 sync modes (OPS-3). One identity in the compose
 # file, and it is the one sync.sh chowns to.
-# The stop pattern must treat every service-level line as a boundary: an
-# earlier `[a-z_]+` missed `ftp-events:`, so this block swallowed that service
-# and any pin matched a line it did not own. Service keys sit at exactly two
-# spaces; two-space lines inside a block are comments, which do not end it.
-backend_service="$(awk '
-    /^  backend:$/ { in_service = 1; next }
-    in_service && /^  [^ #]/ { in_service = 0 }
-    in_service { print }
-' "$COMPOSE")"
 assert_block_contains '    user: "1002:82"' "$backend_service" \
     'the backend must run as 1002:82, the uid of the tree it writes (D-1, OPS-3)'
 
 # Registration hardening (D-92, issue #67). config/registration.php reads five
 # env keys; a key the backend service does not forward is invisible to the
 # container, so the fail-closed defaults are the only thing that can apply and
-# a host .env value silently does nothing. Scoped to the backend block on
-# purpose: the same line under another service would forward the key nowhere.
-# The patterns include the `:-default` part, so they pin the compose defaults as
-# well — those are the effective production values while the host .env omits
-# the key. A default change must therefore be a deliberate edit of this gate.
+# a host .env value silently does nothing. The patterns include the `:-default`
+# part, so they pin the compose defaults as well — those are the effective
+# production values while the host .env omits the key. A default change must
+# therefore be a deliberate edit of this gate.
 assert_block_contains '      - REGISTRATION_BLOCKED_DOMAINS=${REGISTRATION_BLOCKED_DOMAINS:-example.com,example.net,example.org,euploading.com}' \
-    "$backend_service" \
+    "$backend_environment" \
     'the registration blocklist must reach the backend container, or the host .env cannot set it'
 assert_block_contains '      - REGISTRATION_IP_LIMIT=${REGISTRATION_IP_LIMIT:-3}' \
-    "$backend_service" \
+    "$backend_environment" \
     'the per-IP registration budget must reach the backend container'
 assert_block_contains '      - REGISTRATION_DOMAIN_LIMIT=${REGISTRATION_DOMAIN_LIMIT:-3}' \
-    "$backend_service" \
+    "$backend_environment" \
     'the per-domain registration budget must reach the backend container'
 assert_block_contains '      - REGISTRATION_WINDOW_SECONDS=${REGISTRATION_WINDOW_SECONDS:-300}' \
-    "$backend_service" \
+    "$backend_environment" \
     'the registration counter window must reach the backend container'
 assert_block_contains '      - REGISTRATION_MX_CHECK=${REGISTRATION_MX_CHECK:-false}' \
-    "$backend_service" \
+    "$backend_environment" \
     'the opt-in MX check must reach the backend container and stay off by default'
 if grep -qF 'user: "1000:82"' "$COMPOSE"; then
     fail 'a service still runs as 1000:82; that non-owner identity is what made the world-writable sync modes necessary'
@@ -197,9 +228,31 @@ fi
 sync_tree_owner="$(sed -n 's/^TREE_OWNER="\${PORTAL_TREE_OWNER:-\([0-9]*:[0-9]*\)}"$/\1/p' "$ROOT_DIR/sync.sh")"
 [[ -n "$sync_tree_owner" ]] \
     || fail 'sync.sh declares no TREE_OWNER default; the tree owner cannot be compared'
-if ! grep -qF "    user: \"${sync_tree_owner}\"" <<<"$backend_service"; then
-    fail "the backend does not run as the tree owner sync.sh writes (${sync_tree_owner}) — that drift is the OPS-3 cause"
-fi
+assert_block_contains "    user: \"${sync_tree_owner}\"" "$backend_service" \
+    "the backend does not run as the tree owner sync.sh writes (${sync_tree_owner}) — that drift is the OPS-3 cause"
+
+# Every name in the inventory must still be referenced by the compose file.
+# The five REGISTRATION_* keys were listed there since 117785c8 while the
+# backend service forwarded none of them: the inventory said "referenced", the
+# container never saw them, and nothing compared the two. This comparison is
+# one-directional on purpose — the compose file also sets literals of its own
+# (SFTPGO_*__BINDINGS__*, XDG_*, AUTH_THROTTLE_LIMIT, DOWNLOAD_THROTTLE and
+# ZIP_DOWNLOAD_THROTTLE) that the host cannot override and that therefore do
+# not belong in the inventory; the CHECKOUT_THROTTLE_* keys are overridable
+# (`${…:-default}`) and are listed.
+# Comment lines are stripped first: `# - KEY=${KEY}` references nothing, and a
+# text search would accept exactly the defect this check exists for. The strip
+# covers a `#` at the line start and after whitespace, so column-0 comments go
+# too; it treats ` #` as a comment start even inside a value, and no value in
+# this file contains that sequence.
+compose_code="$(sed -E 's/(^|[[:space:]])#.*$//' "$COMPOSE" | grep -vE '^[[:space:]]*$')"
+inventory_missing=''
+while IFS= read -r name; do
+    [[ -z "$name" || "$name" == '#'* ]] && continue
+    grep -qE "\\\$\{${name}([:}])|^[[:space:]]+- ${name}=" <<< "$compose_code" || inventory_missing+=" ${name}"
+done < "$ROOT_DIR/deployment/production-env.keys"
+[[ -z "$inventory_missing" ]] \
+    || fail "production-env.keys lists names the compose file no longer references:${inventory_missing}"
 
 # 19-ftp 7.9 forbids rewriting /home/webadmin/websites to 1000:1000, so the
 # ownership comparison must stay out; writability is the property that matters.
@@ -242,7 +295,7 @@ fi
 # Rule: the container half of each publish must equal the port SFTPGo is told
 # to bind. When the compose sets no binding env, the SFTPGo 2.7 defaults apply
 # (SSH 2022, HTTP 8080, FTP disabled).
-assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__PORT=989' \
+assert_block_contains '      - SFTPGO_FTPD__BINDINGS__0__PORT=989' "$sftpgo_environment" \
     'FTPS must actually be enabled; SFTPGo 2.7 ships the FTP daemon disabled'
 # 0 = off, 1 = explicit (AUTH TLS), 2 = implicit (SFTPGo docs, ftpd package).
 # A Canon camera sends AUTH TLS right after connecting and does not reliably
@@ -253,9 +306,9 @@ assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__PORT=989' \
 # cannot tell the photographer "explicit" while the daemon runs implicit
 # (P1-M44). The default keeps the binding explicit when the host .env omits the
 # variable, and the second assertion is what holds the two consumers together.
-assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__TLS_MODE=${SFTPGO_FTPD_TLS_MODE:-1}' \
+assert_block_contains '      - SFTPGO_FTPD__BINDINGS__0__TLS_MODE=${SFTPGO_FTPD_TLS_MODE:-1}' "$sftpgo_environment" \
     'the FTP binding must default to explicit TLS (mode 1); a Canon camera upgrades with AUTH TLS'
-assert_contains "$COMPOSE" '      - SFTPGO_FTPD_TLS_MODE=${SFTPGO_FTPD_TLS_MODE}' \
+assert_block_contains '      - SFTPGO_FTPD_TLS_MODE=${SFTPGO_FTPD_TLS_MODE}' "$backend_environment" \
     'the backend must receive the same TLS mode the binding uses, or the UI can disagree with the daemon'
 assert_contains "$COMPOSE" '      - "${SFTPGO_SFTP_PORT:-2222}:2022"' \
     'the SFTP publish must target the port SFTPGo 2.7 binds (2022), not 2222'
@@ -271,9 +324,9 @@ assert_contains "$COMPOSE" '      - "${SFTPGO_SFTP_PORT:-2222}:2022"' \
 if grep -qE 'SFTPGO_FTPD__BINDINGS__0__(MAX|MIN)_TLS_VERSION=' "$COMPOSE"; then
     fail 'the FTPS binding pins a TLS version; Go already downgrades per client, a ceiling only removes capability'
 fi
-assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_FILE=/var/lib/sftpgo/ftps/cert.pem' \
+assert_block_contains '      - SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_FILE=/var/lib/sftpgo/ftps/cert.pem' "$sftpgo_environment" \
     'FTPS needs a certificate path; SFTPGo 2.7 will not generate one'
-assert_contains "$COMPOSE" '      - SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_KEY_FILE=/var/lib/sftpgo/ftps/key.pem' \
+assert_block_contains '      - SFTPGO_FTPD__BINDINGS__0__CERTIFICATE_KEY_FILE=/var/lib/sftpgo/ftps/key.pem' "$sftpgo_environment" \
     'the FTPS certificate needs its key path'
 assert_contains "$COMPOSE" \
     '          mkdir -p /var/lib/sftpgo/ftps && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=sftpgo -keyout /var/lib/sftpgo/ftps/key.pem -out /var/lib/sftpgo/ftps/cert.pem;' \
@@ -298,6 +351,9 @@ for token in '$$' '$(' '${' '#'; do
         fail "the sftpgo command block uses $token, which Compose v5 corrupts or comments out the rest of the line"
     fi
 done
+if grep -qE '\$[A-Za-z_]' <<<"$sftpgo_command"; then
+    fail 'the sftpgo command block uses a bare $VAR, which Compose interpolates into docker inspect Cmd'
+fi
 
 sftp_binding="$(grep -oE 'SFTPGO_SFTPD__BINDINGS__0__PORT=[0-9]+' "$COMPOSE" | cut -d= -f2 || true)"
 if [ -n "$sftp_binding" ]; then
@@ -321,13 +377,13 @@ if awk '
 fi
 
 # --- 4. SFTPGo bootstrap comes from the .env.production names ---------------
-assert_contains "$COMPOSE" '      - SFTPGO_DEFAULT_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME}' \
+assert_block_contains '      - SFTPGO_DEFAULT_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME}' "$sftpgo_environment" \
     'the sftpgo admin username must be mapped from the .env.production name'
-assert_contains "$COMPOSE" '      - SFTPGO_DEFAULT_ADMIN_PASSWORD=${SFTPGO_ADMIN_PASSWORD}' \
+assert_block_contains '      - SFTPGO_DEFAULT_ADMIN_PASSWORD=${SFTPGO_ADMIN_PASSWORD}' "$sftpgo_environment" \
     'the sftpgo admin password must be mapped from the .env.production name'
-assert_contains "$COMPOSE" '      - SFTPGO_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME:-}' \
+assert_block_contains '      - SFTPGO_ADMIN_USERNAME=${SFTPGO_ADMIN_USERNAME:-}' "$backend_environment" \
     'the backend JWT fallback must read the same .env.production name'
-assert_contains "$COMPOSE" '      - SFTPGO_BASE_URL=${SFTPGO_BASE_URL:-http://sftpgo:8080}' \
+assert_block_contains '      - SFTPGO_BASE_URL=${SFTPGO_BASE_URL:-http://sftpgo:8080}' "$backend_environment" \
     'the backend must reach the sftpgo admin API by service name'
 
 # Production values stay in the host .env at the Compose project directory.

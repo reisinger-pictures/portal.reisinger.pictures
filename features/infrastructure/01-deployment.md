@@ -116,16 +116,29 @@ All sensitive config is read strictly via `env(...)` with **no hardcoded fallbac
   `o::r-x`/`d:o::r-x` (Verzeichnisse, durchquerbar für die Auslieferung) und
   `o::r--` (Dateien); das ist Teil von Schritt 0 in `deployment/README.md`, und
   eine Schreibprobe nach dem Recreate muss sie bestätigen.
-- **Keine Shell-Expansion im Compose-`command:`:** Docker Compose v5.0.2 gibt
-  jede Command-Substitution als `$$(...)` aus und reduziert `$$` in keiner
-  YAML-Form auf `$`. Die Shell im Container expandiert `$$` zur PID, womit
-  `[ "$$(id -u)" -ne 1000 ]` zu `[ "1(id -u)" ...` wird. Aus demselben Grund darf
-  der Block keine `#`-Kommentare enthalten (`command: >` faltet alle Zeilen zu
-  einer, und `sh` beginnt ab einem mitten liegenden `#` den Kommentar) und kein
-  `${VAR}` verwenden (Compose würde Secrets zur Interpolationszeit in
-  `docker inspect Cmd` schreiben). Der Guard liest daher über
-  `printenv | grep` und `xargs -I{}`. Gate:
+- **Keine Shell-Expansion im Compose-`command:`:** Ob `$$` zu `$` wird, hängt
+  am **Feld**, nicht an der Schreibweise. Im `healthcheck` wird es reduziert:
+  `Config.Healthcheck.Test` trägt `"$(cat …)"` (am laufenden Container gemessen
+  2026-11-25), der Healthcheck ist gesund. Im `command:`-Block wird es in keiner
+  YAML-Form reduziert — die Autorenform `$$(id -u)` erreichte die Shell am
+  2026-09-26 als `$$` (`[ "1(id -u)" ... ]`, `Illegal number`, Start verweigert),
+  und `docker compose config` gibt für beide Quellformen `$$(id -u)` aus, sodass
+  die Ausgabe die Herkunft nicht unterscheidet. Der Block verzichtet deshalb auf
+  jede Expansion: kein `$(...)`, kein `$$`, kein `${VAR}` und kein blankes
+  `$VAR`, das Compose wie `${VAR}` interpolieren würde. Ein `$` als Regex-Anker
+  (`'^[A-Za-z0-9-]*$'`) ist erlaubt: ihm folgt kein Name, das Gate prüft genau
+  `\$[A-Za-z_]`. Ebenfalls verboten sind `#`-Kommentare im Block (`command: >`
+  faltet alle Zeilen zu einer, und `sh` beginnt ab einem mitten liegenden `#`
+  den Kommentar) und `${VAR}` (Compose würde Secrets zur Interpolationszeit
+  in `docker inspect Cmd` schreiben). Der Guard
+  liest daher über `printenv | grep` und `xargs -I{}`. Gate:
   `tests/infrastructure/compose-entrypoint-contract.sh`.
+  Eine stack-weite Zählung ist dafür **kein** Maßstab: der Backend-Healthcheck
+  verwendet bewusst drei `"$$(cat …)"`-Aufrufe in einer gefalteten `>-`-Zeile,
+  und `grep -c '\$\$('` zählt deshalb **1** Zeile (gemessen 2026-11-25 auf dem
+  Produktionshost), während der `command:`-Block für dieses Muster **0** ergibt
+  (die beiden `$`-Regex-Anker erscheinen in der `config`-Ausgabe als `$$`, sind
+  aber kein `$$(`).
 - **Keine `ipv4_address` auf `portal_internal`:** Das Netz existiert bereits aus
   dem Stack und hat `172.21.0.0/16`; eine dort gepinnte Adresse bricht den Deploy
   mit `no configured subnet contains IP address`. Gepinnt wird nur `webnet`, weil

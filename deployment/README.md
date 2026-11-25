@@ -267,7 +267,11 @@ wird absichtlich nicht umgeschrieben (`19-ftp-upload-pipeline.md` 7.9).
 ### Gegenprobe vor jedem Deploy
 
 ```bash
-docker compose -f docker-compose.yml config --format json | grep -c '\$\$('   # muss 0 sein
+# Der stack-weite Zähler ist kein Maßstab: der Backend-Healthcheck nutzt drei
+# `$$(cat …)` in einer gefalteten Zeile, und Compose gibt `$$` unverändert aus.
+# Maßgeblich ist dieser Quelltext-Block (keine Expansion: kein `$$`, `$(`, `${`
+# und kein blankes `$VAR`); das Gate darunter prüft genau ihn.
+docker compose -f docker-compose.yml config --format json | grep -c '\$\$('   # 1
 bash tests/infrastructure/compose-entrypoint-contract.sh                       # muss PASS sein
 ```
 
