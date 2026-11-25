@@ -75,14 +75,18 @@ test.describe('EAR · D-91 Ausfüllhilfe und Einkommensteuer-Eingaben', () => {
         await page.getByRole('tab', { name: 'Steuer', exact: true }).click();
         await expect(main.getByRole('heading', { name: 'Einkommensteuer', exact: true })).toBeVisible();
 
-        const modeSelect = main.getByLabel('Rechenmodus', { exact: true });
+        // Required fields get a CSS-generated " *" (src/index.css:114-116), so
+        // the accessible name is "Rechenmodus *" in a real browser. Use a
+        // regex role locator instead of an exact label match (Vitest's JSDOM
+        // does not render that pseudo-element, which hid this difference).
+        const modeSelect = main.getByRole('combobox', { name: /Rechenmodus/ });
         await expect(modeSelect).toBeVisible();
         for (const option of ['Gesamt', 'Nur Betrieb', 'Nur Vermietung', 'Prognose', 'Nur Bruttolohn', 'Nur andere Gewinne']) {
             await expect(modeSelect.getByRole('option', { name: option, exact: true })).toHaveCount(1);
         }
 
         await modeSelect.selectOption({ label: 'Nur Bruttolohn' });
-        await main.getByLabel('Gewinn (€)', { exact: true }).fill('1000');
+        await main.getByRole('textbox', { name: /Gewinn \(€\)/ }).fill('1000');
         await main.getByRole('button', { name: 'Steuer berechnen' }).click();
 
         // The allocation table only renders after the POST resolves; the
