@@ -1,7 +1,16 @@
 {
   "version": 1,
   "rules": {
+    "broken-feature-links": {
+      "value": 6
+    },
     "gates-untouched": {
+      "value": 0
+    },
+    "inventory-not-forwarded": {
+      "value": 0
+    },
+    "migration-frontier-drift": {
       "value": 0
     },
     "open-security-findings": {

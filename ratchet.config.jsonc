@@ -33,6 +33,39 @@
           "agent_rule": "unverified-commits",
           "since": "2026-11-17"
         }
+      },
+      "migration-frontier-drift": {
+        "class": "a migration landed without the documented frontier being updated",
+        "incident": "AD-2 in features/tech/07-architectural-decisions.md is the only place that names the migration frontier; a migration could land without it and the drift stayed invisible until someone quoted the document",
+        "unit": "migration files ahead of the documented frontier",
+        "direction": "ceiling",
+        "tier": "fast",
+        "description": "counts files V*.php in backend/database/migrations whose number is greater than the highest V<number> named in the AD-2 row of features/tech/07-architectural-decisions.md. That row is the single documented frontier (backend/AGENTS.md, Migration Policy). Measured 0 today: AD-2 names V074 and the directory ends at V074__eur_document_positions.php",
+        "count": {
+          "command": ["sh", "-c", "python3 - <<'PY'\nfrom pathlib import Path\nimport re\nrow = next(l for l in Path('features/tech/07-architectural-decisions.md').read_text().splitlines() if l.startswith('| AD-2 '))\nfrontier = max(int(n) for n in re.findall(r'V([0-9]+)', row))\nfiles = Path('backend/database/migrations').glob('V*.php')\nprint(sum(1 for f in files if int(re.match(r'V([0-9]+)', f.name).group(1)) > frontier))\nPY"]
+        }
+      },
+      "inventory-not-forwarded": {
+        "class": "an inventory name the Compose file no longer forwards",
+        "incident": "the five REGISTRATION_* keys were listed in deployment/production-env.keys since 117785c8 while the backend service forwarded none of them — a host .env entry had no effect and only fail-closed defaults applied",
+        "unit": "inventory names with no Compose reference",
+        "direction": "ceiling",
+        "tier": "fast",
+        "description": "the numerical form of the inventory check in tests/infrastructure/compose-entrypoint-contract.sh: counts names in deployment/production-env.keys that are neither a ${NAME} reference nor a '- NAME=' key line in deployment/docker-compose.yml after comments are stripped. ${MEILI_MASTER_KEY} in the value of '- MEILISEARCH_KEY=…' therefore counts as forwarded; counting bare key names alone would wrongly report 1. Measured 0 today: 84 names, all referenced",
+        "count": {
+          "command": ["sh", "-c", "python3 - <<'PY'\nfrom pathlib import Path\nimport re\ncompose = re.sub(r'(^|[ ])#.*$', '', Path('deployment/docker-compose.yml').read_text(), flags=re.M)\nnames = [l.strip() for l in Path('deployment/production-env.keys').read_text().splitlines() if l.strip() and not l.lstrip().startswith('#')]\nmissing = [n for n in names if not re.search(r'[$][{]' + re.escape(n) + r'([:}])', compose) and not re.search(r'^[ ]+- ' + re.escape(n) + r'=', compose, re.M)]\nprint(len(missing))\nPY"]
+        }
+      },
+      "broken-feature-links": {
+        "class": "a relative Markdown link to a missing file inside this repository",
+        "incident": "six legacy links point at files that do not exist and CI has no link check, so each new typo adds another silently",
+        "unit": "broken relative links",
+        "direction": "ceiling",
+        "tier": "fast",
+        "description": "counts [label](target) links in *.md outside vendor/, node_modules/ and .agents/ whose target resolves inside this repository but to a missing path. Absolute routes (/privacy), URLs and anchors do not count; targets that leave the repository (the sibling strato-vps docs) are not this repository's to check. Measured 6 today, to be paid down one link at a time",
+        "count": {
+          "command": ["sh", "-c", "python3 - <<'PY'\nfrom pathlib import Path\nfrom urllib.parse import unquote\nimport re\nroot = Path('.').resolve()\nlinks = re.compile(re.escape('[') + '[^]]*' + re.escape(']') + re.escape('(') + '([^)]+)' + re.escape(')'))\nskip = {'vendor', 'node_modules', '.agents', '.git'}\nbroken = 0\nfor page in Path('.').rglob('*.md'):\n    if set(page.parts) & skip:\n        continue\n    for m in links.finditer(page.read_text(errors='replace')):\n        target = m.group(1).strip().split('#', 1)[0].split('?', 1)[0]\n        if not target or target.startswith(('/', '#', '//', 'http', 'mailto', 'tel', 'data')):\n            continue\n        if ':' in target.split('/')[0]:\n            continue\n        resolved = (page.parent / unquote(target)).resolve()\n        if resolved.is_relative_to(root) and not resolved.exists():\n            broken += 1\nprint(broken)\nPY"]
+        }
       }
     }
   }
