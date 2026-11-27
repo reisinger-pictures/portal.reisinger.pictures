@@ -39,6 +39,7 @@ import EurEntriesPanel from './eur/EurEntriesPanel';
 import EurEntryDialog from './eur/EurEntryDialog';
 import EurHoursPanel from './eur/EurHoursPanel';
 import EurIncomeTaxPanel from './eur/EurIncomeTaxPanel';
+import EurInvoiceCorrectionPanel from './eur/EurInvoiceCorrectionPanel';
 import EurMonthPanel from './eur/EurMonthPanel';
 import EurOverviewPanel from './eur/EurOverviewPanel';
 import EurProjectAnalyticsPanel from './eur/EurProjectAnalyticsPanel';
@@ -658,6 +659,7 @@ export default function ManagementEurView() {
                                 onRetry={() => void entries.mutate()}
                                 onCreate={() => setIsEntryDialogOpen(true)}
                             />
+                            <EurInvoiceCorrectionPanel year={year} month={month} onCreated={reloadAll}/>
                             <EurOverviewPanel
                                 summary={summary.data}
                                 settings={settings.data}

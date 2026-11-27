@@ -856,6 +856,20 @@ export async function createEurEntry(payload: EurEntryPayload): Promise<void> {
     await apiMutate('/api/management/eur/entries', 'POST', payload);
 }
 
+/** #71: a partial refund of an automatic invoice, booked as negative income. */
+export interface EurInvoiceCorrectionPayload {
+    invoice_number: string;
+    refund_cents: number;
+    reason: string;
+    year: number;
+    month: number;
+    day: number;
+}
+
+export async function createEurInvoiceCorrection(payload: EurInvoiceCorrectionPayload): Promise<void> {
+    await apiMutate('/api/management/eur/entries/invoice-corrections', 'POST', payload);
+}
+
 export async function saveEurSettings(payload: {
     default_business_share: number;
     sv_mode: string;

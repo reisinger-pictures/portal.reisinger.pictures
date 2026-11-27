@@ -98,6 +98,27 @@ idempotent (200, auch beim zweiten Aufruf) und erzeugt einen Audit-Eintrag.
 hint}]`. Die Felder `day`, `category`, `description` sind optional; fehlende
 Werte erzeugen einen Hinweis mit Lösungsweg statt eines Fehlers.
 
+### Rechnungskorrektur (#71)
+
+`POST /eur/entries/invoice-corrections` mit
+`{invoice_number, refund_cents, reason, year, month, day}` dokumentiert eine
+extern ausgeführte Teilrückzahlung als negative Einnahme (Erlösminderung,
+`category: "Rechnungskorrektur"`, `business_amount_cents: -refund_cents`) der
+automatisch übernommenen Rechnung. Antwort `201 {entry: {...}}` mit `id`,
+`year`, `month`, `day`, `direction`, `amount_cents`, `business_amount_cents`,
+`e1a_code`, `category`, `receipt_no`, `description`, `external_id`.
+
+Unbekannte oder fremde Rechnung → 404 (`"Rechnung nicht gefunden."`),
+ungültige Beträge/Daten, eine die Rechnungssumme überschreitende Summe der
+Teilrückzahlungen oder ein abgeschlossener Zielmonat → 422. `year`/`month`
+bezeichnen den Rückzahlungszeitraum und dürfen vom Rechnungsdatum abweichen.
+Die externe ID `invoice-correction:<invoice_number>:<refund_cents>:<year>-<month>-<day>`
+macht den Aufruf idempotent: ein Replay liefert 201 mit derselben Buchung,
+ohne zweite Zeile und ohne zweiten Audit-Eintrag, auch nach Monatsabschluss.
+Es wird keine Erstattung ausgelöst; die USt-Korrektur ist nicht Teil des
+Endpunkts. Siehe
+[`08-invoice-takeover.md`](08-invoice-takeover.md#korrekturen-einer-übernommenen-buchung-portal-71).
+
 ## Belege, Stunden, Wareneingang, Anträge, Signaturen
 
 - `GET/POST /eur/documents` — Upload als `multipart/form-data` mit `file`,

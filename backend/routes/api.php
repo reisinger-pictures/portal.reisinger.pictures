@@ -20,6 +20,7 @@ use App\Http\Controllers\Eur\EurEigenbelegController;
 use App\Http\Controllers\Eur\EurEntryController;
 use App\Http\Controllers\Eur\EurHourController;
 use App\Http\Controllers\Eur\EurIncomeTaxController;
+use App\Http\Controllers\Eur\EurInvoiceCorrectionController;
 use App\Http\Controllers\Eur\EurMonthController;
 use App\Http\Controllers\Eur\EurPdfController;
 use App\Http\Controllers\Eur\EurReferenceController;
@@ -323,6 +324,7 @@ Route::middleware(['auth:api', 'management'])->group(function () {
     Route::get('/management/eur/entries', [EurEntryController::class, 'index'])->name('api.management.eur.entries.index');
     Route::post('/management/eur/entries', [EurEntryController::class, 'store'])->name('api.management.eur.entries.store');
     Route::post('/management/eur/entries/import', [EurEntryController::class, 'import'])->name('api.management.eur.entries.import');
+    Route::post('/management/eur/entries/invoice-corrections', [EurInvoiceCorrectionController::class, 'store'])->name('api.management.eur.entries.invoice-corrections');
     Route::post('/management/eur/eigenbelege', [EurEigenbelegController::class, 'store'])->name('api.management.eur.eigenbelege.store');
     Route::put('/management/eur/entries/{id}', [EurEntryController::class, 'update'])->name('api.management.eur.entries.update');
     Route::delete('/management/eur/entries/{id}', [EurEntryController::class, 'destroy'])->name('api.management.eur.entries.destroy');
