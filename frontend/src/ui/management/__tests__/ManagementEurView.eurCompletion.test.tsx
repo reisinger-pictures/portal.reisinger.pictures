@@ -220,7 +220,7 @@ describe('ManagementEurView EAR completion UI', () => {
         renderView();
 
         await userEvent.click(screen.getByRole('button', {name: '+ Eigenbeleg'}));
-        const day = screen.getByLabelText('Tag');
+        const day = screen.getByLabelText('Tag', {selector: 'input[name="ebDay"]'});
         await userEvent.clear(day);
         await userEvent.type(day, '5');
         await userEvent.type(screen.getByLabelText('Beschreibung'), 'Porto');
@@ -245,7 +245,7 @@ describe('ManagementEurView EAR completion UI', () => {
         renderView();
 
         await userEvent.click(screen.getByRole('button', {name: '+ Eigenbeleg'}));
-        const day = screen.getByLabelText('Tag');
+        const day = screen.getByLabelText('Tag', {selector: 'input[name="ebDay"]'});
         await userEvent.clear(day);
         await userEvent.type(day, '32');
         await userEvent.type(screen.getByLabelText('Betrag (€)'), 'abc');
@@ -284,7 +284,7 @@ describe('ManagementEurView EAR completion UI', () => {
         renderView();
 
         await userEvent.click(screen.getByRole('button', {name: '+ Eigenbeleg'}));
-        const day = screen.getByLabelText('Tag');
+        const day = screen.getByLabelText('Tag', {selector: 'input[name="ebDay"]'});
         await userEvent.clear(day);
         await userEvent.type(day, '5');
         await userEvent.type(screen.getByLabelText('Beschreibung'), 'Null');

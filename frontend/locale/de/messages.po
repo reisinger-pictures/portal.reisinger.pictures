@@ -363,6 +363,10 @@ msgstr "6. SFTP zuerst probieren"
 msgid "7. Widerrufsrecht"
 msgstr "7. Widerrufsrecht"
 
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "70,00"
+msgstr "70,00"
+
 #: src/ui/LicenseTerms.tsx
 msgid "8. Lizenzbedingungen und Nutzungsrechte"
 msgstr "8. Lizenzbedingungen und Nutzungsrechte"
@@ -1934,6 +1938,10 @@ msgstr "Bitte einen gültigen Betrag eingeben"
 msgid "Bitte einen gültigen Betrag eingeben."
 msgstr "Bitte einen gültigen Betrag eingeben."
 
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Bitte einen gültigen Rückzahlungsbetrag über null angeben"
+msgstr "Bitte einen gültigen Rückzahlungsbetrag über null angeben"
+
 #: src/ui/management/eur/EurDocumentsPanel.tsx
 msgid "Bitte einen Namen angeben"
 msgstr "Bitte einen Namen angeben"
@@ -2874,6 +2882,14 @@ msgstr "Die Position {name} wurde entfernt."
 msgid "Die Position konnte nicht entfernt werden."
 msgstr "Die Position konnte nicht entfernt werden."
 
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Die Rechnungskorrektur konnte nicht gebucht werden. Bitte erneut versuchen."
+msgstr "Die Rechnungskorrektur konnte nicht gebucht werden. Bitte erneut versuchen."
+
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Die Rechnungskorrektur wurde gebucht."
+msgstr "Die Rechnungskorrektur wurde gebucht."
+
 #: src/ui/management/ManagementUserView.tsx
 msgid "Die Rollen wurden inzwischen geändert. Der Dialog wurde geschlossen – bitte erneut öffnen und die Rechte erneut speichern."
 msgstr "Die Rollen wurden inzwischen geändert. Der Dialog wurde geschlossen – bitte erneut öffnen und die Rechte erneut speichern."
@@ -3217,6 +3233,10 @@ msgstr "Ein unerwarteter Serverfehler ist aufgetreten."
 #: src/ui/management/eur/EurTravelPanel.tsx
 msgid "eine"
 msgstr "eine"
+
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Eine extern bereits erstattete Teilrückzahlung wird als negative Einnahme (Erlösminderung) gebucht. Es wird keine Zahlung ausgelöst; die Umsatzsteuer-Korrektur bleibt außerhalb dieser Buchung."
+msgstr "Eine extern bereits erstattete Teilrückzahlung wird als negative Einnahme (Erlösminderung) gebucht. Es wird keine Zahlung ausgelöst; die Umsatzsteuer-Korrektur bleibt außerhalb dieser Buchung."
 
 #: src/ui/management/eur/EurAssetGroupsPanel.tsx
 msgid "Eine Gruppe ist eine Abrechnungseinheit: Alle Anlagegüter der hier verknüpften Belege sind Mitglieder dieser Gruppe."
@@ -4502,6 +4522,14 @@ msgstr "Google Pay"
 msgid "Größe"
 msgstr "Größe"
 
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Grund"
+msgstr "Grund"
+
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Grund angeben"
+msgstr "Grund angeben"
+
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 #: src/ui/management/eur/EurReferencePanel.tsx
 msgid "Grundfreibetrag"
@@ -4924,6 +4952,7 @@ msgstr "ISO"
 msgid "Ja"
 msgstr "Ja"
 
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
 #: src/ui/management/ManagementEurView.tsx
 #: src/ui/management/ManagementPayoutsView.tsx
 msgid "Jahr"
@@ -4936,6 +4965,10 @@ msgstr "Jahr {yearValue}: Eigenbeleg {eigenbelegNo} · {amount} bei {usage} Nutz
 #: src/ui/management/eur/EurAssetsPanel.tsx
 msgid "Jahr übernehmen"
 msgstr "Jahr übernehmen"
+
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Jahr zwischen 2024 und 2026 wählen"
+msgstr "Jahr zwischen 2024 und 2026 wählen"
 
 #: src/ui/management/ManagementModelsView.tsx
 #: src/ui/ModelProfileAccessView.tsx
@@ -6208,6 +6241,7 @@ msgstr "Mollie-Verbindungstest"
 #: src/ui/management/eur/EurDocumentsPanel.tsx
 #: src/ui/management/eur/EurEntriesPanel.tsx
 #: src/ui/management/eur/EurEntryDialog.tsx
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
 #: src/ui/management/eur/EurMonthPanel.tsx
 #: src/ui/management/eur/EurOverviewPanel.tsx
 #: src/ui/management/eur/EurSignaturePanel.tsx
@@ -6230,6 +6264,7 @@ msgid "Monat nicht signiert"
 msgstr "Monat nicht signiert"
 
 #: src/ui/management/eur/EurEntryDialog.tsx
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
 msgid "Monat zwischen 1 und 12 wählen"
 msgstr "Monat zwischen 1 und 12 wählen"
 
@@ -7126,6 +7161,10 @@ msgstr "Outdoor-Bilder/Std."
 msgid "Outdoor-Shooting (Bilder/Std.: {outdoorImagesPerHour})"
 msgstr "Outdoor-Shooting (Bilder/Std.: {outdoorImagesPerHour})"
 
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "P-2026-0001-0001"
+msgstr "P-2026-0001-0001"
+
 #: src/logic/modelRegistration.ts
 msgid "Paar"
 msgstr "Paar"
@@ -7717,9 +7756,22 @@ msgstr "Rechnungsdetails"
 msgid "Rechnungsempfänger"
 msgstr "Rechnungsempfänger"
 
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Rechnungskorrektur"
+msgstr "Rechnungskorrektur"
+
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Rechnungskorrektur buchen"
+msgstr "Rechnungskorrektur buchen"
+
 #: src/ui/management/eur/EurDepreciationPanel.tsx
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
 msgid "Rechnungsnummer"
 msgstr "Rechnungsnummer"
+
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Rechnungsnummer angeben"
+msgstr "Rechnungsnummer angeben"
 
 #: src/ui/management/components/UserTable.tsx
 msgid "Rechte (Gruppen / Galerien)"
@@ -7853,6 +7905,10 @@ msgstr "Rollover: {rolledOverAmount}"
 #: src/ui/management/KameraEinrichtungContent.tsx
 msgid "ROOT.PEM herunterladen"
 msgstr "ROOT.PEM herunterladen"
+
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Rückzahlung (€)"
+msgstr "Rückzahlung (€)"
 
 #: src/ui/management/eur/EurIncomeTaxPanel.tsx
 #: src/ui/management/eur/EurMonthPanel.tsx
@@ -8572,6 +8628,7 @@ msgid "Tabelle löschen"
 msgstr "Tabelle löschen"
 
 #: src/ui/management/eur/EurHoursPanel.tsx
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
 #: src/ui/management/eur/EurMonthPanel.tsx
 #: src/ui/management/eur/EurWarehousePanel.tsx
 #: src/ui/management/ManagementEurView.tsx
@@ -8581,6 +8638,10 @@ msgstr "Tag"
 #: src/ui/management/ManagementEurView.tsx
 msgid "Tag zwischen 1 und 31 angeben"
 msgstr "Tag zwischen 1 und 31 angeben"
+
+#: src/ui/management/eur/EurInvoiceCorrectionPanel.tsx
+msgid "Tag zwischen 1 und 31 wählen"
+msgstr "Tag zwischen 1 und 31 wählen"
 
 #: src/ui/management/eur/EurWarehousePanel.tsx
 msgid "Tag, Beschreibung, Lieferant, Belegnummer und Betrag angeben; bei WE-Belegen ist die Ausgaben-Art erforderlich."

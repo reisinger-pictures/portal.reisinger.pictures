@@ -94,7 +94,45 @@ Jede erstmalige Übernahme, jeder Konflikt und jedes Opt-out erzeugt einen
 `eur_audit_logs`-Eintrag mit demselben Brand und nur fachlichen Feldern
 (Quelle, externe ID, Rechnungsnummer, Cent-Betrag, Betriebsanteil).
 
-Korrekturen einer übernommenen Buchung laufen über die regulären
-Buchhaltungs-Schreibpfade und erzeugen dort ihren eigenen Audit-Eintrag. Eine
-neue Signatur ist ohne gesonderten Vertrag nicht Teil der automatischen
-Übernahme.
+## Korrekturen einer übernommenen Buchung (Portal #71)
+
+Eine **Rechnungskorrektur** dokumentiert eine extern bereits ausgeführte
+Teilrückzahlung einer automatisch übernommenen Rechnung. Sie ist eine
+**negative Einnahme** (Erlösminderung) im selben Journal, keine
+Betriebsausgabe: aus 100,00 € ursprünglichem Erlös und 70,00 € Rückzahlung
+wird ein Nettoerlös von 30,00 €. Es wird **keine Zahlung und keine Mollie-
+Erstattung ausgelöst**; die Umsatzsteuer-Korrektur bleibt außerhalb dieses
+Vertrags. Eine neue Signatur ist ohne gesonderten Vertrag ebenfalls nicht
+Teil der automatischen Übernahme.
+
+`POST /eur/entries/invoice-corrections` sucht die Ursprungsbuchung
+brand-scoped über `external_id = invoice:<Rechnungsnummer>`; eine unbekannte
+oder fremde Rechnung ist ein 404. Der Rückzahlungsbetrag muss mindestens
+1 Cent sein; die **Summe aller Teilrückzahlungen** dieser Rechnung darf den
+Rechnungsbetrag nicht überschreiten. Das Jahr muss unterstützt sein, Monat
+und Tag gültig und der Grund nicht leer. Zielzeitraum ist der Zeitraum der
+Rückzahlung: Jahr und Monat dürfen vom Rechnungsdatum abweichen (etwa eine
+Erstattung im Folgejahr mindert das EÜR-Ergebnis des Folgejahres), eine
+Kopplung an das Ursprungsdatum gibt es nicht. Ein Zielmonat mit
+`EurMonthlyReport.status = closed` bleibt für neue Buchungen unveränderlich
+(D-58) und wird mit 422 abgewiesen.
+
+| Feld | Wert der Korrekturbuchung |
+|---|---|
+| `direction` | `income` (negative Einnahme, keine Ausgabe) |
+| `amount_cents` | `-refund_cents` |
+| `business_share` / `business_amount_cents` | `100` / `-refund_cents` |
+| `kind_type`, `category` | `Dienstleistung`, `Rechnungskorrektur` |
+| `e1a_code` | `9040` (Referenz-Fallback EUE-008) |
+| `receipt_no` | Rechnungsnummer der Ursprungsrechnung |
+| `description` | `Rechnungskorrektur: <Grund>`, auf 190 Zeichen gekürzt |
+| `note` | `null` |
+| `external_id` | `invoice-correction:<Rechnungsnummer>:<refund_cents>:<year>-<month>-<day>` |
+
+Die externe ID ist deterministisch; der Unique-Index `(brand, external_id)`
+macht einen Replay zum No-op: ein zweiter Aufruf liefert 201 mit derselben
+Buchung, ohne zweite Zeile und ohne zweiten Audit-Eintrag — auch dann, wenn
+der Zielmonat inzwischen abgeschlossen wurde. Der Audit-Eintrag
+`invoice_correction_created` enthält nur fachliche Felder (Rechnungsnummer,
+Rückzahlungs- und Restbetrag in Cent, Jahr, Monat, Betriebsanteil), keine
+Dateiinhalte und keine Secrets.
