@@ -90,13 +90,13 @@ export default function ProjectModal({ isOpen, onClose, editing: project, onSave
     if (!isOpen) return null;
 
     const onSubmit = async (data: ProjectFormValues) => {
-        const priceEur = data.price_eur === undefined || data.price_eur === '' ? undefined : Number(data.price_eur);
+        const priceEa = data.price_eur === undefined || data.price_eur === '' ? undefined : Number(data.price_eur);
         const input: ProjectInput = {
             client_name: data.client_name,
             email: data.email || '',
             phone: data.phone || null,
             package: data.package || null,
-            price_cents: priceEur != null ? Math.round(priceEur * 100) : null,
+            price_cents: priceEa != null ? Math.round(priceEa * 100) : null,
             payment_status: data.payment_status || 'open',
             assignee_id: data.assignee_id || null,
             notes: data.notes || null,

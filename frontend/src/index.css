@@ -285,11 +285,11 @@
        tablist so every other portal view keeps daisyUI's default tab styling. Active tabs
        keep their raised background/box-shadow and are bolded here so they stay distinct
        from the now full-contrast inactive labels. */
-    .eur-tabs > .tab:not(.tab-active) {
+    .ea-tabs > .tab:not(.tab-active) {
         color: var(--color-base-content);
     }
 
-    .eur-tabs > .tab.tab-active {
+    .ea-tabs > .tab.tab-active {
         font-weight: 700;
     }
 }

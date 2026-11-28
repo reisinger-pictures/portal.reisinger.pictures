@@ -498,9 +498,9 @@ ssh root@reisinger.pictures 'cd /opt/stacks/portal-reisinger-pictures && \
 Der Restart führt den Entrypoint aus; dort laufen `migrate --force`,
 `app:seed-if-fresh` (nur bei leerer `users`-Tabelle) und `admin:update`.
 Danach Health und eine Route der geänderten Funktion prüfen (`/api/ping`,
-`route:list --path=api/management/eur`). Die gemessenen Gates und der
+`route:list --path=api/management/ea`). Die gemessenen Gates und der
 Restore-Test für Belege stehen in
-[`features/security/eur-document-backup-and-delivery.md`](../features/security/eur-document-backup-and-delivery.md).
+[`features/security/ea-document-backup-and-delivery.md`](../features/security/ea-document-backup-and-delivery.md).
 
 #### Rechte-Modell: UID 1002 und geschlossene Dateirechte (OPS-3)
 

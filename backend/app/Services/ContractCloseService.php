@@ -8,8 +8,8 @@ use App\Models\InvoiceSequence;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
-use App\Services\Eur\EurInvoiceTakeoverData;
-use App\Services\Eur\EurInvoiceTakeoverService;
+use App\Services\Ea\EaInvoiceTakeoverData;
+use App\Services\Ea\EaInvoiceTakeoverService;
 use App\Support\BrandRegistry;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\DeadlockException;
@@ -229,8 +229,8 @@ class ContractCloseService
         // A priced contract close is an automatic invoice send. The takeover
         // shares the close transaction and the invoice-number key, so a retry
         // of an already-closed contract cannot create a second booking.
-        app(EurInvoiceTakeoverService::class)->takeover(
-            EurInvoiceTakeoverData::fromInvoiceSnapshot($snapshot, EurInvoiceTakeoverData::SOURCE_CONTRACT_INVOICE)
+        app(EaInvoiceTakeoverService::class)->takeover(
+            EaInvoiceTakeoverData::fromInvoiceSnapshot($snapshot, EaInvoiceTakeoverData::SOURCE_CONTRACT_INVOICE)
         );
     }
 

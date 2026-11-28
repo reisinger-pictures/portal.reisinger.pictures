@@ -41,7 +41,7 @@ class OrderController extends Controller
             'status' => $order->status,
             'invoice_number' => $order->invoiceSnapshot?->invoice_number,
             'total_amount' => (int) $order->total_amount,
-            'currency' => 'eur',
+            'currency' => 'ea',
         ]);
     }
 

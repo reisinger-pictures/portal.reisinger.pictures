@@ -65,7 +65,7 @@ class ManagementMiddleware
         // (eigene Middleware an der Route). Der Rollen-Check ist absichtlich
         // auf EAR-Pfade begrenzt: er kostet eine DB-Abfrage und würde sonst
         // die Query-Baseline jeder Management-Route verändern.
-        if (! $isAllowed && $request->is('api/management/eur*') && $svc->isAccounting($user)) {
+        if (! $isAllowed && $request->is('api/management/ea*') && $svc->isAccounting($user)) {
             $isAllowed = true;
         }
 

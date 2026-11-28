@@ -153,7 +153,7 @@ export default function App() {
                             <Route path="/tenants/:id" element={<TenantRedirect />}/>
                             <Route path="/admin-orders" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/steuern" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
-                            <Route path="/eur" element={<Navigate to="/steuern" replace/>}/>
+                            <Route path="/ea" element={<Navigate to="/steuern" replace/>}/>
                             <Route path="/admin-manual-invoice" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-manual-offer" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>
                             <Route path="/admin-customers" element={<ProtectedRoute requiredFeature="b2b"><ErrorBoundary><ProtectedDashboard/></ErrorBoundary></ProtectedRoute>}/>

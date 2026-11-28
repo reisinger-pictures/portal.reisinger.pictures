@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use App\Eur\Domain\VatCalculator;
-use App\Eur\Parity\BookkeepingTotals;
-use App\Eur\Parity\Money;
-use App\Eur\Parity\RuleValues;
+use App\Ea\Domain\VatCalculator;
+use App\Ea\Parity\BookkeepingTotals;
+use App\Ea\Parity\Money;
+use App\Ea\Parity\RuleValues;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\ExpectationFailedException;

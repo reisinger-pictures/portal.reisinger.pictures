@@ -1,0 +1,363 @@
+# EAR · API-Vertrag für die Buchhaltungsansicht
+
+Alle Endpunkte liegen unter `/api/management/ea/*`, sind authentifiziert und
+brand-scoped. Geld ist immer ganzzahlige Cent, Zeit ganze Minuten, Anteile
+ganze Prozent in 5-%-Schritten. Ein fremder Datensatz ist ein 404, eine
+ungültige Eingabe ein 422. Alle Antworten enthalten keine Paritäts- oder
+Technikdetails.
+
+**Abgrenzung zur gepinnten OpenAPI:** Das Handoff-Artefakt
+`prototype/docs/openapi.yaml` beschreibt eine Server-to-Server-Integrations-API,
+die das Portal nicht implementiert und nicht produktiv nutzt. Es ist
+Übergabeinformation, nicht der Portal-Vertrag ([D-71](../owner-decisions.md#d-71-the-pinned-openapi-contract-is-reference-information-not-a-portal-api-contract)).
+Token-Scopes, `Idempotency-Key`, `409`, `429`/`Retry-After`, Ratenlimit und
+`POST /integrations/invoices` sind daher keine Portal-Anforderungen. Der
+Betriebsanteil wird an der Portal-Grenze zwischen Katalog (0.0–1.0) und API
+(0–100) explizit konvertiert; die Engine wird serverseitig gerufen, niemals vom
+Browser.
+
+## Jahr
+
+`GET /ea/years`
+
+```json
+{
+  "pinned_years": [2024, 2025, 2026],
+  "bookable_years": [2026],
+  "last_pinned_year": 2026,
+  "default_year": 2026,
+  "active_years": [2026]
+}
+```
+
+`pinned_years` sind die **Regeljahre** mit eingepflegter, gepinnter Basis
+(Tarif, SV-Tabellen, Kilometergeld, AfA); sie tragen die Vorjahresvergleiche
+EUE-056/057 und bleiben deshalb auch 2024 und 2025. `bookable_years` ist die
+Schnittmenge aus `pinned_years` und den **Buchungsjahren**, die mit 2026
+beginnen. `last_pinned_year` ist das jüngste Regeljahr; es ist der Fallback für
+jedes spätere Buchungsjahr. `default_year` ist das laufende Jahr, wenn es
+buchbar ist, sonst `last_pinned_year`. Ein `warnings`-Feld gibt es nicht mehr.
+
+`active_years` sind die Jahre mit mindestens einer Buchung im aktuellen Brand.
+Die UI zeigt im Jahres-Selector nur diese Jahre plus das laufende Jahr; das ist
+eine Anzeigeregel, keine Einschränkung der akzeptierten `year`-Werte.
+
+Alle übrigen Endpunkte akzeptieren `year` als Query-Parameter (GET) oder im
+Body (POST/PUT). Buchbar ist jedes Jahr ab 2026; 2024, 2025 und frühere Jahre
+sind kein Buchungsjahr und ergeben ein 422 mit der Meldung aus
+`EaYear::assertBookable()` („Buchungsjahre ab 2026 …"). Ohne Parameter gilt das
+laufende Buchungsjahr (`EaYear::currentOrLast()`): 2026 in 2026, 2027 ab 2027,
+und vor 2026 das letzte Regeljahr.
+
+Alle Lese-Endpunkte akzeptieren dieselbe Grenze — nur Buchungsjahre ab 2026.
+Buchungsdaten vor 2026 gibt es nicht: das Buchhaltungsschema wurde mit V061 für
+das Buchungsjahr 2026 eingeführt, die `ea_*`-Tabellen sind vor dem ersten
+Buchen leer.
+
+Fehlt für ein Buchungsjahr die gepinnte Regelbasis (`year > last_pinned_year`,
+heute 2027), bricht der Request **nicht** ab: Tarif, SV-Werte, Kilometergeld,
+Reise-Ländertabelle und Regelparameter werden über `EaYear::effective()` aus
+`last_pinned_year` gelesen, und die UI weist mit beiden Jahreszahlen darauf hin
+(siehe [05-ui.md](05-ui.md#regelbasis-und-jahres-hinweis-eue-002003)).
+
+Die HTTP-Endpunkte akzeptieren ausschließlich Buchungsjahre ab 2026; 2024 und
+2025 sind dort kein gültiger `year`-Wert (422). Die Regel-Lookups dahinter —
+`YearTables`, `ReferenceTables`, `RuleValues` — bedienen 2024 und 2025 intern
+weiter, weil die Vorjahresvergleiche EUE-056/057 und bestehende AfA-Pläne diese
+Regelbasis brauchen. Diese interne Auflösung ist kein akzeptierter
+Request-Parameter.
+
+Der AfA-Jahreswechsel (`POST /ea/assets/carry-over`) ist **keine** Buchung: er
+schreibt Jahreszeilen und akzeptiert deshalb sowohl die Regeljahre 2024/2025
+(bestehende Pläne, Vorjahresvergleiche EUE-056/057) als auch jedes Buchungsjahr
+ab 2026 — 2027 eingeschlossen. Die Jahreszeile entsteht zieljahresunabhängig
+aus dem Plan (Planindex `Zieljahr − Kaufjahr`, degressiver Satz am Anlagegut);
+eine private Gruppe erhält ihre Zieljahres-Zeile samt Eigenbeleg
+(`EBG-<id>-<jahr>`). Jahre vor 2024 lehnt der Endpunkt mit 422 und der Meldung
+aus `EaYear::assert()` ab (`year` ist Pflichtfeld).
+
+## Journal und Monat
+
+`GET /ea/month?year=2026&month=5`
+
+```json
+{
+  "year": 2026,
+  "month": 5,
+  "lines": [
+    {"type": "E|A|WEB|FR", "day": 5, "description": "…", "amount_cents": 12000,
+     "business_amount_cents": 12000, "vat_kind": null, "receipt_no": null,
+     "warnings": [], "hints": []}
+  ],
+  "totals": {"income_cents": 0, "expense_cents": 0, "warehouse_cents": 0,
+             "vat_cents": 0, "hours_minutes": 0},
+  "checks": [{"code": "BE-ART", "ok": true, "message": "…", "hint": "…"}],
+  "social_insurance": {"amounts_cents": {}, "rates_per_10000": {}},
+  "income_tax": {"profit_cents": 0, "tax_cents": 0},
+  "report": {"status": "open", "closed_at": null},
+  "signature": {"status": "none", "provider": null, "is_test": false}
+}
+```
+
+Portal #58 ergänzt zwei **nicht blockierende** Hinweise zur realen SV-Buchung
+(38,00 € je Quartal, KZ 9225). `GET /ea/summary` liefert zusätzlich
+`sv_reminder` mit `target_per_quarter_cents` (3800), `quarters`
+(`quarter`, `booked_cents`, `done` für Q1–Q4), `open_quarters` und einem
+deutschen `message` (null, wenn alle Quartale gedeckt sind). Die Summe zählt
+brand-scoped alle 9225-Buchungen der jeweiligen Quartalsmonate; mehrere
+Buchungen addieren sich in ganzen Cent. Der Wert wird **nicht** aus
+`svMonthly()` hergeleitet und verändert weder `booked_sv_cents` noch die
+SV-Berechnung (EUE-109/115, D-79 bleiben unberührt). `GET /ea/month` enthält
+in den Quartalsmonaten 3/6/9/12 zusätzlich einen Check mit `code: "SV-9225"`
+im bestehenden `checks`-Array (`JournalRules::check`-Form mit ⚠/💡); außerhalb
+dieser Monate erscheint er nicht. Der Monatsabschluss bleibt uneingeschränkt
+möglich.
+
+`GET /ea/help-texts` und `GET /ea/help-texts?kz=9216` liefern die
+Ausfüllhilfe je Kennzahl aus dem gepinnten Artefakt
+`artifacts/verification/e1a-ausfuellhilfe.md`, Abschnitt 3. Jede Zeile hat
+`kz`, `bezeichnung`, `hilfetext` und `portal_note` (`null` oder ein
+Portalseitiger Hinweis). Die Spalte „Zelle" aus der Quelle wird nicht
+ausgeliefert; die Texte sind reine Hilfe, keine zweite Regelquelle und werden
+nicht verändert. Für `kz=9225` ergänzt `portal_note` den Doppelzählungs-Hinweis
+aus EUE-023/EUE-115. Ein ungültiges `kz` ist ein 422.
+
+`GET /ea/reference` ergänzt `kz_catalogue` mit `expense_codes` (27 diverse
+Kennzahlen), `income_codes` (5), `e1b_codes` (6, inklusive der geteilten 9135)
+und `distinct_expense_count`. Die Vektoren stammen aus der gepinnten `DOMAIN.md`,
+nicht aus der Ausfüllhilfe und nicht aus einer zweiten Liste im Code; die
+Ausfüllhilfe hat einen anderen Scope (Einnahmen/Pauschalen ohne E1B).
+
+`POST /ea/month/close` mit `{year, month, note?}` schließt den Monat
+idempotent (200, auch beim zweiten Aufruf) und erzeugt einen Audit-Eintrag.
+
+`GET /ea/entries` liefert zusätzlich je Buchung `checks: [{code, ok, message,
+hint}]`. Die Felder `day`, `category`, `description` sind optional; fehlende
+Werte erzeugen einen Hinweis mit Lösungsweg statt eines Fehlers.
+
+### Rechnungskorrektur (#71)
+
+`POST /ea/entries/invoice-corrections` mit
+`{invoice_number, refund_cents, reason, year, month, day}` dokumentiert eine
+extern ausgeführte Teilrückzahlung als negative Einnahme (Erlösminderung,
+`category: "Rechnungskorrektur"`, `business_amount_cents: -refund_cents`) der
+automatisch übernommenen Rechnung. Antwort `201 {entry: {...}}` mit `id`,
+`year`, `month`, `day`, `direction`, `amount_cents`, `business_amount_cents`,
+`e1a_code`, `category`, `receipt_no`, `description`, `external_id`.
+
+Unbekannte oder fremde Rechnung → 404 (`"Rechnung nicht gefunden."`),
+ungültige Beträge/Daten, eine die Rechnungssumme überschreitende Summe der
+Teilrückzahlungen oder ein abgeschlossener Zielmonat → 422. `year`/`month`
+bezeichnen den Rückzahlungszeitraum und dürfen vom Rechnungsdatum abweichen.
+Die externe ID `invoice-correction:<invoice_number>:<refund_cents>:<year>-<month>-<day>`
+macht den Aufruf idempotent: ein Replay liefert 201 mit derselben Buchung,
+ohne zweite Zeile und ohne zweiten Audit-Eintrag, auch nach Monatsabschluss.
+Es wird keine Erstattung ausgelöst; die USt-Korrektur ist nicht Teil des
+Endpunkts. Siehe
+[`08-invoice-takeover.md`](08-invoice-takeover.md#korrekturen-einer-übernommenen-buchung-portal-71).
+
+## Belege, Stunden, Wareneingang, Anträge, Signaturen
+
+- `GET/POST /ea/documents` — Upload als `multipart/form-data` mit `file`,
+  `year`, `month?`, `receipt_no?`. Antwort `{document: {...}}` ohne
+  Storage-Pfad. Die Datei liegt im privaten Disk, `sha256` wird gespeichert.
+- `GET /ea/documents/{id}/download` — authentifizierter Download,
+  fremde ID → 404. `DELETE /ea/documents/{id}`.
+- `GET/POST /ea/hours` — `{year, month, day, minutes, project?, description?}`,
+  `minutes > 0`, Antwort `{hours: [...], total_minutes: n}`.
+- `GET/POST /ea/warehouse` — `{year, month, day?, description, amount_cents,
+  receipt_no?}`, Antwort `{entries: [...], total_cents: n}`.
+- `GET/POST /ea/applications` — `{year, type, subject, note?}`, Antwort
+  `{applications: [...]}`. Status `open|done`.
+- `GET/POST /ea/signatures` — `{year, month, ea_document_id?, provider,
+  status?, note?}`, Antwort `{signature: {...}, is_test: bool}`. Provider mit
+  `test` im Namen ist als Testprovider gekennzeichnet.
+
+## Auswertungen und Steuer
+
+`GET /ea/analytics?year=2026`
+
+```json
+{
+  "by_customer": [{"name": "…", "revenue_cents": 0, "cost_cents": 0,
+                   "margin_cents": 0}],
+  "by_project": [{"name": "…", "revenue_cents": 0, "cost_cents": 0,
+                  "margin_cents": 0}],
+  "by_month": [{"month": 1, "income_cents": 0, "expense_cents": 0,
+                "profit_cents": 0}]
+}
+```
+
+`GET /ea/analytics/by-project?year=2026` (EUE-121) adds the project × month
+cross-tab: one row per project with twelve month cells (`income_cents`,
+`expense_cents`, `hours_minutes`, `result_cents`, `result_per_hour_cents`),
+project and annual totals, `month_totals`, `undistributed_hours_minutes`,
+`sv_excluded_cents` and `checks`/`match`. All money is whole cents, all time
+whole minutes; `result_per_hour_cents` is integer cents **per minute** of
+logged time (null without hours). Booked 9225 expenses are removed from
+project expenses outside the UV-only mode and reported as `sv_excluded_cents`.
+`prior_year_afa_cents` is deliberately a single top-level figure: assets have
+no project relation in the portal (D-85), so it is never distributed across
+projects. Hours without a project appear in the "Ohne Projekt" row and are
+also reported as `undistributed_hours_minutes` so no time is dropped.
+
+### Ausfüllhilfe-Werte für FinanzOnline (Portal #62/#63, D-91)
+
+`GET /ea/ausfuellhilfe?year=2026` und `GET /ea/pdf/ausfuellhilfe?year=2026`
+liefern die Werte der gepinnten ODS-Ausfüllhilfe in **ODS-Reihenfolge**, mit
+deutschen Labels, ganzen Cent und `null` für „leer" (nie `0`). Die Abschnitte
+sind `E1A`, `E1B`, `UST`, `UEBERSICHT`, `ABGLEICH`; jedes Feld trägt
+`order`, `sheet`, `cell`, `kz`, `label_de`, `value_cents`, `value_text`,
+`unit`, `source` und `deviations[]`. Das PDF ist eine interne Arbeitsunterlage
+(`Ausfuellhilfe-<year>.pdf`), kein amtliches Formular.
+
+Die E1A-Werte aggregiert `E1Statement::annual()` aus brand-scope Journalen mit
+Quellenzuordnung: `9100` enthält WEB, `9130/9134/9135` das Anlagenverzeichnis,
+`9160` die Reisen; `9040` und `9230` sind Restgrößen, E1B-Beiträge werden
+ausgeschlossen. Die UST-Werte stammen aus `VatReturnService::forYear()`, die SV
+aus `EaOverviewService::svMonthly()`. Es werden **keine** neuen Regeln oder
+Artefakte eingeführt; abweichende Konventionen erscheinen als Marker
+(D-79 110,22 €, D-85 private Eigenbelege, D-86 Reise-Struktur, D-87 KZ 066
+unentschieden, D-88 U23-Interpretation, D-89/D-90 Gruppen/Positionen).
+
+E39 (`ergonomisches_mobiliar_cents`), E40 (`arbeitsplatzpauschale_cents`) und
+`9275` (`arbeitszimmer_cents`) sind optionale **Request**-Parameter
+(`?e39_cents=…&e40_cents=…&arbeitszimmer_cents=…`), validiert und klassifiziert
+mit den gepinnten EUE-101/102-Parametern, aber **nicht persistiert**. Ohne
+Parameter bleibt der Wert `null` mit `source`-Hinweis „Eingabefeld, noch nicht
+gespeichert". Die manuelle Eintragung in FinanzOnline bleibt ausdrücklich beim
+Eigentümer; es gibt keinen elektronischen Übermittlungsweg.
+
+### Anlagen (#34)
+
+`GET /ea/assets?private=1` liefert nur Privateinlagen. `GET /ea/assets/compare`
+akzeptiert zusätzlich `business_share` (50–100 in 5-%-Schritten) und `name` und liefert
+`first_year: {linear_cents, degressive_cents, linear_business_cents,
+degressive_business_cents}` sowie `suggested_category` aus dem gepinnten
+Katalog (keine hartcodierte Kategorie). Neue Anlagegüter übernehmen den
+Kategorievorschlag, sofern nichts anderes angegeben wird.
+
+Bei `business_share < 100` legt das Portal zusätzlich die **Entnahme** nach
+EUE-055 automatisch an: eine Einnahme mit `kind_type = "Entnahme"`, `e1a_code =
+"9040"` (die gepinnte Ausfüllhilfe beschreibt 9060 als Erlös eines *abgegangenen*
+Anlageguts, hier liegt kein Abgang vor), `receipt_no = invoice_no` des
+Anlageguts und `amount_cents = cost_cents × (100 − business_share)` in ganzen
+Cent. Sie ist über Belegnummer + Art idempotent. Das Anlagegut liefert
+`entnahme: {done, entry_id, amount_cents}`; fehlende Entnahmen erzeugen eine
+nicht blockierende Warnung `EUE-055`.
+
+Bei `scope = private` erzeugt das Portal den Eigenbeleg **automatisch** mit dem
+AfA-Plan (beim Anlegen und beim Jahreswechsel, `EaAssetEigenbelegService`);
+die Jahreszeile trägt `eigenbeleg_no`, `theoretical_depreciation_cents`,
+`usage_percent` (`100 - private_use_percent`), `eigenbeleg_cents` und
+`eigenbeleg_created_at`. `POST /assets/{id}/book-depreciation` bleibt erhalten,
+meldet bei einem automatisch erzeugten Eigenbeleg aber `already_created: true`
+und schreibt kein zweites Mal. Es entsteht keine Journalbuchung und keine
+Gewinnminderung.
+
+Die lineare Fortführung im privaten Verzeichnis ist nicht an die
+`useful_life_years` gebunden: `EaAssetCarryOver` erzeugt für jede weitere
+Jahresübernahme eine Zeile mit `(1 / Nutzungsdauer) × Betriebsanteil ×
+Anschaffungswert`, solange das Gut aktiv ist. Die kumulierten Eigenbelege
+dürfen den initialen Anschaffungswert nicht übersteigen; eine Zeile, die die
+Grenze überschreiten würde, entsteht nicht. Der Restbuchwert bleibt dabei gemäß
+EUE-050 auf dem Mindestwert von 1 Cent. Betriebliche Güter behalten ihren
+festen Plan. `EaAssetsPanel.tsx` zeigt die privaten Güter in der eigenen
+Ansicht `Privateinlagen`.
+
+### Anlagegruppen (Portal #57, D-89)
+
+`GET/POST /ea/asset-groups`, `PUT /ea/asset-groups/{id}`,
+`POST /ea/asset-groups/{id}/assets` (`{asset_id}`),
+`DELETE /ea/asset-groups/{id}/assets/{assetId}` und
+`DELETE /ea/asset-groups/{id}` verwalten Abrechnungsgruppen. Eine Gruppe hat
+`id`, `name`, `business_share`, `scope`, `asset_ids`, `assets` und `years`.
+Der Gruppenanteil überschreibt den Anteil der Mitglieder; ein gruppiertes Gut
+trägt `ea_asset_group_id` und wird nicht mehr einzeln abgerechnet. Belege
+bleiben an den einzelnen Gütern. Eine Zuordnung mit gebuchtem Jahr wird mit
+422 abgewiesen. Betriebliche Gruppen buchen **eine** Entnahme unter
+`GR-<group id>`; private Gruppen erzeugen **einen** Eigenbeleg je Jahr
+(`EBG-<group id>-<year>`). Alle Beträge sind ganze Cent.
+
+### Beleg-Positionen (Portal #59, D-90)
+
+`GET/POST /ea/documents/{id}/positions`,
+`DELETE /ea/documents/positions/{positionId}` und
+`PUT /ea/documents/{id}/group` (`{group_id: number|null}`) bilden die beiden
+Richtungen derselben Verknüpfung. Eine Position ist eine angereicherte Zeile
+der bestehenden Pivot `ea_asset_documents` mit `id`, `asset_id`,
+`asset_name`, `label`, `amount_cents` und `ordinal`. Der Dokumenteintrag
+liefert zusätzlich `total_cents` (nullable), `allocated_cents` und
+`remaining_cents` (nullable). Das Splitten legt je Position ein eigenes
+Anlagegut mit eigener AfA und eigener Entnahme/Eigenbeleg an, solange es nicht
+gruppiert ist; ein gesetzter Belegbetrag darf nicht überschritten werden
+(sonst 422), ein Restbetrag bleibt erlaubt. Ein zweiter Split desselben Belegs
+wird mit 422 abgewiesen; das Löschen einer Position entfernt nur die
+Verknüpfung, nicht das Gut und seine Buchung. Die Gruppenzuordnung fasst alle
+mit dem Beleg verknüpften Güter in einer bestehenden Gruppe zusammen (eine
+Abrechnungseinheit je D-89) und stellt beim Lösen die Einzelabrechnung wieder
+her. `GET /ea/documents` liefert dieselben Zusatzfelder je Beleg;
+`GET /ea/asset-groups` ergänzt `document_ids` und `documents`, abgeleitet aus
+den verknüpften Gütern. Alle Abfragen sind brand-scoped (fremder Brand → 404),
+alle Beträge ganze Cent.
+
+Die Antwort enthält je Anlage `warnings: [{code, text}]`. Neben EUE-053/058
+meldet `AssetPlausibility` die nicht blockierenden Hinweise EUE-056
+(Vorjahres-AfA weicht vom gepinnten Plan um mehr als 1 Cent ab) und EUE-057
+(überzählige Vorjahres-AfA im Anschaffungsjahr, fehlender oder abweichender
+Restbuchwert). Der Restbuchwert-Vergleich rundet wie die ODS auf ganze Euro;
+die angezeigte Differenz bleibt in Cent. Nach einem vollzogenen Methodenwechsel
+(DEG-009/014) ist der gespeicherte Plan maßgeblich; für solche Anlagen werden
+keine EUE-056/057-Hinweise erzeugt, weil `switched_to_linear_at` den
+Entscheidungszeitpunkt und nicht das Wechseljahr des Plans speichert.
+
+`POST /ea/assets/{id}/switch-to-linear` setzt zusätzlich
+`switched_to_linear_at` und `switch_reason`. Ein Rückwechsel auf degressiv
+gibt es nicht: es existiert kein Schreibpfad, der `method` danach wieder auf
+`degressiv` setzt; ein zweiter Wechsel liefert 422 (EUE/DEG-013/014).
+
+`POST /ea/assets/{id}/book-depreciation` mit `{year}` erzeugt die
+Jahresabschlussbuchung über den bereits im AfA-Plan enthaltenen
+`business_use_cents`. Die Buchung ist über `ea_asset_years.ea_entry_id`
+idempotent (zweiter Aufruf: 200 mit `already_booked: true`).
+
+`POST /ea/est/calc` akzeptiert zusätzlich `mode`
+(`total|business|rental|forecast|gross_wage|other_profits`; EUE-105/106 —
+die letzten beiden kommen nur in den Formeln vor, das ODS bietet keinen
+Selector dafür) und liefert `e1a`, `e1b`, `deductions_cents` sowie `stages`.
+Der Client rechnet nichts nach. Weitere optionale Eingaben sind
+`employment_income_cents`, `wage_tax_cents`, `prepayment_cents`,
+`ergonomisches_mobiliar_cents`, `arbeitsplatzpauschale_cents`,
+`arbeitszimmer_cents`, `prognose` und `business_forecast_cents`; die
+Antwort ergänzt `steuerbilanz.pauschalen.e40_warning`/`e39_warning` mit den
+gepinnten Texten, `kz.U8`/`kz.U13` (EUE-104) sowie
+`est_allocation.prepayment_cents`/`wage_tax_cents`.
+
+Der Endpunkt bleibt ein **Rechner über übergebene Werte**: ohne `entries`
+und `months` ist die Prognose-Hochrechnung 0, solange kein expliziter
+Prognosewert übergeben wird. Die echten Jahressummen aus der Datenbank
+liefert `GET /ea/ausfuellhilfe` (D-91); die Steueransicht ist keine
+amtliche Erklärung.
+
+Die Antwort enthält zwei additive Blöcke (EUE-095/103/126):
+
+- `est_allocation`: `total_income_cents` (U14), `tax_cents` (U23/`ue_est`),
+  `employment_tax_cents` (U27), `rental_tax_cents` (U25),
+  `business_tax_cents` (U24, im Bruttolohn-Modus `null`) und `due_cents` (U29).
+  `kz.U12` ist das E1B-Ergebnis.
+- `monthlyResults`: `year`, `mode`, `annual` und `months` (zwölf Einträge).
+  Optionaler Request-Block `months: [{month: 1..12, gross_profit_cents,
+  hours_minutes?}]` liefert die Monatsgewinn-/Stundenbasis. Ohne Monatsdaten
+  ist `annual: null` und jeder Monatswert `null`. Je Monat werden
+  `est_sv_cents` (J12), `net_profit_cents` (K12), `net_per_hour_cents` (N5,
+  ganzzahlige Cent pro Stunde) sowie `basis_cents` (I16),
+  `loss_basis_cents` (I14) und `minimum_sv_cents` (I12) ausgeliefert.
+  `hours_minutes` sind ganze Minuten; bei 0 Minuten bleibt
+  `net_per_hour_cents` leer. Alle Geldbeträge sind ganze Cent.
+
+## Querschnitt
+
+- Jeder Schreibzugriff schreibt `ea_audit_logs` ohne Dateiinhalte.
+- Zeilenhinweise haben `code`, `ok`, `message` (deutsch, mit ⚠ bei Problemen)
+  und `hint` (deutscher Lösungsweg mit 💡).
+- Keine Antwort enthält `.xlsx`/`.ods`-Inhalte oder Rohdumps aus der Quelle.

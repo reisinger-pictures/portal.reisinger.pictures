@@ -1,0 +1,58 @@
+<?php
+
+namespace App\Http\Controllers\Ea;
+
+use App\Ea\Reference\SocialInsurance;
+use App\Http\Controllers\Controller;
+use App\Services\SettingResolver;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
+
+/**
+ * EAR · Einstellungen (EUE-004 … EUE-009).
+ *
+ * Die EAR-Einstellungen liegen im bestehenden brand-scoped `settings`-Store —
+ * es gibt keine zweite Firmendatenquelle. Geschrieben wird nur durch
+ * `super_admin`; gelesen wird brand-scoped.
+ */
+class EaSettingsController extends Controller
+{
+    public const DEFAULT_BUSINESS_SHARE = 100;
+
+    public const DEFAULT_SV_MODE = 'gsvg';
+
+    public function show(SettingResolver $resolver): JsonResponse
+    {
+        return response()->json([
+            'business_year' => 2026,
+            'default_business_share' => (int) ($resolver->get('ea_default_business_share') ?? self::DEFAULT_BUSINESS_SHARE),
+            'sv_mode' => (string) ($resolver->get('ea_sv_mode') ?? self::DEFAULT_SV_MODE),
+            'kleinunternehmer' => filter_var($resolver->get('ea_kleinunternehmer', false), FILTER_VALIDATE_BOOLEAN),
+            // EUE-108: Jungunternehmer zahlen den Mindest-KV weiter; nur die
+            // KV-Satz-Anzeige entfällt. Das Flag macht den Modus sichtbar.
+            'kv_rate_hidden' => (string) ($resolver->get('ea_sv_mode') ?? self::DEFAULT_SV_MODE)
+                === SocialInsurance::MODE_JUNGUNTERNEHMER,
+        ]);
+    }
+
+    public function update(Request $request, SettingResolver $resolver): JsonResponse
+    {
+        Gate::authorize('manage-catalog');
+
+        $data = $request->validate([
+            'default_business_share' => 'required|integer|min:0|max:100|multiple_of:5',
+            'sv_mode' => ['required', Rule::in([
+                'gsvg', 'ns_gsvg', 'fsvg', 'uv_only', SocialInsurance::MODE_JUNGUNTERNEHMER,
+            ])],
+            'kleinunternehmer' => 'required|boolean',
+        ]);
+
+        $resolver->set('ea_default_business_share', (string) $data['default_business_share']);
+        $resolver->set('ea_sv_mode', (string) $data['sv_mode']);
+        $resolver->set('ea_kleinunternehmer', $data['kleinunternehmer'] ? '1' : '0');
+
+        return response()->json(['success' => true]);
+    }
+}

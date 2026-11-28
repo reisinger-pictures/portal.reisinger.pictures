@@ -70,7 +70,7 @@ class OrderControllerTest extends TestCase
             'status' => 'pending_payment',
             'invoice_number' => $order->invoiceSnapshot()->value('invoice_number'),
             'total_amount' => 5000,
-            'currency' => 'eur',
+            'currency' => 'ea',
         ]);
         $response->assertJsonMissingPath('client_secret');
         $response->assertJsonMissingPath('mollie_payment_id');

@@ -35,9 +35,9 @@ This directory serves as the single source of truth for all technical concepts, 
 * [08-srp-coupon-system.md](ecommerce/08-srp-coupon-system.md) - SRP coupon/discount code system, schema, API, role-based permissions.
 
 ### 🧾 EAR
-* [README.md](eur/README.md) - Geltende Einheiten und Grenzen der Clean-Room-basierten EAR-Integration.
-* [01-cleanroom-handoff.md](eur/01-cleanroom-handoff.md) - Fixture-Version, Update-Erkennung über MANIFEST.json, Abnahmevorbehalte.
-* [02-parity-vectors.md](eur/02-parity-vectors.md) - 19 datengetriebene Paritätsvektoren und die portal-eigene Wertekette (Issue #10).
+* [README.md](ea/README.md) - Geltende Einheiten und Grenzen der Clean-Room-basierten EAR-Integration.
+* [01-cleanroom-handoff.md](ea/01-cleanroom-handoff.md) - Fixture-Version, Update-Erkennung über MANIFEST.json, Abnahmevorbehalte.
+* [02-parity-vectors.md](ea/02-parity-vectors.md) - 19 datengetriebene Paritätsvektoren und die portal-eigene Wertekette (Issue #10).
 
 ### 🖼️ Gallery Management
 * [01-core-architecture.md](gallery/01-core-architecture.md) - Selection vs. Delivery workflows.

@@ -13,11 +13,11 @@ describe('PWA registrations', () => {
         ['/steuern', '/steuern/sw.js'],
         ['/steuern?x=1', '/steuern/sw.js'],
         ['/steuern/buchungen', '/steuern/sw.js'],
-        ['/eur', '/steuern/sw.js'],
-        ['/eur?x=1', '/steuern/sw.js'],
+        ['/ea', '/steuern/sw.js'],
+        ['/ea?x=1', '/steuern/sw.js'],
         ['/galerie/123', '/sw.js'],
         ['/settings', '/sw.js'],
-        ['/api/management/eur/entries', '/sw.js'],
+        ['/api/management/ea/entries', '/sw.js'],
     ])('resolves %s to %s', (pathname, scriptURL) => {
         expect(serviceWorkerRegistrationFor(pathname).scriptURL).toBe(scriptURL);
     });

@@ -42,7 +42,7 @@ export default function VolumeLicensingCard({photo, onAddToCart}: VolumeLicensin
     return (
         <div data-testid="volume-pricing-card" className="bg-base-100 p-5 md:p-6 rounded-box border border-base-300 shadow-sm flex flex-col gap-5">
             <h4 className="font-bold text-xl flex items-center gap-2">
-                <span className="iconify mdi--currency-eur text-primary"></span> <Trans>Preis</Trans>
+                <span className="iconify mdi--currency-ea text-primary"></span> <Trans>Preis</Trans>
             </h4>
 
             {/* Current price display — hidden until the gallery's descriptor is resolved */}

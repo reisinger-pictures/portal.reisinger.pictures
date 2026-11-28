@@ -195,7 +195,7 @@ class CleanRoomFixtureIntegrityTest extends TestCase
         $entry = $this->manifest['artifacts'][0];
         $source = self::CLEANROOM_DIR.'/artifacts/'.$entry['path'];
 
-        $temp = tempnam(sys_get_temp_dir(), 'eur-artifact-');
+        $temp = tempnam(sys_get_temp_dir(), 'ea-artifact-');
         $this->assertIsString($temp);
         copy($source, $temp);
 

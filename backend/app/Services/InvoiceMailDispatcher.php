@@ -6,8 +6,8 @@ use App\Mail\InvoiceMail;
 use App\Models\InvoiceSnapshot;
 use App\Models\Order;
 use App\Models\User;
-use App\Services\Eur\EurInvoiceTakeoverData;
-use App\Services\Eur\EurInvoiceTakeoverService;
+use App\Services\Ea\EaInvoiceTakeoverData;
+use App\Services\Ea\EaInvoiceTakeoverService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
@@ -138,10 +138,10 @@ class InvoiceMailDispatcher
     {
         $details = is_array($snapshot->customer_details) ? $snapshot->customer_details : [];
         $source = ($details['is_collective'] ?? false) === true
-            ? EurInvoiceTakeoverData::SOURCE_COLLECTIVE_INVOICE
-            : EurInvoiceTakeoverData::SOURCE_ORDER_INVOICE;
-        app(EurInvoiceTakeoverService::class)->takeover(
-            EurInvoiceTakeoverData::fromInvoiceSnapshot($snapshot, $source)
+            ? EaInvoiceTakeoverData::SOURCE_COLLECTIVE_INVOICE
+            : EaInvoiceTakeoverData::SOURCE_ORDER_INVOICE;
+        app(EaInvoiceTakeoverService::class)->takeover(
+            EaInvoiceTakeoverData::fromInvoiceSnapshot($snapshot, $source)
         );
     }
 

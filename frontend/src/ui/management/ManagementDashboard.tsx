@@ -24,7 +24,7 @@ import ManagementCustomersView from './ManagementCustomersView';
 import ManagementProductsView from './ManagementProductsView';
 import ManagementTextSnippetsView from './ManagementTextSnippetsView';
 import ManagementPayoutsView from './ManagementPayoutsView';
-import ManagementEurView from './ManagementEurView';
+import ManagementEaView from './ManagementEaView';
 import ManagementCouponsView from './ManagementCouponsView';
 import ManagementModelsView from './ManagementModelsView';
 import ManagementContractView from './ManagementContractView';
@@ -63,7 +63,7 @@ function DashboardView({
                 {currentView === 'admin-products' && <ManagementProductsView/>}
                 {currentView === 'admin-snippets' && <ManagementTextSnippetsView/>}
                 {currentView === 'admin-payouts' && <ManagementPayoutsView/>}
-                {currentView === 'steuern' && <ManagementEurView/>}
+                {currentView === 'steuern' && <ManagementEaView/>}
                 {currentView === 'admin-coupons' && <ManagementCouponsView/>}
                 {currentView === 'admin-models' && <ManagementModelsView/>}
                 {currentView === 'admin-contracts' && <ManagementContractView/>}
@@ -113,7 +113,7 @@ export default function ManagementDashboard() {
     // Die Buchhaltung ist eine eigenständige Sub-Applikation: eigene Ansicht
     // ohne Portal-Sidebar und Suche, mit explizitem Rücksprung ins Portal.
     if (currentView === 'steuern') {
-        return <ManagementEurView/>;
+        return <ManagementEaView/>;
     }
 
     return (

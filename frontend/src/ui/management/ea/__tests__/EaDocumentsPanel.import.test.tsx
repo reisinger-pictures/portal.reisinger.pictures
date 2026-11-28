@@ -1,0 +1,73 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { importEaEntries, useEaAssetGroups, useEaDocuments } from '../../../../logic/useEa';
+import { renderWithProviders } from '../../../../test-setup';
+import EaDocumentsPanel from '../EaDocumentsPanel';
+
+vi.mock('../../../../logic/useEa', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../../../logic/useEa')>();
+    return {
+        ...actual,
+        useEaDocuments: vi.fn(),
+        useEaAssetGroups: vi.fn(),
+        uploadEaDocument: vi.fn(),
+        deleteEaDocument: vi.fn(),
+        importEaEntries: vi.fn(),
+    };
+});
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useEaAssetGroups).mockReturnValue(swrResult<ReturnType<typeof useEaAssetGroups>>({groups: []}));
+});
+
+function swrResult<R>(data: unknown): R {
+    return {data, error: undefined, isLoading: false, mutate: vi.fn()} as unknown as R;
+}
+
+function renderPanel() {
+    vi.mocked(useEaDocuments).mockReturnValue(swrResult<ReturnType<typeof useEaDocuments>>({documents: []}));
+    return renderWithProviders(<EaDocumentsPanel year={2026} month={3}/>);
+}
+
+describe('EaDocumentsPanel CSV import', () => {
+    it('offers a German-labelled CSV file input and imports into the selected month', async () => {
+        vi.mocked(importEaEntries).mockResolvedValue({created: 4, skipped: 1, errors: []});
+        renderPanel();
+
+        const input = screen.getByLabelText('CSV-Datei auswählen');
+        expect(input).toHaveAttribute('type', 'file');
+        expect(input).toHaveAttribute('accept', '.csv,text/csv');
+        expect(screen.getByText('Keine CSV-Datei ausgewählt')).toBeVisible();
+
+        const file = new File(['Amount;Share\n100;100'], 'buchungen.csv', {type: 'text/csv'});
+        await userEvent.upload(input, file);
+        await userEvent.click(screen.getByRole('button', {name: 'CSV importieren'}));
+
+        expect(importEaEntries).toHaveBeenCalledWith({file, year: 2026, month: 3});
+        expect(screen.getByRole('status')).toHaveTextContent(/Import abgeschlossen: 4 angelegt, 1 übersprungen/);
+    });
+
+    it('shows import errors in German when the request fails', async () => {
+        vi.mocked(importEaEntries).mockRejectedValue(new Error('boom'));
+        renderPanel();
+
+        await userEvent.upload(screen.getByLabelText('CSV-Datei auswählen'),
+            new File(['x'], 'buchungen.csv', {type: 'text/csv'}));
+        await userEvent.click(screen.getByRole('button', {name: 'CSV importieren'}));
+
+        expect(screen.getByRole('alert')).toHaveTextContent(/Der CSV-Import ist fehlgeschlagen/);
+    });
+
+    it('lists row-level errors returned by the import', async () => {
+        vi.mocked(importEaEntries).mockResolvedValue({created: 0, skipped: 0, errors: ['Zeile 2: ungültiger Betrag']});
+        renderPanel();
+
+        await userEvent.upload(screen.getByLabelText('CSV-Datei auswählen'),
+            new File(['x'], 'buchungen.csv', {type: 'text/csv'}));
+        await userEvent.click(screen.getByRole('button', {name: 'CSV importieren'}));
+
+        expect(screen.getByText('Zeile 2: ungültiger Betrag')).toBeVisible();
+    });
+});

@@ -348,9 +348,9 @@ Concretely: fachliche Wirkung, Werte und Rundungen come only from `domain-rules.
 
 ### D-69: Two installable PWAs — one for the portal, one for the bookkeeping view
 
-The owner chose on 2026-11-22 to make both the portal and the bookkeeping view installable: one portal-wide PWA (service worker scope `/`, manifest `/site.webmanifest`) and a second, separate PWA scoped to `/steuern` (manifest `steuern/manifest.webmanifest`, name „Einnahmen Ausgaben Rechnung", short name „EA Rechnung"). This **supersedes** the clause in [EAR UI contract](eur/05-ui.md) that excluded a second service worker.
+The owner chose on 2026-11-22 to make both the portal and the bookkeeping view installable: one portal-wide PWA (service worker scope `/`, manifest `/site.webmanifest`) and a second, separate PWA scoped to `/steuern` (manifest `steuern/manifest.webmanifest`, name „Einnahmen Ausgaben Rechnung", short name „EA Rechnung"). This **supersedes** the clause in [EAR UI contract](ea/05-ui.md) that excluded a second service worker.
 
-The second service worker is allowed only because its scope is a strict sub-path (`/steuern/`): the browser picks the longest matching scope, so `/steuern` pages are controlled by the bookkeeping worker and every other page by the portal worker. Both workers are registered from the same app shell; there is no second React bundle, no second auth flow and no new package. Neither worker caches or intercepts `/api/` or any authenticated response — only same-origin navigation (network-first, offline fallback to the cached app shell) and static assets (stale-while-revalidate). The CSP is unchanged: same-origin worker scripts are covered by `script-src 'self'`. The `/steuern` manifest swaps into the existing single `<link rel="manifest">` while that view is mounted and is restored on leaving it, so there is never a second manifest link. See [EAR UI contract](eur/05-ui.md) and issue #7.
+The second service worker is allowed only because its scope is a strict sub-path (`/steuern/`): the browser picks the longest matching scope, so `/steuern` pages are controlled by the bookkeeping worker and every other page by the portal worker. Both workers are registered from the same app shell; there is no second React bundle, no second auth flow and no new package. Neither worker caches or intercepts `/api/` or any authenticated response — only same-origin navigation (network-first, offline fallback to the cached app shell) and static assets (stale-while-revalidate). The CSP is unchanged: same-origin worker scripts are covered by `script-src 'self'`. The `/steuern` manifest swaps into the existing single `<link rel="manifest">` while that view is mounted and is restored on leaving it, so there is never a second manifest link. See [EAR UI contract](ea/05-ui.md) and issue #7.
 
 ### D-70: Parity vectors may be derived locally from the pinned rule catalogue
 
@@ -362,13 +362,13 @@ Because this changes pinned artifacts, the change carries a deliberate `artifact
 
 ### D-71: The pinned OpenAPI contract is reference information, not a portal API contract
 
-The owner clarified on 2026-11-22 that the versioned OpenAPI document pinned in the clean-room handoff (`prototype/docs/openapi.yaml`) was **information delivered with the handoff**, not a contract the portal must implement or use in production. It was never used in portal tests and is not to be used productively. The portal's own management API contract is [`eur/06-api-contracts.md`](eur/06-api-contracts.md); that document, not the pinned OpenAPI, governs paths, units, errors and authorization.
+The owner clarified on 2026-11-22 that the versioned OpenAPI document pinned in the clean-room handoff (`prototype/docs/openapi.yaml`) was **information delivered with the handoff**, not a contract the portal must implement or use in production. It was never used in portal tests and is not to be used productively. The portal's own management API contract is [`ea/06-api-contracts.md`](ea/06-api-contracts.md); that document, not the pinned OpenAPI, governs paths, units, errors and authorization.
 
 Consequences: the OpenAPI-specific mechanisms (tenant/permission-scoped bearer tokens and scopes, `Idempotency-Key`, `409 idempotency_conflict`, `429` with `Retry-After`, per-token rate limiting, `POST /integrations/invoices`) are **not** portal requirements and are not claimed as implemented. This does not weaken the portal's own rules: integer cents and whole minutes at the boundary, explicit 0.0–1.0 ↔ 0–100 conversion, brand scoping, server-authoritative pricing, validated uploads and metadata-only audit remain in force. Issue #26 is closed on that basis; any future server-to-server integration needs a new decision and its own contract.
 
 ### D-72: No service-to-service scope tokens for the ku-online client
 
-The owner decided on 2026-11-23 that the service-token scope requirement in issue #9 (`invoices:write`, `documents:write`, `verification:read` for the ku-online client, replacing `eur_<prefix>_<secret>`) is **removed**. Consistent with [D-71](owner-decisions.md#d-71-the-pinned-openapi-contract-is-reference-information-not-a-portal-api-contract), the scope-bearing tokens in the pinned OpenAPI are reference information, not a portal requirement. Issue #9's acceptance criterion for scoped service tokens is superseded by this decision; a future server-to-server integration needs its own decision and contract. `ModelAccessToken` stays a 24-hour magic link for model profiles and is not a service-token substitute.
+The owner decided on 2026-11-23 that the service-token scope requirement in issue #9 (`invoices:write`, `documents:write`, `verification:read` for the ku-online client, replacing `ea_<prefix>_<secret>`) is **removed**. Consistent with [D-71](owner-decisions.md#d-71-the-pinned-openapi-contract-is-reference-information-not-a-portal-api-contract), the scope-bearing tokens in the pinned OpenAPI are reference information, not a portal requirement. Issue #9's acceptance criterion for scoped service tokens is superseded by this decision; a future server-to-server integration needs its own decision and contract. `ModelAccessToken` stays a 24-hour magic link for model profiles and is not a service-token substitute.
 
 ### D-73: Transient guest grants as structured abilities behind a custom guard
 
@@ -430,7 +430,7 @@ stays excluded (D-81). This decision adds **no public `/verify` endpoint**,
 binding: a successful check means a verifiable signature is present over those
 bytes, not that a signer is trusted. The concrete library, failure behaviour
 and any migration/seed impact are technical decisions documented in
-`features/eur/` with the implementation; implementation status belongs in the
+`features/ea/` with the implementation; implementation status belongs in the
 issue tracker, not here.
 
 ### D-85: Per-year asset directories with a separate private directory
@@ -467,7 +467,7 @@ All amounts in both directories, including carry-over rows, remain whole cents
 (`*_cents`, integer) per the repository-wide money rule in
 [`AGENTS.md`](../AGENTS.md). The schema, backfill and rollback decision for the
 required migration belongs in the
-[V071 decision](eur/04-data-model.md#schema-entscheidung-v071-anlagenverzeichnisse-je-jahr-d-85)
+[V071 decision](ea/04-data-model.md#schema-entscheidung-v071-anlagenverzeichnisse-je-jahr-d-85)
 before the migration is written (D-83 policy).
 
 ### D-86: One custom Beleg per trip — no ODS-style leg rows
@@ -520,8 +520,8 @@ The owner decided on 2026-11-24 (issue #57) that several purchases that form
 one economic unit — his example is a lens plus a separately bought
 Streulichtblende — can be combined into an **asset group**. The decision:
 
-- A group is its **own master record** (`eur_asset_groups`) with a brand, a
-  name and a whole-percent business share. `eur_assets.eur_asset_group_id` is
+- A group is its **own master record** (`ea_asset_groups`) with a brand, a
+  name and a whole-percent business share. `ea_assets.ea_asset_group_id` is
   nullable; an ungrouped asset is billed on its own as before. The group's
   business share overrides the member assets' shares for scope and for all
   calculations; the member value is retained as information.
@@ -545,21 +545,21 @@ with #55; this decision does not touch them.
 
 The owner decided on 2026-11-24 (issue #59) that a single uploaded receipt can
 contain several positions, and that several receipts can form one billing
-group. Both directions reuse the **existing** `eur_asset_documents`
+group. Both directions reuse the **existing** `ea_asset_documents`
 many-to-many link (D-85); there is no new position master table and no group
 document store (D-89 stands). The decision:
 
 - A **position** is an enriched pivot row: `label`, whole-cent `amount_cents`
-  and `ordinal` on `eur_asset_documents`. The pivot stays the single source of
+  and `ordinal` on `ea_asset_documents`. The pivot stays the single source of
   truth for which receipt belongs to which item; existing links keep NULLs and
   remain valid (no backfill).
-- **Split:** one `EurDocument` → N `EurAsset` items. Each item has its own
+- **Split:** one `EaDocument` → N `EaAsset` items. Each item has its own
   acquisition cost, business share, useful life, depreciation plan and its own
   withdrawal/Eigenbeleg **while it is ungrouped** — this is what "billed
   independently" means. Over-allocating a receipt with a stored
   `total_cents` is refused (422); a partial allocation is allowed and reported
   as an open remainder.
-- **Merge:** N `EurDocument` rows → one existing `EurAssetGroup`, implemented
+- **Merge:** N `EaDocument` rows → one existing `EaAssetGroup`, implemented
   by assigning the documents' linked assets to that group. The group remains
   **one** billing unit (D-89); its share overrides member shares, so a grouped
   position is not independently billed. Document-to-group is transitive via
@@ -567,11 +567,11 @@ document store (D-89 stands). The decision:
 - Split (independent) and merge (one unit) are therefore mutually exclusive
   per item, not a double booking. Grouping a booked year still fails closed
   and detaching restores individual bookings.
-- No `EurEntry` position type, no direct group-document ownership and no
+- No `EaEntry` position type, no direct group-document ownership and no
   mandatory `Σ positions = total` are decided here; those remain open
   questions in issue #59. No clean-room artifact is changed.
 
-The schema decision is recorded in `eur/04-data-model.md` (V074); all amounts
+The schema decision is recorded in `ea/04-data-model.md` (V074); all amounts
 remain whole cents and every new query is brand-scoped.
 
 ### D-91: FinanzOnline is filled in manually from the portal's ODS-aligned values
@@ -633,7 +633,7 @@ The owner decided on 2026-11-25 (issue #55) that immediate expensing is a
 
 This decision fixes the depreciation method only. It does **not** introduce a
 new private↔business transition workflow: the existing scope/business-share
-handling, the Entnahme, the Eigenbeleg and `EurAssetCarryOver` remain unchanged.
+handling, the Entnahme, the Eigenbeleg and `EaAssetCarryOver` remain unchanged.
 A separate transition endpoint design would be a separate owner decision.
 
 ### D-94: No external tax review as an acceptance gate

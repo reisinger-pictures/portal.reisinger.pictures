@@ -113,7 +113,7 @@ function PresetEditor({ initialName = '', initialTiers = [], onSave, onCancel }:
     return (
         <ModalDialogShell
             title={initialName ? t`Preset bearbeiten` : t`Neues Volume-Preset`}
-            icon="mdi--currency-eur"
+            icon="mdi--currency-ea"
             onClose={onCancel}
             // No `onDelete` on purpose: a preset is deleted from the table row,
             // not from this editor. Until D-20 this site passed

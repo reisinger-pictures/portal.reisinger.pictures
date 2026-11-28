@@ -12,9 +12,9 @@ export const PWA_REGISTRATIONS: readonly PwaRegistration[] = [
 function normalizedPath(pathname: string): string {
     const withoutQuery = pathname.split('?')[0];
     const path = withoutQuery.split('#')[0];
-    // /eur is a legacy alias of /steuern and must resolve to the bookkeeping worker.
-    if (path === '/eur') return '/steuern';
-    if (path.startsWith('/eur/')) return `/steuern${path.slice('/eur'.length)}`;
+    // /ea is a legacy alias of /steuern and must resolve to the bookkeeping worker.
+    if (path === '/ea') return '/steuern';
+    if (path.startsWith('/ea/')) return `/steuern${path.slice('/ea'.length)}`;
     return path;
 }
 

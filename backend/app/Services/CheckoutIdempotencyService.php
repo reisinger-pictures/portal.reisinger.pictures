@@ -738,7 +738,7 @@ class CheckoutIdempotencyService
             // The amount is calculated by the server after coupon/offer pricing.
             // A client-supplied amount is never part of the identity input.
             'amount_cents' => $amountCents,
-            'currency' => 'eur',
+            'currency' => 'ea',
             'payment_method' => $paymentMethod,
         ];
         if ($paymentMethod === 'mollie') {
