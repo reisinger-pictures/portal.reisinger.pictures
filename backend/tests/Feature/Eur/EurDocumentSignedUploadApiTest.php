@@ -269,7 +269,7 @@ class EurDocumentSignedUploadApiTest extends EurBookkeepingTestCase
             'kind' => 'unknown', 'year' => 2026, 'month' => 5,
         ])->assertUnprocessable();
         $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/documents/corrections', [
-            'kind' => 'monthly', 'year' => 2027, 'month' => 5,
+            'kind' => 'monthly', 'year' => 2025, 'month' => 5,
         ])->assertUnprocessable();
         $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/documents/corrections', [
             'kind' => 'monthly', 'year' => 2026,

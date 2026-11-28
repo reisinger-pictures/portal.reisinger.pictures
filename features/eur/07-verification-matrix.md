@@ -61,8 +61,8 @@ Testdatei im Portal. `fixture` = im Paritätsvektor referenziert.
 | Regel-ID | Fachliche Wirkung (gekürzt) | Hergeleiteter Wert | Testnachweis |
 |---|---|---|---|
 | EUE-001 | Das Wirtschaftsjahr wird zentral festgelegt und steuert alle jahresabhängigen Konstanten, Formeln und Überschriften. | Wirtschaftsjahr=2026 | E1StatementTest.php, MonthStatementTest.php, VatReturnServiceTest.php, YearTablesTest.php |
-| EUE-002 | Es wird eine Kompatibilitätswarnung angezeigt und der Nutzer wird gebeten, auf die neueste Version zu aktualisieren. | Obergrenze=2026 | EurYearsApiTest.php, YearTablesTest.php; Warntext in `EurYear::warning()`, sichtbar als Banner in `ManagementEurView.tsx` (Vitest `ManagementEurView.test.tsx`) |
-| EUE-003 | Es erscheint die Warnung, dass für ältere Jahre eine ältere Version (Lifetime-Lizenz) nötig ist. | Untergrenze=2024 | EurYearsApiTest.php, YearTablesTest.php; Warntext mit Lifetime-Lizenz-Hinweis, Banner wie EUE-002 |
+| EUE-002 | Liegt für das gewählte Buchungsjahr noch keine gepinnte Regelbasis vor, rechnet das Portal mit den Regeln des letzten Regeljahres und weist mit beiden Jahreszahlen darauf hin; einen Versions- oder Lizenzhinweis gibt es nicht (Owner-Entscheidung #75/#78). | Obergrenze=2026 | EurYearsApiTest.php, EurYearTest.php, YearTablesTest.php, RuleValuesYearFallbackTest.php; Bannerquelle ist `last_pinned_year` aus `/eur/years` plus der UI-Text in `ManagementEurView.tsx` (Vitest `ManagementEurView.test.tsx`) |
+| EUE-003 | 2024 und 2025 bleiben als Regeljahre eingepflegt, sind aber kein Buchungsjahr; Buchungen sind erst ab 2026 möglich, der Request endet sonst mit 422 (Owner-Entscheidung #75). | Untergrenze=2024, Buchungsjahre ab 2026 | EurYearsApiTest.php, EurYearTest.php, YearTablesTest.php; Meldung aus `EurYear::assertBookable()`, kein Lifetime-Lizenz-Hinweis |
 
 ## B02 — Stammdaten & Kontenplan
 

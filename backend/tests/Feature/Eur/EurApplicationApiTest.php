@@ -62,7 +62,7 @@ class EurApplicationApiTest extends EurBookkeepingTestCase
 
         $this->withHeaders($this->bearer($token))
             ->postJson('/api/management/eur/applications', [
-                'year' => 2027, 'type' => 'Foerderung', 'subject' => 'Antrag',
+                'year' => 2025, 'type' => 'Foerderung', 'subject' => 'Antrag',
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('year');

@@ -11,7 +11,8 @@ use RuntimeException;
 /**
  * EAR · Einkommensteuertarif (EUE-089 … EUE-098).
  *
- * Die Stufen kommen aus dem gepinnten Referenzartefakt. Die erste Grenze ist
+ * Die Stufen kommen aus den committeten Referenzdaten
+ * (`App\Eur\Data\ReferenceTablesData`, Issue #74). Die erste Grenze ist
  * die steuerfreie Schwelle; jede weitere Stufe rechnet den Anteil des
  * Einkommens zwischen unterer und oberer Grenze mit ihrem Satz (EUE-094).
  * Gerechnet wird durchgehend mit ganzen Cent und BCMath; gerundet wird einmal
@@ -27,8 +28,8 @@ final class IncomeTaxTariff
     private readonly int $basicAllowanceRatePer10000;
 
     /**
-     * @param  list<array{grenze: int|float, satz: int|float}>  $stages
-     * @param  array{grenze: int|float, satz: int|float}  $basicAllowance
+     * @param  list<array{grenze: int|float|string, satz: int|float|string}>  $stages
+     * @param  array{grenze: int|float|string, satz: int|float|string}  $basicAllowance
      */
     public function __construct(array $stages, array $basicAllowance, private readonly int $businessYear)
     {
@@ -64,12 +65,14 @@ final class IncomeTaxTariff
      * EUE-089 … EUE-093: Tarif aus den jahresabhängigen Tabellen aufbauen.
      *
      * `ReferenceTables::incomeTax()` ist auf das Wirtschaftsjahr 2026 gepinnt;
-     * dieser Factory liefert denselben Tarif für jedes unterstützte Jahr, ohne
+     * dieser Factory liefert denselben Tarif für jedes Regeljahr und für
+     * Buchungsjahre ohne gepinnte Basis (über `EurYear::effective()`), ohne
      * eine zweite Regelquelle oder Float-Geldwerte im Rechenpfad.
      */
     public static function forYear(int $year): self
     {
         EurYear::assert($year);
+        $year = EurYear::effective($year);
 
         $stages = array_map(
             static fn (array $stage): array => [
@@ -176,7 +179,7 @@ final class IncomeTaxTariff
 
     public static function assertYear(int $year): void
     {
-        if ($year !== ReferenceTables::BUSINESS_YEAR) {
+        if (EurYear::effective($year) !== ReferenceTables::BUSINESS_YEAR) {
             throw new RuntimeException(sprintf(
                 'Nur das Wirtschaftsjahr %d ist gepinnt, erhalten: %d.',
                 ReferenceTables::BUSINESS_YEAR,

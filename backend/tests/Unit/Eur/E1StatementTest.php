@@ -69,11 +69,11 @@ class E1StatementTest extends TestCase
         $this->assertSame(0, $result['totals_cents'][E1Statement::GROUP_E1B]);
     }
 
-    /** EUE-001 — ein unbekanntes Jahr wird abgewiesen, nicht gemappt. */
-    public function test_unknown_year_is_rejected(): void
+    /** EUE-001 — ein Jahr unterhalb der Regeljahre wird abgewiesen, nicht gemappt. */
+    public function test_a_year_before_the_first_rule_year_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        E1Statement::fromEntries([], 2027);
+        E1Statement::fromEntries([], 2023);
     }
 
     /** Keine Float-Geldwerte im Rechenpfad. */

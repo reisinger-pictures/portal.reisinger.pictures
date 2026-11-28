@@ -247,6 +247,10 @@ msgstr "< 50€ (Rollover)"
 msgid "< 50€ (Übertrag ins nächste Monat)"
 msgstr "< 50€ (Übertrag ins nächste Monat)"
 
+#: src/ui/management/ManagementEurView.tsx
+msgid "⚠ Die Regeln für {year} sind noch nicht eingepflegt. Es werden derzeit die Berechnungsregeln für {lastPinnedYear} verwendet."
+msgstr "⚠ Die Regeln für {year} sind noch nicht eingepflegt. Es werden derzeit die Berechnungsregeln für {lastPinnedYear} verwendet."
+
 #: src/ui/management/eur/EurAnalyticsMatricesPanel.tsx
 msgid "✓✓ Abgleich mit dem Journal: kein Unterschied."
 msgstr "✓✓ Abgleich mit dem Journal: kein Unterschied."

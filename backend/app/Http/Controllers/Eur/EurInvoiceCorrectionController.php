@@ -61,9 +61,9 @@ class EurInvoiceCorrectionController extends Controller
             'integer',
             function (string $attribute, mixed $value, Closure $fail): void {
                 try {
-                    EurYear::assert((int) $value);
-                } catch (InvalidArgumentException) {
-                    $fail(EurYear::warning((int) $value)['warning']);
+                    EurYear::assertBookable((int) $value);
+                } catch (InvalidArgumentException $exception) {
+                    $fail($exception->getMessage());
                 }
             },
         ];

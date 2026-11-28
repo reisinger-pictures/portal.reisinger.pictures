@@ -187,12 +187,12 @@ class EurAnalyticsApiTest extends EurBookkeepingTestCase
             ->assertJsonValidationErrors('mode');
     }
 
-    public function test_foreign_year_is_rejected(): void
+    public function test_rule_only_year_is_rejected(): void
     {
         $token = $this->tokenFor();
 
         $this->withHeaders($this->bearer($token))
-            ->getJson('/api/management/eur/analytics?year=2027')
+            ->getJson('/api/management/eur/analytics?year=2025')
             ->assertUnprocessable()
             ->assertJsonValidationErrors('year');
     }

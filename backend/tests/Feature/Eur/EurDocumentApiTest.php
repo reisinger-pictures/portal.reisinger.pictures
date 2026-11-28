@@ -128,7 +128,7 @@ class EurDocumentApiTest extends EurBookkeepingTestCase
 
         $this->withHeaders($this->uploadHeaders($token))->post('/api/management/eur/documents', [
             'file' => UploadedFile::fake()->create('beleg.pdf', 1, 'application/pdf'),
-            'year' => 2027,
+            'year' => 2025,
         ])->assertUnprocessable();
 
         $this->assertDatabaseCount('eur_documents', 0);

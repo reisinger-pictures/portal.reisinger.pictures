@@ -56,15 +56,15 @@ class EurIncomeTaxApiTest extends EurBookkeepingTestCase
             ->assertJsonPath('e1a_e1b.E1B.9460', 50000);
     }
 
-    public function test_calc_uses_the_tariff_of_the_selected_year(): void
+    public function test_calc_uses_the_pinned_tariff_and_the_rule_fallback(): void
     {
-        // EUE-089 … EUE-093: 2024/2025 dürfen nicht mit 2026-Grenzen rechnen.
+        // EUE-089 … EUE-093: 2027 rechnet mit den 2026-Grenzen; die eigenen
+        // Grenzen der Regeljahre 2024/2025 prüft YearTablesTest.
         $token = $this->tokenFor();
 
         $thresholds = [
-            2024 => 1281600,
-            2025 => 1330800,
             2026 => 1353900,
+            2027 => 1353900,
         ];
 
         foreach ($thresholds as $year => $expected) {

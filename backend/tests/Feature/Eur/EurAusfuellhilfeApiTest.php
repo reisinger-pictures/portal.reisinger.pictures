@@ -173,9 +173,9 @@ class EurAusfuellhilfeApiTest extends EurBookkeepingTestCase
     {
         $headers = $this->bearer($this->tokenFor());
 
-        $this->withHeaders($headers)->get(self::URL.'?year=2027')->assertUnprocessable();
+        $this->withHeaders($headers)->get(self::URL.'?year=2025')->assertUnprocessable();
         $this->withHeaders($headers)->get(self::URL.'?year=2026&e39_cents=-1')->assertUnprocessable();
-        $this->withHeaders($headers)->get('/api/management/eur/pdf/ausfuellhilfe?year=2027')->assertUnprocessable();
+        $this->withHeaders($headers)->get('/api/management/eur/pdf/ausfuellhilfe?year=2025')->assertUnprocessable();
     }
 
     public function test_pdf_contains_sections_deviation_codes_and_foreign_data_is_absent(): void

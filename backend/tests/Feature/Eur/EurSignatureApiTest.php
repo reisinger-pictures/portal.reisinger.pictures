@@ -77,7 +77,7 @@ class EurSignatureApiTest extends EurBookkeepingTestCase
 
         $this->withHeaders($this->bearer($token))
             ->postJson('/api/management/eur/signatures', [
-                'year' => 2027, 'month' => 5, 'provider' => 'eID',
+                'year' => 2025, 'month' => 5, 'provider' => 'eID',
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('year');

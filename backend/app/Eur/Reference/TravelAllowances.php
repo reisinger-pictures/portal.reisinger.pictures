@@ -11,7 +11,8 @@ use InvalidArgumentException;
  * EAR · Reise-Pauschalen (EUE-013) — Tag-/Nächtigungssätze je Land.
  *
  * Aufgelöst wird serverseitig nach Land und Reisejahr. Die Sätze stammen
- * ausschließlich aus dem gepinnten Referenzartefakt; im Code steht kein
+ * ausschließlich aus den committeten Referenzdaten
+ * (`App\Eur\Data\ReferenceTablesData`, Issue #74); im Code steht kein
  * Länder- oder Betragswert. Rückgaben sind ganze Cent.
  */
 final class TravelAllowances
@@ -20,7 +21,7 @@ final class TravelAllowances
     private array $byCountry = [];
 
     /**
-     * @param  list<array{land: string, nacht: int|float, tag: int|float}>  $rows
+     * @param  list<array{land: string, nacht: int|float|string, tag: int|float|string}>  $rows
      */
     public function __construct(
         array $rows,
@@ -61,7 +62,10 @@ final class TravelAllowances
      */
     public function for(string $country, int $year): array
     {
-        if ($year !== $this->businessYear) {
+        // Die Ländertabelle ist nur für das gepinnte Wirtschaftsjahr
+        // eingepflegt; ein Buchungsjahr ohne Basis liest sie über den
+        // Fallback (Owner-Entscheidung #75/#78).
+        if (EurYear::effective($year) !== $this->businessYear) {
             throw new InvalidArgumentException(sprintf(
                 'Nur das Wirtschaftsjahr %d ist gepinnt, erhalten: %d.',
                 $this->businessYear,

@@ -43,7 +43,7 @@ class EurHourApiTest extends EurBookkeepingTestCase
             ->assertJsonValidationErrors('minutes');
 
         $this->withHeaders($this->bearer($token))
-            ->postJson('/api/management/eur/hours', array_merge($base, ['minutes' => 30, 'year' => 2027]))
+            ->postJson('/api/management/eur/hours', array_merge($base, ['minutes' => 30, 'year' => 2025]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('year');
 

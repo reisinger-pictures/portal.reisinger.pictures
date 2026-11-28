@@ -28,10 +28,19 @@ class EurVatDeclarationServiceTest extends TestCase
         $this->assertStringContainsString('vat-requirements.md', $blocks['voranmeldung']['source']);
     }
 
-    public function test_unknown_year_is_rejected(): void
+    public function test_a_year_before_the_first_rule_year_is_rejected(): void
     {
+        // 2027 hat keine eigene Basis, rechnet aber über den Fallback; erst
+        // unterhalb des ältesten Regeljahres gibt es keine Regelbasis.
+        $pinned = (new EurVatDeclarationService)->blocks(2026);
+        $fallback = (new EurVatDeclarationService)->blocks(2027);
+
+        $this->assertSame(2026, $pinned['voranmeldung']['wirtschaftsjahr']);
+        $this->assertSame(2027, $fallback['voranmeldung']['wirtschaftsjahr']);
+        $this->assertSame($pinned['voranmeldung']['text'], $fallback['voranmeldung']['text']);
+
         $this->expectException(InvalidArgumentException::class);
 
-        (new EurVatDeclarationService)->blocks(2027);
+        (new EurVatDeclarationService)->blocks(2023);
     }
 }

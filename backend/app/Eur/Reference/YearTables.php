@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Eur\Reference;
 
 /**
- * EAR · Jahresabhängige Tabellen 2024–2026.
+ * EAR · Jahresabhängige Tabellen der Regeljahre 2024–2026.
  *
  * Werte stammen aus den abgeleiteten Anforderungen und dem Regelkatalog,
  * ausschließlich in ganzen Cent und exakten Brüchen. Kein Float im Rechenpfad.
+ * Jede Methode prüft die Eingabe und liest danach über `EurYear::effective()`:
+ * ein Buchungsjahr ohne gepinnte Basis (heute 2027) erhält die Werte des
+ * letzten Regeljahres.
  */
 final class YearTables
 {
@@ -43,6 +46,7 @@ final class YearTables
     public static function tariffStages(int $year): array
     {
         EurYear::assert($year);
+        $year = EurYear::effective($year);
 
         $stages = [];
 
@@ -60,7 +64,7 @@ final class YearTables
     {
         EurYear::assert($year);
 
-        // EUE-096/097: 33.000 € Grenze, 15 % Satz in allen unterstützten Jahren.
+        // EUE-096/097: 33.000 € Grenze, 15 % Satz in allen Regeljahren.
         return ['grenze' => 3300000, 'satz' => 1500];
     }
 
@@ -70,6 +74,7 @@ final class YearTables
     public static function socialInsuranceAmountsCents(int $year): array
     {
         EurYear::assert($year);
+        $year = EurYear::effective($year);
 
         return self::SOCIAL_INSURANCE_CENTS[$year];
     }
@@ -90,6 +95,7 @@ final class YearTables
     public static function travelPerKmCents(string $vehicle, int $year, ?int $month = null): int
     {
         EurYear::assert($year);
+        $year = EurYear::effective($year);
 
         if ($month !== null && ($month < 1 || $month > 12)) {
             throw new \InvalidArgumentException('Monat muss zwischen 1 und 12 liegen.');
@@ -108,6 +114,7 @@ final class YearTables
     public static function travelQuota(string $vehicle, int $year): int
     {
         EurYear::assert($year);
+        $year = EurYear::effective($year);
 
         return str_contains(mb_strtolower($vehicle), 'fahrrad')
             ? ($year === 2024 ? 1500 : 3000)
@@ -126,6 +133,7 @@ final class YearTables
     public static function passengerSurchargeCents(string $vehicle, int $year): int
     {
         EurYear::assert($year);
+        $year = EurYear::effective($year);
 
         if (self::maximumPassengers($vehicle) === 0) {
             return 0;

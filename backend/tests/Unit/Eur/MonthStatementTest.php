@@ -113,12 +113,12 @@ class MonthStatementTest extends TestCase
         $this->assertSame(500, $view['lines'][0]['business_amount_cents']);
     }
 
-    /** EUE-001 — unbekanntes Jahr und ungültiger Monat werden abgewiesen. */
-    public function test_unknown_year_and_month_are_rejected(): void
+    /** EUE-001 — ein Jahr unterhalb der Regeljahre und ein ungültiger Monat werden abgewiesen. */
+    public function test_a_year_before_the_first_rule_year_and_an_invalid_month_are_rejected(): void
     {
         try {
-            MonthStatement::build(2027, 5, []);
-            $this->fail('Unbekanntes Jahr wurde nicht abgewiesen.');
+            MonthStatement::build(2023, 5, []);
+            $this->fail('Ein Jahr ohne Regelbasis wurde nicht abgewiesen.');
         } catch (InvalidArgumentException) {
             $this->assertTrue(true);
         }

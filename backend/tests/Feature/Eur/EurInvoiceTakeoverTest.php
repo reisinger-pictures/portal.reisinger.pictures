@@ -32,13 +32,14 @@ class EurInvoiceTakeoverTest extends EurBookkeepingTestCase
         int $amountCents = 12345,
         string $brand = 'rp',
         bool $optedOut = false,
+        int $year = 2026,
     ): EurInvoiceTakeoverData {
         return new EurInvoiceTakeoverData(
             externalId: $externalId,
             source: EurInvoiceTakeoverData::SOURCE_ORDER_INVOICE,
             invoiceNumber: substr($externalId, strlen('invoice:')),
             amountCents: $amountCents,
-            year: 2026,
+            year: $year,
             month: 5,
             day: 4,
             brand: $brand,
@@ -350,5 +351,33 @@ class EurInvoiceTakeoverTest extends EurBookkeepingTestCase
         $this->assertSame($first?->id, $after?->id);
         $this->assertDatabaseCount('eur_entries', 1);
         $this->assertSame(1, EurAuditLog::where('action', 'invoice_takeover_conflict')->count());
+    }
+
+    /**
+     * Ein Replay eines Snapshots aus einem Regeljahr (Altbestellung 2024/2025)
+     * bricht den Sendepfad nicht ab: keine Buchung, aber ein Audit-Eintrag.
+     * Aufrufer (`InvoiceMailDispatcher`, `ContractCloseService`) catchen nicht.
+     */
+    public function test_a_rule_only_year_is_skipped_and_audited_instead_of_aborting(): void
+    {
+        $entry = app(EurInvoiceTakeoverService::class)->takeover($this->data(year: 2024));
+
+        $this->assertNull($entry);
+        $this->assertDatabaseCount('eur_entries', 0);
+        $this->assertSame(1, EurAuditLog::where('action', 'invoice_takeover_skipped_booking_year')->count());
+        $this->assertSame(0, EurAuditLog::where('action', 'invoice_takeover_created')->count());
+    }
+
+    public function test_a_booking_year_without_a_pinned_basis_is_taken_over(): void
+    {
+        $entry = app(EurInvoiceTakeoverService::class)->takeover($this->data(year: 2027));
+
+        $this->assertNotNull($entry);
+        $this->assertSame(2027, (int) $entry->year);
+        $this->assertDatabaseHas('eur_entries', [
+            'external_id' => 'invoice:P-2026-0001-0001',
+            'year' => 2027,
+        ]);
+        $this->assertSame(1, EurAuditLog::where('action', 'invoice_takeover_created')->count());
     }
 }

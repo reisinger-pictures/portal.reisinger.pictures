@@ -98,10 +98,11 @@ function mockHooks() {
         updateBillingDetails: vi.fn(),
     });
     vi.mocked(useEurYears).mockReturnValue(swrResult<ReturnType<typeof useEurYears>>({
+        pinned_years: [2024, 2025, 2026],
+        bookable_years: [2026],
+        last_pinned_year: 2026,
         default_year: 2026,
-        supported: [2024, 2025, 2026],
         active_years: [2026],
-        warnings: [],
     }));
     vi.mocked(useEurReference).mockReturnValue(swrResult<ReturnType<typeof useEurReference>>(undefined));
     vi.mocked(useEurDocuments).mockReturnValue(swrResult<ReturnType<typeof useEurDocuments>>({documents: []}));

@@ -129,7 +129,7 @@ class EurWarehouseApiTest extends EurBookkeepingTestCase
             ->assertJsonValidationErrors('amount_cents');
 
         $this->withHeaders($this->bearer($token))
-            ->postJson('/api/management/eur/warehouse', array_merge($this->payload(), ['year' => 2027]))
+            ->postJson('/api/management/eur/warehouse', array_merge($this->payload(), ['year' => 2025]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('year');
 

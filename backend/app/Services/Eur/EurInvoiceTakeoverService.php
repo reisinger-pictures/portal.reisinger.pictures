@@ -42,6 +42,16 @@ class EurInvoiceTakeoverService
 
     public function takeover(EurInvoiceTakeoverData $data): ?EurEntry
     {
+        // Ein Replay eines Snapshots aus einem Regeljahr (Altbestellung
+        // 2024/2025) ist keine Buchung: der Sendepfad der Mail läuft weiter,
+        // es entsteht keine `eur_entries`-Zeile, und der Skip ist auditierbar.
+        // Der Assert in {@see self::validate()} bleibt für den direkten Aufruf.
+        if (! EurYear::accepts($data->year)) {
+            $this->audit('invoice_takeover_skipped_booking_year', null, $data);
+
+            return null;
+        }
+
         $this->validate($data);
 
         // Lieferscheine (L-) und Angebote (A-) sind keine Erlösereignisse. Ihr
@@ -122,7 +132,8 @@ class EurInvoiceTakeoverService
 
     private function validate(EurInvoiceTakeoverData $data): void
     {
-        EurYear::assert($data->year);
+        // Die Übernahme erzeugt eine Buchung; 2024/2025 sind reine Regeljahre.
+        EurYear::assertBookable($data->year);
         PersistedMoney::assertFitsCents($data->amountCents, 'invoice.total_gross');
 
         if ($data->month < 1 || $data->month > 12 || $data->day < 1 || $data->day > 31) {
@@ -158,6 +169,7 @@ class EurInvoiceTakeoverService
                 'source' => $data->source,
                 'external_id' => $data->externalId,
                 'invoice_number' => $data->invoiceNumber,
+                'year' => $data->year,
                 'amount_cents' => $data->amountCents,
                 'business_share' => self::BUSINESS_SHARE,
             ],

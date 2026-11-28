@@ -137,7 +137,7 @@ class EurPdfApiTest extends EurBookkeepingTestCase
     {
         $headers = $this->bearer($this->tokenFor());
 
-        $this->withHeaders($headers)->get('/api/management/eur/pdf/month?year=2027&month=5')->assertUnprocessable();
+        $this->withHeaders($headers)->get('/api/management/eur/pdf/month?year=2025&month=5')->assertUnprocessable();
         $this->withHeaders($headers)->get('/api/management/eur/pdf/assets?year=2023')->assertUnprocessable();
         $this->withHeaders($headers)->get('/api/management/eur/pdf/eigenbeleg?year=2026&month=13&description=x&amount_cents=1')->assertUnprocessable();
         $this->withHeaders($headers)->get('/api/management/eur/pdf/eigenbeleg?year=2026&month=5&amount_cents=1')->assertUnprocessable();

@@ -17,7 +17,7 @@ use InvalidArgumentException;
  * übergebenen, gepinnten {@see IncomeTaxTariff}; die SV-Parameter werden vom
  * Aufrufer aus der gepinnten SV-Engine (EurOverviewService) geliefert.
  *
- * Die Kennzahlen folgen dem Regelkatalog (features/eur/cleanroom/DOMAIN.md,
+ * Die Kennzahlen folgen dem gepinnten Regelkatalog (Regelartefakt,
  * technischer Beleg der Regeln EUE-094/095/103/125/126):
  *   U10 = betriebliche Einkünfte nach Grundfreibetrag, U11 = KZ 245,
  *   U12 = E1B-Ergebnis, U13 = Prognose Vermietung, U14 = Gesamteinkommen,

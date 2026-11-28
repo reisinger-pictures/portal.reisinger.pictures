@@ -73,16 +73,36 @@ class EurAssetCarryOverTest extends EurBookkeepingTestCase
         $this->assertSame(75, (int) DB::table('eur_asset_years')->where('id', $row->id)->value('private_use_percent'));
     }
 
-    public function test_an_unsupported_target_year_is_rejected(): void
+    public function test_carry_over_accepts_a_booking_year_without_a_pinned_basis(): void
+    {
+        $token = $this->tokenFor();
+        $asset = $this->asset('Fortgeführt', 100, usefulLife: 5);
+
+        $response = $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/assets/carry-over', ['year' => 2027]);
+        $response->assertCreated();
+        $response->assertJsonPath('created', 1);
+
+        // 240000 ct / 5 Jahre = 48000 ct je Jahr; 2027 hat keinen Regelplan
+        // mehr in `PINNED`, ist aber buchbar (EurYear::accepts()).
+        $row = EurAssetYear::forCurrentBrand()->where('eur_asset_id', $asset->id)->where('year', 2027)->firstOrFail();
+        $this->assertSame(2026, (int) $row->carry_over_from_year);
+        $this->assertSame('planned', $row->status);
+        $this->assertSame(48000, (int) $row->depreciation_cents);
+        $this->assertSame(48000, (int) $row->book_value_cents);
+    }
+
+    public function test_a_year_before_the_first_rule_year_is_rejected(): void
     {
         $token = $this->tokenFor();
 
-        $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/assets/carry-over', ['year' => 2027])
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/assets/carry-over', ['year' => 2023])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('year');
     }
 
-    private function asset(string $name, int $share, string $brand = 'rp'): EurAsset
+    private function asset(string $name, int $share, string $brand = 'rp', int $usefulLife = 3): EurAsset
     {
         $asset = EurAsset::create([
             'brand' => $brand,
@@ -91,11 +111,13 @@ class EurAssetCarryOverTest extends EurBookkeepingTestCase
             'supplier' => 'Lieferant',
             'purchase_date' => '2024-01-15',
             'cost_cents' => 240000,
-            'useful_life_years' => 3,
+            'useful_life_years' => $usefulLife,
             'business_share' => $share,
             'scope' => $share < 50 ? 'private' : 'business',
             'method' => 'linear',
         ]);
+
+        $annual = intdiv(240000, $usefulLife);
 
         foreach ([2024, 2025, 2026] as $year) {
             EurAssetYear::create([
@@ -104,11 +126,11 @@ class EurAssetCarryOverTest extends EurBookkeepingTestCase
                 'year' => $year,
                 'scope' => $asset->scope,
                 'method' => 'linear',
-                'depreciation_cents' => 80000,
-                'book_value_cents' => 240000 - ($year - 2024) * 80000,
+                'depreciation_cents' => $annual,
+                'book_value_cents' => 240000 - ($year - 2024) * $annual,
                 'private_use_percent' => 100 - $share,
                 'private_use_cents' => 0,
-                'business_use_cents' => 80000,
+                'business_use_cents' => $annual,
                 'status' => 'planned',
             ]);
         }

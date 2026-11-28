@@ -40,7 +40,7 @@ class EurMonthController extends Controller
             'month' => 'required|integer|min:1|max:12',
         ]);
 
-        $year = (int) ($data['year'] ?? EurYear::DEFAULT);
+        $year = (int) ($data['year'] ?? EurYear::currentOrLast());
         $month = (int) $data['month'];
 
         $entries = EurEntry::forCurrentBrand()->where('year', $year)->where('month', $month)->get();
@@ -169,7 +169,7 @@ class EurMonthController extends Controller
             'note' => 'nullable|string|max:2000',
         ]);
 
-        $year = (int) ($data['year'] ?? EurYear::DEFAULT);
+        $year = (int) ($data['year'] ?? EurYear::currentOrLast());
         $month = (int) $data['month'];
 
         $report = EurMonthlyReport::updateOrCreate(
@@ -357,9 +357,9 @@ class EurMonthController extends Controller
     {
         return [$required ? 'required' : 'nullable', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
             try {
-                EurYear::assert((int) $value);
-            } catch (InvalidArgumentException) {
-                $fail(EurYear::warning((int) $value)['warning']);
+                EurYear::assertBookable((int) $value);
+            } catch (InvalidArgumentException $exception) {
+                $fail($exception->getMessage());
             }
         }];
     }

@@ -99,7 +99,7 @@ class EurMonthCompletionApiTest extends EurBookkeepingTestCase
         $token = $this->tokenFor();
 
         $this->withHeaders($this->bearer($token))
-            ->postJson('/api/management/eur/month/create', ['year' => 2027, 'month' => 5])
+            ->postJson('/api/management/eur/month/create', ['year' => 2025, 'month' => 5])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('year');
 
@@ -131,11 +131,11 @@ class EurMonthCompletionApiTest extends EurBookkeepingTestCase
             ->assertOk()
             ->assertJsonPath('created', true);
         $this->withHeaders($this->bearer($token))
-            ->postJson('/api/management/eur/month/create-year', ['year' => 2025])
+            ->postJson('/api/management/eur/month/create-year', ['year' => 2026])
             ->assertOk()
-            ->assertJsonPath('created', 12);
+            ->assertJsonPath('created', 11);
 
-        $this->assertDatabaseCount('eur_monthly_reports', 14);
+        $this->assertDatabaseCount('eur_monthly_reports', 13);
         $this->assertDatabaseHas('eur_monthly_reports', [
             'brand' => $brand, 'year' => 2026, 'month' => 5, 'status' => 'open',
         ]);
@@ -143,7 +143,7 @@ class EurMonthCompletionApiTest extends EurBookkeepingTestCase
             'brand' => self::OTHER_BRAND, 'year' => 2026, 'month' => 5, 'status' => 'closed',
         ]);
         $this->assertDatabaseMissing('eur_monthly_reports', [
-            'brand' => self::OTHER_BRAND, 'year' => 2025, 'month' => 1,
+            'brand' => self::OTHER_BRAND, 'year' => 2026, 'month' => 1,
         ]);
     }
 }

@@ -23,10 +23,12 @@ use App\Services\Eur\EurAssetEigenbelegService;
 use App\Services\Eur\EurAssetGroupService;
 use App\Services\Eur\EurEntnahmeService;
 use App\Support\BrandRegistry;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 /**
  * EAR · Anlagegüter und AfA (EUE-049 … EUE-061, DEG-001 … DEG-015).
@@ -224,8 +226,8 @@ class EurAssetController extends Controller
         $data = $request->validate(['year' => ['required', 'integer']]);
 
         try {
-            EurYear::assert((int) $data['year']);
-        } catch (\InvalidArgumentException $exception) {
+            EurYear::assertBookable((int) $data['year']);
+        } catch (InvalidArgumentException $exception) {
             return response()->json(['error' => $exception->getMessage()], 422);
         }
 
@@ -318,19 +320,32 @@ class EurAssetController extends Controller
 
     /**
      * D-85: idempotenter Jahreswechsel — nur fehlende Jahreszeilen anlegen.
+     *
+     * Der Jahreswechsel schreibt Jahreszeilen, keine Buchungen. Deshalb nimmt
+     * er neben den Regeljahren 2024/2025 (bestehende Pläne, Vorjahresvergleiche)
+     * auch jedes Buchungsjahr ab {@see EurYear::BOOKING_FROM} — 2027 ebenso wie
+     * das laufende Jahr. `EurAssetCarryOver::planRow()` ist zieljahresunabhängig
+     * (Planindex `targetYear - purchaseYear`, degressiver Satz am Anlagegut).
      */
     public function carryOver(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'year' => ['required', 'integer', Rule::in(EurYear::SUPPORTED)],
+            'year' => ['required', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
+                try {
+                    EurYear::assert((int) $value);
+                } catch (InvalidArgumentException $exception) {
+                    $fail($exception->getMessage());
+                }
+            }],
         ]);
         $year = (int) $data['year'];
         $created = (new EurAssetCarryOver)->carryOver($year, BrandRegistry::currentId());
 
         // Portal #57: private Gruppen bekommen genau EINEN Eigenbeleg je Jahr,
-        // unabhängig von der Zahl ihrer Mitglieder.
+        // unabhängig von der Zahl ihrer Mitglieder. Der Horizont ist das
+        // Zieljahr, damit die Gruppe ihre Zieljahres-Zeile erhält.
         foreach (EurAssetGroup::forCurrentBrand()->get() as $group) {
-            $this->groupService->sync($group);
+            $this->groupService->sync($group, $year);
         }
 
         EurAuditLog::create([
@@ -545,7 +560,7 @@ class EurAssetController extends Controller
             ];
         }
 
-        if ($asset->purchase_date !== null && (int) $asset->purchase_date->format('Y') > EurYear::UPPER) {
+        if ($asset->purchase_date !== null && (int) $asset->purchase_date->format('Y') > EurYear::currentOrLast()) {
             $warnings[] = [
                 'code' => 'EUE-058',
                 'text' => '⚠ Jahr liegt in der Zukunft',
@@ -567,16 +582,17 @@ class EurAssetController extends Controller
         // EUE-056/057: Vorjahres-AfA und Restbuchwert gegen den gepinnten Plan
         // prüfen. Die Toleranz kommt aus dem Regelkatalog, nicht aus dem Code.
         if ($asset->purchase_date !== null) {
+            $currentYear = EurYear::currentOrLast();
             $rules = new RuleValues;
             $plausibility = new AssetPlausibility(
                 $calculator,
-                $rules->parameterFor('EUE-056', 'Toleranz AfA', EurYear::DEFAULT, 'cents'),
+                $rules->parameterFor('EUE-056', 'Toleranz AfA', EurYear::LAST_PINNED, 'cents'),
             );
             $purchaseYear = (int) $asset->purchase_date->format('Y');
             $years = $asset->relationLoaded('years') ? $asset->years : $asset->years()->get();
 
             array_push($warnings, ...$plausibility->warnings([
-                'current_year' => EurYear::DEFAULT,
+                'current_year' => $currentYear,
                 'acquisition_year' => $purchaseYear,
                 'acquisition_month' => (int) $asset->purchase_date->format('n'),
                 'cost_cents' => (int) $asset->cost_cents,

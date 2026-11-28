@@ -74,7 +74,10 @@ function tabLabel(id: TabId): ReactNode {
     }
 }
 
+// Offline-Fallback, solange `/eur/years` nicht antwortet. `YEARS` ist nur die
+// Regelbasis (2024/2025 dienen Vorjahresvergleichen), buchbar ist ab 2026.
 const YEARS = [2024, 2025, 2026];
+const BOOKABLE_YEARS = [2026];
 const DEFAULT_YEAR = 2026;
 const BUSINESS_SHARES = Array.from({length: 21}, (_, index) => index * 5);
 
@@ -280,18 +283,33 @@ export default function ManagementEurView() {
     const years = useEurYears();
     const activeYears = years.data?.active_years ?? [];
     const currentYear = new Date().getFullYear();
-    // Ein Jahr erscheint nur, wenn es Buchungen gibt oder es das laufende Jahr ist.
-    // Die API liefert die Werte; YEARS/DEFAULT_YEAR bleiben der Offline-Fallback.
-    const supportedYears = years.data?.supported ?? YEARS;
+    const currentMonth = new Date().getMonth() + 1;
+    // Wählbar ist die Vereinigung aus den gepinnten Buchungsjahren, allen
+    // bebuchten Jahren ab der Buchungsgrenze und dem laufenden Jahr. Die
+    // Buchungsgrenze ist das kleinste buchbare Jahr (Offline-Fallback
+    // DEFAULT_YEAR); 2024/2025 bleiben reine Regelbasis, weil `active_years`
+    // sie als Vorjahresvergleich führt. So bleibt ein später bebuchtes Jahr
+    // erreichbar, auch wenn es nicht mehr in `bookable_years` liegt — und das
+    // laufende Jahr hinter `last_pinned_year` ist wählbar, weil das Backend
+    // dafür mit den Regeln des letzten eingepflegten Jahres rechnet (#78).
+    // YEARS/BOOKABLE_YEARS/DEFAULT_YEAR bleiben der Offline-Fallback.
+    const bookableYears = years.data?.bookable_years ?? BOOKABLE_YEARS;
+    const lastPinnedYear = years.data?.last_pinned_year ?? Math.max(...YEARS);
     const defaultYear = years.data?.default_year ?? DEFAULT_YEAR;
-    const visibleYears = supportedYears.filter((value) => activeYears.includes(value) || value === currentYear);
+    const firstBookableYear = bookableYears.length > 0 ? Math.min(...bookableYears) : DEFAULT_YEAR;
+    const yearOptions = Array.from(new Set([
+        ...bookableYears,
+        ...activeYears.filter((value) => value >= firstBookableYear),
+        ...(currentYear >= firstBookableYear ? [currentYear] : []),
+    ])).sort((left, right) => left - right);
+    const visibleYears = yearOptions.length > 0 ? yearOptions : [lastPinnedYear];
 
     const requestedYear = Number(searchParams.get('jahr'));
     // Fällt der API-Default aus dem sichtbaren Bereich, gilt das laufende Jahr
-    // bzw. das erste sichtbare Jahr — nie eine Jahreszahl ohne Auswahloption.
+    // bzw. das höchste sichtbare Jahr — nie eine Jahreszahl ohne Auswahloption.
     const fallbackYear = visibleYears.includes(defaultYear)
         ? defaultYear
-        : (visibleYears.includes(currentYear) ? currentYear : (visibleYears[0] ?? defaultYear));
+        : (visibleYears.includes(currentYear) ? currentYear : Math.max(...visibleYears));
     const year = visibleYears.includes(requestedYear) ? requestedYear : fallbackYear;
 
     const reference = useEurReference();
@@ -302,9 +320,43 @@ export default function ManagementEurView() {
     const allEntries = entries.data?.entries ?? [];
     const monthsWithEntries = Array.from(new Set(allEntries.map((entry) => entry.month))).sort((a, b) => b - a);
     const requestedMonth = Number(searchParams.get('monat'));
-    const month = monthsWithEntries.includes(requestedMonth)
-        ? requestedMonth
-        : (monthsWithEntries[0] ?? new Date().getMonth() + 1);
+    // #77: der laufende Monat gilt, wenn er im laufenden Jahr Buchungen hat;
+    // sonst der höchste bebuchte Monat, sonst der laufende Monat (immer 1–12).
+    const defaultMonth = year === currentYear && monthsWithEntries.includes(currentMonth)
+        ? currentMonth
+        : (monthsWithEntries[0] ?? currentMonth);
+    const month = monthsWithEntries.includes(requestedMonth) ? requestedMonth : defaultMonth;
+
+    // #76: die URL ist der Zustand. Nach dem Rendern steht der effektiv
+    // gerenderte Zustand in der Adresse: ungültige Werte werden auf den
+    // tatsächlich angezeigten Wert korrigiert, und `replace` verhindert einen
+    // zusätzlichen History-Eintrag. Stimmen alle drei Parameter, wird nichts
+    // geschrieben (kein Ping-Pong).
+    //
+    // Erst wenn `years` und `entries` geladen sind, ist `year`/`month` der
+    // effektive Zustand; vorher wäre die URL nur der Lade-Fallback (2026,
+    // laufender Monat) und würde einen gültigen Deep-Link überschreiben oder
+    // `default_year` verdrängen. Ob `entries` geladen ist, hängt am laufenden
+    // `year`: ein Jahreswechsel setzt `entries.data` zurück, die Normalisierung
+    // wartet dann erneut und schreibt höchstens einmal.
+    const isUrlStateReady = years.data !== undefined && entries.data !== undefined;
+    useEffect(() => {
+        if (!isUrlStateReady) return;
+        if (
+            searchParams.get('bereich') === tab
+            && searchParams.get('jahr') === String(year)
+            && searchParams.get('monat') === String(month)
+        ) {
+            return;
+        }
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous);
+            next.set('bereich', tab);
+            next.set('jahr', String(year));
+            next.set('monat', String(month));
+            return next;
+        }, {replace: true});
+    }, [isUrlStateReady, searchParams, tab, year, month, setSearchParams]);
 
     const monthData = useEurMonth(year, month);
     const documents = useEurDocuments(year);
@@ -468,15 +520,17 @@ export default function ManagementEurView() {
                 </div>
             </div>
 
-            {/* EUE-002/003: Warnhinweise zu Jahren außerhalb des Supports werden
-                von /eur/years geliefert, aber durften bisher nicht sichtbar werden. */}
-            {(years.data?.warnings ?? []).filter((warning) => !warning.supported).map((warning) => (
-                <div className="border-b border-error/30 bg-error/10" key={warning.code}>
+            {/* EUE-002/003: Das Portal verkauft keine Jahres-/Lifetime-Lizenz.
+                Liegt für das gewählte Jahr noch keine gepinnte Regelbasis vor,
+                rechnet das Backend mit den Regeln des letzten eingepflegten
+                Jahres; die Ansicht nennt beide Jahreszahlen. */}
+            {year > lastPinnedYear && (
+                <div className="border-b border-warning/30 bg-warning/10">
                     <div className="max-w-7xl mx-auto px-4 md:px-8 py-2 text-sm" role="alert">
-                        {warning.warning}
+                        <Trans>⚠ Die Regeln für {year} sind noch nicht eingepflegt. Es werden derzeit die Berechnungsregeln für {lastPinnedYear} verwendet.</Trans>
                     </div>
                 </div>
-            ))}
+            )}
 
             <div className="max-w-7xl mx-auto px-4 md:px-8 pt-4">
                 <div role="tablist" className="tabs tabs-box eur-tabs bg-base-100">

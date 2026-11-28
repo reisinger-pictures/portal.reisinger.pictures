@@ -37,7 +37,14 @@ final class EurAssetGroupService
         private readonly EurAssetEigenbelegService $eigenbelegService = new EurAssetEigenbelegService,
     ) {}
 
-    public function sync(EurAssetGroup $group): void
+    /**
+     * @param  int|null  $horizon  Zieljahr eines Jahreswechsels; die Gruppe erhält
+     *                             Jahreszeilen mindestens bis
+     *                             `max(LAST_PINNED, laufendes Buchungsjahr,
+     *                             jüngste vorhandene Zeile)` und nach oben
+     *                             erweitert durch dieses Zieljahr.
+     */
+    public function sync(EurAssetGroup $group, ?int $horizon = null): void
     {
         $members = $group->assets()->get()->all();
 
@@ -59,7 +66,7 @@ final class EurAssetGroupService
         $privatePercent = 100 - $businessPercent;
 
         $this->syncEntnahme($group, $totalCost, $businessPercent, $privatePercent);
-        $this->syncEigenbelege($group, $members, $totalCost, $businessPercent);
+        $this->syncEigenbelege($group, $members, $totalCost, $businessPercent, $horizon);
     }
 
     /**
@@ -192,8 +199,13 @@ final class EurAssetGroupService
     /**
      * @param  list<EurAsset>  $members
      */
-    private function syncEigenbelege(EurAssetGroup $group, array $members, int $totalCost, int $businessPercent): void
-    {
+    private function syncEigenbelege(
+        EurAssetGroup $group,
+        array $members,
+        int $totalCost,
+        int $businessPercent,
+        ?int $horizon = null,
+    ): void {
         if ($businessPercent >= 50 || $members === []) {
             $group->years()->delete();
 
@@ -213,11 +225,27 @@ final class EurAssetGroupService
         }
 
         $firstYear = min(array_map(static fn (EurAsset $a): int => (int) $a->purchase_date->format('Y'), $members));
+        // Der Eigenbeleg-Träger reicht mindestens bis zum laufenden
+        // Buchungsjahr (und bis zum letzten Regeljahr), wird durch das Zieljahr
+        // eines späteren Jahreswechsels nach oben erweitert und kürzt nie eine
+        // bereits vorhandene Zeile: `sync()` läuft auch ohne Zieljahr (z. B. aus
+        // dem Gruppen-Update) und würde sonst einen früheren Jahreswechsel
+        // zurückdrehen. Deshalb gehört das Bestands-Maximum in den Horizont —
+        // die vorhandenen Zeilen werden im Lauf neu berechnet und über
+        // `$keptIds` gehalten. Die kumulierte Anschaffungswert-Grenze
+        // (`$cumulative + $eigenbeleg > $totalCost`) bleibt unverändert; sie
+        // begrenzt weiterhin nur die Summe der Eigenbelege.
+        $lastYear = max(
+            $horizon ?? 0,
+            EurYear::LAST_PINNED,
+            EurYear::currentOrLast(),
+            (int) $group->years()->max('year'),
+        );
         $cumulative = 0;
         $book = 1;
         $keptIds = [];
 
-        for ($year = $firstYear; $year <= EurYear::UPPER; $year++) {
+        for ($year = $firstYear; $year <= $lastYear; $year++) {
             $eigenbeleg = Share::apply($annual, $businessPercent);
 
             if ($cumulative + $eigenbeleg > $totalCost) {

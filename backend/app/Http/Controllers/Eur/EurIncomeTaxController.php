@@ -34,9 +34,9 @@ class EurIncomeTaxController extends Controller
         $data = $request->validate([
             'year' => ['nullable', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
                 try {
-                    EurYear::assert((int) $value);
-                } catch (InvalidArgumentException) {
-                    $fail(EurYear::warning((int) $value)['warning']);
+                    EurYear::assertBookable((int) $value);
+                } catch (InvalidArgumentException $exception) {
+                    $fail($exception->getMessage());
                 }
             }],
             'profit_cents' => 'required|integer',
@@ -61,7 +61,7 @@ class EurIncomeTaxController extends Controller
             'months.*.hours_minutes' => 'nullable|integer|min:0',
         ]);
 
-        $year = (int) ($data['year'] ?? EurYear::DEFAULT);
+        $year = (int) ($data['year'] ?? EurYear::currentOrLast());
         // EUE-089 … EUE-093: Tarif und Freibetrag aus dem gewählten Jahr,
         // nicht aus dem auf 2026 gepinnten Referenzartefakt.
         $tariff = IncomeTaxTariff::forYear($year);

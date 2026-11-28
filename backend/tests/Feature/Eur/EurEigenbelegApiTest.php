@@ -55,7 +55,7 @@ class EurEigenbelegApiTest extends EurBookkeepingTestCase
 
         $response = $this->withHeaders($this->bearer($token))
             ->postJson('/api/management/eur/eigenbelege', [
-                'year' => 2025,
+                'year' => 2026,
                 'month' => 11,
                 'day' => 3,
                 'description' => 'Internet 50 % betrieblich',
@@ -75,7 +75,7 @@ class EurEigenbelegApiTest extends EurBookkeepingTestCase
         $payload = ['year' => 2026, 'month' => 5, 'day' => 5, 'description' => 'Porto', 'amount_cents' => 100];
 
         $this->withHeaders($this->bearer($token))
-            ->postJson('/api/management/eur/eigenbelege', array_merge($payload, ['year' => 2027]))
+            ->postJson('/api/management/eur/eigenbelege', array_merge($payload, ['year' => 2025]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('year');
         $this->withHeaders($this->bearer($token))

@@ -144,15 +144,28 @@ class EurTravelPersistenceTest extends EurBookkeepingTestCase
         $this->assertDatabaseCount('eur_travel_trips', 0);
     }
 
-    public function test_store_refuses_years_without_a_pinned_country_table(): void
+    public function test_store_refuses_rule_only_years(): void
     {
         $token = $this->tokenFor();
 
         $this->withHeaders($this->bearer($token))
-            ->postJson('/api/management/eur/travel', array_merge($this->payload(), ['year' => 2025]))
-            ->assertUnprocessable();
+            ->postJson('/api/management/eur/travel', array_merge($this->payload(), ['year' => 2024]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('year');
 
         $this->assertDatabaseCount('eur_travel_trips', 0);
+    }
+
+    public function test_store_accepts_a_year_without_a_pinned_country_table(): void
+    {
+        $token = $this->tokenFor();
+
+        // 2027 ist buchbar; die Ländertabelle von 2026 gilt als Fallback.
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/travel', array_merge($this->payload(), ['year' => 2027]))
+            ->assertCreated();
+
+        $this->assertDatabaseCount('eur_travel_trips', 1);
     }
 
     public function test_store_requires_a_receipt_number_and_rejects_duplicates(): void

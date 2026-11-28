@@ -108,8 +108,9 @@ class EurMonthApiTest extends EurBookkeepingTestCase
         $this->assertContains('💡 Bitte den Tag der Buchung (1–31) ergänzen.', $line['hints']);
     }
 
-    public function test_month_defaults_to_2026_and_rejects_2027(): void
+    public function test_month_defaults_to_the_current_booking_year_and_accepts_an_unpinned_year(): void
     {
+        $this->travelTo('2026-03-01 09:00:00');
         $token = $this->tokenFor();
 
         $this->withHeaders($this->bearer($token))
@@ -117,9 +118,28 @@ class EurMonthApiTest extends EurBookkeepingTestCase
             ->assertOk()
             ->assertJsonPath('year', 2026);
 
+        // 2027 ist buchbar und rechnet mit den Regeln von 2026.
         $this->withHeaders($this->bearer($token))
             ->getJson('/api/management/eur/month?year=2027&month=1')
+            ->assertOk()
+            ->assertJsonPath('year', 2027);
+
+        // 2025 ist ein reines Regeljahr und kein Buchungsjahr.
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/month?year=2025&month=1')
             ->assertUnprocessable();
+    }
+
+    /** Ohne `year` gilt das laufende Buchungsjahr, nicht ein gepinnter Konstante. */
+    public function test_month_without_a_year_defaults_to_the_current_booking_year(): void
+    {
+        $this->travelTo('2027-01-15 09:00:00');
+        $token = $this->tokenFor();
+
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/month?month=1')
+            ->assertOk()
+            ->assertJsonPath('year', 2027);
     }
 
     public function test_month_close_is_idempotent_and_audited_once(): void
@@ -148,7 +168,7 @@ class EurMonthApiTest extends EurBookkeepingTestCase
 
         $response = $this->withHeaders($this->bearer($token))
             ->postJson('/api/management/eur/entries', [
-                'year' => 2025,
+                'year' => 2026,
                 'month' => 5,
                 'day' => 31,
                 'direction' => 'expense',
@@ -166,7 +186,7 @@ class EurMonthApiTest extends EurBookkeepingTestCase
         $this->assertIsArray($response->json('entry.checks'));
 
         $listed = $this->withHeaders($this->bearer($token))
-            ->getJson('/api/management/eur/entries?year=2025');
+            ->getJson('/api/management/eur/entries?year=2026');
 
         $listed->assertOk();
         $this->assertIsArray($listed->json('entries.0.checks'));
@@ -179,7 +199,7 @@ class EurMonthApiTest extends EurBookkeepingTestCase
         $token = $this->tokenFor();
 
         $this->withHeaders($this->bearer($token))
-            ->postJson('/api/management/eur/month/close', ['year' => 2027, 'month' => 5])
+            ->postJson('/api/management/eur/month/close', ['year' => 2025, 'month' => 5])
             ->assertUnprocessable();
     }
 }

@@ -7,9 +7,10 @@ use App\Eur\Domain\VatReturnService;
 use App\Eur\Reference\EurYear;
 use App\Http\Controllers\Controller;
 use App\Services\Eur\EurVatDeclarationService;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 /**
  * EAR · Umsatzsteuer (EUE-082 … EUE-088) — Monatsauswertung.
@@ -28,7 +29,13 @@ class EurVatController extends Controller
         EurVatDeclarationService $declarationService,
     ): JsonResponse {
         $data = $request->validate([
-            'year' => ['required', 'integer', Rule::in(EurYear::SUPPORTED)],
+            'year' => ['required', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
+                try {
+                    EurYear::assertBookable((int) $value);
+                } catch (InvalidArgumentException $exception) {
+                    $fail($exception->getMessage());
+                }
+            }],
             'month' => 'required|integer|min:1|max:12',
             'small_business_income_cents' => 'nullable|integer|min:0',
             'reverse_charge_cents' => 'nullable|integer|min:0',

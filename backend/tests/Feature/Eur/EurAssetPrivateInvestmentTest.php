@@ -151,14 +151,14 @@ class EurAssetPrivateInvestmentTest extends EurBookkeepingTestCase
         $again->assertJsonPath('entry.id', $entryId);
     }
 
-    public function test_booking_rejects_an_unsupported_year(): void
+    public function test_booking_rejects_a_rule_only_year(): void
     {
         $token = $this->tokenFor();
         $asset = $this->createAsset('Gut', 'linear');
 
         $this->withHeaders($this->bearer($token))->postJson(
             '/api/management/eur/assets/'.$asset->id.'/book-depreciation',
-            ['year' => 2027],
+            ['year' => 2025],
         )->assertUnprocessable();
     }
 

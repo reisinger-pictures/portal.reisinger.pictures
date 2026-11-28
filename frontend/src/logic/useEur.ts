@@ -308,20 +308,23 @@ export interface EurSettings {
     kleinunternehmer: boolean;
 }
 
-/** `GET /eur/years` — supported years and warnings for unsupported ones. */
-export interface EurYearWarning {
-    year: number;
-    code: string;
-    warning: string;
-    supported: boolean;
-}
-
+/**
+ * `GET /eur/years` — Regelbasis, Buchungsjahre und Jahre mit Buchungen.
+ * `pinned_years` sind die Jahre mit eingepflegten Regeln (2024/2025 dienen nur
+ * Vorjahresvergleichen); buchbar sind ausschließlich `bookable_years`
+ * (Buchungsjahre ab 2026, heute `[2026]`). `last_pinned_year` ist das jüngste
+ * eingepflegte Jahr; das Backend rechnet jedes buchbare Jahr damit, auch wenn
+ * es dafür noch keine eigenen Regeln gibt. Es gibt keine Warnliste und kein
+ * `supported` mehr.
+ */
 export interface EurYearsResponse {
+    pinned_years: number[];
+    /** Jahre, für die gebucht werden darf; 2024/2025 sind nur Regelbasis. */
+    bookable_years: number[];
+    last_pinned_year: number;
     default_year: number;
-    supported: number[];
     /** Jahre mit mindestens einer Buchung im aktuellen Brand. */
     active_years: number[];
-    warnings: EurYearWarning[];
 }
 
 /** `GET /eur/month` — a line's type E/A/WEB/FR. */

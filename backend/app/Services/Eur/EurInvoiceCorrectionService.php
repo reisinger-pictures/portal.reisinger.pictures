@@ -70,7 +70,8 @@ class EurInvoiceCorrectionService
             return $existing;
         }
 
-        EurYear::assert($year);
+        // Die Korrektur erzeugt eine Buchung; 2024/2025 sind reine Regeljahre.
+        EurYear::assertBookable($year);
 
         if ($month < 1 || $month > 12 || $day < 1 || $day > 31) {
             throw new InvalidArgumentException('Ungültiges Buchungsdatum der Rechnungskorrektur.');

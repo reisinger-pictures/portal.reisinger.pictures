@@ -379,7 +379,7 @@ final class EurDocumentPositionService
 
     private function purchaseDate(EurDocument $document): string
     {
-        $year = $document->year === null ? EurYear::DEFAULT : (int) $document->year;
+        $year = $document->year === null ? EurYear::currentOrLast() : (int) $document->year;
         $month = $document->month === null ? 1 : (int) $document->month;
 
         return sprintf('%04d-%02d-15', $year, max(1, min(12, $month)));

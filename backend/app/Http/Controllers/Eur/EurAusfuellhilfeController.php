@@ -37,7 +37,7 @@ class EurAusfuellhilfeController extends Controller
             'wage_tax_cents' => 'nullable|integer|min:0',
         ]);
 
-        $year = (int) ($data['year'] ?? EurYear::DEFAULT);
+        $year = (int) ($data['year'] ?? EurYear::currentOrLast());
 
         return response()->json($this->service->build($year, $data));
     }
@@ -47,9 +47,9 @@ class EurAusfuellhilfeController extends Controller
     {
         return [function (string $attribute, mixed $value, Closure $fail): void {
             try {
-                EurYear::assert((int) $value);
-            } catch (InvalidArgumentException) {
-                $fail(EurYear::warning((int) $value)['warning']);
+                EurYear::assertBookable((int) $value);
+            } catch (InvalidArgumentException $exception) {
+                $fail($exception->getMessage());
             }
         }];
     }

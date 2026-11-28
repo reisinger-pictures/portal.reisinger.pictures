@@ -22,22 +22,59 @@ Browser.
 
 ```json
 {
+  "pinned_years": [2024, 2025, 2026],
+  "bookable_years": [2026],
+  "last_pinned_year": 2026,
   "default_year": 2026,
-  "supported": [2024, 2025, 2026],
-  "active_years": [2024, 2026],
-  "warnings": [
-    {"year": 2027, "code": "EUE-002", "warning": "…", "supported": false}
-  ]
+  "active_years": [2026]
 }
 ```
+
+`pinned_years` sind die **Regeljahre** mit eingepflegter, gepinnter Basis
+(Tarif, SV-Tabellen, Kilometergeld, AfA); sie tragen die Vorjahresvergleiche
+EUE-056/057 und bleiben deshalb auch 2024 und 2025. `bookable_years` ist die
+Schnittmenge aus `pinned_years` und den **Buchungsjahren**, die mit 2026
+beginnen. `last_pinned_year` ist das jüngste Regeljahr; es ist der Fallback für
+jedes spätere Buchungsjahr. `default_year` ist das laufende Jahr, wenn es
+buchbar ist, sonst `last_pinned_year`. Ein `warnings`-Feld gibt es nicht mehr.
 
 `active_years` sind die Jahre mit mindestens einer Buchung im aktuellen Brand.
 Die UI zeigt im Jahres-Selector nur diese Jahre plus das laufende Jahr; das ist
 eine Anzeigeregel, keine Einschränkung der akzeptierten `year`-Werte.
 
 Alle übrigen Endpunkte akzeptieren `year` als Query-Parameter (GET) oder im
-Body (POST/PUT). Erlaubt sind 2024–2026; ein anderer Wert ist ein 422 mit
-`message` aus `EurYear::warning()`. Ohne Parameter gilt 2026.
+Body (POST/PUT). Buchbar ist jedes Jahr ab 2026; 2024, 2025 und frühere Jahre
+sind kein Buchungsjahr und ergeben ein 422 mit der Meldung aus
+`EurYear::assertBookable()` („Buchungsjahre ab 2026 …"). Ohne Parameter gilt das
+laufende Buchungsjahr (`EurYear::currentOrLast()`): 2026 in 2026, 2027 ab 2027,
+und vor 2026 das letzte Regeljahr.
+
+Alle Lese-Endpunkte akzeptieren dieselbe Grenze — nur Buchungsjahre ab 2026.
+Buchungsdaten vor 2026 gibt es nicht: das Buchhaltungsschema wurde mit V061 für
+das Buchungsjahr 2026 eingeführt, die `eur_*`-Tabellen sind vor dem ersten
+Buchen leer.
+
+Fehlt für ein Buchungsjahr die gepinnte Regelbasis (`year > last_pinned_year`,
+heute 2027), bricht der Request **nicht** ab: Tarif, SV-Werte, Kilometergeld,
+Reise-Ländertabelle und Regelparameter werden über `EurYear::effective()` aus
+`last_pinned_year` gelesen, und die UI weist mit beiden Jahreszahlen darauf hin
+(siehe [05-ui.md](05-ui.md#regelbasis-und-jahres-hinweis-eue-002003)).
+
+Die HTTP-Endpunkte akzeptieren ausschließlich Buchungsjahre ab 2026; 2024 und
+2025 sind dort kein gültiger `year`-Wert (422). Die Regel-Lookups dahinter —
+`YearTables`, `ReferenceTables`, `RuleValues` — bedienen 2024 und 2025 intern
+weiter, weil die Vorjahresvergleiche EUE-056/057 und bestehende AfA-Pläne diese
+Regelbasis brauchen. Diese interne Auflösung ist kein akzeptierter
+Request-Parameter.
+
+Der AfA-Jahreswechsel (`POST /eur/assets/carry-over`) ist **keine** Buchung: er
+schreibt Jahreszeilen und akzeptiert deshalb sowohl die Regeljahre 2024/2025
+(bestehende Pläne, Vorjahresvergleiche EUE-056/057) als auch jedes Buchungsjahr
+ab 2026 — 2027 eingeschlossen. Die Jahreszeile entsteht zieljahresunabhängig
+aus dem Plan (Planindex `Zieljahr − Kaufjahr`, degressiver Satz am Anlagegut);
+eine private Gruppe erhält ihre Zieljahres-Zeile samt Eigenbeleg
+(`EBG-<id>-<jahr>`). Jahre vor 2024 lehnt der Endpunkt mit 422 und der Meldung
+aus `EurYear::assert()` ab (`year` ist Pflichtfeld).
 
 ## Journal und Monat
 

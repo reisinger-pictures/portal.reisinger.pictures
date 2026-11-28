@@ -63,13 +63,13 @@ class EurEntryImportApiTest extends EurBookkeepingTestCase
         $token = $this->tokenFor();
         $csv = implode("\n", [
             'Datum,Art,Kategorie,Beschreibung,Betrag,Betriebsanteil',
-            '10.04.2025,Ausgabe,Büro,Papier,"1.234,56",100',
-            '11.04.2025,Einnahme,Dienstleistung,Honorar,"20,00",0',
+            '10.04.2026,Ausgabe,Büro,Papier,"1.234,56",100',
+            '11.04.2026,Einnahme,Dienstleistung,Honorar,"20,00",0',
         ]);
 
         $response = $this->withHeaders($this->uploadHeaders($token))->post('/api/management/eur/entries/import', [
             'file' => UploadedFile::fake()->createWithContent('buchungen.csv', "\xEF\xBB\xBF".$csv),
-            'year' => 2025,
+            'year' => 2026,
         ]);
 
         $response->assertOk()
@@ -83,11 +83,11 @@ class EurEntryImportApiTest extends EurBookkeepingTestCase
     public function test_import_rejects_unknown_year_and_non_csv_files(): void
     {
         $token = $this->tokenFor();
-        $csv = "Datum;Art;Kategorie;Beschreibung;Betrag;Betriebsanteil\n05.05.2027;Einnahme;Art;Text;10,00;100";
+        $csv = "Datum;Art;Kategorie;Beschreibung;Betrag;Betriebsanteil\n05.05.2025;Einnahme;Art;Text;10,00;100";
 
         $this->withHeaders($this->uploadHeaders($token))->post('/api/management/eur/entries/import', [
             'file' => UploadedFile::fake()->createWithContent('buchungen.csv', $csv),
-            'year' => 2027,
+            'year' => 2025,
         ])->assertUnprocessable()->assertJsonValidationErrors('year');
 
         $this->withHeaders($this->uploadHeaders($token))->post('/api/management/eur/entries/import', [

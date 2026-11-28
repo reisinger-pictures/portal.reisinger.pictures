@@ -182,7 +182,7 @@ class EurApiTest extends TestCase
         ];
 
         $this->withHeaders($this->bearer($token))
-            ->postJson('/api/management/eur/entries', array_merge($base, ['year' => 2027]))
+            ->postJson('/api/management/eur/entries', array_merge($base, ['year' => 2025]))
             ->assertUnprocessable();
 
         $this->withHeaders($this->bearer($token))
@@ -275,6 +275,7 @@ class EurApiTest extends TestCase
      */
     public function test_asset_exposes_pinned_afa_and_future_year_warnings(): void
     {
+        $this->travelTo('2026-06-01 09:00:00');
         $token = $this->tokenFor(UserRole::ADMIN->value);
         $payload = [
             'name' => 'Drucker',
@@ -300,6 +301,41 @@ class EurApiTest extends TestCase
         $good->assertCreated();
         $good->assertJsonCount(1, 'asset.warnings');
         $good->assertJsonPath('asset.warnings.0.code', 'EUE-058');
+    }
+
+    /**
+     * EUE-058: "Jahr liegt in der Zukunft" vergleicht gegen das laufende
+     * Buchungsjahr, nicht gegen das letzte gepinnte Regeljahr. In 2027 ist ein
+     * 2027 gekauftes Gut kein Zukunftsfall.
+     */
+    public function test_eue_058_compares_the_purchase_year_with_the_current_booking_year(): void
+    {
+        $this->travelTo('2027-02-01 09:00:00');
+        $token = $this->tokenFor(UserRole::ADMIN->value);
+        $payload = [
+            'name' => 'Drucker 2027',
+            'invoice_no' => 'R-3',
+            'supplier' => 'Fotohandel',
+            'purchase_date' => '2027-01-15',
+            'cost_cents' => 200000,
+            'useful_life_years' => 5,
+            'business_share' => 100,
+            'method' => 'linear',
+            'category' => 'Firmen-Drucker',
+        ];
+
+        $current = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/assets', $payload);
+        $current->assertCreated();
+        $this->assertNotContains('EUE-058', array_column($current->json('asset.warnings'), 'code'));
+
+        $future = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/assets', [
+            ...$payload,
+            'name' => 'Drucker 2028',
+            'invoice_no' => 'R-4',
+            'purchase_date' => '2028-01-15',
+        ]);
+        $future->assertCreated();
+        $this->assertContains('EUE-058', array_column($future->json('asset.warnings'), 'code'));
     }
 
     public function test_degressive_comparison_matches_the_pinned_example(): void
@@ -371,21 +407,21 @@ class EurApiTest extends TestCase
         $response->assertJsonPath('kz.zahllast', 31390);
     }
 
-    public function test_vat_calculation_rejects_a_foreign_year(): void
+    public function test_vat_calculation_rejects_a_rule_only_year(): void
     {
         $token = $this->tokenFor(UserRole::ADMIN->value);
 
         $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/vat/calc', [
-            'year' => 2027,
+            'year' => 2025,
             'month' => 5,
         ])->assertUnprocessable();
     }
 
-    public function test_supported_years_are_accepted_by_summary_and_vat(): void
+    public function test_bookable_years_are_accepted_by_summary_and_vat(): void
     {
         $token = $this->tokenFor(UserRole::ADMIN->value);
 
-        foreach ([2024, 2025, 2026] as $year) {
+        foreach ([2026, 2027] as $year) {
             $this->withHeaders($this->bearer($token))
                 ->getJson('/api/management/eur/summary?year='.$year)
                 ->assertOk()
@@ -422,12 +458,11 @@ class EurApiTest extends TestCase
         $response->assertJsonPath('business_cents', 7200);
     }
 
-    public function test_travel_calculation_rejects_unpinned_years_without_a_server_error(): void
+    public function test_travel_calculation_rejects_a_rule_only_year_without_a_server_error(): void
     {
-        // EUE-063/064: das API-erlaubte Jahr 2025 darf keinen unkontrollierten
-        // HTTP 500 mehr erzeugen. Der km-Satz wird aus YearTables aufgelöst
-        // (30.06./01.07.). Da nur die 2026er-Ländertabelle gepinnt ist (EUE-013),
-        // antwortet die API mit einer klaren 422 statt mit einem 500.
+        // 2024/2025 sind reine Regeljahre und kein Buchungsjahr. Der Request
+        // endet in der 422 der Jahresregel und nicht in einem 500 aus dem
+        // Regel-Lookup (Vorjahresvergleiche und AfA lesen 2024/2025 weiterhin).
         $token = $this->tokenFor(UserRole::ADMIN->value);
 
         $response = $this->withHeaders($this->bearer($token))->postJson('/api/management/eur/travel/calc', [
@@ -444,7 +479,8 @@ class EurApiTest extends TestCase
         ]);
 
         $response->assertStatus(422);
-        $response->assertJsonPath('message', 'Für das Reisejahr 2025 ist keine Ländertabelle gepinnt; verfügbar ist 2026.');
+        $response->assertJsonValidationErrors('year');
+        $this->assertStringContainsString('Buchungsjahre ab 2026', (string) $response->json('message'));
         $this->assertStringNotContainsString('unlesbarer Parameterwert', json_encode($response->json()));
     }
 

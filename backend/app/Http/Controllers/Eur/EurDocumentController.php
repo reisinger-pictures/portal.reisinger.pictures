@@ -149,7 +149,7 @@ class EurDocumentController extends Controller
 
         $document = EurDocument::create([
             'brand' => $brand,
-            'year' => (int) ($data['year'] ?? EurYear::DEFAULT),
+            'year' => (int) ($data['year'] ?? EurYear::currentOrLast()),
             'month' => isset($data['month']) ? (int) $data['month'] : null,
             'receipt_no' => $data['receipt_no'] ?? null,
             'original_name' => $file->getClientOriginalName(),
@@ -581,9 +581,9 @@ class EurDocumentController extends Controller
     {
         return ['nullable', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
             try {
-                EurYear::assert((int) $value);
-            } catch (InvalidArgumentException) {
-                $fail(EurYear::warning((int) $value)['warning']);
+                EurYear::assertBookable((int) $value);
+            } catch (InvalidArgumentException $exception) {
+                $fail($exception->getMessage());
             }
         }];
     }

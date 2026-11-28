@@ -139,8 +139,28 @@ class EurSummaryApiTest extends EurBookkeepingTestCase
     public function test_unknown_year_is_rejected(): void
     {
         $this->withHeaders($this->bearer($this->tokenFor()))
-            ->getJson('/api/management/eur/summary?year=2027')
+            ->getJson('/api/management/eur/summary?year=2025')
             ->assertUnprocessable()
             ->assertJsonValidationErrors('year');
+    }
+
+    /**
+     * Ohne `year` gilt das laufende Buchungsjahr (`EurYear::currentOrLast()`),
+     * nicht ein Literal: im Buchungsjahr 2027 ist 2027 der Default.
+     */
+    public function test_summary_defaults_to_the_current_booking_year(): void
+    {
+        $this->travelTo('2027-02-01 09:00:00');
+        $token = $this->tokenFor();
+
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/summary')
+            ->assertOk()
+            ->assertJsonPath('year', 2027);
+
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/summary?year=2026')
+            ->assertOk()
+            ->assertJsonPath('year', 2026);
     }
 }

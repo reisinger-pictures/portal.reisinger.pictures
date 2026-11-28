@@ -154,6 +154,7 @@ class EurDocumentPositionApiTest extends EurBookkeepingTestCase
 
     public function test_two_documents_merge_into_one_private_group_with_one_eigenbeleg_per_year(): void
     {
+        $this->travelTo('2026-03-01 09:00:00');
         $token = $this->tokenFor();
         $first = $this->document('R-PRIV-1', 240000, 2024);
         $second = $this->document('R-PRIV-2', 60000, 2024);

@@ -10,9 +10,11 @@ use App\Http\Controllers\Controller;
 use App\Models\EurAuditLog;
 use App\Models\EurTravelTrip;
 use App\Support\BrandRegistry;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 /**
  * EAR · Reisekosten (EUE-062 … EUE-081, D-83a).
@@ -50,7 +52,7 @@ class EurTravelController extends Controller
     public function index(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'year' => ['nullable', 'integer', Rule::in(EurYear::SUPPORTED)],
+            'year' => $this->yearRule(),
             'month' => 'nullable|integer|min:1|max:12',
         ]);
 
@@ -142,7 +144,7 @@ class EurTravelController extends Controller
         $travel = $tables->travel();
 
         return [
-            'year' => ['required', 'integer', Rule::in(EurYear::SUPPORTED)],
+            'year' => $this->yearRule(true),
             'month' => 'nullable|integer|min:1|max:12',
             'vehicle' => ['required', 'string', Rule::in(array_column($tables->vehicleTypes(), 'name'))],
             // EUE-067: entweder die Distanz oder Start-/Endstand, nie beides.
@@ -161,14 +163,31 @@ class EurTravelController extends Controller
     }
 
     /**
+     * Buchungsjahr: ab 2026, nach oben offen (Fallback auf das letzte
+     * Regeljahr). 2024 und 2025 sind reine Regeljahre und kein Buchungsjahr.
+     *
+     * @return array<int, mixed>
+     */
+    private function yearRule(bool $required = false): array
+    {
+        return [$required ? 'required' : 'nullable', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
+            try {
+                EurYear::assertBookable((int) $value);
+            } catch (InvalidArgumentException $exception) {
+                $fail($exception->getMessage());
+            }
+        }];
+    }
+
+    /**
      * EUE-013: nur die Ländertabelle des gepinnten Wirtschaftsjahres liegt im
-     * Referenzartefakt vor. Ohne diesen Gate würde ein 2024/2025-Jahr eine
-     * unkontrollierte InvalidArgumentException und damit HTTP 500 auslösen.
-     * Die km-Sätze selbst unterstützen 2024–2026 (YearTables).
+     * Referenzartefakt vor. Ein späteres Buchungsjahr liest sie über den
+     * Fallback (`EurYear::effective()`); 2024/2025 sind kein Buchungsjahr und
+     * scheitern bereits an der Jahresregel.
      */
     private function countryTableGate(int $year): ?JsonResponse
     {
-        if ($year === ReferenceTables::BUSINESS_YEAR) {
+        if (EurYear::effective($year) === ReferenceTables::BUSINESS_YEAR) {
             return null;
         }
 

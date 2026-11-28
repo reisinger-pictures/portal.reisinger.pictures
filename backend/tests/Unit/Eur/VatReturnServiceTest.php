@@ -108,11 +108,11 @@ class VatReturnServiceTest extends TestCase
         $this->assertSame(1, $nineteen['zahllast_cents']);
     }
 
-    /** EUE-001 — unbekanntes Jahr wird abgewiesen. */
-    public function test_unknown_year_is_rejected(): void
+    /** EUE-001 — unterhalb des ältesten Regeljahres wird abgewiesen. */
+    public function test_a_year_before_the_first_rule_year_is_rejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        VatReturnService::forYear(2027, []);
+        VatReturnService::forYear(2023, []);
     }
 
     /** EUE-087 und keine Float-Geldwerte. */

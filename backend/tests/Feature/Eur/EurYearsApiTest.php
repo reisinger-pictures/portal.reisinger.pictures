@@ -6,6 +6,7 @@ namespace Tests\Feature\Eur;
 
 use App\Models\EurEntry;
 use App\Support\BrandRegistry;
+use Illuminate\Support\Carbon;
 
 class EurYearsApiTest extends EurBookkeepingTestCase
 {
@@ -14,7 +15,7 @@ class EurYearsApiTest extends EurBookkeepingTestCase
         $this->getJson('/api/management/eur/years')->assertUnauthorized();
     }
 
-    public function test_years_exposes_default_supported_and_both_warning_examples(): void
+    public function test_years_exposes_pinned_and_bookable_years_without_a_warning_list(): void
     {
         $token = $this->tokenFor();
 
@@ -22,17 +23,34 @@ class EurYearsApiTest extends EurBookkeepingTestCase
             ->getJson('/api/management/eur/years');
 
         $response->assertOk();
+        $response->assertJsonPath('pinned_years', [2024, 2025, 2026]);
+        $response->assertJsonPath('bookable_years', [2026]);
+        $response->assertJsonPath('last_pinned_year', 2026);
         $response->assertJsonPath('default_year', 2026);
-        $response->assertJsonPath('supported', [2024, 2025, 2026]);
-        $response->assertJsonCount(2, 'warnings');
-        $response->assertJsonPath('warnings.0.year', 2023);
-        $response->assertJsonPath('warnings.0.code', 'EUE-003');
-        $response->assertJsonPath('warnings.0.supported', false);
-        $response->assertJsonPath('warnings.0.warning', '⚠ Die Tabelle nicht offiziell mit 2023 kompatibel. Kontaktieren Sie uns für den Zugang zu einer älteren Version (Kauf der Lifetime-Lizenz erforderlich).');
-        $response->assertJsonPath('warnings.1.year', 2027);
-        $response->assertJsonPath('warnings.1.code', 'EUE-002');
-        $response->assertJsonPath('warnings.1.supported', false);
-        $response->assertJsonPath('warnings.1.warning', '⚠ Die Tabelle nicht offiziell mit 2027 kompatibel. Bitte auf die neueste Version der Tabelle umsteigen.');
+        $response->assertJsonMissingPath('warnings');
+        $response->assertJsonMissingPath('supported');
+    }
+
+    public function test_default_year_is_the_current_bookable_year_and_falls_back_below_2026(): void
+    {
+        // Der Token wird nach dem Zeitreisen ausgestellt, damit er nicht
+        // durch die fixierte Uhrzeit abläuft.
+        $this->travelTo(Carbon::parse('2028-03-01'));
+        $token = $this->tokenFor();
+
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/years')
+            ->assertOk()
+            ->assertJsonPath('default_year', 2028);
+
+        // Unterhalb des ersten Buchungsjahres gilt das letzte Regeljahr.
+        $this->travelTo(Carbon::parse('2025-03-01'));
+        $token = $this->tokenFor();
+
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/management/eur/years')
+            ->assertOk()
+            ->assertJsonPath('default_year', 2026);
     }
 
     public function test_active_years_lists_only_years_with_bookings_in_the_current_brand(): void
@@ -61,20 +79,22 @@ class EurYearsApiTest extends EurBookkeepingTestCase
         $response->assertJsonPath('active_years', [2024, 2026]);
     }
 
-    public function test_supported_years_are_accepted_and_2027_is_rejected(): void
+    public function test_month_accepts_bookable_years_and_rejects_rule_only_years(): void
     {
         $token = $this->tokenFor();
 
-        foreach ([2024, 2025, 2026] as $year) {
+        foreach ([2026, 2027] as $year) {
             $this->withHeaders($this->bearer($token))
                 ->getJson("/api/management/eur/month?year={$year}&month=5")
                 ->assertOk();
         }
 
-        $response = $this->withHeaders($this->bearer($token))
-            ->getJson('/api/management/eur/month?year=2027&month=5');
+        foreach ([2023, 2024, 2025] as $year) {
+            $response = $this->withHeaders($this->bearer($token))
+                ->getJson("/api/management/eur/month?year={$year}&month=5");
 
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors('year');
+            $response->assertUnprocessable();
+            $response->assertJsonValidationErrors('year');
+        }
     }
 }

@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { useBrand } from '../../../logic/useBrand';
 import { useBillingDetails } from '../../../logic/useLicenseTerms';
 import {
@@ -151,7 +151,32 @@ function swrResult<R>(data: unknown): R {
     return {data, error: undefined, isLoading: false, mutate: vi.fn()} as unknown as R;
 }
 
-function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summaryData?: typeof summary; noSummary?: boolean; noBilling?: boolean; activeYears?: number[]; warnings?: {year: number; code: string; warning: string; supported: boolean}[]} = {}) {
+// Records every location the router reports. A `replace` navigation produces a
+// new key, so a second write from the URL-normalisation effect is observable.
+const locationKeys: string[] = [];
+
+function LocationEcho() {
+    const location = useLocation();
+    locationKeys.push(location.key);
+    return <output data-testid="location-search">{location.search}</output>;
+}
+
+function effectiveSearch(): URLSearchParams {
+    return new URLSearchParams(screen.getByTestId('location-search').textContent ?? '');
+}
+
+function mockHooks(overrides: {
+    billing?: typeof billingDetails | undefined;
+    summaryData?: typeof summary;
+    noSummary?: boolean;
+    noBilling?: boolean;
+    activeYears?: number[];
+    pinnedYears?: number[];
+    bookableYears?: number[];
+    lastPinnedYear?: number;
+    defaultYear?: number;
+    entryMonths?: number[];
+} = {}) {
     vi.mocked(useBrand).mockReturnValue({
         brand: 'test-brand',
         config: null,
@@ -169,7 +194,13 @@ function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summ
         isLoading: false,
         updateBillingDetails: vi.fn(),
     });
-    vi.mocked(useEurYears).mockReturnValue(swrResult<ReturnType<typeof useEurYears>>({default_year: 2026, supported: [2024, 2025, 2026], active_years: overrides.activeYears ?? [2024, 2025, 2026], warnings: overrides.warnings ?? []}));
+    vi.mocked(useEurYears).mockReturnValue(swrResult<ReturnType<typeof useEurYears>>({
+        pinned_years: overrides.pinnedYears ?? [2024, 2025, 2026],
+        bookable_years: overrides.bookableYears ?? [2026],
+        last_pinned_year: overrides.lastPinnedYear ?? 2026,
+        default_year: overrides.defaultYear ?? 2026,
+        active_years: overrides.activeYears ?? [2024, 2025, 2026],
+    }));
     vi.mocked(useEurReference).mockReturnValue(swrResult<ReturnType<typeof useEurReference>>(reference));
     vi.mocked(useEurSettings).mockReturnValue(swrResult<ReturnType<typeof useEurSettings>>({business_year: 2026, default_business_share: 100, sv_mode: 'gsvg', kleinunternehmer: false}));
     vi.mocked(useEurSummary).mockReturnValue(
@@ -177,13 +208,14 @@ function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summ
             ? ({data: undefined, error: new Error('boom'), isLoading: false, mutate: vi.fn()} as unknown as ReturnType<typeof useEurSummary>)
             : swrResult<ReturnType<typeof useEurSummary>>(overrides.summaryData ?? summary),
     );
+    const entryMonths = overrides.entryMonths ?? [5];
     vi.mocked(useEurEntries).mockReturnValue(swrResult<ReturnType<typeof useEurEntries>>({
-        entries: [{
-            id: 1, year: 2026, month: 5, direction: 'expense' as const, kind_type: 'Software',
+        entries: entryMonths.map((month, index) => ({
+            id: index + 1, year: 2026, month, direction: 'expense' as const, kind_type: 'Software',
             e1a_code: '9190', business_share: 100, amount_cents: 10000, business_amount_cents: 10000,
             vat_kind: null, payment_method: null, project: null, customer: null, receipt_no: null, note: null,
-        }],
-        totals: {income_cents: 0, expense_cents: 10000},
+        })),
+        totals: {income_cents: 0, expense_cents: 10000 * entryMonths.length},
     }));
     vi.mocked(useEurMonth).mockReturnValue(swrResult<ReturnType<typeof useEurMonth>>(monthData));
     vi.mocked(useEurDocuments).mockReturnValue(swrResult<ReturnType<typeof useEurDocuments>>({documents: []}));
@@ -204,17 +236,37 @@ function mockHooks(overrides: {billing?: typeof billingDetails | undefined; summ
     vi.mocked(useEurPaymentReconciliation).mockReturnValue(swrResult<ReturnType<typeof useEurPaymentReconciliation>>({year: 2026, methods: []}));
 }
 
-function renderView(initialEntry = '/steuern') {
-    return renderWithProviders(
+function eurTree(initialEntry = '/steuern') {
+    return (
         <MemoryRouter initialEntries={[initialEntry]}>
             <ManagementEurView/>
-        </MemoryRouter>,
+            <LocationEcho/>
+        </MemoryRouter>
     );
+}
+
+function renderView(initialEntry = '/steuern') {
+    return renderWithProviders(eurTree(initialEntry));
 }
 
 const main = () => within(screen.getByRole('main', {name: 'Buchhaltung'}));
 
+/** Runs the test callback with only `Date` faked, so timers stay real. */
+async function withFakeDate(isoDate: string, run: () => void | Promise<void>) {
+    vi.useFakeTimers({toFake: ['Date']});
+    vi.setSystemTime(new Date(isoDate));
+    try {
+        await run();
+    } finally {
+        vi.useRealTimers();
+    }
+}
+
 describe('ManagementEurView', () => {
+    beforeEach(() => {
+        locationKeys.length = 0;
+    });
+
     it('shows the standalone cockpit with all twelve tabs, the year selector and the booking tab by default', () => {
         mockHooks();
 
@@ -232,53 +284,143 @@ describe('ManagementEurView', () => {
         expect(screen.getByRole('link', {name: 'Zurück zum Portal'})).toHaveAttribute('href', '/');
     });
 
-    it('renders the unsupported-year warnings from the API as a visible banner (EUE-002/003)', () => {
-        mockHooks({warnings: [
-            {year: 2023, code: 'EUE-003', warning: '⚠ Ältere Version (Lifetime-Lizenz) nötig.', supported: false},
-            {year: 2027, code: 'EUE-002', warning: '⚠ Bitte neueste Version der Tabelle.', supported: false},
-        ]});
+    it('does not render a year-warning banner while the selected year has pinned rules (EUE-002/003)', () => {
+        mockHooks();
 
         renderView();
 
-        const alerts = screen.getAllByRole('alert');
-        expect(alerts.some((node) => node.textContent?.includes('Lifetime-Lizenz'))).toBe(true);
-        expect(alerts.some((node) => node.textContent?.includes('neueste Version der Tabelle'))).toBe(true);
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(screen.queryByText(/Die Regeln für/)).not.toBeInTheDocument();
     });
 
-    it('does not render a year-warning banner when the API reports none', () => {
-        mockHooks({warnings: []});
+    it('warns with both years when the selected year has no pinned rules yet (EUE-002/003)', () => {
+        withFakeDate('2027-02-10T12:00:00', () => {
+            mockHooks({activeYears: [2026]});
+
+            renderView('/steuern?jahr=2027');
+
+            const alert = screen.getByRole('alert');
+            expect(alert).toHaveTextContent('2027');
+            expect(alert).toHaveTextContent('2026');
+            expect(alert).toHaveTextContent('noch nicht eingepflegt');
+            expect(screen.queryByText(/Lifetime/)).not.toBeInTheDocument();
+            expect(screen.queryByText(/Lizenz/)).not.toBeInTheDocument();
+            expect(screen.queryByText(/neueste Version/)).not.toBeInTheDocument();
+        });
+    });
+
+    it('keeps the offline fallback banner-free at the pinned year', () => {
+        mockHooks();
+        vi.mocked(useEurYears).mockReturnValue({
+            data: undefined, error: new Error('offline'), isLoading: false, mutate: vi.fn(),
+        } as unknown as ReturnType<typeof useEurYears>);
 
         renderView();
 
-        expect(screen.queryByText(/Lifetime-Lizenz/)).not.toBeInTheDocument();
+        expect(screen.getByRole('combobox', {name: 'Jahr'})).toHaveValue('2026');
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
-    it('falls back to 2026 when the year parameter is unknown', () => {
+    it('falls back to 2026 when the year parameter is unknown and corrects the URL', () => {
         mockHooks();
 
         renderView('/steuern?jahr=1999');
 
         expect(screen.getByRole('combobox', {name: 'Jahr'})).toHaveValue('2026');
         expect(screen.getByText(/Wirtschaftsjahr 2026/)).toBeVisible();
+        expect(effectiveSearch().get('jahr')).toBe('2026');
     });
 
-    it('uses a supported year parameter for the header and the selector', () => {
+    it('uses a valid bookable year parameter for the header and the selector', () => {
+        mockHooks({activeYears: [2025, 2026], bookableYears: [2025, 2026]});
+
+        renderView('/steuern?jahr=2025');
+
+        expect(screen.getByRole('combobox', {name: 'Jahr'})).toHaveValue('2025');
+        expect(screen.getByText(/Wirtschaftsjahr 2025/)).toBeVisible();
+    });
+
+    it('offers only bookable years: 2024/2025 stay rule basis, 2026 is selectable', () => {
+        mockHooks({activeYears: [2025, 2026], bookableYears: [2026]});
+
+        renderView();
+
+        const selector = screen.getByRole('combobox', {name: 'Jahr'});
+        const options = Array.from(selector.querySelectorAll('option')).map((option) => option.value);
+        expect(options).toEqual(['2026']);
+        expect(selector).toHaveValue('2026');
+    });
+
+    it('does not write the URL before years and entries are loaded (#76)', () => {
         mockHooks();
+        vi.mocked(useEurYears).mockReturnValue(
+            {data: undefined, error: undefined, isLoading: true, mutate: vi.fn()} as unknown as ReturnType<typeof useEurYears>,
+        );
+        vi.mocked(useEurEntries).mockReturnValue(
+            {data: undefined, error: undefined, isLoading: true, mutate: vi.fn()} as unknown as ReturnType<typeof useEurEntries>,
+        );
 
-        renderView('/steuern?jahr=2024');
+        renderView();
 
-        expect(screen.getByRole('combobox', {name: 'Jahr'})).toHaveValue('2024');
-        expect(screen.getByText(/Wirtschaftsjahr 2024/)).toBeVisible();
+        expect(screen.getByText(/Wirtschaftsjahr 2026/)).toBeVisible();
+        expect(screen.getByTestId('location-search').textContent).toBe('');
+        expect(new Set(locationKeys).size).toBe(1);
     });
 
-    it('lists only years with bookings plus the current year in the selector', () => {
-        mockHooks({activeYears: [2024]});
+    it('keeps a deep-linked year once years and entries have loaded (#76)', () => {
+        const yearOptions = {activeYears: [2027], bookableYears: [2026], lastPinnedYear: 2026, defaultYear: 2027};
+        mockHooks(yearOptions);
+        vi.mocked(useEurYears).mockReturnValue(
+            {data: undefined, error: undefined, isLoading: true, mutate: vi.fn()} as unknown as ReturnType<typeof useEurYears>,
+        );
+        vi.mocked(useEurEntries).mockReturnValue(
+            {data: undefined, error: undefined, isLoading: true, mutate: vi.fn()} as unknown as ReturnType<typeof useEurEntries>,
+        );
+        const view = renderView('/steuern?bereich=buchungen&jahr=2027&monat=5');
 
-        renderView('/steuern?jahr=2024');
+        // Noch keine Daten: die URL bleibt, wie sie ist.
+        expect(screen.getByTestId('location-search')).toHaveTextContent('?bereich=buchungen&jahr=2027&monat=5');
 
-        const options = Array.from(screen.getByRole('combobox', {name: 'Jahr'}).querySelectorAll('option'))
-            .map((option) => option.value);
-        expect(options).toEqual(['2024', '2026']);
+        mockHooks(yearOptions);
+        view.rerender(eurTree('/steuern?bereich=buchungen&jahr=2027&monat=5'));
+
+        const selector = screen.getByRole('combobox', {name: 'Jahr'});
+        const options = Array.from(selector.querySelectorAll('option')).map((option) => option.value);
+        expect(options).toContain('2027');
+        expect(selector).toHaveValue('2027');
+        expect(screen.getByText(/Wirtschaftsjahr 2027/)).toBeVisible();
+        expect(effectiveSearch().get('jahr')).toBe('2027');
+        expect(new Set(locationKeys).size).toBe(1);
+    });
+
+    it('corrects an unknown year to default_year instead of the offline fallback (#76)', () => {
+        mockHooks({activeYears: [2026, 2027], bookableYears: [2026], lastPinnedYear: 2026, defaultYear: 2027});
+
+        renderView('/steuern?jahr=1999');
+
+        expect(screen.getByRole('combobox', {name: 'Jahr'})).toHaveValue('2027');
+        expect(screen.getByText(/Wirtschaftsjahr 2027/)).toBeVisible();
+        expect(effectiveSearch().get('jahr')).toBe('2027');
+    });
+
+    it('keeps a booked year selectable beyond the pinned bookable base', async () => {
+        await withFakeDate('2026-05-10T12:00:00', async () => {
+            mockHooks({activeYears: [2026, 2027], bookableYears: [2026]});
+            vi.mocked(useEurEntries).mockClear();
+
+            renderView();
+
+            const selector = screen.getByRole('combobox', {name: 'Jahr'});
+            const options = Array.from(selector.querySelectorAll('option')).map((option) => option.value);
+            expect(options).toEqual(['2026', '2027']);
+
+            await userEvent.selectOptions(selector, '2027');
+
+            const calls = vi.mocked(useEurEntries).mock.calls;
+            expect(calls[calls.length - 1]?.[0]).toBe(2027);
+            expect(effectiveSearch().get('jahr')).toBe('2027');
+            expect(screen.getByText(/Wirtschaftsjahr 2027/)).toBeVisible();
+        });
     });
 
     it('always offers the current year even when no year has bookings', () => {
@@ -295,10 +437,11 @@ describe('ManagementEurView', () => {
     it('takes the visible years and the default year from the API response', () => {
         mockHooks();
         vi.mocked(useEurYears).mockReturnValue(swrResult<ReturnType<typeof useEurYears>>({
+            pinned_years: [2024, 2025, 2026, 2027],
+            bookable_years: [2025, 2026],
+            last_pinned_year: 2027,
             default_year: 2025,
-            supported: [2024, 2025, 2026, 2027],
             active_years: [2025],
-            warnings: [],
         }));
 
         renderView();
@@ -308,6 +451,114 @@ describe('ManagementEurView', () => {
         expect(options).toEqual(['2025', '2026']);
         expect(selector).toHaveValue('2025');
         expect(screen.getByText(/Wirtschaftsjahr 2025/)).toBeVisible();
+    });
+
+    it('writes the effective state into the URL for a bare /steuern entry (#76)', () => {
+        mockHooks();
+
+        renderView();
+
+        const search = effectiveSearch();
+        expect(search.get('bereich')).toBe('buchungen');
+        expect(search.get('jahr')).toBe('2026');
+        expect(search.get('monat')).toBe('5');
+        expect(screen.getByRole('heading', {name: 'Mai 2026'})).toBeVisible();
+    });
+
+    it('keeps a valid deep link stable without a second history entry (#76)', () => {
+        mockHooks();
+
+        renderView('/steuern?bereich=buchungen&jahr=2026&monat=5');
+
+        expect(new Set(locationKeys).size).toBe(1);
+        expect(screen.getByTestId('location-search')).toHaveTextContent('?bereich=buchungen&jahr=2026&monat=5');
+    });
+
+    it('corrects an invalid month parameter to the rendered month (#76)', () => {
+        mockHooks();
+
+        renderView('/steuern?monat=99');
+
+        expect(screen.getByRole('heading', {name: 'Mai 2026'})).toBeVisible();
+        expect(effectiveSearch().get('monat')).toBe('5');
+    });
+
+    it('offers the running year beyond the last pinned year and defaults to the API default (#78)', () => {
+        withFakeDate('2027-01-15T12:00:00', () => {
+            mockHooks({activeYears: [2026]});
+
+            renderView();
+
+            const selector = screen.getByRole('combobox', {name: 'Jahr'});
+            const options = Array.from(selector.querySelectorAll('option')).map((option) => option.value);
+            expect(options).toEqual(['2026', '2027']);
+            expect(selector).toHaveValue('2026');
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        });
+    });
+
+    it('shows the rules hint once the running year beyond the pinned basis is selected (#75/#78)', async () => {
+        await withFakeDate('2027-01-15T12:00:00', async () => {
+            mockHooks({activeYears: [2026]});
+
+            renderView();
+
+            await userEvent.selectOptions(screen.getByRole('combobox', {name: 'Jahr'}), '2027');
+
+            const alert = screen.getByRole('alert');
+            expect(alert).toHaveTextContent('2027');
+            expect(alert).toHaveTextContent('2026');
+            expect(effectiveSearch().get('jahr')).toBe('2027');
+        });
+    });
+
+    it('falls back to the last pinned year when no year option is available (#78)', () => {
+        withFakeDate('2024-01-15T12:00:00', () => {
+            mockHooks({pinnedYears: [2025, 2026], lastPinnedYear: 2026, defaultYear: 2026, activeYears: []});
+
+            renderView();
+
+            const selector = screen.getByRole('combobox', {name: 'Jahr'});
+            const options = Array.from(selector.querySelectorAll('option')).map((option) => option.value);
+            expect(options).toEqual(['2026']);
+            expect(selector).toHaveValue('2026');
+        });
+    });
+
+    it('keeps the running month when it has bookings (#77)', () => {
+        withFakeDate('2026-03-15T12:00:00', () => {
+            mockHooks({entryMonths: [2, 3]});
+
+            renderView();
+
+            expect(screen.getByRole('heading', {name: 'März 2026'})).toBeVisible();
+            expect(effectiveSearch().get('monat')).toBe('3');
+        });
+    });
+
+    it('falls back to the latest booked month when the running month has none (#77)', () => {
+        withFakeDate('2026-03-15T12:00:00', () => {
+            mockHooks({entryMonths: [1, 2]});
+
+            renderView();
+
+            expect(screen.getByRole('heading', {name: 'Februar 2026'})).toBeVisible();
+            expect(effectiveSearch().get('monat')).toBe('2');
+        });
+    });
+
+    it('falls back to the running month when the year has no bookings (#77)', () => {
+        withFakeDate('2026-03-15T12:00:00', () => {
+            mockHooks({entryMonths: []});
+
+            renderView();
+
+            expect(screen.getByRole('heading', {name: 'März 2026'})).toBeVisible();
+            const month = Number(effectiveSearch().get('monat'));
+            expect(month).toBeGreaterThanOrEqual(1);
+            expect(month).toBeLessThanOrEqual(12);
+            expect(month).toBe(3);
+        });
     });
 
     it('explains that the month rail only lists months with bookings', () => {

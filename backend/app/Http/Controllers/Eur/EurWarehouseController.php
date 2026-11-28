@@ -79,7 +79,7 @@ class EurWarehouseController extends Controller
         $share = $this->businessShare((string) ($data['expense_kind'] ?? ''), $kinds);
         $entry = EurWarehouseEntry::create([
             'brand' => BrandRegistry::currentId(),
-            'year' => (int) ($data['year'] ?? EurYear::DEFAULT),
+            'year' => (int) ($data['year'] ?? EurYear::currentOrLast()),
             'month' => (int) $data['month'],
             'day' => (int) $data['day'],
             'description' => $data['description'],
@@ -155,9 +155,9 @@ class EurWarehouseController extends Controller
     {
         return ['nullable', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
             try {
-                EurYear::assert((int) $value);
-            } catch (InvalidArgumentException) {
-                $fail(EurYear::warning((int) $value)['warning']);
+                EurYear::assertBookable((int) $value);
+            } catch (InvalidArgumentException $exception) {
+                $fail($exception->getMessage());
             }
         }];
     }

@@ -59,7 +59,7 @@ class EurApplicationController extends Controller
 
         $application = EurApplication::create([
             'brand' => BrandRegistry::currentId(),
-            'year' => (int) ($data['year'] ?? EurYear::DEFAULT),
+            'year' => (int) ($data['year'] ?? EurYear::currentOrLast()),
             'type' => $data['type'],
             'subject' => $data['subject'],
             'status' => $data['status'] ?? 'open',
@@ -132,9 +132,9 @@ class EurApplicationController extends Controller
     {
         return ['nullable', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
             try {
-                EurYear::assert((int) $value);
-            } catch (InvalidArgumentException) {
-                $fail(EurYear::warning((int) $value)['warning']);
+                EurYear::assertBookable((int) $value);
+            } catch (InvalidArgumentException $exception) {
+                $fail($exception->getMessage());
             }
         }];
     }

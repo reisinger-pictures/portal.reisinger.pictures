@@ -53,7 +53,7 @@ class EurVatApiTest extends EurBookkeepingTestCase
     public function test_unknown_year_is_rejected(): void
     {
         $this->withHeaders($this->bearer($this->tokenFor()))
-            ->postJson('/api/management/eur/vat/calc', ['year' => 2027, 'month' => 5])
+            ->postJson('/api/management/eur/vat/calc', ['year' => 2025, 'month' => 5])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('year');
     }

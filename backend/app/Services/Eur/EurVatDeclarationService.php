@@ -4,23 +4,24 @@ declare(strict_types=1);
 
 namespace App\Services\Eur;
 
+use App\Eur\Data\RuleCatalogue;
+use App\Eur\Data\VatRequirements;
 use App\Eur\Reference\EurYear;
 use RuntimeException;
 
 /**
  * EAR · Die beiden USt-Erklärungsbereiche (EUE-088).
  *
- * Wortlaut und Titel stammen ausschließlich aus den gepinnten Artefakten:
- * dem Regelkatalog und der Ausfüllhilfe `vat-requirements.md`. Es wird keine
- * Steuerrechtstext erfunden und keine zweite Regelquelle angelegt. Findet
- * sich ein Text nicht im Artefakt, bricht der Aufbau ab (fail closed).
+ * Wortlaut und Titel stammen ausschließlich aus den committeten Datenklassen
+ * (generiert aus den gepinnten Artefakten, Issue #74): dem Regelkatalog
+ * `App\Eur\Data\RuleCatalogue` und der Ausfüllhilfe
+ * `App\Eur\Data\VatRequirements` (`vat-requirements.md`). Es wird kein
+ * Steuerrechtstext erfunden und keine zweite Regelquelle angelegt. Findet sich
+ * ein Text nicht in den Daten, bricht der Aufbau ab (fail closed). Zur
+ * Laufzeit wird keine Datei geöffnet.
  */
 final class EurVatDeclarationService
 {
-    private const CATALOG = __DIR__.'/../../../../features/eur/cleanroom/domain-rules.json';
-
-    private const HELP = __DIR__.'/../../../../features/eur/cleanroom/artifacts/verification/requirements/vat-requirements.md';
-
     /**
      * @return array{voranmeldung: array{key: string, title: string, title_upper: string, title_cell: string, year_cell: string, wirtschaftsjahr: int, text: string, source: string}, erklaerung: array{key: string, title: string, title_upper: string, title_cell: string, year_cell: string, wirtschaftsjahr: int, text: string, source: string}}
      */
@@ -31,7 +32,7 @@ final class EurVatDeclarationService
         $rule = $this->rule('EUE-088');
         $titles = $this->titles((string) ($rule['logik'] ?? ''));
         $text = $this->helpText();
-        $source = 'features/eur/cleanroom/artifacts/verification/requirements/vat-requirements.md#3-quartale-und-erklärungen';
+        $source = 'vat-requirements.md#3-quartale-und-erklärungen';
 
         $make = static fn (string $key, string $title, string $cell): array => [
             'key' => $key,
@@ -53,17 +54,11 @@ final class EurVatDeclarationService
     /** @return array<string, mixed> */
     private function rule(string $id): array
     {
-        $catalog = json_decode((string) file_get_contents(self::CATALOG), true, 512, JSON_THROW_ON_ERROR);
-
-        foreach ($catalog['bereiche'] ?? [] as $bereich) {
-            foreach ($bereich['regeln'] ?? [] as $rule) {
-                if (($rule['id'] ?? null) === $id) {
-                    return $rule;
-                }
-            }
+        if (! array_key_exists($id, RuleCatalogue::RULES)) {
+            throw new RuntimeException(sprintf('Regel %s fehlt im gepinnten Katalog.', $id));
         }
 
-        throw new RuntimeException(sprintf('Regel %s fehlt im gepinnten Katalog.', $id));
+        return RuleCatalogue::RULES[$id];
     }
 
     /** @return array{0: string, 1: string} */
@@ -85,13 +80,7 @@ final class EurVatDeclarationService
      */
     private function helpText(): string
     {
-        $content = file_get_contents(self::HELP);
-
-        if ($content === false) {
-            throw new RuntimeException('Gepinnte USt-Ausfüllhilfe nicht lesbar.');
-        }
-
-        $lines = explode("\n", $content);
+        $lines = explode("\n", VatRequirements::TEXT);
 
         foreach ($lines as $index => $line) {
             $line = trim($line);

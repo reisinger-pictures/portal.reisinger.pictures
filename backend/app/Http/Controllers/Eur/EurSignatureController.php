@@ -58,7 +58,7 @@ class EurSignatureController extends Controller
             EurDocument::forCurrentBrand()->findOrFail((int) $data['eur_document_id']);
         }
 
-        $year = (int) ($data['year'] ?? EurYear::DEFAULT);
+        $year = (int) ($data['year'] ?? EurYear::currentOrLast());
         $month = (int) $data['month'];
         $status = $data['status'] ?? 'pending';
 
@@ -139,9 +139,9 @@ class EurSignatureController extends Controller
     {
         return ['nullable', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
             try {
-                EurYear::assert((int) $value);
-            } catch (InvalidArgumentException) {
-                $fail(EurYear::warning((int) $value)['warning']);
+                EurYear::assertBookable((int) $value);
+            } catch (InvalidArgumentException $exception) {
+                $fail($exception->getMessage());
             }
         }];
     }

@@ -42,6 +42,9 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
 
     public function test_private_group_creates_one_eigenbeleg_per_year_over_all_members(): void
     {
+        // Gruppen-Jahreszeilen reichen bis zum laufenden Buchungsjahr; das hier
+        // geprüfte Fenster ist 2024–2026 und damit uhrunabhängig.
+        $this->travelTo('2026-03-01 09:00:00');
         $token = $this->tokenFor();
         $first = $this->createAsset($token, 'Objektiv', 100, 240000, '2024-01-15');
         $second = $this->createAsset($token, 'Blende', 100, 60000, '2024-01-15');
@@ -67,6 +70,68 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
         $this->assertSame('private', $this->group($token, $groupId)['scope']);
     }
 
+    /**
+     * Portal #57: die private Gruppe ist der einzige Eigenbeleg-Träger. Der
+     * Jahreswechsel übergibt sein Zieljahr als Horizont, damit die Gruppe auch
+     * in einem Buchungsjahr ohne gepinnte Basis (2027) ihre Jahreszeile erhält.
+     */
+    public function test_carry_over_adds_the_target_year_row_to_a_private_group(): void
+    {
+        $token = $this->tokenFor();
+        $first = $this->createAsset($token, 'Objektiv', 100, 240000, '2024-01-15');
+        $second = $this->createAsset($token, 'Blende', 100, 60000, '2024-01-15');
+        $groupId = $this->createGroup($token, 'Privat-Set', 30);
+
+        foreach ([$first, $second] as $asset) {
+            $this->assign($token, $groupId, $asset);
+        }
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/assets/carry-over', ['year' => 2027])
+            ->assertCreated();
+
+        // (240000/3 + 60000/3) × 30 % = 30000 ct im Zieljahr.
+        $row = EurAssetGroup::findOrFail($groupId)->years()->where('year', 2027)->firstOrFail();
+        $this->assertSame('EBG-'.$groupId.'-2027', $row->eigenbeleg_no);
+        $this->assertSame(30000, (int) $row->eigenbeleg_cents);
+        $this->assertSame(30, (int) $row->usage_percent);
+    }
+
+    /**
+     * Regression: ein späteres `sync()` ohne Zieljahr (hier über das
+     * Gruppen-Update) darf den Jahreswechsel nicht zurückdrehen. Der Horizont
+     * kommt deshalb auch aus dem Bestand der Gruppe.
+     */
+    public function test_a_later_group_sync_keeps_the_carried_over_target_year(): void
+    {
+        $token = $this->tokenFor();
+        $first = $this->createAsset($token, 'Objektiv', 100, 240000, '2024-01-15');
+        $second = $this->createAsset($token, 'Blende', 100, 60000, '2024-01-15');
+        $groupId = $this->createGroup($token, 'Privat-Set', 30);
+
+        foreach ([$first, $second] as $asset) {
+            $this->assign($token, $groupId, $asset);
+        }
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/management/eur/assets/carry-over', ['year' => 2027])
+            ->assertCreated();
+        $this->assertSame('EBG-'.$groupId.'-2027', EurAssetGroup::findOrFail($groupId)
+            ->years()->where('year', 2027)->firstOrFail()->eigenbeleg_no);
+
+        $this->withHeaders($this->bearer($token))
+            ->putJson("/api/management/eur/asset-groups/{$groupId}", [
+                'name' => 'Privat-Set (umbenannt)', 'business_share' => 30,
+            ])
+            ->assertOk();
+
+        $years = EurAssetGroup::findOrFail($groupId)->years()->orderBy('year')->pluck('year')->all();
+        $this->assertSame([2024, 2025, 2026, 2027], $years);
+        $row = EurAssetGroup::findOrFail($groupId)->years()->where('year', 2027)->firstOrFail();
+        $this->assertSame('EBG-'.$groupId.'-2027', $row->eigenbeleg_no);
+        $this->assertSame(30000, (int) $row->eigenbeleg_cents);
+    }
+
     public function test_group_share_overrides_member_share_and_scope(): void
     {
         $token = $this->tokenFor();
@@ -83,7 +148,7 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
     public function test_group_share_drives_plan_and_booked_afa_for_a_member_with_a_different_share(): void
     {
         $token = $this->tokenFor();
-        $asset = $this->createAsset($token, 'Set-Gut', 80, 240000, '2024-01-15');
+        $asset = $this->createAsset($token, 'Set-Gut', 80, 240000, '2026-01-15');
 
         // Ohne Gruppe gilt der eigene Anteil: 80 % betrieblich / 20 % privat.
         $this->assertSame(20, (int) $asset->years()->first()->private_use_percent);
@@ -115,7 +180,7 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
 
         $book = $this->withHeaders($this->bearer($token))->postJson(
             '/api/management/eur/assets/'.$asset->id.'/book-depreciation',
-            ['year' => 2024],
+            ['year' => 2026],
         );
         $book->assertCreated();
         $book->assertJsonPath('entry.amount_cents', 48000);
@@ -129,7 +194,7 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
     public function test_ungrouped_asset_keeps_its_own_share_for_plan_and_booked_afa(): void
     {
         $token = $this->tokenFor();
-        $asset = $this->createAsset($token, 'Einzel-Gut', 80, 240000, '2024-01-15');
+        $asset = $this->createAsset($token, 'Einzel-Gut', 80, 240000, '2026-01-15');
 
         $this->assertSame(80, $asset->effectiveBusinessShare());
         $year = $asset->years()->first();
@@ -139,7 +204,7 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
 
         $book = $this->withHeaders($this->bearer($token))->postJson(
             '/api/management/eur/assets/'.$asset->id.'/book-depreciation',
-            ['year' => 2024],
+            ['year' => 2026],
         );
         $book->assertCreated();
         $book->assertJsonPath('entry.amount_cents', 64000);
@@ -149,7 +214,7 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
     public function test_unassign_restores_the_members_share_for_open_years(): void
     {
         $token = $this->tokenFor();
-        $asset = $this->createAsset($token, 'Löse-Gut', 80, 240000, '2024-01-15');
+        $asset = $this->createAsset($token, 'Löse-Gut', 80, 240000, '2026-01-15');
         $groupId = $this->createGroup($token, 'Set', 60);
         $this->assign($token, $groupId, $asset);
 
@@ -172,7 +237,7 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
 
         $book = $this->withHeaders($this->bearer($token))->postJson(
             '/api/management/eur/assets/'.$asset->id.'/book-depreciation',
-            ['year' => 2024],
+            ['year' => 2026],
         );
         $book->assertCreated();
         $book->assertJsonPath('entry.amount_cents', 64000);
@@ -362,6 +427,7 @@ class EurAssetGroupApiTest extends EurBookkeepingTestCase
     /** D-93: ein degressives Mitglied wird beim Wechsel ins private Verzeichnis automatisch linear. */
     public function test_a_degressive_member_becomes_linear_when_the_group_turns_private(): void
     {
+        $this->travelTo('2026-03-01 09:00:00');
         $token = $this->tokenFor();
         $asset = $this->createAsset($token, 'Degressiv', 100, 240000, '2024-01-15', 'degressive');
         $groupId = $this->createGroup($token, 'Wechsel-Privat', 60);

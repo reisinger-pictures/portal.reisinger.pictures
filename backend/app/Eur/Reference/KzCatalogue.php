@@ -4,21 +4,18 @@ declare(strict_types=1);
 
 namespace App\Eur\Reference;
 
-use RuntimeException;
+use App\Eur\Data\KzCatalogueData;
 
 /**
- * EAR · Kontenplan (EUE-023, EUE-024).
+ * EAR · Kennzahlen-Katalog (EUE-023, EUE-024) aus dem gepinnten Artefakt.
  *
- * Einzige Quelle ist die gepinnte `DOMAIN.md`: die Spalte „Werte" der beiden
- * Regelzeilen enthält die KZ-Vektoren, die Belegspalte die E1B-Zuordnung. Es
- * gibt keine zweite, im Code gepflegte Kennzahlliste. Die Ausfüllhilfen
- * (`E1aHelpTexts`) sind ein anderer Scope (Einnahmen- und Pauschal-KZ ohne
- * E1B) und werden deshalb nicht als Kontenplan verwendet.
+ * Die Listen stehen als Programmcode in `App\Eur\Data\KzCatalogueData`
+ * (generiert vom Generator `php artisan eur:export-data`, Issue #74). Der Katalog
+ * wird zur Laufzeit nicht gelesen; die Ableitung aus den Regelzellen steckt
+ * im Generator und wird vom Paritätstest gegen das Artefakt geprüft.
  */
 final class KzCatalogue
 {
-    private const PATH = __DIR__.'/../../../../features/eur/cleanroom/DOMAIN.md';
-
     /**
      * @return array{
      *     expense_codes: list<string>,
@@ -42,13 +39,13 @@ final class KzCatalogue
     /** @return list<string> die 27 unterschiedlichen Ausgaben-Kennzahlen */
     public function expenseCodes(): array
     {
-        return $this->codes('EUE-023');
+        return KzCatalogueData::EXPENSE_CODES;
     }
 
     /** @return list<string> die fünf Einnahmen-Kennzahlen */
     public function incomeCodes(): array
     {
-        return $this->codes('EUE-024');
+        return KzCatalogueData::INCOME_CODES;
     }
 
     /**
@@ -59,44 +56,6 @@ final class KzCatalogue
      */
     public function e1bCodes(): array
     {
-        $evidence = $this->row('EUE-023')[9] ?? '';
-
-        if (preg_match('/E1B-Kennzahlen\s+([0-9\/]+)/u', $evidence, $matches) !== 1) {
-            throw new RuntimeException('EUE-023: E1B-Zuordnung fehlt im gepinnten Artefakt.');
-        }
-
-        return array_values(array_filter(explode('/', $matches[1]), static fn (string $code): bool => $code !== ''));
-    }
-
-    /** @return list<string> */
-    private function codes(string $ruleId): array
-    {
-        $value = $this->row($ruleId)[6] ?? '';
-
-        if (preg_match_all('/\b\d{4}\b/', $value, $matches) === 0) {
-            throw new RuntimeException(sprintf('%s: Kennzahlen fehlen im gepinnten Artefakt.', $ruleId));
-        }
-
-        return array_values(array_unique($matches[0]));
-    }
-
-    /** @return list<string> */
-    private function row(string $ruleId): array
-    {
-        $content = file_get_contents(self::PATH);
-
-        if ($content === false) {
-            throw new RuntimeException('Gepinntes Artefakt nicht lesbar: '.self::PATH);
-        }
-
-        foreach (explode("\n", $content) as $line) {
-            if (! str_starts_with($line, '| '.$ruleId.' ')) {
-                continue;
-            }
-
-            return array_map('trim', explode('|', $line));
-        }
-
-        throw new RuntimeException(sprintf('%s fehlt im gepinnten Artefakt.', $ruleId));
+        return KzCatalogueData::E1B_CODES;
     }
 }

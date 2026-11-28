@@ -33,7 +33,7 @@ class ReferenceTablesTest extends TestCase
         $this->tables->assertBusinessYear(2026);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->tables->assertBusinessYear(2027);
+        $this->tables->assertBusinessYear(2023);
     }
 
     public function test_kind_catalogues_have_the_pinned_size(): void

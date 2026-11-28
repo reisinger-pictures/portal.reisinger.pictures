@@ -6,7 +6,9 @@ namespace App\Eur\Domain;
 
 use App\Eur\Parity\Money;
 use App\Eur\Parity\RuleValues;
+use App\Eur\Reference\EurYear;
 use App\Eur\Reference\Holidays;
+use App\Eur\Reference\ReferenceTables;
 use App\Eur\Reference\TravelAllowances;
 use App\Eur\Reference\YearTables;
 use DateTimeImmutable;
@@ -287,8 +289,10 @@ final class TravelCalculator
         $start = $trip['start'] ?? null;
         $end = $trip['end'] ?? null;
 
-        if ($year !== 2026) {
-            $warnings[] = 'Das Reisejahr muss dem Wirtschaftsjahr 2026 entsprechen.';
+        // Ein Buchungsjahr ohne gepinnte Ländertabelle rechnet über den
+        // Fallback des letzten Regeljahres und ist deshalb zulässig.
+        if (! is_int($year) || EurYear::effective($year) !== ReferenceTables::BUSINESS_YEAR) {
+            $warnings[] = 'Das Reisejahr muss dem Wirtschaftsjahr '.ReferenceTables::BUSINESS_YEAR.' entsprechen.';
         }
 
         if (! is_string($start) || ! is_string($end) || $end <= $start) {

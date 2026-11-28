@@ -11,9 +11,10 @@ use RuntimeException;
 /**
  * EAR · Sozialversicherungswerte (EUE-014 … EUE-022, EUE-109 … EUE-114).
  *
- * Die Tabelle `sv_werte` wird an dieser einen Lesegrenze in ganze Cent bzw.
- * Basispunkte übersetzt. Die Werte sind jahresabhängig gepinnt; ein anderes
- * Wirtschaftsjahr wird abgewiesen, statt einen stillen Default zu liefern.
+ * Die Tabelle `sv_werte` (committet in `App\Eur\Data\ReferenceTablesData`,
+ * Issue #74) wird an dieser einen Lesegrenze in ganze Cent bzw. Basispunkte
+ * übersetzt. Die Werte sind jahresabhängig gepinnt; ein anderes Wirtschaftsjahr
+ * wird abgewiesen, statt einen stillen Default zu liefern.
  */
 final class SocialInsurance
 {
@@ -30,7 +31,7 @@ final class SocialInsurance
     private array $ratesPer10000 = [];
 
     /**
-     * @param  array<string, int|float>  $values
+     * @param  array<string, int|float|string>  $values
      */
     public function __construct(array $values, private readonly int $businessYear)
     {

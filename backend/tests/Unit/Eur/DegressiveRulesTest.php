@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Eur;
 
+use App\Eur\Data\DegressiveRulesData;
 use App\Eur\Reference\DegressiveRules;
 use PHPUnit\Framework\TestCase;
 
@@ -21,29 +22,17 @@ class DegressiveRulesTest extends TestCase
         $this->assertFalse($rules->isAllowedImmaterialException(null));
     }
 
-    public function test_exceptions_are_read_from_the_given_artifact_not_hardcoded(): void
+    /**
+     * Issue #74: die Liste ist Programmcode, kein Laufzeitartefakt. Der Leser
+     * hat keinen Pfadparameter mehr und liefert genau die committete Konstante.
+     */
+    public function test_exceptions_come_from_the_committed_data_class(): void
     {
-        $path = (string) tempnam(sys_get_temp_dir(), 'deg-rules-');
-        file_put_contents($path, json_encode([
-            'bereiche' => [[
-                'regeln' => [[
-                    'id' => 'DEG-007',
-                    'parameter' => [[
-                        'name' => 'Zulässige Ausnahmen',
-                        'wert' => 'alpha, beta',
-                    ]],
-                ]],
-            ]],
-        ], JSON_THROW_ON_ERROR));
+        $rules = new DegressiveRules;
 
-        try {
-            $rules = new DegressiveRules($path);
-
-            $this->assertSame(['alpha', 'beta'], $rules->allowedImmaterialExceptions());
-            $this->assertTrue($rules->isAllowedImmaterialException('beta'));
-            $this->assertFalse($rules->isAllowedImmaterialException('eco'));
-        } finally {
-            unlink($path);
-        }
+        $this->assertSame(
+            DegressiveRulesData::ALLOWED_IMMATERIAL_EXCEPTIONS,
+            $rules->allowedImmaterialExceptions(),
+        );
     }
 }

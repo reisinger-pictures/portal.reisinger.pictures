@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Eur\Parity;
 
+use App\Eur\Data\RuleCatalogue;
 use App\Eur\Reference\EurYear;
 use InvalidArgumentException;
 use RuntimeException;
@@ -11,24 +12,29 @@ use RuntimeException;
 /**
  * EAR · Parität — Jahreskonstanten aus dem gepinnten Regelkatalog.
  *
- * Es gibt keine zweite Regelquelle im Portal: die Werte werden zur Laufzeit
- * aus dem unveränderlichen Katalog der Clean-Room-Basis gelesen. Regeltexte,
- * Formeln und fremde Bezeichnungen stehen nicht im Code; referenziert wird
- * nur über Regel-IDs, Parameternamen und die strukturierten Felder.
+ * Es gibt keine zweite Regelquelle im Portal: die Werte stehen als
+ * Programmcode in `App\Eur\Data\RuleCatalogue` (generiert aus dem
+ * unveränderlichen Katalog der Clean-Room-Basis, Issue #74). Regeltexte,
+ * Formeln und fremde Bezeichnungen werden nicht neu geschrieben; referenziert
+ * wird nur über Regel-IDs, Parameternamen und die strukturierten Felder.
+ *
+ * Kein Laufzeit-Lesen: der Katalog ist eine PHP-Konstante, `features/` wird
+ * zur Laufzeit nicht geöffnet. Ein Buchungsjahr ohne gepinnte Basis (heute
+ * 2027) liest über `EurYear::effective()` die Parameter des letzten
+ * Regeljahres; 2024 und 2025 bleiben als Regeljahre abfragbar.
  */
 final class RuleValues
 {
-    private const YEAR = 2026;
-
-    private const CATALOG = __DIR__.'/../../../../features/eur/cleanroom/domain-rules.json';
-
     private const UNITS = ['cents', 'percent', 'per-mille', 'per-10000', 'fraction-percent', 'count'];
 
     public function canonicalFor(string $ruleId, int $year, string $unit): int
     {
         self::assertYear($year);
+        // Fehlt die gepinnte Basis für das Jahr, gelten die Regeln des letzten
+        // Regeljahres (EurYear::effective, Owner-Entscheidung #75/#78).
+        $year = EurYear::effective($year);
 
-        $rule = self::findRule(self::readCatalog(), $ruleId);
+        $rule = self::findRule($ruleId);
         $parameters = array_values(array_filter(
             $rule['parameter'] ?? [],
             static fn (array $parameter): bool => in_array($year, $parameter['jahre'] ?? [], true),
@@ -55,8 +61,9 @@ final class RuleValues
     public function parameterFor(string $ruleId, string $name, int $year, string $unit = 'cents'): int
     {
         self::assertYear($year);
+        $year = EurYear::effective($year);
 
-        $rule = self::findRule(self::readCatalog(), $ruleId);
+        $rule = self::findRule($ruleId);
 
         foreach ($rule['parameter'] ?? [] as $parameter) {
             if (($parameter['name'] ?? null) !== $name || ! in_array($year, $parameter['jahre'] ?? [], true)) {
@@ -75,7 +82,7 @@ final class RuleValues
      */
     public function ruleLogic(string $ruleId): string
     {
-        return (string) (self::findRule(self::readCatalog(), $ruleId)['logik'] ?? '');
+        return (string) (self::findRule($ruleId)['logik'] ?? '');
     }
 
     /**
@@ -83,7 +90,7 @@ final class RuleValues
      */
     public function parameterNames(string $ruleId): array
     {
-        $rule = self::findRule(self::readCatalog(), $ruleId);
+        $rule = self::findRule($ruleId);
 
         return array_values(array_map(
             static fn (array $parameter): string => (string) ($parameter['name'] ?? ''),
@@ -96,32 +103,16 @@ final class RuleValues
         EurYear::assert($year);
     }
 
-    private static function readCatalog(): array
+    /**
+     * @return array{logik: string, parameter: list<array{name: string, jahre: list<int>, wert: int|float|string}>}
+     */
+    private static function findRule(string $ruleId): array
     {
-        if (! is_file(self::CATALOG)) {
-            throw new RuntimeException('Gepinnter Regelkatalog fehlt: '.self::CATALOG);
+        if (! array_key_exists($ruleId, RuleCatalogue::RULES)) {
+            throw new InvalidArgumentException(sprintf('Regel %s ist im gepinnten Katalog nicht vorhanden.', $ruleId));
         }
 
-        $catalog = json_decode((string) file_get_contents(self::CATALOG), true, 512, JSON_THROW_ON_ERROR);
-
-        if (! is_array($catalog)) {
-            throw new RuntimeException('Gepinnter Regelkatalog ist kein Dokument.');
-        }
-
-        return $catalog;
-    }
-
-    private static function findRule(array $catalog, string $ruleId): array
-    {
-        foreach ($catalog['bereiche'] ?? [] as $bereich) {
-            foreach ($bereich['regeln'] ?? [] as $rule) {
-                if (($rule['id'] ?? null) === $ruleId) {
-                    return $rule;
-                }
-            }
-        }
-
-        throw new InvalidArgumentException(sprintf('Regel %s ist im gepinnten Katalog nicht vorhanden.', $ruleId));
+        return RuleCatalogue::RULES[$ruleId];
     }
 
     /**

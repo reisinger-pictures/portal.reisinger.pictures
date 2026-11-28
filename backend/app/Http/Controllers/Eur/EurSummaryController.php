@@ -11,9 +11,10 @@ use App\Models\EurEntry;
 use App\Models\EurSignature;
 use App\Services\Eur\EurOverviewService;
 use App\Services\Eur\EurSvBookingReminder;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 /**
  * EAR · Übersicht — Summen aus Buchungen und Anlagen.
@@ -33,10 +34,16 @@ class EurSummaryController extends Controller
     public function show(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'year' => ['nullable', 'integer', Rule::in(EurYear::SUPPORTED)],
+            'year' => ['nullable', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
+                try {
+                    EurYear::assertBookable((int) $value);
+                } catch (InvalidArgumentException $exception) {
+                    $fail($exception->getMessage());
+                }
+            }],
         ]);
 
-        $year = (int) ($data['year'] ?? 2026);
+        $year = (int) ($data['year'] ?? EurYear::currentOrLast());
 
         $entries = EurEntry::forCurrentBrand()->forYear($year)->get();
         $income = (int) $entries->where('direction', 'income')->sum('business_amount_cents');

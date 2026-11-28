@@ -10,12 +10,12 @@ use App\Models\EurEntry;
 use Illuminate\Http\JsonResponse;
 
 /**
- * EAR · Unterstützte Wirtschaftsjahre (EUE-001 … EUE-003).
+ * EAR · Wirtschaftsjahre — Regeljahre und Buchungsjahre (#75/#78).
  *
- * Der Endpunkt ist die einzige Quelle für Default, supported-Menge und die
- * Warnhinweise zu Jahren außerhalb des Supports. Es werden bewusst Beispiele
- * unter- und oberhalb des Bereichs ausgeliefert, damit der Client die
- * Warntexte unabhängig von einer Anfrage darstellen kann.
+ * Der Endpunkt ist die einzige Quelle für die gepinnten Regeljahre, die
+ * buchbaren Jahre, den Default und die bebuchten Jahre des Brands. Ein
+ * Buchungsjahr ohne gepinnte Regelbasis (heute 2027) ist buchbar und rechnet
+ * mit dem letzten Regeljahr; dafür nennt der Client `last_pinned_year`.
  */
 class EurYearsController extends Controller
 {
@@ -31,28 +31,11 @@ class EurYearsController extends Controller
             ->all();
 
         return response()->json([
-            'default_year' => EurYear::DEFAULT,
-            'supported' => EurYear::SUPPORTED,
+            'pinned_years' => EurYear::pinned(),
+            'bookable_years' => EurYear::bookable(),
+            'last_pinned_year' => EurYear::LAST_PINNED,
+            'default_year' => EurYear::currentOrLast(),
             'active_years' => $activeYears,
-            'warnings' => array_map(
-                static fn (int $year): array => self::warningRow($year),
-                [2023, 2027],
-            ),
         ]);
-    }
-
-    /**
-     * @return array{year: int, code: string|null, warning: string, supported: bool}
-     */
-    private static function warningRow(int $year): array
-    {
-        $warning = EurYear::warning($year);
-
-        return [
-            'year' => $warning['year'],
-            'code' => $warning['code'],
-            'warning' => $warning['warning'],
-            'supported' => $warning['supported'],
-        ];
     }
 }

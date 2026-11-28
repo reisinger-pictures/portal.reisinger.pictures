@@ -106,7 +106,7 @@ class EurEntryController extends Controller
             'month' => 'nullable|integer|min:1|max:12',
         ]);
 
-        $defaultYear = isset($data['year']) ? (int) $data['year'] : EurYear::DEFAULT;
+        $defaultYear = isset($data['year']) ? (int) $data['year'] : EurYear::currentOrLast();
         $defaultMonth = isset($data['month']) ? (int) $data['month'] : null;
         $file = $request->file('file');
         $path = $file->getRealPath() ?: $file->getPathname();
@@ -503,9 +503,9 @@ class EurEntryController extends Controller
             'integer',
             function (string $attribute, mixed $value, Closure $fail): void {
                 try {
-                    EurYear::assert((int) $value);
-                } catch (InvalidArgumentException) {
-                    $fail(EurYear::warning((int) $value)['warning']);
+                    EurYear::assertBookable((int) $value);
+                } catch (InvalidArgumentException $exception) {
+                    $fail($exception->getMessage());
                 }
             },
         ];

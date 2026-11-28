@@ -35,7 +35,7 @@ class EurAnalyticsController extends Controller
             'year' => $this->yearRule(),
         ]);
 
-        $year = (int) ($data['year'] ?? EurYear::DEFAULT);
+        $year = (int) ($data['year'] ?? EurYear::currentOrLast());
 
         $entries = EurEntry::forCurrentBrand()
             ->forYear($year)
@@ -261,7 +261,7 @@ class EurAnalyticsController extends Controller
     {
         $data = $request->validate(['year' => $this->yearRule()]);
 
-        return (int) ($data['year'] ?? EurYear::DEFAULT);
+        return (int) ($data['year'] ?? EurYear::currentOrLast());
     }
 
     /**
@@ -328,9 +328,9 @@ class EurAnalyticsController extends Controller
     {
         return ['nullable', 'integer', function (string $attribute, mixed $value, Closure $fail): void {
             try {
-                EurYear::assert((int) $value);
-            } catch (InvalidArgumentException) {
-                $fail(EurYear::warning((int) $value)['warning']);
+                EurYear::assertBookable((int) $value);
+            } catch (InvalidArgumentException $exception) {
+                $fail($exception->getMessage());
             }
         }];
     }

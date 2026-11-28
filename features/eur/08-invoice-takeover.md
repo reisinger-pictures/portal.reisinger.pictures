@@ -63,6 +63,9 @@ stabil. Der eindeutige Schlüssel ist `(brand, external_id)`.
 - Das Überspringen eines Nicht-Rechnungsdokuments wird als
   `invoice_takeover_skipped_non_invoice` auditiert, ohne eine Buchung zu
   erzeugen.
+- Ein Snapshot aus einem Regeljahr (2024/2025) wird als
+  `invoice_takeover_skipped_booking_year` auditiert — ebenfalls ohne Buchung,
+  und ohne den Sendepfad abzubrechen.
 - Parallele Schreiber werden über die Row-Locks der Aufrufer auf Snapshot bzw.
   Vertrag serialisiert. Der Unique-Index `(brand, external_id)` ist die letzte
   Instanz: seine Verletzung bricht den Sendepfad ab (fail closed), statt still
@@ -75,24 +78,28 @@ stabil. Der eindeutige Schlüssel ist `(brand, external_id)`.
 | `direction` | `income` |
 | `amount_cents` | `total_gross` des Rechnungssnapshots, ganzzahlige Cent |
 | `business_share` / `business_amount_cents` | `100` / identisch mit `amount_cents` |
-| `year`, `month`, `day` | aus dem Erstellungsdatum des Snapshots; nur unterstützte Wirtschaftsjahre |
+| `year`, `month`, `day` | aus dem Erstellungsdatum des Snapshots; nur Buchungsjahre ab 2026 |
 | `kind_type`, `category` | `Dienstleistung`, `Rechnung` |
 | `e1a_code` | `9040` (Referenz-Fallback EUE-008 für betriebliche Einnahmen) |
 | `receipt_no` | Rechnungsnummer |
 | `note` | `Automatische Übernahme: <Quelle>` |
 
-Es gibt keine Float- und keine gerundeten Euro-Werte im Schreibpfad. Ein
-nicht unterstütztes Wirtschaftsjahr oder ein negativer Betrag bricht die
-Übernahme ab; die Sendung wird nicht mit einer halben Buchung freigegeben.
+Es gibt keine Float- und keine gerundeten Euro-Werte im Schreibpfad. Ein Jahr
+vor 2026 (2024 und 2025 sind reine Regeljahre) erzeugt **keine** Buchung und
+keine Exception: die Übernahme wird übersprungen und als
+`invoice_takeover_skipped_booking_year` auditiert, der Versand läuft weiter. Ein
+negativer Betrag bleibt ein Fehler und bricht ab; die Sendung wird nicht mit
+einer halben Buchung freigegeben.
 
 ## Mandantenfähigkeit und Audit
 
 Brand und externe ID werden gemeinsam gelesen und geschrieben. Die Quelle
 liefert den Brand; fehlt er, gilt `BrandRegistry::currentId()`. Ein Replay aus
 einem anderen Mandanten trifft daher nicht auf den Eintrag des ersten Mandanten.
-Jede erstmalige Übernahme, jeder Konflikt und jedes Opt-out erzeugt einen
+Jede erstmalige Übernahme, jeder Konflikt, jedes Opt-out und jeder übersprungene
+Lauf (Nicht-Rechnung, Regeljahr) erzeugt einen
 `eur_audit_logs`-Eintrag mit demselben Brand und nur fachlichen Feldern
-(Quelle, externe ID, Rechnungsnummer, Cent-Betrag, Betriebsanteil).
+(Quelle, externe ID, Rechnungsnummer, Jahr, Cent-Betrag, Betriebsanteil).
 
 ## Korrekturen einer übernommenen Buchung (Portal #71)
 
